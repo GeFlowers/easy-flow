@@ -1,4 +1,4 @@
-"""ChannelManager — consumes inbound messages and dispatches them to the DeerFlow agent via Gateway."""
+"""消费即时通讯入站消息，并通过 Gateway 把它们分发给 DeerFlow Agent。"""
 
 from __future__ import annotations
 
@@ -17,6 +17,7 @@ from urllib.parse import quote
 import httpx
 from langgraph_sdk.errors import ConflictError
 
+# 导入即注册内置策略，确保直接构造 ChannelManager 时与 Gateway 启动路径一致。
 from app.channels import feishu_run_policy as _feishu_run_policy  # noqa: F401
 from app.channels.commands import KNOWN_CHANNEL_COMMANDS
 from app.channels.message_bus import (
@@ -31,8 +32,6 @@ from app.channels.run_policy import CHANNEL_RUN_POLICY, ChannelRunPolicy
 from app.channels.store import ChannelStore
 from app.gateway.csrf_middleware import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, generate_csrf_token
 
-# Import built-in channel run-policy registrars eagerly so direct
-# ChannelManager construction sees the same policy map as gateway bootstrap.
 from app.gateway.github import run_policy as _github_run_policy  # noqa: F401
 from app.gateway.internal_auth import create_internal_auth_headers
 from deerflow.config.agents_config import load_agent_config
@@ -51,11 +50,8 @@ DEFAULT_GATEWAY_URL = "http://localhost:8001"
 DEFAULT_ASSISTANT_ID = "lead_agent"
 CUSTOM_AGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9-]+$")
 
-# Lead-agent recursion budget (LangGraph super-steps for the lead graph only).
-# This is independent of subagent depth: a `task()` dispatch runs the whole
-# subagent inside ONE lead tools-node step, and subagents enforce their own
-# limit via `subagents.max_turns` (see SubagentExecutor). Do not conflate this
-# 100 with the general-purpose subagent's max_turns.
+# 此预算只限制主图的 LangGraph super-step。一次 ``task()`` 调度在主图中只占一个
+# 工具节点步骤，子 Agent 另由 ``subagents.max_turns`` 限制，二者不能混用。
 DEFAULT_RUN_CONFIG: dict[str, Any] = {"recursion_limit": 100}
 DEFAULT_RUN_CONTEXT: dict[str, Any] = {
     "thinking_enabled": True,
@@ -63,10 +59,9 @@ DEFAULT_RUN_CONTEXT: dict[str, Any] = {
     "subagent_enabled": False,
 }
 STREAM_UPDATE_MIN_INTERVAL_SECONDS = 1.0
-STREAM_UPDATE_MIN_CHARS = 60  # flush immediately when this many chars accumulate
-# Stream modes requested from the runtime, and the SSE event names under which
-# the message-tuple stream may arrive: the embedded runtime (and LangGraph
-# Platform) deliver the requested "messages-tuple" mode as event "messages".
+STREAM_UPDATE_MIN_CHARS = 60  # 累积到该字符数时无需等待时间窗口，立即刷新平台消息。
+# SDK 请求使用 ``messages-tuple``，但嵌入式运行时和 LangGraph Platform 可能把
+# 相同事件标记为 ``messages``，消费端必须兼容两个事件名。
 STREAM_MODES = ["messages-tuple", "values"]
 MESSAGE_STREAM_EVENTS = ("messages-tuple", "messages")
 THREAD_BUSY_MESSAGE = "This conversation is already processing another request. Please wait for it to finish and try again."
@@ -74,9 +69,8 @@ BOUND_IDENTITY_REQUIRED_MESSAGE = "Connect this channel from DeerFlow Settings, 
 BOUND_IDENTITY_UNAVAILABLE_MESSAGE = "Channel connection verification is temporarily unavailable. Please try again later or contact the DeerFlow operator."
 INBOUND_DEDUPE_TTL_SECONDS = 10 * 60
 INBOUND_DEDUPE_MAX_ENTRIES = 4096
-# Only server-stable provider message ids: client-generated ids (client_msg_id,
-# client_id) are not guaranteed identical across a provider's own redelivery, so
-# keying dedupe on them would miss exactly the retries we want to absorb.
+# 只使用平台服务端稳定生成的消息 ID。``client_msg_id`` 等客户端 ID 在平台重投时
+# 可能变化，若用其去重，恰好会漏掉需要吸收的重复投递。
 INBOUND_DEDUPE_METADATA_KEYS = ("event_id", "message_id", "msg_id")
 
 CHANNEL_CAPABILITIES = {
@@ -96,7 +90,7 @@ _METADATA_DROP_KEYS = frozenset({"raw_message", "ref_msg"})
 
 
 def _slim_metadata(meta: dict[str, Any]) -> dict[str, Any]:
-    """Return a shallow copy of *meta* with known-large keys removed."""
+    """复制元数据并移除不应随每次流式更新重复传递的大对象。"""
     return {k: v for k, v in meta.items() if k not in _METADATA_DROP_KEYS}
 
 
@@ -104,10 +98,12 @@ INBOUND_FILE_READERS: dict[str, InboundFileReader] = {}
 
 
 def register_inbound_file_reader(channel_name: str, reader: InboundFileReader) -> None:
+    """为通道注册入站文件读取策略，覆盖默认 HTTP 下载方式。"""
     INBOUND_FILE_READERS[channel_name] = reader
 
 
 async def _read_http_inbound_file(file_info: dict[str, Any], client: httpx.AsyncClient) -> bytes | None:
+    """从可信文件元数据中的 URL 下载内容，缺少 URL 时跳过。"""
     url = file_info.get("url")
     if not isinstance(url, str) or not url:
         return None
@@ -118,6 +114,7 @@ async def _read_http_inbound_file(file_info: dict[str, Any], client: httpx.Async
 
 
 async def _read_wecom_inbound_file(file_info: dict[str, Any], client: httpx.AsyncClient) -> bytes | None:
+    """下载企业微信文件，并在提供 ``aeskey`` 时完成平台侧解密。"""
     data = await _read_http_inbound_file(file_info, client)
     if data is None:
         return None
@@ -136,6 +133,7 @@ async def _read_wecom_inbound_file(file_info: dict[str, Any], client: httpx.Asyn
 
 
 async def _read_wechat_inbound_file(file_info: dict[str, Any], client: httpx.AsyncClient) -> bytes | None:
+    """优先读取微信适配器已落盘的文件，否则回退到远端 URL。"""
     raw_path = file_info.get("path")
     if isinstance(raw_path, str) and raw_path.strip():
         try:
@@ -156,41 +154,42 @@ register_inbound_file_reader("wechat", _read_wechat_inbound_file)
 
 
 class InvalidChannelSessionConfigError(ValueError):
-    """Raised when IM channel session overrides contain invalid agent config."""
+    """表示即时通讯会话覆盖中包含无效的 Agent 配置。"""
 
 
 class SlashSkillCommandResolutionError(RuntimeError):
-    """Raised when IM slash-skill command resolution cannot complete safely."""
+    """表示斜杠技能命令无法在可信配置下完成解析。"""
 
 
 @dataclass(frozen=True, slots=True)
 class _SlashSkillCommandResolution:
+    """描述斜杠输入应路由到聊天流程还是返回确定性失败。"""
+
     route_to_chat: bool = False
     failure_message: str | None = None
 
 
 @dataclass(frozen=True, slots=True)
 class _BoundIdentityRejection:
+    """封装身份拒绝文本及仅供安全出站路由使用的服务端身份提示。"""
+
     message: str = BOUND_IDENTITY_REQUIRED_MESSAGE
-    # Server-side connection id that may be used only as an outbound routing
-    # hint for the rejection message. This is never copied from the inbound
-    # message; it comes from the repository re-read when available.
+    # 连接 ID 只来自服务端重新查询，绝不信任被拒绝消息自行声明的身份字段。
     outbound_connection_id: str | None = None
-    # Server-side owner for the outbound routing connection above. It lets
-    # channel senders preserve per-connection context without trusting the
-    # rejected inbound identity assertion.
+    # 所有者信息仅帮助通道选择正确凭据发送拒绝消息，不授予入站请求任何权限。
     outbound_owner_user_id: str | None = None
 
 
 @dataclass(slots=True)
 class _SerializedThreadRunState:
-    """Per-thread lock state for channels that queue same-thread turns."""
+    """维护需要串行处理同一线程回合的锁及等待者计数。"""
 
     lock: asyncio.Lock
     waiters: int = 0
 
 
 def _is_thread_busy_error(exc: BaseException | None) -> bool:
+    """兼容 SDK 冲突异常与旧运行时文本，识别同线程运行冲突。"""
     if exc is None:
         return False
     if isinstance(exc, ConflictError):
@@ -199,10 +198,12 @@ def _is_thread_busy_error(exc: BaseException | None) -> bool:
 
 
 def _as_dict(value: Any) -> dict[str, Any]:
+    """只接受映射型配置层，并复制为可安全合并的普通字典。"""
     return dict(value) if isinstance(value, Mapping) else {}
 
 
 def _merge_dicts(*layers: Any) -> dict[str, Any]:
+    """按参数顺序叠加映射配置，使后层覆盖前层。"""
     merged: dict[str, Any] = {}
     for layer in layers:
         if isinstance(layer, Mapping):
@@ -211,7 +212,7 @@ def _merge_dicts(*layers: Any) -> dict[str, Any]:
 
 
 def _normalize_custom_agent_name(raw_value: str) -> str:
-    """Normalize legacy channel assistant IDs into valid custom agent names."""
+    """把旧通道 assistant ID 规范化为合法的自定义 Agent 名称。"""
     normalized = raw_value.strip().lower().replace("_", "-")
     if not normalized:
         raise InvalidChannelSessionConfigError("Channel session assistant_id is empty. Use 'lead_agent' or a valid custom agent name.")
@@ -221,14 +222,10 @@ def _normalize_custom_agent_name(raw_value: str) -> str:
 
 
 def _extract_response_text(result: dict | list) -> str:
-    """Extract the last AI message text from a LangGraph runs.wait result.
+    """从 LangGraph ``runs.wait`` 最终状态提取本轮可展示文本。
 
-    ``runs.wait`` returns the final state dict which contains a ``messages``
-    list.  Each message is a dict with at least ``type`` and ``content``.
-
-    Handles special cases:
-    - Regular AI text responses
-    - Clarification interrupts (``ask_clarification`` tool messages)
+    搜索边界止于最近一条真实用户消息，避免误取上轮回答；如果本轮通过
+    ``ask_clarification`` 中断，则工具消息中的问题优先作为回复。
     """
     if isinstance(result, list):
         messages = result
@@ -237,32 +234,30 @@ def _extract_response_text(result: dict | list) -> str:
     else:
         return ""
 
-    # Walk backwards to find usable response text, but stop at the last
-    # human message to avoid returning text from a previous turn.
+    # 逆序搜索能优先拿到最终回答，但必须在当前回合边界停止。
     for msg in reversed(messages):
         if not isinstance(msg, dict):
             continue
 
         msg_type = msg.get("type")
 
-        # Stop at the last human message — anything before it is a previous turn
+        # 隐藏控制消息不是真实回合边界，不能阻止继续查找当前用户输入。
         if msg_type == "human":
             if _is_hidden_human_control_message(msg):
                 continue
             break
 
-        # Check for tool messages from ask_clarification (interrupt case)
+        # 澄清中断没有普通最终 AI 文本，问题内容保存在工具消息中。
         if msg_type == "tool" and msg.get("name") == "ask_clarification":
             content = msg.get("content", "")
             if isinstance(content, str) and content:
                 return content
 
-        # Regular AI message with text content
         if msg_type == "ai":
             content = msg.get("content", "")
             if isinstance(content, str) and content:
                 return content
-            # content can be a list of content blocks
+            # 兼容提供商返回的多内容块消息，而非假定 content 永远是字符串。
             if isinstance(content, list):
                 parts = []
                 for block in content:
@@ -277,6 +272,7 @@ def _extract_response_text(result: dict | list) -> str:
 
 
 def _messages_from_result(result: dict | list) -> list[Any]:
+    """统一提取最终状态或直接消息列表中的 ``messages``。"""
     if isinstance(result, list):
         return result
     if isinstance(result, dict):
@@ -287,6 +283,7 @@ def _messages_from_result(result: dict | list) -> list[Any]:
 
 
 def _current_turn_messages(result: dict | list) -> list[dict[str, Any]]:
+    """截取最近一条用户消息之后的当前回合消息，并恢复原始顺序。"""
     messages = _messages_from_result(result)
     current_turn: list[dict[str, Any]] = []
     for msg in reversed(messages):
@@ -300,7 +297,7 @@ def _current_turn_messages(result: dict | list) -> list[dict[str, Any]]:
 
 
 def _has_current_turn_clarification(result: dict | list) -> bool:
-    """Return True only when the current turn's final result is clarification."""
+    """仅在本轮最终可见结果为澄清工具消息时返回真。"""
     for msg in reversed(_current_turn_messages(result)):
         msg_type = msg.get("type")
         if msg_type == "tool":
@@ -318,6 +315,7 @@ def _has_current_turn_clarification(result: dict | list) -> bool:
 
 
 def _response_metadata(base_metadata: dict[str, Any], *, pending_clarification: bool = False) -> dict[str, Any]:
+    """构造适合重复出站的精简元数据，并标记待回复澄清状态。"""
     metadata = _slim_metadata(base_metadata)
     if pending_clarification:
         metadata[PENDING_CLARIFICATION_METADATA_KEY] = True
@@ -325,6 +323,7 @@ def _response_metadata(base_metadata: dict[str, Any], *, pending_clarification: 
 
 
 def _thread_channel_metadata(msg: InboundMessage) -> dict[str, Any]:
+    """生成写入 DeerFlow 线程的稳定通道来源元数据。"""
     channel_source: dict[str, Any] = {
         "type": "im_channel",
         "provider": msg.channel_name,
@@ -341,7 +340,7 @@ def _thread_channel_metadata(msg: InboundMessage) -> dict[str, Any]:
 
 
 def _extract_text_content(content: Any) -> str:
-    """Extract text from a streaming payload content field."""
+    """从多种流式载荷形状中提取可展示文本。"""
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -367,25 +366,21 @@ def _extract_text_content(content: Any) -> str:
 
 
 def _merge_stream_text(existing: str, chunk: str) -> str:
-    """Merge either delta text or cumulative text into a single snapshot."""
+    """把增量文本或累计快照合并为最新完整文本。"""
     if not chunk:
         return existing
     if not existing:
         return chunk
-    # Cumulative re-delivery: strictly longer and starts with existing.
+    # 更长且以前缀包含旧文本的载荷是累计快照，可直接替换。
     if len(chunk) > len(existing) and chunk.startswith(existing):
         return chunk
-    # Everything else is a delta — always append, even when the delta
-    # happens to match the buffer suffix (e.g. 'hel' + 'l') or equals
-    # the buffer (CJK reduplication: '谢' + '谢' = '谢谢'). Channels feed
-    # only delta ('messages-tuple') events to this function; 'values'
-    # snapshots are consumed via a separate branch, so a same-content
-    # delta (chunk == existing) still represents a fresh token to keep.
+    # 其余载荷按增量追加，即使内容恰好等于已有后缀也不能去重，例如中文“谢”+
+    # “谢”。``values`` 快照由另一分支处理，因此这里的相同文本仍代表新 token。
     return existing + chunk
 
 
 def _extract_stream_message_id(payload: Any, metadata: Any) -> str | None:
-    """Best-effort extraction of the streamed AI message identifier."""
+    """兼容不同 SDK 载荷形状，尽力提取流式 AI 消息 ID。"""
     candidates = [payload, metadata]
     if isinstance(payload, Mapping):
         candidates.append(payload.get("kwargs"))
@@ -405,7 +400,7 @@ def _accumulate_stream_text(
     current_message_id: str | None,
     event_data: Any,
 ) -> tuple[str | None, str | None]:
-    """Convert a ``messages-tuple`` event into the latest displayable AI text."""
+    """按消息 ID 累积 ``messages-tuple`` 事件并返回最新可展示文本。"""
     payload = event_data
     metadata: Any = None
     if isinstance(event_data, (list, tuple)):
@@ -438,12 +433,10 @@ def _accumulate_stream_text(
 
 
 def _extract_artifacts(result: dict | list) -> list[str]:
-    """Extract artifact paths from the last AI response cycle only.
+    """只提取最近一个 AI 回合通过 ``present_files`` 发布的产物。
 
-    Instead of reading the full accumulated ``artifacts`` state (which contains
-    all artifacts ever produced in the thread), this inspects the messages after
-    the last human message and collects file paths from ``present_files`` tool
-    calls.  This ensures only newly-produced artifacts are returned.
+    线程级 ``artifacts`` 状态包含历史全部产物，直接读取会在后续回合重复发送旧文件。
+    因此这里只检查最近真实用户消息之后的工具调用。
     """
     if isinstance(result, list):
         messages = result
@@ -456,12 +449,12 @@ def _extract_artifacts(result: dict | list) -> list[str]:
     for msg in reversed(messages):
         if not isinstance(msg, dict):
             continue
-        # Stop at the last human message — anything before it is a previous turn
+        # 隐藏控制消息不划分用户回合，遇到真实用户消息才停止。
         if msg.get("type") == "human":
             if _is_hidden_human_control_message(msg):
                 continue
             break
-        # Look for AI messages with present_files tool calls
+        # 产物以 AI 发起的 present_files 工具调用为权威发布记录。
         if msg.get("type") == "ai":
             for tc in msg.get("tool_calls", []):
                 if isinstance(tc, dict) and tc.get("name") == "present_files":
@@ -473,7 +466,7 @@ def _extract_artifacts(result: dict | list) -> list[str]:
 
 
 def _is_hidden_human_control_message(msg: Mapping[str, Any]) -> bool:
-    """Return whether a human message is an internal control message hidden from UI."""
+    """判断 human 消息是否为不应划分真实回合的内部控制消息。"""
     if msg.get("type") != "human":
         return False
 
@@ -485,7 +478,7 @@ def _is_hidden_human_control_message(msg: Mapping[str, Any]) -> bool:
 
 
 def _format_artifact_text(artifacts: list[str]) -> str:
-    """Format artifact paths into a human-readable text block listing filenames."""
+    """把产物路径转换为仅展示文件名的用户可读文本。"""
     import posixpath
 
     filenames = [posixpath.basename(p) for p in artifacts]
@@ -498,6 +491,7 @@ _OUTPUTS_VIRTUAL_PREFIX = "/mnt/user-data/outputs/"
 
 
 def _unknown_command_reply(command: str | None = None) -> str:
+    """构造包含当前权威命令集合的未知命令提示。"""
     available = " | ".join(sorted(KNOWN_CHANNEL_COMMANDS))
     if command:
         return f"Unknown command: /{command}. Available commands: {available}"
@@ -505,6 +499,7 @@ def _unknown_command_reply(command: str | None = None) -> str:
 
 
 def _human_input_message(content: str, *, original_content: str | None = None) -> dict[str, Any]:
+    """构造用户消息，并在注入文件上下文后保留原始用户文本。"""
     message: dict[str, Any] = {"role": "human", "content": content}
     if original_content is not None and original_content != content:
         message["additional_kwargs"] = {ORIGINAL_USER_CONTENT_KEY: original_content}
@@ -512,6 +507,7 @@ def _human_input_message(content: str, *, original_content: str | None = None) -
 
 
 def _auth_disabled_owner_user_id() -> str | None:
+    """在关闭认证的部署中解析统一的服务端所有者 ID。"""
     try:
         from app.gateway.auth_disabled import AUTH_DISABLED_USER_ID, is_auth_disabled
     except Exception:
@@ -521,10 +517,12 @@ def _auth_disabled_owner_user_id() -> str | None:
 
 
 def _effective_owner_user_id(msg: InboundMessage) -> str | None:
+    """解析当前部署模式下真正用于资源归属的 DeerFlow 用户。"""
     return _auth_disabled_owner_user_id() or msg.owner_user_id
 
 
 def _apply_effective_owner(msg: InboundMessage) -> InboundMessage:
+    """把服务端解析的有效所有者写回消息，避免后续阶段重复分叉。"""
     owner_user_id = _effective_owner_user_id(msg)
     if owner_user_id:
         msg.owner_user_id = owner_user_id
@@ -532,6 +530,7 @@ def _apply_effective_owner(msg: InboundMessage) -> InboundMessage:
 
 
 def _owner_headers(msg: InboundMessage) -> dict[str, str] | None:
+    """为绑定用户的内部 Gateway 请求生成所有者认证头。"""
     owner_user_id = _effective_owner_user_id(msg)
     if not owner_user_id:
         return None
@@ -539,6 +538,7 @@ def _owner_headers(msg: InboundMessage) -> dict[str, str] | None:
 
 
 def _safe_user_id_for_run(raw_user_id: str) -> str:
+    """准备文件系统安全的运行用户目录，并在准备失败时确定性降级。"""
     from deerflow.config.paths import get_paths
 
     try:
@@ -549,24 +549,14 @@ def _safe_user_id_for_run(raw_user_id: str) -> str:
 
 
 def _channel_storage_user_id(msg: InboundMessage) -> str | None:
-    """Resolve the canonical DeerFlow user id for a channel-triggered message.
+    """解析通道消息在文件系统中使用的规范 DeerFlow 用户 ID。
 
-    Single source of truth for both the agent **run identity**
-    (``_resolve_run_params`` → ``run_context["user_id"]``) and the **file/artifact
-    storage bucket** (``receive_file`` / ``_ingest_inbound_files`` /
-    ``_prepare_artifact_delivery``), so the bucket the agent reads/writes always
-    matches where channel files are staged. Prefer the bound DeerFlow owner,
-    otherwise fall back to the sanitized raw platform user id. Without that
-    fallback, an unbound auth-enabled channel would run under ``safe(msg.user_id)``
-    but stage files under ``get_effective_user_id()`` (the dispatcher task's unset
-    contextvar → ``"default"``), so uploads would land in ``users/default/...``
-    while the agent reads ``users/{safe_platform_user_id}/...``. Returns ``None``
-    only when neither identity is available, leaving the caller to fall back to the
-    contextvar/default user.
+    该结果同时用于 Agent 运行身份和上传/产物存储桶，确保 Agent 读取的目录与通道
+    暂存文件的位置一致。优先使用绑定的 DeerFlow 所有者，否则回退到净化后的平台
+    用户 ID；两者都不存在时才交由调用方使用上下文默认用户。
 
-    Distinct from :func:`_owner_headers`, which deliberately sends the *raw* owner
-    id (no sanitize, no platform fallback) over HTTP for gateway to re-resolve;
-    this helper is the in-process, sanitized, filesystem-facing identity.
+    本函数面向进程内文件系统，因此返回已净化 ID；``_owner_headers`` 则故意发送
+    原始所有者 ID，让 Gateway 在 HTTP 信任边界内重新解析，两者职责不同。
     """
     owner_user_id = _effective_owner_user_id(msg)
     if owner_user_id:
@@ -581,6 +571,7 @@ def _resolve_slash_skill_command(
     available_skills: set[str] | None = None,
     storage: SkillStorage | Callable[[], SkillStorage] | None = None,
 ) -> _SlashSkillCommandResolution | None:
+    """验证斜杠技能引用是否已安装、启用且对当前 Agent 可用。"""
     reference = parse_slash_skill_reference(text)
     if reference is None:
         return None
@@ -603,14 +594,10 @@ def _resolve_slash_skill_command(
 
 
 def _resolve_attachments(thread_id: str, artifacts: list[str], *, user_id: str | None = None) -> list[ResolvedAttachment]:
-    """Resolve virtual artifact paths to host filesystem paths with metadata.
+    """把允许的虚拟产物路径解析为可上传的宿主机附件。
 
-    Only paths under ``/mnt/user-data/outputs/`` are accepted; any other
-    virtual path is rejected with a warning to prevent exfiltrating uploads
-    or workspace files via IM channels.
-
-    Skips artifacts that cannot be resolved (missing files, invalid paths)
-    and logs warnings for them.
+    只接受 ``/mnt/user-data/outputs/`` 下的文件，阻止借即时通讯通道外传 uploads
+    或 workspace 内容。缺失、无效或越界路径会被跳过并记录告警。
     """
     from deerflow.config.paths import get_paths
 
@@ -619,14 +606,13 @@ def _resolve_attachments(thread_id: str, artifacts: list[str], *, user_id: str |
     effective_user_id = user_id or get_effective_user_id()
     outputs_dir = paths.sandbox_outputs_dir(thread_id, user_id=effective_user_id).resolve()
     for virtual_path in artifacts:
-        # Security: only allow files from the agent outputs directory
+        # 前缀白名单先拒绝明显不属于 Agent 输出目录的路径。
         if not virtual_path.startswith(_OUTPUTS_VIRTUAL_PREFIX):
             logger.warning("[Manager] rejected non-outputs artifact path: %s", virtual_path)
             continue
         try:
             actual = paths.resolve_virtual_path(thread_id, virtual_path, user_id=effective_user_id)
-            # Verify the resolved path is actually under the outputs directory
-            # (guards against path-traversal even after prefix check)
+            # 解析后再次校验真实路径，抵御通过 ``..`` 或符号链接绕过前缀检查。
             try:
                 actual.resolve().relative_to(outputs_dir)
             except ValueError:
@@ -659,7 +645,7 @@ def _prepare_artifact_delivery(
     *,
     user_id: str | None = None,
 ) -> tuple[str, list[ResolvedAttachment]]:
-    """Resolve attachments and append filename fallbacks to the text response."""
+    """解析产物附件，并在文本中保留可发现的文件名后备提示。"""
     attachments: list[ResolvedAttachment] = []
     if not artifacts:
         return response_text, attachments
@@ -672,8 +658,7 @@ def _prepare_artifact_delivery(
         artifact_text = _format_artifact_text(unresolved)
         response_text = (response_text + "\n\n" + artifact_text) if response_text else artifact_text
 
-    # Always include resolved attachment filenames as a text fallback so files
-    # remain discoverable even when the upload is skipped or fails.
+    # 即使平台跳过或上传失败，文本中的文件名仍让用户知道本轮产生了哪些文件。
     if attachments:
         resolved_text = _format_artifact_text([attachment.virtual_path for attachment in attachments])
         response_text = (response_text + "\n\n" + resolved_text) if response_text else resolved_text
@@ -682,6 +667,7 @@ def _prepare_artifact_delivery(
 
 
 async def _ingest_inbound_files(thread_id: str, msg: InboundMessage, *, user_id: str | None = None) -> list[dict[str, Any]]:
+    """读取并安全写入本轮入站附件，返回供模型注入的文件描述。"""
     if not msg.files:
         return []
 
@@ -694,8 +680,8 @@ async def _ingest_inbound_files(thread_id: str, msg: InboundMessage, *, user_id:
     )
 
     def _prepare_uploads_dir() -> tuple[Path, set[str]]:
-        # Worker thread: ensure_uploads_dir's mkdir and the iterdir enumeration are
-        # blocking filesystem IO that must stay off the event loop.
+        """在线程池中创建上传目录，并取得用于冲突消解的已有文件名。"""
+        # mkdir 与目录枚举都是阻塞文件系统操作，不能占用 ChannelManager 事件循环。
         target = ensure_uploads_dir(thread_id, user_id=user_id)
         existing = {entry.name for entry in target.iterdir() if entry.is_file()}
         return target, existing
@@ -769,6 +755,7 @@ async def _ingest_inbound_files(thread_id: str, msg: InboundMessage, *, user_id:
 
 
 def _format_uploaded_files_block(files: list[dict[str, Any]]) -> str:
+    """生成受信任的上传文件上下文块，指导模型选择对应读取工具。"""
     lines = [
         "<uploaded_files>",
         "The following files were uploaded in this message:",
@@ -796,11 +783,11 @@ def _format_uploaded_files_block(files: list[dict[str, Any]]) -> str:
 
 
 class ChannelManager:
-    """Core dispatcher that bridges IM channels to the DeerFlow agent.
+    """在即时通讯通道和 DeerFlow Agent 之间执行统一调度。
 
-    It reads from the MessageBus inbound queue, creates/reuses threads on
-    Gateway's LangGraph-compatible API, sends messages via ``runs.wait``, and publishes
-    outbound responses back through the bus.
+    管理器消费 ``MessageBus`` 入站队列，通过 Gateway 的 LangGraph-compatible API
+    创建或复用线程，并依据通道能力选择 ``runs.wait``、``runs.stream`` 或
+    ``runs.create``，最后把标准化回复发布回消息总线。
     """
 
     def __init__(
@@ -817,6 +804,7 @@ class ChannelManager:
         connection_repo: Any | None = None,
         require_bound_identity: bool = False,
     ) -> None:
+        """初始化调度依赖、并发边界、身份策略与惰性客户端状态。"""
         self.bus = bus
         self.store = store
         self._max_concurrency = max_concurrency
@@ -827,26 +815,24 @@ class ChannelManager:
         self._channel_sessions = dict(channel_sessions or {})
         self._connection_repo = connection_repo
         self._require_bound_identity = require_bound_identity
-        self._client = None  # lazy init — langgraph_sdk async client
+        self._client = None  # langgraph_sdk 异步客户端仅在首次运行时创建。
         self._channel_metadata_synced: set[str] = set()
-        # Per-conversation locks so concurrent inbound messages for the same
-        # chat don't race to create duplicate threads (see _get_or_create_thread).
+        # 创建锁按平台会话划分，防止同一会话的并发首条消息各自创建线程。
         self._thread_create_locks: dict[tuple[str, str, str | None], asyncio.Lock] = {}
-        # Per-thread run locks for channels that want in-manager serialization
-        # instead of surfacing the runtime's generic busy reply.
+        # 运行锁按 DeerFlow 线程划分，只为明确要求排队的通道串行化回合。
         self._serialized_thread_runs: dict[tuple[str, str], _SerializedThreadRunState] = {}
         self._skill_storage: SkillStorage | None = None
         self._csrf_token = generate_csrf_token()
         self._semaphore: asyncio.Semaphore | None = None
         self._running = False
         self._task: asyncio.Task | None = None
-        # Insertion order == chronological (keys are never re-inserted), so an
-        # OrderedDict lets us evict expired/overflow entries from the front in
-        # O(k) instead of scanning all entries on every inbound message.
+        # 键不会重新插入，因此 OrderedDict 的顺序即时间顺序，可从头部 O(k) 淘汰
+        # 过期项，无需每条入站消息都扫描整个去重窗口。
         self._recent_inbound_events: OrderedDict[tuple[str, str, str, str], float] = OrderedDict()
 
     @staticmethod
     def _channel_supports_streaming(channel_name: str) -> bool:
+        """优先读取运行中通道的动态能力，否则使用静态能力表。"""
         from .service import get_channel_service
 
         service = get_channel_service()
@@ -857,6 +843,7 @@ class ChannelManager:
         return CHANNEL_CAPABILITIES.get(channel_name, {}).get("supports_streaming", False)
 
     def _resolve_session_layer(self, msg: InboundMessage) -> tuple[dict[str, Any], dict[str, Any]]:
+        """解析通道级和平台用户级会话覆盖层。"""
         channel_layer = _as_dict(self._channel_sessions.get(msg.channel_name))
         users_layer = _as_dict(channel_layer.get("users"))
         user_layer = _as_dict(users_layer.get(msg.user_id))
@@ -868,6 +855,7 @@ class ChannelManager:
         channel_name: str,
         thread_id: str,
     ) -> tuple[_SerializedThreadRunState | None, bool]:
+        """为要求同线程排队的通道登记等待者，并返回是否已存在运行。"""
         policy = CHANNEL_RUN_POLICY.get(channel_name)
         if policy is None or not policy.serialize_thread_runs:
             return None, False
@@ -889,6 +877,7 @@ class ChannelManager:
         state: _SerializedThreadRunState | None,
         lock_acquired: bool,
     ) -> None:
+        """释放已获取的线程锁，并在无等待者时清理锁注册项。"""
         if state is None:
             return
 
@@ -899,6 +888,7 @@ class ChannelManager:
             self._serialized_thread_runs.pop((channel_name, thread_id), None)
 
     async def _publish_progress_update(self, msg: InboundMessage, thread_id: str, text: str) -> None:
+        """发布绑定到原始平台消息的非最终进度更新。"""
         await self.bus.publish_outbound(
             OutboundMessage(
                 channel_name=msg.channel_name,
@@ -914,13 +904,11 @@ class ChannelManager:
         )
 
     def _resolve_run_params(self, msg: InboundMessage, thread_id: str) -> tuple[str, dict[str, Any], dict[str, Any]]:
+        """按默认、通道、用户和单消息优先级构造 Agent 运行参数。"""
         channel_layer, user_layer = self._resolve_session_layer(msg)
 
-        # Per-message agent override (e.g. GitHub webhook fan-out: multiple
-        # agents may bind the same repo, each gets its own inbound message
-        # with its own agent_name in metadata).  Honors the same shape as
-        # channel/user session config: the bare agent name routes through
-        # the lead_agent + agent_name context pattern below.
+        # 单消息 Agent 覆盖支持 GitHub 等场景把同一事件分发给多个 Agent，并保持与
+        # 通道级、用户级 assistant_id 相同的解析语义。
         message_assistant_id: str | None = None
         msg_metadata = msg.metadata if isinstance(msg.metadata, dict) else {}
         meta_assistant_id = msg_metadata.get("assistant_id") or msg_metadata.get("agent_name")
@@ -944,26 +932,17 @@ class ChannelManager:
         else:
             configurable = {}
         run_config["configurable"] = configurable
-        # Pin channel-triggered runs to the root graph namespace so follow-up
-        # turns continue from the same conversation checkpoint.
+        # 通道回合固定在根图命名空间，后续消息才能从同一会话 checkpoint 延续。
         configurable["checkpoint_ns"] = ""
         configurable["thread_id"] = thread_id
 
-        # ``user_id`` drives DeerFlow-owned memory, files, and thread buckets.
-        # For browser-connected IM channels, prefer the DeerFlow account that
-        # owns the connection. Preserve the raw platform user under
-        # ``channel_user_id`` for platform-facing lookups and audits.
+        # ``user_id`` 控制 DeerFlow 记忆、文件和线程桶；原始平台用户另存为
+        # ``channel_user_id``，仅用于平台查询和审计。
         run_context_identity: dict[str, Any] = {"thread_id": thread_id}
-        # ``channel_name`` lets in-graph code (e.g. ``_make_lead_agent``)
-        # decide whether a tool is safe to expose for this run. Webhook
-        # channels carry untrusted external prompts (GitHub comments,
-        # Telegram chats from non-owners, etc.), so admin-shaped tools
-        # like ``update_agent`` are dropped when the run was triggered
-        # via one. See ``_make_lead_agent`` for the gate.
+        # 图内根据 ``channel_name`` 收窄工具暴露范围；Webhook 等外部输入不能获得
+        # ``update_agent`` 一类管理能力。
         run_context_identity["channel_name"] = msg.channel_name
-        # Single source of truth for the run identity: the same helper that scopes
-        # inbound files and outbound artifacts, so the bucket the agent reads/writes
-        # always matches where channel files are staged.
+        # 运行与文件共用同一身份解析函数，防止 Agent 所见目录和通道暂存目录分离。
         run_user_id = _channel_storage_user_id(msg)
         if run_user_id:
             run_context_identity["user_id"] = run_user_id
@@ -978,28 +957,17 @@ class ChannelManager:
             run_context_identity,
         )
 
-        # Custom agents are implemented as lead_agent + agent_name context.
-        # Keep backward compatibility for channel configs that set
-        # assistant_id: <custom-agent-name> by routing through lead_agent.
+        # 自定义 Agent 实际由 lead_agent 配合 agent_name 上下文实现；这里兼容旧的
+        # ``assistant_id: <custom-agent-name>`` 通道配置。
         if assistant_id != DEFAULT_ASSISTANT_ID:
             run_context.setdefault("agent_name", _normalize_custom_agent_name(assistant_id))
             assistant_id = DEFAULT_ASSISTANT_ID
 
-        # Apply per-channel run policy (recursion_limit bump for webhook
-        # channels, etc.). Looking the policy up by channel_name keeps
-        # GitHub-specific knobs out of this method — adding the next
-        # webhook channel is a one-row CHANNEL_RUN_POLICY entry, not a
-        # new if-branch here.
+        # 通道差异由注册表驱动，避免为每个 Webhook 平台新增硬编码分支。
         policy = CHANNEL_RUN_POLICY.get(msg.channel_name)
         if policy is not None and policy.default_recursion_limit is not None:
-            # Per-message override (via msg.metadata[channel_name]) honors
-            # the operator's explicit per-agent recursion_limit verbatim —
-            # including values below the channel default. A safety-conscious
-            # ``github.recursion_limit: 50`` on a review-only agent now halts
-            # at 50 super-steps as documented in GitHubAgentConfig, instead
-            # of being silently clamped up to the channel default. When no
-            # override is present, the channel default acts as a floor over
-            # whatever session config supplied (the higher value wins).
+            # 单消息显式上限代表操作者的安全选择，即使低于通道默认值也必须原样采用；
+            # 只有未显式覆盖时，通道默认值才作为会话配置的下限。
             channel_meta = (msg.metadata or {}).get(msg.channel_name, {})
             override = channel_meta.get("recursion_limit") if isinstance(channel_meta, dict) else None
             if isinstance(override, int) and override > 0:
@@ -1010,28 +978,12 @@ class ChannelManager:
         return assistant_id, run_config, run_context
 
     async def _apply_channel_policy(self, msg: InboundMessage, run_context: dict[str, Any]) -> ChannelRunPolicy | None:
-        """Apply per-channel run policy that needs ``run_context`` access.
+        """在 Agent 启动前应用需要访问 ``run_context`` 的通道策略。
 
-        Run AFTER ``_resolve_run_params`` (which produced ``run_context``)
-        and BEFORE the agent runs. Covers:
-
-        * ``disable_clarification`` for non-interactive channels —
-          ``ClarificationMiddleware`` would otherwise dead-end a webhook
-          run waiting for a synchronous reply that only arrives as a
-          later, separate webhook delivery.
-        * Channel-specific credentials provider — e.g. the GitHub channel
-          installs a token-mint callable so ``bash_tool`` can resolve a
-          fresh installation token on every invocation (longer than the
-          1h GitHub TTL).
-
-        ``recursion_limit`` is applied inside :meth:`_resolve_run_params`
-        instead because it lives on ``run_config`` (not ``run_context``)
-        and the resolver already builds ``run_config``.
-
-        Returns the resolved :class:`ChannelRunPolicy` (or ``None`` when
-        the channel has no entry) so :meth:`_handle_chat` can branch on
-        flags like ``fire_and_forget`` without doing a second dict
-        lookup.
+        非交互通道会禁止同步澄清，避免 Webhook 运行等待只能由下一次独立投递提供的
+        回复；凭据提供器则可注入按需签发的平台令牌。递归上限属于 ``run_config``，
+        已由 ``_resolve_run_params`` 处理。返回策略供后续直接判断
+        ``fire_and_forget``，避免重复查表。
         """
         policy = CHANNEL_RUN_POLICY.get(msg.channel_name)
         if policy is None:
@@ -1042,9 +994,7 @@ class ChannelManager:
             try:
                 await policy.credentials_provider(msg, run_context)
             except Exception:
-                # Credential failures must NOT drop the delivery — the
-                # provider's own logging records the cause; we keep the
-                # run going (read-only is better than no response).
+                # 凭据失败不能丢弃整次投递；保留只读运行通常优于完全不回复。
                 logger.warning(
                     "[Manager] channel=%s credentials_provider raised; run proceeds without injected credentials",
                     msg.channel_name,
@@ -1053,6 +1003,7 @@ class ChannelManager:
         return policy
 
     def _resolve_available_skill_names(self, msg: InboundMessage) -> set[str] | None:
+        """解析当前通道回合允许通过斜杠激活的技能集合。"""
         thread_id = self.store.get_thread_id(msg.channel_name, msg.chat_id, topic_id=msg.topic_id) or ""
         _, _, run_context = self._resolve_run_params(msg, thread_id)
         if run_context.get("is_bootstrap"):
@@ -1062,19 +1013,17 @@ class ChannelManager:
         if not isinstance(agent_name, str) or not agent_name.strip():
             return None
 
-        # Read the agent config from the same owner bucket the run uses:
-        # ``run_context["user_id"]`` is the resolved owner (``_channel_storage_user_id``),
-        # but without it ``load_agent_config`` falls back to the dispatch loop's unset
-        # contextvar (``"default"``), reading the wrong user's per-user custom agent.
+        # 必须从运行所属用户桶读取 Agent 配置，否则调度循环未绑定的 ContextVar 会
+        # 回退到 ``default``，错误读取其他用户的自定义 Agent。
         agent_config = load_agent_config(_normalize_custom_agent_name(agent_name), user_id=run_context.get("user_id"))
         if agent_config and agent_config.skills is not None:
             return set(agent_config.skills)
         return None
 
-    # -- LangGraph SDK client (lazy) ----------------------------------------
+    # -- LangGraph SDK 惰性客户端 ------------------------------------------
 
     def _get_client(self):
-        """Return the ``langgraph_sdk`` async client, creating it on first use."""
+        """返回共享的 ``langgraph_sdk`` 异步客户端，并在首次使用时创建。"""
         if self._client is None:
             from langgraph_sdk import get_client
 
@@ -1089,14 +1038,15 @@ class ChannelManager:
         return self._client
 
     def _get_skill_storage(self) -> SkillStorage:
+        """惰性获取共享技能存储，避免仅启动通道时加载技能目录。"""
         if self._skill_storage is None:
             self._skill_storage = get_or_new_skill_storage()
         return self._skill_storage
 
-    # -- lifecycle ---------------------------------------------------------
+    # -- 生命周期 ----------------------------------------------------------
 
     async def start(self) -> None:
-        """Start the dispatch loop."""
+        """启动带全局并发上限的入站分发循环。"""
         if self._running:
             return
         self._running = True
@@ -1105,7 +1055,7 @@ class ChannelManager:
         logger.info("ChannelManager started (max_concurrency=%d)", self._max_concurrency)
 
     async def stop(self) -> None:
-        """Stop the dispatch loop."""
+        """取消并等待分发循环退出。"""
         self._running = False
         if self._task:
             self._task.cancel()
@@ -1116,9 +1066,10 @@ class ChannelManager:
             self._task = None
         logger.info("ChannelManager stopped")
 
-    # -- dispatch loop -----------------------------------------------------
+    # -- 分发循环 ----------------------------------------------------------
 
     async def _dispatch_loop(self) -> None:
+        """持续消费入站队列，去重后为每条消息创建独立处理任务。"""
         logger.info("[Manager] dispatch loop started, waiting for inbound messages")
         while self._running:
             try:
@@ -1128,12 +1079,8 @@ class ChannelManager:
             except asyncio.CancelledError:
                 break
 
-            # Dedupe before logging "received" so a provider retrying an event N
-            # times does not log N accepts; duplicates are logged once as ignored.
-            # Note: this manager-level dedupe only guards the agent run / final
-            # answer. Provider adapters may emit ack side-effects (a "Working on
-            # it…" reply, an "eyes" reaction) before publish_inbound, so those are
-            # intentionally not deduped here.
+            # 在“已接收”日志前去重，避免平台重投制造多条成功接收记录。适配器在
+            # publish_inbound 前产生的确认反应不属于此层职责，可能仍会重复。
             if self._is_duplicate_inbound(msg):
                 continue
             logger.info(
@@ -1149,6 +1096,7 @@ class ChannelManager:
 
     @staticmethod
     def _inbound_dedupe_key(msg: InboundMessage) -> tuple[str, str, str, str] | None:
+        """构造包含平台工作区的稳定去重键；信息不足时放弃去重。"""
         metadata = msg.metadata or {}
         message_id = None
         for key in INBOUND_DEDUPE_METADATA_KEYS:
@@ -1167,22 +1115,20 @@ class ChannelManager:
         if message_id is None:
             return None
 
-        # Fail closed: without a workspace/team/guild identifier we cannot tell two
-        # workspaces apart (e.g. Slack channel ids are not globally unique), so
-        # skip dedupe rather than risk collapsing distinct workspaces' messages.
+        # 缺少工作区时无法区分不同租户中的同名会话，宁可不去重也不能合并跨租户消息。
         workspace_id = msg.workspace_id or metadata.get("workspace_id") or metadata.get("team_id") or metadata.get("guild_id") or metadata.get("aibotid")
         if not workspace_id:
             return None
         return (msg.channel_name, str(workspace_id), msg.chat_id, message_id)
 
     def _is_duplicate_inbound(self, msg: InboundMessage) -> bool:
+        """在有界 TTL 窗口内识别平台重复投递，并维护去重缓存。"""
         key = self._inbound_dedupe_key(msg)
         if key is None:
             return False
 
         now = time.monotonic()
-        # Entries are in chronological insertion order, so expired ones cluster at
-        # the front: pop from the front until we hit a still-live entry.
+        # 插入顺序即时间顺序，只需从头部弹出，遇到仍有效项即可停止。
         while self._recent_inbound_events:
             _, oldest_at = next(iter(self._recent_inbound_events.items()))
             if now - oldest_at > INBOUND_DEDUPE_TTL_SECONDS:
@@ -1205,12 +1151,11 @@ class ChannelManager:
         return False
 
     def _release_inbound_dedupe_key(self, msg: InboundMessage) -> None:
-        """Drop a recorded dedupe key so a provider redelivery can be reprocessed.
+        """删除已记录的去重键，使平台重投能够再次进入处理流程。
 
-        Called only on transient/unexpected handling failures: the key was
-        recorded on receipt so retries arriving *while* the message is being
-        handled are still deduped, but if handling fails we must not turn a
-        recoverable error into a TTL-long black hole for the same message_id.
+        消息刚进入队列时仍需登记去重键，以吸收处理期间的并发重投；只有暂时性或
+        未预期失败才释放它，避免可恢复错误让相同 ``message_id`` 在整个 TTL 内
+        进入黑洞。
         """
         key = self._inbound_dedupe_key(msg)
         if key is not None:
@@ -1218,7 +1163,7 @@ class ChannelManager:
 
     @staticmethod
     def _log_task_error(task: asyncio.Task) -> None:
-        """Surface unhandled exceptions from background tasks."""
+        """记录消息后台任务中未被业务分支处理的异常。"""
         if task.cancelled():
             return
         exc = task.exception()
@@ -1226,12 +1171,11 @@ class ChannelManager:
             logger.error("[Manager] unhandled error in message task: %s", exc, exc_info=exc)
 
     async def _handle_message(self, msg: InboundMessage) -> None:
+        """执行身份准入和全局并发控制，再分派命令或普通聊天。"""
         msg = _apply_effective_owner(msg)
         try:
-            # Non-command chat can be rejected before it consumes a semaphore
-            # slot. Commands are handled below because provider adapters consume
-            # binding commands before manager dispatch, and _handle_command()
-            # applies its own admission gate for manager-level commands.
+            # 普通聊天可在占用并发槽前拒绝；管理器命令有独立准入入口，而平台绑定命令
+            # 已由适配器提前消费。
             bound_identity_rejection = None
             if msg.msg_type != InboundMessageType.COMMAND:
                 bound_identity_rejection = await self._get_bound_identity_rejection(msg)
@@ -1266,30 +1210,22 @@ class ChannelManager:
                 msg.channel_name,
                 msg.chat_id,
             )
-            # Transient/unexpected failure: release the dedupe key so a provider
-            # redelivery of the same message can recover instead of being dropped
-            # for the dedupe TTL.
+            # 未预期失败后释放去重键，让平台重投能够恢复，而非在整个 TTL 内被吞掉。
             self._release_inbound_dedupe_key(msg)
             await self._send_error(msg, "An internal error occurred. Please try again.")
 
-    # -- chat handling -----------------------------------------------------
+    # -- 聊天处理 ----------------------------------------------------------
 
     async def _get_bound_identity_rejection(self, msg: InboundMessage) -> _BoundIdentityRejection | None:
-        """Return None when *msg* may proceed; otherwise return rejection routing hints.
+        """验证持久化连接身份，允许时返回 ``None``，否则返回拒绝路由提示。
 
-        The returned object means the message lacks a verified bound identity.
-        Its fields are intentionally limited to server-side values re-read from
-        the connection repository, so rejection outbounds never trust a rejected
-        inbound message's asserted connection metadata.
+        拒绝对象只携带从服务端连接仓库重新读取的字段，确保回复拒绝消息时不会信任
+        入站消息自行声明的连接身份。
         """
         if not self._require_bound_identity:
             return None
-        # Webhook-authenticated channels (GitHub) opt out via
-        # ChannelRunPolicy.requires_bound_identity=False. Authenticity is
-        # enforced at the webhook route by HMAC, and the "sender → DeerFlow
-        # user" binding is encoded in the agent's config.yaml ownership, not
-        # in the channel-connections table — there is no per-sender
-        # /connect handshake to perform.
+        # GitHub 等 Webhook 通道已在路由层完成 HMAC 验证，且所有权来自 Agent 配置，
+        # 不存在逐发送者的 ``/connect`` 流程，因此可由策略显式跳过此门禁。
         policy = CHANNEL_RUN_POLICY.get(msg.channel_name)
         if policy is not None and not policy.requires_bound_identity:
             return None
@@ -1303,11 +1239,8 @@ class ChannelManager:
         if self._connection_repo is None:
             return _BoundIdentityRejection(message=BOUND_IDENTITY_UNAVAILABLE_MESSAGE)
 
-        # The manager is the run-creation security boundary, so it does not
-        # trust mutable InboundMessage identity fields by themselves. Re-read
-        # the binding by provider identity before creating DeerFlow threads or
-        # runs. If the asserted identity does not match, keep only the
-        # server-side connection fields as outbound routing hints.
+        # 管理器是创建线程和运行的安全边界，必须按平台身份重新查询绑定，不能只相信
+        # 可变的 InboundMessage 字段。
         connection = await self._connection_repo.find_connection_by_external_identity(
             provider=msg.channel_name,
             external_account_id=msg.user_id,
@@ -1328,6 +1261,7 @@ class ChannelManager:
         *,
         bound_identity_rejection: _BoundIdentityRejection,
     ) -> None:
+        """使用服务端可信路由提示发送身份拒绝消息。"""
         logger.info(
             "[Manager] rejecting unbound channel message: channel=%s, chat_id=%s",
             msg.channel_name,
@@ -1346,6 +1280,7 @@ class ChannelManager:
         await self.bus.publish_outbound(outbound)
 
     async def _lookup_thread_id(self, msg: InboundMessage) -> str | None:
+        """优先从用户连接仓库查询线程，否则回退到旧版本地映射。"""
         if msg.connection_id and self._connection_repo is not None:
             return await self._connection_repo.get_thread_id(
                 msg.connection_id,
@@ -1355,6 +1290,7 @@ class ChannelManager:
         return self.store.get_thread_id(msg.channel_name, msg.chat_id, topic_id=msg.topic_id)
 
     async def _store_thread_id(self, msg: InboundMessage, thread_id: str) -> None:
+        """按消息身份选择用户连接仓库或旧版本地存储保存线程映射。"""
         if msg.connection_id and msg.owner_user_id and self._connection_repo is not None:
             await self._connection_repo.set_thread_id(
                 connection_id=msg.connection_id,
@@ -1375,13 +1311,11 @@ class ChannelManager:
         )
 
     async def _create_thread(self, client, msg: InboundMessage) -> str:
-        """Create a new thread through Gateway and store the mapping."""
+        """通过 Gateway 创建线程，并在确认存在后保存平台映射。"""
         metadata = _thread_channel_metadata(msg)
         owner_headers = _owner_headers(msg)
-        # Some channels (notably GitHub) supply a deterministic preferred
-        # thread id so a (repo, PR/issue number) always lands on the same
-        # LangGraph thread, even after a store wipe. When absent, Gateway
-        # mints a random id as before.
+        # GitHub 等通道可提供确定性 thread_id，使仓库存储丢失后同一 PR/Issue 仍回到
+        # 相同 LangGraph 线程；未提供时由 Gateway 生成随机 ID。
         meta = msg.metadata if isinstance(msg.metadata, dict) else {}
         preferred_thread_id = meta.get("preferred_thread_id")
         create_kwargs: dict[str, Any] = {"metadata": metadata}
@@ -1392,28 +1326,14 @@ class ChannelManager:
         try:
             thread = await client.threads.create(**create_kwargs)
         except ConflictError as exc:
-            # True race: two webhook deliveries for the same (repo, number)
-            # land within ms with the same preferred_thread_id. The Gateway
-            # ``POST /threads`` route is idempotent on sequential reads (it
-            # returns the existing record when present), so this branch only
-            # fires for a real concurrent-create conflict that the underlying
-            # store surfaced as 409.
-            #
-            # Narrow the recovery to ConflictError specifically: any other
-            # exception (transient DB outage, network error, 5xx) used to
-            # land here too and silently wrote ``preferred_thread_id`` into
-            # the store, mapping subsequent webhooks to a thread that was
-            # never created — every later run would 404 forever with no
-            # retry path. Those non-conflict failures now propagate so the
-            # caller fails the delivery cleanly.
+            # 顺序创建本身是幂等的，因此 409 只代表相同确定性 ID 的真实并发竞争。
+            # 恢复范围必须严格限定为 ConflictError；数据库、网络或 5xx 异常若被当作
+            # 成功缓存，会让后续消息永久映射到实际不存在的线程。
             if not (isinstance(preferred_thread_id, str) and preferred_thread_id):
-                # Without a preferred id we cannot deterministically recover.
+                # 没有确定性 ID 就无法确认冲突目标，只能让异常继续向上传播。
                 raise
-            # Verify the racing-write target actually exists before we
-            # cache the mapping. If ConflictError fires but threads.get
-            # also rejects, the store underneath is in an inconsistent
-            # state and we surface the failure rather than poisoning the
-            # mapping for every future delivery on this issue/PR.
+            # 缓存映射前重新读取竞争目标；读取也失败说明底层状态不一致，不能污染该
+            # Issue/PR 的所有后续投递。
             try:
                 get_kwargs: dict[str, Any] = {}
                 if owner_headers:
@@ -1440,14 +1360,11 @@ class ChannelManager:
         return thread_id
 
     async def _get_or_create_thread(self, client, msg: InboundMessage) -> tuple[str, bool]:
-        """Return ``(thread_id, created)``, creating a thread only if needed.
+        """返回 ``(thread_id, created)``，仅在映射不存在时创建线程。
 
-        Each inbound message is dispatched on its own task, so two messages that
-        arrive close together for the same chat would both look up a missing
-        thread and then both create one — the second store silently overwrites
-        the first, orphaning a Gateway thread and splitting the conversation.
-        Serialize the create path per conversation and re-check inside the lock
-        so only the first message creates a thread and the rest reuse it.
+        每条入站消息由独立任务处理，并发首条消息可能同时观察到空映射。创建路径按
+        平台会话加锁并在锁内二次检查，确保只有一个任务创建线程，避免后写覆盖映射、
+        遗留孤儿线程并分裂对话历史。
         """
         thread_id = await self._lookup_thread_id(msg)
         if thread_id:
@@ -1457,23 +1374,19 @@ class ChannelManager:
         lock = self._thread_create_locks.setdefault(key, asyncio.Lock())
         try:
             async with lock:
-                # A concurrent message for the same chat may have created the
-                # thread while we were waiting on the lock.
+                # 等锁期间其他消息可能已完成创建，因此锁内必须再次查询。
                 thread_id = await self._lookup_thread_id(msg)
                 if thread_id:
                     return thread_id, False
                 return await self._create_thread(client, msg), True
         finally:
-            # Once the thread is stored, later messages short-circuit on the
-            # lookup above and never reach this lock, so it's safe to drop the
-            # entry and keep the registry bounded to in-flight conversations.
+            # 映射落盘后后续消息会在首次查询处返回，删除锁项可将注册表限制在进行中的
+            # 首次创建会话。
             self._thread_create_locks.pop(key, None)
 
     async def _update_thread_channel_metadata(self, client, msg: InboundMessage, thread_id: str) -> None:
-        """Best-effort source metadata backfill for existing IM-created threads."""
-        # The metadata (provider/chat/topic) is constant for a thread, so one
-        # successful backfill per manager lifetime is enough — skip the
-        # redundant PATCH on every subsequent inbound message.
+        """尽力为已有即时通讯线程回填稳定的来源元数据。"""
+        # 平台、会话和话题在线程生命周期内不变，每个管理器进程成功回填一次即可。
         if thread_id in self._channel_metadata_synced:
             return
         update_kwargs: dict[str, Any] = {"metadata": _thread_channel_metadata(msg)}
@@ -1495,9 +1408,9 @@ class ChannelManager:
         *,
         bound_identity_checked: bool = False,
     ) -> None:
-        # Normal entry paths already run the bound-identity check in
-        # _handle_message() or _handle_command(). Keep this default False so
-        # direct callers and future internal paths still fail closed.
+        """解析或创建线程，并按通道策略串行化同线程回合。"""
+        # 正常入口已经完成身份检查；默认仍设为 False，使直接调用和未来内部路径保持
+        # fail-closed，而不是意外绕过准入。
         bound_identity_rejection = None if bound_identity_checked else await self._get_bound_identity_rejection(msg)
         if bound_identity_rejection is not None:
             await self._reject_unbound_channel_message(msg, bound_identity_rejection=bound_identity_rejection)
@@ -1506,10 +1419,8 @@ class ChannelManager:
         client = self._get_client()
         storage_user_id = _channel_storage_user_id(msg)
 
-        # Look up the existing DeerFlow thread, creating one if this is the
-        # first message for the chat. topic_id may be None (e.g. Telegram
-        # private chats) — the store handles this by using the "channel:chat_id"
-        # key without a topic suffix.
+        # topic_id 缺失时映射退化为 ``channel:chat_id``，让 Telegram 私聊等场景在
+        # 会话级复用同一 DeerFlow 线程。
         thread_id, created = await self._get_or_create_thread(client, msg)
         if not created:
             logger.info("[Manager] reusing thread: thread_id=%s for topic_id=%s", thread_id, msg.topic_id)
@@ -1556,22 +1467,17 @@ class ChannelManager:
         extra_context: dict[str, Any] | None = None,
         storage_user_id: str | None = None,
     ) -> None:
+        """在确定的 DeerFlow 线程上准备附件、运行参数并执行 Agent 回合。"""
         if storage_user_id is None:
             storage_user_id = _channel_storage_user_id(msg)
 
         assistant_id, run_config, run_context = self._resolve_run_params(msg, thread_id)
 
-        # Apply per-channel policy: credentials provider (e.g. GitHub
-        # installation-token mint) and the non-interactive flag for
-        # webhook channels. Driven by CHANNEL_RUN_POLICY so each new
-        # webhook channel is a one-row registration, not a fresh
-        # if-branch here.
+        # 凭据注入与非交互标记由策略注册表驱动，新增 Webhook 通道无需修改主流程。
         policy = await self._apply_channel_policy(msg, run_context)
 
-        # If the inbound message contains file attachments, let the channel
-        # materialize (download) them and update msg.text to include sandbox file paths.
-        # This enables downstream models to access user-uploaded files by path.
-        # Channels that do not support file download will simply return the original message.
+        # 平台适配器先把远端附件实体化，再由通用上传流程写入用户线程目录；不支持
+        # 下载的通道按基类契约原样返回消息。
         if msg.files:
             from .service import get_channel_service
 
@@ -1611,17 +1517,8 @@ class ChannelManager:
             run_kwargs["headers"] = owner_headers
 
         if policy is not None and policy.fire_and_forget:
-            # Fire-and-forget path: the channel does its own outbound
-            # during the run (GitHub agents post to the issue/PR via the
-            # ``gh`` CLI from inside the sandbox), so there is nothing
-            # for the manager to ferry back. Use ``runs.create`` — a
-            # short POST that returns once the run is ``pending`` — to
-            # avoid the SDK's 300s ``httpx.ReadTimeout`` on legitimately
-            # long autonomous runs, and the false "internal error"
-            # outbound that follows when it fires. ``ConflictError`` is
-            # still raised synchronously by ``start_run`` if a previous
-            # run on this thread is still active, so the existing
-            # busy-thread path is preserved.
+            # 自行回写平台的通道无需管理器转发最终状态。``runs.create`` 在 pending
+            # 后即返回，可避免长时间自治任务触发 SDK 读取超时；线程冲突仍会同步抛出。
             logger.info(
                 "[Manager] invoking runs.create(thread_id=%s, text_len=%d) [fire_and_forget]",
                 thread_id,
@@ -1663,9 +1560,8 @@ class ChannelManager:
             len(artifacts),
         )
 
-        # Reuse the storage owner cached at the top of _handle_chat so uploads and
-        # artifact delivery always resolve to the same bucket, even if a future
-        # channel.receive_file returns a rewritten InboundMessage.
+        # 复用回合开始时解析的存储所有者，即使 receive_file 返回新消息对象，上传与
+        # 产物仍位于同一用户桶。
         response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts, user_id=storage_user_id)
 
         if not response_text:
@@ -1700,6 +1596,7 @@ class ChannelManager:
         human_message: dict[str, Any],
         storage_user_id: str | None = None,
     ) -> None:
+        """消费 Agent SSE 流，节流发布中间文本，并保证最终消息必定落地。"""
         logger.info("[Manager] invoking runs.stream(thread_id=%s, text_len=%d)", thread_id, len(msg.text or ""))
 
         last_values: dict[str, Any] | list | None = None
@@ -1735,8 +1632,7 @@ class ChannelManager:
                         latest_text = accumulated_text
                 elif event == "values" and isinstance(data, (dict, list)):
                     last_values = data
-                    # Clarification text is only in the values snapshot;
-                    # publish it so the user sees the question mid-stream.
+                    # 澄清问题只存在于 values 快照，也必须在流中及时展示给用户。
                     if _has_current_turn_clarification(data):
                         clarification_text = _extract_response_text(data)
                         if clarification_text and clarification_text != latest_text:
@@ -1747,7 +1643,7 @@ class ChannelManager:
 
                 now = time.monotonic()
                 new_chars = len(latest_text) - last_published_len
-                # OR logic: flush when interval elapsed OR enough chars accumulated
+                # 时间窗口或字符阈值任一满足即可刷新，兼顾响应感和平台限流。
                 if last_published_text:
                     if now - last_publish_at < STREAM_UPDATE_MIN_INTERVAL_SECONDS and new_chars < STREAM_UPDATE_MIN_CHARS:
                         continue
@@ -1780,9 +1676,7 @@ class ChannelManager:
             response_text = _extract_response_text(result)
             pending_clarification = _has_current_turn_clarification(result)
             artifacts = _extract_artifacts(result)
-            # Reuse the storage owner resolved by _handle_chat so artifact delivery
-            # matches the upload bucket and we avoid re-running _safe_user_id_for_run
-            # (and its possible filesystem touch) on the streaming-error path.
+            # 复用已解析的存储身份，使错误收尾路径也不会切换产物桶或再次触碰文件系统。
             response_text, attachments = _prepare_artifact_delivery(thread_id, response_text, artifacts, user_id=storage_user_id)
 
             if not response_text:
@@ -1819,16 +1713,12 @@ class ChannelManager:
                 )
             )
 
-    # -- command handling --------------------------------------------------
+    # -- 命令处理 ----------------------------------------------------------
 
     async def _handle_command(self, msg: InboundMessage) -> None:
-        # Commands are the other run-creation entry point besides chat: /new
-        # calls _create_thread() directly, and /bootstrap routes into
-        # _handle_chat(). Apply the same bound-identity admission boundary here
-        # so unbound platform users cannot create unowned threads/checkpoints or
-        # query Gateway state via commands. Provider-level binding flows
-        # (/connect <code>, /start <code>) are consumed by the provider adapter
-        # before the message reaches the manager, so they are unaffected.
+        """解析管理器级命令，并在需要时转入普通聊天流程。"""
+        # 命令同样可以创建线程或查询 Gateway，必须执行与聊天一致的身份门禁。平台级
+        # ``/connect``、``/start`` 已在适配器中消费，不受此处影响。
         bound_identity_rejection = await self._get_bound_identity_rejection(msg)
         if bound_identity_rejection is not None:
             await self._reject_unbound_channel_message(msg, bound_identity_rejection=bound_identity_rejection)
@@ -1856,7 +1746,7 @@ class ChannelManager:
             return
 
         if reply is None and command == "new":
-            # Create a new thread through Gateway
+            # /new 明确要求切换会话，因此不复用当前映射。
             client = self._get_client()
             await self._create_thread(client, msg)
             reply = "New conversation started."
@@ -1922,6 +1812,7 @@ class ChannelManager:
         headers: dict[str, str],
         json: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        """向线程目标 API 发起带所有者身份的 goal 请求。"""
         async with httpx.AsyncClient() as http:
             request = getattr(http, method.lower())
             kwargs: dict[str, Any] = {"timeout": 10, "headers": headers}
@@ -1932,6 +1823,7 @@ class ChannelManager:
             return response.json() or {}
 
     async def _handle_goal_command(self, msg: InboundMessage, args: str) -> str | None:
+        """执行 goal 查询、清除或设置，并在设置后启动首个目标回合。"""
         command = parse_goal_command(args)
         thread_id = await self._lookup_thread_id(msg)
         headers = _owner_headers(msg) or create_internal_auth_headers()
@@ -1972,7 +1864,7 @@ class ChannelManager:
         return None
 
     async def _fetch_gateway(self, path: str, kind: str, *, msg: InboundMessage | None = None) -> str:
-        """Fetch data from the Gateway API for command responses."""
+        """为通道命令读取 Gateway 数据并转换为简短文本。"""
         import httpx
 
         try:
@@ -1997,9 +1889,10 @@ class ChannelManager:
             return f"Memory contains {len(facts)} fact(s)."
         return str(data)
 
-    # -- error helper ------------------------------------------------------
+    # -- 错误回复 ----------------------------------------------------------
 
     async def _send_error(self, msg: InboundMessage, error_text: str) -> None:
+        """把处理错误回复到原平台消息，同时保留安全精简后的路由元数据。"""
         outbound = OutboundMessage(
             channel_name=msg.channel_name,
             chat_id=msg.chat_id,

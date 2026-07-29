@@ -1,4 +1,4 @@
-"""ChannelService — manages the lifecycle of all IM channels."""
+"""管理全部即时通讯通道及其共享调度器的生命周期。"""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ if TYPE_CHECKING:
     from deerflow.config.app_config import AppConfig
     from deerflow.config.channel_connections_config import ChannelConnectionsConfig
 
-# Channel name → import path for lazy loading
+# 通道类按需导入，未启用的平台不会加载其可选 SDK。
 _CHANNEL_REGISTRY: dict[str, str] = {
     "dingtalk": "app.channels.dingtalk:DingTalkChannel",
     "discord": "app.channels.discord:DiscordChannel",
@@ -31,7 +31,7 @@ _CHANNEL_REGISTRY: dict[str, str] = {
     "wecom": "app.channels.wecom:WeComChannel",
 }
 
-# Keys that indicate a user has configured credentials for a channel.
+# 这些键只用于判断“已配置但未启用”，不会参与凭据有效性校验。
 _CHANNEL_CREDENTIAL_KEYS: dict[str, list[str]] = {
     "dingtalk": ["client_id", "client_secret"],
     "discord": ["bot_token"],
@@ -47,11 +47,13 @@ _CHANNELS_GATEWAY_URL_ENV = "DEER_FLOW_CHANNELS_GATEWAY_URL"
 
 
 def _channel_has_credentials(name: str, channel_config: dict[str, Any]) -> bool:
+    """判断通道是否至少填写了一个非布尔凭据字段。"""
     cred_keys = _CHANNEL_CREDENTIAL_KEYS.get(name, [])
     return any(not isinstance(channel_config.get(key), bool) and channel_config.get(key) is not None and str(channel_config[key]).strip() for key in cred_keys)
 
 
 def _resolve_service_url(config: dict[str, Any], config_key: str, env_key: str, default: str) -> str:
+    """按通道配置、环境变量、默认值的顺序解析服务地址。"""
     value = config.pop(config_key, None)
     if isinstance(value, str) and value.strip():
         return value
@@ -62,11 +64,13 @@ def _resolve_service_url(config: dict[str, Any], config_key: str, env_key: str, 
 
 
 def _merge_channel_connection_runtime_config(channels_config: dict[str, Any], app_config: AppConfig) -> None:
+    """把界面持久化的运行时连接覆盖合并到静态通道配置。"""
     connection_config = getattr(app_config, "channel_connections", None)
     merge_runtime_channel_configs(channels_config, connection_config)
 
 
 def _make_connection_repo(connection_config: ChannelConnectionsConfig | None):
+    """在连接功能和数据库均可用时创建连接仓库。"""
     if connection_config is None or not getattr(connection_config, "enabled", False):
         return None
 
@@ -85,10 +89,10 @@ def _make_connection_repo(connection_config: ChannelConnectionsConfig | None):
 
 
 class ChannelService:
-    """Manages the lifecycle of all configured IM channels.
+    """统一管理配置中的通道实例与共享 ``ChannelManager``。
 
-    Reads configuration from ``config.yaml`` under the ``channels`` key,
-    instantiates enabled channels, and starts the ChannelManager dispatcher.
+    服务读取 ``config.yaml`` 的 ``channels`` 配置及运行时覆盖，只实例化已启用通道，
+    并确保平台工作线程与管理器按正确顺序启动和停止。
     """
 
     def __init__(
@@ -98,6 +102,7 @@ class ChannelService:
         connection_repo: Any | None = None,
         require_bound_identity: bool = False,
     ) -> None:
+        """构造共享总线、映射存储、管理器及通道配置快照。"""
         self.bus = MessageBus()
         self.store = ChannelStore()
         self._connection_repo = connection_repo
@@ -116,20 +121,20 @@ class ChannelService:
             connection_repo=connection_repo,
             require_bound_identity=require_bound_identity,
         )
-        self._channels: dict[str, Any] = {}  # name -> Channel instance
+        self._channels: dict[str, Any] = {}  # 仅保存已成功进入运行状态的通道实例。
         self._config = config
         self._running = False
         self._readiness_locks: dict[str, asyncio.Lock] = {}
 
     @classmethod
     def from_app_config(cls, app_config: AppConfig | None = None) -> ChannelService:
-        """Create a ChannelService from the application config."""
+        """从应用配置与运行时覆盖构造通道服务。"""
         if app_config is None:
             from deerflow.config.app_config import get_app_config
 
             app_config = get_app_config()
         channels_config = {}
-        # extra fields are allowed by AppConfig (extra="allow")
+        # ``channels`` 是 AppConfig 允许保留的扩展字段，不属于固定模型属性。
         extra = app_config.model_extra or {}
         if "channels" in extra:
             channels_config = dict(extra["channels"] or {})
@@ -144,7 +149,7 @@ class ChannelService:
         )
 
     async def start(self) -> None:
-        """Start the manager and all enabled channels."""
+        """先启动管理器，再尝试启动全部已启用通道。"""
         if self._running:
             return
 
@@ -156,7 +161,7 @@ class ChannelService:
         logger.info("ChannelService started with %d/%d ready channels", ready_count, len(ready_status))
 
     async def ensure_ready_channels(self, *, attempts: int = 1) -> dict[str, bool]:
-        """Start or restart enabled configured channels that are not ready."""
+        """启动或恢复尚未就绪的已启用通道，并返回逐通道结果。"""
         ready_status: dict[str, bool] = {}
         for name, channel_config in self._config.items():
             if not isinstance(channel_config, dict):
@@ -180,7 +185,7 @@ class ChannelService:
         *,
         attempts: int = 1,
     ) -> bool:
-        """Ensure a single enabled channel is running using its current config."""
+        """使用当前有效配置确保指定通道处于运行状态。"""
         if not self._running:
             logger.warning("ChannelService is not running; cannot ensure channel readiness")
             return False
@@ -188,8 +193,7 @@ class ChannelService:
         if config is not None:
             self._config[name] = dict(config)
 
-        # Serialize per channel: readiness is polled from request handlers, so
-        # concurrent calls must not stop/start the same channel worker twice.
+        # 就绪检查可能由多个请求并发触发，按通道加锁可避免同一工作线程被重复停启。
         lock = self._readiness_locks.setdefault(name, asyncio.Lock())
         async with lock:
             channel_config = self._config.get(name)
@@ -219,7 +223,7 @@ class ChannelService:
             return False
 
     async def stop(self) -> None:
-        """Stop all channels and the manager."""
+        """先停止所有平台通道，再停止共享管理器。"""
         for name, channel in list(self._channels.items()):
             try:
                 await channel.stop()
@@ -233,15 +237,11 @@ class ChannelService:
         logger.info("ChannelService stopped")
 
     def _load_channel_config(self, name: str) -> dict[str, Any] | None:
-        """Load the latest config for a specific channel from disk.
+        """从磁盘重新加载指定通道的最新有效配置。
 
-        Uses ``get_app_config()`` which detects file changes via config
-        signature, so edits to ``config.yaml`` are picked up without a process
-        restart.
-        The UI runtime-config overlay applied at startup is re-applied here
-        so a file-driven reload neither drops credentials entered from the
-        browser nor resurrects a channel disconnected from it.
-        Falls back to the cached ``self._config`` when config loading fails.
+        ``get_app_config()`` 会根据配置签名识别 ``config.yaml`` 变化；随后必须重新
+        应用界面运行时覆盖，避免丢失浏览器录入凭据或重新启用已主动断开的通道。
+        加载失败时回退到内存快照。
         """
         try:
             from deerflow.config.app_config import get_app_config
@@ -252,7 +252,7 @@ class ChannelService:
             _merge_channel_connection_runtime_config(channels_config, app_config)
             channel_config = channels_config.get(name)
             if isinstance(channel_config, dict):
-                # Update the cached config so get_status() stays consistent.
+                # 同步内存快照，使状态查询与实际重启配置保持一致。
                 self._config[name] = channel_config
                 return channel_config
         except Exception:
@@ -260,7 +260,7 @@ class ChannelService:
         return self._config.get(name)
 
     async def restart_channel(self, name: str, *, reload_config: bool = True) -> bool:
-        """Restart a specific channel. Returns True if successful."""
+        """停止并重新创建指定通道，成功时返回真。"""
         if name in self._channels:
             try:
                 await self._channels[name].stop()
@@ -269,8 +269,7 @@ class ChannelService:
             del self._channels[name]
 
         if reload_config:
-            # Reading config.yaml and the runtime store is disk IO; keep it
-            # off the event loop.
+            # 读取 config.yaml 和运行时存储属于阻塞磁盘 IO，放到工作线程执行。
             config = await asyncio.to_thread(self._load_channel_config, name)
         else:
             config = self._config.get(name)
@@ -285,17 +284,15 @@ class ChannelService:
         return await self._start_channel(name, config)
 
     async def configure_channel(self, name: str, config: dict[str, Any]) -> bool:
-        """Apply runtime config for a channel and restart it if the service is running."""
+        """应用权威运行时配置，并在服务运行时立即重启通道。"""
         self._config[name] = dict(config)
         if not self._running:
             return True
-        # The caller just supplied the authoritative config (e.g. credentials
-        # entered in the browser that are never written to config.yaml) — a
-        # file reload here would clobber it with the stale on-disk entry.
+        # 调用方刚提供的界面配置可能从未写入 config.yaml，重启时不能再用旧磁盘值覆盖。
         return await self.restart_channel(name, reload_config=False)
 
     async def remove_channel(self, name: str) -> bool:
-        """Remove runtime config for a channel and stop it if currently running."""
+        """删除运行时配置，并停止仍在运行的对应通道。"""
         self._config.pop(name, None)
         channel = self._channels.pop(name, None)
         if channel is None:
@@ -309,7 +306,7 @@ class ChannelService:
             return False
 
     async def _start_channel(self, name: str, config: dict[str, Any]) -> bool:
-        """Instantiate and start a single channel."""
+        """惰性解析通道类，注入共享依赖并验证其成功进入运行状态。"""
         import_path = _CHANNEL_REGISTRY.get(name)
         if not import_path:
             logger.warning("Unknown channel type")
@@ -343,7 +340,7 @@ class ChannelService:
             return False
 
     def get_status(self) -> dict[str, Any]:
-        """Return status information for all channels."""
+        """返回服务及所有已知通道的启用与运行状态。"""
         channels_status = {}
         for name in _CHANNEL_REGISTRY:
             config = self._config.get(name, {})
@@ -359,20 +356,15 @@ class ChannelService:
         }
 
     def get_channel(self, name: str) -> Channel | None:
-        """Return a running channel instance by name when available."""
+        """按名称返回已注册通道实例，不存在时返回 ``None``。"""
         return self._channels.get(name)
 
     def is_channel_enabled(self, name: str) -> bool:
-        """Return whether ``channels.<name>.enabled`` is truthy in the live config.
+        """读取实时配置中的 ``channels.<name>.enabled``。
 
-        Tracks the runtime-authoritative ``_config`` dict, which
-        :meth:`configure_channel` updates when the UI flips the
-        enabled flag — so callers that read this between requests get
-        the current effective setting without re-reading config.yaml.
-        Used by the GitHub webhook router as a fan-out kill-switch:
-        ``channels.github.enabled: false`` skips dispatch even though
-        the webhook route itself remains mounted (which is governed by
-        ``GITHUB_WEBHOOK_SECRET``, not this flag).
+        ``_config`` 是运行时权威快照，界面切换状态后无需重新读取 config.yaml。
+        GitHub Webhook 路由以此作为分发开关；关闭通道只停止分发，不会卸载由
+        ``GITHUB_WEBHOOK_SECRET`` 控制的路由。
         """
         config = self._config.get(name)
         if not isinstance(config, dict):
@@ -380,16 +372,10 @@ class ChannelService:
         return bool(config.get("enabled", False))
 
     def get_channel_config(self, name: str) -> dict[str, Any] | None:
-        """Return a shallow copy of the live ``channels.<name>`` block, or None.
+        """返回实时 ``channels.<name>`` 配置的浅拷贝。
 
-        Mirrors :meth:`is_channel_enabled` in tracking the runtime-
-        authoritative ``_config`` dict, so callers see the same effective
-        configuration the manager sees — including any updates pushed via
-        :meth:`configure_channel` from the UI. Returns ``None`` when no
-        config exists for ``name`` (rather than an empty dict) so callers
-        can distinguish "not configured" from "configured with defaults".
-        The shallow copy keeps callers from accidentally mutating live
-        config state.
+        返回 ``None`` 表示未配置，与“已配置为空或默认值”明确区分；复制可防止调用方
+        意外修改管理器正在使用的权威内存状态。
         """
         config = self._config.get(name)
         if not isinstance(config, dict):
@@ -397,30 +383,29 @@ class ChannelService:
         return dict(config)
 
 
-# -- singleton access -------------------------------------------------------
+# -- 单例访问 --------------------------------------------------------------
 
 _channel_service: ChannelService | None = None
 
 
 def get_channel_service() -> ChannelService | None:
-    """Get the singleton ChannelService instance (if started)."""
+    """返回已启动的全局 ``ChannelService``，尚未创建时返回 ``None``。"""
     return _channel_service
 
 
 async def start_channel_service(app_config: AppConfig | None = None) -> ChannelService:
-    """Create and start the global ChannelService from app config."""
+    """从应用配置创建并启动全局 ``ChannelService``。"""
     global _channel_service
     if _channel_service is not None:
         return _channel_service
-    # from_app_config reads the JSON channel store and runtime config files;
-    # keep that disk IO off the event loop.
+    # from_app_config 会读取 JSON 映射和运行时配置文件，必须避开事件循环。
     _channel_service = await asyncio.to_thread(ChannelService.from_app_config, app_config)
     await _channel_service.start()
     return _channel_service
 
 
 async def stop_channel_service() -> None:
-    """Stop the global ChannelService."""
+    """停止并清除全局 ``ChannelService``。"""
     global _channel_service
     if _channel_service is not None:
         await _channel_service.stop()
