@@ -1,31 +1,17 @@
-"""GitHub channel — webhook-driven IM channel for PR/issue comments.
+"""提供由 Webhook 驱动的 GitHub PR/Issue 评论通道。
 
-Unlike other IM channels (Feishu, Slack, Telegram) which long-poll or use
-WebSockets, GitHub delivers messages via HTTP push webhooks. This channel
-therefore has a no-op ``start``/``stop`` — inbound messages arrive through
-``POST /api/webhooks/github`` and are published to the bus by the webhook
-route handler.
+GitHub 不使用长轮询或 WebSocket，而是通过 HTTP Webhook 主动推送事件。入站消息由
+``POST /api/webhooks/github`` 路由发布到消息总线，因此 ``start``/``stop`` 只管理
+出站订阅，不创建平台监听器。
 
-**The channel does not auto-post the agent's final response.** Each GitHub
-agent (coder, reviewer, …) has the `gh` CLI in its sandbox and is expected to
-decide for itself what — if anything — to post on the issue or PR, and to use
-``gh issue comment`` / ``gh pr comment`` / ``gh pr create`` during the run.
-The agent's final assistant message is logged at INFO for visibility in
-``gateway.log`` but is **not** sent to GitHub.
+该通道不会自动发布 Agent 最终回答。coder、reviewer 等 Agent 在沙箱内使用 ``gh``
+自行决定是否以及何时回写 Issue/PR；最终 assistant 消息只写入 ``gateway.log``。
 
-Why log-only rather than auto-post:
+只记录而不自动发布有三个原因：
 
-- Two agents can bind the same event (e.g. coder + reviewer on a mention).
-  If both auto-posted their final messages, the user would see two replies
-  for every mention even when only one had useful work to do. Letting the
-  LLM call ``gh`` mid-run means silence is just "the LLM did not call gh."
-- The agent often wants to post *intermediate* updates (an issue comment
-  linking the PR, a separate comment on a new sub-issue, …) — the
-  auto-post-the-final-message contract didn't model that and forced the
-  final message to play double duty.
-- The dispatcher's per-agent ``_is_self_event`` gate already prevents the
-  comments the LLM posts via ``gh`` from looping the webhook back into a
-  new run for the same agent.
+- 同一事件可能同时绑定多个 Agent，自动发布会制造无意义的重复回复。
+- Agent 往往需要在运行中发布 PR 链接等中间进度，单一最终消息无法表达该流程。
+- 分发器的 ``_is_self_event`` 门禁已阻止 Agent 自己发布的评论回环触发同一 Agent。
 """
 
 from __future__ import annotations
@@ -40,31 +26,23 @@ logger = logging.getLogger(__name__)
 
 
 class GitHubChannel(Channel):
-    """Webhook-driven GitHub channel.
+    """把 GitHub Webhook 入站事件接入共享消息总线。
 
-    Inbound: ``POST /api/webhooks/github`` publishes ``InboundMessage`` to
-    the bus. Outbound: ``send`` is log-only (see module docstring) — agents
-    post to GitHub themselves via the ``gh`` CLI in their sandbox.
-
-    Configuration keys (in ``config.yaml`` under ``channels.github``):
-
-        - ``enabled`` (bool): set to ``true`` to activate.
-        - ``default_mention_login`` (str, optional): bot handle used by
-          ``require_mention`` when the agent binding does not set one.
-          Falls back to ``"deerflow-bot"``.
+    入站由 Webhook 路由发布，出站 ``send`` 仅记录日志，平台回写由沙箱中的 ``gh``
+    完成。``channels.github.enabled`` 控制是否激活；``default_mention_login`` 在
+    Agent 绑定未指定账号时为 ``require_mention`` 提供默认机器人名称。
     """
 
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
+        """以固定通道名初始化 GitHub 适配器。"""
         super().__init__(name="github", bus=bus, config=config)
 
-    # -- lifecycle ---------------------------------------------------------
+    # -- 生命周期 ----------------------------------------------------------
 
     async def start(self) -> None:
-        """Register the outbound callback.
+        """注册只记录日志的出站回调。
 
-        GitHub is push-based (webhooks), so no long-poll or socket
-        listener is needed. We only register for outbound replies so the
-        agent's final message gets logged.
+        GitHub 入站由 Webhook 推送，不需要长轮询或套接字监听器。
         """
         if self._running:
             return
@@ -73,26 +51,20 @@ class GitHubChannel(Channel):
         logger.info("GitHubChannel started (webhook-driven, no polling)")
 
     async def stop(self) -> None:
-        """Unregister the outbound callback."""
+        """注销出站回调。"""
         if not self._running:
             return
         self.bus.unsubscribe_outbound(self._on_outbound)
         self._running = False
         logger.info("GitHubChannel stopped")
 
-    # -- outbound ----------------------------------------------------------
+    # -- 出站消息 ----------------------------------------------------------
 
     async def send(self, msg: OutboundMessage) -> None:
-        """Log the agent's final message — do NOT post it to GitHub.
+        """记录 Agent 最终消息，但不将其发布到 GitHub。
 
-        GitHub agents post to issues/PRs themselves via ``gh`` mid-run; the
-        final assistant message is logged for ``gateway.log`` visibility but
-        is not delivered to the platform. See the module docstring for why.
-
-        Metadata layout (read for logging context only):
-            - ``repo`` (str, e.g. ``"owner/name"``) — falls back to ``chat_id``
-            - ``number`` (int, issue or PR number)
-            - ``installation_id`` (int)
+        ``github`` 元数据中的 ``repo``、``number`` 和 ``installation_id`` 只用于
+        日志关联；缺少 ``repo`` 时回退到 ``chat_id``。
         """
         gh = msg.metadata.get("github", {}) if isinstance(msg.metadata, dict) else {}
         if not isinstance(gh, dict):
@@ -109,7 +81,6 @@ class GitHubChannel(Channel):
             number,
             len(body),
         )
-        # Mirror the body itself at DEBUG so operators can correlate without
-        # spamming INFO. Truncate to keep log lines bounded.
+        # 正文放在 DEBUG 级别并截断，既便于关联运行，又不会淹没 INFO 日志。
         if body:
             logger.debug("[GitHubChannel] final body (truncated to 2000 chars): %s", body[:2000])
