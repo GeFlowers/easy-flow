@@ -12,12 +12,12 @@ interface Shortcut {
 }
 
 /**
- * Register global keyboard shortcuts on window.
- * Shortcuts are suppressed when focus is inside an input, textarea, or
- * contentEditable element - except for Cmd+K which always fires.
+ * 在 window 上注册全局快捷键。焦点位于输入控件时抑制普通快捷键，但保留
+ * Cmd/Ctrl+K，以符合命令面板的通用交互习惯。
  */
 export function useGlobalShortcuts(shortcuts: Shortcut[]) {
   useEffect(() => {
+    /** 规范化平台修饰键并执行首个精确匹配的快捷键。 */
     function handleKeyDown(event: KeyboardEvent) {
       if (typeof event.key !== "string" || event.key.length === 0) {
         return;
@@ -33,7 +33,7 @@ export function useGlobalShortcuts(shortcuts: Shortcut[]) {
           meta === shortcut.meta &&
           (shortcut.shift ?? false) === event.shiftKey
         ) {
-          // Allow Cmd+K even in inputs (standard command palette behavior)
+          // 命令面板快捷键在输入框内仍应可用，其他快捷键不得打断文本编辑。
           if (shortcutKey !== "k") {
             const target = event.target as HTMLElement;
             const tag = target.tagName;
