@@ -1,13 +1,8 @@
-"""Per-channel run policy registry.
+"""维护按即时通讯通道划分的 Agent 运行策略。
 
-Holds the global ``CHANNEL_RUN_POLICY`` map and its :class:`ChannelRunPolicy`
-descriptor. Split into its own module so channels can register their own
-policy entries (typically as a side-effect of importing their package)
-without creating a circular dependency on :mod:`app.channels.manager`.
-
-The dispatch path in :class:`app.channels.manager.ChannelManager` looks
-up policy entries by ``msg.channel_name`` and applies them after
-``_resolve_run_params``.
+策略注册表与 ``ChannelRunPolicy`` 独立于管理器定义，使通道能够在导入时注册能力，
+又不会与 :mod:`app.channels.manager` 形成循环依赖。``ChannelManager`` 在
+``_resolve_run_params`` 之后按 ``msg.channel_name`` 应用对应策略。
 """
 
 from __future__ import annotations
@@ -22,68 +17,20 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ChannelRunPolicy:
-    """Per-channel knobs applied by :meth:`ChannelManager._apply_channel_policy`.
+    """描述 :meth:`ChannelManager._apply_channel_policy` 应用的通道差异。
 
-    Webhook-driven channels (GitHub today; others later) need four
-    things the generic interactive-chat path does not: a higher
-    ``recursion_limit`` for autonomous long runs, suppression of
-    ``ask_clarification`` (no human is synchronously present), a
-    credentials provider that mints platform tokens for the agent, and
-    an opt-out from the per-sender bound-identity gate (authenticity is
-    enforced at the webhook route by HMAC, and there is no equivalent
-    of a per-user ``/connect`` handshake to perform).
+    普通交互式通道采用保守默认值；Webhook 驱动的自治通道则可集中声明更高递归
+    上限、禁止同步澄清、动态凭据、身份门禁例外或无需等待最终回复等能力。把这些
+    差异收敛为不可变数据，新增通道时只需注册策略，不必在管理器多个分支中硬编码。
 
-    Declaring all four on one dataclass keeps the channel's run
-    behavior in a single discoverable place and turns "add a new
-    webhook channel" into a one-row registration instead of touching
-    multiple separate methods on the manager.
-
-    Attributes:
-        is_interactive: When False, the manager sets
-            ``run_context["disable_clarification"] = True`` so
-            ``ClarificationMiddleware`` returns a "proceed with best
-            judgment" ToolMessage instead of interrupting via
-            ``Command(goto=END)``. Defaults to True (the safe default
-            for an IM channel).
-        default_recursion_limit: When set, the manager raises
-            ``run_config["recursion_limit"]`` to ``max(existing,
-            limit)``. None leaves the global default (100) untouched —
-            interactive chat turns don't need 250 super-steps.
-        credentials_provider: Optional async hook that mutates
-            ``run_context`` with platform-specific credentials. Called
-            after ``_resolve_run_params``. Exceptions are caught and
-            logged so a credential failure degrades gracefully (agent
-            runs read-only) instead of dropping the delivery.
-        requires_bound_identity: When False, the manager skips the
-            per-sender bound-identity gate (``_get_bound_identity_rejection``)
-            for this channel even when ``channel_connections.enabled`` is
-            on. Webhook-authenticated channels (GitHub) have no
-            per-sender ``/connect`` handshake — authenticity is enforced
-            by HMAC at the webhook route, and the binding from "sender"
-            to DeerFlow user is encoded in the agent's ``config.yaml``
-            ownership, not in the channel-connections table. Defaults to
-            True (the safe default for an interactive IM channel).
-        fire_and_forget: When True, the manager schedules the run with
-            ``runs.create`` (returns immediately once the run is
-            ``pending``) instead of ``runs.wait`` (which keeps an HTTP
-            stream open for the entire run lifetime). Channels that do
-            their own outbound during the run — e.g. GitHub, where the
-            agent posts to the issue/PR via the ``gh`` CLI in its
-            sandbox — don't need the manager to ferry a final state
-            back. Eliminates the SDK's 300s ``httpx.ReadTimeout`` on
-            runs that legitimately take more than 5 minutes, and the
-            false "internal error" outbound that follows when it
-            fires. Defaults to False (the safe default for an
-            interactive IM channel that depends on the manager to
-            publish the agent's reply).
-        serialize_thread_runs: When True, the manager serializes
-            same-thread inbound turns for this channel instead of
-            surfacing the runtime's generic busy-thread error. This is
-            useful for chat surfaces like Feishu topics where rapid
-            follow-up messages should queue behind the active turn while
-            unrelated DeerFlow threads continue concurrently. Defaults
-            to False so existing channels keep the runtime's native
-            multitask behavior unless they opt in explicitly.
+    ``is_interactive`` 为假时，管理器通过
+    ``run_context["disable_clarification"]`` 阻止无人值守任务等待人工回复。
+    ``default_recursion_limit`` 只提高现有上限，不会压低调用方的显式配置。
+    ``credentials_provider`` 可在运行前注入短期平台凭据，其失败会降级为只读执行。
+    ``requires_bound_identity`` 允许已在 Webhook 边界完成 HMAC 验证的通道跳过
+    ``/connect`` 身份流程。``fire_and_forget`` 使用 ``runs.create``，适合自行回写
+    平台且可能超过 SDK 等待超时的任务。``serialize_thread_runs`` 则只串行化同一
+    DeerFlow 线程，避免快速连续消息触发运行冲突，同时保留不同线程之间的并发。
     """
 
     is_interactive: bool = True
@@ -94,9 +41,5 @@ class ChannelRunPolicy:
     serialize_thread_runs: bool = False
 
 
-# Channel name → policy. Channels absent from this map fall through to
-# the policy default (an interactive IM channel with no credential
-# plumbing) — which is what every IM channel had before GitHub. Webhook
-# channels register their entry at package-import time (see
-# ``app.gateway.github.run_policy``).
+# 未注册通道沿用交互式安全默认值；Webhook 通道在模块导入时显式登记例外策略。
 CHANNEL_RUN_POLICY: dict[str, ChannelRunPolicy] = {}

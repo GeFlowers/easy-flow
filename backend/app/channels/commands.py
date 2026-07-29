@@ -1,9 +1,7 @@
-"""Shared command definitions used by all channel implementations.
+"""集中定义所有即时通讯通道共享的控制命令。
 
-Keeping the authoritative command set in one place ensures that channel
-parsers (e.g. Feishu) and the ChannelManager dispatcher stay in sync
-automatically — adding or removing a command here is the single edit
-required.
+权威命令集合只维护在此处，使平台解析器与 ``ChannelManager`` 的分发判断始终一致；
+新增或移除命令时无需同步修改多个通道实现。
 """
 
 from __future__ import annotations
@@ -22,7 +20,7 @@ KNOWN_CHANNEL_COMMANDS: frozenset[str] = frozenset(
 
 
 def extract_connect_code(text: str) -> str | None:
-    """Extract the one-time channel binding code from a connect command."""
+    """从连接命令中提取一次性绑定码，不接受缺少参数的命令。"""
     parts = text.strip().split()
     if len(parts) < 2:
         return None
@@ -33,7 +31,7 @@ def extract_connect_code(text: str) -> str | None:
 
 
 def is_known_channel_command(text: str) -> bool:
-    """Return whether text starts with a registered channel control command."""
+    """判断文本首段是否为已注册的通道控制命令。"""
     if not text.startswith("/"):
         return False
     return text.split(maxsplit=1)[0].lower() in KNOWN_CHANNEL_COMMANDS
