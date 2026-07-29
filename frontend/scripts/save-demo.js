@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { env } from "process";
 
+/** 从线程历史导出可离线展示的演示快照及其上传、产物文件。 */
 export async function main() {
   const url = new URL(process.argv[2]);
   const threadId = url.pathname.split("/").pop();
@@ -48,6 +49,7 @@ export async function main() {
   console.info(`Saved demo "${title}" to ${rootPath}`);
 }
 
+/** 仅在源目录存在时复制演示所需的线程子目录。 */
 function copyFolder(relPath, rootPath, backendRootPath) {
   const outputsPath = path.resolve(backendRootPath, relPath);
   if (fs.existsSync(outputsPath)) {

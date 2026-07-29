@@ -1,3 +1,4 @@
+/** 定义使用模拟后端的常规浏览器端到端测试环境。 */
 import { defineConfig, devices } from "@playwright/test";
 
 const baseURL = process.env.PLAYWRIGHT_BASE_URL ?? "http://localhost:3000";

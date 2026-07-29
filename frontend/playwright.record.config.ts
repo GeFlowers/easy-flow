@@ -1,12 +1,11 @@
 import { defineConfig, devices } from "@playwright/test";
 
 /**
- * RECORD-through-browser config (Plan A): drive the REAL frontend against a
- * REAL-model gateway and capture every model call so the fixture's inputs match
- * exactly what the frontend produces. Manual, needs OPENAI_API_KEY/OPENAI_API_BASE
- * + DEERFLOW_RECORD_OUT in the environment — never run in CI.
+ * 浏览器录制配置：让真实前端连接真实模型 Gateway，并捕获每次模型调用，保证生成的
+ * fixture 输入与前端实际请求完全一致。该流程只供人工执行，依赖
+ * `OPENAI_API_KEY`、`OPENAI_API_BASE` 和 `DEERFLOW_RECORD_OUT`，不得在 CI 中运行。
  *
- * Not committed as a test run; `tests/e2e-record/` holds the driver spec.
+ * `tests/e2e-record/` 保存驱动用例，本配置本身不属于常规测试套件。
  */
 export default defineConfig({
   testDir: "./tests/e2e-record",
@@ -28,9 +27,8 @@ export default defineConfig({
       env: {
         RECORD_PORT: "8012",
         RECORD_MODEL: process.env.RECORD_MODEL ?? "gpt-5.5",
-        // Forwarded from the invoking shell; never hardcoded. Passed through only
-        // when actually set, so record_gateway.py raises a clear "missing env"
-        // error instead of receiving "" (which would write to Path("")).
+        // 仅转发调用 shell 中真实存在的值，避免空字符串让 record_gateway.py
+        // 误写 Path("")，并保留其明确的“缺少环境变量”错误。
         ...(process.env.DEERFLOW_RECORD_OUT
           ? { DEERFLOW_RECORD_OUT: process.env.DEERFLOW_RECORD_OUT }
           : {}),

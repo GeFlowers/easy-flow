@@ -1,3 +1,4 @@
+/** 组合 Next.js 与类型感知 TypeScript 规则，形成前端统一静态检查配置。 */
 import { FlatCompat } from "@eslint/eslintrc";
 import tseslint from "typescript-eslint";
 

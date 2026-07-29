@@ -3,8 +3,7 @@ import { z } from "zod";
 
 export const env = createEnv({
   /**
-   * Specify your server-side environment variables schema here. This way you can ensure the app
-   * isn't built with invalid env vars.
+   * 服务端环境变量模式在构建前拒绝无效配置。
    */
   server: {
     GITHUB_OAUTH_TOKEN: z.string().optional(),
@@ -14,9 +13,7 @@ export const env = createEnv({
   },
 
   /**
-   * Specify your client-side environment variables schema here. This way you can ensure the app
-   * isn't built with invalid env vars. To expose them to the client, prefix them with
-   * `NEXT_PUBLIC_`.
+   * 客户端环境变量必须使用 `NEXT_PUBLIC_` 前缀，并在构建期完成模式校验。
    */
   client: {
     NEXT_PUBLIC_BACKEND_BASE_URL: z.string().optional(),
@@ -25,8 +22,8 @@ export const env = createEnv({
   },
 
   /**
-   * You can't destruct `process.env` as a regular object in the Next.js edge runtimes (e.g.
-   * middlewares) or client-side so we need to destruct manually.
+   * Edge Runtime 与浏览器构建不能把 `process.env` 当普通对象展开，因此逐项声明
+   * 运行时可访问的变量，确保 Next.js 能静态替换。
    */
   runtimeEnv: {
     NODE_ENV: process.env.NODE_ENV,
@@ -38,13 +35,11 @@ export const env = createEnv({
     GITHUB_OAUTH_TOKEN: process.env.GITHUB_OAUTH_TOKEN,
   },
   /**
-   * Run `build` or `dev` with `SKIP_ENV_VALIDATION` to skip env validation. This is especially
-   * useful for Docker builds.
+   * Docker 等分阶段构建可通过 `SKIP_ENV_VALIDATION` 跳过当前阶段无法满足的校验。
    */
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   /**
-   * Makes it so that empty strings are treated as undefined. `SOME_VAR: z.string()` and
-   * `SOME_VAR=''` will throw an error.
+   * 将空字符串视为未定义，避免看似存在但实际不可用的凭据通过字符串校验。
    */
   emptyStringAsUndefined: true,
 });

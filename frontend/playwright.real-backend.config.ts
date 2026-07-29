@@ -7,15 +7,12 @@ const gatewayUrl = `http://localhost:${gatewayPort}`;
 const gatewayInternalUrl = `http://127.0.0.1:${gatewayPort}`;
 
 /**
- * Layer 2 of the record/replay e2e: the REAL Next.js frontend rendering data
- * from a REAL gateway whose LLM is the deterministic `ReplayChatModel` (no API
- * key). This is separate from `playwright.config.ts` (which mocks the backend)
- * so the mock-based suite is untouched.
+ * 录制/回放端到端测试的第二层：真实 Next.js 前端连接真实 Gateway，但 LLM 使用
+ * 无需 API Key 的确定性 `ReplayChatModel`。它与模拟后端的常规配置隔离，避免改变
+ * 原有测试语义。
  *
- * Two webServers are started: the replay gateway and the frontend pointed at
- * it. Auth-disabled mode is enabled on both servers so the no-cookie e2e
- * contract is covered; specs that need session cookies still register a
- * throwaway test account at runtime.
+ * 配置同时启动回放 Gateway 与指向它的前端。两端默认关闭认证以覆盖无 Cookie
+ * 契约，需要会话 Cookie 的用例会在运行时注册一次性测试账号。
  */
 export default defineConfig({
   testDir: "./tests/e2e-real-backend",
@@ -42,9 +39,7 @@ export default defineConfig({
       timeout: 180_000,
       stdout: "pipe",
       stderr: "pipe",
-      // Mount the test-only run/message seeder used by multi-run-order.spec.ts
-      // (#3352). The endpoint exists only on this replay gateway, never in the
-      // production app.
+      // 只在回放 Gateway 挂载多运行顺序用例需要的数据播种端点，生产应用不会暴露。
       env: {
         DEERFLOW_ENABLE_TEST_SEED: "1",
         DEER_FLOW_AUTH_DISABLED: "1",
@@ -60,10 +55,8 @@ export default defineConfig({
         SKIP_ENV_VALIDATION: "1",
         DEER_FLOW_AUTH_DISABLED: "1",
         BETTER_AUTH_SECRET: "local-dev-secret",
-        // Leave NEXT_PUBLIC_* unset so the frontend uses its built-in
-        // next.config rewrites (same-origin proxy) instead of talking to the
-        // gateway cross-origin — cross-origin fetches drop the auth cookies.
-        // Just point that proxy at the replay gateway.
+        // 保持 NEXT_PUBLIC_* 未设置，让前端通过同源代理访问回放 Gateway；跨源请求
+        // 会丢失认证 Cookie，不能复现生产访问边界。
         DEER_FLOW_INTERNAL_GATEWAY_BASE_URL: gatewayInternalUrl,
       },
     },
