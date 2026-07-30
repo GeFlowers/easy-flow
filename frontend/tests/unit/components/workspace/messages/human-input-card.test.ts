@@ -29,6 +29,9 @@ const request: HumanInputRequest = {
 };
 
 describe("HumanInputCard", () => {
+  /**
+   * 覆盖“renders request text, options, and the other-answer input”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("renders request text, options, and the other-answer input", () => {
     const html = renderCard();
 
@@ -40,6 +43,11 @@ describe("HumanInputCard", () => {
     expect(html).toContain("Other answer");
     expect(html).toContain("Type another answer...");
   });
+
+  /**
+   * 覆盖“renders answered state as disabled with the selected value”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("renders answered state as disabled with the selected value", () => {
     const response: HumanInputResponse = {
@@ -58,12 +66,22 @@ describe("HumanInputCard", () => {
     expect(html).toContain("disabled");
   });
 
+  /**
+   * 覆盖“renders read-only state when no submit handler is available”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("renders read-only state when no submit handler is available", () => {
     const html = renderCard({ onSubmit: undefined });
 
     expect(html).toContain("Read only");
     expect(html).toContain("disabled");
   });
+
+  /**
+   * 覆盖“renders markdown in question field (bold, lists)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("renders markdown in question field (bold, lists)", () => {
     const html = renderCard({
@@ -82,6 +100,11 @@ describe("HumanInputCard", () => {
     expect(html).not.toContain("**篇幅**");
   });
 
+  /**
+   * 覆盖“does not submit text with Enter while IME composition is active”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("does not submit text with Enter while IME composition is active", () => {
     expect(shouldSubmitHumanInputTextOnKeyDown(keyEvent())).toBe(true);
     expect(
@@ -96,6 +119,11 @@ describe("HumanInputCard", () => {
     expect(shouldSubmitHumanInputTextOnKeyDown(keyEvent(), true)).toBe(false);
   });
 });
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderCard 的约定。
+
+ */
 
 function renderCard(props: Partial<Parameters<typeof HumanInputCard>[0]> = {}) {
   return renderToStaticMarkup(
@@ -115,6 +143,11 @@ function renderCard(props: Partial<Parameters<typeof HumanInputCard>[0]> = {}) {
     ),
   );
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 keyEvent 的约定。
+
+ */
 
 function keyEvent({
   isComposing = false,

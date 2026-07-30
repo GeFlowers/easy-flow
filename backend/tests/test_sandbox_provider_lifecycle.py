@@ -1,14 +1,4 @@
-"""Concurrency regression tests for the sandbox provider singleton lifecycle.
-
-These guard the fix for the unsynchronized check-then-create in
-``get_sandbox_provider`` and the unlocked ``reset``/``shutdown``/``set`` paths:
-before the lock was added, concurrent cold-start callers could each construct a
-separate provider and overwrite the global, and a ``reset``/``shutdown`` racing
-a ``get`` could hand a caller ``None`` or a torn-down instance.
-
-Each test resets the process-global singleton on entry and in a ``finally`` on
-exit, so tests never leak a provider into one another.
-"""
+'未说明'
 
 import threading
 import time
@@ -19,38 +9,38 @@ from deerflow.sandbox.sandbox_provider import SandboxProvider
 
 
 class SlowSandboxProvider(SandboxProvider):
-    """Provider whose constructor is slow, to widen the check-then-create gap."""
+    '未说明'
 
     instances_created = 0
     instances_lock = threading.Lock()
 
     def __init__(self) -> None:
+        '未说明'
         time.sleep(0.05)
         with self.instances_lock:
             type(self).instances_created += 1
 
     def acquire(self, thread_id: str | None = None) -> str:
+        '未说明'
         return "sandbox-id"
 
     def get(self, sandbox_id: str) -> Sandbox | None:
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     def release(self, sandbox_id: str) -> None:
+        '未说明'
         pass
 
 
 class ShutdownSandboxProvider(SlowSandboxProvider):
-    """Provider that also exposes ``shutdown``/``reset``, to exercise the paths
-    that run a provider callback outside ``_provider_lock``.
-
-    Every constructed instance registers itself in ``registry`` so a test can
-    assert which instances were later torn down.
-    """
+    '未说明'
 
     registry: list["ShutdownSandboxProvider"] = []
     registry_lock = threading.Lock()
 
     def __init__(self) -> None:
+        '未说明'
         super().__init__()
         self.shutdown_calls = 0
         self.reset_calls = 0
@@ -60,36 +50,33 @@ class ShutdownSandboxProvider(SlowSandboxProvider):
     def shutdown(self) -> None:
         # A non-trivial teardown: the fix runs this outside the lock, so a
         # concurrent get() must not be blocked or torn by it.
+        '未说明'
         time.sleep(0.02)
         self.shutdown_calls += 1
 
     def reset(self) -> None:
+        """处理重置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.reset_calls += 1
 
 
 class _SandboxConfig:
+    '未说明'
     use = "SlowSandboxProvider"
 
 
 class _AppConfig:
+    '未说明'
     sandbox = _SandboxConfig()
 
 
 def _patch_provider_resolution(monkeypatch, cls=SlowSandboxProvider) -> None:
+    '未说明'
     monkeypatch.setattr(sandbox_provider, "get_app_config", lambda: _AppConfig())
     monkeypatch.setattr(sandbox_provider, "resolve_class", lambda *args: cls)
 
 
 def test_get_sandbox_provider_installs_one_singleton_under_concurrent_access(monkeypatch):
-    """Eight threads racing on a cold start must all observe the *same* installed
-    instance.
-
-    Construction runs outside ``_provider_lock`` (so plugin ``__init__``/import
-    never runs under a non-reentrant lock), so racing callers may each build a
-    candidate; the contract is that exactly one is installed and every caller
-    sees it. The losers are torn down — see
-    ``test_losing_cold_start_racer_shuts_down_its_orphan``.
-    """
+    '未说明'
     sandbox_provider.reset_sandbox_provider()
     SlowSandboxProvider.instances_created = 0
     _patch_provider_resolution(monkeypatch)
@@ -102,6 +89,7 @@ def test_get_sandbox_provider_installs_one_singleton_under_concurrent_access(mon
     barrier = threading.Barrier(n_threads)
 
     def get_provider() -> None:
+        """处理获取 提供方相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         barrier.wait()
         provider = sandbox_provider.get_sandbox_provider()
         with providers_lock:
@@ -123,13 +111,7 @@ def test_get_sandbox_provider_installs_one_singleton_under_concurrent_access(mon
 
 
 def test_reset_racing_get_of_live_singleton_never_returns_none_or_torn(monkeypatch):
-    """A reset racing concurrent gets of a *live* singleton must never hand back
-    ``None`` or a half-built instance: every returned value is a real provider.
-
-    The singleton is populated *before* the barrier so the resetter tears down a
-    live instance while the getters read it — the interleaving that the unlocked
-    get-read path could turn into a ``None``/torn return.
-    """
+    '未说明'
     sandbox_provider.reset_sandbox_provider()
     SlowSandboxProvider.instances_created = 0
     _patch_provider_resolution(monkeypatch)
@@ -142,12 +124,14 @@ def test_reset_racing_get_of_live_singleton_never_returns_none_or_torn(monkeypat
     barrier = threading.Barrier(5)
 
     def getter() -> None:
+        '未说明'
         barrier.wait()
         provider = sandbox_provider.get_sandbox_provider()
         with results_lock:
             results.append(provider)
 
     def resetter() -> None:
+        '未说明'
         barrier.wait()
         sandbox_provider.reset_sandbox_provider()
 
@@ -169,11 +153,7 @@ def test_reset_racing_get_of_live_singleton_never_returns_none_or_torn(monkeypat
 
 
 def test_shutdown_racing_get_of_live_singleton_never_returns_none_or_torn(monkeypatch):
-    """Same guarantee as the reset case, for ``shutdown_sandbox_provider()``.
-
-    Uses a provider with a real (non-trivial) ``shutdown()`` so the teardown
-    runs outside the lock while getters read the global concurrently.
-    """
+    '未说明'
     sandbox_provider.reset_sandbox_provider()
     SlowSandboxProvider.instances_created = 0
     _patch_provider_resolution(monkeypatch, cls=ShutdownSandboxProvider)
@@ -185,12 +165,14 @@ def test_shutdown_racing_get_of_live_singleton_never_returns_none_or_torn(monkey
     barrier = threading.Barrier(5)
 
     def getter() -> None:
+        '未说明'
         barrier.wait()
         provider = sandbox_provider.get_sandbox_provider()
         with results_lock:
             results.append(provider)
 
     def shutter() -> None:
+        '未说明'
         barrier.wait()
         sandbox_provider.shutdown_sandbox_provider()
 
@@ -209,8 +191,7 @@ def test_shutdown_racing_get_of_live_singleton_never_returns_none_or_torn(monkey
 
 
 def test_set_racing_get_never_returns_none_or_torn(monkeypatch):
-    """``set_sandbox_provider()`` racing concurrent gets must never expose a
-    ``None`` global: every getter sees a fully constructed provider."""
+    '未说明'
     sandbox_provider.reset_sandbox_provider()
     SlowSandboxProvider.instances_created = 0
     _patch_provider_resolution(monkeypatch)
@@ -223,12 +204,14 @@ def test_set_racing_get_never_returns_none_or_torn(monkeypatch):
     barrier = threading.Barrier(5)
 
     def getter() -> None:
+        '未说明'
         barrier.wait()
         provider = sandbox_provider.get_sandbox_provider()
         with results_lock:
             results.append(provider)
 
     def setter() -> None:
+        '未说明'
         barrier.wait()
         sandbox_provider.set_sandbox_provider(injected)
 
@@ -247,14 +230,7 @@ def test_set_racing_get_never_returns_none_or_torn(monkeypatch):
 
 
 def test_losing_cold_start_racer_shuts_down_its_orphan(monkeypatch):
-    """When two cold-start callers race, the loser must shut down the instance it
-    built so a side-effectful constructor (idle-checker thread, etc.) does not
-    leak — the core consequence in issue #3721.
-
-    With ``ShutdownSandboxProvider`` every constructed-but-discarded instance has
-    its ``shutdown()`` invoked, so exactly ``(constructed - 1)`` of them are torn
-    down (the single winner is kept).
-    """
+    '未说明'
     sandbox_provider.reset_sandbox_provider()
     ShutdownSandboxProvider.instances_created = 0
     ShutdownSandboxProvider.registry = []
@@ -266,6 +242,7 @@ def test_losing_cold_start_racer_shuts_down_its_orphan(monkeypatch):
     barrier = threading.Barrier(n_threads)
 
     def get_provider() -> None:
+        """处理获取 提供方相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         barrier.wait()
         provider = sandbox_provider.get_sandbox_provider()
         with providers_lock:

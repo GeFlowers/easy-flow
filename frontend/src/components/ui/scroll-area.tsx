@@ -5,6 +5,7 @@ import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 
 import { cn } from "@/lib/utils";
 
+/** ScrollArea 内部组件：组织对应的界面结构与交互语义。 */
 function ScrollArea({
   className,
   children,
@@ -28,6 +29,7 @@ function ScrollArea({
   );
 }
 
+/** ScrollBar 内部组件：组织对应的界面结构与交互语义。 */
 function ScrollBar({
   className,
   orientation = "vertical",

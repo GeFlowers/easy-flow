@@ -1,4 +1,4 @@
-"""Tests for DeerFlowClient."""
+'定义 test_client 模块提供的职责与可复用接口。\n\nTests for DeerFlowClient.'
 
 import asyncio
 import concurrent.futures
@@ -30,7 +30,7 @@ from deerflow.uploads.manager import PathTraversalError
 
 @pytest.fixture
 def mock_app_config():
-    """Provide a minimal AppConfig mock."""
+    '执行 mock_app_config 的明确职责，并返回与调用约定一致的结果。\n\nProvide a minimal AppConfig mock.'
     model = MagicMock()
     model.name = "test-model"
     model.model = "test-model"
@@ -49,7 +49,7 @@ def mock_app_config():
 
 @pytest.fixture
 def client(mock_app_config, tmp_path):
-    """Create a DeerFlowClient with mocked config loading."""
+    '执行 client 的明确职责，并返回与调用约定一致的结果。\n\nCreate a DeerFlowClient with mocked config loading.'
     import deerflow.skills.storage as _storage_mod
     from deerflow.skills.storage.local_skill_storage import LocalSkillStorage
 
@@ -60,7 +60,9 @@ def client(mock_app_config, tmp_path):
 
 @pytest.fixture
 def allow_skill_security_scan():
+    '执行 allow_skill_security_scan 的明确职责，并返回与调用约定一致的结果'
     async def _scan(*args, **kwargs):
+        '执行 _scan 的明确职责，并返回与调用约定一致的结果'
         from deerflow.skills.security_scanner import ScanResult
 
         return ScanResult(decision="allow", reason="ok")
@@ -75,7 +77,9 @@ def allow_skill_security_scan():
 
 
 class TestClientInit:
+    '组织 TestClientInit 场景的行为与边界验证'
     def test_default_params(self, client):
+        '验证 default、params 场景下的预期行为、边界条件与结果'
         assert client._model_name is None
         assert client._thinking_enabled is True
         assert client._subagent_enabled is False
@@ -86,6 +90,7 @@ class TestClientInit:
         assert client._agent is None
 
     def test_custom_params(self, mock_app_config):
+        '验证 custom、params 场景下的预期行为、边界条件与结果'
         mock_middleware = MagicMock()
         with patch("deerflow.client.get_app_config", return_value=mock_app_config):
             c = DeerFlowClient(model_name="gpt-4", thinking_enabled=False, subagent_enabled=True, plan_mode=True, agent_name="test-agent", available_skills={"skill1", "skill2"}, middlewares=[mock_middleware])
@@ -98,6 +103,7 @@ class TestClientInit:
         assert c._middlewares == [mock_middleware]
 
     def test_invalid_agent_name(self, mock_app_config):
+        '验证 invalid、agent、name 场景下的预期行为、边界条件与结果'
         with patch("deerflow.client.get_app_config", return_value=mock_app_config):
             with pytest.raises(ValueError, match="Invalid agent name"):
                 DeerFlowClient(agent_name="invalid name with spaces!")
@@ -105,6 +111,7 @@ class TestClientInit:
                 DeerFlowClient(agent_name="../path/traversal")
 
     def test_custom_config_path(self, mock_app_config):
+        '验证 custom、config、path 场景下的预期行为、边界条件与结果'
         with (
             patch("deerflow.client.reload_app_config") as mock_reload,
             patch("deerflow.client.get_app_config", return_value=mock_app_config),
@@ -113,6 +120,7 @@ class TestClientInit:
             mock_reload.assert_called_once_with("/tmp/custom.yaml")
 
     def test_checkpointer_stored(self, mock_app_config):
+        '验证 checkpointer、stored 场景下的预期行为、边界条件与结果'
         cp = MagicMock()
         with patch("deerflow.client.get_app_config", return_value=mock_app_config):
             c = DeerFlowClient(checkpointer=cp)
@@ -125,7 +133,9 @@ class TestClientInit:
 
 
 class TestConfigQueries:
+    '组织 TestConfigQueries 场景的行为与边界验证'
     def test_list_models(self, client):
+        '验证 list、models 场景下的预期行为、边界条件与结果'
         result = client.list_models()
         assert "models" in result
         assert result["token_usage"] == {"enabled": False}
@@ -137,6 +147,7 @@ class TestConfigQueries:
         assert "supports_thinking" in result["models"][0]
 
     def test_list_skills(self, client):
+        '验证 list、skills 场景下的预期行为、边界条件与结果'
         skill = MagicMock()
         skill.name = "web-search"
         skill.description = "Search the web"
@@ -159,6 +170,7 @@ class TestConfigQueries:
         }
 
     def test_list_skills_enabled_only(self, client):
+        '验证 list、skills、enabled、only 场景下的预期行为、边界条件与结果'
         with patch("deerflow.skills.storage.local_skill_storage.LocalSkillStorage.load_skills", return_value=[]) as mock_load:
             client.list_skills(enabled_only=True)
             # UserScopedSkillStorage.load_skills calls super().load_skills(enabled_only=False)
@@ -166,6 +178,7 @@ class TestConfigQueries:
             mock_load.assert_called_once_with(enabled_only=False)
 
     def test_get_memory(self, client):
+        '验证 get、memory 场景下的预期行为、边界条件与结果'
         memory = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.get_memory.return_value = memory
@@ -175,6 +188,7 @@ class TestConfigQueries:
         assert result == memory
 
     def test_export_memory(self, client):
+        '验证 export、memory 场景下的预期行为、边界条件与结果'
         memory = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.get_memory.return_value = memory
@@ -190,30 +204,31 @@ class TestConfigQueries:
 
 
 def _make_agent_mock(chunks: list[dict]):
-    """Create a mock agent whose .stream() yields the given chunks."""
+    '执行 _make_agent_mock 的明确职责，并返回与调用约定一致的结果。\n\nCreate a mock agent whose .stream() yields the given chunks.'
     agent = MagicMock()
     agent.stream.return_value = iter(chunks)
     return agent
 
 
 def _ai_events(events):
-    """Filter messages-tuple events with type=ai and non-empty content."""
+    '执行 _ai_events 的明确职责，并返回与调用约定一致的结果。\n\nFilter messages-tuple events with type=ai and non-empty content.'
     return [e for e in events if e.type == "messages-tuple" and e.data.get("type") == "ai" and e.data.get("content")]
 
 
 def _tool_call_events(events):
-    """Filter messages-tuple events with type=ai and tool_calls."""
+    '执行 _tool_call_events 的明确职责，并返回与调用约定一致的结果。\n\nFilter messages-tuple events with type=ai and tool_calls.'
     return [e for e in events if e.type == "messages-tuple" and e.data.get("type") == "ai" and "tool_calls" in e.data]
 
 
 def _tool_result_events(events):
-    """Filter messages-tuple events with type=tool."""
+    '执行 _tool_result_events 的明确职责，并返回与调用约定一致的结果。\n\nFilter messages-tuple events with type=tool.'
     return [e for e in events if e.type == "messages-tuple" and e.data.get("type") == "tool"]
 
 
 class TestStream:
+    '组织 TestStream 场景的行为与边界验证'
     def test_basic_message(self, client):
-        """stream() emits messages-tuple + values + end for a simple AI reply."""
+        '验证 basic、message 场景下的预期行为、边界条件与结果。\n\nstream() emits messages-tuple + values + end for a simple AI reply.'
         ai = AIMessage(content="Hello!", id="ai-1")
         chunks = [
             {"messages": [HumanMessage(content="hi", id="h-1")]},
@@ -235,7 +250,7 @@ class TestStream:
         assert msg_events[0].data["content"] == "Hello!"
 
     def test_custom_events_are_forwarded(self, client):
-        """stream() forwards custom stream events alongside normal values output."""
+        '验证 custom、events、are、forwarded 场景下的预期行为、边界条件与结果。\n\nstream() forwards custom stream events alongside normal values output.'
         ai = AIMessage(content="Hello!", id="ai-1")
         agent = MagicMock()
         agent.stream.return_value = iter(
@@ -264,7 +279,7 @@ class TestStream:
         assert events[-1].type == "end"
 
     def test_context_propagation(self, client):
-        """stream() passes agent_name to the context."""
+        '验证 context、propagation 场景下的预期行为、边界条件与结果。\n\nstream() passes agent_name to the context.'
         agent = _make_agent_mock([{"messages": [AIMessage(content="ok", id="ai-1")]}])
 
         client._agent_name = "test-agent-1"
@@ -281,7 +296,7 @@ class TestStream:
         assert call_kwargs["context"]["agent_name"] == "test-agent-1"
 
     def test_stream_assigns_unique_run_id_per_call(self, client):
-        """Each embedded client stream call has a run identity for per-run middleware."""
+        '验证 stream、assigns、unique、run、id、per、call 场景下的预期行为、边界条件与结果。\n\nEach embedded client stream call has a run identity for per-run middleware.'
         agent = MagicMock()
         agent.stream.side_effect = [
             iter([{"messages": [AIMessage(content="one", id="ai-1")]}]),
@@ -307,12 +322,14 @@ class TestStream:
         assert second_args[0]["messages"][0].additional_kwargs["run_id"] == second_run_id
 
     def test_custom_mode_is_normalized_to_string(self, client):
-        """stream() forwards custom events even when the mode is not a plain string."""
+        '验证 custom、mode、is、normalized、to、string 场景下的预期行为、边界条件与结果。\n\nstream() forwards custom events even when the mode is not a plain string.'
 
         class StreamMode(Enum):
+            '封装 StreamMode 的状态、协作关系与公开操作'
             CUSTOM = "custom"
 
             def __str__(self):
+                '实现 __str__ 协议方法，保持对象交互语义一致'
                 return self.value
 
         agent = _make_agent_mock(
@@ -334,7 +351,7 @@ class TestStream:
         assert events[-1].type == "end"
 
     def test_tool_call_and_result(self, client):
-        """stream() emits messages-tuple events for tool calls and results."""
+        '验证 tool、call、and、result 场景下的预期行为、边界条件与结果。\n\nstream() emits messages-tuple events for tool calls and results.'
         ai = AIMessage(content="", id="ai-1", tool_calls=[{"name": "bash", "args": {"cmd": "ls"}, "id": "tc-1"}])
         tool = ToolMessage(content="file.txt", id="tm-1", tool_call_id="tc-1", name="bash")
         ai2 = AIMessage(content="Here are the files.", id="ai-2")
@@ -358,7 +375,7 @@ class TestStream:
         assert events[-1].type == "end"
 
     def test_values_event_with_title(self, client):
-        """stream() emits values event containing title when present in state."""
+        '验证 values、event、with、title 场景下的预期行为、边界条件与结果。\n\nstream() emits values event containing title when present in state.'
         ai = AIMessage(content="ok", id="ai-1")
         chunks = [
             {"messages": [HumanMessage(content="hi", id="h-1"), ai], "title": "Greeting"},
@@ -377,7 +394,7 @@ class TestStream:
         assert "messages" in values_events[-1].data
 
     def test_deduplication(self, client):
-        """Messages with the same id are not emitted twice."""
+        '验证 deduplication 场景下的预期行为、边界条件与结果。\n\nMessages with the same id are not emitted twice.'
         ai = AIMessage(content="Hello!", id="ai-1")
         chunks = [
             {"messages": [HumanMessage(content="hi", id="h-1"), ai]},
@@ -395,7 +412,7 @@ class TestStream:
         assert len(msg_events) == 1
 
     def test_auto_thread_id(self, client):
-        """stream() auto-generates a thread_id if not provided."""
+        '验证 auto、thread、id 场景下的预期行为、边界条件与结果。\n\nstream() auto-generates a thread_id if not provided.'
         agent = _make_agent_mock([{"messages": [AIMessage(content="ok", id="ai-1")]}])
 
         with (
@@ -408,13 +425,7 @@ class TestStream:
         assert events[-1].type == "end"
 
     def test_messages_mode_emits_token_deltas(self, client):
-        """stream() forwards LangGraph ``messages`` mode chunks as delta events.
-
-        Regression for bytedance/deer-flow#1969 — before the fix the client
-        only subscribed to ``values`` mode, so LLM output was delivered as
-        a single cumulative dump after each graph node finished instead of
-        token-by-token deltas as the model generated them.
-        """
+        '验证 messages、mode、emits、token、deltas 场景下的预期行为、边界条件与结果。\n\nstream() forwards LangGraph ``messages`` mode chunks as delta events.\n\n        Regression for bytedance/deer-flow#1969 — before the fix the client\n        only subscribed to ``values`` mode, so LLM output was delivered as\n        a single cumulative dump after each graph node finished instead of\n        token-by-token deltas as the model generated them.\n        '
         # Three AI chunks sharing the same id, followed by a terminal
         # values snapshot with the fully assembled message — this matches
         # the shape LangGraph emits when ``stream_mode`` includes both
@@ -475,7 +486,7 @@ class TestStream:
         assert "messages" in call_kwargs["stream_mode"]
 
     def test_stream_emits_additional_kwargs_updates_for_streamed_ai_messages(self, client):
-        """stream() emits a follow-up AI event when attribution metadata arrives via values."""
+        '验证 stream、emits、additional、kwargs、updates、for、streamed、ai、messages 场景下的预期行为、边界条件与结果。\n\nstream() emits a follow-up AI event when attribution metadata arrives via values.'
         assembled = AIMessage(
             content="Hello!",
             id="ai-1",
@@ -507,7 +518,7 @@ class TestStream:
         assert any(event.data.get("additional_kwargs", {}).get("token_usage_attribution", {}).get("kind") == "final_answer" for event in ai_events)
 
     def test_stream_emits_new_additional_kwargs_after_prior_metadata(self, client):
-        """stream() emits later attribution metadata even after earlier kwargs for the same id."""
+        '验证 stream、emits、new、additional、kwargs、after、prior、metadata 场景下的预期行为、边界条件与结果。\n\nstream() emits later attribution metadata even after earlier kwargs for the same id.'
         attribution = {
             "version": 1,
             "kind": "final_answer",
@@ -554,7 +565,7 @@ class TestStream:
         assert metadata_events[1].data["additional_kwargs"] == {"token_usage_attribution": attribution}
 
     def test_chat_accumulates_streamed_deltas(self, client):
-        """chat() concatenates per-id deltas from messages mode."""
+        '验证 chat、accumulates、streamed、deltas 场景下的预期行为、边界条件与结果。\n\nchat() concatenates per-id deltas from messages mode.'
         agent = MagicMock()
         agent.stream.return_value = iter(
             [
@@ -574,7 +585,7 @@ class TestStream:
         assert result == "Hello world!"
 
     def test_messages_mode_tool_message(self, client):
-        """stream() forwards ToolMessage chunks from messages mode."""
+        '验证 messages、mode、tool、message 场景下的预期行为、边界条件与结果。\n\nstream() forwards ToolMessage chunks from messages mode.'
         agent = MagicMock()
         agent.stream.return_value = iter(
             [
@@ -604,7 +615,7 @@ class TestStream:
         assert tool_events[0].data["tool_call_id"] == "tc-1"
 
     def test_list_content_blocks(self, client):
-        """stream() handles AIMessage with list-of-blocks content."""
+        '验证 list、content、blocks 场景下的预期行为、边界条件与结果。\n\nstream() handles AIMessage with list-of-blocks content.'
         ai = AIMessage(
             content=[
                 {"type": "thinking", "thinking": "hmm"},
@@ -635,25 +646,7 @@ class TestStream:
     # ------------------------------------------------------------------
 
     def test_dedup_requires_messages_before_values_invariant(self, client):
-        """Canary: locks the order-dependence of cross-mode dedup.
-
-        ``streamed_ids`` is populated only by the ``messages`` branch.
-        If a ``values`` snapshot arrives BEFORE its corresponding
-        ``messages`` chunks for the same id, the values path falls
-        through and synthesizes its own AI text event, then the
-        messages chunk emits another delta — consumers see the same
-        id twice.
-
-        Under normal LangGraph operation this never happens (messages
-        chunks are emitted during LLM streaming, the values snapshot
-        after the node completes), so the implicit invariant is safe
-        in production.  This test exists as a tripwire for refactors
-        that switch to ``agent.astream()`` or share a core with
-        Gateway: if the ordering ever changes, this test fails and
-        forces the refactor to either (a) preserve the ordering or
-        (b) deliberately re-baseline to a stronger order-independent
-        dedup contract — and document the new contract here.
-        """
+        '验证 dedup、requires、messages、before、values、invariant 场景下的预期行为、边界条件与结果。\n\nCanary: locks the order-dependence of cross-mode dedup.\n\n        ``streamed_ids`` is populated only by the ``messages`` branch.\n        If a ``values`` snapshot arrives BEFORE its corresponding\n        ``messages`` chunks for the same id, the values path falls\n        through and synthesizes its own AI text event, then the\n        messages chunk emits another delta — consumers see the same\n        id twice.\n\n        Under normal LangGraph operation this never happens (messages\n        chunks are emitted during LLM streaming, the values snapshot\n        after the node completes), so the implicit invariant is safe\n        in production.  This test exists as a tripwire for refactors\n        that switch to ``agent.astream()`` or share a core with\n        Gateway: if the ordering ever changes, this test fails and\n        forces the refactor to either (a) preserve the ordering or\n        (b) deliberately re-baseline to a stronger order-independent\n        dedup contract — and document the new contract here.\n        '
         agent = MagicMock()
         agent.stream.return_value = iter(
             [
@@ -680,30 +673,7 @@ class TestStream:
         assert [e.data["content"] for e in ai_text_events] == ["Hello", "Hello"]
 
     def test_messages_mode_golden_event_sequence(self, client):
-        """Locks the **exact** event sequence for a canonical streaming turn.
-
-        This is a strong regression guard: any future refactor that
-        changes the order, type, or shape of emitted events fails this
-        test with a clear list-equality diff, forcing either a
-        preserved sequence or a deliberate re-baseline.
-
-        Input shape:
-            messages chunk 1 — text "Hel", no usage
-            messages chunk 2 — text "lo",  with cumulative usage
-            values snapshot  — assembled AIMessage with same usage
-
-        Locked behavior:
-            * Two messages-tuple AI text events (one per chunk), each
-              carrying ONLY its own delta — not cumulative.
-            * ``usage_metadata`` attached only to the chunk that
-              delivered it (not the first chunk).
-            * The values event is still emitted, but its embedded
-              ``messages`` list is the *serialized* form — no
-              synthesized messages-tuple events for the already-
-              streamed id.
-            * ``end`` event carries cumulative usage counted exactly
-              once across both modes.
-        """
+        '验证 messages、mode、golden、event、sequence 场景下的预期行为、边界条件与结果。\n\nLocks the **exact** event sequence for a canonical streaming turn.\n\n        This is a strong regression guard: any future refactor that\n        changes the order, type, or shape of emitted events fails this\n        test with a clear list-equality diff, forcing either a\n        preserved sequence or a deliberate re-baseline.\n\n        Input shape:\n            messages chunk 1 — text "Hel", no usage\n            messages chunk 2 — text "lo",  with cumulative usage\n            values snapshot  — assembled AIMessage with same usage\n\n        Locked behavior:\n            * Two messages-tuple AI text events (one per chunk), each\n              carrying ONLY its own delta — not cumulative.\n            * ``usage_metadata`` attached only to the chunk that\n              delivered it (not the first chunk).\n            * The values event is still emitted, but its embedded\n              ``messages`` list is the *serialized* form — no\n              synthesized messages-tuple events for the already-\n              streamed id.\n            * ``end`` event carries cumulative usage counted exactly\n              once across both modes.\n        '
         # Inline the usage literal at construction sites so Pyright can
         # narrow ``dict[str, int]`` to ``UsageMetadata`` (TypedDict
         # narrowing only works on literals, not on bound variables).
@@ -753,25 +723,7 @@ class TestStream:
         assert actual == expected
 
     def test_chat_accumulates_in_linear_time(self, client):
-        """``chat()`` must use a non-quadratic accumulation strategy.
-
-        PR #1974 commit 2 replaced ``buffer = buffer + delta`` with
-        ``list[str].append`` + ``"".join`` to fix an O(n²) regression
-        introduced in commit 1.  This test guards against a future
-        refactor accidentally restoring the quadratic path.
-
-        Threshold rationale (10,000 single-char chunks, 1 second):
-            * Current O(n) implementation: ~50-200 ms total, including
-              all mock + event yield overhead.
-            * O(n²) regression at n=10,000: chat accumulation alone
-              becomes ~500 ms-2 s (50 M character copies), reliably
-              over the bound on any reasonable CI.
-
-        If this test ever flakes on slow CI, do NOT raise the threshold
-        blindly — first confirm the implementation still uses
-        ``"".join``, then consider whether the test should move to a
-        benchmark suite that excludes mock overhead.
-        """
+        '验证 chat、accumulates、in、linear、time 场景下的预期行为、边界条件与结果。\n\n``chat()`` must use a non-quadratic accumulation strategy.\n\n        PR #1974 commit 2 replaced ``buffer = buffer + delta`` with\n        ``list[str].append`` + ``"".join`` to fix an O(n²) regression\n        introduced in commit 1.  This test guards against a future\n        refactor accidentally restoring the quadratic path.\n\n        Threshold rationale (10,000 single-char chunks, 1 second):\n            * Current O(n) implementation: ~50-200 ms total, including\n              all mock + event yield overhead.\n            * O(n²) regression at n=10,000: chat accumulation alone\n              becomes ~500 ms-2 s (50 M character copies), reliably\n              over the bound on any reasonable CI.\n\n        If this test ever flakes on slow CI, do NOT raise the threshold\n        blindly — first confirm the implementation still uses\n        ``"".join``, then consider whether the test should move to a\n        benchmark suite that excludes mock overhead.\n        '
         import time
 
         n = 10_000
@@ -802,38 +754,7 @@ class TestStream:
         assert elapsed < 1.0, f"chat() took {elapsed:.3f}s for {n} chunks — possible O(n^2) regression (see PR #1974 commit 2 for the original fix)"
 
     def test_none_id_chunks_produce_duplicates_known_limitation(self, client):
-        """Documents a known dedup limitation: ``messages`` chunks with ``id=None``.
-
-        Some LLM providers (vLLM, certain custom backends) emit
-        ``AIMessageChunk`` instances without an ``id``.  In that case
-        the cross-mode dedup machinery cannot record the chunk in
-        ``streamed_ids`` (the implementation guards on ``if msg_id``
-        before adding), and a subsequent ``values`` snapshot whose
-        reassembled ``AIMessage`` carries a real id will fall through
-        the dedup check and synthesize a second AI text event for the
-        same logical message — consumers see duplicated text.
-
-        Why this is documented rather than fixed
-        ----------------------------------------
-        Falling back to ``metadata.get("id")`` does **not** help:
-        LangGraph's messages-mode metadata never carries the message
-        id (it carries ``langgraph_node`` / ``langgraph_step`` /
-        ``checkpoint_ns`` / ``tags`` etc.).  Synthesizing a fallback
-        like ``f"_synth_{id(msg_chunk)}"`` only helps if the values
-        snapshot uses the same fallback, which it does not.  A real
-        fix requires either provider cooperation (always emit chunk
-        ids — out of scope for this PR) or content-based dedup (risks
-        false positives for two distinct short messages with identical
-        text).
-
-        This test makes the limitation **explicit and discoverable**
-        so a future contributor debugging "duplicate text in vLLM
-        streaming" finds the answer immediately.  If a real fix lands,
-        replace this test with a positive assertion that dedup works
-        for the None-id case.
-
-        See PR #1974 Copilot review comment on ``client.py:515``.
-        """
+        '验证 none、id、chunks、produce、duplicates、known、limitation 场景下的预期行为、边界条件与结果。\n\nDocuments a known dedup limitation: ``messages`` chunks with ``id=None``.\n\n        Some LLM providers (vLLM, certain custom backends) emit\n        ``AIMessageChunk`` instances without an ``id``.  In that case\n        the cross-mode dedup machinery cannot record the chunk in\n        ``streamed_ids`` (the implementation guards on ``if msg_id``\n        before adding), and a subsequent ``values`` snapshot whose\n        reassembled ``AIMessage`` carries a real id will fall through\n        the dedup check and synthesize a second AI text event for the\n        same logical message — consumers see duplicated text.\n\n        Why this is documented rather than fixed\n        ----------------------------------------\n        Falling back to ``metadata.get("id")`` does **not** help:\n        LangGraph\'s messages-mode metadata never carries the message\n        id (it carries ``langgraph_node`` / ``langgraph_step`` /\n        ``checkpoint_ns`` / ``tags`` etc.).  Synthesizing a fallback\n        like ``f"_synth_{id(msg_chunk)}"`` only helps if the values\n        snapshot uses the same fallback, which it does not.  A real\n        fix requires either provider cooperation (always emit chunk\n        ids — out of scope for this PR) or content-based dedup (risks\n        false positives for two distinct short messages with identical\n        text).\n\n        This test makes the limitation **explicit and discoverable**\n        so a future contributor debugging "duplicate text in vLLM\n        streaming" finds the answer immediately.  If a real fix lands,\n        replace this test with a positive assertion that dedup works\n        for the None-id case.\n\n        See PR #1974 Copilot review comment on ``client.py:515``.\n        '
         agent = MagicMock()
         agent.stream.return_value = iter(
             [
@@ -874,8 +795,9 @@ class TestStream:
 
 
 class TestChat:
+    '组织 TestChat 场景的行为与边界验证'
     def test_returns_last_message(self, client):
-        """chat() returns the last AI message text."""
+        '验证 returns、last、message 场景下的预期行为、边界条件与结果。\n\nchat() returns the last AI message text.'
         ai1 = AIMessage(content="thinking...", id="ai-1")
         ai2 = AIMessage(content="final answer", id="ai-2")
         chunks = [
@@ -893,7 +815,7 @@ class TestChat:
         assert result == "final answer"
 
     def test_empty_response(self, client):
-        """chat() returns empty string if no AI message produced."""
+        '验证 empty、response 场景下的预期行为、边界条件与结果。\n\nchat() returns empty string if no AI message produced.'
         chunks = [{"messages": []}]
         agent = _make_agent_mock(chunks)
 
@@ -912,10 +834,13 @@ class TestChat:
 
 
 class TestExtractText:
+    '组织 TestExtractText 场景的行为与边界验证'
     def test_string(self):
+        '验证 string 场景下的预期行为、边界条件与结果'
         assert DeerFlowClient._extract_text("hello") == "hello"
 
     def test_list_text_blocks(self):
+        '验证 list、text、blocks 场景下的预期行为、边界条件与结果'
         content = [
             {"type": "text", "text": "first"},
             {"type": "thinking", "thinking": "skip"},
@@ -924,12 +849,15 @@ class TestExtractText:
         assert DeerFlowClient._extract_text(content) == "first\nsecond"
 
     def test_list_plain_strings(self):
+        '验证 list、plain、strings 场景下的预期行为、边界条件与结果'
         assert DeerFlowClient._extract_text(["a", "b"]) == "a\nb"
 
     def test_empty_list(self):
+        '验证 empty、list 场景下的预期行为、边界条件与结果'
         assert DeerFlowClient._extract_text([]) == ""
 
     def test_other_type(self):
+        '验证 other、type 场景下的预期行为、边界条件与结果'
         assert DeerFlowClient._extract_text(42) == "42"
 
 
@@ -939,8 +867,9 @@ class TestExtractText:
 
 
 class TestEnsureAgent:
+    '组织 TestEnsureAgent 场景的行为与边界验证'
     def test_creates_agent(self, client):
-        """_ensure_agent creates an agent on first call."""
+        '验证 creates、agent 场景下的预期行为、边界条件与结果。\n\n_ensure_agent creates an agent on first call.'
         mock_agent = MagicMock()
         config = client._get_runnable_config("t1")
 
@@ -966,6 +895,7 @@ class TestEnsureAgent:
         assert mock_apply_prompt.call_args.kwargs.get("available_skills") == {"test_skill"}
 
     def test_uses_default_checkpointer_when_available(self, client):
+        '验证 uses、default、checkpointer、when、available 场景下的预期行为、边界条件与结果'
         mock_agent = MagicMock()
         mock_checkpointer = MagicMock()
         config = client._get_runnable_config("t1")
@@ -984,6 +914,7 @@ class TestEnsureAgent:
         assert mock_create_agent.call_args.kwargs["checkpointer"] is mock_checkpointer
 
     def test_injects_custom_middlewares(self, client):
+        '验证 injects、custom、middlewares 场景下的预期行为、边界条件与结果'
         mock_agent = MagicMock()
         mock_custom_middleware = MagicMock()
         client._middlewares = [mock_custom_middleware]
@@ -993,6 +924,7 @@ class TestEnsureAgent:
         mock_clarification.__class__.__name__ = "ClarificationMiddleware"
 
         def fake_build_middlewares(*args, **kwargs):
+            '执行 fake_build_middlewares 的明确职责，并返回与调用约定一致的结果'
             custom = kwargs.get("custom_middlewares") or []
             return [MagicMock()] + custom + [mock_clarification]
 
@@ -1013,6 +945,7 @@ class TestEnsureAgent:
         assert called_middlewares[-1] is mock_clarification
 
     def test_skips_default_checkpointer_when_unconfigured(self, client):
+        '验证 skips、default、checkpointer、when、unconfigured 场景下的预期行为、边界条件与结果'
         mock_agent = MagicMock()
         config = client._get_runnable_config("t1")
 
@@ -1030,7 +963,7 @@ class TestEnsureAgent:
         assert "checkpointer" not in mock_create_agent.call_args.kwargs
 
     def test_reuses_agent_same_config(self, client):
-        """_ensure_agent does not recreate if config key unchanged."""
+        '验证 reuses、agent、same、config 场景下的预期行为、边界条件与结果。\n\n_ensure_agent does not recreate if config key unchanged.'
         mock_agent = MagicMock()
         client._agent = mock_agent
         client._agent_config_key = (None, True, False, False, None, None, None, None)
@@ -1042,7 +975,7 @@ class TestEnsureAgent:
         assert client._agent is mock_agent
 
     def test_recreates_agent_when_subagent_limits_change(self, client):
-        """Subagent limit changes alter prompt/middleware and must invalidate the cached agent."""
+        '验证 recreates、agent、when、subagent、limits、change 场景下的预期行为、边界条件与结果。\n\nSubagent limit changes alter prompt/middleware and must invalidate the cached agent.'
         config1 = client._get_runnable_config("t1")
         config1["configurable"].update(
             {
@@ -1075,8 +1008,7 @@ class TestEnsureAgent:
         assert mock_create_agent.call_count == 2
 
     def test_deferred_skill_discovery_wired_when_enabled(self, client, mock_app_config):
-        """When skills.deferred_discovery=True, skill_names reaches apply_prompt_template
-        (parity with agent.py — config flag must not be a silent no-op on the embedded path)."""
+        '验证 deferred、skill、discovery、wired、when、enabled 场景下的预期行为、边界条件与结果。\n\nWhen skills.deferred_discovery=True, skill_names reaches apply_prompt_template\n        (parity with agent.py — config flag must not be a silent no-op on the embedded path).'
         from pathlib import Path
 
         from deerflow.skills.types import Skill, SkillCategory
@@ -1114,7 +1046,7 @@ class TestEnsureAgent:
         assert "deep-research" in skill_names_arg
 
     def test_deferred_skill_discovery_not_wired_when_disabled(self, client, mock_app_config):
-        """When skills.deferred_discovery=False, skill_names is None so the legacy prompt path runs."""
+        '验证 deferred、skill、discovery、not、wired、when、disabled 场景下的预期行为、边界条件与结果。\n\nWhen skills.deferred_discovery=False, skill_names is None so the legacy prompt path runs.'
         from pathlib import Path
 
         from deerflow.skills.types import Skill, SkillCategory
@@ -1151,13 +1083,7 @@ class TestEnsureAgent:
         assert skill_names_arg is None, "skill_names must be None when deferred_discovery=False"
 
     def test_mcp_routing_middleware_wired_when_tool_search_enabled(self, client, mock_app_config):
-        """Embedded client builds McpRoutingMiddleware from routed deferred MCP tools.
-
-        RFC §10.3/§12.5 requires verifying the actual embedded-client builder path
-        rather than assuming it inherits lead-agent behavior. Exercises the real
-        assemble_deferred_tools + build_mcp_routing_middleware wiring and asserts a
-        genuine McpRoutingMiddleware reaches build_middlewares.
-        """
+        '验证 mcp、routing、middleware、wired、when、tool、search、enabled 场景下的预期行为、边界条件与结果。\n\nEmbedded client builds McpRoutingMiddleware from routed deferred MCP tools.\n\n        RFC §10.3/§12.5 requires verifying the actual embedded-client builder path\n        rather than assuming it inherits lead-agent behavior. Exercises the real\n        assemble_deferred_tools + build_mcp_routing_middleware wiring and asserts a\n        genuine McpRoutingMiddleware reaches build_middlewares.\n        '
         from langchain_core.tools import tool as as_tool
 
         from deerflow.agents.middlewares.mcp_routing_middleware import McpRoutingMiddleware
@@ -1165,7 +1091,7 @@ class TestEnsureAgent:
 
         @as_tool
         def postgres_query(sql: str) -> str:
-            "Query Postgres."
+            '执行 postgres_query 的明确职责，并返回与调用约定一致的结果。\n\nQuery Postgres.'
             return sql
 
         tag_mcp_tool(postgres_query)
@@ -1193,7 +1119,7 @@ class TestEnsureAgent:
         assert routing_arg._matched_names({"messages": [HumanMessage(content="show orders")]}) == ["postgres_query"]
 
     def test_mcp_routing_middleware_absent_when_tool_search_disabled(self, client, mock_app_config):
-        """No routing middleware is built on the embedded path when tool_search is off."""
+        '验证 mcp、routing、middleware、absent、when、tool、search、disabled 场景下的预期行为、边界条件与结果。\n\nNo routing middleware is built on the embedded path when tool_search is off.'
         mock_app_config.tool_search.enabled = False
         mock_app_config.skills.deferred_discovery = False
         client._app_config = mock_app_config
@@ -1219,7 +1145,9 @@ class TestEnsureAgent:
 
 
 class TestGetModel:
+    '组织 TestGetModel 场景的行为与边界验证'
     def test_found(self, client):
+        '验证 found 场景下的预期行为、边界条件与结果'
         model_cfg = MagicMock()
         model_cfg.name = "test-model"
         model_cfg.model = "test-model"
@@ -1240,6 +1168,7 @@ class TestGetModel:
         }
 
     def test_not_found(self, client):
+        '验证 not、found 场景下的预期行为、边界条件与结果'
         client._app_config.get_model_config.return_value = None
         assert client.get_model("nonexistent") is None
 
@@ -1250,6 +1179,7 @@ class TestGetModel:
 
 
 class TestThreadQueries:
+    '组织 TestThreadQueries 场景的行为与边界验证'
     def _make_mock_checkpoint_tuple(
         self,
         thread_id: str,
@@ -1260,6 +1190,7 @@ class TestThreadQueries:
         messages: list = None,
         pending_writes: list = None,
     ):
+        '执行 _make_mock_checkpoint_tuple 的明确职责，并返回与调用约定一致的结果'
         cp = MagicMock()
         cp.config = {"configurable": {"thread_id": thread_id, "checkpoint_id": checkpoint_id}}
 
@@ -1281,6 +1212,7 @@ class TestThreadQueries:
         return cp
 
     def test_list_threads_empty(self, client):
+        '验证 list、threads、empty 场景下的预期行为、边界条件与结果'
         mock_checkpointer = MagicMock()
         mock_checkpointer.list.return_value = []
         client._checkpointer = mock_checkpointer
@@ -1290,6 +1222,7 @@ class TestThreadQueries:
         mock_checkpointer.list.assert_called_once_with(config=None, limit=10)
 
     def test_list_threads_basic(self, client):
+        '验证 list、threads、basic 场景下的预期行为、边界条件与结果'
         mock_checkpointer = MagicMock()
         client._checkpointer = mock_checkpointer
 
@@ -1320,6 +1253,7 @@ class TestThreadQueries:
         assert threads[1]["title"] == "Thread 1 Updated"
 
     def test_list_threads_fallback_checkpointer(self, client):
+        '验证 list、threads、fallback、checkpointer 场景下的预期行为、边界条件与结果'
         mock_checkpointer = MagicMock()
         mock_checkpointer.list.return_value = []
 
@@ -1331,6 +1265,7 @@ class TestThreadQueries:
         mock_checkpointer.list.assert_called_once()
 
     def test_get_thread(self, client):
+        '验证 get、thread 场景下的预期行为、边界条件与结果'
         mock_checkpointer = MagicMock()
         client._checkpointer = mock_checkpointer
 
@@ -1374,6 +1309,7 @@ class TestThreadQueries:
         assert checkpoints[2]["pending_writes"][0]["channel"] == "messages"
 
     def test_get_thread_fallback_checkpointer(self, client):
+        '验证 get、thread、fallback、checkpointer 场景下的预期行为、边界条件与结果'
         mock_checkpointer = MagicMock()
         mock_checkpointer.list.return_value = []
 
@@ -1391,7 +1327,9 @@ class TestThreadQueries:
 
 
 class TestGoalManagement:
+    '组织 TestGoalManagement 场景的行为与边界验证'
     def test_goal_round_trip_uses_checkpoint(self, client):
+        '验证 goal、round、trip、uses、checkpoint 场景下的预期行为、边界条件与结果'
         from langgraph.checkpoint.memory import InMemorySaver
 
         client._checkpointer = InMemorySaver()
@@ -1414,7 +1352,9 @@ class TestGoalManagement:
 
 
 class TestMcpConfig:
+    '组织 TestMcpConfig 场景的行为与边界验证'
     def test_get_mcp_config(self, client):
+        '验证 get、mcp、config 场景下的预期行为、边界条件与结果'
         server = MagicMock()
         server.model_dump.return_value = {"enabled": True, "type": "stdio"}
         ext_config = MagicMock()
@@ -1429,6 +1369,7 @@ class TestMcpConfig:
 
     def test_update_mcp_config(self, client):
         # Set up current config with skills
+        '验证 update、mcp、config 场景下的预期行为、边界条件与结果'
         current_config = MagicMock()
         current_config.skills = {}
 
@@ -1470,7 +1411,9 @@ class TestMcpConfig:
 
 
 class TestSkillsManagement:
+    '组织 TestSkillsManagement 场景的行为与边界验证'
     def _make_skill(self, name="test-skill", enabled=True):
+        '执行 _make_skill 的明确职责，并返回与调用约定一致的结果'
         s = MagicMock()
         s.name = name
         s.description = "A test skill"
@@ -1480,6 +1423,7 @@ class TestSkillsManagement:
         return s
 
     def test_get_skill_found(self, client):
+        '验证 get、skill、found 场景下的预期行为、边界条件与结果'
         skill = self._make_skill()
         with patch("deerflow.skills.storage.local_skill_storage.LocalSkillStorage.load_skills", return_value=[skill]):
             result = client.get_skill("test-skill")
@@ -1487,11 +1431,13 @@ class TestSkillsManagement:
         assert result["name"] == "test-skill"
 
     def test_get_skill_not_found(self, client):
+        '验证 get、skill、not、found 场景下的预期行为、边界条件与结果'
         with patch("deerflow.skills.storage.local_skill_storage.LocalSkillStorage.load_skills", return_value=[]):
             result = client.get_skill("nonexistent")
         assert result is None
 
     def test_update_skill(self, client):
+        '验证 update、skill 场景下的预期行为、边界条件与结果'
         skill = self._make_skill(enabled=True)
         updated_skill = self._make_skill(enabled=False)
 
@@ -1527,11 +1473,13 @@ class TestSkillsManagement:
             tmp_path.unlink()
 
     def test_update_skill_not_found(self, client):
+        '验证 update、skill、not、found 场景下的预期行为、边界条件与结果'
         with patch("deerflow.skills.storage.local_skill_storage.LocalSkillStorage.load_skills", return_value=[]):
             with pytest.raises(ValueError, match="not found"):
                 client.update_skill("nonexistent", enabled=True)
 
     def test_install_skill(self, client, allow_skill_security_scan):
+        '验证 install、skill 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
 
@@ -1561,10 +1509,12 @@ class TestSkillsManagement:
             assert (skills_root / "custom" / "my-skill").exists()
 
     def test_install_skill_not_found(self, client):
+        '验证 install、skill、not、found 场景下的预期行为、边界条件与结果'
         with pytest.raises(FileNotFoundError):
             client.install_skill("/nonexistent/path.skill")
 
     def test_install_skill_bad_extension(self, client):
+        '验证 install、skill、bad、extension 场景下的预期行为、边界条件与结果'
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as f:
             tmp_path = Path(f.name)
         try:
@@ -1580,7 +1530,9 @@ class TestSkillsManagement:
 
 
 class TestMemoryManagement:
+    '组织 TestMemoryManagement 场景的行为与边界验证'
     def test_import_memory(self, client):
+        '验证 import、memory 场景下的预期行为、边界条件与结果'
         imported = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.import_memory.return_value = imported
@@ -1593,6 +1545,7 @@ class TestMemoryManagement:
         assert result == imported
 
     def test_reload_memory(self, client):
+        '验证 reload、memory 场景下的预期行为、边界条件与结果'
         data = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.reload_memory.return_value = data
@@ -1601,6 +1554,7 @@ class TestMemoryManagement:
         assert result == data
 
     def test_clear_memory(self, client):
+        '验证 clear、memory 场景下的预期行为、边界条件与结果'
         data = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.clear_memory.return_value = data
@@ -1609,6 +1563,7 @@ class TestMemoryManagement:
         assert result == data
 
     def test_create_memory_fact(self, client):
+        '验证 create、memory、fact 场景下的预期行为、边界条件与结果'
         data = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.create_fact.return_value = (data, "fact_new")
@@ -1627,6 +1582,7 @@ class TestMemoryManagement:
         assert result == data
 
     def test_delete_memory_fact(self, client):
+        '验证 delete、memory、fact 场景下的预期行为、边界条件与结果'
         data = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.delete_fact.return_value = data
@@ -1636,6 +1592,7 @@ class TestMemoryManagement:
         assert result == data
 
     def test_update_memory_fact(self, client):
+        '验证 update、memory、fact 场景下的预期行为、边界条件与结果'
         data = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.update_fact.return_value = data
@@ -1656,6 +1613,7 @@ class TestMemoryManagement:
         assert result == data
 
     def test_update_memory_fact_preserves_omitted_fields(self, client):
+        '验证 update、memory、fact、preserves、omitted、fields 场景下的预期行为、边界条件与结果'
         data = {"version": "1.0", "facts": []}
         mock_mgr = MagicMock()
         mock_mgr.update_fact.return_value = data
@@ -1674,6 +1632,7 @@ class TestMemoryManagement:
         assert result == data
 
     def test_get_memory_config(self, client):
+        '验证 get、memory、config 场景下的预期行为、边界条件与结果'
         config = MagicMock()
         config.enabled = True
         config.mode = "middleware"
@@ -1688,6 +1647,7 @@ class TestMemoryManagement:
         assert result["manager_class"] == "deermem"
 
     def test_get_memory_status(self, client):
+        '验证 get、memory、status 场景下的预期行为、边界条件与结果'
         config = MagicMock()
         config.enabled = True
         config.mode = "middleware"
@@ -1715,7 +1675,9 @@ class TestMemoryManagement:
 
 
 class TestUploads:
+    '组织 TestUploads 场景的行为与边界验证'
     def test_upload_files(self, client):
+        '验证 upload、files 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
 
@@ -1738,15 +1700,18 @@ class TestUploads:
             assert (uploads_dir / "test.txt").exists()
 
     def test_upload_files_not_found(self, client):
+        '验证 upload、files、not、found 场景下的预期行为、边界条件与结果'
         with pytest.raises(FileNotFoundError):
             client.upload_files("thread-1", ["/nonexistent/file.txt"])
 
     def test_upload_files_rejects_directory_path(self, client):
+        '验证 upload、files、rejects、directory、path 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             with pytest.raises(ValueError, match="Path is not a file"):
                 client.upload_files("thread-1", [tmp])
 
     def test_upload_files_reuses_single_executor_inside_event_loop(self, client):
+        '验证 upload、files、reuses、single、executor、inside、event、loop 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_dir = tmp_path / "uploads"
@@ -1761,25 +1726,31 @@ class TestUploads:
             real_executor_cls = concurrent.futures.ThreadPoolExecutor
 
             async def fake_convert(path: Path) -> Path:
+                '执行 fake_convert 的明确职责，并返回与调用约定一致的结果'
                 md_path = path.with_suffix(".md")
                 md_path.write_text(f"converted {path.name}")
                 return md_path
 
             class FakeExecutor:
+                '封装 FakeExecutor 的状态、协作关系与公开操作'
                 def __init__(self, max_workers: int):
+                    '实现 __init__ 协议方法，保持对象交互语义一致'
                     self.max_workers = max_workers
                     self.shutdown_calls = []
                     self._executor = real_executor_cls(max_workers=max_workers)
                     created_executors.append(self)
 
                 def submit(self, fn, *args, **kwargs):
+                    '执行 submit 的明确职责，并返回与调用约定一致的结果'
                     return self._executor.submit(fn, *args, **kwargs)
 
                 def shutdown(self, wait: bool = True):
+                    '执行 shutdown 的明确职责，并返回与调用约定一致的结果'
                     self.shutdown_calls.append(wait)
                     self._executor.shutdown(wait=wait)
 
             async def call_upload() -> dict:
+                '执行 call_upload 的明确职责，并返回与调用约定一致的结果'
                 return client.upload_files("thread-async", [first, second])
 
             with (
@@ -1800,6 +1771,7 @@ class TestUploads:
             assert result["files"][1]["markdown_file"] == "second.md"
 
     def test_list_uploads(self, client):
+        '验证 list、uploads 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             uploads_dir = Path(tmp)
             (uploads_dir / "a.txt").write_text("a")
@@ -1819,6 +1791,7 @@ class TestUploads:
                 assert "artifact_url" in f
 
     def test_delete_upload(self, client):
+        '验证 delete、upload 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             uploads_dir = Path(tmp)
             (uploads_dir / "delete-me.txt").write_text("gone")
@@ -1831,12 +1804,14 @@ class TestUploads:
             assert not (uploads_dir / "delete-me.txt").exists()
 
     def test_delete_upload_not_found(self, client):
+        '验证 delete、upload、not、found 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             with patch("deerflow.client.get_uploads_dir", return_value=Path(tmp)):
                 with pytest.raises(FileNotFoundError):
                     client.delete_upload("thread-1", "nope.txt")
 
     def test_delete_upload_path_traversal(self, client):
+        '验证 delete、upload、path、traversal 场景下的预期行为、边界条件与结果'
         with tempfile.TemporaryDirectory() as tmp:
             uploads_dir = Path(tmp)
             with patch("deerflow.client.get_uploads_dir", return_value=uploads_dir), patch("deerflow.client.ensure_uploads_dir", return_value=uploads_dir):
@@ -1850,7 +1825,9 @@ class TestUploads:
 
 
 class TestArtifacts:
+    '组织 TestArtifacts 场景的行为与边界验证'
     def test_get_artifact(self, client):
+        '验证 get、artifact 场景下的预期行为、边界条件与结果'
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1867,6 +1844,7 @@ class TestArtifacts:
             assert "text" in mime
 
     def test_get_artifact_not_found(self, client):
+        '验证 get、artifact、not、found 场景下的预期行为、边界条件与结果'
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1879,10 +1857,12 @@ class TestArtifacts:
                     client.get_artifact("t1", "mnt/user-data/outputs/nope.txt")
 
     def test_get_artifact_bad_prefix(self, client):
+        '验证 get、artifact、bad、prefix 场景下的预期行为、边界条件与结果'
         with pytest.raises(ValueError, match="must start with"):
             client.get_artifact("t1", "bad/path/file.txt")
 
     def test_get_artifact_path_traversal(self, client):
+        '验证 get、artifact、path、traversal 场景下的预期行为、边界条件与结果'
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -1903,11 +1883,10 @@ class TestArtifacts:
 
 
 class TestScenarioMultiTurnConversation:
-    """Scenario: User has a multi-turn conversation within a single thread."""
+    '组织 TestScenarioMultiTurnConversation 场景的行为与边界验证。\n\nScenario: User has a multi-turn conversation within a single thread.'
 
     def test_two_turn_conversation(self, client):
-        """Two sequential chat() calls on the same thread_id produce
-        independent results (without checkpointer, each call is stateless)."""
+        '验证 two、turn、conversation 场景下的预期行为、边界条件与结果。\n\nTwo sequential chat() calls on the same thread_id produce\n        independent results (without checkpointer, each call is stateless).'
         ai1 = AIMessage(content="I'm a helpful assistant.", id="ai-1")
         ai2 = AIMessage(content="Python is great!", id="ai-2")
 
@@ -1929,7 +1908,7 @@ class TestScenarioMultiTurnConversation:
         assert agent.stream.call_count == 2
 
     def test_stream_collects_all_event_types_across_turns(self, client):
-        """A full turn emits messages-tuple (tool_call, tool_result, ai text) + values + end."""
+        '验证 stream、collects、all、event、types、across、turns 场景下的预期行为、边界条件与结果。\n\nA full turn emits messages-tuple (tool_call, tool_result, ai text) + values + end.'
         ai_tc = AIMessage(
             content="",
             id="ai-1",
@@ -1980,10 +1959,10 @@ class TestScenarioMultiTurnConversation:
 
 
 class TestScenarioToolChain:
-    """Scenario: Agent chains multiple tool calls in sequence."""
+    '组织 TestScenarioToolChain 场景的行为与边界验证。\n\nScenario: Agent chains multiple tool calls in sequence.'
 
     def test_multi_tool_chain(self, client):
-        """Agent calls bash → reads output → calls write_file → responds."""
+        '验证 multi、tool、chain 场景下的预期行为、边界条件与结果。\n\nAgent calls bash → reads output → calls write_file → responds.'
         ai_bash = AIMessage(
             content="",
             id="ai-1",
@@ -2030,10 +2009,10 @@ class TestScenarioToolChain:
 
 
 class TestScenarioFileLifecycle:
-    """Scenario: Upload files → list them → use in chat → download artifact."""
+    '组织 TestScenarioFileLifecycle 场景的行为与边界验证。\n\nScenario: Upload files → list them → use in chat → download artifact.'
 
     def test_upload_list_delete_lifecycle(self, client):
-        """Upload → list → verify → delete → list again."""
+        '验证 upload、list、delete、lifecycle 场景下的预期行为、边界条件与结果。\n\nUpload → list → verify → delete → list again.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_dir = tmp_path / "uploads"
@@ -2071,7 +2050,7 @@ class TestScenarioFileLifecycle:
                 assert listed["files"][0]["filename"] == "data.csv"
 
     def test_upload_then_read_artifact(self, client):
-        """Upload a file, simulate agent producing artifact, read it back."""
+        '验证 upload、then、read、artifact 场景下的预期行为、边界条件与结果。\n\nUpload a file, simulate agent producing artifact, read it back.'
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -2104,10 +2083,10 @@ class TestScenarioFileLifecycle:
 
 
 class TestScenarioConfigManagement:
-    """Scenario: Query and update configuration through a management session."""
+    '组织 TestScenarioConfigManagement 场景的行为与边界验证。\n\nScenario: Query and update configuration through a management session.'
 
     def test_model_and_skill_discovery(self, client):
-        """List models → get specific model → list skills → get specific skill."""
+        '验证 model、and、skill、discovery 场景下的预期行为、边界条件与结果。\n\nList models → get specific model → list skills → get specific skill.'
         # List models
         result = client.list_models()
         assert len(result["models"]) >= 1
@@ -2144,7 +2123,7 @@ class TestScenarioConfigManagement:
         assert detail["enabled"] is True
 
     def test_mcp_update_then_skill_toggle(self, client):
-        """Update MCP config → toggle skill → verify both invalidate agent."""
+        '验证 mcp、update、then、skill、toggle 场景下的预期行为、边界条件与结果。\n\nUpdate MCP config → toggle skill → verify both invalidate agent.'
         with tempfile.TemporaryDirectory() as tmp:
             config_file = Path(tmp) / "extensions_config.json"
             config_file.write_text("{}")
@@ -2200,13 +2179,14 @@ class TestScenarioConfigManagement:
 
 
 class TestScenarioAgentRecreation:
-    """Scenario: Config changes trigger agent recreation at the right times."""
+    '组织 TestScenarioAgentRecreation 场景的行为与边界验证。\n\nScenario: Config changes trigger agent recreation at the right times.'
 
     def test_different_model_triggers_rebuild(self, client):
-        """Switching model_name between calls forces agent rebuild."""
+        '验证 different、model、triggers、rebuild 场景下的预期行为、边界条件与结果。\n\nSwitching model_name between calls forces agent rebuild.'
         agents_created = []
 
         def fake_create_agent(**kwargs):
+            '执行 fake_create_agent 的明确职责，并返回与调用约定一致的结果'
             agent = MagicMock()
             agents_created.append(agent)
             return agent
@@ -2233,10 +2213,11 @@ class TestScenarioAgentRecreation:
         assert first_agent is not second_agent
 
     def test_same_config_reuses_agent(self, client):
-        """Repeated calls with identical config do not rebuild."""
+        '验证 same、config、reuses、agent 场景下的预期行为、边界条件与结果。\n\nRepeated calls with identical config do not rebuild.'
         agents_created = []
 
         def fake_create_agent(**kwargs):
+            '执行 fake_create_agent 的明确职责，并返回与调用约定一致的结果'
             agent = MagicMock()
             agents_created.append(agent)
             return agent
@@ -2259,10 +2240,11 @@ class TestScenarioAgentRecreation:
         assert len(agents_created) == 1
 
     def test_reset_agent_forces_rebuild(self, client):
-        """reset_agent() clears cache, next call rebuilds."""
+        '验证 reset、agent、forces、rebuild 场景下的预期行为、边界条件与结果。\n\nreset_agent() clears cache, next call rebuilds.'
         agents_created = []
 
         def fake_create_agent(**kwargs):
+            '执行 fake_create_agent 的明确职责，并返回与调用约定一致的结果'
             agent = MagicMock()
             agents_created.append(agent)
             return agent
@@ -2285,13 +2267,14 @@ class TestScenarioAgentRecreation:
         assert len(agents_created) == 2
 
     def test_per_call_override_triggers_rebuild(self, client):
-        """stream() with model_name override creates a different agent config."""
+        '验证 per、call、override、triggers、rebuild 场景下的预期行为、边界条件与结果。\n\nstream() with model_name override creates a different agent config.'
         ai = AIMessage(content="ok", id="ai-1")
         agent = _make_agent_mock([{"messages": [ai]}])
 
         agents_created = []
 
         def fake_ensure(config):
+            '执行 fake_ensure 的明确职责，并返回与调用约定一致的结果'
             key = tuple(config.get("configurable", {}).get(k) for k in ["model_name", "thinking_enabled", "is_plan_mode", "subagent_enabled"])
             agents_created.append(key)
             client._agent = agent
@@ -2306,10 +2289,10 @@ class TestScenarioAgentRecreation:
 
 
 class TestScenarioThreadIsolation:
-    """Scenario: Operations on different threads don't interfere."""
+    "组织 TestScenarioThreadIsolation 场景的行为与边界验证。\n\nScenario: Operations on different threads don't interfere."
 
     def test_uploads_isolated_per_thread(self, client):
-        """Files uploaded to thread-A are not visible in thread-B."""
+        '验证 uploads、isolated、per、thread 场景下的预期行为、边界条件与结果。\n\nFiles uploaded to thread-A are not visible in thread-B.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_a = tmp_path / "thread-a" / "uploads"
@@ -2321,6 +2304,7 @@ class TestScenarioThreadIsolation:
             src_file.write_text("thread-a only")
 
             def get_dir(thread_id):
+                '读取并返回，并遵守 get_dir 所表达的接口约束'
                 return uploads_a if thread_id == "thread-a" else uploads_b
 
             with patch("deerflow.client.get_uploads_dir", side_effect=get_dir), patch("deerflow.client.ensure_uploads_dir", side_effect=get_dir):
@@ -2333,7 +2317,7 @@ class TestScenarioThreadIsolation:
             assert files_b["count"] == 0
 
     def test_artifacts_isolated_per_thread(self, client):
-        """Artifacts in thread-A are not accessible from thread-B."""
+        '验证 artifacts、isolated、per、thread 场景下的预期行为、边界条件与结果。\n\nArtifacts in thread-A are not accessible from thread-B.'
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -2353,10 +2337,10 @@ class TestScenarioThreadIsolation:
 
 
 class TestScenarioMemoryWorkflow:
-    """Scenario: Memory query → reload → status check."""
+    '组织 TestScenarioMemoryWorkflow 场景的行为与边界验证。\n\nScenario: Memory query → reload → status check.'
 
     def test_memory_full_lifecycle(self, client):
-        """get_memory → reload → get_status covers the full memory API."""
+        '验证 memory、full、lifecycle 场景下的预期行为、边界条件与结果。\n\nget_memory → reload → get_status covers the full memory API.'
         initial_data = {"version": "1.0", "facts": [{"id": "f1", "content": "User likes Python"}]}
         updated_data = {
             "version": "1.0",
@@ -2395,10 +2379,10 @@ class TestScenarioMemoryWorkflow:
 
 
 class TestScenarioSkillInstallAndUse:
-    """Scenario: Install a skill → verify it appears → toggle it."""
+    '组织 TestScenarioSkillInstallAndUse 场景的行为与边界验证。\n\nScenario: Install a skill → verify it appears → toggle it.'
 
     def test_install_then_toggle(self, client, allow_skill_security_scan):
-        """Install .skill archive → list to verify → disable → verify disabled."""
+        '验证 install、then、toggle 场景下的预期行为、边界条件与结果。\n\nInstall .skill archive → list to verify → disable → verify disabled.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
 
@@ -2463,10 +2447,10 @@ class TestScenarioSkillInstallAndUse:
 
 
 class TestScenarioEdgeCases:
-    """Scenario: Edge cases and error boundaries in realistic workflows."""
+    '组织 TestScenarioEdgeCases 场景的行为与边界验证。\n\nScenario: Edge cases and error boundaries in realistic workflows.'
 
     def test_empty_stream_response(self, client):
-        """Agent produces no messages — only values + end events."""
+        '验证 empty、stream、response 场景下的预期行为、边界条件与结果。\n\nAgent produces no messages — only values + end events.'
         agent = _make_agent_mock([{"messages": []}])
 
         with (
@@ -2481,7 +2465,7 @@ class TestScenarioEdgeCases:
         assert events[-1].type == "end"
 
     def test_chat_on_empty_response(self, client):
-        """chat() returns empty string for no-message response."""
+        '验证 chat、on、empty、response 场景下的预期行为、边界条件与结果。\n\nchat() returns empty string for no-message response.'
         agent = _make_agent_mock([{"messages": []}])
 
         with (
@@ -2493,7 +2477,7 @@ class TestScenarioEdgeCases:
         assert result == ""
 
     def test_multiple_title_changes(self, client):
-        """Title changes are carried in values events."""
+        '验证 multiple、title、changes 场景下的预期行为、边界条件与结果。\n\nTitle changes are carried in values events.'
         ai = AIMessage(content="ok", id="ai-1")
         chunks = [
             {"messages": [ai], "title": "First Title"},
@@ -2516,7 +2500,7 @@ class TestScenarioEdgeCases:
         assert values_events[2].data["title"] == "Second Title"
 
     def test_concurrent_tool_calls_in_single_message(self, client):
-        """Agent produces multiple tool_calls in one AIMessage — emitted as single messages-tuple."""
+        '验证 concurrent、tool、calls、in、single、message 场景下的预期行为、边界条件与结果。\n\nAgent produces multiple tool_calls in one AIMessage — emitted as single messages-tuple.'
         ai = AIMessage(
             content="",
             id="ai-1",
@@ -2542,7 +2526,7 @@ class TestScenarioEdgeCases:
         assert {tc["id"] for tc in tool_calls} == {"tc-1", "tc-2", "tc-3"}
 
     def test_upload_convertible_file_conversion_failure(self, client):
-        """Upload a .pdf file where conversion fails — file still uploaded, no markdown."""
+        '验证 upload、convertible、file、conversion、failure 场景下的预期行为、边界条件与结果。\n\nUpload a .pdf file where conversion fails — file still uploaded, no markdown.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_dir = tmp_path / "uploads"
@@ -2572,14 +2556,10 @@ class TestScenarioEdgeCases:
 
 
 class TestGatewayConformance:
-    """Validate that DeerFlowClient return dicts conform to Gateway Pydantic response models.
-
-    Each test calls a client method, then parses the result through the
-    corresponding Gateway response model. If the client drifts (missing or
-    wrong-typed fields), Pydantic raises ``ValidationError`` and CI catches it.
-    """
+    '组织 TestGatewayConformance 场景的行为与边界验证。\n\nValidate that DeerFlowClient return dicts conform to Gateway Pydantic response models.\n\n    Each test calls a client method, then parses the result through the\n    corresponding Gateway response model. If the client drifts (missing or\n    wrong-typed fields), Pydantic raises ``ValidationError`` and CI catches it.\n    '
 
     def test_list_models(self, mock_app_config):
+        '验证 list、models 场景下的预期行为、边界条件与结果'
         model = MagicMock()
         model.name = "test-model"
         model.model = "gpt-test"
@@ -2601,6 +2581,7 @@ class TestGatewayConformance:
         assert parsed.token_usage.enabled is True
 
     def test_get_model(self, mock_app_config):
+        '验证 get、model 场景下的预期行为、边界条件与结果'
         model = MagicMock()
         model.name = "test-model"
         model.model = "gpt-test"
@@ -2620,6 +2601,7 @@ class TestGatewayConformance:
         assert parsed.model == "gpt-test"
 
     def test_list_skills(self, client):
+        '验证 list、skills 场景下的预期行为、边界条件与结果'
         skill = MagicMock()
         skill.name = "web-search"
         skill.description = "Search the web"
@@ -2635,6 +2617,7 @@ class TestGatewayConformance:
         assert parsed.skills[0].name == "web-search"
 
     def test_get_skill(self, client):
+        '验证 get、skill 场景下的预期行为、边界条件与结果'
         skill = MagicMock()
         skill.name = "web-search"
         skill.description = "Search the web"
@@ -2650,6 +2633,7 @@ class TestGatewayConformance:
         assert parsed.name == "web-search"
 
     def test_install_skill(self, client, tmp_path, allow_skill_security_scan):
+        '验证 install、skill 场景下的预期行为、边界条件与结果'
         skill_dir = tmp_path / "my-skill"
         skill_dir.mkdir()
         (skill_dir / "SKILL.md").write_text("---\nname: my-skill\ndescription: A test skill\n---\nBody\n")
@@ -2672,6 +2656,7 @@ class TestGatewayConformance:
         assert parsed.skill_name == "my-skill"
 
     def test_get_mcp_config(self, client):
+        '验证 get、mcp、config 场景下的预期行为、边界条件与结果'
         server = MagicMock()
         server.model_dump.return_value = {
             "enabled": True,
@@ -2693,6 +2678,7 @@ class TestGatewayConformance:
         assert "test" in parsed.mcp_servers
 
     def test_update_mcp_config(self, client, tmp_path):
+        '验证 update、mcp、config 场景下的预期行为、边界条件与结果'
         server = MagicMock()
         server.model_dump.return_value = {
             "enabled": True,
@@ -2722,6 +2708,7 @@ class TestGatewayConformance:
         assert "srv" in parsed.mcp_servers
 
     def test_upload_files(self, client, tmp_path):
+        '验证 upload、files 场景下的预期行为、边界条件与结果'
         uploads_dir = tmp_path / "uploads"
         uploads_dir.mkdir()
 
@@ -2737,6 +2724,7 @@ class TestGatewayConformance:
         assert parsed.files[0].size == len("hello")
 
     def test_goal_methods(self, client):
+        '验证 goal、methods 场景下的预期行为、边界条件与结果'
         from langgraph.checkpoint.memory import InMemorySaver
 
         client._checkpointer = InMemorySaver()
@@ -2749,6 +2737,7 @@ class TestGatewayConformance:
         assert ThreadGoalResponse(**client.clear_goal("t-goal")).goal is None
 
     def test_get_memory_config(self, client):
+        '验证 get、memory、config 场景下的预期行为、边界条件与结果'
         mem_cfg = MagicMock()
         mem_cfg.enabled = True
         mem_cfg.mode = "middleware"
@@ -2764,6 +2753,7 @@ class TestGatewayConformance:
         assert parsed.manager_class == "deermem"
 
     def test_get_memory_status(self, client):
+        '验证 get、memory、status 场景下的预期行为、边界条件与结果'
         mem_cfg = MagicMock()
         mem_cfg.enabled = True
         mem_cfg.mode = "middleware"
@@ -2807,10 +2797,10 @@ class TestGatewayConformance:
 
 
 class TestInstallSkillSecurity:
-    """Every security gate in install_skill() must have a red-line test."""
+    '组织 TestInstallSkillSecurity 场景的行为与边界验证。\n\nEvery security gate in install_skill() must have a red-line test.'
 
     def test_zip_bomb_rejected(self, client):
-        """Archives whose extracted size exceeds the limit are rejected."""
+        '验证 zip、bomb、rejected 场景下的预期行为、边界条件与结果。\n\nArchives whose extracted size exceeds the limit are rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "bomb.skill"
             # Create a small archive that claims huge uncompressed size.
@@ -2828,6 +2818,7 @@ class TestInstallSkillSecurity:
             orig = _installer.safe_extract_skill_archive
 
             def patched_extract(zf, dest, max_total_size=100):
+                '执行 patched_extract 的明确职责，并返回与调用约定一致的结果'
                 return orig(zf, dest, max_total_size=100)
 
             from deerflow.skills.storage.local_skill_storage import LocalSkillStorage
@@ -2840,7 +2831,7 @@ class TestInstallSkillSecurity:
                     client.install_skill(archive)
 
     def test_absolute_path_in_archive_rejected(self, client):
-        """ZIP entries with absolute paths are rejected."""
+        '验证 absolute、path、in、archive、rejected 场景下的预期行为、边界条件与结果。\n\nZIP entries with absolute paths are rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "abs.skill"
             with zipfile.ZipFile(archive, "w") as zf:
@@ -2856,7 +2847,7 @@ class TestInstallSkillSecurity:
                     client.install_skill(archive)
 
     def test_dotdot_path_in_archive_rejected(self, client):
-        """ZIP entries with '..' path components are rejected."""
+        "验证 dotdot、path、in、archive、rejected 场景下的预期行为、边界条件与结果。\n\nZIP entries with '..' path components are rejected."
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "traversal.skill"
             with zipfile.ZipFile(archive, "w") as zf:
@@ -2872,7 +2863,7 @@ class TestInstallSkillSecurity:
                     client.install_skill(archive)
 
     def test_symlinks_skipped_during_extraction(self, client, allow_skill_security_scan):
-        """Symlink entries in the archive are skipped (never written to disk)."""
+        '验证 symlinks、skipped、during、extraction 场景下的预期行为、边界条件与结果。\n\nSymlink entries in the archive are skipped (never written to disk).'
         import stat as stat_mod
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -2904,7 +2895,7 @@ class TestInstallSkillSecurity:
             assert not (installed / "sneaky_link").exists()
 
     def test_invalid_skill_name_rejected(self, client):
-        """Skill names containing special characters are rejected."""
+        '验证 invalid、skill、name、rejected 场景下的预期行为、边界条件与结果。\n\nSkill names containing special characters are rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
 
@@ -2929,7 +2920,7 @@ class TestInstallSkillSecurity:
                     client.install_skill(archive)
 
     def test_existing_skill_rejected(self, client, allow_skill_security_scan):
-        """Installing a skill that already exists is rejected."""
+        '验证 existing、skill、rejected 场景下的预期行为、边界条件与结果。\n\nInstalling a skill that already exists is rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
 
@@ -2955,7 +2946,7 @@ class TestInstallSkillSecurity:
                     client.install_skill(archive)
 
     def test_empty_archive_rejected(self, client):
-        """An archive with no entries is rejected."""
+        '验证 empty、archive、rejected 场景下的预期行为、边界条件与结果。\n\nAn archive with no entries is rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "empty.skill"
             with zipfile.ZipFile(archive, "w"):
@@ -2971,7 +2962,7 @@ class TestInstallSkillSecurity:
                     client.install_skill(archive)
 
     def test_invalid_frontmatter_rejected(self, client):
-        """Archive with invalid SKILL.md frontmatter is rejected."""
+        '验证 invalid、frontmatter、rejected 场景下的预期行为、边界条件与结果。\n\nArchive with invalid SKILL.md frontmatter is rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             skill_dir = tmp_path / "bad-meta"
@@ -2995,7 +2986,7 @@ class TestInstallSkillSecurity:
                     client.install_skill(archive)
 
     def test_not_a_zip_rejected(self, client):
-        """A .skill file that is not a valid ZIP is rejected."""
+        '验证 not、a、zip、rejected 场景下的预期行为、边界条件与结果。\n\nA .skill file that is not a valid ZIP is rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             archive = Path(tmp) / "fake.skill"
             archive.write_text("this is not a zip file")
@@ -3004,7 +2995,7 @@ class TestInstallSkillSecurity:
                 client.install_skill(archive)
 
     def test_directory_path_rejected(self, client):
-        """Passing a directory instead of a file is rejected."""
+        '验证 directory、path、rejected 场景下的预期行为、边界条件与结果。\n\nPassing a directory instead of a file is rejected.'
         with tempfile.TemporaryDirectory() as tmp:
             with pytest.raises(ValueError, match="not a file"):
                 client.install_skill(tmp)
@@ -3016,8 +3007,9 @@ class TestInstallSkillSecurity:
 
 
 class TestAtomicWriteJson:
+    '组织 TestAtomicWriteJson 场景的行为与边界验证'
     def test_temp_file_cleaned_on_serialization_failure(self):
-        """If json.dump raises, the temp file is removed."""
+        '验证 temp、file、cleaned、on、serialization、failure 场景下的预期行为、边界条件与结果。\n\nIf json.dump raises, the temp file is removed.'
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "config.json"
 
@@ -3034,7 +3026,7 @@ class TestAtomicWriteJson:
             assert tmp_files == []
 
     def test_happy_path_writes_atomically(self):
-        """Normal write produces correct JSON and no temp files."""
+        '验证 happy、path、writes、atomically 场景下的预期行为、边界条件与结果。\n\nNormal write produces correct JSON and no temp files.'
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "out.json"
             data = {"key": "value", "nested": [1, 2, 3]}
@@ -3049,7 +3041,7 @@ class TestAtomicWriteJson:
             assert list(Path(tmp).glob("*.tmp")) == []
 
     def test_original_preserved_on_failure(self):
-        """If write fails, the original file is not corrupted."""
+        '验证 original、preserved、on、failure 场景下的预期行为、边界条件与结果。\n\nIf write fails, the original file is not corrupted.'
         with tempfile.TemporaryDirectory() as tmp:
             target = Path(tmp) / "config.json"
             target.write_text('{"original": true}')
@@ -3069,14 +3061,15 @@ class TestAtomicWriteJson:
 
 
 class TestConfigUpdateErrors:
+    '组织 TestConfigUpdateErrors 场景的行为与边界验证'
     def test_update_mcp_config_no_config_file(self, client):
-        """FileNotFoundError when extensions_config.json cannot be located."""
+        '验证 update、mcp、config、no、config、file 场景下的预期行为、边界条件与结果。\n\nFileNotFoundError when extensions_config.json cannot be located.'
         with patch("deerflow.client.ExtensionsConfig.resolve_config_path", return_value=None):
             with pytest.raises(FileNotFoundError, match="Cannot locate"):
                 client.update_mcp_config({"server": {}})
 
     def test_update_skill_no_config_file(self, client):
-        """FileNotFoundError when extensions_config.json cannot be located."""
+        '验证 update、skill、no、config、file 场景下的预期行为、边界条件与结果。\n\nFileNotFoundError when extensions_config.json cannot be located.'
         skill = MagicMock()
         skill.name = "some-skill"
         skill.category = SkillCategory.PUBLIC  # Only PUBLIC skills need extensions_config.json
@@ -3089,7 +3082,7 @@ class TestConfigUpdateErrors:
                 client.update_skill("some-skill", enabled=False)
 
     def test_update_skill_disappears_after_write(self, client):
-        """RuntimeError when skill vanishes between write and re-read."""
+        '验证 update、skill、disappears、after、write 场景下的预期行为、边界条件与结果。\n\nRuntimeError when skill vanishes between write and re-read.'
         skill = MagicMock()
         skill.name = "ghost-skill"
 
@@ -3117,8 +3110,9 @@ class TestConfigUpdateErrors:
 
 
 class TestStreamHardening:
+    '组织 TestStreamHardening 场景的行为与边界验证'
     def test_agent_exception_propagates(self, client):
-        """Exceptions from agent.stream() propagate to caller."""
+        '验证 agent、exception、propagates 场景下的预期行为、边界条件与结果。\n\nExceptions from agent.stream() propagate to caller.'
         agent = MagicMock()
         agent.stream.side_effect = RuntimeError("model quota exceeded")
 
@@ -3130,7 +3124,7 @@ class TestStreamHardening:
                 list(client.stream("hi", thread_id="t-err"))
 
     def test_messages_without_id(self, client):
-        """Messages without id attribute are emitted without crashing."""
+        '验证 messages、without、id 场景下的预期行为、边界条件与结果。\n\nMessages without id attribute are emitted without crashing.'
         ai = AIMessage(content="no id here")
         # Forcibly remove the id attribute to simulate edge case.
         object.__setattr__(ai, "id", None)
@@ -3150,7 +3144,7 @@ class TestStreamHardening:
         assert ai_events[0].data["content"] == "no id here"
 
     def test_tool_calls_only_no_text(self, client):
-        """chat() returns empty string when agent only emits tool calls."""
+        '验证 tool、calls、only、no、text 场景下的预期行为、边界条件与结果。\n\nchat() returns empty string when agent only emits tool calls.'
         ai = AIMessage(
             content="",
             id="ai-1",
@@ -3172,7 +3166,7 @@ class TestStreamHardening:
         assert result == ""
 
     def test_duplicate_messages_without_id_not_deduplicated(self, client):
-        """Messages with id=None are NOT deduplicated (each is emitted)."""
+        '验证 duplicate、messages、without、id、not、deduplicated 场景下的预期行为、边界条件与结果。\n\nMessages with id=None are NOT deduplicated (each is emitted).'
         ai1 = AIMessage(content="first")
         ai2 = AIMessage(content="second")
         object.__setattr__(ai1, "id", None)
@@ -3200,7 +3194,9 @@ class TestStreamHardening:
 
 
 class TestSerializeMessage:
+    '组织 TestSerializeMessage 场景的行为与边界验证'
     def test_system_message(self):
+        '验证 system、message 场景下的预期行为、边界条件与结果'
         msg = SystemMessage(content="You are a helpful assistant.", id="sys-1")
         result = DeerFlowClient._serialize_message(msg)
         assert result["type"] == "system"
@@ -3208,7 +3204,7 @@ class TestSerializeMessage:
         assert result["id"] == "sys-1"
 
     def test_unknown_message_type(self):
-        """Non-standard message types serialize as 'unknown'."""
+        "验证 unknown、message、type 场景下的预期行为、边界条件与结果。\n\nNon-standard message types serialize as 'unknown'."
         msg = MagicMock()
         msg.id = "unk-1"
         msg.content = "something"
@@ -3219,6 +3215,7 @@ class TestSerializeMessage:
         assert result["id"] == "unk-1"
 
     def test_ai_message_with_tool_calls(self):
+        '验证 ai、message、with、tool、calls 场景下的预期行为、边界条件与结果'
         msg = AIMessage(
             content="",
             id="ai-tc",
@@ -3230,6 +3227,7 @@ class TestSerializeMessage:
         assert result["tool_calls"][0]["name"] == "bash"
 
     def test_tool_message_non_string_content(self):
+        '验证 tool、message、non、string、content 场景下的预期行为、边界条件与结果'
         msg = ToolMessage(content={"key": "value"}, id="tm-1", tool_call_id="tc-1", name="tool")
         result = DeerFlowClient._serialize_message(msg)
         assert result["type"] == "tool"
@@ -3242,8 +3240,9 @@ class TestSerializeMessage:
 
 
 class TestUploadDeleteSymlink:
+    '组织 TestUploadDeleteSymlink 场景的行为与边界验证'
     def test_delete_upload_symlink_outside_dir(self, client):
-        """A symlink in uploads dir pointing outside is caught by path traversal check."""
+        '验证 delete、upload、symlink、outside、dir 场景下的预期行为、边界条件与结果。\n\nA symlink in uploads dir pointing outside is caught by path traversal check.'
         with tempfile.TemporaryDirectory() as tmp:
             uploads_dir = Path(tmp) / "uploads"
             uploads_dir.mkdir()
@@ -3271,7 +3270,7 @@ class TestUploadDeleteSymlink:
             assert outside.exists()
 
     def test_upload_filename_with_spaces_and_unicode(self, client):
-        """Files with spaces and unicode characters in names upload correctly."""
+        '验证 upload、filename、with、spaces、and、unicode 场景下的预期行为、边界条件与结果。\n\nFiles with spaces and unicode characters in names upload correctly.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_dir = tmp_path / "uploads"
@@ -3295,8 +3294,9 @@ class TestUploadDeleteSymlink:
 
 
 class TestArtifactHardening:
+    '组织 TestArtifactHardening 场景的行为与边界验证'
     def test_artifact_directory_rejected(self, client):
-        """get_artifact rejects paths that resolve to a directory."""
+        '验证 artifact、directory、rejected 场景下的预期行为、边界条件与结果。\n\nget_artifact rejects paths that resolve to a directory.'
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -3310,7 +3310,7 @@ class TestArtifactHardening:
                     client.get_artifact("t1", "mnt/user-data/outputs/subdir")
 
     def test_artifact_leading_slash_stripped(self, client):
-        """Paths with leading slash are handled correctly."""
+        '验证 artifact、leading、slash、stripped 场景下的预期行为、边界条件与结果。\n\nPaths with leading slash are handled correctly.'
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -3332,16 +3332,10 @@ class TestArtifactHardening:
 
 
 class TestUploadDuplicateFilenames:
-    """Regression: upload_files must auto-rename duplicate basenames.
-
-    Previously it silently overwrote the first file with the second,
-    then reported both in the response while only one existed on disk.
-    Now duplicates are renamed (data.txt → data_1.txt) and the response
-    includes original_filename so the agent / caller can see what happened.
-    """
+    '组织 TestUploadDuplicateFilenames 场景的行为与边界验证。\n\nRegression: upload_files must auto-rename duplicate basenames.\n\n    Previously it silently overwrote the first file with the second,\n    then reported both in the response while only one existed on disk.\n    Now duplicates are renamed (data.txt → data_1.txt) and the response\n    includes original_filename so the agent / caller can see what happened.\n    '
 
     def test_duplicate_filenames_auto_renamed(self, client):
-        """Two files with same basename → second gets _1 suffix."""
+        '验证 duplicate、filenames、auto、renamed 场景下的预期行为、边界条件与结果。\n\nTwo files with same basename → second gets _1 suffix.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_dir = tmp_path / "uploads"
@@ -3376,7 +3370,7 @@ class TestUploadDuplicateFilenames:
             assert (uploads_dir / "data_1.txt").read_text() == "version B"
 
     def test_triple_duplicate_increments_counter(self, client):
-        """Three files with same basename → _1, _2 suffixes."""
+        '验证 triple、duplicate、increments、counter 场景下的预期行为、边界条件与结果。\n\nThree files with same basename → _1, _2 suffixes.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_dir = tmp_path / "uploads"
@@ -3398,7 +3392,7 @@ class TestUploadDuplicateFilenames:
             assert len(list(uploads_dir.iterdir())) == 3
 
     def test_different_filenames_no_rename(self, client):
-        """Non-duplicate filenames upload normally without rename."""
+        '验证 different、filenames、no、rename 场景下的预期行为、边界条件与结果。\n\nNon-duplicate filenames upload normally without rename.'
         with tempfile.TemporaryDirectory() as tmp:
             tmp_path = Path(tmp)
             uploads_dir = tmp_path / "uploads"
@@ -3417,19 +3411,15 @@ class TestUploadDuplicateFilenames:
 
 
 class TestBugArtifactPrefixMatchTooLoose:
-    """Regression: get_artifact must reject paths like ``mnt/user-data-evil/...``.
-
-    Previously ``startswith("mnt/user-data")`` matched ``"mnt/user-data-evil"``
-    because it was a string prefix, not a path-segment check.
-    """
+    '组织 TestBugArtifactPrefixMatchTooLoose 场景的行为与边界验证。\n\nRegression: get_artifact must reject paths like ``mnt/user-data-evil/...``.\n\n    Previously ``startswith("mnt/user-data")`` matched ``"mnt/user-data-evil"``\n    because it was a string prefix, not a path-segment check.\n    '
 
     def test_non_canonical_prefix_rejected(self, client):
-        """Paths that share a string prefix but differ at segment boundary are rejected."""
+        '验证 non、canonical、prefix、rejected 场景下的预期行为、边界条件与结果。\n\nPaths that share a string prefix but differ at segment boundary are rejected.'
         with pytest.raises(ValueError, match="must start with"):
             client.get_artifact("t1", "mnt/user-data-evil/secret.txt")
 
     def test_exact_prefix_without_subpath_accepted(self, client):
-        """Bare 'mnt/user-data' is accepted (will later fail as directory, not at prefix)."""
+        "验证 exact、prefix、without、subpath、accepted 场景下的预期行为、边界条件与结果。\n\nBare 'mnt/user-data' is accepted (will later fail as directory, not at prefix)."
         from deerflow.runtime.user_context import get_effective_user_id
 
         with tempfile.TemporaryDirectory() as tmp:
@@ -3444,12 +3434,10 @@ class TestBugArtifactPrefixMatchTooLoose:
 
 
 class TestBugListUploadsDeadCode:
-    """Regression: list_uploads works even when called on a fresh thread
-    (directory does not exist yet — returns empty without creating it).
-    """
+    '组织 TestBugListUploadsDeadCode 场景的行为与边界验证。\n\nRegression: list_uploads works even when called on a fresh thread\n    (directory does not exist yet — returns empty without creating it).\n    '
 
     def test_list_uploads_on_fresh_thread(self, client):
-        """list_uploads on a thread that never had uploads returns empty list."""
+        '验证 list、uploads、on、fresh、thread 场景下的预期行为、边界条件与结果。\n\nlist_uploads on a thread that never had uploads returns empty list.'
         with tempfile.TemporaryDirectory() as tmp:
             non_existent = Path(tmp) / "does-not-exist" / "uploads"
             assert not non_existent.exists()
@@ -3466,12 +3454,10 @@ class TestBugListUploadsDeadCode:
 
 
 class TestBugAgentInvalidationInconsistency:
-    """Regression: update_skill and update_mcp_config must reset both
-    _agent and _agent_config_key, just like reset_agent() does.
-    """
+    '组织 TestBugAgentInvalidationInconsistency 场景的行为与边界验证。\n\nRegression: update_skill and update_mcp_config must reset both\n    _agent and _agent_config_key, just like reset_agent() does.\n    '
 
     def test_update_mcp_resets_config_key(self, client):
-        """After update_mcp_config, both _agent and _agent_config_key are None."""
+        '验证 update、mcp、resets、config、key 场景下的预期行为、边界条件与结果。\n\nAfter update_mcp_config, both _agent and _agent_config_key are None.'
         client._agent = MagicMock()
         client._agent_config_key = ("model", True, False, False)
 
@@ -3495,7 +3481,7 @@ class TestBugAgentInvalidationInconsistency:
         assert client._agent_config_key is None
 
     def test_update_skill_resets_config_key(self, client):
-        """After update_skill, both _agent and _agent_config_key are None."""
+        '验证 update、skill、resets、config、key 场景下的预期行为、边界条件与结果。\n\nAfter update_skill, both _agent and _agent_config_key are None.'
         client._agent = MagicMock()
         client._agent_config_key = ("model", True, False, False)
 

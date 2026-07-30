@@ -1,4 +1,4 @@
-"""Authentication configuration for DeerFlow."""
+"""DeerFlow 的认证配置。"""
 
 import logging
 import os
@@ -12,12 +12,11 @@ _SECRET_FILE = ".jwt_secret"
 
 
 class AuthConfig(BaseModel):
-    """JWT and auth-related configuration. Parsed once at startup.
+    """JWT 与认证相关配置，在启动时只解析一次。
 
-    Note: the ``users`` table now lives in the shared persistence
-    database managed by ``deerflow.persistence.engine``. The old
-    ``users_db_path`` config key has been removed — user storage is
-    configured through ``config.database`` like every other table.
+    ``users`` 表位于 ``deerflow.persistence.engine`` 管理的共享持久化
+    数据库中；已移除旧 ``users_db_path`` 配置，用户存储与其他表一样由
+    ``config.database`` 配置。
     """
 
     jwt_secret: str = Field(
@@ -33,7 +32,7 @@ _auth_config: AuthConfig | None = None
 
 
 def _load_or_create_secret() -> str:
-    """Load persisted JWT secret from ``{base_dir}/.jwt_secret``, or generate and persist a new one."""
+    """读取已持久化的 JWT 密钥；不存在时生成并保存新的密钥。"""
     from deerflow.config.paths import get_paths
 
     paths = get_paths()
@@ -59,7 +58,7 @@ def _load_or_create_secret() -> str:
 
 
 def get_auth_config() -> AuthConfig:
-    """Get the global AuthConfig instance. Parses from env on first call."""
+    """获取全局 ``AuthConfig`` 实例，首次调用时从环境变量解析。"""
     global _auth_config
     if _auth_config is None:
         from dotenv import load_dotenv
@@ -80,6 +79,6 @@ def get_auth_config() -> AuthConfig:
 
 
 def set_auth_config(config: AuthConfig) -> None:
-    """Set the global AuthConfig instance (for testing)."""
+    """设置全局 ``AuthConfig`` 实例，供测试隔离配置使用。"""
     global _auth_config
     _auth_config = config

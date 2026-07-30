@@ -3,9 +3,9 @@ import { getBackendBaseURL } from "../config";
 
 import { eventsToSteps, type SubtaskStep } from "./steps";
 
-/** Default per-request page size; matches the events endpoint's default. */
+/** 单次请求默认页大小，与事件端点默认值一致。 */
 const SUBTASK_STEPS_PAGE_SIZE = 500;
-/** Safety bound on pagination so a misbehaving cursor can't loop forever. */
+/** 分页安全上限，防止异常游标无限循环。 */
 const SUBTASK_STEPS_MAX_PAGES = 100;
 
 type FetchedEvent = Parameters<typeof eventsToSteps>[0][number] & {
@@ -13,13 +13,11 @@ type FetchedEvent = Parameters<typeof eventsToSteps>[0][number] & {
 };
 
 /**
- * Fetch a subtask's persisted step history for a historical run (#3779).
+ * 获取历史运行中子任务已持久化的步骤历史（#3779）。
  *
- * Scoped server-side to this `taskId` (and to `subagent.step` events) and paged
- * forward with an `after_seq` cursor until a short page, so the run-wide event
- * limit can never truncate a subagent's step timeline — even for long runs or
- * runs with several subagents. Used by the subtask card to backfill steps on
- * expand when the live SSE steps are gone (e.g. after a page reload).
+ * 服务端限定为该 `taskId`（及 `subagent.step` 事件），用 `after_seq` 游标向前分页直至短页，
+ * 使运行级事件上限不会截断子代理步骤时间线，即使运行很长或包含多个子代理。子任务卡片展开时，
+ * 若实时 SSE 步骤已消失（例如页面重载后），以此回填步骤。
  */
 export async function fetchSubtaskSteps(
   threadId: string,
@@ -56,7 +54,7 @@ export async function fetchSubtaskSteps(
     }
     const lastSeq = batch[batch.length - 1]?.seq;
     if (lastSeq === undefined) {
-      break; // can't advance the cursor; stop rather than refetch page 0 forever
+      break; // 无法推进游标，停止而非无限重复请求第 0 页。
     }
     afterSeq = lastSeq;
   }

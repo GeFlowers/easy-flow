@@ -1,3 +1,5 @@
+"""构建主代理系统提示词，并维护技能提示词缓存。"""
+
 from __future__ import annotations
 
 import asyncio
@@ -25,14 +27,10 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# LRU cap on the per-(app_config, user_id) enabled-skills cache.
-# Without this, a long-running multi-user process leaks one entry per
-# distinct user (and per app_config injection), bounded only by the
-# number of distinct identities the process has ever seen. 256 is
-# generous for realistic traffic and matches the cap used for
-# ``_user_scoped_storages`` in ``deerflow.skills.storage``; the
-# least-recently-used entry is evicted on overflow and re-computed on
-# the next miss.
+# 按 (app_config, user_id) 划分的启用技能缓存采用最近最少使用上限。没有此限制时，
+# 长期运行的多用户进程会为每个不同用户及配置注入保留一个条目，数量只受进程历史上
+# 见过的身份数限制。256 对实际流量足够宽松，并与 ``deerflow.skills.storage`` 中
+# ``_user_scoped_storages`` 的上限一致；溢出时淘汰最久未使用条目，并在下次未命中时重算。
 _ENABLED_SKILLS_BY_CONFIG_CACHE_MAXSIZE = 256
 
 _ENABLED_SKILLS_REFRESH_WAIT_TIMEOUT_SECONDS = 5.0
@@ -45,10 +43,12 @@ _enabled_skills_refresh_event = threading.Event()
 
 
 def _load_enabled_skills_sync() -> list[Skill]:
+    """同步读取当前启用的技能列表，供后台刷新任务使用。"""
     return list(get_or_new_skill_storage().load_skills(enabled_only=True))
 
 
 def _start_enabled_skills_refresh_thread() -> None:
+    """启动守护线程，以异步方式刷新启用技能缓存。"""
     threading.Thread(
         target=_refresh_enabled_skills_cache_worker,
         name="deerflow-enabled-skills-loader",
@@ -57,6 +57,7 @@ def _start_enabled_skills_refresh_thread() -> None:
 
 
 def _refresh_enabled_skills_cache_worker() -> None:
+    """加载启用技能，并仅在版本仍最新时写入共享缓存。"""
     global _enabled_skills_cache, _enabled_skills_refresh_active
 
     while True:
@@ -76,12 +77,13 @@ def _refresh_enabled_skills_cache_worker() -> None:
                 _enabled_skills_refresh_event.set()
                 return
 
-            # A newer invalidation happened while loading. Keep the worker alive
-            # and loop again so the cache always converges on the latest version.
+            # 加载期间发生了更新的失效操作。保持工作线程存活并再次循环，确保缓存
+            # 最终收敛到最新版本。
             _enabled_skills_cache = None
 
 
 def _ensure_enabled_skills_cache() -> threading.Event:
+    """确保缓存刷新已启动，并返回可等待其完成的事件。"""
     global _enabled_skills_refresh_active
 
     with _enabled_skills_lock:
@@ -98,6 +100,7 @@ def _ensure_enabled_skills_cache() -> threading.Event:
 
 
 def _invalidate_enabled_skills_cache() -> threading.Event:
+    """清空全局及按配置划分的缓存，并触发一次最新刷新。"""
     global _enabled_skills_cache, _enabled_skills_refresh_active, _enabled_skills_refresh_version
 
     _get_cached_skills_prompt_section.cache_clear()
@@ -115,10 +118,12 @@ def _invalidate_enabled_skills_cache() -> threading.Event:
 
 
 def prime_enabled_skills_cache() -> None:
+    """预先启动启用技能缓存的加载流程，但不等待结果。"""
     _ensure_enabled_skills_cache()
 
 
 def warm_enabled_skills_cache(timeout_seconds: float = _ENABLED_SKILLS_REFRESH_WAIT_TIMEOUT_SECONDS) -> bool:
+    """等待启用技能缓存预热完成，并在超时时返回失败。"""
     if _ensure_enabled_skills_cache().wait(timeout=timeout_seconds):
         return True
 
@@ -127,14 +132,15 @@ def warm_enabled_skills_cache(timeout_seconds: float = _ENABLED_SKILLS_REFRESH_W
 
 
 def _get_enabled_skills():
+    """获取全局缓存中的启用技能列表。"""
     return get_cached_enabled_skills()
 
 
 def get_cached_enabled_skills() -> list[Skill]:
-    """Return the cached enabled-skills list, kicking off a background refresh on miss.
+    """返回已缓存的启用技能；未命中时启动后台刷新。
 
-    Safe to call from request paths: never blocks on disk I/O. Returns an empty
-    list on cache miss; the next call will see the warmed result.
+    可安全地在请求路径调用，绝不阻塞磁盘读写。缓存未命中时返回空列表，
+    下一次调用即可取得预热后的结果。
     """
     with _enabled_skills_lock:
         cached = _enabled_skills_cache
@@ -147,16 +153,14 @@ def get_cached_enabled_skills() -> list[Skill]:
 
 
 def get_enabled_skills_for_config(app_config: AppConfig | None = None, user_id: str | None = None) -> list[Skill]:
-    """Return enabled skills using the caller's config source and user scope.
+    """按调用方配置来源和用户范围返回启用的技能。
 
-    When a concrete ``app_config`` is supplied, cache the loaded skills by that
-    config object's identity combined with ``user_id`` so request-scoped config
-    injection resolves skill paths from the matching config AND user scope
-    without rescanning storage on every agent factory call.
+    提供具体应用配置时，按该配置对象身份及用户身份缓存加载结果，使请求级
+    配置注入可从匹配的配置和用户范围解析技能路径，无需每次代理工厂调用
+    都重新扫描存储。
 
-    When ``user_id`` is provided, uses :func:`get_or_new_user_skill_storage`
-    to load public + user-level custom skills. Otherwise falls back to the
-    global storage (public + global custom fallback).
+    提供用户身份时加载公开技能与该用户的自定义技能；否则回退至全局存储，
+    即公开技能和全局自定义技能回退集合。
     """
     if app_config is None:
         return _get_enabled_skills()
@@ -167,8 +171,7 @@ def get_enabled_skills_for_config(app_config: AppConfig | None = None, user_id: 
         if cached is not None:
             cached_config, cached_skills = cached
             if cached_config is app_config:
-                # LRU touch: move the entry to the end so it survives the
-                # next eviction cycle.
+                # 访问最近最少使用缓存：将条目移至末尾，使其能通过下一轮淘汰。
                 _enabled_skills_by_config_cache.move_to_end(cache_key)
                 return list(cached_skills)
 
@@ -178,15 +181,15 @@ def get_enabled_skills_for_config(app_config: AppConfig | None = None, user_id: 
         skills = list(get_or_new_skill_storage(app_config=app_config).load_skills(enabled_only=True))
     with _enabled_skills_lock:
         _enabled_skills_by_config_cache[cache_key] = (app_config, skills)
-        # Evict the least-recently-used entries when we exceed the cap.
-        # The cap is intentionally small (256) so a long-running process
-        # cannot leak one entry per distinct (config, user) pair seen.
+        # 超过上限时淘汰最久未使用的条目。上限有意设为较小的 256，避免长期运行的
+        # 进程为每个见过的不同（配置、用户）组合泄漏一个条目。
         while len(_enabled_skills_by_config_cache) > _ENABLED_SKILLS_BY_CONFIG_CACHE_MAXSIZE:
             _enabled_skills_by_config_cache.popitem(last=False)
     return list(skills)
 
 
 def _skill_mutability_label(category: SkillCategory | str) -> str:
+    """根据技能分类生成其可编辑性的提示标签。"""
     if category == SkillCategory.CUSTOM:
         return "[custom, editable]"
     if category == SkillCategory.LEGACY:
@@ -195,10 +198,10 @@ def _skill_mutability_label(category: SkillCategory | str) -> str:
 
 
 def _render_available_skill(name: str, description: str, category: SkillCategory | str, location: str) -> str:
-    # name/description/location come from a ``.skill`` archive's frontmatter
-    # (untrusted); escape them so a value cannot close its tag and forge a
-    # framework block in the system prompt (matches the slash-activation and
-    # durable-context siblings). ``category`` is a controlled enum.
+    """转义不可信技能元数据，并渲染为提示词中的技能条目。"""
+    # name、description、location 来自不可信 ``.skill`` 归档的前置信息；必须转义，
+    # 防止值闭合标签并在系统提示词中伪造框架区块（与斜杠激活和持久上下文处理一致）。
+    # ``category`` 是受控的枚举值。
     esc_name = html.escape(name, quote=False)
     esc_description = html.escape(description, quote=False)
     esc_location = html.escape(location, quote=False)
@@ -206,42 +209,42 @@ def _render_available_skill(name: str, description: str, category: SkillCategory
 
 
 def clear_skills_system_prompt_cache() -> None:
+    """清除技能系统提示词相关的全部缓存并开始刷新。"""
     _invalidate_enabled_skills_cache()
 
 
 async def refresh_skills_system_prompt_cache_async() -> None:
+    """异步等待技能系统提示词缓存完成刷新。"""
     await asyncio.to_thread(_invalidate_enabled_skills_cache().wait)
 
 
 def invalidate_user_skill_cache(user_id: str) -> None:
-    """Invalidate the skill cache for a specific user only.
+    """仅使指定用户的技能缓存失效。
 
-    Removes all entries in ``_enabled_skills_by_config_cache`` that
-    match the given ``user_id``, without affecting other users' caches.
-    The prompt-section LRU cache is also cleared so stale skill
-    signatures are not served on the next prompt construction.
+    删除按配置划分的缓存中与给定用户身份匹配的所有条目，不影响其他用户
+    的缓存。同时清除提示词片段的最近最少使用缓存，避免下一次构建提示词
+    时继续使用过期的技能签名。
     """
     with _enabled_skills_lock:
         keys_to_remove = [key for key in _enabled_skills_by_config_cache if key[1] == user_id]
         for key in keys_to_remove:
             _enabled_skills_by_config_cache.pop(key, None)
-    # Also clear the prompt-section LRU cache so stale skill signatures
-    # for this user are not served on the next prompt construction.
+    # 同时清除提示词片段的最近最少使用缓存，避免下一次构建提示词时返回该用户
+    # 已过期的技能签名。
     _get_cached_skills_prompt_section.cache_clear()
 
 
 async def refresh_user_skills_system_prompt_cache_async(user_id: str) -> None:
-    """Per-user variant of :func:`refresh_skills_system_prompt_cache_async`.
+    """异步执行仅针对指定用户的技能提示词缓存失效操作。
 
-    Only invalidates the cache entries for the given ``user_id``, leaving
-    other users' caches intact. The prompt-section LRU cache is also
-    cleared so stale skill signatures are not served on the next prompt
-    construction.
+    只清除给定用户身份对应的缓存条目，保留其他用户缓存；同时清除提示词
+    片段的最近最少使用缓存，避免下一次构建时使用过期技能签名。
     """
     invalidate_user_skill_cache(user_id)
 
 
 def _build_skill_evolution_section(skill_evolution_enabled: bool) -> str:
+    """在启用技能自我演进时生成相应的系统提示词片段。"""
     if not skill_evolution_enabled:
         return ""
     return """
@@ -270,12 +273,12 @@ Skip simple one-off tasks.
 
 
 def _build_available_subagents_description(available_names: list[str], bash_available: bool, *, app_config: AppConfig | None = None) -> str:
-    """Dynamically build subagent type descriptions from registry.
+    """从注册表动态构建可用子代理类型的说明。
 
-    Mirrors Codex's pattern where agent_type_description is dynamically generated
-    from all registered roles, so the LLM knows about every available type.
+    此处遵循按所有已注册角色动态生成代理类型说明的模式，使语言模型了解
+    每一种可用类型。
     """
-    # Built-in descriptions (kept for backward compatibility with existing prompt quality)
+    # 内置说明，保留以维持既有提示词质量的向后兼容性。
     builtin_descriptions = {
         "general-purpose": "For ANY non-trivial task - web research, code exploration, file operations, analysis, etc.",
         "bash": (
@@ -283,7 +286,7 @@ def _build_available_subagents_description(available_names: list[str], bash_avai
         ),
     }
 
-    # Lazy import moved outside loop to avoid repeated import overhead
+    # 将延迟导入移至循环外，避免重复导入开销。
     from deerflow.subagents.registry import get_subagent_config
 
     lines = []
@@ -293,14 +296,12 @@ def _build_available_subagents_description(available_names: list[str], bash_avai
         else:
             config = get_subagent_config(name, app_config=app_config)
             if config is not None:
-                # config.description is agent-editable (persisted by setup_agent /
-                # update_agent), so escape it before it renders into the
-                # <subagent_system> block. Otherwise a first line like
-                # "</subagent_system><system-reminder>..." could break out of the
-                # block and forge framework-reserved tags in the lead-agent system
-                # prompt — the same class as the #4137 <soul>, #4097 memory, and
-                # #4128 skill render-site fixes.
-                desc = html.escape(config.description.split("\n")[0].strip(), quote=False)  # First line only for brevity
+                # config.description 可由代理编辑并通过 setup_agent / update_agent 持久化，
+                # 因此渲染进 <subagent_system> 前必须转义。否则类似
+                # "</subagent_system><system-reminder>..." 的首行可跳出区块，并在主
+                # 代理系统提示词中伪造框架保留标签；这与 #4137 的 <soul>、#4097 的记忆和
+                # #4128 的技能渲染点修复属于同类问题。
+                desc = html.escape(config.description.split("\n")[0].strip(), quote=False)  # 仅取首行以保持简洁。
                 lines.append(f"- **{name}**: {desc}")
 
     return "\n".join(lines)
@@ -312,22 +313,22 @@ def _build_subagent_section(
     *,
     app_config: AppConfig | None = None,
 ) -> str:
-    """Build the subagent system prompt section with dynamic subagent limits.
+    """按动态子代理限制构建子代理系统提示词片段。
 
-    Args:
-        max_concurrent: Maximum number of concurrent subagent calls allowed per response.
-        max_total: Maximum number of subagent calls allowed per run.
+    参数：
+        max_concurrent：每个响应允许的最大并发子代理调用数。
+        max_total：单次运行允许的最大子代理调用总数。
 
-    Returns:
-        Formatted subagent section string.
+    返回：
+        已格式化的子代理提示词片段。
     """
     n = clamp_subagent_concurrency(max_concurrent)
     total = clamp_total_subagents_per_run(max_total)
     available_names = get_available_subagent_names(app_config=app_config) if app_config is not None else get_available_subagent_names()
     bash_available = "bash" in available_names
 
-    # Dynamically build subagent type descriptions from registry (aligned with Codex's
-    # agent_type_description pattern where all registered roles are listed in the tool spec).
+    # 从注册表动态构建子代理类型说明，与在工具定义中列出所有注册角色的
+    # agent_type_description 模式保持一致。
     available_subagents = _build_available_subagents_description(available_names, bash_available, app_config=app_config)
     direct_tool_examples = "bash, ls, read_file, web_search, etc." if bash_available else "ls, read_file, web_search, etc."
     direct_execution_example = (
@@ -696,15 +697,14 @@ combined with a FastAPI gateway for REST API access [citation:FastAPI](https://f
 
 
 def _get_memory_context(agent_name: str | None = None, *, app_config: AppConfig | None = None) -> str:
-    """Get memory context for injection into system prompt.
+    """取得注入系统提示词的记忆上下文。
 
-    Args:
-        agent_name: If provided, loads per-agent memory. If None, loads global memory.
-        app_config: Explicit application config. When provided, memory options
-            are read from this value instead of the global config singleton.
+    参数：
+        agent_name：提供时加载代理专属记忆；为空时加载全局记忆。
+        app_config：显式应用配置。提供时从该值读取记忆选项，而非全局配置单例。
 
-    Returns:
-        Formatted memory context string wrapped in XML tags, or empty string if disabled.
+    返回：
+        以 ``XML`` 标签包装的已格式化记忆上下文；功能禁用时返回空字符串。
     """
     try:
         from deerflow.agents.memory import get_memory_manager
@@ -745,6 +745,7 @@ def _get_cached_skills_prompt_section(
     container_base_path: str,
     skill_evolution_section: str,
 ) -> str:
+    """按技能签名缓存并生成技能系统提示词片段。"""
     filtered = [(name, description, category, location) for name, description, category, location in skill_signature if available_skills_key is None or name in available_skills_key]
     skills_list = ""
     if filtered:
@@ -794,22 +795,19 @@ def get_skills_prompt_section(
     user_id: str | None = None,
     skill_names: frozenset[str] | None = None,
 ) -> str:
-    """Generate the skills prompt section.
+    """生成技能提示词片段。
 
-    When *skill_names* is provided, renders a compact ``<skill_index>`` (names
-    only) so the LLM can discover skills via ``describe_skill``.  When omitted,
-    falls back to the legacy full-metadata ``<available_skills>`` rendering for
-    backward compatibility.
+    提供 *skill_names* 时，渲染仅含名称的紧凑 ``<skill_index>``，让语言模型通过
+    ``describe_skill`` 发现技能；省略时回退为旧版完整元数据 ``<available_skills>``
+    渲染，以维持向后兼容。
     """
     if app_config is None:
         try:
             from deerflow.config import get_app_config
 
-            # Rebind so the storage/enabled-skills loads below use this resolved
-            # config too. Reading only container_path here and then letting
-            # get_enabled_skills_for_config(None) fall back to the warm cache
-            # rendered an empty enabled-skills list on a cold start while the
-            # synchronously-loaded disabled section was populated (#4144).
+            # 重新绑定，确保下方存储和启用技能加载也使用此解析后的配置。此前仅在此处
+            # 读取 container_path，再令 get_enabled_skills_for_config(None) 回退到预热
+            # 缓存，会在冷启动时渲染空的启用技能列表，而同步加载的禁用片段却已填充（#4144）。
             app_config = get_app_config()
             container_base_path = app_config.skills.container_path
             skill_evolution_enabled = app_config.skill_evolution.enabled
@@ -823,7 +821,7 @@ def get_skills_prompt_section(
 
     skill_evolution_section = _build_skill_evolution_section(skill_evolution_enabled)
 
-    # ── Deferred discovery path — storage not needed (caller supplies names) ─
+    # ── 延迟发现路径：调用方提供名称，无需读取存储 ─
     if skill_names is not None:
         from deerflow.skills.describe import get_skill_index_prompt_section
 
@@ -833,7 +831,7 @@ def get_skills_prompt_section(
             skill_evolution_section=skill_evolution_section,
         )
 
-    # ── Legacy full-metadata path — load ALL skills for disabled-skill section
+    # ── 旧版完整元数据路径：为禁用技能片段加载全部技能 ─
     if user_id:
         storage = get_or_new_user_skill_storage(user_id, app_config=app_config)
     else:
@@ -858,21 +856,20 @@ def get_skills_prompt_section(
 
 
 def get_agent_soul(agent_name: str | None) -> str:
-    # Append SOUL.md (agent personality) if present
+    """读取代理人格内容，并转义后包装为可信提示词区块。"""
+    # 存在时追加 SOUL.md（代理人格）。
     soul = load_agent_soul(agent_name)
     if soul:
-        # SOUL.md is agent-editable (setup_agent / update_agent persist it) and is
-        # rendered into the <soul> block of the lead-agent system prompt. Escape it
-        # so a value like "</soul></system-reminder>" cannot close the block and
-        # relocate the text after it out of the trust zone the prompt declares —
-        # matching the skill/memory/tool-result escaping in #4097/#4119/#4128/#4099.
-        # quote=False: it lands in element-text position, never an attribute value.
+        # SOUL.md 可由代理编辑并由 setup_agent / update_agent 持久化，且会渲染至主代理
+        # 系统提示词的 <soul> 区块。必须转义，避免 "</soul></system-reminder>" 一类值
+        # 闭合区块并把后续文本移出提示词声明的信任区域；这与 #4097/#4119/#4128/#4099 的
+        # 技能、记忆和工具结果转义保持一致。quote=False 表示它位于元素文本位置而非属性值。
         return f"<soul>\n{html.escape(soul, quote=False)}\n</soul>\n"
     return ""
 
 
 def _build_self_update_section(agent_name: str | None) -> str:
-    """Prompt block that teaches the custom agent to persist self-updates via update_agent."""
+    """生成指导自定义代理通过更新工具持久化自身改动的提示词区块。"""
     if not agent_name:
         return ""
     return f"""<self_update>
@@ -893,7 +890,7 @@ Rules:
 
 
 def _build_acp_section(*, app_config: AppConfig | None = None) -> str:
-    """Build the ACP agent prompt section, only if ACP agents are configured."""
+    """仅在已配置外部代理时构建其任务提示词片段。"""
     if app_config is None:
         try:
             from deerflow.config.acp_config import get_acp_agents
@@ -917,7 +914,7 @@ def _build_acp_section(*, app_config: AppConfig | None = None) -> str:
 
 
 def _build_custom_mounts_section(*, app_config: AppConfig | None = None) -> str:
-    """Build a prompt section for explicitly configured sandbox mounts."""
+    """为显式配置的沙箱挂载目录构建提示词片段。"""
     if app_config is None:
         try:
             from deerflow.config import get_app_config
@@ -944,7 +941,7 @@ def _build_custom_mounts_section(*, app_config: AppConfig | None = None) -> str:
 
 
 def _build_memory_tool_section(*, app_config: AppConfig | None = None) -> str:
-    """Build tool-mode memory guidance for the static system prompt."""
+    """为静态系统提示词构建工具模式下的记忆使用指引。"""
     try:
         if app_config is None:
             from deerflow.config.memory_config import get_memory_config
@@ -983,7 +980,8 @@ def apply_prompt_template(
     user_id: str | None = None,
     skill_names: frozenset[str] | None = None,
 ) -> str:
-    # Include subagent section only if enabled (from runtime parameter)
+    """组合技能、记忆与子代理约束，生成完整静态系统提示词。"""
+    # 仅在运行时参数启用时加入子代理片段。
     n = clamp_subagent_concurrency(max_concurrent_subagents)
     total = max_total_subagents
     if total is None:
@@ -992,7 +990,7 @@ def apply_prompt_template(
     total = clamp_total_subagents_per_run(total)
     subagent_section = _build_subagent_section(n, total, app_config=app_config) if subagent_enabled else ""
 
-    # Add subagent reminder to critical_reminders if enabled
+    # 启用时向 critical_reminders 加入子代理提醒。
     subagent_reminder = (
         "- **Orchestrator Mode**: You are a task orchestrator - decompose complex tasks into parallel sub-tasks. "
         f"**HARD LIMITS: max {n} `task` calls per response, max {total} per run.** "
@@ -1001,7 +999,7 @@ def apply_prompt_template(
         else ""
     )
 
-    # Add subagent thinking guidance if enabled
+    # 启用时加入子代理思考指引。
     subagent_thinking = (
         "- **DECOMPOSITION CHECK: Can this task be broken into 2+ parallel sub-tasks? If YES, COUNT them. "
         f"If count > {n}, you MUST plan batches of ≤{n} and only launch the FIRST batch now. "
@@ -1010,7 +1008,7 @@ def apply_prompt_template(
         else ""
     )
 
-    # Get skills section (deferred discovery when skill_names is provided)
+    # 获取技能片段；提供 skill_names 时使用延迟发现。
     skills_section = get_skills_prompt_section(
         available_skills,
         app_config=app_config,
@@ -1018,16 +1016,16 @@ def apply_prompt_template(
         skill_names=skill_names,
     )
 
-    # Get deferred tools section (tool_search)
+    # 获取延迟工具片段（tool_search）。
     deferred_tools_section = get_deferred_tools_prompt_section(deferred_names=deferred_names)
 
-    # Build ACP agent section only if ACP agents are configured
+    # 仅已配置 ACP 代理时构建相应片段。
     acp_section = _build_acp_section(app_config=app_config)
     custom_mounts_section = _build_custom_mounts_section(app_config=app_config)
     acp_and_mounts_section = "\n".join(section for section in (acp_section, custom_mounts_section) if section)
 
-    # Gate the "Skill First" instruction on the deferred discovery path:
-    # legacy mode uses tool-agnostic wording; deferred mode references describe_skill.
+    # 根据延迟发现路径决定是否给出“技能优先”指令：旧版模式使用工具无关的措辞，
+    # 延迟模式引用 describe_skill。
     skill_first_reminder = (
         "- Skill First: For complex tasks, call describe_skill(name) to check if a matching skill exists, then read_file to load it.\n"
         if skill_names is not None
@@ -1036,10 +1034,9 @@ def apply_prompt_template(
 
     memory_tool_section = _build_memory_tool_section(app_config=app_config)
 
-    # Build and return the fully static system prompt.
-    # Memory and current date are injected per-turn via DynamicContextMiddleware
-    # as a <system-reminder> in the first HumanMessage, keeping this prompt
-    # identical across users and sessions for maximum prefix-cache reuse.
+    # 构建并返回完全静态的系统提示词。记忆和当前日期在每轮由
+    # DynamicContextMiddleware 作为首条 HumanMessage 中的 <system-reminder> 注入，
+    # 以保持不同用户和会话间的提示词一致，最大化复用前缀缓存。
     return SYSTEM_PROMPT_TEMPLATE.format(
         agent_name=agent_name or "DeerFlow 2.0",
         soul=get_agent_soul(agent_name),

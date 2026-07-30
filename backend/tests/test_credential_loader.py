@@ -1,3 +1,4 @@
+'定义 test_credential_loader 模块提供的职责与可复用接口'
 import json
 import os
 
@@ -8,6 +9,7 @@ from deerflow.models.credential_loader import (
 
 
 def _clear_claude_code_env(monkeypatch) -> None:
+    '执行 _clear_claude_code_env 的明确职责，并返回与调用约定一致的结果'
     for env_var in (
         "CLAUDE_CODE_OAUTH_TOKEN",
         "ANTHROPIC_AUTH_TOKEN",
@@ -18,6 +20,7 @@ def _clear_claude_code_env(monkeypatch) -> None:
 
 
 def test_load_claude_code_credential_from_direct_env(monkeypatch):
+    '验证 load、claude、code、credential、from、direct、env 场景下的预期行为、边界条件与结果'
     _clear_claude_code_env(monkeypatch)
     monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "  sk-ant-oat01-env  ")
 
@@ -30,6 +33,7 @@ def test_load_claude_code_credential_from_direct_env(monkeypatch):
 
 
 def test_load_claude_code_credential_from_anthropic_auth_env(monkeypatch):
+    '验证 load、claude、code、credential、from、anthropic、auth、env 场景下的预期行为、边界条件与结果'
     _clear_claude_code_env(monkeypatch)
     monkeypatch.setenv("ANTHROPIC_AUTH_TOKEN", "sk-ant-oat01-anthropic-auth")
 
@@ -41,6 +45,7 @@ def test_load_claude_code_credential_from_anthropic_auth_env(monkeypatch):
 
 
 def test_load_claude_code_credential_from_file_descriptor(monkeypatch):
+    '验证 load、claude、code、credential、from、file、descriptor 场景下的预期行为、边界条件与结果'
     _clear_claude_code_env(monkeypatch)
 
     read_fd, write_fd = os.pipe()
@@ -60,6 +65,7 @@ def test_load_claude_code_credential_from_file_descriptor(monkeypatch):
 
 
 def test_load_claude_code_credential_from_override_path(tmp_path, monkeypatch):
+    '验证 load、claude、code、credential、from、override、path 场景下的预期行为、边界条件与结果'
     _clear_claude_code_env(monkeypatch)
     cred_path = tmp_path / "claude-credentials.json"
     cred_path.write_text(
@@ -84,8 +90,9 @@ def test_load_claude_code_credential_from_override_path(tmp_path, monkeypatch):
 
 
 def test_load_claude_code_credential_ignores_directory_path(tmp_path, monkeypatch):
+    '验证 load、claude、code、credential、ignores、directory、path 场景下的预期行为、边界条件与结果'
     _clear_claude_code_env(monkeypatch)
-    # Redirect HOME so the default ~/.claude/.credentials.json doesn't exist
+    # 重定向 HOME，因此默认的 ~/.claude/.credentials.json 不存在
     monkeypatch.setenv("HOME", str(tmp_path))
     cred_dir = tmp_path / "claude-creds-dir"
     cred_dir.mkdir()
@@ -95,6 +102,7 @@ def test_load_claude_code_credential_ignores_directory_path(tmp_path, monkeypatc
 
 
 def test_load_claude_code_credential_falls_back_to_default_file_when_override_is_invalid(tmp_path, monkeypatch):
+    '验证 load、claude、code、credential、falls、back、to、default、file、when、override、is、invalid 场景下的预期行为、边界条件与结果'
     _clear_claude_code_env(monkeypatch)
     monkeypatch.setenv("HOME", str(tmp_path))
 
@@ -125,6 +133,7 @@ def test_load_claude_code_credential_falls_back_to_default_file_when_override_is
 
 
 def test_load_codex_cli_credential_supports_nested_tokens_shape(tmp_path, monkeypatch):
+    '验证 load、codex、cli、credential、supports、nested、tokens、shape 场景下的预期行为、边界条件与结果'
     auth_path = tmp_path / "auth.json"
     auth_path.write_text(
         json.dumps(
@@ -147,6 +156,7 @@ def test_load_codex_cli_credential_supports_nested_tokens_shape(tmp_path, monkey
 
 
 def test_load_codex_cli_credential_supports_legacy_top_level_shape(tmp_path, monkeypatch):
+    '验证 load、codex、cli、credential、supports、legacy、top、level、shape 场景下的预期行为、边界条件与结果'
     auth_path = tmp_path / "auth.json"
     auth_path.write_text(json.dumps({"access_token": "legacy-access-token"}))
     monkeypatch.setenv("CODEX_AUTH_PATH", str(auth_path))

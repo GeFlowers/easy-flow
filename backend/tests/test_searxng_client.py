@@ -1,4 +1,4 @@
-"""Tests for SearXNG community tools."""
+'未说明'
 
 import json
 from unittest.mock import MagicMock, patch
@@ -10,18 +10,19 @@ from deerflow.community.searxng.searxng_client import SearxngClient
 
 
 class AsyncMock(MagicMock):
-    """Mock that supports async call."""
+    '未说明'
 
     async def __call__(self, *args, **kwargs):
+        '未说明'
         return super().__call__(*args, **kwargs)
 
 
 @pytest.mark.asyncio
 class TestSearxngClient:
-    """Tests for the SearxngClient class."""
+    '未说明'
 
     async def test_search_success(self):
-        """Search returns normalized results."""
+        '未说明'
         results_data = {
             "results": [
                 {"title": "Page 1", "url": "https://example.com/1", "content": "Snippet 1"},
@@ -47,7 +48,7 @@ class TestSearxngClient:
             assert result[1]["url"] == "https://example.com/2"
 
     async def test_search_empty_results(self):
-        """Search returns empty list when no results."""
+        '未说明'
         with patch("deerflow.community.searxng.searxng_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -63,7 +64,7 @@ class TestSearxngClient:
             assert result == []
 
     async def test_search_http_error(self):
-        """Search raises on HTTP error."""
+        '未说明'
         with patch("deerflow.community.searxng.searxng_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -79,7 +80,7 @@ class TestSearxngClient:
                 await client.search("blocked query")
 
     async def test_search_request_error(self):
-        """Search raises on request error."""
+        '未说明'
         with patch("deerflow.community.searxng.searxng_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -93,7 +94,7 @@ class TestSearxngClient:
                 await client.search("unreachable query")
 
     async def test_search_with_categories(self):
-        """Search passes categories parameter."""
+        '未说明'
         with patch("deerflow.community.searxng.searxng_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -113,11 +114,11 @@ class TestSearxngClient:
 
 @pytest.mark.asyncio
 class TestSearxngTools:
-    """Tests for the SearXNG tool functions."""
+    '未说明'
 
     @patch("deerflow.community.searxng.tools._get_searxng_client")
     async def test_web_search_tool_success(self, mock_get_client):
-        """web_search_tool returns JSON results."""
+        '未说明'
         mock_client = MagicMock()
         mock_client.search = AsyncMock(
             return_value=[
@@ -135,7 +136,7 @@ class TestSearxngTools:
 
     @patch("deerflow.community.searxng.tools._get_searxng_client")
     async def test_web_search_tool_error(self, mock_get_client):
-        """web_search_tool handles errors gracefully."""
+        '未说明'
         mock_client = MagicMock()
         mock_client.search = AsyncMock(side_effect=Exception("API error"))
         mock_get_client.return_value = mock_client
@@ -148,7 +149,7 @@ class TestSearxngTools:
 
     @patch("deerflow.community.searxng.tools._get_searxng_client")
     async def test_web_search_tool_with_max_results(self, mock_get_client):
-        """web_search_tool respects max_results config."""
+        '未说明'
         mock_client = MagicMock()
         # Return 10 results; the tool should slice to max_results=3
         mock_client.search = AsyncMock(return_value=[{"title": f"Result {i}", "url": f"https://example.com/{i}", "content": f"Desc {i}"} for i in range(10)])

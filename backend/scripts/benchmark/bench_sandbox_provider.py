@@ -1,47 +1,5 @@
 #!/usr/bin/env python3
-"""Provider-agnostic sandbox benchmark.
-
-Measures acquire / run / release latency across providers, scenarios,
-workloads, and concurrency levels.  Outputs JSONL for aggregation.
-
-Usage::
-
-    python scripts/benchmark/bench_sandbox_provider.py \\
-        --provider boxlite \\
-        --scenario warm_same_thread \\
-        --workload noop \\
-        --iterations 50 \\
-        --concurrency 4 \\
-        --output results.jsonl
-
-    python scripts/benchmark/bench_sandbox_provider.py \\
-        --provider boxlite \\
-        --scenario cold_unique_thread \\
-        --no-warmpool \\
-        --iterations 30 \\
-        --output results.jsonl
-
-Providers
----------
-``boxlite``       BoxLite micro-VM sandbox (requires ``pip install boxlite``).
-``aio-docker``    AIO Docker sandbox (requires Docker daemon + ``deerflow-harness`` extras).
-
-Scenarios
----------
-``warm_same_thread``       Reuse one ``(user_id, thread_id)`` — warm pool hit after first turn.
-``cold_unique_thread``     Fresh ``thread_id`` per turn — never hits warm pool.
-``warm_miss_many_threads`` Rotate through N distinct threads — verifies isolation.
-``idle_timeout``           Release, sleep > timeout, re-acquire — verify reaper works.
-``replica_pressure``       Push past ``replicas`` — verify eviction only targets warm entries.
-
-Workloads
----------
-``noop``          ``true`` — exposes acquire/release overhead.
-``python_small``  ``python -c "print(sum(range(100000)))"`` — typical agent code.
-``fs_1mb``        Write + read 1 MB file inside sandbox.
-``sleep_2s``      ``sleep 2`` — verifies timeout handling + active-box protection.
-``state_reuse``   Write state in turn N, verify it persists in turn N+1 (warm only).
-"""
+"""本脚本负责沙箱 提供方。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -66,6 +24,7 @@ from typing import Any
 
 @dataclass
 class BenchResult:
+    '未说明'
     provider: str
     scenario: str
     workload: str
@@ -123,13 +82,14 @@ PY"""
 
 
 def _stub_config(sandbox_attrs: dict[str, Any] | None = None) -> types.SimpleNamespace:
-    """Build a stub config namespace mimicking ``get_app_config()``."""
+    '未说明'
     attrs = sandbox_attrs or {}
     return types.SimpleNamespace(sandbox=types.SimpleNamespace(**attrs))
 
 
 @contextmanager
 def _patched_module_attr(module_name: str, attr_name: str, value: Any):
+    '未说明'
     module = importlib.import_module(module_name)
     original = getattr(module, attr_name)
     setattr(module, attr_name, value)
@@ -140,6 +100,7 @@ def _patched_module_attr(module_name: str, attr_name: str, value: Any):
 
 
 def _boxlite_version() -> str | None:
+    '未说明'
     try:
         return importlib.metadata.version("boxlite")
     except importlib.metadata.PackageNotFoundError:
@@ -147,6 +108,7 @@ def _boxlite_version() -> str | None:
 
 
 def _chmod_boxlite_shims(boxes_dir: str) -> int:
+    '未说明'
     fixed = 0
     for shim in Path(boxes_dir).glob("*/bin/boxlite-shim"):
         st = shim.stat()
@@ -163,6 +125,7 @@ def _create_box_with_097_shim_workaround(
     *,
     boxes_dir: str,
 ) -> Any:
+    '未说明'
     try:
         return create_box(sandbox_id)
     except RuntimeError as exc:
@@ -176,11 +139,7 @@ def _create_box_with_097_shim_workaround(
 
 
 def _make_boxlite_provider(config: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
-    """Create a BoxliteProvider with stub config; returns (provider, config_used).
-
-    On BoxLite 0.9.7 only, retries a failed create after fixing missing execute
-    bits on extracted ``boxlite-shim`` binaries under ``~/.boxlite/boxes``.
-    """
+    '未说明'
     from deerflow.community.boxlite.provider import BoxliteProvider
 
     sandbox_attrs = {
@@ -207,6 +166,7 @@ def _make_boxlite_provider(config: dict[str, Any]) -> tuple[Any, dict[str, Any]]
     boxes_dir = os.path.expanduser("~/.boxlite/boxes")
 
     def _patched_create_box(self: Any, sandbox_id: str) -> Any:
+        '未说明'
         return _create_box_with_097_shim_workaround(
             original_create_box,
             sandbox_id,
@@ -218,7 +178,7 @@ def _make_boxlite_provider(config: dict[str, Any]) -> tuple[Any, dict[str, Any]]
 
 
 def _make_aio_provider(config: dict[str, Any]) -> tuple[Any, dict[str, Any]]:
-    """Create an AioSandboxProvider with stub config."""
+    '未说明'
     from deerflow.community.aio_sandbox.aio_sandbox_provider import AioSandboxProvider
 
     sandbox_attrs = {
@@ -252,7 +212,7 @@ _WARM_HIT_STATE = threading.local()
 
 
 def _install_warm_hit_tracking(provider: Any) -> None:
-    """Record warm-pool reclaims from inside the provider acquire path."""
+    '未说明'
     if getattr(provider, "_bench_warm_hit_tracking_installed", False):
         return
 
@@ -263,6 +223,7 @@ def _install_warm_hit_tracking(provider: Any) -> None:
             continue
 
         def _wrapped(*args: Any, _original: Callable = original, **kwargs: Any):
+            '未说明'
             result = _original(*args, **kwargs)
             if result is not None:
                 _WARM_HIT_STATE.value = True
@@ -275,15 +236,17 @@ def _install_warm_hit_tracking(provider: Any) -> None:
 
 
 def _reset_warm_hit_tracking() -> None:
+    '未说明'
     _WARM_HIT_STATE.value = False
 
 
 def _warm_hit_from_acquire() -> bool:
+    '未说明'
     return bool(getattr(_WARM_HIT_STATE, "value", False))
 
 
 def _compute_sandbox_id(provider: Any, thread_id: str, user_id: str) -> str:
-    """Compute the deterministic sandbox_id the provider would use."""
+    '未说明'
     if hasattr(provider, "_sandbox_id"):
         return provider._sandbox_id(thread_id, user_id)
     # Fallback: use the provider's own method or hash
@@ -293,13 +256,13 @@ def _compute_sandbox_id(provider: Any, thread_id: str, user_id: str) -> str:
 
 
 def _was_warm_hit(provider: Any, sandbox_id: str) -> bool:
-    """Check if the sandbox_id is currently in the provider's warm pool."""
+    '未说明'
     with provider._lock:
         return sandbox_id in provider._warm_pool
 
 
 def _evict_from_warm(provider: Any, sandbox_id: str) -> None:
-    """Forcibly remove and destroy a warm-pool entry (no-warmpool simulation)."""
+    '未说明'
     with provider._lock:
         entry = provider._warm_pool.pop(sandbox_id, None)
     if entry is not None:
@@ -327,7 +290,7 @@ def _run_one_turn(
     state_write_turn: bool = False,
     expected_state: str | None = None,
 ) -> BenchResult:
-    """Execute one acquire→run→release cycle and return a BenchResult."""
+    '未说明'
     t0 = time.perf_counter()
     sandbox_id = _compute_sandbox_id(provider, thread_id, user_id)
 
@@ -446,6 +409,7 @@ def _run_scenario(
     fault_inject_after: int | None = None,
 ) -> list[BenchResult]:
 
+    '未说明'
     command = WORKLOADS.get(workload_name, WORKLOADS["noop"])
 
     # For state_reuse workload, run paired turns: write → read
@@ -454,6 +418,7 @@ def _run_scenario(
     results: list[BenchResult] = []
 
     def _run_one(i: int) -> BenchResult:
+        '未说明'
         if scenario == "cold_unique_thread":
             tid = f"cold-{i}"
         elif scenario == "warm_same_thread":
@@ -484,6 +449,7 @@ def _run_scenario(
         )
 
     def _tid(i: int) -> str:
+        '未说明'
         if scenario == "cold_unique_thread":
             return f"cold-{i}"
         elif scenario == "warm_same_thread":
@@ -496,6 +462,7 @@ def _run_scenario(
             return f"default-{i}"
 
     def _inject_fault(i: int) -> None:
+        '未说明'
         if fault_inject_after is None or i != fault_inject_after:
             return
         tid = _tid(i)
@@ -527,6 +494,7 @@ def _run_scenario(
         sem = threading.BoundedSemaphore(concurrency)
 
         def _guarded(i: int) -> BenchResult:
+            '未说明'
             with sem:
                 return _run_one(i)
 
@@ -556,6 +524,7 @@ def _run_scenario(
 
 
 def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    '未说明'
     p = argparse.ArgumentParser(
         description="Provider-agnostic sandbox benchmark",
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -650,6 +619,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    '未说明'
     args = _parse_args(argv)
     if args.workload == "state_reuse" and (args.scenario != "warm_same_thread" or args.concurrency != 1):
         raise SystemExit("state_reuse requires --scenario warm_same_thread --concurrency 1")
@@ -734,12 +704,7 @@ def _run_idle_timeout_scenario(
     output_path: Path,
     config_used: dict[str, Any],
 ) -> int:
-    """Acquire, release, force-reap warm entries, verify re-acquire is cold.
-
-    The idle reaper thread runs every 60 s by default — too slow for a
-    benchmark.  We call ``_reap_expired_warm`` directly after the sleep to
-    simulate the reaper firing.
-    """
+    '未说明'
     idle = min(args.idle_timeout, 10)
     print(
         f"Idle timeout scenario: acquire, release, force-reap after {idle + 1}s sleep (timeout={idle}s)",
@@ -806,7 +771,7 @@ def _run_replica_pressure_scenario(
     output_path: Path,
     config_used: dict[str, Any],
 ) -> int:
-    """Push past replicas limit to verify eviction behaviour."""
+    '未说明'
     replicas = args.replicas
     overcommit = replicas * 2
 
@@ -856,7 +821,7 @@ def _run_replica_pressure_scenario(
 
 
 def _print_summary(results: list[BenchResult], args: argparse.Namespace) -> None:
-    """Print a quick summary to stderr."""
+    '未说明'
     ok = [r for r in results if r.success]
     fail = [r for r in results if not r.success]
     warm = [r for r in ok if r.warm_hit]
@@ -869,6 +834,7 @@ def _print_summary(results: list[BenchResult], args: argparse.Namespace) -> None
         return
 
     def _p(arr: list[float], pct: float) -> float:
+        '未说明'
         if not arr:
             return 0.0
         idx = max(0, min(len(arr) - 1, int(len(arr) * pct / 100)))

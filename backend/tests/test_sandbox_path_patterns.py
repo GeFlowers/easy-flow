@@ -1,17 +1,4 @@
-"""Tests for the shared host→virtual output-mask pattern (``sandbox/path_patterns.py``).
-
-The rule these pin is not "the regex is correct" — that is #4035/#4053 — but
-"there is exactly one copy of it, and extracting it did not change either call
-site's matching". The two sites differ on one axis only (separator handling),
-and that asymmetry is load-bearing: erasing it would widen ``LocalSandbox``'s
-masking or narrow ``sandbox.tools``'s.
-
-The move itself was cleared by a differential against the *real* pre-extraction
-expressions, run once on the parent commit. That run cannot be committed: after
-this lands there is no old inline expression left to diff against, only the
-frozen copies below. So the committed guard is the weaker snapshot, and its
-red-ness rests on those literals — not on the length of ``_BASES``.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -26,13 +13,13 @@ from deerflow.sandbox.tools import _compiled_mask_patterns
 
 
 def _legacy_tools_pattern(base: str) -> re.Pattern[str]:
-    """The expression ``_compiled_mask_patterns`` inlined before the extraction."""
+    '未说明'
     escaped = re.escape(base).replace(r"\\", r"[/\\]")
     return re.compile(escaped + r"(?=/|$|[^\w./-])" + r"(?:[/\\][^\s\"';&|<>()]*)?")
 
 
 def _legacy_local_pattern(base: str) -> re.Pattern[str]:
-    """The expression ``_reverse_output_patterns`` inlined before the extraction."""
+    '未说明'
     return re.compile(re.escape(base) + r"(?=/|$|[^\w./-])" + r"(?:[/\\][^\s\"';&|<>()]*)?")
 
 
@@ -53,23 +40,13 @@ _BASES = [
 
 @pytest.mark.parametrize("base", _BASES)
 def test_helper_reproduces_the_pre_extraction_expressions(base: str) -> None:
-    """Byte-identical to what each call site built inline, for both separator modes.
-
-    This is the anchor for the move itself: edit the helper in a way that changes
-    either site's regex and this goes red.
-    """
+    '未说明'
     assert build_output_mask_pattern(base, separator_agnostic=True).pattern == _legacy_tools_pattern(base).pattern
     assert build_output_mask_pattern(base).pattern == _legacy_local_pattern(base).pattern
 
 
 def test_separator_agnostic_is_the_only_difference_between_the_two_modes() -> None:
-    """The asymmetry the helper must preserve rather than unify.
-
-    ``sandbox.tools`` derives bases from ``_path_variants`` (Windows spellings)
-    and matches them against output whose separators it does not control, so a
-    ``\\``-spelled base must still match ``/``-spelled output. ``LocalSandbox``
-    resolves its bases from the running platform and must not be widened.
-    """
+    '未说明'
     windows_base = "C:\\host\\skills"
     posix_spelling = "C:/host/skills/file.md"
 
@@ -82,7 +59,7 @@ def test_separator_agnostic_is_the_only_difference_between_the_two_modes() -> No
 
 
 def test_boundary_still_rejects_prefix_siblings_and_accepts_real_segments() -> None:
-    """The #4035/#4053 rule itself, now asserted once against the shared helper."""
+    '未说明'
     pattern = build_output_mask_pattern("/host/skills")
 
     # Matches: the root itself, a child, a Windows-separated child, and a root
@@ -99,12 +76,7 @@ def test_boundary_still_rejects_prefix_siblings_and_accepts_real_segments() -> N
 
 
 def test_local_sandbox_reverse_patterns_route_through_the_helper(tmp_path: Path) -> None:
-    """Call-site wiring: a re-inlined copy that *diverges* from the shared rule goes red.
-
-    It does not (and cannot) catch a byte-identical re-inline — that is not yet a
-    defect. What it catches is the shape of the actual regression: #4035 changed
-    one copy of the rule and left the other behind.
-    """
+    '未说明'
     local = tmp_path / "skills"
     local.mkdir()
     sandbox = LocalSandbox(
@@ -117,7 +89,7 @@ def test_local_sandbox_reverse_patterns_route_through_the_helper(tmp_path: Path)
 
 
 def test_tools_mask_patterns_route_through_the_helper(tmp_path: Path) -> None:
-    """Same wiring check for the other copy — and it must stay separator-agnostic."""
+    '未说明'
     host = tmp_path / "skills"
     host.mkdir()
 

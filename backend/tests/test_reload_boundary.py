@@ -1,12 +1,4 @@
-"""Regression tests for the config reload boundary registry.
-
-Bytedance/deer-flow issue #3144: the hot-reload boundary is the contract
-between gateway dependencies that resolve ``AppConfig`` every request and the
-infrastructure that captures the snapshot once at startup. The registry in
-``deerflow.config.reload_boundary`` is the machine-readable source of truth;
-these tests pin the registry against the actual Pydantic schema so a future
-field rename / addition / boundary change cannot silently drift.
-"""
+"""本模块覆盖边界的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -23,23 +15,19 @@ from deerflow.config.reload_boundary import (
 
 
 def test_registry_has_a_reason_for_every_field():
-    """Every registry entry must explain *why* the field is restart-required.
-
-    The reason text is what surfaces in IDE hover and in the AppConfig schema
-    description, so an empty / placeholder value would defeat the purpose.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     for field_path, reason in STARTUP_ONLY_FIELDS.items():
         assert reason.strip(), f"empty reason for {field_path}"
         assert len(reason) > 20, f"reason for {field_path} too short to be useful: {reason!r}"
 
 
 def test_iter_startup_only_field_paths_matches_registry():
-    """Iterator stays in sync with the registry mapping."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     assert sorted(iter_startup_only_field_paths()) == sorted(STARTUP_ONLY_FIELDS)
 
 
 def test_is_startup_only_field_recognises_registered_fields():
-    """The membership helper accepts every registered field path."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     for field_path in STARTUP_ONLY_FIELDS:
         assert is_startup_only_field(field_path)
     assert not is_startup_only_field("memory")  # hot-reloadable
@@ -48,8 +36,7 @@ def test_is_startup_only_field_recognises_registered_fields():
 
 
 def test_format_field_description_prefixes_with_marker():
-    """The formatter produces a description that machine-readable tooling can
-    pivot on (drift tests, future "needs-restart" scanners)."""
+    """验证格式在预期条件及边界场景下的可观察行为，防止相关回归。"""
     for field_path in STARTUP_ONLY_FIELDS:
         text = format_field_description(field_path)
         assert text.startswith(STARTUP_ONLY_PREFIX), text
@@ -59,20 +46,13 @@ def test_format_field_description_prefixes_with_marker():
 
 
 def test_format_field_description_rejects_unknown_field():
+    """验证格式在预期条件及边界场景下的可观察行为，防止相关回归。"""
     with pytest.raises(KeyError):
         format_field_description("not_in_registry")
 
 
 def test_format_field_description_appends_optional_field_doc():
-    """The formatter composes the startup-only marker with the field's own
-    human-facing description when supplied.
-
-    The original ``Field(description=)`` used to document allowed values
-    (e.g. ``log_level`` listed ``debug/info/warning/error``); registry
-    adoption must not drop that. The composed output keeps the marker as
-    the leading token so machine-readable tooling still pivots on it,
-    then appends the prose after a blank line.
-    """
+    """验证格式在预期条件及边界场景下的可观察行为，防止相关回归。"""
     text = format_field_description("log_level", field_doc="Logging level (debug/info/warning/error).")
     assert text.startswith(STARTUP_ONLY_PREFIX)
     assert STARTUP_ONLY_FIELDS["log_level"] in text
@@ -80,9 +60,7 @@ def test_format_field_description_appends_optional_field_doc():
 
 
 def test_appconfig_descriptions_retain_original_field_documentation():
-    """``AppConfig.model_fields[name].description`` for restart-required
-    fields should still carry the original human-facing field doc so IDE
-    hover documents what the field is *and* why a restart is needed."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     descriptions = {
         "log_level": "debug/info/warning/error",
         "logging": "Structured logging and request trace correlation settings.",
@@ -100,10 +78,7 @@ def test_appconfig_descriptions_retain_original_field_documentation():
 
 
 def test_appconfig_schema_marks_registered_fields_with_prefix():
-    """Every registry entry that corresponds to a top-level AppConfig field
-    must carry the standardized ``startup-only:`` prefix in its Pydantic
-    ``Field(description=...)``. This is the contract IDE hover relies on.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     schema_fields = AppConfig.model_fields
     for field_path in STARTUP_ONLY_FIELDS:
         if field_path not in schema_fields:
@@ -116,13 +91,7 @@ def test_appconfig_schema_marks_registered_fields_with_prefix():
 
 
 def test_no_appconfig_field_uses_prefix_without_registration():
-    """Reverse drift check: if a future schema edit adds the
-    ``startup-only:`` prefix to a new field, the registry must list it.
-
-    This catches the silent-drift case where someone marks a field
-    restart-required in the schema but forgets to update the registry
-    that the operator-facing scanners and docs consume.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     for name, info in AppConfig.model_fields.items():
         description = info.description or ""
         if not description.startswith(STARTUP_ONLY_PREFIX):
@@ -131,11 +100,7 @@ def test_no_appconfig_field_uses_prefix_without_registration():
 
 
 def test_pydantic_field_descriptions_are_introspectable_at_runtime():
-    """``AppConfig.model_fields[name].description`` is the IDE-hover source.
-
-    If this read ever breaks (e.g. Pydantic deprecation, schema swap), the
-    IDE-hover guarantee #3144 promises silently regresses. Pin it.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     assert "database" in AppConfig.model_fields
     description = AppConfig.model_fields["database"].description
     assert description is not None

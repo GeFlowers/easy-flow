@@ -13,11 +13,13 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+/** MobileNavLink 的公开类型定义。 */
 export type MobileNavLink = {
   href: string;
   label: string;
 };
 
+/** MobileNav 组件：提供对应的界面结构与交互语义。 */
 export function MobileNav({ links }: { links: MobileNavLink[] }) {
   const [open, setOpen] = useState(false);
   return (

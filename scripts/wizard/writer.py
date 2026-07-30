@@ -1,8 +1,4 @@
-"""Config file writer for the Setup Wizard.
-
-Writes config.yaml as a minimal working configuration and updates .env
-without wiping existing user customisations where possible.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -24,13 +20,14 @@ CHANNEL_CONNECTION_PROVIDERS: tuple[str, ...] = (
 
 
 def _project_root() -> Path:
+    '未说明'
     return Path(__file__).resolve().parents[2]
 
 
 # ── .env helpers ──────────────────────────────────────────────────────────────
 
 def read_env_file(env_path: Path) -> dict[str, str]:
-    """Parse a .env file into a dict (ignores comments and blank lines)."""
+    """执行读取 文件对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     result: dict[str, str] = {}
     if not env_path.exists():
         return result
@@ -45,11 +42,7 @@ def read_env_file(env_path: Path) -> dict[str, str]:
 
 
 def write_env_file(env_path: Path, pairs: dict[str, str]) -> None:
-    """Merge *pairs* into an existing (or new) .env file.
-
-    Existing keys are updated in place; new keys are appended.
-    Lines with comments and other formatting are preserved.
-    """
+    """执行写入 文件对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     lines: list[str] = []
     if env_path.exists():
         lines = env_path.read_text(encoding="utf-8").splitlines()
@@ -76,10 +69,12 @@ def write_env_file(env_path: Path, pairs: dict[str, str]) -> None:
 # ── config.yaml helpers ───────────────────────────────────────────────────────
 
 def _yaml_dump(data: Any) -> str:
+    '未说明'
     return yaml.safe_dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
 def _default_tools() -> list[dict[str, Any]]:
+    '未说明'
     return [
         {"name": "image_search", "use": "deerflow.community.image_search.tools:image_search_tool", "group": "web", "max_results": 5},
         {"name": "ls", "use": "deerflow.sandbox.tools:ls_tool", "group": "file:read"},
@@ -104,6 +99,7 @@ def _build_tools(
     include_bash_tool: bool,
     include_write_tools: bool,
 ) -> list[dict[str, Any]]:
+    '未说明'
     tools = deepcopy(base_tools if base_tools is not None else _default_tools())
     tools = [
         tool
@@ -149,12 +145,7 @@ def _build_tools(
 
 
 def _make_model_config_name(model_name: str) -> str:
-    """Derive a meaningful config model name from the provider model identifier.
-
-    Replaces path separators and dots with hyphens so the result is a clean
-    YAML-friendly identifier (e.g. "google/gemini-2.5-pro" → "gemini-2-5-pro",
-    "gpt-5.4" → "gpt-5-4", "deepseek-v4-pro" → "deepseek-v4-pro").
-    """
+    '未说明'
     # Take only the last path component for namespaced models (e.g. "org/model-name")
     base = model_name.split("/")[-1]
     # Replace dots with hyphens so "gpt-5.4" → "gpt-5-4"
@@ -162,6 +153,7 @@ def _make_model_config_name(model_name: str) -> str:
 
 
 def _build_channel_connections_config(enabled_providers: list[str]) -> dict[str, Any]:
+    '未说明'
     selected = set(enabled_providers)
     unknown = selected.difference(CHANNEL_CONNECTION_PROVIDERS)
     if unknown:
@@ -196,7 +188,7 @@ def build_minimal_config(
     config_version: int = 5,
     base_config: dict[str, Any] | None = None,
 ) -> str:
-    """Build the content of a minimal config.yaml."""
+    """执行构建 配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     from datetime import date
 
     today = date.today().isoformat()
@@ -277,7 +269,7 @@ def write_config_yaml(
     include_write_tools: bool = True,
     channel_connection_providers: list[str] | None = None,
 ) -> None:
-    """Write (or overwrite) config.yaml with a minimal working configuration."""
+    """执行写入 配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     # Read config_version from config.example.yaml if present
     config_version = 5
     example_path = config_path.parent / "config.example.yaml"

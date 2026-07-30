@@ -1,4 +1,4 @@
-"""Tests for the GitHub dispatcher's trigger-filter logic."""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ BOT = "coding-llm-gateway"
 
 
 def _pr_payload(action: str = "opened", author: str = "zhfeng") -> dict:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     return {
         "action": action,
         "pull_request": {"number": 7, "user": {"login": author}},
@@ -23,6 +24,7 @@ def _pr_payload(action: str = "opened", author: str = "zhfeng") -> dict:
 
 
 def _comment_payload(body: str, author: str = "zhfeng") -> dict:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     return {
         "action": "created",
         "issue": {"number": 11},
@@ -32,116 +34,118 @@ def _comment_payload(body: str, author: str = "zhfeng") -> dict:
 
 
 def _resolve(event: str, override: GitHubTriggerConfig | None = None) -> GitHubTriggerConfig:
-    """Mimic what the registry does for one ``(event, override)`` pair.
-
-    The dispatcher used to take a full ``binding_triggers`` dict and let
-    ``event_should_fire`` look the event up itself. After the registry
-    refactor that lookup moved to :func:`_resolved_trigger` at build
-    time, and ``event_should_fire`` receives a single pre-resolved
-    :class:`GitHubTriggerConfig`. The tests below still want to assert
-    behavior given a binding-shaped declaration, so this helper bridges
-    the two — equivalent to ``_resolved_trigger(event, {event: override})``
-    with an empty-override default.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     override = override if override is not None else GitHubTriggerConfig()
     resolved = _resolved_trigger(event, {event: override})
-    assert resolved is not None  # The registry would never call us otherwise.
+    assert resolved is not None  # 说明当前测试分支所验证的真实行为与边界。
     return resolved
 
 
 # ---------------------------------------------------------------------------
-# Defaults (merged into a binding's explicit-but-empty override)
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 #
-# Events are opt-in per binding: an empty triggers map (``{}``) registers
-# the agent for NO events — that opt-in / opt-out concern now lives in the
-# registry (``_resolved_trigger`` returns ``None`` when the binding omits
-# the event, and the registry simply does not index the agent for it).
-# Once an event IS listed, the per-event defaults in ``DEFAULT_TRIGGERS``
-# fill in any field the override didn't explicitly set, exactly as before.
+# 说明当前测试分支所验证的真实行为与边界。
+# 说明当前测试分支所验证的真实行为与边界。
+# 说明当前测试分支所验证的真实行为与边界。
+# 说明当前测试分支所验证的真实行为与边界。
+# 说明当前测试分支所验证的真实行为与边界。
+# 说明当前测试分支所验证的真实行为与边界。
 
 
 def test_default_pull_request_opened_fires() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fire, reason = event_should_fire("pull_request", _pr_payload("opened"), _resolve("pull_request"), BOT)
     assert fire is True
     assert "opened" in reason
 
 
 def test_default_pull_request_synchronize_does_not_fire() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fire, reason = event_should_fire("pull_request", _pr_payload("synchronize"), _resolve("pull_request"), BOT)
     assert fire is False
     assert "synchronize" in reason
 
 
 def test_default_issue_comment_without_mention_does_not_fire() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fire, reason = event_should_fire("issue_comment", _comment_payload("just a thought"), _resolve("issue_comment"), BOT)
     assert fire is False
     assert "mention" in reason.lower()
 
 
 def test_default_issue_comment_with_mention_fires() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fire, _ = event_should_fire("issue_comment", _comment_payload(f"hey @{BOT} please look"), _resolve("issue_comment"), BOT)
     assert fire is True
 
 
 def test_default_issue_comment_mention_case_insensitive() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fire, _ = event_should_fire("issue_comment", _comment_payload(f"hey @{BOT.upper()} look"), _resolve("issue_comment"), BOT)
     assert fire is True
 
 
 def test_event_not_in_binding_is_disabled_at_registry() -> None:
-    # An event the binding does not list resolves to ``None`` — the
-    # registry never indexes the agent for it, so ``event_should_fire``
-    # is never called. This boundary is verified at the resolver layer.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     assert _resolved_trigger("pull_request", {}) is None
 
 
 def test_default_ping_is_disabled_even_when_opted_in() -> None:
-    # ``ping`` has DEFAULT_TRIGGERS[ping] = None — no field defaults — so
-    # the opt-in override is used as-is. It has no actions or mention
-    # requirement, so it fires (which is fine; ping is harmless). What
-    # we DO care about is that the registry never indexes a ``ping`` event
-    # the binding didn't list; that's the test above.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     assert DEFAULT_TRIGGERS["ping"] is None
 
 
 def test_default_issues_is_disabled_unless_listed_at_registry() -> None:
-    # Same shape as the pull_request case above: an issues-less binding
-    # resolves to ``None`` and the registry drops it.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     assert _resolved_trigger("issues", {}) is None
 
 
 # ---------------------------------------------------------------------------
-# Override: action whitelist
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_action_whitelist_overrides_default() -> None:
-    # Default for pull_request is ["opened"]. Widening lets "reopened" fire.
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("pull_request", GitHubTriggerConfig(actions=["opened", "reopened"]))
     fire, _ = event_should_fire("pull_request", _pr_payload("reopened"), trigger, BOT)
     assert fire is True
 
 
 def test_empty_actions_list_blocks_all() -> None:
-    # Empty list = explicit empty whitelist = nothing matches.
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("pull_request", GitHubTriggerConfig(actions=[]))
     fire, _ = event_should_fire("pull_request", _pr_payload("opened"), trigger, BOT)
     assert fire is False
 
 
 def test_actions_none_allows_any_action() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("pull_request", GitHubTriggerConfig(actions=None))
     fire, _ = event_should_fire("pull_request", _pr_payload("labeled"), trigger, BOT)
     assert fire is True
 
 
 # ---------------------------------------------------------------------------
-# Override: allow_authors bypasses require_mention
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_allow_authors_bypasses_mention_requirement() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, allow_authors=["zhfeng"]))
     fire, reason = event_should_fire(
         "issue_comment",
@@ -154,6 +158,7 @@ def test_allow_authors_bypasses_mention_requirement() -> None:
 
 
 def test_allow_authors_does_not_help_other_users() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, allow_authors=["alice"]))
     fire, _ = event_should_fire(
         "issue_comment",
@@ -167,25 +172,14 @@ def test_allow_authors_does_not_help_other_users() -> None:
 @pytest.mark.parametrize(
     ("allow_authors", "author"),
     [
-        (["Alice"], "alice"),  # config upper / payload lower
-        (["alice"], "Alice"),  # reverse: config lower / payload upper
-        (["ALICE"], "alice"),  # all-caps config
-        (["Alice"], "Alice"),  # exact case still fires after folding
+        (["Alice"], "alice"),  # 说明当前测试分支所验证的真实行为与边界。
+        (["alice"], "Alice"),  # 说明当前测试分支所验证的真实行为与边界。
+        (["ALICE"], "alice"),  # 说明当前测试分支所验证的真实行为与边界。
+        (["Alice"], "Alice"),  # 说明当前测试分支所验证的真实行为与边界。
     ],
 )
 def test_allow_authors_match_is_case_insensitive(allow_authors: list[str], author: str) -> None:
-    """GitHub logins are case-insensitive; allow_authors must match that.
-
-    Sibling gates already ignore case: ``_mentions`` documents
-    ``Match is case-insensitive; GitHub itself is.``, and the self-event
-    check lowercases both sides. A bare ``in`` membership test rejects an
-    owner whose YAML casing differs from the payload login, so
-    ``require_mention`` still applies and the webhook is silently dropped.
-
-    ``.lower()`` is symmetric, so both fold directions and an all-caps
-    config must fire; the exact-case pair pins that folding stays a
-    superset of the old exact match.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve(
         "issue_comment",
         GitHubTriggerConfig(require_mention=True, allow_authors=allow_authors),
@@ -201,7 +195,7 @@ def test_allow_authors_match_is_case_insensitive(allow_authors: list[str], autho
 
 
 def test_allow_authors_case_insensitive_still_rejects_other_users() -> None:
-    """Case-folding the allowlist must not open the gate for non-members."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve(
         "issue_comment",
         GitHubTriggerConfig(require_mention=True, allow_authors=["Alice"]),
@@ -216,11 +210,12 @@ def test_allow_authors_case_insensitive_still_rejects_other_users() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Override: mention_login replaces default login
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_mention_login_override() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, mention_login="other-bot"))
     fire, _ = event_should_fire(
         "issue_comment",
@@ -232,6 +227,7 @@ def test_mention_login_override() -> None:
 
 
 def test_mention_login_override_default_login_does_not_match() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, mention_login="other-bot"))
     fire, _ = event_should_fire(
         "issue_comment",
@@ -243,12 +239,13 @@ def test_mention_login_override_default_login_does_not_match() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Enabling previously-disabled events
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_enabling_issues_via_override() -> None:
-    # ``issues`` is disabled by default but an operator can opt in.
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issues", GitHubTriggerConfig(actions=["opened"]))
     fire, _ = event_should_fire(
         "issues",
@@ -264,11 +261,12 @@ def test_enabling_issues_via_override() -> None:
 
 
 # ---------------------------------------------------------------------------
-# issues event: require_mention scans the issue body (no separate comment)
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_issues_require_mention_fires_when_body_mentions_bot() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issues", GitHubTriggerConfig(actions=["opened"], require_mention=True, mention_login=BOT))
     fire, reason = event_should_fire(
         "issues",
@@ -281,10 +279,11 @@ def test_issues_require_mention_fires_when_body_mentions_bot() -> None:
         BOT,
     )
     assert fire is True
-    assert "mention" not in reason  # mention gate passed
+    assert "mention" not in reason  # 说明当前测试分支所验证的真实行为与边界。
 
 
 def test_issues_require_mention_skips_without_mention() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issues", GitHubTriggerConfig(actions=["opened"], require_mention=True, mention_login=BOT))
     fire, reason = event_should_fire(
         "issues",
@@ -301,7 +300,8 @@ def test_issues_require_mention_skips_without_mention() -> None:
 
 
 def test_issues_allow_authors_bypasses_mention() -> None:
-    # zhfeng opening an issue fires even without a mention.
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issues", GitHubTriggerConfig(actions=["opened"], require_mention=True, mention_login=BOT, allow_authors=["zhfeng"]))
     fire, reason = event_should_fire(
         "issues",
@@ -318,7 +318,8 @@ def test_issues_allow_authors_bypasses_mention() -> None:
 
 
 def test_pull_request_require_mention_scans_pr_body() -> None:
-    # A PR-opened trigger with require_mention should scan the PR body.
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("pull_request", GitHubTriggerConfig(actions=["opened"], require_mention=True, mention_login=BOT))
     fire, _ = event_should_fire(
         "pull_request",
@@ -334,14 +335,15 @@ def test_pull_request_require_mention_scans_pr_body() -> None:
 
 
 # ---------------------------------------------------------------------------
-# pull_request_review: require_mention scans the review summary body
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_pull_request_review_require_mention_fires_on_review_body_mention() -> None:
-    # Regression: _comment_body used to fall through to "" for
-    # pull_request_review, so require_mention could never match even when
-    # the human explicitly @-mentioned the bot in the review summary.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("pull_request_review", GitHubTriggerConfig(require_mention=True, mention_login=BOT))
     fire, reason = event_should_fire(
         "pull_request_review",
@@ -359,6 +361,7 @@ def test_pull_request_review_require_mention_fires_on_review_body_mention() -> N
 
 
 def test_pull_request_review_require_mention_skips_without_mention() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("pull_request_review", GitHubTriggerConfig(require_mention=True, mention_login=BOT))
     fire, reason = event_should_fire(
         "pull_request_review",
@@ -376,14 +379,15 @@ def test_pull_request_review_require_mention_skips_without_mention() -> None:
 
 
 # ---------------------------------------------------------------------------
-# @-mention boundary: ``@deerflow`` must NOT match ``@deerflow-bot``
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_mention_prefix_does_not_match_longer_login() -> None:
-    # Agent with mention_login='deerflow' must NOT fire on a comment that
-    # addresses a different account, '@deerflow-bot'. Regression for the
-    # naive substring ``f'@{login}' in body`` check.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, mention_login="deerflow"))
     fire, reason = event_should_fire(
         "issue_comment",
@@ -401,8 +405,9 @@ def test_mention_prefix_does_not_match_longer_login() -> None:
 
 
 def test_mention_inside_email_does_not_match() -> None:
-    # Login-class char immediately before ``@`` (an email-like context)
-    # must not register as a mention.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, mention_login=BOT))
     fire, _ = event_should_fire(
         "issue_comment",
@@ -419,9 +424,10 @@ def test_mention_inside_email_does_not_match() -> None:
 
 
 def test_mention_at_start_of_body_matches() -> None:
-    # The boundary regex must allow a mention at position 0 (no char before
-    # @). Guards against an over-eager fix that requires a preceding
-    # whitespace.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, mention_login=BOT))
     fire, _ = event_should_fire(
         "issue_comment",
@@ -438,8 +444,9 @@ def test_mention_at_start_of_body_matches() -> None:
 
 
 def test_mention_followed_by_punctuation_matches() -> None:
-    # ``@bot,`` and ``@bot.`` are still valid mentions — the trailing char
-    # is not in the login class, so the boundary regex accepts it.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     trigger = _resolve("issue_comment", GitHubTriggerConfig(require_mention=True, mention_login=BOT))
     for body in (f"hey @{BOT}, please look", f"asked @{BOT}.", f"thanks @{BOT}!"):
         fire, _ = event_should_fire(

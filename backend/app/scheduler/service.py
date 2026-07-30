@@ -1,3 +1,5 @@
+"""提供定时任务轮询、分派及运行结果回调的应用服务。"""
+
 from __future__ import annotations
 
 import asyncio
@@ -16,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScheduledTaskService:
+    """协调定时任务的轮询抢占、重叠处理、运行分派与生命周期收尾。"""
     def __init__(
         self,
         *,
@@ -26,6 +29,7 @@ class ScheduledTaskService:
         lease_seconds: int,
         max_concurrent_runs: int,
     ) -> None:
+        """初始化仓储、运行分派器以及轮询和租约控制参数。"""
         self._task_repo = task_repo
         self._task_run_repo = task_run_repo
         self._launch_run = launch_run
@@ -37,9 +41,9 @@ class ScheduledTaskService:
         self._stop = asyncio.Event()
 
     async def run_once(self, *, now: datetime) -> None:
-        # ``max_concurrent_runs`` is a global cap on active scheduled runs, not
-        # just a per-poll claim batch: long runs accumulate across poll cycles,
-        # so each cycle only claims into the remaining budget.
+        """执行一次轮询：在全局并发余量内抢占到期任务并分派运行。"""
+        # ``max_concurrent_runs`` 限制的是全部活跃的定时运行，而非单次轮询的抢占批次：
+        # 长时间运行会跨多个轮询周期累积，因此每轮只能按剩余并发额度抢占任务。
         active = await self._task_run_repo.count_active_runs()
         budget = self._max_concurrent_runs - active
         if budget <= 0:
@@ -55,16 +59,17 @@ class ScheduledTaskService:
 
     @staticmethod
     def _is_overlap_conflict(exc: Exception) -> bool:
+        """判断异常是否表示同一执行线程已被占用的重叠冲突。"""
         if isinstance(exc, ConflictError):
             return True
         return isinstance(exc, HTTPException) and exc.status_code == 409
 
     @staticmethod
     def _task_status_for_failure(task: dict[str, Any], *, trigger: str) -> str:
+        """根据触发方式和调度类型确定启动失败后任务应保留的状态。"""
         if trigger == "manual":
-            # A failed manual trigger must not consume the task's scheduled
-            # future: a `once` task with run_at still ahead would otherwise be
-            # flipped to "failed" and never claimed again.
+            # 手动触发失败不能消耗任务未来的调度机会：若一次性任务的 run_at 仍未到达，
+            # 否则它会被改为“failed”，从而再也不会被抢占执行。
             return task.get("status") or "enabled"
         if task["schedule_type"] == "once":
             return "failed"
@@ -72,9 +77,9 @@ class ScheduledTaskService:
 
     @staticmethod
     def _task_status_for_skip(task: dict[str, Any]) -> str:
+        """根据调度类型确定因重叠而跳过后任务应保留的状态。"""
         if task["schedule_type"] == "once":
-            # The single occurrence was lost to an overlapping run; "completed"
-            # would claim an execution that never happened.
+            # 唯一一次执行已因重叠运行而错过；标为“completed”会错误地表示它执行过。
             return "failed"
         return "enabled"
 
@@ -85,15 +90,14 @@ class ScheduledTaskService:
         now: datetime,
         trigger: str,
     ) -> dict[str, Any]:
+        """创建任务运行记录，处理重叠策略并通过既有运行链路分派任务。"""
         execution_thread_id = task.get("thread_id")
         if task.get("context_mode") == "fresh_thread_per_run" or not execution_thread_id:
             execution_thread_id = str(uuid.uuid4())
-        # "skip" must hold for fresh-thread runs too, where every run gets a new
-        # thread and the same-thread multitask ConflictError below can never
-        # fire. Checked before creating this dispatch's own run row so the row
-        # does not count itself as the active run. A manual trigger against an
-        # active run is rejected outright (409 at the router) instead of being
-        # recorded as a skipped occurrence — nothing was scheduled to happen.
+        # “skip”也必须适用于每次使用新线程的运行；这类运行不会共享线程，因而下方的
+        # 同线程多任务 ConflictError 永远不会触发。必须在创建本次分派的运行记录前检查，
+        # 以免该记录把自己计为活跃运行。手动触发遇到活跃运行时会被直接拒绝（路由返回 409），
+        # 而不会记录为跳过的执行，因为当时并没有已安排的任务需要发生。
         skip_error: str | None = None
         if task.get("overlap_policy", "skip") == "skip" and await self._task_run_repo.has_active_runs(task["id"]):
             if trigger == "manual":
@@ -135,10 +139,9 @@ class ScheduledTaskService:
                 now=now,
             )
             if task["schedule_type"] == "once":
-                # Stay "running" until handle_run_completion sees the real
-                # terminal outcome; declaring "completed" at launch would stick
-                # if the run fails or the process dies (startup reconciliation
-                # is cancel_stuck_once_tasks).
+                # 保持“running”直到 handle_run_completion 获得真实终态；启动时即标为
+                # “completed”会在运行失败或进程退出后遗留错误状态（启动时由
+                # cancel_stuck_once_tasks 负责协调）。
                 task_status = "running"
             elif trigger == "manual" and task.get("status") == "paused":
                 task_status = "paused"
@@ -149,8 +152,8 @@ class ScheduledTaskService:
                 status="running",
                 run_id=result["run_id"],
                 started_at=now,
-                # A fast-failing run can reach handle_run_completion before this
-                # write resumes; never clobber its terminal status.
+                # 快速失败的运行可能在本次写入恢复前就到达 handle_run_completion；
+                # 绝不能覆盖它已经写入的终态。
                 protect_terminal=True,
             )
             await self._task_repo.update_after_launch(
@@ -162,8 +165,8 @@ class ScheduledTaskService:
                 last_thread_id=result["thread_id"],
                 last_error=None,
                 increment_run_count=True,
-                # Same race as the run-row write above: a fast-failing run's
-                # completion hook may have already finalized a `once` task.
+                # 与上方运行记录写入存在同样的竞争：快速失败运行的完成回调可能已经
+                # 终结了一次性任务。
                 protect_terminal=True,
             )
             return {
@@ -218,6 +221,7 @@ class ScheduledTaskService:
         now: datetime,
         error: str,
     ) -> dict[str, Any]:
+        """将因重叠而跳过的运行和关联任务更新为相应状态并返回结果。"""
         next_at = next_run_at(
             task["schedule_type"],
             task["schedule_spec"],
@@ -250,6 +254,7 @@ class ScheduledTaskService:
         }
 
     async def handle_run_completion(self, record: RunRecord) -> None:
+        """接收运行完成回调，写入终态并收尾一次性任务的状态。"""
         metadata = record.metadata or {}
         task_id = metadata.get("scheduled_task_id")
         task_run_id = metadata.get("scheduled_task_run_id")
@@ -262,8 +267,8 @@ class ScheduledTaskService:
             terminal_status = "success"
             error = None
         elif record.status.value == "interrupted":
-            # Distinct from "failed": an interrupt (user cancel, same-thread
-            # takeover) carries no error and is not an execution failure.
+            # 与“failed”不同：中断（用户取消或同线程接管）不属于执行失败，
+            # 并且不携带失败错误。
             terminal_status = "interrupted"
             error = record.error or "run was interrupted before completion"
         elif record.status.value in {"error", "timeout"}:
@@ -289,9 +294,8 @@ class ScheduledTaskService:
 
         updates: dict[str, Any] = {"last_error": error}
         if task["schedule_type"] == "once":
-            # The single occurrence is consumed either way (the run did launch,
-            # so re-arming risks duplicate side effects), but an interrupt ends
-            # as "cancelled", not "failed".
+            # 唯一一次执行无论结果如何都已被消耗（运行确已启动，重新启用可能产生重复副作用），
+            # 但中断应以“cancelled”结束，而不是“failed”。
             if terminal_status == "success":
                 updates["status"] = "completed"
             elif terminal_status == "interrupted":
@@ -301,6 +305,7 @@ class ScheduledTaskService:
         await self._task_repo.update(task_id, user_id=user_id, updates=updates)
 
     async def start(self) -> None:
+        """清理重启遗留状态后启动后台定时任务轮询循环。"""
         if self._task is not None:
             return
         restart_error = "interrupted: gateway restarted before the run reached a terminal state"
@@ -311,9 +316,8 @@ class ScheduledTaskService:
         except Exception:
             logger.exception("Failed to sweep stale scheduled task runs at startup")
         try:
-            # The run rows above are only half the story: a launched `once`
-            # task is parked in "running" until the (now dead) completion hook
-            # would have finalized it, so reconcile the parent rows too.
+            # 上方运行记录只是部分状态：已启动的一次性任务会停留在“running”，直到
+            # 已失效的完成回调本应将其终结，因此还必须协调其父任务记录。
             stuck = await self._task_repo.cancel_stuck_once_tasks(error=restart_error)
             if stuck:
                 logger.warning("Cancelled %d stuck once task(s) after restart", stuck)
@@ -323,6 +327,7 @@ class ScheduledTaskService:
         self._task = asyncio.create_task(self._run_loop())
 
     async def stop(self) -> None:
+        """发出停止信号并等待后台轮询循环有序结束。"""
         if self._task is None:
             return
         self._stop.set()
@@ -330,12 +335,13 @@ class ScheduledTaskService:
         self._task = None
 
     async def _run_loop(self) -> None:
+        """持续轮询到期任务；单次轮询失败时记录异常并在下个周期重试。"""
         while not self._stop.is_set():
             try:
                 await self.run_once(now=datetime.now(UTC))
             except Exception:
-                # A transient DB error (e.g. SQLite "database is locked") must
-                # not kill the poller task for the rest of the process life.
+                # 瞬时数据库错误（例如 SQLite“database is locked”）不能使轮询任务
+                # 在进程剩余生命周期内停止。
                 logger.exception("Scheduled task poll failed; retrying next interval")
             try:
                 await asyncio.wait_for(

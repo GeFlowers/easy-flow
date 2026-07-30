@@ -1,11 +1,4 @@
-"""Tests for update_agent tool — partial updates, atomic writes, and validation.
-
-Resolves issue #2616: a custom agent must be able to persist updates to its
-own SOUL.md / config.yaml from inside a normal chat (not only from bootstrap).
-
-The tool writes per-user (``{base_dir}/users/{user_id}/agents/{name}/``) so
-that one user's update cannot mutate another user's agent.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -24,15 +17,18 @@ DEFAULT_USER = "test-user-autouse"  # matches the autouse fixture in tests/conft
 
 
 class _DummyRuntime(SimpleNamespace):
+    '未说明'
     context: dict
     tool_call_id: str
 
 
 def _runtime(agent_name: str | None = "test-agent", tool_call_id: str = "call_1") -> _DummyRuntime:
+    '未说明'
     return _DummyRuntime(context={"agent_name": agent_name} if agent_name is not None else {}, tool_call_id=tool_call_id)
 
 
 def _tool_runtime(agent_name: str | None = "test-agent", tool_call_id: str = "call_1") -> ToolRuntime:
+    '未说明'
     return ToolRuntime(
         state={"sandbox": {"sandbox_id": "local"}, "thread_data": {}},
         context={"agent_name": agent_name} if agent_name is not None else {},
@@ -45,6 +41,7 @@ def _tool_runtime(agent_name: str | None = "test-agent", tool_call_id: str = "ca
 
 
 def _make_paths_mock(tmp_path: Path) -> MagicMock:
+    '未说明'
     paths = MagicMock()
     paths.base_dir = tmp_path
     paths.agent_dir = lambda name: tmp_path / "agents" / name
@@ -55,6 +52,7 @@ def _make_paths_mock(tmp_path: Path) -> MagicMock:
 
 
 def _user_agent_dir(tmp_path: Path, name: str = "test-agent", user_id: str = DEFAULT_USER) -> Path:
+    '未说明'
     return tmp_path / "users" / user_id / "agents" / name
 
 
@@ -68,7 +66,7 @@ def _seed_agent(
     github: dict | None = None,
     user_id: str = DEFAULT_USER,
 ) -> Path:
-    """Create a baseline agent dir with config.yaml and SOUL.md for tests to mutate."""
+    '未说明'
     agent_dir = _user_agent_dir(tmp_path, name, user_id=user_id)
     agent_dir.mkdir(parents=True, exist_ok=True)
     cfg: dict = {"name": name, "description": description}
@@ -83,6 +81,7 @@ def _seed_agent(
 
 @pytest.fixture()
 def patched_paths(tmp_path: Path):
+    """为适配准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     paths_mock = _make_paths_mock(tmp_path)
     with patch("deerflow.tools.builtins.update_agent_tool.get_paths", return_value=paths_mock):
         # load_agent_config also calls get_paths(); patch the same target it uses.
@@ -92,7 +91,7 @@ def patched_paths(tmp_path: Path):
 
 @pytest.fixture()
 def stub_app_config():
-    """Stub get_app_config so model validation accepts only known names."""
+    """为配置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     fake = MagicMock()
     fake.get_model_config.side_effect = lambda name: object() if name in {"gpt-known", "m1"} else None
     with patch("deerflow.tools.builtins.update_agent_tool.get_app_config", return_value=fake):
@@ -103,6 +102,7 @@ def stub_app_config():
 
 
 def test_update_agent_rejects_missing_agent_name(patched_paths):
+    '未说明'
     result = update_agent.func(runtime=_runtime(agent_name=None), soul="new soul")
 
     msg = result.update["messages"][0]
@@ -110,6 +110,7 @@ def test_update_agent_rejects_missing_agent_name(patched_paths):
 
 
 def test_update_agent_rejects_invalid_agent_name(patched_paths):
+    '未说明'
     result = update_agent.func(runtime=_runtime(agent_name="../../etc/passwd"), soul="x")
 
     msg = result.update["messages"][0]
@@ -117,6 +118,7 @@ def test_update_agent_rejects_invalid_agent_name(patched_paths):
 
 
 def test_update_agent_rejects_unknown_agent(tmp_path, patched_paths):
+    '未说明'
     result = update_agent.func(runtime=_runtime(agent_name="ghost"), soul="x")
 
     msg = result.update["messages"][0]
@@ -125,17 +127,7 @@ def test_update_agent_rejects_unknown_agent(tmp_path, patched_paths):
 
 
 def test_update_agent_rejects_legacy_agent_when_user_dir_has_only_memory(tmp_path, patched_paths):
-    """Regression for #3390's update_agent guard.
-
-    A per-user agent directory can exist containing only memory.json —
-    written automatically the first time this user chats with a legacy
-    shared agent, before update_agent is ever called. The stale guard
-    checked bare directory existence, so it missed this case, fell
-    through to load_agent_config (which correctly resolves through to
-    the legacy shared config via resolve_agent_dir), and then silently
-    forked a brand-new config.yaml/SOUL.md into the memory-only
-    directory — splitting the agent for just this user with no warning.
-    """
+    '未说明'
     legacy_dir = tmp_path / "agents" / "legacy-agent"
     legacy_dir.mkdir(parents=True)
     (legacy_dir / "config.yaml").write_text(yaml.safe_dump({"name": "legacy-agent", "description": "legacy"}), encoding="utf-8")
@@ -156,6 +148,7 @@ def test_update_agent_rejects_legacy_agent_when_user_dir_has_only_memory(tmp_pat
 
 
 def test_update_agent_requires_at_least_one_field(tmp_path, patched_paths):
+    '未说明'
     _seed_agent(tmp_path)
 
     result = update_agent.func(runtime=_runtime())
@@ -166,9 +159,7 @@ def test_update_agent_requires_at_least_one_field(tmp_path, patched_paths):
 
 
 def test_update_agent_rejects_unknown_model(tmp_path, patched_paths, stub_app_config):
-    """Copilot review: model must be validated against configured models before
-    being persisted; otherwise _resolve_model_name silently falls back to the
-    default and the user gets repeated warnings on every later turn."""
+    '未说明'
     _seed_agent(tmp_path)
 
     result = update_agent.func(runtime=_runtime(), model="not-in-config")
@@ -180,6 +171,7 @@ def test_update_agent_rejects_unknown_model(tmp_path, patched_paths, stub_app_co
 
 
 def test_update_agent_accepts_known_model(tmp_path, patched_paths, stub_app_config):
+    '未说明'
     _seed_agent(tmp_path)
 
     result = update_agent.func(runtime=_runtime(), model="gpt-known")
@@ -190,11 +182,7 @@ def test_update_agent_accepts_known_model(tmp_path, patched_paths, stub_app_conf
 
 
 def test_update_agent_treats_nullish_optional_text_as_omitted(tmp_path, patched_paths):
-    """Models sometimes pass literal "null" strings while trying to omit fields.
-
-    Treat those as omitted for optional text fields so they do not get persisted
-    as a model name or SOUL.md content and feed repeated update_agent retries.
-    """
+    '未说明'
     agent_dir = _seed_agent(tmp_path, description="old desc", soul="old soul")
 
     result = update_agent.invoke(
@@ -217,7 +205,7 @@ def test_update_agent_treats_nullish_optional_text_as_omitted(tmp_path, patched_
 
 
 def test_update_agent_rejects_string_list_fields(tmp_path, patched_paths):
-    """skills/tool_groups must be real arrays; string placeholders are invalid."""
+    '未说明'
     agent_dir = _seed_agent(tmp_path, skills=["existing"])
 
     assert update_agent.args_schema is not None
@@ -229,6 +217,7 @@ def test_update_agent_rejects_string_list_fields(tmp_path, patched_paths):
 
 
 def test_update_agent_treats_nullish_string_list_fields_as_omitted(tmp_path, patched_paths):
+    '未说明'
     agent_dir = _seed_agent(tmp_path, skills=["existing"])
 
     result = update_agent.invoke(
@@ -252,6 +241,7 @@ def test_update_agent_treats_nullish_string_list_fields_as_omitted(tmp_path, pat
 
 
 def test_update_agent_updates_soul_only(tmp_path, patched_paths):
+    '未说明'
     agent_dir = _seed_agent(tmp_path, description="keep me", soul="old soul")
 
     result = update_agent.func(runtime=_runtime(), soul="brand new soul")
@@ -263,6 +253,7 @@ def test_update_agent_updates_soul_only(tmp_path, patched_paths):
 
 
 def test_update_agent_updates_description_only(tmp_path, patched_paths):
+    '未说明'
     agent_dir = _seed_agent(tmp_path, description="old desc", soul="keep this soul")
 
     result = update_agent.func(runtime=_runtime(), description="new desc")
@@ -274,14 +265,7 @@ def test_update_agent_updates_description_only(tmp_path, patched_paths):
 
 
 def test_update_agent_preserves_github_block_on_description_change(tmp_path, patched_paths):
-    """Hand-authored github: bindings must survive a description/model/etc update.
-
-    Regression: the tool used to rebuild config.yaml from a hardcoded
-    allowlist of fields (name/description/model/tool_groups/skills), so
-    any other top-level field on AgentConfig — most importantly the
-    ``github:`` block that wires the agent into webhook fan-out — was
-    silently stripped whenever the agent called update_agent.
-    """
+    '未说明'
     github_block = {
         "installation_id": 140594274,
         "bot_login": "my-app-bot",
@@ -309,6 +293,7 @@ def test_update_agent_preserves_github_block_on_description_change(tmp_path, pat
 
 
 def test_update_agent_skills_empty_list_disables_all(tmp_path, patched_paths):
+    '未说明'
     agent_dir = _seed_agent(tmp_path, skills=["a", "b"])
 
     result = update_agent.func(runtime=_runtime(), skills=[])
@@ -319,6 +304,7 @@ def test_update_agent_skills_empty_list_disables_all(tmp_path, patched_paths):
 
 
 def test_update_agent_skills_omitted_keeps_existing(tmp_path, patched_paths):
+    '未说明'
     agent_dir = _seed_agent(tmp_path, skills=["alpha", "beta"])
 
     update_agent.func(runtime=_runtime(), description="bumped")
@@ -328,6 +314,7 @@ def test_update_agent_skills_omitted_keeps_existing(tmp_path, patched_paths):
 
 
 def test_update_agent_no_op_when_values_match_existing(tmp_path, patched_paths):
+    '未说明'
     _seed_agent(tmp_path, description="same")
 
     result = update_agent.func(runtime=_runtime(), description="same")
@@ -336,9 +323,7 @@ def test_update_agent_no_op_when_values_match_existing(tmp_path, patched_paths):
 
 
 def test_update_agent_forces_name_to_directory(tmp_path, patched_paths):
-    """Copilot review: if the existing config.yaml has a drifted ``name`` field,
-    update_agent must rewrite it to match the directory name so on-disk state
-    stays consistent with the runtime context."""
+    '未说明'
     agent_dir = _user_agent_dir(tmp_path)
     agent_dir.mkdir(parents=True)
     (agent_dir / "config.yaml").write_text(yaml.safe_dump({"name": "drifted-name", "description": "old"}, sort_keys=False), encoding="utf-8")
@@ -354,11 +339,13 @@ def test_update_agent_forces_name_to_directory(tmp_path, patched_paths):
 
 
 def test_update_agent_failure_preserves_existing_files(tmp_path, patched_paths):
+    '未说明'
     agent_dir = _seed_agent(tmp_path, soul="original soul")
 
     real_replace = Path.replace
 
     def _explode(self, target):
+        '未说明'
         if str(target).endswith("SOUL.md"):
             raise OSError("disk full")
         return real_replace(self, target)
@@ -373,10 +360,7 @@ def test_update_agent_failure_preserves_existing_files(tmp_path, patched_paths):
 
 
 def test_update_agent_soul_failure_does_not_replace_config(tmp_path, patched_paths):
-    """Copilot review: if both config.yaml and SOUL.md are scheduled to be
-    written and SOUL.md staging fails *before* any rename, config.yaml must
-    NOT be replaced. The fix stages every temp file first and only renames
-    after all temps exist on disk."""
+    '未说明'
     agent_dir = _seed_agent(tmp_path, description="original-desc", soul="original soul")
 
     real_named_temp_file = __import__("tempfile").NamedTemporaryFile
@@ -384,6 +368,7 @@ def test_update_agent_soul_failure_does_not_replace_config(tmp_path, patched_pat
 
     def _explode_on_soul(*args, **kwargs):
         # Inspect target dir + suffix; the SOUL temp file is the second one we stage.
+        '未说明'
         call_count["n"] += 1
         if call_count["n"] >= 2:
             raise OSError("disk full while staging SOUL.md")
@@ -403,7 +388,7 @@ def test_update_agent_soul_failure_does_not_replace_config(tmp_path, patched_pat
 
 
 def test_update_agent_only_writes_under_current_user(tmp_path, patched_paths):
-    """An update from user 'alice' must never touch user 'bob's agent files."""
+    '未说明'
     from deerflow.runtime.user_context import reset_current_user, set_current_user
 
     # Seed an agent for both users with the same name.
@@ -428,14 +413,7 @@ def test_update_agent_only_writes_under_current_user(tmp_path, patched_paths):
 
 
 def test_update_agent_round_trips_known_fields(tmp_path, patched_paths):
-    """update_agent reads through load_agent_config so all fields the loader
-    knows about (name, description, model, tool_groups, skills) round-trip
-    on a partial update.
-
-    Note: ``load_agent_config`` strips unknown fields before constructing
-    AgentConfig, so legacy/extra YAML keys are NOT preserved across
-    updates — by design.
-    """
+    '未说明'
     _seed_agent(tmp_path, description="legacy")
 
     fake_cfg = AgentConfig(name="test-agent", description="legacy", skills=["s1"], tool_groups=["g1"], model="m1")
@@ -453,19 +431,7 @@ def test_update_agent_round_trips_known_fields(tmp_path, patched_paths):
 
 
 def test_update_agent_refuses_on_webhook_channel(tmp_path, patched_paths):
-    """Defence-in-depth gate inside the tool itself.
-
-    The lead-agent factory already withholds ``update_agent`` from runs
-    on webhook channels (see ``_WEBHOOK_CHANNELS`` in
-    ``deerflow.agents.lead_agent.agent``). The same set is mirrored
-    here so a future code path that re-attaches the tool without going
-    through ``_make_lead_agent`` (custom factories, ad-hoc tests, etc.)
-    does not silently accept untrusted self-mutation requests routed
-    in from a webhook.
-
-    The tool MUST NOT touch the filesystem in this branch — we assert
-    the agent's existing config remains exactly as we seeded it.
-    """
+    '未说明'
     seeded = _seed_agent(tmp_path, description="seeded", soul="seeded soul", github={"installation_id": 12345})
 
     runtime = SimpleNamespace(
@@ -492,11 +458,7 @@ def test_update_agent_refuses_on_webhook_channel(tmp_path, patched_paths):
 
 
 def test_update_agent_proceeds_on_non_webhook_channel(tmp_path, patched_paths, stub_app_config):
-    """Sanity: a non-webhook channel (or no channel at all) still allows updates.
-
-    Counterpart to ``test_update_agent_refuses_on_webhook_channel`` — guards
-    against the gate accidentally rejecting legitimate self-updates.
-    """
+    '未说明'
     seeded = _seed_agent(tmp_path, description="seeded")
 
     fake_cfg = AgentConfig(name="test-agent", description="seeded")

@@ -1,3 +1,4 @@
+'未说明'
 import json
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -10,6 +11,7 @@ from deerflow.sandbox.tools import glob_tool, grep_tool, ls_tool
 
 
 def _make_runtime(tmp_path):
+    '未说明'
     workspace = tmp_path / "workspace"
     uploads = tmp_path / "uploads"
     outputs = tmp_path / "outputs"
@@ -30,6 +32,7 @@ def _make_runtime(tmp_path):
 
 
 def test_glob_tool_returns_virtual_paths_and_ignores_common_dirs(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "app.py").write_text("print('hi')\n", encoding="utf-8")
@@ -54,6 +57,7 @@ def test_glob_tool_returns_virtual_paths_and_ignores_common_dirs(tmp_path, monke
 
 
 def test_glob_tool_supports_skills_virtual_paths(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     skills_dir = tmp_path / "skills"
     (skills_dir / "public" / "demo").mkdir(parents=True)
@@ -79,6 +83,7 @@ def test_glob_tool_supports_skills_virtual_paths(tmp_path, monkeypatch) -> None:
 
 
 def test_grep_tool_filters_by_glob_and_skips_binary_files(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "main.py").write_text("TODO = 'ship it'\nprint(TODO)\n", encoding="utf-8")
@@ -102,6 +107,7 @@ def test_grep_tool_filters_by_glob_and_skips_binary_files(tmp_path, monkeypatch)
 
 
 def test_grep_tool_truncates_results(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "main.py").write_text("TODO one\nTODO two\nTODO three\n", encoding="utf-8")
@@ -126,6 +132,7 @@ def test_grep_tool_truncates_results(tmp_path, monkeypatch) -> None:
 
 
 def test_glob_tool_include_dirs_filters_nested_ignored_paths(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "src").mkdir()
@@ -148,6 +155,7 @@ def test_glob_tool_include_dirs_filters_nested_ignored_paths(tmp_path, monkeypat
 
 
 def test_grep_tool_literal_mode(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "file.py").write_text("price = (a+b)\nresult = a+b\n", encoding="utf-8")
@@ -168,6 +176,7 @@ def test_grep_tool_literal_mode(tmp_path, monkeypatch) -> None:
 
 
 def test_grep_tool_case_sensitive(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "file.py").write_text("TODO: fix\ntodo: also fix\n", encoding="utf-8")
@@ -187,6 +196,7 @@ def test_grep_tool_case_sensitive(tmp_path, monkeypatch) -> None:
 
 
 def test_grep_tool_invalid_regex_returns_error(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
 
     monkeypatch.setattr("deerflow.sandbox.tools.ensure_sandbox_initialized", lambda runtime: LocalSandbox(id="local"))
@@ -202,6 +212,7 @@ def test_grep_tool_invalid_regex_returns_error(tmp_path, monkeypatch) -> None:
 
 
 def test_aio_sandbox_glob_include_dirs_filters_nested_ignored(monkeypatch) -> None:
+    '未说明'
     with patch("deerflow.community.aio_sandbox.aio_sandbox.AioSandboxClient"):
         sandbox = AioSandbox(id="test-sandbox", base_url="http://localhost:8080")
     monkeypatch.setattr(
@@ -228,6 +239,7 @@ def test_aio_sandbox_glob_include_dirs_filters_nested_ignored(monkeypatch) -> No
 
 
 def test_aio_sandbox_grep_invalid_regex_raises() -> None:
+    '未说明'
     with patch("deerflow.community.aio_sandbox.aio_sandbox.AioSandboxClient"):
         sandbox = AioSandbox(id="test-sandbox", base_url="http://localhost:8080")
 
@@ -241,6 +253,7 @@ def test_aio_sandbox_grep_invalid_regex_raises() -> None:
 
 
 def test_aio_sandbox_glob_parses_json(monkeypatch) -> None:
+    '未说明'
     with patch("deerflow.community.aio_sandbox.aio_sandbox.AioSandboxClient"):
         sandbox = AioSandbox(id="test-sandbox", base_url="http://localhost:8080")
     monkeypatch.setattr(
@@ -256,6 +269,7 @@ def test_aio_sandbox_glob_parses_json(monkeypatch) -> None:
 
 
 def test_aio_sandbox_grep_parses_json(monkeypatch) -> None:
+    '未说明'
     with patch("deerflow.community.aio_sandbox.aio_sandbox.AioSandboxClient"):
         sandbox = AioSandbox(id="test-sandbox", base_url="http://localhost:8080")
     monkeypatch.setattr(
@@ -286,6 +300,7 @@ def test_aio_sandbox_grep_parses_json(monkeypatch) -> None:
 
 
 def test_find_glob_matches_raises_not_a_directory(tmp_path) -> None:
+    '未说明'
     file_path = tmp_path / "file.txt"
     file_path.write_text("x\n", encoding="utf-8")
 
@@ -297,6 +312,7 @@ def test_find_glob_matches_raises_not_a_directory(tmp_path) -> None:
 
 
 def test_find_grep_matches_raises_not_a_directory(tmp_path) -> None:
+    '未说明'
     file_path = tmp_path / "file.txt"
     file_path.write_text("TODO\n", encoding="utf-8")
 
@@ -308,6 +324,7 @@ def test_find_grep_matches_raises_not_a_directory(tmp_path) -> None:
 
 
 def test_find_grep_matches_skips_symlink_outside_root(tmp_path) -> None:
+    '未说明'
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     outside = tmp_path / "outside.txt"
@@ -321,6 +338,7 @@ def test_find_grep_matches_skips_symlink_outside_root(tmp_path) -> None:
 
 
 def test_glob_tool_honors_smaller_requested_max_results(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "a.py").write_text("print('a')\n", encoding="utf-8")
@@ -346,6 +364,7 @@ def test_glob_tool_honors_smaller_requested_max_results(tmp_path, monkeypatch) -
 
 
 def test_aio_sandbox_glob_include_dirs_enforces_root_boundary(monkeypatch) -> None:
+    '未说明'
     with patch("deerflow.community.aio_sandbox.aio_sandbox.AioSandboxClient"):
         sandbox = AioSandbox(id="test-sandbox", base_url="http://localhost:8080")
     monkeypatch.setattr(
@@ -368,6 +387,7 @@ def test_aio_sandbox_glob_include_dirs_enforces_root_boundary(monkeypatch) -> No
 
 
 def test_aio_sandbox_grep_skips_mismatched_line_number_payloads(monkeypatch) -> None:
+    '未说明'
     with patch("deerflow.community.aio_sandbox.aio_sandbox.AioSandboxClient"):
         sandbox = AioSandbox(id="test-sandbox", base_url="http://localhost:8080")
     monkeypatch.setattr(
@@ -403,7 +423,7 @@ def test_aio_sandbox_grep_skips_mismatched_line_number_payloads(monkeypatch) -> 
 
 
 def test_ls_tool_masks_user_data_host_paths(tmp_path, monkeypatch) -> None:
-    """ls_tool output must not leak host user-data paths; they should be virtual."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
     workspace = tmp_path / "workspace"
     (workspace / "report.txt").write_text("hello\n", encoding="utf-8")
@@ -425,7 +445,7 @@ def test_ls_tool_masks_user_data_host_paths(tmp_path, monkeypatch) -> None:
 
 
 def test_ls_tool_masks_skills_host_paths(tmp_path, monkeypatch) -> None:
-    """ls_tool output must not leak host skills paths; they should be virtual."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
     skills_dir = tmp_path / "skills"
     (skills_dir / "public").mkdir(parents=True)
@@ -453,7 +473,7 @@ def test_ls_tool_masks_skills_host_paths(tmp_path, monkeypatch) -> None:
 
 
 def test_ls_tool_returns_empty_for_empty_directory(tmp_path, monkeypatch) -> None:
-    """ls_tool should return '(empty)' for an empty directory."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
 
     monkeypatch.setattr("deerflow.sandbox.tools.ensure_sandbox_initialized", lambda runtime: LocalSandbox(id="local"))
@@ -468,16 +488,7 @@ def test_ls_tool_returns_empty_for_empty_directory(tmp_path, monkeypatch) -> Non
 
 
 def test_ls_tool_skills_path_uses_sandbox_mapping_user_id_not_contextvar(tmp_path, monkeypatch) -> None:
-    """ls_tool must resolve /mnt/skills/custom via the sandbox PathMapping
-    (which uses the user_id from acquire time), not via _resolve_skills_path
-    (which uses get_effective_user_id() from contextvar).
-
-    Regression: when the contextvar user_id differs from the sandbox mapping's
-    user_id (e.g., contextvar unset → "default", but sandbox uses authenticated
-    "user-abc"), _resolve_skills_path would resolve to the wrong directory,
-    making /mnt/skills/custom appear empty. The fix delegates resolution to the
-    sandbox's PathMapping which always uses the acquire-time user_id.
-    """
+    '未说明'
     from deerflow.runtime.user_context import reset_current_user, set_current_user
 
     # Create two user-specific custom skill directories:
@@ -538,6 +549,7 @@ def test_ls_tool_skills_path_uses_sandbox_mapping_user_id_not_contextvar(tmp_pat
 
 
 def test_ls_tool_filters_upload_staging_files(tmp_path, monkeypatch) -> None:
+    '未说明'
     runtime = _make_runtime(tmp_path)
     uploads = tmp_path / "uploads"
     (uploads / "report.txt").write_text("ready\n", encoding="utf-8")
@@ -558,11 +570,7 @@ def test_ls_tool_filters_upload_staging_files(tmp_path, monkeypatch) -> None:
 
 
 def _make_skills_sandbox(tmp_path, monkeypatch, *, disabled: str):
-    """Skills tree with one disabled and one enabled public skill.
-
-    Drives the real `_is_disabled_skill_path` gate through a real
-    extensions_config.json rather than stubbing the gate out.
-    """
+    '未说明'
     skills_dir = tmp_path / "skills"
     for name, body in [(disabled, "SECRET_PROCEDURE = step-1-step-2\n"), ("open-skill", "PUBLIC_PROCEDURE = hello\n")]:
         (skills_dir / "public" / name).mkdir(parents=True)
@@ -584,7 +592,7 @@ def _make_skills_sandbox(tmp_path, monkeypatch, *, disabled: str):
 
 
 def test_glob_tool_blocks_disabled_skill_root(tmp_path, monkeypatch) -> None:
-    """glob must refuse a disabled skill's own directory, like ls and read_file do."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
     _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
 
@@ -600,7 +608,7 @@ def test_glob_tool_blocks_disabled_skill_root(tmp_path, monkeypatch) -> None:
 
 
 def test_grep_tool_blocks_disabled_skill_root(tmp_path, monkeypatch) -> None:
-    """grep must refuse a disabled skill's own directory, like ls and read_file do."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
     _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
 
@@ -616,7 +624,7 @@ def test_grep_tool_blocks_disabled_skill_root(tmp_path, monkeypatch) -> None:
 
 
 def test_glob_tool_does_not_surface_disabled_skill_from_ancestor_root(tmp_path, monkeypatch) -> None:
-    """A root above the skill must not surface it: glob descends past the path gate."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
     _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
 
@@ -633,7 +641,7 @@ def test_glob_tool_does_not_surface_disabled_skill_from_ancestor_root(tmp_path, 
 
 
 def test_grep_tool_does_not_surface_disabled_skill_content_from_ancestor_root(tmp_path, monkeypatch) -> None:
-    """The strongest leak: grep from /mnt/skills printed a disabled skill's file contents."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
     _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
 
@@ -651,7 +659,7 @@ def test_grep_tool_does_not_surface_disabled_skill_content_from_ancestor_root(tm
 
 
 def test_ls_tool_does_not_surface_disabled_skill_from_category_root(tmp_path, monkeypatch) -> None:
-    """ls gates the requested path but descends two levels, so the category root leaked."""
+    '未说明'
     runtime = _make_runtime(tmp_path)
     _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
 
@@ -667,14 +675,7 @@ def test_ls_tool_does_not_surface_disabled_skill_from_category_root(tmp_path, mo
 
 
 def test_ls_tool_keeps_category_dirs_when_listing_skills_root(tmp_path, monkeypatch) -> None:
-    """`ls /mnt/skills` lists dirs with a trailing slash ("public/"), which the
-    skill-name extractor must read as a category root, not as a skill named "".
-
-    An empty name skips the `skill_name is None` short-circuit and falls through
-    to a config read; it currently lands on "keep" only because unknown skills
-    default to enabled. This pins the intended outcome directly: category dirs
-    stay visible while the disabled skill below them does not.
-    """
+    '未说明'
     runtime = _make_runtime(tmp_path)
     _make_skills_sandbox(tmp_path, monkeypatch, disabled="secret-skill")
 
@@ -690,9 +691,7 @@ def test_ls_tool_keeps_category_dirs_when_listing_skills_root(tmp_path, monkeypa
 
 
 def test_extract_skill_name_treats_category_dir_with_trailing_slash_as_root() -> None:
-    """LocalSandbox.list_dir appends "/" to directories, so the gate sees
-    "/mnt/skills/public/" — which must resolve to None (category root), not "".
-    """
+    '未说明'
     from deerflow.sandbox.tools import _extract_skill_name_from_skills_path as extract
 
     # Changed direction: trailing-slash category roots used to yield "".
@@ -709,13 +708,7 @@ def test_extract_skill_name_treats_category_dir_with_trailing_slash_as_root() ->
 
 
 def _make_custom_skills_sandbox(tmp_path, monkeypatch, *, user_id: str, disabled: str):
-    """Per-user CUSTOM skills tree with one disabled and one enabled skill.
-
-    CUSTOM/LEGACY enabled state lives in the per-user ``_skill_states.json``
-    (``UserScopedSkillStorage``), a different store from the public skills'
-    ``extensions_config.json`` — so the public fixture above does not exercise
-    this branch of ``_is_disabled_skill_path``.
-    """
+    '未说明'
     from deerflow.skills.storage import reset_skill_storage
 
     base_dir = tmp_path / ".deer-flow"
@@ -755,8 +748,7 @@ def _make_custom_skills_sandbox(tmp_path, monkeypatch, *, user_id: str, disabled
 
 
 def test_grep_tool_does_not_surface_disabled_custom_skill(tmp_path, monkeypatch) -> None:
-    """CUSTOM skills resolve enabled state through the per-user _skill_states.json,
-    not extensions_config.json — the store the public-skill tests never touch."""
+    '未说明'
     from deerflow.skills.storage import reset_skill_storage
 
     runtime = _make_runtime(tmp_path)
@@ -781,7 +773,7 @@ def test_grep_tool_does_not_surface_disabled_custom_skill(tmp_path, monkeypatch)
 
 
 def test_ls_tool_does_not_surface_disabled_custom_skill(tmp_path, monkeypatch) -> None:
-    """Same per-user store, via the descending ls listing."""
+    '未说明'
     from deerflow.skills.storage import reset_skill_storage
 
     runtime = _make_runtime(tmp_path)

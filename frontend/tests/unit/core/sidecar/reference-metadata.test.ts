@@ -23,6 +23,11 @@ const contexts: SidecarContext[] = [
   },
 ];
 
+/**
+ * 覆盖“builds visible message reference metadata for selected contexts”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("builds visible message reference metadata for selected contexts", () => {
   expect(buildReferenceMessageMetadata(contexts)).toEqual({
     referenced_message_count: 2,
@@ -44,6 +49,11 @@ test("builds visible message reference metadata for selected contexts", () => {
     ],
   });
 });
+
+/**
+ * 覆盖“reads visible message reference metadata defensively”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("reads visible message reference metadata defensively", () => {
   expect(

@@ -17,6 +17,11 @@ type EnvSnapshot = Partial<
   Record<(typeof ENV_KEYS)[number], string | undefined>
 >;
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 snapshotEnv 的约定。
+
+ */
+
 function snapshotEnv(): EnvSnapshot {
   const snapshot: EnvSnapshot = {};
   for (const key of ENV_KEYS) {
@@ -25,9 +30,14 @@ function snapshotEnv(): EnvSnapshot {
   return snapshot;
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 setEnv 的约定。
+
+ */
+
 function setEnv(key: (typeof ENV_KEYS)[number], value: string | undefined) {
-  // NODE_ENV is typed as a readonly literal union, so we go through the
-  // index signature to keep the test compiler-friendly across cases.
+  // NODE_ENV 的类型是只读字面量联合，因此通过索引签名访问，以使测试在各场景下
+  // 都能通过编译。
   const env = process.env as Record<string, string | undefined>;
   if (value === undefined) {
     delete env[key];
@@ -36,11 +46,21 @@ function setEnv(key: (typeof ENV_KEYS)[number], value: string | undefined) {
   }
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 restoreEnv 的约定。
+
+ */
+
 function restoreEnv(snapshot: EnvSnapshot) {
   for (const key of ENV_KEYS) {
     setEnv(key, snapshot[key]);
   }
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 loadFreshConfig 的约定。
+
+ */
 
 async function loadFreshConfig() {
   rs.resetModules();
@@ -60,6 +80,11 @@ describe("getGatewayConfig", () => {
     restoreEnv(saved);
   });
 
+  /**
+   * 覆盖“returns localhost defaults when env is unset in development”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("returns localhost defaults when env is unset in development", async () => {
     setEnv("NODE_ENV", "development");
 
@@ -69,6 +94,11 @@ describe("getGatewayConfig", () => {
     expect(cfg.internalGatewayUrl).toBe("http://127.0.0.1:8001");
     expect(cfg.trustedOrigins).toEqual(["http://localhost:3000"]);
   });
+
+  /**
+   * 覆盖“returns localhost defaults when env is unset in production (regression: issue #2705)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("returns localhost defaults when env is unset in production (regression: issue #2705)", async () => {
     setEnv("NODE_ENV", "production");
@@ -80,6 +110,11 @@ describe("getGatewayConfig", () => {
     expect(cfg.internalGatewayUrl).toBe("http://127.0.0.1:8001");
     expect(cfg.trustedOrigins).toEqual(["http://localhost:3000"]);
   });
+
+  /**
+   * 覆盖“uses env values verbatim when set, regardless of NODE_ENV”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("uses env values verbatim when set, regardless of NODE_ENV", async () => {
     setEnv("NODE_ENV", "production");
@@ -98,6 +133,11 @@ describe("getGatewayConfig", () => {
       "https://admin.example.com",
     ]);
   });
+
+  /**
+   * 覆盖“trims and filters empty entries in trustedOrigins”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("trims and filters empty entries in trustedOrigins", async () => {
     setEnv("NODE_ENV", "production");

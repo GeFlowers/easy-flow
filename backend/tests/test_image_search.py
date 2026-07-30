@@ -1,3 +1,5 @@
+"""覆盖本文件测试的输入约束、模拟边界与回归保护，确保测试仅记录既有行为。"""
+
 import json
 from unittest.mock import MagicMock, patch
 
@@ -5,8 +7,9 @@ from deerflow.community.image_search.tools import image_search_tool
 
 
 def test_image_search_uses_full_image_url_not_thumbnail():
-    # Regression: `image_url` must expose the full-resolution `image` from the DDGS result,
-    # not the low-res `thumbnail` (both fields were previously set to `thumbnail`).
+    # 回归边界：下方用例固定不可信输入不得伪造受信任边界或权限上下文。
+    # 此处说明下方测试的前置条件与预期，便于回归时定位断言所保护的行为边界。
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     fake_results = [
         {
             "title": "a cat",

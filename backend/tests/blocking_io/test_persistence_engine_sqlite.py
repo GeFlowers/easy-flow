@@ -1,23 +1,4 @@
-"""Regression test: persistence-engine sqlite dir setup must run off the loop.
-
-Anchors the production offload in `persistence/engine.py:init_engine`, where the
-SQLite data directory is created with `os.makedirs`. `init_engine` runs on the
-FastAPI lifespan event loop, so a sync `os.makedirs` (a stat + mkdir syscall)
-there blocks startup — the same class of bug fixed for the checkpointer's
-`ensure_sqlite_parent_dir` in #1912 (see `test_sqlite_lifespan.py`).
-
-This invokes the production `init_engine(backend="sqlite", ...)` under the strict
-Blockbuster context with a `sqlite_dir` that does not yet exist, so `os.makedirs`
-actually runs. The async engine/session machinery is mocked out so the only host
-filesystem operation under test is the directory creation; if it regresses to run
-directly on the event loop, Blockbuster raises `BlockingError` and this fails.
-
-We also stub ``bootstrap_schema`` so the alembic stamp/upgrade path -- which has
-its own ``asyncio.to_thread`` regression anchor in
-``test_persistence_bootstrap.py`` -- does not turn this test into a
-double-coverage one. Keeping concerns separated means a regression in either
-offload (makedirs vs alembic) points at the right place.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -26,8 +7,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# Pre-import so `init_engine`'s lazy ``import deerflow.persistence.models`` is a
-# cached no-op rather than a file read under the strict gate.
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 import deerflow.persistence.models  # noqa: E402,F401
 from deerflow.persistence import engine as engine_mod  # noqa: E402
 
@@ -35,16 +16,18 @@ pytestmark = pytest.mark.asyncio
 
 
 def _noop_listens_for(*_args, **_kwargs):
-    """Decorator factory that registers nothing (mock engine has no real events)."""
+    """准备可控测试资源与状态，供后续断言读取。"""
 
     def _decorator(fn):
+        """返回不修改被装饰函数的替身装饰器，供引擎初始化测试替换事件监听注册。"""
         return fn
 
     return _decorator
 
 
 async def test_init_engine_sqlite_dir_setup_does_not_block_event_loop(tmp_path: Path) -> None:
-    data_dir = tmp_path / "newsubdir"  # does not exist yet -> os.makedirs runs
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
+    data_dir = tmp_path / "newsubdir"  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     db_file = data_dir / "app.db"
 
     mock_conn = AsyncMock()
@@ -56,6 +39,7 @@ async def test_init_engine_sqlite_dir_setup_does_not_block_event_loop(tmp_path: 
     mock_engine.dispose = AsyncMock()
 
     async def _noop_bootstrap(*_args, **_kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return None
 
     with (

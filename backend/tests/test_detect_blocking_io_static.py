@@ -1,3 +1,4 @@
+'定义 test_detect_blocking_io_static 模块提供的职责与可复用接口'
 from __future__ import annotations
 
 import json
@@ -8,15 +9,18 @@ from support.detectors import blocking_io_static as detector
 
 
 def _write_python(path: Path, source: str) -> Path:
+    '执行 _write_python 的明确职责，并返回与调用约定一致的结果'
     path.write_text(textwrap.dedent(source).strip() + "\n", encoding="utf-8")
     return path
 
 
 def _payload(path: Path, repo_root: Path) -> list[dict[str, object]]:
+    '执行 _payload 的明确职责，并返回与调用约定一致的结果'
     return [finding.to_dict() for finding in detector.scan_file(path, repo_root=repo_root)]
 
 
 def test_scan_file_detects_direct_blocking_calls_in_async_code(tmp_path: Path) -> None:
+    '验证 scan、file、detects、direct、blocking、calls、in、async、code 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -49,6 +53,7 @@ def test_scan_file_detects_direct_blocking_calls_in_async_code(tmp_path: Path) -
 
 
 def test_scan_file_detects_blocking_calls_in_sync_helper_reached_from_async_code(tmp_path: Path) -> None:
+    '验证 scan、file、detects、blocking、calls、in、sync、helper、reached、from、async、code 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -72,6 +77,7 @@ def test_scan_file_detects_blocking_calls_in_sync_helper_reached_from_async_code
 
 
 def test_scan_file_omits_sync_only_blocking_calls_from_default_results(tmp_path: Path) -> None:
+    '验证 scan、file、omits、sync、only、blocking、calls、from、default、results 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -86,6 +92,7 @@ def test_scan_file_omits_sync_only_blocking_calls_from_default_results(tmp_path:
 
 
 def test_scan_file_detects_self_helper_reached_from_async_method(tmp_path: Path) -> None:
+    '验证 scan、file、detects、self、helper、reached、from、async、method 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -106,6 +113,7 @@ def test_scan_file_detects_self_helper_reached_from_async_method(tmp_path: Path)
 
 
 def test_json_output_uses_concise_review_record_schema(tmp_path: Path, capsys) -> None:
+    '验证 json、output、uses、concise、review、record、schema 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -145,6 +153,7 @@ def test_json_output_uses_concise_review_record_schema(tmp_path: Path, capsys) -
 
 
 def test_summary_output_writes_json_report(tmp_path: Path, capsys) -> None:
+    '验证 summary、output、writes、json、report 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -169,6 +178,7 @@ def test_summary_output_writes_json_report(tmp_path: Path, capsys) -> None:
 
 
 def test_json_output_ranks_operations_without_confidence_noise(tmp_path: Path, capsys) -> None:
+    '验证 json、output、ranks、operations、without、confidence、noise 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -197,6 +207,7 @@ def test_json_output_ranks_operations_without_confidence_noise(tmp_path: Path, c
 
 
 def test_path_receiver_detection_uses_path_annotations(tmp_path: Path) -> None:
+    '验证 path、receiver、detection、uses、path、annotations 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -217,6 +228,7 @@ def test_path_receiver_detection_uses_path_annotations(tmp_path: Path) -> None:
 
 
 def test_summary_groups_findings_by_priority_and_operation(tmp_path: Path, capsys) -> None:
+    '验证 summary、groups、findings、by、priority、and、operation 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -250,6 +262,7 @@ def test_summary_groups_findings_by_priority_and_operation(tmp_path: Path, capsy
 
 
 def test_source_code_snippet_is_truncated_for_json_output(tmp_path: Path) -> None:
+    '验证 source、code、snippet、is、truncated、for、json、output 场景下的预期行为、边界条件与结果'
     long_suffix = " + ".join('"chunk"' for _ in range(80))
     source_file = _write_python(
         tmp_path / "sample.py",
@@ -267,6 +280,7 @@ def test_source_code_snippet_is_truncated_for_json_output(tmp_path: Path) -> Non
 
 
 def test_cli_default_filters_sync_only_inventory_items(tmp_path: Path, capsys) -> None:
+    '验证 cli、default、filters、sync、only、inventory、items 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -284,6 +298,7 @@ def test_cli_default_filters_sync_only_inventory_items(tmp_path: Path, capsys) -
 
 
 def test_sync_only_agent_middleware_hook_gets_event_loop_exposure(tmp_path: Path) -> None:
+    '验证 sync、only、agent、middleware、hook、gets、event、loop、exposure 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -308,6 +323,7 @@ def test_sync_only_agent_middleware_hook_gets_event_loop_exposure(tmp_path: Path
 
 
 def test_sync_agent_middleware_hook_with_async_counterpart_is_not_reported(tmp_path: Path) -> None:
+    '验证 sync、agent、middleware、hook、with、async、counterpart、is、not、reported 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -327,6 +343,7 @@ def test_sync_agent_middleware_hook_with_async_counterpart_is_not_reported(tmp_p
 
 
 def test_scan_file_detects_sync_httpx_client_methods_in_async_code(tmp_path: Path) -> None:
+    '验证 scan、file、detects、sync、httpx、client、methods、in、async、code 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -348,6 +365,7 @@ def test_scan_file_detects_sync_httpx_client_methods_in_async_code(tmp_path: Pat
 
 
 def test_scan_file_detects_chained_sync_http_client_methods_in_async_code(tmp_path: Path) -> None:
+    '验证 scan、file、detects、chained、sync、http、client、methods、in、async、code 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -370,6 +388,7 @@ def test_scan_file_detects_chained_sync_http_client_methods_in_async_code(tmp_pa
 
 
 def test_scan_file_detects_os_walk_and_path_resolve_in_async_code(tmp_path: Path) -> None:
+    '验证 scan、file、detects、os、walk、and、path、resolve、in、async、code 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -390,6 +409,7 @@ def test_scan_file_detects_os_walk_and_path_resolve_in_async_code(tmp_path: Path
 
 
 def test_scan_file_does_not_treat_string_replace_as_file_io(tmp_path: Path) -> None:
+    '验证 scan、file、does、not、treat、string、replace、as、file、io 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -405,6 +425,7 @@ def test_scan_file_does_not_treat_string_replace_as_file_io(tmp_path: Path) -> N
 
 
 def test_parse_errors_are_reported_as_findings(tmp_path: Path) -> None:
+    '验证 parse、errors、are、reported、as、findings 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "broken.py",
         """

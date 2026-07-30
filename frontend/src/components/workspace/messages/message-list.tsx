@@ -94,9 +94,8 @@ export const MESSAGE_LIST_DEFAULT_PADDING_BOTTOM = 24;
 const LOAD_MORE_HISTORY_THROTTLE_MS = 1200;
 
 const SELECTION_TOOLBAR_MARGIN = 8;
-// Approximate rendered height of the pill (p-1 padding + h-8 button). Used only
-// to decide whether the toolbar fits above the selection; exact height isn't
-// needed because we flip below when space is tight.
+// 浮层的大致渲染高度（p-1 内边距加 h-8 按钮）。仅用于判断工具条能否置于
+// 选区上方；空间不足时会翻转到下方，因此不需要精确高度。
 const SELECTION_TOOLBAR_ESTIMATED_HEIGHT = 48;
 
 type SelectionToolbarState = {
@@ -211,6 +210,7 @@ function LoadMoreHistoryIndicator({
   );
 }
 
+/** 渲染线程消息、流式追加内容和人工输入卡片；集中管理可见卡片的交互归属。 */
 export function MessageList({
   className,
   testId,
@@ -353,9 +353,8 @@ export function MessageList({
       return;
     }
 
-    // `sendMessage` can return after dispatching while the SDK stream later
-    // reports an async error through `thread.error`. In that case the hidden
-    // human reply never reaches history, so unlock the card for retry.
+    // `sendMessage` 在分发后即可返回，但 SDK 流稍后可能通过 `thread.error`
+    // 报告异步错误。此时隐藏的人类回复不会进入历史记录，故需解锁卡片以便重试。
     setPendingHumanInputRequestIds(new Set());
   }, [pendingHumanInputRequestIds.size, thread.error]);
 
@@ -467,10 +466,8 @@ export function MessageList({
         return;
       }
 
-      // Widen containment to the shared assistant-turn container so a selection
-      // that spans multiple AI messages within the same turn still yields a
-      // toolbar (#3553). Fall back to the per-message wrapper if the turn
-      // container can't be found.
+      // 将包含范围扩展到共享的助手轮次容器，使同一轮内跨多条 AI 消息的选区
+      // 仍可显示工具条（#3553）。若找不到轮次容器，则回退到单条消息容器。
       const turnContainer =
         event.currentTarget.closest<HTMLElement>("[data-assistant-turn]") ??
         event.currentTarget;
@@ -478,8 +475,7 @@ export function MessageList({
         return;
       }
       if (!turnContainer.contains(selection.focusNode)) {
-        // The selection leaked into another turn/message; the quote would be
-        // ambiguous, so surface a hint instead of failing silently.
+        // 选区跨入另一轮或另一条消息时引用会产生歧义，需显示提示而非静默失败。
         toast.info(t.sidecar.selectionCrossesMessages);
         setSelectionToolbar(null);
         return;
@@ -492,10 +488,8 @@ export function MessageList({
         return;
       }
 
-      // The pill is rendered with `-translate-y-full`, so anchoring it at
-      // `rect.top` moves it up by its own height. When the selection sits near
-      // the viewport top there isn't room above, so flip it below the selection
-      // to keep both actions reachable (#3551).
+      // 浮层使用 `-translate-y-full` 渲染，锚定在 `rect.top` 会将它上移自身高度。
+      // 当选区靠近视口顶部且上方空间不足时翻转到选区下方，确保两个操作都可达（#3551）。
       const rect = selection.getRangeAt(0).getBoundingClientRect();
       const fitsAbove =
         rect.top -
@@ -523,10 +517,8 @@ export function MessageList({
     if (!selectionToolbar) {
       return;
     }
-    // On the sidecar surface, "add to conversation" targets the side chat's
-    // own composer (activeReferences) rather than the main composer's quotes,
-    // so the selected snippet is attached to the conversation the user is
-    // actually reading.
+    // 在侧边栏中，“添加到对话”应写入侧边聊天自己的编辑器（activeReferences），
+    // 而不是主编辑器的引用，确保所选片段附加到用户正在阅读的对话。
     if (sidecarSurface) {
       sidecar?.openContext(selectionToolbar.context);
     } else {

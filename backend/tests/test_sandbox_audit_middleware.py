@@ -1,4 +1,4 @@
-"""Tests for SandboxAuditMiddleware - command classification and audit logging."""
+'未说明'
 
 import unittest.mock
 from types import SimpleNamespace
@@ -19,7 +19,7 @@ from deerflow.agents.middlewares.sandbox_audit_middleware import (
 
 
 def _make_request(command: str, workspace_path: str | None = "/tmp/workspace", thread_id: str = "thread-1") -> MagicMock:
-    """Build a minimal ToolCallRequest mock for the bash tool."""
+    '未说明'
     args = {"command": command}
     request = MagicMock()
     request.tool_call = {
@@ -37,6 +37,7 @@ def _make_request(command: str, workspace_path: str | None = "/tmp/workspace", t
 
 
 def _make_non_bash_request(tool_name: str = "ls") -> MagicMock:
+    '未说明'
     request = MagicMock()
     request.tool_call = {"name": tool_name, "id": "call-456", "args": {}}
     request.runtime = SimpleNamespace(context={}, config={}, state={})
@@ -44,7 +45,7 @@ def _make_non_bash_request(tool_name: str = "ls") -> MagicMock:
 
 
 def _make_handler(return_value: ToolMessage | None = None):
-    """Sync handler that records calls."""
+    '未说明'
     if return_value is None:
         return_value = ToolMessage(content="ok", tool_call_id="call-123", name="bash")
     handler = MagicMock(return_value=return_value)
@@ -59,6 +60,7 @@ def _make_handler(return_value: ToolMessage | None = None):
 class TestClassifyCommand:
     # --- High-risk (should return "block") ---
 
+    '未说明'
     @pytest.mark.parametrize(
         "cmd",
         [
@@ -116,6 +118,7 @@ class TestClassifyCommand:
         ],
     )
     def test_high_risk_classified_as_block(self, cmd):
+        '未说明'
         assert _classify_command(cmd) == "block", f"Expected 'block' for: {cmd!r}"
 
     # --- Medium-risk (should return "warn") ---
@@ -141,6 +144,7 @@ class TestClassifyCommand:
         ],
     )
     def test_medium_risk_classified_as_warn(self, cmd):
+        '未说明'
         assert _classify_command(cmd) == "warn", f"Expected 'warn' for: {cmd!r}"
 
     @pytest.mark.parametrize(
@@ -152,6 +156,7 @@ class TestClassifyCommand:
         ],
     )
     def test_curl_wget_classified_as_pass(self, cmd):
+        '未说明'
         assert _classify_command(cmd) == "pass", f"Expected 'pass' for: {cmd!r}"
 
     # --- Safe (should return "pass") ---
@@ -181,13 +186,16 @@ class TestClassifyCommand:
         ],
     )
     def test_safe_classified_as_pass(self, cmd):
+        '未说明'
         assert _classify_command(cmd) == "pass", f"Expected 'pass' for: {cmd!r}"
 
     def test_unparseable_heredoc_classified_as_pass(self):
+        '未说明'
         cmd = "python3 << 'EOF'\necho it's fine\nEOF"
         assert _classify_command(cmd) == "pass"
 
     def test_unparseable_heredoc_with_high_risk_pattern_still_blocks(self):
+        '未说明'
         cmd = "python3 << 'EOF'\necho it's fine\ncat /etc/shadow\nEOF"
         assert _classify_command(cmd) == "block"
 
@@ -217,50 +225,62 @@ class TestClassifyCommand:
         ],
     )
     def test_compound_command_classification(self, cmd, expected):
+        '未说明'
         assert _classify_command(cmd) == expected, f"Expected {expected!r} for compound cmd: {cmd!r}"
 
 
 class TestSplitCompoundCommand:
-    """Tests for _split_compound_command quote-aware splitting."""
+    '未说明'
 
     def test_simple_and(self):
+        '未说明'
         assert _split_compound_command("cmd1 && cmd2") == ["cmd1", "cmd2"]
 
     def test_simple_and_without_whitespace(self):
+        '未说明'
         assert _split_compound_command("cmd1&&cmd2") == ["cmd1", "cmd2"]
 
     def test_simple_or(self):
+        '未说明'
         assert _split_compound_command("cmd1 || cmd2") == ["cmd1", "cmd2"]
 
     def test_simple_or_without_whitespace(self):
+        '未说明'
         assert _split_compound_command("cmd1||cmd2") == ["cmd1", "cmd2"]
 
     def test_simple_semicolon(self):
+        '未说明'
         assert _split_compound_command("cmd1 ; cmd2") == ["cmd1", "cmd2"]
 
     def test_simple_semicolon_without_whitespace(self):
+        '未说明'
         assert _split_compound_command("cmd1;cmd2") == ["cmd1", "cmd2"]
 
     def test_mixed_operators(self):
+        '未说明'
         result = _split_compound_command("a && b || c ; d")
         assert result == ["a", "b", "c", "d"]
 
     def test_mixed_operators_without_whitespace(self):
+        '未说明'
         result = _split_compound_command("a&&b||c;d")
         assert result == ["a", "b", "c", "d"]
 
     def test_quoted_operators_not_split(self):
         # && inside quotes should not be treated as separator
+        '未说明'
         result = _split_compound_command("echo 'a && b' && rm -rf /")
         assert len(result) == 2
         assert "a && b" in result[0]
         assert "rm -rf /" in result[1]
 
     def test_single_command(self):
+        '未说明'
         assert _split_compound_command("ls -la") == ["ls -la"]
 
     def test_unclosed_quote_returns_whole(self):
         # shlex fails → fallback returns whole command
+        '未说明'
         result = _split_compound_command("echo 'hello")
         assert result == ["echo 'hello"]
 
@@ -271,43 +291,55 @@ class TestSplitCompoundCommand:
 
 
 class TestValidateInput:
+    '未说明'
     def setup_method(self):
+        """处理设置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.mw = SandboxAuditMiddleware()
 
     def test_empty_string_rejected(self):
+        '未说明'
         assert self.mw._validate_input("") == "empty command"
 
     def test_whitespace_only_rejected(self):
+        '未说明'
         assert self.mw._validate_input("   \t\n  ") == "empty command"
 
     def test_normal_command_accepted(self):
+        '未说明'
         assert self.mw._validate_input("ls -la") is None
 
     def test_command_at_max_length_accepted(self):
+        '未说明'
         cmd = "a" * 10_000
         assert self.mw._validate_input(cmd) is None
 
     def test_command_exceeding_max_length_rejected(self):
+        '未说明'
         cmd = "a" * 10_001
         assert self.mw._validate_input(cmd) == "command too long"
 
     def test_null_byte_rejected(self):
+        '未说明'
         assert self.mw._validate_input("ls\x00; rm -rf /") == "null byte detected"
 
     def test_null_byte_at_start_rejected(self):
+        '未说明'
         assert self.mw._validate_input("\x00ls") == "null byte detected"
 
     def test_null_byte_at_end_rejected(self):
+        '未说明'
         assert self.mw._validate_input("ls\x00") == "null byte detected"
 
 
 class TestInputSanitisationBlocksInWrapToolCall:
-    """Verify that input sanitisation rejections flow through wrap_tool_call correctly."""
+    '未说明'
 
     def setup_method(self):
+        """处理设置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.mw = SandboxAuditMiddleware()
 
     def test_empty_command_blocked_with_reason(self):
+        '未说明'
         request = _make_request("")
         handler = _make_handler()
         result = self.mw.wrap_tool_call(request, handler)
@@ -317,6 +349,7 @@ class TestInputSanitisationBlocksInWrapToolCall:
         assert "empty command" in result.content.lower()
 
     def test_null_byte_command_blocked_with_reason(self):
+        '未说明'
         request = _make_request("echo\x00rm -rf /")
         handler = _make_handler()
         result = self.mw.wrap_tool_call(request, handler)
@@ -326,6 +359,7 @@ class TestInputSanitisationBlocksInWrapToolCall:
         assert "null byte" in result.content.lower()
 
     def test_oversized_command_blocked_with_reason(self):
+        '未说明'
         request = _make_request("a" * 10_001)
         handler = _make_handler()
         result = self.mw.wrap_tool_call(request, handler)
@@ -335,7 +369,7 @@ class TestInputSanitisationBlocksInWrapToolCall:
         assert "command too long" in result.content.lower()
 
     def test_none_command_coerced_to_empty(self):
-        """args.get('command') returning None should be coerced to str and rejected as empty."""
+        '未说明'
         request = _make_request("")
         # Simulate None value by patching args directly
         request.tool_call["args"]["command"] = None
@@ -346,7 +380,7 @@ class TestInputSanitisationBlocksInWrapToolCall:
         assert result.status == "error"
 
     def test_oversized_command_audit_log_truncated(self):
-        """Oversized commands should be truncated in audit logs to prevent log amplification."""
+        '未说明'
         big_cmd = "x" * 10_001
         request = _make_request(big_cmd)
         handler = _make_handler()
@@ -363,11 +397,13 @@ class TestInputSanitisationBlocksInWrapToolCall:
 
 
 class TestSandboxAuditMiddlewareWrapToolCall:
+    '未说明'
     def setup_method(self):
+        """处理设置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.mw = SandboxAuditMiddleware()
 
     def _call(self, command: str, workspace_path: str | None = "/tmp/workspace") -> tuple:
-        """Run wrap_tool_call, return (result, handler_called, handler_mock)."""
+        '未说明'
         request = _make_request(command, workspace_path=workspace_path)
         handler = _make_handler()
         with patch.object(self.mw, "_write_audit"):
@@ -377,6 +413,7 @@ class TestSandboxAuditMiddlewareWrapToolCall:
     # --- Non-bash tools are passed through unchanged ---
 
     def test_non_bash_tool_passes_through(self):
+        '未说明'
         request = _make_non_bash_request("ls")
         handler = _make_handler()
         with patch.object(self.mw, "_write_audit"):
@@ -401,6 +438,7 @@ class TestSandboxAuditMiddlewareWrapToolCall:
         ],
     )
     def test_high_risk_blocks_handler(self, cmd):
+        '未说明'
         result, called, _ = self._call(cmd)
         assert not called, f"handler should NOT be called for high-risk cmd: {cmd!r}"
         assert isinstance(result, ToolMessage)
@@ -417,6 +455,7 @@ class TestSandboxAuditMiddlewareWrapToolCall:
         ],
     )
     def test_medium_risk_executes_with_warning(self, cmd):
+        '未说明'
         result, called, _ = self._call(cmd)
         assert called, f"handler SHOULD be called for medium-risk cmd: {cmd!r}"
         assert isinstance(result, ToolMessage)
@@ -435,6 +474,7 @@ class TestSandboxAuditMiddlewareWrapToolCall:
         ],
     )
     def test_safe_command_passes_to_handler(self, cmd):
+        '未说明'
         result, called, handler = self._call(cmd)
         assert called, f"handler SHOULD be called for safe cmd: {cmd!r}"
         assert result == handler.return_value
@@ -442,6 +482,7 @@ class TestSandboxAuditMiddlewareWrapToolCall:
     # --- Audit log is written for every bash call ---
 
     def test_audit_log_written_for_safe_command(self):
+        '未说明'
         request = _make_request("ls -la")
         handler = _make_handler()
         with patch.object(self.mw, "_write_audit") as mock_audit:
@@ -452,6 +493,7 @@ class TestSandboxAuditMiddlewareWrapToolCall:
         assert verdict == "pass"
 
     def test_audit_log_written_for_blocked_command(self):
+        '未说明'
         request = _make_request("rm -rf /")
         handler = _make_handler()
         with patch.object(self.mw, "_write_audit") as mock_audit:
@@ -462,6 +504,7 @@ class TestSandboxAuditMiddlewareWrapToolCall:
         assert verdict == "block"
 
     def test_audit_log_written_for_medium_risk_command(self):
+        '未说明'
         request = _make_request("pip install requests")
         handler = _make_handler()
         with patch.object(self.mw, "_write_audit") as mock_audit:
@@ -477,15 +520,18 @@ class TestSandboxAuditMiddlewareWrapToolCall:
 
 
 class TestSandboxAuditMiddlewareAwrapToolCall:
+    '未说明'
     def setup_method(self):
+        """处理设置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.mw = SandboxAuditMiddleware()
 
     async def _call(self, command: str) -> tuple:
-        """Run awrap_tool_call, return (result, handler_called, handler_mock)."""
+        '未说明'
         request = _make_request(command)
         handler_mock = _make_handler()
 
         async def async_handler(req):
+            '未说明'
             return handler_mock(req)
 
         with patch.object(self.mw, "_write_audit"):
@@ -494,10 +540,12 @@ class TestSandboxAuditMiddlewareAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_non_bash_tool_passes_through(self):
+        '未说明'
         request = _make_non_bash_request("ls")
         handler_mock = _make_handler()
 
         async def async_handler(req):
+            '未说明'
             return handler_mock(req)
 
         with patch.object(self.mw, "_write_audit"):
@@ -507,6 +555,7 @@ class TestSandboxAuditMiddlewareAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_high_risk_blocks_handler(self):
+        '未说明'
         result, called, _ = await self._call("rm -rf /")
         assert not called
         assert isinstance(result, ToolMessage)
@@ -515,6 +564,7 @@ class TestSandboxAuditMiddlewareAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_medium_risk_executes_with_warning(self):
+        '未说明'
         result, called, _ = await self._call("pip install requests")
         assert called
         assert isinstance(result, ToolMessage)
@@ -522,6 +572,7 @@ class TestSandboxAuditMiddlewareAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_safe_command_passes_to_handler(self):
+        '未说明'
         result, called, handler_mock = await self._call("ls -la")
         assert called
         assert result == handler_mock.return_value
@@ -538,6 +589,7 @@ class TestSandboxAuditMiddlewareAwrapToolCall:
         ],
     )
     async def test_fork_bomb_blocked(self, cmd):
+        '未说明'
         result, called, _ = await self._call(cmd)
         assert not called, f"handler should NOT be called for fork bomb: {cmd!r}"
         assert isinstance(result, ToolMessage)
@@ -556,6 +608,7 @@ class TestSandboxAuditMiddlewareAwrapToolCall:
         ],
     )
     async def test_compound_command_handling(self, cmd, expect_blocked):
+        '未说明'
         result, called, _ = await self._call(cmd)
         if expect_blocked:
             assert not called, f"handler should NOT be called for: {cmd!r}"
@@ -571,15 +624,18 @@ class TestSandboxAuditMiddlewareAwrapToolCall:
 
 
 class TestInputSanitisationBlocksInAwrapToolCall:
-    """Verify that input sanitisation rejections flow through awrap_tool_call correctly."""
+    '未说明'
 
     def setup_method(self):
+        """处理设置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.mw = SandboxAuditMiddleware()
 
     async def _call_async(self, request):
+        '未说明'
         handler_mock = _make_handler()
 
         async def async_handler(req):
+            '未说明'
             return handler_mock(req)
 
         result = await self.mw.awrap_tool_call(request, async_handler)
@@ -587,6 +643,7 @@ class TestInputSanitisationBlocksInAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_empty_command_blocked_with_reason(self):
+        '未说明'
         request = _make_request("")
         result, called = await self._call_async(request)
         assert not called
@@ -596,6 +653,7 @@ class TestInputSanitisationBlocksInAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_null_byte_command_blocked_with_reason(self):
+        '未说明'
         request = _make_request("echo\x00rm -rf /")
         result, called = await self._call_async(request)
         assert not called
@@ -605,6 +663,7 @@ class TestInputSanitisationBlocksInAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_oversized_command_blocked_with_reason(self):
+        '未说明'
         request = _make_request("a" * 10_001)
         result, called = await self._call_async(request)
         assert not called
@@ -614,6 +673,7 @@ class TestInputSanitisationBlocksInAwrapToolCall:
 
     @pytest.mark.anyio
     async def test_none_command_coerced_to_empty(self):
+        '未说明'
         request = _make_request("")
         request.tool_call["args"]["command"] = None
         result, called = await self._call_async(request)
@@ -628,7 +688,7 @@ class TestInputSanitisationBlocksInAwrapToolCall:
 
 
 class TestBenchmarkSummary:
-    """Run the full test-case corpus and assert precision / recall metrics."""
+    '未说明'
 
     HIGH_RISK = [
         # original
@@ -710,6 +770,7 @@ class TestBenchmarkSummary:
     ]
 
     def test_benchmark_metrics(self):
+        '未说明'
         high_blocked = sum(1 for c in self.HIGH_RISK if _classify_command(c) == "block")
         medium_warned = sum(1 for c in self.MEDIUM_RISK if _classify_command(c) == "warn")
         safe_passed = sum(1 for c in self.SAFE if _classify_command(c) == "pass")

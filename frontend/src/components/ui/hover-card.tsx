@@ -5,12 +5,14 @@ import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
 
 import { cn } from "@/lib/utils";
 
+/** HoverCard 内部组件：组织对应的界面结构与交互语义。 */
 function HoverCard({
   ...props
 }: React.ComponentProps<typeof HoverCardPrimitive.Root>) {
   return <HoverCardPrimitive.Root data-slot="hover-card" {...props} />;
 }
 
+/** HoverCardTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function HoverCardTrigger({
   ...props
 }: React.ComponentProps<typeof HoverCardPrimitive.Trigger>) {
@@ -19,6 +21,7 @@ function HoverCardTrigger({
   );
 }
 
+/** HoverCardContent 内部组件：组织对应的界面结构与交互语义。 */
 function HoverCardContent({
   className,
   align = "center",

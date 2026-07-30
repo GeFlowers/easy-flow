@@ -1,34 +1,31 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Layer 2 (cross-stack contract): reproduces upstream issue #3352 — after the
- * checkpoint no longer holds the older messages (post context-compression), the
- * frontend rebuilds thread history from the per-run endpoints, and the order it
- * rebuilds them in must stay chronological.
+ * 第 2 层（跨栈契约）：复现上游问题 #3352——检查点不再保存较旧消息（上下文压缩后）时，
+ * 前端会从按运行划分的端点重建线程历史，且重建顺序必须保持时间先后。
  *
- * The dangerous class this guards: a BACKEND change to run ordering silently
- * breaks a FRONTEND assumption. Backend `list_by_thread` returns runs
- * NEWEST-FIRST (PR #2932); the pre-#3354 frontend iterated runs from the end and
- * PREPENDED each loaded page (`core/threads/hooks.ts`), which inverts order. A
- * backend-only ordering test was green the whole time #3352 was live, and the
- * frontend regression unit test hardcodes "backend returns newest-first" in a
- * mock — so only a real frontend against a real backend catches the desync.
+ * 本测试防护的危险类别是：后端对运行排序的变更会悄然破坏前端假设。后端 `list_by_thread`
+ * 按最新优先返回运行（PR #2932）；#3354 之前的前端从末尾遍历运行，并将每个已加载页面
+ * 前置（`core/threads/hooks.ts`），从而反转顺序。在 #3352 存在期间，仅后端的排序测试始终
+ * 通过，而前端回归单元测试在 mock 中硬编码“backend returns newest-first”——因此只有真实
+ * 前端连接真实后端才能发现这种不同步。
  *
- * This drives the REAL frontend against a REAL gateway with two seeded runs and
- * NO checkpoint (the seeder forces the per-run reload path to be the sole source
- * of truth), then asserts the first run's message renders ABOVE the second's.
- * No model, no recording, no API key — the runs are seeded via a test-only
- * endpoint mounted only on the replay gateway.
+ * 本测试使用两个预置运行和无检查点的真实 Gateway 驱动真实前端（预置器强制按运行重载路径成为
+ * 唯一事实来源），随后断言第一个运行的消息渲染在第二个运行消息的上方。无需模型、录制或 API
+ * key——通过仅挂载在回放 Gateway 上的测试专用端点预置运行。
  */
 const APP =
   process.env.E2E_APP_URL ??
   `http://localhost:${process.env.E2E_FRONTEND_PORT ?? "3000"}`;
 
-// Distinctive markers so getByText can't collide with UI chrome.
+// 使用明显不同的标记，避免 getByText 与 UI 框架元素发生冲突。
 const ALPHA = "ALPHA-FIRST-QUESTION-7f3a2c";
 const OMEGA = "OMEGA-SECOND-QUESTION-9b21d4";
 
 test.describe("multi-run thread renders chronologically (replay, no API key)", () => {
+  /**
+   * 覆盖“first run renders above second run after history rebuild (#3352)”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("first run renders above second run after history rebuild (#3352)", async ({
     page,
     context,
@@ -37,9 +34,8 @@ test.describe("multi-run thread renders chronologically (replay, no API key)", (
     const threadId = `e2e-multi-run-${uniq}`;
     const email = `e2e-${uniq}@example.com`;
 
-    // Register through the frontend origin (same-origin proxy) so the auth
-    // cookies are stored for localhost and forwarded to the gateway via the
-    // next.config rewrite — never cross-origin from the browser.
+    // 通过前端来源（同源代理）注册，使鉴权 cookie 存储于 localhost，并通过 next.config rewrite
+    // 转发至 Gateway——浏览器绝不跨源请求。
     const reg = await context.request.post(`${APP}/api/v1/auth/register`, {
       data: { email, password: "very-strong-password-123" },
     });
@@ -49,9 +45,8 @@ test.describe("multi-run thread renders chronologically (replay, no API key)", (
     const csrf = cookies.find((c) => c.name === "csrf_token")?.value;
     expect(csrf, "register must set csrf_token cookie").toBeTruthy();
 
-    // Seed two runs in one thread: run-1 (ALPHA) older, run-2 (OMEGA) newer, so
-    // the real backend's list_by_thread returns them newest-first. No checkpoint
-    // is seeded — that is the #3352 precondition.
+    // 在同一线程中预置两个运行：run-1（ALPHA）较旧，run-2（OMEGA）较新，因此真实后端的
+    // list_by_thread 按最新优先返回它们。未预置检查点——这是 #3352 的前置条件。
     const seed = await context.request.post(`${APP}/api/test-only/seed-runs`, {
       headers: { "X-CSRF-Token": csrf! },
       data: {
@@ -78,19 +73,19 @@ test.describe("multi-run thread renders chronologically (replay, no API key)", (
     });
     expect(seed.status(), await seed.text()).toBe(200);
 
-    // Load the thread fresh — triggers useThreadHistory's per-run reload path.
+    // 全新加载线程——触发 useThreadHistory 的按运行重载路径。
     await page.goto(`/workspace/chats/${threadId}`);
 
     const alpha = page.getByText(ALPHA, { exact: false });
     const omega = page.getByText(OMEGA, { exact: false });
     await expect(alpha).toBeVisible({ timeout: 60_000 });
     await expect(omega).toBeVisible({ timeout: 30_000 });
-    // Each marker renders exactly once (guards against accidental duplicate matches).
+    // 每个标记恰好渲染一次（防止意外的重复匹配）。
     expect(await alpha.count(), "ALPHA should render exactly once").toBe(1);
     expect(await omega.count(), "OMEGA should render exactly once").toBe(1);
 
-    // The contract: ALPHA (first run) must render ABOVE OMEGA (second run). With
-    // the #3352 bug the per-run rebuild inverts this and OMEGA renders first.
+    // 契约：ALPHA（第一个运行）必须渲染在 OMEGA（第二个运行）上方。存在 #3352 bug 时，
+    // 按运行重建会反转此顺序，使 OMEGA 先渲染。
     const alphaBox = await alpha.first().boundingBox();
     const omegaBox = await omega.first().boundingBox();
     expect(alphaBox, "ALPHA must have a layout box").toBeTruthy();

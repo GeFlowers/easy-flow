@@ -7,6 +7,11 @@ import {
 } from "@/core/threads/thread-search-query";
 import type { AgentThread } from "@/core/threads/types";
 
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeThread 的约定。
+
+ */
+
 function makeThread(
   threadId: string,
   metadata: Record<string, unknown> = {},
@@ -21,6 +26,11 @@ function makeThread(
   } as unknown as AgentThread;
 }
 
+/**
+ * 覆盖“thread search query refreshes so IM-created sessions appear in the sidebar”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("thread search query refreshes so IM-created sessions appear in the sidebar", () => {
   const search = rs.fn();
   const options = buildThreadsSearchQueryOptions(
@@ -32,6 +42,11 @@ test("thread search query refreshes so IM-created sessions appear in the sidebar
   expect(options.refetchIntervalInBackground).toBe(false);
   expect(options.refetchOnWindowFocus).toBe(false);
 });
+
+/**
+ * 覆盖“thread search hides sidecar threads from primary lists by default”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("thread search hides sidecar threads from primary lists by default", async () => {
   const search = rs
@@ -51,6 +66,11 @@ test("thread search hides sidecar threads from primary lists by default", async 
     makeThread("primary-2"),
   ]);
 });
+
+/**
+ * 覆盖“thread search can explicitly include sidecar threads for parent lookup”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("thread search can explicitly include sidecar threads for parent lookup", async () => {
   const sidecar = makeThread("sidecar-1", {

@@ -1,8 +1,4 @@
-"""Shared SKILL.md frontmatter parsing helpers.
-
-The runtime parser, install-time validator, and review core all use this module
-as the schema source for DeerFlow SKILL.md metadata.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -30,7 +26,7 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 
 @dataclass(frozen=True)
 class SkillMarkdownParts:
-    """Parsed pieces of a SKILL.md document."""
+    '未说明'
 
     metadata: dict[str, Any]
     frontmatter_text: str
@@ -38,12 +34,7 @@ class SkillMarkdownParts:
 
 
 def split_skill_markdown(content: str) -> tuple[SkillMarkdownParts | None, str | None]:
-    """Split a SKILL.md document into frontmatter and body.
-
-    Returns ``(parts, None)`` on success and ``(None, message)`` on failure. The
-    message intentionally avoids host paths so callers can reuse it in
-    deterministic review output.
-    """
+    '未说明'
     match = _FRONTMATTER_RE.match(content)
     if not match:
         return None, "No YAML frontmatter found"

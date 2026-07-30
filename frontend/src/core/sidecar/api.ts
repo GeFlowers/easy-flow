@@ -10,19 +10,20 @@ import {
   isSidecarThread,
 } from "./thread";
 
+/** 查找侧栏线程所需的最小客户端能力，便于在测试中注入替身。 */
 type SidecarThreadSearchClient = {
   threads: {
     search: (query: Record<string, unknown>) => Promise<AgentThread[]>;
   };
 };
 
-// The find-then-create flow is two independent round-trips with no backend
-// upsert, so a double-click on "Ask in side chat" or two callers racing on the
-// same parent thread can each create a duplicate sidecar thread. Coalesce
-// concurrent creates for the same parent behind a single in-flight promise so
-// only one thread is created; the entry is cleared once it settles.
+/**
+ * 查找后创建是彼此独立的两次请求，后端也没有原子创建或更新能力。双击侧栏提问或同一父线程的两个调用方竞争时，
+ * 均可能创建重复线程；此映射将同一父线程的并发创建合并为同一个进行中的承诺，并在完成后清除条目。
+ */
 const inFlightCreates = new Map<string, Promise<AgentThread>>();
 
+/** 创建关联父线程的侧栏线程；同一父线程的并发请求复用同一次创建。 */
 export async function createSidecarThread({
   parentThreadId,
   context,
@@ -46,6 +47,7 @@ export async function createSidecarThread({
   }
 }
 
+/** 调用线程接口创建侧栏线程，并兼容客户端能力差异。 */
 async function createSidecarThreadRequest({
   parentThreadId,
   context,
@@ -70,6 +72,7 @@ async function createSidecarThreadRequest({
   return (await response.json()) as AgentThread;
 }
 
+/** 查找父线程最近创建的侧栏线程。 */
 export async function findLatestSidecarThread({
   parentThreadId,
   isMock,

@@ -1,4 +1,4 @@
-"""Tests for per-user IM channel connection persistence."""
+"""本模块覆盖相关测试，固定公开行为、失败处理与状态边界。"""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ from deerflow.persistence.channel_connections import (
 
 @pytest.fixture
 async def repo(tmp_path):
+    """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
 
     url = f"sqlite+aiosqlite:///{tmp_path / 'channels.db'}"
@@ -33,8 +34,10 @@ async def repo(tmp_path):
 
 
 class TestChannelConnectionRepository:
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
     @pytest.mark.anyio
     async def test_connections_are_listed_per_owner(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过5项断言固定返回、状态或副作用边界。"""
         alice = await repo.upsert_connection(
             owner_user_id="alice",
             provider="slack",
@@ -64,6 +67,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_upsert_connection_updates_existing_provider_identity(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过4项断言固定返回、状态或副作用边界。"""
         first = await repo.upsert_connection(
             owner_user_id="alice",
             provider="telegram",
@@ -90,6 +94,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_upsert_connection_transfers_external_identity_between_owners(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过5项断言固定返回、状态或副作用边界。"""
         await repo.upsert_connection(
             owner_user_id="alice",
             provider="slack",
@@ -121,8 +126,9 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_active_identity_unique_index_rejects_second_connected_owner(self, repo):
-        # The single-active-owner invariant must be enforced by the database, not
-        # only by the app-level revoke step (which can race under READ COMMITTED).
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过0项断言固定返回、状态或副作用边界。"""
+        # 单活动所有者不变量必须由数据库强制执行，而不是
+        # 此处说明该测试段的前置条件、调用限制及预期边界。
         from sqlalchemy.exc import IntegrityError
 
         await repo.upsert_connection(
@@ -149,8 +155,10 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_active_identity_unique_index_allows_revoked_rows(self, repo):
-        # A revoked row must not occupy the active-identity slot, so a fresh
-        # connected bind for the same identity is allowed afterwards.
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
+        # 已撤销的行不得占用活动身份槽，因此新的行
+        # 随后允许相同身份的
+        # 连接绑定。
         first = await repo.upsert_connection(
             owner_user_id="alice",
             provider="slack",
@@ -171,9 +179,11 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_concurrent_upserts_keep_single_active_owner(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         import asyncio
 
         async def connect(owner: str):
+            """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
             return await repo.upsert_connection(
                 owner_user_id=owner,
                 provider="slack",
@@ -203,6 +213,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_credentials_are_encrypted_at_rest_and_decrypted_by_repository(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过10项断言固定返回、状态或副作用边界。"""
         connection = await repo.upsert_connection(
             owner_user_id="alice",
             provider="slack",
@@ -238,6 +249,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_get_credentials_returns_none_when_decryption_fails(self, repo, caplog):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         connection = await repo.upsert_connection(
             owner_user_id="alice",
             provider="slack",
@@ -258,6 +270,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_conversations_are_scoped_by_connection(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         alice = await repo.upsert_connection(
             owner_user_id="alice",
             provider="slack",
@@ -293,6 +306,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_disconnect_connection_revokes_owner_connection_and_removes_credentials(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过5项断言固定返回、状态或副作用边界。"""
         connection = await repo.upsert_connection(
             owner_user_id="alice",
             provider="telegram",
@@ -322,6 +336,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_disconnect_connection_is_owner_scoped(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         connection = await repo.upsert_connection(
             owner_user_id="alice",
             provider="telegram",
@@ -338,6 +353,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_consume_oauth_state_deletes_expired_states(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         now = datetime.now(UTC)
         await repo.create_oauth_state(
             owner_user_id="alice",
@@ -361,6 +377,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_count_oauth_states_active_only_and_delete_expired(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过4项断言固定返回、状态或副作用边界。"""
         now = datetime.now(UTC)
         await repo.create_oauth_state(
             owner_user_id="alice",
@@ -378,14 +395,15 @@ class TestChannelConnectionRepository:
         assert await repo.count_oauth_states(owner_user_id="alice", provider="slack", active_only=True, now=now) == 1
         assert await repo.delete_expired_oauth_states(now=now) == 1
         assert await repo.count_oauth_states(owner_user_id="alice", provider="slack") == 1
-        # Pin that the surviving row is the active one (an inverted expiry
-        # predicate would delete the active row, still return 1, and pass above).
+        # 固定幸存行是活动行（反向到期
+        # 谓词将删除活动行，仍然返回 1，并在上面传递）。
         async with repo.session_factory() as session:
             survivors = (await session.execute(select(ChannelOAuthStateRow))).scalars().all()
         assert [row.state_hash for row in survivors] == [repo.hash_state("active-state")]
 
     @pytest.mark.anyio
     async def test_create_oauth_state_within_cap_enforces_pending_cap(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过4项断言固定返回、状态或副作用边界。"""
         now = datetime.now(UTC)
         expires = now + timedelta(minutes=5)
 
@@ -393,17 +411,18 @@ class TestChannelConnectionRepository:
             inserted = await repo.create_oauth_state_within_cap(owner_user_id="alice", provider="slack", state=f"code-{i}", expires_at=expires, max_pending=3, now=now)
             assert inserted is True
 
-        # Cap reached: the next issuance is rejected and nothing is inserted.
+        # 达到上限：拒绝下一个发行并且不插入任何内容。
         assert await repo.create_oauth_state_within_cap(owner_user_id="alice", provider="slack", state="code-over", expires_at=expires, max_pending=3, now=now) is False
         assert await repo.count_oauth_states(owner_user_id="alice", provider="slack", active_only=True, now=now) == 3
 
-        # Expired rows are pruned and free up capacity; a different owner is unaffected.
+        # 过期行被修剪并释放容量；不同的所有者不受影响。
         assert await repo.create_oauth_state_within_cap(owner_user_id="bob", provider="slack", state="bob-1", expires_at=expires, max_pending=3, now=now) is True
 
     @pytest.mark.anyio
     async def test_create_oauth_state_within_cap_ignores_expired_rows(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         now = datetime.now(UTC)
-        # Three already-expired rows must not count against the cap.
+        # 三个已过期的行不得计入上限。
         for i in range(3):
             await repo.create_oauth_state(owner_user_id="alice", provider="slack", state=f"old-{i}", expires_at=now - timedelta(minutes=1))
 
@@ -413,7 +432,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_create_oauth_state_within_cap_does_not_leak_under_concurrency(self, repo):
-        """Concurrent issuance for one owner cannot push past the cap (willem #1)."""
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         import anyio
 
         now = datetime.now(UTC)
@@ -421,6 +440,7 @@ class TestChannelConnectionRepository:
         results: list[bool] = []
 
         async def issue(state: str) -> None:
+            """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
             results.append(await repo.create_oauth_state_within_cap(owner_user_id="alice", provider="slack", state=state, expires_at=expires, max_pending=3, now=now))
 
         async with anyio.create_task_group() as tg:
@@ -432,6 +452,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_consume_oauth_state_is_one_time_even_under_concurrent_consumers(self, repo):
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         import anyio
 
         now = datetime.now(UTC)
@@ -445,6 +466,7 @@ class TestChannelConnectionRepository:
         results: list = []
 
         async def consume():
+            """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
             results.append(await repo.consume_oauth_state(provider="slack", state="bind-once", now=now))
 
         async with anyio.create_task_group() as tg:
@@ -457,7 +479,7 @@ class TestChannelConnectionRepository:
 
     @pytest.mark.anyio
     async def test_upsert_connection_retries_as_update_when_concurrent_insert_wins(self, repo):
-        """A losing concurrent INSERT retries as an UPDATE instead of raising IntegrityError."""
+        """验证当前场景的异步调用：使用受控输入与依赖替身，通过3项断言固定返回、状态或副作用边界。"""
         first = await repo.upsert_connection(
             owner_user_id="alice",
             provider="slack",
@@ -469,21 +491,26 @@ class TestChannelConnectionRepository:
         real_factory = repo.session_factory
 
         class _EmptyResult:
+            """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
             @staticmethod
             def scalar_one_or_none():
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 return None
 
         class MissFirstSelectSession:
-            """Make the initial identity SELECT miss, as if a concurrent writer inserted after it."""
+            """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
 
             def __init__(self, session):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 self._session = session
                 self._missed = False
 
             def __getattr__(self, name):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 return getattr(self._session, name)
 
             async def execute(self, *args, **kwargs):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 result = await self._session.execute(*args, **kwargs)
                 if not self._missed:
                     self._missed = True
@@ -491,10 +518,12 @@ class TestChannelConnectionRepository:
                 return result
 
             async def __aenter__(self):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 await self._session.__aenter__()
                 return self
 
             async def __aexit__(self, *args):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 return await self._session.__aexit__(*args)
 
         repo.session_factory = lambda: MissFirstSelectSession(real_factory())

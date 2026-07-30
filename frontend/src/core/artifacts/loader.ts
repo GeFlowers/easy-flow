@@ -5,6 +5,7 @@ import type { AgentThreadState } from "../threads";
 import { buildWriteFileDraftContent } from "./preview";
 import { urlOfArtifact } from "./utils";
 
+/** 获取制品文本内容；技能包路径会定向到其 `SKILL.md` 入口。 */
 export async function loadArtifactContent({
   filepath,
   threadId,
@@ -24,6 +25,7 @@ export async function loadArtifactContent({
   return { content: text, url };
 }
 
+/** 从线程内的 `write_file` 工具调用还原尚未落盘的制品内容。 */
 export function loadArtifactContentFromToolCall({
   url: urlString,
   thread,

@@ -1,4 +1,4 @@
-"""Tests for the WeChat IM channel."""
+'未说明'
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from app.channels.message_bus import InboundMessageType, MessageBus, OutboundMes
 
 
 def _run(coro):
+    '未说明'
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(coro)
@@ -23,19 +24,24 @@ def _run(coro):
 
 
 class _MockResponse:
+    '未说明'
     def __init__(self, payload: dict[str, Any], content: bytes | None = None):
+        '未说明'
         self._payload = payload
         self.content = content or b""
         self.headers = payload.get("headers", {}) if isinstance(payload, dict) else {}
 
     def raise_for_status(self) -> None:
+        '未说明'
         return None
 
     def json(self) -> dict[str, Any]:
+        """处理JSON相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return self._payload
 
 
 class _MockAsyncClient:
+    '未说明'
     def __init__(
         self,
         responses: list[dict[str, Any]] | None = None,
@@ -47,6 +53,7 @@ class _MockAsyncClient:
         put_responses: list[dict[str, Any]] | None = None,
         **kwargs,
     ):
+        '未说明'
         self._responses = list(responses or [])
         self._post_responses = list(post_responses or self._responses)
         self._get_responses = list(get_responses or [])
@@ -63,35 +70,42 @@ class _MockAsyncClient:
         headers: dict[str, Any] | None = None,
         **kwargs,
     ):
+        '未说明'
         if self._post_calls is not None:
             self._post_calls.append({"url": url, "json": json or {}, "headers": headers or {}, **kwargs})
         payload = self._post_responses.pop(0) if self._post_responses else {"ret": 0}
         return _MockResponse(payload)
 
     async def get(self, url: str, params: dict[str, Any] | None = None, headers: dict[str, Any] | None = None, **kwargs):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         if self._get_calls is not None:
             self._get_calls.append({"url": url, "params": params or {}, "headers": headers or {}, **kwargs})
         payload = self._get_responses.pop(0) if self._get_responses else {"ret": 0}
         return _MockResponse(payload)
 
     async def put(self, url: str, content: bytes, headers: dict[str, Any] | None = None, **kwargs):
+        '未说明'
         if self._put_calls is not None:
             self._put_calls.append({"url": url, "content": content, "headers": headers or {}, **kwargs})
         payload = self._put_responses.pop(0) if self._put_responses else {"ret": 0}
         return _MockResponse(payload)
 
     async def aclose(self) -> None:
+        '未说明'
         return None
 
 
 def test_handle_update_publishes_private_chat_message():
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -120,13 +134,16 @@ def test_handle_update_publishes_private_chat_message():
 
 
 def test_handle_update_downloads_inbound_image(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -138,6 +155,7 @@ def test_handle_update_downloads_inbound_image(monkeypatch, tmp_path: Path):
         encrypted = channel.__class__.__dict__["_extract_image_file"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -175,13 +193,16 @@ def test_handle_update_downloads_inbound_image(monkeypatch, tmp_path: Path):
 
 
 def test_handle_update_downloads_inbound_png_with_png_extension(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -193,6 +214,7 @@ def test_handle_update_downloads_inbound_png_with_png_extension(monkeypatch, tmp
         encrypted = channel.__class__.__dict__["_extract_image_file"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -224,13 +246,16 @@ def test_handle_update_downloads_inbound_png_with_png_extension(monkeypatch, tmp
 
 
 def test_handle_update_preserves_text_and_ref_msg_with_image(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -241,6 +266,7 @@ def test_handle_update_preserves_text_and_ref_msg_with_image(monkeypatch, tmp_pa
         encrypted = channel.__class__.__dict__["_extract_image_file"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -275,13 +301,16 @@ def test_handle_update_preserves_text_and_ref_msg_with_image(monkeypatch, tmp_pa
 
 
 def test_handle_update_skips_image_without_url_or_key(tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -308,13 +337,16 @@ def test_handle_update_skips_image_without_url_or_key(tmp_path: Path):
 
 
 def test_handle_update_routes_slash_command_as_command():
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -336,13 +368,16 @@ def test_handle_update_routes_slash_command_as_command():
 
 
 def test_allowed_users_filter_blocks_non_whitelisted_sender():
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -363,11 +398,13 @@ def test_allowed_users_filter_blocks_non_whitelisted_sender():
 
 
 def test_connect_code_bypasses_allowed_users_filter(tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
     from deerflow.persistence.channel_connections import ChannelConnectionRepository, ChannelCredentialCipher
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
 
     async def go():
+        '未说明'
         from datetime import UTC, datetime, timedelta
 
         await init_engine("sqlite", url=f"sqlite+aiosqlite:///{tmp_path / 'wechat.db'}", sqlite_dir=str(tmp_path))
@@ -388,6 +425,7 @@ def test_connect_code_bypasses_allowed_users_filter(tmp_path: Path):
             published = []
 
             async def capture(msg):
+                '未说明'
                 published.append(msg)
 
             bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -423,12 +461,15 @@ def test_connect_code_bypasses_allowed_users_filter(tmp_path: Path):
 
 
 def test_send_uses_cached_context_token(monkeypatch):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(responses=[{"ret": 0}], post_calls=post_calls, **kwargs)
 
         monkeypatch.setattr("app.channels.wechat.httpx.AsyncClient", _client_factory)
@@ -458,12 +499,15 @@ def test_send_uses_cached_context_token(monkeypatch):
 
 
 def test_send_skips_when_context_token_missing(monkeypatch):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(responses=[{"ret": 0}], post_calls=post_calls, **kwargs)
 
         monkeypatch.setattr("app.channels.wechat.httpx.AsyncClient", _client_factory)
@@ -484,6 +528,7 @@ def test_send_skips_when_context_token_missing(monkeypatch):
 
 
 def test_protocol_helpers_build_expected_values():
+    '未说明'
     from app.channels.wechat import (
         MessageItemType,
         UploadMediaType,
@@ -506,6 +551,7 @@ def test_protocol_helpers_build_expected_values():
 
 
 def test_aes_roundtrip_encrypts_and_decrypts():
+    '未说明'
     from app.channels.wechat import _decrypt_aes_128_ecb, _encrypt_aes_128_ecb
 
     key = b"1234567890abcdef"
@@ -519,6 +565,7 @@ def test_aes_roundtrip_encrypts_and_decrypts():
 
 
 def test_build_upload_request_supports_no_need_thumb():
+    '未说明'
     from app.channels.wechat import UploadMediaType, WechatChannel
 
     channel = WechatChannel(bus=MessageBus(), config={"bot_token": "bot-token"})
@@ -541,14 +588,17 @@ def test_build_upload_request_supports_no_need_thumb():
 
 
 def test_send_file_uploads_and_sends_image(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
         put_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 post_calls=post_calls,
                 put_calls=put_calls,
@@ -609,13 +659,16 @@ def test_send_file_uploads_and_sends_image(monkeypatch, tmp_path: Path):
 
 
 def test_send_file_returns_false_without_upload_full_url(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 post_calls=post_calls,
                 post_responses=[
@@ -657,13 +710,16 @@ def test_send_file_returns_false_without_upload_full_url(monkeypatch, tmp_path: 
 
 
 def test_send_file_prefers_cdn_response_header_for_image(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 post_calls=post_calls,
                 post_responses=[
@@ -706,13 +762,16 @@ def test_send_file_prefers_cdn_response_header_for_image(monkeypatch, tmp_path: 
 
 
 def test_send_file_skips_non_image(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(post_calls=post_calls, **kwargs)
 
         monkeypatch.setattr("app.channels.wechat.httpx.AsyncClient", _client_factory)
@@ -740,14 +799,17 @@ def test_send_file_skips_non_image(monkeypatch, tmp_path: Path):
 
 
 def test_send_file_uploads_and_sends_regular_file(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
         put_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 post_calls=post_calls,
                 put_calls=put_calls,
@@ -800,13 +862,16 @@ def test_send_file_uploads_and_sends_regular_file(monkeypatch, tmp_path: Path):
 
 
 def test_send_regular_file_uses_cdn_upload_fallback_when_upload_full_url_missing(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 post_calls=post_calls,
                 post_responses=[
@@ -848,14 +913,17 @@ def test_send_regular_file_uses_cdn_upload_fallback_when_upload_full_url_missing
 
 
 def test_send_image_uses_post_even_when_upload_full_url_present(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
         put_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 post_calls=post_calls,
                 put_calls=put_calls,
@@ -900,13 +968,16 @@ def test_send_image_uses_post_even_when_upload_full_url_present(monkeypatch, tmp
 
 
 def test_send_file_blocks_disallowed_regular_file(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.message_bus import ResolvedAttachment
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(post_calls=post_calls, **kwargs)
 
         monkeypatch.setattr("app.channels.wechat.httpx.AsyncClient", _client_factory)
@@ -936,13 +1007,16 @@ def test_send_file_blocks_disallowed_regular_file(monkeypatch, tmp_path: Path):
 
 
 def test_handle_update_downloads_inbound_file(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -954,6 +1028,7 @@ def test_handle_update_downloads_inbound_file(monkeypatch, tmp_path: Path):
         encrypted = channel.__class__.__dict__["_extract_file_item"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -991,13 +1066,16 @@ def test_handle_update_downloads_inbound_file(monkeypatch, tmp_path: Path):
 
 
 def test_handle_update_downloads_inbound_file_with_media_aeskey_hex(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -1009,6 +1087,7 @@ def test_handle_update_downloads_inbound_file_with_media_aeskey_hex(monkeypatch,
         encrypted = channel.__class__.__dict__["_extract_file_item"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -1041,13 +1120,16 @@ def test_handle_update_downloads_inbound_file_with_media_aeskey_hex(monkeypatch,
 
 
 def test_handle_update_downloads_inbound_file_with_unpadded_item_aes_key(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -1060,6 +1142,7 @@ def test_handle_update_downloads_inbound_file_with_unpadded_item_aes_key(monkeyp
         encrypted = channel.__class__.__dict__["_extract_file_item"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -1090,13 +1173,16 @@ def test_handle_update_downloads_inbound_file_with_unpadded_item_aes_key(monkeyp
 
 
 def test_handle_update_downloads_inbound_file_with_media_aes_key_base64_of_hex(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -1109,6 +1195,7 @@ def test_handle_update_downloads_inbound_file_with_media_aes_key_base64_of_hex(m
         encrypted = channel.__class__.__dict__["_extract_file_item"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -1141,13 +1228,16 @@ def test_handle_update_downloads_inbound_file_with_media_aes_key_base64_of_hex(m
 
 
 def test_handle_update_skips_disallowed_inbound_file(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         bus = MessageBus()
         published = []
 
         async def capture(msg):
+            '未说明'
             published.append(msg)
 
         bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -1159,6 +1249,7 @@ def test_handle_update_skips_disallowed_inbound_file(monkeypatch, tmp_path: Path
         encrypted = channel.__class__.__dict__["_extract_file_item"].__globals__["_encrypt_aes_128_ecb"](plaintext, aes_key)
 
         async def _fake_download(_url: str, *, timeout: float | None = None):
+            '未说明'
             return encrypted
 
         channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -1188,12 +1279,15 @@ def test_handle_update_skips_disallowed_inbound_file(monkeypatch, tmp_path: Path
 
 
 def test_poll_loop_updates_server_timeout(monkeypatch):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         post_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 post_calls=post_calls,
                 post_responses=[
@@ -1220,6 +1314,7 @@ def test_poll_loop_updates_server_timeout(monkeypatch):
         channel._running = True
 
         async def _fake_handle_update(_raw):
+            '未说明'
             channel._running = False
             return None
 
@@ -1235,6 +1330,7 @@ def test_poll_loop_updates_server_timeout(monkeypatch):
 
 
 def test_state_cursor_is_loaded_from_disk(tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     state_dir = tmp_path / "wechat-state"
@@ -1256,6 +1352,7 @@ def test_state_cursor_is_loaded_from_disk(tmp_path: Path):
 
 
 def test_auth_state_is_loaded_from_disk(tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     state_dir = tmp_path / "wechat-state"
@@ -1278,12 +1375,15 @@ def test_auth_state_is_loaded_from_disk(tmp_path: Path):
 
 
 def test_qrcode_login_binds_and_persists_auth_state(monkeypatch, tmp_path: Path):
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     async def go():
+        '未说明'
         get_calls: list[dict[str, Any]] = []
 
         def _client_factory(*args, **kwargs):
+            '未说明'
             return _MockAsyncClient(
                 get_calls=get_calls,
                 get_responses=[
@@ -1324,14 +1424,7 @@ def test_qrcode_login_binds_and_persists_auth_state(monkeypatch, tmp_path: Path)
 
 
 def test_save_auth_state_tightens_preexisting_loose_file(tmp_path: Path):
-    """A world-readable auth file is replaced by an owner-only one, atomically.
-
-    The bot_token must never be observable at loose permissions: the atomic
-    0o600-temp + ``Path.replace`` path swaps in a fresh owner-only inode rather
-    than truncating the existing 0o644 file in place. Seeding the destination at
-    0o644 first means a regression back to ``write_text`` + late ``chmod`` would
-    leave a detectable window (and, here, the temp-file artifact behind).
-    """
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     state_dir = tmp_path / "wechat-state"
@@ -1353,12 +1446,7 @@ def test_save_auth_state_tightens_preexisting_loose_file(tmp_path: Path):
 
 
 def test_save_auth_state_chmod_failure_is_logged_not_warned(tmp_path: Path, caplog):
-    """A chmod failure on a perms-less filesystem must not look like a persist failure.
-
-    With the post-replace chmod split into its own try/except, a chmod ``OSError``
-    is logged at debug while the JSON is genuinely on disk — operators must not see
-    the misleading ``failed to persist`` warning that the shared try/except produced.
-    """
+    '未说明'
     from app.channels.wechat import WechatChannel
 
     state_dir = tmp_path / "wechat-state"
@@ -1370,6 +1458,7 @@ def test_save_auth_state_chmod_failure_is_logged_not_warned(tmp_path: Path, capl
     real_chmod = Path.chmod
 
     def chmod_spy(self: Path, mode: int, *args, **kwargs):
+        '未说明'
         if self.suffix == ".json":
             raise OSError("chmod unsupported on this filesystem")
         return real_chmod(self, mode, *args, **kwargs)

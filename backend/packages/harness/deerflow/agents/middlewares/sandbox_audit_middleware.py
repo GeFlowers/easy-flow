@@ -1,4 +1,4 @@
-"""SandboxAuditMiddleware - bash command security auditing."""
+'定义 sandbox_audit_middleware 模块提供的职责与可复用接口。\n\nSandboxAuditMiddleware - bash command security auditing.'
 
 import json
 import logging
@@ -62,15 +62,7 @@ _MEDIUM_RISK_PATTERNS: list[re.Pattern[str]] = [
 
 
 def _split_compound_command(command: str) -> list[str]:
-    """Split a compound command into sub-commands (quote-aware).
-
-    Scans the raw command string so unquoted shell control operators are
-    recognised even when they are not surrounded by whitespace
-    (e.g. ``safe;rm -rf /`` or ``rm -rf /&&echo ok``). Operators inside
-    quotes are ignored. If the command ends with an unclosed quote or a
-    dangling escape, return the whole command unchanged (fail-closed —
-    safer to classify the unsplit string than silently drop parts).
-    """
+    '执行 _split_compound_command 的明确职责，并返回与调用约定一致的结果。\n\nSplit a compound command into sub-commands (quote-aware).\n\n    Scans the raw command string so unquoted shell control operators are\n    recognised even when they are not surrounded by whitespace\n    (e.g. ``safe;rm -rf /`` or ``rm -rf /&&echo ok``). Operators inside\n    quotes are ignored. If the command ends with an unclosed quote or a\n    dangling escape, return the whole command unchanged (fail-closed —\n    safer to classify the unsplit string than silently drop parts).\n    '
     parts: list[str] = []
     current: list[str] = []
     in_single_quote = False
@@ -135,7 +127,7 @@ def _split_compound_command(command: str) -> list[str]:
 
 
 def _classify_single_command(command: str) -> str:
-    """Classify a single (non-compound) command. Return 'block', 'warn', or 'pass'."""
+    "执行 _classify_single_command 的明确职责，并返回与调用约定一致的结果。\n\nClassify a single (non-compound) command. Return 'block', 'warn', or 'pass'."
     normalized = " ".join(command.split())
 
     for pattern in _HIGH_RISK_PATTERNS:
@@ -162,16 +154,7 @@ def _classify_single_command(command: str) -> str:
 
 
 def _classify_command(command: str) -> str:
-    """Return 'block', 'warn', or 'pass'.
-
-    Strategy:
-    1. First scan the *whole* raw command against high-risk patterns. This
-       catches structural attacks like ``while true; do bash & done`` or
-       ``:(){ :|:& };:`` that span multiple shell statements — splitting them
-       on ``;`` would destroy the pattern context.
-    2. Then split compound commands (e.g. ``cmd1 && cmd2 ; cmd3``) and
-       classify each sub-command independently. The most severe verdict wins.
-    """
+    "执行 _classify_command 的明确职责，并返回与调用约定一致的结果。\n\nReturn 'block', 'warn', or 'pass'.\n\n    Strategy:\n    1. First scan the *whole* raw command against high-risk patterns. This\n       catches structural attacks like ``while true; do bash & done`` or\n       ``:(){ :|:& };:`` that span multiple shell statements — splitting them\n       on ``;`` would destroy the pattern context.\n    2. Then split compound commands (e.g. ``cmd1 && cmd2 ; cmd3``) and\n       classify each sub-command independently. The most severe verdict wins.\n    "
     # Pass 1: whole-command high-risk scan (catches multi-statement patterns)
     normalized = " ".join(command.split())
     for pattern in _HIGH_RISK_PATTERNS:
@@ -196,21 +179,7 @@ def _classify_command(command: str) -> str:
 
 
 class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
-    """Bash command security auditing middleware.
-
-    For every ``bash`` tool call:
-    1. **Command classification**: regex + shlex analysis grades commands as
-       high-risk (block), medium-risk (warn), or safe (pass).
-    2. **Audit log**: every bash call is recorded as a structured JSON entry
-       via the standard logger (visible in gateway.log).
-
-    High-risk commands (e.g. ``rm -rf /``, ``curl url | bash``) are blocked:
-    the handler is not called and an error ``ToolMessage`` is returned so the
-    agent loop can continue gracefully.
-
-    Medium-risk commands (e.g. ``pip install``, ``chmod 777``) are executed
-    normally; a warning is appended to the tool result so the LLM is aware.
-    """
+    '封装 SandboxAuditMiddleware 的状态、协作关系与公开操作。\n\nBash command security auditing middleware.\n\n    For every ``bash`` tool call:\n    1. **Command classification**: regex + shlex analysis grades commands as\n       high-risk (block), medium-risk (warn), or safe (pass).\n    2. **Audit log**: every bash call is recorded as a structured JSON entry\n       via the standard logger (visible in gateway.log).\n\n    High-risk commands (e.g. ``rm -rf /``, ``curl url | bash``) are blocked:\n    the handler is not called and an error ``ToolMessage`` is returned so the\n    agent loop can continue gracefully.\n\n    Medium-risk commands (e.g. ``pip install``, ``chmod 777``) are executed\n    normally; a warning is appended to the tool result so the LLM is aware.\n    '
 
     state_schema = ThreadState
 
@@ -219,6 +188,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
     # ------------------------------------------------------------------
 
     def _get_thread_id(self, request: ToolCallRequest) -> str | None:
+        '执行 _get_thread_id 的明确职责，并返回与调用约定一致的结果'
         runtime = request.runtime  # ToolRuntime; may be None-like in tests
         if runtime is None:
             return None
@@ -232,6 +202,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
     _AUDIT_COMMAND_LIMIT = 200
 
     def _write_audit(self, thread_id: str | None, command: str, verdict: str, *, truncate: bool = False) -> None:
+        '执行 _write_audit 的明确职责，并返回与调用约定一致的结果'
         audited_command = command
         if truncate and len(command) > self._AUDIT_COMMAND_LIMIT:
             audited_command = f"{command[: self._AUDIT_COMMAND_LIMIT]}... ({len(command)} chars)"
@@ -244,6 +215,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
         logger.info("[SandboxAudit] %s", json.dumps(record, ensure_ascii=False))
 
     def _build_block_message(self, request: ToolCallRequest, reason: str) -> ToolMessage:
+        '执行 _build_block_message 的明确职责，并返回与调用约定一致的结果'
         tool_call_id = str(request.tool_call.get("id") or "missing_id")
         return ToolMessage(
             content=f"Command blocked: {reason}. Please use a safer alternative approach.",
@@ -253,7 +225,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
         )
 
     def _append_warn_to_result(self, result: ToolMessage | Command, command: str) -> ToolMessage | Command:
-        """Append a warning note to the tool result for medium-risk commands."""
+        '执行 _append_warn_to_result 的明确职责，并返回与调用约定一致的结果。\n\nAppend a warning note to the tool result for medium-risk commands.'
         if not isinstance(result, ToolMessage):
             return result
         warning = f"\n\n⚠️ Warning: `{command}` is a medium-risk command that may modify the runtime environment."
@@ -279,7 +251,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
     _MAX_COMMAND_LENGTH = 10_000
 
     def _validate_input(self, command: str) -> str | None:
-        """Return ``None`` if *command* is acceptable, else a rejection reason."""
+        '执行 _validate_input 的明确职责，并返回与调用约定一致的结果。\n\nReturn ``None`` if *command* is acceptable, else a rejection reason.'
         if not command.strip():
             return "empty command"
         if len(command) > self._MAX_COMMAND_LENGTH:
@@ -293,11 +265,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
     # ------------------------------------------------------------------
 
     def _pre_process(self, request: ToolCallRequest) -> tuple[str, str | None, str, str | None]:
-        """
-        Returns (command, thread_id, verdict, reject_reason).
-        verdict is 'block', 'warn', or 'pass'.
-        reject_reason is non-None only for input sanitisation rejections.
-        """
+        "执行 _pre_process 的明确职责，并返回与调用约定一致的结果。\n\n\n        Returns (command, thread_id, verdict, reject_reason).\n        verdict is 'block', 'warn', or 'pass'.\n        reject_reason is non-None only for input sanitisation rejections.\n        "
         args = request.tool_call.get("args", {})
         raw_command = args.get("command")
         command = raw_command if isinstance(raw_command, str) else ""
@@ -333,6 +301,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
+        '执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果'
         if request.tool_call.get("name") != "bash":
             return handler(request)
 
@@ -351,6 +320,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
+        '执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果'
         if request.tool_call.get("name") != "bash":
             return await handler(request)
 

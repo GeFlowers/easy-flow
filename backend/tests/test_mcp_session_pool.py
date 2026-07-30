@@ -1,4 +1,4 @@
-"""Tests for the MCP persistent-session pool."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import asyncio
 import logging
@@ -13,19 +13,20 @@ from deerflow.mcp.session_pool import MCPSessionPool, get_session_pool, reset_se
 
 @pytest.fixture(autouse=True)
 def _reset_pool():
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     reset_session_pool()
     yield
     reset_session_pool()
 
 
 # ---------------------------------------------------------------------------
-# MCPSessionPool unit tests
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_get_session_creates_new():
-    """First call for a key creates a new session."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
 
     mock_session = AsyncMock()
@@ -42,7 +43,7 @@ async def test_get_session_creates_new():
 
 @pytest.mark.asyncio
 async def test_get_session_reuses_existing():
-    """Second call for the same key returns the cached session."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
 
     mock_session = AsyncMock()
@@ -55,23 +56,26 @@ async def test_get_session_reuses_existing():
         s2 = await pool.get_session("server", "thread-1", {"transport": "stdio", "command": "x", "args": []})
 
     assert s1 is s2
-    # Only one session should have been created.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert mock_cm.__aenter__.await_count == 1
 
 
 @pytest.mark.asyncio
 async def test_different_scope_creates_different_session():
-    """Different scope keys get different sessions."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
 
     sessions = [AsyncMock(), AsyncMock()]
     idx = 0
 
     class CmFactory:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.enter_count = 0
 
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             nonlocal idx
             s = sessions[idx]
             idx += 1
@@ -79,6 +83,7 @@ async def test_different_scope_creates_different_session():
             return s
 
         async def __aexit__(self, *args):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return False
 
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=lambda *a, **kw: CmFactory()):
@@ -92,24 +97,29 @@ async def test_different_scope_creates_different_session():
 
 @pytest.mark.asyncio
 async def test_lru_eviction():
-    """Oldest entries are evicted when the pool is full."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     pool.MAX_SESSIONS = 2
 
     class CmFactory:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.closed = False
 
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return AsyncMock()
 
         async def __aexit__(self, *args):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.closed = True
             return False
 
     cms: list[CmFactory] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = CmFactory()
         cms.append(cm)
         return cm
@@ -117,7 +127,7 @@ async def test_lru_eviction():
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
         await pool.get_session("s", "t1", {"transport": "stdio", "command": "x", "args": []})
         await pool.get_session("s", "t2", {"transport": "stdio", "command": "x", "args": []})
-        # Pool is full (2). Adding t3 should evict t1.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await pool.get_session("s", "t3", {"transport": "stdio", "command": "x", "args": []})
 
     assert cms[0].closed is True
@@ -127,23 +137,28 @@ async def test_lru_eviction():
 
 @pytest.mark.asyncio
 async def test_close_scope():
-    """close_scope shuts down sessions for a specific scope key."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
 
     class CmFactory:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.closed = False
 
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return AsyncMock()
 
         async def __aexit__(self, *args):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.closed = True
             return False
 
     cms: list[CmFactory] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = CmFactory()
         cms.append(cm)
         return cm
@@ -157,29 +172,34 @@ async def test_close_scope():
     assert cms[0].closed is True
     assert cms[1].closed is False
 
-    # t2 session still exists.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert ("s", "t2") in pool._entries
 
 
 @pytest.mark.asyncio
 async def test_close_all():
-    """close_all shuts down every session."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
 
     class CmFactory:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.closed = False
 
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return AsyncMock()
 
         async def __aexit__(self, *args):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.closed = True
             return False
 
     cms: list[CmFactory] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = CmFactory()
         cms.append(cm)
         return cm
@@ -195,19 +215,19 @@ async def test_close_all():
 
 
 # ---------------------------------------------------------------------------
-# Singleton helpers
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_get_session_pool_singleton():
-    """get_session_pool returns the same instance."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     p1 = get_session_pool()
     p2 = get_session_pool()
     assert p1 is p2
 
 
 def test_reset_session_pool():
-    """reset_session_pool clears the singleton."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     p1 = get_session_pool()
     reset_session_pool()
     p2 = get_session_pool()
@@ -215,20 +235,21 @@ def test_reset_session_pool():
 
 
 # ---------------------------------------------------------------------------
-# Integration: _make_session_pool_tool uses the pool
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_wrapping():
-    """The wrapper tool delegates to a pool-managed session."""
-    # Build a dummy StructuredTool (as returned by langchain-mcp-adapters).
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -250,7 +271,7 @@ async def test_session_pool_tool_wrapping():
     with patch("langchain_mcp_adapters.sessions.create_session", return_value=mock_cm):
         wrapped = _make_session_pool_tool(original_tool, "playwright", connection)
 
-        # Simulate a tool call with a runtime context containing thread_id.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mock_runtime = MagicMock()
         mock_runtime.context = {"thread_id": "thread-42"}
         mock_runtime.config = {}
@@ -262,7 +283,7 @@ async def test_session_pool_tool_wrapping():
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_pins_cwd_and_temp_env(tmp_path):
-    """Stdio MCP subprocesses should write relative and temp outputs under user-data."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -270,6 +291,7 @@ async def test_session_pool_tool_pins_cwd_and_temp_env(tmp_path):
     from deerflow.mcp.tools import _MCP_TMP_SUBDIR, _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -314,7 +336,7 @@ async def test_session_pool_tool_pins_cwd_and_temp_env(tmp_path):
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_does_not_override_explicit_tmpdir(tmp_path):
-    """An operator-provided TMPDIR must win over our injected default."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -322,6 +344,7 @@ async def test_session_pool_tool_does_not_override_explicit_tmpdir(tmp_path):
     from deerflow.mcp.tools import _MCP_TMP_SUBDIR, _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -352,14 +375,14 @@ async def test_session_pool_tool_does_not_override_explicit_tmpdir(tmp_path):
         await wrapped.coroutine(runtime=mock_runtime, url="https://example.com")
 
     session_connection = create_session.call_args.args[0]
-    # Operator-provided TMPDIR is preserved; TMP/TEMP still get our default.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert session_connection["env"]["TMPDIR"] == "/operator/tmp"
     assert session_connection["env"]["TMP"].endswith(_MCP_TMP_SUBDIR)
 
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_does_not_override_explicit_cwd(tmp_path):
-    """An operator-provided cwd must win over our injected workspace default."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -367,6 +390,7 @@ async def test_session_pool_tool_does_not_override_explicit_cwd(tmp_path):
     from deerflow.mcp.tools import _MCP_TMP_SUBDIR, _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -407,7 +431,7 @@ async def test_session_pool_tool_does_not_override_explicit_cwd(tmp_path):
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_skips_fs_work_for_non_stdio_transport(tmp_path):
-    """SSE/HTTP transports must not get a pinned cwd/temp env or workspace dirs."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -415,6 +439,7 @@ async def test_session_pool_tool_skips_fs_work_for_non_stdio_transport(tmp_path)
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -447,15 +472,15 @@ async def test_session_pool_tool_skips_fs_work_for_non_stdio_transport(tmp_path)
     session_connection = create_session.call_args.args[0]
     assert "cwd" not in session_connection
     assert session_connection["env"] == {"KEEP": "1"}
-    # No filesystem work at all: get_paths() is never consulted and no thread
-    # workspace directory is created for non-stdio transports.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     get_paths.assert_not_called()
     assert not paths.sandbox_work_dir("thread-42", user_id="user-7").exists()
 
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_skips_after_walk_when_no_text_content(tmp_path):
-    """With no text content to rewrite, the post-call snapshot diff must be skipped."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -463,6 +488,7 @@ async def test_session_pool_tool_skips_after_walk_when_no_text_content(tmp_path)
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -473,8 +499,8 @@ async def test_session_pool_tool_skips_after_walk_when_no_text_content(tmp_path)
         response_format="content_and_artifact",
     )
 
-    # An image-only result carries no text, so bare-filename correlation has
-    # nothing to do and the second recursive walk should not run.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     from mcp.types import ImageContent
 
     image_result = MagicMock(content=[ImageContent(type="image", data="QUJD", mimeType="image/png")], isError=False, structuredContent=None)
@@ -503,7 +529,7 @@ async def test_session_pool_tool_skips_after_walk_when_no_text_content(tmp_path)
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_runs_after_walk_when_text_content_present(tmp_path):
-    """A text result must trigger the post-call snapshot diff for path rewriting."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -511,6 +537,7 @@ async def test_session_pool_tool_runs_after_walk_when_text_content_present(tmp_p
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -549,16 +576,14 @@ async def test_session_pool_tool_runs_after_walk_when_text_content_present(tmp_p
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_forwards_interceptor_headers():
-    """Regression for PR #3294: when an interceptor sets ``request.headers``, the
-    pooled stdio call must forward them via ``meta={"headers": ...}`` so downstream
-    MCP servers can read auth/context headers.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         x: int = Field(..., description="x")
 
     original_tool = StructuredTool(
@@ -576,6 +601,7 @@ async def test_session_pool_tool_forwards_interceptor_headers():
     mock_cm.__aexit__ = AsyncMock(return_value=False)
 
     async def header_interceptor(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request.override(headers={"X-User-Id": "u-42"}))
 
     with patch("langchain_mcp_adapters.sessions.create_session", return_value=mock_cm):
@@ -592,15 +618,14 @@ async def test_session_pool_tool_forwards_interceptor_headers():
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_no_headers_omits_meta():
-    """When no interceptor sets headers, the pooled call must not pass a ``meta``
-    kwarg (falls back to the plain two-argument ``call_tool``).
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         x: int = Field(..., description="x")
 
     original_tool = StructuredTool(
@@ -618,6 +643,7 @@ async def test_session_pool_tool_no_headers_omits_meta():
     mock_cm.__aexit__ = AsyncMock(return_value=False)
 
     async def passthrough_interceptor(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request)
 
     with patch("langchain_mcp_adapters.sessions.create_session", return_value=mock_cm):
@@ -634,17 +660,20 @@ async def test_session_pool_tool_no_headers_omits_meta():
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_ignores_unsupported_header_type(caplog):
-    """Defensive path: non-mapping truthy headers should be ignored safely."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         x: int = Field(..., description="x")
 
     class TruthyHeaders:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __bool__(self) -> bool:
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return True
 
     original_tool = StructuredTool(
@@ -662,6 +691,7 @@ async def test_session_pool_tool_ignores_unsupported_header_type(caplog):
     mock_cm.__aexit__ = AsyncMock(return_value=False)
 
     async def invalid_header_interceptor(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request.override(headers=TruthyHeaders()))
 
     with patch("langchain_mcp_adapters.sessions.create_session", return_value=mock_cm):
@@ -679,13 +709,14 @@ async def test_session_pool_tool_ignores_unsupported_header_type(caplog):
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_extracts_thread_id():
-    """Thread ID is extracted from runtime.config when not in context."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         x: int = Field(..., description="x")
 
     original_tool = StructuredTool(
@@ -711,22 +742,23 @@ async def test_session_pool_tool_extracts_thread_id():
 
         await wrapped.coroutine(runtime=mock_runtime, x=1)
 
-    # Verify the session was created with the correct scope key.
-    # The scope key is "{user_id}:{thread_id}"; the autouse fixture sets
-    # the effective user to "test-user-autouse".
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     pool = get_session_pool()
     assert ("server", "test-user-autouse:from-config") in pool._entries
 
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_default_scope():
-    """When no thread_id is available, 'default' is used as scope key."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         x: int = Field(..., description="x")
 
     original_tool = StructuredTool(
@@ -746,7 +778,7 @@ async def test_session_pool_tool_default_scope():
     with patch("langchain_mcp_adapters.sessions.create_session", return_value=mock_cm):
         wrapped = _make_session_pool_tool(original_tool, "server", {"transport": "stdio", "command": "x", "args": []})
 
-        # No thread_id in runtime at all.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await wrapped.coroutine(runtime=None, x=1)
 
     pool = get_session_pool()
@@ -755,13 +787,14 @@ async def test_session_pool_tool_default_scope():
 
 @pytest.mark.asyncio
 async def test_session_pool_tool_get_config_fallback():
-    """When runtime is None, get_config() provides thread_id as fallback."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import _make_session_pool_tool
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         x: int = Field(..., description="x")
 
     original_tool = StructuredTool(
@@ -786,7 +819,7 @@ async def test_session_pool_tool_get_config_fallback():
     ):
         wrapped = _make_session_pool_tool(original_tool, "server", {"transport": "stdio", "command": "x", "args": []})
 
-        # runtime=None — get_config() fallback should provide thread_id
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await wrapped.coroutine(runtime=None, x=1)
 
     pool = get_session_pool()
@@ -794,7 +827,7 @@ async def test_session_pool_tool_get_config_fallback():
 
 
 def test_session_pool_tool_sync_wrapper_path_is_safe():
-    """Sync wrapper (tool.func) invocation doesn't crash on cross-loop access."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -802,6 +835,7 @@ def test_session_pool_tool_sync_wrapper_path_is_safe():
     from deerflow.tools.sync import make_sync_tool_wrapper
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         url: str = Field(..., description="url")
 
     original_tool = StructuredTool(
@@ -822,30 +856,31 @@ def test_session_pool_tool_sync_wrapper_path_is_safe():
 
     with patch("langchain_mcp_adapters.sessions.create_session", return_value=mock_cm):
         wrapped = _make_session_pool_tool(original_tool, "playwright", connection)
-        # Attach the sync wrapper exactly as get_mcp_tools() does.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         wrapped.func = make_sync_tool_wrapper(wrapped.coroutine, wrapped.name)
 
-        # Call via the sync path (asyncio.run in a worker thread).
-        # runtime is not supplied so _extract_thread_id falls back to "default".
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         wrapped.func(url="https://example.com")
 
     mock_session.call_tool.assert_called_once_with("navigate", {"url": "https://example.com"})
 
 
 # ---------------------------------------------------------------------------
-# get_mcp_tools: HTTP transport should NOT be pooled
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_http_transport_tools_not_pooled():
-    """HTTP/SSE transport tools should NOT be wrapped with the session pool."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import get_mcp_tools
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         query: str = Field(..., description="query")
 
     http_tool = StructuredTool(
@@ -892,6 +927,7 @@ async def test_http_transport_tools_not_pooled():
         mock_client_instance = MockClient.return_value
 
         async def get_tools_for_server(*, server_name: str | None = None):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             if server_name == "myserver":
                 return [http_tool]
             if server_name == "playwright":
@@ -903,15 +939,15 @@ async def test_http_transport_tools_not_pooled():
         tools = await get_mcp_tools()
 
     pool = get_session_pool()
-    # Tool discovery is lazy: no pooled sessions are created until a wrapped tool is invoked.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert list(pool._entries.keys()) == []
 
-    # Verify the HTTP tool was NOT wrapped with the pool (it's the original tool).
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     http_tools = [t for t in tools if t.name == "myserver_search"]
     assert len(http_tools) == 1
     assert http_tools[0].coroutine is http_tool.coroutine
 
-    # Verify the stdio tool WAS wrapped with the pool.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     stdio_tools = [t for t in tools if t.name == "playwright_navigate"]
     assert len(stdio_tools) == 1
     assert stdio_tools[0].coroutine is not stdio_tool.coroutine
@@ -919,7 +955,7 @@ async def test_http_transport_tools_not_pooled():
 
 @pytest.mark.asyncio
 async def test_non_stdio_tool_call_timeout_warns_that_it_is_ignored(caplog):
-    """HTTP/SSE servers should not silently ignore stdio-only tool_call_timeout."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -927,6 +963,7 @@ async def test_non_stdio_tool_call_timeout_warns_that_it_is_ignored(caplog):
     from deerflow.mcp.tools import get_mcp_tools
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         query: str = Field(..., description="query")
 
     http_tool = StructuredTool(
@@ -969,19 +1006,13 @@ async def test_non_stdio_tool_call_timeout_warns_that_it_is_ignored(caplog):
 
 
 # ---------------------------------------------------------------------------
-# Regression for PR #3843: tool_call_timeout must not leak into connection dict
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_stdio_tool_call_timeout_does_not_raise_typeerror():
-    """A stdio server with tool_call_timeout must load tools without TypeError.
-
-    The timeout must be read from McpServerConfig (extensions_config), NOT from
-    the connection dict that langchain's create_session receives.  If it leaks
-    into the connection dict, _create_stdio_session() raises TypeError.
-    Regression for PR #3843 P1 bug.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
@@ -989,6 +1020,7 @@ async def test_stdio_tool_call_timeout_does_not_raise_typeerror():
     from deerflow.mcp.tools import get_mcp_tools
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         query: str = Field(..., description="query")
 
     stdio_tool = StructuredTool(
@@ -1004,8 +1036,8 @@ async def test_stdio_tool_call_timeout_does_not_raise_typeerror():
     mock_cm.__aenter__ = AsyncMock(return_value=mock_session)
     mock_cm.__aexit__ = AsyncMock(return_value=False)
 
-    # Use real McpServerConfig so tool_call_timeout is a real field value,
-    # not a MagicMock that might accidentally work.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     server_cfg = McpServerConfig(
         type="stdio",
         command="biomcp",
@@ -1018,7 +1050,7 @@ async def test_stdio_tool_call_timeout_does_not_raise_typeerror():
     extensions_config.mcp_servers = {"biomcp": server_cfg}
     extensions_config.model_extra = {}
 
-    # Connection dict must NOT contain tool_call_timeout — this is the key assertion.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     servers_config = {
         "biomcp": {"transport": "stdio", "command": "biomcp", "args": ["serve"]},
     }
@@ -1034,41 +1066,37 @@ async def test_stdio_tool_call_timeout_does_not_raise_typeerror():
         mock_client_instance = MockClient.return_value
         mock_client_instance.get_tools = AsyncMock(return_value=[stdio_tool])
 
-        # This must NOT raise TypeError from _create_stdio_session()
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         tools = await get_mcp_tools()
 
     assert len(tools) == 1
-    # The tool should be wrapped with session pool (it's stdio)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert tools[0].coroutine is not stdio_tool.coroutine
 
-    # Verify the connection dict passed to the pool does NOT contain tool_call_timeout
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "tool_call_timeout" not in servers_config["biomcp"]
 
 
 # ---------------------------------------------------------------------------
-# Regression for #3379: cancel scope must be exited in the entering task
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 class _CancelScopeCm:
-    """Fake session context manager that mimics anyio's cancel-scope rule.
-
-    ``ClientSession`` is built on an anyio task group, which requires the cancel
-    scope to be exited from the *same asyncio task* that entered it. This fake
-    records the task that runs ``__aenter__`` and raises the exact RuntimeError
-    anyio would raise if ``__aexit__`` runs in a different task — reproducing the
-    crash reported in GitHub issue #3379.
-    """
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def __init__(self) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.enter_task: object | None = None
         self.closed = False
 
     async def __aenter__(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.enter_task = asyncio.current_task()
         return AsyncMock()
 
     async def __aexit__(self, *args):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if asyncio.current_task() is not self.enter_task:
             raise RuntimeError("Attempted to exit cancel scope in a different task than it was entered in")
         self.closed = True
@@ -1076,24 +1104,18 @@ class _CancelScopeCm:
 
 
 async def _get_session_in_own_task(pool, *args):
-    """Create a pooled session from a *dedicated* child task.
-
-    In production every stdio session is entered from its own short-lived task
-    (the sync-tool path runs each call through a fresh ``asyncio.run``). This
-    helper reproduces that so the close paths are exercised from a *different*
-    task than the one that entered the session — the exact condition that
-    triggered #3379.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return await asyncio.create_task(pool.get_session(*args))
 
 
 @pytest.mark.asyncio
 async def test_close_all_does_not_cross_tasks():
-    """close_all must not raise the cross-task cancel-scope RuntimeError (#3379)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     cms: list[_CancelScopeCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _CancelScopeCm()
         cms.append(cm)
         return cm
@@ -1102,8 +1124,8 @@ async def test_close_all_does_not_cross_tasks():
         await _get_session_in_own_task(pool, "s1", "t1", {"transport": "stdio", "command": "x", "args": []})
         await _get_session_in_own_task(pool, "s2", "t2", {"transport": "stdio", "command": "x", "args": []})
 
-    # close_all runs in this task, which is *not* the task that entered either
-    # session. The owner task must perform __aexit__ so each CM closes cleanly.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await pool.close_all()
 
     assert all(cm.closed for cm in cms)
@@ -1112,11 +1134,12 @@ async def test_close_all_does_not_cross_tasks():
 
 @pytest.mark.asyncio
 async def test_close_scope_does_not_cross_tasks():
-    """close_scope must respect the same-task cancel-scope rule (#3379)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     cms: list[_CancelScopeCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _CancelScopeCm()
         cms.append(cm)
         return cm
@@ -1134,12 +1157,13 @@ async def test_close_scope_does_not_cross_tasks():
 
 @pytest.mark.asyncio
 async def test_lru_eviction_does_not_cross_tasks():
-    """LRU eviction must close the victim without a cross-task RuntimeError (#3379)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     pool.MAX_SESSIONS = 2
     cms: list[_CancelScopeCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _CancelScopeCm()
         cms.append(cm)
         return cm
@@ -1147,8 +1171,8 @@ async def test_lru_eviction_does_not_cross_tasks():
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
         await _get_session_in_own_task(pool, "s", "t1", {"transport": "stdio", "command": "x", "args": []})
         await _get_session_in_own_task(pool, "s", "t2", {"transport": "stdio", "command": "x", "args": []})
-        # Adding t3 evicts t1 — its own owner task must run __aexit__, even
-        # though the eviction is driven from t3's get_session call.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await _get_session_in_own_task(pool, "s", "t3", {"transport": "stdio", "command": "x", "args": []})
 
     assert cms[0].closed is True
@@ -1157,48 +1181,48 @@ async def test_lru_eviction_does_not_cross_tasks():
 
 
 def test_close_all_sync_across_loops_does_not_cross_tasks():
-    """close_all_sync, the path hit by the sync tool wrapper, must close sessions
-    created in earlier (now-finished) asyncio.run loops without crashing (#3379).
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     cms: list[_CancelScopeCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _CancelScopeCm()
         cms.append(cm)
         return cm
 
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
-        # Simulate the sync-tool path: a session created inside one short-lived
-        # event loop, then a second one in a different loop.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         asyncio.run(pool.get_session("s", "t1", {"transport": "stdio", "command": "x", "args": []}))
         asyncio.run(pool.get_session("s", "t2", {"transport": "stdio", "command": "x", "args": []}))
 
-    # The owning loops are already closed; close_all_sync must not raise.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     pool.close_all_sync()
 
     assert len(pool._entries) == 0
 
 
 def test_get_session_replaces_session_from_closed_loop():
-    """A pooled session whose owning loop has closed is evicted and recreated."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     cms: list[_CancelScopeCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _CancelScopeCm()
         cms.append(cm)
         return cm
 
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
-        # First session created in a throwaway loop that is torn down by
-        # asyncio.run (mirrors the sync-tool path). asyncio.run cancels the
-        # pending owner task and runs its __aexit__ on the same loop.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         asyncio.run(pool.get_session("s", "t1", {"transport": "stdio", "command": "x", "args": []}))
         assert ("s", "t1") in pool._entries
 
-        # Now request the same key from a fresh loop: the stale entry (closed
-        # loop) must be evicted and replaced with a fresh session.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         session = asyncio.run(pool.get_session("s", "t1", {"transport": "stdio", "command": "x", "args": []}))
 
     assert session is not None
@@ -1207,59 +1231,55 @@ def test_get_session_replaces_session_from_closed_loop():
 
 
 class _BlockingInitCm:
-    """Fake session CM whose ``initialize`` blocks until released.
-
-    Lets a test cancel ``get_session`` while the owner task is still
-    initializing, reproducing the caller-cancellation window.
-    """
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def __init__(self, gate: asyncio.Event) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._gate = gate
         self.entered = False
         self.closed = False
 
     async def __aenter__(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.entered = True
         session = MagicMock()
         session.initialize = self._initialize
         return session
 
     async def _initialize(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         await self._gate.wait()
 
     async def __aexit__(self, *args):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.closed = True
         return False
 
 
 @pytest.mark.asyncio
 async def test_get_session_cancelled_while_initializing_does_not_leak():
-    """Cancelling get_session mid-init must not leak the owner task/session (#3379 CR).
-
-    The session is not registered yet, so if cancellation skipped the cleanup
-    the owner task would block forever on close_evt.wait() and the CM's
-    __aexit__ would never run — an unreachable, unclosable session.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     gate = asyncio.Event()
     cms: list[_BlockingInitCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _BlockingInitCm(gate)
         cms.append(cm)
         return cm
 
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
         call = asyncio.create_task(pool.get_session("s", "t1", {"transport": "stdio", "command": "x", "args": []}))
-        # Let the owner task enter the CM and reach the blocking initialize().
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await asyncio.sleep(0.01)
         call.cancel()
         with pytest.raises(asyncio.CancelledError):
             await call
 
-        # Release initialize() so the owner task can finish its shutdown path.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         gate.set()
-        # Give the owner task a chance to run __aexit__ and complete.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for _ in range(10):
             if cms and cms[0].closed:
                 break
@@ -1276,29 +1296,29 @@ async def test_get_session_cancelled_while_initializing_does_not_leak():
 
 
 class _InitFailCm:
-    """Fake session CM whose ``initialize`` fails, with a slow ``__aexit__``.
-
-    The slow __aexit__ lets a test observe whether cleanup is allowed to run to
-    completion (closed=True) or is interrupted by a stray cancellation.
-    """
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def __init__(self) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.entered = False
         self.exit_started = False
         self.closed = False
 
     async def __aenter__(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.entered = True
         session = MagicMock()
         session.initialize = self._initialize
         return session
 
     async def _initialize(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise RuntimeError("init boom")
 
     async def __aexit__(self, *args):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.exit_started = True
-        # Yield control so a buggy double-cancel would interrupt us here.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await asyncio.sleep(0.02)
         self.closed = True
         return False
@@ -1306,15 +1326,12 @@ class _InitFailCm:
 
 @pytest.mark.asyncio
 async def test_get_session_init_failure_runs_full_cleanup():
-    """On initialize() failure the owner task's __aexit__ must complete (#3379 CR P1).
-
-    The caller must NOT cancel the owner task on a reported failure, otherwise
-    the in-progress __aexit__ cleanup gets interrupted and leaks resources.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     cms: list[_InitFailCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _InitFailCm()
         cms.append(cm)
         return cm
@@ -1333,12 +1350,13 @@ async def test_get_session_init_failure_runs_full_cleanup():
 
 @pytest.mark.asyncio
 async def test_concurrent_get_session_same_key_creates_single_session():
-    """Concurrent get_session for the same key must share one session (#3379 CR P1)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     gate = asyncio.Event()
     cms: list[_BlockingInitCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _BlockingInitCm(gate)
         cms.append(cm)
         return cm
@@ -1347,12 +1365,12 @@ async def test_concurrent_get_session_same_key_creates_single_session():
         conn = {"transport": "stdio", "command": "x", "args": []}
         t1 = asyncio.create_task(pool.get_session("s", "same", conn))
         t2 = asyncio.create_task(pool.get_session("s", "same", conn))
-        # Let both calls pass Phase 1 and reach the (gated) initialize().
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await asyncio.sleep(0.02)
         gate.set()
         s1, s2 = await asyncio.gather(t1, t2)
 
-    # Only one CM/session created, both callers got the same object.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert len(cms) == 1, "concurrent same-key calls must not create duplicate sessions"
     assert s1 is s2
     assert len(pool._entries) == 1
@@ -1361,17 +1379,13 @@ async def test_concurrent_get_session_same_key_creates_single_session():
 
 @pytest.mark.asyncio
 async def test_close_all_during_in_flight_creation_does_not_resurrect_session():
-    """close_all while a creation is in-flight must not leave a live session (#3379 CR P1).
-
-    The in-flight record must be removed and its owner task torn down, so when
-    the (blocked) creator finishes initializing it does NOT register the session
-    back into _entries — otherwise the pool resurrects an unclosable session.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     gate = asyncio.Event()
     cms: list[_BlockingInitCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _BlockingInitCm(gate)
         cms.append(cm)
         return cm
@@ -1379,18 +1393,18 @@ async def test_close_all_during_in_flight_creation_does_not_resurrect_session():
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
         conn = {"transport": "stdio", "command": "x", "args": []}
         call = asyncio.create_task(pool.get_session("s", "t1", conn))
-        # Let the owner task enter the CM and reach the blocking initialize().
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await asyncio.sleep(0.01)
         assert ("s", "t1") in pool._inflight
 
-        # Close everything while the creation is still in-flight.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await pool.close_all()
 
-        # The in-flight creation must be gone, not promoted to an entry.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert len(pool._inflight) == 0
         assert len(pool._entries) == 0
 
-        # Even if the gate is released afterwards, nothing must come back.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         gate.set()
         with pytest.raises(asyncio.CancelledError):
             await call
@@ -1405,17 +1419,12 @@ async def test_close_all_during_in_flight_creation_does_not_resurrect_session():
 
 
 def test_get_session_cross_loop_in_flight_does_not_raise_assertion():
-    """A same-key request from another loop must not hit the in-flight assertion (#3379 CR P1).
-
-    Loop A starts (and leaves running) an in-flight creation, then loop B
-    requests the same key. The stale in-flight record (owned by loop A) must be
-    dropped and loop B must become a fresh creator — never fall through to an
-    AssertionError.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     cms: list[_CancelScopeCm] = []
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         cm = _CancelScopeCm()
         cms.append(cm)
         return cm
@@ -1425,20 +1434,21 @@ def test_get_session_cross_loop_in_flight_does_not_raise_assertion():
     errors: list[BaseException] = []
 
     def run_in_own_loop():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         try:
             results.append(asyncio.run(pool.get_session("s", "t1", conn)))
         except BaseException as e:  # noqa: BLE001 - capture for assertion
             errors.append(e)
 
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
-        # First loop creates and registers an entry, then its loop is torn down
-        # by asyncio.run, leaving a stale (closed-loop) record behind.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         t1 = threading.Thread(target=run_in_own_loop)
         t1.start()
         t1.join()
 
-        # Second loop requests the same key. It must evict the stale record and
-        # create a fresh session instead of raising AssertionError.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         t2 = threading.Thread(target=run_in_own_loop)
         t2.start()
         t2.join()
@@ -1449,13 +1459,7 @@ def test_get_session_cross_loop_in_flight_does_not_raise_assertion():
 
 
 def test_cross_loop_preempting_blocked_in_flight_does_not_hang_owner():
-    """A foreign-loop request must not leave a still-initializing owner hung (#3379 CR P1).
-
-    Loop A starts a creation that blocks inside initialize() (the in-flight
-    record stays live). Loop B then requests the same key. B must tear A's owner
-    down — cancelling it, because close_evt alone cannot wake a task blocked in
-    initialize() — so that A's get_session unwinds instead of hanging forever.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     conn = {"transport": "stdio", "command": "x", "args": []}
     first_gate = threading.Event()
@@ -1465,40 +1469,50 @@ def test_cross_loop_preempting_blocked_in_flight_does_not_hang_owner():
     closed: list[str] = []
 
     class _BlockingForeverCm:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             session = MagicMock()
             session.initialize = self._initialize
             entered.set()
             return session
 
         async def _initialize(self):
-            # Block until released, simulating a slow/stuck server handshake.
+            # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             while not first_gate.is_set():
                 await asyncio.sleep(0.005)
 
         async def __aexit__(self, *args):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             closed.append("blocking")
             return False
 
     class _FastCm:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             session = MagicMock()
 
             async def init():
+                """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
                 return None
 
             session.initialize = init
             return session
 
         async def __aexit__(self, *args):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return False
 
     cms: list[object] = [_BlockingForeverCm(), _FastCm()]
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return cms.pop(0)
 
     def run_get(name):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         try:
             results.append((name, asyncio.run(pool.get_session("s", "t1", conn))))
         except BaseException as e:  # noqa: BLE001 - capture for assertion
@@ -1513,9 +1527,9 @@ def test_cross_loop_preempting_blocked_in_flight_does_not_hang_owner():
         tb.start()
         tb.join(3)
 
-        # B must complete without depending on A's blocked initialize().
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert not tb.is_alive(), "foreign-loop request B must not hang"
-        # A must already be unwound (cancelled), not waiting on the dead gate.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         ta.join(3)
         assert not ta.is_alive(), "preempted owner A must not hang forever"
 
@@ -1526,13 +1540,7 @@ def test_cross_loop_preempting_blocked_in_flight_does_not_hang_owner():
 
 @pytest.mark.asyncio
 async def test_close_all_sync_from_running_loop_does_not_wait_on_itself():
-    """close_all_sync must not block on the current running loop (#3379 CR P1).
-
-    When called from code already executing inside the owner loop's thread,
-    close_all_sync cannot synchronously wait for that loop to run the shutdown
-    coroutine. It must signal the owner task and return promptly, then the owner
-    task closes itself once the loop regains control.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     pool = MCPSessionPool()
     pool.SESSION_CLOSE_TIMEOUT = 0.2
     conn = {"transport": "stdio", "command": "x", "args": []}
@@ -1540,6 +1548,7 @@ async def test_close_all_sync_from_running_loop_does_not_wait_on_itself():
     cm = _CloseTrackingCm()
 
     def make_cm(*a, **kw):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return cm
 
     with patch("langchain_mcp_adapters.sessions.create_session", side_effect=make_cm):
@@ -1562,41 +1571,36 @@ async def test_close_all_sync_from_running_loop_does_not_wait_on_itself():
 
 
 # ---------------------------------------------------------------------------
-# reset_mcp_tools_cache deadlock regression
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 class _CloseTrackingCm:
-    """A create_session() context manager that records when __aexit__ runs."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def __init__(self) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.closed = False
 
     async def __aenter__(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         session = MagicMock()
 
         async def init():
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return None
 
         session.initialize = init
         return session
 
     async def __aexit__(self, *args):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.closed = True
         return False
 
 
 def test_reset_mcp_tools_cache_from_running_loop_is_bounded():
-    """reset_mcp_tools_cache() must not deadlock when called from inside a
-    running loop that owns sessions (#3392 CR blocker).
-
-    The previous implementation spun up a worker thread running
-    ``asyncio.run(pool.close_all())`` and blocked the loop thread on
-    ``.result()``. close_all() then routed teardown of the current loop's
-    sessions back onto that blocked loop via run_coroutine_threadsafe(...),
-    so neither side could make progress. This test drives the exact scenario
-    on a daemon thread and asserts the call returns within a bounded time.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.mcp.cache import reset_mcp_tools_cache
     from deerflow.mcp.session_pool import get_session_pool
 
@@ -1605,16 +1609,18 @@ def test_reset_mcp_tools_cache_from_running_loop_is_bounded():
     done = threading.Event()
 
     async def scenario():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         pool = get_session_pool()
-        # Entry owned by THIS loop — the deadlock-prone case.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await pool.get_session("s", "t1", conn)
-        # Synchronous call: asyncio.get_running_loop() succeeds inside it, so
-        # it takes the "running loop" branch in reset_mcp_tools_cache().
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         reset_mcp_tools_cache()
-        # Signal-only teardown completes once the loop regains control.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         await asyncio.sleep(0.05)
 
     def run():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         asyncio.run(scenario())
         done.set()
 
@@ -1628,26 +1634,20 @@ def test_reset_mcp_tools_cache_from_running_loop_is_bounded():
 
 
 # ---------------------------------------------------------------------------
-# get_mcp_tools: routing when one server name is a prefix of another
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.asyncio
 async def test_mcp_tools_routed_to_source_server_with_prefix_overlap():
-    """Regression: tools must be routed to the server that produced them, not the first
-    server whose name is a string prefix of the (prefixed) tool name.
-
-    With `tool_name_prefix=True`, a tool from server `web_scraper` is named
-    `web_scraper_search`. When a server `web` is also configured, prefix-matching the tool
-    name picks `web` first (`"web_scraper_search".startswith("web_")`), mis-routing the
-    tool and stripping it to the wrong original name. Routing by the source grouping fixes it.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_core.tools import StructuredTool
     from pydantic import BaseModel, Field
 
     from deerflow.mcp.tools import get_mcp_tools
 
     class Args(BaseModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         query: str = Field(..., description="query")
 
     web_tool = StructuredTool(
@@ -1668,8 +1668,8 @@ async def test_mcp_tools_routed_to_source_server_with_prefix_overlap():
     extensions_config = MagicMock()
     extensions_config.model_extra = {}
 
-    # `web` is inserted before `web_scraper`, so a first-prefix-match mis-routes
-    # `web_scraper_search` to `web`.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     servers_config = {
         "web": {"transport": "stdio", "command": "npx", "args": ["web"]},
         "web_scraper": {"transport": "stdio", "command": "npx", "args": ["scraper"]},
@@ -1678,10 +1678,12 @@ async def test_mcp_tools_routed_to_source_server_with_prefix_overlap():
     routed: list[tuple[str, str]] = []
 
     def fake_wrap(tool, server_name, connection, interceptors, tool_call_timeout=None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         routed.append((tool.name, server_name))
         return tool
 
     async def get_tools_for_server(*, server_name: str | None = None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if server_name == "web":
             return [web_tool]
         if server_name == "web_scraper":

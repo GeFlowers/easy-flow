@@ -1,4 +1,4 @@
-"""Regression tests for provisioner request-path K8s IO threading."""
+"""本模块覆盖预配器 请求的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from kubernetes.client.rest import ApiException
 
 
 class _RecordingCoreV1:
+    """集中覆盖当前测试分支与回归边界。"""
     def __init__(
         self,
         *,
@@ -23,6 +24,7 @@ class _RecordingCoreV1:
         ready_after_service_reads: dict[str, int] | None = None,
         service_read_failures: dict[str, list[int]] | None = None,
     ) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.event_loop_thread_id = event_loop_thread_id
         self.thread_ids: list[int] = []
         self.service_sandboxes: set[str] = {"sandbox-existing"}
@@ -34,6 +36,7 @@ class _RecordingCoreV1:
         self.created_services: list[str] = []
 
     def _record_k8s_call(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         thread_id = threading.get_ident()
         self.thread_ids.append(thread_id)
         time.sleep(0)
@@ -46,6 +49,7 @@ class _RecordingCoreV1:
         raise AssertionError("Kubernetes client call ran inside an asyncio event loop")
 
     def read_namespaced_service(self, _name: str, _namespace: str):
+        """处理读取 服务相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self._record_k8s_call()
         sandbox_id = _sandbox_id_from_service_name(_name)
         self.service_read_counts[sandbox_id] = self.service_read_counts.get(sandbox_id, 0) + 1
@@ -58,34 +62,41 @@ class _RecordingCoreV1:
         return _node_port_service(sandbox_id)
 
     def read_namespaced_pod(self, _name: str, _namespace: str):
+        """处理读取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self._record_k8s_call()
         return SimpleNamespace(status=SimpleNamespace(phase="Running"))
 
     def create_namespaced_pod(self, _namespace: str, pod) -> None:
+        """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self._record_k8s_call()
         sandbox_id = pod.metadata.labels["sandbox-id"]
         self.created_pods.append(sandbox_id)
         self.created_pod_specs[sandbox_id] = pod
 
     def create_namespaced_service(self, _namespace: str, service) -> None:
+        """处理创建 服务相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self._record_k8s_call()
         sandbox_id = service.metadata.labels["sandbox-id"]
         self.created_services.append(sandbox_id)
         self.service_sandboxes.add(sandbox_id)
 
     def delete_namespaced_service(self, _name: str, _namespace: str) -> None:
+        """处理服务相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self._record_k8s_call()
 
     def delete_namespaced_pod(self, _name: str, _namespace: str) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         self._record_k8s_call()
 
     def list_namespaced_service(self, _namespace: str, *, label_selector: str):
+        """处理服务相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self._record_k8s_call()
         assert label_selector == "app=deer-flow-sandbox"
         return SimpleNamespace(items=[_node_port_service("sandbox-listed")])
 
 
 def _node_port_service(sandbox_id: str):
+    """准备可控测试资源与状态，供后续断言读取。"""
     return SimpleNamespace(
         metadata=SimpleNamespace(labels={"sandbox-id": sandbox_id}),
         spec=SimpleNamespace(ports=[SimpleNamespace(name="http", port=8080, node_port=32123)]),
@@ -93,6 +104,7 @@ def _node_port_service(sandbox_id: str):
 
 
 def _sandbox_id_from_service_name(name: str) -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     assert name.startswith("sandbox-")
     assert name.endswith("-svc")
     return name[len("sandbox-") : -len("-svc")]
@@ -100,6 +112,7 @@ def _sandbox_id_from_service_name(name: str) -> str:
 
 @contextmanager
 def _detect_provisioner_blocking_io(provisioner_module):
+    """准备可控测试资源与状态，供后续断言读取。"""
     detector = BlockBuster(scanned_modules=[provisioner_module.__name__])
     detector.activate()
     try:
@@ -109,7 +122,7 @@ def _detect_provisioner_blocking_io(provisioner_module):
 
 
 def test_sandbox_business_route_handlers_are_sync(provisioner_module) -> None:
-    """FastAPI runs sync handlers in its worker pool, away from the event loop."""
+    """验证沙箱 同步在预期条件及边界场景下的可观察行为，防止相关回归。"""
     for handler in (
         provisioner_module.create_sandbox,
         provisioner_module.destroy_sandbox,
@@ -139,6 +152,7 @@ async def test_sandbox_business_routes_run_k8s_client_off_event_loop_thread(
     monkeypatch: pytest.MonkeyPatch,
     provisioner_module,
 ) -> None:
+    """验证沙箱 运行 事件 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     fake_core_v1 = _RecordingCoreV1(
         event_loop_thread_id=threading.get_ident(),
         ready_after_service_reads={"sandbox-new": 3},
@@ -182,6 +196,7 @@ def test_create_sandbox_route_builds_expected_skills_mount_layout(
     monkeypatch: pytest.MonkeyPatch,
     provisioner_module,
 ) -> None:
+    """验证创建 沙箱在预期条件及边界场景下的可观察行为，防止相关回归。"""
     fake_core_v1 = _RecordingCoreV1(
         event_loop_thread_id=-1,
         ready_after_service_reads={"sandbox-layout": 1},
@@ -206,6 +221,7 @@ def test_create_sandbox_route_builds_expected_skills_mount_layout(
 
 
 def test_create_sandbox_retries_transient_service_read_errors(monkeypatch: pytest.MonkeyPatch, provisioner_module) -> None:
+    """验证创建 沙箱 服务 读取在预期条件及边界场景下的可观察行为，防止相关回归。"""
     fake_core_v1 = _RecordingCoreV1(
         event_loop_thread_id=-1,
         ready_after_service_reads={"sandbox-transient": 3},
@@ -228,6 +244,7 @@ def test_create_sandbox_retries_transient_service_read_errors(monkeypatch: pytes
 
 
 def test_sandbox_service_defaults_to_node_port_with_node_host_url(provisioner_module) -> None:
+    """验证沙箱 服务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     provisioner_module.K8S_NAMESPACE = "mdv-sit"
     provisioner_module.SANDBOX_CONTAINER_PORT = 8080
     provisioner_module.SANDBOX_SERVICE_TYPE = "NodePort"
@@ -242,6 +259,7 @@ def test_sandbox_service_defaults_to_node_port_with_node_host_url(provisioner_mo
 
 
 def test_sandbox_service_supports_cluster_ip_with_dns_url(provisioner_module) -> None:
+    """验证沙箱 服务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     provisioner_module.K8S_NAMESPACE = "mdv-sit"
     provisioner_module.SANDBOX_CONTAINER_PORT = 8080
     provisioner_module.SANDBOX_SERVICE_TYPE = "ClusterIP"
@@ -256,7 +274,7 @@ def test_sandbox_service_supports_cluster_ip_with_dns_url(provisioner_module) ->
 
 @pytest.mark.asyncio
 async def test_auth_middleware(monkeypatch: pytest.MonkeyPatch, provisioner_module) -> None:
-    """Verify the X-API-Key middleware: /health is open; /api/* requires a correct key."""
+    """验证认证在预期条件及边界场景下的可观察行为，防止相关回归。"""
     monkeypatch.setattr(provisioner_module, "PROVISIONER_API_KEY", "test-secret")
     fake_core_v1 = _RecordingCoreV1(event_loop_thread_id=-1)
     monkeypatch.setattr(provisioner_module, "core_v1", fake_core_v1)
@@ -282,7 +300,7 @@ async def test_auth_middleware(monkeypatch: pytest.MonkeyPatch, provisioner_modu
 
 @pytest.mark.asyncio
 async def test_auth_middleware_unset_key(monkeypatch: pytest.MonkeyPatch, provisioner_module) -> None:
-    """When PROVISIONER_API_KEY is unset/empty, all /api/* routes return 401."""
+    """验证认证在预期条件及边界场景下的可观察行为，防止相关回归。"""
     monkeypatch.setattr(provisioner_module, "PROVISIONER_API_KEY", "")
     fake_core_v1 = _RecordingCoreV1(event_loop_thread_id=-1)
     monkeypatch.setattr(provisioner_module, "core_v1", fake_core_v1)

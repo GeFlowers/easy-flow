@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 
 import { WorkspaceChangePanel } from "./workspace-change-panel";
 
+/** 以紧凑徽标提示当前线程累计的工作区文件变更数量。 */
 export function WorkspaceChangeBadge({
   threadId,
   runId,

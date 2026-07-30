@@ -1,4 +1,4 @@
-"""Tests for PR2 MCP routing auto-promotion."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import asyncio
 
@@ -18,29 +18,30 @@ from deerflow.utils.messages import ORIGINAL_USER_CONTENT_KEY
 
 @as_tool
 def active_tool(x: str) -> str:
-    "An always-active tool."
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return x
 
 
 @as_tool
 def postgres_query(sql: str) -> str:
-    "Query Postgres."
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return sql
 
 
 @as_tool
 def metrics_query(query: str) -> str:
-    "Query metrics."
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return query
 
 
 @as_tool
 def archive_lookup(query: str) -> str:
-    "Search archived records."
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return query
 
 
 def _routed(tool, *, keywords: list[str], priority: int = 0, mode: str = "prefer"):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     tag_mcp_tool(tool)
     tag_mcp_routing(
         tool,
@@ -54,6 +55,7 @@ def _routed(tool, *, keywords: list[str], priority: int = 0, mode: str = "prefer
 
 
 def test_builder_indexes_only_deferred_prefer_tools():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     routed = _routed(postgres_query, keywords=["orders"], priority=100)
     off = _routed(metrics_query, keywords=["metrics"], priority=50, mode="off")
     empty_keywords = _routed(archive_lookup, keywords=[], priority=90)
@@ -67,6 +69,7 @@ def test_builder_indexes_only_deferred_prefer_tools():
 
 
 def test_builder_skips_when_tool_search_disabled_or_no_index():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     routed = _routed(postgres_query, keywords=["orders"], priority=100)
     final_tools, setup = assemble_deferred_tools([routed], enabled=False)
 
@@ -77,6 +80,7 @@ def test_builder_skips_when_tool_search_disabled_or_no_index():
 
 
 def test_matching_uses_latest_real_human_message_only():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     middleware = McpRoutingMiddleware(
         {
             "postgres_query": {"priority": 100, "keywords": ["orders"]},
@@ -91,6 +95,7 @@ def test_matching_uses_latest_real_human_message_only():
 
 
 def test_matching_supports_casefold_chinese_priority_tiebreak_and_top_k():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     middleware = McpRoutingMiddleware(
         {
             "z_tool": {"priority": 50, "keywords": ["订单"]},
@@ -105,6 +110,7 @@ def test_matching_supports_casefold_chinese_priority_tiebreak_and_top_k():
 
 
 def test_structured_original_user_text_is_used():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     middleware = McpRoutingMiddleware(
         {"postgres_query": {"priority": 100, "keywords": ["orders"]}},
         "hash1",
@@ -119,6 +125,7 @@ def test_structured_original_user_text_is_used():
 
 
 def test_before_model_returns_minimal_promoted_update_and_reducer_unions():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     middleware = McpRoutingMiddleware(
         {"postgres_query": {"priority": 100, "keywords": ["orders"]}},
         "hash1",
@@ -139,6 +146,7 @@ def test_before_model_returns_minimal_promoted_update_and_reducer_unions():
 
 @pytest.mark.asyncio
 async def test_abefore_model_matches_sync_behavior():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     middleware = McpRoutingMiddleware(
         {"postgres_query": {"priority": 100, "keywords": ["orders"]}},
         "hash1",
@@ -149,11 +157,13 @@ async def test_abefore_model_matches_sync_behavior():
 
 
 def test_no_match_and_missing_catalog_hash_return_no_update():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert McpRoutingMiddleware({"postgres_query": {"priority": 100, "keywords": ["orders"]}}, None, 3).before_model({"messages": [HumanMessage(content="orders")]}, runtime=None) is None
     assert McpRoutingMiddleware({"postgres_query": {"priority": 100, "keywords": ["orders"]}}, "hash1", 3).before_model({"messages": [HumanMessage(content="nothing")]}, runtime=None) is None
 
 
 def test_order_invariant_rejects_reversed_middlewares():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     routing = McpRoutingMiddleware({"postgres_query": {"priority": 100, "keywords": ["orders"]}}, "hash1", 3)
     deferred = DeferredToolFilterMiddleware(frozenset({"postgres_query"}), "hash1")
 
@@ -163,10 +173,13 @@ def test_order_invariant_rejects_reversed_middlewares():
 
 
 def test_auto_promote_makes_schema_visible_in_same_model_cycle():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     bound: list[list[str]] = []
 
     class RecordingModel(GenericFakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def bind_tools(self, tools, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             bound.append([getattr(t, "name", None) for t in tools])
             return self
 
@@ -196,10 +209,13 @@ def test_auto_promote_makes_schema_visible_in_same_model_cycle():
 
 
 def test_auto_promoted_tool_can_be_called_without_tool_search():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     bound: list[list[str]] = []
 
     class RecordingModel(GenericFakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def bind_tools(self, tools, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             bound.append([getattr(t, "name", None) for t in tools])
             return self
 
@@ -232,8 +248,11 @@ def test_auto_promoted_tool_can_be_called_without_tool_search():
 
 
 def test_explicit_tool_search_merges_with_auto_promoted_names():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     class RecordingModel(GenericFakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def bind_tools(self, tools, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return self
 
     routed = _routed(postgres_query, keywords=["orders"], priority=100)
@@ -264,12 +283,14 @@ def test_explicit_tool_search_merges_with_auto_promoted_names():
 
 
 def test_bootstrap_like_no_mcp_tools_skips_middleware():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     final_tools, setup = assemble_deferred_tools([active_tool], enabled=True)
 
     assert build_mcp_routing_middleware(final_tools, setup, top_k=3) is None
 
 
 def test_acp_tool_without_mcp_metadata_is_not_indexed():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     final_tools, setup = assemble_deferred_tools([active_tool], enabled=True)
 
     assert setup.deferred_names == frozenset()
@@ -277,6 +298,7 @@ def test_acp_tool_without_mcp_metadata_is_not_indexed():
 
 
 def test_privacy_no_trace_metadata_or_info_logs(caplog):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     caplog.set_level("INFO")
     middleware = McpRoutingMiddleware(
         {"secret_tool": {"priority": 100, "keywords": ["sensitive-keyword"]}},

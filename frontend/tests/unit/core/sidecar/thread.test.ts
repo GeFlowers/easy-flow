@@ -7,6 +7,11 @@ import {
   shouldShowInPrimaryThreadLists,
 } from "@/core/sidecar/thread";
 
+/**
+ * 覆盖“builds sidecar thread metadata from parent thread and context”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("builds sidecar thread metadata from parent thread and context", () => {
   const metadata = buildSidecarThreadMetadata("parent-1", {
     type: "referenced_message",
@@ -28,6 +33,11 @@ test("builds sidecar thread metadata from parent thread and context", () => {
     referenced_message_roles: ["assistant"],
   });
 });
+
+/**
+ * 覆盖“builds searchable sidecar thread metadata from multiple contexts”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("builds searchable sidecar thread metadata from multiple contexts", () => {
   const metadata = buildSidecarThreadMetadata("parent-1", [
@@ -60,6 +70,11 @@ test("builds searchable sidecar thread metadata from multiple contexts", () => {
   });
 });
 
+/**
+ * 覆盖“keeps referenced ids/roles parallel when quoting one message twice”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps referenced ids/roles parallel when quoting one message twice", () => {
   const metadata = buildSidecarThreadMetadata("parent-1", [
     {
@@ -88,6 +103,11 @@ test("keeps referenced ids/roles parallel when quoting one message twice", () =>
     metadata.sidecar_context_count,
   );
 });
+
+/**
+ * 覆盖“identifies sidecar threads and hides them from primary thread lists”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("identifies sidecar threads and hides them from primary thread lists", () => {
   const sidecar = {

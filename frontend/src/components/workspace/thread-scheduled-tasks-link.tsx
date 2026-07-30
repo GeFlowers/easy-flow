@@ -4,6 +4,7 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/core/i18n/hooks";
 
+/** 跳转到当前线程关联的定时任务页面，并保留线程筛选上下文。 */
 export function ThreadScheduledTasksLink({ threadId }: { threadId: string }) {
   const { t } = useI18n();
   return (

@@ -1,3 +1,5 @@
+"""组装 DeerFlow 网关的 HTTP 入口、运行时依赖和受控应用生命周期。"""
+
 import asyncio
 import logging
 from collections.abc import AsyncGenerator
@@ -43,7 +45,7 @@ from deerflow.uploads.manager import cleanup_stale_upload_staging_files
 AppConfig = deerflow_app_config.AppConfig
 get_app_config = deerflow_app_config.get_app_config
 
-# Default logging; lifespan overrides from config.yaml log_level.
+# 默认日志配置；生命周期会使用 config.yaml 中的日志级别覆盖它。
 logging.basicConfig(
     level=logging.INFO,
     format=DEFAULT_LOG_FORMAT,
@@ -52,32 +54,26 @@ logging.basicConfig(
 
 logger = logging.getLogger(__name__)
 
-# Upper bound (seconds) each lifespan shutdown hook is allowed to run.
-# Bounds worker exit time so uvicorn's reload supervisor does not keep
-# firing signals into a worker that is stuck waiting for shutdown cleanup.
+# 每个生命周期关闭钩子允许执行的最长秒数。
+# 限制工作进程退出时间，避免 uvicorn 的重载管理器持续向卡在关闭清理等待中的
+# 工作进程发送信号。
 _SHUTDOWN_HOOK_TIMEOUT_SECONDS = 5.0
 
 
 async def _ensure_admin_user(app: FastAPI) -> None:
-    """Startup hook: handle first boot and migrate orphan threads otherwise.
+    """处理首次启动，或在后续启动时迁移无主线程。
 
-    After admin creation, migrate orphan threads from the LangGraph
-    store (metadata.user_id unset) to the admin account. This is the
-    "no-auth → with-auth" upgrade path: users who ran DeerFlow without
-    authentication have existing LangGraph thread data that needs an
-    owner assigned.
-        First boot (no admin exists):
-            - Does NOT create any user accounts automatically.
-            - The operator must visit ``/setup`` to create the first admin.
+    创建管理员后，会将 LangGraph 存储中 ``metadata.user_id`` 未设置的无主线程迁移
+    至该管理员账户。这是“无认证 → 启用认证”的升级路径：此前未启用认证的 DeerFlow
+    用户已有需要分配所有者的 LangGraph 线程数据。
 
-    Subsequent boots (admin already exists):
-      - Runs the one-time "no-auth → with-auth" orphan thread migration for
-        existing LangGraph thread metadata that has no user_id.
+    首次启动（尚无管理员）时不自动创建用户，操作员必须访问 ``/setup`` 创建首个
+    管理员。后续启动（已有管理员）时，才对无 ``user_id`` 的既有 LangGraph 线程元数据
+    执行一次无主线程迁移。
 
-    No SQL persistence migration is needed: the four user_id columns
-    (threads_meta, runs, run_events, feedback) only come into existence
-    alongside the auth module via create_all, so freshly created tables
-    never contain NULL-owner rows.
+    无需 SQL 持久化迁移：``threads_meta``、``runs``、``run_events`` 与 ``feedback``
+    的四个 ``user_id`` 列随认证模块通过 ``create_all`` 一同创建，因此新建表不会包含
+    所有者为空的行。
     """
     from sqlalchemy import select
 
@@ -88,8 +84,8 @@ async def _ensure_admin_user(app: FastAPI) -> None:
     try:
         provider = get_local_provider()
     except RuntimeError:
-        # Auth persistence may not be initialized in some test/boot paths.
-        # Skip admin migration work rather than failing gateway startup.
+        # 某些测试或启动路径可能尚未初始化认证持久化。
+        # 跳过管理员迁移工作，避免网关启动失败。
         logger.warning("Auth persistence not ready; skipping admin bootstrap check")
         return
 
@@ -106,20 +102,18 @@ async def _ensure_admin_user(app: FastAPI) -> None:
         logger.info("=" * 60)
         return
 
-    # Admin already exists — run orphan thread migration for any
-    # LangGraph thread metadata that pre-dates the auth module.
+    # 管理员已存在，迁移早于认证模块的所有 LangGraph 无主线程元数据。
     async with sf() as session:
         stmt = select(UserRow).where(UserRow.system_role == "admin").limit(1)
         row = (await session.execute(stmt)).scalar_one_or_none()
 
     if row is None:
-        return  # Should not happen (admin_count > 0 above), but be safe.
+        return  # 上方 admin_count 已大于 0，此情况不应发生，但仍安全退出。
 
     admin_id = str(row.id)
 
-    # LangGraph store orphan migration — non-fatal.
-    # This covers the "no-auth → with-auth" upgrade path for users
-    # whose existing LangGraph thread metadata has no user_id set.
+    # LangGraph 存储的无主线程迁移为非致命操作，覆盖未设 user_id 的既有线程在
+    # “无认证 → 启用认证”升级路径中的归属补全。
     store = getattr(app.state, "store", None)
     if store is not None:
         try:
@@ -131,12 +125,10 @@ async def _ensure_admin_user(app: FastAPI) -> None:
 
 
 async def _iter_store_items(store, namespace, *, page_size: int = 500):
-    """Paginated async iterator over a LangGraph store namespace.
+    """以分页方式异步遍历 LangGraph 存储命名空间。
 
-    Replaces the old hardcoded ``limit=1000`` call with a cursor-style
-    loop so that environments with more than one page of orphans do
-    not silently lose data. Terminates when a page is empty OR when a
-    short page arrives (indicating the last page).
+    使用游标式循环取代旧的固定 ``limit=1000`` 调用，防止无主线程超过一页时静默
+    丢失数据；当页面为空或取得短页（代表最后一页）时结束遍历。
     """
     offset = 0
     while True:
@@ -151,10 +143,9 @@ async def _iter_store_items(store, namespace, *, page_size: int = 500):
 
 
 async def _migrate_orphaned_threads(store, admin_user_id: str) -> int:
-    """Migrate LangGraph store threads with no user_id to the given admin.
+    """将未设 ``user_id`` 的 LangGraph 存储线程迁移至指定管理员。
 
-    Uses cursor pagination so all orphans are migrated regardless of
-    count. Returns the number of rows migrated.
+    使用游标分页确保无论无主线程数量多少都能全部迁移，并返回已迁移的行数。
     """
     migrated = 0
     async for item in _iter_store_items(store, ("threads",)):
@@ -169,15 +160,14 @@ async def _migrate_orphaned_threads(store, admin_user_id: str) -> int:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
-    """Application lifespan handler."""
+    """管理应用启动、运行期依赖装配及受控关闭的生命周期。"""
 
-    # Load config and check necessary environment variables at startup.
-    # `startup_config` is a local snapshot used only for one-shot bootstrap
-    # work (logging level, langgraph_runtime engines, channels). Request-time
-    # config resolution always routes through `get_app_config()` in
-    # `app/gateway/deps.py::get_config()` so `config.yaml` edits become
-    # visible without a process restart. We deliberately do NOT cache this
-    # snapshot on `app.state` to keep that contract enforceable.
+    # 启动时加载配置并检查必要的环境变量。
+    # ``startup_config`` 只是用于一次性引导工作的本地快照（日志级别、
+    # langgraph_runtime 引擎和频道）。请求期配置始终通过
+    # ``app/gateway/deps.py::get_config()`` 中的 ``get_app_config()`` 解析，
+    # 使 config.yaml 的修改无需重启即可生效。刻意不将该快照缓存到 ``app.state``，
+    # 以确保此约定可被落实。
     try:
         startup_config = get_app_config()
         configure_logging(startup_config)
@@ -190,24 +180,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     config = get_gateway_config()
     logger.info(f"Starting API Gateway on {config.host}:{config.port}")
 
-    # Agent observability (Monocle). Off by default; enabled with
-    # MONOCLE_TRACING. Initialized here at startup — not at import time — so a
-    # plain `import deerflow.agents` never installs a process-global tracer.
-    # Unlike LangSmith/Langfuse, whose validation failures abort the agent run,
-    # a bad Monocle config only logs: the Gateway keeps serving without tracing.
+    # 智能体可观测性（Monocle）默认关闭，通过 MONOCLE_TRACING 启用。仅在此处启动时
+    # 初始化，而非导入时初始化，因此普通的 ``import deerflow.agents`` 不会安装进程级
+    # 追踪器。不同于验证失败会终止智能体运行的 LangSmith/Langfuse，Monocle 配置错误
+    # 只会记录日志，网关仍会在未启用追踪的状态下继续服务。
     try:
         setup_monocle_tracing_if_enabled()
-    except Exception:  # observability must never break startup
+    except Exception:  # 可观测性绝不能阻断启动。
         logger.exception("Monocle tracing setup failed; continuing without it")
 
-    # Pre-warm tiktoken encoding cache so the first memory-injection request
-    # never blocks on the BPE data download (which hits an OpenAI/Azure URL
-    # that may be unreachable in restricted networks — see issue #3402).
-    # Warm-up runs via the manager's `warm` capability (getattr-probed, so
-    # non-DeerMem backends skip it). DeerMem.warm re-checks token_counting==
-    # "char" and returns early, so char-mode backends never touch tiktoken
-    # (avoids even the 5s probe in
-    # network-restricted deployments — see issue #3429).
+    # 预热 tiktoken 编码缓存，防止首次记忆注入请求阻塞在 BPE 数据下载上；受限网络可能
+    # 无法访问相应 OpenAI/Azure 地址（见问题 #3402）。通过管理器的 ``warm`` 能力预热，
+    # 使用 getattr 探测，非 DeerMem 后端会跳过。DeerMem.warm 会再次检查
+    # token_counting 是否为 ``char`` 并提前返回，因此字符计数后端不会触及 tiktoken，
+    # 也避免受限网络部署中额外的五秒探测（见问题 #3429）。
     try:
         from deerflow.agents.memory import get_memory_manager
 
@@ -236,15 +222,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception:
         logger.warning("Upload staging file cleanup skipped", exc_info=True)
 
-    # Initialize LangGraph runtime components (StreamBridge, RunManager, checkpointer, store)
+    # 初始化 LangGraph 运行时组件（StreamBridge、RunManager、检查点与存储）。
     async with langgraph_runtime(app, startup_config):
         logger.info("LangGraph runtime initialised")
 
-        # Check admin bootstrap state and migrate orphan threads after admin exists.
-        # Must run AFTER langgraph_runtime so app.state.store is available for thread migration
+        # 检查管理员引导状态，并在管理员存在后迁移无主线程；必须在 langgraph_runtime
+        # 之后执行，以使线程迁移可使用 app.state.store。
         await _ensure_admin_user(app)
 
-        # Start IM channel service if any channels are configured
+        # 配置了即时通信频道时启动频道服务。
         try:
             from app.channels.service import start_channel_service
 
@@ -279,7 +265,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         except Exception:
             logger.exception("Failed to close OIDC service")
 
-        # Stop channel service on shutdown (bounded to prevent worker hang)
+        # 关闭时停止频道服务，并设定时限以防工作进程卡死。
         try:
             from app.channels.service import stop_channel_service
 
@@ -301,25 +287,18 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             except Exception:
                 logger.exception("Failed to stop scheduled task service")
 
-        # Drain the memory backend's pending-update buffer before the worker
-        # exits (best-effort, bounded). IM channels and the scheduler are
-        # already stopped above, so no new IM/scheduler updates arrive during
-        # the drain; the LangGraph runtime / in-flight HTTP requests can still
-        # complete memory enqueues in a narrow window, but anything added after
-        # the drain copies the buffer only resets the debounce Timer
-        # (best-effort, same as today).
+        # 在工作进程退出前排空记忆后端的待更新缓冲区（尽力而为且有时限）。上方已停止
+        # 即时通信频道和调度器，因此排空期间不会有新的此类更新；LangGraph 运行时与在途
+        # HTTP 请求仍可能在短暂窗口内完成记忆入队，但在排空复制缓冲区后新增的项目只会
+        # 重置防抖计时器，仍保持当前的尽力而为语义。
         #
-        # No host-level pending/processing guard: ``shutdown_flush``
-        # short-circuits on a truly idle buffer (returns True immediately), so
-        # calling it unconditionally is cheap and keeps the in-flight-worker
-        # race entirely inside the backend (where the buffer lives) -- the host
-        # cannot "forget" that case the way a ``pending_count > 0``-only guard
-        # would (review #6 on the original PR).
+        # 不设置主机级待处理或处理中守卫：``shutdown_flush`` 面对真正空闲的缓冲区会立即
+        # 返回 ``True``，无条件调用成本很低，并将运行中工作进程的竞争完全留在持有缓冲区
+        # 的后端内部；这样主机不会像只判断 ``pending_count > 0`` 的守卫那样遗忘该情况。
         #
-        # K8s caveat: ``shutdown_flush_timeout_seconds`` must fit inside the
-        # pod's ``terminationGracePeriodSeconds`` (channel stop + this drain +
-        # buffer), set on the gateway Helm deployment -- or K8s SIGKILLs the
-        # drain mid-flight and the loss this is fixing is silently re-introduced.
+        # K8s 注意事项：网关 Helm 部署中 ``shutdown_flush_timeout_seconds`` 必须能纳入
+        # Pod 的 ``terminationGracePeriodSeconds``（频道停止、此次排空与缓冲时间），否则
+        # K8s 会在排空中途 SIGKILL，导致本次修复的数据丢失问题悄然重现。
         try:
             app_cfg = get_app_config()
             if app_cfg.memory.enabled:
@@ -342,10 +321,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 def create_app() -> FastAPI:
-    """Create and configure the FastAPI application.
+    """创建并配置 FastAPI 应用实例。
 
-    Returns:
-        Configured FastAPI application instance.
+    返回已完成中间件、路由和生命周期装配的 FastAPI 应用。
     """
     config = get_gateway_config()
     docs_url = "/docs" if config.enable_docs else None
@@ -438,15 +416,14 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
         ],
     )
 
-    # Auth: reject unauthenticated requests to non-public paths (fail-closed safety net)
+    # 认证：拒绝访问非公开路径的未认证请求，作为失败关闭的安全兜底。
     app.add_middleware(AuthMiddleware)
 
-    # CSRF: Double Submit Cookie pattern for state-changing requests
+    # CSRF：为状态变更请求启用双重提交 Cookie 模式。
     app.add_middleware(CSRFMiddleware)
 
-    # CORS: the unified nginx endpoint is same-origin by default. Split-origin
-    # browser clients must opt in with this explicit Gateway allowlist so CORS
-    # and CSRF origin checks share the same source of truth.
+    # CORS：统一 nginx 入口默认同源。跨源浏览器客户端必须通过该网关显式白名单加入，
+    # 使 CORS 与 CSRF 来源检查共享同一事实来源。
     cors_origins = sorted(get_configured_cors_origins())
     if cors_origins:
         app.add_middleware(
@@ -457,87 +434,78 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
             allow_headers=["*"],
         )
 
-    # Request trace correlation: when logging.enhance.enabled=true, bind one
-    # trace id per Gateway HTTP request and write it to response start headers.
-    # `logging` is registered as restart-required (see reload_boundary.py) so we
-    # snapshot the flag from the startup AppConfig instead of reading live; a
-    # runtime toggle would otherwise leave the log formatter (installed once by
-    # configure_logging() at lifespan startup) out of sync with the middleware.
+    # 请求追踪关联：logging.enhance.enabled=true 时，为每个 Gateway HTTP 请求绑定一个
+    # 追踪 ID 并写入响应起始头。``logging`` 被登记为需重启字段，因此从启动期 AppConfig
+    # 取得开关快照而非实时读取；否则运行时切换会令生命周期启动时仅安装一次的日志格式器
+    # 与中间件失去同步。
     app.add_middleware(TraceMiddleware, enabled=_resolve_trace_enabled_for_app_construction())
 
-    # Include routers
-    # Models API is mounted at /api/models
+    # 装配路由；模型 API 挂载至 /api/models。
     app.include_router(models.router)
 
-    # Features API is mounted at /api/features
+    # 功能 API 挂载至 /api/features。
     app.include_router(features.router)
 
-    # Console API (cross-thread observability) is mounted at /api/console
+    # 控制台 API（跨线程可观测性）挂载至 /api/console。
     app.include_router(console.router)
 
-    # MCP API is mounted at /api/mcp
+    # MCP API 挂载至 /api/mcp。
     app.include_router(mcp.router)
 
-    # Memory API is mounted at /api/memory
+    # 记忆 API 挂载至 /api/memory。
     app.include_router(memory.router)
 
-    # Skills API is mounted at /api/skills
+    # 技能 API 挂载至 /api/skills。
     app.include_router(skills.router)
 
-    # Artifacts API is mounted at /api/threads/{thread_id}/artifacts
+    # 工件 API 挂载至 /api/threads/{thread_id}/artifacts。
     app.include_router(artifacts.router)
 
-    # Uploads API is mounted at /api/threads/{thread_id}/uploads
+    # 上传 API 挂载至 /api/threads/{thread_id}/uploads。
     app.include_router(uploads.router)
 
-    # Thread cleanup API is mounted at /api/threads/{thread_id}
+    # 线程清理 API 挂载至 /api/threads/{thread_id}。
     app.include_router(threads.router)
 
-    # Scheduled tasks API is mounted at /api/scheduled-tasks
+    # 定时任务 API 挂载至 /api/scheduled-tasks。
     app.include_router(scheduled_tasks.router)
 
-    # Agents API is mounted at /api/agents
+    # 智能体 API 挂载至 /api/agents。
     app.include_router(agents.router)
 
-    # Suggestions API is mounted at /api/threads/{thread_id}/suggestions
+    # 建议 API 挂载至 /api/threads/{thread_id}/suggestions。
     app.include_router(suggestions.router)
 
-    # Input polishing API is mounted at /api/input-polish
+    # 输入润色 API 挂载至 /api/input-polish。
     app.include_router(input_polish.router)
 
-    # User-facing IM channel connection API is mounted at /api/channels
+    # 面向用户的即时通信频道连接 API 挂载至 /api/channels。
     app.include_router(channel_connections.router)
 
-    # Channels API is mounted at /api/channels
+    # 频道 API 挂载至 /api/channels。
     app.include_router(channels.router)
 
-    # Assistants compatibility API (LangGraph Platform stub)
+    # 助手兼容 API（LangGraph Platform 存根）。
     app.include_router(assistants_compat.router)
 
-    # Auth API is mounted at /api/v1/auth
+    # 认证 API 挂载至 /api/v1/auth。
     app.include_router(auth.router)
 
-    # Feedback API is mounted at /api/threads/{thread_id}/runs/{run_id}/feedback
+    # 反馈 API 挂载至 /api/threads/{thread_id}/runs/{run_id}/feedback。
     app.include_router(feedback.router)
 
-    # Thread Runs API (LangGraph Platform-compatible runs lifecycle)
+    # 线程运行 API（兼容 LangGraph Platform 的运行生命周期）。
     app.include_router(thread_runs.router)
 
-    # Stateless Runs API (stream/wait without a pre-existing thread)
+    # 无状态运行 API（无需预先存在的线程即可流式执行或等待）。
     app.include_router(runs.router)
 
-    # GitHub webhooks API is mounted at /api/webhooks/github
-    # Exempt from auth and CSRF middleware (see auth_middleware._PUBLIC_PATH_PREFIXES
-    # and csrf_middleware.should_check_csrf); authenticity is enforced via the
-    # X-Hub-Signature-256 HMAC against GITHUB_WEBHOOK_SECRET.
-    # Including this router transitively imports app.gateway.github, which
-    # registers the GitHub channel's ChannelRunPolicy as an import side-effect.
-    #
-    # Fail-closed: only mount the route when a webhook secret is configured
-    # (or when the explicit DEER_FLOW_ALLOW_UNVERIFIED_GITHUB_WEBHOOKS=1
-    # dev opt-in is set). A misconfigured deployment without a secret cannot
-    # serve forged deliveries because the URL responds 404 — there is no
-    # handler to reach.
+    # GitHub Webhook API 挂载至 /api/webhooks/github。它免于认证和 CSRF 中间件检查，
+    # 真实性通过 GITHUB_WEBHOOK_SECRET 的 X-Hub-Signature-256 HMAC 保证。装配此路由会
+    # 间接导入 app.gateway.github，并以导入副作用注册 GitHub 频道的 ChannelRunPolicy。
+    # 失败关闭：仅在已配置 Webhook 密钥，或显式设置开发开关
+    # DEER_FLOW_ALLOW_UNVERIFIED_GITHUB_WEBHOOKS=1 时挂载路由。未配置密钥的部署会返回
+    # 404，无法处理伪造投递。
     if github_webhooks.is_route_enabled():
         app.include_router(github_webhooks.router)
         logger.info("GitHub webhooks route mounted at /api/webhooks/github")
@@ -546,25 +514,21 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict[str, str]:
-        """Health check endpoint.
-
-        Returns:
-            Service health status information.
-        """
+        """返回服务健康状态。"""
         return {"status": "healthy", "service": "deer-flow-gateway"}
 
     return app
 
 
 def _resolve_trace_enabled_for_app_construction() -> bool:
-    """Resolve the trace middleware flag without making imports require config.yaml."""
+    """解析追踪中间件开关，且不要求模块导入时存在 config.yaml。"""
     try:
         return resolve_trace_enabled(get_app_config())
     except FileNotFoundError:
-        # Startup lifespan still performs strict config loading before serving.
+        # 启动生命周期仍会在开始服务前严格加载配置。
         logger.debug("config.yaml not found while constructing Gateway app; TraceMiddleware disabled for this app instance")
         return False
 
 
-# Create app instance for uvicorn
+# 为 uvicorn 创建应用实例。
 app = create_app()

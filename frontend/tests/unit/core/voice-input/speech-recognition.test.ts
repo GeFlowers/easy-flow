@@ -11,6 +11,9 @@ import {
 } from "@/core/voice-input/speech-recognition";
 
 describe("speech recognition helpers", () => {
+  /**
+   * 覆盖“prefers the standard constructor and falls back to webkit”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("prefers the standard constructor and falls back to webkit", () => {
     const standard = makeSpeechRecognitionConstructor();
     const webkit = makeSpeechRecognitionConstructor();
@@ -31,6 +34,11 @@ describe("speech recognition helpers", () => {
     expect(getSpeechRecognitionConstructor({})).toBeNull();
   });
 
+  /**
+   * 覆盖“maps DeerFlow locales to browser recognition locales”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("maps DeerFlow locales to browser recognition locales", () => {
     expect(getSpeechRecognitionLanguage("zh-CN")).toBe("zh-CN");
     expect(getSpeechRecognitionLanguage("zh-Hans")).toBe("zh-CN");
@@ -41,6 +49,11 @@ describe("speech recognition helpers", () => {
     expect(getSpeechRecognitionLanguage("xx-YY")).toBe("en-US");
     expect(getSpeechRecognitionLanguage("not a locale")).toBe("en-US");
   });
+
+  /**
+   * 覆盖“combines final and interim transcripts with whitespace cleanup”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("combines final and interim transcripts with whitespace cleanup", () => {
     expect(
@@ -57,6 +70,11 @@ describe("speech recognition helpers", () => {
     });
   });
 
+  /**
+   * 覆盖“appends transcript to an existing draft without duplicating whitespace”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("appends transcript to an existing draft without duplicating whitespace", () => {
     expect(appendSpeechTranscript("", "  hello  world ")).toBe("hello world");
     expect(appendSpeechTranscript("Draft", "voice text")).toBe(
@@ -67,6 +85,11 @@ describe("speech recognition helpers", () => {
     );
     expect(appendSpeechTranscript("Draft", "   ")).toBe("Draft");
   });
+
+  /**
+   * 覆盖“normalizes browser speech recognition errors”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("normalizes browser speech recognition errors", () => {
     expect(mapSpeechRecognitionError("not-allowed")).toBe("permission_denied");
@@ -85,6 +108,11 @@ describe("speech recognition helpers", () => {
     expect(mapSpeechRecognitionError("bad-grammar")).toBe("unknown");
   });
 
+  /**
+   * 覆盖“restarts only after browser auto-end conditions”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("restarts only after browser auto-end conditions", () => {
     expect(shouldRestartSpeechRecognition(null)).toBe(true);
     expect(shouldRestartSpeechRecognition("no_speech")).toBe(true);
@@ -94,6 +122,11 @@ describe("speech recognition helpers", () => {
     expect(shouldRestartSpeechRecognition("unknown")).toBe(false);
   });
 });
+
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeSpeechRecognitionConstructor 的约定。
+
+ */
 
 function makeSpeechRecognitionConstructor(): SpeechRecognitionConstructor {
   return class {

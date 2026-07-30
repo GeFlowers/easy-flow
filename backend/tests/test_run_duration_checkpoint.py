@@ -1,3 +1,4 @@
+"""本模块覆盖运行 时长的行为、边界与回归场景，确保既有契约稳定。"""
 import asyncio
 import copy
 from types import SimpleNamespace
@@ -15,24 +16,29 @@ from deerflow.runtime.runs.worker import RunContext, _persist_run_duration, run_
 
 
 class _YieldingSaver(InMemorySaver):
+    """集中覆盖当前测试分支与回归边界。"""
     async def aget_tuple(self, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         checkpoint_tuple = await super().aget_tuple(config)
         await asyncio.sleep(0)
         return checkpoint_tuple
 
     async def aput(self, config, checkpoint, metadata, new_versions):
+        """准备可控测试资源与状态，供后续断言读取。"""
         await asyncio.sleep(0)
         return await super().aput(config, checkpoint, metadata, new_versions)
 
 
 class _AdvancingSaver(InMemorySaver):
-    """Inject a title checkpoint between duration read and write."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         super().__init__()
         self._reads = 0
 
     async def aget_tuple(self, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self._reads += 1
         checkpoint_tuple = await super().aget_tuple(config)
         if self._reads != 2 or checkpoint_tuple is None:
@@ -62,6 +68,7 @@ async def _put_checkpoint(
     parent_config: dict | None = None,
     inherited_metadata: dict | None = None,
 ) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     checkpoint = empty_checkpoint()
     checkpoint["id"] = checkpoint_id
     checkpoint["channel_values"] = {"messages": messages}
@@ -74,6 +81,7 @@ async def _put_checkpoint(
 
 @pytest.mark.anyio
 async def test_run_duration_survives_a_later_checkpoint() -> None:
+    """验证运行 时长在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = InMemorySaver()
     thread_id = "duration-survives"
     messages = [
@@ -118,6 +126,7 @@ async def test_run_duration_survives_a_later_checkpoint() -> None:
 
 @pytest.mark.anyio
 async def test_run_duration_checkpoint_stores_duration_in_metadata_without_rewriting_messages() -> None:
+    """验证运行 时长 时长 元数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = InMemorySaver()
     thread_id = "duration-metadata"
     messages = [
@@ -148,6 +157,7 @@ async def test_run_duration_checkpoint_stores_duration_in_metadata_without_rewri
 
 @pytest.mark.anyio
 async def test_run_duration_retries_after_intervening_title_checkpoint() -> None:
+    """验证运行 时长 标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = _AdvancingSaver()
     thread_id = "duration-title-race"
     await _put_checkpoint(
@@ -176,6 +186,7 @@ async def test_run_duration_retries_after_intervening_title_checkpoint() -> None
 
 @pytest.mark.anyio
 async def test_concurrent_run_duration_updates_preserve_both_turns() -> None:
+    """验证并发 运行 时长在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = _YieldingSaver()
     thread_id = "duration-concurrent"
     messages = [
@@ -214,6 +225,7 @@ async def test_concurrent_run_duration_updates_preserve_both_turns() -> None:
 
 @pytest.mark.anyio
 async def test_run_duration_checkpoint_preserves_parent_lineage() -> None:
+    """验证运行 时长在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = InMemorySaver()
     thread_id = "duration-parent"
     parent_checkpoint_id = "00000000-0000-6000-8000-000000000001"
@@ -249,6 +261,7 @@ async def test_run_duration_checkpoint_preserves_parent_lineage() -> None:
 
 @pytest.mark.anyio
 async def test_agent_stream_serializes_with_duration_checkpoint_write() -> None:
+    """验证流 时长 写入在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = _YieldingSaver()
     run_manager = RunManager()
     record = await run_manager.create("duration-stream-lock")
@@ -275,7 +288,9 @@ async def test_agent_stream_serializes_with_duration_checkpoint_write() -> None:
     finished_during_stream = None
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             nonlocal duration_task, finished_during_stream
             duration_task = asyncio.create_task(
                 _persist_run_duration(
@@ -294,6 +309,7 @@ async def test_agent_stream_serializes_with_duration_checkpoint_write() -> None:
             yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return DummyAgent()
 
     await run_agent(
@@ -313,7 +329,7 @@ async def test_agent_stream_serializes_with_duration_checkpoint_write() -> None:
 
 @pytest.mark.anyio
 async def test_agent_stream_allows_graph_goal_state_access() -> None:
-    """A graph node may acquire the goal lock while a run is streaming."""
+    """验证流 状态在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = InMemorySaver()
     run_manager = RunManager()
     record = await run_manager.create("duration-stream-goal-lock")
@@ -324,11 +340,14 @@ async def test_agent_stream_allows_graph_goal_state_access() -> None:
     )
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             async with goal_thread_lock(record.thread_id):
                 yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return DummyAgent()
 
     await asyncio.wait_for(
@@ -348,6 +367,7 @@ async def test_agent_stream_allows_graph_goal_state_access() -> None:
 
 @pytest.mark.anyio
 async def test_successful_subsecond_run_persists_zero_duration(monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证运行 时长在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = InMemorySaver()
     run_manager = RunManager()
     record = await run_manager.create("duration-zero")
@@ -361,10 +381,13 @@ async def test_successful_subsecond_run_persists_zero_duration(monkeypatch: pyte
     persist_duration = AsyncMock()
 
     async def set_status(run_id, status, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         record.status = status
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             yield {"messages": []}
 
     monkeypatch.setattr(run_manager, "set_status", set_status)

@@ -1,16 +1,5 @@
 #!/usr/bin/env python3
-"""Sync GitHub labels from the declarative source of truth.
-
-Reads ``.github/labels.yml`` and creates/updates each label via the GitHub CLI
-(``gh label create --force``). Sync is additive/update-only: labels not listed
-in the file are left untouched (never deleted).
-
-Usage:
-    uv run --with pyyaml python scripts/sync_labels.py [--repo OWNER/NAME] [--dry-run]
-
-Requires the ``gh`` CLI to be installed and authenticated (or ``GH_TOKEN`` set,
-as in CI). When ``--repo`` is omitted, ``gh`` uses the current repository.
-"""
+"""本脚本负责同步。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -31,6 +20,7 @@ LABELS_FILE = Path(__file__).resolve().parent.parent / ".github" / "labels.yml"
 
 
 def load_labels(path: Path) -> list[dict[str, str]]:
+    """执行加载对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     labels = data.get("labels")
     if not isinstance(labels, list) or not labels:
@@ -42,6 +32,7 @@ def load_labels(path: Path) -> list[dict[str, str]]:
 
 
 def sync_label(label: dict[str, str], repo: str | None, dry_run: bool) -> bool:
+    """执行同步 标签对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     name = str(label["name"])
     color = str(label.get("color", "ededed")).lstrip("#")
     description = str(label.get("description", ""))
@@ -65,6 +56,7 @@ def sync_label(label: dict[str, str], repo: str | None, dry_run: bool) -> bool:
 
 
 def main() -> int:
+    '未说明'
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", help="Target repository as OWNER/NAME")
     parser.add_argument(

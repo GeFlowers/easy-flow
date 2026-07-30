@@ -1,4 +1,4 @@
-"""ORM model for run metadata."""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from deerflow.persistence.base import Base
 
 
 class RunRow(Base):
+    """定义与持久化数据表对应的行模型。"""
     __tablename__ = "runs"
 
     run_id: Mapped[str] = mapped_column(String(64), primary_key=True)

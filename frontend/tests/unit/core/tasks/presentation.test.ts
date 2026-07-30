@@ -6,6 +6,9 @@ import {
 } from "@/core/tasks/presentation";
 
 describe("resolveSubtaskModelLabel", () => {
+  /**
+   * 覆盖“prefers the configured display name and falls back to the model identifier”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("prefers the configured display name and falls back to the model identifier", () => {
     expect(
       resolveSubtaskModelLabel("claude-3-7-sonnet", [
@@ -22,6 +25,11 @@ describe("resolveSubtaskModelLabel", () => {
       "unlisted-model",
     );
   });
+
+  /**
+   * 覆盖“formats only reported cumulative token usage”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("formats only reported cumulative token usage", () => {
     expect(formatSubtaskTokenUsage(undefined)).toBeUndefined();

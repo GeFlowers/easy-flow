@@ -1,3 +1,4 @@
+"""覆盖本模块的可回归测试，固定关键输入、失败分支与资源生命周期，避免后续改动破坏既有契约。"""
 from __future__ import annotations
 
 import json
@@ -25,6 +26,7 @@ from deerflow.runtime.store import get_store, reset_store
 
 
 def _reset_config_singletons() -> None:
+    """为“重置配置该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     load_title_config_from_dict({})
     load_summarization_config_from_dict({})
     load_memory_config_from_dict({})
@@ -41,6 +43,7 @@ def _reset_config_singletons() -> None:
 
 
 def _write_config(path: Path, *, model_name: str, supports_thinking: bool) -> None:
+    """为“写入配置”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     path.write_text(
         yaml.safe_dump(
             {
@@ -66,6 +69,7 @@ def _write_config_with_agents_api(
     supports_thinking: bool,
     agents_api: dict | None = None,
 ) -> None:
+    """为“写入配置使用智能体接口”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     config = {
         "sandbox": {"use": "deerflow.sandbox.local:LocalSandboxProvider"},
         "models": [
@@ -84,6 +88,7 @@ def _write_config_with_agents_api(
 
 
 def _write_config_with_sections(path: Path, sections: dict | None = None) -> None:
+    """为“写入配置使用配置段”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     config = {
         "sandbox": {"use": "deerflow.sandbox.local:LocalSandboxProvider"},
         "models": [
@@ -101,10 +106,12 @@ def _write_config_with_sections(path: Path, sections: dict | None = None) -> Non
 
 
 def _write_extensions_config(path: Path) -> None:
+    """为“写入该项配置”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     path.write_text(json.dumps({"mcpServers": {}, "skills": {}}), encoding="utf-8")
 
 
 def test_app_config_defaults_missing_database_to_sqlite(tmp_path, monkeypatch):
+    """验证“应用配置该项缺失数据库该项轻量数据库”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -119,6 +126,7 @@ def test_app_config_defaults_missing_database_to_sqlite(tmp_path, monkeypatch):
 
 
 def test_app_config_defaults_empty_database_to_sqlite(tmp_path, monkeypatch):
+    """验证“应用配置该项空值数据库该项轻量数据库”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -141,12 +149,7 @@ def test_app_config_defaults_empty_database_to_sqlite(tmp_path, monkeypatch):
 
 
 def test_app_config_coerces_commented_out_list_sections(tmp_path, monkeypatch):
-    """Commenting out every entry under a list key makes PyYAML parse it as None.
-
-    Regression for the documented ``cp config.example.yaml config.yaml`` flow
-    (issue #1444): such a config must load with empty lists instead of raising
-    ``Input should be a valid list``.
-    """
+    """验证“应用配置该项该项该项列出配置段”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -171,12 +174,7 @@ def test_app_config_coerces_commented_out_list_sections(tmp_path, monkeypatch):
 
 
 def test_app_config_coerces_commented_out_object_sections(tmp_path, monkeypatch):
-    """Commenting out every entry under an object key makes PyYAML parse it as None.
-
-    Same documented ``cp config.example.yaml config.yaml`` flow as the list
-    sections: object sections (memory, summarization, ...) must fall back to
-    their defaults instead of raising ``Input should be a valid dictionary``.
-    """
+    """验证“应用配置该项该项该项对象配置段”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -197,8 +195,8 @@ def test_app_config_coerces_commented_out_object_sections(tmp_path, monkeypatch)
 
     config = AppConfig.from_file(str(config_path))
 
-    # Each present-but-null object section falls back to a real default config
-    # object of the expected type (not merely non-None).
+    # 每个存在但为空的对象部分都会回退到真正的默认配置
+    # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
     assert type(config.memory).__name__ == "MemoryConfig"
     assert type(config.summarization).__name__ == "SummarizationConfig"
     assert type(config.guardrails).__name__ == "GuardrailsConfig"
@@ -207,12 +205,7 @@ def test_app_config_coerces_commented_out_object_sections(tmp_path, monkeypatch)
 
 
 def test_app_config_null_required_section_still_errors(tmp_path, monkeypatch):
-    """A present-but-null *required* section still errors.
-
-    ``sandbox`` has no default, so dropping a ``sandbox: null`` key leaves the
-    required field absent — there is nothing to fall back to (per
-    ``_drop_null_config_sections``), unlike the optional object sections above.
-    """
+    """验证“应用配置该项该项该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -224,6 +217,7 @@ def test_app_config_null_required_section_still_errors(tmp_path, monkeypatch):
 
 
 def test_app_config_warns_when_no_models_configured(tmp_path, monkeypatch, caplog):
+    """验证“应用配置警告当没有模型被配置”的回归边界，固定缺省模型配置触发的告警内容与后续安全回退。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -245,6 +239,7 @@ def test_app_config_warns_when_no_models_configured(tmp_path, monkeypatch, caplo
 
 
 def test_get_app_config_reloads_when_file_changes(tmp_path, monkeypatch):
+    """验证“获取应用配置该项当文件该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -270,6 +265,7 @@ def test_get_app_config_reloads_when_file_changes(tmp_path, monkeypatch):
 
 
 def test_get_app_config_reloads_when_content_digest_changes_without_metadata(tmp_path, monkeypatch):
+    """验证“获取应用配置该项当内容摘要该项不使用元数据”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -291,6 +287,7 @@ def test_get_app_config_reloads_when_content_digest_changes_without_metadata(tmp
         real_get_config_signature = app_config_module._get_config_signature
 
         def stale_metadata_signature(path: Path):
+            """为“过期元数据签名”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
             current_signature = real_get_config_signature(path)
             assert current_signature is not None
             return (initial_signature[0], initial_signature[1], current_signature[2])
@@ -309,6 +306,7 @@ def test_get_app_config_reloads_when_content_digest_changes_without_metadata(tmp
 
 
 def test_get_app_config_reloads_when_config_path_changes(tmp_path, monkeypatch):
+    """验证“获取应用配置该项当配置路径该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_a = tmp_path / "config-a.yaml"
     config_b = tmp_path / "config-b.yaml"
     extensions_path = tmp_path / "extensions_config.json"
@@ -333,6 +331,7 @@ def test_get_app_config_reloads_when_config_path_changes(tmp_path, monkeypatch):
 
 
 def test_get_app_config_resets_agents_api_config_when_section_removed(tmp_path, monkeypatch):
+    """验证“获取应用配置该项智能体接口配置当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -368,6 +367,7 @@ def test_get_app_config_resets_agents_api_config_when_section_removed(tmp_path, 
 
 
 def test_get_app_config_resets_singleton_configs_when_sections_removed(tmp_path, monkeypatch):
+    """验证“获取应用配置该项单例该项当配置段该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -418,6 +418,7 @@ def test_get_app_config_resets_singleton_configs_when_sections_removed(tmp_path,
 
 
 def test_get_app_config_resets_persistence_runtime_singletons_when_checkpointer_removed(tmp_path, monkeypatch):
+    """验证“获取应用配置该项持久化运行时该项当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -448,6 +449,7 @@ def test_get_app_config_resets_persistence_runtime_singletons_when_checkpointer_
 
 
 def test_get_app_config_keeps_persistence_runtime_singletons_when_checkpointer_unchanged(tmp_path, monkeypatch):
+    """验证“获取应用配置保留持久化运行时该项当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)
@@ -487,6 +489,7 @@ def test_get_app_config_keeps_persistence_runtime_singletons_when_checkpointer_u
 
 
 def test_get_app_config_does_not_mutate_singletons_when_reload_validation_fails(tmp_path, monkeypatch):
+    """验证“获取应用配置该项该项该项该项当重载该项失败”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     config_path = tmp_path / "config.yaml"
     extensions_path = tmp_path / "extensions_config.json"
     _write_extensions_config(extensions_path)

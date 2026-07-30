@@ -1,18 +1,4 @@
-"""Tests for subagent executor async/sync execution paths.
-
-Covers:
-- SubagentExecutor.execute() synchronous execution path
-- SubagentExecutor._aexecute() asynchronous execution path
-- execute_async() routes background work without bouncing through execute()
-- Error handling in both sync and async paths
-- Async tool support (MCP tools)
-- Cooperative cancellation via cancel_event
-- Parent/child checkpoint-lineage and message-stream isolation
-
-Note: Due to circular import issues in the main codebase, conftest.py mocks
-deerflow.subagents.executor. This test file uses delayed import via fixture to test
-the real implementation in isolation.
-"""
+'未说明'
 
 import asyncio
 import importlib
@@ -46,15 +32,18 @@ _LANGGRAPH_HAS_ROOT_LINEAGE_STREAM_REGRESSION = Version(package_version("langgra
 
 
 def _default_app_config():
+    '未说明'
     return SimpleNamespace(tool_search=SimpleNamespace(enabled=False))
 
 
 def _patch_default_get_app_config(executor_module):
+    '未说明'
     executor_module.get_app_config = _default_app_config
     return executor_module
 
 
 def _clear_stale_executor_package_attr() -> None:
+    '未说明'
     subagents_pkg = sys.modules.get("deerflow.subagents")
     if subagents_pkg is not None and hasattr(subagents_pkg, "executor"):
         delattr(subagents_pkg, "executor")
@@ -62,11 +51,7 @@ def _clear_stale_executor_package_attr() -> None:
 
 @pytest.fixture(autouse=True)
 def _setup_executor_classes():
-    """Set up mocked modules and import real executor classes.
-
-    This fixture runs once per test and yields the executor classes.
-    It handles module cleanup to avoid affecting other test files.
-    """
+    """为设置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     # Save original modules
     original_modules = {name: sys.modules.get(name) for name in _MOCKED_MODULE_NAMES}
     original_executor = sys.modules.get("deerflow.subagents.executor")
@@ -130,25 +115,29 @@ def _setup_executor_classes():
 
 # Helper classes that wrap real classes for testing
 class MockHumanMessage:
-    """Mock HumanMessage for testing - wraps real class from fixture."""
+    '未说明'
 
     def __init__(self, content, _classes=None):
+        '未说明'
         self._content = content
         self._classes = _classes
 
     def _get_real(self):
+        '未说明'
         return self._classes["HumanMessage"](content=self._content)
 
 
 class MockAIMessage:
-    """Mock AIMessage for testing - wraps real class from fixture."""
+    '未说明'
 
     def __init__(self, content, msg_id=None, _classes=None):
+        '未说明'
         self._content = content
         self._msg_id = msg_id
         self._classes = _classes
 
     def _get_real(self):
+        '未说明'
         msg = self._classes["AIMessage"](content=self._content)
         if self._msg_id:
             msg.id = self._msg_id
@@ -156,11 +145,14 @@ class MockAIMessage:
 
 
 class NamedTool:
+    '未说明'
     def __init__(self, name: str):
+        '未说明'
         self.name = name
 
 
 def _skill(name: str, allowed_tools: list[str] | None) -> Skill:
+    '未说明'
     skill_dir = Path(f"/tmp/{name}")
     return Skill(
         name=name,
@@ -176,7 +168,7 @@ def _skill(name: str, allowed_tools: list[str] | None) -> Skill:
 
 
 async def async_iterator(items):
-    """Helper to create an async iterator from a list."""
+    '未说明'
     for item in items:
         yield item
 
@@ -188,13 +180,13 @@ async def async_iterator(items):
 
 @pytest.fixture
 def classes(_setup_executor_classes):
-    """Provide access to executor classes."""
+    '未说明'
     return _setup_executor_classes
 
 
 @pytest.fixture
 def base_config(classes):
-    """Return a basic subagent config for testing."""
+    """为配置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     return classes["SubagentConfig"](
         name="test-agent",
         description="Test agent",
@@ -206,13 +198,14 @@ def base_config(classes):
 
 @pytest.fixture
 def mock_agent():
-    """Return a properly configured mock agent with async stream."""
+    """为模拟准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     agent = MagicMock()
     agent.astream = MagicMock()
     return agent
 
 
 def _module(name: str, **attrs):
+    '未说明'
     module = ModuleType(name)
     for key, value in attrs.items():
         setattr(module, key, value)
@@ -221,21 +214,25 @@ def _module(name: str, **attrs):
 
 # Helper to create real message objects
 class _MsgHelper:
-    """Helper to create real message objects from fixture classes."""
+    '未说明'
 
     def __init__(self, classes):
+        '未说明'
         self.classes = classes
 
     def human(self, content):
+        '未说明'
         return self.classes["HumanMessage"](content=content)
 
     def ai(self, content, msg_id=None):
+        '未说明'
         msg = self.classes["AIMessage"](content=content)
         if msg_id:
             msg.id = msg_id
         return msg
 
     def tool(self, content, tool_call_id, name=None, msg_id=None):
+        """处理工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         msg = self.classes["ToolMessage"](content=content, tool_call_id=tool_call_id, name=name)
         if msg_id:
             msg.id = msg_id
@@ -244,7 +241,7 @@ class _MsgHelper:
 
 @pytest.fixture
 def msg(classes):
-    """Provide message factory."""
+    '未说明'
     return _MsgHelper(classes)
 
 
@@ -254,7 +251,7 @@ def msg(classes):
 
 
 class TestAgentConstruction:
-    """Test _create_agent() wiring before execution starts."""
+    '未说明'
 
     def test_create_agent_threads_explicit_app_config_to_model_and_middlewares(
         self,
@@ -262,7 +259,7 @@ class TestAgentConstruction:
         base_config,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """Explicit app_config must flow into both model and middleware factories."""
+        '未说明'
         import deerflow.config as config_module
         from deerflow.subagents import executor as executor_module
 
@@ -275,17 +272,21 @@ class TestAgentConstruction:
         captured: dict[str, dict] = {}
 
         def fake_get_app_config():
+            '未说明'
             raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
         def fake_create_chat_model(**kwargs):
+            '未说明'
             captured["model"] = kwargs
             return model
 
         def fake_build_subagent_runtime_middlewares(**kwargs):
+            '未说明'
             captured["middlewares"] = kwargs
             return middlewares
 
         def fake_create_agent(**kwargs):
+            '未说明'
             captured["agent"] = kwargs
             return agent
 
@@ -345,7 +346,7 @@ class TestAgentConstruction:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path,
     ):
-        """Explicit app_config must be threaded into subagent skill storage lookup."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         app_config = SimpleNamespace(models=[SimpleNamespace(name="default-model")])
@@ -356,6 +357,7 @@ class TestAgentConstruction:
         captured: dict[str, object] = {}
 
         def fake_get_or_new_skill_storage(*, app_config=None):
+            '未说明'
             captured["app_config"] = app_config
             return SimpleNamespace(load_skills=lambda *, enabled_only: [SimpleNamespace(name="demo-skill", skill_file=skill_file)])
 
@@ -382,12 +384,7 @@ class TestAgentConstruction:
         base_config,
         tmp_path,
     ):
-        """Skill name and SKILL.md body are attacker-controlled (installable
-        ``.skill`` archive) and must be html-escaped before injection, matching
-        the slash-activation sibling (``SkillActivationMiddleware`` escapes both
-        ``skill_name`` and ``skill_content``). Without it a crafted body can
-        forge a framework-trusted ``<system-reminder>`` in the subagent prompt.
-        """
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         skill_dir = tmp_path / "demo"
@@ -416,7 +413,7 @@ class TestAgentConstruction:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path,
     ):
-        """_build_initial_state merges system_prompt and skills into one SystemMessage."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         skill_dir = tmp_path / "my-skill"
@@ -459,7 +456,7 @@ class TestAgentConstruction:
         base_config,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """_build_initial_state works when there are no skills."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         monkeypatch.setattr(
@@ -491,7 +488,7 @@ class TestAgentConstruction:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path,
     ):
-        """_build_initial_state works when there is no system_prompt but there are skills."""
+        '未说明'
         SubagentConfig = classes["SubagentConfig"]
 
         config = SubagentConfig(
@@ -533,9 +530,7 @@ class TestAgentConstruction:
         base_config,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """tool_search enabled + a surviving MCP tool: _build_initial_state appends
-        the tool_search tool, withholds the MCP schema, and injects the
-        <available-deferred-tools> section into the SystemMessage."""
+        '未说明'
         from langchain_core.tools import tool as as_tool
 
         from deerflow.subagents import executor as executor_module
@@ -552,7 +547,7 @@ class TestAgentConstruction:
 
         @as_tool
         def mcp_calc(expression: str) -> str:
-            "Evaluate arithmetic."
+            '未说明'
             return expression
 
         executor = SubagentExecutor(config=base_config, tools=[tag_mcp_tool(mcp_calc)], thread_id="test-thread")
@@ -575,8 +570,7 @@ class TestAgentConstruction:
         base_config,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """tool_search disabled: no tool_search tool, no section - pure no-op even
-        with an MCP-tagged tool present."""
+        '未说明'
         from langchain_core.tools import tool as as_tool
 
         from deerflow.subagents import executor as executor_module
@@ -593,7 +587,7 @@ class TestAgentConstruction:
 
         @as_tool
         def mcp_calc(expression: str) -> str:
-            "Evaluate arithmetic."
+            '未说明'
             return expression
 
         executor = SubagentExecutor(config=base_config, tools=[tag_mcp_tool(mcp_calc)], thread_id="test-thread")
@@ -610,17 +604,7 @@ class TestAgentConstruction:
         classes,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """Adversarial-review follow-up (#3341): tool_search is appended AFTER the
-        subagent tool-policy filter, mirroring the lead's intentional decision
-        (test_tool_search_appended_after_policy_but_never_exposes_denied_tool).
-        Lock the safe-by-construction property:
-
-        - an MCP tool denied by ``disallowed_tools`` never enters the deferred
-          catalog, so tool_search can never promote/expose it;
-        - tool_search itself is infrastructure: naming it in ``disallowed_tools``
-          does not remove it, because its catalog derives from the already-
-          filtered list and carries no access the policy didn't already grant.
-        """
+        '未说明'
         from langchain_core.tools import tool as as_tool
 
         from deerflow.subagents import executor as executor_module
@@ -638,17 +622,17 @@ class TestAgentConstruction:
 
         @as_tool
         def active_tool(x: str) -> str:
-            "active"
+            """处理工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return x
 
         @as_tool
         def mcp_allowed(x: str) -> str:
-            "allowed mcp tool"
+            '未说明'
             return x
 
         @as_tool
         def mcp_denied(x: str) -> str:
-            "denied mcp tool"
+            '未说明'
             return x
 
         config = SubagentConfig(
@@ -681,8 +665,7 @@ class TestAgentConstruction:
         base_config,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """A deferred setup passed to _create_agent flows into the subagent
-        middleware factory (so DeferredToolFilterMiddleware can attach)."""
+        '未说明'
         from deerflow.subagents import executor as executor_module
         from deerflow.tools.builtins.tool_search import DeferredToolSetup
 
@@ -691,6 +674,7 @@ class TestAgentConstruction:
         captured: dict[str, object] = {}
 
         def fake_build_subagent_runtime_middlewares(**kwargs):
+            '未说明'
             captured["middlewares"] = kwargs
             return [object()]
 
@@ -719,11 +703,11 @@ class TestAgentConstruction:
 
 
 class TestAsyncExecutionPath:
-    """Test _aexecute() async execution path."""
+    '未说明'
 
     @pytest.mark.anyio
     async def test_aexecute_success(self, classes, base_config, mock_agent, msg):
-        """Test successful async execution returns completed result."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -754,12 +738,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_marks_structured_llm_error_fallback_as_failed(self, classes, base_config, mock_agent, msg):
-        """A handled provider error is still a failed delegated task.
-
-        ``LLMErrorHandlingMiddleware`` intentionally returns an ``AIMessage``
-        instead of raising, so the executor must honor its structured marker
-        rather than treating normal graph termination as task success.
-        """
+        '未说明'
         AIMessage = classes["AIMessage"]
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
@@ -788,7 +767,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_does_not_infer_llm_failure_from_message_text(self, classes, base_config, mock_agent, msg):
-        """Error-looking prose without the middleware marker is valid output."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -806,16 +785,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_ignores_stale_parent_history_fallback_marker(self, classes, base_config, mock_agent, msg):
-        """A stale fallback marker replayed from parent history is not terminal.
-
-        Subagents share the parent's ``thread_id`` and LangGraph replays the
-        full parent message history, so ``final_state`` can carry a fallback
-        ``AIMessage`` left by an earlier parent turn. Because the subagent
-        always appends its own terminal assistant message, ``_extract_llm_error_fallback``
-        inspects only the last ``AIMessage`` and must treat this run as a
-        normal completion — this locks the "no masking needed" invariant that
-        justifies scanning the tail instead of all messages.
-        """
+        '未说明'
         AIMessage = classes["AIMessage"]
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
@@ -842,7 +812,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_exposes_collected_usage_before_subagent_finishes(self, classes, base_config, mock_agent, msg, monkeypatch):
-        """Polling callers can read a cumulative token snapshot while running."""
+        '未说明'
         from deerflow.subagents import executor as executor_module
 
         SubagentExecutor = classes["SubagentExecutor"]
@@ -853,14 +823,18 @@ class TestAsyncExecutionPath:
         release = asyncio.Event()
 
         class Collector:
+            '未说明'
             def __init__(self, caller):
+                '未说明'
                 self.records = []
                 collectors.append(self)
 
             def snapshot_records(self):
+                '未说明'
                 return list(self.records)
 
         async def streaming_agent(*args, **kwargs):
+            '未说明'
             collectors[0].records = [
                 {
                     "source_run_id": "subagent-llm-1",
@@ -903,7 +877,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_collects_ai_messages(self, classes, base_config, mock_agent, msg):
-        """Test that AI messages are collected during streaming."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -931,7 +905,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_handles_duplicate_messages(self, classes, base_config, mock_agent, msg):
-        """Test that duplicate AI messages are not added."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         msg1 = msg.ai("Response", "msg-1")
@@ -955,9 +929,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_dedup_scales_over_repeated_chunks(self, classes, base_config, mock_agent, msg):
-        """``stream_mode="values"`` re-yields the same trailing message across many
-        snapshots before the next one appears. Dedup must collapse the repeats and
-        still capture each distinct message exactly once, in arrival order."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         m1 = msg.ai("first", "msg-1")
@@ -982,9 +954,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_dedup_idless_messages_fall_back_to_content(self, classes, base_config, mock_agent, msg):
-        """Messages without an id can't be keyed by the seen-id set, so dedup must
-        fall back to a full content compare: identical content collapses, distinct
-        content is kept."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         chunks = [
@@ -1002,10 +972,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_captures_all_tool_outputs_from_one_super_step(self, classes, base_config, mock_agent, msg):
-        """Regression for #3779: when the model emits several tool calls in one
-        turn, LangGraph's ToolNode appends all their ToolMessages in a single
-        ``values`` super-step. Capturing only ``messages[-1]`` dropped every tool
-        output but the last; all three must now survive in ``ai_messages``."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         human = msg.human("Task")
@@ -1030,19 +997,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_step_capture_survives_history_contraction(self, classes, base_config, mock_agent, msg):
-        """Regression for #3875 Phase 3: DeerFlowSummarizationMiddleware rewrites the
-        messages channel mid-run via ``RemoveMessage(id=REMOVE_ALL_MESSAGES)``,
-        so a later ``values`` snapshot hands the executor a SHORTER message list
-        than the cursor it was tracking. Without the contraction reset in
-        ``capture_new_step_messages``, every step appended after the compaction
-        is dropped until the list length overtakes the stale cursor.
-
-        Faithful to the real middleware: compaction puts the summary into a
-        SEPARATE ``summary_text`` state key — the messages channel after
-        compaction holds only the preserved recent tail (already-seen
-        messages), NOT a synthetic summary AIMessage. So the contraction chunk
-        is the already-seen tail (deduped, no new step); the real regression
-        coverage is that POST-compaction growth is still captured."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         human = msg.human("Task")
@@ -1084,7 +1039,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_handles_list_content(self, classes, base_config, mock_agent, msg):
-        """Test handling of list-type content in AIMessage."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1112,7 +1067,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_handles_agent_exception(self, classes, base_config, mock_agent):
-        """Test that exceptions during execution are caught and returned as FAILED."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1133,15 +1088,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_recursion_error_with_partial_surfaces_completed_turn_capped(self, classes, base_config, mock_agent, msg):
-        """#3875 Phase 2: ``GraphRecursionError`` (``recursion_limit`` ==
-        ``max_turns``) with usable partial work surfaces as ``completed`` +
-        ``stop_reason=turn_capped`` — the partial work survives on ``result``
-        the way a clean success does, and the cap travels on the additive
-        ``stop_reason`` field, not a dedicated status enum (which would break v1
-        contract consumers). Before #3949 this fell through to the generic
-        ``except Exception`` and was misclassified as FAILED; #3949 then used a
-        ``MAX_TURNS_REACHED`` enum that diverged from the agreed additive-field
-        contract, which this change corrects."""
+        '未说明'
         from langgraph.errors import GraphRecursionError
 
         SubagentExecutor = classes["SubagentExecutor"]
@@ -1151,6 +1098,7 @@ class TestAsyncExecutionPath:
         partial_state = {"messages": [msg.human("Task"), partial_ai]}
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             yield partial_state
             raise GraphRecursionError("Recursion limit of 10 reached")
 
@@ -1176,14 +1124,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_recursion_error_prefers_guard_stop_reason_over_turn_capped(self, classes, base_config, mock_agent, msg):
-        """If a guard (token budget / loop) already hard-stopped this run and
-        set its stop reason, and ``GraphRecursionError`` then trips on the next
-        super-step before the forced final answer lands, the exception handler
-        surfaces the guard's reason (the binding constraint) instead of blindly
-        falling back to ``turn_capped``. Keeps the exception path consistent
-        with the normal-completion path (both consult
-        ``_consume_guard_stop_reason``) and pops the reason so it is not
-        orphaned in the guard's bounded dict."""
+        '未说明'
         from langgraph.errors import GraphRecursionError
 
         SubagentExecutor = classes["SubagentExecutor"]
@@ -1193,6 +1134,7 @@ class TestAsyncExecutionPath:
         partial_state = {"messages": [msg.human("Task"), partial_ai]}
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             yield partial_state
             raise GraphRecursionError("Recursion limit reached after the token budget fired")
 
@@ -1212,16 +1154,14 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_recursion_error_before_first_chunk_surfaces_failed_turn_capped(self, classes, base_config, mock_agent):
-        """If ``GraphRecursionError`` fires before any chunk is yielded there is
-        no usable partial work to recover; the result is ``failed`` +
-        ``stop_reason=turn_capped`` so the budget-cap signal survives even when
-        nothing was streamed."""
+        '未说明'
         from langgraph.errors import GraphRecursionError
 
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             raise GraphRecursionError("Recursion limit reached before first step")
             yield  # pragma: no cover - make this an async generator
 
@@ -1243,20 +1183,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_recursion_error_with_llm_error_fallback_surfaces_failed(self, classes, base_config, mock_agent, msg):
-        """A structured LLM error fallback that coincides with hitting
-        ``max_turns`` must still classify as ``failed``, not ``completed``.
-
-        ``_extract_llm_error_fallback`` (#4042) marks a terminal ``AIMessage``
-        as a handled provider failure via
-        ``additional_kwargs.deerflow_error_fallback``, and the
-        normal-completion branch above already consults it before falling
-        back to ``_extract_final_result``. This except-block must apply the
-        same check before recovering ``usable_partial`` from raw non-empty
-        ``AIMessage`` text: a fallback message always carries non-empty
-        user-facing text, so without checking the marker first it is
-        indistinguishable from genuine partial output and gets misclassified
-        as a completed task rather than the failed provider error it is.
-        """
+        '未说明'
         from langgraph.errors import GraphRecursionError
 
         AIMessage = classes["AIMessage"]
@@ -1276,6 +1203,7 @@ class TestAsyncExecutionPath:
         fallback_state = {"messages": [msg.human("Task"), fallback_message]}
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             yield fallback_state
             raise GraphRecursionError("Recursion limit reached right after the LLM error fallback")
 
@@ -1293,12 +1221,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_token_capped_surfaces_completed_token_capped(self, classes, base_config, mock_agent, msg):
-        """#3875 Phase 2: the token-budget hard-stop does not raise — it strips
-        tool_calls so the run completes with a final answer. When the captured
-        ``TokenBudgetMiddleware`` reports ``token_capped`` via
-        ``consume_stop_reason``, the completed result carries
-        ``stop_reason=token_capped`` so the lead can tell a budget-capped
-        completion from a clean one."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1320,13 +1243,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_loop_capped_surfaces_when_loop_guard_fires(self, classes, base_config, mock_agent, msg):
-        """#3875 Phase 2 (ggnnggez review): the executor collects EVERY guard
-        middleware with ``consume_stop_reason``, not just the first. When the
-        token-budget guard reports no cap but the loop-detection guard reports
-        ``loop_capped``, the completed result carries ``stop_reason=loop_capped``
-        — proving the contract's full cap vocabulary is reachable, not only the
-        token axis. A ``next(...)`` capture would stop at the first guard and
-        miss the loop cap entirely."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1348,7 +1265,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_no_final_state(self, classes, base_config, mock_agent):
-        """Test handling when no final state is returned."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1368,7 +1285,7 @@ class TestAsyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_aexecute_no_ai_message_in_state(self, classes, base_config, mock_agent, msg):
-        """Test fallback when no AIMessage found in final state."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1396,14 +1313,7 @@ class TestAsyncExecutionPath:
         monkeypatch: pytest.MonkeyPatch,
         tmp_path,
     ):
-        """Regression: messages sent to agent.astream must contain at most one
-        SystemMessage and it must be the first message.
-
-        This catches any regression where system_prompt would be re-injected
-        via create_agent() (e.g. system_prompt not passed as None) and appear
-        as a second SystemMessage, which providers like vLLM and Xinference
-        reject with "System message must be at the beginning."
-        """
+        '未说明'
         from langchain_core.messages import AIMessage, SystemMessage
 
         SubagentExecutor = classes["SubagentExecutor"]
@@ -1424,6 +1334,7 @@ class TestAsyncExecutionPath:
         captured_states: list[dict] = []
 
         async def capturing_astream(state, **kwargs):
+            '未说明'
             captured_states.append(state)
             yield {"messages": [AIMessage(content="Done", id="msg-1")]}
 
@@ -1454,8 +1365,10 @@ class TestAsyncExecutionPath:
 
 
 class TestSkillAllowedTools:
+    '未说明'
     @pytest.mark.anyio
     async def test_skill_allowed_tools_union_filters_agent_tools(self, classes, base_config, mock_agent, msg):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         final_state = {"messages": [msg.human("Task"), msg.ai("Done", "msg-1")]}
@@ -1464,6 +1377,7 @@ class TestSkillAllowedTools:
         executor = SubagentExecutor(config=base_config, tools=tools, thread_id="test-thread")
 
         async def load_skills():
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return [_skill("a", ["bash"]), _skill("b", ["read_file"])]
 
         with patch.object(executor, "_load_skills", load_skills), patch.object(executor, "_create_agent", return_value=mock_agent) as create_agent_mock:
@@ -1475,6 +1389,7 @@ class TestSkillAllowedTools:
 
     @pytest.mark.anyio
     async def test_all_missing_allowed_tools_preserves_legacy_allow_all(self, classes, base_config, mock_agent, msg):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         final_state = {"messages": [msg.human("Task"), msg.ai("Done", "msg-1")]}
@@ -1483,6 +1398,7 @@ class TestSkillAllowedTools:
         executor = SubagentExecutor(config=base_config, tools=tools, thread_id="test-thread")
 
         async def load_skills():
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return [_skill("legacy-a", None), _skill("legacy-b", None)]
 
         with patch.object(executor, "_load_skills", load_skills), patch.object(executor, "_create_agent", return_value=mock_agent) as create_agent_mock:
@@ -1493,6 +1409,7 @@ class TestSkillAllowedTools:
 
     @pytest.mark.anyio
     async def test_mixed_missing_allowed_tools_does_not_disable_explicit_restrictions(self, classes, base_config, mock_agent, msg):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         final_state = {"messages": [msg.human("Task"), msg.ai("Done", "msg-1")]}
@@ -1501,6 +1418,7 @@ class TestSkillAllowedTools:
         executor = SubagentExecutor(config=base_config, tools=tools, thread_id="test-thread")
 
         async def load_skills():
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return [_skill("legacy", None), _skill("restricted", ["bash"])]
 
         with patch.object(executor, "_load_skills", load_skills), patch.object(executor, "_create_agent", return_value=mock_agent) as create_agent_mock:
@@ -1511,6 +1429,7 @@ class TestSkillAllowedTools:
 
     @pytest.mark.anyio
     async def test_mixed_missing_allowed_tools_order_does_not_disable_explicit_restrictions(self, classes, base_config, mock_agent, msg):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         final_state = {"messages": [msg.human("Task"), msg.ai("Done", "msg-1")]}
@@ -1519,6 +1438,7 @@ class TestSkillAllowedTools:
         executor = SubagentExecutor(config=base_config, tools=tools, thread_id="test-thread")
 
         async def load_skills():
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return [_skill("restricted", ["bash"]), _skill("legacy", None)]
 
         with patch.object(executor, "_load_skills", load_skills), patch.object(executor, "_create_agent", return_value=mock_agent) as create_agent_mock:
@@ -1529,6 +1449,7 @@ class TestSkillAllowedTools:
 
     @pytest.mark.anyio
     async def test_empty_allowed_tools_contributes_no_tools(self, classes, base_config, mock_agent, msg, caplog):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
 
         final_state = {"messages": [msg.human("Task"), msg.ai("Done", "msg-1")]}
@@ -1537,6 +1458,7 @@ class TestSkillAllowedTools:
         executor = SubagentExecutor(config=base_config, tools=tools, thread_id="test-thread")
 
         async def load_skills():
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return [_skill("empty", []), _skill("reader", ["read_file"])]
 
         with patch.object(executor, "_load_skills", load_skills), patch.object(executor, "_create_agent", return_value=mock_agent) as create_agent_mock, caplog.at_level("INFO"):
@@ -1548,10 +1470,12 @@ class TestSkillAllowedTools:
 
     @pytest.mark.anyio
     async def test_skill_load_failure_fails_without_creating_agent(self, classes, base_config, mock_agent):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         executor = SubagentExecutor(config=base_config, tools=[NamedTool("bash")], thread_id="test-thread")
 
         async def load_skills():
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             raise RuntimeError("skill storage unavailable")
 
         with patch.object(executor, "_load_skills", load_skills), patch.object(executor, "_create_agent", return_value=mock_agent) as create_agent_mock:
@@ -1568,10 +1492,10 @@ class TestSkillAllowedTools:
 
 
 class TestSyncExecutionPath:
-    """Test execute() synchronous execution path with asyncio.run()."""
+    '未说明'
 
     def test_execute_runs_async_in_event_loop(self, classes, base_config, mock_agent, msg):
-        """Test that execute() runs _aexecute() in a new event loop via asyncio.run()."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1597,11 +1521,7 @@ class TestSyncExecutionPath:
         assert result.result == "Sync result"
 
     def test_execute_in_thread_pool_context(self, classes, base_config, msg):
-        """Test that execute() works correctly when called from a thread pool.
-
-        This simulates the real-world usage where execute() is called from
-        a worker thread outside the main event loop.
-        """
+        '未说明'
         from concurrent.futures import ThreadPoolExecutor
 
         SubagentExecutor = classes["SubagentExecutor"]
@@ -1616,6 +1536,7 @@ class TestSyncExecutionPath:
         }
 
         def run_in_thread():
+            """处理运行 会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             mock_agent = MagicMock()
             mock_agent.astream = lambda *args, **kwargs: async_iterator([final_state])
 
@@ -1638,7 +1559,7 @@ class TestSyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_execute_in_running_event_loop_calls_isolated_loop_directly(self, classes, base_config, mock_agent, msg):
-        """Test that execute() calls the isolated-loop helper directly in a running loop."""
+        '未说明'
         from deerflow.runtime.user_context import (
             get_effective_user_id,
             reset_current_user,
@@ -1660,6 +1581,7 @@ class TestSyncExecutionPath:
         }
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             execution_threads.append(threading.current_thread().name)
             effective_user_ids.append(get_effective_user_id())
             yield final_state
@@ -1675,6 +1597,7 @@ class TestSyncExecutionPath:
         original_isolated_execute = executor._execute_in_isolated_loop
 
         def tracked_isolated_execute(task, result_holder=None):
+            '未说明'
             isolated_helper_threads.append(threading.current_thread().name)
             return original_isolated_execute(task, result_holder)
 
@@ -1696,7 +1619,7 @@ class TestSyncExecutionPath:
 
     @pytest.mark.anyio
     async def test_execute_in_running_event_loop_reuses_persistent_isolated_loop(self, classes, base_config, mock_agent, msg):
-        """Regression: repeated isolated executions should reuse one long-lived loop."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
         execution_loops = []
@@ -1709,6 +1632,7 @@ class TestSyncExecutionPath:
         }
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             execution_loops.append(asyncio.get_running_loop())
             yield final_state
 
@@ -1731,7 +1655,7 @@ class TestSyncExecutionPath:
         assert execution_loops[0].is_running()
 
     def test_execute_handles_asyncio_run_failure(self, classes, base_config):
-        """Test handling when asyncio.run() itself fails."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -1751,7 +1675,7 @@ class TestSyncExecutionPath:
         assert result.completed_at is not None
 
     def test_execute_with_result_holder(self, classes, base_config, mock_agent, msg):
-        """Test execute() updates provided result_holder in real-time."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
@@ -1790,21 +1714,18 @@ class TestSyncExecutionPath:
 
 
 class TestAsyncToolSupport:
-    """Test that async-only tools (like MCP tools) work correctly."""
+    '未说明'
 
     @pytest.mark.anyio
     async def test_async_tool_called_in_astream(self, classes, base_config, msg):
-        """Test that async tools are properly awaited in astream.
-
-        This verifies the fix for: async MCP tools not being executed properly
-        because they were being called synchronously.
-        """
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
         async_tool_calls = []
 
         async def mock_async_tool(*args, **kwargs):
+            """处理模拟 工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             async_tool_calls.append("called")
             await asyncio.sleep(0.01)  # Simulate async work
             return {"result": "async tool result"}
@@ -1813,6 +1734,7 @@ class TestAsyncToolSupport:
 
         # Simulate agent that calls async tools during streaming
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             await mock_async_tool()
             yield {
                 "messages": [
@@ -1836,13 +1758,14 @@ class TestAsyncToolSupport:
         assert result.status == SubagentStatus.COMPLETED
 
     def test_sync_execute_with_async_tools(self, classes, base_config, msg):
-        """Test that sync execute() properly runs async tools via asyncio.run()."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
         async_tool_calls = []
 
         async def mock_async_tool():
+            """处理模拟 工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             async_tool_calls.append("called")
             await asyncio.sleep(0.01)
             return {"result": "async result"}
@@ -1850,6 +1773,7 @@ class TestAsyncToolSupport:
         mock_agent = MagicMock()
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             await mock_async_tool()
             yield {
                 "messages": [
@@ -1879,17 +1803,17 @@ class TestAsyncToolSupport:
 
 
 class TestThreadSafety:
-    """Test thread safety of executor operations."""
+    '未说明'
 
     @pytest.fixture
     def executor_module(self, _setup_executor_classes):
-        """Import the executor module with real classes."""
+        '未说明'
         executor = importlib.import_module("deerflow.subagents.executor")
 
         return _patch_default_get_app_config(importlib.reload(executor))
 
     def test_multiple_executors_in_parallel(self, classes, base_config, msg):
-        """Test multiple executors running in parallel via thread pool."""
+        '未说明'
         from concurrent.futures import ThreadPoolExecutor, as_completed
 
         SubagentExecutor = classes["SubagentExecutor"]
@@ -1898,7 +1822,9 @@ class TestThreadSafety:
         results = []
 
         def execute_task(task_id: int):
+            """处理任务相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             def make_astream(*args, **kwargs):
+                '未说明'
                 return async_iterator(
                     [
                         {
@@ -1934,7 +1860,7 @@ class TestThreadSafety:
             assert "Result" in result.result
 
     def test_terminal_status_is_published_after_payload_fields(self, executor_module, monkeypatch):
-        """Readers must not observe terminal status before terminal payload is complete."""
+        '未说明'
         SubagentResult = executor_module.SubagentResult
         SubagentStatus = executor_module.SubagentStatus
 
@@ -1944,8 +1870,10 @@ class TestThreadSafety:
         writer_errors: list[BaseException] = []
 
         class BlockingDateTime:
+            '未说明'
             @staticmethod
             def now():
+                '未说明'
                 now_entered.set()
                 release_now.wait(timeout=5)
                 return completed_at
@@ -1968,6 +1896,7 @@ class TestThreadSafety:
         ]
 
         def set_terminal():
+            '未说明'
             try:
                 assert result.try_set_terminal(
                     SubagentStatus.COMPLETED,
@@ -2002,18 +1931,18 @@ class TestThreadSafety:
 
 
 class TestCleanupBackgroundTask:
-    """Test cleanup_background_task function for race condition prevention."""
+    '未说明'
 
     @pytest.fixture
     def executor_module(self, _setup_executor_classes):
-        """Import the executor module with real classes."""
+        '未说明'
         # Re-import to get the real module with cleanup_background_task
         executor = importlib.import_module("deerflow.subagents.executor")
 
         return _patch_default_get_app_config(importlib.reload(executor))
 
     def test_cleanup_removes_terminal_completed_task(self, executor_module, classes):
-        """Test that cleanup removes a COMPLETED task."""
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2034,7 +1963,7 @@ class TestCleanupBackgroundTask:
         assert task_id not in executor_module._background_tasks
 
     def test_cleanup_removes_terminal_failed_task(self, executor_module, classes):
-        """Test that cleanup removes a FAILED task."""
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2053,7 +1982,7 @@ class TestCleanupBackgroundTask:
         assert task_id not in executor_module._background_tasks
 
     def test_cleanup_removes_terminal_timed_out_task(self, executor_module, classes):
-        """Test that cleanup removes a TIMED_OUT task."""
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2072,11 +2001,7 @@ class TestCleanupBackgroundTask:
         assert task_id not in executor_module._background_tasks
 
     def test_cleanup_skips_running_task(self, executor_module, classes):
-        """Test that cleanup does NOT remove a RUNNING task.
-
-        This prevents race conditions where task_tool calls cleanup
-        while the background executor is still updating the task.
-        """
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2095,7 +2020,7 @@ class TestCleanupBackgroundTask:
         assert task_id in executor_module._background_tasks
 
     def test_cleanup_skips_pending_task(self, executor_module, classes):
-        """Test that cleanup does NOT remove a PENDING task."""
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2112,16 +2037,12 @@ class TestCleanupBackgroundTask:
         assert task_id in executor_module._background_tasks
 
     def test_cleanup_handles_unknown_task_gracefully(self, executor_module):
-        """Test that cleanup doesn't raise for unknown task IDs."""
+        '未说明'
         # Should not raise
         executor_module.cleanup_background_task("nonexistent-task")
 
     def test_cleanup_removes_task_with_completed_at_even_if_running(self, executor_module, classes):
-        """Test that cleanup removes task if completed_at is set, even if status is RUNNING.
-
-        This is a safety net: if completed_at is set, the task is considered done
-        regardless of status.
-        """
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2146,18 +2067,18 @@ class TestCleanupBackgroundTask:
 
 
 class TestCooperativeCancellation:
-    """Test cooperative cancellation via cancel_event."""
+    '未说明'
 
     @pytest.fixture
     def executor_module(self, _setup_executor_classes):
-        """Import the executor module with real classes."""
+        '未说明'
         executor = importlib.import_module("deerflow.subagents.executor")
 
         return _patch_default_get_app_config(importlib.reload(executor))
 
     @pytest.mark.anyio
     async def test_aexecute_cancelled_before_streaming(self, classes, base_config, mock_agent, msg):
-        """Test that _aexecute returns CANCELLED when cancel_event is set before streaming."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
@@ -2166,6 +2087,7 @@ class TestCooperativeCancellation:
         call_count = 0
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             nonlocal call_count
             call_count += 1
             yield {"messages": [msg.human("Task"), msg.ai("Done", "msg-1")]}
@@ -2197,7 +2119,7 @@ class TestCooperativeCancellation:
 
     @pytest.mark.anyio
     async def test_aexecute_cancelled_mid_stream(self, classes, base_config, msg):
-        """Test that _aexecute returns CANCELLED when cancel_event is set during streaming."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
@@ -2205,6 +2127,7 @@ class TestCooperativeCancellation:
         cancel_event = threading.Event()
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             yield {"messages": [msg.human("Task"), msg.ai("Partial", "msg-1")]}
             # Simulate cancellation during streaming
             cancel_event.set()
@@ -2235,7 +2158,7 @@ class TestCooperativeCancellation:
         assert result.completed_at is not None
 
     def test_request_cancel_sets_event(self, executor_module, classes):
-        """Test that request_cancel_background_task sets the cancel_event."""
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2255,11 +2178,11 @@ class TestCooperativeCancellation:
         assert result.cancel_event.is_set()
 
     def test_request_cancel_nonexistent_task_is_noop(self, executor_module):
-        """Test that requesting cancellation on a nonexistent task does not raise."""
+        '未说明'
         executor_module.request_cancel_background_task("nonexistent-task")
 
     def test_execute_async_runs_without_calling_execute(self, executor_module, classes, base_config):
-        """Regression: execute_async should not route through execute()/asyncio.run()."""
+        '未说明'
         import concurrent.futures
 
         SubagentExecutor = classes["SubagentExecutor"]
@@ -2267,6 +2190,7 @@ class TestCooperativeCancellation:
         SubagentStatus = classes["SubagentStatus"]
 
         def run_inline(fn, *args, **kwargs):
+            """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             future = concurrent.futures.Future()
             try:
                 future.set_result(fn(*args, **kwargs))
@@ -2275,6 +2199,7 @@ class TestCooperativeCancellation:
             return future
 
         async def fake_aexecute(task, result_holder=None):
+            '未说明'
             result = result_holder or SubagentResult(
                 task_id="inline-task",
                 trace_id="test-trace",
@@ -2306,7 +2231,7 @@ class TestCooperativeCancellation:
         assert result.error is None
 
     def test_execute_async_propagates_user_context_to_isolated_loop(self, executor_module, classes, base_config):
-        """Regression: background subagent execution must keep request user context."""
+        '未说明'
         import concurrent.futures
 
         from deerflow.runtime.user_context import (
@@ -2319,6 +2244,7 @@ class TestCooperativeCancellation:
         SubagentStatus = classes["SubagentStatus"]
 
         async def fake_aexecute(task, result_holder=None):
+            '未说明'
             result = result_holder
             result.status = SubagentStatus.COMPLETED
             result.result = get_effective_user_id()
@@ -2353,14 +2279,7 @@ class TestCooperativeCancellation:
         assert result.error is None
 
     def test_timeout_does_not_overwrite_cancelled(self, executor_module, classes, base_config, msg):
-        """Test that the real timeout handler does not overwrite CANCELLED status.
-
-        This exercises the actual execute_async → run_task → FuturesTimeoutError
-        code path in executor.py.  We make execute() block so the timeout fires
-        deterministically, pre-set the task to CANCELLED, and verify the RUNNING
-        guard preserves it.  Uses threading.Event for synchronisation instead of
-        wall-clock sleeps.
-        """
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2378,6 +2297,7 @@ class TestCooperativeCancellation:
 
         # A blocking _aexecute() replacement so we control the timing exactly.
         async def blocking_aexecute(task, result_holder=None):
+            """处理阻塞相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             execute_entered.set()
             await asyncio.Event().wait()
 
@@ -2392,7 +2312,9 @@ class TestCooperativeCancellation:
         original_scheduler_submit = executor_module._scheduler_pool.submit
 
         def tracked_submit(fn, *args, **kwargs):
+            '未说明'
             def wrapper():
+                '未说明'
                 try:
                     fn(*args, **kwargs)
                 finally:
@@ -2426,7 +2348,7 @@ class TestCooperativeCancellation:
         assert result.completed_at is not None
 
     def test_late_completion_after_timeout_does_not_overwrite_timed_out(self, executor_module, classes, msg):
-        """Late completion from the execution worker must not overwrite TIMED_OUT."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2443,6 +2365,7 @@ class TestCooperativeCancellation:
         execution_done = threading.Event()
 
         async def mock_astream(*args, **kwargs):
+            """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             yield {"messages": [msg.human("Task"), msg.ai("late completion", "msg-late")]}
             first_chunk_seen.set()
             deadline = asyncio.get_running_loop().time() + 5
@@ -2463,6 +2386,7 @@ class TestCooperativeCancellation:
         original_aexecute = executor._aexecute
 
         async def tracked_aexecute(task, result_holder=None):
+            '未说明'
             try:
                 return await original_aexecute(task, result_holder)
             finally:
@@ -2489,7 +2413,7 @@ class TestCooperativeCancellation:
         assert result.completed_at == timed_out_completed_at
 
     def test_cleanup_removes_cancelled_task(self, executor_module, classes):
-        """Test that cleanup removes a CANCELLED task (terminal state)."""
+        '未说明'
         SubagentResult = classes["SubagentResult"]
         SubagentStatus = classes["SubagentStatus"]
 
@@ -2527,18 +2451,15 @@ class TestCooperativeCancellation:
 
 
 class _FakeStreamAgent:
-    """Stand-in agent that records the ``config`` passed to ``astream``.
-
-    Yields no chunks so ``_aexecute`` takes the ``final_state is None`` path
-    and finishes without exercising message-handling code that is unrelated
-    to the tracing wiring under test.
-    """
+    '未说明'
 
     def __init__(self) -> None:
+        '未说明'
         self.captured_config: dict | None = None
         self.captured_context: dict | None = None
 
     async def astream(self, state, *, config, context, stream_mode):  # noqa: ARG002 - signature parity
+        '未说明'
         self.captured_config = config
         self.captured_context = context
         return
@@ -2546,7 +2467,7 @@ class _FakeStreamAgent:
 
 
 class TestSubagentCheckpointLineage:
-    """Keep delegated graphs on the parent run's checkpoint lineage."""
+    '未说明'
 
     @pytest.mark.anyio
     async def test_aexecute_leaves_checkpoint_coordinates_to_parent_context(
@@ -2554,13 +2475,7 @@ class TestSubagentCheckpointLineage:
         classes,
         monkeypatch,
     ):
-        """A delegated graph must not declare a new root checkpoint lineage.
-
-        LangGraph treats any explicitly supplied checkpoint coordinate as an
-        independent lineage.  In particular, re-supplying the parent's own
-        ``thread_id`` clears the ambient ``checkpoint_ns`` on LangGraph 1.2.6+,
-        so the child is routed as a root graph instead of a subgraph.
-        """
+        '未说明'
         executor_module = importlib.import_module("deerflow.subagents.executor")
         monkeypatch.setattr(executor_module, "build_tracing_callbacks", lambda: [])
 
@@ -2580,6 +2495,7 @@ class TestSubagentCheckpointLineage:
         fake_agent = _FakeStreamAgent()
 
         async def build_initial_state(task):
+            """处理构建 状态相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return ({"messages": [classes["HumanMessage"](content=task)]}, [], None)
 
         monkeypatch.setattr(executor, "_build_initial_state", build_initial_state)
@@ -2609,7 +2525,7 @@ class TestSubagentCheckpointLineage:
         classes,
         monkeypatch,
     ):
-        """Child AI/tool frames stay outside the parent's messages stream."""
+        '未说明'
         from langchain_core.messages import AIMessage, ToolMessage
         from langgraph.checkpoint.memory import MemorySaver
         from langgraph.graph import END, START, MessagesState, StateGraph
@@ -2682,12 +2598,14 @@ class TestSubagentCheckpointLineage:
         )
 
         async def build_initial_state(task):
+            """处理构建 状态相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return ({"messages": [classes["HumanMessage"](content=task)]}, [], None)
 
         monkeypatch.setattr(executor, "_build_initial_state", build_initial_state)
         monkeypatch.setattr(executor, "_create_agent", lambda *args, **kwargs: child_graph)
 
         async def delegate(_state):
+            '未说明'
             task_id = executor.execute_async("run the child graph")
             try:
                 deadline = asyncio.get_running_loop().time() + 5
@@ -2738,18 +2656,17 @@ class TestSubagentCheckpointLineage:
 
 
 class TestSubagentTracingWiring:
-    """Verify the subagent graph-root tracing wiring matches the lead agent."""
+    '未说明'
 
     @pytest.fixture
     def executor_module(self, _setup_executor_classes):
+        '未说明'
         executor = importlib.import_module("deerflow.subagents.executor")
         return _patch_default_get_app_config(importlib.reload(executor))
 
     @pytest.fixture(autouse=True)
     def _clear_langfuse_env(self, monkeypatch):
-        """Reset tracing config and env between tests so monkeypatched env
-        vars do not leak across tests in this class or the rest of the suite.
-        """
+        '未说明'
         from deerflow.config.tracing_config import reset_tracing_config
 
         for name in ("LANGFUSE_TRACING", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL"):
@@ -2759,6 +2676,7 @@ class TestSubagentTracingWiring:
         reset_tracing_config()
 
     def _make_executor(self, classes, *, user_id=None, name="general-purpose", parent_model="test-model", deerflow_trace_id=None):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentConfig = classes["SubagentConfig"]
         config = SubagentConfig(
@@ -2785,9 +2703,7 @@ class TestSubagentTracingWiring:
         executor_module,
         monkeypatch,
     ):
-        """``build_tracing_callbacks()`` output must be appended (not replace)
-        to the existing callbacks so the SubagentTokenCollector keeps working.
-        """
+        '未说明'
         SubagentStatus = classes["SubagentStatus"]
 
         sentinel_handler = object()
@@ -2815,11 +2731,7 @@ class TestSubagentTracingWiring:
         executor_module,
         monkeypatch,
     ):
-        """When Langfuse is enabled, ``run_config['metadata']`` must carry the
-        parent thread_id (-> session_id), the constructor-supplied user_id, and
-        a ``subagent:<name>`` trace name so the subagent trace groups under
-        the parent thread's session card.
-        """
+        '未说明'
         monkeypatch.setenv("LANGFUSE_TRACING", "true")
         monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
         monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -2828,6 +2740,7 @@ class TestSubagentTracingWiring:
         reset_tracing_config()
 
         class _Sentinel:
+            '未说明'
             pass
 
         sentinel = _Sentinel()
@@ -2858,10 +2771,7 @@ class TestSubagentTracingWiring:
         executor_module,
         monkeypatch,
     ):
-        """When Langfuse is not in the enabled providers, ``inject_langfuse_metadata``
-        must be a no-op and ``run_config['metadata']`` must not carry langfuse_*
-        keys. LangSmith-only deployments are unaffected.
-        """
+        '未说明'
         monkeypatch.setattr(executor_module, "build_tracing_callbacks", lambda: [])
 
         executor = self._make_executor(classes, user_id="alice")
@@ -2882,10 +2792,7 @@ class TestSubagentTracingWiring:
         executor_module,
         monkeypatch,
     ):
-        """When ``user_id`` is None at construction (parent did not capture
-        one), the tracing layer must fall back to DEFAULT_USER_ID so the
-        Langfuse Users page still groups the trace.
-        """
+        '未说明'
         monkeypatch.setenv("LANGFUSE_TRACING", "true")
         monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
         monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -2912,9 +2819,7 @@ class TestSubagentTracingWiring:
         executor_module,
         monkeypatch,
     ):
-        """A subagent config without ``name`` must still produce a non-empty
-        trace name so Langfuse does not render the trace as unnamed.
-        """
+        '未说明'
         monkeypatch.setenv("LANGFUSE_TRACING", "true")
         monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
         monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -2954,9 +2859,7 @@ class TestSubagentTracingWiring:
         executor_module,
         monkeypatch,
     ):
-        """``DEER_FLOW_ENV`` must surface as an ``env:<value>`` tag so Langfuse
-        cost aggregation can split traces by deployment environment.
-        """
+        '未说明'
         monkeypatch.setenv("LANGFUSE_TRACING", "true")
         monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
         monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -2978,23 +2881,18 @@ class TestSubagentTracingWiring:
         assert "env:staging" in tags
 
     async def _noop_build_initial_state(self, task):  # noqa: ARG002 - signature parity
-        """Return a minimal state tuple so ``_aexecute`` reaches ``astream``
-        without loading skills, MCP tools, or the real config.
-        """
+        '未说明'
         from langchain_core.messages import HumanMessage
 
         return ({"messages": [HumanMessage(content=task)]}, [], None)
 
 
 class TestSubagentGuardrailAttribution:
-    """GuardrailMiddleware runs on subagents too, so the authenticated runtime
-    context captured at the lead-agent layer must reach the subagent's own
-    ``astream`` context — otherwise delegated tool calls are evaluated with
-    ``user_role=None`` and role-aware policy silently mis-attributes them.
-    """
+    '未说明'
 
     @pytest.fixture
     def executor_module(self, _setup_executor_classes):
+        '未说明'
         executor = importlib.import_module("deerflow.subagents.executor")
         return _patch_default_get_app_config(importlib.reload(executor))
 
@@ -3010,6 +2908,7 @@ class TestSubagentGuardrailAttribution:
         name="general-purpose",
         parent_model="test-model",
     ):
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentConfig = classes["SubagentConfig"]
         config = SubagentConfig(
@@ -3039,10 +2938,7 @@ class TestSubagentGuardrailAttribution:
         executor_module,
         monkeypatch,
     ):
-        """The authenticated runtime context captured at task_tool must reach
-        the subagent's ``astream`` context so GuardrailMiddleware sees the
-        same identity/attribution as the lead agent.
-        """
+        '未说明'
         executor = self._make_executor(
             classes,
             user_id="alice",
@@ -3073,10 +2969,7 @@ class TestSubagentGuardrailAttribution:
         executor_module,
         monkeypatch,
     ):
-        """The IM-channel sender identity captured at task_tool must reach the
-        subagent's ``astream`` context so delegated bash commands export the
-        dispatching turn's ``DEERFLOW_CHANNEL_USER_ID`` (group chats share one
-        thread across senders)."""
+        '未说明'
         SubagentExecutor = classes["SubagentExecutor"]
         SubagentConfig = classes["SubagentConfig"]
         executor = SubagentExecutor(
@@ -3110,10 +3003,7 @@ class TestSubagentGuardrailAttribution:
         executor_module,
         monkeypatch,
     ):
-        """When no authenticated context is propagated (e.g. internal-auth
-        runs), the subagent context still carries the attribution keys as
-        None so GuardrailRequest fields stay None rather than KeyError-ing.
-        """
+        '未说明'
         executor = self._make_executor(classes)
         fake_agent = _FakeStreamAgent()
         monkeypatch.setattr(executor, "_build_initial_state", self._noop_build_initial_state)
@@ -3129,6 +3019,7 @@ class TestSubagentGuardrailAttribution:
         assert context.get("run_id") is None
 
     async def _noop_build_initial_state(self, task):  # noqa: ARG002 - signature parity
+        '未说明'
         from langchain_core.messages import HumanMessage
 
         return ({"messages": [HumanMessage(content=task)]}, [], None)

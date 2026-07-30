@@ -170,6 +170,7 @@ void main() {
 }
 `;
 
+/** Galaxy 组件：提供对应的界面结构与交互语义。 */
 export default function Galaxy({
   focal = [0.5, 0.5],
   rotation = [1.0, 0.0],

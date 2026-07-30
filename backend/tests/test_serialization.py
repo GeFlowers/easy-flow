@@ -1,39 +1,45 @@
-"""Tests for deerflow.runtime.serialization."""
+'未说明'
 
 from __future__ import annotations
 
 
 class _FakePydanticV2:
-    """Object with model_dump (Pydantic v2)."""
+    '未说明'
 
     def model_dump(self):
+        """处理模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return {"key": "v2"}
 
 
 class _FakePydanticV1:
-    """Object with dict (Pydantic v1)."""
+    '未说明'
 
     def dict(self):
+        '未说明'
         return {"key": "v1"}
 
 
 class _Unprintable:
-    """Object whose str() raises."""
+    '未说明'
 
     def __str__(self):
+        '未说明'
         raise RuntimeError("no str")
 
     def __repr__(self):
+        '未说明'
         return "<Unprintable>"
 
 
 def test_serialize_none():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     assert serialize_lc_object(None) is None
 
 
 def test_serialize_primitives():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     assert serialize_lc_object("hello") == "hello"
@@ -43,6 +49,7 @@ def test_serialize_primitives():
 
 
 def test_serialize_dict():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     obj = {"a": _FakePydanticV2(), "b": [1, "two"]}
@@ -51,6 +58,7 @@ def test_serialize_dict():
 
 
 def test_serialize_list():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     result = serialize_lc_object([_FakePydanticV1(), 1])
@@ -58,6 +66,7 @@ def test_serialize_list():
 
 
 def test_serialize_tuple():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     result = serialize_lc_object((_FakePydanticV2(),))
@@ -65,18 +74,21 @@ def test_serialize_tuple():
 
 
 def test_serialize_pydantic_v2():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     assert serialize_lc_object(_FakePydanticV2()) == {"key": "v2"}
 
 
 def test_serialize_pydantic_v1():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     assert serialize_lc_object(_FakePydanticV1()) == {"key": "v1"}
 
 
 def test_serialize_fallback_str():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     result = serialize_lc_object(object())
@@ -84,12 +96,14 @@ def test_serialize_fallback_str():
 
 
 def test_serialize_fallback_repr():
+    '未说明'
     from deerflow.runtime.serialization import serialize_lc_object
 
     assert serialize_lc_object(_Unprintable()) == "<Unprintable>"
 
 
 def test_serialize_channel_values_strips_pregel_keys():
+    '未说明'
     from deerflow.runtime.serialization import serialize_channel_values
 
     raw = {
@@ -111,6 +125,7 @@ def test_serialize_channel_values_strips_pregel_keys():
 
 
 def test_serialize_channel_values_serializes_objects():
+    '未说明'
     from deerflow.runtime.serialization import serialize_channel_values
 
     result = serialize_channel_values({"obj": _FakePydanticV2()})
@@ -118,6 +133,7 @@ def test_serialize_channel_values_serializes_objects():
 
 
 def test_serialize_messages_tuple():
+    '未说明'
     from deerflow.runtime.serialization import serialize_messages_tuple
 
     chunk = _FakePydanticV2()
@@ -127,6 +143,7 @@ def test_serialize_messages_tuple():
 
 
 def test_serialize_messages_tuple_non_dict_metadata():
+    '未说明'
     from deerflow.runtime.serialization import serialize_messages_tuple
 
     result = serialize_messages_tuple((_FakePydanticV2(), "not-a-dict"))
@@ -134,6 +151,7 @@ def test_serialize_messages_tuple_non_dict_metadata():
 
 
 def test_serialize_messages_tuple_fallback():
+    '未说明'
     from deerflow.runtime.serialization import serialize_messages_tuple
 
     result = serialize_messages_tuple("not-a-tuple")
@@ -141,6 +159,7 @@ def test_serialize_messages_tuple_fallback():
 
 
 def test_serialize_dispatcher_messages_mode():
+    '未说明'
     from deerflow.runtime.serialization import serialize
 
     chunk = _FakePydanticV2()
@@ -149,6 +168,7 @@ def test_serialize_dispatcher_messages_mode():
 
 
 def test_serialize_dispatcher_values_mode():
+    '未说明'
     from deerflow.runtime.serialization import serialize
 
     result = serialize({"msg": "hi", "__pregel_tasks": "x"}, mode="values")
@@ -156,6 +176,7 @@ def test_serialize_dispatcher_values_mode():
 
 
 def test_serialize_dispatcher_default_mode():
+    '未说明'
     from deerflow.runtime.serialization import serialize
 
     result = serialize(_FakePydanticV1())
@@ -171,7 +192,7 @@ def _make_msg(
     hide_from_ui=False,
     msg_type="human",
 ):
-    """Build a serialised-style message dict."""
+    '未说明'
     msg = {"type": msg_type, "content": content}
     if hide_from_ui:
         msg["additional_kwargs"] = {"hide_from_ui": True}
@@ -179,6 +200,7 @@ def _make_msg(
 
 
 def test_strip_data_url_removes_base64_from_hidden_messages():
+    '未说明'
     from deerflow.runtime.serialization import strip_data_url_image_blocks
 
     messages = [
@@ -209,6 +231,7 @@ def test_strip_data_url_removes_base64_from_hidden_messages():
 
 
 def test_strip_data_url_preserves_non_hidden_messages():
+    '未说明'
     from deerflow.runtime.serialization import strip_data_url_image_blocks
 
     messages = [
@@ -228,6 +251,7 @@ def test_strip_data_url_preserves_non_hidden_messages():
 
 
 def test_strip_data_url_preserves_https_image_urls():
+    '未说明'
     from deerflow.runtime.serialization import strip_data_url_image_blocks
 
     messages = [
@@ -247,6 +271,7 @@ def test_strip_data_url_preserves_https_image_urls():
 
 
 def test_strip_data_url_handles_string_content():
+    '未说明'
     from deerflow.runtime.serialization import strip_data_url_image_blocks
 
     messages = [
@@ -257,6 +282,7 @@ def test_strip_data_url_handles_string_content():
 
 
 def test_strip_data_url_handles_non_dict_messages():
+    '未说明'
     from deerflow.runtime.serialization import strip_data_url_image_blocks
 
     result = strip_data_url_image_blocks(["a_string", None, 42])
@@ -264,7 +290,7 @@ def test_strip_data_url_handles_non_dict_messages():
 
 
 def test_strip_data_url_mixed_messages():
-    """A realistic mix: normal user message + hidden image injection + AI reply."""
+    '未说明'
     from deerflow.runtime.serialization import strip_data_url_image_blocks
 
     messages = [
@@ -292,6 +318,7 @@ def test_strip_data_url_mixed_messages():
 
 
 def test_serialize_channel_values_for_api_strips_base64():
+    '未说明'
     from deerflow.runtime.serialization import serialize_channel_values_for_api
 
     channel_values = {
@@ -323,7 +350,7 @@ def test_serialize_channel_values_for_api_strips_base64():
 
 
 def test_serialize_channel_values_for_api_no_messages():
-    """When channel_values has no messages key, returns without error."""
+    '未说明'
     from deerflow.runtime.serialization import serialize_channel_values_for_api
 
     result = serialize_channel_values_for_api({"title": "empty"})
@@ -331,9 +358,7 @@ def test_serialize_channel_values_for_api_no_messages():
 
 
 def test_serialize_values_mode_strips_base64_from_hidden_messages():
-    """The SSE stream emits ``values`` snapshots of the full state, so it must
-    strip base64 image data from hide_from_ui messages just like the REST
-    endpoints do — otherwise the same payload leaks over the stream."""
+    '未说明'
     import json
 
     from deerflow.runtime.serialization import serialize

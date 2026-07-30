@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# status.sh — Check DeerFlow status and list available resources.
+# status.sh — 检查 DeerFlow 状态并列出可用资源。
 #
-# Usage:
+# 用法：
 #   bash status.sh                  # health + summary
 #   bash status.sh models           # list models
 #   bash status.sh skills           # list skills
@@ -10,10 +10,10 @@
 #   bash status.sh memory           # show memory
 #   bash status.sh thread <id>      # show thread history
 #
-# Environment variables:
-#   DEERFLOW_URL           — Unified proxy base URL (default: http://localhost:2026)
-#   DEERFLOW_GATEWAY_URL   — Gateway API base URL (default: $DEERFLOW_URL)
-#   DEERFLOW_LANGGRAPH_URL — LangGraph API base URL (default: $DEERFLOW_URL/api/langgraph)
+# 环境变量：
+#   DEERFLOW_URL           — 统一代理基地址（默认：http://localhost:2026）
+#   DEERFLOW_GATEWAY_URL   — Gateway API 基地址（默认：$DEERFLOW_URL）
+#   DEERFLOW_LANGGRAPH_URL — LangGraph API 基地址（默认：$DEERFLOW_URL/api/langgraph）
 
 set -euo pipefail
 

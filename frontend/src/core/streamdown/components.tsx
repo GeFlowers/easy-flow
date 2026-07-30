@@ -18,6 +18,7 @@ import {
   useSafeStreamdownMarkdown,
 } from "./safe-children";
 
+/** 使用安全预处理结果渲染通用流式内容。 */
 export function SafeStreamdown({
   children,
   ...props
@@ -29,6 +30,7 @@ export function SafeStreamdown({
   );
 }
 
+/** 使用安全预处理结果渲染消息回复。 */
 export function SafeMessageResponse({
   children,
   ...props
@@ -38,6 +40,7 @@ export function SafeMessageResponse({
   return <MessageResponse {...props}>{safeChildren}</MessageResponse>;
 }
 
+/** 使用安全预处理结果渲染推理内容。 */
 export function SafeReasoningContent({
   children,
   ...props

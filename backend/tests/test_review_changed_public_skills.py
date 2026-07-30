@@ -1,3 +1,4 @@
+"""本模块覆盖审查 变更 公开的行为、边界与回归场景，确保既有契约稳定。"""
 from __future__ import annotations
 
 import subprocess
@@ -7,10 +8,12 @@ import review_changed_public_skills as runner
 
 
 def _completed(command: list[str], *, stdout: bytes = b"", returncode: int = 0) -> subprocess.CompletedProcess[bytes]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     return subprocess.CompletedProcess(command, returncode, stdout=stdout, stderr=b"")
 
 
 def _write_skill(repo_root: Path, package: str) -> Path:
+    """准备可控测试资源与状态，供后续断言读取。"""
     skill_md = repo_root / "skills" / "public" / package / "SKILL.md"
     skill_md.parent.mkdir(parents=True, exist_ok=True)
     skill_md.write_text("---\nname: demo\ndescription: Demo skill.\n---\n", encoding="utf-8")
@@ -18,7 +21,9 @@ def _write_skill(repo_root: Path, package: str) -> Path:
 
 
 def test_main_skips_successfully_when_no_public_skill_changed(tmp_path: Path, monkeypatch, capsys) -> None:
+    """验证公开 技能 变更在预期条件及边界场景下的可观察行为，防止相关回归。"""
     def fake_run(command, **kwargs):
+        """处理仿真 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert command == [
             "git",
             "diff",
@@ -34,6 +39,7 @@ def test_main_skips_successfully_when_no_public_skill_changed(tmp_path: Path, mo
         return _completed(command)
 
     def fail_review(*args, **kwargs):
+        """处理审查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise AssertionError("review should not run when no public skill package file changed")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_run)
@@ -60,6 +66,7 @@ def test_main_reviews_changed_public_skill_and_skips_deleted_skill_md(
     monkeypatch,
     capsys,
 ) -> None:
+    """验证变更 公开 技能 技能在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _write_skill(tmp_path, "alpha")
     _write_skill(tmp_path, "alpha/evals/fixtures/blocked")
     diff_output = b"\0".join(
@@ -80,10 +87,12 @@ def test_main_reviews_changed_public_skill_and_skips_deleted_skill_md(
     reviewed: list[str] = []
 
     def fake_git_diff(command, **kwargs):
+        """处理仿真相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert command[:3] == ["git", "diff", "--name-status"]
         return _completed(command, stdout=diff_output)
 
     def fake_review(package: Path, repo_root: Path, python_executable: str) -> int:
+        """处理仿真 审查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert repo_root == tmp_path
         assert python_executable
         reviewed.append(package.relative_to(repo_root).as_posix())
@@ -114,6 +123,7 @@ def test_main_reviews_changed_public_skill_and_skips_deleted_skill_md(
 def test_main_skips_fully_deleted_skill_package(tmp_path: Path, monkeypatch, capsys) -> None:
     # Nothing is written to tmp_path for "removed": the whole package (SKILL.md and its
     # other files) was deleted, so the package directory does not exist on disk anymore.
+    """验证技能在预期条件及边界场景下的可观察行为，防止相关回归。"""
     diff_output = b"\0".join(
         [
             b"D",
@@ -127,9 +137,11 @@ def test_main_skips_fully_deleted_skill_package(tmp_path: Path, monkeypatch, cap
     )
 
     def fake_git_diff(command, **kwargs):
+        """处理仿真相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _completed(command, stdout=diff_output)
 
     def fail_review(*args, **kwargs):
+        """处理审查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise AssertionError("review should not run for a fully deleted skill package")
 
     monkeypatch.setattr(runner.subprocess, "run", fake_git_diff)
@@ -160,6 +172,7 @@ def test_main_reviews_package_when_skill_md_deleted_but_sibling_file_remains(
 ) -> None:
     # SKILL.md was deleted but a sibling package file still exists on disk: this is a
     # broken/partial package, not a full removal, and must still be queued for review.
+    """验证技能 文件在预期条件及边界场景下的可观察行为，防止相关回归。"""
     skill_dir = tmp_path / "skills" / "public" / "broken"
     (skill_dir / "scripts").mkdir(parents=True, exist_ok=True)
     (skill_dir / "scripts" / "helper.py").write_text("def helper():\n    return 1\n", encoding="utf-8")
@@ -176,9 +189,11 @@ def test_main_reviews_package_when_skill_md_deleted_but_sibling_file_remains(
     reviewed: list[str] = []
 
     def fake_git_diff(command, **kwargs):
+        """处理仿真相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _completed(command, stdout=diff_output)
 
     def fake_review(package: Path, repo_root: Path, python_executable: str) -> int:
+        """处理仿真 审查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         reviewed.append(package.relative_to(repo_root).as_posix())
         return 1
 
@@ -208,15 +223,18 @@ def test_main_reviews_package_when_only_support_file_changed(
     monkeypatch,
     capsys,
 ) -> None:
+    """验证支持 文件 变更在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _write_skill(tmp_path, "alpha")
     diff_output = b"M\0skills/public/alpha/references/guide.md\0"
     reviewed: list[str] = []
 
     def fake_git_diff(command, **kwargs):
+        """处理仿真相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert command[-1] == runner.PUBLIC_SKILL_PACKAGE_PATHSPEC
         return _completed(command, stdout=diff_output)
 
     def fake_review(package: Path, repo_root: Path, python_executable: str) -> int:
+        """处理仿真 审查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         reviewed.append(package.relative_to(repo_root).as_posix())
         return 0
 
@@ -244,15 +262,18 @@ def test_main_maps_eval_fixture_changes_to_owner_package(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
+    """验证夹具 所有者在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _write_skill(tmp_path, "skill-reviewer")
     _write_skill(tmp_path, "skill-reviewer/evals/fixtures/blocked")
     diff_output = b"M\0skills/public/skill-reviewer/evals/fixtures/blocked/SKILL.md\0"
     reviewed: list[str] = []
 
     def fake_git_diff(command, **kwargs):
+        """处理仿真相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _completed(command, stdout=diff_output)
 
     def fake_review(package: Path, repo_root: Path, python_executable: str) -> int:
+        """处理仿真 审查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         reviewed.append(package.relative_to(repo_root).as_posix())
         return 0
 
@@ -275,11 +296,13 @@ def test_main_maps_eval_fixture_changes_to_owner_package(
 
 
 def test_main_exits_nonzero_when_review_cli_reports_error(tmp_path: Path, monkeypatch, capsys) -> None:
+    """验证审查 命令行 错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _write_skill(tmp_path, "bad")
     diff_output = b"M\0skills/public/bad/SKILL.md\0"
     calls: list[list[str]] = []
 
     def fake_run(command, **kwargs):
+        """处理仿真 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         calls.append(command)
         if command[0] == "git":
             return _completed(command, stdout=diff_output)
@@ -323,18 +346,21 @@ def test_main_exits_nonzero_when_review_cli_reports_error(tmp_path: Path, monkey
 
 
 def test_main_falls_back_to_empty_tree_when_push_before_is_missing(tmp_path: Path, monkeypatch, capsys) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     _write_skill(tmp_path, "alpha")
     diff_output = b"M\0skills/public/alpha/SKILL.md\0"
     calls: list[list[str]] = []
     reviewed: list[str] = []
 
     def fake_run(command, **kwargs):
+        """处理仿真 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         calls.append(command)
         if len(calls) == 1:
             return subprocess.CompletedProcess(command, 128, stdout=b"", stderr=b"fatal: bad object before")
         return _completed(command, stdout=diff_output)
 
     def fake_review(package: Path, repo_root: Path, python_executable: str) -> int:
+        """处理仿真 审查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         reviewed.append(package.relative_to(repo_root).as_posix())
         return 0
 
@@ -360,22 +386,26 @@ def test_main_falls_back_to_empty_tree_when_push_before_is_missing(tmp_path: Pat
 
 
 def test_is_fully_removed_package_true_when_all_deletions_and_directory_missing(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     package_rel = PurePosixPath("skills/public/removed")
     assert runner.is_fully_removed_package(package_rel, ["D", "D"], tmp_path) is True
 
 
 def test_is_fully_removed_package_false_when_directory_still_exists(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     package_rel = PurePosixPath("skills/public/broken")
     (tmp_path / package_rel).mkdir(parents=True)
     assert runner.is_fully_removed_package(package_rel, ["D", "D"], tmp_path) is False
 
 
 def test_is_fully_removed_package_false_when_any_status_is_not_a_deletion(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     package_rel = PurePosixPath("skills/public/partial")
     assert runner.is_fully_removed_package(package_rel, ["D", "M"], tmp_path) is False
 
 
 def test_is_zero_sha_requires_full_sha_length() -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     assert runner.is_zero_sha("0" * 40) is True
     assert runner.is_zero_sha("0" * 64) is True
     assert runner.is_zero_sha("0") is False

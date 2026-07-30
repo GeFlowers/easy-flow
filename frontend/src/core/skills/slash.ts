@@ -1,13 +1,8 @@
 import type { Skill } from "./type";
 
 /**
- * Composer control commands that own the leading slash. They must never be
- * shown as skill activations. These values plus {@link SLASH_SKILL_RE} mirror
- * the backend gate in `deerflow/skills/slash.py`; both sides are pinned to the
- * shared fixture at `contracts/slash_skill_contract.json` by contract tests
- * (`tests/unit/core/skills/slash-contract.test.ts` here,
- * `tests/test_slash_skill_contract.py` on the backend), so adding a reserved
- * command or changing the name grammar in only one language fails CI.
+ * 占用前导斜杠的编辑器控制命令，绝不可显示为技能激活。其取值和名称语法必须镜像后端拦截规则；
+ * 前后端的契约测试均固定到共享样例。只在一端新增保留命令或改变名称语法会使持续集成失败。
  */
 export const RESERVED_SLASH_SKILL_NAMES = new Set([
   "bootstrap",
@@ -19,17 +14,18 @@ export const RESERVED_SLASH_SKILL_NAMES = new Set([
   "status",
 ]);
 
+/** 匹配严格的斜杠技能名称语法；必须与后端共享契约保持一致。 */
 export const SLASH_SKILL_RE = /^\/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s+|$)/;
 
+/** 从文本开头解析出的技能名称及其剩余任务文本。 */
 export type SlashSkillReference = {
   name: string;
   remainingText: string;
 };
 
 /**
- * Parse strict `/skill-name task` syntax, ignoring reserved control commands.
- * Mirrors the backend `parse_slash_skill_reference`; returns null when the text
- * is not a slash-skill activation.
+ * 解析严格的“斜杠技能名加任务”语法，并忽略保留控制命令。该规则镜像后端；
+ * 文本不是斜杠技能激活时返回空值。
  */
 export function parseSlashSkillReference(
   text: string,
@@ -49,10 +45,8 @@ export function parseSlashSkillReference(
 }
 
 /**
- * Resolve a slash-skill reference against the enabled skill catalog, matching
- * the backend `resolve_slash_skill` gate: only an installed + enabled skill
- * activates. Returns null when the text is not a slash command or the skill is
- * unknown/disabled, so callers fall back to plain-text rendering.
+ * 按已启用的技能目录解析斜杠技能引用，匹配后端拦截规则：仅已安装且启用的技能可以激活。
+ * 文本不是斜杠命令，或技能未知／已禁用时返回空值，使调用方回退为纯文本渲染。
  */
 export function resolveSlashSkillDisplay(
   text: string,

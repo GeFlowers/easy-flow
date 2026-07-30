@@ -5,6 +5,7 @@ import { useThread } from "@/components/workspace/messages/context";
 
 import { loadArtifactContent, loadArtifactContentFromToolCall } from "./loader";
 
+/** 加载线程制品内容，并在写文件临时制品时直接从消息流中还原草稿。 */
 export function useArtifactContent({
   filepath,
   threadId,
@@ -31,7 +32,7 @@ export function useArtifactContent({
       return loadArtifactContent({ filepath, threadId, isMock });
     },
     enabled,
-    // Cache artifact content for 5 minutes to avoid repeated fetches (especially for .skill ZIP extraction)
+    // 缓存制品内容五分钟，避免重复获取，尤其是 .skill ZIP 解压场景。
     staleTime: 5 * 60 * 1000,
   });
   return {

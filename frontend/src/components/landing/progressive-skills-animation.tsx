@@ -47,7 +47,7 @@ const searchSteps = [
   { type: "search", text: "targeted mRNA tissue-specific" },
 ];
 
-// Animation duration configuration - adjust the duration for each step here
+// 动画时长配置：在此调整各阶段的持续时间。
 const ANIMATION_DELAYS = {
   "user-input": 0, // User input phase duration (milliseconds)
   scanning: 2000, // Scanning phase duration
@@ -61,6 +61,7 @@ const ANIMATION_DELAYS = {
   done: 2500, // Done phase duration (final step)
 } as const;
 
+/** ProgressiveSkillsAnimation 组件：提供对应的界面结构与交互语义。 */
 export default function ProgressiveSkillsAnimation() {
   const [phase, setPhase] = useState<AnimationPhase>("idle");
   const [searchIndex, setSearchIndex] = useState(0);
@@ -74,13 +75,13 @@ export default function ProgressiveSkillsAnimation() {
   const containerRef = useRef<HTMLDivElement>(null);
   const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
 
-  // Additional display duration after the final step (done) completes, used to show the final result
+  // 最终阶段完成后额外展示一段时间，以便看清最终结果。
   const FINAL_DISPLAY_DURATION = 3000; // milliseconds
 
-  // Play animation only when isPlaying is true
+  // 仅在 isPlaying 为 true 时运行动画。
   useEffect(() => {
     if (!isPlaying) {
-      // Clear all timeouts when paused
+      // 暂停时清除全部计时器，避免后台继续推进动画。
       timeoutsRef.current.forEach(clearTimeout);
       timeoutsRef.current = [];
       return;
@@ -113,8 +114,8 @@ export default function ProgressiveSkillsAnimation() {
       timeouts.push(setTimeout(() => setPhase(phase), totalDelay));
     });
 
-    // Reset after animation completes
-    // Total duration for the final step = ANIMATION_DELAYS["done"] + FINAL_DISPLAY_DURATION
+    // 动画完成后重置。
+    // 最终阶段总时长为 ANIMATION_DELAYS["done"] 加上 FINAL_DISPLAY_DURATION。
     timeouts.push(
       setTimeout(() => {
         setPhase("idle");
@@ -148,17 +149,17 @@ export default function ProgressiveSkillsAnimation() {
     if (isPlaying) {
       setIsPlaying(false);
     } else {
-      // If animation hasn't started or is at idle, restart from beginning
+      // 尚未开始或处于空闲阶段时，从开头重新播放。
       if (phase === "idle") {
         handlePlay();
       } else {
-        // Resume from current phase
+        // 否则从当前阶段继续。
         setIsPlaying(true);
       }
     }
   };
 
-  // Auto-play when component enters viewport for the first time
+  // 组件首次进入视口时自动播放。
   useEffect(() => {
     if (hasAutoPlayed || !containerRef.current) return;
 
@@ -168,7 +169,7 @@ export default function ProgressiveSkillsAnimation() {
         entries.forEach((entry) => {
           if (entry.isIntersecting && !hasAutoPlayed && !isPlaying) {
             setHasAutoPlayed(true);
-            // Small delay before auto-playing for better UX
+            // 自动播放前短暂延迟，避免突兀出现。
             setTimeout(() => {
               setIsPlaying(true);
               setHasPlayed(true);
@@ -196,7 +197,7 @@ export default function ProgressiveSkillsAnimation() {
     };
   }, [hasAutoPlayed, isPlaying]);
 
-  // Handle search animation
+  // 处理搜索阶段动画。
   useEffect(() => {
     if (phase === "researching" && searchIndex < searchSteps.length) {
       const timer = setTimeout(() => {
@@ -206,7 +207,7 @@ export default function ProgressiveSkillsAnimation() {
     }
   }, [phase, searchIndex]);
 
-  // Handle build animation
+  // 处理构建阶段动画。
   useEffect(() => {
     if (phase === "building" && buildIndex < 3) {
       const timer = setTimeout(() => {
@@ -219,7 +220,7 @@ export default function ProgressiveSkillsAnimation() {
     }
   }, [phase, buildIndex]);
 
-  // Auto scroll chat to bottom when messages change
+  // 消息变化时自动滚动到聊天底部。
   useEffect(() => {
     if (chatMessagesRef.current && phase !== "idle") {
       chatMessagesRef.current.scrollTo({
@@ -334,7 +335,7 @@ export default function ProgressiveSkillsAnimation() {
       ref={containerRef}
       className="relative flex h-[calc(100vh-280px)] w-full items-center justify-center overflow-hidden p-8"
     >
-      {/* Overlay and Play Button */}
+      {/* 遮罩层与播放按钮。 */}
       <AnimatePresence>
         {!isPlaying && !hasPlayed && (
           <motion.div
@@ -365,7 +366,7 @@ export default function ProgressiveSkillsAnimation() {
         )}
       </AnimatePresence>
 
-      {/* Bottom Left Play/Pause Button */}
+      {/* 左下角播放/暂停按钮。 */}
       <Tooltip content="Play / Pause">
         <div className="absolute bottom-12 left-12 z-40 flex items-center gap-2">
           <motion.button
@@ -387,7 +388,7 @@ export default function ProgressiveSkillsAnimation() {
       </Tooltip>
 
       <div className="flex h-full max-h-[700px] w-full max-w-6xl gap-8">
-        {/* Left: File Tree */}
+        {/* 左侧：文件树。 */}
         <div className="flex flex-1 flex-col">
           <motion.div
             className="mb-4 font-mono text-sm text-zinc-500"
@@ -455,9 +456,9 @@ export default function ProgressiveSkillsAnimation() {
           </div>
         </div>
 
-        {/* Right: Chat Interface */}
+        {/* 右侧：聊天界面。 */}
         <div className="flex flex-1 flex-col overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-900/50">
-          {/* Chat Header */}
+          {/* 聊天标题栏。 */}
           <div className="border-b border-zinc-800 p-4">
             <div className="flex items-center gap-2">
               <div className="h-3 w-3 rounded-full bg-green-500" />
@@ -465,12 +466,12 @@ export default function ProgressiveSkillsAnimation() {
             </div>
           </div>
 
-          {/* Chat Messages */}
+          {/* 聊天消息。 */}
           <div
             ref={chatMessagesRef}
             className="flex-1 space-y-4 overflow-y-auto p-6"
           >
-            {/* User Message */}
+            {/* 用户消息。 */}
             <AnimatePresence>
               {phase !== "idle" && (
                 <motion.div
@@ -488,7 +489,7 @@ export default function ProgressiveSkillsAnimation() {
               )}
             </AnimatePresence>
 
-            {/* Agent Messages */}
+            {/* 智能体消息。 */}
             <AnimatePresence>
               {phase !== "idle" && phase !== "user-input" && (
                 <motion.div
@@ -496,7 +497,7 @@ export default function ProgressiveSkillsAnimation() {
                   animate={{ opacity: 1, y: 0 }}
                   className="space-y-3"
                 >
-                  {/* Found Skills */}
+                  {/* 已找到的技能。 */}
                   {[
                     "scanning",
                     "load-skill",
@@ -513,7 +514,7 @@ export default function ProgressiveSkillsAnimation() {
                     </div>
                   )}
 
-                  {/* Researching Section */}
+                  {/* 研究阶段。 */}
                   {[
                     "load-skill",
                     "load-template",
@@ -530,7 +531,7 @@ export default function ProgressiveSkillsAnimation() {
                         🔬 Researching...
                       </div>
                       <div className="mb-3 space-y-2">
-                        {/* Loading SKILL.md */}
+                        {/* 正在加载 SKILL.md。 */}
                         {[
                           "load-skill",
                           "load-template",
@@ -546,7 +547,7 @@ export default function ProgressiveSkillsAnimation() {
                             <span>Loading deep-search/SKILL.md...</span>
                           </div>
                         )}
-                        {/* Loading biotech.md */}
+                        {/* 正在加载 biotech.md。 */}
                         {[
                           "load-template",
                           "researching",
@@ -565,7 +566,7 @@ export default function ProgressiveSkillsAnimation() {
                           </div>
                         )}
                       </div>
-                      {/* Search steps */}
+                      {/* 搜索步骤。 */}
                       {phase === "researching" && (
                         <div className="max-h-[180px] space-y-2 overflow-hidden pl-4">
                           {searchSteps.slice(0, searchIndex).map((step, i) => (
@@ -613,7 +614,7 @@ export default function ProgressiveSkillsAnimation() {
                     </div>
                   )}
 
-                  {/* Building */}
+                  {/* 构建阶段。 */}
                   {["building", "load-deploy", "deploying", "done"].includes(
                     phase,
                   ) && (
@@ -645,7 +646,7 @@ export default function ProgressiveSkillsAnimation() {
                     </motion.div>
                   )}
 
-                  {/* Deploying */}
+                  {/* 部署阶段。 */}
                   {["load-deploy", "deploying", "done"].includes(phase) && (
                     <motion.div
                       initial={{ opacity: 0 }}
@@ -688,7 +689,7 @@ export default function ProgressiveSkillsAnimation() {
             </AnimatePresence>
           </div>
 
-          {/* Chat Input (decorative) */}
+          {/* 聊天输入框（仅作装饰）。 */}
           <div className="border-t border-zinc-800 p-4">
             <div className="rounded-xl bg-zinc-800 px-4 py-3 text-sm text-zinc-500">
               Ask DeerFlow anything...

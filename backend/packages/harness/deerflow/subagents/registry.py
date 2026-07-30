@@ -1,4 +1,4 @@
-"""Subagent registry for managing available subagents."""
+"""提供子代理隔离执行、调度校验或终端异步交互功能。"""
 
 import logging
 from dataclasses import replace
@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_subagents_app_config(app_config: Any | None = None):
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     if app_config is None:
         from deerflow.config.subagents_config import get_subagents_app_config
 
@@ -20,15 +21,7 @@ def _resolve_subagents_app_config(app_config: Any | None = None):
 
 
 def _build_custom_subagent_config(name: str, *, app_config: Any | None = None) -> SubagentConfig | None:
-    """Build a SubagentConfig from config.yaml custom_agents section.
-
-    Args:
-        name: The name of the custom subagent.
-        app_config: Optional AppConfig or SubagentsAppConfig to resolve from.
-
-    Returns:
-        SubagentConfig if found in custom_agents, None otherwise.
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     subagents_config = _resolve_subagents_app_config(app_config)
     custom = subagents_config.custom_agents.get(name)
     if custom is None:
@@ -48,20 +41,7 @@ def _build_custom_subagent_config(name: str, *, app_config: Any | None = None) -
 
 
 def get_subagent_config(name: str, *, app_config: Any | None = None) -> SubagentConfig | None:
-    """Get a subagent configuration by name, with config.yaml overrides applied.
-
-    Resolution order (mirrors Codex's config layering):
-    1. Built-in subagents (general-purpose, bash)
-    2. Custom subagents from config.yaml custom_agents section
-    3. Per-agent overrides from config.yaml agents section (timeout, max_turns, model, skills)
-
-    Args:
-        name: The name of the subagent.
-        app_config: Optional AppConfig or SubagentsAppConfig to resolve overrides from.
-
-    Returns:
-        SubagentConfig if found (with any config.yaml overrides applied), None otherwise.
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     # Step 1: Look up built-in, then fall back to custom_agents
     config = BUILTIN_SUBAGENTS.get(name)
     if config is None:
@@ -117,11 +97,7 @@ def get_subagent_config(name: str, *, app_config: Any | None = None) -> Subagent
 
 
 def list_subagents(*, app_config: Any | None = None) -> list[SubagentConfig]:
-    """List all available subagent configurations (with config.yaml overrides applied).
-
-    Returns:
-        List of all registered SubagentConfig instances (built-in + custom).
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     configs = []
     for name in get_subagent_names(app_config=app_config):
         config = get_subagent_config(name, app_config=app_config)
@@ -131,11 +107,7 @@ def list_subagents(*, app_config: Any | None = None) -> list[SubagentConfig]:
 
 
 def get_subagent_names(*, app_config: Any | None = None) -> list[str]:
-    """Get all available subagent names (built-in + custom).
-
-    Returns:
-        List of subagent names.
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     names = list(BUILTIN_SUBAGENTS.keys())
 
     # Merge custom_agents from config.yaml
@@ -148,11 +120,7 @@ def get_subagent_names(*, app_config: Any | None = None) -> list[str]:
 
 
 def get_available_subagent_names(*, app_config: Any | None = None) -> list[str]:
-    """Get subagent names that should be exposed to the active runtime.
-
-    Returns:
-        List of subagent names visible to the current sandbox configuration.
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     names = get_subagent_names(app_config=app_config)
     try:
         host_bash_allowed = is_host_bash_allowed(app_config) if hasattr(app_config, "sandbox") else is_host_bash_allowed()

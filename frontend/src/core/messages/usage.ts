@@ -1,15 +1,13 @@
 import type { Message } from "@langchain/langgraph-sdk";
 
+/** 统一的输入、输出与总令牌用量。 */
 export interface TokenUsage {
   inputTokens: number;
   outputTokens: number;
   totalTokens: number;
 }
 
-/**
- * Extract usage_metadata from an AI message if present.
- * The field is added by the backend (PR #1218) but not typed in the SDK.
- */
+/** 从 AI 消息中提取 usage_metadata；该字段由后端添加（PR #1218），但 SDK 尚未为其声明类型。 */
 export function getUsageMetadata(message: Message): TokenUsage | null {
   if (message.type !== "ai") {
     return null;
@@ -40,12 +38,10 @@ export function getUsageMetadata(message: Message): TokenUsage | null {
 }
 
 /**
- * Accumulate token usage across AI messages.
+ * 汇总多条 AI 消息的令牌用量。
  *
- * UI rendering may place the same AI message in more than one group, such as
- * when a message contains both reasoning and final answer content. Token usage
- * is attached to the AI message itself, so a message id should only contribute
- * once to any aggregate.
+ * UI 渲染可能将同一条 AI 消息放入多个分组，例如消息同时包含推理和最终回答时。
+ * 令牌用量归属于 AI 消息本身，因此每个消息 ID 在任一汇总中只能计入一次。
  */
 export function accumulateUsage(messages: Message[]): TokenUsage | null {
   const cumulative: TokenUsage = {
@@ -78,14 +74,13 @@ export function accumulateUsage(messages: Message[]): TokenUsage | null {
 }
 
 /**
- * Validate a raw `{input,output,total}_tokens` object into {@link TokenUsage}.
+ * 将原始的 `{input,output,total}_tokens` 对象校验并转换为 {@link TokenUsage}。
  *
- * The single shared validator for both sub-agent usage surfaces — the live
- * `task_running` event (`core/tasks/lifecycle.ts`) and the terminal ToolMessage
- * metadata (`core/tasks/subtask-result.ts`). Keeping one function stops the two
- * from drifting (e.g. one accepting an extra token field the other rejects).
- * Every key must be a finite, non-negative number or the whole snapshot is
- * rejected as `undefined`.
+ * 这是子代理两种用量来源共用的唯一校验器：实时 `task_running` 事件
+ * （`core/tasks/lifecycle.ts`）和终态 ToolMessage 元数据
+ * （`core/tasks/subtask-result.ts`）。共用函数可防止两处规则漂移，例如一处接受
+ * 额外令牌字段而另一处拒绝。每个键均须是有限且非负的数字，否则整个快照返回
+ * `undefined`。
  */
 export function normalizeTokenUsage(value: unknown): TokenUsage | undefined {
   if (typeof value !== "object" || value === null) {
@@ -105,12 +100,14 @@ export function normalizeTokenUsage(value: unknown): TokenUsage | undefined {
   return { inputTokens, outputTokens, totalTokens };
 }
 
+/** 将有限的非负数规范化为可用令牌数。 */
 function nonNegativeNumber(value: unknown): number | undefined {
   return typeof value === "number" && Number.isFinite(value) && value >= 0
     ? value
     : undefined;
 }
 
+/** 判断令牌用量是否存在且至少有一项大于零。 */
 export function hasNonZeroUsage(
   usage: TokenUsage | null | undefined,
 ): usage is TokenUsage {
@@ -121,6 +118,7 @@ export function hasNonZeroUsage(
   );
 }
 
+/** 将一段令牌用量累加到既有汇总。 */
 export function addUsage(base: TokenUsage, delta: TokenUsage): TokenUsage {
   return {
     inputTokens: base.inputTokens + delta.inputTokens,
@@ -129,6 +127,7 @@ export function addUsage(base: TokenUsage, delta: TokenUsage): TokenUsage {
   };
 }
 
+/** 选择页头显示的令牌用量，优先采用后端提供的总量。 */
 export function selectHeaderTokenUsage({
   backendUsage,
   messages,
@@ -145,9 +144,7 @@ export function selectHeaderTokenUsage({
   return accumulateUsage(messages);
 }
 
-/**
- * Format a token count for display: 1234 -> "1,234", 12345 -> "12.3K"
- */
+/** 将令牌数格式化为显示值：1234 → "1,234"，12345 → "12.3K"。 */
 export function formatTokenCount(count: number): string {
   if (count < 10_000) {
     return count.toLocaleString();

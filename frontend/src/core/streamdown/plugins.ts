@@ -12,6 +12,7 @@ const katexOptions = {
   strict: false,
 } as const;
 
+/** 标准消息内容渲染所需的流式渲染组件插件配置。 */
 export const streamdownPlugins = {
   remarkPlugins: [
     remarkGfm,
@@ -23,6 +24,7 @@ export const streamdownPlugins = {
   ] as StreamdownProps["rehypePlugins"],
 };
 
+/** 额外启用词语动画的流式渲染组件插件配置。 */
 export const streamdownPluginsWithWordAnimation = {
   remarkPlugins: [
     remarkGfm,
@@ -34,6 +36,7 @@ export const streamdownPluginsWithWordAnimation = {
   ] as StreamdownProps["rehypePlugins"],
 };
 
+/** 禁止解析原始网页标记的流式渲染组件插件配置。 */
 export const streamdownPluginsWithoutRawHtml = {
   remarkPlugins: streamdownPlugins.remarkPlugins,
   rehypePlugins: streamdownPlugins.rehypePlugins?.filter(
@@ -41,6 +44,6 @@ export const streamdownPluginsWithoutRawHtml = {
   ) as StreamdownProps["rehypePlugins"],
 };
 
-// Plugins for reasoning/thinking content — derived from streamdownPlugins but without rehypeRaw,
-// to prevent LLM-hallucinated HTML tags (e.g. <simd>) from being rendered as DOM elements.
+// 推理／思考内容沿用基础插件，但不解析原始网页标记，防止模型臆造的标签被渲染为页面元素。
+/** 推理／思考内容使用的安全插件配置。 */
 export const reasoningPlugins = streamdownPluginsWithoutRawHtml;

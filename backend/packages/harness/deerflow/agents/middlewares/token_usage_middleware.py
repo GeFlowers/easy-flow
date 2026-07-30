@@ -1,4 +1,4 @@
-"""Middleware for logging token usage and annotating step attribution."""
+'定义 token_usage_middleware 模块提供的职责与可复用接口。\n\nMiddleware for logging token usage and annotating step attribution.'
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ TOKEN_USAGE_ATTRIBUTION_KEY = "token_usage_attribution"
 
 
 def _string_arg(value: Any) -> str | None:
+    '执行 _string_arg 的明确职责，并返回与调用约定一致的结果'
     if isinstance(value, str):
         normalized = value.strip()
         return normalized or None
@@ -25,6 +26,7 @@ def _string_arg(value: Any) -> str | None:
 
 
 def _normalize_todos(value: Any) -> list[Todo]:
+    '执行 _normalize_todos 的明确职责，并返回与调用约定一致的结果'
     if not isinstance(value, list):
         return []
 
@@ -48,6 +50,7 @@ def _normalize_todos(value: Any) -> list[Todo]:
 
 
 def _todo_action_kind(previous: Todo | None, current: Todo) -> str:
+    '执行 _todo_action_kind 的明确职责，并返回与调用约定一致的结果'
     status = current.get("status")
     previous_content = previous.get("content") if previous else None
     current_content = current.get("content")
@@ -73,6 +76,7 @@ def _build_todo_actions(previous_todos: list[Todo], next_todos: list[Todo]) -> l
     # This is the single source of truth for precise write_todos token
     # attribution. The frontend intentionally falls back to a generic
     # "Update to-do list" label when this metadata is missing or malformed.
+    '执行 _build_todo_actions 的明确职责，并返回与调用约定一致的结果'
     previous_by_content: dict[str, list[tuple[int, Todo]]] = defaultdict(list)
     matched_previous_indices: set[int] = set()
 
@@ -133,6 +137,7 @@ def _build_todo_actions(previous_todos: list[Todo], next_todos: list[Todo]) -> l
 
 
 def _describe_tool_call(tool_call: dict[str, Any], todos: list[Todo]) -> list[dict[str, Any]]:
+    '执行 _describe_tool_call 的明确职责，并返回与调用约定一致的结果'
     name = _string_arg(tool_call.get("name")) or "unknown"
     args = tool_call.get("args") if isinstance(tool_call.get("args"), dict) else {}
     tool_call_id = _string_arg(tool_call.get("id"))
@@ -204,6 +209,7 @@ def _describe_tool_call(tool_call: dict[str, Any], todos: list[Todo]) -> list[di
 
 
 def _infer_step_kind(message: AIMessage, actions: list[dict[str, Any]]) -> str:
+    '执行 _infer_step_kind 的明确职责，并返回与调用约定一致的结果'
     if actions:
         first_kind = actions[0].get("kind")
         if len(actions) == 1 and first_kind in {"todo_start", "todo_complete", "todo_update", "todo_remove"}:
@@ -218,7 +224,7 @@ def _infer_step_kind(message: AIMessage, actions: list[dict[str, Any]]) -> str:
 
 
 def _has_tool_call(message: AIMessage, tool_call_id: str) -> bool:
-    """Return True if the AIMessage contains a tool_call with the given id."""
+    '执行 _has_tool_call 的明确职责，并返回与调用约定一致的结果。\n\nReturn True if the AIMessage contains a tool_call with the given id.'
     for tc in message.tool_calls or []:
         if isinstance(tc, dict):
             if tc.get("id") == tool_call_id:
@@ -229,6 +235,7 @@ def _has_tool_call(message: AIMessage, tool_call_id: str) -> bool:
 
 
 def _build_attribution(message: AIMessage, todos: list[Todo]) -> dict[str, Any]:
+    '执行 _build_attribution 的明确职责，并返回与调用约定一致的结果'
     tool_calls = getattr(message, "tool_calls", None) or []
     actions: list[dict[str, Any]] = []
     current_todos = list(todos)
@@ -265,9 +272,10 @@ def _build_attribution(message: AIMessage, todos: list[Todo]) -> dict[str, Any]:
 
 
 class TokenUsageMiddleware(AgentMiddleware):
-    """Logs token usage from model responses and annotates the AI step."""
+    '封装 TokenUsageMiddleware 的状态、协作关系与公开操作。\n\nLogs token usage from model responses and annotates the AI step.'
 
     def _apply(self, state: AgentState) -> dict | None:
+        '执行 _apply 的明确职责，并返回与调用约定一致的结果'
         messages = state.get("messages", [])
         if not messages:
             return None
@@ -351,8 +359,10 @@ class TokenUsageMiddleware(AgentMiddleware):
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '执行 after_model 的明确职责，并返回与调用约定一致的结果'
         return self._apply(state)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '执行 aafter_model 的明确职责，并返回与调用约定一致的结果'
         return self._apply(state)

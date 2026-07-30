@@ -273,6 +273,7 @@ function upperFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
 
+/** 浏览、筛选与维护记忆条目；将批量删除与普通编辑操作明确区隔。 */
 export function MemorySettingsPage() {
   const { t } = useI18n();
   const { memory, isLoading, error } = useMemory();
@@ -556,7 +557,7 @@ export function MemorySettingsPage() {
             ) : null}
 
             <div className="flex flex-col gap-3">
-              {/* Row 1: search + filter tabs */}
+              {/* 第一行：搜索与筛选标签 */}
               <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
                 <Input
                   value={query}
@@ -588,7 +589,7 @@ export function MemorySettingsPage() {
                 </ToggleGroup>
               </div>
 
-              {/* Row 2: actions — constructive group on the left, destructive separated to the right */}
+              {/* 第二行：常规操作靠左，破坏性操作单独置于右侧以降低误触风险。 */}
               <div className="flex flex-wrap items-center gap-2">
                 <input
                   ref={fileInputRef}

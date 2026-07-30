@@ -1,5 +1,5 @@
 /**
- * React hooks for file uploads
+ * 文件上传相关的状态钩子。
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,8 +15,7 @@ import {
 } from "./api";
 
 /**
- * Hook to load the gateway-enforced upload limits.
- * Callers intentionally degrade to server-side validation if this request fails.
+ * 获取网关强制上传限制的状态钩子。请求失败时，调用方有意降级为仅依赖服务端校验。
  */
 export function useUploadLimits(threadId: string) {
   return useQuery({
@@ -29,7 +28,7 @@ export function useUploadLimits(threadId: string) {
 }
 
 /**
- * Hook to upload files
+ * 上传文件的状态钩子。
  */
 export function useUploadFiles(threadId: string) {
   const queryClient = useQueryClient();
@@ -37,7 +36,7 @@ export function useUploadFiles(threadId: string) {
   return useMutation<UploadResponse, Error, File[]>({
     mutationFn: (files: File[]) => uploadFiles(threadId, files),
     onSuccess: () => {
-      // Invalidate the uploaded files list
+      // 使已上传文件列表缓存失效。
       void queryClient.invalidateQueries({
         queryKey: ["uploads", "list", threadId],
       });
@@ -46,7 +45,7 @@ export function useUploadFiles(threadId: string) {
 }
 
 /**
- * Hook to list uploaded files
+ * 列出已上传文件的状态钩子。
  */
 export function useUploadedFiles(threadId: string) {
   return useQuery({
@@ -57,7 +56,7 @@ export function useUploadedFiles(threadId: string) {
 }
 
 /**
- * Hook to delete an uploaded file
+ * 删除已上传文件的状态钩子。
  */
 export function useDeleteUploadedFile(threadId: string) {
   const queryClient = useQueryClient();
@@ -65,7 +64,7 @@ export function useDeleteUploadedFile(threadId: string) {
   return useMutation({
     mutationFn: (filename: string) => deleteUploadedFile(threadId, filename),
     onSuccess: () => {
-      // Invalidate the uploaded files list
+      // 使已上传文件列表缓存失效。
       void queryClient.invalidateQueries({
         queryKey: ["uploads", "list", threadId],
       });
@@ -74,8 +73,7 @@ export function useDeleteUploadedFile(threadId: string) {
 }
 
 /**
- * Hook to handle file uploads in submit flow
- * Returns a function that uploads files and returns their info
+ * 在提交流程中处理文件上传的状态钩子，返回一个上传文件并返回其信息的函数。
  */
 export function useUploadFilesOnSubmit(threadId: string) {
   const uploadMutation = useUploadFiles(threadId);

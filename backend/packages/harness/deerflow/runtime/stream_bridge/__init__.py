@@ -1,11 +1,4 @@
-"""Stream bridge — decouples agent workers from SSE endpoints.
-
-A ``StreamBridge`` sits between the background task that runs an agent
-(producer) and the HTTP endpoint that pushes Server-Sent Events to
-the client (consumer).  This package provides an abstract protocol
-(:class:`StreamBridge`) plus a default in-memory implementation backed
-by :mod:`asyncio.Queue`.
-"""
+'定义 __init__ 模块提供的职责与可复用接口。\n\nStream bridge — decouples agent workers from SSE endpoints.\n\nA ``StreamBridge`` sits between the background task that runs an agent\n(producer) and the HTTP endpoint that pushes Server-Sent Events to\nthe client (consumer).  This package provides an abstract protocol\n(:class:`StreamBridge`) plus a default in-memory implementation backed\nby :mod:`asyncio.Queue`.\n'
 
 from .async_provider import make_stream_bridge
 from .base import END_SENTINEL, HEARTBEAT_SENTINEL, StreamBridge, StreamEvent

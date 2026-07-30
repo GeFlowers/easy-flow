@@ -7,11 +7,13 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { I18nProvider } from "@/core/i18n/context";
 import { detectLocaleServer } from "@/core/i18n/server";
 
+/** 定义全站默认的 HTML 文档元数据。 */
 export const metadata: Metadata = {
   title: "DeerFlow",
   description: "A LangChain-based framework for building super agents.",
 };
 
+/** 提供全站 HTML 骨架、主题上下文与服务端检测到的语言环境。 */
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {

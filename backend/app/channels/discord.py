@@ -1,4 +1,4 @@
-"""Discord channel integration using discord.py."""
+"""通过 discord.py 接入 Discord 消息通道，并维护频道与会话线程的路由关系。"""
 
 from __future__ import annotations
 
@@ -21,20 +21,16 @@ _DISCORD_MAX_MESSAGE_LEN = 2000
 
 
 class DiscordChannel(Channel):
-    """Discord bot channel.
+    """Discord 机器人通道。
 
-    Configuration keys (in ``config.yaml`` under ``channels.discord``):
-        - ``bot_token``: Discord Bot token.
-        - ``allowed_guilds``: (optional) List of allowed Discord guild IDs. Empty = allow all.
-        - ``mention_only``: (optional) If true, only respond when the bot is mentioned.
-        - ``allowed_channels``: (optional) List of channel IDs where messages are always accepted
-          (even when mention_only is true). Use for channels where you want the bot to respond
-          without mentions. Empty = mention_only applies everywhere.
-        - ``thread_mode``: (optional) If true, group a channel conversation into a thread.
-          Default: same as ``mention_only``.
+    ``channels.discord`` 配置中的 ``bot_token`` 是机器人令牌；``allowed_guilds``
+    限制可接收的服务器；``mention_only`` 仅在被提及时响应；``allowed_channels``
+    是提及限制的例外频道；``thread_mode`` 决定是否为频道会话创建 Discord 线程，
+    默认值与 ``mention_only`` 保持一致。
     """
 
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
+        """初始化 Discord 配置、线程映射、输入状态任务和跨线程事件循环引用。"""
         super().__init__(name="discord", bus=bus, config=config)
         self._bot_token = str(config.get("bot_token", "")).strip()
         self._allowed_guilds: set[int] = set()
@@ -49,14 +45,12 @@ class DiscordChannel(Channel):
         for channel_id in config.get("allowed_channels", []):
             self._allowed_channels.add(str(channel_id))
 
-        # Session tracking: channel_id -> Discord thread_id (in-memory, persisted to JSON).
-        # Uses a dedicated JSON file separate from ChannelStore, which maps IM
-        # conversations to DeerFlow thread IDs — a different concern.
+        # 记录频道 ID 到 Discord 线程 ID 的会话映射；内存副本会持久化为 JSON。
+        # 该文件独立于 ChannelStore，后者负责 IM 会话到 DeerFlow 线程的另一层映射。
         self._active_threads: dict[str, str] = {}
-        # Reverse-lookup set for O(1) thread ID checks (avoids O(n) scan of _active_threads.values()).
+        # 用于常数时间判断线程 ID 的反查集合，避免遍历映射值。
         self._active_thread_ids: set[str] = set()
-        # Lock protecting _active_threads and the JSON file from concurrent access.
-        # _run_client (Discord loop thread) and the main thread both read/write.
+        # 保护映射和 JSON 文件；Discord 循环线程与主线程都会读写它们。
         self._thread_store_lock = threading.Lock()
         store = config.get("channel_store")
         if store is not None:
@@ -64,7 +58,7 @@ class DiscordChannel(Channel):
         else:
             self._thread_store_path = Path.home() / ".deer-flow" / "channels" / "discord_threads.json"
 
-        # Typing indicator management
+        # 按回复目标管理输入状态任务。
         self._typing_tasks: dict[str, asyncio.Task] = {}
 
         self._client = None
@@ -74,6 +68,7 @@ class DiscordChannel(Channel):
         self._discord_module = None
 
     async def start(self) -> None:
+        """创建 Discord 客户端并在专用线程启动其事件循环，同时恢复线程映射。"""
         if self._running:
             return
 
@@ -102,6 +97,7 @@ class DiscordChannel(Channel):
 
         @client.event
         async def on_message(message) -> None:
+            """把 discord.py 的消息事件转交给通道实例处理。"""
             await self._on_message(message)
 
         self._running = True
@@ -113,7 +109,7 @@ class DiscordChannel(Channel):
         logger.info("Discord channel started")
 
     def _load_active_threads(self) -> None:
-        """Restore Discord thread mappings from the dedicated JSON file on startup."""
+        """启动时从专用 JSON 文件恢复频道到 Discord 线程的映射。"""
         with self._thread_store_lock:
             try:
                 if not self._thread_store_path.exists():
@@ -131,15 +127,10 @@ class DiscordChannel(Channel):
                 logger.exception("[Discord] failed to load thread mappings")
 
     def _record_thread_mapping(self, channel_id: str, thread_id: str) -> None:
-        """Synchronously update the in-memory channel->thread mapping and its reverse-lookup set.
+        """同步更新频道到 Discord 线程的内存映射及其反查集合。
 
-        Runs on the event loop (no IO, no await) so a follow-up message in the
-        newly created thread is recognized immediately, before the offloaded
-        persistence write completes. Deferring this update into the worker
-        thread opened a window where ``_active_thread_ids`` had not yet been
-        updated and an inbound message was misclassified as orphaned (see the
-        #3927 review). Persistence is handled separately by
-        ``_persist_thread_mappings``.
+        此操作没有 I/O，必须先在事件循环中完成，使新线程中的追发消息在持久化完成前
+        立即可被识别；磁盘写入由 ``_persist_thread_mappings`` 异步卸载处理。
         """
         old_id = self._active_threads.get(channel_id)
         self._active_threads[channel_id] = thread_id
@@ -148,13 +139,10 @@ class DiscordChannel(Channel):
         self._active_thread_ids.add(thread_id)
 
     def _persist_thread_mappings(self) -> None:
-        """Flush the current in-memory thread mappings to disk.
+        """将当前线程映射写入磁盘，供 ``asyncio.to_thread`` 在线程池中调用。
 
-        Intended for ``asyncio.to_thread``: this is pure filesystem IO. The
-        in-memory state is updated synchronously by ``_record_thread_mapping``,
-        so persistence latency never delays visibility of a new mapping to
-        inbound-message handling. The mapping is snapshotted under the store
-        lock so a concurrent record cannot mutate the dict mid-serialization.
+        内存状态已由同步记录方法更新，持久化延迟不会影响入站消息路由；在锁内复制快照，
+        防止并发记录在 JSON 序列化期间修改字典。
         """
         with self._thread_store_lock:
             try:
@@ -166,15 +154,16 @@ class DiscordChannel(Channel):
 
     @staticmethod
     def _read_attachment_bytes(path: str) -> bytes:
-        """Read an attachment file synchronously (intended for ``asyncio.to_thread``)."""
+        """同步读取附件字节，调用方应通过 ``asyncio.to_thread`` 避免阻塞事件循环。"""
         with open(path, "rb") as fp:
             return fp.read()
 
     async def stop(self) -> None:
+        """取消输入状态、关闭 Discord 客户端并回收其专用线程。"""
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
 
-        # Cancel all active typing indicator tasks
+        # 取消全部仍在运行的输入状态任务。
         for target_id, task in list(self._typing_tasks.items()):
             if not task.done():
                 task.cancel()
@@ -200,7 +189,8 @@ class DiscordChannel(Channel):
         logger.info("Discord channel stopped")
 
     async def send(self, msg: OutboundMessage) -> None:
-        # Stop typing indicator once we're sending the response
+        """向回复线程优先、频道兜底的目标发送文本，并在发送前停止输入状态。"""
+        # 开始发送回复时停止对应目标的输入状态。
         stop_future = asyncio.run_coroutine_threadsafe(self._stop_typing(msg.chat_id, msg.thread_ts), self._discord_loop)
         await asyncio.wrap_future(stop_future)
 
@@ -215,6 +205,7 @@ class DiscordChannel(Channel):
             await asyncio.wrap_future(send_future)
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
+        """向解析出的 Discord 线程或频道发送附件，并返回是否发送成功。"""
         stop_future = asyncio.run_coroutine_threadsafe(self._stop_typing(msg.chat_id, msg.thread_ts), self._discord_loop)
         await asyncio.wrap_future(stop_future)
 
@@ -227,11 +218,8 @@ class DiscordChannel(Channel):
             return False
 
         try:
-            # Read the attachment off the event loop (open + read are blocking IO),
-            # then hand discord.py an in-memory buffer. The bytes are consumed while
-            # ``target.send`` runs on ``_discord_loop``; once that future resolves the
-            # buffer can be reclaimed, so this avoids leaking a file handle on both the
-            # success and failure paths.
+            # 在线程池读取会阻塞的文件 I/O，再把内存缓冲区交给 Discord 循环发送。
+            # 发送 Future 结束后缓冲区即可回收，因此成功与失败路径都不会遗留文件句柄。
             data = await asyncio.to_thread(self._read_attachment_bytes, str(attachment.actual_path))
             file = self._discord_module.File(io.BytesIO(data), filename=attachment.filename)
             send_future = asyncio.run_coroutine_threadsafe(target.send(file=file), self._discord_loop)
@@ -243,12 +231,13 @@ class DiscordChannel(Channel):
             return False
 
     async def _start_typing(self, channel, chat_id: str, thread_ts: str | None = None) -> None:
-        """Starts a loop to send periodic typing indicators."""
+        """为线程优先、频道兜底的回复目标启动定期输入状态；同一目标最多一个任务。"""
         target_id = thread_ts or chat_id
         if target_id in self._typing_tasks:
-            return  # Already typing for this target
+            return  # 此回复目标已有输入状态任务。
 
         async def _typing_loop():
+            """每十秒刷新一次 Discord 输入状态，直至任务被取消。"""
             try:
                 while True:
                     try:
@@ -263,7 +252,7 @@ class DiscordChannel(Channel):
         self._typing_tasks[target_id] = task
 
     async def _stop_typing(self, chat_id: str, thread_ts: str | None = None) -> None:
-        """Stops the typing loop for a specific target."""
+        """停止指定线程或频道回复目标的输入状态任务。"""
         target_id = thread_ts or chat_id
         task = self._typing_tasks.pop(target_id, None)
         if task and not task.done():
@@ -271,13 +260,14 @@ class DiscordChannel(Channel):
             logger.debug("[Discord] stopped typing indicator for target %s", target_id)
 
     async def _add_reaction(self, message) -> None:
-        """Add a checkmark reaction to acknowledge the message was received."""
+        """为已接收的消息添加勾选表情作为确认，失败不影响后续处理。"""
         try:
             await message.add_reaction("✅")
         except Exception:
             logger.debug("[Discord] failed to add reaction to message %s", message.id, exc_info=True)
 
     async def _on_message(self, message) -> None:
+        """过滤并路由 Discord 入站消息，建立话题键、身份绑定和输入状态。"""
         if not self._running or not self._client:
             return
 
@@ -299,11 +289,11 @@ class DiscordChannel(Channel):
         if self._discord_module is None:
             return
 
-        # Determine whether the bot is mentioned in this message
+        # 判断消息是否提及机器人。
         user = self._client.user if self._client else None
         if user:
-            bot_mention = user.mention  # <@ID>
-            alt_mention = f"<@!{user.id}>"  # <@!ID> (ping variant)
+            bot_mention = user.mention  # 标准 ``<@ID>`` 提及形式。
+            alt_mention = f"<@!{user.id}>"  # 带通知标记的 ``<@!ID>`` 提及形式。
             standard_mention = f"<@{user.id}>"
         else:
             bot_mention = None
@@ -311,28 +301,28 @@ class DiscordChannel(Channel):
             standard_mention = ""
         has_mention = (bot_mention and bot_mention in message.content) or (alt_mention and alt_mention in message.content) or (standard_mention and standard_mention in message.content)
 
-        # Strip mention from text for processing
+        # 删除提及标记，再将余下文本交给命令和会话处理。
         if has_mention:
             text = text.replace(bot_mention or "", "").replace(alt_mention or "", "").replace(standard_mention or "", "").strip()
-            # Don't return early if text is empty — still process the mention (e.g., create thread)
+            # 即使余下文本为空仍继续处理，以便仅提及时也能创建会话线程。
 
         connect_code = self._pending_connect_code(text)
         if connect_code and await self._bind_connection_from_connect_code(message, connect_code):
             return
 
-        # --- Determine thread/channel routing and typing target ---
+        # 决定线程/频道路由，并选择应显示输入状态的目标。
         thread_id = None
         chat_id = None
-        typing_target = None  # The Discord object to type into
+        typing_target = None  # 用于显示输入状态的 Discord 线程或频道对象。
 
         if isinstance(message.channel, self._discord_module.Thread):
-            # --- Message already inside a thread ---
+            # 消息已位于 Discord 线程内。
             thread_obj = message.channel
             thread_id = str(thread_obj.id)
             chat_id = str(thread_obj.parent_id or thread_obj.id)
             typing_target = thread_obj
 
-            # If this is a known active thread, process normally
+            # 已记录的活动线程直接作为 DeerFlow 话题键处理。
             if thread_id in self._active_thread_ids:
                 msg_type = InboundMessageType.COMMAND if is_known_channel_command(text) else InboundMessageType.CHAT
                 inbound = self._make_inbound(
@@ -350,33 +340,27 @@ class DiscordChannel(Channel):
                 inbound.topic_id = thread_id
                 inbound = await self._attach_connection_identity(inbound, guild_id=str(guild.id) if guild else None)
                 self._publish(inbound)
-                # Start typing indicator in the thread
+                # 在该线程内启动输入状态。
                 if typing_target:
                     asyncio.create_task(self._start_typing(typing_target, chat_id, thread_id))
                 asyncio.create_task(self._add_reaction(message))
                 return
 
-            # Thread not tracked (orphaned) — create new thread and handle below
+            # 未记录的孤立线程不复用，回退到下方的新会话路由。
             logger.debug("[Discord] message in orphaned thread %s, will create new thread", thread_id)
             thread_id = None
             typing_target = None
 
-        # At this point we're guaranteed to be in a channel, not a thread
-        # (the Thread case is handled above). Apply mention_only for all
-        # non-thread messages — no special case needed.
+        # 处理至此的消息一定来自频道而非线程，因此统一应用仅提及规则。
         channel_id = str(message.channel.id)
 
-        # Check if there's an active thread for this channel
+        # 检查该频道是否已有活动 Discord 线程。
         if channel_id in self._active_threads:
-            # respect mention_only: if enabled, only process messages that mention the bot
-            # (unless the channel is in allowed_channels)
-            # Messages within a thread are always allowed through (continuation).
-            # At this code point we know the message is in a channel, not a thread
-            # (Thread case handled above), so always apply the check.
+            # 对频道根消息应用仅提及规则；允许频道除外。线程内续聊已在上方放行。
             if self._mention_only and not has_mention and channel_id not in self._allowed_channels:
                 logger.debug("[Discord] skipping no-@ message in channel %s (not in thread)", channel_id)
                 return
-            # mention_only + fresh @ → create new thread instead of routing to existing one
+            # 仅提及模式下的新提及会创建新线程，而不是复用旧会话。
             if self._mention_only and has_mention:
                 thread_obj = await self._create_thread(message)
                 if thread_obj is not None:
@@ -393,18 +377,18 @@ class DiscordChannel(Channel):
                     chat_id = channel_id
                     typing_target = message.channel
             else:
-                # Existing session → route to the existing thread
+                # 将频道中的续聊路由到现有 Discord 线程。
                 target_thread_id = self._active_threads[channel_id]
                 logger.debug("[Discord] routing message in channel %s to existing thread %s", channel_id, target_thread_id)
                 thread_id = target_thread_id
                 chat_id = channel_id
                 typing_target = await self._get_channel_or_thread(target_thread_id)
         elif self._mention_only and not has_mention and channel_id not in self._allowed_channels:
-            # Not mentioned and not in an allowed channel → skip
+            # 未提及且不在允许频道内的消息不处理。
             logger.debug("[Discord] skipping message without mention in channel %s", channel_id)
             return
         elif self._mention_only and has_mention:
-            # First mention in this channel → create thread
+            # 此频道首次提及时创建 Discord 线程。
             thread_obj = await self._create_thread(message)
             if thread_obj is not None:
                 target_thread_id = str(thread_obj.id)
@@ -412,35 +396,35 @@ class DiscordChannel(Channel):
                 await asyncio.to_thread(self._persist_thread_mappings)
                 thread_id = target_thread_id
                 chat_id = channel_id
-                typing_target = thread_obj  # Type into the new thread
+                typing_target = thread_obj  # 在新线程中显示输入状态。
                 logger.info("[Discord] created thread %s in channel %s for user %s", target_thread_id, channel_id, message.author.display_name)
             else:
-                # Fallback: thread creation failed (disabled/permissions), reply in channel
+                # 无法创建线程（未启用或无权限）时回退到频道回复。
                 logger.info("[Discord] thread creation failed in channel %s, falling back to channel replies", channel_id)
                 thread_id = channel_id
                 chat_id = channel_id
-                typing_target = message.channel  # Type into the channel
+                typing_target = message.channel  # 在频道中显示输入状态。
         elif self._thread_mode:
-            # thread_mode but mention_only is False → create thread anyway for conversation grouping
+            # 未启用仅提及时，仍可按 thread_mode 创建线程以隔离会话。
             thread_obj = await self._create_thread(message)
             if thread_obj is None:
-                # Thread creation failed (disabled/permissions), fall back to channel replies
+                # 无法创建线程（未启用或无权限）时回退到频道回复。
                 logger.info("[Discord] thread creation failed in channel %s, falling back to channel replies", channel_id)
                 thread_id = channel_id
                 chat_id = channel_id
-                typing_target = message.channel  # Type into the channel
+                typing_target = message.channel  # 在频道中显示输入状态。
             else:
                 target_thread_id = str(thread_obj.id)
                 self._record_thread_mapping(channel_id, target_thread_id)
                 await asyncio.to_thread(self._persist_thread_mappings)
                 thread_id = target_thread_id
                 chat_id = channel_id
-                typing_target = thread_obj  # Type into the new thread
+                typing_target = thread_obj  # 在新线程中显示输入状态。
         else:
-            # No threading — reply directly in channel
+            # 未启用线程模式时直接在频道中回复。
             thread_id = channel_id
             chat_id = channel_id
-            typing_target = message.channel  # Type into the channel
+            typing_target = message.channel  # 在频道中显示输入状态。
 
         msg_type = InboundMessageType.COMMAND if is_known_channel_command(text) else InboundMessageType.CHAT
         inbound = self._make_inbound(
@@ -458,7 +442,7 @@ class DiscordChannel(Channel):
         inbound.topic_id = thread_id
         inbound = await self._attach_connection_identity(inbound, guild_id=str(guild.id) if guild else None)
 
-        # Start typing indicator in the correct target (thread or channel)
+        # 在最终选定的线程或频道中启动输入状态。
         if typing_target:
             asyncio.create_task(self._start_typing(typing_target, chat_id, thread_id))
 
@@ -466,12 +450,13 @@ class DiscordChannel(Channel):
         asyncio.create_task(self._add_reaction(message))
 
     def _publish(self, inbound) -> None:
-        """Publish an inbound message to the main event loop."""
+        """将入站消息线程安全地发布到主事件循环中的消息总线。"""
         if self._main_loop and self._main_loop.is_running():
             future = asyncio.run_coroutine_threadsafe(self.bus.publish_inbound(inbound), self._main_loop)
             future.add_done_callback(lambda f: logger.exception("[Discord] publish_inbound failed", exc_info=f.exception()) if f.exception() else None)
 
     async def _attach_connection_identity(self, inbound: InboundMessage, guild_id: str | None = None) -> InboundMessage:
+        """按服务器优先、无服务器回退的范围，为入站消息附加已绑定的 DeerFlow 身份。"""
         return await attach_connection_identity(
             inbound,
             repo=self._connection_repo,
@@ -481,6 +466,7 @@ class DiscordChannel(Channel):
         )
 
     async def _bind_connection_from_connect_code(self, message, code: str) -> bool:
+        """消费连接码并将 Discord 外部账号、服务器和频道绑定到 DeerFlow 用户。"""
         if self._connection_repo is None or not code:
             return False
 
@@ -516,6 +502,7 @@ class DiscordChannel(Channel):
 
     @staticmethod
     async def _send_connection_reply(message, text: str) -> None:
+        """向连接码所在频道发送绑定结果；无法发送时仅记录异常。"""
         channel = getattr(message, "channel", None)
         send = getattr(channel, "send", None)
         if send is None:
@@ -526,6 +513,7 @@ class DiscordChannel(Channel):
             logger.exception("[Discord] failed to send connection reply")
 
     def _run_client(self) -> None:
+        """在专用线程创建 Discord 事件循环并运行客户端，退出时尽力关闭客户端。"""
         self._discord_loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._discord_loop)
         try:
@@ -541,11 +529,12 @@ class DiscordChannel(Channel):
                 logger.exception("Error during Discord shutdown")
 
     async def _create_thread(self, message):
+        """为消息创建 Discord 线程；频道类型或权限不支持时返回 ``None``。"""
         try:
             if self._discord_module is None:
                 return None
 
-            # Only TextChannel (type 0) and NewsChannel (type 10) support threads
+            # 仅文本频道和公告频道支持创建 Discord 线程。
             channel_type = message.channel.type
             if channel_type not in (
                 self._discord_module.ChannelType.text,
@@ -579,6 +568,7 @@ class DiscordChannel(Channel):
             return None
 
     async def _resolve_target(self, msg: OutboundMessage):
+        """按 ``thread_ts`` 优先、``chat_id`` 兜底的顺序解析 Discord 回复目标。"""
         if not self._client or not self._discord_loop:
             return None
 
@@ -595,6 +585,7 @@ class DiscordChannel(Channel):
         return None
 
     async def _get_channel_or_thread(self, raw_id: str):
+        """在 Discord 专用事件循环中按 ID 查询频道或线程。"""
         if not self._client or not self._discord_loop:
             return None
 
@@ -611,6 +602,7 @@ class DiscordChannel(Channel):
             return None
 
     async def _fetch_channel(self, target_id: int):
+        """先读取 discord.py 缓存，未命中时请求远端频道或线程。"""
         if not self._client:
             return None
 
@@ -625,6 +617,7 @@ class DiscordChannel(Channel):
 
     @staticmethod
     def _split_text(text: str) -> list[str]:
+        """按 Discord 的 2000 字符限制切分文本，优先在换行处断开。"""
         if not text:
             return [""]
 

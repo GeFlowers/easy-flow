@@ -91,7 +91,7 @@ function FeedbackButtons({
           setFeedback(result);
         }
       } catch {
-        // Revert on error — feedback state unchanged on catch
+        // 请求失败时保留原反馈状态，避免界面显示未持久化的选择。
       } finally {
         setIsSubmitting(false);
       }
@@ -131,6 +131,7 @@ function FeedbackButtons({
   );
 }
 
+/** 渲染单条线程消息，并按角色、流式阶段和附件类型选择对应内容边界。 */
 export function MessageListItem({
   className,
   message,
@@ -192,9 +193,7 @@ export function MessageListItem({
   );
 }
 
-/**
- * Custom image component that handles artifact URLs
- */
+/** 处理产物 URL 的图片渲染器，保持消息内资源的线程访问上下文。 */
 function MessageImage({
   src,
   alt,
@@ -227,12 +226,9 @@ function MessageImage({
 const clientTurnDurations = new Map<string, number>();
 
 function HumanMessageText({ content }: { content: string }) {
-  // `parseSlashSkillReference` is a pure regex gate (no data subscription), so
-  // the overwhelmingly common plain-text human message never subscribes to the
-  // skills query. Only a message that literally looks like a `/skill …`
-  // activation mounts `HumanSlashSkillText`, which owns the `useSkills()`
-  // lookup. This keeps a skill-enabled toggle from re-rendering every human
-  // turn — only the few slash-candidate turns react to catalog changes.
+  // `parseSlashSkillReference` 仅作正则判断且不订阅数据，绝大多数纯文本消息无需
+  // 订阅技能查询。只有字面符合 `/skill …` 激活格式的消息才挂载拥有 `useSkills()`
+  // 查询的 `HumanSlashSkillText`，因此切换技能开关只会重渲染少数候选轮次。
   const reference = useMemo(() => parseSlashSkillReference(content), [content]);
 
   if (!reference) {
@@ -346,7 +342,7 @@ function MessageContent_({
     const files = message.additional_kwargs?.files;
     if (!Array.isArray(files) || files.length === 0) {
       if (rawContent.includes("<uploaded_files>")) {
-        // If the content contains the <uploaded_files> tag, we return the parsed files from the content for backward compatibility.
+        // 含 `<uploaded_files>` 标签时从内容解析文件，以兼容旧消息格式。
         return parseUploadedFiles(rawContent);
       }
       return null;
@@ -380,7 +376,7 @@ function MessageContent_({
       <RichFilesList files={files} threadId={threadId} />
     ) : null;
 
-  // Uploading state: mock AI message shown while files upload
+  // 文件上传期间显示模拟的 AI 消息，以维持对话时间线的连续性。
   if (message.additional_kwargs?.element === "task") {
     return (
       <AIElementMessageContent className={className}>
@@ -396,7 +392,7 @@ function MessageContent_({
     );
   }
 
-  // Reasoning-only AI message (no main response content yet)
+  // 尚无主回复内容时，将仅含推理的 AI 消息单独呈现。
   if (!isHuman && reasoningContent && !rawContent) {
     return (
       <AIElementMessageContent className={className}>
@@ -414,10 +410,9 @@ function MessageContent_({
   }
 
   if (isHuman) {
-    // Composer input is plain text, not authored Markdown. Parsing it as
-    // Markdown mangles pasted code/logs (indented lines become code blocks,
-    // "$...$" spans become math) and lets pathological input crash the page
-    // through marked's recursive blockquote lexer, so render it verbatim.
+    // 编辑器输入是纯文本而非用户编写的 Markdown。解析 Markdown 会篡改粘贴的
+    // 代码或日志（缩进行成为代码块，`$...$` 成为数学公式），恶意输入还可能触发
+    // marked 的递归引用词法器导致页面崩溃，故直接按原文渲染。
     return (
       <div
         className={cn(
@@ -478,9 +473,7 @@ function MessageContent_({
   );
 }
 
-/**
- * Get file extension and check helpers
- */
+/** 提取文件扩展名，供消息附件的类型分支共用。 */
 const getFileExt = (filename: string) =>
   filename.split(".").pop()?.toLowerCase() ?? "";
 
@@ -521,9 +514,7 @@ function isImageFile(filename: string): boolean {
   return IMAGE_EXTENSIONS.includes(getFileExt(filename));
 }
 
-/**
- * Format bytes to human-readable size string
- */
+/** 将字节数格式化为稳定且便于阅读的文件大小文本。 */
 function formatBytes(bytes: number): string {
   if (bytes === 0) return "—";
   const kb = bytes / 1024;
@@ -531,9 +522,7 @@ function formatBytes(bytes: number): string {
   return `${(kb / 1024).toFixed(1)} MB`;
 }
 
-/**
- * List of files from additional_kwargs.files (with optional upload status)
- */
+/** 渲染 `additional_kwargs.files` 中的文件列表，并保留可选上传状态。 */
 function RichFilesList({
   files,
   threadId,
@@ -555,9 +544,7 @@ function RichFilesList({
   );
 }
 
-/**
- * Single file card that handles FileInMessage (supports uploading state)
- */
+/** 渲染单个 FileInMessage 文件卡片，并兼容上传中的临时状态。 */
 function RichFileCard({
   file,
   threadId,

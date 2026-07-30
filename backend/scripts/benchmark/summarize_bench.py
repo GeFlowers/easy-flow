@@ -1,12 +1,5 @@
 #!/usr/bin/env python3
-"""Aggregate JSONL benchmark results into summary tables.
-
-Usage::
-
-    python scripts/benchmark/summarize_bench.py results.jsonl
-    python scripts/benchmark/summarize_bench.py results/*.jsonl --group provider,scenario,workload
-    python scripts/benchmark/summarize_bench.py results.jsonl --csv > summary.csv
-"""
+"""本脚本负责汇总。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -19,6 +12,7 @@ from typing import Any
 
 
 def _p(arr: list[float], pct: float) -> float:
+    '未说明'
     if not arr:
         return 0.0
     s = sorted(arr)
@@ -32,6 +26,7 @@ def _p(arr: list[float], pct: float) -> float:
 
 
 def _load_jsonl(paths: list[Path]) -> list[dict[str, Any]]:
+    '未说明'
     rows: list[dict[str, Any]] = []
     errors: list[str] = []
     for p in paths:
@@ -50,10 +45,12 @@ def _load_jsonl(paths: list[Path]) -> list[dict[str, Any]]:
 
 
 def _group_key(row: dict[str, Any], group_by: list[str]) -> tuple:
+    '未说明'
     return tuple(row.get(k, "?") for k in group_by)
 
 
 def _summarize(rows: list[dict[str, Any]], group_by: list[str]) -> list[dict[str, Any]]:
+    '未说明'
     groups: dict[tuple, list[dict[str, Any]]] = defaultdict(list)
     for r in rows:
         groups[_group_key(r, group_by)].append(r)
@@ -116,6 +113,7 @@ _COLUMNS = [
 
 
 def _print_table(rows: list[dict[str, Any]], fmt: str = "plain") -> None:
+    '未说明'
     if fmt == "csv":
         import csv as _csv
 
@@ -137,6 +135,7 @@ def _print_table(rows: list[dict[str, Any]], fmt: str = "plain") -> None:
             col_widths[h] = max(col_widths[h], len(v))
 
     def _fmt_row(vals: list[str]) -> str:
+        '未说明'
         parts = [v.rjust(col_widths[h]) for h, v in zip(headers, vals)]
         return "  ".join(parts)
 
@@ -147,6 +146,7 @@ def _print_table(rows: list[dict[str, Any]], fmt: str = "plain") -> None:
 
 
 def main(argv: list[str] | None = None) -> int:
+    '未说明'
     p = argparse.ArgumentParser(description="Aggregate JSONL benchmark results")
     p.add_argument("inputs", nargs="+", help="JSONL file(s) from bench_sandbox_provider.py")
     p.add_argument(

@@ -3,6 +3,11 @@ import { expect, test } from "@rstest/core";
 
 import { buildThreadSubmitMessages } from "@/core/threads/hooks";
 
+/**
+ * 覆盖“builds thread submit messages with hidden sidecar context before the visible user message”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("builds thread submit messages with hidden sidecar context before the visible user message", () => {
   const hiddenContext = {
     type: "human",
@@ -27,6 +32,11 @@ test("builds thread submit messages with hidden sidecar context before the visib
     },
   ]);
 });
+
+/**
+ * 覆盖“keeps uploaded files on the visible user message only”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("keeps uploaded files on the visible user message only", () => {
   const messages = buildThreadSubmitMessages({
@@ -60,6 +70,11 @@ test("keeps uploaded files on the visible user message only", () => {
     ],
   });
 });
+
+/**
+ * 覆盖“keeps human input response metadata on the hidden user message”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("keeps human input response metadata on the hidden user message", () => {
   const response = {

@@ -1,4 +1,4 @@
-"""OIDC / SSO authentication configuration models."""
+"""提供配置、auth、配置相关功能。"""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class OIDCProviderConfig(BaseModel):
-    """Configuration for a single OIDC identity provider (Keycloak, Google, Azure AD, etc.)."""
+    """\u6267\u884c OIDCProviderConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     display_name: str = Field(description="Human-readable name shown on the login button")
     issuer: str = Field(description="OIDC issuer URL (e.g. https://keycloak.example.com/realms/deerflow)")
@@ -24,7 +24,7 @@ class OIDCProviderConfig(BaseModel):
         description="How the client authenticates at the token endpoint",
     )
 
-    # ── User provisioning ─────────────────────────────────────────────
+        # 中文说明：此处用于执行相关处理。
     auto_create_users: bool = Field(
         default=True,
         description="Automatically create a DeerFlow user on first SSO login",
@@ -42,11 +42,11 @@ class OIDCProviderConfig(BaseModel):
         description="Users with these email addresses are automatically granted the admin role on first login",
     )
 
-    # ── PKCE / nonce ──────────────────────────────────────────────────
+        # 中文说明：此处用于执行相关处理。
     pkce_enabled: bool = Field(default=True, description="Enable PKCE (S256) for the authorization code flow")
     nonce_enabled: bool = Field(default=True, description="Include and validate the nonce claim in ID tokens")
 
-    # ── Endpoint overrides (for providers with non-standard discovery) ─
+        # 中文说明：此处用于执行相关处理。
     authorization_endpoint: str | None = Field(default=None)
     token_endpoint: str | None = Field(default=None)
     userinfo_endpoint: str | None = Field(default=None)
@@ -54,7 +54,7 @@ class OIDCProviderConfig(BaseModel):
 
 
 class OIDCAuthConfig(BaseModel):
-    """Top-level OIDC authentication configuration."""
+    """\u6267\u884c OIDCAuthConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(default=False, description="Enable OIDC SSO authentication")
     frontend_base_url: str | None = Field(
@@ -68,6 +68,6 @@ class OIDCAuthConfig(BaseModel):
 
 
 class AuthAppConfig(BaseModel):
-    """Authentication configuration section for the DeerFlow app config."""
+    """\u6267\u884c AuthAppConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     oidc: OIDCAuthConfig = Field(default_factory=OIDCAuthConfig, description="OIDC SSO authentication settings")

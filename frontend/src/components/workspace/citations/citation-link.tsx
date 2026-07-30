@@ -9,6 +9,7 @@ import {
 } from "@/components/ui/hover-card";
 import { cn } from "@/lib/utils";
 
+/** 渲染引用链接并优先保留传入文本，缺失文本时以域名提供可辨识的回退标签。 */
 export function CitationLink({
   href,
   children,
@@ -16,7 +17,7 @@ export function CitationLink({
 }: ComponentProps<"a">) {
   const domain = extractDomain(href ?? "");
 
-  // Priority: children > domain
+  // 显示文本优先使用 children，其次才使用链接域名。
   const childrenText =
     typeof children === "string"
       ? children.replace(/^citation:\s*/i, "")

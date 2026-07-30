@@ -1,4 +1,4 @@
-"""Middleware for memory mechanism."""
+'定义 memory_middleware 模块提供的职责与可复用接口。\n\nMiddleware for memory mechanism.'
 
 import logging
 from typing import TYPE_CHECKING, override
@@ -20,46 +20,25 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryMiddlewareState(AgentState):
-    """Compatible with the `ThreadState` schema."""
+    '封装 MemoryMiddlewareState 的状态、协作关系与公开操作。\n\nCompatible with the `ThreadState` schema.'
 
     pass
 
 
 class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
-    """Middleware that queues conversation for memory update after agent execution.
-
-    This middleware:
-    1. After each agent execution, queues the conversation for memory update
-    2. Only includes user inputs and final assistant responses (ignores tool calls)
-    3. The queue uses debouncing to batch multiple updates together
-    4. Memory is updated asynchronously via LLM summarization
-    """
+    '封装 MemoryMiddleware 的状态、协作关系与公开操作。\n\nMiddleware that queues conversation for memory update after agent execution.\n\n    This middleware:\n    1. After each agent execution, queues the conversation for memory update\n    2. Only includes user inputs and final assistant responses (ignores tool calls)\n    3. The queue uses debouncing to batch multiple updates together\n    4. Memory is updated asynchronously via LLM summarization\n    '
 
     state_schema = MemoryMiddlewareState
 
     def __init__(self, agent_name: str | None = None, *, memory_config: "MemoryConfig | None" = None):
-        """Initialize the MemoryMiddleware.
-
-        Args:
-            agent_name: If provided, memory is stored per-agent. If None, uses global memory.
-            memory_config: Explicit memory config. When omitted, legacy global
-                config fallback is used.
-        """
+        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nInitialize the MemoryMiddleware.\n\n        Args:\n            agent_name: If provided, memory is stored per-agent. If None, uses global memory.\n            memory_config: Explicit memory config. When omitted, legacy global\n                config fallback is used.\n        '
         super().__init__()
         self._agent_name = agent_name
         self._memory_config = memory_config
 
     @override
     def after_agent(self, state: MemoryMiddlewareState, runtime: Runtime) -> dict | None:
-        """Queue conversation for memory update after agent completes.
-
-        Args:
-            state: The current agent state.
-            runtime: The runtime context.
-
-        Returns:
-            None (no state changes needed from this middleware).
-        """
+        '执行 after_agent 的明确职责，并返回与调用约定一致的结果。\n\nQueue conversation for memory update after agent completes.\n\n        Args:\n            state: The current agent state.\n            runtime: The runtime context.\n\n        Returns:\n            None (no state changes needed from this middleware).\n        '
         config = self._memory_config or get_memory_config()
         if not config.enabled:
             return None

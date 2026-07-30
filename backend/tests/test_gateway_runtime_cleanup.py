@@ -1,4 +1,4 @@
-"""Regression coverage for the Gateway-owned LangGraph API runtime."""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -9,10 +9,12 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _read(path: str) -> str:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     return (REPO_ROOT / path).read_text(encoding="utf-8")
 
 
 def test_root_makefile_no_longer_exposes_transition_gateway_targets():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     makefile = _read("Makefile")
 
     assert "dev-pro" not in makefile
@@ -27,6 +29,7 @@ def test_root_makefile_no_longer_exposes_transition_gateway_targets():
 
 
 def test_service_launchers_always_use_gateway_runtime():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     operational_files = {
         "scripts/serve.sh": _read("scripts/serve.sh"),
         "scripts/docker.sh": _read("scripts/docker.sh"),
@@ -44,6 +47,7 @@ def test_service_launchers_always_use_gateway_runtime():
 
 
 def test_docker_dev_mounts_mutable_configs_through_project_directory():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     compose = _read("docker/docker-compose-dev.yaml")
 
     assert re.search(r"^\s*-\s*\.\./:/app/project(?:\:\S+)?\s*$", compose, re.M)
@@ -54,13 +58,14 @@ def test_docker_dev_mounts_mutable_configs_through_project_directory():
 
 
 def test_local_dev_gateway_reload_excludes_runtime_state_with_absolute_dirs():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     serve_sh = _read("scripts/serve.sh")
 
     assert 'export DEER_FLOW_PROJECT_ROOT="$REPO_ROOT"' in serve_sh
     assert 'BACKEND_RUNTIME_HOME="$REPO_ROOT/backend/.deer-flow"' in serve_sh
     assert 'export DEER_FLOW_HOME="$BACKEND_RUNTIME_HOME"' in serve_sh
-    # Every absolute reload-exclude must be pre-created, including backend/sandbox
-    # (#3459 / #3454) — see test_uvicorn_reload_exclude.py for the mechanism.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     assert 'mkdir -p "$DEER_FLOW_HOME" "$BACKEND_RUNTIME_HOME" "$REPO_ROOT/backend/sandbox"' in serve_sh
     assert "--reload-exclude='$DEER_FLOW_HOME'" in serve_sh
     assert "--reload-exclude='$BACKEND_RUNTIME_HOME'" in serve_sh
@@ -69,6 +74,7 @@ def test_local_dev_gateway_reload_excludes_runtime_state_with_absolute_dirs():
 
 
 def test_backend_container_only_exposes_gateway_port():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     dockerfile = _read("backend/Dockerfile")
 
     assert not re.search(r"^EXPOSE\s+.*\b2024\b", dockerfile, re.M)
@@ -77,12 +83,14 @@ def test_backend_container_only_exposes_gateway_port():
 
 
 def test_root_makefile_clean_does_not_reference_langgraph_server_cache():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     makefile = _read("Makefile")
 
     assert ".langgraph_api" not in makefile
 
 
 def test_nginx_routes_official_langgraph_prefix_to_gateway_api():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     for path in ("docker/nginx/nginx.local.conf", "docker/nginx/nginx.conf"):
         content = _read(path)
 
@@ -93,6 +101,7 @@ def test_nginx_routes_official_langgraph_prefix_to_gateway_api():
 
 
 def test_nginx_defers_cors_to_gateway_allowlist():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     for path in ("docker/nginx/nginx.local.conf", "docker/nginx/nginx.conf"):
         content = _read(path)
 
@@ -105,6 +114,7 @@ def test_nginx_defers_cors_to_gateway_allowlist():
 
 
 def test_gateway_cors_configuration_uses_gateway_allowlist():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     gateway_config = _read("backend/app/gateway/config.py")
     gateway_app = _read("backend/app/gateway/app.py")
     csrf_middleware = _read("backend/app/gateway/csrf_middleware.py")
@@ -116,6 +126,7 @@ def test_gateway_cors_configuration_uses_gateway_allowlist():
 
 
 def test_frontend_rewrites_langgraph_prefix_to_gateway():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     next_config = _read("frontend/next.config.js")
     api_client = _read("frontend/src/core/api/api-client.ts")
 
@@ -125,6 +136,7 @@ def test_frontend_rewrites_langgraph_prefix_to_gateway():
 
 
 def test_smoke_test_docs_do_not_expect_standalone_langgraph_server():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     smoke_files = {
         ".agent/skills/smoke-test/SKILL.md": _read(".agent/skills/smoke-test/SKILL.md"),
         ".agent/skills/smoke-test/references/SOP.md": _read(".agent/skills/smoke-test/references/SOP.md"),
@@ -146,6 +158,7 @@ def test_smoke_test_docs_do_not_expect_standalone_langgraph_server():
 
 
 def test_gateway_runtime_docs_do_not_reference_transition_modes():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     docs = {
         "backend/docs/AUTH_UPGRADE.md": _read("backend/docs/AUTH_UPGRADE.md"),
         "backend/docs/AUTH_TEST_DOCKER_GAP.md": _read("backend/docs/AUTH_TEST_DOCKER_GAP.md"),
@@ -160,8 +173,7 @@ def test_gateway_runtime_docs_do_not_reference_transition_modes():
 
 
 def test_agent_instruction_docs_do_not_reference_standalone_langgraph_server():
-    """Agent/Copilot instruction docs must describe only the Gateway-embedded
-    runtime — no standalone LangGraph service, port 2024, or langgraph.log."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     content = _read(".github/copilot-instructions.md")
 
     assert "langgraph.log" not in content

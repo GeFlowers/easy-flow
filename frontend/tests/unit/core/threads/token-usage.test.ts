@@ -3,6 +3,11 @@ import { expect, test } from "@rstest/core";
 import { threadTokenUsageToTokenUsage } from "@/core/threads/token-usage";
 import type { ThreadTokenUsageResponse } from "@/core/threads/types";
 
+/**
+ * 覆盖“maps backend thread token usage to UI token usage”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("maps backend thread token usage to UI token usage", () => {
   const response: ThreadTokenUsageResponse = {
     thread_id: "thread-1",
@@ -24,6 +29,11 @@ test("maps backend thread token usage to UI token usage", () => {
     totalTokens: 150,
   });
 });
+
+/**
+ * 覆盖“returns null when backend thread token usage is unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("returns null when backend thread token usage is unavailable", () => {
   expect(threadTokenUsageToTokenUsage(null)).toBeNull();

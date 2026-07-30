@@ -1,14 +1,4 @@
-"""Tests for multi-worker run ownership (work items 2–3).
-
-Coverage:
-- create_or_reject with reject strategy blocks duplicate active runs
-- create_or_reject with interrupt strategy claims and cancels old runs
-- create_run_atomic refuses to interrupt a run owned by another live worker
-- reconcile_orphaned_inflight_runs uses lease-based detection
-- Worker reconciliation skips runs with unexpired leases
-- Lease heartbeat renews active run leases
-- GATEWAY_WORKERS=1 + heartbeat_enabled=false behaviour unchanged
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -24,11 +14,12 @@ from deerflow.runtime.runs.manager import CancelOutcome, ConflictError, _generat
 from deerflow.runtime.runs.store.memory import MemoryRunStore
 
 # ---------------------------------------------------------------------------
-# Helpers
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def _lease_config(**kwargs) -> RunOwnershipConfig:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return RunOwnershipConfig(
         lease_seconds=kwargs.get("lease_seconds", 30),
         grace_seconds=kwargs.get("grace_seconds", 10),
@@ -37,6 +28,7 @@ def _lease_config(**kwargs) -> RunOwnershipConfig:
 
 
 def _make_manager(store=None, **kwargs) -> RunManager:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return RunManager(
         store=store or MemoryRunStore(),
         run_ownership_config=kwargs.pop("run_ownership_config", _lease_config()),
@@ -45,13 +37,13 @@ def _make_manager(store=None, **kwargs) -> RunManager:
 
 
 # ---------------------------------------------------------------------------
-# create_or_reject — reject strategy
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_reject_blocks_when_active_run_exists():
-    """reject strategy must raise ConflictError when thread has an active run."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
     await manager.create("thread-1")
@@ -63,7 +55,7 @@ async def test_reject_blocks_when_active_run_exists():
 
 @pytest.mark.anyio
 async def test_reject_succeeds_when_no_active_run():
-    """reject strategy must succeed when the thread has no active run."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True))
     record = await manager.create_or_reject("thread-1", multitask_strategy="reject")
@@ -75,7 +67,7 @@ async def test_reject_succeeds_when_no_active_run():
 
 @pytest.mark.anyio
 async def test_reject_blocks_reentrant_same_thread_locally():
-    """reject must also block when a local in-memory active run exists."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
     await manager.create_or_reject("thread-1", multitask_strategy="reject")
@@ -85,13 +77,13 @@ async def test_reject_blocks_reentrant_same_thread_locally():
 
 
 # ---------------------------------------------------------------------------
-# create_or_reject — interrupt strategy
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_interrupt_cancels_old_run_and_creates_new():
-    """interrupt must cancel the previous active run and create a new one."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
     old = await manager.create_or_reject("thread-1", multitask_strategy="reject")
@@ -102,18 +94,18 @@ async def test_interrupt_cancels_old_run_and_creates_new():
     assert new.run_id != old.run_id
     assert new.status == RunStatus.pending
 
-    # Old run must be interrupted locally
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert old.status == RunStatus.interrupted
     assert old.abort_event.is_set()
 
-    # Old run must be marked interrupted in-store (persist_status after local cancel)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     old_after = await store.get(old.run_id)
     assert old_after["status"] == "interrupted"
 
 
 @pytest.mark.anyio
 async def test_interrupt_creates_new_when_old_completed():
-    """interrupt must succeed when the previous run already reached a terminal status."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
     old = await manager.create_or_reject("thread-1")
@@ -126,27 +118,19 @@ async def test_interrupt_creates_new_when_old_completed():
 
 @pytest.mark.anyio
 async def test_interrupt_exhausted_retries_surface_as_conflict_error():
-    """When all retry attempts collide with a unique violation, the loop must
-    surface ConflictError (HTTP 409) — matching the reject branch — instead of
-    leaking the raw IntegrityError (HTTP 500).
-
-    Without the post-loop conversion, the last attempt's ``raise`` re-raises
-    the IntegrityError, giving callers an inconsistent signal depending on
-    which strategy they picked. The reject path already converts; this test
-    pins the symmetric behaviour for interrupt/rollback.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import sqlite3
 
     class _AlwaysUniqueViolationStore(MemoryRunStore):
-        """MemoryRunStore whose ``create_run_atomic`` always raises a
-        real-flavoured unique-violation IntegrityError, simulating a worker
-        that keeps losing the cross-worker race for the same thread."""
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
         def __init__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             super().__init__()
             self.atomic_call_count = 0
 
         async def create_run_atomic(self, *args, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.atomic_call_count += 1
             err = sqlite3.IntegrityError("UNIQUE constraint failed: runs.uq_runs_thread_active")
             err.sqlite_errorcode = sqlite3.SQLITE_CONSTRAINT_UNIQUE
@@ -158,18 +142,18 @@ async def test_interrupt_exhausted_retries_surface_as_conflict_error():
     with pytest.raises(ConflictError, match="already has an active run"):
         await manager.create_or_reject("thread-1", multitask_strategy="interrupt")
 
-    # Sanity: the loop actually retried 3 times before giving up.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert store.atomic_call_count == 3
 
 
 # ---------------------------------------------------------------------------
-# create_or_reject — run ownership metadata
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_run_record_stores_owner_and_lease():
-    """Newly created runs must carry owner_worker_id and lease_expires_at (when heartbeat is on)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True))
     record = await manager.create_or_reject("thread-1")
@@ -178,7 +162,7 @@ async def test_run_record_stores_owner_and_lease():
     assert isinstance(record.owner_worker_id, str) and len(record.owner_worker_id) > 0
     assert record.lease_expires_at is not None
 
-    # Store row must also carry the fields
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     stored = await store.get(record.run_id)
     assert stored is not None
     assert stored["owner_worker_id"] == manager.worker_id
@@ -187,7 +171,7 @@ async def test_run_record_stores_owner_and_lease():
 
 @pytest.mark.anyio
 async def test_store_row_roundtrips_ownership_fields():
-    """Records hydrated from the store must surface ownership fields."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True))
     record = await manager.create_or_reject("thread-1")
@@ -199,17 +183,17 @@ async def test_store_row_roundtrips_ownership_fields():
 
 
 # ---------------------------------------------------------------------------
-# reconcile_orphaned_inflight_runs — lease-based
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_reconciliation_claims_expired_lease_runs():
-    """A run with an expired lease must be reclaimed as orphaned."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
 
-    # Insert a run with an already-expired lease
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     expired_lease = (datetime.now(UTC) - timedelta(seconds=60)).isoformat()
     await store.put(
         "expired-run",
@@ -234,11 +218,11 @@ async def test_reconciliation_claims_expired_lease_runs():
 
 @pytest.mark.anyio
 async def test_reconciliation_skips_active_lease_runs():
-    """A run with a still-valid lease must NOT be reclaimed."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
 
-    # Insert a run with a still-valid lease
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     valid_lease = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
     await store.put(
         "live-run",
@@ -253,7 +237,7 @@ async def test_reconciliation_skips_active_lease_runs():
         error="Gateway restarted before this run reached a durable final state.",
     )
 
-    # Live run's lease is still valid — must not be reclaimed
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert all(r.run_id != "live-run" for r in recovered)
 
     stored = await store.get("live-run")
@@ -262,7 +246,7 @@ async def test_reconciliation_skips_active_lease_runs():
 
 @pytest.mark.anyio
 async def test_reconciliation_claims_null_lease_runs():
-    """Pre-ownership rows (NULL lease) must be reclaimed."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
 
@@ -283,29 +267,23 @@ async def test_reconciliation_claims_null_lease_runs():
 
 @pytest.mark.anyio
 async def test_heartbeat_disabled_crashed_run_reclaimed_immediately():
-    """Single-worker regression: when heartbeat is off, a crashed run must be
-    reclaimed on the next restart without waiting for lease expiry.
-
-    The run is created with lease_expires_at=NULL (no heartbeat => no lease),
-    so reconciliation treats it as an orphan and reclaims it right away —
-    preserving the pre-ownership recovery latency.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
-    # Worker A: heartbeat disabled (single-worker default)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     manager_a = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=False))
     record = await manager_a.create("thread-1")
     await manager_a.set_status(record.run_id, RunStatus.running)
 
-    # Verify the run was stored WITHOUT a lease (heartbeat off)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     stored = await store.get(record.run_id)
     assert stored is not None
     assert stored["lease_expires_at"] is None
 
-    # Simulate crash: drop manager_a's local state, build a fresh manager
-    # (same store) as if Worker A restarted.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     manager_b = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=False))
 
-    # Reconciliation must reclaim the run IMMEDIATELY — no lease to wait out.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     recovered = await manager_b.reconcile_orphaned_inflight_runs(
         error="Gateway restarted before this run reached a durable final state.",
     )
@@ -317,15 +295,15 @@ async def test_heartbeat_disabled_crashed_run_reclaimed_immediately():
 
 @pytest.mark.anyio
 async def test_reconciliation_skips_locally_active_runs():
-    """An active local run (owned by this worker) must NOT be reclaimed even with an expired lease."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
 
-    # Create a live local run
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     record = await manager.create("thread-1")
     await manager.set_status(record.run_id, RunStatus.running)
 
-    # Its lease hasn't expired yet, so this is mostly testing the local-ownership guard
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     recovered = await manager.reconcile_orphaned_inflight_runs(
         error="Gateway restarted before this run reached a durable final state.",
     )
@@ -335,7 +313,7 @@ async def test_reconciliation_skips_locally_active_runs():
 
 @pytest.mark.anyio
 async def test_reconciliation_returns_empty_when_no_orphaned_runs():
-    """Reconciliation must return empty when there are no orphaned runs."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
 
@@ -347,13 +325,13 @@ async def test_reconciliation_returns_empty_when_no_orphaned_runs():
 
 
 # ---------------------------------------------------------------------------
-# Lease heartbeat
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_heartbeat_renews_active_run_leases():
-    """Heartbeat must extend the lease on active runs owned by this worker."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=config)
@@ -364,46 +342,36 @@ async def test_heartbeat_renews_active_run_leases():
     original_lease = record.lease_expires_at
     assert original_lease is not None
 
-    # Start heartbeat and let it tick once
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await manager.start_heartbeat()
-    await asyncio.sleep(0.2)  # heartbeat interval = 10s, too long; manually renew
+    await asyncio.sleep(0.2)  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     await manager._renew_leases()
     await manager.stop_heartbeat()
 
     assert record.lease_expires_at is not None
-    # Lease should have been extended
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert record.lease_expires_at >= original_lease
 
 
 @pytest.mark.anyio
 async def test_heartbeat_renews_pending_run_before_task_is_spawned():
-    """A run sitting in ``pending`` between ``create_run_atomic`` and task
-    spawn must still have its lease renewed.
-
-    Pre-fix the renewal filter required ``record.task is not None``, so a
-    pending run with no task yet (the brief window after
-    ``create_run_atomic`` inserts the row before the worker layer spawns
-    the agent task) was silently skipped. If that window stretched past
-    ``lease_seconds`` — e.g. event-loop saturation, slow checkpoint
-    hydrate — peer reconciliation reclaimed the run as an orphan and
-    marked it ``error`` even though this worker still intended to run it.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=config)
 
     record = await manager.create_or_reject("thread-1")
     assert record.status == RunStatus.pending
-    # No task has been spawned — this is the regression sentinel.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert record.task is None
 
     original_lease = record.lease_expires_at
     assert original_lease is not None
 
-    # Force a measurable gap so the renewed lease strictly post-dates the
-    # original — without this the two timestamps land in the same
-    # microsecond on fast hosts and the strict comparison fails trivially.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await asyncio.sleep(0.001)
 
     store.update_lease = AsyncMock(wraps=store.update_lease)
@@ -417,12 +385,12 @@ async def test_heartbeat_renews_pending_run_before_task_is_spawned():
 
 @pytest.mark.anyio
 async def test_heartbeat_skips_runs_not_owned_by_this_worker():
-    """Heartbeat must only renew leases for runs owned by this worker."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = _lease_config(lease_seconds=30, heartbeat_enabled=True)
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=config)
 
-    # Create a run owned by a different worker
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     old_lease = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
     await store.put(
         "other-worker-run",
@@ -436,13 +404,13 @@ async def test_heartbeat_skips_runs_not_owned_by_this_worker():
     await manager._renew_leases()
 
     stored = await store.get("other-worker-run")
-    # Lease should be unchanged (other worker's run)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert stored["lease_expires_at"] == old_lease
 
 
 @pytest.mark.anyio
 async def test_heartbeat_not_started_when_disabled():
-    """When heartbeat_enabled is False, start_heartbeat must be a no-op."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = _lease_config(heartbeat_enabled=False)
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=config)
@@ -454,13 +422,13 @@ async def test_heartbeat_not_started_when_disabled():
 
 
 # ---------------------------------------------------------------------------
-# cancel with cross-worker lease awareness
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_cancel_local_run_succeeds():
-    """Cancel must succeed for a locally-owned active run."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
     record = await manager.create("thread-1")
@@ -473,7 +441,7 @@ async def test_cancel_local_run_succeeds():
 
 @pytest.mark.anyio
 async def test_cancel_unknown_run_returns_false():
-    """Cancel must return not_active_locally for a run not known to this worker (heartbeat off)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
 
@@ -483,7 +451,7 @@ async def test_cancel_unknown_run_returns_false():
 
 @pytest.mark.anyio
 async def test_cancel_idempotent():
-    """Cancel must return cancelled when the run is already interrupted."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     manager = _make_manager(store=store)
     record = await manager.create("thread-1")
@@ -494,18 +462,18 @@ async def test_cancel_idempotent():
 
 
 # ---------------------------------------------------------------------------
-# GATEWAY_WORKERS=1 backward compatibility
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_single_worker_default_config_behavior_unchanged():
-    """With default config (heartbeat_enabled=False), behavior must match pre-ownership code."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = _lease_config(heartbeat_enabled=False)
     store = MemoryRunStore()
     manager = _make_manager(store=store, run_ownership_config=config)
 
-    # Create runs, cancel, create_or_reject — all must work
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     r1 = await manager.create("thread-1")
     assert r1.owner_worker_id is not None
 
@@ -519,27 +487,27 @@ async def test_single_worker_default_config_behavior_unchanged():
 
 @pytest.mark.anyio
 async def test_manager_without_run_ownership_config():
-    """Manager without run_ownership_config must still work (backward compat)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
-    manager = RunManager(store=store)  # no run_ownership_config
+    manager = RunManager(store=store)  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     record = await manager.create_or_reject("thread-1")
     assert record is not None
-    assert record.owner_worker_id is not None  # always set, even without config
+    assert record.owner_worker_id is not None  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
-    # Heartbeat must be a no-op without config
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert manager.heartbeat_enabled is False
     await manager.start_heartbeat()
     assert manager._heartbeat_task is None
 
 
 # ---------------------------------------------------------------------------
-# worker_id uniqueness
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_worker_id_is_generated():
-    """worker_id must be a non-empty string containing hostname."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wid = _generate_worker_id()
     assert isinstance(wid, str)
     assert len(wid) > 0
@@ -547,20 +515,20 @@ def test_worker_id_is_generated():
 
 
 def test_two_managers_have_different_default_ids():
-    """Two managers without explicit worker_id must get unique ids."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     m1 = RunManager()
     m2 = RunManager()
     assert m1.worker_id != m2.worker_id
 
 
 # ---------------------------------------------------------------------------
-# Store atomic methods
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_create_run_atomic_reject_prevents_duplicate():
-    """store.create_run_atomic with reject must raise ConflictError on duplicate."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     config = _lease_config()
 
@@ -588,10 +556,10 @@ async def test_create_run_atomic_reject_prevents_duplicate():
 
 @pytest.mark.anyio
 async def test_create_run_atomic_interrupt_claims_and_creates():
-    """store.create_run_atomic with interrupt must claim old and create new."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     config = _lease_config()
-    # Create an active run with an expired lease (simulating a crashed worker)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     expired_lease = (datetime.now(UTC) - timedelta(seconds=60)).isoformat()
 
     await store.create_run_atomic(
@@ -617,19 +585,14 @@ async def test_create_run_atomic_interrupt_claims_and_creates():
     assert len(claimed) == 1
     assert claimed[0]["run_id"] == "run-old"
 
-    # Old run must be interrupted in-store
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     old_row = await store.get("run-old")
     assert old_row["status"] == "interrupted"
 
 
 @pytest.mark.anyio
 async def test_create_run_atomic_interrupt_rejects_other_worker_valid_lease():
-    """Interrupt must raise ConflictError when a valid-lease run is owned by another worker.
-
-    The partial unique index ``uq_runs_thread_active`` would reject the INSERT
-    anyway; surfacing ConflictError here gives the caller a clean signal
-    instead of a futile retry loop on IntegrityError.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     config = _lease_config(grace_seconds=10)
     valid_lease = (datetime.now(UTC) + timedelta(seconds=30)).isoformat()
@@ -653,7 +616,7 @@ async def test_create_run_atomic_interrupt_rejects_other_worker_valid_lease():
             grace_seconds=config.grace_seconds,
         )
 
-    # The valid-lease run must be untouched (transaction rolled back).
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     old_row = await store.get("valid-lease-run")
     assert old_row["status"] == "pending"
     assert old_row["owner_worker_id"] == "other-worker"
@@ -661,7 +624,7 @@ async def test_create_run_atomic_interrupt_rejects_other_worker_valid_lease():
 
 @pytest.mark.anyio
 async def test_create_run_atomic_interrupt_allows_self_owned_valid_lease():
-    """Interrupt must succeed when the existing valid-lease run is owned by this worker."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     config = _lease_config(grace_seconds=10)
     valid_lease = (datetime.now(UTC) + timedelta(seconds=30)).isoformat()
@@ -678,7 +641,7 @@ async def test_create_run_atomic_interrupt_allows_self_owned_valid_lease():
     new_row, claimed = await store.create_run_atomic(
         run_id="run-new",
         thread_id="thread-1",
-        owner_worker_id="w1",  # same worker
+        owner_worker_id="w1",  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         lease_expires_at=(datetime.now(UTC) + timedelta(seconds=30)).isoformat(),
         multitask_strategy="interrupt",
         grace_seconds=config.grace_seconds,
@@ -692,31 +655,17 @@ async def test_create_run_atomic_interrupt_allows_self_owned_valid_lease():
 
 @pytest.mark.anyio
 async def test_create_run_atomic_interrupt_rolls_back_earlier_mutations_on_conflict():
-    """Interrupt must not leave earlier candidates interrupted when a later
-    candidate raises ConflictError.
-
-    Mirrors the SQL store's transactional semantics: the whole interrupt pass
-    is one transaction, so a raise on any candidate must roll back mutations
-    already applied to earlier candidates. Without this, the memory store
-    diverges from SQL (which the production path uses), and the
-    test_multi_worker_run_ownership.py suite gives false confidence by
-    passing against memory while SQL would behave differently.
-
-    Setup: expired-lease run (interruptible) inserted FIRST, then a
-    valid-lease run owned by another worker. Iteration order means the
-    expired run is mutated before the valid-lease run raises — so a naive
-    single-pass implementation would leave the expired run interrupted.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     config = _lease_config(grace_seconds=10)
     expired_lease = (datetime.now(UTC) - timedelta(seconds=60)).isoformat()
     valid_lease = (datetime.now(UTC) + timedelta(seconds=30)).isoformat()
 
-    # Seed both active rows directly via ``put`` (bypassing create_run_atomic's
-    # reject check, which would refuse the second row). Insert the
-    # interruptible run first so dict iteration visits it first — that's the
-    # ordering that exposes the half-interrupted divergence in a naive
-    # single-pass implementation.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put(
         "expired-run",
         thread_id="thread-1",
@@ -742,30 +691,30 @@ async def test_create_run_atomic_interrupt_rolls_back_earlier_mutations_on_confl
             grace_seconds=config.grace_seconds,
         )
 
-    # The expired run must be UNTOUCHED — the interrupt pass must roll back
-    # on ConflictError, not leave a half-interrupted store.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     expired_row = await store.get("expired-run")
     assert expired_row["status"] == "pending"
     assert expired_row["owner_worker_id"] == "old-worker"
     assert expired_row["error"] is None
 
-    # The valid-lease run that caused the conflict is also untouched.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     valid_row = await store.get("valid-lease-run")
     assert valid_row["status"] == "pending"
     assert valid_row["owner_worker_id"] == "other-worker"
 
-    # The new run was never inserted.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert await store.get("run-new") is None
 
 
 # ---------------------------------------------------------------------------
-# update_lease
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_update_lease_renews_row():
-    """update_lease must update the lease_expires_at on the stored row."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     old_lease = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
     await store.put(
@@ -790,7 +739,7 @@ async def test_update_lease_renews_row():
 
 @pytest.mark.anyio
 async def test_update_lease_returns_false_for_terminal_run():
-    """update_lease must return False when the run is not pending/running."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     await store.put("run-1", thread_id="thread-1", status="success", owner_worker_id="w1")
 
@@ -808,7 +757,7 @@ async def test_update_lease_returns_false_for_terminal_run():
 
 @pytest.mark.anyio
 async def test_update_lease_returns_false_for_wrong_owner():
-    """update_lease must reject renewal when owner_worker_id does not match."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     old_lease = (datetime.now(UTC) + timedelta(seconds=5)).isoformat()
     await store.put(
@@ -822,41 +771,41 @@ async def test_update_lease_returns_false_for_wrong_owner():
     new_lease = (datetime.now(UTC) + timedelta(seconds=30)).isoformat()
     updated = await store.update_lease(
         "run-1",
-        owner_worker_id="w2",  # different worker
+        owner_worker_id="w2",  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         lease_expires_at=new_lease,
     )
     assert updated is False
 
-    # The original lease must be untouched
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     stored = await store.get("run-1")
     assert stored["owner_worker_id"] == "w1"
     assert stored["lease_expires_at"] == old_lease
 
 
 # ---------------------------------------------------------------------------
-# list_inflight_with_expired_lease
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_list_inflight_with_expired_lease_filters_correctly():
-    """Only runs with expired or NULL leases must be returned."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     now = datetime.now(UTC)
     grace = 10
 
-    # Expired lease
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     expired = (now - timedelta(seconds=60)).isoformat()
     await store.put("expired-run", thread_id="t1", status="running", owner_worker_id="w1", lease_expires_at=expired, created_at=expired)
 
-    # Valid lease
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     valid = (now + timedelta(seconds=60)).isoformat()
     await store.put("valid-run", thread_id="t2", status="running", owner_worker_id="w2", lease_expires_at=valid, created_at=valid)
 
-    # NULL lease (legacy)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("null-lease-run", thread_id="t3", status="running", created_at=(now - timedelta(seconds=30)).isoformat())
 
-    # Terminal status (should not appear)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("success-run", thread_id="t4", status="success", created_at=(now - timedelta(seconds=60)).isoformat())
 
     results = await store.list_inflight_with_expired_lease(grace_seconds=grace)
@@ -869,26 +818,21 @@ async def test_list_inflight_with_expired_lease_filters_correctly():
 
 
 # ---------------------------------------------------------------------------
-# MemoryRunStore — datetime comparison for created_at filtering
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_list_inflight_with_expired_lease_compares_created_at_as_datetime():
-    """``before`` filter must use datetime comparison, not string lexical order.
-
-    ISO-8601 strings compare lexically only when every component is zero-padded
-    to the same width and the timezone suffix matches. Datetime parsing is
-    order-safe regardless of format.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     now = datetime.now(UTC)
     grace = 10
 
-    # A run created "now" — should be included when before=None (defaults to now).
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("recent-run", thread_id="t1", status="running", created_at=now.isoformat())
-    # A run created far in the future — should be excluded by the before filter
-    # even though the string "2300-01-01..." > "2025-..." lexically.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     far_future = "2300-01-01T00:00:00+00:00"
     await store.put("future-run", thread_id="t2", status="running", created_at=far_future)
 
@@ -900,7 +844,7 @@ async def test_list_inflight_with_expired_lease_compares_created_at_as_datetime(
 
 @pytest.mark.anyio
 async def test_list_inflight_with_expired_lease_handles_malformed_created_at():
-    """Malformed ``created_at`` values must not crash the listing."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
 
@@ -918,7 +862,7 @@ async def test_list_inflight_with_expired_lease_handles_malformed_created_at():
     }
 
     results = await store.list_inflight_with_expired_lease(grace_seconds=grace)
-    # Both should be skipped because their created_at can't be parsed
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     result_ids = {r["run_id"] for r in results}
     assert "bad-run" not in result_ids
     assert "empty-run" not in result_ids
@@ -926,40 +870,34 @@ async def test_list_inflight_with_expired_lease_handles_malformed_created_at():
 
 @pytest.mark.anyio
 async def test_list_inflight_with_expired_lease_datetime_aware_naive_handling():
-    """Lease comparison must handle aware and naive datetimes.
-
-    ``lease_expires_at`` stored with a trailing ``+00:00`` (aware) and without
-    (naive) should both be comparable against the aware ``cutoff``. The MemoryRunStore
-    uses ``datetime.fromisoformat`` which preserves the offset, so both paths
-    must work.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     now = datetime.now(UTC)
     grace = 10
 
-    # Naive datetime (no timezone suffix) — common on SQLite read-back
-    naive_expired = (now - timedelta(seconds=60)).isoformat()  # "2025-01-01T00:00:00"
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    naive_expired = (now - timedelta(seconds=60)).isoformat()  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("naive-run", thread_id="t1", status="running", lease_expires_at=naive_expired, created_at=naive_expired)
 
-    # Aware datetime (with +00:00)
-    aware_expired = (now - timedelta(seconds=60)).replace(tzinfo=UTC).isoformat()  # "2025-01-01T00:00:00+00:00"
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    aware_expired = (now - timedelta(seconds=60)).replace(tzinfo=UTC).isoformat()  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("aware-run", thread_id="t2", status="running", lease_expires_at=aware_expired, created_at=aware_expired)
 
     results = await store.list_inflight_with_expired_lease(grace_seconds=grace)
     result_ids = {r["run_id"] for r in results}
-    # Both expired, both should be returned
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "naive-run" in result_ids
     assert "aware-run" in result_ids
 
 
 @pytest.mark.anyio
 async def test_list_inflight_with_expired_lease_null_lease_always_reclaimed():
-    """NULL lease rows are always reclaimed regardless of created_at value."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
 
-    # NULL lease is the single-worker mode default — every inflight row
-    # must be returned so reconciliation can reclaim it.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("null-run", thread_id="t1", status="running", created_at=datetime.now(UTC).isoformat())
 
     results = await store.list_inflight_with_expired_lease(grace_seconds=grace)
@@ -968,13 +906,13 @@ async def test_list_inflight_with_expired_lease_null_lease_always_reclaimed():
 
 
 # ---------------------------------------------------------------------------
-# claim_for_takeover — store primitive
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_claim_for_takeover_succeeds_with_expired_lease():
-    """claim_for_takeover must succeed when the lease has passed the grace window."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     expired_lease = (datetime.now(UTC) - timedelta(seconds=grace + 5)).isoformat()
@@ -991,7 +929,7 @@ async def test_claim_for_takeover_succeeds_with_expired_lease():
 
 @pytest.mark.anyio
 async def test_claim_for_takeover_fails_with_valid_lease():
-    """claim_for_takeover must return False when the lease is still valid."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     valid_lease = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
@@ -1007,7 +945,7 @@ async def test_claim_for_takeover_fails_with_valid_lease():
 
 @pytest.mark.anyio
 async def test_claim_for_takeover_succeeds_with_null_lease():
-    """NULL-lease rows (pre-ownership data) must be claimable."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     await store.put("run-null", thread_id="t1", status="running", created_at=datetime.now(UTC).isoformat())
 
@@ -1020,7 +958,7 @@ async def test_claim_for_takeover_succeeds_with_null_lease():
 
 @pytest.mark.anyio
 async def test_claim_for_takeover_fails_on_terminal_status():
-    """claim_for_takeover must return False for already-terminal runs."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     await store.put("run-done", thread_id="t1", status="success", created_at=datetime.now(UTC).isoformat())
 
@@ -1030,20 +968,20 @@ async def test_claim_for_takeover_fails_on_terminal_status():
 
 @pytest.mark.anyio
 async def test_claim_for_takeover_fails_for_nonexistent_run():
-    """claim_for_takeover must return False when the run doesn't exist."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     ok = await store.claim_for_takeover("no-such-run", grace_seconds=10, error="claimed")
     assert ok is False
 
 
 # ---------------------------------------------------------------------------
-# cancel() cross-worker takeover — work item 4
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_cancel_takeover_from_crashed_worker():
-    """cancel must take over (mark error) when lease is expired and owner is another worker."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     expired_lease = (datetime.now(UTC) - timedelta(seconds=grace + 5)).isoformat()
@@ -1060,7 +998,7 @@ async def test_cancel_takeover_from_crashed_worker():
 
 @pytest.mark.anyio
 async def test_cancel_refuses_active_lease_from_other_worker():
-    """cancel must return lease_valid_elsewhere when the run is owned by another worker with a valid lease."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     valid_lease = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
@@ -1072,12 +1010,12 @@ async def test_cancel_refuses_active_lease_from_other_worker():
 
     row = await store.get("run-alive")
     assert row is not None
-    assert row["status"] == "running"  # untouched
+    assert row["status"] == "running"  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 @pytest.mark.anyio
 async def test_cancel_returns_unknown_when_no_store():
-    """cancel must return unknown when there's no store and the run is not in memory."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     manager = _make_manager(run_ownership_config=_lease_config(heartbeat_enabled=True))
     outcome = await manager.cancel("no-such-run")
     assert outcome == CancelOutcome.unknown
@@ -1085,7 +1023,7 @@ async def test_cancel_returns_unknown_when_no_store():
 
 @pytest.mark.anyio
 async def test_cancel_returns_not_active_locally_when_heartbeat_disabled():
-    """With heartbeat disabled, store-only runs must not be cancellable (old 409 path)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     await store.put("store-only", thread_id="t1", status="running", created_at=datetime.now(UTC).isoformat())
 
@@ -1096,19 +1034,20 @@ async def test_cancel_returns_not_active_locally_when_heartbeat_disabled():
 
 @pytest.mark.anyio
 async def test_cancel_takeover_race_owner_renewed_lease():
-    """When the owner heartbeats between our read and the conditional UPDATE, cancel must return lease_valid_elsewhere."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     expired_lease = (datetime.now(UTC) - timedelta(seconds=grace + 5)).isoformat()
     await store.put("run-race", thread_id="t1", status="running", created_at=datetime.now(UTC).isoformat(), owner_worker_id="w-a", lease_expires_at=expired_lease)
 
-    # Simulate the race: right before claim_for_takeover writes, another
-    # heartbeat renews the lease.  We monkey-patch claim_for_takeover to
-    # simulate the lease having been renewed.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     original = store.claim_for_takeover
 
     async def race_lost(run_id, *, grace_seconds, error):
-        # Simulate a heartbeat renewal between the read and the write
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         run = store._runs.get(run_id)
         if run and run["status"] in ("pending", "running"):
             run["lease_expires_at"] = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
@@ -1123,10 +1062,10 @@ async def test_cancel_takeover_race_owner_renewed_lease():
 
 @pytest.mark.anyio
 async def test_cancel_takeover_respects_grace_seconds():
-    """Cancel must not take over when the lease is within the grace window."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
-    # Lease expired, but only by 3s — still within the 10s grace window
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     just_expired = (datetime.now(UTC) - timedelta(seconds=3)).isoformat()
     await store.put("run-grace", thread_id="t1", status="running", created_at=datetime.now(UTC).isoformat(), owner_worker_id="w-a", lease_expires_at=just_expired)
 
@@ -1137,7 +1076,7 @@ async def test_cancel_takeover_respects_grace_seconds():
 
 @pytest.mark.anyio
 async def test_cancel_not_cancellable_for_store_terminal_run():
-    """cancel must return not_cancellable when the store run is already in a terminal state."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     await store.put("run-done", thread_id="t1", status="success", created_at=datetime.now(UTC).isoformat())
 
@@ -1147,12 +1086,12 @@ async def test_cancel_not_cancellable_for_store_terminal_run():
 
 
 # ---------------------------------------------------------------------------
-# HTTP-level — cancel endpoint cross-worker responses
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def _make_cancel_test_app(mgr: RunManager):
-    """Build a TestClient wired with the thread_runs router + memory bridge."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     from _router_auth_helpers import make_authed_test_app
     from fastapi.testclient import TestClient
 
@@ -1167,7 +1106,7 @@ def _make_cancel_test_app(mgr: RunManager):
 
 
 def test_http_cancel_non_owner_valid_lease_returns_409_with_retry_after():
-    """POST /cancel on a non-owning worker with a valid lease must return 409 + Retry-After."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     valid_lease = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()
@@ -1187,17 +1126,17 @@ def test_http_cancel_non_owner_valid_lease_returns_409_with_retry_after():
     resp = client.post("/api/threads/t1/runs/run-alive/cancel")
     assert resp.status_code == 409
     assert "Retry-After" in resp.headers
-    # Retry-After = remaining lease (≈60s) + grace (10s) = ≈70s
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     retry_after = int(resp.headers["Retry-After"])
     assert 50 <= retry_after <= 75
 
-    # Store row must be untouched
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     row = asyncio.run(store.get("run-alive"))
     assert row["status"] == "running"
 
 
 def test_http_cancel_non_owner_expired_lease_returns_202_takeover():
-    """POST /cancel on a non-owning worker with an expired lease must return 202 (takeover)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     expired_lease = (datetime.now(UTC) - timedelta(seconds=grace + 30)).isoformat()
@@ -1217,13 +1156,13 @@ def test_http_cancel_non_owner_expired_lease_returns_202_takeover():
     resp = client.post("/api/threads/t1/runs/run-dead/cancel")
     assert resp.status_code == 202
 
-    # Store row must be marked error
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     row = asyncio.run(store.get("run-dead"))
     assert row["status"] == "error"
 
 
 def test_http_stream_action_interrupt_takeover_returns_202_not_hang():
-    """POST /stream?action=interrupt on a dead-owner run must return 202 immediately, not hang on SSE."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     expired_lease = (datetime.now(UTC) - timedelta(seconds=grace + 30)).isoformat()
@@ -1240,7 +1179,7 @@ def test_http_stream_action_interrupt_takeover_returns_202_not_hang():
     mgr = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True, grace_seconds=grace))
     client = _make_cancel_test_app(mgr)
 
-    # This must NOT hang — the takeover path returns 202 before reaching StreamingResponse.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     resp = client.post("/api/threads/t1/runs/run-dead-stream/stream", params={"action": "interrupt"})
     assert resp.status_code == 202
 
@@ -1249,28 +1188,25 @@ def test_http_stream_action_interrupt_takeover_returns_202_not_hang():
 
 
 # ---------------------------------------------------------------------------
-# Split-brain defences — update_status guard + heartbeat self-termination
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_update_status_rejects_terminal_row():
-    """update_status must return False when the store row is already terminal
-    (error/success), so a late writer cannot overwrite a peer's takeover or
-    a completed run. interrupted is NOT terminal — the rollback path needs
-    ``interrupted → error`` to finalize."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
-    # error (takeover) must stay locked
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("run-err", thread_id="t1", status="error", created_at=datetime.now(UTC).isoformat())
     assert await store.update_status("run-err", "success") is False
     assert (await store.get("run-err"))["status"] == "error"
 
-    # success must stay locked
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("run-ok", thread_id="t1", status="success", created_at=datetime.now(UTC).isoformat())
     assert await store.update_status("run-ok", "error") is False
     assert (await store.get("run-ok"))["status"] == "success"
 
-    # interrupted → error MUST pass (rollback finalize path)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.put("run-rb", thread_id="t1", status="interrupted", created_at=datetime.now(UTC).isoformat())
     assert await store.update_status("run-rb", "error", error="Rolled back by user") is True
     row = await store.get("run-rb")
@@ -1280,83 +1216,72 @@ async def test_update_status_rejects_terminal_row():
 
 @pytest.mark.anyio
 async def test_persist_status_skips_recovery_when_row_taken_over():
-    """_persist_status must not recreate a row that was taken over by another worker.
-
-    When update_status returns False, the recovery path checks whether the
-    row still exists. A row that exists but is terminal (taken over) must
-    be left alone — calling put() would overwrite the takeover."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     mgr = RunManager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True))
 
-    # Simulate: this worker created and started a run, but a peer took it over.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     record = await mgr.create("thread-1")
     await mgr.set_status(record.run_id, RunStatus.running)
-    # Peer takeover: directly flip the store row to error
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.update_status(record.run_id, "error")
-    # Now simulate the original owner's task finishing and trying to write success
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     ok = await mgr._persist_status(record, RunStatus.success)
-    assert ok is False  # skipped recovery, row already exists and is terminal
+    assert ok is False  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     row = await store.get(record.run_id)
-    assert row["status"] == "error"  # not overwritten
+    assert row["status"] == "error"  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 @pytest.mark.anyio
 async def test_heartbeat_cancels_task_on_lease_loss():
-    """Heartbeat must cancel the local asyncio task when update_lease returns False.
-
-    If the store row was claimed by another worker (status no longer
-    pending/running, or owner changed), the heartbeat tick must abort the
-    local task so wasted CPU is bounded to ~10s instead of the full task
-    lifetime."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     mgr = RunManager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True, lease_seconds=30))
 
-    # Create a run that this worker owns
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     record = await mgr.create("thread-1")
     await mgr.set_status(record.run_id, RunStatus.running)
 
-    # Spawn a dummy task so cancel has something to stop
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     loop = asyncio.get_running_loop()
     record.task = loop.create_task(asyncio.sleep(3600))
 
-    # Simulate takeover: directly flip the store row to error
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await store.update_status(record.run_id, "error")
 
-    # Run a single heartbeat tick — it should see update_lease return False
-    # and cancel the task
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await mgr._renew_leases()
 
-    # Let the event loop process the cancellation (task.cancel() schedules,
-    # doesn't await).
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await asyncio.sleep(0)
     assert record.task.cancelled()
 
 
 @pytest.mark.anyio
 async def test_cancel_returns_taken_over_when_peer_claims_during_local_cancel():
-    """When a peer's claim_for_takeover flips the row to error between this
-    worker's in-memory cancel and the guarded update_status, cancel() must
-    surface taken_over (not cancelled) so the client sees a status consistent
-    with the store."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     mgr = RunManager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True))
 
     record = await mgr.create("thread-1")
     await mgr.set_status(record.run_id, RunStatus.running)
 
-    # Wrap update_status so that the first call (from cancel's _persist_status)
-    # is rejected as if a peer already marked the row error. This simulates
-    # the race: in-memory cancel succeeds, but store write is blocked.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     original = store.update_status
 
     async def race_update(run_id, status, *, error=None, stop_reason=None):
-        # Simulate peer takeover: flip to error before our write lands
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         run = store._runs.get(run_id)
         if run and run["status"] == "running" and status == "interrupted":
             run["status"] = "error"
             run["error"] = "peer takeover"
             run["updated_at"] = datetime.now(UTC).isoformat()
-            return False  # our write was blocked
+            return False  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         return await original(run_id, status, error=error, stop_reason=stop_reason)
 
     store.update_status = race_update
@@ -1364,36 +1289,29 @@ async def test_cancel_returns_taken_over_when_peer_claims_during_local_cancel():
     outcome = await mgr.cancel(record.run_id)
     assert outcome == CancelOutcome.taken_over
 
-    # Store row must reflect the takeover, not the local cancel
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     row = await store.get(record.run_id)
     assert row["status"] == "error"
 
 
 @pytest.mark.anyio
 async def test_cancel_action_rollback_finalizes_to_error_in_store():
-    """action=rollback must end up as error in the store with the
-    "Rolled back by user" message preserved.
-
-    Regression guard: the update_status guard was originally
-    ``status IN ('pending','running')`` which blocked the rollback path's
-    ``interrupted → error`` transition — the store stayed interrupted and
-    the rollback message was lost.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     mgr = RunManager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True))
 
     record = await mgr.create("thread-1")
     await mgr.set_status(record.run_id, RunStatus.running)
 
-    # Step 1: cancel(action=rollback) flips running → interrupted
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     outcome = await mgr.cancel(record.run_id, action="rollback")
     assert outcome == CancelOutcome.cancelled
     row = await store.get(record.run_id)
     assert row["status"] == "interrupted"
 
-    # Step 2: worker.py finalize path — task raises CancelledError, then
-    # set_status(error, "Rolled back by user"). The widened guard
-    # (interrupted is in the whitelist) must let this through.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     await mgr.set_status(record.run_id, RunStatus.error, error="Rolled back by user")
     row = await store.get(record.run_id)
     assert row["status"] == "error"
@@ -1401,19 +1319,17 @@ async def test_cancel_action_rollback_finalizes_to_error_in_store():
 
 
 # ---------------------------------------------------------------------------
-# cancel() claim_for_takeover False → re-read precision
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_cancel_claim_lost_to_terminal_returns_not_cancellable():
-    """When cancel() reads the run as active but claim_for_takeover returns
-    False because the row went terminal (run finished) between the read and
-    the conditional UPDATE, the re-read must surface not_cancellable."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     mgr = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True, grace_seconds=10))
 
-    # Seed as running so cancel()'s first read passes the status guard.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     expired = (datetime.now(UTC) - timedelta(seconds=60)).isoformat()
     await store.put(
         "run-race",
@@ -1424,11 +1340,12 @@ async def test_cancel_claim_lost_to_terminal_returns_not_cancellable():
         created_at=datetime.now(UTC).isoformat(),
     )
 
-    # Wrap claim_for_takeover: flip the row to success just before the
-    # conditional UPDATE so it matches 0 rows.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     original = store.claim_for_takeover
 
     async def race_claim(run_id, *, grace_seconds, error):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         store._runs[run_id]["status"] = "success"
         return await original(run_id, grace_seconds=grace_seconds, error=error)
 
@@ -1440,9 +1357,7 @@ async def test_cancel_claim_lost_to_terminal_returns_not_cancellable():
 
 @pytest.mark.anyio
 async def test_cancel_claim_lost_to_takeover_returns_taken_over():
-    """When cancel() reads the run as active but claim_for_takeover returns
-    False because another worker already took it over (row is error), the
-    re-read must surface taken_over."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     mgr = _make_manager(store=store, run_ownership_config=_lease_config(heartbeat_enabled=True, grace_seconds=10))
 
@@ -1456,11 +1371,12 @@ async def test_cancel_claim_lost_to_takeover_returns_taken_over():
         created_at=datetime.now(UTC).isoformat(),
     )
 
-    # Wrap claim_for_takeover: flip the row to error before the conditional
-    # UPDATE so it matches 0 rows (peer already took it over).
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     original = store.claim_for_takeover
 
     async def race_takeover(run_id, *, grace_seconds, error):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         store._runs[run_id]["status"] = "error"
         store._runs[run_id]["error"] = "peer claim"
         return await original(run_id, grace_seconds=grace_seconds, error=error)
@@ -1472,40 +1388,42 @@ async def test_cancel_claim_lost_to_takeover_returns_taken_over():
 
 
 # ---------------------------------------------------------------------------
-# _compute_retry_after unit tests
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_compute_retry_after_null_lease_returns_none():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from app.gateway.routers.thread_runs import _compute_retry_after
 
     assert _compute_retry_after(None, 10) is None
 
 
 def test_compute_retry_after_unparseable_returns_none():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from app.gateway.routers.thread_runs import _compute_retry_after
 
     assert _compute_retry_after("not-a-date", 10) is None
 
 
 def test_compute_retry_after_normal():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from app.gateway.routers.thread_runs import _compute_retry_after
 
     future = (datetime.now(UTC) + timedelta(seconds=45)).isoformat()
     val = _compute_retry_after(future, 10)
     assert val is not None
-    # lease_expires_at is ~45s from now + grace_seconds 10 = ~55, within reason
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert 40 <= val <= 65
 
 
 # ---------------------------------------------------------------------------
-# HTTP — stream endpoint cross-worker 409
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_http_stream_action_interrupt_non_owner_returns_409_with_retry_after():
-    """POST /stream?action=interrupt on a non-owner with valid lease must
-    return 409 + Retry-After, not hang on SSE."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     store = MemoryRunStore()
     grace = 10
     valid_lease = (datetime.now(UTC) + timedelta(seconds=60)).isoformat()

@@ -1,4 +1,4 @@
-"""Regression anchor: uploads router must not block the event loop."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -19,47 +19,60 @@ pytestmark = pytest.mark.asyncio
 
 
 class _SandboxRecorder:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def __init__(self) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.updates: list[tuple[str, bytes]] = []
 
     def update_file(self, path: str, content: bytes) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.updates.append((path, content))
 
 
 class _MountedProvider:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     uses_thread_data_mounts = True
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("mounted upload path must not acquire a sandbox")
 
     async def acquire_async(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("mounted upload path must not acquire a sandbox")
 
     def get(self, sandbox_id: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("mounted upload path must not read a sandbox")
 
 
 class _RemoteProvider:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     uses_thread_data_mounts = False
 
     def __init__(self) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.sandbox = _SandboxRecorder()
         self.acquire_async_calls: list[tuple[str | None, str | None]] = []
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("upload route should use acquire_async")
 
     async def acquire_async(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.acquire_async_calls.append((thread_id, user_id))
         return "remote-sandbox"
 
     def get(self, sandbox_id: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if sandbox_id == "remote-sandbox":
             return self.sandbox
         return None
 
 
 def _reset_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
 
     import deerflow.config.paths as paths_mod
@@ -68,11 +81,13 @@ def _reset_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 async def _thread_uploads_dir(thread_id: str, *, user_id: str | None = None) -> Path:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     user_id = user_id or get_effective_user_id()
     return await asyncio.to_thread(ensure_uploads_dir, thread_id, user_id=user_id)
 
 
 async def test_upload_endpoint_mounted_provider_does_not_block_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     _reset_paths(tmp_path, monkeypatch)
     provider = _MountedProvider()
     monkeypatch.setattr(uploads, "get_sandbox_provider", lambda: provider)
@@ -93,6 +108,7 @@ async def test_upload_endpoint_mounted_provider_does_not_block_event_loop(tmp_pa
 
 
 async def test_upload_endpoint_remote_provider_syncs_without_blocking_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     _reset_paths(tmp_path, monkeypatch)
     provider = _RemoteProvider()
     monkeypatch.setattr(uploads, "get_sandbox_provider", lambda: provider)
@@ -112,6 +128,7 @@ async def test_upload_endpoint_remote_provider_syncs_without_blocking_event_loop
 
 
 async def test_list_uploaded_files_does_not_block_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     _reset_paths(tmp_path, monkeypatch)
     uploads_dir = await _thread_uploads_dir("t-list")
     await asyncio.to_thread((uploads_dir / "notes.txt").write_bytes, b"hello")
@@ -124,6 +141,7 @@ async def test_list_uploaded_files_does_not_block_event_loop(tmp_path: Path, mon
 
 
 async def test_delete_uploaded_file_does_not_block_event_loop(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     _reset_paths(tmp_path, monkeypatch)
     uploads_dir = await _thread_uploads_dir("t-delete")
     target = uploads_dir / "notes.txt"

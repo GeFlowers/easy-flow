@@ -1,9 +1,12 @@
+"""本模块覆盖适配的行为、边界与回归场景，确保既有契约稳定。"""
+
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage, SystemMessage
 
 from deerflow.models.patched_minimax import PatchedChatMiniMax
 
 
 def _make_model(**kwargs) -> PatchedChatMiniMax:
+    """准备可控测试资源与状态，供后续断言读取。"""
     return PatchedChatMiniMax(
         model="MiniMax-M3",
         api_key="test-key",
@@ -13,6 +16,7 @@ def _make_model(**kwargs) -> PatchedChatMiniMax:
 
 
 def test_get_request_payload_preserves_thinking_and_forces_reasoning_split():
+    """验证获取 请求 载荷 思考 推理在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model(extra_body={"thinking": {"type": "disabled"}})
 
     payload = model._get_request_payload([HumanMessage(content="hello")])
@@ -22,13 +26,7 @@ def test_get_request_payload_preserves_thinking_and_forces_reasoning_split():
 
 
 def test_get_request_payload_strips_inconsistent_user_message_names():
-    """MiniMax rejects user messages whose `name` fields differ (error 2013).
-
-    DeerFlow middlewares tag user messages with internal provenance names
-    (e.g. "summary", "user-input", "loop_warning"). langchain serializes those
-    into the OpenAI-compatible payload, and MiniMax requires every user-role
-    name to be consistent. Strip them so the request is accepted.
-    """
+    """验证获取 请求 载荷 用户 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
 
     payload = model._get_request_payload(
@@ -46,6 +44,7 @@ def test_get_request_payload_strips_inconsistent_user_message_names():
 
 
 def test_create_chat_result_maps_reasoning_details_to_reasoning_content():
+    """验证创建 结果 推理 推理在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
     response = {
         "choices": [
@@ -78,6 +77,7 @@ def test_create_chat_result_maps_reasoning_details_to_reasoning_content():
 
 
 def test_create_chat_result_strips_inline_think_tags():
+    """验证创建 结果在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
     response = {
         "choices": [
@@ -101,6 +101,7 @@ def test_create_chat_result_strips_inline_think_tags():
 
 
 def test_convert_chunk_to_generation_chunk_preserves_reasoning_deltas():
+    """验证推理在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
     first = model._convert_chunk_to_generation_chunk(
         {

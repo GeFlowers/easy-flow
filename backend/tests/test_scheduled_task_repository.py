@@ -1,3 +1,4 @@
+'未说明'
 from datetime import UTC, datetime
 
 import pytest
@@ -10,6 +11,7 @@ from deerflow.persistence.scheduled_tasks import ScheduledTaskRepository
 
 @pytest.mark.asyncio
 async def test_scheduled_task_repository_create_and_list(tmp_path):
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -38,6 +40,7 @@ async def test_scheduled_task_repository_create_and_list(tmp_path):
 
 @pytest.mark.asyncio
 async def test_scheduled_task_run_repository_records_history(tmp_path):
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -61,7 +64,7 @@ async def test_scheduled_task_run_repository_records_history(tmp_path):
 
 @pytest.mark.asyncio
 async def test_mark_stale_active_runs_fails_orphaned_runs(tmp_path):
-    """Runs stuck in queued/running after a process crash are swept to interrupted."""
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -106,8 +109,7 @@ async def test_mark_stale_active_runs_fails_orphaned_runs(tmp_path):
 
 @pytest.mark.asyncio
 async def test_update_status_protect_terminal_keeps_completion_result(tmp_path):
-    """The launch-path "running" write must not clobber a terminal status
-    already committed by the completion hook (launch/completion race)."""
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -136,6 +138,7 @@ async def test_update_status_protect_terminal_keeps_completion_result(tmp_path):
 
 @pytest.mark.asyncio
 async def test_has_active_runs_sees_only_queued_and_running(tmp_path):
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -159,8 +162,7 @@ async def test_has_active_runs_sees_only_queued_and_running(tmp_path):
 
 @pytest.mark.asyncio
 async def test_cancel_stuck_once_tasks_reconciles_orphaned_running(tmp_path):
-    """Launched (lease cleared) once tasks stuck in running are cancelled at
-    startup; leased ones are left for expired-lease reclaim."""
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -216,8 +218,7 @@ async def test_cancel_stuck_once_tasks_reconciles_orphaned_running(tmp_path):
 
 @pytest.mark.asyncio
 async def test_update_after_launch_protect_terminal_keeps_hook_result(tmp_path):
-    """The launch-path bookkeeping write must not clobber a terminal task
-    status committed first by the completion hook (fast-failing run)."""
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -264,6 +265,7 @@ async def test_update_after_launch_protect_terminal_keeps_hook_result(tmp_path):
 
 @pytest.mark.asyncio
 async def test_list_by_task_paginates(tmp_path):
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -291,6 +293,7 @@ async def test_list_by_task_paginates(tmp_path):
 
 @pytest.mark.asyncio
 async def test_list_by_user_and_thread_filters_in_sql(tmp_path):
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None

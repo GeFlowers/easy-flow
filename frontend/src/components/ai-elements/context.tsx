@@ -29,6 +29,7 @@ type ContextSchema = {
 
 const ContextContext = createContext<ContextSchema | null>(null);
 
+/** useContextValue Hook：封装本模块所需的状态或上下文访问。 */
 const useContextValue = () => {
   const context = useContext(ContextContext);
 
@@ -39,8 +40,10 @@ const useContextValue = () => {
   return context;
 };
 
+/** ContextProps 的公开类型定义。 */
 export type ContextProps = ComponentProps<typeof HoverCard> & ContextSchema;
 
+/** Context 组件：提供对应的界面结构与交互语义。 */
 export const Context = ({
   usedTokens,
   maxTokens,
@@ -60,6 +63,7 @@ export const Context = ({
   </ContextContext.Provider>
 );
 
+/** ContextIcon 内部组件：组织对应的界面结构与交互语义。 */
 const ContextIcon = () => {
   const { usedTokens, maxTokens } = useContextValue();
   const circumference = 2 * Math.PI * ICON_RADIUS;
@@ -101,8 +105,10 @@ const ContextIcon = () => {
   );
 };
 
+/** ContextTriggerProps 的公开类型定义。 */
 export type ContextTriggerProps = ComponentProps<typeof Button>;
 
+/** ContextTrigger 组件：提供对应的界面结构与交互语义。 */
 export const ContextTrigger = ({ children, ...props }: ContextTriggerProps) => {
   const { usedTokens, maxTokens } = useContextValue();
   const usedPercent = usedTokens / maxTokens;
@@ -125,8 +131,10 @@ export const ContextTrigger = ({ children, ...props }: ContextTriggerProps) => {
   );
 };
 
+/** ContextContentProps 的公开类型定义。 */
 export type ContextContentProps = ComponentProps<typeof HoverCardContent>;
 
+/** ContextContent 组件：提供对应的界面结构与交互语义。 */
 export const ContextContent = ({
   className,
   ...props
@@ -137,8 +145,10 @@ export const ContextContent = ({
   />
 );
 
+/** ContextContentHeaderProps 的公开类型定义。 */
 export type ContextContentHeaderProps = ComponentProps<"div">;
 
+/** ContextContentHeader 组件：提供对应的界面结构与交互语义。 */
 export const ContextContentHeader = ({
   children,
   className,
@@ -176,8 +186,10 @@ export const ContextContentHeader = ({
   );
 };
 
+/** ContextContentBodyProps 的公开类型定义。 */
 export type ContextContentBodyProps = ComponentProps<"div">;
 
+/** ContextContentBody 组件：提供对应的界面结构与交互语义。 */
 export const ContextContentBody = ({
   children,
   className,
@@ -188,8 +200,10 @@ export const ContextContentBody = ({
   </div>
 );
 
+/** ContextContentFooterProps 的公开类型定义。 */
 export type ContextContentFooterProps = ComponentProps<"div">;
 
+/** ContextContentFooter 组件：提供对应的界面结构与交互语义。 */
 export const ContextContentFooter = ({
   children,
   className,
@@ -228,8 +242,10 @@ export const ContextContentFooter = ({
   );
 };
 
+/** ContextInputUsageProps 的公开类型定义。 */
 export type ContextInputUsageProps = ComponentProps<"div">;
 
+/** ContextInputUsage 组件：提供对应的界面结构与交互语义。 */
 export const ContextInputUsage = ({
   className,
   children,
@@ -268,8 +284,10 @@ export const ContextInputUsage = ({
   );
 };
 
+/** ContextOutputUsageProps 的公开类型定义。 */
 export type ContextOutputUsageProps = ComponentProps<"div">;
 
+/** ContextOutputUsage 组件：提供对应的界面结构与交互语义。 */
 export const ContextOutputUsage = ({
   className,
   children,
@@ -308,8 +326,10 @@ export const ContextOutputUsage = ({
   );
 };
 
+/** ContextReasoningUsageProps 的公开类型定义。 */
 export type ContextReasoningUsageProps = ComponentProps<"div">;
 
+/** ContextReasoningUsage 组件：提供对应的界面结构与交互语义。 */
 export const ContextReasoningUsage = ({
   className,
   children,
@@ -348,8 +368,10 @@ export const ContextReasoningUsage = ({
   );
 };
 
+/** ContextCacheUsageProps 的公开类型定义。 */
 export type ContextCacheUsageProps = ComponentProps<"div">;
 
+/** ContextCacheUsage 组件：提供对应的界面结构与交互语义。 */
 export const ContextCacheUsage = ({
   className,
   children,

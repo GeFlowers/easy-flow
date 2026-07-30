@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Run the eval + improve loop until all pass or max iterations reached.
+"""重复执行触发评估和描述改进，直到通过或达到迭代上限。
 
-Combines run_eval.py and improve_description.py in a loop, tracking history
-and returning the best description found. Supports train/test split to prevent
-overfitting.
+脚本维护每轮历史，可将评估集分为训练和保留测试部分以减少过拟合，并生成实时或最终报告。
 """
 
 import argparse
@@ -22,7 +20,7 @@ from scripts.utils import parse_skill_md
 
 
 def split_eval_set(eval_set: list[dict], holdout: float, seed: int = 42) -> tuple[list[dict], list[dict]]:
-    """Split eval set into train and test sets, stratified by should_trigger."""
+    """按预期是否触发分层打乱评估集，分别划分训练集和保留测试集。"""
     random.seed(seed)
 
     # Separate by should_trigger
@@ -59,7 +57,7 @@ def run_loop(
     live_report_path: Path | None = None,
     log_dir: Path | None = None,
 ) -> dict:
-    """Run the eval + improvement loop."""
+    """循环评估并改进描述，记录每轮训练与测试结果、可选实时报告及日志，返回最佳描述和完整历史。"""
     project_root = find_project_root()
     name, original_description, content = parse_skill_md(skill_path)
     current_description = description_override or original_description
@@ -152,6 +150,7 @@ def run_loop(
 
         if verbose:
             def print_eval_stats(label, results, elapsed):
+                """计算并打印当前结果集的混淆矩阵计数、精确率、召回率、准确率和逐查询结果。"""
                 pos = [r for r in results if r["should_trigger"]]
                 neg = [r for r in results if not r["should_trigger"]]
                 tp = sum(r["triggers"] for r in pos)
@@ -242,6 +241,7 @@ def run_loop(
 
 
 def main():
+    """解析循环配置，准备报告和结果目录，执行优化循环，并保存结构化结果、最终报告与日志。"""
     parser = argparse.ArgumentParser(description="Run eval + improve loop")
     parser.add_argument("--eval-set", required=True, help="Path to eval set JSON file")
     parser.add_argument("--skill-path", required=True, help="Path to skill directory")

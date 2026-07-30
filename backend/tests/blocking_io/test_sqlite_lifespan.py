@@ -1,19 +1,4 @@
-"""Regression test: sqlite path setup must run off the event loop.
-
-Anchors the production offload from
-`runtime/checkpointer/async_provider.py:_async_checkpointer`, where SQLite
-path resolution and `ensure_sqlite_parent_dir` are dispatched via
-`await asyncio.to_thread(...)`.
-That fix addressed #1912, where the sync `Path.mkdir` / `os.mkdir` inside
-`ensure_sqlite_parent_dir` ran on the FastAPI lifespan event loop thread
-and blocked startup.
-
-This test invokes the production `_async_checkpointer()` path under the
-strict Blockbuster context. The target path's parent does not yet exist, so
-the underlying path resolution and `os.mkdir` both execute. If either step is
-regressed to run directly on the event loop, Blockbuster raises
-`BlockingError` and this test fails.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -27,6 +12,7 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_async_checkpointer_sqlite_setup_does_not_block_event_loop(tmp_path: Path) -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.config.checkpointer_config import CheckpointerConfig
     from deerflow.runtime.checkpointer.async_provider import _async_checkpointer
 

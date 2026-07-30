@@ -1,4 +1,4 @@
-"""Tests for user_id propagation through memory queue (DI)."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from unittest.mock import MagicMock, patch
 
@@ -7,20 +7,24 @@ from deerflow.agents.memory.backends.deermem.deermem.core.queue import Conversat
 
 
 def _queue(updater: MagicMock | None = None) -> MemoryUpdateQueue:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return MemoryUpdateQueue(DeerMemConfig(), updater or MagicMock())
 
 
 def test_conversation_context_has_user_id():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     ctx = ConversationContext(thread_id="t1", messages=[], user_id="alice")
     assert ctx.user_id == "alice"
 
 
 def test_conversation_context_user_id_default_none():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     ctx = ConversationContext(thread_id="t1", messages=[])
     assert ctx.user_id is None
 
 
 def test_queue_add_stores_user_id():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     q = _queue()
     with patch.object(q, "_reset_timer"):
         q.add(thread_id="t1", messages=["msg"], user_id="alice")
@@ -30,6 +34,7 @@ def test_queue_add_stores_user_id():
 
 
 def test_queue_process_passes_user_id_to_updater():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     mock_updater.update_memory.return_value = True
     q = _queue(mock_updater)
@@ -43,6 +48,7 @@ def test_queue_process_passes_user_id_to_updater():
 
 
 def test_queue_keeps_updates_for_different_users_in_same_thread_and_agent():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     q = _queue()
     with patch.object(q, "_reset_timer"):
         q.add(thread_id="main", messages=["alice update"], agent_name="researcher", user_id="alice")
@@ -54,6 +60,7 @@ def test_queue_keeps_updates_for_different_users_in_same_thread_and_agent():
 
 
 def test_queue_still_coalesces_updates_for_same_user_thread_and_agent():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     q = _queue()
     with patch.object(q, "_reset_timer"):
         q.add(thread_id="main", messages=["first"], agent_name="researcher", user_id="alice")
@@ -66,6 +73,7 @@ def test_queue_still_coalesces_updates_for_same_user_thread_and_agent():
 
 
 def test_add_nowait_keeps_different_users_separate():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     q = _queue()
     with patch.object(q, "_schedule_timer"):
         q.add_nowait(thread_id="main", messages=["alice update"], agent_name="researcher", user_id="alice")

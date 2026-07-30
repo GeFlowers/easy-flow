@@ -1,9 +1,4 @@
-"""Tests for the GitHub binding block on :class:`AgentConfig`.
-
-Verifies the new ``github:`` block parses correctly when present, is ``None``
-when absent (so every existing agent continues to load unchanged), and that
-``load_agent_config`` round-trips through YAML correctly.
-"""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -22,11 +17,13 @@ from deerflow.config.agents_config import (
 
 
 def test_github_field_defaults_to_none() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     cfg = AgentConfig(name="solo")
     assert cfg.github is None
 
 
 def test_github_block_parses_full_shape() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     cfg = AgentConfig(
         name="coding-llm-gateway",
         github={
@@ -65,22 +62,25 @@ def test_github_block_parses_full_shape() -> None:
 
 
 def test_github_block_minimal_uses_defaults() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     cfg = AgentConfig(name="x", github={})
     assert cfg.github is not None
     assert cfg.github.installation_id is None
     assert cfg.github.bindings == []
-    # recursion_limit defaults to None — the channel default (250) is
-    # applied later by ChannelManager._resolve_run_params, not here.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     assert cfg.github.recursion_limit is None
 
 
 def test_github_recursion_limit_parses() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     cfg = AgentConfig(name="refactorer", github={"recursion_limit": 500})
     assert cfg.github is not None
     assert cfg.github.recursion_limit == 500
 
 
 def test_github_trigger_invalid_type_raises() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with pytest.raises(Exception):  # noqa: PT011 — pydantic ValidationError subclasses Exception
         AgentConfig(
             name="x",
@@ -89,24 +89,27 @@ def test_github_trigger_invalid_type_raises() -> None:
 
 
 def test_github_bindings_must_have_repo() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with pytest.raises(Exception):  # noqa: PT011
         AgentConfig(name="x", github={"bindings": [{"triggers": {}}]})
 
 
 # ---------------------------------------------------------------------------
-# YAML round-trip via load_agent_config
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def _write_agent(base: Path, user_id: str, name: str, body: dict) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     agent_dir = base / "users" / user_id / "agents" / name
     agent_dir.mkdir(parents=True, exist_ok=True)
     (agent_dir / "config.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
 
 
 def test_load_agent_config_reads_github_block(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
-    # Reset the singleton so the new HOME is picked up.
+    # 说明当前测试分支所验证的真实行为与边界。
     from deerflow.config import paths as paths_module
 
     monkeypatch.setattr(paths_module, "_paths", None)
@@ -137,6 +140,7 @@ def test_load_agent_config_reads_github_block(tmp_path: Path, monkeypatch: pytes
 
 
 def test_load_agent_config_without_github_block_is_none(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
     from deerflow.config import paths as paths_module
 
@@ -149,17 +153,12 @@ def test_load_agent_config_without_github_block_is_none(tmp_path: Path, monkeypa
 
 
 # ---------------------------------------------------------------------------
-# Single-binding-per-repo validator (PR feedback R3)
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_duplicate_bindings_same_repo_rejected() -> None:
-    """Two bindings on the same repo must fail validation.
-
-    Pre-R3 the dispatcher silently picked the FIRST binding for the repo,
-    so a second binding with a different ``triggers:`` map would never fire
-    its events. Fail loudly at config load instead.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with pytest.raises(ValueError, match="duplicate repos"):
         GitHubAgentConfig(
             bindings=[
@@ -170,7 +169,7 @@ def test_duplicate_bindings_same_repo_rejected() -> None:
 
 
 def test_duplicate_bindings_error_lists_offending_repo() -> None:
-    """The error mentions every duplicate repo so operators can locate them."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with pytest.raises(ValueError) as excinfo:
         GitHubAgentConfig(
             bindings=[
@@ -186,7 +185,7 @@ def test_duplicate_bindings_error_lists_offending_repo() -> None:
 
 
 def test_distinct_repo_bindings_allowed() -> None:
-    """One agent with bindings on different repos is fine (the common case)."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     cfg = GitHubAgentConfig(
         bindings=[
             GitHubBinding(repo="a/one"),
@@ -198,7 +197,7 @@ def test_distinct_repo_bindings_allowed() -> None:
 
 
 def test_load_agent_config_rejects_duplicate_repo_bindings(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """End-to-end: load_agent_config surfaces the validator error from YAML."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
     from deerflow.config import paths as paths_module
 

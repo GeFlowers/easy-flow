@@ -1,10 +1,11 @@
 /**
- * API functions for file uploads
+ * 文件上传接口函数。
  */
 
 import { fetch } from "../api/fetcher";
 import { getBackendBaseURL } from "../config";
 
+/** 网关已保存文件的元数据及其可访问路径。 */
 export interface UploadedFileInfo {
   filename: string;
   size: number;
@@ -19,6 +20,7 @@ export interface UploadedFileInfo {
   markdown_artifact_url?: string;
 }
 
+/** 文件上传接口的结果，包括成功保存和跳过的文件。 */
 export interface UploadResponse {
   success: boolean;
   files: UploadedFileInfo[];
@@ -26,17 +28,20 @@ export interface UploadResponse {
   skipped_files: string[];
 }
 
+/** 查询线程上传文件列表时的响应。 */
 export interface ListFilesResponse {
   files: UploadedFileInfo[];
   count: number;
 }
 
+/** 网关对单次上传请求强制执行的数量和体积限制。 */
 export interface UploadLimits {
   max_files: number;
   max_file_size: number;
   max_total_size: number;
 }
 
+/** 从失败的上传响应中提取可展示的错误说明。 */
 async function readErrorDetail(
   response: Response,
   fallback: string,
@@ -45,9 +50,7 @@ async function readErrorDetail(
   return error.detail ?? fallback;
 }
 
-/**
- * Upload files to a thread
- */
+/** 将文件上传到指定线程并返回已保存或跳过文件的信息。 */
 export async function uploadFiles(
   threadId: string,
   files: File[],
@@ -73,9 +76,7 @@ export async function uploadFiles(
   return response.json();
 }
 
-/**
- * Load the upload limits enforced by the gateway for a thread
- */
+/** 获取指定线程适用的网关强制上传限制。 */
 export async function getUploadLimits(threadId: string): Promise<UploadLimits> {
   const response = await fetch(
     `${getBackendBaseURL()}/api/threads/${threadId}/uploads/limits`,
@@ -90,9 +91,7 @@ export async function getUploadLimits(threadId: string): Promise<UploadLimits> {
   return response.json();
 }
 
-/**
- * List all uploaded files for a thread
- */
+/** 列出指定线程中已上传且仍可用的文件。 */
 export async function listUploadedFiles(
   threadId: string,
 ): Promise<ListFilesResponse> {
@@ -109,9 +108,7 @@ export async function listUploadedFiles(
   return response.json();
 }
 
-/**
- * Delete an uploaded file
- */
+/** 删除指定线程中的一个已上传文件。 */
 export async function deleteUploadedFile(
   threadId: string,
   filename: string,

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 
 import { useLocalSettings } from "../settings";
 
+/** 浏览器通知创建时可传入的选项。 */
 interface NotificationOptions {
   body?: string;
   icon?: string;
@@ -12,6 +13,7 @@ interface NotificationOptions {
   silent?: boolean;
 }
 
+/** 通知钩子向调用方提供的状态和操作。 */
 interface UseNotificationReturn {
   permission: NotificationPermission;
   isSupported: boolean;
@@ -19,6 +21,7 @@ interface UseNotificationReturn {
   showNotification: (title: string, options?: NotificationOptions) => void;
 }
 
+/** 提供浏览器通知权限状态与发送能力。 */
 export function useNotification(): UseNotificationReturn {
   const [permission, setPermission] =
     useState<NotificationPermission>("default");
@@ -27,7 +30,7 @@ export function useNotification(): UseNotificationReturn {
   const lastNotificationTime = useRef<number | null>(null);
 
   useEffect(() => {
-    // Check if browser supports Notification API
+    // 检查浏览器是否支持通知接口。
     if ("Notification" in window) {
       setIsSupported(true);
       setPermission(Notification.permission);
@@ -82,7 +85,7 @@ export function useNotification(): UseNotificationReturn {
 
       const notification = new Notification(title, options);
 
-      // Optional: Add event listeners
+      // 注册点击和错误事件处理器。
       notification.onclick = () => {
         window.focus();
         notification.close();

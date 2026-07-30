@@ -1,4 +1,4 @@
-"""Unit tests for the Brave Search community web search tool."""
+"""覆盖本模块的可回归测试，固定关键输入、失败分支与资源生命周期，避免后续改动破坏既有契约。"""
 
 import json
 from unittest.mock import MagicMock, patch
@@ -9,7 +9,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def reset_api_key_warned():
-    """Reset the module-level warning flag before each test."""
+    """执行“重置接口密钥该项”的测试辅助步骤，维持断言所依赖的状态、失败分支与资源生命周期。"""
     import deerflow.community.brave.tools as brave_mod
 
     brave_mod._api_key_warned = set()
@@ -19,6 +19,7 @@ def reset_api_key_warned():
 
 @pytest.fixture
 def mock_config_with_key():
+    """构造“模拟配置使用密钥”的可控模拟依赖，使测试能够复现目标调用的失败与清理边界。"""
     with patch("deerflow.community.brave.tools.get_app_config") as mock:
         tool_config = MagicMock()
         tool_config.model_extra = {"api_key": "test-brave-key", "max_results": 5}
@@ -28,6 +29,7 @@ def mock_config_with_key():
 
 @pytest.fixture
 def mock_config_no_key():
+    """构造“模拟配置该项密钥”的可控模拟依赖，使测试能够复现目标调用的失败与清理边界。"""
     with patch("deerflow.community.brave.tools.get_app_config") as mock:
         tool_config = MagicMock()
         tool_config.model_extra = {}
@@ -36,6 +38,7 @@ def mock_config_no_key():
 
 
 def _make_brave_response(results: list) -> MagicMock:
+    """为“构造搜索服务响应”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"web": {"results": results}}
     mock_resp.raise_for_status = MagicMock()
@@ -43,6 +46,7 @@ def _make_brave_response(results: list) -> MagicMock:
 
 
 def _make_brave_images_response(results: list | object) -> MagicMock:
+    """为“构造搜索服务该项响应”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"results": results}
     mock_resp.raise_for_status = MagicMock()
@@ -50,9 +54,10 @@ def _make_brave_images_response(results: list | object) -> MagicMock:
 
 
 def _count_aware_get(results: list):
-    """Mimic Brave returning at most `count` results for the request."""
+    """为“计数该项获取”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
 
     def _get(url, **kwargs):
+        """为“获取”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         count = kwargs["params"]["count"]
         return _make_brave_response(results[:count])
 
@@ -60,9 +65,10 @@ def _count_aware_get(results: list):
 
 
 def _image_count_aware_get(results: list):
-    """Mimic Brave Image Search returning at most `count` results for the request."""
+    """为“镜像计数该项获取”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
 
     def _get(url, **kwargs):
+        """为“获取”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         count = kwargs["params"]["count"]
         return _make_brave_images_response(results[:count])
 
@@ -70,7 +76,9 @@ def _image_count_aware_get(results: list):
 
 
 class TestGetApiKey:
+    """归集“获取接口密钥”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
     def test_returns_config_key_when_present(self):
+        """验证“返回配置密钥当该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "from-config"}
@@ -81,6 +89,7 @@ class TestGetApiKey:
             assert _get_api_key() == "from-config"
 
     def test_reads_config_for_requested_tool_name(self):
+        """验证“该项配置该项该项工具名称”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "image-key"}
@@ -92,6 +101,7 @@ class TestGetApiKey:
             mock.return_value.get_tool_config.assert_called_with("image_search")
 
     def test_falls_back_to_env_when_config_key_empty(self):
+        """验证“该项该项该项环境变量当配置密钥空值”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "   "}
@@ -102,6 +112,7 @@ class TestGetApiKey:
                 assert _get_api_key() == "env-key"
 
     def test_falls_back_to_env_when_no_config(self):
+        """验证“该项该项该项环境变量当该项配置”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {"BRAVE_SEARCH_API_KEY": "env-only"}, clear=True):
@@ -110,6 +121,7 @@ class TestGetApiKey:
                 assert _get_api_key() == "env-only"
 
     def test_ignores_legacy_brave_api_key(self):
+        """验证“忽略该项搜索服务接口密钥”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {"BRAVE_API_KEY": "legacy"}, clear=True):
@@ -118,6 +130,7 @@ class TestGetApiKey:
                 assert _get_api_key() is None
 
     def test_returns_none_when_no_key_anywhere(self):
+        """验证“返回空值当该项密钥该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {}, clear=True):
@@ -126,6 +139,7 @@ class TestGetApiKey:
                 assert _get_api_key() is None
 
     def test_model_extra_none_does_not_crash(self):
+        """验证“该项该项空值该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = None
@@ -137,7 +151,9 @@ class TestGetApiKey:
 
 
 class TestWebSearchTool:
+    """归集“网页搜索工具”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
     def test_basic_search_returns_normalized_results(self, mock_config_with_key):
+        """验证“基本搜索返回标准化结果”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [
             {"title": "Result 1", "url": "https://example.com/1", "description": "Desc 1"},
             {"title": "Result 2", "url": "https://example.com/2", "description": "Desc 2"},
@@ -159,6 +175,7 @@ class TestWebSearchTool:
         assert parsed["results"][0]["content"] == "Desc 1"
 
     def test_respects_max_results_from_config(self, mock_config_with_key):
+        """验证“该项最大结果该项配置”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_config_with_key.return_value.get_tool_config.return_value.model_extra = {
             "api_key": "test-key",
             "max_results": 3,
@@ -177,7 +194,7 @@ class TestWebSearchTool:
         assert len(parsed["results"]) == 3
 
     def test_max_results_parameter_accepted(self, mock_config_no_key):
-        """Tool accepts max_results as a call parameter when config does not override it."""
+        """验证“最大结果参数该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [{"title": f"R{i}", "url": f"https://x.com/{i}", "description": f"D{i}"} for i in range(10)]
 
         with patch.dict("os.environ", {"BRAVE_SEARCH_API_KEY": "env-key"}, clear=True):
@@ -192,6 +209,7 @@ class TestWebSearchTool:
         assert parsed["total_results"] == 2
 
     def test_config_max_results_overrides_parameter(self):
+        """验证“配置最大结果该项参数”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "test-key", "max_results": 3}
@@ -210,7 +228,7 @@ class TestWebSearchTool:
         assert parsed["total_results"] == 3
 
     def test_max_results_string_from_env_is_coerced_and_clamped(self):
-        """Env-sourced max_results is a string and must be coerced and clamped to 20."""
+        """验证“最大结果字符串该项环境变量该项该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "test-key", "max_results": "50"}
@@ -232,6 +250,7 @@ class TestWebSearchTool:
         assert parsed["total_results"] == 20
 
     def test_invalid_max_results_falls_back_to_default(self, caplog):
+        """验证“非法最大结果该项该项该项默认值”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "test-key", "max_results": "abc"}
@@ -255,6 +274,7 @@ class TestWebSearchTool:
         assert any("Invalid Brave Search max_results" in record.message for record in caplog.records)
 
     def test_empty_results_returns_error_json(self, mock_config_with_key):
+        """验证“空值结果返回错误该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_resp = _make_brave_response([])
 
         with patch("deerflow.community.brave.tools.httpx.Client") as mock_client_cls:
@@ -269,7 +289,7 @@ class TestWebSearchTool:
         assert parsed["query"] == "no results"
 
     def test_missing_web_key_returns_error_json(self, mock_config_with_key):
-        """A response without a `web` block should be treated as no results."""
+        """验证“缺失网页密钥返回错误该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_resp = MagicMock()
         mock_resp.json.return_value = {}
         mock_resp.raise_for_status = MagicMock()
@@ -285,6 +305,7 @@ class TestWebSearchTool:
         assert parsed["error"] == "No results found"
 
     def test_missing_api_key_returns_error_json(self, mock_config_no_key):
+        """验证“缺失接口密钥返回错误该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch.dict("os.environ", {}, clear=True):
             from deerflow.community.brave.tools import web_search_tool
 
@@ -295,6 +316,7 @@ class TestWebSearchTool:
         assert "BRAVE_SEARCH_API_KEY" in parsed["error"]
 
     def test_missing_api_key_logs_warning_once(self, mock_config_no_key, caplog):
+        """验证“缺失接口密钥该项警告该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         import logging
 
         with patch.dict("os.environ", {}, clear=True):
@@ -308,6 +330,7 @@ class TestWebSearchTool:
         assert len(warnings) == 1
 
     def test_http_error_returns_structured_error(self, mock_config_with_key):
+        """验证“超文本传输协议错误返回结构化错误”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_error_response = MagicMock()
         mock_error_response.status_code = 403
         mock_error_response.text = "Forbidden"
@@ -324,6 +347,7 @@ class TestWebSearchTool:
         assert "403" in parsed["error"]
 
     def test_network_exception_returns_error_json(self, mock_config_with_key):
+        """验证“网络异常返回错误该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.httpx.Client") as mock_client_cls:
             mock_client_cls.return_value.__enter__.return_value.get.side_effect = Exception("timeout")
 
@@ -335,6 +359,7 @@ class TestWebSearchTool:
         assert "error" in parsed
 
     def test_sends_correct_headers_and_params(self, mock_config_with_key):
+        """验证“该项该项该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [{"title": "T", "url": "https://x.com", "description": "D"}]
         mock_resp = _make_brave_response(results)
 
@@ -355,6 +380,7 @@ class TestWebSearchTool:
         assert params["count"] == 5
 
     def test_long_query_is_truncated_to_brave_limit(self, mock_config_with_key):
+        """验证“过长该项该项截断该项搜索服务该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [{"title": "T", "url": "https://x.com", "description": "D"}]
         mock_resp = _make_brave_response(results)
 
@@ -372,6 +398,7 @@ class TestWebSearchTool:
         assert parsed["query"] == "a" * 400
 
     def test_uses_env_key_when_config_absent(self):
+        """验证“使用环境变量密钥当配置该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {"BRAVE_SEARCH_API_KEY": "env-only-key"}, clear=True):
@@ -390,7 +417,7 @@ class TestWebSearchTool:
                 assert headers["X-Subscription-Token"] == "env-only-key"
 
     def test_partial_fields_in_result(self, mock_config_with_key):
-        """Missing title/url/description should default to empty string."""
+        """验证“该项字段该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [{}]
         mock_resp = _make_brave_response(results)
 
@@ -406,64 +433,78 @@ class TestWebSearchTool:
 
 
 class TestSafePublicUrl:
+    """归集“安全公开网址”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
     def test_https_public_hostname_passes(self):
+        """验证“该项公开主机名该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("https://example.com/i.jpg") == "https://example.com/i.jpg"
 
     def test_non_http_scheme_is_filtered(self):
+        """验证“该项超文本传输协议协议该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("file:///etc/passwd") == ""
 
     def test_localhost_is_filtered(self):
+        """验证“本机该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://localhost/i.jpg") == ""
 
     def test_private_ip_is_filtered(self):
+        """验证“私有网络地址该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://10.0.0.1/i.jpg") == ""
 
     def test_obfuscated_loopback_ip_is_filtered(self):
+        """验证“该项回环网络地址该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://2130706433/i.jpg") == ""
 
     def test_malformed_ipv6_url_does_not_raise(self):
+        """验证“格式错误该项网址该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://[::1/i.jpg") == ""
 
     def test_nat64_embedded_loopback_is_filtered(self):
+        """验证“该项该项回环该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://[64:ff9b::127.0.0.1]/i.jpg") == ""
 
     def test_ipv4_compatible_embedded_private_is_filtered(self):
+        """验证“该项该项该项私有该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://[::10.0.0.1]/i.jpg") == ""
 
     def test_ipv4_mapped_loopback_is_filtered(self):
+        """验证“该项该项回环该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://[::ffff:127.0.0.1]/i.jpg") == ""
 
     def test_sixtofour_loopback_is_filtered(self):
+        """验证“该项回环该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://[2002:7f00:1::]/i.jpg") == ""
 
     def test_global_ipv6_passes(self):
+        """验证“全局该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         from deerflow.community.brave.tools import _safe_public_url
 
         assert _safe_public_url("http://[2001:4860:4860::8888]/i.jpg") == "http://[2001:4860:4860::8888]/i.jpg"
 
 
 class TestImageSearchTool:
+    """归集“镜像搜索工具”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
     def test_basic_image_search_returns_normalized_results(self, mock_config_with_key):
+        """验证“基本镜像搜索返回标准化结果”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [
             {
                 "title": "Mountain",
@@ -503,6 +544,7 @@ class TestImageSearchTool:
         assert "usage_hint" in parsed
 
     def test_image_search_sends_brave_image_params_from_config(self):
+        """验证“镜像搜索该项搜索服务镜像该项该项配置”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {
@@ -547,6 +589,7 @@ class TestImageSearchTool:
         assert parsed["total_results"] == 200
 
     def test_image_search_filters_unsafe_image_urls_but_keeps_safe_thumbnail(self, mock_config_with_key):
+        """验证“镜像搜索该项不安全镜像该项该项保留安全缩略图”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [
             {
                 "title": "Unsafe original",
@@ -577,6 +620,7 @@ class TestImageSearchTool:
         assert parsed["results"][0]["source_url"] == ""
 
     def test_image_search_falls_back_when_only_one_image_url_is_present(self, mock_config_with_key):
+        """验证“镜像搜索该项该项当仅该项镜像网址该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [
             {
                 "title": "Only thumbnail",
@@ -605,7 +649,7 @@ class TestImageSearchTool:
         assert parsed["results"][1]["thumbnail_url"] == "https://cdn.example.com/original.jpg"
 
     def test_image_search_reports_thumbnail_dimensions_when_original_dropped(self, mock_config_with_key):
-        """When only the thumbnail URL survives, width/height must describe it, not the dropped original."""
+        """验证“镜像搜索该项缩略图该项当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         results = [
             {
                 "title": "Unsafe original with dims",
@@ -631,6 +675,7 @@ class TestImageSearchTool:
         assert entry["height"] == 200
 
     def test_image_search_missing_api_key_returns_error_json(self, mock_config_no_key):
+        """验证“镜像搜索缺失接口密钥返回错误该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch.dict("os.environ", {}, clear=True):
             from deerflow.community.brave.tools import image_search_tool
 
@@ -641,6 +686,7 @@ class TestImageSearchTool:
         assert parsed["query"] == "test"
 
     def test_image_search_missing_api_key_logs_warning_once_per_tool(self, mock_config_no_key, caplog):
+        """验证“镜像搜索缺失接口密钥该项警告该项该项工具”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         import logging
 
         with patch.dict("os.environ", {}, clear=True):
@@ -657,6 +703,7 @@ class TestImageSearchTool:
         assert any("image_search" in r.message for r in warnings)
 
     def test_image_search_http_error_returns_structured_error(self, mock_config_with_key):
+        """验证“镜像搜索超文本传输协议错误返回结构化错误”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_error_response = MagicMock()
         mock_error_response.status_code = 403
         mock_error_response.text = "Forbidden"
@@ -673,6 +720,7 @@ class TestImageSearchTool:
         assert parsed["query"] == "test"
 
     def test_image_search_unexpected_results_format_returns_error(self, mock_config_with_key):
+        """验证“镜像搜索意外结果格式返回错误”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.brave.tools.httpx.Client") as mock_client_cls:
             mock_client_cls.return_value.__enter__.return_value.get.return_value = _make_brave_images_response({"not": "a list"})
 
@@ -686,6 +734,7 @@ class TestImageSearchTool:
 
 
 def test_package_exports_image_search_tool():
+    """验证“包导出镜像搜索工具”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     from deerflow.community.brave import image_search_tool
     from deerflow.community.brave.tools import image_search_tool as direct_image_search_tool
 

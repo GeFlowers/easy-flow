@@ -6,6 +6,9 @@ import {
 } from "@/core/citations/sources";
 
 describe("extractCitationSources", () => {
+  /**
+   * 覆盖“extracts citation markdown links in first-seen order”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("extracts citation markdown links in first-seen order", () => {
     const markdown = [
       "Deep research needs evidence [citation:Paper A](https://example.com/a).",
@@ -34,6 +37,11 @@ describe("extractCitationSources", () => {
     ]);
   });
 
+  /**
+   * 覆盖“deduplicates repeated citation URLs and preserves occurrence titles”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("deduplicates repeated citation URLs and preserves occurrence titles", () => {
     const markdown = [
       "First [citation:Original Title](https://example.com/research).",
@@ -56,6 +64,11 @@ describe("extractCitationSources", () => {
       },
     ]);
   });
+
+  /**
+   * 覆盖“ignores normal links, image links, and citations inside fenced code”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("ignores normal links, image links, and citations inside fenced code", () => {
     const markdown = [
@@ -80,6 +93,11 @@ describe("extractCitationSources", () => {
     ]);
   });
 
+  /**
+   * 覆盖“keeps every source when citations are directly adjacent”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("keeps every source when citations are directly adjacent", () => {
     const markdown =
       "[citation:A](https://example.com/a)[citation:B](https://example.com/b)[citation:C](https://example.com/c)";
@@ -91,6 +109,11 @@ describe("extractCitationSources", () => {
     ]);
   });
 
+  /**
+   * 覆盖“keeps URLs that contain multiple balanced parenthetical groups”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("keeps URLs that contain multiple balanced parenthetical groups", () => {
     const markdown = "[citation:W](https://en.wikipedia.org/wiki/Foo_(a)_(b))";
 
@@ -99,6 +122,11 @@ describe("extractCitationSources", () => {
       domain: "en.wikipedia.org",
     });
   });
+
+  /**
+   * 覆盖“ignores citations inside inline code spans”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("ignores citations inside inline code spans", () => {
     const markdown =
@@ -109,6 +137,11 @@ describe("extractCitationSources", () => {
     ]);
   });
 
+  /**
+   * 覆盖“ignores citations inside an unclosed fenced code block”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("ignores citations inside an unclosed fenced code block", () => {
     const markdown = [
       "Streaming output:",
@@ -118,6 +151,11 @@ describe("extractCitationSources", () => {
 
     expect(extractCitationSources(markdown)).toEqual([]);
   });
+
+  /**
+   * 覆盖“uses the source domain when the citation label is generic”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("uses the source domain when the citation label is generic", () => {
     const markdown = "See [citation:Source](https://www.example.com/path).";
@@ -131,6 +169,9 @@ describe("extractCitationSources", () => {
 });
 
 describe("formatCitationMarkdownReference", () => {
+  /**
+   * 覆盖“formats a source as a reusable markdown reference”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("formats a source as a reusable markdown reference", () => {
     const [source] = extractCitationSources(
       "Evidence [citation:Paper A](https://example.com/a).",

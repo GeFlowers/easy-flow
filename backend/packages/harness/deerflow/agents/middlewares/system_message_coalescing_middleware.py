@@ -1,31 +1,4 @@
-"""Middleware to coalesce multiple SystemMessages into a single leading one.
-
-Strict OpenAI-compatible backends (vLLM, SGLang, Qwen) and Anthropic reject
-non-leading SystemMessages with errors like "System message must be at the
-beginning" or "Received multiple non-consecutive system messages". The
-official OpenAI API tolerates mid-conversation system messages, so the issue
-only surfaces on strict backends.
-
-DeerFlow's lead agent accumulates multiple SystemMessages because
-DynamicContextMiddleware uses the ID-swap technique to replace the first or
-last HumanMessage with a triplet whose first element is a SystemMessage
-reminder (framework-owned date/metadata must not masquerade as user input,
-per OWASP LLM01). On midnight crossings a second SystemMessage (date update)
-is injected. create_agent holds the static system_prompt in the separate
-``request.system_message`` field and only flattens it into the message list
-inside the model-call handler (``[request.system_message, *messages]``).
-
-This middleware runs in wrap_model_call — before the handler flattens the two
-— and merges ``request.system_message`` plus every SystemMessage found in
-``request.messages`` into a single leading SystemMessage emitted via the
-``system_message`` field. It only touches the request payload; the persistent
-conversation state (checkpoint) is unchanged, so middleware that scans history
-by marker (e.g. is_dynamic_context_reminder) keeps working.
-
-Note: Mirrors the per-request coalescing already done for Claude in
-claude_provider._coalesce_system_messages but at a provider-agnostic layer so
-every backend benefits from a single fix instead of per-provider patches.
-"""
+'定义 system_message_coalescing_middleware 模块提供的职责与可复用接口。\n\nMiddleware to coalesce multiple SystemMessages into a single leading one.\n\nStrict OpenAI-compatible backends (vLLM, SGLang, Qwen) and Anthropic reject\nnon-leading SystemMessages with errors like "System message must be at the\nbeginning" or "Received multiple non-consecutive system messages". The\nofficial OpenAI API tolerates mid-conversation system messages, so the issue\nonly surfaces on strict backends.\n\nDeerFlow\'s lead agent accumulates multiple SystemMessages because\nDynamicContextMiddleware uses the ID-swap technique to replace the first or\nlast HumanMessage with a triplet whose first element is a SystemMessage\nreminder (framework-owned date/metadata must not masquerade as user input,\nper OWASP LLM01). On midnight crossings a second SystemMessage (date update)\nis injected. create_agent holds the static system_prompt in the separate\n``request.system_message`` field and only flattens it into the message list\ninside the model-call handler (``[request.system_message, *messages]``).\n\nThis middleware runs in wrap_model_call — before the handler flattens the two\n— and merges ``request.system_message`` plus every SystemMessage found in\n``request.messages`` into a single leading SystemMessage emitted via the\n``system_message`` field. It only touches the request payload; the persistent\nconversation state (checkpoint) is unchanged, so middleware that scans history\nby marker (e.g. is_dynamic_context_reminder) keeps working.\n\nNote: Mirrors the per-request coalescing already done for Claude in\nclaude_provider._coalesce_system_messages but at a provider-agnostic layer so\nevery backend benefits from a single fix instead of per-provider patches.\n'
 
 from collections.abc import Awaitable, Callable
 from typing import override
@@ -39,12 +12,7 @@ from deerflow.agents.middlewares.dynamic_context_middleware import is_dynamic_co
 
 
 def _flatten_content(content) -> str:
-    """Convert message content to a plain string, handling both str and list types.
-
-    langchain messages support list-type content for multimodal (e.g.
-    ``[{"type": "text", "text": "..."}]``). SystemMessages in DeerFlow are always
-    plain strings, but this helper ensures robustness for any content shape.
-    """
+    '执行 _flatten_content 的明确职责，并返回与调用约定一致的结果。\n\nConvert message content to a plain string, handling both str and list types.\n\n    langchain messages support list-type content for multimodal (e.g.\n    ``[{"type": "text", "text": "..."}]``). SystemMessages in DeerFlow are always\n    plain strings, but this helper ensures robustness for any content shape.\n    '
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -61,20 +29,7 @@ def _flatten_content(content) -> str:
 
 
 def _coalesce_request(request: ModelRequest) -> ModelRequest | None:
-    """Merge ``request.system_message`` and in-``messages`` SystemMessages into one.
-
-    On langchain >= 1.2.15 the static system prompt lives in the separate
-    ``request.system_message`` field, not in ``request.messages``. The model-call
-    handler flattens them at the very last moment (``[system_message, *messages]``),
-    so a middleware that only scans ``messages`` cannot see the prompt and ends up
-    a no-op. This helper inspects both sources, merges every SystemMessage into a
-    single entry, and emits the result via ``system_message`` so the handler still
-    prepends it correctly.
-
-    Returns None when no SystemMessages live inside ``messages`` — in that case
-    ``system_message`` (if set) is already the sole leading system block and the
-    request can pass through with zero mutation, preserving prefix-cache hits.
-    """
+    '执行 _coalesce_request 的明确职责，并返回与调用约定一致的结果。\n\nMerge ``request.system_message`` and in-``messages`` SystemMessages into one.\n\n    On langchain >= 1.2.15 the static system prompt lives in the separate\n    ``request.system_message`` field, not in ``request.messages``. The model-call\n    handler flattens them at the very last moment (``[system_message, *messages]``),\n    so a middleware that only scans ``messages`` cannot see the prompt and ends up\n    a no-op. This helper inspects both sources, merges every SystemMessage into a\n    single entry, and emits the result via ``system_message`` so the handler still\n    prepends it correctly.\n\n    Returns None when no SystemMessages live inside ``messages`` — in that case\n    ``system_message`` (if set) is already the sole leading system block and the\n    request can pass through with zero mutation, preserving prefix-cache hits.\n    '
     in_msg_systems = [m for m in request.messages if isinstance(m, SystemMessage)]
     if not in_msg_systems:
         return None
@@ -117,17 +72,11 @@ def _coalesce_request(request: ModelRequest) -> ModelRequest | None:
 
 
 class SystemMessageCoalescingMiddleware(AgentMiddleware[AgentState]):
-    """Merge all SystemMessages into a single leading SystemMessage.
-
-    Uses wrap_model_call (not before_agent) so the merge runs on the final
-    request payload — where ``system_message`` and ``messages`` are still
-    separate fields — and never touches the persisted state["messages"]. This
-    keeps the checkpoint structure intact for every consumer that scans history
-    (memory builder, journal, summarization, dynamic-context detection).
-    """
+    '封装 SystemMessageCoalescingMiddleware 的状态、协作关系与公开操作。\n\nMerge all SystemMessages into a single leading SystemMessage.\n\n    Uses wrap_model_call (not before_agent) so the merge runs on the final\n    request payload — where ``system_message`` and ``messages`` are still\n    separate fields — and never touches the persisted state["messages"]. This\n    keeps the checkpoint structure intact for every consumer that scans history\n    (memory builder, journal, summarization, dynamic-context detection).\n    '
 
     @staticmethod
     def _maybe_coalesce(request: ModelRequest) -> ModelRequest:
+        '执行 _maybe_coalesce 的明确职责，并返回与调用约定一致的结果'
         coalesced = _coalesce_request(request)
         if coalesced is None:
             return request
@@ -139,6 +88,7 @@ class SystemMessageCoalescingMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
+        '执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果'
         return handler(self._maybe_coalesce(request))
 
     @override
@@ -147,4 +97,5 @@ class SystemMessageCoalescingMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
+        '执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果'
         return await handler(self._maybe_coalesce(request))

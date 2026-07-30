@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 import asyncio
@@ -12,6 +13,7 @@ from deerflow.utils.messages import ORIGINAL_USER_CONTENT_KEY
 
 
 def _checkpoint(checkpoint_id: str, messages: list[object], *, metadata: dict | None = None):
+    '未说明'
     return SimpleNamespace(
         config={
             "configurable": {
@@ -27,40 +29,51 @@ def _checkpoint(checkpoint_id: str, messages: list[object], *, metadata: dict | 
 
 
 class FakeCheckpointer:
+    '未说明'
     def __init__(self, history, *, latest=None):
+        '未说明'
         self.history = history
         self.latest = latest
         self.alist_limits = []
 
     async def aget_tuple(self, config):
+        '未说明'
         checkpoint_id = config.get("configurable", {}).get("checkpoint_id")
         if checkpoint_id:
             return next((item for item in self.history if item.config["configurable"]["checkpoint_id"] == checkpoint_id), None)
         return self.latest or (self.history[0] if self.history else None)
 
     async def alist(self, config, limit=200):
+        '未说明'
         self.alist_limits.append(limit)
         for item in self.history[:limit]:
             yield item
 
 
 class FakeEventStore:
+    '未说明'
     def __init__(self, rows):
+        '未说明'
         self.rows = rows
 
     async def list_messages(self, thread_id, *, limit=50, before_seq=None, after_seq=None):
+        '未说明'
         return self.rows[-limit:]
 
 
 class FakeRunManager:
+    '未说明'
     def __init__(self, records):
+        '未说明'
         self.records = records
 
     async def list_by_thread(self, thread_id, *, user_id=None, limit=100):
+        """处理会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return self.records[:limit]
 
 
 def _request(checkpointer, event_store, *, run_manager=None, user_id="user-1"):
+    '未说明'
     from app.gateway.auth_disabled import AUTH_SOURCE_SESSION
 
     return SimpleNamespace(
@@ -76,6 +89,7 @@ def _request(checkpointer, event_store, *, run_manager=None, user_id="user-1"):
 
 
 def test_prepare_regenerate_payload_returns_clean_input_and_base_checkpoint():
+    '未说明'
     from app.gateway.routers.thread_runs import _prepare_regenerate_payload
 
     human = HumanMessage(
@@ -123,6 +137,7 @@ def test_prepare_regenerate_payload_returns_clean_input_and_base_checkpoint():
 
 
 def test_prepare_regenerate_payload_rejects_non_latest_assistant():
+    '未说明'
     from app.gateway.routers.thread_runs import _prepare_regenerate_payload
 
     human = HumanMessage(id="human-1", content="question")
@@ -152,6 +167,7 @@ def test_prepare_regenerate_payload_rejects_non_latest_assistant():
 
 
 def test_prepare_regenerate_payload_falls_back_to_matching_run_when_events_are_missing():
+    '未说明'
     from app.gateway.routers.thread_runs import _prepare_regenerate_payload
 
     human = HumanMessage(id="human-1", content="question")
@@ -180,6 +196,7 @@ def test_prepare_regenerate_payload_falls_back_to_matching_run_when_events_are_m
 
 
 def test_prepare_regenerate_payload_rejects_unverified_run_fallback_when_events_are_missing():
+    '未说明'
     from app.gateway.routers.thread_runs import _prepare_regenerate_payload
 
     human = HumanMessage(id="human-1", content="question")
@@ -208,6 +225,7 @@ def test_prepare_regenerate_payload_rejects_unverified_run_fallback_when_events_
 
 
 def test_prepare_regenerate_payload_requires_addressable_checkpoint_before_human():
+    '未说明'
     from app.gateway.routers.thread_runs import _prepare_regenerate_payload
 
     human = HumanMessage(id="human-1", content="question")
@@ -235,6 +253,7 @@ def test_prepare_regenerate_payload_requires_addressable_checkpoint_before_human
 
 
 def test_prepare_regenerate_payload_reports_recent_checkpoint_scan_limit():
+    '未说明'
     from app.gateway.routers.thread_runs import _prepare_regenerate_payload
 
     human = HumanMessage(id="human-1", content="question")
@@ -263,6 +282,7 @@ def test_prepare_regenerate_payload_reports_recent_checkpoint_scan_limit():
 
 
 def test_find_base_checkpoint_ignores_duration_only_checkpoints() -> None:
+    '未说明'
     from app.gateway.routers.thread_runs import _find_base_checkpoint_before_human
 
     human = HumanMessage(id="human-1", content="question")

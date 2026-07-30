@@ -11,6 +11,7 @@ import {
   QueueList,
 } from "../ai-elements/queue";
 
+/** 按代理返回顺序呈现待办状态，帮助用户理解当前执行计划而不改变其内容。 */
 export function TodoList({
   className,
   todos,

@@ -1,11 +1,4 @@
-"""Core behaviour tests for UploadsMiddleware.
-
-Covers:
-- _files_from_kwargs: parsing, validation, existence check, virtual-path construction
-- _create_files_message: output format with new-only and new+historical files
-- before_agent: full injection pipeline (string & list content, preserved
-  additional_kwargs, historical files from uploads dir, edge-cases)
-"""
+'未说明'
 
 import os
 import re
@@ -28,16 +21,19 @@ CONTEXT_SECTION_LIMIT = 10
 
 
 def _middleware(tmp_path: Path) -> UploadsMiddleware:
+    '未说明'
     return UploadsMiddleware(base_dir=str(tmp_path))
 
 
 def _runtime(thread_id: str | None = THREAD_ID) -> MagicMock:
+    '未说明'
     rt = MagicMock()
     rt.context = {"thread_id": thread_id}
     return rt
 
 
 def _uploads_dir(tmp_path: Path, thread_id: str = THREAD_ID) -> Path:
+    '未说明'
     from deerflow.runtime.user_context import get_effective_user_id
 
     d = Paths(str(tmp_path)).sandbox_uploads_dir(thread_id, user_id=get_effective_user_id())
@@ -46,6 +42,7 @@ def _uploads_dir(tmp_path: Path, thread_id: str = THREAD_ID) -> Path:
 
 
 def _human(content, files=None, **extra_kwargs):
+    '未说明'
     additional_kwargs = dict(extra_kwargs)
     if files is not None:
         additional_kwargs["files"] = files
@@ -53,6 +50,7 @@ def _human(content, files=None, **extra_kwargs):
 
 
 def _uploaded_files_block(content) -> str:
+    '未说明'
     text = message_content_to_text(content)
     match = re.search(r"<uploaded_files>[\s\S]*?</uploaded_files>", text)
     assert match is not None
@@ -65,33 +63,39 @@ def _uploaded_files_block(content) -> str:
 
 
 class TestFilesFromKwargs:
+    '未说明'
     def test_returns_none_when_files_field_absent(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = HumanMessage(content="hello")
         assert mw._files_from_kwargs(msg) is None
 
     def test_returns_none_for_empty_files_list(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hello", files=[])
         assert mw._files_from_kwargs(msg) is None
 
     def test_returns_none_for_non_list_files(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hello", files="not-a-list")
         assert mw._files_from_kwargs(msg) is None
 
     def test_skips_non_dict_entries(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hi", files=["bad", 42, None])
         assert mw._files_from_kwargs(msg) is None
 
     def test_skips_entries_with_empty_filename(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hi", files=[{"filename": "", "size": 100, "path": "/mnt/user-data/uploads/x"}])
         assert mw._files_from_kwargs(msg) is None
 
     def test_always_uses_virtual_path(self, tmp_path):
-        """path field must be /mnt/user-data/uploads/<filename> regardless of what the frontend sent."""
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human(
             "hi",
@@ -102,6 +106,7 @@ class TestFilesFromKwargs:
         assert result[0]["path"] == "/mnt/user-data/uploads/report.pdf"
 
     def test_skips_file_that_does_not_exist_on_disk(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         # file is NOT written to disk
@@ -109,6 +114,7 @@ class TestFilesFromKwargs:
         assert mw._files_from_kwargs(msg, uploads_dir) is None
 
     def test_accepts_file_that_exists_on_disk(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "data.csv").write_text("a,b,c")
@@ -120,6 +126,7 @@ class TestFilesFromKwargs:
         assert result[0]["path"] == "/mnt/user-data/uploads/data.csv"
 
     def test_skips_nonexistent_but_accepts_existing_in_mixed_list(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "present.txt").write_text("here")
@@ -135,7 +142,7 @@ class TestFilesFromKwargs:
         assert [f["filename"] for f in result] == ["present.txt"]
 
     def test_no_existence_check_when_uploads_dir_is_none(self, tmp_path):
-        """Without an uploads_dir argument the existence check is skipped entirely."""
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hi", files=[{"filename": "phantom.txt", "size": 10, "path": "/mnt/user-data/uploads/phantom.txt"}])
         result = mw._files_from_kwargs(msg, uploads_dir=None)
@@ -143,6 +150,7 @@ class TestFilesFromKwargs:
         assert result[0]["filename"] == "phantom.txt"
 
     def test_size_is_coerced_to_int(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hi", files=[{"filename": "f.txt", "size": "2048", "path": "/mnt/user-data/uploads/f.txt"}])
         result = mw._files_from_kwargs(msg)
@@ -150,6 +158,7 @@ class TestFilesFromKwargs:
         assert result[0]["size"] == 2048
 
     def test_missing_size_defaults_to_zero(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hi", files=[{"filename": "f.txt", "path": "/mnt/user-data/uploads/f.txt"}])
         result = mw._files_from_kwargs(msg)
@@ -157,6 +166,7 @@ class TestFilesFromKwargs:
         assert result[0]["size"] == 0
 
     def test_skips_upload_staging_filenames(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("hi", files=[{"filename": ".upload-active.part", "size": 5, "path": "/mnt/user-data/uploads/.upload-active.part"}])
         assert mw._files_from_kwargs(msg) is None
@@ -168,10 +178,13 @@ class TestFilesFromKwargs:
 
 
 class TestCreateFilesMessage:
+    '未说明'
     def _new_file(self, filename="notes.txt", size=1024):
+        '未说明'
         return {"filename": filename, "size": size, "path": f"/mnt/user-data/uploads/{filename}"}
 
     def test_new_files_section_always_present(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = mw._create_files_message([self._new_file()], [])
         assert "<uploaded_files>" in msg
@@ -181,6 +194,7 @@ class TestCreateFilesMessage:
         assert "/mnt/user-data/uploads/notes.txt" in msg
 
     def test_historical_section_present_only_when_non_empty(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
 
         msg_no_hist = mw._create_files_message([self._new_file()], [])
@@ -192,21 +206,25 @@ class TestCreateFilesMessage:
         assert "old.txt" in msg_with_hist
 
     def test_size_formatting_kb(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = mw._create_files_message([self._new_file(size=2048)], [])
         assert "2.0 KB" in msg
 
     def test_size_formatting_mb(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = mw._create_files_message([self._new_file(size=2 * 1024 * 1024)], [])
         assert "2.0 MB" in msg
 
     def test_read_file_instruction_included(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = mw._create_files_message([self._new_file()], [])
         assert "read_file" in msg
 
     def test_empty_new_files_produces_empty_marker(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = mw._create_files_message([], [])
         assert "(empty)" in msg
@@ -220,24 +238,30 @@ class TestCreateFilesMessage:
 
 
 class TestBeforeAgent:
+    '未说明'
     def _state(self, *messages):
+        '未说明'
         return {"messages": list(messages)}
 
     def test_returns_none_when_messages_empty(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         assert mw.before_agent({"messages": []}, _runtime()) is None
 
     def test_returns_none_when_last_message_is_not_human(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         state = self._state(HumanMessage(content="q"), AIMessage(content="a"))
         assert mw.before_agent(state, _runtime()) is None
 
     def test_returns_none_when_no_files_in_kwargs(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         state = self._state(_human("plain message"))
         assert mw.before_agent(state, _runtime()) is None
 
     def test_returns_none_when_all_files_missing_from_disk(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         _uploads_dir(tmp_path)  # directory exists but is empty
         msg = _human("hi", files=[{"filename": "ghost.txt", "size": 10, "path": "/mnt/user-data/uploads/ghost.txt"}])
@@ -245,6 +269,7 @@ class TestBeforeAgent:
         assert mw.before_agent(state, _runtime()) is None
 
     def test_injects_uploaded_files_tag_into_string_content(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "report.pdf").write_bytes(b"pdf")
@@ -261,6 +286,7 @@ class TestBeforeAgent:
         assert "please analyse" in updated_msg.content
 
     def test_injects_uploaded_files_tag_into_list_content(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "data.csv").write_bytes(b"a,b")
@@ -280,6 +306,7 @@ class TestBeforeAgent:
         assert "analyse this" in combined_text
 
     def test_list_content_preserves_original_slash_skill_text(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "data.csv").write_bytes(b"a,b")
@@ -296,6 +323,7 @@ class TestBeforeAgent:
         assert updated_msg.additional_kwargs[ORIGINAL_USER_CONTENT_KEY] == "/data-analysis analyze data.csv"
 
     def test_preserves_additional_kwargs_on_updated_message(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "img.png").write_bytes(b"png")
@@ -311,6 +339,7 @@ class TestBeforeAgent:
         assert updated_kwargs.get("element") == "task"
 
     def test_preserves_original_user_content_before_upload_context(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "report.pdf").write_bytes(b"pdf")
@@ -327,6 +356,7 @@ class TestBeforeAgent:
         assert updated_msg.additional_kwargs[ORIGINAL_USER_CONTENT_KEY] == "/data-analysis 分析这个文档"
 
     def test_preserves_existing_original_user_content_marker(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "report.pdf").write_bytes(b"pdf")
@@ -342,6 +372,7 @@ class TestBeforeAgent:
         assert result["messages"][-1].additional_kwargs[ORIGINAL_USER_CONTENT_KEY] == "/data-analysis run"
 
     def test_replaces_non_string_original_user_content_before_upload_context(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "report.pdf").write_bytes(b"pdf")
@@ -359,6 +390,7 @@ class TestBeforeAgent:
         assert updated_msg.content.startswith("<uploaded_files>")
 
     def test_uploaded_files_returned_in_state_update(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "notes.txt").write_bytes(b"hello")
@@ -379,6 +411,7 @@ class TestBeforeAgent:
         ]
 
     def test_current_message_files_are_limited_in_context(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         total_files = CONTEXT_SECTION_LIMIT + 2
@@ -401,6 +434,7 @@ class TestBeforeAgent:
         assert len(result["uploaded_files"]) == total_files
 
     def test_current_message_query_matches_are_selected_before_upload_order(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         total_files = CONTEXT_SECTION_LIMIT + 2
@@ -421,6 +455,7 @@ class TestBeforeAgent:
         assert "2 more file(s) from this message omitted from this context" in content
 
     def test_current_message_ranking_uses_original_user_content(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         total_files = CONTEXT_SECTION_LIMIT + 2
@@ -445,6 +480,7 @@ class TestBeforeAgent:
         assert "current_11.txt" not in content
 
     def test_historical_files_from_uploads_dir_excluding_new(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "old.txt").write_bytes(b"old")
@@ -461,6 +497,7 @@ class TestBeforeAgent:
         assert "old.txt" in content
 
     def test_historical_files_ignore_upload_staging_files(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "old.txt").write_bytes(b"old")
@@ -477,6 +514,7 @@ class TestBeforeAgent:
         assert ".upload-active.part" not in content
 
     def test_historical_files_are_limited_to_recent_context_entries(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         total_files = CONTEXT_SECTION_LIMIT + 2
@@ -498,6 +536,7 @@ class TestBeforeAgent:
         assert "Omitted file types: 2 .txt" in content
 
     def test_historical_query_matches_are_selected_before_recency(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
 
@@ -521,6 +560,7 @@ class TestBeforeAgent:
         assert "Omitted file types: 1 .txt" in content
 
     def test_no_historical_section_when_upload_dir_is_empty(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "only.txt").write_bytes(b"x")
@@ -532,6 +572,7 @@ class TestBeforeAgent:
         assert "previous messages" not in content
 
     def test_no_historical_scan_when_thread_id_is_none(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         msg = _human("go", files=[{"filename": "f.txt", "size": 1, "path": "/mnt/user-data/uploads/f.txt"}])
         # thread_id=None → _files_from_kwargs skips existence check, no dir scan
@@ -542,6 +583,7 @@ class TestBeforeAgent:
         assert "previous messages" not in content
 
     def test_message_id_preserved_on_updated_message(self, tmp_path):
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "f.txt").write_bytes(b"x")
@@ -553,7 +595,7 @@ class TestBeforeAgent:
         assert result["messages"][-1].id == "original-id-42"
 
     def test_outline_injected_when_md_file_exists(self, tmp_path):
-        """When a converted .md file exists alongside the upload, its outline is injected."""
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "report.pdf").write_bytes(b"%PDF fake")
@@ -575,7 +617,7 @@ class TestBeforeAgent:
         assert "read_file" in content
 
     def test_no_outline_when_no_md_file(self, tmp_path):
-        """Files without a sibling .md have no outline section."""
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "data.xlsx").write_bytes(b"fake-xlsx")
@@ -588,7 +630,7 @@ class TestBeforeAgent:
         assert "Document outline" not in content
 
     def test_outline_truncation_hint_shown(self, tmp_path):
-        """When outline is truncated, a hint line is appended after the last visible entry."""
+        '未说明'
         from deerflow.utils.file_conversion import MAX_OUTLINE_ENTRIES
 
         mw = _middleware(tmp_path)
@@ -607,7 +649,7 @@ class TestBeforeAgent:
         assert "use `read_file` to explore further" in content
 
     def test_no_truncation_hint_for_short_outline(self, tmp_path):
-        """Short outlines (under the cap) must not show a truncation hint."""
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "short.pdf").write_bytes(b"%PDF fake")
@@ -621,7 +663,7 @@ class TestBeforeAgent:
         assert "showing first" not in content
 
     def test_historical_file_outline_injected(self, tmp_path):
-        """Outline is also shown for historical (previously uploaded) files."""
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         # Historical file with .md
@@ -642,7 +684,7 @@ class TestBeforeAgent:
         assert "Chapter 2" in content
 
     def test_fallback_preview_shown_when_outline_empty(self, tmp_path):
-        """When .md exists but has no headings, first lines are shown as a preview."""
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "report.pdf").write_bytes(b"%PDF fake")
@@ -666,7 +708,7 @@ class TestBeforeAgent:
         assert "grep" in content
 
     def test_fallback_grep_hint_shown_when_no_md_file(self, tmp_path):
-        """Files with no sibling .md still get the grep hint (outline is empty)."""
+        '未说明'
         mw = _middleware(tmp_path)
         uploads_dir = _uploads_dir(tmp_path)
         (uploads_dir / "data.csv").write_bytes(b"a,b,c\n1,2,3\n")

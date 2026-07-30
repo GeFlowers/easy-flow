@@ -1,6 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("Localized documentation links", () => {
+  /**
+   * 覆盖“keeps English card navigation in the English docs”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("keeps English card navigation in the English docs", async ({
     page,
   }) => {
@@ -17,6 +20,11 @@ test.describe("Localized documentation links", () => {
     await expect(page.locator("main h1")).toContainText("Why DeerFlow");
   });
 
+  /**
+   * 覆盖“keeps Chinese card navigation in the Chinese docs”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("keeps Chinese card navigation in the Chinese docs", async ({
     page,
   }) => {
@@ -32,6 +40,11 @@ test.describe("Localized documentation links", () => {
     await expect(page).toHaveURL(/\/zh\/docs\/introduction\/harness-vs-app$/);
     await expect(page.locator("main h1")).toContainText("Harness 与应用");
   });
+
+  /**
+   * 覆盖“localizes regular Markdown links”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("localizes regular Markdown links", async ({ page }) => {
     await page.goto("/en/docs/application/workspace-usage");

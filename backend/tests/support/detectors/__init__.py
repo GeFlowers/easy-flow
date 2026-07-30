@@ -1,1 +1,1 @@
-"""Runtime and static detectors used by tests."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""

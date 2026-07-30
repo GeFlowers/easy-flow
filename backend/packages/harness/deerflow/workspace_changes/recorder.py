@@ -1,3 +1,4 @@
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 from __future__ import annotations
 
 import asyncio
@@ -23,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_thread_workspace_roots(thread_id: str, *, user_id: str | None = None) -> list[WorkspaceRoot]:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     paths = get_paths()
     return [
         WorkspaceRoot(
@@ -45,6 +47,7 @@ async def capture_workspace_snapshot(
     limits: WorkspaceChangeLimits | None = None,
     include_text: bool = True,
 ) -> WorkspaceSnapshot:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     roots = build_thread_workspace_roots(thread_id, user_id=user_id)
     text_cache_dir = Path(tempfile.mkdtemp(prefix="deerflow-workspace-changes-")) if include_text else None
     try:
@@ -70,6 +73,7 @@ async def record_workspace_changes(
     user_id: str | None = None,
     limits: WorkspaceChangeLimits | None = None,
 ) -> dict | None:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     try:
         roots = build_thread_workspace_roots(thread_id, user_id=user_id)
         after_metadata = await asyncio.to_thread(
@@ -107,5 +111,6 @@ async def record_workspace_changes(
 
 
 def _cleanup_snapshot_text_cache(snapshot: WorkspaceSnapshot) -> None:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if snapshot.text_cache_dir:
         shutil.rmtree(snapshot.text_cache_dir, ignore_errors=True)

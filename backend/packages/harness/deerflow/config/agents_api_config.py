@@ -1,10 +1,10 @@
-"""Configuration for the custom agents management API."""
+"""提供配置、agents、接口、配置相关功能。"""
 
 from pydantic import BaseModel, Field
 
 
 class AgentsApiConfig(BaseModel):
-    """Configuration for custom-agent and user-profile management routes."""
+    """\u6267\u884c AgentsApiConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=False,
@@ -16,17 +16,17 @@ _agents_api_config: AgentsApiConfig = AgentsApiConfig()
 
 
 def get_agents_api_config() -> AgentsApiConfig:
-    """Get the current agents API configuration."""
+    """\u6267\u884c get_agents_api_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return _agents_api_config
 
 
 def set_agents_api_config(config: AgentsApiConfig) -> None:
-    """Set the agents API configuration."""
+    """\u6267\u884c set_agents_api_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _agents_api_config
     _agents_api_config = config
 
 
 def load_agents_api_config_from_dict(config_dict: dict) -> None:
-    """Load agents API configuration from a dictionary."""
+    """\u6267\u884c load_agents_api_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _agents_api_config
     _agents_api_config = AgentsApiConfig(**config_dict)

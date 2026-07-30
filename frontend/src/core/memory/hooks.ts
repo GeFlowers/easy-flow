@@ -14,6 +14,7 @@ import type {
   UserMemory,
 } from "./types";
 
+/** 查询当前用户的记忆数据，并提供加载与错误状态。 */
 export function useMemory() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["memory"],
@@ -22,6 +23,7 @@ export function useMemory() {
   return { memory: data ?? null, isLoading, error };
 }
 
+/** 返回清空记忆的变更操作，成功后直接写回记忆缓存。 */
 export function useClearMemory() {
   const queryClient = useQueryClient();
 
@@ -33,6 +35,7 @@ export function useClearMemory() {
   });
 }
 
+/** 返回删除记忆事实的变更操作，成功后直接写回记忆缓存。 */
 export function useDeleteMemoryFact() {
   const queryClient = useQueryClient();
 
@@ -44,6 +47,7 @@ export function useDeleteMemoryFact() {
   });
 }
 
+/** 返回导入记忆的变更操作，成功后直接写回记忆缓存。 */
 export function useImportMemory() {
   const queryClient = useQueryClient();
 
@@ -55,6 +59,7 @@ export function useImportMemory() {
   });
 }
 
+/** 返回创建记忆事实的变更操作，成功后直接写回记忆缓存。 */
 export function useCreateMemoryFact() {
   const queryClient = useQueryClient();
 
@@ -66,6 +71,7 @@ export function useCreateMemoryFact() {
   });
 }
 
+/** 返回更新记忆事实的变更操作，成功后直接写回记忆缓存。 */
 export function useUpdateMemoryFact() {
   const queryClient = useQueryClient();
 

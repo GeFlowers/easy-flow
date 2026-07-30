@@ -5,13 +5,14 @@ import type { GoalState } from "@/core/threads/types";
 import { goalReconciliationKey } from "./goal-status-helpers";
 
 export type UseActiveGoalResult = {
-  /** The goal to render — the optimistic override while set, else server state. */
+  /** 待渲染的目标：存在本地乐观覆盖时使用覆盖值，否则使用服务端状态。 */
   activeGoal: GoalState | null;
   hasGoal: boolean;
-  /** Apply an optimistic goal after a `/goal` command (or `null` to hide it). */
+  /** 在 `/goal` 命令后应用乐观目标；传入 `null` 时隐藏目标。 */
   setLocalGoal: (goal: GoalState | null) => void;
 };
 
+/** 优先返回本地乐观目标；未覆盖时使用服务端线程状态。 */
 export function resolveActiveGoal(
   localGoal: GoalState | null | undefined,
   serverGoal: GoalState | null | undefined,
@@ -19,6 +20,7 @@ export function resolveActiveGoal(
   return localGoal !== undefined ? localGoal : (serverGoal ?? null);
 }
 
+/** 判断服务端目标是否已追上本地乐观覆盖，从而可安全清除覆盖。 */
 export function shouldResetLocalGoalOverride({
   serverGoalProvided,
   threadChanged,
@@ -32,16 +34,7 @@ export function shouldResetLocalGoalOverride({
   return serverGoalProvided;
 }
 
-/**
- * Reconciles the optimistic `/goal`-command result with the server's goal state.
- *
- * A `/goal` command updates the UI immediately via `setLocalGoal`, but that
- * override is dropped as soon as the server explicitly reports goal state —
- * switching threads, a new `continuation_count`, or a cleared goal. A stream
- * chunk that omits the `goal` field is not treated as a clear, because
- * clarification interrupts can publish partial values while the active goal is
- * still present in the checkpoint.
- */
+/** 管理编辑器目标命令产生的乐观展示状态，并与流式线程状态协调。 */
 export function useActiveGoal(
   threadId: string,
   serverGoal: GoalState | null | undefined,

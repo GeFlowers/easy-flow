@@ -1,3 +1,4 @@
+"""提供配置、技能、配置相关功能。"""
 import os
 from pathlib import Path
 
@@ -8,14 +9,14 @@ from deerflow.constants import DEFAULT_SKILLS_CONTAINER_PATH
 
 
 def _legacy_skills_candidates() -> tuple[Path, ...]:
-    """Return source-tree skills locations for monorepo compatibility."""
+    """\u6267\u884c _legacy_skills_candidates \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     backend_dir = Path(__file__).resolve().parents[4]
     repo_root = backend_dir.parent
     return (repo_root / "skills",)
 
 
 class SkillsConfig(BaseModel):
-    """Configuration for skills system"""
+    """\u6267\u884c SkillsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     use: str = Field(
         default="deerflow.skills.storage.local_skill_storage:LocalSkillStorage",
@@ -35,20 +36,9 @@ class SkillsConfig(BaseModel):
     )
 
     def get_skills_path(self) -> Path:
-        """
-        Get the resolved skills directory path.
-
-        Resolution order:
-            1. Explicit ``path`` field
-            2. ``DEER_FLOW_SKILLS_PATH`` environment variable
-            3. ``skills`` under the caller project root (``project_root()``)
-            4. Legacy repo-root candidates for monorepo compatibility (``_legacy_skills_candidates``)
-
-        When none of (3) or (4) exist on disk, the project-root default is returned so callers
-        can still surface a stable "no skills" location without raising.
-        """
+        """\u6267\u884c get_skills_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if self.path:
-            # Use configured path (can be absolute or relative to project root)
+                        # 中文说明：此处用于执行相关处理。
             return resolve_path(self.path)
         if env_path := os.getenv("DEER_FLOW_SKILLS_PATH"):
             return resolve_path(env_path)
@@ -64,14 +54,5 @@ class SkillsConfig(BaseModel):
         return project_default
 
     def get_skill_container_path(self, skill_name: str, category: str = "public") -> str:
-        """
-        Get the full container path for a specific skill.
-
-        Args:
-            skill_name: Name of the skill (directory name)
-            category: Category of the skill (public or custom)
-
-        Returns:
-            Full path to the skill in the container
-        """
+        """\u6267\u884c get_skill_container_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return f"{self.container_path}/{category}/{skill_name}"

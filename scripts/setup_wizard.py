@@ -1,9 +1,5 @@
 #!/usr/bin/env python3
-"""DeerFlow Interactive Setup Wizard.
-
-Usage:
-    uv run python scripts/setup_wizard.py
-"""
+"""本脚本负责设置 向导。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -15,10 +11,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def _is_interactive() -> bool:
+    '未说明'
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
 def main() -> int:
+    '未说明'
     try:
         if not _is_interactive():
             print(

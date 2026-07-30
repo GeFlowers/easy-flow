@@ -7,9 +7,13 @@ import {
 } from "@/core/threads/export";
 import type { AgentThread } from "@/core/threads/types";
 
-// Bytedance/deer-flow issue #3107 BUG-006: the chat export path bypasses the
-// UI-level hidden-message filter and emits reasoning content, tool calls, and
-// any other "internal" payload as if it were part of the user transcript.
+// Bytedance/deer-flow 问题 #3107 BUG-006：聊天导出路径绕过 UI 层隐藏消息过滤器，
+// 将推理内容、工具调用及其他“内部”载荷当作用户对话记录的一部分输出。
+
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeThread 的约定。
+
+ */
 
 function makeThread(): AgentThread {
   return {
@@ -22,6 +26,11 @@ function makeThread(): AgentThread {
   } as unknown as AgentThread;
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 human 的约定。
+
+ */
+
 function human(content: string, extra: Partial<Message> = {}): Message {
   return {
     id: `h-${content}`,
@@ -30,6 +39,11 @@ function human(content: string, extra: Partial<Message> = {}): Message {
     ...extra,
   } as Message;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 ai 的约定。
+
+ */
 
 function ai(
   content: string,
@@ -43,6 +57,11 @@ function ai(
   } as Message;
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 toolMsg 的约定。
+
+ */
+
 function toolMsg(content: string): Message {
   return {
     id: `t-${content}`,
@@ -54,6 +73,9 @@ function toolMsg(content: string): Message {
 }
 
 describe("formatThreadAsMarkdown", () => {
+  /**
+   * 覆盖“includes plain user and assistant text”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("includes plain user and assistant text", () => {
     const md = formatThreadAsMarkdown(makeThread(), [
       human("hello"),
@@ -62,6 +84,11 @@ describe("formatThreadAsMarkdown", () => {
     expect(md).toContain("hello");
     expect(md).toContain("hi there");
   });
+
+  /**
+   * 覆盖“drops messages marked hide_from_ui”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("drops messages marked hide_from_ui", () => {
     const hidden = human("internal system reminder", {
@@ -75,6 +102,11 @@ describe("formatThreadAsMarkdown", () => {
     expect(md).toContain("public answer");
   });
 
+  /**
+   * 覆盖“does not emit reasoning_content by default”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("does not emit reasoning_content by default", () => {
     const message = ai("final answer", {
       additional_kwargs: {
@@ -86,6 +118,11 @@ describe("formatThreadAsMarkdown", () => {
     expect(md).not.toContain("Thinking");
   });
 
+  /**
+   * 覆盖“does not emit tool calls by default”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("does not emit tool calls by default", () => {
     const message = ai("ok", {
       tool_calls: [{ id: "1", name: "task", args: { description: "do work" } }],
@@ -94,6 +131,11 @@ describe("formatThreadAsMarkdown", () => {
     expect(md).not.toContain("**Tool:**");
     expect(md).not.toContain("`task`");
   });
+
+  /**
+   * 覆盖“drops tool result messages”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("drops tool result messages", () => {
     const md = formatThreadAsMarkdown(makeThread(), [
@@ -105,6 +147,9 @@ describe("formatThreadAsMarkdown", () => {
 });
 
 describe("formatThreadAsMarkdown opt-in flags", () => {
+  /**
+   * 覆盖“emits reasoning when includeReasoning is true”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("emits reasoning when includeReasoning is true", () => {
     const message = ai("final answer", {
       additional_kwargs: {
@@ -118,6 +163,11 @@ describe("formatThreadAsMarkdown opt-in flags", () => {
     expect(md).toContain("Thinking");
   });
 
+  /**
+   * 覆盖“emits tool call rows when includeToolCalls is true”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("emits tool call rows when includeToolCalls is true", () => {
     const message = ai("ok", {
       tool_calls: [{ id: "1", name: "task", args: { description: "do work" } }],
@@ -128,6 +178,11 @@ describe("formatThreadAsMarkdown opt-in flags", () => {
     expect(md).toContain("**Tool:**");
     expect(md).toContain("`task`");
   });
+
+  /**
+   * 覆盖“keeps hidden messages when includeHidden is true”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("keeps hidden messages when includeHidden is true", () => {
     const hidden = human("internal reminder", {
@@ -141,6 +196,9 @@ describe("formatThreadAsMarkdown opt-in flags", () => {
 });
 
 describe("formatThreadAsJSON opt-in flags", () => {
+  /**
+   * 覆盖“emits tool_calls field when includeToolCalls is true”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("emits tool_calls field when includeToolCalls is true", () => {
     const message = ai("ok", {
       tool_calls: [{ id: "1", name: "task", args: { description: "x" } }],
@@ -151,6 +209,11 @@ describe("formatThreadAsJSON opt-in flags", () => {
     expect(raw).toContain("tool_calls");
     expect(raw).toContain('"task"');
   });
+
+  /**
+   * 覆盖“keeps tool messages when includeToolMessages is true”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("keeps tool messages when includeToolMessages is true", () => {
     const raw = formatThreadAsJSON(
@@ -165,6 +228,9 @@ describe("formatThreadAsJSON opt-in flags", () => {
 });
 
 describe("formatThreadAsJSON", () => {
+  /**
+   * 覆盖“strips hidden messages, tool messages, reasoning, and tool calls”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("strips hidden messages, tool messages, reasoning, and tool calls", () => {
     const messages = [
       human("hello"),
@@ -192,10 +258,14 @@ describe("formatThreadAsJSON", () => {
     expect(raw).not.toContain("tool_calls");
   });
 
+  /**
+   * 覆盖“strips inline <think>...</think> wrappers from content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("strips inline <think>...</think> wrappers from content", () => {
-    // bytedance/deer-flow#3131 review: JSON export must run the same
-    // sanitiser the Markdown path uses so inline reasoning never leaks
-    // even when `includeReasoning` is left at its default false.
+    // bytedance/deer-flow#3131 审查：JSON 导出必须运行 Markdown 路径使用的同一
+    // 清理器，以确保即使 `includeReasoning` 保持默认 false，内联推理也绝不泄漏。
     const message = ai("<think>internal monologue</think>visible answer", {
       id: "ai-1",
     } as Partial<Message>);
@@ -204,6 +274,11 @@ describe("formatThreadAsJSON", () => {
     expect(raw).not.toContain("<think>");
     expect(raw).toContain("visible answer");
   });
+
+  /**
+   * 覆盖“strips content-array thinking blocks from content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("strips content-array thinking blocks from content", () => {
     const message = ai("placeholder", {
@@ -218,6 +293,11 @@ describe("formatThreadAsJSON", () => {
     expect(raw).toContain("final visible text");
   });
 
+  /**
+   * 覆盖“strips <uploaded_files> markers from content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("strips <uploaded_files> markers from content", () => {
     const message = human(
       "real prompt\n<uploaded_files>\n/mnt/user-data/uploads/secret.pdf\n</uploaded_files>",
@@ -229,9 +309,13 @@ describe("formatThreadAsJSON", () => {
     expect(raw).toContain("real prompt");
   });
 
+  /**
+   * 覆盖“drops AI messages that sanitise to empty content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("drops AI messages that sanitise to empty content", () => {
-    // Pure-reasoning AI fragments (no visible text, no tool calls) should
-    // not survive as `{content: ""}` rows in the export.
+    // 纯推理 AI 片段（无可见文本、无工具调用）不应在导出中以 `{content: ""}` 行保留。
     const message = ai("<think>only thinking, no answer</think>", {
       id: "ai-3",
     } as Partial<Message>);
@@ -240,17 +324,20 @@ describe("formatThreadAsJSON", () => {
     expect(parsed.messages).toHaveLength(0);
   });
 
+  /**
+   * 覆盖“strips <system-reminder>/<memory>/<current_date> as defence in depth”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("strips <system-reminder>/<memory>/<current_date> as defence in depth", () => {
-    // Primary protection is `isHiddenFromUIMessage` filtering the whole
-    // hidden HumanMessage. If a regression strips the `hide_from_ui` flag
-    // (or the marker leaks into an otherwise-visible message), the
-    // sanitiser must still scrub the payload before export.
+    // 首要保护是 `isHiddenFromUIMessage` 过滤整个隐藏的 HumanMessage。若回归移除了
+    // `hide_from_ui` 标志（或标记泄漏到原本可见的消息中），清理器在导出前仍必须
+    // 清除该载荷。
     const leaky = human("real user text", {
       id: "leak-1",
       content:
         "<system-reminder>\n<memory>secret fact A</memory>\n<current_date>2026-01-01, Tuesday</current_date>\n</system-reminder>\nreal user text",
-      // Deliberately *not* setting hide_from_ui to model the regression
-      // case the defence-in-depth strip is guarding against.
+      // 故意不设置 hide_from_ui，以模拟深度防御清除逻辑所防范的回归场景。
     } as unknown as Partial<Message>);
     const raw = formatThreadAsJSON(makeThread(), [leaky]);
     expect(raw).not.toContain("<system-reminder>");
@@ -260,10 +347,14 @@ describe("formatThreadAsJSON", () => {
     expect(raw).toContain("real user text");
   });
 
+  /**
+   * 覆盖“strips <slash_skill_activation> as defence in depth”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("strips <slash_skill_activation> as defence in depth", () => {
-    // Slash activation normally rides in a hidden HumanMessage. If a replay
-    // or state merge loses the flag, export must still not leak full SKILL.md
-    // content into a user-visible transcript.
+    // 斜杠激活通常位于隐藏的 HumanMessage 中。若回放或状态合并丢失该标志，导出仍
+    // 不得将完整 SKILL.md 内容泄漏到用户可见的对话记录。
     const leaky = human("real user task", {
       id: "leak-slash-skill",
       content:
@@ -275,6 +366,11 @@ describe("formatThreadAsJSON", () => {
     expect(raw).not.toContain("internal source");
     expect(raw).toContain("real user task");
   });
+
+  /**
+   * 覆盖“sanitises tool message content when includeToolMessages is true”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("sanitises tool message content when includeToolMessages is true", () => {
     const message = {
@@ -294,10 +390,14 @@ describe("formatThreadAsJSON", () => {
     expect(raw).not.toContain("secret.pdf");
   });
 
+  /**
+   * 覆盖“preserves text and image_url parts in mixed content arrays”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("preserves text and image_url parts in mixed content arrays", () => {
-    // `extractContentFromMessage` keeps `text` and `image_url` parts and
-    // drops `thinking` parts. The JSON export must agree with that
-    // contract.
+    // `extractContentFromMessage` 保留 `text` 和 `image_url` 部分，并丢弃
+    // `thinking` 部分。JSON 导出必须遵守该契约。
     const message = ai("placeholder", {
       id: "ai-mixed",
       content: [
@@ -315,11 +415,15 @@ describe("formatThreadAsJSON", () => {
     expect(raw).not.toContain("internal reasoning");
   });
 
+  /**
+   * 覆盖“drops opted-in empty reasoning rather than emit reasoning: ''”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("drops opted-in empty reasoning rather than emit reasoning: ''", () => {
-    // `extractReasoningContentFromMessage` can legitimately hand back ""
-    // for an AI message that has no reasoning content. The export must
-    // mirror the Markdown path's `!reasoning` `continue` and drop the row
-    // instead of leaking `{reasoning: ""}`.
+    // `extractReasoningContentFromMessage` 对没有推理内容的 AI 消息可以合法地返回
+    // ""。导出必须镜像 Markdown 路径的 `!reasoning` `continue`，丢弃该行而不是
+    // 泄漏 `{reasoning: ""}`。
     const message = ai("", {
       id: "ai-empty-reasoning",
       additional_kwargs: { reasoning_content: "" },

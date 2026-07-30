@@ -1,4 +1,4 @@
-"""Deterministic capture and rendering for task delegations."""
+'定义 delegation_ledger 模块提供的职责与可复用接口。\n\nDeterministic capture and rendering for task delegations.'
 
 from __future__ import annotations
 
@@ -27,11 +27,12 @@ _STATUS_ONLY_RESULT_BRIEFS = {
 
 
 def _utc_now_iso() -> str:
+    """返回以 Z 结尾的当前 UTC ISO 8601 时间字符串。"""
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
-    """Deterministic head/tail truncation. This is not an LLM summary."""
+    '执行 _bound_text 的明确职责，并返回与调用约定一致的结果。\n\nDeterministic head/tail truncation. This is not an LLM summary.'
     if len(text) <= cap:
         return text
     if cap <= 0:
@@ -47,10 +48,12 @@ def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
 
 
 def _escape_context_text(value: object) -> str:
+    """压缩空白并转义将注入模型上下文的文本。"""
     return escape(" ".join(str(value).split()), quote=False)
 
 
 def _status_guidance(status: str, stop_reason: str | None = None) -> str:
+    """根据委派状态和可选终止原因生成后续行动指引。"""
     if stop_reason:
         # A guardrail cap ended this run early (#3875 Phase 2): the status is
         # still completed/failed, and ``stop_reason`` carries *why* it stopped
@@ -76,6 +79,7 @@ def _status_guidance(status: str, stop_reason: str | None = None) -> str:
 
 
 def _tool_call_name(tool_call: dict[str, Any]) -> str:
+    """从标准或嵌套 function 格式的工具调用中提取名称。"""
     name = tool_call.get("name")
     if isinstance(name, str):
         return name
@@ -86,17 +90,19 @@ def _tool_call_name(tool_call: dict[str, Any]) -> str:
 
 
 def _tool_call_id(tool_call: dict[str, Any]) -> str | None:
+    """提取工具调用 ID，并在缺失时返回 None。"""
     tool_call_id = tool_call.get("id")
     return str(tool_call_id) if tool_call_id else None
 
 
 def _tool_call_args(tool_call: dict[str, Any]) -> dict[str, Any]:
+    """提取字典类型的工具调用参数，其他情况返回空字典。"""
     args = tool_call.get("args")
     return args if isinstance(args, dict) else {}
 
 
 def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
-    """Enumerate `task` delegations from AI tool calls and paired results."""
+    '执行 extract_delegations 的明确职责，并返回与调用约定一致的结果。\n\nEnumerate `task` delegations from AI tool calls and paired results.'
     entries_by_id: dict[str, DelegationEntry] = {}
     order: list[str] = []
     now = _utc_now_iso()
@@ -149,10 +155,12 @@ def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
 
 
 def _fits_budget(lines: list[str], candidate: str, max_chars: int) -> bool:
+    """判断追加候选行后是否仍满足总字符预算。"""
     return len("\n".join([*lines, candidate])) <= max_chars
 
 
 def _render_entry_line(entry: DelegationEntry) -> str:
+    """将单条委派记录渲染为安全的模型可见列表行。"""
     status = _escape_context_text(entry["status"])
     description = _escape_context_text(entry["description"])
     subagent_type = _escape_context_text(entry["subagent_type"])
@@ -165,7 +173,7 @@ def _render_entry_line(entry: DelegationEntry) -> str:
 
 
 def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int = _LEDGER_RENDER_CHAR_BUDGET) -> str:
-    """Render the delegation ledger as model-visible system context."""
+    '执行 render_delegation_ledger 的明确职责，并返回与调用约定一致的结果。\n\nRender the delegation ledger as model-visible system context.'
     if not entries:
         return ""
 

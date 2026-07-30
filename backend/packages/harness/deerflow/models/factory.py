@@ -1,3 +1,4 @@
+'定义 factory 模块提供的职责与可复用接口'
 import logging
 
 from langchain.chat_models import BaseChatModel
@@ -12,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 
 def _deep_merge_dicts(base: dict | None, override: dict) -> dict:
-    """Recursively merge two dictionaries without mutating the inputs."""
+    '执行 _deep_merge_dicts 的明确职责，并返回与调用约定一致的结果。\n\nRecursively merge two dictionaries without mutating the inputs.'
     merged = dict(base or {})
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
@@ -23,7 +24,7 @@ def _deep_merge_dicts(base: dict | None, override: dict) -> dict:
 
 
 def _vllm_disable_chat_template_kwargs(chat_template_kwargs: dict) -> dict:
-    """Build the disable payload for vLLM/Qwen chat template kwargs."""
+    '执行 _vllm_disable_chat_template_kwargs 的明确职责，并返回与调用约定一致的结果。\n\nBuild the disable payload for vLLM/Qwen chat template kwargs.'
     disable_kwargs: dict[str, bool] = {}
     if "thinking" in chat_template_kwargs:
         disable_kwargs["thinking"] = False
@@ -33,33 +34,12 @@ def _vllm_disable_chat_template_kwargs(chat_template_kwargs: dict) -> dict:
 
 
 def _declares_api_base(model_class: type) -> bool:
-    """Whether *model_class* declares ``api_base`` as its own constructor field.
-
-    ``langchain_deepseek:ChatDeepSeek`` (and therefore ``PatchedChatDeepSeek``) does, so for it
-    ``api_base`` is the canonical endpoint key and must be passed through untouched. Every other
-    ``BaseChatOpenAI`` subclass inherits only ``openai_api_base`` (alias ``base_url``).
-    """
+    '执行 _declares_api_base 的明确职责，并返回与调用约定一致的结果。\n\nWhether *model_class* declares ``api_base`` as its own constructor field.\n\n    ``langchain_deepseek:ChatDeepSeek`` (and therefore ``PatchedChatDeepSeek``) does, so for it\n    ``api_base`` is the canonical endpoint key and must be passed through untouched. Every other\n    ``BaseChatOpenAI`` subclass inherits only ``openai_api_base`` (alias ``base_url``).\n    '
     return "api_base" in getattr(model_class, "model_fields", {})
 
 
 def _normalize_openai_base_url(model_class: type, model_settings_from_config: dict) -> None:
-    """Map the common ``api_base`` alias to ``base_url`` for OpenAI-compatible clients.
-
-    ``BaseChatOpenAI`` subclasses accept the OpenAI endpoint override as ``base_url`` (with
-    ``openai_api_base`` as a legacy alias). Several providers in ``config.example.yaml`` use
-    ``api_base`` for *other* model classes, so users frequently copy ``api_base`` onto such a model
-    by mistake. Because ``ModelConfig`` is ``extra="allow"``, the bad key is not caught at
-    config-load time — it is forwarded to the constructor, which does not reject it but transfers it
-    into ``model_kwargs``; that is then spread into every ``Completions.create()`` call and rejected
-    by the OpenAI SDK at *request* time with an opaque ``unexpected keyword argument 'api_base'``
-    error (and the endpoint override is silently dropped). Rename it here so the model works as the
-    user intended.
-
-    Gated on ``issubclass(model_class, BaseChatOpenAI)`` rather than a class-path allowlist, so any
-    OpenAI-compatible subclass is covered automatically — the divert-and-crash behaviour is a
-    property of the base class, not of the two paths that used to be listed. Classes that declare
-    ``api_base`` themselves are skipped: there the key is canonical, not a typo.
-    """
+    '执行 _normalize_openai_base_url 的明确职责，并返回与调用约定一致的结果。\n\nMap the common ``api_base`` alias to ``base_url`` for OpenAI-compatible clients.\n\n    ``BaseChatOpenAI`` subclasses accept the OpenAI endpoint override as ``base_url`` (with\n    ``openai_api_base`` as a legacy alias). Several providers in ``config.example.yaml`` use\n    ``api_base`` for *other* model classes, so users frequently copy ``api_base`` onto such a model\n    by mistake. Because ``ModelConfig`` is ``extra="allow"``, the bad key is not caught at\n    config-load time — it is forwarded to the constructor, which does not reject it but transfers it\n    into ``model_kwargs``; that is then spread into every ``Completions.create()`` call and rejected\n    by the OpenAI SDK at *request* time with an opaque ``unexpected keyword argument \'api_base\'``\n    error (and the endpoint override is silently dropped). Rename it here so the model works as the\n    user intended.\n\n    Gated on ``issubclass(model_class, BaseChatOpenAI)`` rather than a class-path allowlist, so any\n    OpenAI-compatible subclass is covered automatically — the divert-and-crash behaviour is a\n    property of the base class, not of the two paths that used to be listed. Classes that declare\n    ``api_base`` themselves are skipped: there the key is canonical, not a typo.\n    '
     if not issubclass(model_class, BaseChatOpenAI) or _declares_api_base(model_class):
         return
     if "api_base" not in model_settings_from_config:
@@ -74,24 +54,7 @@ def _normalize_openai_base_url(model_class: type, model_settings_from_config: di
 
 
 def _warn_unknown_model_settings(model_class, model_name: str, model_settings_from_config: dict) -> None:
-    """Warn about config keys the OpenAI client will silently divert into ``model_kwargs``.
-
-    ``ModelConfig`` is ``extra="allow"``, so a typo'd key (e.g. ``maxx_tokens``) is not caught at
-    config-load time. LangChain's OpenAI client does not reject an unknown constructor kwarg — it
-    emits a ``UserWarning`` and transfers the key into ``model_kwargs``, which is then spread into
-    every ``Completions.create()`` call and rejected by the OpenAI SDK at *request* time with an
-    opaque ``unexpected keyword argument`` error that is very hard to trace back to a config typo.
-
-    This turns that latent failure into an explicit, actionable log line at model-build time. It is
-    **scoped to the OpenAI-compatible family** — that is where the ``model_kwargs``
-    divert-and-crash behavior occurs and where the known field/alias set is accurate. The family is
-    ``issubclass(model_class, BaseChatOpenAI)``: the divert is implemented in that base class, so
-    every subclass inherits it. Other providers (e.g. ``ChatAnthropic``) route extra kwargs
-    differently and would false-positive against this allow-list, so they are intentionally left
-    alone. Best-effort and non-fatal: it only fires when the class exposes a pydantic
-    ``model_fields`` schema, treats both field names and their aliases as valid, and allow-lists the
-    standard passthrough kwargs the factory injects and the OpenAI client accepts.
-    """
+    '执行 _warn_unknown_model_settings 的明确职责，并返回与调用约定一致的结果。\n\nWarn about config keys the OpenAI client will silently divert into ``model_kwargs``.\n\n    ``ModelConfig`` is ``extra="allow"``, so a typo\'d key (e.g. ``maxx_tokens``) is not caught at\n    config-load time. LangChain\'s OpenAI client does not reject an unknown constructor kwarg — it\n    emits a ``UserWarning`` and transfers the key into ``model_kwargs``, which is then spread into\n    every ``Completions.create()`` call and rejected by the OpenAI SDK at *request* time with an\n    opaque ``unexpected keyword argument`` error that is very hard to trace back to a config typo.\n\n    This turns that latent failure into an explicit, actionable log line at model-build time. It is\n    **scoped to the OpenAI-compatible family** — that is where the ``model_kwargs``\n    divert-and-crash behavior occurs and where the known field/alias set is accurate. The family is\n    ``issubclass(model_class, BaseChatOpenAI)``: the divert is implemented in that base class, so\n    every subclass inherits it. Other providers (e.g. ``ChatAnthropic``) route extra kwargs\n    differently and would false-positive against this allow-list, so they are intentionally left\n    alone. Best-effort and non-fatal: it only fires when the class exposes a pydantic\n    ``model_fields`` schema, treats both field names and their aliases as valid, and allow-lists the\n    standard passthrough kwargs the factory injects and the OpenAI client accepts.\n    '
     if not issubclass(model_class, BaseChatOpenAI):
         return
     known = getattr(model_class, "model_fields", None)
@@ -135,34 +98,7 @@ _DEFAULT_STREAM_CHUNK_TIMEOUT_SECONDS: float = 240.0
 
 
 def _apply_stream_chunk_timeout_default(model_class: type, model_settings_from_config: dict) -> None:
-    """Inject a generous ``stream_chunk_timeout`` for OpenAI-compatible clients.
-
-    ``stream_chunk_timeout`` is a field of langchain-openai's ``BaseChatOpenAI``, so
-    it is accepted by ``ChatOpenAI`` and by every DeerFlow provider that subclasses
-    it: ``PatchedChatOpenAI`` plus the self-hosted / reasoning adapters
-    ``VllmChatModel``, ``MindIEChatModel``, ``PatchedChatDeepSeek``,
-    ``PatchedChatMiMo``, ``PatchedChatStepFun`` and ``PatchedChatMiniMax``. We gate on
-    ``issubclass(model_class, BaseChatOpenAI)`` rather than an explicit class-path
-    allowlist so any OpenAI-compatible subclass inherits the default (and honors an
-    explicit override) automatically. Issue #3189 was reported against ``mimo-v2.5``
-    (``PatchedChatMiMo``); the original fix (#3195) matched only ``ChatOpenAI`` /
-    ``PatchedChatOpenAI``, so those subclasses kept langchain-openai's aggressive
-    built-in chunk-gap timeout and — worse — silently discarded a user's explicit
-    ``stream_chunk_timeout``.
-
-    Behaviour:
-
-    * ``BaseChatOpenAI`` subclass: an explicit value in ``config.yaml`` is preserved.
-      An explicit ``null`` is dropped upstream by ``model_dump(exclude_none=True)``
-      and therefore treated as "unset", so the default is injected.
-    * Any other client (e.g. ``ChatAnthropic``): drop the key so it is never
-      forwarded to a constructor that does not declare it. The kwarg is not a
-      declared field of these clients: depending on the client it is either
-      silently dropped (``ChatAnthropic`` declares ``extra="ignore"``) or, for
-      other OpenAI-style clients, diverted into ``model_kwargs`` and rejected
-      at request time. Either way the user's intent is lost, so we drop it
-      proactively instead.
-    """
+    '执行 _apply_stream_chunk_timeout_default 的明确职责，并返回与调用约定一致的结果。\n\nInject a generous ``stream_chunk_timeout`` for OpenAI-compatible clients.\n\n    ``stream_chunk_timeout`` is a field of langchain-openai\'s ``BaseChatOpenAI``, so\n    it is accepted by ``ChatOpenAI`` and by every DeerFlow provider that subclasses\n    it: ``PatchedChatOpenAI`` plus the self-hosted / reasoning adapters\n    ``VllmChatModel``, ``MindIEChatModel``, ``PatchedChatDeepSeek``,\n    ``PatchedChatMiMo``, ``PatchedChatStepFun`` and ``PatchedChatMiniMax``. We gate on\n    ``issubclass(model_class, BaseChatOpenAI)`` rather than an explicit class-path\n    allowlist so any OpenAI-compatible subclass inherits the default (and honors an\n    explicit override) automatically. Issue #3189 was reported against ``mimo-v2.5``\n    (``PatchedChatMiMo``); the original fix (#3195) matched only ``ChatOpenAI`` /\n    ``PatchedChatOpenAI``, so those subclasses kept langchain-openai\'s aggressive\n    built-in chunk-gap timeout and — worse — silently discarded a user\'s explicit\n    ``stream_chunk_timeout``.\n\n    Behaviour:\n\n    * ``BaseChatOpenAI`` subclass: an explicit value in ``config.yaml`` is preserved.\n      An explicit ``null`` is dropped upstream by ``model_dump(exclude_none=True)``\n      and therefore treated as "unset", so the default is injected.\n    * Any other client (e.g. ``ChatAnthropic``): drop the key so it is never\n      forwarded to a constructor that does not declare it. The kwarg is not a\n      declared field of these clients: depending on the client it is either\n      silently dropped (``ChatAnthropic`` declares ``extra="ignore"``) or, for\n      other OpenAI-style clients, diverted into ``model_kwargs`` and rejected\n      at request time. Either way the user\'s intent is lost, so we drop it\n      proactively instead.\n    '
     if not issubclass(model_class, BaseChatOpenAI):
         model_settings_from_config.pop("stream_chunk_timeout", None)
         return
@@ -172,27 +108,7 @@ def _apply_stream_chunk_timeout_default(model_class: type, model_settings_from_c
 
 
 def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *, app_config: AppConfig | None = None, attach_tracing: bool = True, **kwargs) -> BaseChatModel:
-    """Create a chat model instance from the config.
-
-    Args:
-        name: The name of the model to create. If None, the first model in the config will be used.
-        thinking_enabled: Enable the model's extended-thinking mode when supported.
-        app_config: Explicit application config; falls back to the cached global if omitted.
-        attach_tracing: When True (default), attach tracing callbacks (Langfuse,
-            LangSmith) directly to the model instance. Standalone callers — anything
-            that invokes the model outside a LangGraph run that already wires tracing
-            at the invocation root (``MemoryUpdater``, ad-hoc utilities, etc.) — keep
-            this default so the model-level callback still produces traces. Callers
-            that already attach tracing at the graph root (``make_lead_agent``, the
-            in-graph ``TitleMiddleware``) MUST pass ``attach_tracing=False``; otherwise
-            the same LLM call emits duplicate spans (one rooted at the graph, one at
-            the model) and ``session_id`` / ``user_id`` metadata never reach the trace
-            because the model becomes a nested observation whose ``langfuse_*`` keys
-            get stripped.
-
-    Returns:
-        A chat model instance.
-    """
+    "创建并返回，并遵守 create_chat_model 所表达的接口约束。\n\nCreate a chat model instance from the config.\n\n    Args:\n        name: The name of the model to create. If None, the first model in the config will be used.\n        thinking_enabled: Enable the model's extended-thinking mode when supported.\n        app_config: Explicit application config; falls back to the cached global if omitted.\n        attach_tracing: When True (default), attach tracing callbacks (Langfuse,\n            LangSmith) directly to the model instance. Standalone callers — anything\n            that invokes the model outside a LangGraph run that already wires tracing\n            at the invocation root (``MemoryUpdater``, ad-hoc utilities, etc.) — keep\n            this default so the model-level callback still produces traces. Callers\n            that already attach tracing at the graph root (``make_lead_agent``, the\n            in-graph ``TitleMiddleware``) MUST pass ``attach_tracing=False``; otherwise\n            the same LLM call emits duplicate spans (one rooted at the graph, one at\n            the model) and ``session_id`` / ``user_id`` metadata never reach the trace\n            because the model becomes a nested observation whose ``langfuse_*`` keys\n            get stripped.\n\n    Returns:\n        A chat model instance.\n    "
     config = app_config or get_app_config()
     if name is None:
         name = config.models[0].name

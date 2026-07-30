@@ -19,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { GithubIcon } from "./github-icon";
 import { Tooltip } from "./tooltip";
 
+/** 组装工作区的自适应外层容器，承载侧栏与主内容区域。 */
 export function WorkspaceContainer({
   className,
   children,
@@ -31,6 +32,7 @@ export function WorkspaceContainer({
   );
 }
 
+/** 渲染容器级标题栏，并在窄屏下维持主导航的可达性。 */
 export function WorkspaceHeader({
   className,
   children,
@@ -108,6 +110,7 @@ export function WorkspaceHeader({
   );
 }
 
+/** 渲染工作区主体并限制滚动归属，防止嵌套面板争夺页面滚动。 */
 export function WorkspaceBody({
   className,
   children,

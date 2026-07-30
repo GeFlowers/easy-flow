@@ -57,10 +57,12 @@ const NAME_RE = /^[A-Za-z0-9-]+$/;
 const SAVE_HINT_STORAGE_KEY = "deerflow.agent-create.save-hint-seen";
 const AGENT_READ_RETRY_DELAYS_MS = [200, 500, 1_000, 2_000];
 
+/** 等待指定时长，以便在创建后轮询后端的最终一致性结果。 */
 function wait(ms: number) {
   return new Promise((resolve) => window.setTimeout(resolve, ms));
 }
 
+/** 在代理保存后重试读取，直到写入生效或重试次数耗尽。 */
 async function getAgentWithRetry(agentName: string) {
   for (const delay of [0, ...AGENT_READ_RETRY_DELAYS_MS]) {
     if (delay > 0) {
@@ -70,13 +72,14 @@ async function getAgentWithRetry(agentName: string) {
     try {
       return await getAgent(agentName);
     } catch {
-      // Retry until the write settles or the attempts are exhausted.
+      // 写入尚未可见时继续重试，直到达到最大尝试次数。
     }
   }
 
   return null;
 }
 
+/** 引导用户命名、对话式配置并保存新的自定义代理。 */
 export default function NewAgentPage() {
   const { t } = useI18n();
   const router = useRouter();
@@ -137,6 +140,7 @@ export default function NewAgentPage() {
     window.localStorage.setItem(SAVE_HINT_STORAGE_KEY, "1");
   }, [step]);
 
+  /** 校验代理名称后启动引导会话，并将名称绑定为会话上下文。 */
   const handleConfirmName = useCallback(async () => {
     const trimmed = nameInput.trim();
     if (!trimmed) return;
@@ -165,15 +169,7 @@ export default function NewAgentPage() {
         err instanceof AgentNameCheckError &&
         err.reason === "request_failed"
       ) {
-        // Surface the backend-provided detail (e.g. validation error) when
-        // one is present, wrapped in a localised prefix so zh-CN users
-        // don't see a bare English string next to the surrounding Chinese
-        // UI. Falls back to the generic localised fallback when the backend
-        // sent no detail — `err.message` is unreliable for this branch
-        // because `checkAgentName` substitutes a generated fallback string
-        // ("Failed to check agent name: ${statusText}") when `detail` is
-        // missing, so testing `err.message` would always be truthy and the
-        // generated fallback would leak through.
+        // 仅在后端返回明确详情时拼接本地化前缀；不能依赖 err.message，缺少 detail 时它会被 API 层填入英文兜底文本。
         setNameError(
           err.detail
             ? t.agents.nameStepCheckErrorWithDetail.replace(
@@ -213,6 +209,7 @@ export default function NewAgentPage() {
     threadId,
   ]);
 
+  /** 在非输入法组合状态下允许 Enter 提交代理名称。 */
   const handleNameKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && !isIMEComposing(e)) {
       e.preventDefault();
@@ -220,6 +217,7 @@ export default function NewAgentPage() {
     }
   };
 
+  /** 发送配置对话消息；存在待回答的人机输入卡片时禁止绕过该流程。 */
   const handleChatSubmit = useCallback(
     async (text: string) => {
       const trimmed = text.trim();
@@ -233,6 +231,7 @@ export default function NewAgentPage() {
     [agentName, hasOpenHumanInputCard, sendMessage, thread.isLoading, threadId],
   );
 
+  /** 以隐藏消息提交结构化人机输入答案，保留后端所需元数据。 */
   const handleSubmitHumanInput = useCallback(
     async (request: HumanInputRequest, response: HumanInputResponse) => {
       if (!agentName) {
@@ -262,6 +261,7 @@ export default function NewAgentPage() {
     [agentName, sendMessage, threadId],
   );
 
+  /** 请求引导代理执行保存，并防止重复或并发保存。 */
   const handleSaveAgent = useCallback(async () => {
     if (
       !agentName ||

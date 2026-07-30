@@ -1,4 +1,4 @@
-"""Shared contracts and deterministic helpers for skill review."""
+'未说明'
 
 from __future__ import annotations
 
@@ -32,11 +32,13 @@ SKILLSCAN_SEVERITY_MAP: dict[str, Severity] = {
 
 @dataclass(frozen=True)
 class PackageLimits:
+    '未说明'
     max_files: int = 4096
     max_file_bytes: int = 64 * 1024 * 1024
     max_total_bytes: int = 512 * 1024 * 1024
 
     def to_dict(self) -> dict[str, int]:
+        '未说明'
         return {
             "max_files": self.max_files,
             "max_file_bytes": self.max_file_bytes,
@@ -48,12 +50,12 @@ DEFAULT_PACKAGE_LIMITS = PackageLimits()
 
 
 def stable_json_dumps(data: Any) -> str:
-    """Serialize review data in a byte-stable, path-independent form."""
+    '未说明'
     return json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def normalize_relative_path(path: str) -> str:
-    """Normalize a package-relative path and reject escape attempts."""
+    '未说明'
     raw = path.replace("\\", "/").strip()
     if not raw:
         raise ValueError("path must not be empty")
@@ -82,6 +84,7 @@ def make_finding(
     evidence: Any | None = None,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
+    '未说明'
     finding = {
         "rule_id": rule_id,
         "source": source,
@@ -99,6 +102,7 @@ def make_finding(
 
 
 def sort_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    '未说明'
     return sorted(
         findings,
         key=lambda item: (
@@ -112,6 +116,7 @@ def sort_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def summarize_findings(findings: list[dict[str, Any]]) -> dict[str, int]:
+    '未说明'
     summary = {"blockers": 0, "errors": 0, "warnings": 0, "infos": 0}
     for finding in findings:
         severity = finding.get("severity")

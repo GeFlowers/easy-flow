@@ -1,4 +1,4 @@
-"""Cross-store contracts used by thread-global history pagination."""
+"""覆盖本文件测试的输入约束、模拟边界与回归保护，确保测试仅记录既有行为。"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from deerflow.runtime.runs.store.memory import MemoryRunStore
 
 
 async def _seed_ai_messages(store):
+    """构造测试所需的受控前置条件，隔离外部资源并保持断言可重复。"""
     await store.put(
         thread_id="t1",
         run_id="r1",
@@ -55,6 +56,7 @@ async def _seed_ai_messages(store):
 
 @pytest.mark.anyio
 async def test_memory_event_store_returns_global_last_non_middleware_ai_seq():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     store = MemoryRunEventStore()
     expected = await _seed_ai_messages(store)
     result = await store.get_last_visible_ai_seq_by_run("t1", {"r1", "r2", "r_mw", "missing"})
@@ -64,6 +66,7 @@ async def test_memory_event_store_returns_global_last_non_middleware_ai_seq():
 
 @pytest.mark.anyio
 async def test_memory_event_store_defensively_rechecks_message_category():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     store = MemoryRunEventStore()
     expected = await store.put(
         thread_id="t1",
@@ -81,9 +84,9 @@ async def test_memory_event_store_defensively_rechecks_message_category():
         content={"type": "ai", "content": "no longer a message"},
         metadata={"caller": "lead_agent"},
     )
-    # Memory projections intentionally share their row dictionaries. Recheck
-    # category at read time so an accidental mutation cannot violate the same
-    # contract that the DB and JSONL stores enforce explicitly.
+    # 此处说明下方测试的前置条件与预期，便于回归时定位断言所保护的行为边界。
+    # 此处说明下方测试的前置条件与预期，便于回归时定位断言所保护的行为边界。
+    # 此处说明下方测试的前置条件与预期，便于回归时定位断言所保护的行为边界。
     mutated["category"] = "trace"
 
     assert await store.get_last_visible_ai_seq_by_run("t1", {"r1"}) == {"r1": expected["seq"]}
@@ -91,6 +94,7 @@ async def test_memory_event_store_defensively_rechecks_message_category():
 
 @pytest.mark.anyio
 async def test_jsonl_event_store_returns_global_last_non_middleware_ai_seq(tmp_path):
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
     store = JsonlRunEventStore(base_dir=tmp_path)
@@ -102,6 +106,7 @@ async def test_jsonl_event_store_returns_global_last_non_middleware_ai_seq(tmp_p
 
 @pytest.mark.anyio
 async def test_db_event_store_returns_global_last_non_middleware_ai_seq(tmp_path):
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
     from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -118,6 +123,7 @@ async def test_db_event_store_returns_global_last_non_middleware_ai_seq(tmp_path
 
 @pytest.mark.anyio
 async def test_memory_run_store_supersession_is_unbounded_and_owner_scoped():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     store = MemoryRunStore()
     for index in range(105):
         await store.put(f"normal-{index}", thread_id="t1", user_id="alice", status="success")
@@ -148,6 +154,7 @@ async def test_memory_run_store_supersession_is_unbounded_and_owner_scoped():
 
 @pytest.mark.anyio
 async def test_run_repository_batch_queries_are_unbounded_and_owner_scoped(tmp_path):
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
     from deerflow.persistence.run import RunRepository
 
@@ -180,6 +187,7 @@ async def test_run_repository_batch_queries_are_unbounded_and_owner_scoped(tmp_p
 
 @pytest.mark.anyio
 async def test_run_manager_prefers_latest_in_memory_regenerate_status():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     store = MemoryRunStore()
     await store.put(
         "regen",
@@ -188,8 +196,8 @@ async def test_run_manager_prefers_latest_in_memory_regenerate_status():
         metadata={"regenerate_from_run_id": "source"},
     )
     manager = RunManager(store=store)
-    # Simulate the same logical run being newer in memory than its persisted
-    # successful snapshot.
+    # 此处说明下方测试的前置条件与预期，便于回归时定位断言所保护的行为边界。
+    # 此处说明下方测试的前置条件与预期，便于回归时定位断言所保护的行为边界。
     persisted = await manager.get("regen")
     assert persisted is not None
     manager._runs["regen"] = persisted
@@ -201,6 +209,7 @@ async def test_run_manager_prefers_latest_in_memory_regenerate_status():
 
 @pytest.mark.anyio
 async def test_run_manager_uses_latest_attempt_for_shared_regenerate_source():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     manager = RunManager()
     older = await manager.create(
         "t1",
@@ -218,6 +227,7 @@ async def test_run_manager_uses_latest_attempt_for_shared_regenerate_source():
 
 @pytest.mark.anyio
 async def test_run_manager_batch_history_methods_default_to_current_user():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     from types import SimpleNamespace
 
     from deerflow.runtime.user_context import reset_current_user, set_current_user
@@ -251,6 +261,7 @@ async def test_run_manager_batch_history_methods_default_to_current_user():
 
 @pytest.mark.anyio
 async def test_run_manager_batch_history_methods_fail_closed_without_user_context():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     from deerflow.runtime import user_context
 
     manager = RunManager(store=MemoryRunStore())
@@ -266,6 +277,7 @@ async def test_run_manager_batch_history_methods_fail_closed_without_user_contex
 
 @pytest.mark.anyio
 async def test_run_manager_batch_history_methods_allow_explicit_unscoped_access():
+    """验证当前用例覆盖的既有输入、返回或异常契约；生产实现偏离时，本用例必须明确失败。"""
     store = MemoryRunStore()
     await store.put(
         "regen-alice",

@@ -21,6 +21,11 @@ import {
 } from "@/core/threads/hooks";
 import type { RunMessage } from "@/core/threads/types";
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 runMessage 的约定。
+
+ */
+
 function runMessage(seq?: number): RunMessage {
   return {
     run_id: "run-1",
@@ -30,6 +35,11 @@ function runMessage(seq?: number): RunMessage {
     created_at: "2026-05-22T00:00:00Z",
   };
 }
+
+/**
+ * 覆盖“mergeMessages removes duplicate messages already present in history”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeMessages removes duplicate messages already present in history", () => {
   const human = {
@@ -45,6 +55,11 @@ test("mergeMessages removes duplicate messages already present in history", () =
 
   expect(mergeMessages([human, ai, human, ai], [], [])).toEqual([human, ai]);
 });
+
+/**
+ * 覆盖“mergeMessages does not collapse an unloaded gap before the first shared anchor”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeMessages does not collapse an unloaded gap before the first shared anchor", () => {
   const protectedEarly = {
@@ -67,6 +82,11 @@ test("mergeMessages does not collapse an unloaded gap before the first shared an
     mergeMessages([latestHuman, latestAi], [protectedEarly, latestHuman], []),
   ).toEqual([latestHuman, latestAi]);
 });
+
+/**
+ * 覆盖“mergeMessages lets live thread messages replace overlapping history”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeMessages lets live thread messages replace overlapping history", () => {
   const oldHuman = {
@@ -95,6 +115,11 @@ test("mergeMessages lets live thread messages replace overlapping history", () =
     liveAi,
   ]);
 });
+
+/**
+ * 覆盖“mergeMessages keeps a protected pre-compression input at its canonical position”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeMessages keeps a protected pre-compression input at its canonical position", () => {
   const canonicalInput = {
@@ -148,6 +173,11 @@ test("mergeMessages keeps a protected pre-compression input at its canonical pos
   ]);
 });
 
+/**
+ * 覆盖“mergeMessages keeps source order when history and live tail do not overlap”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("mergeMessages keeps source order when history and live tail do not overlap", () => {
   const historyAi = {
     id: "history-ai",
@@ -166,7 +196,15 @@ test("mergeMessages keeps source order when history and live tail do not overlap
   ]);
 });
 
+/**
+ * 覆盖“mergeMessages appends a trailing live-only segment after newer canonical rows”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("mergeMessages appends a trailing live-only segment after newer canonical rows", () => {
+  /**
+   * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 message 约定的逻辑。
+   */
   const message = (id: string) =>
     ({ id, type: "human", content: id }) as Message;
   const [a, b, c, d, y] = ["a", "b", "c", "d", "y"].map(message) as [
@@ -180,7 +218,15 @@ test("mergeMessages appends a trailing live-only segment after newer canonical r
   expect(mergeMessages([a, b, c, d], [b, y], [])).toEqual([a, b, c, d, y]);
 });
 
+/**
+ * 覆盖“mergeMessages keeps live-only messages between shared anchors in place”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("mergeMessages keeps live-only messages between shared anchors in place", () => {
+  /**
+   * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 message 约定的逻辑。
+   */
   const message = (id: string) =>
     ({ id, type: "human", content: id }) as Message;
   const [a, b, c, d, x, y] = ["a", "b", "c", "d", "x", "y"].map(message) as [
@@ -202,6 +248,11 @@ test("mergeMessages keeps live-only messages between shared anchors in place", (
   ]);
 });
 
+/**
+ * 覆盖“mergeMessages deduplicates tool messages by tool_call_id”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("mergeMessages deduplicates tool messages by tool_call_id", () => {
   const oldTool = {
     id: "tool-message-old",
@@ -218,6 +269,11 @@ test("mergeMessages deduplicates tool messages by tool_call_id", () => {
 
   expect(mergeMessages([oldTool], [liveTool], [])).toEqual([liveTool]);
 });
+
+/**
+ * 覆盖“mergeMessages keeps a visible history message when a hidden live message reuses its id”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeMessages keeps a visible history message when a hidden live message reuses its id", () => {
   const historyHuman = {
@@ -243,6 +299,11 @@ test("mergeMessages keeps a visible history message when a hidden live message r
   ]);
 });
 
+/**
+ * 覆盖“mergeMessages lets a visible live message replace overlapping hidden history”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("mergeMessages lets a visible live message replace overlapping hidden history", () => {
   const hiddenHistoryHuman = {
     id: "human-1",
@@ -260,6 +321,11 @@ test("mergeMessages lets a visible live message replace overlapping hidden histo
     liveHuman,
   ]);
 });
+
+/**
+ * 覆盖“getSummarizationMiddlewareMessages matches DeerFlow summarization update keys”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("getSummarizationMiddlewareMessages matches DeerFlow summarization update keys", () => {
   const removeAll = {
@@ -283,6 +349,11 @@ test("getSummarizationMiddlewareMessages matches DeerFlow summarization update k
   ).toEqual([removeAll, summary]);
 });
 
+/**
+ * 覆盖“getSummarizationMiddlewareMessages matches base LangChain summarization update keys”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("getSummarizationMiddlewareMessages matches base LangChain summarization update keys", () => {
   const summary = {
     id: "summary-1",
@@ -299,6 +370,11 @@ test("getSummarizationMiddlewareMessages matches base LangChain summarization up
     }),
   ).toEqual([summary]);
 });
+
+/**
+ * 覆盖“getSummarizationMiddlewareMessages ignores unrelated suffix-sharing update keys”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("getSummarizationMiddlewareMessages ignores unrelated suffix-sharing update keys", () => {
   const summary = {
@@ -317,6 +393,11 @@ test("getSummarizationMiddlewareMessages ignores unrelated suffix-sharing update
   ).toBeUndefined();
 });
 
+/**
+ * 覆盖“getVisibleOptimisticMessages hides optimistic user input after server human arrives”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("getVisibleOptimisticMessages hides optimistic user input after server human arrives", () => {
   const optimisticHuman = {
     id: "opt-human-1",
@@ -326,6 +407,11 @@ test("getVisibleOptimisticMessages hides optimistic user input after server huma
 
   expect(getVisibleOptimisticMessages([optimisticHuman], 0, 1)).toEqual([]);
 });
+
+/**
+ * 覆盖“mergeMessages shows server human instead of optimistic duplicate after first response”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeMessages shows server human instead of optimistic duplicate after first response", () => {
   const serverHuman = {
@@ -349,6 +435,11 @@ test("mergeMessages shows server human instead of optimistic duplicate after fir
   ]);
 });
 
+/**
+ * 覆盖“getVisibleOptimisticMessages keeps optimistic user input until server human arrives”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("getVisibleOptimisticMessages keeps optimistic user input until server human arrives", () => {
   const optimisticHuman = {
     id: "opt-human-1",
@@ -361,6 +452,11 @@ test("getVisibleOptimisticMessages keeps optimistic user input until server huma
   ]);
 });
 
+/**
+ * 覆盖“getVisibleOptimisticMessages keeps non-human optimistic status messages”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("getVisibleOptimisticMessages keeps non-human optimistic status messages", () => {
   const optimisticAi = {
     id: "opt-ai-1",
@@ -372,6 +468,11 @@ test("getVisibleOptimisticMessages keeps non-human optimistic status messages", 
     optimisticAi,
   ]);
 });
+
+/**
+ * 覆盖“getVisibleOptimisticMessages hides the upload optimistic pair after server human arrives”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("getVisibleOptimisticMessages hides the upload optimistic pair after server human arrives", () => {
   const optimisticHuman = {
@@ -394,6 +495,11 @@ test("getVisibleOptimisticMessages hides the upload optimistic pair after server
   ).toEqual([]);
 });
 
+/**
+ * 覆盖“getVisibleOptimisticMessages hides optimistic user input after later server turns”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("getVisibleOptimisticMessages hides optimistic user input after later server turns", () => {
   const optimisticHuman = {
     id: "opt-human-2",
@@ -407,6 +513,11 @@ test("getVisibleOptimisticMessages hides optimistic user input after later serve
   ]);
 });
 
+/**
+ * 覆盖“buildThreadMessagesPageUrl encodes the thread and backward cursor”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("buildThreadMessagesPageUrl encodes the thread and backward cursor", () => {
   expect(
     buildThreadMessagesPageUrl(
@@ -419,17 +530,32 @@ test("buildThreadMessagesPageUrl encodes the thread and backward cursor", () => 
   );
 });
 
+/**
+ * 覆盖“buildThreadMessagesPageUrl omits before_seq for the latest page”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("buildThreadMessagesPageUrl omits before_seq for the latest page", () => {
   expect(
     buildThreadMessagesPageUrl("https://api.example.test", "thread-1"),
   ).toBe("https://api.example.test/api/threads/thread-1/messages/page");
 });
 
+/**
+ * 覆盖“buildThreadMessagesPageUrl returns a relative URL behind nginx”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("buildThreadMessagesPageUrl returns a relative URL behind nginx", () => {
   expect(buildThreadMessagesPageUrl("", "thread-1", 42)).toBe(
     "/api/threads/thread-1/messages/page?before_seq=42",
   );
 });
+
+/**
+ * 覆盖“flattenThreadHistoryPages prepends backward pages in global seq order”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("flattenThreadHistoryPages prepends backward pages in global seq order", () => {
   expect(
@@ -453,6 +579,11 @@ test("flattenThreadHistoryPages prepends backward pages in global seq order", ()
   ).toEqual([1, 2, 3, 4, 5, 6]);
 });
 
+/**
+ * 覆盖“flattenThreadHistoryPages retains backward pages when the latest page refreshes”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("flattenThreadHistoryPages retains backward pages when the latest page refreshes", () => {
   const olderPage = {
     data: [runMessage(1), runMessage(2)],
@@ -471,6 +602,11 @@ test("flattenThreadHistoryPages retains backward pages when the latest page refr
     ]).map((message) => message.seq),
   ).toEqual([1, 2, 3, 4, 5]);
 });
+
+/**
+ * 覆盖“infinite history refetch recalculates older-page cursors from the refreshed newest page”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("infinite history refetch recalculates older-page cursors from the refreshed newest page", async () => {
   const queryClient = new QueryClient({
@@ -523,6 +659,11 @@ test("infinite history refetch recalculates older-page cursors from the refreshe
   queryClient.clear();
 });
 
+/**
+ * 覆盖“infinite history stops and warns when has_more has no cursor”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("infinite history stops and warns when has_more has no cursor", async () => {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -556,11 +697,21 @@ test("infinite history stops and warns when has_more has no cursor", async () =>
   }
 });
 
+/**
+ * 覆盖“removeSetItems removes pending superseded ids after submit failure”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("removeSetItems removes pending superseded ids after submit failure", () => {
   expect(
     removeSetItems(new Set(["run-old", "run-other"]), ["run-old"]),
   ).toEqual(new Set(["run-other"]));
 });
+
+/**
+ * 覆盖“buildVisibleHistoryMessages filters superseded runs but keeps regenerated run”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("buildVisibleHistoryMessages filters superseded runs but keeps regenerated run", () => {
   const oldHuman = {
@@ -610,13 +761,18 @@ test("buildVisibleHistoryMessages filters superseded runs but keeps regenerated 
     },
   ];
 
-  // run_id is carried onto each content message (#3779) so historical subtask
-  // cards can fetch their persisted step history on expand.
+  // run_id 被携带到每条内容消息上（#3779），使历史子任务卡片在展开时可获取其
+  // 持久化步骤历史。
   expect(buildVisibleHistoryMessages(rows, new Set(["run-old"]))).toEqual([
     { ...newHuman, run_id: "run-new" },
     { ...newAi, run_id: "run-new" },
   ]);
 });
+
+/**
+ * 覆盖“buildVisibleHistoryMessages attaches run_id to each content message (#3779)”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("buildVisibleHistoryMessages attaches run_id to each content message (#3779)", () => {
   const rows: RunMessage[] = [
@@ -633,10 +789,9 @@ test("buildVisibleHistoryMessages attaches run_id to each content message (#3779
   expect((result[0] as { run_id?: string }).run_id).toBe("run-1");
 });
 
-// Regression coverage for #3825: after context summarization the backend emits
-// RemoveMessage(ALL) + summary + retained, and onUpdateEvent rescues the removed
-// messages into a current-stream transient bridge. The bridge fills only the
-// journal flush/refetch gap and never mutates canonical history pages.
+// #3825 的回归覆盖：上下文摘要后，后端发出 RemoveMessage(ALL) + summary + retained，
+// onUpdateEvent 会将被移除消息挽救到当前流瞬态桥接层。该桥接层仅填补日志刷新/重新获取的
+// 间隙，绝不修改规范历史页面。
 
 const summarizationHuman1 = {
   id: "human-1",
@@ -664,6 +819,11 @@ const summarizationMovedMessages = [
   summarizationHuman2,
 ];
 
+/**
+ * 覆盖“resolveTransientHistoryBridge keeps rescued messages while history state is stale”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("resolveTransientHistoryBridge keeps rescued messages while history state is stale", () => {
   const staleHistory: Message[] = [];
 
@@ -671,6 +831,11 @@ test("resolveTransientHistoryBridge keeps rescued messages while history state i
     resolveTransientHistoryBridge(staleHistory, summarizationMovedMessages),
   ).toEqual(summarizationMovedMessages);
 });
+
+/**
+ * 覆盖“resolveTransientHistoryBridge appends rescued messages after canonical history”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("resolveTransientHistoryBridge appends rescued messages after canonical history", () => {
   const olderLoadedHuman = {
@@ -687,13 +852,16 @@ test("resolveTransientHistoryBridge appends rescued messages after canonical his
   ).toEqual([olderLoadedHuman, ...summarizationMovedMessages]);
 });
 
+/**
+ * 覆盖“resolveTransientHistoryBridge does not collapse an unloaded gap before its first canonical anchor”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("resolveTransientHistoryBridge does not collapse an unloaded gap before its first canonical anchor", () => {
-  // Real regression shape from thread 4e81444d-c6ce-471e-93fd-b6ddb18dc938:
-  // the default history page starts at event seq=35, while the clarification
-  // conversation lives at seq=2..14. Context compression captured both the
-  // old turns and a later message that overlaps the canonical page. The old
-  // turns must stay suppressed until their canonical page loads; otherwise
-  // the unloaded seq=15..34 gap is visually collapsed before the page anchor.
+  // 来自线程 4e81444d-c6ce-471e-93fd-b6ddb18dc938 的真实回归形状：默认历史页面从
+  // event seq=35 开始，而澄清对话位于 seq=2..14。上下文压缩同时捕获旧回合和一条与
+  // 规范页面重叠的较晚消息。旧回合必须保持抑制，直至其规范页面加载；否则未加载的
+  // seq=15..34 间隙会在页面锚点前被视觉上折叠。
   const clarificationRequest = {
     id: "clarification-request",
     type: "ai",
@@ -756,6 +924,11 @@ test("resolveTransientHistoryBridge does not collapse an unloaded gap before its
   ).toEqual(["event-seq-35", "event-seq-88"]);
 });
 
+/**
+ * 覆盖“resolveTransientHistoryBridge does not duplicate once canonical history catches up”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("resolveTransientHistoryBridge does not duplicate once canonical history catches up", () => {
   expect(
     resolveTransientHistoryBridge(
@@ -765,10 +938,20 @@ test("resolveTransientHistoryBridge does not duplicate once canonical history ca
   ).toEqual(summarizationMovedMessages);
 });
 
+/**
+ * 覆盖“resolveTransientHistoryBridge returns history unchanged when the bridge is empty”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("resolveTransientHistoryBridge returns history unchanged when the bridge is empty", () => {
   const history = [summarizationHuman1, summarizationAi1];
   expect(resolveTransientHistoryBridge(history, [])).toBe(history);
 });
+
+/**
+ * 覆盖“resolveThreadTransientHistoryBridge never leaks a bridge across threads”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("resolveThreadTransientHistoryBridge never leaks a bridge across threads", () => {
   const canonical = [
@@ -800,6 +983,11 @@ test("resolveThreadTransientHistoryBridge never leaks a bridge across threads", 
   ).toEqual([canonical[0], ...summarizationMovedMessages]);
 });
 
+/**
+ * 覆盖“mergeTransientHistoryBridge preserves chronology across repeated compression”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("mergeTransientHistoryBridge preserves chronology across repeated compression", () => {
   const human3 = {
     id: "human-3",
@@ -823,6 +1011,11 @@ test("mergeTransientHistoryBridge preserves chronology across repeated compressi
     "human-3",
   ]);
 });
+
+/**
+ * 覆盖“mergeTransientHistoryBridge does not move a protected input recaptured by later compression”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeTransientHistoryBridge does not move a protected input recaptured by later compression", () => {
   const protectedInput = {
@@ -860,6 +1053,11 @@ test("mergeTransientHistoryBridge does not move a protected input recaptured by 
   ]);
 });
 
+/**
+ * 覆盖“mergeTransientHistoryBridgeOrder retains confirmed overlap as a non-rendering anchor”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("mergeTransientHistoryBridgeOrder retains confirmed overlap as a non-rendering anchor", () => {
   const firstOrder = mergeTransientHistoryBridgeOrder(
     [],
@@ -877,6 +1075,11 @@ test("mergeTransientHistoryBridgeOrder retains confirmed overlap as a non-render
     "message:ai-2",
   ]);
 });
+
+/**
+ * 覆盖“mergeTransientHistoryBridgeOrder keeps a recaptured protected prefix in place”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("mergeTransientHistoryBridgeOrder keeps a recaptured protected prefix in place", () => {
   const protectedInput = {
@@ -911,9 +1114,14 @@ test("mergeTransientHistoryBridgeOrder keeps a recaptured protected prefix in pl
   ]);
 });
 
+/**
+ * 覆盖“merge keeps the full conversation across summarization even when visibleHistory lags (regression for #3825)”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("merge keeps the full conversation across summarization even when visibleHistory lags (regression for #3825)", () => {
-  // Hidden summary (name === "summary") + the retained latest answer is all the
-  // live thread carries after RemoveMessage(ALL).
+  // RemoveMessage(ALL) 后，活动线程仅携带隐藏摘要（name === "summary"）和保留的
+  // 最新回答。
   const hiddenSummary = {
     id: "summary-1",
     type: "human",
@@ -922,8 +1130,8 @@ test("merge keeps the full conversation across summarization even when visibleHi
   } as Message;
   const postSummaryThread = [hiddenSummary, summarizationAi2];
 
-  // The bad render: visibleHistory is still empty, so without the buffer the
-  // rescued round-1/2 messages exist in neither merge input and are lost.
+  // 错误渲染：visibleHistory 仍为空，因此若没有缓冲区，被挽救的第 1/2 轮消息不在
+  // 任一合并输入中，因而丢失。
   const effectiveHistory = resolveTransientHistoryBridge(
     [],
     summarizationMovedMessages,
@@ -939,8 +1147,13 @@ test("merge keeps the full conversation across summarization even when visibleHi
   ]);
 });
 
+/**
+ * 覆盖“pruneConfirmedTransientMessages drops canonical identities but keeps the rest”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("pruneConfirmedTransientMessages drops canonical identities but keeps the rest", () => {
-  // History has caught up on the first two rescued messages only.
+  // 历史仅追赶上前两条被挽救的消息。
   expect(
     pruneConfirmedTransientMessages(summarizationMovedMessages, [
       summarizationHuman1,
@@ -949,16 +1162,25 @@ test("pruneConfirmedTransientMessages drops canonical identities but keeps the r
   ).toEqual([summarizationHuman2]);
 });
 
+/**
+ * 覆盖“pruneConfirmedTransientMessages keeps entries while canonical history is stale”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("pruneConfirmedTransientMessages keeps entries while canonical history is stale", () => {
   expect(
     pruneConfirmedTransientMessages(summarizationMovedMessages, []),
   ).toEqual(summarizationMovedMessages);
 });
 
+/**
+ * 覆盖“resolveTransientHistoryBridge prefers canonical copy over stale transient copy”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("resolveTransientHistoryBridge prefers canonical copy over stale transient copy", () => {
-  // Same identity, but the buffered copy is an older snapshot. The live history
-  // copy (e.g. the finalized answer) must win — the buffer only fills gaps, it
-  // must never overwrite a message history already shows.
+  // 身份相同，但缓冲副本是较旧快照。活动历史副本（例如最终回答）必须优先——缓冲区
+  // 仅填补间隙，绝不能覆盖历史已展示的消息。
   const staleBuffered = {
     id: "ai-1",
     type: "ai",
@@ -974,6 +1196,11 @@ test("resolveTransientHistoryBridge prefers canonical copy over stale transient 
     liveFinal,
   ]);
 });
+
+/**
+ * 覆盖“computeSummarizationTransientMessages captures live turns dropped before the retained boundary”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("computeSummarizationTransientMessages captures live turns dropped before the retained boundary", () => {
   const removeAll = {
@@ -993,7 +1220,7 @@ test("computeSummarizationTransientMessages captures live turns dropped before t
     summarizationHuman2,
     summarizationAi2,
   ];
-  // Summarization emits RemoveMessage(ALL) + hidden summary + retained answer.
+  // 摘要会发出 RemoveMessage(ALL) + 隐藏摘要 + 保留回答。
   const summarizationMessages = [removeAll, hiddenSummary, summarizationAi2];
 
   expect(
@@ -1004,6 +1231,11 @@ test("computeSummarizationTransientMessages captures live turns dropped before t
     ),
   ).toEqual([summarizationHuman1, summarizationAi1, summarizationHuman2]);
 });
+
+/**
+ * 覆盖“computeSummarizationTransientMessages excludes already-summarized control messages”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("computeSummarizationTransientMessages excludes already-summarized control messages", () => {
   const priorSummary = {
@@ -1029,7 +1261,7 @@ test("computeSummarizationTransientMessages excludes already-summarized control 
     summarizationAi2,
   ];
 
-  // priorSummary is in the summarized set, so it must not enter the bridge.
+  // priorSummary 位于已摘要集合中，因此不得进入桥接层。
   expect(
     computeSummarizationTransientMessages(
       liveThreadBeforeSummary,
@@ -1039,10 +1271,14 @@ test("computeSummarizationTransientMessages excludes already-summarized control 
   ).toEqual([summarizationHuman1, summarizationAi1]);
 });
 
+/**
+ * 覆盖“full summarization rescue pipeline keeps the conversation when history state lags (regression for #3825)”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("full summarization rescue pipeline keeps the conversation when history state lags (regression for #3825)", () => {
-  // Exercises the whole rescue algorithm the hook runs: derive the moved
-  // messages, buffer them, then merge against the post-summary thread while the
-  // canonical run-event page is still stale (empty).
+  // 演练 hook 运行的完整挽救算法：推导被移动的消息、将其缓冲，然后在规范运行事件页
+  // 仍处于过期（为空）状态时，与摘要后的线程合并。
   const removeAll = {
     id: "__remove_all__",
     type: "remove",
@@ -1084,6 +1320,11 @@ test("full summarization rescue pipeline keeps the conversation when history sta
     "ai-2",
   ]);
 });
+
+/**
+ * 覆盖“refresh reconstructs the same 1-to-6 order from run events without a bridge”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("refresh reconstructs the same 1-to-6 order from run events without a bridge", () => {
   const canonical = Array.from({ length: 6 }, (_, index) => ({

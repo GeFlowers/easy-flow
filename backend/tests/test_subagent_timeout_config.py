@@ -1,13 +1,4 @@
-"""Tests for subagent runtime configuration.
-
-Covers:
-- SubagentsAppConfig / SubagentOverrideConfig model validation and defaults
-- get_timeout_for() / get_max_turns_for() resolution logic
-- load_subagents_config_from_dict() and get_subagents_app_config() singleton
-- registry.get_subagent_config() applies config overrides
-- registry.list_subagents() applies overrides for all agents
-- Polling timeout calculation in task_tool is consistent with config
-"""
+'未说明'
 
 import pytest
 
@@ -32,7 +23,7 @@ def _reset_subagents_config(
     max_turns: int | None = None,
     agents: dict | None = None,
 ) -> None:
-    """Reset global subagents config to a known state."""
+    '未说明'
     load_subagents_config_from_dict(
         {
             "timeout_seconds": timeout_seconds,
@@ -48,44 +39,47 @@ def _reset_subagents_config(
 
 
 class TestSubagentOverrideConfig:
+    '未说明'
     def test_default_is_none(self):
+        '未说明'
         override = SubagentOverrideConfig()
         assert override.timeout_seconds is None
         assert override.max_turns is None
         assert override.model is None
 
     def test_explicit_value(self):
+        '未说明'
         override = SubagentOverrideConfig(timeout_seconds=300, max_turns=42, model="gpt-5.4")
         assert override.timeout_seconds == 300
         assert override.max_turns == 42
         assert override.model == "gpt-5.4"
 
     def test_model_accepts_any_non_empty_string(self):
-        """Model name is a free-form non-empty string; cross-reference validation
-        against the `models:` section happens at registry lookup time."""
+        '未说明'
         override = SubagentOverrideConfig(model="any-arbitrary-model-name")
         assert override.model == "any-arbitrary-model-name"
 
     def test_rejects_zero(self):
+        '未说明'
         with pytest.raises(ValueError):
             SubagentOverrideConfig(timeout_seconds=0)
         with pytest.raises(ValueError):
             SubagentOverrideConfig(max_turns=0)
 
     def test_rejects_negative(self):
+        '未说明'
         with pytest.raises(ValueError):
             SubagentOverrideConfig(timeout_seconds=-1)
         with pytest.raises(ValueError):
             SubagentOverrideConfig(max_turns=-1)
 
     def test_rejects_empty_model(self):
-        """Empty-string model would silently bypass the `is not None` check and
-        reach `create_chat_model(name="")` as a runtime error. Reject at load time
-        instead, symmetric with the `ge=1` guard on timeout_seconds / max_turns."""
+        '未说明'
         with pytest.raises(ValueError):
             SubagentOverrideConfig(model="")
 
     def test_minimum_valid_value(self):
+        '未说明'
         override = SubagentOverrideConfig(timeout_seconds=1, max_turns=1)
         assert override.timeout_seconds == 1
         assert override.max_turns == 1
@@ -97,29 +91,36 @@ class TestSubagentOverrideConfig:
 
 
 class TestSubagentsAppConfigDefaults:
+    '未说明'
     def test_default_timeout(self):
+        '未说明'
         config = SubagentsAppConfig()
         assert config.timeout_seconds == 1800
 
     def test_default_max_turns_override_is_none(self):
+        '未说明'
         config = SubagentsAppConfig()
         assert config.max_turns is None
 
     def test_default_max_total_per_run(self):
+        '未说明'
         config = SubagentsAppConfig()
         assert config.max_total_per_run == DEFAULT_MAX_TOTAL_SUBAGENTS_PER_RUN
 
     def test_default_agents_empty(self):
+        '未说明'
         config = SubagentsAppConfig()
         assert config.agents == {}
 
     def test_custom_global_runtime_overrides(self):
+        '未说明'
         config = SubagentsAppConfig(timeout_seconds=1800, max_turns=120, max_total_per_run=8)
         assert config.timeout_seconds == 1800
         assert config.max_turns == 120
         assert config.max_total_per_run == 8
 
     def test_rejects_zero_timeout(self):
+        '未说明'
         with pytest.raises(ValueError):
             SubagentsAppConfig(timeout_seconds=0)
         with pytest.raises(ValueError):
@@ -128,6 +129,7 @@ class TestSubagentsAppConfigDefaults:
             SubagentsAppConfig(max_total_per_run=0)
 
     def test_rejects_negative_timeout(self):
+        '未说明'
         with pytest.raises(ValueError):
             SubagentsAppConfig(timeout_seconds=-60)
         with pytest.raises(ValueError):
@@ -136,16 +138,12 @@ class TestSubagentsAppConfigDefaults:
             SubagentsAppConfig(max_total_per_run=-1)
 
     def test_rejects_above_max_total_per_run(self):
+        '未说明'
         with pytest.raises(ValueError):
             SubagentsAppConfig(max_total_per_run=51)
 
     def test_default_token_budget_coupled_to_summarization_switch(self):
-        """The token-budget backstop engages by default (#3857 point 4). Its
-        ``max_tokens`` ceiling is coupled to whether subagent summarization is
-        on (#3875 Phase 3 review): 1M when compaction runs, 2M otherwise —
-        because Phase 2 acknowledged legitimate deep-research runs can exceed
-        1M without compaction, so tightening to 1M unconditionally would
-        prematurely cap summarization-off deployments."""
+        '未说明'
         # Default (no summarization): 2M — preserves Phase 2 headroom.
         budget_off = default_subagent_token_budget(summarization_enabled=False)
         assert budget_off.enabled is True
@@ -162,17 +160,14 @@ class TestSubagentsAppConfigDefaults:
         assert config.token_budget.enabled is True
 
     def test_get_token_budget_for_couples_default_to_summarization(self):
-        """``get_token_budget_for`` must re-couple the DEFAULT ceiling to the
-        summarization switch, but a user-set budget (global or per-agent) must
-        always win regardless of the switch (#3875 Phase 3 review)."""
+        '未说明'
         # Default global budget → re-coupled.
         config = SubagentsAppConfig()
         assert config.get_token_budget_for("general-purpose", summarization_enabled=True).max_tokens == 1_000_000
         assert config.get_token_budget_for("general-purpose", summarization_enabled=False).max_tokens == 2_000_000
 
     def test_get_token_budget_for_respects_explicit_global(self):
-        """A user-set global ``token_budget`` is respected as-is — the
-        summarization coupling only affects the default."""
+        '未说明'
         from deerflow.config.token_budget_config import TokenBudgetConfig
 
         config = SubagentsAppConfig(token_budget=TokenBudgetConfig(enabled=True, max_tokens=500_000))
@@ -181,8 +176,7 @@ class TestSubagentsAppConfigDefaults:
         assert config.get_token_budget_for("general-purpose", summarization_enabled=False).max_tokens == 500_000
 
     def test_get_token_budget_for_respects_per_agent_override(self):
-        """A per-agent ``token_budget`` override wins over both the default and
-        the summarization coupling."""
+        '未说明'
         from deerflow.config.token_budget_config import TokenBudgetConfig
 
         config = SubagentsAppConfig(
@@ -197,7 +191,9 @@ class TestSubagentsAppConfigDefaults:
 
 
 class TestRuntimeResolution:
+    '未说明'
     def test_returns_global_default_when_no_override(self):
+        '未说明'
         config = SubagentsAppConfig(timeout_seconds=600)
         assert config.get_timeout_for("general-purpose") == 600
         assert config.get_timeout_for("bash") == 600
@@ -206,6 +202,7 @@ class TestRuntimeResolution:
         assert config.get_max_turns_for("bash", 60) == 60
 
     def test_returns_per_agent_override_when_set(self):
+        '未说明'
         config = SubagentsAppConfig(
             timeout_seconds=900,
             max_turns=120,
@@ -215,6 +212,7 @@ class TestRuntimeResolution:
         assert config.get_max_turns_for("bash", 60) == 80
 
     def test_other_agents_still_use_global_default(self):
+        '未说明'
         config = SubagentsAppConfig(
             timeout_seconds=900,
             max_turns=140,
@@ -224,6 +222,7 @@ class TestRuntimeResolution:
         assert config.get_max_turns_for("general-purpose", 100) == 140
 
     def test_agent_with_none_override_falls_back_to_global(self):
+        '未说明'
         config = SubagentsAppConfig(
             timeout_seconds=900,
             max_turns=150,
@@ -233,6 +232,7 @@ class TestRuntimeResolution:
         assert config.get_max_turns_for("general-purpose", 100) == 150
 
     def test_multiple_per_agent_overrides(self):
+        '未说明'
         config = SubagentsAppConfig(
             timeout_seconds=900,
             max_turns=120,
@@ -247,13 +247,14 @@ class TestRuntimeResolution:
         assert config.get_max_turns_for("bash", 60) == 80
 
     def test_get_model_for_returns_none_when_no_override(self):
-        """No per-agent model override -> returns None so callers fall back to builtin/parent."""
+        '未说明'
         config = SubagentsAppConfig(timeout_seconds=900)
         assert config.get_model_for("general-purpose") is None
         assert config.get_model_for("bash") is None
         assert config.get_model_for("unknown-agent") is None
 
     def test_get_model_for_returns_override_when_set(self):
+        '未说明'
         config = SubagentsAppConfig(
             timeout_seconds=900,
             agents={
@@ -265,7 +266,7 @@ class TestRuntimeResolution:
         assert config.get_model_for("bash") == "gpt-5.4"
 
     def test_get_model_for_returns_none_for_omitted_agent(self):
-        """An agent not listed in overrides returns None even when other agents have model overrides."""
+        '未说明'
         config = SubagentsAppConfig(
             timeout_seconds=900,
             agents={"bash": SubagentOverrideConfig(model="gpt-5.4")},
@@ -273,7 +274,7 @@ class TestRuntimeResolution:
         assert config.get_model_for("general-purpose") is None
 
     def test_get_model_for_handles_explicit_none(self):
-        """Explicit model=None in the override is equivalent to no override."""
+        '未说明'
         config = SubagentsAppConfig(
             timeout_seconds=900,
             agents={"bash": SubagentOverrideConfig(timeout_seconds=300, model=None)},
@@ -289,16 +290,19 @@ class TestRuntimeResolution:
 
 
 class TestLoadSubagentsConfig:
+    '未说明'
     def teardown_method(self):
-        """Restore defaults after each test."""
+        '未说明'
         _reset_subagents_config()
 
     def test_load_global_timeout(self):
+        '未说明'
         load_subagents_config_from_dict({"timeout_seconds": 300, "max_turns": 120})
         assert get_subagents_app_config().timeout_seconds == 300
         assert get_subagents_app_config().max_turns == 120
 
     def test_load_with_per_agent_overrides(self):
+        '未说明'
         load_subagents_config_from_dict(
             {
                 "timeout_seconds": 900,
@@ -316,6 +320,7 @@ class TestLoadSubagentsConfig:
         assert cfg.get_max_turns_for("bash", 60) == 80
 
     def test_load_partial_override(self):
+        '未说明'
         load_subagents_config_from_dict(
             {
                 "timeout_seconds": 600,
@@ -329,6 +334,7 @@ class TestLoadSubagentsConfig:
         assert cfg.get_max_turns_for("bash", 60) == 70
 
     def test_load_with_model_overrides(self):
+        '未说明'
         load_subagents_config_from_dict(
             {
                 "timeout_seconds": 900,
@@ -345,6 +351,7 @@ class TestLoadSubagentsConfig:
         assert cfg.get_timeout_for("bash") == 300
 
     def test_load_empty_dict_uses_defaults(self):
+        '未说明'
         load_subagents_config_from_dict({})
         cfg = get_subagents_app_config()
         assert cfg.timeout_seconds == 1800
@@ -352,6 +359,7 @@ class TestLoadSubagentsConfig:
         assert cfg.agents == {}
 
     def test_load_replaces_previous_config(self):
+        '未说明'
         load_subagents_config_from_dict({"timeout_seconds": 100, "max_turns": 90})
         assert get_subagents_app_config().timeout_seconds == 100
         assert get_subagents_app_config().max_turns == 90
@@ -361,6 +369,7 @@ class TestLoadSubagentsConfig:
         assert get_subagents_app_config().max_turns == 110
 
     def test_singleton_returns_same_instance_between_calls(self):
+        '未说明'
         load_subagents_config_from_dict({"timeout_seconds": 777, "max_turns": 123})
         assert get_subagents_app_config() is get_subagents_app_config()
 
@@ -371,24 +380,26 @@ class TestLoadSubagentsConfig:
 
 
 class TestRegistryGetSubagentConfig:
+    '未说明'
     def teardown_method(self):
+        '未说明'
         _reset_subagents_config()
 
     def test_returns_none_for_unknown_agent(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         assert get_subagent_config("nonexistent") is None
 
     def test_returns_config_for_builtin_agents(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         assert get_subagent_config("general-purpose") is not None
         assert get_subagent_config("bash") is not None
 
     def test_explicit_global_timeout_propagates_to_general_purpose(self):
-        """An explicit global timeout (here the non-default 900) propagates to a
-        built-in agent, while max_turns still comes from the builtin def (150).
-        """
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         _reset_subagents_config(timeout_seconds=900)
@@ -397,10 +408,7 @@ class TestRegistryGetSubagentConfig:
         assert config.max_turns == 150
 
     def test_builtin_defaults_have_research_headroom(self):
-        """Out-of-box defaults (no config.yaml subagents section) must give
-        general-purpose enough turns/time for deep research, which previously
-        failed with GraphRecursionError at the old max_turns=100 limit.
-        """
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict({})  # no subagents config -> model defaults
@@ -411,6 +419,7 @@ class TestRegistryGetSubagentConfig:
         assert get_subagent_config("bash").max_turns == 60
 
     def test_global_timeout_override_applied(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         _reset_subagents_config(timeout_seconds=1800, max_turns=140)
@@ -419,6 +428,7 @@ class TestRegistryGetSubagentConfig:
         assert config.max_turns == 140
 
     def test_per_agent_runtime_override_applied(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict(
@@ -433,6 +443,7 @@ class TestRegistryGetSubagentConfig:
         assert bash_config.max_turns == 80
 
     def test_per_agent_override_does_not_affect_other_agents(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict(
@@ -447,6 +458,7 @@ class TestRegistryGetSubagentConfig:
         assert gp_config.max_turns == 120
 
     def test_per_agent_model_override_applied(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict(
@@ -459,7 +471,7 @@ class TestRegistryGetSubagentConfig:
         assert bash_config.model == "gpt-5.4-mini"
 
     def test_omitted_model_keeps_builtin_value(self):
-        """When config.yaml has no `model` field for an agent, the builtin default must be preserved."""
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -474,7 +486,7 @@ class TestRegistryGetSubagentConfig:
         assert bash_config.model == builtin_bash_model
 
     def test_explicit_null_model_keeps_builtin_value(self):
-        """An explicit `model: null` in config.yaml is equivalent to omission — builtin wins."""
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -489,6 +501,7 @@ class TestRegistryGetSubagentConfig:
         assert bash_config.model == builtin_bash_model
 
     def test_model_override_does_not_affect_other_agents(self):
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -503,7 +516,7 @@ class TestRegistryGetSubagentConfig:
         assert gp_config.model == builtin_gp_model
 
     def test_model_override_preserves_other_fields(self):
-        """Applying a model override must leave timeout_seconds / max_turns / name intact."""
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -523,7 +536,7 @@ class TestRegistryGetSubagentConfig:
         assert overridden.max_turns == original.max_turns
 
     def test_model_override_does_not_mutate_builtin(self):
-        """Registry must return a new object, leaving the builtin default intact."""
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -538,7 +551,7 @@ class TestRegistryGetSubagentConfig:
         assert BUILTIN_SUBAGENTS["bash"].model == original_bash_model
 
     def test_builtin_config_object_is_not_mutated(self):
-        """Registry must return a new object, leaving the builtin default intact."""
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -553,7 +566,7 @@ class TestRegistryGetSubagentConfig:
         assert BUILTIN_SUBAGENTS["bash"].max_turns == original_max_turns
 
     def test_config_preserves_other_fields(self):
-        """Applying runtime overrides must not change other SubagentConfig fields."""
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -575,10 +588,13 @@ class TestRegistryGetSubagentConfig:
 
 
 class TestRegistryListSubagents:
+    '未说明'
     def teardown_method(self):
+        '未说明'
         _reset_subagents_config()
 
     def test_lists_both_builtin_agents(self):
+        '未说明'
         from deerflow.subagents.registry import list_subagents
 
         names = {cfg.name for cfg in list_subagents()}
@@ -586,6 +602,7 @@ class TestRegistryListSubagents:
         assert "bash" in names
 
     def test_all_returned_configs_get_global_override(self):
+        '未说明'
         from deerflow.subagents.registry import list_subagents
 
         _reset_subagents_config(timeout_seconds=123, max_turns=77)
@@ -594,6 +611,7 @@ class TestRegistryListSubagents:
             assert cfg.max_turns == 77, f"{cfg.name} has wrong max_turns"
 
     def test_per_agent_overrides_reflected_in_list(self):
+        '未说明'
         from deerflow.subagents.registry import list_subagents
 
         load_subagents_config_from_dict(
@@ -619,7 +637,7 @@ class TestRegistryListSubagents:
 
 
 class TestPollingTimeoutCalculation:
-    """Verify the formula (timeout_seconds + 60) // 5 is correct for various inputs."""
+    '未说明'
 
     @pytest.mark.parametrize(
         "timeout_seconds, expected_max_polls",
@@ -632,6 +650,7 @@ class TestPollingTimeoutCalculation:
         ],
     )
     def test_polling_timeout_formula(self, timeout_seconds: int, expected_max_polls: int):
+        '未说明'
         dummy_config = SubagentConfig(
             name="test",
             description="test",
@@ -642,7 +661,7 @@ class TestPollingTimeoutCalculation:
         assert max_poll_count == expected_max_polls
 
     def test_polling_timeout_exceeds_execution_timeout(self):
-        """Safety-net polling window must always be longer than the execution timeout."""
+        '未说明'
         for timeout_seconds in [60, 300, 900, 1800]:
             dummy_config = SubagentConfig(
                 name="test",

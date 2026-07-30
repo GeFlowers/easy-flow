@@ -1,7 +1,7 @@
-"""OIDC (OpenID Connect) authentication service.
+"""OIDC（OpenID Connect）认证服务。
 
-Provides provider-agnostic OIDC operations: discovery, authorization URL
-generation, token exchange, ID token validation, and userinfo retrieval.
+提供与供应商无关的 OIDC 发现、授权 URL 生成、令牌交换、ID 令牌验证及用户
+信息读取能力。
 """
 
 from __future__ import annotations
@@ -19,7 +19,7 @@ from jwt import PyJWK
 
 logger = logging.getLogger(__name__)
 
-# ── Data types ────────────────────────────────────────────────────────────
+# ── 数据类型 ──────────────────────────────────────────────────────────────
 
 OIDC_DISCOVERY_PATH = "/.well-known/openid-configuration"
 METADATA_CACHE_TTL = 300  # 5 minutes
@@ -28,7 +28,7 @@ JWKS_CACHE_TTL = 300
 
 @dataclass(frozen=True)
 class OIDCMetadata:
-    """Resolved OIDC provider metadata after discovery."""
+    """完成发现后得到的 OIDC 提供者元数据。"""
 
     issuer: str
     authorization_endpoint: str
@@ -39,7 +39,7 @@ class OIDCMetadata:
 
 @dataclass(frozen=True)
 class OIDCIdentity:
-    """Normalized identity extracted from an OIDC provider response."""
+    """从 OIDC 提供者响应中提取并标准化的身份信息。"""
 
     provider: str
     subject: str
@@ -50,30 +50,29 @@ class OIDCIdentity:
 
 
 class OIDCError(Exception):
-    """Base error for OIDC operations. Message is safe for API responses."""
+    """OIDC 操作的基础异常，其消息可安全用于 API 响应。"""
 
 
 class OIDCProviderError(OIDCError):
-    """The OIDC provider returned an error (e.g. access_denied)."""
+    """OIDC 提供者返回错误，例如 ``access_denied``。"""
 
 
 class OIDCValidationError(OIDCError):
-    """ID token validation failed."""
+    """ID 令牌验证失败。"""
 
 
 class OIDCUserInfoMismatch(OIDCError):
-    """UserInfo sub does not match ID token sub."""
+    """UserInfo 的 ``sub`` 与 ID 令牌的 ``sub`` 不匹配。"""
 
 
-# ── Service ────────────────────────────────────────────────────────────────
+# ── 服务 ──────────────────────────────────────────────────────────────────
 
 
 class OIDCService:
-    """OIDC authentication service.
+    """OIDC 认证服务。
 
-    Uses in-process caching for provider metadata and JWKS. The cache is
-    keyed by the provider's ``issuer`` — different providers get separate
-    entries. TTLs are configurable via constructor arguments.
+    在进程内缓存提供者元数据和 JWKS，并按提供者 ``issuer`` 隔离缓存；构造参数
+    可配置两类缓存的存活时间。
     """
 
     def __init__(
@@ -81,6 +80,7 @@ class OIDCService:
         metadata_cache_ttl: float = METADATA_CACHE_TTL,
         jwks_cache_ttl: float = JWKS_CACHE_TTL,
     ) -> None:
+        """初始化 OIDC HTTP 客户端及提供者元数据、JWKS 缓存。"""
         self._metadata_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._jwks_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._metadata_ttl = metadata_cache_ttl
@@ -88,17 +88,13 @@ class OIDCService:
         self._http = httpx.AsyncClient(timeout=httpx.Timeout(15.0))
 
     async def close(self) -> None:
-        """Close the underlying HTTP client."""
+        """关闭底层 HTTP 客户端。"""
         await self._http.aclose()
 
-    # ── Discovery ──────────────────────────────────────────────────────────
+    # ── 发现 ──────────────────────────────────────────────────────────────
 
     async def discover(self, issuer: str, overrides: dict[str, str | None] | None = None) -> OIDCMetadata:
-        """Fetch and cache OIDC discovery metadata from the issuer.
-
-        ``overrides`` may contain endpoint URIs to override discovery values
-        (e.g. for providers with non-standard endpoints).
-        """
+        """读取并缓存 issuer 的 OIDC 发现元数据，可用 ``overrides`` 覆盖端点。"""
         now = time.time()
         cached = self._metadata_cache.get(issuer)
         if cached and now - cached[0] < self._metadata_ttl:
@@ -118,10 +114,8 @@ class OIDCService:
         if not discovered_issuer:
             raise OIDCError(f"OIDC discovery response from {issuer} is missing the issuer field")
 
-        # RFC 8414 §4: the metadata issuer must equal the configured issuer.
-        # Pinning it prevents a tampered/rogue discovery document from steering
-        # the accepted `iss` (and thus the ID-token forgery surface) to an
-        # attacker-chosen value.
+        # 标准要求元数据签发方与配置签发方相等。固定二者的一致性可防止被篡改或
+        # 恶意的发现文档把接受的签发方（进而令牌伪造面）引向攻击者指定值。
         if discovered_issuer.rstrip("/") != issuer.rstrip("/"):
             raise OIDCError(f"OIDC discovered issuer '{discovered_issuer}' does not match configured issuer '{issuer}'")
 
@@ -129,7 +123,7 @@ class OIDCService:
         return self._metadata_from_dict(data, overrides)
 
     def _metadata_from_dict(self, data: dict[str, Any], overrides: dict[str, str | None] | None) -> OIDCMetadata:
-        """Build OIDCMetadata from a discovery dict, applying endpoint overrides."""
+        """由发现字典构建 ``OIDCMetadata``，并应用端点覆盖值。"""
         overrides = overrides or {}
         return OIDCMetadata(
             issuer=data["issuer"],
@@ -139,7 +133,7 @@ class OIDCService:
             jwks_uri=overrides.get("jwks_uri") or data["jwks_uri"],
         )
 
-    # ── Authorization URL ──────────────────────────────────────────────────
+    # ── 授权地址 ─────────────────────────────────────────────────────────
 
     def build_authorization_url(
         self,
@@ -151,10 +145,7 @@ class OIDCService:
         nonce: str | None = None,
         code_challenge: str | None = None,
     ) -> str:
-        """Build the OIDC authorization URL for the provider.
-
-        Returns a URL the browser should be redirected to.
-        """
+        """构建浏览器应跳转到的 OIDC 提供者授权 URL。"""
         params: dict[str, str] = {
             "response_type": "code",
             "client_id": client_id,
@@ -170,7 +161,7 @@ class OIDCService:
 
         return f"{metadata.authorization_endpoint}?{urlencode(params)}"
 
-    # ── Token exchange ─────────────────────────────────────────────────────
+    # ── 令牌交换 ──────────────────────────────────────────────────────────
 
     async def exchange_code(
         self,
@@ -182,7 +173,7 @@ class OIDCService:
         code_verifier: str | None = None,
         auth_method: str = "client_secret_post",
     ) -> dict[str, Any]:
-        """Exchange the authorization code for tokens at the token endpoint."""
+        """在令牌端点使用授权码交换令牌。"""
         data: dict[str, str] = {
             "grant_type": "authorization_code",
             "code": code,
@@ -216,13 +207,10 @@ class OIDCService:
         except httpx.RequestError as exc:
             raise OIDCError(f"Token exchange failed: {exc}") from exc
 
-    # ── JWKS loading ───────────────────────────────────────────────────────
+    # ── 密钥集加载 ───────────────────────────────────────────────────────
 
     async def _load_jwks(self, jwks_uri: str, force_refresh: bool = False) -> dict[str, Any]:
-        """Load (and cache) JWKS from the provider.
-
-        Set ``force_refresh=True`` to bypass the cache (e.g. on a kid miss).
-        """
+        """从提供者加载并缓存 JWKS；``force_refresh`` 可在 kid 未命中时跳过缓存。"""
         now = time.time()
         cached = self._jwks_cache.get(jwks_uri)
         if not force_refresh and cached and now - cached[0] < self._jwks_ttl:
@@ -247,11 +235,9 @@ class OIDCService:
         algorithm: str,
         jwks_uri: str,
     ) -> Any | None:
-        """Find the signing key matching ``kid`` in the JWKS.
+        """在 JWKS 中寻找匹配 ``kid`` 的签名密钥，未找到时返回 ``None``。
 
-        Returns the key object or ``None`` if no match is found. Catches
-        invalid JWK entries (e.g. wrong key type for the algorithm) and
-        logs a warning so a single bad entry does not crash validation.
+        无效 JWK（如算法不匹配的密钥类型）只记录警告，避免单个坏条目中断验证。
         """
         for jwk_dict in jwks_data.get("keys", []):
             if kid and jwk_dict.get("kid") != kid:
@@ -262,13 +248,13 @@ class OIDCService:
             except jwt.PyJWTError as exc:
                 logger.warning("Skipping invalid JWK (kid=%s) from %s: %s", kid, jwks_uri, exc)
                 if not kid:
-                    # No kid in token — try next key
+                    # 令牌没有密钥标识，继续尝试下一把密钥。
                     continue
-                # kid was specified and this key is the one — fail fast
+                # 已指定密钥标识且当前即该密钥，立即失败。
                 raise OIDCValidationError(f"JWK for kid={kid} is invalid: {exc}") from exc
         return None
 
-    # ── ID token validation ────────────────────────────────────────────────
+    # ── 身份令牌验证 ─────────────────────────────────────────────────────
 
     async def validate_id_token(
         self,
@@ -277,14 +263,13 @@ class OIDCService:
         id_token: str,
         nonce: str | None = None,
     ) -> dict[str, Any]:
-        """Validate the ID token and return its claims.
+        """验证 ID 令牌并返回声明。
 
-        Validates: signature (via JWKS), issuer, audience, expiration,
-        issued-at, and nonce (if provided).
+        验证项包括 JWKS 签名、issuer、audience、过期时间、签发时间及可选 nonce。
         """
         jwks_data = await self._load_jwks(metadata.jwks_uri)
 
-        # Resolve the signing key from the JWKS using the token's kid header
+        # 使用令牌头部的密钥标识从公开密钥集解析签名密钥。
         jwt_header = jwt.get_unverified_header(id_token)
         kid = jwt_header.get("kid")
         alg = jwt_header.get("alg", "RS256")
@@ -293,7 +278,7 @@ class OIDCService:
         if alg not in allowed_algorithms:
             raise OIDCValidationError(f"ID token uses unsupported algorithm '{alg}'")
 
-        # Resolve signing key, refetching JWKS once on kid miss for key rotation
+        # 解析签名密钥；标识未命中时重新拉取一次公开密钥集，以支持密钥轮换。
         signing_key = await self._resolve_signing_key(jwks_data, kid, alg, metadata.jwks_uri)
         if signing_key is None:
             jwks_data = await self._load_jwks(metadata.jwks_uri, force_refresh=True)
@@ -323,7 +308,7 @@ class OIDCService:
         except jwt.PyJWTError as exc:
             raise OIDCValidationError(f"ID token validation failed: {exc}") from exc
 
-        # Validate nonce if expected
+        # 提供预期随机校验值时必须验证它。
         if nonce is not None:
             token_nonce = claims.get("nonce")
             if not token_nonce:
@@ -333,13 +318,12 @@ class OIDCService:
 
         return claims
 
-    # ── UserInfo ────────────────────────────────────────────────────────────
+    # ── 用户信息 ──────────────────────────────────────────────────────────
 
     async def fetch_userinfo(self, metadata: OIDCMetadata, access_token: str, expected_sub: str) -> dict[str, Any]:
-        """Fetch userinfo from the UserInfo endpoint.
+        """从 UserInfo 端点读取用户信息，并验证其 ``sub`` 与 ID 令牌一致。
 
-        Validates that the ``sub`` claim matches ``expected_sub``
-        (from the ID token) to prevent userinfo injection.
+        该一致性校验可防止 UserInfo 注入其他用户身份信息。
         """
         if not metadata.userinfo_endpoint:
             return {}
@@ -359,7 +343,7 @@ class OIDCService:
 
         return userinfo
 
-    # ── Orchestrated callback ──────────────────────────────────────────────
+    # ── 回调编排 ──────────────────────────────────────────────────────────
 
     async def authenticate_callback(
         self,
@@ -373,9 +357,9 @@ class OIDCService:
         nonce: str | None = None,
         auth_method: str = "client_secret_post",
     ) -> OIDCIdentity:
-        """Orchestrate the full OIDC callback: token exchange, ID token validation, userinfo.
+        """编排完整 OIDC 回调：交换令牌、验证 ID 令牌并读取用户信息。
 
-        Returns a normalized ``OIDCIdentity``.
+        返回标准化的 ``OIDCIdentity``。
         """
         token_response = await self.exchange_code(
             metadata=metadata,
@@ -400,7 +384,7 @@ class OIDCService:
             nonce=nonce,
         )
 
-        # Fetch userinfo for email/name if not present in ID token
+        # 当身份令牌未携带邮箱或姓名时，读取用户信息端点补充信息。
         userinfo: dict[str, Any] = {}
         if metadata.userinfo_endpoint and access_token:
             try:
@@ -412,7 +396,7 @@ class OIDCService:
             except OIDCError as exc:
                 logger.warning("OIDC userinfo fetch failed (continuing with ID token): %s", exc)
 
-        # Merge userinfo into claims (userinfo takes precedence for email)
+        # 合并用户信息和声明；邮箱以用户信息端点的值优先。
         merged = {**claims, **userinfo}
 
         email = merged.get("email") or ""
@@ -429,5 +413,5 @@ class OIDCService:
 
 
 def _constant_time_compare(a: str, b: str) -> bool:
-    """Constant-time string comparison."""
+    """以恒定时间比较字符串，避免泄露匹配位置。"""
     return secrets.compare_digest(a, b)

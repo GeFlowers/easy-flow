@@ -1,3 +1,5 @@
+'未说明'
+
 import asyncio
 import json
 import tempfile
@@ -27,6 +29,7 @@ def _pending(
     card_message_id: str | None = None,
     created_at: float = 9999999999,
 ) -> dict:
+    '未说明'
     return {
         "thread_id": thread_id or f"deer-thread-{topic_id}",
         "topic_id": topic_id,
@@ -37,6 +40,7 @@ def _pending(
 
 
 def _run(coro):
+    '未说明'
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(coro)
@@ -45,26 +49,27 @@ def _run(coro):
 
 
 def test_feishu_on_message_plain_text():
+    '未说明'
     bus = MessageBus()
     config = {"app_id": "test", "app_secret": "test"}
     channel = FeishuChannel(bus, config)
 
-    # Create mock event
+    # ??????????????????????????
     event = MagicMock()
     event.event.message.chat_id = "chat_1"
     event.event.message.message_id = "msg_1"
     event.event.message.root_id = None
     event.event.sender.sender_id.open_id = "user_1"
 
-    # Plain text content
+    # ??????????????????????????
     content_dict = {"text": "Hello world"}
     event.event.message.content = json.dumps(content_dict)
 
-    # Call _on_message
+    # ??????????????????????????
     channel._on_message(event)
 
-    # Since main_loop isn't running in this synchronous test, we can't easily assert on bus,
-    # but we can intercept _make_inbound to check the parsed text.
+    # ??????????????????????????
+    # ??????????????????????????
     with pytest.MonkeyPatch.context() as m:
         mock_make_inbound = MagicMock()
         m.setattr(channel, "_make_inbound", mock_make_inbound)
@@ -75,6 +80,7 @@ def test_feishu_on_message_plain_text():
 
 
 def test_feishu_is_not_running_when_ws_thread_exits():
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
     channel._running = True
@@ -85,6 +91,7 @@ def test_feishu_is_not_running_when_ws_thread_exits():
 
 
 def test_feishu_event_handler_ignores_non_content_message_events():
+    '未说明'
     import lark_oapi as lark
 
     bus = MessageBus()
@@ -100,18 +107,19 @@ def test_feishu_event_handler_ignores_non_content_message_events():
 
 
 def test_feishu_on_message_rich_text():
+    '未说明'
     bus = MessageBus()
     config = {"app_id": "test", "app_secret": "test"}
     channel = FeishuChannel(bus, config)
 
-    # Create mock event
+    # ??????????????????????????
     event = MagicMock()
     event.event.message.chat_id = "chat_1"
     event.event.message.message_id = "msg_1"
     event.event.message.root_id = None
     event.event.sender.sender_id.open_id = "user_1"
 
-    # Rich text content (topic group / post)
+    # ??????????????????????????
     content_dict = {"content": [[{"tag": "text", "text": "Paragraph 1, part 1."}, {"tag": "text", "text": "Paragraph 1, part 2."}], [{"tag": "at", "text": "@bot"}, {"tag": "text", "text": " Paragraph 2."}]]}
     event.event.message.content = json.dumps(content_dict)
 
@@ -123,17 +131,19 @@ def test_feishu_on_message_rich_text():
         mock_make_inbound.assert_called_once()
         parsed_text = mock_make_inbound.call_args[1]["text"]
 
-        # Expected text:
-        # Paragraph 1, part 1. Paragraph 1, part 2.
-        #
-        # @bot  Paragraph 2.
+        # ??????????????????????????
+        # ??????????????????????????
+        # ??????????????????????????
+        # ??????????????????????????
         assert "Paragraph 1, part 1. Paragraph 1, part 2." in parsed_text
         assert "@bot  Paragraph 2." in parsed_text
         assert "\n\n" in parsed_text
 
 
 def test_feishu_receive_file_replaces_placeholders_in_order():
+    '未说明'
     async def go():
+        '未说明'
         bus = MessageBus()
         channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
 
@@ -156,7 +166,9 @@ def test_feishu_receive_file_replaces_placeholders_in_order():
 
 
 def test_feishu_receive_file_syncs_sandbox_with_explicit_user_id(tmp_path, monkeypatch):
+    '未说明'
     async def go():
+        '未说明'
         from deerflow.config.paths import Paths
 
         bus = MessageBus()
@@ -196,6 +208,7 @@ def test_feishu_receive_file_syncs_sandbox_with_explicit_user_id(tmp_path, monke
 
 
 def test_feishu_on_message_extracts_image_and_file_keys():
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
 
@@ -205,7 +218,7 @@ def test_feishu_on_message_extracts_image_and_file_keys():
     event.event.message.root_id = None
     event.event.sender.sender_id.open_id = "user_1"
 
-    # Rich text with one image and one file element.
+    # ??????????????????????????
     event.event.message.content = json.dumps(
         {
             "content": [
@@ -232,6 +245,7 @@ def test_feishu_on_message_extracts_image_and_file_keys():
 
 
 def test_feishu_on_message_reuses_stored_parent_topic_for_card_replies():
+    '未说明'
     bus = MessageBus()
     store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
     store.set_thread_id(
@@ -275,6 +289,7 @@ def _make_text_event(
     parent_id: str | None = None,
     thread_id: str | None = None,
 ):
+    '未说明'
     event = MagicMock()
     event.event.message.chat_id = chat_id
     event.event.message.message_id = message_id
@@ -296,6 +311,7 @@ def _make_file_event(
     parent_id: str | None = None,
     thread_id: str | None = None,
 ):
+    '未说明'
     event = MagicMock()
     event.event.message.chat_id = chat_id
     event.event.message.message_id = message_id
@@ -308,7 +324,9 @@ def _make_file_event(
 
 
 def test_feishu_batches_top_level_file_messages_from_same_user(monkeypatch):
+    '未说明'
     async def go():
+        '未说明'
         monkeypatch.setattr("app.channels.feishu.FEISHU_INBOUND_BATCH_WINDOW_SECONDS", 0.01)
         bus = MessageBus()
         channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
@@ -344,6 +362,7 @@ def test_feishu_batches_top_level_file_messages_from_same_user(monkeypatch):
 
 
 def test_feishu_rich_text_file_message_does_not_enter_batch():
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
     channel._schedule_prepare_inbound = MagicMock()
@@ -376,7 +395,9 @@ def test_feishu_rich_text_file_message_does_not_enter_batch():
 
 
 def test_feishu_file_batch_window_expiry_starts_new_topic(monkeypatch):
+    '未说明'
     async def go():
+        '未说明'
         monkeypatch.setattr("app.channels.feishu.FEISHU_INBOUND_BATCH_WINDOW_SECONDS", 0.01)
         bus = MessageBus()
         channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
@@ -403,7 +424,9 @@ def test_feishu_file_batch_window_expiry_starts_new_topic(monkeypatch):
 
 
 def test_feishu_explicit_file_reply_does_not_enter_batch(monkeypatch):
+    '未说明'
     async def go():
+        '未说明'
         monkeypatch.setattr("app.channels.feishu.FEISHU_INBOUND_BATCH_WINDOW_SECONDS", 10.0)
         bus = MessageBus()
         channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
@@ -423,6 +446,7 @@ def test_feishu_explicit_file_reply_does_not_enter_batch(monkeypatch):
 
 
 def test_feishu_expired_file_batch_does_not_get_overwritten(monkeypatch):
+    '未说明'
     monkeypatch.setattr("app.channels.feishu.FEISHU_INBOUND_BATCH_WINDOW_SECONDS", 0.5)
     now = 0.0
     monkeypatch.setattr("app.channels.feishu.time.time", lambda: now)
@@ -465,6 +489,7 @@ def test_feishu_expired_file_batch_does_not_get_overwritten(monkeypatch):
 
 
 def test_feishu_plain_reply_consumes_pending_clarification_topic():
+    '未说明'
     bus = MessageBus()
     store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
     store.set_thread_id("feishu", "chat_1", "deer-thread-1", topic_id="om_original", user_id="user_1")
@@ -485,6 +510,7 @@ def test_feishu_plain_reply_consumes_pending_clarification_topic():
 
 
 def test_feishu_pending_clarification_is_consumed_once():
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
     channel._pending_clarifications[channel._pending_key("chat_1", "user_1")] = [_pending("om_original", thread_id="deer-thread-1", card_message_id="om_card")]
@@ -493,6 +519,7 @@ def test_feishu_pending_clarification_is_consumed_once():
         created = []
 
         def fake_make_inbound(**kwargs):
+            '未说明'
             inbound = InboundMessage(channel_name="feishu", **kwargs)
             created.append(inbound)
             return inbound
@@ -515,6 +542,7 @@ def test_feishu_pending_clarification_is_consumed_once():
 
 
 def test_feishu_expired_pending_clarification_is_ignored(monkeypatch):
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
     monkeypatch.setattr("app.channels.feishu.time.time", lambda: 10_000.0)
@@ -532,6 +560,7 @@ def test_feishu_expired_pending_clarification_is_ignored(monkeypatch):
 
 
 def test_feishu_command_does_not_consume_pending_clarification():
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
     key = channel._pending_key("chat_1", "user_1")
@@ -550,6 +579,7 @@ def test_feishu_command_does_not_consume_pending_clarification():
 
 
 def test_feishu_remembers_pending_clarification_only_after_final_card_success():
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
     outbound = OutboundMessage(
@@ -577,6 +607,7 @@ def test_feishu_remembers_pending_clarification_only_after_final_card_success():
 
 
 def test_feishu_multiple_pending_clarifications_are_consumed_in_order():
+    '未说明'
     bus = MessageBus()
     channel = FeishuChannel(bus, {"app_id": "test", "app_secret": "test"})
     key = channel._pending_key("chat_1", "user_1")
@@ -589,6 +620,7 @@ def test_feishu_multiple_pending_clarifications_are_consumed_in_order():
         created = []
 
         def fake_make_inbound(**kwargs):
+            '未说明'
             inbound = InboundMessage(channel_name="feishu", **kwargs)
             created.append(inbound)
             return inbound
@@ -602,6 +634,7 @@ def test_feishu_multiple_pending_clarifications_are_consumed_in_order():
 
 
 def test_feishu_explicit_reply_prefers_stored_mapping_over_pending():
+    '未说明'
     bus = MessageBus()
     store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
     store.set_thread_id("feishu", "chat_1", "deer-thread-card", topic_id="om_card", user_id="user_1")
@@ -629,7 +662,7 @@ def test_feishu_explicit_reply_prefers_stored_mapping_over_pending():
 
 @pytest.mark.parametrize("command", sorted(KNOWN_CHANNEL_COMMANDS))
 def test_feishu_recognizes_all_known_slash_commands(command):
-    """Every entry in KNOWN_CHANNEL_COMMANDS must be classified as a command."""
+    '未说明'
     bus = MessageBus()
     config = {"app_id": "test", "app_secret": "test"}
     channel = FeishuChannel(bus, config)
@@ -660,7 +693,7 @@ def test_feishu_recognizes_all_known_slash_commands(command):
     ],
 )
 def test_feishu_treats_unknown_slash_text_as_chat(text):
-    """Slash-prefixed text that is not a known command must be classified as CHAT."""
+    '未说明'
     bus = MessageBus()
     config = {"app_id": "test", "app_secret": "test"}
     channel = FeishuChannel(bus, config)

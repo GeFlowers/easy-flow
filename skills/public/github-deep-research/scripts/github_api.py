@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""
-GitHub API client for deep research.
-Uses requests for HTTP operations.
+"""深度研究技能使用的代码托管平台接口客户端。
+
+该模块通过 ``requests`` 发起 HTTP 请求；依赖不可用时使用兼容接口的 ``urllib``
+回退实现。它只负责读取仓库元数据、文件和统计信息，不承担部署、配置写入或技能扫描。
 """
 
 import os
@@ -17,23 +18,29 @@ except ImportError:
     import urllib.request
 
     class RequestsFallback:
-        """Minimal requests-like interface using urllib."""
+        """使用 ``urllib`` 提供本模块所需的最小 ``requests`` 兼容接口。"""
 
         class Response:
+            """封装 HTTP 响应字节、状态码和解码后的文本内容。"""
+
             def __init__(self, data: bytes, status: int):
+                """保存响应字节并预先生成替换非法字符后的 UTF-8 文本。"""
                 self._data = data
                 self.status_code = status
                 self.text = data.decode("utf-8", errors="replace")
 
             def json(self):
+                """将响应字节解析为 JSON 并返回对应的 Python 对象。"""
                 return json.loads(self._data)
 
             def raise_for_status(self):
+                """在 HTTP 状态码表示失败时抛出异常。"""
                 if self.status_code >= 400:
                     raise Exception(f"HTTP {self.status_code}")
 
         @staticmethod
         def get(url: str, headers: dict = None, params: dict = None, timeout: int = 30):
+            """使用 ``urllib`` 执行 GET 请求，并返回兼容的响应包装对象。"""
             if params:
                 query = "&".join(f"{k}={v}" for k, v in params.items())
                 url = f"{url}?{query}"
@@ -49,18 +56,14 @@ except ImportError:
 
 
 class GitHubAPI:
-    """GitHub API client for repository analysis."""
+    """供仓库研究使用的只读代码托管平台 REST 接口客户端。"""
 
     BASE_URL = "https://api.github.com"
 
     def __init__(self, token: Optional[str] = None):
-        """
-        Initialize GitHub API client.
+        """初始化请求头，并可选地加入用于提高限额的个人访问令牌。
 
-        Args:
-            token:
-                Optional GitHub personal access token for higher rate limits.
-                User can set it in .env by uncommenting the line "GITHUB_TOKEN=your-github-token".
+        令牌可由调用方从环境配置传入；本客户端不会读取、保存或修改部署配置。
         """
         self.headers = {
             "Accept": "application/vnd.github.v3+json",
@@ -72,7 +75,7 @@ class GitHubAPI:
     def _get(
         self, endpoint: str, params: Optional[Dict] = None, accept: Optional[str] = None
     ) -> Any:
-        """Make GET request to GitHub API."""
+        """向指定接口端点发送 GET 请求，并按 ``accept`` 返回文本或 JSON。"""
         url = f"{self.BASE_URL}{endpoint}"
         headers = self.headers.copy()
         if accept:
@@ -86,11 +89,11 @@ class GitHubAPI:
         return resp.json()
 
     def get_repo_info(self, owner: str, repo: str) -> Dict:
-        """Get basic repository information."""
+        """获取仓库的基础元数据。"""
         return self._get(f"/repos/{owner}/{repo}")
 
     def get_readme(self, owner: str, repo: str) -> str:
-        """Get repository README content as markdown."""
+        """获取仓库 README 的原始 Markdown；不存在时返回说明文本。"""
         try:
             return self._get(
                 f"/repos/{owner}/{repo}/readme", accept="application/vnd.github.raw"
@@ -101,7 +104,7 @@ class GitHubAPI:
     def get_tree(
         self, owner: str, repo: str, branch: str = "main", recursive: bool = True
     ) -> Dict:
-        """Get repository directory tree."""
+        """获取指定分支的目录树，必要时从 ``main`` 回退到 ``master``。"""
         params = {"recursive": "1"} if recursive else {}
         try:
             return self._get(f"/repos/{owner}/{repo}/git/trees/{branch}", params)
@@ -112,7 +115,7 @@ class GitHubAPI:
             raise
 
     def get_file_content(self, owner: str, repo: str, path: str) -> str:
-        """Get content of a specific file."""
+        """获取指定仓库文件的原始内容；未找到时返回说明文本。"""
         try:
             return self._get(
                 f"/repos/{owner}/{repo}/contents/{path}",
@@ -122,11 +125,11 @@ class GitHubAPI:
             return f"[File not found: {e}]"
 
     def get_languages(self, owner: str, repo: str) -> Dict[str, int]:
-        """Get repository languages and their bytes."""
+        """获取仓库语言及各语言对应的代码字节数。"""
         return self._get(f"/repos/{owner}/{repo}/languages")
 
     def get_contributors(self, owner: str, repo: str, limit: int = 30) -> List[Dict]:
-        """Get repository contributors."""
+        """获取贡献者列表，并将单页数量限制在 API 上限以内。"""
         return self._get(
             f"/repos/{owner}/{repo}/contributors", params={"per_page": min(limit, 100)}
         )
@@ -134,15 +137,7 @@ class GitHubAPI:
     def get_recent_commits(
         self, owner: str, repo: str, limit: int = 50, since: Optional[str] = None
     ) -> List[Dict]:
-        """
-        Get recent commits.
-
-        Args:
-            owner: Repository owner
-            repo: Repository name
-            limit: Max commits to fetch
-            since: ISO date string to fetch commits since
-        """
+        """获取近期提交，可按 ISO 日期筛选并限制返回数量。"""
         params = {"per_page": min(limit, 100)}
         if since:
             params["since"] = since
@@ -156,13 +151,7 @@ class GitHubAPI:
         limit: int = 30,
         labels: Optional[str] = None,
     ) -> List[Dict]:
-        """
-        Get repository issues.
-
-        Args:
-            state: 'open', 'closed', or 'all'
-            labels: Comma-separated label names
-        """
+        """按状态和逗号分隔的标签筛选仓库议题。"""
         params = {"state": state, "per_page": min(limit, 100)}
         if labels:
             params["labels"] = labels
@@ -171,45 +160,39 @@ class GitHubAPI:
     def get_pull_requests(
         self, owner: str, repo: str, state: str = "all", limit: int = 30
     ) -> List[Dict]:
-        """Get repository pull requests."""
+        """获取仓库拉取请求列表。"""
         return self._get(
             f"/repos/{owner}/{repo}/pulls",
             params={"state": state, "per_page": min(limit, 100)},
         )
 
     def get_releases(self, owner: str, repo: str, limit: int = 10) -> List[Dict]:
-        """Get repository releases."""
+        """获取仓库发布版本列表。"""
         return self._get(
             f"/repos/{owner}/{repo}/releases", params={"per_page": min(limit, 100)}
         )
 
     def get_tags(self, owner: str, repo: str, limit: int = 20) -> List[Dict]:
-        """Get repository tags."""
+        """获取仓库标签列表。"""
         return self._get(
             f"/repos/{owner}/{repo}/tags", params={"per_page": min(limit, 100)}
         )
 
     def search_issues(self, owner: str, repo: str, query: str, limit: int = 30) -> Dict:
-        """Search issues and PRs in repository."""
+        """在仓库内搜索议题和拉取请求。"""
         q = f"repo:{owner}/{repo} {query}"
         return self._get("/search/issues", params={"q": q, "per_page": min(limit, 100)})
 
     def get_commit_activity(self, owner: str, repo: str) -> List[Dict]:
-        """Get weekly commit activity for the last year."""
+        """获取最近一年的按周提交活跃度。"""
         return self._get(f"/repos/{owner}/{repo}/stats/commit_activity")
 
     def get_code_frequency(self, owner: str, repo: str) -> List[List[int]]:
-        """Get weekly additions/deletions."""
+        """获取按周统计的代码新增和删除数量。"""
         return self._get(f"/repos/{owner}/{repo}/stats/code_frequency")
 
     def format_tree(self, tree_data: Dict, max_depth: int = 3) -> str:
-        """
-        Format tree data as text directory structure.
-
-        Args:
-            tree_data: Response from get_tree()
-            max_depth: Maximum depth to display
-        """
+        """将目录树响应格式化为不超过指定深度的文本结构。"""
         if "tree" not in tree_data:
             return "[Unable to parse tree]"
 
@@ -228,12 +211,7 @@ class GitHubAPI:
         return "\n".join(lines[:100])  # Limit output
 
     def summarize_repo(self, owner: str, repo: str) -> Dict:
-        """
-        Get comprehensive repository summary.
-
-        Returns dict with: info, languages, contributor_count,
-        recent_activity, top_issues, latest_release
-        """
+        """汇总仓库信息、语言、贡献者、活动、议题和最新发布版本。"""
         info = self.get_repo_info(owner, repo)
 
         summary = {
@@ -286,7 +264,7 @@ class GitHubAPI:
 
 
 def main():
-    """CLI interface for testing."""
+    """提供用于手动验证仓库读取功能的命令行入口。"""
     if len(sys.argv) < 3:
         print("Usage: python github_api.py <owner> <repo> [command]")
         print("Commands: info, readme, tree, languages, contributors,")

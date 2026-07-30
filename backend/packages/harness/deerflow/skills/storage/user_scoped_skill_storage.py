@@ -1,30 +1,4 @@
-"""User-scoped SkillStorage that isolates custom skills per user.
-
-Custom skills are stored under ``{base_dir}/users/{user_id}/skills/custom/``
-instead of the global ``{base_dir}/skills/custom/``. Public skills are still
-read from the global ``{base_dir}/skills/public/`` (read-only).
-
-Layout::
-
-    <host_root>/public/<name>/SKILL.md            ← global, read-only
-    <user_custom_root>/<name>/SKILL.md             ← per-user, read-write
-    <user_custom_root>/.history/<name>.jsonl       ← per-user history
-    <user_skills_root>/_skill_states.json          ← per-user enabled state
-    <global_custom_root>/<name>/SKILL.md           ← legacy fallback, read-only
-
-Fallback: when a user has no custom skills yet, global ``skills/custom/``
-skills are yielded as ``SkillCategory.LEGACY`` (read-only) so they are
-visible but cannot be edited/deleted by the user. This preserves backward
-compatibility during migration without leaking mutable access to legacy
-skills. Legacy skills are mounted at ``/mnt/skills/legacy/<name>/`` in
-the sandbox so their supporting files (references, templates, scripts,
-assets) are accessible to the agent.
-
-Enabled/disabled state for CUSTOM and LEGACY skills is stored per-user in
-``_skill_states.json`` (keyed by skill name). PUBLIC skill state remains
-global in ``extensions_config.json``. This prevents cross-user bleed when
-two users own same-named custom skills.
-"""
+'定义 user_scoped_skill_storage 模块提供的职责与可复用接口。\n\nUser-scoped SkillStorage that isolates custom skills per user.\n\nCustom skills are stored under ``{base_dir}/users/{user_id}/skills/custom/``\ninstead of the global ``{base_dir}/skills/custom/``. Public skills are still\nread from the global ``{base_dir}/skills/public/`` (read-only).\n\nLayout::\n\n    <host_root>/public/<name>/SKILL.md            ← global, read-only\n    <user_custom_root>/<name>/SKILL.md             ← per-user, read-write\n    <user_custom_root>/.history/<name>.jsonl       ← per-user history\n    <user_skills_root>/_skill_states.json          ← per-user enabled state\n    <global_custom_root>/<name>/SKILL.md           ← legacy fallback, read-only\n\nFallback: when a user has no custom skills yet, global ``skills/custom/``\nskills are yielded as ``SkillCategory.LEGACY`` (read-only) so they are\nvisible but cannot be edited/deleted by the user. This preserves backward\ncompatibility during migration without leaking mutable access to legacy\nskills. Legacy skills are mounted at ``/mnt/skills/legacy/<name>/`` in\nthe sandbox so their supporting files (references, templates, scripts,\nassets) are accessible to the agent.\n\nEnabled/disabled state for CUSTOM and LEGACY skills is stored per-user in\n``_skill_states.json`` (keyed by skill name). PUBLIC skill state remains\nglobal in ``extensions_config.json``. This prevents cross-user bleed when\ntwo users own same-named custom skills.\n'
 
 from __future__ import annotations
 
@@ -47,26 +21,7 @@ logger = logging.getLogger(__name__)
 
 
 class UserScopedSkillStorage(LocalSkillStorage):
-    """Skill storage with per-user isolation for custom skills.
-
-    Inherits all public-skill behaviour from :class:`LocalSkillStorage`
-    (reading from ``_host_root/public/``). Custom-skill paths are
-    redirected to ``_user_custom_root`` so each user's custom skills
-    live in their own directory tree.
-
-    Fallback: when the user's custom directory is empty and the global
-    ``skills/custom/`` has content, those legacy skills are loaded as
-    ``SkillCategory.LEGACY`` — they appear in listings but are treated
-    as read-only (cannot be edited/deleted). This preserves backward
-    compatibility during migration without giving users mutable access
-    to other users' legacy skills.
-
-    **Design note**: once a user creates their first custom skill, the
-    per-user directory exists and the global custom fallback no longer
-    applies — LEGACY skills disappear from that user's listing. This is
-    intentional (shadow-mount semantics: the user's own directory
-    shadows the global one).
-    """
+    "封装 UserScopedSkillStorage 的状态、协作关系与公开操作。\n\nSkill storage with per-user isolation for custom skills.\n\n    Inherits all public-skill behaviour from :class:`LocalSkillStorage`\n    (reading from ``_host_root/public/``). Custom-skill paths are\n    redirected to ``_user_custom_root`` so each user's custom skills\n    live in their own directory tree.\n\n    Fallback: when the user's custom directory is empty and the global\n    ``skills/custom/`` has content, those legacy skills are loaded as\n    ``SkillCategory.LEGACY`` — they appear in listings but are treated\n    as read-only (cannot be edited/deleted). This preserves backward\n    compatibility during migration without giving users mutable access\n    to other users' legacy skills.\n\n    **Design note**: once a user creates their first custom skill, the\n    per-user directory exists and the global custom fallback no longer\n    applies — LEGACY skills disappear from that user's listing. This is\n    intentional (shadow-mount semantics: the user's own directory\n    shadows the global one).\n    "
 
     def __init__(
         self,
@@ -75,6 +30,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
         container_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
         app_config=None,
     ) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__(host_path=host_path, container_path=container_path, app_config=app_config)
 
         from deerflow.config.paths import _validate_user_id, get_paths
@@ -91,12 +47,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
     # ------------------------------------------------------------------
 
     def _read_skill_states(self) -> dict[str, dict[str, bool]]:
-        """Read per-user skill enabled states from ``_skill_states.json``.
-
-        Returns a dict keyed by skill name, each value being
-        ``{"enabled": True/False}``.  Returns an empty dict if the file
-        does not exist or is unreadable.
-        """
+        '执行 _read_skill_states 的明确职责，并返回与调用约定一致的结果。\n\nRead per-user skill enabled states from ``_skill_states.json``.\n\n        Returns a dict keyed by skill name, each value being\n        ``{"enabled": True/False}``.  Returns an empty dict if the file\n        does not exist or is unreadable.\n        '
         if not self._skill_states_file.exists():
             return {}
         try:
@@ -109,16 +60,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
         return {}
 
     def _write_skill_states(self, states: dict[str, dict[str, bool]]) -> None:
-        """Persist per-user skill enabled states to ``_skill_states.json``.
-
-        Atomic write via a temp file in the same directory followed by
-        ``Path.replace`` (POSIX-atomic on the same filesystem). Without this,
-        a crash/SIGTERM/disk-full mid-write would leave the file truncated
-        or empty; ``_read_skill_states`` would then return ``{}`` and
-        ``get_skill_enabled_state`` would silently re-enable every skill
-        the user had disabled. Mirrors the pattern used by
-        ``LocalSkillStorage.write_custom_skill`` in this same module.
-        """
+        '执行 _write_skill_states 的明确职责，并返回与调用约定一致的结果。\n\nPersist per-user skill enabled states to ``_skill_states.json``.\n\n        Atomic write via a temp file in the same directory followed by\n        ``Path.replace`` (POSIX-atomic on the same filesystem). Without this,\n        a crash/SIGTERM/disk-full mid-write would leave the file truncated\n        or empty; ``_read_skill_states`` would then return ``{}`` and\n        ``get_skill_enabled_state`` would silently re-enable every skill\n        the user had disabled. Mirrors the pattern used by\n        ``LocalSkillStorage.write_custom_skill`` in this same module.\n        '
         self._user_skills_root.mkdir(parents=True, exist_ok=True)
         fd, tmp_path_str = tempfile.mkstemp(
             dir=str(self._user_skills_root),
@@ -139,10 +81,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
             raise
 
     def get_skill_enabled_state(self, skill_name: str) -> bool:
-        """Return the enabled state for a custom/legacy skill.
-
-        Default is ``True`` (newly created skills are enabled by default).
-        """
+        '读取并返回，并遵守 get_skill_enabled_state 所表达的接口约束。\n\nReturn the enabled state for a custom/legacy skill.\n\n        Default is ``True`` (newly created skills are enabled by default).\n        '
         states = self._read_skill_states()
         entry = states.get(skill_name)
         if entry is None:
@@ -150,7 +89,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
         return entry.get("enabled", True)
 
     def set_skill_enabled_state(self, skill_name: str, enabled: bool) -> None:
-        """Set the enabled state for a custom/legacy skill and persist."""
+        '执行 set_skill_enabled_state 的明确职责，并返回与调用约定一致的结果。\n\nSet the enabled state for a custom/legacy skill and persist.'
         states = self._read_skill_states()
         states[skill_name] = {"enabled": enabled}
         self._write_skill_states(states)
@@ -160,16 +99,16 @@ class UserScopedSkillStorage(LocalSkillStorage):
     # ------------------------------------------------------------------
 
     def get_custom_skill_dir(self, name: str) -> Path:
-        """Per-user custom skill directory: ``<user_custom_root>/<name>/``."""
+        '读取并返回，并遵守 get_custom_skill_dir 所表达的接口约束。\n\nPer-user custom skill directory: ``<user_custom_root>/<name>/``.'
         normalized_name = self.validate_skill_name(name)
         return self._user_custom_root / normalized_name
 
     def get_custom_skill_file(self, name: str) -> Path:
-        """Per-user custom SKILL.md path."""
+        '读取并返回，并遵守 get_custom_skill_file 所表达的接口约束。\n\nPer-user custom SKILL.md path.'
         return self.get_custom_skill_dir(name) / SKILL_MD_FILE
 
     def get_skill_history_file(self, name: str) -> Path:
-        """Per-user custom skill history: ``<user_custom_root>/.history/<name>.jsonl``."""
+        '读取并返回，并遵守 get_skill_history_file 所表达的接口约束。\n\nPer-user custom skill history: ``<user_custom_root>/.history/<name>.jsonl``.'
         normalized_name = self.validate_skill_name(name)
         return self._user_custom_root / ".history" / f"{normalized_name}.jsonl"
 
@@ -178,19 +117,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
     # ------------------------------------------------------------------
 
     def load_skills(self, *, enabled_only: bool = False) -> list:
-        """Discover all skills and merge enabled state per isolation scope.
-
-        Delegates skill discovery and PUBLIC enabled-state to
-        :meth:`LocalSkillStorage.load_skills` (which reads from the
-        overridden ``_iter_skill_files``).  Then overrides CUSTOM/LEGACY
-        enabled state with per-user ``_skill_states.json`` so that two
-        users each owning a same-named custom skill can toggle independently.
-
-        Calling ``super().load_skills()`` preserves the full template-method
-        flow (discover → global enabled-state merge → filter → sort) so
-        that patching ``LocalSkillStorage.load_skills`` in tests still
-        intercepts the call.
-        """
+        '加载并返回，并遵守 load_skills 所表达的接口约束。\n\nDiscover all skills and merge enabled state per isolation scope.\n\n        Delegates skill discovery and PUBLIC enabled-state to\n        :meth:`LocalSkillStorage.load_skills` (which reads from the\n        overridden ``_iter_skill_files``).  Then overrides CUSTOM/LEGACY\n        enabled state with per-user ``_skill_states.json`` so that two\n        users each owning a same-named custom skill can toggle independently.\n\n        Calling ``super().load_skills()`` preserves the full template-method\n        flow (discover → global enabled-state merge → filter → sort) so\n        that patching ``LocalSkillStorage.load_skills`` in tests still\n        intercepts the call.\n        '
         # Let the parent do full discovery + global enabled-state merge.
         # The overridden _iter_skill_files() routes custom reads to
         # _user_custom_root and legacy reads to _global_custom_root.
@@ -223,14 +150,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
     # ------------------------------------------------------------------
 
     def public_skill_exists(self, name: str) -> bool:
-        """Check if a skill exists as public **or** as a global-custom fallback.
-
-        The global ``skills/custom/`` directory contains legacy skills that
-        are presented as ``SkillCategory.LEGACY`` to users who have no
-        per-user custom skills yet. This override ensures those skills are
-        recognised as "read-only" so ``ensure_custom_skill_is_editable``
-        can give a helpful error message instead of ``FileNotFoundError``.
-        """
+        '执行 public_skill_exists 的明确职责，并返回与调用约定一致的结果。\n\nCheck if a skill exists as public **or** as a global-custom fallback.\n\n        The global ``skills/custom/`` directory contains legacy skills that\n        are presented as ``SkillCategory.LEGACY`` to users who have no\n        per-user custom skills yet. This override ensures those skills are\n        recognised as "read-only" so ``ensure_custom_skill_is_editable``\n        can give a helpful error message instead of ``FileNotFoundError``.\n        '
         normalized_name = self.validate_skill_name(name)
         # Standard public check
         if (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists():
@@ -241,13 +161,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
         return False
 
     def ensure_custom_skill_is_editable(self, name: str) -> None:
-        """Override to handle global-custom fallback skills gracefully.
-
-        When a user tries to edit/delete a legacy global-custom skill (one
-        that appears as ``SkillCategory.LEGACY`` due to fallback), we tell
-        them to create their own version rather than raising a confusing
-        ``FileNotFoundError``.
-        """
+        '执行 ensure_custom_skill_is_editable 的明确职责，并返回与调用约定一致的结果。\n\nOverride to handle global-custom fallback skills gracefully.\n\n        When a user tries to edit/delete a legacy global-custom skill (one\n        that appears as ``SkillCategory.LEGACY`` due to fallback), we tell\n        them to create their own version rather than raising a confusing\n        ``FileNotFoundError``.\n        '
         if self.custom_skill_exists(name):
             return
         # Check both public and global-custom fallback
@@ -262,6 +176,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
 
     def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
         # 1. Public skills: always from global root
+        '执行 _iter_skill_files 的明确职责，并返回与调用约定一致的结果'
         public_path = self._host_root / SkillCategory.PUBLIC.value
         if public_path.exists() and public_path.is_dir():
             for current_root, dir_names, file_names in os.walk(public_path, followlinks=True):
@@ -300,6 +215,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
     # ------------------------------------------------------------------
 
     async def ainstall_skill_from_archive(self, archive_path: str | Path) -> dict:
+        '执行 ainstall_skill_from_archive 的明确职责，并返回与调用约定一致的结果'
         from deerflow.skills.installer import _scan_skill_archive_contents_or_raise
 
         logger.info("Installing skill from %s for user %s", archive_path, self._user_id)
@@ -340,6 +256,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
 
     def write_custom_skill(self, name: str, relative_path: str, content: str) -> None:
         # Ensure user custom skills directory exists
+        '执行 write_custom_skill 的明确职责，并返回与调用约定一致的结果'
         self._user_custom_root.mkdir(parents=True, exist_ok=True)
         target = self.validate_relative_path(relative_path, self.get_custom_skill_dir(name))
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -360,11 +277,11 @@ class UserScopedSkillStorage(LocalSkillStorage):
 
     @property
     def user_id(self) -> str:
-        """The user ID this storage is scoped to."""
+        '执行 user_id 的明确职责，并返回与调用约定一致的结果。\n\nThe user ID this storage is scoped to.'
         return self._user_id
 
     def get_user_custom_root(self) -> Path:
-        """Host path to this user's custom skills root directory."""
+        "读取并返回，并遵守 get_user_custom_root 所表达的接口约束。\n\nHost path to this user's custom skills root directory."
         return self._user_custom_root
 
     # ------------------------------------------------------------------
@@ -372,12 +289,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
     # ------------------------------------------------------------------
 
     def validate_skill_file_path(self, skill_file: Path) -> Path:
-        """Accept files under *either* the global root or the per-user custom root.
-
-        Custom skills live in ``_user_custom_root`` which is not a sub-path
-        of ``_host_root``, so the default implementation's single-root check
-        would reject them.  This override allows both roots.
-        """
+        "校验输入并在约束不满足时报告错误，并遵守 validate_skill_file_path 所表达的接口约束。\n\nAccept files under *either* the global root or the per-user custom root.\n\n        Custom skills live in ``_user_custom_root`` which is not a sub-path\n        of ``_host_root``, so the default implementation's single-root check\n        would reject them.  This override allows both roots.\n        "
         resolved_file = skill_file.resolve()
         for allowed_root in (self._host_root.resolve(), self._user_custom_root.resolve()):
             try:

@@ -1,8 +1,4 @@
-"""Unit tests for the Setup Wizard (scripts/wizard/).
-
-Run from repo root:
-    cd backend && uv run pytest tests/test_setup_wizard.py -v
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -21,10 +17,13 @@ from wizard.writer import (
 
 
 class TestProviders:
+    '未说明'
     def test_llm_providers_not_empty(self):
+        '未说明'
         assert len(LLM_PROVIDERS) >= 8
 
     def test_llm_providers_cover_config_example_families(self):
+        '未说明'
         providers = {provider.name: provider for provider in LLM_PROVIDERS}
 
         expected = {
@@ -57,11 +56,7 @@ class TestProviders:
         assert providers["volcengine"].extra_config["api_base"] == "https://ark.cn-beijing.volces.com/api/v3"
 
     def test_minimax_vision_is_per_model(self):
-        """M3 supports vision; M2.7 variants are text-only.
-
-        The provider-level extra_config carries the default (M3) capability, but
-        extra_config_for() must drop vision when an M2.7 model is selected.
-        """
+        '未说明'
         providers = {provider.name: provider for provider in LLM_PROVIDERS}
 
         for name in ("minimax", "minimax_cn"):
@@ -74,12 +69,13 @@ class TestProviders:
             assert provider.extra_config["supports_vision"] is True
 
     def test_extra_config_for_returns_provider_config_without_override(self):
-        """Providers without per-model overrides return their config unchanged."""
+        '未说明'
         providers = {provider.name: provider for provider in LLM_PROVIDERS}
         openai = providers["openai"]
         assert openai.extra_config_for("gpt-5") == openai.extra_config
 
     def test_llm_providers_have_required_fields(self):
+        '未说明'
         for p in LLM_PROVIDERS:
             assert p.name
             assert p.display_name
@@ -89,6 +85,7 @@ class TestProviders:
             assert p.default_model in p.models
 
     def test_search_providers_have_required_fields(self):
+        '未说明'
         for sp in SEARCH_PROVIDERS:
             assert sp.name
             assert sp.display_name
@@ -96,10 +93,12 @@ class TestProviders:
             assert ":" in sp.use
 
     def test_search_and_fetch_include_firecrawl(self):
+        '未说明'
         assert any(provider.name == "firecrawl" for provider in SEARCH_PROVIDERS)
         assert any(provider.name == "firecrawl" for provider in WEB_FETCH_PROVIDERS)
 
     def test_web_fetch_providers_have_required_fields(self):
+        '未说明'
         for provider in WEB_FETCH_PROVIDERS:
             assert provider.name
             assert provider.display_name
@@ -108,17 +107,20 @@ class TestProviders:
             assert provider.tool_name == "web_fetch"
 
     def test_at_least_one_free_search_provider(self):
-        """At least one search provider needs no API key."""
+        '未说明'
         free = [sp for sp in SEARCH_PROVIDERS if sp.env_var is None]
         assert free, "Expected at least one free (no-key) search provider"
 
     def test_at_least_one_free_web_fetch_provider(self):
+        '未说明'
         free = [provider for provider in WEB_FETCH_PROVIDERS if provider.env_var is None]
         assert free, "Expected at least one free (no-key) web fetch provider"
 
 
 class TestBuildMinimalConfig:
+    '未说明'
     def test_produces_valid_yaml(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -137,6 +139,7 @@ class TestBuildMinimalConfig:
         assert model["api_key"] == "$OPENAI_API_KEY"
 
     def test_gemini_uses_gemini_api_key_field(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_google_genai:ChatGoogleGenerativeAI",
             model_name="gemini-2.0-flash",
@@ -151,6 +154,7 @@ class TestBuildMinimalConfig:
         assert "api_key" not in model
 
     def test_search_tool_included(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -165,6 +169,7 @@ class TestBuildMinimalConfig:
         assert search_tool["max_results"] == 5
 
     def test_openrouter_defaults_are_preserved(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="google/gemini-2.5-flash-preview",
@@ -188,6 +193,7 @@ class TestBuildMinimalConfig:
         assert model["temperature"] == 0.7
 
     def test_web_fetch_tool_included(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -202,6 +208,7 @@ class TestBuildMinimalConfig:
         assert fetch_tool["timeout"] == 10
 
     def test_no_search_tool_when_not_configured(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -215,6 +222,7 @@ class TestBuildMinimalConfig:
         assert "web_fetch" not in tool_names
 
     def test_sandbox_included(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -229,6 +237,7 @@ class TestBuildMinimalConfig:
         assert data["sandbox"]["allow_host_bash"] is False
 
     def test_bash_tool_disabled_by_default(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -241,6 +250,7 @@ class TestBuildMinimalConfig:
         assert "bash" not in tool_names
 
     def test_can_enable_container_sandbox_and_bash(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -257,6 +267,7 @@ class TestBuildMinimalConfig:
         assert "bash" in tool_names
 
     def test_can_disable_write_tools(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -271,6 +282,7 @@ class TestBuildMinimalConfig:
         assert "str_replace" not in tool_names
 
     def test_config_version_present(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -283,6 +295,7 @@ class TestBuildMinimalConfig:
         assert data["config_version"] == 5
 
     def test_cli_provider_does_not_emit_fake_api_key(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="deerflow.models.openai_codex_provider:CodexChatModel",
             model_name="gpt-5.4",
@@ -295,6 +308,7 @@ class TestBuildMinimalConfig:
         assert "api_key" not in model
 
     def test_responses_api_provider_defaults_are_preserved(self):
+        '未说明'
         provider = next(p for p in LLM_PROVIDERS if p.name == "openai_responses")
         content = build_minimal_config(
             provider_use=provider.use,
@@ -311,6 +325,7 @@ class TestBuildMinimalConfig:
         assert model["supports_vision"] is True
 
     def test_patched_thinking_provider_defaults_are_preserved(self):
+        '未说明'
         provider = next(p for p in LLM_PROVIDERS if p.name == "mimo")
         content = build_minimal_config(
             provider_use=provider.use,
@@ -330,6 +345,7 @@ class TestBuildMinimalConfig:
         assert model["when_thinking_disabled"]["extra_body"]["thinking"]["type"] == "disabled"
 
     def test_can_enable_selected_channel_connections(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -352,6 +368,7 @@ class TestBuildMinimalConfig:
         assert channel_connections["wecom"]["enabled"] is False
 
     def test_channel_connections_disabled_when_no_channels_selected(self):
+        '未说明'
         content = build_minimal_config(
             provider_use="langchain_openai:ChatOpenAI",
             model_name="gpt-4o",
@@ -369,11 +386,14 @@ class TestBuildMinimalConfig:
 
 
 class TestThinkingSupport:
+    '未说明'
     def test_other_provider_requests_thinking_prompt(self):
+        '未说明'
         other = next(p for p in LLM_PROVIDERS if p.name == "other")
         assert other.ask_thinking_support is True
 
     def test_with_thinking_support_enabled_wires_toggles(self):
+        '未说明'
         other = next(p for p in LLM_PROVIDERS if p.name == "other")
         original = dict(other.extra_config)
 
@@ -386,6 +406,7 @@ class TestThinkingSupport:
         assert other.extra_config == original
 
     def test_with_thinking_support_disabled_marks_unsupported(self):
+        '未说明'
         other = next(p for p in LLM_PROVIDERS if p.name == "other")
 
         updated = with_thinking_support(other, False)
@@ -395,7 +416,9 @@ class TestThinkingSupport:
 
 
 class TestLLMStep:
+    '未说明'
     def test_model_selection_defaults_to_provider_default_model(self, monkeypatch):
+        '未说明'
         provider = LLMProvider(
             name="test",
             display_name="Test",
@@ -409,6 +432,7 @@ class TestLLMStep:
         prompts: list[tuple[str, int | None]] = []
 
         def fake_choice(prompt, options, default=None):
+            '未说明'
             prompts.append((prompt, default))
             return default if default is not None else 0
 
@@ -425,6 +449,7 @@ class TestLLMStep:
         assert prompts == [("Enter choice", None), ("Select model", 1)]
 
     def test_base_url_prompt_is_used_for_custom_gateway(self, monkeypatch):
+        '未说明'
         provider = LLMProvider(
             name="gateway",
             display_name="Gateway",
@@ -450,6 +475,7 @@ class TestLLMStep:
         assert result.base_url == "https://gateway.example/v1"
 
     def test_other_gateway_prompts_and_enables_thinking(self, monkeypatch):
+        '未说明'
         provider = LLMProvider(
             name="other",
             display_name="Other OpenAI-compatible",
@@ -480,6 +506,7 @@ class TestLLMStep:
         assert result.provider.extra_config["when_thinking_enabled"]["extra_body"]["thinking"]["type"] == "enabled"
 
     def test_other_gateway_declined_thinking_marks_unsupported(self, monkeypatch):
+        '未说明'
         provider = LLMProvider(
             name="other",
             display_name="Other OpenAI-compatible",
@@ -510,7 +537,9 @@ class TestLLMStep:
 
 
 class TestChannelsStep:
+    '未说明'
     def test_returns_selected_channel_keys(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr(channels_step, "print_header", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(channels_step, "print_info", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(channels_step, "print_success", lambda *_args, **_kwargs: None)
@@ -521,6 +550,7 @@ class TestChannelsStep:
         assert result.enabled_providers == ["telegram", "feishu", "wecom"]
 
     def test_empty_selection_disables_channel_connections(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr(channels_step, "print_header", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(channels_step, "print_info", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(channels_step, "print_success", lambda *_args, **_kwargs: None)
@@ -532,13 +562,16 @@ class TestChannelsStep:
 
 
 class TestWizardUi:
+    '未说明'
     def test_multi_choice_blank_requires_input_without_default(self, monkeypatch):
+        '未说明'
         answers = iter(["", "2"])
         monkeypatch.setattr("builtins.input", lambda _prompt: next(answers))
 
         assert wizard_ui.ask_multi_choice("Pick", ["First", "Second"], default=None) == [1]
 
     def test_multi_choice_blank_accepts_empty_default(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr("builtins.input", lambda _prompt: "")
 
         assert wizard_ui.ask_multi_choice("Pick", ["First", "Second"], default=[]) == []
@@ -550,13 +583,16 @@ class TestWizardUi:
 
 
 class TestEnvFileHelpers:
+    '未说明'
     def test_write_and_read_new_file(self, tmp_path):
+        '未说明'
         env_file = tmp_path / ".env"
         write_env_file(env_file, {"OPENAI_API_KEY": "sk-test123"})
         pairs = read_env_file(env_file)
         assert pairs["OPENAI_API_KEY"] == "sk-test123"
 
     def test_update_existing_key(self, tmp_path):
+        '未说明'
         env_file = tmp_path / ".env"
         env_file.write_text("OPENAI_API_KEY=old-key\n")
         write_env_file(env_file, {"OPENAI_API_KEY": "new-key"})
@@ -567,6 +603,7 @@ class TestEnvFileHelpers:
         assert content.count("OPENAI_API_KEY") == 1
 
     def test_preserve_existing_keys(self, tmp_path):
+        '未说明'
         env_file = tmp_path / ".env"
         env_file.write_text("TAVILY_API_KEY=tavily-val\n")
         write_env_file(env_file, {"OPENAI_API_KEY": "sk-new"})
@@ -575,6 +612,7 @@ class TestEnvFileHelpers:
         assert pairs["OPENAI_API_KEY"] == "sk-new"
 
     def test_preserve_comments(self, tmp_path):
+        '未说明'
         env_file = tmp_path / ".env"
         env_file.write_text("# My .env file\nOPENAI_API_KEY=old\n")
         write_env_file(env_file, {"OPENAI_API_KEY": "new"})
@@ -582,6 +620,7 @@ class TestEnvFileHelpers:
         assert "# My .env file" in content
 
     def test_read_ignores_comments(self, tmp_path):
+        '未说明'
         env_file = tmp_path / ".env"
         env_file.write_text("# comment\nKEY=value\n")
         pairs = read_env_file(env_file)
@@ -595,8 +634,9 @@ class TestEnvFileHelpers:
 
 
 class TestWriteConfigYaml:
+    '未说明'
     def test_generated_config_loadable_by_appconfig(self, tmp_path):
-        """The generated config.yaml must be parseable (basic YAML validity)."""
+        '未说明'
 
         config_path = tmp_path / "config.yaml"
         write_config_yaml(
@@ -614,6 +654,7 @@ class TestWriteConfigYaml:
         assert "models" in data
 
     def test_copies_example_defaults_for_unconfigured_sections(self, tmp_path):
+        '未说明'
         example_path = tmp_path / "config.example.yaml"
         example_path.write_text(
             yaml.safe_dump(
@@ -674,7 +715,7 @@ class TestWriteConfigYaml:
         assert any(tool["name"] == "image_search" and tool["max_results"] == 5 for tool in data["tools"])
 
     def test_config_version_read_from_example(self, tmp_path):
-        """write_config_yaml should read config_version from config.example.yaml if present."""
+        '未说明'
 
         example_path = tmp_path / "config.example.yaml"
         example_path.write_text("config_version: 99\n")
@@ -693,6 +734,7 @@ class TestWriteConfigYaml:
         assert data["config_version"] == 99
 
     def test_model_base_url_from_extra_config(self, tmp_path):
+        '未说明'
         config_path = tmp_path / "config.yaml"
         write_config_yaml(
             config_path,
@@ -709,7 +751,9 @@ class TestWriteConfigYaml:
 
 
 class TestSearchStep:
+    '未说明'
     def test_reuses_api_key_for_same_provider(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr(search_step, "print_header", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(search_step, "print_success", lambda *_args, **_kwargs: None)
         monkeypatch.setattr(search_step, "print_info", lambda *_args, **_kwargs: None)
@@ -718,9 +762,11 @@ class TestSearchStep:
         prompts: list[str] = []
 
         def fake_choice(_prompt, _options, default=0):
+            '未说明'
             return next(choices)
 
         def fake_secret(prompt):
+            '未说明'
             prompts.append(prompt)
             return "shared-api-key"
 

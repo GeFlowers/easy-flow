@@ -9,6 +9,7 @@ import {
 import { useSidebar } from "@/components/ui/sidebar";
 import { env } from "@/env";
 
+/** 定义产物面板共享的列表、当前选择与切换操作契约。 */
 export interface ArtifactsContextType {
   artifacts: string[];
   setArtifacts: (artifacts: string[]) => void;
@@ -31,6 +32,7 @@ interface ArtifactsProviderProps {
   children: ReactNode;
 }
 
+/** 提供产物选择状态，确保同一工作区内的触发器与面板保持同步。 */
 export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   const [artifacts, setArtifacts] = useState<string[]>([]);
   const [selectedArtifact, setSelectedArtifact] = useState<string | null>(null);
@@ -87,6 +89,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   );
 }
 
+/** 读取必需的产物上下文；脱离 Provider 使用时立即报错以暴露装配问题。 */
 export function useArtifacts() {
   const context = useContext(ArtifactsContext);
   if (context === undefined) {

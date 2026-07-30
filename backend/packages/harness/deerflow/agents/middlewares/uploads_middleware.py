@@ -1,4 +1,4 @@
-"""Middleware to inject uploaded files information into agent context."""
+'定义 uploads_middleware 模块提供的职责与可复用接口。\n\nMiddleware to inject uploaded files information into agent context.'
 
 import logging
 import re
@@ -27,17 +27,20 @@ _QUERY_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 def _extension_label(file: dict) -> str:
+    '执行 _extension_label 的明确职责，并返回与调用约定一致的结果'
     extension = str(file.get("extension") or Path(str(file.get("filename") or "")).suffix).lower()
     return extension or "(no extension)"
 
 
 def _format_omitted_file_types(files: list[dict]) -> str:
+    '执行 _format_omitted_file_types 的明确职责，并返回与调用约定一致的结果'
     counts = Counter(_extension_label(file) for file in files)
     parts = [f"{count} {extension}" for extension, count in sorted(counts.items())]
     return ", ".join(parts)
 
 
 def _query_match_strength(file: dict, query_text: str) -> int:
+    '执行 _query_match_strength 的明确职责，并返回与调用约定一致的结果'
     query = query_text.lower()
     if not query:
         return 0
@@ -66,19 +69,7 @@ def _query_match_strength(file: dict, query_text: str) -> int:
 
 
 def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
-    """Return the document outline and fallback preview for *file_path*.
-
-    Looks for a sibling ``<stem>.md`` file produced by the upload conversion
-    pipeline.
-
-    Returns:
-        (outline, preview) where:
-        - outline: list of ``{title, line}`` dicts (plus optional sentinel).
-          Empty when no headings are found or no .md exists.
-        - preview: first few non-empty lines of the .md, used as a content
-          anchor when outline is empty so the agent has some context.
-          Empty when outline is non-empty (no fallback needed).
-    """
+    '执行 _extract_outline_for_file 的明确职责，并返回与调用约定一致的结果。\n\nReturn the document outline and fallback preview for *file_path*.\n\n    Looks for a sibling ``<stem>.md`` file produced by the upload conversion\n    pipeline.\n\n    Returns:\n        (outline, preview) where:\n        - outline: list of ``{title, line}`` dicts (plus optional sentinel).\n          Empty when no headings are found or no .md exists.\n        - preview: first few non-empty lines of the .md, used as a content\n          anchor when outline is empty so the agent has some context.\n          Empty when outline is non-empty (no fallback needed).\n    '
     md_path = file_path.with_suffix(".md")
     if not md_path.is_file():
         return [], []
@@ -104,18 +95,13 @@ def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
 
 
 class UploadsMiddlewareState(AgentState):
-    """State schema for uploads middleware."""
+    '封装 UploadsMiddlewareState 的状态、协作关系与公开操作。\n\nState schema for uploads middleware.'
 
     uploaded_files: NotRequired[list[dict] | None]
 
 
 class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
-    """Middleware to inject uploaded files information into the agent context.
-
-    Reads file metadata from the current message's additional_kwargs.files
-    (set by the frontend after upload) and prepends an <uploaded_files> block
-    to the last human message so the model knows which files are available.
-    """
+    "封装 UploadsMiddleware 的状态、协作关系与公开操作。\n\nMiddleware to inject uploaded files information into the agent context.\n\n    Reads file metadata from the current message's additional_kwargs.files\n    (set by the frontend after upload) and prepends an <uploaded_files> block\n    to the last human message so the model knows which files are available.\n    "
 
     state_schema = UploadsMiddlewareState
 
@@ -125,13 +111,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         *,
         max_files_per_context_section: int = _MAX_FILES_PER_CONTEXT_SECTION,
     ):
-        """Initialize the middleware.
-
-        Args:
-            base_dir: Base directory for thread data. Defaults to Paths resolution.
-            max_files_per_context_section: Maximum number of files listed in
-                each uploaded-files prompt section.
-        """
+        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nInitialize the middleware.\n\n        Args:\n            base_dir: Base directory for thread data. Defaults to Paths resolution.\n            max_files_per_context_section: Maximum number of files listed in\n                each uploaded-files prompt section.\n        '
         super().__init__()
         if max_files_per_context_section < 1:
             raise ValueError("max_files_per_context_section must be at least 1")
@@ -139,7 +119,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         self._max_files_per_context_section = max_files_per_context_section
 
     def _format_file_entry(self, file: dict, lines: list[str]) -> None:
-        """Append a single file entry (name, size, path, optional outline) to lines."""
+        '执行 _format_file_entry 的明确职责，并返回与调用约定一致的结果。\n\nAppend a single file entry (name, size, path, optional outline) to lines.'
         size_kb = file["size"] / 1024
         size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
         lines.append(f"- {file['filename']} ({size_str})")
@@ -171,7 +151,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         *,
         recency_key: str | None = None,
     ) -> tuple[list[dict], list[dict]]:
-        """Return bounded context files, prioritizing current-query matches."""
+        '执行 _select_files_for_context 的明确职责，并返回与调用约定一致的结果。\n\nReturn bounded context files, prioritizing current-query matches.'
         ranked: list[tuple[tuple, dict]] = []
         for index, file in enumerate(files):
             selected_file = dict(file)
@@ -199,19 +179,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         omitted_new_files: list[dict] | None = None,
         omitted_historical_files: list[dict] | None = None,
     ) -> str:
-        """Create a formatted message listing uploaded files.
-
-        Args:
-            new_files: Files uploaded in the current message.
-            historical_files: Files uploaded in previous messages.
-                Each file dict may contain an optional ``outline`` key — a list of
-                ``{title, line}`` dicts extracted from the converted Markdown file.
-            omitted_new_files: Current-message files omitted from the prompt context.
-            omitted_historical_files: Older historical files omitted from the prompt context.
-
-        Returns:
-            Formatted string inside <uploaded_files> tags.
-        """
+        '执行 _create_files_message 的明确职责，并返回与调用约定一致的结果。\n\nCreate a formatted message listing uploaded files.\n\n        Args:\n            new_files: Files uploaded in the current message.\n            historical_files: Files uploaded in previous messages.\n                Each file dict may contain an optional ``outline`` key — a list of\n                ``{title, line}`` dicts extracted from the converted Markdown file.\n            omitted_new_files: Current-message files omitted from the prompt context.\n            omitted_historical_files: Older historical files omitted from the prompt context.\n\n        Returns:\n            Formatted string inside <uploaded_files> tags.\n        '
         lines = ["<uploaded_files>"]
 
         lines.append("The following files were uploaded in this message:")
@@ -253,20 +221,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         return "\n".join(lines)
 
     def _files_from_kwargs(self, message: HumanMessage, uploads_dir: Path | None = None) -> list[dict] | None:
-        """Extract file info from message additional_kwargs.files.
-
-        The frontend sends uploaded file metadata in additional_kwargs.files
-        after a successful upload. Each entry has: filename, size (bytes),
-        path (virtual path), status.
-
-        Args:
-            message: The human message to inspect.
-            uploads_dir: Physical uploads directory used to verify file existence.
-                         When provided, entries whose files no longer exist are skipped.
-
-        Returns:
-            List of file dicts with virtual paths, or None if the field is absent or empty.
-        """
+        '执行 _files_from_kwargs 的明确职责，并返回与调用约定一致的结果。\n\nExtract file info from message additional_kwargs.files.\n\n        The frontend sends uploaded file metadata in additional_kwargs.files\n        after a successful upload. Each entry has: filename, size (bytes),\n        path (virtual path), status.\n\n        Args:\n            message: The human message to inspect.\n            uploads_dir: Physical uploads directory used to verify file existence.\n                         When provided, entries whose files no longer exist are skipped.\n\n        Returns:\n            List of file dicts with virtual paths, or None if the field is absent or empty.\n        '
         kwargs_files = (message.additional_kwargs or {}).get("files")
         if not isinstance(kwargs_files, list) or not kwargs_files:
             return None
@@ -292,23 +247,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
 
     @override
     def before_agent(self, state: UploadsMiddlewareState, runtime: Runtime) -> dict | None:
-        """Inject uploaded files information before agent execution.
-
-        New files come from the current message's additional_kwargs.files.
-        Historical files are scanned from the thread's uploads directory,
-        excluding the new ones.
-
-        Prepends <uploaded_files> context to the last human message content.
-        The original additional_kwargs (including files metadata) is preserved
-        on the updated message so the frontend can read it from the stream.
-
-        Args:
-            state: Current agent state.
-            runtime: Runtime context containing thread_id.
-
-        Returns:
-            State updates including uploaded files list.
-        """
+        "执行 before_agent 的明确职责，并返回与调用约定一致的结果。\n\nInject uploaded files information before agent execution.\n\n        New files come from the current message's additional_kwargs.files.\n        Historical files are scanned from the thread's uploads directory,\n        excluding the new ones.\n\n        Prepends <uploaded_files> context to the last human message content.\n        The original additional_kwargs (including files metadata) is preserved\n        on the updated message so the frontend can read it from the stream.\n\n        Args:\n            state: Current agent state.\n            runtime: Runtime context containing thread_id.\n\n        Returns:\n            State updates including uploaded files list.\n        "
         messages = list(state.get("messages", []))
         if not messages:
             return None
@@ -437,13 +376,5 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
 
     @override
     async def abefore_agent(self, state: UploadsMiddlewareState, runtime: Runtime) -> dict | None:
-        """Async hook that offloads the synchronous uploads scan off the event loop.
-
-        ``before_agent`` performs blocking filesystem IO (directory enumeration,
-        ``stat``, reading sibling ``.md`` outlines). When the graph runs async,
-        langgraph would otherwise execute the sync hook directly on the event
-        loop, so it is dispatched to a worker thread via ``run_in_executor``.
-        ``run_in_executor`` copies the current context, so the ``user_id``
-        contextvar read by ``get_effective_user_id()`` is preserved.
-        """
+        '执行 abefore_agent 的明确职责，并返回与调用约定一致的结果。\n\nAsync hook that offloads the synchronous uploads scan off the event loop.\n\n        ``before_agent`` performs blocking filesystem IO (directory enumeration,\n        ``stat``, reading sibling ``.md`` outlines). When the graph runs async,\n        langgraph would otherwise execute the sync hook directly on the event\n        loop, so it is dispatched to a worker thread via ``run_in_executor``.\n        ``run_in_executor`` copies the current context, so the ``user_id``\n        contextvar read by ``get_effective_user_id()`` is preserved.\n        '
         return await run_in_executor(None, self.before_agent, state, runtime)

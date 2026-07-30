@@ -1,14 +1,11 @@
-"""Read-only operations-console endpoints.
+"""只读运维控制台端点。
 
-Aggregates observability data across all of the current user's threads: run
-history, token spend over time, and asset counts — the data layer for an
-operations dashboard or any external monitoring consumer.
+汇总当前用户全部线程的可观测性数据，包括运行历史、时间范围内的 Token 支出和资产
+计数，可作为运维仪表盘或外部监控消费者的数据层。
 
-This is a reporting layer, not a runtime path: it issues short-lived read-only
-queries against the harness-owned ``runs`` / ``threads_meta`` tables instead of
-widening the runtime ``RunStore`` surface. Requires a SQL database backend
-(``database.backend: sqlite | postgres``); returns 503 on the memory backend,
-which persists no run history to report on.
+该模块仅负责报表，不参与运行时执行：它对 harness 管理的 ``runs`` / ``threads_meta``
+表执行短生命周期的只读查询，而不扩展运行时 `RunStore` 的接口。需要 SQL 数据库后端
+（``database.backend: sqlite | postgres``）；内存后端不持久化运行历史，因此返回 503。
 """
 
 import asyncio
@@ -34,17 +31,17 @@ router = APIRouter(prefix="/api/console", tags=["console"])
 _ACTIVE_STATUSES = ("pending", "running")
 _FAILED_STATUSES = ("error", "timeout")
 
-# Cap the error excerpt in list responses; the full text stays on the run row.
+# 限制列表响应中的错误摘要长度；完整文本保留在运行记录中。
 _ERROR_EXCERPT_CHARS = 300
 
 
 # ---------------------------------------------------------------------------
-# Response models
+# 响应模型
 # ---------------------------------------------------------------------------
 
 
 class ConsoleStatsResponse(BaseModel):
-    """Headline counters for the console dashboard."""
+    """控制台仪表盘的核心统计计数。"""
 
     total_runs: int = Field(..., description="All recorded runs for the current user")
     active_runs: int = Field(..., description="Runs currently pending or running")
@@ -57,7 +54,7 @@ class ConsoleStatsResponse(BaseModel):
 
 
 class ConsoleRunItem(BaseModel):
-    """One run in the cross-thread run listing."""
+    """跨线程运行列表中的一次运行。"""
 
     run_id: str
     thread_id: str
@@ -75,14 +72,14 @@ class ConsoleRunItem(BaseModel):
 
 
 class ConsoleRunsResponse(BaseModel):
-    """Paginated cross-thread run listing, newest first."""
+    """分页的跨线程运行列表，最新的在前。"""
 
     runs: list[ConsoleRunItem]
     has_more: bool
 
 
 class ConsoleUsageDay(BaseModel):
-    """Token usage aggregated over one local-time day."""
+    """按本地时间单日汇总的 Token 使用量。"""
 
     date: str = Field(..., description="Local date (YYYY-MM-DD) per the requested tz offset")
     total_tokens: int = 0
@@ -93,7 +90,7 @@ class ConsoleUsageDay(BaseModel):
 
 
 class ConsoleUsageModelBreakdown(BaseModel):
-    """Token usage attributed to one model."""
+    """归因到单个模型的 Token 使用量。"""
 
     tokens: int = 0
     runs: int = Field(default=0, description="Runs that used this model (non-exclusive)")
@@ -103,7 +100,7 @@ class ConsoleUsageModelBreakdown(BaseModel):
 
 
 class ConsoleUsageResponse(BaseModel):
-    """Daily token-usage series plus per-model breakdown for the window."""
+    """时间窗口内按日汇总的 Token 使用序列及按模型明细。"""
 
     days: list[ConsoleUsageDay]
     by_model: dict[str, ConsoleUsageModelBreakdown]
@@ -114,11 +111,12 @@ class ConsoleUsageResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Helpers
+# 辅助函数
 # ---------------------------------------------------------------------------
 
 
 def _session_factory_or_503():
+    """返回 SQL 会话工厂；未配置 SQL 后端时返回 503。"""
     sf = get_session_factory()
     if sf is None:
         raise HTTPException(
@@ -129,40 +127,39 @@ def _session_factory_or_503():
 
 
 def _as_utc(dt: datetime | None) -> datetime | None:
-    """Normalize DB timestamps: SQLite round-trips them naive, Postgres aware."""
+    """规范化数据库时间戳：SQLite 读回无时区时间，Postgres 保留时区信息。"""
     if dt is None:
         return None
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
 # ---------------------------------------------------------------------------
-# Pricing — real spend estimation
+# 定价：实际支出估算
 # ---------------------------------------------------------------------------
 
 
 class _ModelPricing(NamedTuple):
+    """每百万 Token 的模型定价配置。"""
     input_per_million: float
     output_per_million: float
     currency: str
-    # Price for prompt-cache-hit input tokens. None → hits are billed at the
-    # full input price (conservative upper bound for providers that don't
-    # discount, or when the operator hasn't configured the hit price).
+    # 提示词缓存命中输入 Token 的价格。为 `None` 时按完整输入价格计费，作为未提供
+    # 缓存命中折扣或运营方未配置该价格时的保守上界。
     input_cache_hit_per_million: float | None = None
 
 
 def _build_pricing_map() -> dict[str, _ModelPricing]:
-    """Collect per-model prices from ``models[*].pricing`` in config.yaml.
+    """从 `config.yaml` 的 `models[*].pricing` 收集各模型定价。
 
-    ``ModelConfig`` allows extra fields, so operators can annotate each model
-    with e.g. ``pricing: {currency: CNY, input_per_million: 8,
-    output_per_million: 32, input_cache_hit_per_million: 0.8}`` without any
-    schema change. Entries are keyed by both the config ``name`` and the
-    provider ``model`` id (plus lowercase variants), because
-    ``token_usage_by_model`` buckets carry the provider-reported model name.
+    `ModelConfig` 允许额外字段，因此运营方可为模型添加例如
+    ``pricing: {currency: CNY, input_per_million: 8, output_per_million: 32,
+    input_cache_hit_per_million: 0.8}`` 的配置，无需修改模式。定价同时以配置的 `name`
+    和提供商 `model` ID（及其小写形式）为键，因为 `token_usage_by_model` 的分桶使用
+    提供商报告的模型名称。
     """
     try:
         models = get_app_config().models
-    except Exception:  # pragma: no cover - defensive: cost display must not break the console
+    except Exception:  # pragma: no cover - 防御性处理：成本展示不得导致控制台不可用。
         logger.warning("console: failed to load model pricing from config", exc_info=True)
         return {}
 
@@ -191,22 +188,22 @@ def _build_pricing_map() -> dict[str, _ModelPricing]:
 
 
 def _pricing_currency(pricing: dict[str, _ModelPricing]) -> str | None:
-    """Display currency: the first configured entry's (one currency per deployment)."""
+    """返回展示货币，即首个配置定价条目的货币（每个部署使用一种货币）。"""
     return next(iter(pricing.values())).currency if pricing else None
 
 
 def _lookup_pricing(pricing: dict[str, _ModelPricing], model: str | None) -> _ModelPricing | None:
+    """按模型名称查找定价，同时兼容大小写差异。"""
     if not model:
         return None
     return pricing.get(model) or pricing.get(model.lower())
 
 
 def _token_cost(input_tokens: int, output_tokens: int, price: _ModelPricing, cache_read_tokens: int = 0) -> float:
-    """Cache-aware spend: cache-hit input tokens are billed at the hit price.
+    """计算缓存感知的支出：缓存命中输入 Token 按命中价格计费。
 
-    ``cache_read_tokens`` is clamped into ``[0, input_tokens]``; the remainder
-    is billed at the full (cache-miss) input price. Without a configured hit
-    price all input is billed at the miss price.
+    `cache_read_tokens` 会被限制在 `[0, input_tokens]` 区间内，其余输入按完整
+    （缓存未命中）输入价格计费。未配置命中价格时，所有输入均按未命中价格计费。
     """
     cache_read = min(max(int(cache_read_tokens or 0), 0), max(int(input_tokens or 0), 0))
     uncached = max(int(input_tokens or 0), 0) - cache_read
@@ -222,12 +219,10 @@ def _run_cost(
     total_output_tokens: int | None,
     token_usage_by_model: dict | None,
 ) -> float | None:
-    """Estimate one run's spend, or None when none of its models are priced.
+    """估算单次运行的支出；若所用模型均未定价则返回 `None`。
 
-    Prefers the per-model breakdown (accurate for multi-model runs, e.g.
-    subagents on a different model); falls back to run-level totals priced at
-    ``model_name`` for legacy rows. Buckets without an input/output split are
-    skipped rather than guessed.
+    优先使用按模型明细，以准确覆盖子智能体使用不同模型等多模型运行；旧记录则回退为
+    按 `model_name` 的运行级合计。缺少输入/输出拆分的分桶会被跳过，不进行猜测。
     """
     cost = 0.0
     priced = False
@@ -257,7 +252,7 @@ def _run_cost(
 
 
 # ---------------------------------------------------------------------------
-# Endpoints
+# 端点
 # ---------------------------------------------------------------------------
 
 
@@ -269,7 +264,7 @@ def _run_cost(
 )
 @require_permission("runs", "read")
 async def console_stats(request: Request) -> ConsoleStatsResponse:
-    """Return the dashboard's headline counters."""
+    """返回仪表板的标题计数器。"""
     sf = _session_factory_or_503()
     user_id = await get_current_user(request)
     run_where = (RunRow.user_id == user_id,) if user_id else ()
@@ -310,11 +305,11 @@ async def console_stats(request: Request) -> ConsoleStatsResponse:
             total_cost = round(cost_sum, 6)
 
     try:
-        # Filesystem scan; resolves the effective user internally (AuthMiddleware
-        # sets the context for real requests, "default" in no-auth mode).
+        # 文件系统扫描会在内部解析有效用户：真实请求由 `AuthMiddleware` 设置上下文，
+        # 认证禁用模式使用 `"default"`。
         agents = await asyncio.to_thread(list_custom_agents)
         total_agents = len(agents)
-    except Exception:  # pragma: no cover - defensive: stats must not 500 on a bad agents dir
+    except Exception:  # pragma: no cover - 防御性处理：异常的智能体目录不得使统计接口返回 500。
         logger.warning("console_stats: failed to list custom agents", exc_info=True)
         total_agents = 0
 
@@ -343,7 +338,7 @@ async def console_runs(
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None, description="Filter by run status (e.g. running, success, error)"),
 ) -> ConsoleRunsResponse:
-    """Return a page of the user's runs across all threads."""
+    """返回用户在所有线程中运行的页面。"""
     sf = _session_factory_or_503()
     user_id = await get_current_user(request)
 
@@ -406,7 +401,7 @@ async def console_usage(
     days: int = Query(default=14, ge=1, le=90),
     tz_offset_minutes: int = Query(default=0, ge=-840, le=840, description="Local-time offset from UTC for day bucketing"),
 ) -> ConsoleUsageResponse:
-    """Aggregate token usage by local day and by model."""
+    """按当地时间和型号汇总令牌使用情况。"""
     sf = _session_factory_or_503()
     user_id = await get_current_user(request)
 
@@ -439,7 +434,7 @@ async def console_usage(
         local_date = ((created + tz_delta).date()).isoformat()
         bucket = day_buckets.get(local_date)
         if bucket is None:
-            # Row sits just outside the local window (UTC-window over-fetch); skip.
+            # 该记录位于本地时间窗口之外（UTC 查询范围包含了额外数据），跳过。
             continue
         run_tokens = row.total_tokens or 0
         bucket.total_tokens += run_tokens
@@ -475,7 +470,7 @@ async def console_usage(
                     model_cost = _token_cost(int(usage.get("input_tokens") or 0), int(usage.get("output_tokens") or 0), price, int(usage.get("cache_read_tokens") or 0))
                     entry.cost = round((entry.cost or 0.0) + model_cost, 6)
         elif row.model_name and run_tokens > 0:
-            # Legacy rows predating token_usage_by_model: fall back to the run's model.
+            # 早于 `token_usage_by_model` 的旧记录：回退到运行级模型。
             entry = by_model.setdefault(row.model_name, ConsoleUsageModelBreakdown())
             entry.tokens += run_tokens
             entry.runs += 1

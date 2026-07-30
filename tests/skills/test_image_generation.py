@@ -1,3 +1,4 @@
+'未说明'
 import base64
 import sys
 from pathlib import Path
@@ -12,39 +13,46 @@ img = load("image-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
+    '未说明'
     for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "IMAGE_GENERATION_PROVIDER",
               "MINIMAX_API_HOST", "MINIMAX_IMAGE_MODEL"]:
         monkeypatch.delenv(k, raising=False)
 
 
 def test_resolve_prefers_gemini(monkeypatch):
+    '未说明'
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "gemini"
 
 
 def test_resolve_falls_back_to_minimax(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", False) == "minimax"
 
 
 def test_resolve_override_wins(monkeypatch):
+    '未说明'
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "MiniMax")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "minimax"
 
 
 def test_resolve_errors_when_none(monkeypatch):
+    '未说明'
     with pytest.raises(ValueError):
         img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", False)
 
 
 def test_minimax_builds_payload_and_writes(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     raw = b"PNGBYTES"
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         captured["url"] = url
         captured["headers"] = headers
         captured["json"] = json
@@ -69,10 +77,12 @@ def test_minimax_builds_payload_and_writes(monkeypatch, tmp_path):
 
 
 def test_minimax_reference_image_as_data_url(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         captured["json"] = json
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
                          "base_resp": {"status_code": 0}})
@@ -93,9 +103,11 @@ def test_minimax_reference_image_as_data_url(monkeypatch, tmp_path):
 
 
 def test_minimax_raises_on_base_resp_error(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"base_resp": {"status_code": 1004, "status_msg": "auth failed"}})
 
     monkeypatch.setattr(img.requests, "post", fake_post)
@@ -107,10 +119,12 @@ def test_minimax_raises_on_base_resp_error(monkeypatch, tmp_path):
 
 
 def test_minimax_extracts_json_prompt_field(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         captured["json"] = json
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
                          "base_resp": {"status_code": 0}})
@@ -130,10 +144,12 @@ def test_minimax_extracts_json_prompt_field(monkeypatch, tmp_path):
 
 
 def test_minimax_plaintext_prompt_passes_through(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         captured["json"] = json
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
                          "base_resp": {"status_code": 0}})
@@ -147,9 +163,11 @@ def test_minimax_plaintext_prompt_passes_through(monkeypatch, tmp_path):
 
 
 def test_minimax_rejects_overlong_prompt_without_calling_api(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):  # pragma: no cover
+        '未说明'
         raise AssertionError("must not call the API when the prompt is over the limit")
 
     monkeypatch.setattr(img.requests, "post", fake_post)
@@ -164,9 +182,11 @@ def test_minimax_rejects_overlong_prompt_without_calling_api(monkeypatch, tmp_pa
 
 
 def test_minimax_creates_nested_output_dir(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"img").decode()]},
                          "base_resp": {"status_code": 0}})
 
@@ -180,6 +200,7 @@ def test_minimax_creates_nested_output_dir(monkeypatch, tmp_path):
 
 
 def test_unknown_provider_raises(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "openai")
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     pf = tmp_path / "p.json"
@@ -189,6 +210,7 @@ def test_unknown_provider_raises(monkeypatch, tmp_path):
 
 
 def test_guess_mime_by_extension():
+    '未说明'
     assert img._guess_mime("/a/b.png") == "image/png"
     assert img._guess_mime("/a/b.webp") == "image/webp"
     assert img._guess_mime("/a/b.jpg") == "image/jpeg"

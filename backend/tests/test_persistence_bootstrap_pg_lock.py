@@ -1,27 +1,4 @@
-"""Regression test for the Postgres bootstrap advisory-lock protection.
-
-Managed Postgres (RDS, Cloud SQL, Supabase) defaults
-``idle_in_transaction_session_timeout`` to 1-10 minutes. If the lock-holding
-connection sits idle while ``asyncio.to_thread(_upgrade, ...)`` runs alembic
-on a different pooled connection longer than that, the host kills the idle
-session and the advisory lock is **silently released** -- defeating the
-cross-process mutex. ``_postgres_lock`` issues
-``SET LOCAL idle_in_transaction_session_timeout = 0`` immediately on the
-lock-holding connection to neutralise that kill for the lifetime of the
-transaction.
-
-This test pins:
-
-1. The ``SET LOCAL`` is emitted at all (no silent regression).
-2. It runs **before** ``pg_advisory_lock`` -- otherwise a slow lock acquire
-   on a heavily-contended cluster would itself be vulnerable.
-3. The ``pg_advisory_unlock`` still fires on the way out (the new SQL must
-   not break the release path).
-
-We mock the engine instead of standing up a real Postgres because the only
-behaviour worth pinning here is the SQL execution order; the timeout's
-runtime effect is Postgres's contract, not ours.
-"""
+"""本模块覆盖持久化的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -31,35 +8,40 @@ from deerflow.persistence import bootstrap as bootstrap_mod
 
 
 class _FakeAsyncConn:
-    """Async-context-manager stand-in for SQLAlchemy's ``AsyncConnection``.
-
-    Records every ``execute(stmt, params)`` so the test can assert SQL order.
-    """
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.executed: list[tuple[str, dict | None]] = []
 
     async def execute(self, stmt, params=None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.executed.append((str(stmt), params))
         return None
 
     async def __aenter__(self) -> _FakeAsyncConn:
+        """准备可控测试资源与状态，供后续断言读取。"""
         return self
 
     async def __aexit__(self, *_exc_info: object) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         return None
 
 
 class _FakeAsyncEngine:
+    """集中覆盖当前测试分支与回归边界。"""
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.conn = _FakeAsyncConn()
 
     def connect(self) -> _FakeAsyncConn:
+        """准备可控测试资源与状态，供后续断言读取。"""
         return self.conn
 
 
 @pytest.mark.asyncio
 async def test_postgres_lock_disables_idle_in_transaction_kill_before_locking() -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = _FakeAsyncEngine()
 
     async with bootstrap_mod._postgres_lock(engine):  # type: ignore[arg-type]
@@ -86,8 +68,7 @@ async def test_postgres_lock_disables_idle_in_transaction_kill_before_locking() 
 
 @pytest.mark.asyncio
 async def test_postgres_lock_releases_even_if_body_raises() -> None:
-    """Defence-in-depth: the SET LOCAL addition must not regress the
-    existing finally-block contract that releases the lock on body errors."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = _FakeAsyncEngine()
 
     with pytest.raises(RuntimeError, match="boom"):

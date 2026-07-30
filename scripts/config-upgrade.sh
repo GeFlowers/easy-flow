@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# config-upgrade.sh - Upgrade config.yaml to match config.example.yaml
+# config-upgrade.sh - 将 config.yaml 升级为与 config.example.yaml 兼容的结构
 #
-# 1. Runs version-specific migrations (value replacements, renames, etc.)
-# 2. Merges missing fields from the example into the user config
-# 3. Backs up config.yaml to config.yaml.bak before modifying.
+# 1. 执行特定版本迁移（值替换、重命名等）
+# 2. 将示例中缺失的字段合并至用户配置
+# 3. 修改前备份 config.yaml 至 config.yaml.bak，保留可恢复副本。
 
 set -e
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 EXAMPLE="$REPO_ROOT/config.example.yaml"
 
-# Resolve config.yaml location: env var > backend/ > repo root
+# 配置路径优先级：环境变量 > backend/ > 仓库根目录，保留显式部署覆盖。
 if [ -n "$DEER_FLOW_CONFIG_PATH" ] && [ -f "$DEER_FLOW_CONFIG_PATH" ]; then
     CONFIG="$DEER_FLOW_CONFIG_PATH"
 elif [ -f "$REPO_ROOT/backend/config.yaml" ]; then
@@ -34,7 +34,7 @@ if [ -z "$CONFIG" ]; then
     exit 0
 fi
 
-# Use inline Python to do migrations + recursive merge with PyYAML
+# 使用内联 Python 与 PyYAML 执行迁移和递归合并；Shell 仅负责路径兼容与调用边界。
 if command -v cygpath >/dev/null 2>&1; then
     CONFIG_WIN="$(cygpath -w "$CONFIG")"
     EXAMPLE_WIN="$(cygpath -w "$EXAMPLE")"

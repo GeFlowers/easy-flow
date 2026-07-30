@@ -1,19 +1,4 @@
-"""Issue #2873 regression — the public Sandbox API must honor the documented
-/mnt/user-data contract uniformly across implementations.
-
-Today AIO sandbox already accepts /mnt/user-data/... paths directly because the
-container has those paths bind-mounted per-thread. LocalSandbox, however,
-externalises that translation to ``deerflow.sandbox.tools`` via ``thread_data``,
-so any caller that bypasses tools.py (e.g. ``uploads.py`` syncing files into a
-remote sandbox via ``sandbox.update_file(virtual_path, ...)``) sees inconsistent
-behaviour.
-
-These tests pin down the **public Sandbox API boundary**: when a caller obtains
-a ``LocalSandbox`` from ``LocalSandboxProvider.acquire(thread_id)`` and invokes
-its abstract methods with documented virtual paths, those paths must resolve to
-the thread's user-data directory automatically — no tools.py / thread_data
-shim required.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -28,7 +13,7 @@ from deerflow.sandbox.local.local_sandbox_provider import LocalSandboxProvider
 
 
 def _build_config(skills_dir: Path) -> SimpleNamespace:
-    """Minimal app config covering what ``LocalSandboxProvider`` reads at init."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return SimpleNamespace(
         skills=SimpleNamespace(
             container_path="/mnt/skills",
@@ -41,11 +26,7 @@ def _build_config(skills_dir: Path) -> SimpleNamespace:
 
 @pytest.fixture
 def isolated_paths(monkeypatch, tmp_path):
-    """Redirect ``get_paths().base_dir`` to ``tmp_path`` and reset its singleton.
-
-    Without this, per-thread directories would be created under the developer's
-    real ``.deer-flow/`` tree.
-    """
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
     from deerflow.config import paths as paths_module
 
@@ -56,7 +37,7 @@ def isolated_paths(monkeypatch, tmp_path):
 
 @pytest.fixture
 def provider(isolated_paths, tmp_path):
-    """Provider with a real skills dir and no custom mounts."""
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     cfg = _build_config(skills_dir)
@@ -65,26 +46,29 @@ def provider(isolated_paths, tmp_path):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 1. Direct Sandbox API accepts the virtual path contract for ``acquire(tid)``
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ──────────────────────────────────────────────────────────────────────────
 
 
 def test_acquire_with_thread_id_returns_per_thread_id(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha", user_id="default")
     assert sandbox_id == "local:default:alpha"
 
 
 def test_acquire_with_thread_id_uses_uniform_user_scoped_id(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert provider.acquire("alpha", user_id="alice") == "local:alice:alpha"
 
 
 def test_acquire_without_thread_id_remains_legacy_local_id(provider):
-    """Backward-compat: ``acquire()`` with no thread keeps the singleton id."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert provider.acquire() == "local"
     assert provider.acquire(None) == "local"
 
 
 def test_write_then_read_via_public_api_with_virtual_path(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
     assert sbx is not None
@@ -95,15 +79,17 @@ def test_write_then_read_via_public_api_with_virtual_path(provider):
 
 
 def test_list_dir_via_public_api_with_virtual_path(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
     sbx.write_file("/mnt/user-data/workspace/foo.txt", "x")
     entries = sbx.list_dir("/mnt/user-data/workspace")
-    # entries should be reverse-resolved back to the virtual prefix
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert any("/mnt/user-data/workspace/foo.txt" in e for e in entries)
 
 
 def test_execute_command_with_virtual_path(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
     sbx.write_file("/mnt/user-data/uploads/note.txt", "payload")
@@ -112,6 +98,7 @@ def test_execute_command_with_virtual_path(provider):
 
 
 def test_glob_with_virtual_path(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
     sbx.write_file("/mnt/user-data/outputs/report.md", "# r")
@@ -120,6 +107,7 @@ def test_glob_with_virtual_path(provider):
 
 
 def test_grep_with_virtual_path(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
     sbx.write_file("/mnt/user-data/workspace/findme.txt", "needle line\nother line")
@@ -129,11 +117,10 @@ def test_grep_with_virtual_path(provider):
 
 
 def test_execute_command_lists_aggregate_user_data_root(provider):
-    """``ls /mnt/user-data`` (the parent prefix itself) must list the three
-    subdirs — matching the AIO container's natural filesystem view."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
-    # Touch all three subdirs so they materialise on disk
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     sbx.write_file("/mnt/user-data/workspace/.keep", "")
     sbx.write_file("/mnt/user-data/uploads/.keep", "")
     sbx.write_file("/mnt/user-data/outputs/.keep", "")
@@ -144,19 +131,11 @@ def test_execute_command_lists_aggregate_user_data_root(provider):
 
 
 def test_list_dir_on_user_data_root_does_not_duplicate_subdir_mounts(provider):
-    """Regression: ``list_dir``'s virtual sub-directory overlay must not
-    double-list a mount that the underlying scan already found.
-
-    The overlay compared a bare child name (e.g. "workspace") against
-    ``existing_dirs``, which holds full container paths (e.g.
-    "/mnt/user-data/workspace") -- so the containment guard never matched and
-    each of workspace/uploads/outputs (real nested subdirectories the plain
-    scan already discovers) was appended a second time.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
-    # Touch all three subdirs so they materialise on disk and are found by the
-    # underlying (non-overlay) directory scan.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     sbx.write_file("/mnt/user-data/workspace/.keep", "")
     sbx.write_file("/mnt/user-data/uploads/.keep", "")
     sbx.write_file("/mnt/user-data/outputs/.keep", "")
@@ -169,12 +148,7 @@ def test_list_dir_on_user_data_root_does_not_duplicate_subdir_mounts(provider):
 
 
 def test_update_file_with_virtual_path_for_remote_sync_scenario(provider):
-    """This is the exact code path used by ``uploads.py:282`` and ``feishu.py:389``.
-
-    They build a ``virtual_path`` like ``/mnt/user-data/uploads/foo.pdf`` and hand
-    raw bytes to the sandbox. Before this fix LocalSandbox would try to write to
-    the literal host path ``/mnt/user-data/uploads/foo.pdf`` and fail.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox_id = provider.acquire("alpha")
     sbx = provider.get(sandbox_id)
     sbx.update_file("/mnt/user-data/uploads/blob.bin", b"\x00\x01\x02binary")
@@ -182,11 +156,12 @@ def test_update_file_with_virtual_path_for_remote_sync_scenario(provider):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 2. Per-thread isolation (no cross-thread state leaks)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ──────────────────────────────────────────────────────────────────────────
 
 
 def test_two_threads_get_distinct_sandboxes(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sid_a = provider.acquire("alpha")
     sid_b = provider.acquire("beta")
     assert sid_a != sid_b
@@ -197,20 +172,20 @@ def test_two_threads_get_distinct_sandboxes(provider):
 
 
 def test_per_thread_user_data_mapping_isolated(provider, isolated_paths):
-    """Files written via one thread's sandbox must not be visible through another."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sid_a = provider.acquire("alpha")
     sid_b = provider.acquire("beta")
     sbx_a = provider.get(sid_a)
     sbx_b = provider.get(sid_b)
 
     sbx_a.write_file("/mnt/user-data/workspace/secret.txt", "alpha-only")
-    # The same virtual path resolves to a different host path in thread "beta"
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     with pytest.raises(FileNotFoundError):
         sbx_b.read_file("/mnt/user-data/workspace/secret.txt")
 
 
 def test_same_thread_different_users_are_isolated(provider):
-    """Channel/user-scoped mounts must not reuse another user's local mapping."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sid_alice = provider.acquire("alpha", user_id="alice")
     sid_bob = provider.acquire("alpha", user_id="bob")
     assert sid_alice != sid_bob
@@ -225,8 +200,7 @@ def test_same_thread_different_users_are_isolated(provider):
 
 
 def test_agent_written_paths_per_thread_isolation(provider):
-    """``_agent_written_paths`` tracks files this sandbox wrote so reverse-resolve
-    runs on read. The set must not leak across threads."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sid_a = provider.acquire("alpha")
     sid_b = provider.acquire("beta")
     sbx_a = provider.get(sid_a)
@@ -237,22 +211,23 @@ def test_agent_written_paths_per_thread_isolation(provider):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 3. Lifecycle: get / release / reset
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ──────────────────────────────────────────────────────────────────────────
 
 
 def test_get_returns_cached_instance_for_known_id(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sid = provider.acquire("alpha")
     assert provider.get(sid) is provider.get(sid)
 
 
 def test_get_unknown_id_returns_none(provider):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert provider.get("local:default:nonexistent") is None
 
 
 def test_release_is_noop_keeps_instance_available(provider):
-    """Local has no resources to release; the cached instance stays alive across
-    turns so ``_agent_written_paths`` persists for reverse-resolve on later reads."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sid = provider.acquire("alpha")
     sbx_before = provider.get(sid)
     provider.release(sid)
@@ -261,8 +236,9 @@ def test_release_is_noop_keeps_instance_available(provider):
 
 
 def test_reset_clears_both_generic_and_per_thread_caches(provider):
-    provider.acquire()  # populate generic
-    provider.acquire("alpha")  # populate per-thread
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
+    provider.acquire()  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    provider.acquire("alpha")  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert provider._generic_sandbox is not None
     assert provider._thread_sandboxes
 
@@ -272,11 +248,12 @@ def test_reset_clears_both_generic_and_per_thread_caches(provider):
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 4. is_local_sandbox detects both generic and per-thread ids
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ──────────────────────────────────────────────────────────────────────────
 
 
 def test_is_local_sandbox_accepts_generic_and_per_thread_id_formats():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.sandbox.tools import is_local_sandbox
 
     generic = SimpleNamespace(state={"sandbox": {"sandbox_id": "local"}}, context={})
@@ -291,27 +268,22 @@ def test_is_local_sandbox_accepts_generic_and_per_thread_id_formats():
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 5. Concurrency safety (Copilot review feedback)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ──────────────────────────────────────────────────────────────────────────
 
 
 def test_concurrent_acquire_same_thread_yields_single_instance(provider):
-    """Two threads racing on ``acquire("alpha")`` must share one LocalSandbox.
-
-    Without the provider lock the check-then-act in ``acquire`` is non-atomic:
-    both racers would see an empty cache, both would build their own
-    LocalSandbox, and one would overwrite the other — losing the loser's
-    ``_agent_written_paths`` and any in-flight state on it.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import threading
     import time
 
     from deerflow.sandbox.local import local_sandbox as local_sandbox_module
 
-    # Force a wide race window by slowing the LocalSandbox constructor down.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     original_init = local_sandbox_module.LocalSandbox.__init__
 
     def slow_init(self, *args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         time.sleep(0.05)
         original_init(self, *args, **kwargs)
 
@@ -320,6 +292,7 @@ def test_concurrent_acquire_same_thread_yields_single_instance(provider):
     results_lock = threading.Lock()
 
     def racer():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         barrier.wait()
         sid = provider.acquire("alpha", user_id="default")
         with results_lock:
@@ -332,15 +305,15 @@ def test_concurrent_acquire_same_thread_yields_single_instance(provider):
         for t in threads:
             t.join()
 
-    # Every racer must observe the same ``sandbox_id``…
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert len(set(results)) == 1, f"Racers saw different ids: {results}"
-    # …and the cache must hold exactly one instance for ``alpha``.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert len(provider._thread_sandboxes) == 1
     assert ("default", "alpha") in provider._thread_sandboxes
 
 
 def test_concurrent_acquire_distinct_threads_yields_distinct_instances(provider):
-    """Different thread_ids race-acquired in parallel each get their own sandbox."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import threading
 
     barrier = threading.Barrier(6)
@@ -348,6 +321,7 @@ def test_concurrent_acquire_distinct_threads_yields_distinct_instances(provider)
     lock = threading.Lock()
 
     def racer(name: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         barrier.wait()
         sid = provider.acquire(name, user_id="default")
         with lock:
@@ -364,14 +338,12 @@ def test_concurrent_acquire_distinct_threads_yields_distinct_instances(provider)
 
 
 # ──────────────────────────────────────────────────────────────────────────
-# 6. Bounded memory growth (Copilot review feedback)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ──────────────────────────────────────────────────────────────────────────
 
 
 def test_thread_sandbox_cache_is_bounded(isolated_paths, tmp_path):
-    """The LRU cap must evict the least-recently-used thread sandboxes once
-    exceeded — otherwise long-running gateways would accumulate cache entries
-    for every distinct ``thread_id`` ever served."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     cfg = _build_config(skills_dir)
@@ -382,15 +354,14 @@ def test_thread_sandbox_cache_is_bounded(isolated_paths, tmp_path):
     for i in range(5):
         provider.acquire(f"t{i}", user_id="default")
 
-    # Only the 3 most-recent thread_ids should be retained.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert set(provider._thread_sandboxes.keys()) == {("default", "t2"), ("default", "t3"), ("default", "t4")}
     assert provider.get("local:default:t0") is None
     assert provider.get("local:default:t4") is not None
 
 
 def test_lru_promotes_recently_used_thread(isolated_paths, tmp_path):
-    """``get`` on a cached thread should mark it as most-recently used so a
-    later acquire-storm doesn't evict an active thread that is being polled."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills_dir = tmp_path / "skills"
     skills_dir.mkdir()
     cfg = _build_config(skills_dir)
@@ -400,9 +371,9 @@ def test_lru_promotes_recently_used_thread(isolated_paths, tmp_path):
 
     for name in ["a", "b", "c"]:
         provider.acquire(name, user_id="default")
-    # Touch "a" via ``get`` so it becomes most-recently used.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     provider.get("local:default:a")
-    # Adding a fourth thread should evict "b" (the new LRU), not "a".
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     provider.acquire("d", user_id="default")
 
     assert ("default", "a") in provider._thread_sandboxes

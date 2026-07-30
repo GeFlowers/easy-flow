@@ -1,3 +1,4 @@
+'未说明'
 import sys
 from pathlib import Path
 
@@ -11,12 +12,15 @@ mus = load("music-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
+    '未说明'
     for k in ["MINIMAX_API_KEY", "MINIMAX_API_HOST", "MINIMAX_MUSIC_MODEL"]:
         monkeypatch.delenv(k, raising=False)
 
 
 def _post_ok(captured):
+    '未说明'
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         captured["url"] = url
         captured["headers"] = headers
         captured["json"] = json
@@ -26,6 +30,7 @@ def _post_ok(captured):
 
 
 def test_with_lyrics_payload_and_writes(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))
@@ -44,6 +49,7 @@ def test_with_lyrics_payload_and_writes(monkeypatch, tmp_path):
 
 
 def test_instrumental_sets_flag(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))
@@ -56,6 +62,7 @@ def test_instrumental_sets_flag(monkeypatch, tmp_path):
 
 
 def test_no_lyrics_uses_optimizer(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))
@@ -67,6 +74,7 @@ def test_no_lyrics_uses_optimizer(monkeypatch, tmp_path):
 
 
 def test_model_override(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     monkeypatch.setenv("MINIMAX_MUSIC_MODEL", "music-2.6")
     captured = {}
@@ -78,9 +86,11 @@ def test_model_override(monkeypatch, tmp_path):
 
 
 def test_raises_on_base_resp_error(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"base_resp": {"status_code": 1008, "status_msg": "no balance"}})
 
     monkeypatch.setattr(mus.requests, "post", fake_post)
@@ -92,6 +102,7 @@ def test_raises_on_base_resp_error(monkeypatch, tmp_path):
 
 
 def test_missing_api_key_returns_message(monkeypatch, tmp_path):
+    '未说明'
     spec = tmp_path / "s.json"
     spec.write_text('{"prompt":"x"}', encoding="utf-8")
     msg = mus.generate_music(str(spec), str(tmp_path / "o.mp3"))
@@ -99,9 +110,11 @@ def test_missing_api_key_returns_message(monkeypatch, tmp_path):
 
 
 def test_raises_on_missing_audio_data(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"base_resp": {"status_code": 0}})  # no "data" key
 
     monkeypatch.setattr(mus.requests, "post", fake_post)
@@ -112,9 +125,11 @@ def test_raises_on_missing_audio_data(monkeypatch, tmp_path):
 
 
 def test_empty_prompt_raises(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):  # pragma: no cover
+        '未说明'
         raise AssertionError("must not call the API when prompt is missing")
 
     monkeypatch.setattr(mus.requests, "post", fake_post)
@@ -125,6 +140,7 @@ def test_empty_prompt_raises(monkeypatch, tmp_path):
 
 
 def test_empty_lyrics_falls_back_to_optimizer(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))

@@ -1,4 +1,4 @@
-"""Unified extensions configuration for MCP servers and skills."""
+"""提供配置、extensions、配置相关功能。"""
 
 import json
 import logging
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class McpRoutingConfig(BaseModel):
-    """Soft routing hints for MCP tool preference."""
+    """\u6267\u884c McpRoutingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     mode: Literal["off", "prefer"] = Field(
         default="off",
@@ -33,6 +33,7 @@ class McpRoutingConfig(BaseModel):
     @field_validator("priority")
     @classmethod
     def _clamp_priority(cls, value: int) -> int:
+        """\u6267\u884c _clamp_priority \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if value < 0:
             logger.warning("MCP routing priority %s is below 0; clamping to 0.", value)
             return 0
@@ -43,14 +44,14 @@ class McpRoutingConfig(BaseModel):
 
 
 class McpToolOverride(BaseModel):
-    """Per-tool MCP configuration overrides."""
+    """\u6267\u884c McpToolOverride \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     routing: McpRoutingConfig = Field(default_factory=McpRoutingConfig)
     model_config = ConfigDict(extra="allow")
 
 
 class McpOAuthConfig(BaseModel):
-    """OAuth configuration for an MCP server (HTTP/SSE transports)."""
+    """\u6267\u884c McpOAuthConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(default=True, description="Whether OAuth token injection is enabled")
     token_url: str = Field(description="OAuth token endpoint URL")
@@ -73,7 +74,7 @@ class McpOAuthConfig(BaseModel):
 
 
 class McpServerConfig(BaseModel):
-    """Configuration for a single MCP server."""
+    """\u6267\u884c McpServerConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(default=True, description="Whether this MCP server is enabled")
     type: str = Field(default="stdio", description="Transport type: 'stdio', 'sse', or 'http'")
@@ -95,15 +96,7 @@ class McpServerConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _accept_transport_alias(cls, data: Any) -> Any:
-        """Accept the MCP-spec ``transport`` field as an alias for ``type``.
-
-        The official MCP configuration schema uses ``transport`` to indicate
-        the transport mechanism (``stdio``/``sse``/``http``). Earlier versions
-        of this project only honored ``type``, which caused remote SSE/HTTP
-        servers configured with just ``transport`` to be incorrectly treated as
-        ``stdio`` (the default). This validator normalizes the two so either
-        spelling works, with ``type`` taking precedence when both are provided.
-        """
+        """\u6267\u884c _accept_transport_alias \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if isinstance(data, dict):
             transport = data.get("transport")
             if transport and not data.get("type"):
@@ -112,7 +105,7 @@ class McpServerConfig(BaseModel):
 
 
 def resolve_effective_mcp_routing(server_config: McpServerConfig | None, original_tool_name: str) -> dict[str, Any]:
-    """Merge server-level routing with per-tool overrides for one MCP tool."""
+    """\u6267\u884c resolve_effective_mcp_routing \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     if server_config is None:
         return McpRoutingConfig().model_dump(mode="json")
 
@@ -124,13 +117,13 @@ def resolve_effective_mcp_routing(server_config: McpServerConfig | None, origina
 
 
 class SkillStateConfig(BaseModel):
-    """Configuration for a single skill's state."""
+    """\u6267\u884c SkillStateConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(default=True, description="Whether this skill is enabled")
 
 
 class ExtensionsConfig(BaseModel):
-    """Unified configuration for MCP servers and skills."""
+    """\u6267\u884c ExtensionsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     mcp_servers: dict[str, McpServerConfig] = Field(
         default_factory=dict,
@@ -145,28 +138,7 @@ class ExtensionsConfig(BaseModel):
 
     @classmethod
     def resolve_config_path(cls, config_path: str | None = None) -> Path | None:
-        """Resolve the extensions config file path.
-
-        Priority:
-        1. If provided `config_path` argument, use it.
-        2. If provided `DEER_FLOW_EXTENSIONS_CONFIG_PATH` environment variable, use it.
-        3. Otherwise, search the caller project root for `extensions_config.json`, then `mcp_config.json`.
-        4. For backward compatibility, also search legacy backend/repository-root defaults.
-        5. If not found, return None (extensions are optional).
-
-        Args:
-            config_path: Optional path to extensions config file.
-
-        Resolution order:
-            1. If provided `config_path` argument, use it.
-            2. If provided `DEER_FLOW_EXTENSIONS_CONFIG_PATH` environment variable, use it.
-            3. Otherwise, search the caller project root for
-               `extensions_config.json`, then legacy `mcp_config.json`.
-            4. Finally, search backend/repository-root defaults for monorepo compatibility.
-
-        Returns:
-            Path to the extensions config file if found, otherwise None.
-        """
+        """\u6267\u884c resolve_config_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if config_path:
             path = Path(config_path)
             if not path.exists():
@@ -193,24 +165,15 @@ class ExtensionsConfig(BaseModel):
                 if path.exists():
                     return path
 
-            # Extensions are optional, so return None if not found
+                        # 中文说明：此处用于执行相关处理。
             return None
 
     @classmethod
     def from_file(cls, config_path: str | None = None) -> "ExtensionsConfig":
-        """Load extensions config from JSON file.
-
-        See `resolve_config_path` for more details.
-
-        Args:
-            config_path: Path to the extensions config file.
-
-        Returns:
-            ExtensionsConfig: The loaded config, or empty config if file not found.
-        """
+        """\u6267\u884c from_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         resolved_path = cls.resolve_config_path(config_path)
         if resolved_path is None:
-            # Return empty config if extensions config file is not found
+                        # 中文说明：此处用于执行相关处理。
             return cls(mcp_servers={}, skills={})
 
         try:
@@ -225,24 +188,15 @@ class ExtensionsConfig(BaseModel):
 
     @classmethod
     def resolve_env_variables(cls, config: Any) -> Any:
-        """Recursively resolve environment variables in the config.
-
-        Environment variables are resolved using the `os.getenv` function. Example: $OPENAI_API_KEY
-
-        Args:
-            config: The config to resolve environment variables in.
-
-        Returns:
-            The config with environment variables resolved.
-        """
+        """\u6267\u884c resolve_env_variables \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if isinstance(config, str):
             if not config.startswith("$"):
                 return config
             env_value = os.getenv(config[1:])
             if env_value is None:
-                # Unresolved placeholder — store empty string so downstream
-                # consumers (e.g. MCP servers) don't receive the literal "$VAR"
-                # token as an actual environment value.
+                                # 中文说明：此处用于执行相关处理。
+                                # 中文说明：此处用于执行相关处理。
+                                # 中文说明：此处用于执行相关处理。
                 return ""
             return env_value
 
@@ -258,31 +212,14 @@ class ExtensionsConfig(BaseModel):
         return config
 
     def get_enabled_mcp_servers(self) -> dict[str, McpServerConfig]:
-        """Get only the enabled MCP servers.
-
-        Returns:
-            Dictionary of enabled MCP servers.
-        """
+        """\u6267\u884c get_enabled_mcp_servers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return {name: config for name, config in self.mcp_servers.items() if config.enabled}
 
     def is_skill_enabled(self, skill_name: str, skill_category: str) -> bool:
-        """Check if a skill is enabled.
-
-        Args:
-            skill_name: Name of the skill
-            skill_category: Category of the skill (public, custom, or legacy)
-
-        Returns:
-            True if enabled, False otherwise.
-
-        Note:
-            All skill categories (public, custom, legacy) respect the
-            extensions_config enabled/disabled state.  When no explicit
-            entry exists, skills default to enabled.
-        """
+        """\u6267\u884c is_skill_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         skill_config = self.skills.get(skill_name)
         if skill_config is None:
-            # Default to enabled for all skill categories
+                        # 中文说明：此处用于执行相关处理。
             return skill_category in ("public", "custom", "legacy")
         return skill_config.enabled
 
@@ -291,14 +228,7 @@ _extensions_config: ExtensionsConfig | None = None
 
 
 def get_extensions_config() -> ExtensionsConfig:
-    """Get the extensions config instance.
-
-    Returns a cached singleton instance. Use `reload_extensions_config()` to reload
-    from file, or `reset_extensions_config()` to clear the cache.
-
-    Returns:
-        The cached ExtensionsConfig instance.
-    """
+    """\u6267\u884c get_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _extensions_config
     if _extensions_config is None:
         _extensions_config = ExtensionsConfig.from_file()
@@ -306,41 +236,19 @@ def get_extensions_config() -> ExtensionsConfig:
 
 
 def reload_extensions_config(config_path: str | None = None) -> ExtensionsConfig:
-    """Reload the extensions config from file and update the cached instance.
-
-    This is useful when the config file has been modified and you want
-    to pick up the changes without restarting the application.
-
-    Args:
-        config_path: Optional path to extensions config file. If not provided,
-                     uses the default resolution strategy.
-
-    Returns:
-        The newly loaded ExtensionsConfig instance.
-    """
+    """\u6267\u884c reload_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _extensions_config
     _extensions_config = ExtensionsConfig.from_file(config_path)
     return _extensions_config
 
 
 def reset_extensions_config() -> None:
-    """Reset the cached extensions config instance.
-
-    This clears the singleton cache, causing the next call to
-    `get_extensions_config()` to reload from file. Useful for testing
-    or when switching between different configurations.
-    """
+    """\u6267\u884c reset_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _extensions_config
     _extensions_config = None
 
 
 def set_extensions_config(config: ExtensionsConfig) -> None:
-    """Set a custom extensions config instance.
-
-    This allows injecting a custom or mock config for testing purposes.
-
-    Args:
-        config: The ExtensionsConfig instance to use.
-    """
+    """\u6267\u884c set_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _extensions_config
     _extensions_config = config

@@ -1,4 +1,4 @@
-"""Tests for reflection resolvers."""
+"""本模块覆盖相关功能的行为、边界与回归场景，确保既有契约稳定。"""
 
 import pytest
 
@@ -7,9 +7,10 @@ from deerflow.reflection.resolvers import resolve_variable
 
 
 def test_resolve_variable_reports_install_hint_for_missing_google_provider(monkeypatch: pytest.MonkeyPatch):
-    """Missing google provider should return actionable install guidance."""
+    """验证安装 提供方在预期条件及边界场景下的可观察行为，防止相关回归。"""
 
     def fake_import_module(module_path: str):
+        """处理仿真相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise ModuleNotFoundError(f"No module named '{module_path}'", name=module_path)
 
     monkeypatch.setattr(resolvers, "import_module", fake_import_module)
@@ -25,10 +26,11 @@ def test_resolve_variable_reports_install_hint_for_missing_google_provider(monke
 def test_resolve_variable_reports_install_hint_for_missing_google_transitive_dependency(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Missing transitive dependency should still return actionable install guidance."""
+    """验证安装在预期条件及边界场景下的可观察行为，防止相关回归。"""
 
     def fake_import_module(module_path: str):
         # Simulate provider module existing but a transitive dependency (e.g. `google`) missing.
+        """处理仿真相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise ModuleNotFoundError("No module named 'google'", name="google")
 
     monkeypatch.setattr(resolvers, "import_module", fake_import_module)
@@ -42,7 +44,7 @@ def test_resolve_variable_reports_install_hint_for_missing_google_transitive_dep
 
 
 def test_resolve_variable_invalid_path_format():
-    """Invalid variable path should fail with format guidance."""
+    """验证路径 格式在预期条件及边界场景下的可观察行为，防止相关回归。"""
     with pytest.raises(ImportError) as exc_info:
         resolve_variable("invalid.variable.path")
 

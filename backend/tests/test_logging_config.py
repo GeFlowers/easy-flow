@@ -1,3 +1,4 @@
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 import io
 import logging
 from types import SimpleNamespace
@@ -7,6 +8,7 @@ from deerflow.trace_context import request_trace_context
 
 
 def test_trace_context_filter_injects_current_trace_id() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     record = logging.LogRecord("deerflow.test", logging.INFO, __file__, 1, "hello", (), None)
 
     with request_trace_context("trace-log-1"):
@@ -16,6 +18,7 @@ def test_trace_context_filter_injects_current_trace_id() -> None:
 
 
 def test_configure_logging_enhanced_text_includes_trace_id() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     root = logging.getLogger()
     old_handlers = root.handlers[:]
     old_level = root.level

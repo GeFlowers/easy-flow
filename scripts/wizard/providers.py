@@ -1,4 +1,4 @@
-"""LLM and search provider definitions for the Setup Wizard."""
+'未说明'
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from dataclasses import dataclass, field, replace
 
 @dataclass
 class LLMProvider:
+    '未说明'
     name: str
     display_name: str
     description: str
@@ -31,10 +32,7 @@ class LLMProvider:
     ask_thinking_support: bool = False
 
     def extra_config_for(self, model_name: str) -> dict:
-        """Return extra_config for a selected model, applying per-model overrides.
-
-        Does not mutate the shared provider-level ``extra_config``.
-        """
+        """执行配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
         config = dict(self.extra_config)
         if model_name in self.model_vision_overrides:
             config["supports_vision"] = self.model_vision_overrides[model_name]
@@ -43,6 +41,7 @@ class LLMProvider:
 
 @dataclass
 class WebProvider:
+    '未说明'
     name: str
     display_name: str
     description: str
@@ -54,6 +53,7 @@ class WebProvider:
 
 @dataclass
 class SearchProvider:
+    '未说明'
     name: str
     display_name: str
     description: str
@@ -98,14 +98,7 @@ ANTHROPIC_THINKING_CONFIG = {
 
 
 def with_thinking_support(provider: LLMProvider, supports_thinking: bool) -> LLMProvider:
-    """Return a copy of *provider* with thinking-capability flags applied.
-
-    For generic OpenAI-compatible gateways the wizard cannot infer whether the
-    user-supplied model supports thinking/reasoning. When the user confirms
-    support we also wire the common OpenAI-compatible enable/disable toggles so
-    the runtime can switch thinking on and off; otherwise we record the
-    capability as unsupported. The shared provider definition is never mutated.
-    """
+    """执行思考 支持对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if supports_thinking:
         extra_config = {**provider.extra_config, **OPENAI_COMPAT_THINKING_CONFIG}
     else:

@@ -1,4 +1,4 @@
-"""Tests for deerflow.tracing.factory."""
+'未说明'
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ from deerflow.tracing import factory as tracing_factory
 
 @pytest.fixture(autouse=True)
 def clear_tracing_env(monkeypatch):
+    '未说明'
     from deerflow.config.tracing_config import reset_tracing_config
 
     for name in (
@@ -39,6 +40,7 @@ def clear_tracing_env(monkeypatch):
 
 
 def test_build_tracing_callbacks_returns_empty_list_when_disabled(monkeypatch):
+    '未说明'
     monkeypatch.setattr(tracing_factory, "validate_enabled_tracing_providers", lambda: None)
     monkeypatch.setattr(tracing_factory, "get_enabled_tracing_providers", lambda: [])
 
@@ -48,12 +50,17 @@ def test_build_tracing_callbacks_returns_empty_list_when_disabled(monkeypatch):
 
 
 def test_build_tracing_callbacks_creates_langsmith_and_langfuse(monkeypatch):
+    '未说明'
     class FakeLangSmithTracer:
+        '未说明'
         def __init__(self, *, project_name: str):
+            '未说明'
             self.project_name = project_name
 
     class FakeLangfuseHandler:
+        '未说明'
         def __init__(self, *, public_key: str):
+            '未说明'
             self.public_key = public_key
 
     monkeypatch.setattr(tracing_factory, "get_enabled_tracing_providers", lambda: ["langsmith", "langfuse"])
@@ -93,6 +100,7 @@ def test_build_tracing_callbacks_creates_langsmith_and_langfuse(monkeypatch):
 
 
 def test_build_tracing_callbacks_raises_when_enabled_provider_fails(monkeypatch):
+    '未说明'
     monkeypatch.setattr(tracing_factory, "get_enabled_tracing_providers", lambda: ["langfuse"])
     monkeypatch.setattr(tracing_factory, "validate_enabled_tracing_providers", lambda: None)
     monkeypatch.setattr(
@@ -117,6 +125,7 @@ def test_build_tracing_callbacks_raises_when_enabled_provider_fails(monkeypatch)
 
 
 def test_build_tracing_callbacks_raises_for_explicitly_enabled_misconfigured_provider(monkeypatch):
+    '未说明'
     from deerflow.config.tracing_config import reset_tracing_config
 
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
@@ -129,14 +138,19 @@ def test_build_tracing_callbacks_raises_for_explicitly_enabled_misconfigured_pro
 
 
 def test_create_langfuse_handler_initializes_client_before_handler(monkeypatch):
+    '未说明'
     calls: list[tuple[str, dict]] = []
 
     class FakeLangfuse:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             calls.append(("client", kwargs))
 
     class FakeCallbackHandler:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             calls.append(("handler", kwargs))
 
     fake_langfuse_module = types.ModuleType("langfuse")

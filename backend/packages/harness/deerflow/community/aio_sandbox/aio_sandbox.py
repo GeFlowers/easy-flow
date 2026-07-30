@@ -1,3 +1,4 @@
+'定义 aio_sandbox 模块提供的职责与可复用接口'
 import base64
 import errno
 import logging
@@ -33,21 +34,10 @@ _BASH_EXEC_UNSUPPORTED_ERROR = (
 
 
 class AioSandbox(Sandbox):
-    """Sandbox implementation using the agent-infra/sandbox Docker container.
-
-    This sandbox connects to a running AIO sandbox container via HTTP API.
-    A threading lock serializes shell commands to prevent concurrent requests
-    from corrupting the container's single persistent session (see #1433).
-    """
+    "封装 AioSandbox 的状态、协作关系与公开操作。\n\nSandbox implementation using the agent-infra/sandbox Docker container.\n\n    This sandbox connects to a running AIO sandbox container via HTTP API.\n    A threading lock serializes shell commands to prevent concurrent requests\n    from corrupting the container's single persistent session (see #1433).\n    "
 
     def __init__(self, id: str, base_url: str, home_dir: str | None = None):
-        """Initialize the AIO sandbox.
-
-        Args:
-            id: Unique identifier for this sandbox instance.
-            base_url: URL of the sandbox API (e.g., http://localhost:8080).
-            home_dir: Home directory inside the sandbox. If None, will be fetched from the sandbox.
-        """
+        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nInitialize the AIO sandbox.\n\n        Args:\n            id: Unique identifier for this sandbox instance.\n            base_url: URL of the sandbox API (e.g., http://localhost:8080).\n            home_dir: Home directory inside the sandbox. If None, will be fetched from the sandbox.\n        '
         super().__init__(id)
         self._base_url = base_url
         self._client = AioSandboxClient(base_url=base_url, timeout=600)
@@ -60,28 +50,11 @@ class AioSandbox(Sandbox):
 
     @property
     def base_url(self) -> str:
+        '执行 base_url 的明确职责，并返回与调用约定一致的结果'
         return self._base_url
 
     def close(self) -> None:
-        """Best-effort close of the host-side HTTP client owned by this sandbox.
-
-        The agent_sandbox SDK is Fern-generated and exposes no ``close()`` /
-        ``__exit__``, so we reach the socket-owning ``httpx.Client`` explicitly
-        through its attribute chain::
-
-            Sandbox._client_wrapper        -> SyncClientWrapper
-                .httpx_client              -> Fern HttpClient (a wrapper, NOT httpx.Client)
-                    .httpx_client          -> httpx.Client     <- the real socket owner
-
-        Closing it releases pooled sockets so long-running provider lifecycles
-        do not accumulate unreclaimed host-side resources (#2872).
-
-        Resolution is most-specific-first with graceful degradation: if a future
-        SDK adds a top-level ``Sandbox.close()`` it is picked up automatically
-        without changing this code. Idempotent, thread-safe, and non-fatal:
-        failures during teardown are logged and swallowed so provider/backend
-        cleanup is never blocked.
-        """
+        '执行 close 的明确职责，并返回与调用约定一致的结果。\n\nBest-effort close of the host-side HTTP client owned by this sandbox.\n\n        The agent_sandbox SDK is Fern-generated and exposes no ``close()`` /\n        ``__exit__``, so we reach the socket-owning ``httpx.Client`` explicitly\n        through its attribute chain::\n\n            Sandbox._client_wrapper        -> SyncClientWrapper\n                .httpx_client              -> Fern HttpClient (a wrapper, NOT httpx.Client)\n                    .httpx_client          -> httpx.Client     <- the real socket owner\n\n        Closing it releases pooled sockets so long-running provider lifecycles\n        do not accumulate unreclaimed host-side resources (#2872).\n\n        Resolution is most-specific-first with graceful degradation: if a future\n        SDK adds a top-level ``Sandbox.close()`` it is picked up automatically\n        without changing this code. Idempotent, thread-safe, and non-fatal:\n        failures during teardown are logged and swallowed so provider/backend\n        cleanup is never blocked.\n        '
         with self._lock:
             if self._closed:
                 return
@@ -115,7 +88,7 @@ class AioSandbox(Sandbox):
 
     @property
     def home_dir(self) -> str:
-        """Get the home directory inside the sandbox."""
+        '执行 home_dir 的明确职责，并返回与调用约定一致的结果。\n\nGet the home directory inside the sandbox.'
         if self._home_dir is None:
             context = self._client.sandbox.get_context()
             self._home_dir = context.home_dir
@@ -143,31 +116,7 @@ class AioSandbox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> str:
-        """Execute a shell command in the sandbox.
-
-        Uses a lock to serialize concurrent requests. The AIO sandbox
-        container maintains a single persistent shell session that
-        corrupts when hit with concurrent exec_command calls (returns
-        ``ErrorObservation`` instead of real output). If corruption is
-        detected despite the lock (e.g. multiple processes sharing a
-        sandbox), the command is retried on a fresh session.
-
-        Args:
-            command: The command to execute.
-            env: Optional per-call environment variables (request-scoped secrets,
-                issue #3861). When provided, the command runs via the ``bash.exec``
-                API (which supports per-command env) on a fresh auto-created session
-                so the secrets are scoped to this single command and never persist;
-                secret values travel in the structured ``env`` field, never in the
-                command string. When ``None`` the legacy persistent-shell path runs
-                unchanged.
-            timeout: Optional per-call timeout. The current sandbox SDK does not
-                expose a command-level timeout distinct from its client/request
-                timeout, so DeerFlow keeps using the backend's default here.
-
-        Returns:
-            The output of the command.
-        """
+        "执行 execute_command 的明确职责，并返回与调用约定一致的结果。\n\nExecute a shell command in the sandbox.\n\n        Uses a lock to serialize concurrent requests. The AIO sandbox\n        container maintains a single persistent shell session that\n        corrupts when hit with concurrent exec_command calls (returns\n        ``ErrorObservation`` instead of real output). If corruption is\n        detected despite the lock (e.g. multiple processes sharing a\n        sandbox), the command is retried on a fresh session.\n\n        Args:\n            command: The command to execute.\n            env: Optional per-call environment variables (request-scoped secrets,\n                issue #3861). When provided, the command runs via the ``bash.exec``\n                API (which supports per-command env) on a fresh auto-created session\n                so the secrets are scoped to this single command and never persist;\n                secret values travel in the structured ``env`` field, never in the\n                command string. When ``None`` the legacy persistent-shell path runs\n                unchanged.\n            timeout: Optional per-call timeout. The current sandbox SDK does not\n                expose a command-level timeout distinct from its client/request\n                timeout, so DeerFlow keeps using the backend's default here.\n\n        Returns:\n            The output of the command.\n        "
         del timeout
         # Validate ``env`` keys before forwarding them to the ``bash.exec`` API.
         # The public ``Sandbox.execute_command`` contract accepts arbitrary dict
@@ -206,33 +155,7 @@ class AioSandbox(Sandbox):
                 return f"Error: {e}"
 
     def _execute_with_env(self, command: str, env: dict[str, str]) -> str:
-        """Execute a command with per-call environment variables injected.
-
-        The persistent-shell ``shell.exec_command`` API has no env parameter, so
-        injected commands use the ``bash.exec`` API which accepts per-command env.
-        Each call lets the sandbox auto-create a fresh session (no ``session_id``),
-        so injected request-scoped secrets are scoped to this command and never
-        persist across calls. Secret values travel in the structured ``env`` field,
-        never in the command string.
-
-        Trade-off of the fresh-session choice: consecutive env-bearing bash calls
-        within the same skill do not share session state (cwd, sourced venv,
-        exported variables). This mirrors the LocalSandbox model (each call is a
-        fresh subprocess) and is intentional — a shared session_id would let
-        request-scoped secrets ride the session env into later commands, which the
-        SDK does not contractually forbid. Skills that need setup must fold it into
-        a single command (e.g. ``cd /mnt/user-data/workspace && source .venv/bin/activate && python run.py``).
-
-        The ``_ERROR_OBSERVATION_SIGNATURE`` recovery contract is shared with the
-        legacy persistent-shell path: if the (unlikely, since each call is a fresh
-        session) corruption marker shows up, the call is retried on another fresh
-        session rather than returned verbatim.
-
-        Images older than all-in-one-sandbox 1.9.x have no ``/v1/bash/*`` routes;
-        there is no fallback on the legacy shell path that would keep the secret
-        values out of the command string, so the only safe behaviour is to fail
-        fast with an actionable error (#3921).
-        """
+        '执行 _execute_with_env 的明确职责，并返回与调用约定一致的结果。\n\nExecute a command with per-call environment variables injected.\n\n        The persistent-shell ``shell.exec_command`` API has no env parameter, so\n        injected commands use the ``bash.exec`` API which accepts per-command env.\n        Each call lets the sandbox auto-create a fresh session (no ``session_id``),\n        so injected request-scoped secrets are scoped to this command and never\n        persist across calls. Secret values travel in the structured ``env`` field,\n        never in the command string.\n\n        Trade-off of the fresh-session choice: consecutive env-bearing bash calls\n        within the same skill do not share session state (cwd, sourced venv,\n        exported variables). This mirrors the LocalSandbox model (each call is a\n        fresh subprocess) and is intentional — a shared session_id would let\n        request-scoped secrets ride the session env into later commands, which the\n        SDK does not contractually forbid. Skills that need setup must fold it into\n        a single command (e.g. ``cd /mnt/user-data/workspace && source .venv/bin/activate && python run.py``).\n\n        The ``_ERROR_OBSERVATION_SIGNATURE`` recovery contract is shared with the\n        legacy persistent-shell path: if the (unlikely, since each call is a fresh\n        session) corruption marker shows up, the call is retried on another fresh\n        session rather than returned verbatim.\n\n        Images older than all-in-one-sandbox 1.9.x have no ``/v1/bash/*`` routes;\n        there is no fallback on the legacy shell path that would keep the secret\n        values out of the command string, so the only safe behaviour is to fail\n        fast with an actionable error (#3921).\n        '
         if self._bash_exec_unsupported:
             return _BASH_EXEC_UNSUPPORTED_ERROR
         output = self._run_bash_exec(command, env)
@@ -244,7 +167,7 @@ class AioSandbox(Sandbox):
         return output
 
     def _run_bash_exec(self, command: str, env: dict[str, str]) -> str:
-        """Single bash.exec invocation with injected env (one fresh session)."""
+        '执行 _run_bash_exec 的明确职责，并返回与调用约定一致的结果。\n\nSingle bash.exec invocation with injected env (one fresh session).'
         with self._lock:
             try:
                 result = self._client.bash.exec(
@@ -271,14 +194,7 @@ class AioSandbox(Sandbox):
                 return f"Error: {e}"
 
     def read_file(self, path: str) -> str:
-        """Read the content of a file in the sandbox.
-
-        Args:
-            path: The absolute path of the file to read.
-
-        Returns:
-            The content of the file.
-        """
+        '执行 read_file 的明确职责，并返回与调用约定一致的结果。\n\nRead the content of a file in the sandbox.\n\n        Args:\n            path: The absolute path of the file to read.\n\n        Returns:\n            The content of the file.\n        '
         try:
             result = self._client.file.read_file(file=path)
             return result.data.content if result.data else ""
@@ -287,13 +203,7 @@ class AioSandbox(Sandbox):
             return f"Error: {e}"
 
     def download_file(self, path: str) -> bytes:
-        """Download file bytes from the sandbox.
-
-        Raises:
-            PermissionError: If the path contains '..' traversal segments or is
-                outside ``VIRTUAL_PATH_PREFIX``.
-            OSError: If the file cannot be retrieved from the sandbox.
-        """
+        "执行 download_file 的明确职责，并返回与调用约定一致的结果。\n\nDownload file bytes from the sandbox.\n\n        Raises:\n            PermissionError: If the path contains '..' traversal segments or is\n                outside ``VIRTUAL_PATH_PREFIX``.\n            OSError: If the file cannot be retrieved from the sandbox.\n        "
         # Reject path traversal before sending to the container API.
         # LocalSandbox gets this implicitly via _resolve_path;
         # here the path is forwarded verbatim so we must check explicitly.
@@ -330,15 +240,7 @@ class AioSandbox(Sandbox):
                 raise OSError(f"Failed to download file '{path}' from sandbox: {e}") from e
 
     def list_dir(self, path: str, max_depth: int = 2) -> list[str]:
-        """List the contents of a directory in the sandbox.
-
-        Args:
-            path: The absolute path of the directory to list.
-            max_depth: The maximum depth to traverse. Default is 2.
-
-        Returns:
-            The contents of the directory.
-        """
+        '收集并返回，并遵守 list_dir 所表达的接口约束。\n\nList the contents of a directory in the sandbox.\n\n        Args:\n            path: The absolute path of the directory to list.\n            max_depth: The maximum depth to traverse. Default is 2.\n\n        Returns:\n            The contents of the directory.\n        '
         with self._lock:
             try:
                 result = self._client.shell.exec_command(command=f"find {shlex.quote(path)} -maxdepth {max_depth} -type f -o -type d 2>/dev/null | head -500", no_change_timeout=self._DEFAULT_NO_CHANGE_TIMEOUT)
@@ -351,13 +253,7 @@ class AioSandbox(Sandbox):
                 return []
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
-        """Write content to a file in the sandbox.
-
-        Args:
-            path: The absolute path of the file to write to.
-            content: The text content to write to the file.
-            append: Whether to append the content to the file.
-        """
+        '执行 write_file 的明确职责，并返回与调用约定一致的结果。\n\nWrite content to a file in the sandbox.\n\n        Args:\n            path: The absolute path of the file to write to.\n            content: The text content to write to the file.\n            append: Whether to append the content to the file.\n        '
         with self._lock:
             try:
                 if append:
@@ -370,6 +266,7 @@ class AioSandbox(Sandbox):
                 raise
 
     def glob(self, path: str, pattern: str, *, include_dirs: bool = False, max_results: int = 200) -> tuple[list[str], bool]:
+        '执行 glob 的明确职责，并返回与调用约定一致的结果'
         if not include_dirs:
             result = self._client.file.find_files(path=path, glob=pattern)
             files = result.data.files if result.data and result.data.files else []
@@ -404,6 +301,7 @@ class AioSandbox(Sandbox):
         case_sensitive: bool = False,
         max_results: int = 100,
     ) -> tuple[list[GrepMatch], bool]:
+        '执行 grep 的明确职责，并返回与调用约定一致的结果'
         import re as _re
 
         regex_source = _re.escape(pattern) if literal else pattern
@@ -450,12 +348,7 @@ class AioSandbox(Sandbox):
         return matches, truncated
 
     def update_file(self, path: str, content: bytes) -> None:
-        """Update a file with binary content in the sandbox.
-
-        Args:
-            path: The absolute path of the file to update.
-            content: The binary content to write to the file.
-        """
+        '更新目标状态并返回最新结果，并遵守 update_file 所表达的接口约束。\n\nUpdate a file with binary content in the sandbox.\n\n        Args:\n            path: The absolute path of the file to update.\n            content: The binary content to write to the file.\n        '
         with self._lock:
             try:
                 base64_content = base64.b64encode(content).decode("utf-8")

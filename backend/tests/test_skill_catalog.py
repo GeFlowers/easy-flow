@@ -1,4 +1,4 @@
-"""Tests for SkillCatalog — deferred skill discovery search engine."""
+'未说明'
 
 from pathlib import Path
 
@@ -16,7 +16,7 @@ def _make_skill(
     category: SkillCategory = SkillCategory.PUBLIC,
     allowed_tools: tuple[str, ...] | None = None,
 ) -> Skill:
-    """Create a minimal Skill for testing."""
+    '未说明'
     base = Path("/mnt/skills") / category.value / name
     return Skill(
         name=name,
@@ -33,6 +33,7 @@ def _make_skill(
 
 @pytest.fixture
 def sample_skills() -> list[Skill]:
+    '未说明'
     return [
         _make_skill("data-analysis", "Analyze data with Python, pandas, jupyter"),
         _make_skill("deep-research", "Conduct multi-source research with fact-checking"),
@@ -48,6 +49,7 @@ def sample_skills() -> list[Skill]:
 
 @pytest.fixture
 def catalog(sample_skills: list[Skill]) -> SkillCatalog:
+    '未说明'
     return SkillCatalog(tuple(sample_skills))
 
 
@@ -55,15 +57,18 @@ def catalog(sample_skills: list[Skill]) -> SkillCatalog:
 
 
 def test_names_returns_frozenset(catalog: SkillCatalog):
+    '未说明'
     assert isinstance(catalog.names, frozenset)
 
 
 def test_names_contains_all_skills(catalog: SkillCatalog, sample_skills: list[Skill]):
+    '未说明'
     expected = {s.name for s in sample_skills}
     assert catalog.names == expected
 
 
 def test_empty_catalog_names():
+    '未说明'
     catalog = SkillCatalog(())
     assert catalog.names == frozenset()
 
@@ -72,31 +77,34 @@ def test_empty_catalog_names():
 
 
 def test_select_single(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("select:data-analysis")
     assert len(result) == 1
     assert result[0].name == "data-analysis"
 
 
 def test_select_multiple(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("select:data-analysis,deep-research")
     names = {s.name for s in result}
     assert names == {"data-analysis", "deep-research"}
 
 
 def test_select_nonexistent(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("select:nonexistent-skill")
     assert result == []
 
 
 def test_select_partial_match(catalog: SkillCatalog):
-    """select: with one valid and one invalid name returns only the valid one."""
+    '未说明'
     result = catalog.search("select:data-analysis,nonexistent")
     assert len(result) == 1
     assert result[0].name == "data-analysis"
 
 
 def test_select_returns_all_requested(catalog: SkillCatalog, sample_skills: list[Skill]):
-    """select: returns all requested names without capping — exact selection, not ranked search."""
+    '未说明'
     all_names = ",".join(sorted(catalog.names))
     result = catalog.search(f"select:{all_names}")
     assert len(result) == len(sample_skills)
@@ -106,23 +114,25 @@ def test_select_returns_all_requested(catalog: SkillCatalog, sample_skills: list
 
 
 def test_required_prefix_filters_by_name(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("+podcast")
     assert all("podcast" in s.name for s in result)
 
 
 def test_required_prefix_with_ranking(catalog: SkillCatalog):
-    """'+gen generation' should require 'gen' in name, rank by 'generation'."""
+    '未说明'
     result = catalog.search("+gen generation")
     assert all("gen" in s.name for s in result)
 
 
 def test_required_prefix_bare_plus(catalog: SkillCatalog):
-    """Bare '+' with no token returns empty."""
+    '未说明'
     result = catalog.search("+")
     assert result == []
 
 
 def test_required_prefix_no_match(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("+zzz_nonexistent")
     assert result == []
 
@@ -131,18 +141,19 @@ def test_required_prefix_no_match(catalog: SkillCatalog):
 
 
 def test_keyword_matches_name(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("podcast")
     assert any(s.name == "podcast-generation" for s in result)
 
 
 def test_keyword_matches_description(catalog: SkillCatalog):
-    """Description match should also be returned."""
+    '未说明'
     result = catalog.search("pandas")
     assert any(s.name == "data-analysis" for s in result)
 
 
 def test_name_match_scores_higher_than_description(catalog: SkillCatalog):
-    """When both name and description match, name match should rank first."""
+    '未说明'
     # 'data-analysis' name matches 'data', description also matches 'data'
     # 'deep-research' description matches 'data' (no, it doesn't)
     # Let's use 'chart' — matches chart-visualization by name
@@ -151,30 +162,33 @@ def test_name_match_scores_higher_than_description(catalog: SkillCatalog):
 
 
 def test_regex_case_insensitive(catalog: SkillCatalog):
+    '未说明'
     result_lower = catalog.search("data")
     result_upper = catalog.search("DATA")
     assert {s.name for s in result_lower} == {s.name for s in result_upper}
 
 
 def test_invalid_regex_falls_back_to_literal(catalog: SkillCatalog):
-    """Unbalanced paren should degrade to literal match, not raise."""
+    '未说明'
     result = catalog.search("(invalid")
     # Should not raise; may or may not match anything
     assert isinstance(result, list)
 
 
 def test_empty_query(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("")
     assert result == []
 
 
 def test_whitespace_only_query(catalog: SkillCatalog):
+    '未说明'
     result = catalog.search("   ")
     assert result == []
 
 
 def test_max_results_cap(catalog: SkillCatalog):
-    """Free-text search should cap results at MAX_RESULTS."""
+    '未说明'
     # 'generation' matches many descriptions
     result = catalog.search("generation")
     assert len(result) <= MAX_RESULTS
@@ -184,10 +198,10 @@ def test_max_results_cap(catalog: SkillCatalog):
 
 
 def test_frozen_catalog_is_hashable(catalog: SkillCatalog):
-    """SkillCatalog with real skills must be hashable (frozen=True on both Skill and SkillCatalog)."""
+    '未说明'
     assert hash(catalog) is not None
 
 
 def test_names_cached_property_stable(catalog: SkillCatalog):
-    """Multiple accesses to .names should return the same frozenset."""
+    '未说明'
     assert catalog.names is catalog.names

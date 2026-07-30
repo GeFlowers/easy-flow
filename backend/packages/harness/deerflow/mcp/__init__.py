@@ -1,4 +1,4 @@
-"""MCP (Model Context Protocol) integration using langchain-mcp-adapters."""
+"""导出 MCP 工具加载、配置构建与缓存管理的公共接口。"""
 
 from .cache import (
     get_cached_mcp_tools,

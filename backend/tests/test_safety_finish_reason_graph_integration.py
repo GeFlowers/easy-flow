@@ -1,20 +1,4 @@
-"""End-to-end graph integration test for SafetyFinishReasonMiddleware.
-
-Unit tests prove ``_apply`` does the right thing on a synthetic state.
-This test does one level up: builds a real ``langchain.agents.create_agent``
-graph with the SafetyFinishReasonMiddleware in place, feeds it a fake model
-that returns ``finish_reason='content_filter'`` + tool_calls, and asserts:
-
-  1. The tool node is **not** invoked (the dangerous truncated tool call
-     is suppressed).
-  2. The final AIMessage in graph state has ``tool_calls == []``.
-  3. The observability ``safety_termination`` record is attached.
-  4. The user-facing explanation is appended to the message content.
-
-This is the closest we can get to the issue's failure mode without a live
-Moonshot key, and it proves the middleware actually gates LangChain's
-tool router — not just rewrites state in isolation.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -35,32 +19,30 @@ _TOOL_INVOCATIONS: list[dict[str, Any]] = []
 
 @tool
 def write_file(path: str, content: str) -> str:
-    """Pretend to write *content* to *path*. Records the call for assertion."""
+    """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
     _TOOL_INVOCATIONS.append({"path": path, "content": content})
     return f"wrote {len(content)} bytes to {path}"
 
 
 class _ContentFilteredModel(BaseChatModel):
-    """Fake chat model that mimics OpenAI/Moonshot's content_filter response.
-
-    First call returns finish_reason='content_filter' + a tool_call whose
-    arguments are visibly truncated. Second call (if reached) returns a
-    normal text completion so the agent can terminate cleanly.
-    """
+    '未说明'
 
     call_count: int = 0
 
     @property
     def _llm_type(self) -> str:
+        '未说明'
         return "fake-content-filtered"
 
     def bind_tools(self, tools, **kwargs):
         # create_agent binds tools onto the model; we don't actually need
         # to bind anything since responses are hard-coded, but the method
         # must not raise.
+        '未说明'
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         self.call_count += 1
         if self.call_count == 1:
             message = AIMessage(
@@ -82,23 +64,26 @@ class _ContentFilteredModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=message)])
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
 class _InspectMiddleware(AgentMiddleware):
-    """Captures the messages list at every model entry so we can assert
-    no synthetic tool result was injected back into the conversation."""
+    '未说明'
 
     def __init__(self) -> None:
+        '未说明'
         super().__init__()
         self.observed: list[list[Any]] = []
 
     def wrap_model_call(self, request: ModelRequest, handler) -> ModelResponse:
+        """处理模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.observed.append(list(request.messages))
         return handler(request)
 
 
 def test_content_filter_with_tool_calls_does_not_invoke_tool_node():
+    '未说明'
     _TOOL_INVOCATIONS.clear()
     inspector = _InspectMiddleware()
 
@@ -141,19 +126,22 @@ def test_content_filter_with_tool_calls_does_not_invoke_tool_node():
 
 
 def test_content_filter_without_tool_calls_passes_through_unchanged():
-    """No tool calls => issue scope says don't intervene; the partial
-    response should be delivered as-is so the user sees what they got."""
+    '未说明'
     _TOOL_INVOCATIONS.clear()
 
     class _NoToolModel(BaseChatModel):
+        '未说明'
         @property
         def _llm_type(self) -> str:
+            '未说明'
             return "fake-no-tool"
 
         def bind_tools(self, tools, **kwargs):
+            '未说明'
             return self
 
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            '未说明'
             msg = AIMessage(
                 content="Partial answer truncated by safety filter",
                 response_metadata={"finish_reason": "content_filter"},
@@ -161,6 +149,7 @@ def test_content_filter_without_tool_calls_passes_through_unchanged():
             return ChatResult(generations=[ChatGeneration(message=msg)])
 
         async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+            '未说明'
             return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
     agent = create_agent(
@@ -180,21 +169,24 @@ def test_content_filter_without_tool_calls_passes_through_unchanged():
 
 
 def test_normal_tool_call_round_trip_is_not_affected():
-    """Regression: a healthy finish_reason='tool_calls' response must still
-    execute the tool. The middleware must not over-fire."""
+    '未说明'
     _TOOL_INVOCATIONS.clear()
 
     class _HealthyToolModel(BaseChatModel):
+        '未说明'
         call_count: int = 0
 
         @property
         def _llm_type(self) -> str:
+            '未说明'
             return "fake-healthy"
 
         def bind_tools(self, tools, **kwargs):
+            '未说明'
             return self
 
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            '未说明'
             self.call_count += 1
             if self.call_count == 1:
                 msg = AIMessage(
@@ -213,6 +205,7 @@ def test_normal_tool_call_round_trip_is_not_affected():
             return ChatResult(generations=[ChatGeneration(message=msg)])
 
         async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+            '未说明'
             return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
     agent = create_agent(

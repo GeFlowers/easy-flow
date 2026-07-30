@@ -1,12 +1,7 @@
-"""CLI tool to reset an admin password.
+"""重置管理员密码的命令行工具。
 
-Usage:
-    python -m app.gateway.auth.reset_admin
-    python -m app.gateway.auth.reset_admin --email admin@example.com
-
-Writes the new password to ``.deer-flow/admin_initial_credentials.txt``
-(mode 0600) instead of printing it, so CI / log aggregators never see
-the cleartext secret.
+新密码写入权限为 0600 的 ``.deer-flow/admin_initial_credentials.txt``，
+而不输出明文，避免 CI 或日志聚合器收集该密钥。
 """
 
 from __future__ import annotations
@@ -25,6 +20,7 @@ from deerflow.persistence.user.model import UserRow
 
 
 async def _run(email: str | None) -> int:
+    """执行管理员密码重置，并以进程退出码表示处理结果。"""
     from deerflow.config import get_app_config
     from deerflow.persistence.engine import (
         close_engine,
@@ -45,9 +41,7 @@ async def _run(email: str | None) -> int:
         if email:
             user = await repo.get_user_by_email(email)
         else:
-            # Find first admin via direct SELECT — repository does not
-            # expose a "first admin" helper and we do not want to add
-            # one just for this CLI.
+            # 直接查询首个管理员；仓储未提供此专用查询，且不应仅为该命令行工具增加接口。
             async with sf() as session:
                 stmt = select(UserRow).where(UserRow.system_role == "admin").limit(1)
                 row = (await session.execute(stmt)).scalar_one_or_none()
@@ -79,6 +73,7 @@ async def _run(email: str | None) -> int:
 
 
 def main() -> None:
+    """解析命令行参数、运行异步重置流程并退出。"""
     parser = argparse.ArgumentParser(description="Reset admin password")
     parser.add_argument("--email", help="Admin email (default: first admin found)")
     args = parser.parse_args()

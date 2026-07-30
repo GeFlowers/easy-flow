@@ -1,4 +1,4 @@
-"""Sandbox metadata for cross-process discovery and state persistence."""
+'定义 sandbox_info 模块提供的职责与可复用接口。\n\nSandbox metadata for cross-process discovery and state persistence.'
 
 from __future__ import annotations
 
@@ -8,12 +8,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class SandboxInfo:
-    """Persisted sandbox metadata that enables cross-process discovery.
-
-    This dataclass holds all the information needed to reconnect to an
-    existing sandbox from a different process (e.g., gateway vs langgraph,
-    multiple workers, or across K8s pods with shared storage).
-    """
+    '封装 SandboxInfo 的状态、协作关系与公开操作。\n\nPersisted sandbox metadata that enables cross-process discovery.\n\n    This dataclass holds all the information needed to reconnect to an\n    existing sandbox from a different process (e.g., gateway vs langgraph,\n    multiple workers, or across K8s pods with shared storage).\n    '
 
     sandbox_id: str
     sandbox_url: str  # e.g. http://localhost:8080 or http://k3s:30001
@@ -22,6 +17,7 @@ class SandboxInfo:
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict:
+        '执行 to_dict 的明确职责，并返回与调用约定一致的结果'
         return {
             "sandbox_id": self.sandbox_id,
             "sandbox_url": self.sandbox_url,
@@ -32,6 +28,7 @@ class SandboxInfo:
 
     @classmethod
     def from_dict(cls, data: dict) -> SandboxInfo:
+        '执行 from_dict 的明确职责，并返回与调用约定一致的结果'
         return cls(
             sandbox_id=data["sandbox_id"],
             sandbox_url=data.get("sandbox_url", data.get("base_url", "")),

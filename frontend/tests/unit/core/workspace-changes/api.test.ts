@@ -4,6 +4,11 @@ afterEach(() => {
   rs.unstubAllGlobals();
 });
 
+/**
+ * 覆盖“fetchWorkspaceChanges can request file metadata without diffs”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("fetchWorkspaceChanges can request file metadata without diffs", async () => {
   let requestedUrl = "";
   const fetchMock = rs.fn(async (input: RequestInfo | URL) => {

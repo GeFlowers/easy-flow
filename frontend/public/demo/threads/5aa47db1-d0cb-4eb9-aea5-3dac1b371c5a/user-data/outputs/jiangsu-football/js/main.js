@@ -36,6 +36,9 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 
 // 加载动画
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initLoader 的约定。
+ */
 function initLoader() {
   const loader = document.querySelector(".loader");
 
@@ -51,6 +54,9 @@ function initLoader() {
 }
 
 // 主题切换
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initThemeToggle 的约定。
+ */
 function initThemeToggle() {
   const themeToggle = document.querySelector(".btn-theme-toggle");
   const themeIcon = themeToggle.querySelector("i");
@@ -75,6 +81,11 @@ function initThemeToggle() {
     }, 150);
   });
 
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 updateThemeIcon 的约定。
+
+   */
+
   function updateThemeIcon(theme) {
     if (theme === "dark") {
       themeIcon.className = "fas fa-sun";
@@ -85,6 +96,9 @@ function initThemeToggle() {
 }
 
 // 导航菜单
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initNavigation 的约定。
+ */
 function initNavigation() {
   const navLinks = document.querySelectorAll(".nav-link");
 
@@ -117,6 +131,9 @@ function initNavigation() {
 }
 
 // 滚动监听
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initScrollSpy 的约定。
+ */
 function initScrollSpy() {
   const sections = document.querySelectorAll("section[id]");
   const navLinks = document.querySelectorAll(".nav-link");
@@ -143,6 +160,9 @@ function initScrollSpy() {
 }
 
 // 渲染球队卡片
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderTeams 的约定。
+ */
 function renderTeams() {
   const teamsGrid = document.querySelector(".teams-grid");
 
@@ -189,6 +209,9 @@ function renderTeams() {
 }
 
 // 渲染积分榜
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderStandings 的约定。
+ */
 function renderStandings() {
   const standingsTable = document.querySelector(".standings-table tbody");
 
@@ -233,6 +256,9 @@ function renderStandings() {
 }
 
 // 渲染赛程表
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderFixtures 的约定。
+ */
 function renderFixtures() {
   const fixturesList = document.querySelector(".fixtures-list");
 
@@ -324,11 +350,19 @@ function renderFixtures() {
 }
 
 // 渲染数据统计
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderStats 的约定。
+ */
 function renderStats() {
   renderScorers();
   renderAssists();
   renderTeamStats();
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderScorers 的约定。
+
+ */
 
 function renderScorers() {
   const scorersContainer = document.querySelector("#scorers");
@@ -368,6 +402,11 @@ function renderScorers() {
     `;
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderAssists 的约定。
+
+ */
+
 function renderAssists() {
   const assistsContainer = document.querySelector("#assists");
 
@@ -405,6 +444,11 @@ function renderAssists() {
         </table>
     `;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderTeamStats 的约定。
+
+ */
 
 function renderTeamStats() {
   const teamStatsContainer = document.querySelector("#teams");
@@ -470,6 +514,9 @@ function renderTeamStats() {
 }
 
 // 渲染新闻动态
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderNews 的约定。
+ */
 function renderNews() {
   const newsGrid = document.querySelector(".news-grid");
 
@@ -513,6 +560,9 @@ function renderNews() {
 }
 
 // 初始化标签页切换
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initTabs 的约定。
+ */
 function initTabs() {
   // 赛程标签页
   const fixtureTabs = document.querySelectorAll(".fixtures-tabs .tab");
@@ -556,6 +606,9 @@ function initTabs() {
 }
 
 // 初始化移动端菜单
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initMobileMenu 的约定。
+ */
 function initMobileMenu() {
   const menuToggle = document.querySelector(".btn-menu-toggle");
   const navMenu = document.querySelector(".nav-menu");
@@ -584,6 +637,9 @@ function initMobileMenu() {
 }
 
 // 工具函数：加深颜色
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 darkenColor 的约定。
+ */
 function darkenColor(color, percent) {
   const num = parseInt(color.replace("#", ""), 16);
   const amt = Math.round(2.55 * percent);
@@ -605,6 +661,9 @@ function darkenColor(color, percent) {
 }
 
 // 工具函数：格式化日期（简写）
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 formatDate 的约定。
+ */
 function formatDate(dateString) {
   const date = new Date(dateString);
   const month = date.getMonth() + 1;
@@ -613,6 +672,9 @@ function formatDate(dateString) {
 }
 
 // 工具函数：根据ID获取球队信息
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 getTeamById 的约定。
+ */
 function getTeamById(teamId) {
   return leagueData.teams.find((team) => team.id === teamId);
 }

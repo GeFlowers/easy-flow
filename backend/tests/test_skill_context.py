@@ -1,3 +1,4 @@
+'未说明'
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 
 from deerflow.agents.middlewares.skill_context import (
@@ -18,6 +19,7 @@ Use pandas. ALWAYS_USE_PANDAS_SENTINEL
 
 
 def _ai_read(tool_call_id: str, path: str, name: str = "read_file") -> AIMessage:
+    '未说明'
     return AIMessage(
         content="",
         tool_calls=[{"name": name, "args": {"path": path}, "id": tool_call_id, "type": "tool_call"}],
@@ -25,6 +27,7 @@ def _ai_read(tool_call_id: str, path: str, name: str = "read_file") -> AIMessage
 
 
 def _skill_metadata(path: str = "/mnt/skills/public/data-analysis/SKILL.md", description: str = "Analyze data with pandas and charts.") -> dict:
+    '未说明'
     return {
         "skill_context_entry": {
             "name": path.split("/")[-2],
@@ -35,7 +38,9 @@ def _skill_metadata(path: str = "/mnt/skills/public/data-analysis/SKILL.md", des
 
 
 class TestExtractSkills:
+    '未说明'
     def test_build_skill_entry_metadata_from_read_rejects_non_skill_files(self):
+        '未说明'
         assert (
             build_skill_entry_metadata_from_read(
                 "/mnt/skills/public/data-analysis/README.md",
@@ -46,6 +51,7 @@ class TestExtractSkills:
         )
 
     def test_build_skill_entry_metadata_from_read_returns_compact_reference(self):
+        '未说明'
         entry = build_skill_entry_metadata_from_read(
             "/mnt/skills/public/data-analysis/SKILL.md",
             _SKILL_BODY,
@@ -58,6 +64,7 @@ class TestExtractSkills:
         assert "ALWAYS_USE_PANDAS_SENTINEL" not in repr(entry)
 
     def test_captures_skill_reference_with_description(self):
+        '未说明'
         msgs = [
             HumanMessage(content="use the analysis skill"),
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
@@ -73,6 +80,7 @@ class TestExtractSkills:
         assert isinstance(out[0]["loaded_at"], int)
 
     def test_description_is_capped_at_capture_time(self):
+        '未说明'
         description = "x" * 500
         msgs = [
             _ai_read("r1", "/mnt/skills/public/huge/SKILL.md"),
@@ -91,6 +99,7 @@ class TestExtractSkills:
         assert "BODY_SENTINEL" not in repr(out[0])
 
     def test_metadata_with_empty_description_yields_empty_description(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/x/SKILL.md"),
             ToolMessage(
@@ -104,6 +113,7 @@ class TestExtractSkills:
         assert out and out[0]["description"] == ""
 
     def test_missing_metadata_logs_warning_without_recovering_from_content(self, caplog):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/x/SKILL.md"),
             ToolMessage(content=_SKILL_BODY, tool_call_id="r1", id="tm1"),
@@ -117,6 +127,7 @@ class TestExtractSkills:
         assert "/mnt/skills/public/x/SKILL.md" in caplog.text
 
     def test_normalizes_dot_segments_under_skills_root(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/./data-analysis/SKILL.md"),
             ToolMessage(content="body", tool_call_id="r1", id="tm1", additional_kwargs=_skill_metadata()),
@@ -128,6 +139,7 @@ class TestExtractSkills:
         assert out[0]["name"] == "data-analysis"
 
     def test_rejects_traversal_that_escapes_skills_root(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/../workspace/secrets.txt"),
             ToolMessage(content="secret", tool_call_id="r1", id="tm1"),
@@ -136,6 +148,7 @@ class TestExtractSkills:
         assert extract_skills(msgs, skills_root=_ROOT, read_tool_names=_READ) == []
 
     def test_ignores_supporting_resources_under_skill_directory(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/scripts/analyze.py"),
             ToolMessage(content="large script body", tool_call_id="r1", id="tm1"),
@@ -144,6 +157,7 @@ class TestExtractSkills:
         assert extract_skills(msgs, skills_root=_ROOT, read_tool_names=_READ) == []
 
     def test_ignores_error_tool_messages(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
             ToolMessage(content="Error: File not found", tool_call_id="r1", id="tm1", status="error"),
@@ -152,6 +166,7 @@ class TestExtractSkills:
         assert extract_skills(msgs, skills_root=_ROOT, read_tool_names=_READ) == []
 
     def test_ignores_read_file_error_text_even_when_tool_status_is_success(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/missing/SKILL.md"),
             ToolMessage(content="Error: File not found: /mnt/skills/public/missing/SKILL.md", tool_call_id="r1", id="tm1"),
@@ -160,6 +175,7 @@ class TestExtractSkills:
         assert extract_skills(msgs, skills_root=_ROOT, read_tool_names=_READ) == []
 
     def test_ignores_reads_outside_skills_root(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/workspace/notes.md"),
             ToolMessage(content="notes", tool_call_id="r1", id="tm1"),
@@ -167,6 +183,7 @@ class TestExtractSkills:
         assert extract_skills(msgs, skills_root=_ROOT, read_tool_names=_READ) == []
 
     def test_ignores_non_read_tool_names(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/a/SKILL.md", name="write_file"),
             ToolMessage(content="x", tool_call_id="r1", id="tm1"),
@@ -174,10 +191,12 @@ class TestExtractSkills:
         assert extract_skills(msgs, skills_root=_ROOT, read_tool_names=_READ) == []
 
     def test_read_without_result_is_skipped(self):
+        '未说明'
         msgs = [_ai_read("r1", "/mnt/skills/a/SKILL.md")]
         assert extract_skills(msgs, skills_root=_ROOT, read_tool_names=_READ) == []
 
     def test_trailing_slash_root_normalized(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/a/SKILL.md"),
             ToolMessage(
@@ -191,6 +210,7 @@ class TestExtractSkills:
         assert out and out[0]["name"] == "a"
 
     def test_multiple_skills_each_captured(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/a/SKILL.md"),
             ToolMessage(
@@ -211,6 +231,7 @@ class TestExtractSkills:
         assert [e["name"] for e in out] == ["a", "b"]
 
     def test_extract_skills_prefers_metadata_only_when_path_matches_read_call(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
             ToolMessage(
@@ -239,6 +260,7 @@ class TestExtractSkills:
         ]
 
     def test_extract_skills_rejects_metadata_path_mismatch_without_reparsing_content(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
             ToolMessage(
@@ -260,6 +282,7 @@ class TestExtractSkills:
         assert out == []
 
     def test_extract_skills_warns_on_metadata_path_mismatch(self, caplog):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
             ToolMessage(
@@ -284,6 +307,7 @@ class TestExtractSkills:
         assert "metadata_path=/mnt/skills/public/other/SKILL.md" in caplog.text
 
     def test_extract_skills_rebuilds_name_from_validated_read_path(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
             ToolMessage(
@@ -307,6 +331,7 @@ class TestExtractSkills:
         assert out[0]["description"] == "Structured description."
 
     def test_extract_skills_accepts_same_path_metadata_with_missing_description(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
             ToolMessage(
@@ -328,6 +353,7 @@ class TestExtractSkills:
         assert out[0]["description"] == ""
 
     def test_extract_skills_accepts_same_path_metadata_with_non_string_description_as_empty(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/mnt/skills/public/data-analysis/SKILL.md"),
             ToolMessage(
@@ -350,6 +376,7 @@ class TestExtractSkills:
         assert out[0]["description"] == ""
 
     def test_extract_skills_ignores_standalone_outside_root_metadata(self):
+        '未说明'
         msgs = [
             _ai_read("r1", "/workspace/notes.md"),
             ToolMessage(
@@ -368,10 +395,13 @@ class TestExtractSkills:
 
 
 class TestRenderSkillContext:
+    '未说明'
     def test_empty_returns_empty_string(self):
+        '未说明'
         assert render_skill_context([]) == ""
 
     def test_renders_reference_reminder_not_body(self):
+        '未说明'
         entries = [
             {
                 "name": "data-analysis",
@@ -389,12 +419,14 @@ class TestRenderSkillContext:
         assert "###" not in out
 
     def test_entry_without_description_still_renders_name_and_path(self):
+        '未说明'
         entries = [{"name": "x", "path": "/mnt/skills/public/x/SKILL.md", "description": "", "loaded_at": 0}]
         out = render_skill_context(entries)
         assert "- x" in out
         assert "/mnt/skills/public/x/SKILL.md" in out
 
     def test_render_caps_large_description(self):
+        '未说明'
         entries = [{"name": "x", "path": "/mnt/skills/public/x/SKILL.md", "description": "x" * 2000, "loaded_at": 0}]
 
         out = render_skill_context(entries)

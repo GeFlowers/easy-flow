@@ -1,9 +1,4 @@
-"""run stop_reason
-
-Revision ID: 0005_run_stop_reason
-Revises: 0004_run_ownership
-Create Date: 2026-07-15
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -19,10 +14,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
+    """执行本迁移版本定义的数据库架构升级操作。"""
     from deerflow.persistence.migrations._helpers import safe_add_column
 
     safe_add_column("runs", sa.Column("stop_reason", sa.String(50), nullable=True))
 
 
 def downgrade() -> None:
+    """执行本迁移版本定义的数据库架构回退操作。"""
     op.drop_column("runs", "stop_reason")

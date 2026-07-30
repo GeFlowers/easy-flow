@@ -1,3 +1,4 @@
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 import errno
 from pathlib import Path
 from types import SimpleNamespace
@@ -10,6 +11,7 @@ from deerflow.sandbox.local.local_sandbox_provider import LocalSandboxProvider
 
 
 def _symlink_to(target, link, *, target_is_directory=False):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     try:
         link.symlink_to(target, target_is_directory=target_is_directory)
     except (NotImplementedError, OSError) as exc:
@@ -17,19 +19,24 @@ def _symlink_to(target, link, *, target_is_directory=False):
 
 
 class TestPathMapping:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_path_mapping_dataclass(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mapping = PathMapping(container_path="/mnt/skills", local_path="/home/user/skills", read_only=True)
         assert mapping.container_path == "/mnt/skills"
         assert mapping.local_path == "/home/user/skills"
         assert mapping.read_only is True
 
     def test_path_mapping_defaults_to_false(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mapping = PathMapping(container_path="/mnt/data", local_path="/home/user/data")
         assert mapping.read_only is False
 
 
 class TestLocalSandboxPathResolution:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_resolve_path_exact_match(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
@@ -40,6 +47,7 @@ class TestLocalSandboxPathResolution:
         assert resolved == str(Path("/home/user/skills").resolve())
 
     def test_resolve_path_nested_path(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
@@ -50,6 +58,7 @@ class TestLocalSandboxPathResolution:
         assert resolved == str(Path("/home/user/skills/agent/prompt.py").resolve())
 
     def test_resolve_path_no_mapping(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
@@ -60,6 +69,7 @@ class TestLocalSandboxPathResolution:
         assert resolved == "/mnt/other/file.txt"
 
     def test_resolve_path_longest_prefix_first(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
@@ -68,10 +78,11 @@ class TestLocalSandboxPathResolution:
             ],
         )
         resolved = sandbox._resolve_path("/mnt/skills/file.py")
-        # Should match /mnt/skills first (longer prefix)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert resolved == str(Path("/home/user/skills/file.py").resolve())
 
     def test_reverse_resolve_path_exact_match(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         sandbox = LocalSandbox(
@@ -84,6 +95,7 @@ class TestLocalSandboxPathResolution:
         assert resolved == "/mnt/skills"
 
     def test_reverse_resolve_path_nested(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         file_path = skills_dir / "agent" / "prompt.py"
@@ -101,7 +113,9 @@ class TestLocalSandboxPathResolution:
 
 
 class TestReadOnlyPath:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_is_read_only_true(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
@@ -111,6 +125,7 @@ class TestReadOnlyPath:
         assert sandbox._is_read_only_path("/home/user/skills/file.py") is True
 
     def test_is_read_only_false_for_writable(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
@@ -120,16 +135,18 @@ class TestReadOnlyPath:
         assert sandbox._is_read_only_path("/home/user/data/file.txt") is False
 
     def test_is_read_only_false_for_unmapped_path(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
                 PathMapping(container_path="/mnt/skills", local_path="/home/user/skills", read_only=True),
             ],
         )
-        # Path not under any mapping
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert sandbox._is_read_only_path("/tmp/other/file.txt") is False
 
     def test_is_read_only_true_for_exact_match(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         sandbox = LocalSandbox(
             "test",
             [
@@ -139,6 +156,7 @@ class TestReadOnlyPath:
         assert sandbox._is_read_only_path("/home/user/skills") is True
 
     def test_write_file_blocked_on_read_only(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
 
@@ -148,12 +166,13 @@ class TestReadOnlyPath:
                 PathMapping(container_path="/mnt/skills", local_path=str(skills_dir), read_only=True),
             ],
         )
-        # Skills dir is read-only, write should be blocked
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         with pytest.raises(OSError) as exc_info:
             sandbox.write_file("/mnt/skills/new_file.py", "content")
         assert exc_info.value.errno == errno.EROFS
 
     def test_write_file_allowed_on_writable_mount(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
@@ -167,6 +186,7 @@ class TestReadOnlyPath:
         assert (data_dir / "file.txt").read_text() == "content"
 
     def test_update_file_blocked_on_read_only(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         existing_file = skills_dir / "existing.py"
@@ -184,7 +204,9 @@ class TestReadOnlyPath:
 
 
 class TestSymlinkEscapes:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_read_file_blocks_symlink_escape_from_mount(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mount_dir = tmp_path / "mount"
         mount_dir.mkdir()
         outside_dir = tmp_path / "outside"
@@ -205,6 +227,7 @@ class TestSymlinkEscapes:
         assert exc_info.value.errno == errno.EACCES
 
     def test_download_file_blocks_symlink_escape_from_mount(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mount_dir = tmp_path / "mount"
         mount_dir.mkdir()
         outside_dir = tmp_path / "outside"
@@ -225,6 +248,7 @@ class TestSymlinkEscapes:
         assert exc_info.value.errno == errno.EACCES
 
     def test_write_file_blocks_symlink_escape_from_mount(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mount_dir = tmp_path / "mount"
         mount_dir.mkdir()
         outside_dir = tmp_path / "outside"
@@ -247,6 +271,7 @@ class TestSymlinkEscapes:
         assert victim.read_text() == "original"
 
     def test_write_file_uses_matched_read_only_mount_for_symlink_target(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         writable_dir = repo_dir / "writable"
@@ -268,6 +293,7 @@ class TestSymlinkEscapes:
         assert not (writable_dir / "file.txt").exists()
 
     def test_list_dir_does_not_follow_symlink_escape_from_mount(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mount_dir = tmp_path / "mount"
         mount_dir.mkdir()
         outside_dir = tmp_path / "outside"
@@ -290,6 +316,7 @@ class TestSymlinkEscapes:
         assert all("outside" not in entry for entry in entries)
 
     def test_list_dir_formats_internal_directory_symlink_like_directory(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mount_dir = tmp_path / "mount"
         nested_dir = mount_dir / "nested"
         linked_dir = nested_dir / "linked-dir"
@@ -310,6 +337,7 @@ class TestSymlinkEscapes:
         assert "/mnt/data/dir-link" not in entries
 
     def test_write_file_blocks_symlink_into_nested_read_only_mount(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         protected_dir = repo_dir / "protected"
@@ -331,6 +359,7 @@ class TestSymlinkEscapes:
         assert not (protected_dir / "file.txt").exists()
 
     def test_update_file_blocks_symlink_into_nested_read_only_mount(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         repo_dir = tmp_path / "repo"
         repo_dir.mkdir()
         protected_dir = repo_dir / "protected"
@@ -355,11 +384,10 @@ class TestSymlinkEscapes:
 
 
 class TestDownloadFileMappings:
-    """download_file must use _resolve_path_with_mapping so path resolution, symlink
-    containment, and read-only awareness are consistent with read_file."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_resolves_container_path_via_mapping(self, tmp_path):
-        """download_file should resolve container paths through path mappings."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         (data_dir / "asset.bin").write_bytes(b"\x01\x02\x03")
@@ -374,7 +402,7 @@ class TestDownloadFileMappings:
         assert result == b"\x01\x02\x03"
 
     def test_raises_oserror_with_original_path_when_missing(self, tmp_path):
-        """OSError filename should show the container path, not the resolved host path."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
@@ -389,7 +417,7 @@ class TestDownloadFileMappings:
         assert exc_info.value.filename == "/mnt/user-data/missing.bin"
 
     def test_rejects_path_outside_virtual_prefix_and_logs_error(self, tmp_path, caplog):
-        """download_file must reject paths outside /mnt/user-data and log the reason."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         (data_dir / "model.bin").write_bytes(b"weights")
@@ -407,7 +435,7 @@ class TestDownloadFileMappings:
         assert "outside allowed directory" in caplog.text
 
     def test_readable_from_read_only_mount(self, tmp_path):
-        """Read-only mounts must not block download_file — read-only only restricts writes."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         (skills_dir / "model.bin").write_bytes(b"weights")
@@ -423,7 +451,9 @@ class TestDownloadFileMappings:
 
 
 class TestMultipleMounts:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_multiple_read_write_mounts(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         data_dir = tmp_path / "data"
@@ -440,20 +470,20 @@ class TestMultipleMounts:
             ],
         )
 
-        # Skills is read-only
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         with pytest.raises(OSError):
             sandbox.write_file("/mnt/skills/file.py", "content")
 
-        # Data is writable
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         sandbox.write_file("/mnt/data/file.txt", "data content")
         assert (data_dir / "file.txt").read_text() == "data content"
 
-        # External is read-only
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         with pytest.raises(OSError):
             sandbox.write_file("/mnt/external/file.txt", "content")
 
     def test_nested_mounts_writable_under_readonly(self, tmp_path):
-        """A writable mount nested under a read-only mount should allow writes."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         ro_dir = tmp_path / "ro"
         ro_dir.mkdir()
         rw_dir = ro_dir / "writable"
@@ -467,15 +497,16 @@ class TestMultipleMounts:
             ],
         )
 
-        # Parent mount is read-only
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         with pytest.raises(OSError):
             sandbox.write_file("/mnt/repo/file.txt", "content")
 
-        # Nested writable mount should allow writes
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         sandbox.write_file("/mnt/repo/writable/file.txt", "content")
         assert (rw_dir / "file.txt").read_text() == "content"
 
     def test_execute_command_path_replacement(self, tmp_path, monkeypatch):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
         test_file = data_dir / "test.txt"
@@ -488,13 +519,14 @@ class TestMultipleMounts:
             ],
         )
 
-        # Mock subprocess to capture the resolved command. The POSIX path runs
-        # commands via subprocess.Popen, so wrap that and still execute the real
-        # command.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         captured = {}
         original_popen = __import__("subprocess").Popen
 
         def mock_popen(*args, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             if len(args) > 0:
                 captured["command"] = args[0]
             return original_popen(*args, **kwargs)
@@ -503,12 +535,13 @@ class TestMultipleMounts:
         monkeypatch.setattr("deerflow.sandbox.local.local_sandbox.LocalSandbox._get_shell", lambda self: "/bin/sh")
 
         sandbox.execute_command("cat /mnt/data/test.txt")
-        # Verify the command received the resolved local path
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         command = captured.get("command", [])
         assert isinstance(command, list) and len(command) >= 3
         assert str(data_dir) in command[2]
 
     def test_reverse_resolve_path_does_not_match_partial_prefix(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         foo_dir = tmp_path / "foo"
         foo_dir.mkdir()
         foobar_dir = tmp_path / "foobar"
@@ -527,6 +560,7 @@ class TestMultipleMounts:
         assert resolved == str(target.resolve())
 
     def test_reverse_resolve_paths_in_output_supports_backslash_separator(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mount_dir = tmp_path / "mount"
         mount_dir.mkdir()
         sandbox = LocalSandbox(
@@ -544,7 +578,9 @@ class TestMultipleMounts:
 
 
 class TestLocalSandboxProviderMounts:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_setup_path_mappings_uses_configured_skills_container_path_as_reserved_prefix(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         public_dir = skills_dir / "public"
@@ -568,13 +604,14 @@ class TestLocalSandboxProviderMounts:
         with patch("deerflow.config.get_app_config", return_value=config):
             provider = LocalSandboxProvider()
 
-        # Public skills are the only static skills mount; custom skills are
-        # per-user and built dynamically in _build_thread_path_mappings.
-        # Custom volume mount /custom-skills/nested is also included (not
-        # a reserved prefix like /custom-skills/custom).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert [m.container_path for m in provider._path_mappings] == ["/custom-skills/public", "/custom-skills/nested"]
 
     def test_setup_path_mappings_skips_relative_host_path(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         public_dir = skills_dir / "public"
@@ -596,10 +633,11 @@ class TestLocalSandboxProviderMounts:
         with patch("deerflow.config.get_app_config", return_value=config):
             provider = LocalSandboxProvider()
 
-        # Public skills mount is static; custom skills are per-thread.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert [m.container_path for m in provider._path_mappings] == ["/mnt/skills/public"]
 
     def test_setup_path_mappings_skips_non_absolute_container_path(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         public_dir = skills_dir / "public"
@@ -626,15 +664,7 @@ class TestLocalSandboxProviderMounts:
         assert [m.container_path for m in provider._path_mappings] == ["/mnt/skills/public"]
 
     def test_setup_path_mappings_logs_actionable_error_for_missing_host_path(self, tmp_path, caplog):
-        """Regression for #3244.
-
-        When ``sandbox.mounts[].host_path`` is absent from the gateway process's
-        filesystem (the typical symptom in Docker production mode: host_path is a
-        host machine path that is not bind-mounted into the gateway container),
-        the mount is still skipped — but the failure must be a hard-to-miss ERROR
-        log with explicit, actionable guidance about Docker bind mounts, not the
-        old DEBUG/WARNING that buried the silent failure.
-        """
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         public_dir = skills_dir / "public"
@@ -658,26 +688,26 @@ class TestLocalSandboxProviderMounts:
             with patch("deerflow.config.get_app_config", return_value=config):
                 provider = LocalSandboxProvider()
 
-        # Silent-skip behaviour is preserved (no breaking change for existing deployments).
-        # Only public skills mount is static; custom skills are per-thread.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert [m.container_path for m in provider._path_mappings] == ["/mnt/skills/public"]
 
-        # The failure must be observable at ERROR level and reference the offending paths.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         error_records = [r for r in caplog.records if r.levelname == "ERROR"]
         assert error_records, "expected an ERROR log when host_path is missing"
         message = "\n".join(r.getMessage() for r in error_records)
         assert str(missing_host_path) in message
         assert "/mnt/knowledge" in message
 
-        # And it must include actionable Docker guidance so users don't lose hours
-        # to a silent empty-mount failure in production.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         lowered = message.lower()
         assert "docker" in lowered
         assert "gateway" in lowered
         assert "docker-compose" in lowered
 
     def test_write_file_resolves_container_paths_in_content(self, tmp_path):
-        """write_file should replace container paths in file content with local paths."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
@@ -692,12 +722,12 @@ class TestLocalSandboxProviderMounts:
             'import pathlib\npath = "/mnt/data/output"\nprint(path)',
         )
         written = (data_dir / "script.py").read_text()
-        # Container path should be resolved to local path (forward slashes)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert str(data_dir).replace("\\", "/") in written
         assert "/mnt/data/output" not in written
 
     def test_write_file_uses_forward_slashes_on_windows_paths(self, tmp_path):
-        """Resolved paths in content should always use forward slashes."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
@@ -712,11 +742,11 @@ class TestLocalSandboxProviderMounts:
             'DATA_DIR = "/mnt/data/files"',
         )
         written = (data_dir / "config.py").read_text()
-        # Must not contain backslashes that could break escape sequences
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert "\\" not in written.split("DATA_DIR = ")[1].split("\n")[0]
 
     def test_read_file_reverse_resolves_local_paths_in_agent_written_files(self, tmp_path):
-        """read_file should convert local paths back to container paths in agent-written files."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
@@ -726,14 +756,14 @@ class TestLocalSandboxProviderMounts:
                 PathMapping(container_path="/mnt/data", local_path=str(data_dir)),
             ],
         )
-        # Use write_file so the path is tracked as agent-written
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         sandbox.write_file("/mnt/data/info.txt", "File located at: /mnt/data/info.txt")
 
         content = sandbox.read_file("/mnt/data/info.txt")
         assert "/mnt/data/info.txt" in content
 
     def test_read_file_does_not_reverse_resolve_non_agent_files(self, tmp_path):
-        """read_file should NOT rewrite paths in user-uploaded or external files."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
@@ -743,16 +773,16 @@ class TestLocalSandboxProviderMounts:
                 PathMapping(container_path="/mnt/data", local_path=str(data_dir)),
             ],
         )
-        # Write directly to filesystem (simulates user upload or external tool output)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         local_path = str(data_dir).replace("\\", "/")
         (data_dir / "config.yml").write_text(f"output_dir: {local_path}/outputs")
 
         content = sandbox.read_file("/mnt/data/config.yml")
-        # Content should be returned as-is, NOT reverse-resolved
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert local_path in content
 
     def test_write_then_read_roundtrip(self, tmp_path):
-        """Container paths survive a write → read roundtrip."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         data_dir = tmp_path / "data"
         data_dir.mkdir()
 
@@ -765,10 +795,11 @@ class TestLocalSandboxProviderMounts:
         original = 'cfg = {"path": "/mnt/data/config.json", "flag": true}'
         sandbox.write_file("/mnt/data/settings.py", original)
         result = sandbox.read_file("/mnt/data/settings.py")
-        # The container path should be preserved through roundtrip
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert "/mnt/data/config.json" in result
 
     def test_setup_path_mappings_normalizes_container_path_trailing_slash(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         skills_dir = tmp_path / "skills"
         skills_dir.mkdir()
         public_dir = skills_dir / "public"
@@ -796,14 +827,10 @@ class TestLocalSandboxProviderMounts:
 
 
 class TestLocalSandboxProviderResetClearsSingleton:
-    """Regression coverage for issue #2815.
-
-    The module-level LocalSandbox singleton must be cleared whenever the
-    provider is reset or shut down — otherwise stale path mappings and
-    mount policy survive config reloads and test teardown.
-    """
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def _build_config(self, skills_dir, mounts):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         from deerflow.config.sandbox_config import SandboxConfig
 
         sandbox_config = SandboxConfig(
@@ -820,6 +847,7 @@ class TestLocalSandboxProviderResetClearsSingleton:
         )
 
     def test_reset_sandbox_provider_clears_local_singleton(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.config.sandbox_config import VolumeMountConfig
         from deerflow.sandbox import local as local_module
         from deerflow.sandbox.local import local_sandbox_provider as lsp_module
@@ -844,7 +872,7 @@ class TestLocalSandboxProviderResetClearsSingleton:
             [VolumeMountConfig(host_path=str(second_dir), container_path="/mnt/second", read_only=False)],
         )
 
-        # Make sure no leftover singleton from a prior test interferes.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         lsp_module._singleton = None
         reset_sandbox_provider()
 
@@ -859,7 +887,7 @@ class TestLocalSandboxProviderResetClearsSingleton:
 
             reset_sandbox_provider()
 
-            # The whole point of the regression: reset must drop the cached LocalSandbox.
+            # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
             assert lsp_module._singleton is None
 
             with patch("deerflow.sandbox.sandbox_provider.get_app_config", return_value=second_cfg), patch("deerflow.config.get_app_config", return_value=second_cfg):
@@ -874,11 +902,12 @@ class TestLocalSandboxProviderResetClearsSingleton:
             lsp_module._singleton = None
             reset_sandbox_provider()
 
-        # Sanity: the local sandbox module still exposes the singleton symbol
-        # at the same module path (guards against accidental rename).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert hasattr(local_module.local_sandbox_provider, "_singleton")
 
     def test_shutdown_sandbox_provider_clears_local_singleton(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.config.sandbox_config import VolumeMountConfig
         from deerflow.sandbox.local import local_sandbox_provider as lsp_module
         from deerflow.sandbox.sandbox_provider import (
@@ -915,6 +944,7 @@ class TestLocalSandboxProviderResetClearsSingleton:
             reset_sandbox_provider()
 
     def test_provider_reset_method_is_idempotent(self, tmp_path):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.sandbox.local import local_sandbox_provider as lsp_module
         from deerflow.sandbox.local.local_sandbox_provider import LocalSandboxProvider
 
@@ -933,7 +963,7 @@ class TestLocalSandboxProviderResetClearsSingleton:
             provider.reset()
             assert lsp_module._singleton is None
 
-            # Calling reset again on an already-cleared singleton is safe.
+            # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
             provider.reset()
             assert lsp_module._singleton is None
         finally:

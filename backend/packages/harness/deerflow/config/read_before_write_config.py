@@ -1,16 +1,10 @@
-"""Configuration for the read-before-write file gate middleware (issue #3857)."""
+"""提供配置、read、before、write、配置相关功能。"""
 
 from pydantic import BaseModel, Field
 
 
 class ReadBeforeWriteConfig(BaseModel):
-    """Deterministic version gate on file-modifying tools.
-
-    When enabled, ``write_file`` (append or overwrite of an existing file) and
-    ``str_replace`` are blocked unless the file was read (``read_file``) after
-    its last modification, forcing the agent to see the file's current state
-    before changing it.
-    """
+    """\u6267\u884c ReadBeforeWriteConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=True,

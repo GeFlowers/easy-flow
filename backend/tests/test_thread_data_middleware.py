@@ -1,3 +1,4 @@
+'未说明'
 import pytest
 from langgraph.runtime import Runtime
 
@@ -5,11 +6,14 @@ from deerflow.agents.middlewares.thread_data_middleware import ThreadDataMiddlew
 
 
 def _as_posix(path: str) -> str:
+    '未说明'
     return path.replace("\\", "/")
 
 
 class TestThreadDataMiddleware:
+    '未说明'
     def test_before_agent_returns_paths_when_thread_id_present_in_context(self, tmp_path):
+        '未说明'
         middleware = ThreadDataMiddleware(base_dir=str(tmp_path), lazy_init=True)
 
         result = middleware.before_agent(state={}, runtime=Runtime(context={"thread_id": "thread-123"}))
@@ -20,6 +24,7 @@ class TestThreadDataMiddleware:
         assert _as_posix(result["thread_data"]["outputs_path"]).endswith("threads/thread-123/user-data/outputs")
 
     def test_before_agent_uses_thread_id_from_configurable_when_context_is_none(self, tmp_path, monkeypatch):
+        '未说明'
         middleware = ThreadDataMiddleware(base_dir=str(tmp_path), lazy_init=True)
         runtime = Runtime(context=None)
         monkeypatch.setattr(
@@ -34,6 +39,7 @@ class TestThreadDataMiddleware:
         assert runtime.context is None
 
     def test_before_agent_uses_thread_id_from_configurable_when_context_missing_thread_id(self, tmp_path, monkeypatch):
+        '未说明'
         middleware = ThreadDataMiddleware(base_dir=str(tmp_path), lazy_init=True)
         runtime = Runtime(context={})
         monkeypatch.setattr(
@@ -50,6 +56,7 @@ class TestThreadDataMiddleware:
     def test_before_agent_handles_none_context_with_trailing_human_message(self, tmp_path, monkeypatch):
         # Regression: run_id was read via the unguarded `runtime.context`, so a None context plus a
         # trailing HumanMessage raised AttributeError (thread_id still resolves from config.configurable).
+        '未说明'
         from langchain_core.messages import HumanMessage
 
         middleware = ThreadDataMiddleware(base_dir=str(tmp_path), lazy_init=True)
@@ -65,6 +72,7 @@ class TestThreadDataMiddleware:
         assert runtime.context is None
 
     def test_before_agent_raises_clear_error_when_thread_id_missing_everywhere(self, tmp_path, monkeypatch):
+        '未说明'
         middleware = ThreadDataMiddleware(base_dir=str(tmp_path), lazy_init=True)
         monkeypatch.setattr(
             "deerflow.agents.middlewares.thread_data_middleware.get_config",

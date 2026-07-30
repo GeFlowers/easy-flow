@@ -1,17 +1,4 @@
-"""Regression anchor: ingesting inbound channel files must not block the event loop.
-
-``ChannelManager``'s ``_ingest_inbound_files`` ensures the thread uploads
-directory (``mkdir``), enumerates it (``iterdir`` / ``is_file``) to de-duplicate
-filenames, and writes each downloaded attachment to disk
-(``write_upload_file_no_symlink``) — all blocking filesystem IO. The async
-function offloads the directory prep and every per-file write via
-``asyncio.to_thread`` while keeping the genuinely async network read
-(``file_reader``) on the loop. If any of that regresses back onto the event
-loop, the strict Blockbuster gate raises ``BlockingError`` and this test fails.
-
-Imports are kept at module top so any import-time IO runs at collection (outside
-the gate); the surface under test runs on the event loop inside the gated test.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -28,21 +15,23 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_ingest_inbound_files_does_not_block_event_loop(tmp_path: Path, monkeypatch) -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
-    # Rebuild the cached Paths against the tmp home so uploads resolve under it.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     import deerflow.config.paths as paths_mod
 
     monkeypatch.setattr(paths_mod, "_paths", None)
 
-    # Swap the network reader for an in-memory one: no real HTTP, so the only IO
-    # left for this anchor to guard is the filesystem work.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     async def _fake_reader(f, client):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return b"payload-bytes"
 
     monkeypatch.setattr(mgr, "_read_http_inbound_file", _fake_reader)
 
     msg = InboundMessage(
-        channel_name="unit-test-channel",  # absent from INBOUND_FILE_READERS -> default reader
+        channel_name="unit-test-channel",  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         chat_id="c1",
         user_id="u1",
         text="hi",

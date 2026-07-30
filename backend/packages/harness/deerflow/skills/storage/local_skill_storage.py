@@ -1,4 +1,4 @@
-"""Local-filesystem implementation of ``SkillStorage``."""
+'定义 local_skill_storage 模块提供的职责与可复用接口。\n\nLocal-filesystem implementation of ``SkillStorage``.'
 
 from __future__ import annotations
 
@@ -27,14 +27,7 @@ _INSTALL_TMP_CLEANUP_TIMEOUT_SECONDS = 5.0
 
 
 class LocalSkillStorage(SkillStorage):
-    """Skill storage backed by the local filesystem.
-
-    Layout::
-
-        <root>/public/<name>/SKILL.md
-        <root>/custom/<name>/SKILL.md
-        <root>/custom/.history/<name>.jsonl
-    """
+    '封装 LocalSkillStorage 的状态、协作关系与公开操作。\n\nSkill storage backed by the local filesystem.\n\n    Layout::\n\n        <root>/public/<name>/SKILL.md\n        <root>/custom/<name>/SKILL.md\n        <root>/custom/.history/<name>.jsonl\n    '
 
     def __init__(
         self,
@@ -42,6 +35,7 @@ class LocalSkillStorage(SkillStorage):
         container_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
         app_config=None,
     ) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__(container_path=container_path)
         if host_path is None:
             from deerflow.config import get_app_config
@@ -63,16 +57,20 @@ class LocalSkillStorage(SkillStorage):
     # ------------------------------------------------------------------
 
     def get_skills_root_path(self) -> Path:
+        '读取并返回，并遵守 get_skills_root_path 所表达的接口约束'
         return self._host_root
 
     def custom_skill_exists(self, name: str) -> bool:
+        '执行 custom_skill_exists 的明确职责，并返回与调用约定一致的结果'
         return self.get_custom_skill_file(name).exists()
 
     def public_skill_exists(self, name: str) -> bool:
+        '执行 public_skill_exists 的明确职责，并返回与调用约定一致的结果'
         normalized_name = self.validate_skill_name(name)
         return (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists()
 
     def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
+        '执行 _iter_skill_files 的明确职责，并返回与调用约定一致的结果'
         if not self._host_root.exists():
             return
         for category in SkillCategory:
@@ -86,11 +84,13 @@ class LocalSkillStorage(SkillStorage):
                 yield category, category_path, Path(current_root) / SKILL_MD_FILE
 
     def read_custom_skill(self, name: str) -> str:
+        '执行 read_custom_skill 的明确职责，并返回与调用约定一致的结果'
         if not self.custom_skill_exists(name):
             raise FileNotFoundError(f"Custom skill '{name}' not found.")
         return (self.get_custom_skill_dir(name) / SKILL_MD_FILE).read_text(encoding="utf-8")
 
     def write_custom_skill(self, name: str, relative_path: str, content: str) -> None:
+        '执行 write_custom_skill 的明确职责，并返回与调用约定一致的结果'
         target = self.validate_relative_path(relative_path, self.get_custom_skill_dir(name))
         target.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
@@ -105,6 +105,7 @@ class LocalSkillStorage(SkillStorage):
         make_skill_written_path_sandbox_readable(self.get_custom_skill_dir(name), target)
 
     async def ainstall_skill_from_archive(self, archive_path: str | Path) -> dict:
+        '执行 ainstall_skill_from_archive 的明确职责，并返回与调用约定一致的结果'
         from deerflow.skills.installer import _scan_skill_archive_contents_or_raise
 
         logger.info("Installing skill from %s", archive_path)
@@ -138,14 +139,14 @@ class LocalSkillStorage(SkillStorage):
 
     @staticmethod
     def _cleanup_install_tmp(tmp: str) -> None:
-        """Best-effort removal that never masks the install outcome, but leaves a trace."""
+        '执行 _cleanup_install_tmp 的明确职责，并返回与调用约定一致的结果。\n\nBest-effort removal that never masks the install outcome, but leaves a trace.'
         try:
             shutil.rmtree(tmp)
         except OSError:
             logger.warning("Failed to clean up skill install temp dir %s", tmp, exc_info=True)
 
     def _prepare_skill_archive(self, path: Path, tmp_path: Path, custom_dir: Path, archive_path: str | Path) -> tuple[Path, str, Path]:
-        """Extract and validate the archive (blocking; runs off the event loop)."""
+        '执行 _prepare_skill_archive 的明确职责，并返回与调用约定一致的结果。\n\nExtract and validate the archive (blocking; runs off the event loop).'
         import zipfile
 
         from deerflow.skills.installer import (
@@ -191,7 +192,7 @@ class LocalSkillStorage(SkillStorage):
         return skill_dir, skill_name, target
 
     def _commit_skill_install(self, skill_dir: Path, skill_name: str, custom_dir: Path, target: Path) -> None:
-        """Stage and move the validated skill into place (blocking; runs off the event loop)."""
+        '执行 _commit_skill_install 的明确职责，并返回与调用约定一致的结果。\n\nStage and move the validated skill into place (blocking; runs off the event loop).'
         from deerflow.skills.installer import _move_staged_skill_into_reserved_target
 
         with tempfile.TemporaryDirectory(prefix=f".installing-{skill_name}-", dir=custom_dir) as staging_root:
@@ -201,6 +202,7 @@ class LocalSkillStorage(SkillStorage):
         make_skill_written_path_sandbox_readable(custom_dir, target)
 
     def delete_custom_skill(self, name: str, *, history_meta: dict | None = None) -> None:
+        '删除目标资源并返回操作结果，并遵守 delete_custom_skill 所表达的接口约束'
         self.validate_skill_name(name)
         self.ensure_custom_skill_is_editable(name)
         target = self.get_custom_skill_dir(name)
@@ -220,6 +222,7 @@ class LocalSkillStorage(SkillStorage):
             shutil.rmtree(target)
 
     def append_history(self, name: str, record: dict) -> None:
+        '执行 append_history 的明确职责，并返回与调用约定一致的结果'
         self.validate_skill_name(name)
         payload = {"ts": datetime.now(UTC).isoformat(), **record}
         history_path = self.get_skill_history_file(name)
@@ -229,6 +232,7 @@ class LocalSkillStorage(SkillStorage):
             f.write("\n")
 
     def read_history(self, name: str) -> list[dict]:
+        '执行 read_history 的明确职责，并返回与调用约定一致的结果'
         self.validate_skill_name(name)
         history_path = self.get_skill_history_file(name)
         if not history_path.exists():

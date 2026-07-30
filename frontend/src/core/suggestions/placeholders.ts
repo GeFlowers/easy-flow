@@ -1,20 +1,19 @@
 /**
- * Regex matching known suggestion template placeholders.
+ * 匹配已知建议模板占位符的正则表达式。
  *
- * These are the exact placeholder tokens used in suggestion prompt templates
- * defined in the i18n locale files (e.g., zh-CN.ts, en-US.ts).
+ * 这些是语言文件中建议提示词模板使用的精确占位符标记。
  *
- * Update this pattern whenever new placeholder tokens are added to templates.
+ * 模板新增占位符标记时，必须同步更新该模式。
  */
 export const SUGGESTION_TEMPLATE_PLACEHOLDER_PATTERN =
   /\[(?:主题|来源|topic|source)\]/i;
 
 /**
- * Locates an unreplaced suggestion template placeholder in the given text.
+ * 在给定文本中定位尚未替换的建议模板占位符。
  *
- * Returns the start/end character indices of the placeholder if found,
- * or `null` if the text contains no known placeholder tokens.
+ * 找到时返回占位符的起止字符索引；文本未包含已知占位符标记时返回空值。
  */
+/** 查找建议模板中位于指定光标位置的占位符。 */
 export function findSuggestionTemplatePlaceholder(
   text: string,
 ): { start: number; end: number } | null {

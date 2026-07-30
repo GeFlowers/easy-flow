@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Landing page", () => {
+  /**
+   * 覆盖“renders the header and hero section”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("renders the header and hero section", async ({ page }) => {
     await page.goto("/");
 
@@ -12,7 +15,7 @@ test.describe("Landing page", () => {
     await expect(page.locator("h1")).toHaveCount(1);
     await expect(page.locator("h1")).toContainText("DeerFlow");
 
-    // "Get Started" call-to-action button in hero
+    // 首屏中的“Get Started”行动号召按钮。
     await expect(
       page.getByRole("link", { name: /get started/i }),
     ).toBeVisible();
@@ -30,6 +33,11 @@ test.describe("Landing page", () => {
     });
   }
 
+  /**
+   * 覆盖“Get Started link navigates to workspace”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("Get Started link navigates to workspace", async ({ page }) => {
     mockLangGraphAPI(page);
 
@@ -38,7 +46,7 @@ test.describe("Landing page", () => {
     const getStarted = page.getByRole("link", { name: /get started/i });
     await getStarted.click();
 
-    // Should redirect to /workspace/chats/new
+    // 应重定向至 /workspace/chats/new。
     await page.waitForURL("**/workspace/chats/new");
     await expect(page).toHaveURL(/\/workspace\/chats\/new/);
   });

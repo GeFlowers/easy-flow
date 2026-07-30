@@ -1,4 +1,4 @@
-"""Tests for the CJK-aware composer cursor offset."""
+'未说明'
 
 import pytest
 from textual.app import App, ComposeResult
@@ -7,12 +7,15 @@ from deerflow.tui.widgets.composer import ComposerInput
 
 
 class _Harness(App):
+    '未说明'
     def compose(self) -> ComposeResult:
+        '未说明'
         yield ComposerInput(id="c")
 
 
 @pytest.mark.asyncio
 async def test_cursor_offset_after_cjk_has_no_off_by_one():
+    '未说明'
     app = _Harness()
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -26,6 +29,7 @@ async def test_cursor_offset_after_cjk_has_no_off_by_one():
 
 @pytest.mark.asyncio
 async def test_cursor_offset_mid_text_is_unchanged():
+    '未说明'
     app = _Harness()
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -37,6 +41,7 @@ async def test_cursor_offset_mid_text_is_unchanged():
 
 @pytest.mark.asyncio
 async def test_cursor_offset_ascii_end_is_exact():
+    '未说明'
     app = _Harness()
     async with app.run_test() as pilot:
         await pilot.pause()

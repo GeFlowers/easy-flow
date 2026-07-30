@@ -44,6 +44,7 @@ import { cn } from "@/lib/utils";
 
 const NONE = "—";
 
+/** 将任务时间戳格式化为当前界面语言对应的绝对时间。 */
 function formatTimestamp(value: string | null, locale: string): string {
   if (!value) {
     return NONE;
@@ -52,8 +53,7 @@ function formatTimestamp(value: string | null, locale: string): string {
   if (Number.isNaN(date.getTime())) {
     return value;
   }
-  // Use a locale-aware short format like "2026-07-03 09:00". Future timestamps
-  // (next_run_at) render as an absolute time, not a relative "ago" string.
+  // 使用本地化短格式；下次执行时间必须显示绝对时间，不能显示相对的“多久前”。
   const intlLocale = locale === "zh-CN" ? "zh-CN" : "en-US";
   return new Intl.DateTimeFormat(intlLocale, {
     year: "numeric",
@@ -64,6 +64,7 @@ function formatTimestamp(value: string | null, locale: string): string {
   }).format(date);
 }
 
+/** 管理计划任务的创建、筛选、编辑、触发、暂停与删除。 */
 export default function ScheduledTasksPage() {
   const { t, locale } = useI18n();
   const st = t.scheduledTasks;
@@ -137,6 +138,7 @@ export default function ScheduledTasksPage() {
     `${scheduleTypeLabel(task.schedule_type)} · ${statusLabel(task.status)}`;
   const runSummary = (run: ScheduledTaskRun) =>
     `${runTriggerLabel(run.trigger)} · ${runStatusLabel(run.status)}`;
+  /** 将预设配方写入创建表单，并重置计划输入组件。 */
   const applyRecipe = (recipe: Recipe) => {
     const labels = st.recipes[recipe.titleKey];
     setTitle(labels.title);
@@ -182,8 +184,7 @@ export default function ScheduledTasksPage() {
       },
       timezone: selectedTask.timezone || "UTC",
     });
-    // Depend on id only so a background refetch (same task, new object reference)
-    // does not wipe edits in progress.
+    // 仅依赖任务 ID，后台刷新产生的新对象引用不会抹去用户正在编辑的内容。
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTask?.id]);
 
@@ -289,7 +290,7 @@ export default function ScheduledTasksPage() {
                   },
                   {
                     onSuccess: () => {
-                      // Clear the form so a follow-up task starts fresh.
+                      // 清空表单，确保后续创建任务不会继承本次输入。
                       setTitle("");
                       setPrompt("");
                       setTargetThreadId("");
@@ -576,7 +577,7 @@ export default function ScheduledTasksPage() {
         </div>
       </WorkspaceBody>
 
-      {/* Delete confirm — follows the agent-card confirm pattern. */}
+      {/* 删除前需二次确认，交互方式与代理卡片一致。 */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>

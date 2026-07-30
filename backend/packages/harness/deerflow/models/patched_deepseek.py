@@ -1,11 +1,4 @@
-"""Patched ChatDeepSeek that preserves reasoning_content in multi-turn conversations.
-
-This module provides a patched version of ChatDeepSeek that properly handles
-reasoning_content when sending messages back to the API. The original implementation
-stores reasoning_content in additional_kwargs but doesn't include it when making
-subsequent API calls, which causes errors with APIs that require reasoning_content
-on all assistant messages when thinking mode is enabled.
-"""
+"定义 patched_deepseek 模块提供的职责与可复用接口。\n\nPatched ChatDeepSeek that preserves reasoning_content in multi-turn conversations.\n\nThis module provides a patched version of ChatDeepSeek that properly handles\nreasoning_content when sending messages back to the API. The original implementation\nstores reasoning_content in additional_kwargs but doesn't include it when making\nsubsequent API calls, which causes errors with APIs that require reasoning_content\non all assistant messages when thinking mode is enabled.\n"
 
 from typing import Any
 
@@ -16,20 +9,16 @@ from deerflow.models.assistant_payload_replay import restore_assistant_payloads,
 
 
 class PatchedChatDeepSeek(ChatDeepSeek):
-    """ChatDeepSeek with proper reasoning_content preservation.
-
-    When using thinking/reasoning enabled models, the API expects reasoning_content
-    to be present on ALL assistant messages in multi-turn conversations. This patched
-    version ensures reasoning_content from additional_kwargs is included in the
-    request payload.
-    """
+    '封装 PatchedChatDeepSeek 的状态、协作关系与公开操作。\n\nChatDeepSeek with proper reasoning_content preservation.\n\n    When using thinking/reasoning enabled models, the API expects reasoning_content\n    to be present on ALL assistant messages in multi-turn conversations. This patched\n    version ensures reasoning_content from additional_kwargs is included in the\n    request payload.\n    '
 
     @classmethod
     def is_lc_serializable(cls) -> bool:
+        '判断条件是否成立并返回布尔结果，并遵守 is_lc_serializable 所表达的接口约束'
         return True
 
     @property
     def lc_secrets(self) -> dict[str, str]:
+        '执行 lc_secrets 的明确职责，并返回与调用约定一致的结果'
         return {"api_key": "DEEPSEEK_API_KEY", "openai_api_key": "DEEPSEEK_API_KEY"}
 
     def _get_request_payload(
@@ -39,11 +28,7 @@ class PatchedChatDeepSeek(ChatDeepSeek):
         stop: list[str] | None = None,
         **kwargs: Any,
     ) -> dict:
-        """Get request payload with reasoning_content preserved.
-
-        Overrides the parent method to inject reasoning_content from
-        additional_kwargs into assistant messages in the payload.
-        """
+        '执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果。\n\nGet request payload with reasoning_content preserved.\n\n        Overrides the parent method to inject reasoning_content from\n        additional_kwargs into assistant messages in the payload.\n        '
         # Get the original messages before conversion
         original_messages = self._convert_input(input_).to_messages()
 

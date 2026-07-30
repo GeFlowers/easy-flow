@@ -8,6 +8,7 @@ import { useI18n } from "@/core/i18n/hooks";
 
 import { Tooltip } from "./tooltip";
 
+/** 复制指定文本并以按钮状态反馈结果，避免调用方重复处理剪贴板交互。 */
 export function CopyButton({
   clipboardData,
   ...props

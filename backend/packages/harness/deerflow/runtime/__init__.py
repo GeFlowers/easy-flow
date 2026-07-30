@@ -1,9 +1,4 @@
-"""LangGraph-compatible runtime — runs, streaming, and lifecycle management.
-
-Re-exports the public API of :mod:`~deerflow.runtime.runs` and
-:mod:`~deerflow.runtime.stream_bridge` so that consumers can import
-directly from ``deerflow.runtime``.
-"""
+'定义 __init__ 模块提供的职责与可复用接口。\n\nLangGraph-compatible runtime — runs, streaming, and lifecycle management.\n\nRe-exports the public API of :mod:`~deerflow.runtime.runs` and\n:mod:`~deerflow.runtime.stream_bridge` so that consumers can import\ndirectly from ``deerflow.runtime``.\n'
 
 from .checkpointer import checkpointer_context, get_checkpointer, make_checkpointer, reset_checkpointer
 from .runs import CancelOutcome, ConflictError, DisconnectMode, RunContext, RunManager, RunRecord, RunStatus, UnsupportedStrategyError, run_agent

@@ -3,6 +3,9 @@ import { describe, expect, it } from "@rstest/core";
 import { taskEventToSubtaskUpdate } from "@/core/tasks/lifecycle";
 
 describe("taskEventToSubtaskUpdate", () => {
+  /**
+   * 覆盖“maps a task-start event to the effective model for that task”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("maps a task-start event to the effective model for that task", () => {
     expect(
       taskEventToSubtaskUpdate({
@@ -16,6 +19,11 @@ describe("taskEventToSubtaskUpdate", () => {
       modelName: "claude-3-7-sonnet",
     });
   });
+
+  /**
+   * 覆盖“maps a running event to its cumulative token snapshot”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("maps a running event to its cumulative token snapshot", () => {
     expect(

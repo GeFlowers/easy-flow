@@ -1,8 +1,4 @@
-"""Integration tests for the Textual app via the pilot harness.
-
-Uses a fake in-process session so no real model is invoked. Exercises the full
-loop: keypress -> submit -> worker thread -> stream_actions -> reducer -> state.
-"""
+'未说明'
 
 import asyncio
 
@@ -14,27 +10,35 @@ from deerflow.tui.cli import LaunchPlan
 
 
 class _FakeClient:
+    '未说明'
     def list_models(self):
+        '未说明'
         return {"models": [{"name": "fake-model", "display_name": "Fake Model"}]}
 
     def list_skills(self, enabled_only=False):
+        '未说明'
         return {"skills": [{"name": "tdd", "enabled": True}]}
 
     def stream(self, message, *, thread_id=None, **kwargs):
+        """处理流相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         yield StreamEvent(type="messages-tuple", data={"type": "ai", "content": "Hello ", "id": "m1"})
         yield StreamEvent(type="messages-tuple", data={"type": "ai", "content": "world", "id": "m1"})
         yield StreamEvent(type="end", data={"usage": {"total_tokens": 3}})
 
 
 class _FakeSession:
+    '未说明'
     def __init__(self):
+        '未说明'
         self.client = _FakeClient()
 
     def resolve_thread(self, plan):
+        """处理会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
 
 async def _wait_until(predicate, pilot, *, timeout=3.0):
+    '未说明'
     deadline = 0.0
     while deadline < timeout:
         await pilot.pause()
@@ -47,6 +51,7 @@ async def _wait_until(predicate, pilot, *, timeout=3.0):
 
 @pytest.mark.asyncio
 async def test_app_runs_a_turn_and_renders_streamed_assistant():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -67,6 +72,7 @@ async def test_app_runs_a_turn_and_renders_streamed_assistant():
 
 @pytest.mark.asyncio
 async def test_app_assigns_thread_id_on_first_send():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -79,6 +85,7 @@ async def test_app_assigns_thread_id_on_first_send():
 
 @pytest.mark.asyncio
 async def test_help_command_renders_system_row_without_calling_agent():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -94,6 +101,7 @@ async def test_help_command_renders_system_row_without_calling_agent():
 
 @pytest.mark.asyncio
 async def test_up_arrow_recalls_previous_input_from_history():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -109,6 +117,7 @@ async def test_up_arrow_recalls_previous_input_from_history():
 
 @pytest.mark.asyncio
 async def test_escape_interrupts_an_active_run():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -122,6 +131,7 @@ async def test_escape_interrupts_an_active_run():
 
 @pytest.mark.asyncio
 async def test_tab_keeps_focus_on_composer_when_palette_closed():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -135,6 +145,7 @@ async def test_tab_keeps_focus_on_composer_when_palette_closed():
 
 @pytest.mark.asyncio
 async def test_unknown_command_shows_error_system_row():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -154,38 +165,46 @@ async def test_unknown_command_shows_error_system_row():
 
 
 class _GoalClient(_FakeClient):
-    """Records goal API calls and keeps an in-memory active goal."""
+    '未说明'
 
     def __init__(self):
+        '未说明'
         self.calls: list[tuple] = []
         self.goal: dict | None = None
 
     def get_goal(self, thread_id):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.calls.append(("get", thread_id))
         return {"goal": self.goal}
 
     def set_goal(self, thread_id, objective):
+        '未说明'
         self.calls.append(("set", thread_id, objective))
         self.goal = {"objective": objective, "status": "active"}
         return {"goal": self.goal}
 
     def clear_goal(self, thread_id):
+        '未说明'
         self.calls.append(("clear", thread_id))
         self.goal = None
         return {"goal": None}
 
 
 class _GoalSession(_FakeSession):
+    '未说明'
     def __init__(self):
+        '未说明'
         self.client = _GoalClient()
 
 
 def _system_rows(app):
+    '未说明'
     return [r for r in app.state.rows if r.kind == "system"]
 
 
 @pytest.mark.asyncio
 async def test_goal_set_mints_thread_and_reports_objective():
+    '未说明'
     session = _GoalSession()
     app = DeerFlowTUI(session, LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
@@ -200,6 +219,7 @@ async def test_goal_set_mints_thread_and_reports_objective():
 
 @pytest.mark.asyncio
 async def test_goal_status_without_thread_reports_no_active_goal():
+    '未说明'
     session = _GoalSession()
     app = DeerFlowTUI(session, LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
@@ -213,6 +233,7 @@ async def test_goal_status_without_thread_reports_no_active_goal():
 
 @pytest.mark.asyncio
 async def test_goal_status_reports_active_objective():
+    '未说明'
     session = _GoalSession()
     session.client.goal = {"objective": "ship it", "status": "active"}
     app = DeerFlowTUI(session, LaunchPlan(mode="tui"))
@@ -227,6 +248,7 @@ async def test_goal_status_reports_active_objective():
 
 @pytest.mark.asyncio
 async def test_goal_clear_calls_gateway_and_confirms():
+    '未说明'
     session = _GoalSession()
     session.client.goal = {"objective": "ship it", "status": "active"}
     app = DeerFlowTUI(session, LaunchPlan(mode="tui"))
@@ -241,8 +263,11 @@ async def test_goal_clear_calls_gateway_and_confirms():
 
 @pytest.mark.asyncio
 async def test_goal_set_failure_shows_error_tone():
+    '未说明'
     class _Boom(_GoalClient):
+        '未说明'
         def set_goal(self, thread_id, objective):
+            '未说明'
             raise RuntimeError("gateway down")
 
     session = _GoalSession()

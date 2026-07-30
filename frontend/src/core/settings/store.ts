@@ -11,6 +11,7 @@ import {
 
 type Listener = () => void;
 
+/** 用于更新一个本地设置区段的回调类型。 */
 export type LocalSettingsSetter = <K extends keyof LocalSettings>(
   key: K,
   value: Partial<LocalSettings[K]>,
@@ -23,12 +24,14 @@ let baseSettings: LocalSettings = DEFAULT_LOCAL_SETTINGS;
 let baseSettingsLoaded = false;
 let storageListenerRegistered = false;
 
+/** 通知所有订阅者本地设置快照已经变化。 */
 function emitChange() {
   for (const listener of listeners) {
     listener();
   }
 }
 
+/** 延迟加载基础设置，避免服务端渲染访问浏览器存储。 */
 function ensureBaseSettingsLoaded() {
   if (baseSettingsLoaded || typeof window === "undefined") {
     return;
@@ -38,6 +41,7 @@ function ensureBaseSettingsLoaded() {
   baseSettingsLoaded = true;
 }
 
+/** 注册跨标签页本地存储同步监听器。 */
 function ensureStorageListenerRegistered() {
   if (storageListenerRegistered || typeof window === "undefined") {
     return;
@@ -47,6 +51,7 @@ function ensureStorageListenerRegistered() {
   storageListenerRegistered = true;
 }
 
+/** 以浅合并方式更新设置中的一个嵌套区段。 */
 function mergeSettingsSection<K extends keyof LocalSettings>(
   settings: LocalSettings,
   key: K,
@@ -61,6 +66,7 @@ function mergeSettingsSection<K extends keyof LocalSettings>(
   } as LocalSettings;
 }
 
+/** 处理其他标签页写入本地设置造成的存储事件。 */
 function handleStorage(event: StorageEvent) {
   if (event.storageArea && event.storageArea !== localStorage) {
     return;
@@ -90,6 +96,7 @@ function handleStorage(event: StorageEvent) {
   emitChange();
 }
 
+/** 订阅设置快照变化，并返回取消订阅函数。 */
 export function subscribe(listener: Listener): () => void {
   ensureBaseSettingsLoaded();
   ensureStorageListenerRegistered();
@@ -100,11 +107,13 @@ export function subscribe(listener: Listener): () => void {
   };
 }
 
+/** 获取当前基础设置快照。 */
 export function getBaseSettingsSnapshot(): LocalSettings {
   ensureBaseSettingsLoaded();
   return baseSettings;
 }
 
+/** 获取指定线程当前的模型覆盖快照。 */
 export function getThreadModelSnapshot(threadId: string): string | undefined {
   ensureBaseSettingsLoaded();
 
@@ -115,6 +124,7 @@ export function getThreadModelSnapshot(threadId: string): string | undefined {
   return threadModelNames.get(threadId);
 }
 
+/** 更新基础本地设置并通知所有订阅者。 */
 export const updateLocalSettings: LocalSettingsSetter = (key, value) => {
   ensureBaseSettingsLoaded();
   ensureStorageListenerRegistered();
@@ -124,6 +134,7 @@ export const updateLocalSettings: LocalSettingsSetter = (key, value) => {
   emitChange();
 };
 
+/** 更新线程覆盖设置并向订阅者发布新快照。 */
 export function updateThreadSettings<K extends keyof LocalSettings>(
   threadId: string,
   key: K,

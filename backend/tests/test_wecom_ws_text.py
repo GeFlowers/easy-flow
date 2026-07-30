@@ -1,11 +1,4 @@
-"""Regression tests for WeComChannel._on_ws_text quote parsing.
-
-A quoted non-text message (or any payload where ``quote``/``quote.text``/
-``quote.text.content`` is JSON ``null``) must not crash the text handler.
-``dict.get(key, default)`` returns the stored ``None`` when the key is present
-with a null value, so chaining ``.get``/``.strip`` on it raised
-``AttributeError`` before the fix.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -18,7 +11,7 @@ from app.channels.wecom import WeComChannel
 
 
 def _run(coro):
-    """Run an async coroutine synchronously."""
+    '未说明'
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(coro)
@@ -27,6 +20,7 @@ def _run(coro):
 
 
 def _channel() -> WeComChannel:
+    '未说明'
     ch = WeComChannel(bus=MessageBus(), config={})
     # Bypass the real websocket publish path so the test exercises only the
     # frame-parsing logic in _on_ws_text.
@@ -35,7 +29,9 @@ def _channel() -> WeComChannel:
 
 
 class TestOnWsTextQuoteParsing:
+    '未说明'
     def test_quote_is_null_does_not_crash(self):
+        '未说明'
         ch = _channel()
         frame: dict[str, Any] = {"body": {"quote": None}}
         _run(ch._on_ws_text(frame))
@@ -43,12 +39,14 @@ class TestOnWsTextQuoteParsing:
         ch._publish_ws_inbound.assert_not_called()
 
     def test_quote_text_is_null_does_not_crash(self):
+        '未说明'
         ch = _channel()
         frame: dict[str, Any] = {"body": {"quote": {"text": None}}}
         _run(ch._on_ws_text(frame))
         ch._publish_ws_inbound.assert_not_called()
 
     def test_quote_content_is_null_does_not_crash(self):
+        '未说明'
         ch = _channel()
         frame: dict[str, Any] = {"body": {"quote": {"text": {"content": None}}}}
         _run(ch._on_ws_text(frame))
@@ -58,12 +56,14 @@ class TestOnWsTextQuoteParsing:
         # This is the crash the fix targets: a real text message that also
         # carries a null ``quote`` (e.g. quoting a non-text message) used to
         # raise AttributeError before reaching _publish_ws_inbound.
+        '未说明'
         ch = _channel()
         frame: dict[str, Any] = {"body": {"text": {"content": "hello"}, "quote": None}}
         _run(ch._on_ws_text(frame))
         ch._publish_ws_inbound.assert_called_once_with(frame, "hello")
 
     def test_text_and_valid_quote_are_combined(self):
+        '未说明'
         ch = _channel()
         frame: dict[str, Any] = {
             "body": {"text": {"content": "T"}, "quote": {"text": {"content": "Q"}}},

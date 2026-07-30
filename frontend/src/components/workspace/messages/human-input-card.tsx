@@ -25,6 +25,7 @@ import { MarkdownContent } from "./markdown-content";
 
 export type HumanInputSubmitResult = boolean | void;
 
+/** 判断键盘事件是否应提交文本型人工输入，保留多行输入能力。 */
 export function shouldSubmitHumanInputTextOnKeyDown(
   event: KeyboardEvent<HTMLTextAreaElement>,
   isComposing = false,
@@ -36,6 +37,7 @@ export function shouldSubmitHumanInputTextOnKeyDown(
   );
 }
 
+/** 渲染代理请求人工补充信息的卡片，并由父列表拥有回答与待处理状态。 */
 export function HumanInputCard({
   request,
   disabled = false,

@@ -21,6 +21,7 @@ import type { AgentThread } from "@/core/threads/types";
 import { useThread } from "./messages/context";
 import { Tooltip } from "./tooltip";
 
+/** 为给定线程提供导出入口，并将导出进度限制在该线程范围内。 */
 export function ExportTrigger({ threadId }: { threadId: string }) {
   const { t } = useI18n();
   const { thread } = useThread();

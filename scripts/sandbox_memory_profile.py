@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Collect Kubernetes sandbox pod memory snapshots for DeerFlow.
-
-This script is intentionally lightweight: it shells out to ``kubectl`` and
-emits either JSON or Markdown so maintainers can compare sandbox backends and
-workloads without adding runtime dependencies.
-"""
+"""本脚本负责沙箱 内存。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -24,6 +19,7 @@ DEFAULT_KUBECTL_TIMEOUT = 30
 
 @dataclass(frozen=True)
 class TopPod:
+    '未说明'
     name: str
     cpu_raw: str
     memory_raw: str
@@ -33,6 +29,7 @@ class TopPod:
 
 @dataclass(frozen=True)
 class ProcessSample:
+    '未说明'
     pid: int
     ppid: int | None
     rss_kib: int
@@ -41,11 +38,13 @@ class ProcessSample:
 
 @dataclass(frozen=True)
 class ProcessSampleResult:
+    '未说明'
     samples: dict[str, list[ProcessSample]]
     errors: dict[str, str]
 
 
 def parse_cpu_millicores(value: str) -> int | None:
+    '未说明'
     value = value.strip()
     if not value:
         return None
@@ -58,6 +57,7 @@ def parse_cpu_millicores(value: str) -> int | None:
 
 
 def parse_memory_bytes(value: str) -> int | None:
+    """执行内存对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     value = value.strip()
     if not value:
         return None
@@ -88,6 +88,7 @@ def parse_memory_bytes(value: str) -> int | None:
 
 
 def format_mib(value: int | None) -> str:
+    """执行格式对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if value is None:
         return "-"
     return f"{value / 1024 / 1024:.1f} MiB"
@@ -96,6 +97,7 @@ def format_mib(value: int | None) -> str:
 def run_kubectl(
     args: list[str], *, kubectl: str, timeout: int = DEFAULT_KUBECTL_TIMEOUT
 ) -> str:
+    """执行运行对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     completed = subprocess.run(
         [kubectl, *args],
         check=True,
@@ -107,6 +109,7 @@ def run_kubectl(
 
 
 def parse_top_pods(output: str) -> list[TopPod]:
+    '未说明'
     pods: list[TopPod] = []
     for raw_line in output.splitlines():
         line = raw_line.strip()
@@ -131,6 +134,7 @@ def parse_top_pods(output: str) -> list[TopPod]:
 
 
 def parse_processes(output: str, *, limit: int) -> list[ProcessSample]:
+    '未说明'
     if limit < 1:
         raise ValueError("process limit must be greater than 0")
 
@@ -162,6 +166,7 @@ def parse_processes(output: str, *, limit: int) -> list[ProcessSample]:
 
 
 def _container_resources(pod: dict[str, Any]) -> dict[str, Any]:
+    '未说明'
     resources: dict[str, Any] = {}
     for container in pod.get("spec", {}).get("containers", []):
         name = container.get("name", "")
@@ -178,6 +183,7 @@ def _container_resources(pod: dict[str, Any]) -> dict[str, Any]:
 def merge_pod_data(
     top_pods: list[TopPod], pod_json: dict[str, Any]
 ) -> list[dict[str, Any]]:
+    """执行数据对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     pod_items = pod_json.get("items", []) if isinstance(pod_json, dict) else []
     metadata_by_name = {
         pod.get("metadata", {}).get("name"): pod
@@ -218,6 +224,7 @@ def attach_process_samples(
     pods: list[dict[str, Any]],
     process_samples: dict[str, list[ProcessSample]],
 ) -> list[dict[str, Any]]:
+    '未说明'
     for pod in pods:
         samples = process_samples.get(pod["name"], [])
         pod["processes"] = [
@@ -243,6 +250,7 @@ def build_report(
     process_samples: dict[str, list[ProcessSample]] | None = None,
     process_errors: dict[str, str] | None = None,
 ) -> dict[str, Any]:
+    """执行构建对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     pods = merge_pod_data(top_pods, pod_json)
     if process_samples:
         pods = attach_process_samples(pods, process_samples)
@@ -293,6 +301,7 @@ def build_report(
 
 
 def render_markdown(report: dict[str, Any]) -> str:
+    """执行渲染对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     summary = report["summary"]
     lines = [
         "# DeerFlow Sandbox Memory Profile",
@@ -374,6 +383,7 @@ def collect_process_samples(
     limit: int,
     kubectl_timeout: int = DEFAULT_KUBECTL_TIMEOUT,
 ) -> ProcessSampleResult:
+    '未说明'
     samples: dict[str, list[ProcessSample]] = {}
     errors: dict[str, str] = {}
     command = (
@@ -406,6 +416,7 @@ def collect(
     process_limit: int = 10,
     kubectl_timeout: int = DEFAULT_KUBECTL_TIMEOUT,
 ) -> dict[str, Any]:
+    '未说明'
     if process_limit < 1:
         raise ValueError("--process-limit must be greater than 0")
     if kubectl_timeout < 1:
@@ -442,6 +453,7 @@ def collect(
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
+    '未说明'
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--namespace",
@@ -486,6 +498,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    '未说明'
     args = parse_args(list(sys.argv[1:] if argv is None else argv))
     try:
         report = collect(

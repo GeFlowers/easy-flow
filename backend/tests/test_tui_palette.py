@@ -1,4 +1,4 @@
-"""Integration tests for the slash-command palette via the pilot harness."""
+'未说明'
 
 import asyncio
 
@@ -10,25 +10,33 @@ from deerflow.tui.cli import LaunchPlan
 
 
 class _FakeClient:
+    '未说明'
     def list_models(self):
+        '未说明'
         return {"models": [{"name": "m"}]}
 
     def list_skills(self, enabled_only=False):
+        '未说明'
         return {"skills": [{"name": "tdd", "description": "Test first", "enabled": True}]}
 
     def stream(self, *args, **kwargs):
+        """处理流相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         yield StreamEvent(type="end", data={})
 
 
 class _FakeSession:
+    '未说明'
     def __init__(self):
+        '未说明'
         self.client = _FakeClient()
 
     def resolve_thread(self, plan):
+        """处理会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
 
 async def _settle(pilot, predicate, timeout=2.0):
+    '未说明'
     elapsed = 0.0
     while elapsed < timeout:
         await pilot.pause()
@@ -41,6 +49,7 @@ async def _settle(pilot, predicate, timeout=2.0):
 
 @pytest.mark.asyncio
 async def test_typing_slash_opens_palette_with_matches():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -52,6 +61,7 @@ async def test_typing_slash_opens_palette_with_matches():
 
 @pytest.mark.asyncio
 async def test_palette_index_resets_when_filter_changes():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -67,6 +77,7 @@ async def test_palette_index_resets_when_filter_changes():
 
 @pytest.mark.asyncio
 async def test_palette_enter_runs_builtin_and_closes():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -83,6 +94,7 @@ async def test_palette_enter_runs_builtin_and_closes():
 
 @pytest.mark.asyncio
 async def test_escape_closes_palette():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -95,6 +107,7 @@ async def test_escape_closes_palette():
 
 @pytest.mark.asyncio
 async def test_skill_command_tab_completes_with_trailing_space():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -108,6 +121,7 @@ async def test_skill_command_tab_completes_with_trailing_space():
 
 @pytest.mark.asyncio
 async def test_normal_text_does_not_open_palette():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()

@@ -13,6 +13,7 @@ type MockThreadSearchResult = Record<string, unknown> & {
   updated_at: string | undefined;
 };
 
+/** 按分页和时间排序参数返回本地演示会话列表。 */
 export async function POST(request: Request) {
   const body = ((await request.json().catch(() => ({}))) ??
     {}) as ThreadSearchRequest;

@@ -7,6 +7,11 @@ import {
   getMessageGroups,
 } from "@/core/messages/utils";
 
+/**
+ * 覆盖“accumulates each AI message usage only once by message id”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("accumulates each AI message usage only once by message id", () => {
   const aiMessage = {
     id: "ai-1",
@@ -21,6 +26,11 @@ test("accumulates each AI message usage only once by message id", () => {
     totalTokens: 15,
   });
 });
+
+/**
+ * 覆盖“counts later usage-bearing snapshots for the same AI message id”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("counts later usage-bearing snapshots for the same AI message id", () => {
   const earlySnapshot = {
@@ -41,6 +51,11 @@ test("counts later usage-bearing snapshots for the same AI message id", () => {
     totalTokens: 15,
   });
 });
+
+/**
+ * 覆盖“reads usage metadata from additional kwargs when the SDK nests it there”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("reads usage metadata from additional kwargs when the SDK nests it there", () => {
   const aiMessage = {
@@ -63,13 +78,16 @@ test("reads usage metadata from additional kwargs when the SDK nests it there", 
   });
 });
 
+/**
+ * 覆盖“keeps header and per-turn aggregation consistent for a reasoning+answer message”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps header and per-turn aggregation consistent for a reasoning+answer message", () => {
-  // A single AI message carrying both reasoning (here via inline <think>) and
-  // answer text now lands in exactly one assistant group (#3868), so its usage
-  // is counted once both in the per-turn aggregation and against the header
-  // total. The by-id dedupe (see "accumulates each AI message usage only once")
-  // remains the defence-in-depth guard if any future grouping reintroduces a
-  // duplicate.
+  // 一条同时携带推理（此处通过内联 <think>）和回答文本的 AI 消息现在恰好落入一个
+  // 助手分组（#3868），因此它在每回合聚合和页头总量中均只计数一次。按 ID 去重（见
+  // “accumulates each AI message usage only once”）仍是深度防御措施，以防未来某种
+  // 分组方式重新引入重复项。
   const messages = [
     {
       id: "human-1",
@@ -100,6 +118,11 @@ test("keeps header and per-turn aggregation consistent for a reasoning+answer me
   });
 });
 
+/**
+ * 覆盖“prefers backend thread usage for header totals”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("prefers backend thread usage for header totals", () => {
   const messages = [
     {
@@ -121,6 +144,11 @@ test("prefers backend thread usage for header totals", () => {
     totalTokens: 150,
   });
 });
+
+/**
+ * 覆盖“adds current in-flight message usage to backend header totals”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("adds current in-flight message usage to backend header totals", () => {
   const completedMessages = [
@@ -150,6 +178,11 @@ test("adds current in-flight message usage to backend header totals", () => {
     totalTokens: 160,
   });
 });
+
+/**
+ * 覆盖“falls back to visible messages when backend usage is unavailable or zero”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("falls back to visible messages when backend usage is unavailable or zero", () => {
   const messages = [

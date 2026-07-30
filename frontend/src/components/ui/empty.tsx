@@ -2,6 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/** Empty 内部组件：组织对应的界面结构与交互语义。 */
 function Empty({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -15,6 +16,7 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** EmptyHeader 内部组件：组织对应的界面结构与交互语义。 */
 function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -43,6 +45,7 @@ const emptyMediaVariants = cva(
   },
 );
 
+/** EmptyMedia 内部组件：组织对应的界面结构与交互语义。 */
 function EmptyMedia({
   className,
   variant = "default",
@@ -58,6 +61,7 @@ function EmptyMedia({
   );
 }
 
+/** EmptyTitle 内部组件：组织对应的界面结构与交互语义。 */
 function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -68,6 +72,7 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** EmptyDescription 内部组件：组织对应的界面结构与交互语义。 */
 function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <div
@@ -81,6 +86,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
+/** EmptyContent 内部组件：组织对应的界面结构与交互语义。 */
 function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

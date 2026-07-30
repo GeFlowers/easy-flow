@@ -1,21 +1,11 @@
+"""实现受根目录约束的本地目录遍历。"""
 from pathlib import Path
 
 from deerflow.sandbox.search import should_ignore_name
 
 
 def list_dir(path: str, max_depth: int = 2) -> list[str]:
-    """
-    List files and directories up to max_depth levels deep.
-
-    Args:
-        path: The root directory path to list.
-        max_depth: Maximum depth to traverse (default: 2).
-                   1 = only direct children, 2 = children + grandchildren, etc.
-
-    Returns:
-        A list of absolute paths for files and directories,
-        excluding items matching IGNORE_PATTERNS.
-    """
+    """列出根路径内、深度受限且过滤忽略项的目录内容。"""
     result: list[str] = []
     root_path = Path(path).resolve()
 
@@ -23,6 +13,7 @@ def list_dir(path: str, max_depth: int = 2) -> list[str]:
         return result
 
     def _is_within_root(candidate: Path) -> bool:
+        """判断解析后的候选路径是否仍位于根目录内。"""
         try:
             candidate.relative_to(root_path)
             return True
@@ -30,7 +21,7 @@ def list_dir(path: str, max_depth: int = 2) -> list[str]:
             return False
 
     def _traverse(current_path: Path, current_depth: int) -> None:
-        """Recursively traverse directories up to max_depth."""
+        """递归遍历当前目录，并维持根目录与深度限制。"""
         if current_depth > max_depth:
             return
 
@@ -57,7 +48,7 @@ def list_dir(path: str, max_depth: int = 2) -> list[str]:
                 post_fix = "/" if item.is_dir() else ""
                 result.append(str(item_resolved) + post_fix)
 
-                # Recurse into subdirectories if not at max depth
+                                # 中文说明：此处用于执行相关处理。
                 if item.is_dir() and current_depth < max_depth:
                     _traverse(item, current_depth + 1)
         except PermissionError:

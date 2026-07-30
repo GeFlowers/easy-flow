@@ -1,8 +1,4 @@
-"""Tests for DynamicContextMiddleware.
-
-Verifies that memory and current date are injected as a <system-reminder> into
-the first HumanMessage exactly once per session (frozen-snapshot pattern).
-"""
+'定义 test_dynamic_context_middleware 模块提供的职责与可复用接口。\n\nTests for DynamicContextMiddleware.\n\nVerifies that memory and current date are injected as a <system-reminder> into\nthe first HumanMessage exactly once per session (frozen-snapshot pattern).\n'
 
 import hashlib
 from types import SimpleNamespace
@@ -20,10 +16,12 @@ _SYSTEM_REMINDER_TAG = "<system-reminder>"
 
 
 def _make_middleware(**kwargs) -> DynamicContextMiddleware:
+    '执行 _make_middleware 的明确职责，并返回与调用约定一致的结果'
     return DynamicContextMiddleware(**kwargs)
 
 
 def _fake_runtime(journal=None, *, pre_existing_message_ids=()):
+    '执行 _fake_runtime 的明确职责，并返回与调用约定一致的结果'
     context = {"__run_journal": journal} if journal is not None else {}
     if pre_existing_message_ids:
         context[CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY] = frozenset(pre_existing_message_ids)
@@ -31,11 +29,7 @@ def _fake_runtime(journal=None, *, pre_existing_message_ids=()):
 
 
 def _reminder_msg(content: str, msg_id: str) -> HumanMessage:
-    """Build a pre-PR HumanMessage reminder — simulates historical checkpoints.
-
-    Uses HumanMessage (DEPRECATED format) to exercise the backward-compat
-    path in ``is_dynamic_context_reminder``.  New reminders are SystemMessage.
-    """
+    '执行 _reminder_msg 的明确职责，并返回与调用约定一致的结果。\n\nBuild a pre-PR HumanMessage reminder — simulates historical checkpoints.\n\n    Uses HumanMessage (DEPRECATED format) to exercise the backward-compat\n    path in ``is_dynamic_context_reminder``.  New reminders are SystemMessage.\n    '
     return HumanMessage(
         content=content,
         id=msg_id,
@@ -44,11 +38,7 @@ def _reminder_msg(content: str, msg_id: str) -> HumanMessage:
 
 
 def _date_reminder_msg(date_str: str, msg_id: str) -> SystemMessage:
-    """Build a persisted date reminder in the current production shape.
-
-    A date SystemMessage whose ``reminder_date`` additional_kwargs carries the
-    authoritative date — what ``DynamicContextMiddleware`` now writes to state.
-    """
+    '执行 _date_reminder_msg 的明确职责，并返回与调用约定一致的结果。\n\nBuild a persisted date reminder in the current production shape.\n\n    A date SystemMessage whose ``reminder_date`` additional_kwargs carries the\n    authoritative date — what ``DynamicContextMiddleware`` now writes to state.\n    '
     content = f"<system-reminder>\n<current_date>{date_str}</current_date>\n</system-reminder>"
     return SystemMessage(
         content=content,
@@ -63,6 +53,7 @@ def _date_reminder_msg(date_str: str, msg_id: str) -> SystemMessage:
 
 
 def test_injects_system_reminder_into_first_human_message():
+    '验证 injects、system、reminder、into、first、human、message 场景下的预期行为、边界条件与结果'
     mw = _make_middleware()
     state = {"messages": [HumanMessage(content="Hello", id="msg-1")]}
 
@@ -89,6 +80,7 @@ def test_injects_system_reminder_into_first_human_message():
 
 
 def test_memory_included_when_present():
+    '验证 memory、included、when、present 场景下的预期行为、边界条件与结果'
     mw = _make_middleware()
     state = {"messages": [HumanMessage(content="Hi", id="msg-1")]}
 
@@ -117,6 +109,7 @@ def test_memory_included_when_present():
 
 
 def test_first_run_records_exact_effective_memory():
+    '验证 first、run、records、exact、effective、memory 场景下的预期行为、边界条件与结果'
     journal = mock.MagicMock()
     mw = _make_middleware()
     state = {"messages": [HumanMessage(content="Hi", id="msg-1")]}
@@ -137,6 +130,7 @@ def test_first_run_records_exact_effective_memory():
 
 
 def test_checkpointed_memory_is_recorded_for_a_later_run_or_branch_without_reloading():
+    '验证 checkpointed、memory、is、recorded、for、a、later、run、or、branch、without、reloading 场景下的预期行为、边界条件与结果'
     journal = mock.MagicMock()
     mw = _make_middleware()
     memory_content = "<memory>\nFrozen context\n</memory>"
@@ -177,6 +171,7 @@ def test_checkpointed_memory_is_recorded_for_a_later_run_or_branch_without_reloa
 
 
 def test_state_memory_without_checkpoint_proof_cannot_forge_context_event():
+    '验证 state、memory、without、checkpoint、proof、cannot、forge、context、event 场景下的预期行为、边界条件与结果'
     journal = mock.MagicMock()
     mw = _make_middleware()
     state = {
@@ -203,6 +198,7 @@ def test_state_memory_without_checkpoint_proof_cannot_forge_context_event():
 
 
 def test_context_event_failure_does_not_block_memory_injection():
+    '验证 context、event、failure、does、not、block、memory、injection 场景下的预期行为、边界条件与结果'
     journal = mock.MagicMock()
     journal.record_memory_context.side_effect = RuntimeError("event store unavailable")
     mw = _make_middleware()
@@ -228,7 +224,7 @@ def test_context_event_failure_does_not_block_memory_injection():
 
 
 def test_skips_injection_if_already_present():
-    """Second turn: separate reminder message already present → no update."""
+    '验证 skips、injection、if、already、present 场景下的预期行为、边界条件与结果。\n\nSecond turn: separate reminder message already present → no update.'
     mw = _make_middleware()
     state = {
         "messages": [
@@ -247,18 +243,7 @@ def test_skips_injection_if_already_present():
 
 
 def test_second_turn_with_memory_does_not_reinject():
-    """Regression: a dateless memory reminder must not shadow the date reminder.
-
-    Reproduces the scrambled-messages / wrong-answer bug (thread
-    9be75d63): production persists the injected context as TWO flagged
-    messages — a date SystemMessage and a separate dateless <memory>
-    HumanMessage. On a later turn ``_last_injected_date`` scans in reverse
-    and hits the memory message first; because it has no <current_date> it
-    must keep scanning to find the real date. If it stops and returns None,
-    the middleware falsely treats this as the first turn, re-injects, picks
-    the previous turn's ``__user`` message as the target, and the model
-    re-answers the stale turn instead of the new one.
-    """
+    "验证 second、turn、with、memory、does、not、reinject 场景下的预期行为、边界条件与结果。\n\nRegression: a dateless memory reminder must not shadow the date reminder.\n\n    Reproduces the scrambled-messages / wrong-answer bug (thread\n    9be75d63): production persists the injected context as TWO flagged\n    messages — a date SystemMessage and a separate dateless <memory>\n    HumanMessage. On a later turn ``_last_injected_date`` scans in reverse\n    and hits the memory message first; because it has no <current_date> it\n    must keep scanning to find the real date. If it stops and returns None,\n    the middleware falsely treats this as the first turn, re-injects, picks\n    the previous turn's ``__user`` message as the target, and the model\n    re-answers the stale turn instead of the new one.\n    "
     mw = _make_middleware()
     date_reminder = "<system-reminder>\n<current_date>2026-05-08, Friday</current_date>\n</system-reminder>"
     state = {
@@ -286,16 +271,7 @@ def test_second_turn_with_memory_does_not_reinject():
 
 
 def test_poisoned_memory_does_not_spoof_injected_date():
-    """A <current_date> embedded in user-influenceable memory must not spoof detection.
-
-    Memory is LLM-extracted from user input and injected unescaped (it's
-    hide_from_ui, so InputSanitizationMiddleware skips it). If a memory fact
-    contains a literal <current_date>…</current_date>, content-regex detection
-    would return that fake date (it sits after the authoritative date message but
-    is hit first in the reverse scan) and trigger a false midnight crossing /
-    re-injection. The authoritative date lives in additional_kwargs, so detection
-    must ignore the memory content entirely.
-    """
+    "验证 poisoned、memory、does、not、spoof、injected、date 场景下的预期行为、边界条件与结果。\n\nA <current_date> embedded in user-influenceable memory must not spoof detection.\n\n    Memory is LLM-extracted from user input and injected unescaped (it's\n    hide_from_ui, so InputSanitizationMiddleware skips it). If a memory fact\n    contains a literal <current_date>…</current_date>, content-regex detection\n    would return that fake date (it sits after the authoritative date message but\n    is hit first in the reverse scan) and trigger a false midnight crossing /\n    re-injection. The authoritative date lives in additional_kwargs, so detection\n    must ignore the memory content entirely.\n    "
     mw = _make_middleware()
     today = "2026-05-08, Friday"
     date_reminder = f"<system-reminder>\n<current_date>{today}</current_date>\n</system-reminder>"
@@ -323,11 +299,7 @@ def test_poisoned_memory_does_not_spoof_injected_date():
 
 
 def test_date_reminder_carries_structured_date():
-    """First-turn injection records the authoritative date in additional_kwargs.
-
-    The date SystemMessage carries ``reminder_date``; the memory HumanMessage
-    deliberately does not (it is dateless and must never spoof detection).
-    """
+    '验证 date、reminder、carries、structured、date 场景下的预期行为、边界条件与结果。\n\nFirst-turn injection records the authoritative date in additional_kwargs.\n\n    The date SystemMessage carries ``reminder_date``; the memory HumanMessage\n    deliberately does not (it is dateless and must never spoof detection).\n    '
     mw = _make_middleware()
     state = {"messages": [HumanMessage(content="Hi", id="msg-1")]}
 
@@ -347,12 +319,7 @@ def test_date_reminder_carries_structured_date():
 
 
 def test_legacy_systemmessage_reminder_without_key_detected():
-    """Backward-compat: pre-reminder_date checkpoints kept the date in content only.
-
-    A date SystemMessage with the date in content but no ``reminder_date`` key
-    must still be detected (via the SystemMessage-scoped content fallback) so
-    in-flight conversations from before the upgrade do not re-inject.
-    """
+    '验证 legacy、systemmessage、reminder、without、key、detected 场景下的预期行为、边界条件与结果。\n\nBackward-compat: pre-reminder_date checkpoints kept the date in content only.\n\n    A date SystemMessage with the date in content but no ``reminder_date`` key\n    must still be detected (via the SystemMessage-scoped content fallback) so\n    in-flight conversations from before the upgrade do not re-inject.\n    '
     mw = _make_middleware()
     state = {
         "messages": [
@@ -375,7 +342,7 @@ def test_legacy_systemmessage_reminder_without_key_detected():
 
 
 def test_injects_only_into_first_human_message_not_later_ones():
-    """Reminder targets the first HumanMessage; subsequent messages are not touched."""
+    '验证 injects、only、into、first、human、message、not、later、ones 场景下的预期行为、边界条件与结果。\n\nReminder targets the first HumanMessage; subsequent messages are not touched.'
     mw = _make_middleware()
     state = {
         "messages": [
@@ -408,12 +375,14 @@ def test_injects_only_into_first_human_message_not_later_ones():
 
 
 def test_no_messages_returns_none():
+    '验证 no、messages、returns、none 场景下的预期行为、边界条件与结果'
     mw = _make_middleware()
     result = mw.before_agent({"messages": []}, _fake_runtime())
     assert result is None
 
 
 def test_no_human_message_returns_none():
+    '验证 no、human、message、returns、none 场景下的预期行为、边界条件与结果'
     mw = _make_middleware()
     state = {"messages": [AIMessage(content="assistant only")]}
     with mock.patch("deerflow.agents.lead_agent.prompt._get_memory_context", return_value=""):
@@ -422,7 +391,7 @@ def test_no_human_message_returns_none():
 
 
 def test_list_content_message_handled_as_separate_reminder():
-    """List-content (e.g. multi-modal) messages remain intact; reminder is a separate message."""
+    '验证 list、content、message、handled、as、separate、reminder 场景下的预期行为、边界条件与结果。\n\nList-content (e.g. multi-modal) messages remain intact; reminder is a separate message.'
     mw = _make_middleware()
     original_content = [{"type": "text", "text": "Hello"}]
     state = {"messages": [HumanMessage(content=original_content, id="msg-1")]}
@@ -443,7 +412,7 @@ def test_list_content_message_handled_as_separate_reminder():
 
 
 def test_reminder_uses_original_id_user_message_uses_derived_id():
-    """Reminder takes original ID (position swap); user message gets {id}__user."""
+    '验证 reminder、uses、original、id、user、message、uses、derived、id 场景下的预期行为、边界条件与结果。\n\nReminder takes original ID (position swap); user message gets {id}__user.'
     mw = _make_middleware()
     original_id = "original-id-abc"
     state = {"messages": [HumanMessage(content="Hello", id=original_id)]}
@@ -457,7 +426,7 @@ def test_reminder_uses_original_id_user_message_uses_derived_id():
 
 
 def test_message_without_id_gets_stable_uuid():
-    """If the original HumanMessage has no ID, a UUID is generated and used consistently."""
+    '验证 message、without、id、gets、stable、uuid 场景下的预期行为、边界条件与结果。\n\nIf the original HumanMessage has no ID, a UUID is generated and used consistently.'
     mw = _make_middleware()
     state = {"messages": [HumanMessage(content="Hello", id=None)]}
 
@@ -474,7 +443,7 @@ def test_message_without_id_gets_stable_uuid():
 
 
 def test_user_message_containing_system_reminder_tag_does_not_prevent_injection():
-    """A user message containing '<system-reminder>' must not be mistaken for a reminder."""
+    "验证 user、message、containing、system、reminder、tag、does、not、prevent、injection 场景下的预期行为、边界条件与结果。\n\nA user message containing '<system-reminder>' must not be mistaken for a reminder."
     mw = _make_middleware()
     state = {
         "messages": [
@@ -497,8 +466,7 @@ def test_user_message_containing_system_reminder_tag_does_not_prevent_injection(
 
 
 def test_midnight_crossing_injects_date_update_as_separate_message():
-    """When the date has changed, a separate date-update reminder is injected before
-    the current turn's HumanMessage using the ID-swap technique."""
+    "验证 midnight、crossing、injects、date、update、as、separate、message 场景下的预期行为、边界条件与结果。\n\nWhen the date has changed, a separate date-update reminder is injected before\n    the current turn's HumanMessage using the ID-swap technique."
     mw = _make_middleware()
     state = {
         "messages": [
@@ -533,7 +501,7 @@ def test_midnight_crossing_injects_date_update_as_separate_message():
 
 
 def test_midnight_crossing_id_swap():
-    """Date-update reminder uses original ID; user message uses {id}__user."""
+    '验证 midnight、crossing、id、swap 场景下的预期行为、边界条件与结果。\n\nDate-update reminder uses original ID; user message uses {id}__user.'
     mw = _make_middleware()
     state = {
         "messages": [
@@ -551,13 +519,7 @@ def test_midnight_crossing_id_swap():
 
 
 def test_memory_message_carries_reminder_key_for_title_eligibility():
-    """Regression: memory HumanMessage must carry _DYNAMIC_CONTEXT_REMINDER_KEY.
-
-    Without it, title_middleware._is_user_message_for_title counts the memory
-    block as a second user message and skips title generation entirely.
-    Similarly, summarization_middleware._preserve_dynamic_context_reminders
-    would not rescue the memory block from summary compression.
-    """
+    '验证 memory、message、carries、reminder、key、for、title、eligibility 场景下的预期行为、边界条件与结果。\n\nRegression: memory HumanMessage must carry _DYNAMIC_CONTEXT_REMINDER_KEY.\n\n    Without it, title_middleware._is_user_message_for_title counts the memory\n    block as a second user message and skips title generation entirely.\n    Similarly, summarization_middleware._preserve_dynamic_context_reminders\n    would not rescue the memory block from summary compression.\n    '
     from deerflow.agents.middlewares.dynamic_context_middleware import is_dynamic_context_reminder
 
     mw = _make_middleware()
@@ -589,7 +551,7 @@ def test_memory_message_carries_reminder_key_for_title_eligibility():
 
 
 def test_no_second_midnight_injection_once_date_updated():
-    """After a midnight update is persisted, the same-day path skips re-injection."""
+    '验证 no、second、midnight、injection、once、date、updated 场景下的预期行为、边界条件与结果。\n\nAfter a midnight update is persisted, the same-day path skips re-injection.'
     mw = _make_middleware()
     state = {
         "messages": [
@@ -616,14 +578,7 @@ def test_no_second_midnight_injection_once_date_updated():
 
 
 def test_user_suffix_message_is_not_injection_target():
-    """Regression guard: HumanMessage whose ID ends with ``__user`` must not be
-    treated as an injection target.
-
-    After the ID-swap in ``_make_reminder_and_user_messages``, the original user
-    text becomes ``HumanMessage(id=X__user)``. If the middleware processes this
-    message again, it would perform another ID-swap → ``X__user__user`` → … →
-    unbounded suffix growth and ghost-message re-execution (issue #3725).
-    """
+    '验证 user、suffix、message、is、not、injection、target 场景下的预期行为、边界条件与结果。\n\nRegression guard: HumanMessage whose ID ends with ``__user`` must not be\n    treated as an injection target.\n\n    After the ID-swap in ``_make_reminder_and_user_messages``, the original user\n    text becomes ``HumanMessage(id=X__user)``. If the middleware processes this\n    message again, it would perform another ID-swap → ``X__user__user`` → … →\n    unbounded suffix growth and ghost-message re-execution (issue #3725).\n    '
     from deerflow.agents.middlewares.dynamic_context_middleware import _is_user_injection_target
 
     # A __user-suffix message is NOT a valid injection target
@@ -644,6 +599,7 @@ def test_user_suffix_message_is_not_injection_target():
 
 
 def test_legacy_summary_message_is_not_injection_target():
+    '验证 legacy、summary、message、is、not、injection、target 场景下的预期行为、边界条件与结果'
     from deerflow.agents.middlewares.dynamic_context_middleware import _is_user_injection_target
 
     summary_msg = HumanMessage(content="Here is a summary of the conversation", name="summary")
@@ -652,11 +608,7 @@ def test_legacy_summary_message_is_not_injection_target():
 
 
 def test_endswith_not_substring_prevents_false_positive():
-    """``endswith("__user")`` must NOT reject messages whose ID merely contains
-    ``__user`` somewhere in the middle (e.g. ``user__question-123``).
-
-    A substring check (``"__user" in id``) would incorrectly reject such IDs.
-    """
+    '验证 endswith、not、substring、prevents、false、positive 场景下的预期行为、边界条件与结果。\n\n``endswith("__user")`` must NOT reject messages whose ID merely contains\n    ``__user`` somewhere in the middle (e.g. ``user__question-123``).\n\n    A substring check (``"__user" in id``) would incorrectly reject such IDs.\n    '
     from deerflow.agents.middlewares.dynamic_context_middleware import _is_user_injection_target
 
     # ID contains "__user" in the middle — should NOT be rejected
@@ -673,20 +625,7 @@ def test_endswith_not_substring_prevents_false_positive():
 
 
 def test_no_recursive_id_swap_in_full_middleware_flow():
-    """End-to-end guard: after the first ID-swap, a second call to ``before_agent``
-    must NOT produce a second swap on the ``__user`` message.
-
-    This reproduces the exact scenario from issue #3725: a session with an
-    existing ID-swap triplet receives a new HumanMessage, and the middleware
-    must only inject into the new message — not re-process the ``__user`` peer.
-
-    The state_v2 reminder deliberately omits the parseable date from both
-    content and additional_kwargs so ``_last_injected_date`` returns None.
-    This forces the first-turn injection path to actually reach
-    ``_is_user_injection_target``, which must reject ``msg-1__user`` and
-    select ``msg-2`` instead — exercising the endswith("__user") guard
-    end-to-end rather than relying on the same-day short-circuit.
-    """
+    '验证 no、recursive、id、swap、in、full、middleware、flow 场景下的预期行为、边界条件与结果。\n\nEnd-to-end guard: after the first ID-swap, a second call to ``before_agent``\n    must NOT produce a second swap on the ``__user`` message.\n\n    This reproduces the exact scenario from issue #3725: a session with an\n    existing ID-swap triplet receives a new HumanMessage, and the middleware\n    must only inject into the new message — not re-process the ``__user`` peer.\n\n    The state_v2 reminder deliberately omits the parseable date from both\n    content and additional_kwargs so ``_last_injected_date`` returns None.\n    This forces the first-turn injection path to actually reach\n    ``_is_user_injection_target``, which must reject ``msg-1__user`` and\n    select ``msg-2`` instead — exercising the endswith("__user") guard\n    end-to-end rather than relying on the same-day short-circuit.\n    '
     mw = _make_middleware()
 
     # First call: inject into HumanMessage(id="msg-1")

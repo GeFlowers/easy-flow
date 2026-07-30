@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { getGoalContinuationDisplay } from "./goal-status-helpers";
 import { Tooltip } from "./tooltip";
 
+/** 展示线程目标及其续跑进度；缺少活动目标时不渲染占位内容。 */
 export function GoalStatus({
   className,
   goal,

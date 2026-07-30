@@ -12,6 +12,7 @@ const i18n = [
   { locale: "zh", name: "中文" },
 ];
 
+/** 为文档页目录项补齐当前语言与文档根路径。 */
 function formatPageRoute(base: string, items: PageMapItem[]): PageMapItem[] {
   return items.map((item) => {
     if ("route" in item && !item.route.startsWith(base)) {
@@ -24,6 +25,7 @@ function formatPageRoute(base: string, items: PageMapItem[]): PageMapItem[] {
   });
 }
 
+/** 装配带语言前缀的文档主题布局及其页面目录。 */
 export default async function DocLayout({ children, params }) {
   const { lang } = await params;
   const locale = getLocaleByLang(lang);
@@ -43,7 +45,7 @@ export default async function DocLayout({ children, params }) {
       docsRepositoryBase="https://github.com/bytedance/deerflow/tree/main/frontend/src/content"
       footer={<Footer className="mt-0" />}
       i18n={i18n}
-      // ... Your additional layout options
+      // 可在此添加其他布局选项。
     >
       {children}
     </Layout>

@@ -1,12 +1,4 @@
-"""read_file tool behaviour on binary files.
-
-``read_file`` decodes with UTF-8. Binary uploads (``.xlsx``, images, ...) raise
-``UnicodeDecodeError`` deep in the sandbox layer, which previously surfaced to
-the model as a vague ``Unexpected error reading file`` message. The model could
-not tell that the file was binary, so it retried ``read_file`` instead of
-switching to ``bash`` + pandas/openpyxl — burning LLM round-trips. These tests
-pin the actionable error contract and guard the normal text path.
-"""
+"""本模块覆盖读取 文件 工具的行为、边界与回归场景，确保既有契约稳定。"""
 
 from pathlib import Path
 from types import SimpleNamespace
@@ -16,6 +8,7 @@ from deerflow.sandbox.tools import read_file_tool
 
 
 def _local_runtime(tmp_path: Path) -> SimpleNamespace:
+    """准备可控测试资源与状态，供后续断言读取。"""
     for sub in ("workspace", "uploads", "outputs"):
         (tmp_path / sub).mkdir(parents=True, exist_ok=True)
     thread_data = {
@@ -30,6 +23,7 @@ def _local_runtime(tmp_path: Path) -> SimpleNamespace:
 
 
 def test_read_file_tool_binary_file_returns_actionable_hint(tmp_path, monkeypatch) -> None:
+    """验证读取 文件 工具 文件在预期条件及边界场景下的可观察行为，防止相关回归。"""
     runtime = _local_runtime(tmp_path)
     # .xlsx is a zip container: header bytes PK\x03\x04 plus a non-UTF-8 byte 0x82
     # that makes strict UTF-8 decoding fail (the exact byte seen in the field logs).
@@ -50,6 +44,7 @@ def test_read_file_tool_binary_file_returns_actionable_hint(tmp_path, monkeypatc
 
 
 def test_read_file_tool_text_file_unaffected(tmp_path, monkeypatch) -> None:
+    """验证读取 文件 工具 文件在预期条件及边界场景下的可观察行为，防止相关回归。"""
     runtime = _local_runtime(tmp_path)
     (tmp_path / "uploads" / "notes.txt").write_text("hello 你好\nsecond line", encoding="utf-8")
     monkeypatch.setattr("deerflow.sandbox.tools.ensure_sandbox_initialized", lambda runtime: LocalSandbox("t1"))

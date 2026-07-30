@@ -5,6 +5,7 @@ import * as AvatarPrimitive from "@radix-ui/react-avatar";
 
 import { cn } from "@/lib/utils";
 
+/** Avatar 内部组件：组织对应的界面结构与交互语义。 */
 function Avatar({
   className,
   ...props
@@ -21,6 +22,7 @@ function Avatar({
   );
 }
 
+/** AvatarImage 内部组件：组织对应的界面结构与交互语义。 */
 function AvatarImage({
   className,
   ...props
@@ -34,6 +36,7 @@ function AvatarImage({
   );
 }
 
+/** AvatarFallback 内部组件：组织对应的界面结构与交互语义。 */
 function AvatarFallback({
   className,
   ...props

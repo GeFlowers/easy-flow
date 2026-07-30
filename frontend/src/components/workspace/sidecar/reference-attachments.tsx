@@ -45,6 +45,7 @@ function ReferencePreview({ references }: { references: SidecarReference[] }) {
   );
 }
 
+/** 汇总侧边对话附带的引用，供编辑器在提交前展示可移除的上下文边界。 */
 export function ReferenceAttachmentSummary({
   references,
   onClear,

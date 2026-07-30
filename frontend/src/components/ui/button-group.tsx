@@ -21,6 +21,7 @@ const buttonGroupVariants = cva(
   },
 );
 
+/** ButtonGroup 内部组件：组织对应的界面结构与交互语义。 */
 function ButtonGroup({
   className,
   orientation,
@@ -37,6 +38,7 @@ function ButtonGroup({
   );
 }
 
+/** ButtonGroupText 内部组件：组织对应的界面结构与交互语义。 */
 function ButtonGroupText({
   className,
   asChild = false,
@@ -57,6 +59,7 @@ function ButtonGroupText({
   );
 }
 
+/** ButtonGroupSeparator 内部组件：组织对应的界面结构与交互语义。 */
 function ButtonGroupSeparator({
   className,
   orientation = "vertical",

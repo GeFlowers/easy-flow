@@ -3,6 +3,7 @@ import type { ThreadsClient } from "@langchain/langgraph-sdk/client";
 
 import type { AgentThread, AgentThreadState } from "./types";
 
+/** 静态演示站点预置线程的标识列表。 */
 export const DEMO_THREAD_IDS = [
   "21cfea46-34bd-4aa6-9e1f-3009452fbeb9",
   "3823e443-4e2b-4679-b496-a9506eae462b",
@@ -19,10 +20,12 @@ export const DEMO_THREAD_IDS = [
   "fe3f7974-1bcb-4a01-a950-79673baafefd",
 ] as const;
 
+/** 静态演示线程列表查询接受的搜索参数。 */
 export type ThreadSearchParams = NonNullable<
   Parameters<ThreadsClient["search"]>[0]
 >;
 
+/** 加载静态演示站点预置的线程列表。 */
 export async function loadStaticDemoThreads(
   params: ThreadSearchParams = {},
 ): Promise<AgentThread[]> {
@@ -50,6 +53,7 @@ export async function loadStaticDemoThreads(
   return sortedThreads.slice(offset, offset + limit);
 }
 
+/** 按标识加载静态演示线程。 */
 export async function loadStaticDemoThread(
   threadId: string,
 ): Promise<AgentThread> {
@@ -67,6 +71,7 @@ export async function loadStaticDemoThread(
   };
 }
 
+/** 将静态演示线程转换为可供界面消费的线程状态。 */
 export function staticDemoThreadState(
   thread: AgentThread,
 ): ThreadState<AgentThreadState> {

@@ -18,6 +18,7 @@ import { ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, useContext, useEffect, useState } from "react";
 
+/** WebPreviewContextValue 的公开类型定义。 */
 export type WebPreviewContextValue = {
   url: string;
   setUrl: (url: string) => void;
@@ -27,6 +28,7 @@ export type WebPreviewContextValue = {
 
 const WebPreviewContext = createContext<WebPreviewContextValue | null>(null);
 
+/** useWebPreview Hook：封装本模块所需的状态或上下文访问。 */
 const useWebPreview = () => {
   const context = useContext(WebPreviewContext);
   if (!context) {
@@ -35,11 +37,13 @@ const useWebPreview = () => {
   return context;
 };
 
+/** WebPreviewProps 的公开类型定义。 */
 export type WebPreviewProps = ComponentProps<"div"> & {
   defaultUrl?: string;
   onUrlChange?: (url: string) => void;
 };
 
+/** WebPreview 组件：提供对应的界面结构与交互语义。 */
 export const WebPreview = ({
   className,
   children,
@@ -77,8 +81,10 @@ export const WebPreview = ({
   );
 };
 
+/** WebPreviewNavigationProps 的公开类型定义。 */
 export type WebPreviewNavigationProps = ComponentProps<"div">;
 
+/** WebPreviewNavigation 组件：提供对应的界面结构与交互语义。 */
 export const WebPreviewNavigation = ({
   className,
   children,
@@ -92,10 +98,12 @@ export const WebPreviewNavigation = ({
   </div>
 );
 
+/** WebPreviewNavigationButtonProps 的公开类型定义。 */
 export type WebPreviewNavigationButtonProps = ComponentProps<typeof Button> & {
   tooltip?: string;
 };
 
+/** WebPreviewNavigationButton 组件：提供对应的界面结构与交互语义。 */
 export const WebPreviewNavigationButton = ({
   onClick,
   disabled,
@@ -124,8 +132,10 @@ export const WebPreviewNavigationButton = ({
   </TooltipProvider>
 );
 
+/** WebPreviewUrlProps 的公开类型定义。 */
 export type WebPreviewUrlProps = ComponentProps<typeof Input>;
 
+/** WebPreviewUrl 组件：提供对应的界面结构与交互语义。 */
 export const WebPreviewUrl = ({
   value,
   onChange,
@@ -135,7 +145,7 @@ export const WebPreviewUrl = ({
   const { url, setUrl } = useWebPreview();
   const [inputValue, setInputValue] = useState(url);
 
-  // Sync input value with context URL when it changes externally
+  // 上下文 URL 从外部变化时同步受控输入值。
   useEffect(() => {
     setInputValue(url);
   }, [url]);
@@ -165,10 +175,12 @@ export const WebPreviewUrl = ({
   );
 };
 
+/** WebPreviewBodyProps 的公开类型定义。 */
 export type WebPreviewBodyProps = ComponentProps<"iframe"> & {
   loading?: ReactNode;
 };
 
+/** WebPreviewBody 组件：提供对应的界面结构与交互语义。 */
 export const WebPreviewBody = ({
   className,
   loading,
@@ -191,6 +203,7 @@ export const WebPreviewBody = ({
   );
 };
 
+/** WebPreviewConsoleProps 的公开类型定义。 */
 export type WebPreviewConsoleProps = ComponentProps<"div"> & {
   logs?: Array<{
     level: "log" | "warn" | "error";
@@ -199,6 +212,7 @@ export type WebPreviewConsoleProps = ComponentProps<"div"> & {
   }>;
 };
 
+/** WebPreviewConsole 组件：提供对应的界面结构与交互语义。 */
 export const WebPreviewConsole = ({
   className,
   logs = [],

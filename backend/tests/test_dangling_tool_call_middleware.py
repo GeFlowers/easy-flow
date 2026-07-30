@@ -1,4 +1,4 @@
-"""Tests for DanglingToolCallMiddleware."""
+'定义 test_dangling_tool_call_middleware 模块提供的职责与可复用接口。\n\nTests for DanglingToolCallMiddleware.'
 
 import json
 from unittest.mock import AsyncMock, MagicMock
@@ -16,22 +16,27 @@ from deerflow.agents.middlewares.dangling_tool_call_middleware import (
 
 
 def _ai_with_tool_calls(tool_calls):
+    '执行 _ai_with_tool_calls 的明确职责，并返回与调用约定一致的结果'
     return AIMessage(content="", tool_calls=tool_calls)
 
 
 def _ai_with_invalid_tool_calls(invalid_tool_calls):
+    '执行 _ai_with_invalid_tool_calls 的明确职责，并返回与调用约定一致的结果'
     return AIMessage(content="", tool_calls=[], invalid_tool_calls=invalid_tool_calls)
 
 
 def _tool_msg(tool_call_id, name="test_tool"):
+    '执行 _tool_msg 的明确职责，并返回与调用约定一致的结果'
     return ToolMessage(content="result", tool_call_id=tool_call_id, name=name)
 
 
 def _tc(name="bash", tc_id="call_1"):
+    '执行 _tc 的明确职责，并返回与调用约定一致的结果'
     return {"name": name, "id": tc_id, "args": {}}
 
 
 def _invalid_tc(name="write_file", tc_id="write_file:36", error="Failed to parse tool arguments: malformed JSON"):
+    '执行 _invalid_tc 的明确职责，并返回与调用约定一致的结果'
     return {
         "type": "invalid_tool_call",
         "name": name,
@@ -42,21 +47,26 @@ def _invalid_tc(name="write_file", tc_id="write_file:36", error="Failed to parse
 
 
 class TestBuildPatchedMessagesNoPatch:
+    '组织 TestBuildPatchedMessagesNoPatch 场景的行为与边界验证'
     def test_empty_messages(self):
+        '验证 empty、messages 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         assert mw._build_patched_messages([]) is None
 
     def test_no_ai_messages(self):
+        '验证 no、ai、messages 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [HumanMessage(content="hello")]
         assert mw._build_patched_messages(msgs) is None
 
     def test_ai_without_tool_calls(self):
+        '验证 ai、without、tool、calls 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [AIMessage(content="hello")]
         assert mw._build_patched_messages(msgs) is None
 
     def test_all_tool_calls_responded(self):
+        '验证 all、tool、calls、responded 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1")]),
@@ -65,6 +75,7 @@ class TestBuildPatchedMessagesNoPatch:
         assert mw._build_patched_messages(msgs) is None
 
     def test_valid_tool_call_names_are_sanitization_noop(self):
+        '验证 valid、tool、call、names、are、sanitization、noop 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             AIMessage(
@@ -87,7 +98,9 @@ class TestBuildPatchedMessagesNoPatch:
 
 
 class TestBuildPatchedMessagesPatching:
+    '组织 TestBuildPatchedMessagesPatching 场景的行为与边界验证'
     def test_single_dangling_call(self):
+        '验证 single、dangling、call 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [_ai_with_tool_calls([_tc("bash", "call_1")])]
         patched = mw._build_patched_messages(msgs)
@@ -98,6 +111,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].status == "error"
 
     def test_multiple_dangling_calls_same_message(self):
+        '验证 multiple、dangling、calls、same、message 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1"), _tc("read", "call_2")]),
@@ -111,6 +125,7 @@ class TestBuildPatchedMessagesPatching:
         assert {tm.tool_call_id for tm in tool_msgs} == {"call_1", "call_2"}
 
     def test_patch_inserted_after_offending_ai_message(self):
+        '验证 patch、inserted、after、offending、ai、message 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             HumanMessage(content="hi"),
@@ -128,6 +143,7 @@ class TestBuildPatchedMessagesPatching:
         assert isinstance(patched[3], HumanMessage)
 
     def test_mixed_responded_and_dangling(self):
+        '验证 mixed、responded、and、dangling 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1"), _tc("read", "call_2")]),
@@ -140,6 +156,7 @@ class TestBuildPatchedMessagesPatching:
         assert synthetic[0].tool_call_id == "call_2"
 
     def test_multiple_ai_messages_each_patched(self):
+        '验证 multiple、ai、messages、each、patched 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1")]),
@@ -152,6 +169,7 @@ class TestBuildPatchedMessagesPatching:
         assert len(synthetic) == 2
 
     def test_synthetic_message_content(self):
+        '验证 synthetic、message、content 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [_ai_with_tool_calls([_tc("bash", "call_1")])]
         patched = mw._build_patched_messages(msgs)
@@ -160,6 +178,7 @@ class TestBuildPatchedMessagesPatching:
         assert tool_msg.name == "bash"
 
     def test_raw_provider_tool_calls_are_patched(self):
+        '验证 raw、provider、tool、calls、are、patched 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             AIMessage(
@@ -185,6 +204,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].status == "error"
 
     def test_empty_structured_tool_call_name_is_sanitized(self):
+        '验证 empty、structured、tool、call、name、is、sanitized 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [_ai_with_tool_calls([_tc("", "empty_name_call")])]
 
@@ -208,6 +228,7 @@ class TestBuildPatchedMessagesPatching:
         ],
     )
     def test_malformed_raw_provider_tool_call_name_is_sanitized(self, raw_tool_call):
+        '验证 malformed、raw、provider、tool、call、name、is、sanitized 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             AIMessage.model_construct(
@@ -230,6 +251,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].status == "error"
 
     def test_existing_tool_result_still_sanitizes_empty_structured_tool_call_name(self):
+        '验证 existing、tool、result、still、sanitizes、empty、structured、tool、call、name 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc(" ", "empty_name_call")]),
@@ -246,6 +268,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].name == "unknown_tool"
 
     def test_raw_provider_tool_call_empty_function_name_is_sanitized(self):
+        '验证 raw、provider、tool、call、empty、function、name、is、sanitized 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             AIMessage(
@@ -276,6 +299,7 @@ class TestBuildPatchedMessagesPatching:
         assert "name was missing or empty" in patched[1].content
 
     def test_valid_structured_call_with_empty_raw_provider_name_is_sanitized(self):
+        '验证 valid、structured、call、with、empty、raw、provider、name、is、sanitized 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             AIMessage.model_construct(
@@ -309,6 +333,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].name == "bash"
 
     def test_empty_name_invalid_tool_call_uses_name_recovery_message(self):
+        '验证 empty、name、invalid、tool、call、uses、name、recovery、message 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [_ai_with_invalid_tool_calls([_invalid_tc(name="", tc_id="empty_invalid_call")])]
 
@@ -321,6 +346,7 @@ class TestBuildPatchedMessagesPatching:
         assert "arguments were invalid" not in patched[1].content
 
     def test_issue_4172_mixed_tool_calls_serialize_with_valid_names_and_arguments(self):
+        '验证 issue、4172、mixed、tool、calls、serialize、with、valid、names、and、arguments 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         invalid_args = '{"description": "读取CSV数据文件前部内容", "path": "/mnt/user-data/uploads/test2.csv"}}'
         ai_message = AIMessage(
@@ -371,6 +397,7 @@ class TestBuildPatchedMessagesPatching:
         assert tool_messages[2].status == "error"
 
     def test_empty_name_and_malformed_arguments_in_invalid_tool_call_are_sanitized(self):
+        '验证 empty、name、and、malformed、arguments、in、invalid、tool、call、are、sanitized 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_invalid_tool_calls(
@@ -401,6 +428,7 @@ class TestBuildPatchedMessagesPatching:
         ],
     )
     def test_raw_provider_tool_call_arguments_are_sanitized(self, arguments):
+        '验证 raw、provider、tool、call、arguments、are、sanitized 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             AIMessage.model_construct(
@@ -428,6 +456,7 @@ class TestBuildPatchedMessagesPatching:
         assert json.loads(raw_arguments) == (arguments if isinstance(arguments, dict) else {})
 
     def test_valid_invalid_tool_call_arguments_are_sanitization_noop(self):
+        '验证 valid、invalid、tool、call、arguments、are、sanitization、noop 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_invalid_tool_calls(
@@ -447,6 +476,7 @@ class TestBuildPatchedMessagesPatching:
         assert mw._build_patched_messages(msgs) is None
 
     def test_non_adjacent_tool_result_is_moved_next_to_tool_call(self):
+        '验证 non、adjacent、tool、result、is、moved、next、to、tool、call 场景下的预期行为、边界条件与结果'
         middleware = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1")]),
@@ -461,6 +491,7 @@ class TestBuildPatchedMessagesPatching:
         assert isinstance(patched[2], HumanMessage)
 
     def test_multiple_tool_results_stay_grouped_after_ai_tool_call(self):
+        '验证 multiple、tool、results、stay、grouped、after、ai、tool、call 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1"), _tc("read", "call_2")]),
@@ -479,6 +510,7 @@ class TestBuildPatchedMessagesPatching:
         assert isinstance(patched[3], HumanMessage)
 
     def test_non_tool_message_inserted_between_partial_tool_results_is_regrouped(self):
+        '验证 non、tool、message、inserted、between、partial、tool、results、is、regrouped 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1"), _tc("read", "call_2")]),
@@ -497,6 +529,7 @@ class TestBuildPatchedMessagesPatching:
         assert isinstance(patched[3], HumanMessage)
 
     def test_valid_adjacent_tool_results_are_unchanged(self):
+        '验证 valid、adjacent、tool、results、are、unchanged 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1")]),
@@ -507,6 +540,7 @@ class TestBuildPatchedMessagesPatching:
         assert mw._build_patched_messages(msgs) is None
 
     def test_reused_tool_call_ids_across_ai_turns_keep_their_own_tool_results(self):
+        '验证 reused、tool、call、ids、across、ai、turns、keep、their、own、tool、results 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             HumanMessage(content="summary", name="summary", additional_kwargs={"hide_from_ui": True}),
@@ -535,6 +569,7 @@ class TestBuildPatchedMessagesPatching:
         assert mw._build_patched_messages(msgs) is None
 
     def test_reused_tool_call_id_patches_second_dangling_occurrence(self):
+        '验证 reused、tool、call、id、patches、second、dangling、occurrence 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("web_search", "web_search:11")]),
@@ -553,6 +588,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[3].status == "error"
 
     def test_reused_tool_call_id_consumes_later_result_for_first_dangling_occurrence(self):
+        '验证 reused、tool、call、id、consumes、later、result、for、first、dangling、occurrence 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         result = _tool_msg("web_search:11", "web_search")
         msgs = [
@@ -571,6 +607,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[3].status == "error"
 
     def test_tool_results_are_grouped_with_their_own_ai_turn_across_multiple_ai_messages(self):
+        '验证 tool、results、are、grouped、with、their、own、ai、turn、across、multiple、ai、messages 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             _ai_with_tool_calls([_tc("bash", "call_1")]),
@@ -592,13 +629,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[4].tool_call_id == "call_2"
 
     def test_orphan_tool_message_is_dropped_during_grouping(self):
-        """An orphan ToolMessage — one whose tool_call_id has no matching AIMessage
-        tool_call — is dropped from the patched output.
-
-        Behavior intentionally changed: strict OpenAI-compatible providers reject a
-        ToolMessage that does not follow an assistant tool_call, so an orphan left
-        over from interruption/compaction must not be forwarded.
-        """
+        '验证 orphan、tool、message、is、dropped、during、grouping 场景下的预期行为、边界条件与结果。\n\nAn orphan ToolMessage — one whose tool_call_id has no matching AIMessage\n        tool_call — is dropped from the patched output.\n\n        Behavior intentionally changed: strict OpenAI-compatible providers reject a\n        ToolMessage that does not follow an assistant tool_call, so an orphan left\n        over from interruption/compaction must not be forwarded.\n        '
         mw = DanglingToolCallMiddleware()
         orphan = _tool_msg("orphan_call", "orphan")
         msgs = [
@@ -621,8 +652,7 @@ class TestBuildPatchedMessagesPatching:
         assert len(patched) == 3
 
     def test_leading_orphan_tool_message_is_dropped(self):
-        """A ToolMessage that leads the transcript with no preceding tool_call is an
-        orphan and must be dropped (leaving a valid grouped transcript)."""
+        '验证 leading、orphan、tool、message、is、dropped 场景下的预期行为、边界条件与结果。\n\nA ToolMessage that leads the transcript with no preceding tool_call is an\n        orphan and must be dropped (leaving a valid grouped transcript).'
         mw = DanglingToolCallMiddleware()
         leading_orphan = _tool_msg("stale_call", "stale")
         msgs = [
@@ -641,8 +671,7 @@ class TestBuildPatchedMessagesPatching:
         assert len(patched) == 2
 
     def test_tool_call_id_none_orphan_is_dropped(self):
-        """A ToolMessage whose tool_call_id is None is always an orphan —
-        no valid tool call uses ``None`` as its id — and must be dropped."""
+        '验证 tool、call、id、none、orphan、is、dropped 场景下的预期行为、边界条件与结果。\n\nA ToolMessage whose tool_call_id is None is always an orphan —\n        no valid tool call uses ``None`` as its id — and must be dropped.'
         mw = DanglingToolCallMiddleware()
         # Use model_construct to bypass pydantic validation (ToolMessage requires
         # a string tool_call_id at construction, but a corrupt serialized payload
@@ -664,6 +693,7 @@ class TestBuildPatchedMessagesPatching:
         assert patched[1].tool_call_id == "call_1"
 
     def test_invalid_tool_call_is_patched(self):
+        '验证 invalid、tool、call、is、patched 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [_ai_with_invalid_tool_calls([_invalid_tc()])]
         patched = mw._build_patched_messages(msgs)
@@ -683,6 +713,7 @@ class TestBuildPatchedMessagesPatching:
         assert 'bad {"json"}' not in patched[1].content
 
     def test_non_write_file_invalid_tool_call_uses_generic_recovery_message(self):
+        '验证 non、write、file、invalid、tool、call、uses、generic、recovery、message 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [_ai_with_invalid_tool_calls([_invalid_tc(name="search", tc_id="search:1")])]
 
@@ -696,6 +727,7 @@ class TestBuildPatchedMessagesPatching:
         assert "write_file failed before execution" not in patched[1].content
 
     def test_valid_and_invalid_tool_calls_are_both_patched(self):
+        '验证 valid、and、invalid、tool、calls、are、both、patched 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         msgs = [
             AIMessage(
@@ -711,6 +743,7 @@ class TestBuildPatchedMessagesPatching:
         assert {tm.tool_call_id for tm in tool_msgs} == {"call_1", "write_file:36"}
 
     def test_invalid_tool_call_already_responded_is_sanitized_without_placeholder(self):
+        '验证 invalid、tool、call、already、responded、is、sanitized、without、placeholder 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         ai_message = _ai_with_invalid_tool_calls([_invalid_tc()])
         tool_message = _tool_msg("write_file:36", "write_file")
@@ -728,7 +761,9 @@ class TestBuildPatchedMessagesPatching:
 
 
 class TestWrapModelCall:
+    '组织 TestWrapModelCall 场景的行为与边界验证'
     def test_no_patch_passthrough(self):
+        '验证 no、patch、passthrough 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         request = MagicMock()
         request.messages = [AIMessage(content="hello")]
@@ -740,6 +775,7 @@ class TestWrapModelCall:
         assert result == "response"
 
     def test_patched_request_forwarded(self):
+        '验证 patched、request、forwarded 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         request = MagicMock()
         request.messages = [_ai_with_tool_calls([_tc("bash", "call_1")])]
@@ -762,8 +798,10 @@ class TestWrapModelCall:
 
 
 class TestAwrapModelCall:
+    '组织 TestAwrapModelCall 场景的行为与边界验证'
     @pytest.mark.anyio
     async def test_async_no_patch(self):
+        '验证 async、no、patch 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         request = MagicMock()
         request.messages = [AIMessage(content="hello")]
@@ -776,6 +814,7 @@ class TestAwrapModelCall:
 
     @pytest.mark.anyio
     async def test_async_patched(self):
+        '验证 async、patched 场景下的预期行为、边界条件与结果'
         mw = DanglingToolCallMiddleware()
         request = MagicMock()
         request.messages = [_ai_with_tool_calls([_tc("bash", "call_1")])]

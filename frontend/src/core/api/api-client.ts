@@ -15,15 +15,13 @@ import { isStateChangingMethod, readCsrfCookie } from "./fetcher";
 import { sanitizeRunStreamOptions } from "./stream-mode";
 
 /**
- * SDK ``onRequest`` hook that mints the ``X-CSRF-Token`` header from the
- * live ``csrf_token`` cookie just before each outbound fetch.
+ * SDK 的 ``onRequest`` 钩子：每次发起出站请求前，从当前 ``csrf_token``
+ * Cookie 生成 ``X-CSRF-Token`` 请求头。
  *
- * Reading the cookie per-request (rather than baking it into the SDK's
- * ``defaultHeaders`` at construction) handles login / logout / password
- * change cookie rotation transparently. Both the ``/api/langgraph/*`` SDK
- * path and the direct REST endpoints in ``fetcher.ts:fetchWithAuth``
- * share :func:`readCsrfCookie` and :const:`STATE_CHANGING_METHODS` so
- * the contract stays in lockstep.
+ * 每次请求读取 Cookie（而非在构造 SDK 时写入 ``defaultHeaders``）可透明处理
+ * 登录、登出及修改密码导致的 Cookie 轮换。``/api/langgraph/*`` SDK 路径和
+ * ``fetcher.ts:fetchWithAuth`` 中的直连 REST 端点共用
+ * :func:`readCsrfCookie` 与 :const:`STATE_CHANGING_METHODS`，从而保持该约定同步。
  */
 function injectCsrfHeader(_url: URL, init: RequestInit): RequestInit {
   if (!isStateChangingMethod(init.method ?? "GET")) {
@@ -38,28 +36,24 @@ function injectCsrfHeader(_url: URL, init: RequestInit): RequestInit {
   return { ...init, headers };
 }
 
-// Run statuses that have reached a terminal state where no further streaming
-// is possible. Reconnecting (``joinStream``) to such a run either 409s or, once
-// the backend's in-memory stream bridge is reaped (``worker.py`` calls
-// ``publish_end`` unconditionally, including for interrupted runs, then reaps
-// the bridge after 60s), blocks forever on a drained condition variable —
-// pinning ``isLoading`` true so the submit button stays a stop button and the
-// first message after a reload never sends. The ``joinStream`` wrapper below
-// short-circuits these *before* joining.
+// 已到达终态、无法继续流式传输的运行状态。对此类运行调用重连（``joinStream``）
+// 要么会得到 409，要么会在后端回收内存流桥接器后（``worker.py`` 对所有运行，
+// 包括被中断的运行，都会无条件调用 ``publish_end``，再于 60 秒后回收桥接器），
+// 永久阻塞在已耗尽的条件变量上。这会让 ``isLoading`` 一直为 true，使提交按钮
+// 保持“停止”状态，并导致刷新后的第一条消息无法发送。下方 ``joinStream`` 包装器
+// 会在真正加入流之前短路这些情形。
 //
-// ``interrupted`` is included because in DeerFlow it is only ever written by
-// ``RunManager.cancel()`` (a user-initiated stop); the resumable human-in-the-
-// loop path uses ``Command(goto=END)`` (``ClarificationMiddleware``), which
-// ends the run as ``success``, not ``interrupted``. So an interrupted run has
-// nothing left to stream — its state lives in the checkpoint, fetched
-// independently by ``useThreadHistory``, and resuming means a fresh ``submit``.
+// 包含 ``interrupted``，因为它在 DeerFlow 中只由 ``RunManager.cancel()`` 写入
+// （即用户主动停止）；可恢复的人机交互路径使用
+// ``Command(goto=END)``（``ClarificationMiddleware``），会将运行以
+// ``success`` 而非 ``interrupted`` 结束。因此，被中断的运行已没有内容可流式传输：
+// 其状态保存在由 ``useThreadHistory`` 独立获取的检查点中，恢复意味着重新 ``submit``。
 //
-// ``error``/``timeout`` are terminal too, so a reload within the ~60s
-// bridge-reap window no longer replays the buffered error event through
-// ``onError`` — the transient error toast (``getStreamErrorMessage``) is
-// dropped. The persisted error state still loads from the checkpoint via
-// ``useThreadHistory``, so only the toast is lost; that is intentional, since
-// surfacing a stale error toast on every reload is noise rather than signal.
+// 错误和超时状态同样是终态，因此在约 60 秒的桥接器回收窗口内刷新页面时，
+// 不再会通过 ``onError`` 重放缓冲的错误事件，临时错误提示
+// （``getStreamErrorMessage``）会被丢弃。持久化的错误状态仍由
+// ``useThreadHistory`` 从检查点加载，因此损失的只有提示；这是有意为之，
+// 因为每次刷新都显示陈旧错误提示只会制造噪音。
 const TERMINAL_RUN_STATUSES = new Set([
   "success",
   "error",
@@ -68,18 +62,17 @@ const TERMINAL_RUN_STATUSES = new Set([
 ]);
 
 /**
- * Shared matcher for the gateway's 409 conflict responses. The SDK surfaces
- * non-2xx responses as ``HTTPError { status, message }`` where ``message`` is
- * ``"HTTP 409: {\"detail\":\"...\"}"``, so a 409 may be detected either via the
- * numeric ``status`` or a substring of ``message``.
+ * Gateway 409 冲突响应的共享匹配器。SDK 将非 2xx 响应呈现为
+ * ``HTTPError { status, message }``，其中 ``message`` 形如
+ * ``"HTTP 409: {\"detail\":\"...\"}"``，所以既可通过数值 ``status``，也可通过
+ * ``message`` 子串检测 409。
  *
- * Every passed ``needles`` substring must be present; this AND semantics is what
- * lets a caller distinguish sibling conflict branches by phrase (e.g. the
- * terminal-state cancel branch from the still-active-on-another-worker branch).
+ * 传入的每个 ``needles`` 子串都必须存在；这一“与”语义让调用方可凭措辞区分并列的
+ * 冲突分支（例如，区分终态取消分支与仍在另一工作进程中活动的分支）。
  *
- * Match strings until the API exposes a structured error code; the source of
- * truth is ``_cancel_conflict_detail`` / the store-only response in
- * ``backend/app/gateway/routers/thread_runs.py``.
+ * 在 API 提供结构化错误码前先匹配字符串；事实来源是
+ * ``backend/app/gateway/routers/thread_runs.py`` 中的
+ * ``_cancel_conflict_detail`` / 仅存储响应。
  */
 function isRunConflictError(error: unknown, ...needles: string[]): boolean {
   const status =
@@ -101,8 +94,8 @@ function isRunConflictError(error: unknown, ...needles: string[]): boolean {
   );
 }
 
-// Store-only run cannot be streamed (no in-memory stream bridge on this
-// worker): reconnect has nothing to rejoin.
+// 仅存储的运行无法流式传输（此工作进程没有内存流桥接器），重连时没有流可加入。
+/** 判断错误是否表示运行不在当前工作进程中，因而无法重新加入流。 */
 export function isInactiveRunStreamError(error: unknown): boolean {
   return isRunConflictError(
     error,
@@ -112,30 +105,26 @@ export function isInactiveRunStreamError(error: unknown): boolean {
 }
 
 /**
- * Matches the gateway's terminal-state cancel conflict, raised by
- * ``_cancel_conflict_detail`` in ``backend/app/gateway/routers/thread_runs.py``
- * as ``Run X is not cancellable (status: success|error|timeout)`` when
- * ``RunManager.cancel`` refuses a run that already finished.
+ * 匹配 Gateway 的终态取消冲突：当 ``RunManager.cancel`` 拒绝已结束的运行时，
+ * ``backend/app/gateway/routers/thread_runs.py`` 中的
+ * ``_cancel_conflict_detail`` 会返回
+ * “运行 X 不可取消（状态：成功、错误或超时）”。
  *
- * The sibling ``"not active on this worker and cannot be cancelled"`` branch
- * (run still pending/running on another worker in a multi-instance deploy) is
- * intentionally NOT matched — that is a real cancel failure on a live run and
- * must stay visible. Only the terminal-state branch is a true no-op.
+ * 有意不匹配“运行不在当前工作进程中且无法取消”的并列分支：
+ * 在多实例部署中，它表示运行仍在另一工作进程中等待或执行，是活动运行的真实取消失败，
+ * 必须对用户可见。只有终态分支才是真正的无操作。
  */
 export function isRunNotCancellableError(error: unknown): boolean {
   return isRunConflictError(error, "is not cancellable");
 }
 
 /**
- * Preflight a reconnect: if the run already reached a terminal state, there is
- * nothing to rejoin. Returns ``true`` when the caller should skip the
- * underlying ``joinStream`` so the SDK's ``onSuccess`` path runs and
- * ``isLoading`` flips back to false — instead of blocking forever on a drained
- * stream bridge.
+ * 重连预检：如果运行已到达终态，就没有流可加入。当调用方应跳过底层
+ * ``joinStream`` 时返回 ``true``，使 SDK 的 ``onSuccess`` 路径执行并将
+ * ``isLoading`` 复位为 false，避免永久阻塞在已耗尽的流桥接器上。
  *
- * Any error (404 for an evicted record, network blip, auth hiccup, …) falls
- * back to the original join so a legitimately active reconnect is never
- * silently suppressed.
+ * 任意错误（被驱逐记录的 404、短暂网络故障、认证异常等）都会回退至原始加入逻辑，
+ * 以免合法活动的重连被静默抑制。
  */
 async function shouldSkipReconnect(
   client: LangGraphClient,
@@ -150,6 +139,7 @@ async function shouldSkipReconnect(
   }
 }
 
+/** 仅在会话存储仍指向指定运行时，清除该线程的陈旧重连标记。 */
 export function clearReconnectRun(
   threadId: string | null | undefined,
   runId: string,
@@ -163,10 +153,11 @@ export function clearReconnectRun(
       storage.removeItem(key);
     }
   } catch {
-    // Ignore storage access failures so reconnect cleanup never throws.
+    // 忽略存储访问失败，确保清理重连状态本身永不抛错。
   }
 }
 
+/** 创建兼容 Gateway、CSRF 保护、终态重连和流模式约束的 LangGraph 客户端。 */
 function createCompatibleClient(isMock?: boolean): LangGraphClient {
   if (isStaticWebsiteOnly() && !isMock) {
     return createStaticClient();
@@ -193,12 +184,10 @@ function createCompatibleClient(isMock?: boolean): LangGraphClient {
       return await originalCancel(threadId, runId, wait, action, options);
     } catch (error) {
       if (isRunNotCancellableError(error)) {
-        // The run already reached a terminal state, so cancelling it is a
-        // no-op. Swallow the 409 so a stop click during the finish window
-        // (backend flipped to ``success`` but the SSE stream hasn't drained)
-        // doesn't surface as an unhandled rejection, and clear the now-stale
-        // reconnect key. clearReconnectRun only removes the key when it still
-        // matches this runId, so a newer run's key is never touched.
+        // 运行已到达终态，取消操作是无操作。吞掉 409，避免在结束窗口内点击停止
+        // （后端已切换为 ``success``，但 SSE 流尚未排空）时出现未处理的拒绝；同时
+        // 清除已陈旧的重连键。clearReconnectRun 仅在键仍匹配该 runId 时删除，
+        // 因此绝不会误触及更新运行的键。
         clearReconnectRun(threadId, runId);
         return;
       }
@@ -208,10 +197,9 @@ function createCompatibleClient(isMock?: boolean): LangGraphClient {
 
   const originalJoinStream = client.runs.joinStream.bind(client.runs);
   client.runs.joinStream = async function* (threadId, runId, options) {
-    // Short-circuit reconnects to runs that have already finished: otherwise a
-    // reload after the backend's stream bridge is reaped blocks forever on a
-    // drained condition variable, pinning ``isLoading`` true so the first
-    // post-reload message is routed to ``stop`` instead of ``submit``.
+    // 短路已结束运行的重连：否则，在后端回收流桥接器后刷新页面会永久阻塞在已耗尽的
+    // 条件变量上，使 ``isLoading`` 固定为 true，刷新后的第一条消息会被路由到
+    // ``stop`` 而非 ``submit``。
     if (threadId && (await shouldSkipReconnect(client, threadId, runId))) {
       clearReconnectRun(threadId, runId);
       return;
@@ -234,6 +222,7 @@ function createCompatibleClient(isMock?: boolean): LangGraphClient {
   return client;
 }
 
+/** 创建供静态网站演示模式使用的本地 LangGraph 客户端替身。 */
 function createStaticClient(): LangGraphClient {
   const apiUrl =
     typeof window === "undefined"
@@ -263,16 +252,17 @@ function createStaticClient(): LangGraphClient {
 
   client.runs.list = (async () => []) as typeof client.runs.list;
   client.runs.stream = async function* () {
-    /* empty */
+    /* 静态演示模式没有运行流。 */
   } as typeof client.runs.stream;
   client.runs.joinStream = async function* () {
-    /* empty */
+    /* 静态演示模式没有可重新加入的运行流。 */
   } as typeof client.runs.joinStream;
 
   return client as LangGraphClient<AgentThreadState>;
 }
 
 const _clients = new Map<string, LangGraphClient>();
+/** 按普通或模拟模式获取并缓存唯一的兼容 LangGraph 客户端。 */
 export function getAPIClient(isMock?: boolean): LangGraphClient {
   const cacheKey = isMock ? "mock" : "default";
   let client = _clients.get(cacheKey);

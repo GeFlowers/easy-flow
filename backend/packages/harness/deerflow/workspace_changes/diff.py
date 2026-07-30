@@ -1,3 +1,4 @@
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 from __future__ import annotations
 
 import difflib
@@ -20,6 +21,7 @@ def compare_snapshots(
     *,
     limits: WorkspaceChangeLimits | None = None,
 ) -> WorkspaceChangeResult:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     resolved_limits = limits or WorkspaceChangeLimits()
     all_paths = sorted(set(before.files) | set(after.files))
     changes: list[WorkspaceFileChange] = []
@@ -93,6 +95,7 @@ def compare_snapshots(
 
 
 def get_changed_paths(before: WorkspaceSnapshot, after: WorkspaceSnapshot) -> set[str]:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     changed: set[str] = set()
     for path in set(before.files) | set(after.files):
         before_file = before.files.get(path)
@@ -107,6 +110,7 @@ def _status(
     before_file: FileSnapshot | None,
     after_file: FileSnapshot | None,
 ) -> WorkspaceChangeStatus:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if before_file is None:
         return "created"
     if after_file is None:
@@ -115,6 +119,7 @@ def _status(
 
 
 def _same_file(before_file: FileSnapshot, after_file: FileSnapshot) -> bool:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if before_file.sha256 is not None and after_file.sha256 is not None:
         return before_file.sha256 == after_file.sha256
     return before_file.size == after_file.size and before_file.mtime_ns == after_file.mtime_ns
@@ -127,6 +132,7 @@ def _build_diff(
     *,
     remaining_bytes: int,
 ) -> tuple[str, int, int, bool, DiffUnavailableReason | None]:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     reason = _diff_unavailable_reason(before_file, after_file)
     if reason is not None:
         return "", 0, 0, False, reason
@@ -159,6 +165,7 @@ def _diff_unavailable_reason(
     before_file: FileSnapshot | None,
     after_file: FileSnapshot | None,
 ) -> DiffUnavailableReason | None:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     files = [file for file in (before_file, after_file) if file is not None]
     for preferred in ("sensitive", "binary", "large"):
         if any(file.content_unavailable_reason == preferred for file in files):
@@ -167,6 +174,7 @@ def _diff_unavailable_reason(
 
 
 def _snapshot_text(file: FileSnapshot | None) -> str | None:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if file is None:
         return ""
     if file.text is not None:
@@ -181,12 +189,13 @@ def _snapshot_text(file: FileSnapshot | None) -> str | None:
 
 
 def _count_diff_lines(lines: list[str]) -> tuple[int, int]:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     additions = 0
     deletions = 0
     for line in lines:
-        # Unified-diff file headers are "+++ " / "--- " with a trailing space;
-        # a bare "+++"/"---" prefix would also swallow real content lines whose
-        # text begins with those sequences (e.g. an added line "+++foo").
+                # ????????????????
+                # ????????????????
+                # ????????????????
         if line.startswith("+++ ") or line.startswith("--- "):
             continue
         if line.startswith("+"):

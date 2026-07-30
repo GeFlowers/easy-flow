@@ -1,15 +1,15 @@
-# DeerFlow - Unified Development Environment
+# DeerFlow - 统一开发环境入口
 
 .PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
 
-# Detect OS for Windows compatibility
+# 检测 Windows，并将 Shell 脚本转交 Git Bash，避免 cmd.exe/PowerShell 的语法差异。
 ifeq ($(OS),Windows_NT)
     SHELL := cmd.exe
     PYTHON ?= python
-    # Run repo shell scripts through Git Bash when Make is launched from cmd.exe / PowerShell.
+    # 从 cmd.exe / PowerShell 启动 Make 时，通过 Git Bash 运行仓库 Shell 脚本。
     RUN_WITH_GIT_BASH = call scripts\run-with-git-bash.cmd
 else
     PYTHON ?= python3
@@ -49,7 +49,7 @@ help:
 	@echo "  make docker-logs-gateway - View Docker gateway logs"
 	@echo "  make docker-logs-redis - View Docker Redis logs"
 
-## Setup & Diagnosis
+## 初始化与诊断：只生成或检查本地配置，不启动服务
 setup:
 	@$(BACKEND_UV_RUN) python ../scripts/setup_wizard.py
 
@@ -71,11 +71,11 @@ config:
 config-upgrade:
 	@$(RUN_WITH_GIT_BASH) ./scripts/config-upgrade.sh
 
-# Check required tools
+# 依赖检查：在安装或启动前尽早报告缺失工具。
 check:
 	@$(PYTHON) ./scripts/check.py
 
-# Install all dependencies
+# 安装全部依赖与 Git 钩子；不会启动服务。
 install:
 	@echo "Installing backend dependencies..."
 	@cd backend && uv sync
@@ -94,39 +94,39 @@ install:
 	@echo "  make setup-sandbox"
 	@echo ""
 
-# Pre-pull sandbox Docker image (optional but recommended)
+# 可选预拉取沙箱镜像，缩短首次容器沙箱启动时间。
 setup-sandbox:
 	@$(RUN_WITH_GIT_BASH) ./scripts/setup-sandbox.sh
 
-# Start all services in development mode (with hot-reloading)
+# 开发服务组：启用热重载并在启动前执行依赖检查。
 dev:
 	@$(PYTHON) ./scripts/check.py
 	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --dev
 
-# Start all services in production mode (with optimizations)
+# 生产服务组：使用优化模式且不启用热重载。
 start:
 	@$(PYTHON) ./scripts/check.py
 	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --prod
 
-# Start all services in daemon mode (background)
+# 后台开发服务组：启动后返回调用终端。
 dev-daemon:
 	@$(PYTHON) ./scripts/check.py
 	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --dev --daemon
 
-# Start prod services in daemon mode (background)
+# 后台生产服务组：启动后返回调用终端。
 start-daemon:
 	@$(PYTHON) ./scripts/check.py
 	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --prod --daemon
 
-# Start nginx alone in the foreground with the local dev config
+# 仅在前台启动 nginx，使用本地开发配置用于独立代理调试。
 nginx:
 	@$(RUN_WITH_GIT_BASH) ./scripts/nginx.sh
 
-# Stop all services
+# 仅停止 DeerFlow 所属服务；停止逻辑会保留无关项目进程。
 stop:
 	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --stop
 
-# Clean up
+# 清理运行时目录与日志；依赖 stop 先释放 DeerFlow 服务资源。
 clean: stop
 	@echo "Cleaning up..."
 	@-rm -rf backend/.deer-flow 2>/dev/null || true
@@ -134,26 +134,26 @@ clean: stop
 	@echo "✓ Cleanup complete"
 
 # ==========================================
-# Docker Development Commands
+# Docker 开发命令：按 config.yaml 的沙箱模式选择服务和权限边界。
 # ==========================================
 
-# Initialize Docker containers and install dependencies
+# 预拉取 Docker 沙箱镜像；本地沙箱会安全跳过。
 docker-init:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh init
 
-# Start Docker development environment
+# 启动 Docker 开发环境。
 docker-start:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh start
 
-# Stop Docker development environment
+# 停止 Docker 开发环境。
 docker-stop:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh stop
 
-# View Docker development logs
+# 跟随全部 Docker 开发服务日志。
 docker-logs:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh logs
 
-# View Docker development logs
+# 仅跟随前端 Docker 服务日志。
 docker-logs-frontend:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh logs --frontend
 docker-logs-gateway:
@@ -162,13 +162,13 @@ docker-logs-redis:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh logs --redis
 
 # ==========================================
-# Production Docker Commands
+# Docker 生产命令：构建或管理生产 Compose 服务。
 # ==========================================
 
-# Build and start production services
+# 构建并启动生产 Compose 服务。
 up:
 	@$(RUN_WITH_GIT_BASH) ./scripts/deploy.sh
 
-# Stop and remove production containers
+# 停止并移除生产 Compose 容器。
 down:
 	@$(RUN_WITH_GIT_BASH) ./scripts/deploy.sh down

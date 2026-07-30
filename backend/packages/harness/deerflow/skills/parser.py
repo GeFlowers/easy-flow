@@ -1,3 +1,4 @@
+'未说明'
 import logging
 import re
 from pathlib import Path
@@ -13,7 +14,7 @@ _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> str:
-    """Render a developer-friendly explanation of a YAML front-matter error."""
+    '未说明'
 
     lines = [f"Invalid YAML front-matter in {skill_file}: {exc}"]
 
@@ -39,12 +40,7 @@ def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> st
 
 
 def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None:
-    """Parse the optional allowed-tools frontmatter field.
-
-    Returns None when the field is omitted. Returns a tuple when the field is a
-    YAML sequence of strings, including an empty tuple for explicit no-tool
-    skills. Raises ValueError for malformed values.
-    """
+    '未说明'
     if raw is None:
         return None
     if not isinstance(raw, list):
@@ -62,15 +58,7 @@ def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None
 
 
 def parse_required_secrets(raw: object, skill_file: Path) -> tuple[SecretRequirement, ...]:
-    """Parse the optional required-secrets frontmatter field (issue #3861).
-
-    Accepts a YAML sequence whose items are either a string (the secret / env
-    variable name) or a mapping (``{name, optional}``). Returns an empty tuple
-    when the field is omitted. Entries whose name is missing or is not a valid
-    environment-variable name are dropped with a warning, so one malformed
-    declaration does not invalidate the whole skill. Raises ValueError only when
-    the field is present but is not a list.
-    """
+    '未说明'
     if raw is None:
         return ()
     if not isinstance(raw, list):
@@ -99,13 +87,7 @@ def parse_required_secrets(raw: object, skill_file: Path) -> tuple[SecretRequire
 
 
 def parse_secrets_autonomous(raw: object, skill_file: Path) -> bool:
-    """Parse the optional ``secrets-autonomous`` frontmatter field (issue #3914).
-
-    ``True`` (the default) lets declared secrets bind while the skill is
-    in-context via an autonomous model load; ``False`` restricts binding to
-    explicit ``/slash`` activation. A malformed (non-boolean) value fails
-    closed to ``False`` — the safer, less-injection direction.
-    """
+    '未说明'
     if raw is None:
         return True
     if isinstance(raw, bool):
@@ -115,17 +97,7 @@ def parse_secrets_autonomous(raw: object, skill_file: Path) -> bool:
 
 
 def parse_skill_file(skill_file: Path, category: SkillCategory, relative_path: Path | None = None) -> Skill | None:
-    """Parse a SKILL.md file and extract metadata.
-
-    Args:
-        skill_file: Path to the SKILL.md file.
-        category: Category of the skill.
-        relative_path: Relative path from the category root to the skill
-            directory.  Defaults to the skill directory name when omitted.
-
-    Returns:
-        Skill object if parsing succeeds, None otherwise.
-    """
+    '未说明'
     if not skill_file.exists() or skill_file.name != SKILL_MD_FILE:
         return None
 

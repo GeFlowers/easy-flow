@@ -1,10 +1,4 @@
-"""One-time migration: move legacy thread dirs, memory, agents, and skills into per-user layout.
-
-Usage:
-    PYTHONPATH=. python scripts/migrate_user_isolation.py [--dry-run] [--user-id USER_ID]
-
-The script is idempotent — re-running it after a successful migration is a no-op.
-"""
+"""本脚本负责迁移 用户 隔离。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 import argparse
 import logging
@@ -21,16 +15,7 @@ def migrate_thread_dirs(
     *,
     dry_run: bool = False,
 ) -> list[dict]:
-    """Move legacy thread directories into per-user layout.
-
-    Args:
-        paths: Paths instance.
-        thread_owner_map: Mapping of thread_id -> user_id from threads_meta table.
-        dry_run: If True, only log what would happen.
-
-    Returns:
-        List of migration report entries.
-    """
+    """执行迁移 会话对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     report: list[dict] = []
     legacy_threads = paths.base_dir / "threads"
     if not legacy_threads.exists():
@@ -75,24 +60,7 @@ def migrate_agents(
     *,
     dry_run: bool = False,
 ) -> list[dict]:
-    """Move legacy custom-agent directories into per-user layout.
-
-    Legacy layout:  ``{base_dir}/agents/{name}/``
-    Per-user layout: ``{base_dir}/users/{user_id}/agents/{name}/``
-
-    Pre-existing per-user agents take precedence: if a destination already
-    exists for an agent name, the legacy copy is moved to
-    ``{base_dir}/migration-conflicts/agents/{name}/`` for manual review.
-
-    Args:
-        paths: Paths instance.
-        user_id: Target user to receive the legacy agents (defaults to
-            ``"default"``, matching ``DEFAULT_USER_ID`` for no-auth setups).
-        dry_run: If True, only log what would happen.
-
-    Returns:
-        List of migration report entries, one per legacy agent directory found.
-    """
+    """执行迁移对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     report: list[dict] = []
     legacy_agents = paths.agents_dir
     if not legacy_agents.exists():
@@ -136,24 +104,7 @@ def migrate_skills(
     *,
     dry_run: bool = False,
 ) -> list[dict]:
-    """Move legacy global custom skills into per-user layout.
-
-    Legacy layout:  ``{base_dir}/skills/custom/{name}/``
-    Per-user layout: ``{base_dir}/users/{user_id}/skills/custom/{name}/``
-
-    Pre-existing per-user custom skills take precedence: if a destination
-    already exists for a skill name, the legacy copy is moved to
-    ``{base_dir}/migration-conflicts/skills/{name}/`` for manual review.
-
-    Args:
-        paths: Paths instance.
-        user_id: Target user to receive the legacy custom skills (defaults to
-            ``"default"``, matching ``DEFAULT_USER_ID`` for no-auth setups).
-        dry_run: If True, only log what would happen.
-
-    Returns:
-        List of migration report entries, one per legacy custom skill directory found.
-    """
+    """执行迁移对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     report: list[dict] = []
     legacy_custom = paths.base_dir / "skills" / "custom"
     if not legacy_custom.exists():
@@ -218,13 +169,7 @@ def migrate_memory(
     *,
     dry_run: bool = False,
 ) -> None:
-    """Move legacy global memory.json into per-user layout.
-
-    Args:
-        paths: Paths instance.
-        user_id: Target user to receive the legacy memory.
-        dry_run: If True, only log.
-    """
+    """执行迁移 内存对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     legacy_mem = paths.base_dir / "memory.json"
     if not legacy_mem.exists():
         logger.info("No legacy memory.json found — nothing to migrate.")
@@ -245,10 +190,7 @@ def migrate_memory(
 
 
 def _build_owner_map_from_db(paths: Paths) -> dict[str, str]:
-    """Query threads_meta table for thread_id -> user_id mapping.
-
-    Uses raw sqlite3 to avoid async dependencies.
-    """
+    '未说明'
     import sqlite3
 
     db_path = paths.base_dir / "deer-flow.db"
@@ -268,6 +210,7 @@ def _build_owner_map_from_db(paths: Paths) -> dict[str, str]:
 
 
 def main() -> None:
+    '未说明'
     parser = argparse.ArgumentParser(description="Migrate DeerFlow data to per-user layout")
     parser.add_argument("--dry-run", action="store_true", help="Log actions without making changes")
     parser.add_argument(

@@ -1,4 +1,4 @@
-"""Redis Streams-backed stream bridge."""
+'定义 redis 模块提供的职责与可复用接口。\n\nRedis Streams-backed stream bridge.'
 
 from __future__ import annotations
 
@@ -49,12 +49,7 @@ _MAX_SUBSCRIBE_RETRIES = 3
 
 
 class RedisStreamBridge(StreamBridge):
-    """Per-run stream bridge backed by Redis Streams.
-
-    Each run is stored in one Redis Stream and subscribers read directly with
-    ``XREAD``.  This keeps the SSE bridge usable across multiple gateway
-    worker processes while preserving ``Last-Event-ID`` replay semantics.
-    """
+    '封装 RedisStreamBridge 的状态、协作关系与公开操作。\n\nPer-run stream bridge backed by Redis Streams.\n\n    Each run is stored in one Redis Stream and subscribers read directly with\n    ``XREAD``.  This keeps the SSE bridge usable across multiple gateway\n    worker processes while preserving ``Last-Event-ID`` replay semantics.\n    '
 
     supports_cross_process = True
 
@@ -68,6 +63,7 @@ class RedisStreamBridge(StreamBridge):
         stream_ttl_seconds: int | None = 86400,
         client: Redis | None = None,
     ) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self._redis_url = redis_url
         self._maxsize = max(1, queue_maxsize)
         self._key_prefix = key_prefix.rstrip(":")
@@ -82,9 +78,11 @@ class RedisStreamBridge(StreamBridge):
         self._owns_client = client is None
 
     def _stream_key(self, run_id: str) -> str:
+        '执行 _stream_key 的明确职责，并返回与调用约定一致的结果'
         return f"{self._key_prefix}:{run_id}"
 
     async def _xadd_retained(self, key: str, fields: dict[str, str], *, maxlen: int) -> None:
+        '执行 _xadd_retained 的明确职责，并返回与调用约定一致的结果'
         if self._stream_ttl_seconds is None:
             await self._redis.xadd(
                 key,
@@ -106,20 +104,24 @@ class RedisStreamBridge(StreamBridge):
 
     @staticmethod
     def _decode(value: Any) -> str:
+        '执行 _decode 的明确职责，并返回与调用约定一致的结果'
         if isinstance(value, bytes):
             return value.decode("utf-8")
         return str(value)
 
     @classmethod
     def _normalise_fields(cls, fields: Mapping[Any, Any]) -> dict[str, str]:
+        '执行 _normalise_fields 的明确职责，并返回与调用约定一致的结果'
         return {cls._decode(key): cls._decode(value) for key, value in fields.items()}
 
     @staticmethod
     def _encode_data(data: Any) -> str:
+        '执行 _encode_data 的明确职责，并返回与调用约定一致的结果'
         return json.dumps(data, default=str, ensure_ascii=False, separators=(",", ":"))
 
     @staticmethod
     def _decode_data(raw: str | None) -> Any:
+        '执行 _decode_data 的明确职责，并返回与调用约定一致的结果'
         if raw is None:
             return None
         try:
@@ -129,6 +131,7 @@ class RedisStreamBridge(StreamBridge):
             return raw
 
     def _entry_from_redis(self, event_id: str, fields: Mapping[Any, Any]) -> StreamEvent:
+        '执行 _entry_from_redis 的明确职责，并返回与调用约定一致的结果'
         payload = self._normalise_fields(fields)
         kind = payload.get("kind", _KIND_EVENT)
         if kind == _KIND_END:
@@ -140,6 +143,7 @@ class RedisStreamBridge(StreamBridge):
         )
 
     async def publish(self, run_id: str, event: str, data: Any) -> None:
+        '执行 publish 的明确职责，并返回与调用约定一致的结果'
         key = self._stream_key(run_id)
         await self._xadd_retained(
             key,
@@ -153,6 +157,7 @@ class RedisStreamBridge(StreamBridge):
 
     async def publish_end(self, run_id: str) -> None:
         # Keep the configured number of data events plus the internal end marker.
+        '执行 publish_end 的明确职责，并返回与调用约定一致的结果'
         key = self._stream_key(run_id)
         await self._xadd_retained(
             key,
@@ -161,10 +166,11 @@ class RedisStreamBridge(StreamBridge):
         )
 
     async def stream_exists(self, run_id: str) -> bool:
-        """Return whether Redis still has retained stream data for *run_id*."""
+        '持续产出流式结果并传递终止状态，并遵守 stream_exists 所表达的接口约束。\n\nReturn whether Redis still has retained stream data for *run_id*.'
         return bool(await self._redis.exists(self._stream_key(run_id)))
 
     async def _resolve_start_stream_id(self, key: str, last_event_id: str | None) -> str:
+        '执行 _resolve_start_stream_id 的明确职责，并返回与调用约定一致的结果'
         if last_event_id is None:
             return "0-0"
         if _REDIS_STREAM_ID_RE.fullmatch(last_event_id):
@@ -185,6 +191,7 @@ class RedisStreamBridge(StreamBridge):
         last_event_id: str | None = None,
         heartbeat_interval: float = 15.0,
     ) -> AsyncIterator[StreamEvent]:
+        '执行 subscribe 的明确职责，并返回与调用约定一致的结果'
         key = self._stream_key(run_id)
         stream_id = await self._resolve_start_stream_id(key, last_event_id)
         block_ms = max(1, int(heartbeat_interval * 1000)) if heartbeat_interval > 0 else 1
@@ -235,11 +242,13 @@ class RedisStreamBridge(StreamBridge):
                     yield entry
 
     async def cleanup(self, run_id: str, *, delay: float = 0) -> None:
+        '执行 cleanup 的明确职责，并返回与调用约定一致的结果'
         if delay > 0:
             await asyncio.sleep(delay)
         await self._redis.delete(self._stream_key(run_id))
 
     async def close(self) -> None:
+        '执行 close 的明确职责，并返回与调用约定一致的结果'
         if not self._owns_client:
             return
         close = getattr(self._redis, "aclose", None) or getattr(self._redis, "close", None)

@@ -1,30 +1,4 @@
-"""Trigger filter logic for GitHub webhook dispatch.
-
-Pure functions, no I/O. Given an event name, its payload, and the
-agent-config's per-event trigger overrides, decide whether to fire the
-agent and why (the reason string makes the gateway log line useful).
-
-**Events are opt-in per binding.** If an event name does not appear as a
-key in the binding's ``triggers:`` mapping, the agent is **not registered**
-for that event — the dispatcher never even loads the agent for it. The
-agent's ``config.yaml`` is the single source of truth for "which events
-do I care about?".
-
-:data:`DEFAULT_TRIGGERS` still exists, but it is no longer an
-event-enablement list. It is the per-event **field-level defaults** that
-get merged into the binding's override when an event IS listed. So:
-
-* ``issue_comment: {}`` → registers the agent for ``issue_comment`` and
-  inherits ``require_mention: True`` from the default. (Same shape as
-  before — minimal config, sensible defaults.)
-* Binding omits ``issue_comment`` entirely → the agent does **not** see
-  ``issue_comment`` events at all. (New behavior.)
-
-Trigger override merge is field-wise via Pydantic's ``exclude_unset``:
-fields the binding explicitly set win; fields it omitted fall back to
-the default. Fields with no default (``DEFAULT_TRIGGERS[event]`` is
-``None``) just use the binding's literal value.
-"""
+'定义 triggers 模块提供的职责与可复用接口。\n\nTrigger filter logic for GitHub webhook dispatch.\n\nPure functions, no I/O. Given an event name, its payload, and the\nagent-config\'s per-event trigger overrides, decide whether to fire the\nagent and why (the reason string makes the gateway log line useful).\n\n**Events are opt-in per binding.** If an event name does not appear as a\nkey in the binding\'s ``triggers:`` mapping, the agent is **not registered**\nfor that event — the dispatcher never even loads the agent for it. The\nagent\'s ``config.yaml`` is the single source of truth for "which events\ndo I care about?".\n\n:data:`DEFAULT_TRIGGERS` still exists, but it is no longer an\nevent-enablement list. It is the per-event **field-level defaults** that\nget merged into the binding\'s override when an event IS listed. So:\n\n* ``issue_comment: {}`` → registers the agent for ``issue_comment`` and\n  inherits ``require_mention: True`` from the default. (Same shape as\n  before — minimal config, sensible defaults.)\n* Binding omits ``issue_comment`` entirely → the agent does **not** see\n  ``issue_comment`` events at all. (New behavior.)\n\nTrigger override merge is field-wise via Pydantic\'s ``exclude_unset``:\nfields the binding explicitly set win; fields it omitted fall back to\nthe default. Fields with no default (``DEFAULT_TRIGGERS[event]`` is\n``None``) just use the binding\'s literal value.\n'
 
 from __future__ import annotations
 
@@ -51,19 +25,13 @@ DEFAULT_TRIGGERS: dict[str, GitHubTriggerConfig | None] = {
 
 
 def _action(payload: dict[str, Any]) -> str | None:
+    """从事件负载中提取字符串类型的动作值。"""
     action = payload.get("action")
     return action if isinstance(action, str) else None
 
 
 def _comment_body(event: str, payload: dict[str, Any]) -> str:
-    """Extract the human-typed text to scan for an ``@mention``.
-
-    For comment events this is the comment body. For ``issues`` and
-    ``pull_request`` events there is no separate comment — the mention
-    would be in the issue/PR body itself — so we read that. For
-    ``pull_request_review`` the body is the review summary. Other events
-    have no user-authored text to mention-check and return ``""``.
-    """
+    '执行 _comment_body 的明确职责，并返回与调用约定一致的结果。\n\nExtract the human-typed text to scan for an ``@mention``.\n\n    For comment events this is the comment body. For ``issues`` and\n    ``pull_request`` events there is no separate comment — the mention\n    would be in the issue/PR body itself — so we read that. For\n    ``pull_request_review`` the body is the review summary. Other events\n    have no user-authored text to mention-check and return ``""``.\n    '
     if event in ("issue_comment", "pull_request_review_comment"):
         body = (payload.get("comment") or {}).get("body")
         return body if isinstance(body, str) else ""
@@ -80,7 +48,7 @@ def _comment_body(event: str, payload: dict[str, Any]) -> str:
 
 
 def _author_login(event: str, payload: dict[str, Any]) -> str | None:
-    """Login of the human who triggered the event, for ``allow_authors``."""
+    '执行 _author_login 的明确职责，并返回与调用约定一致的结果。\n\nLogin of the human who triggered the event, for ``allow_authors``.'
     if event in ("issue_comment", "pull_request_review_comment"):
         login = (payload.get("comment") or {}).get("user", {}).get("login")
     elif event == "pull_request":
@@ -98,21 +66,7 @@ def _resolved_trigger(
     event: str,
     binding_triggers: dict[str, GitHubTriggerConfig],
 ) -> GitHubTriggerConfig | None:
-    """Merge the binding's override with per-event field defaults.
-
-    Returns ``None`` if the binding does not list the event at all — the
-    event is opt-in per binding.
-
-    Otherwise, returns a ``GitHubTriggerConfig`` where:
-    * fields the binding explicitly set win,
-    * fields the binding omitted fall back to ``DEFAULT_TRIGGERS[event]``,
-    * and if there is no per-event default the binding's own field
-      defaults (from the Pydantic model) apply.
-
-    Detection of "explicitly set" relies on Pydantic's
-    ``model_fields_set`` — fields not present in the source YAML aren't
-    counted as set.
-    """
+    '执行 _resolved_trigger 的明确职责，并返回与调用约定一致的结果。\n\nMerge the binding\'s override with per-event field defaults.\n\n    Returns ``None`` if the binding does not list the event at all — the\n    event is opt-in per binding.\n\n    Otherwise, returns a ``GitHubTriggerConfig`` where:\n    * fields the binding explicitly set win,\n    * fields the binding omitted fall back to ``DEFAULT_TRIGGERS[event]``,\n    * and if there is no per-event default the binding\'s own field\n      defaults (from the Pydantic model) apply.\n\n    Detection of "explicitly set" relies on Pydantic\'s\n    ``model_fields_set`` — fields not present in the source YAML aren\'t\n    counted as set.\n    '
     override = binding_triggers.get(event)
     if override is None:
         return None
@@ -129,20 +83,7 @@ def _resolved_trigger(
 
 
 def _mentions(body: str, login: str) -> bool:
-    """Return True if ``body`` @-mentions ``login`` with proper boundaries.
-
-    GitHub logins are ``[A-Za-z0-9-]+``, so the character immediately
-    after the login in a mention must NOT be one of those — otherwise
-    ``@deerflow`` would falsely match ``@deerflow-bot`` (a different,
-    legitimate GitHub user). A plain substring ``in`` check is wrong for
-    this reason.
-
-    Also rejects mentions where the ``@`` is preceded by a login-class
-    character (e.g. ``foo@deerflow`` inside an email address) to avoid
-    incidental matches on URLs / pasted addresses.
-
-    Match is case-insensitive; GitHub itself is.
-    """
+    '执行 _mentions 的明确职责，并返回与调用约定一致的结果。\n\nReturn True if ``body`` @-mentions ``login`` with proper boundaries.\n\n    GitHub logins are ``[A-Za-z0-9-]+``, so the character immediately\n    after the login in a mention must NOT be one of those — otherwise\n    ``@deerflow`` would falsely match ``@deerflow-bot`` (a different,\n    legitimate GitHub user). A plain substring ``in`` check is wrong for\n    this reason.\n\n    Also rejects mentions where the ``@`` is preceded by a login-class\n    character (e.g. ``foo@deerflow`` inside an email address) to avoid\n    incidental matches on URLs / pasted addresses.\n\n    Match is case-insensitive; GitHub itself is.\n    '
     pattern = rf"(?:^|[^A-Za-z0-9-])@{re.escape(login)}(?![A-Za-z0-9-])"
     return re.search(pattern, body, flags=re.IGNORECASE) is not None
 
@@ -153,25 +94,7 @@ def event_should_fire(
     trigger: GitHubTriggerConfig,
     default_mention_login: str,
 ) -> tuple[bool, str]:
-    """Decide whether ``event`` fires the agent for this binding.
-
-    Args:
-        event: GitHub event name (``X-GitHub-Event``).
-        payload: Parsed webhook payload.
-        trigger: Pre-resolved trigger config for this ``(repo, event)``.
-            The caller (registry) has already merged the binding override
-            with per-event :data:`DEFAULT_TRIGGERS` field defaults, so this
-            function does not look the event up in any dict — it just
-            applies the gates the trigger declares.
-        default_mention_login: Bot login (without ``@``) used by
-            ``require_mention`` when the trigger doesn't override
-            ``mention_login``. Pass the agent name as a fallback.
-
-    Returns:
-        ``(fire, reason)`` where ``fire`` is the decision and ``reason``
-        is a short label for logging (e.g. ``"action=opened"``,
-        ``"mention"``, ``"disabled"``).
-    """
+    '执行 event_should_fire 的明确职责，并返回与调用约定一致的结果。\n\nDecide whether ``event`` fires the agent for this binding.\n\n    Args:\n        event: GitHub event name (``X-GitHub-Event``).\n        payload: Parsed webhook payload.\n        trigger: Pre-resolved trigger config for this ``(repo, event)``.\n            The caller (registry) has already merged the binding override\n            with per-event :data:`DEFAULT_TRIGGERS` field defaults, so this\n            function does not look the event up in any dict — it just\n            applies the gates the trigger declares.\n        default_mention_login: Bot login (without ``@``) used by\n            ``require_mention`` when the trigger doesn\'t override\n            ``mention_login``. Pass the agent name as a fallback.\n\n    Returns:\n        ``(fire, reason)`` where ``fire`` is the decision and ``reason``\n        is a short label for logging (e.g. ``"action=opened"``,\n        ``"mention"``, ``"disabled"``).\n    '
     # Action whitelist (e.g. only "opened" PRs).
     if trigger.actions is not None:
         action = _action(payload)

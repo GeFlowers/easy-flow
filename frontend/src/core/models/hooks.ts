@@ -2,17 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 
 import { loadModels } from "./api";
 
+/** 查询模型配置，并在会话期间缓存稳定的模型列表。 */
 export function useModels({ enabled = true }: { enabled?: boolean } = {}) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["models"],
     queryFn: () => loadModels(),
     enabled,
     refetchOnWindowFocus: false,
-    // Model config changes rarely and every subtask card mounts its own
-    // observer of this query; without a staleTime each newly-mounted card would
-    // refetch /api/models on mount (default staleTime: 0). Treat the list as
-    // fresh for the session so a long conversation with many cards issues one
-    // request, not one per card.
+    // 模型配置很少变动，而每张子任务卡都会订阅此查询。将其视为会话内新鲜数据，
+    // 可避免默认过期时间为零时新卡片挂载触发重复请求。
     staleTime: Infinity,
   });
   return {

@@ -1,4 +1,4 @@
-"""Memory API router for retrieving and managing global memory data."""
+'定义 memory 模块提供的职责与可复用接口。\n\nMemory API router for retrieving and managing global memory data.'
 
 from typing import Literal
 
@@ -15,21 +15,7 @@ router = APIRouter(prefix="/api", tags=["memory"])
 
 
 def _resolve_memory_user_id(request: Request) -> str:
-    """Resolve the memory owner for this request.
-
-    Honors the trusted internal owner header that channel workers attach when
-    acting for a connection owner, so an IM ``/memory`` command reads the bound
-    owner's memory instead of the synthetic internal user. The header is only
-    honored after ``AuthMiddleware`` validated the internal token (see
-    ``get_trusted_internal_owner_user_id``). Browser/API callers are never
-    internal, so this falls back to the normal contextvar-based effective user.
-
-    The trusted owner header carries the *raw* owner id, so sanitize it through
-    ``make_safe_user_id`` (the same normalization the channel file pipeline applies
-    via ``_safe_user_id_for_run``/``prepare_user_dir_for_raw_id``). This keeps the
-    memory bucket aligned with the owner's file/upload bucket and avoids a 500 when
-    the raw id contains characters ``_validate_user_id`` would reject.
-    """
+    "执行 _resolve_memory_user_id 的明确职责，并返回与调用约定一致的结果。\n\nResolve the memory owner for this request.\n\n    Honors the trusted internal owner header that channel workers attach when\n    acting for a connection owner, so an IM ``/memory`` command reads the bound\n    owner's memory instead of the synthetic internal user. The header is only\n    honored after ``AuthMiddleware`` validated the internal token (see\n    ``get_trusted_internal_owner_user_id``). Browser/API callers are never\n    internal, so this falls back to the normal contextvar-based effective user.\n\n    The trusted owner header carries the *raw* owner id, so sanitize it through\n    ``make_safe_user_id`` (the same normalization the channel file pipeline applies\n    via ``_safe_user_id_for_run``/``prepare_user_dir_for_raw_id``). This keeps the\n    memory bucket aligned with the owner's file/upload bucket and avoids a 500 when\n    the raw id contains characters ``_validate_user_id`` would reject.\n    "
     raw_owner = get_trusted_internal_owner_user_id(request)
     if raw_owner:
         return make_safe_user_id(raw_owner)
@@ -37,14 +23,14 @@ def _resolve_memory_user_id(request: Request) -> str:
 
 
 class ContextSection(BaseModel):
-    """Model for context sections (user and history)."""
+    '封装 ContextSection 的状态、协作关系与公开操作。\n\nModel for context sections (user and history).'
 
     summary: str = Field(default="", description="Summary content")
     updatedAt: str = Field(default="", description="Last update timestamp")
 
 
 class UserContext(BaseModel):
-    """Model for user context."""
+    '封装 UserContext 的状态、协作关系与公开操作。\n\nModel for user context.'
 
     workContext: ContextSection = Field(default_factory=ContextSection)
     personalContext: ContextSection = Field(default_factory=ContextSection)
@@ -52,7 +38,7 @@ class UserContext(BaseModel):
 
 
 class HistoryContext(BaseModel):
-    """Model for history context."""
+    '封装 HistoryContext 的状态、协作关系与公开操作。\n\nModel for history context.'
 
     recentMonths: ContextSection = Field(default_factory=ContextSection)
     earlierContext: ContextSection = Field(default_factory=ContextSection)
@@ -60,7 +46,7 @@ class HistoryContext(BaseModel):
 
 
 class Fact(BaseModel):
-    """Model for a memory fact."""
+    '封装 Fact 的状态、协作关系与公开操作。\n\nModel for a memory fact.'
 
     id: str = Field(..., description="Unique identifier for the fact")
     content: str = Field(..., description="Fact content")
@@ -72,7 +58,7 @@ class Fact(BaseModel):
 
 
 class MemoryResponse(BaseModel):
-    """Response model for memory data."""
+    '封装 MemoryResponse 的状态、协作关系与公开操作。\n\nResponse model for memory data.'
 
     version: str = Field(default="1.0", description="Memory schema version")
     lastUpdated: str = Field(default="", description="Last update timestamp")
@@ -82,7 +68,7 @@ class MemoryResponse(BaseModel):
 
 
 def _map_memory_fact_value_error(exc: ValueError) -> HTTPException:
-    """Convert updater validation errors into stable API responses."""
+    '执行 _map_memory_fact_value_error 的明确职责，并返回与调用约定一致的结果。\n\nConvert updater validation errors into stable API responses.'
     if exc.args and exc.args[0] == "confidence":
         detail = "Invalid confidence value; must be between 0 and 1."
     else:
@@ -91,14 +77,7 @@ def _map_memory_fact_value_error(exc: ValueError) -> HTTPException:
 
 
 def _require_capability(name: str, *, label: str):
-    """Return a DeerMem-internal capability (bound method) or raise 501.
-
-    ``reload_memory`` / ``create_fact`` / ``delete_fact`` / ``update_fact`` are
-    not on the ``MemoryManager`` ABC -- they are DeerMem-internal. Probe with
-    ``hasattr`` rather than importing DeerMem, so this router has no hard
-    dependency on the default backend: a non-DeerMem (or removed) backend
-    simply lacks the attribute and the endpoint returns 501.
-    """
+    '执行 _require_capability 的明确职责，并返回与调用约定一致的结果。\n\nReturn a DeerMem-internal capability (bound method) or raise 501.\n\n    ``reload_memory`` / ``create_fact`` / ``delete_fact`` / ``update_fact`` are\n    not on the ``MemoryManager`` ABC -- they are DeerMem-internal. Probe with\n    ``hasattr`` rather than importing DeerMem, so this router has no hard\n    dependency on the default backend: a non-DeerMem (or removed) backend\n    simply lacks the attribute and the endpoint returns 501.\n    '
     manager = get_memory_manager()
     if not hasattr(manager, name):
         raise HTTPException(
@@ -109,7 +88,7 @@ def _require_capability(name: str, *, label: str):
 
 
 class FactCreateRequest(BaseModel):
-    """Request model for creating a memory fact."""
+    '封装 FactCreateRequest 的状态、协作关系与公开操作。\n\nRequest model for creating a memory fact.'
 
     content: str = Field(..., min_length=1, description="Fact content")
     category: str = Field(default="context", description="Fact category")
@@ -117,7 +96,7 @@ class FactCreateRequest(BaseModel):
 
 
 class FactPatchRequest(BaseModel):
-    """PATCH request model that preserves existing values for omitted fields."""
+    '封装 FactPatchRequest 的状态、协作关系与公开操作。\n\nPATCH request model that preserves existing values for omitted fields.'
 
     content: str | None = Field(default=None, min_length=1, description="Fact content")
     category: str | None = Field(default=None, description="Fact category")
@@ -125,7 +104,7 @@ class FactPatchRequest(BaseModel):
 
 
 class MemoryConfigResponse(BaseModel):
-    """Response model for memory configuration."""
+    '封装 MemoryConfigResponse 的状态、协作关系与公开操作。\n\nResponse model for memory configuration.'
 
     enabled: bool = Field(..., description="Whether the memory mechanism is enabled (call-site gate).")
     mode: Literal["middleware", "tool"] = Field(..., description="Memory operation mode: 'middleware' (passive per-turn LLM summarization) or 'tool' (model calls memory tools directly). Mechanism-level, applies to any backend.")
@@ -136,7 +115,7 @@ class MemoryConfigResponse(BaseModel):
 
 
 class MemoryStatusResponse(BaseModel):
-    """Response model for memory status."""
+    '封装 MemoryStatusResponse 的状态、协作关系与公开操作。\n\nResponse model for memory status.'
 
     config: MemoryConfigResponse
     data: MemoryResponse
@@ -150,39 +129,7 @@ class MemoryStatusResponse(BaseModel):
     description="Retrieve the current global memory data including user context, history, and facts.",
 )
 async def get_memory(http_request: Request) -> MemoryResponse:
-    """Get the current global memory data.
-
-    Returns:
-        The current memory data with user context, history, and facts.
-
-    Example Response:
-        ```json
-        {
-            "version": "1.0",
-            "lastUpdated": "2024-01-15T10:30:00Z",
-            "user": {
-                "workContext": {"summary": "Working on DeerFlow project", "updatedAt": "..."},
-                "personalContext": {"summary": "Prefers concise responses", "updatedAt": "..."},
-                "topOfMind": {"summary": "Building memory API", "updatedAt": "..."}
-            },
-            "history": {
-                "recentMonths": {"summary": "Recent development activities", "updatedAt": "..."},
-                "earlierContext": {"summary": "", "updatedAt": ""},
-                "longTermBackground": {"summary": "", "updatedAt": ""}
-            },
-            "facts": [
-                {
-                    "id": "fact_abc123",
-                    "content": "User prefers TypeScript over JavaScript",
-                    "category": "preference",
-                    "confidence": 0.9,
-                    "createdAt": "2024-01-15T10:30:00Z",
-                    "source": "thread_xyz"
-                }
-            ]
-        }
-        ```
-    """
+    '读取并返回，并遵守 get_memory 所表达的接口约束。\n\nGet the current global memory data.\n\n    Returns:\n        The current memory data with user context, history, and facts.\n\n    Example Response:\n        ```json\n        {\n            "version": "1.0",\n            "lastUpdated": "2024-01-15T10:30:00Z",\n            "user": {\n                "workContext": {"summary": "Working on DeerFlow project", "updatedAt": "..."},\n                "personalContext": {"summary": "Prefers concise responses", "updatedAt": "..."},\n                "topOfMind": {"summary": "Building memory API", "updatedAt": "..."}\n            },\n            "history": {\n                "recentMonths": {"summary": "Recent development activities", "updatedAt": "..."},\n                "earlierContext": {"summary": "", "updatedAt": ""},\n                "longTermBackground": {"summary": "", "updatedAt": ""}\n            },\n            "facts": [\n                {\n                    "id": "fact_abc123",\n                    "content": "User prefers TypeScript over JavaScript",\n                    "category": "preference",\n                    "confidence": 0.9,\n                    "createdAt": "2024-01-15T10:30:00Z",\n                    "source": "thread_xyz"\n                }\n            ]\n        }\n        ```\n    '
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
     return MemoryResponse(**memory_data)
 
@@ -195,14 +142,7 @@ async def get_memory(http_request: Request) -> MemoryResponse:
     description="Reload memory data from the storage file, refreshing the in-memory cache.",
 )
 async def reload_memory(http_request: Request) -> MemoryResponse:
-    """Reload memory data from file.
-
-    This forces a reload of the memory data from the storage file,
-    useful when the file has been modified externally.
-
-    Returns:
-        The reloaded memory data.
-    """
+    '执行 reload_memory 的明确职责，并返回与调用约定一致的结果。\n\nReload memory data from file.\n\n    This forces a reload of the memory data from the storage file,\n    useful when the file has been modified externally.\n\n    Returns:\n        The reloaded memory data.\n    '
     user_id = _resolve_memory_user_id(http_request)
     manager = get_memory_manager()
     if hasattr(manager, "reload_memory"):
@@ -224,7 +164,7 @@ async def reload_memory(http_request: Request) -> MemoryResponse:
     description="Delete all saved memory data and reset the memory structure to an empty state.",
 )
 async def clear_memory(http_request: Request) -> MemoryResponse:
-    """Clear all persisted memory data."""
+    '执行 clear_memory 的明确职责，并返回与调用约定一致的结果。\n\nClear all persisted memory data.'
     try:
         memory_data = get_memory_manager().clear_memory(user_id=_resolve_memory_user_id(http_request))
     except OSError as exc:
@@ -241,7 +181,7 @@ async def clear_memory(http_request: Request) -> MemoryResponse:
     description="Create a single saved memory fact manually.",
 )
 async def create_memory_fact_endpoint(request: FactCreateRequest, http_request: Request) -> MemoryResponse:
-    """Create a single fact manually."""
+    '创建并返回，并遵守 create_memory_fact_endpoint 所表达的接口约束。\n\nCreate a single fact manually.'
     try:
         create_fact = _require_capability("create_fact", label="create fact")
         memory_data, fact_id = create_fact(
@@ -269,7 +209,7 @@ async def create_memory_fact_endpoint(request: FactCreateRequest, http_request: 
     description="Delete a single saved memory fact by its fact id.",
 )
 async def delete_memory_fact_endpoint(fact_id: str, http_request: Request) -> MemoryResponse:
-    """Delete a single fact from memory by fact id."""
+    '删除目标资源并返回操作结果，并遵守 delete_memory_fact_endpoint 所表达的接口约束。\n\nDelete a single fact from memory by fact id.'
     try:
         delete_fact = _require_capability("delete_fact", label="delete fact")
         memory_data = delete_fact(fact_id, user_id=_resolve_memory_user_id(http_request))
@@ -289,7 +229,7 @@ async def delete_memory_fact_endpoint(fact_id: str, http_request: Request) -> Me
     description="Partially update a single saved memory fact by its fact id while preserving omitted fields.",
 )
 async def update_memory_fact_endpoint(fact_id: str, request: FactPatchRequest, http_request: Request) -> MemoryResponse:
-    """Partially update a single fact manually."""
+    '更新目标状态并返回最新结果，并遵守 update_memory_fact_endpoint 所表达的接口约束。\n\nPartially update a single fact manually.'
     try:
         update_fact = _require_capability("update_fact", label="update fact")
         memory_data = update_fact(
@@ -317,7 +257,7 @@ async def update_memory_fact_endpoint(fact_id: str, request: FactPatchRequest, h
     description="Export the current global memory data as JSON for backup or transfer.",
 )
 async def export_memory(http_request: Request) -> MemoryResponse:
-    """Export the current memory data."""
+    '执行 export_memory 的明确职责，并返回与调用约定一致的结果。\n\nExport the current memory data.'
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
     return MemoryResponse(**memory_data)
 
@@ -330,7 +270,7 @@ async def export_memory(http_request: Request) -> MemoryResponse:
     description="Import and overwrite the current global memory data from a JSON payload.",
 )
 async def import_memory(request: MemoryResponse, http_request: Request) -> MemoryResponse:
-    """Import and persist memory data."""
+    '执行 import_memory 的明确职责，并返回与调用约定一致的结果。\n\nImport and persist memory data.'
     try:
         memory_data = get_memory_manager().import_memory(request.model_dump(), user_id=_resolve_memory_user_id(http_request))
     except OSError as exc:
@@ -346,37 +286,7 @@ async def import_memory(request: MemoryResponse, http_request: Request) -> Memor
     description="Retrieve the current memory system configuration.",
 )
 async def get_memory_config_endpoint() -> MemoryConfigResponse:
-    """Get the memory system configuration.
-
-    Returns:
-        The current memory configuration. The response is backend-agnostic:
-        ``enabled`` / ``injection_enabled`` / ``mode`` are mechanism-level
-        fields that apply to any backend (``mode`` selects middleware vs tool
-        operation), and ``backend_config`` is an opaque dict the active
-        backend (``manager_class``) self-interprets. DeerMem's knobs
-        (``storage_path``, ``max_facts``, ``debounce_seconds``, ...) live under
-        ``backend_config`` -- they are NOT top-level, because a non-DeerMem
-        backend has its own (different) knobs.
-
-    Example Response:
-        ```json
-        {
-            "enabled": true,
-            "injection_enabled": true,
-            "shutdown_flush_timeout_seconds": 30.0,
-            "mode": "middleware",
-            "manager_class": "deermem",
-            "backend_config": {
-                "storage_path": "/.../.deer-flow",
-                "debounce_seconds": 30,
-                "max_facts": 100,
-                "fact_confidence_threshold": 0.7,
-                "max_injection_tokens": 2000,
-                "token_counting": "tiktoken"
-            }
-        }
-        ```
-    """
+    '读取并返回，并遵守 get_memory_config_endpoint 所表达的接口约束。\n\nGet the memory system configuration.\n\n    Returns:\n        The current memory configuration. The response is backend-agnostic:\n        ``enabled`` / ``injection_enabled`` / ``mode`` are mechanism-level\n        fields that apply to any backend (``mode`` selects middleware vs tool\n        operation), and ``backend_config`` is an opaque dict the active\n        backend (``manager_class``) self-interprets. DeerMem\'s knobs\n        (``storage_path``, ``max_facts``, ``debounce_seconds``, ...) live under\n        ``backend_config`` -- they are NOT top-level, because a non-DeerMem\n        backend has its own (different) knobs.\n\n    Example Response:\n        ```json\n        {\n            "enabled": true,\n            "injection_enabled": true,\n            "shutdown_flush_timeout_seconds": 30.0,\n            "mode": "middleware",\n            "manager_class": "deermem",\n            "backend_config": {\n                "storage_path": "/.../.deer-flow",\n                "debounce_seconds": 30,\n                "max_facts": 100,\n                "fact_confidence_threshold": 0.7,\n                "max_injection_tokens": 2000,\n                "token_counting": "tiktoken"\n            }\n        }\n        ```\n    '
     config = get_memory_config()
     return MemoryConfigResponse(
         enabled=config.enabled,
@@ -396,11 +306,7 @@ async def get_memory_config_endpoint() -> MemoryConfigResponse:
     description="Retrieve both memory configuration and current data in a single request.",
 )
 async def get_memory_status(http_request: Request) -> MemoryStatusResponse:
-    """Get the memory system status including configuration and data.
-
-    Returns:
-        Combined memory configuration and current data.
-    """
+    '读取并返回，并遵守 get_memory_status 所表达的接口约束。\n\nGet the memory system status including configuration and data.\n\n    Returns:\n        Combined memory configuration and current data.\n    '
     config = get_memory_config()
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
 

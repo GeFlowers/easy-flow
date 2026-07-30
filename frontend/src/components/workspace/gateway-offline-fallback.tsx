@@ -5,24 +5,13 @@ import { AuthProvider } from "@/core/auth/AuthProvider";
 import { GatewayOfflineBanner } from "./gateway-offline-banner";
 
 interface GatewayOfflineFallbackProps {
-  /**
-   * When true, this component renders its own banner. The workspace layout
-   * sets this to false because WorkspaceContent already mounts the banner
-   * inside its sidebar layout. The (auth) layout sets it to true because
-   * its plain children have no banner of their own.
-   */
+  /** 为 true 时由本组件渲染横幅；workspace 布局已在 WorkspaceContent 的侧栏布局中挂载横幅，故传 false；`(auth)` 布局的普通子节点没有横幅，故传 true。 */
   renderBanner?: boolean;
   children?: React.ReactNode;
 }
 
-/**
- * Shared fallback shown by both the workspace and (auth) layouts when the
- * server-side auth probe could not reach the gateway. Wraps the children
- * with an AuthProvider so the banner's probe / logout / refresh hooks work
- * — fixing the `(auth)/layout.tsx` lockup where the bare static HTML had
- * no AuthProvider / QueryClientProvider and the user could not recover
- * without a manual reload.
- */
+/** 服务端认证探测无法连通网关时，供 workspace 与 `(auth)` 布局共用的降级容器。它以 AuthProvider 包裹子节点，使横幅的探测、退出和刷新 Hook 可用，避免 `(auth)/layout.tsx` 的静态 HTML 缺少 AuthProvider / QueryClientProvider 而必须手动刷新才能恢复。 */
+/** 为网关离线页面装配认证与查询上下文，允许横幅执行恢复操作。 */
 export function GatewayOfflineFallback({
   renderBanner = false,
   children,

@@ -1,10 +1,9 @@
-"""Configuration and loaders for custom agents.
+"""自定义智能体的配置定义与加载功能。
 
-Custom agents are stored per-user under ``{base_dir}/users/{user_id}/agents/{name}/``.
-A legacy shared layout at ``{base_dir}/agents/{name}/`` is still readable so that
-installations that pre-date user isolation continue to work until they run the
-``scripts/migrate_user_isolation.py`` migration. New writes always target the
-per-user layout.
+自定义智能体按用户存储在 ``{base_dir}/users/{user_id}/agents/{name}/`` 下。
+为兼容用户隔离功能之前的安装，仍可读取 ``{base_dir}/agents/{name}/`` 中的旧版
+共享布局，直至执行 ``scripts/migrate_user_isolation.py`` 迁移脚本。所有新写入
+始终使用按用户划分的布局。
 """
 
 import logging
@@ -25,17 +24,15 @@ AGENT_NAME_PATTERN = re.compile(r"^[A-Za-z0-9-]+$")
 
 
 def _blank_to_none(value: str | None) -> str | None:
-    """Normalize a whitespace-only string to ``None``; leave real values untouched.
+    """将仅含空白字符的字符串规范化为 ``None``，其余有效值保持不变。
 
-    A whitespace-only string (e.g. ``"   "``) is truthy in Python, so an
-    unstripped ``value or fallback`` expression never falls through to the
-    fallback. The ``require_mention`` precedence chain (``trigger.mention_login``
-    -> ``github.bot_login`` -> ``channels.github.default_mention_login`` ->
-    ``agent.name``, see AGENTS.md) relies on exactly that fallthrough, so both
-    of the config-sourced links are normalized here, once, at the model layer
-    — every reader downstream (today's and any future one) sees an honest
-    "unset" instead of a literal whitespace string that can never match a
-    real ``@mention``.
+    仅含空白字符的字符串（例如 ``"   "``）在 Python 中为真值，因此未执行
+    strip 的 ``value or fallback`` 表达式不会回退。``require_mention`` 的
+    优先级链（``trigger.mention_login`` -> ``github.bot_login`` ->
+    ``channels.github.default_mention_login`` -> ``agent.name``，详见
+    AGENTS.md）依赖这一回退行为，故在模型层统一规范化这两个来自配置的环节。
+    这样所有下游读取方（当前及未来）都会看到真实的“未设置”状态，而非永远无法
+    匹配真实 ``@mention`` 的字面空白字符串。
     """
     if value is None:
         return None
@@ -44,7 +41,7 @@ def _blank_to_none(value: str | None) -> str | None:
 
 
 class GitHubTriggerConfig(BaseModel):
-    """Per-event trigger filter inside a :class:`GitHubBinding`."""
+    """GitHubBinding 内按事件生效的触发筛选器。"""
 
     # If set, only these GitHub action values fire the agent. None means "any
     # action allowed". Example: ["opened"] for pull_request restricts the agent
@@ -66,11 +63,12 @@ class GitHubTriggerConfig(BaseModel):
     @field_validator("mention_login")
     @classmethod
     def _normalize_mention_login(cls, value: str | None) -> str | None:
+        """规范化提及登录名中的空白值。"""
         return _blank_to_none(value)
 
 
 class GitHubBinding(BaseModel):
-    """One (agent, repo) binding with per-event trigger overrides."""
+    """一个带有按事件触发覆盖项的（智能体、仓库）绑定。"""
 
     # GitHub "owner/name" string.
     repo: str
@@ -80,7 +78,7 @@ class GitHubBinding(BaseModel):
 
 
 class GitHubAgentConfig(BaseModel):
-    """Top-level ``github:`` block on a custom agent's ``config.yaml``."""
+    """自定义智能体 ``config.yaml`` 中顶层的 ``github:`` 配置块。"""
 
     # GitHub App installation id used to mint per-repo access tokens. The
     # ``ChannelManager`` mints a 1h installation token from this and injects it
@@ -119,20 +117,18 @@ class GitHubAgentConfig(BaseModel):
     @field_validator("bot_login")
     @classmethod
     def _normalize_bot_login(cls, value: str | None) -> str | None:
+        """规范化机器人登录名中的空白值。"""
         return _blank_to_none(value)
 
     @model_validator(mode="after")
     def _unique_binding_repos(self) -> "GitHubAgentConfig":
-        """Reject duplicate ``repo`` values across ``bindings``.
+        """拒绝在 ``bindings`` 中重复出现的 ``repo`` 值。
 
-        At most one binding per repo is allowed. The per-event ``triggers``
-        map on a single binding already expresses "this agent listens to N
-        events on this repo", so multiple bindings for the same repo would
-        either duplicate events (silent first-wins / double-registration —
-        see PR feedback R3) or fragment them across rows for no benefit.
-        Since this is the initial implementation and no existing operator
-        config relies on duplicate-repo bindings, we fail loudly at config
-        load instead of papering over the ambiguity at dispatch time.
+        每个仓库至多允许一个绑定。单个绑定的按事件 ``triggers`` 映射已经可表达
+        “此智能体监听该仓库的 N 个事件”，因此同一仓库的多个绑定要么会重复事件
+        （静默的首项优先或重复注册，参见 PR 反馈 R3），要么会无益地将事件拆分到
+        多行。由于这是初始实现，且现有运维配置不依赖重复仓库绑定，故在加载配置
+        时明确报错，而不是在分发时掩盖这种歧义。
         """
         seen: set[str] = set()
         dupes: set[str] = set()
@@ -146,7 +142,7 @@ class GitHubAgentConfig(BaseModel):
 
 
 def validate_agent_name(name: str | None) -> str | None:
-    """Validate a custom agent name before using it in filesystem paths."""
+    """在将自定义智能体名称用于文件系统路径前验证其有效性。"""
     if name is None:
         return None
     if not isinstance(name, str):
@@ -157,7 +153,7 @@ def validate_agent_name(name: str | None) -> str | None:
 
 
 class AgentConfig(BaseModel):
-    """Configuration for a custom agent."""
+    """自定义智能体的配置。"""
 
     name: str
     description: str = ""
@@ -186,38 +182,33 @@ MANAGED_AGENT_CONFIG_FIELDS: frozenset[str] = frozenset({"name", "description", 
 
 
 def preserve_non_managed_fields(existing_cfg: AgentConfig) -> dict[str, object]:
-    """Return every top-level field on ``existing_cfg`` not in :data:`MANAGED_AGENT_CONFIG_FIELDS`.
+    """返回 ``existing_cfg`` 中不属于 :data:`MANAGED_AGENT_CONFIG_FIELDS` 的所有顶层字段。
 
-    Used by the two surfaces that rewrite a custom agent's ``config.yaml``
-    (the ``update_agent`` harness tool and the HTTP ``PATCH /api/agents/{name}``
-    route) to carry forward any hand-authored field — currently ``github``,
-    and any field added to :class:`AgentConfig` in the future — that the
-    update API does not expose as an argument. Without this, operators who
-    hand-author a ``github:`` block on a custom agent would silently lose
-    it the next time the agent or a UI editor touched ``description`` /
-    ``model`` / ``tool_groups`` / ``skills``.
+    重写自定义智能体 ``config.yaml`` 的两个入口（``update_agent`` harness 工具与
+    HTTP ``PATCH /api/agents/{name}`` 路由）使用此函数保留更新 API 未暴露为参数的
+    手工配置字段：目前为 ``github``，以及未来加入 :class:`AgentConfig` 的任何字段。
+    否则，运维人员手写的 ``github:`` 配置块会在智能体或 UI 编辑器下次修改
+    ``description`` / ``model`` / ``tool_groups`` / ``skills`` 时被静默丢失。
 
-    ``exclude_unset=True`` is recursive in Pydantic v2, so a sub-field the
-    user did not write (and that defaulted to a Pydantic default) is not
-    materialized into the dict — the file round-trips visually intact.
+    Pydantic v2 的 ``exclude_unset=True`` 会递归生效，因此用户未写入且使用
+    Pydantic 默认值的子字段不会被具体化到字典中，文件往返后仍保持原有外观。
     """
     return existing_cfg.model_dump(exclude_unset=True, exclude=MANAGED_AGENT_CONFIG_FIELDS)
 
 
 def resolve_agent_dir(name: str, *, user_id: str | None = None) -> Path:
-    """Return the on-disk directory for an agent, preferring the per-user layout.
+    """返回智能体的磁盘目录，并优先选择按用户划分的布局。
 
-    Resolution order:
-    1. ``{base_dir}/users/{user_id}/agents/{name}/`` (per-user, current layout).
-    2. ``{base_dir}/agents/{name}/`` (legacy shared layout — read-only fallback).
+    解析顺序：
+    1. ``{base_dir}/users/{user_id}/agents/{name}/``（当前的按用户布局）。
+    2. ``{base_dir}/agents/{name}/``（旧版共享布局，只读回退）。
 
-    If neither exists, the per-user path is returned so callers that intend to
-    create the agent write into the new layout.
+    若两者都不存在，则返回按用户划分的路径，以便需要创建智能体的调用方写入新布局。
 
-    Args:
-        name: Validated agent name.
-        user_id: Owner of the agent. Defaults to the effective user from the
-            request context (or ``"default"`` in no-auth mode).
+    参数：
+        name: 已验证的智能体名称。
+        user_id: 智能体所有者。默认取请求上下文中的有效用户；无认证模式下为
+            ``"default"``。
     """
     paths = get_paths()
     effective_user = user_id or get_effective_user_id()
@@ -235,22 +226,20 @@ def resolve_agent_dir(name: str, *, user_id: str | None = None) -> Path:
 
 
 def load_agent_config(name: str | None, *, user_id: str | None = None) -> AgentConfig | None:
-    """Load the custom or default agent's config from its directory.
+    """从智能体目录加载自定义或默认智能体的配置。
 
-    Reads from the per-user layout first; falls back to the legacy shared layout
-    for installations that have not yet been migrated.
+    优先从按用户划分的布局读取；尚未迁移的安装会回退到旧版共享布局。
 
-    Args:
-        name: The agent name.
-        user_id: Owner of the agent. Defaults to the effective user from the
-            current request context.
+    参数：
+        name: 智能体名称。
+        user_id: 智能体所有者。默认取当前请求上下文中的有效用户。
 
-    Returns:
-        AgentConfig instance, or ``None`` if ``name`` is ``None``.
+    返回：
+        ``AgentConfig`` 实例；若 ``name`` 为 ``None``，则返回 ``None``。
 
-    Raises:
-        FileNotFoundError: If the agent directory or config.yaml does not exist.
-        ValueError: If config.yaml cannot be parsed.
+    异常：
+        FileNotFoundError: 智能体目录或 config.yaml 不存在。
+        ValueError: 无法解析 config.yaml。
     """
 
     if name is None:
@@ -284,18 +273,17 @@ def load_agent_config(name: str | None, *, user_id: str | None = None) -> AgentC
 
 
 def load_agent_soul(agent_name: str | None, *, user_id: str | None = None) -> str | None:
-    """Read the SOUL.md file for a custom agent, if it exists.
+    """在存在时读取自定义智能体的 SOUL.md 文件。
 
-    SOUL.md defines the agent's personality, values, and behavioral guardrails.
-    It is injected into the lead agent's system prompt as additional context.
+    SOUL.md 定义智能体的个性、价值观和行为护栏，并作为额外上下文注入主智能体的
+    系统提示词。
 
-    Args:
-        agent_name: The name of the agent or None for the default agent.
-        user_id: Owner of the agent. Defaults to the effective user from the
-            current request context.
+    参数：
+        agent_name: 智能体名称；默认智能体传入 None。
+        user_id: 智能体所有者。默认取当前请求上下文中的有效用户。
 
-    Returns:
-        The SOUL.md content as a string, or None if the file does not exist.
+    返回：
+        SOUL.md 的字符串内容；文件不存在时返回 None。
     """
     if agent_name:
         agent_dir = resolve_agent_dir(agent_name, user_id=user_id)
@@ -332,18 +320,16 @@ def load_agent_soul(agent_name: str | None, *, user_id: str | None = None) -> st
 
 
 def list_custom_agents(*, user_id: str | None = None) -> list[AgentConfig]:
-    """Scan the agents directory and return all valid custom agents.
+    """扫描智能体目录并返回所有有效的自定义智能体。
 
-    Returns the union of agents in the per-user layout and the legacy shared
-    layout, so that pre-migration installations remain visible until they are
-    migrated. Per-user entries shadow legacy entries with the same name.
+    返回按用户布局与旧版共享布局中的智能体并集，使迁移前的安装在迁移完成前仍然可见。
+    同名的按用户条目会覆盖旧版条目。
 
-    Args:
-        user_id: Owner whose agents to list. Defaults to the effective user
-            from the current request context.
+    参数：
+        user_id: 要列出其智能体的所有者。默认取当前请求上下文中的有效用户。
 
-    Returns:
-        List of AgentConfig for each valid agent directory found.
+    返回：
+        每个找到的有效智能体目录对应的 ``AgentConfig`` 列表。
     """
     paths = get_paths()
     effective_user = user_id or get_effective_user_id()

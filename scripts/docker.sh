@@ -1,20 +1,21 @@
 #!/usr/bin/env bash
 set -e
 
-# Colors for output
+# 终端输出颜色；仅影响可读性。
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 关闭颜色
 
-# Get script directory
+# 从脚本位置推导项目路径，避免依赖调用时的当前目录。
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DOCKER_DIR="$PROJECT_ROOT/docker"
 
-# Docker Compose command with project name
+# 固定 Compose 项目名，避免开发栈与其他 Compose 项目混淆。
 COMPOSE_CMD="docker compose -p deer-flow-dev -f docker-compose-dev.yaml"
 
+# 仅在环境变量尚未显式设置时从 .env 读取代理，保留调用方的优先级。
 load_proxy_env_from_dotenv() {
     local env_file="$PROJECT_ROOT/.env"
     local var
@@ -41,6 +42,7 @@ load_proxy_env_from_dotenv() {
     done
 }
 
+# 仅解析 sandbox 配置的必要字段；未知配置安全回退为 local，避免暴露 Docker 守护进程。
 detect_sandbox_mode() {
     local config_file="$PROJECT_ROOT/config.yaml"
     local sandbox_use=""
@@ -86,23 +88,24 @@ detect_sandbox_mode() {
     fi
 }
 
-# Cleanup function for Ctrl+C
+# 接收中断时以约定的 130 状态退出，不尝试停止已在后台运行的服务。
 cleanup() {
     echo ""
     echo -e "${YELLOW}Operation interrupted by user${NC}"
     exit 130
 }
 
-# Set up trap for Ctrl+C
+# 捕获终止信号，避免交互式命令留下误导性的成功状态。
 trap cleanup INT TERM
 
+# 同时验证 CLI 与守护进程可用性，避免后续 Compose 命令产生不清晰错误。
 docker_available() {
-    # Check that the docker CLI exists
+    # 先检查客户端是否存在。
     if ! command -v docker >/dev/null 2>&1; then
         return 1
     fi
 
-    # Check that the Docker daemon is reachable
+    # 再确认客户端可以连接守护进程。
     if ! docker info >/dev/null 2>&1; then
         return 1
     fi
@@ -110,7 +113,7 @@ docker_available() {
     return 0
 }
 
-# Initialize: pre-pull the sandbox image so first Pod startup is fast
+# 预拉取容器沙箱镜像；本地沙箱无需镜像，故不将其视为初始化失败。
 init() {
     echo "=========================================="
     echo "  DeerFlow Init — Pull Sandbox Image"
@@ -119,11 +122,11 @@ init() {
 
     SANDBOX_IMAGE="enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest"
 
-    # Detect sandbox mode from config.yaml
+    # 根据配置决定是否需要容器镜像。
     local sandbox_mode
     sandbox_mode="$(detect_sandbox_mode)"
 
-    # Skip image pull for local sandbox mode (no container image needed)
+    # 本地沙箱不使用容器镜像，跳过拉取并仅报告 Docker 是否可供其他工作流使用。
     if [ "$sandbox_mode" = "local" ]; then
         echo -e "${GREEN}Detected local sandbox mode — no Docker image required.${NC}"
         echo ""
@@ -173,7 +176,7 @@ init() {
     echo -e "${YELLOW}Next step: make docker-start${NC}"
 }
 
-# Start Docker development environment
+# 启动开发 Compose 服务，仅在配置要求时附加 provisioner 或 DooD 覆盖层。
 start() {
     local sandbox_mode
     local services
@@ -196,10 +199,9 @@ start() {
         services="redis frontend gateway provisioner nginx"
     fi
 
-    # Only aio mode (AioSandboxProvider without provisioner_url) needs the host
-    # Docker socket. Mount it via the opt-in docker-compose.dood.yaml overlay so
-    # the default (local) and provisioner modes never expose the host daemon.
-    # Mounting the socket = root-equivalent host control; see SECURITY.md.
+    # 仅 aio 模式（无 provisioner_url 的 AioSandboxProvider）需要宿主 Docker socket。
+    # 通过显式的 docker-compose.dood.yaml 覆盖层挂载，确保 local 与 provisioner 模式
+    # 不会接触宿主守护进程；该挂载等同于宿主 root 权限，详见 SECURITY.md。
     if [ "$sandbox_mode" = "aio" ]; then
         local docker_socket="${DEER_FLOW_DOCKER_SOCKET:-/var/run/docker.sock}"
         if [ ! -S "$docker_socket" ]; then
@@ -219,14 +221,14 @@ start() {
     fi
     echo ""
     
-    # Set DEER_FLOW_ROOT for provisioner if not already set
+    # 仅在调用方未设置时提供 provisioner 所需根目录，保留外部覆盖。
     if [ -z "$DEER_FLOW_ROOT" ]; then
         export DEER_FLOW_ROOT="$PROJECT_ROOT"
         echo -e "${BLUE}Setting DEER_FLOW_ROOT=$DEER_FLOW_ROOT${NC}"
         echo ""
     fi
     
-    # Ensure config.yaml exists before starting.
+    # 启动前确保配置文件存在；从模板生成后停止，以免带着未配置的密钥继续运行。
     if [ ! -f "$PROJECT_ROOT/config.yaml" ]; then
         if [ -f "$PROJECT_ROOT/config.example.yaml" ]; then
             cp "$PROJECT_ROOT/config.example.yaml" "$PROJECT_ROOT/config.yaml"
@@ -248,8 +250,7 @@ start() {
         fi
     fi
 
-    # Ensure extensions_config.json exists as a file before mounting.
-    # Docker creates a directory when bind-mounting a non-existent host path.
+    # 挂载前确保扩展配置是文件；Docker 对不存在的宿主路径会创建目录。
     if [ ! -f "$PROJECT_ROOT/extensions_config.json" ]; then
         if [ -f "$PROJECT_ROOT/extensions_config.example.json" ]; then
             cp "$PROJECT_ROOT/extensions_config.example.json" "$PROJECT_ROOT/extensions_config.json"
@@ -279,7 +280,7 @@ start() {
     echo ""
 }
 
-# View Docker development logs
+# 按服务筛选或汇总跟随开发日志，未知选项直接失败以避免静默查看错误服务。
 logs() {
     local service=""
     
@@ -317,10 +318,9 @@ logs() {
     cd "$DOCKER_DIR" && $COMPOSE_CMD logs -f $service
 }
 
-# Stop Docker development environment
+# 停止开发 Compose 服务，并仅清理 DeerFlow 前缀的残留沙箱容器。
 stop() {
-    # DEER_FLOW_ROOT is referenced in docker-compose-dev.yaml; set it before
-    # running compose down to suppress "variable is not set" warnings.
+    # docker-compose-dev.yaml 引用了 DEER_FLOW_ROOT；down 前提供默认值以避免变量未设置警告。
     if [ -z "$DEER_FLOW_ROOT" ]; then
         export DEER_FLOW_ROOT="$PROJECT_ROOT"
     fi
@@ -331,7 +331,7 @@ stop() {
     echo -e "${GREEN}✓ Docker services stopped${NC}"
 }
 
-# Restart Docker development environment
+# 重启已运行的开发服务；不重新构建镜像或修改服务集合。
 restart() {
     echo "========================================"
     echo "  Restarting DeerFlow Docker Services"
@@ -347,7 +347,7 @@ restart() {
     echo ""
 }
 
-# Show help
+# 输出稳定的命令接口说明，供 Make 目标和人工调用共用。
 help() {
     echo "DeerFlow Docker Management Script"
     echo ""
@@ -368,8 +368,8 @@ help() {
     echo ""
 }
 
+# 分派一级命令；未识别命令返回失败，避免把拼写错误当作帮助成功处理。
 main() {
-    # Main command dispatcher
     case "$1" in
         init)
             init

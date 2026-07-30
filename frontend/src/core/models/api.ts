@@ -8,6 +8,7 @@ const STATIC_MODELS_RESPONSE: ModelsResponse = {
   token_usage: { enabled: false },
 };
 
+/** 获取后端可用模型及令牌用量开关；静态站点返回安全的空配置。 */
 export async function loadModels(): Promise<ModelsResponse> {
   if (isStaticWebsiteOnly()) {
     return STATIC_MODELS_RESPONSE;

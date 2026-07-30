@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 
 import { env } from "@/env";
 
+/** 将工作区入口重定向到静态演示的首个会话或新建会话页。 */
 export default function WorkspacePage() {
   if (env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true") {
     const firstThread = fs

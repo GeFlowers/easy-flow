@@ -16,30 +16,25 @@ import {
 } from "./feature-cache";
 import type { CreateAgentRequest, UpdateAgentRequest } from "./types";
 
+/** 查询并以粘滞缓存归并智能体 API 是否可用。 */
 export function useAgentsApiEnabled() {
   const { data, isPending } = useQuery({
     queryKey: ["features", "agents_api"],
     queryFn: () => fetchAgentsApiEnabled(),
-    // Re-check on every mount so flipping config.yaml + revisiting the
-    // agents section auto-enables the feature without a rebuild.
+    // 每次挂载重新检查，使修改 config.yaml 后重访智能体区域即可生效，无需重新构建。
     staleTime: 0,
     refetchOnMount: true,
     retry: false,
   });
 
-  // localStorage only exists in the browser, so read the last-known value
-  // after mount (not during render). This keeps the first client render equal
-  // to the server's (cache unknown → fail open), avoiding a hydration mismatch
-  // on the non-loading-gated sidebar; the sticky value is applied on the next
-  // render.
+  // localStorage 仅存在于浏览器；挂载后再读取可保持首个客户端渲染与服务端一致，
+  // 避免未受加载状态控制的侧边栏出现水合不匹配。
   const [cached, setCached] = useState<boolean | undefined>(undefined);
   useEffect(() => {
     setCached(readCachedAgentsApiEnabled());
   }, []);
 
-  // Persist every definitive answer so a cold start during an /api/features
-  // outage can fall back to it instead of failing open and re-introducing the
-  // 403 storm (#3757).
+  // 持久化每个确定结果，使接口故障期间的冷启动可安全回退，避免重现 403 风暴（#3757）。
   useEffect(() => {
     if (data !== undefined) {
       writeCachedAgentsApiEnabled(data);
@@ -47,14 +42,14 @@ export function useAgentsApiEnabled() {
     }
   }, [data]);
 
-  // A live answer wins; otherwise stay on the last-known value (sticky) and
-  // only fail open when nothing has ever been observed.
+  // 实时结果优先；没有实时结果时保持最后已知值，仅在从未观测到值时故障开放。
   return {
     enabled: resolveAgentsApiEnabled(data, cached),
     isLoading: isPending,
   };
 }
 
+/** 查询智能体列表，并提供加载与错误状态。 */
 export function useAgents() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["agents"],
@@ -63,6 +58,7 @@ export function useAgents() {
   return { agents: data ?? [], isLoading, error };
 }
 
+/** 按名称查询智能体；名称为空时保持请求禁用。 */
 export function useAgent(name: string | null | undefined) {
   const { data, isLoading, error } = useQuery({
     queryKey: ["agents", name],
@@ -72,6 +68,7 @@ export function useAgent(name: string | null | undefined) {
   return { agent: data ?? null, isLoading, error };
 }
 
+/** 返回创建智能体的变更操作，成功后刷新智能体列表缓存。 */
 export function useCreateAgent() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -82,6 +79,7 @@ export function useCreateAgent() {
   });
 }
 
+/** 返回更新智能体的变更操作，成功后刷新列表和目标详情缓存。 */
 export function useUpdateAgent() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -99,6 +97,7 @@ export function useUpdateAgent() {
   });
 }
 
+/** 返回删除智能体的变更操作，成功后刷新智能体列表缓存。 */
 export function useDeleteAgent() {
   const queryClient = useQueryClient();
   return useMutation({

@@ -1,3 +1,4 @@
+'定义 jina_client 模块提供的职责与可复用接口'
 import logging
 import os
 
@@ -9,7 +10,9 @@ _api_key_warned = False
 
 
 class JinaClient:
+    '封装 JinaClient 的状态、协作关系与公开操作'
     async def crawl(self, url: str, return_format: str = "html", timeout: int = 10, proxy: str | None = None, trust_env: bool = True) -> str:
+        '执行 crawl 的明确职责，并返回与调用约定一致的结果'
         global _api_key_warned
         headers = {
             "Content-Type": "application/json",

@@ -1,4 +1,4 @@
-"""Tests for user_id propagation in memory updater (DI: MemoryUpdater(config, storage, llm))."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from unittest.mock import MagicMock
 
@@ -7,10 +7,12 @@ from deerflow.agents.memory.backends.deermem.deermem.core.updater import MemoryU
 
 
 def _updater(storage: MagicMock) -> MemoryUpdater:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return MemoryUpdater(DeerMemConfig(), storage, None)
 
 
 def test_get_memory_data_passes_user_id():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_storage = MagicMock()
     mock_storage.load.return_value = {"version": "1.0"}
     updater = _updater(mock_storage)
@@ -21,6 +23,7 @@ def test_get_memory_data_passes_user_id():
 
 
 def test_save_memory_passes_user_id():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_storage = MagicMock()
     mock_storage.save.return_value = True
     updater = _updater(mock_storage)
@@ -31,6 +34,7 @@ def test_save_memory_passes_user_id():
 
 
 def test_clear_memory_data_passes_user_id():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_storage = MagicMock()
     mock_storage.save.return_value = True
     updater = _updater(mock_storage)

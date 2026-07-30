@@ -43,7 +43,7 @@ const getHandleCoordsByPosition = (
   node: InternalNode<Node>,
   handlePosition: Position,
 ) => {
-  // Choose the handle type based on position - Left is for target, Right is for source
+  // 按位置选择连接柄类型：左侧为目标端，右侧为源端。
   const handleType = handlePosition === Position.Left ? "target" : "source";
 
   const handle = node.internals.handleBounds?.[handleType]?.find(
@@ -57,9 +57,8 @@ const getHandleCoordsByPosition = (
   let offsetX = handle.width / 2;
   let offsetY = handle.height / 2;
 
-  // this is a tiny detail to make the markerEnd of an edge visible.
-  // The handle position that gets calculated has the origin top-left, so depending which side we are using, we add a little offset
-  // when the handlePosition is Position.Right for example, we need to add an offset as big as the handle itself in order to get the correct position
+  // 为使边线终点标记可见，计算出的连接柄坐标以左上角为原点，因此须按使用侧加入偏移。
+  // 例如右侧连接柄需要增加其自身宽度，才能得到正确的实际位置。
   switch (handlePosition) {
     case Position.Left:
       offsetX = 0;
@@ -102,6 +101,7 @@ const getEdgeParams = (
   };
 };
 
+/** Animated 内部组件：组织对应的界面结构与交互语义。 */
 const Animated = ({ id, source, target, markerEnd, style }: EdgeProps) => {
   const sourceNode = useInternalNode(source);
   const targetNode = useInternalNode(target);
@@ -134,6 +134,7 @@ const Animated = ({ id, source, target, markerEnd, style }: EdgeProps) => {
   );
 };
 
+/** Edge 组件：提供对应的界面结构与交互语义。 */
 export const Edge = {
   Temporary,
   Animated,

@@ -44,6 +44,7 @@ function TokenUsageSummary({
   );
 }
 
+/** 以可折叠列表展示消息相关 token 用量，缺失数据时避免伪造统计值。 */
 export function MessageTokenUsageList({
   className,
   enabled = false,
@@ -81,6 +82,7 @@ export function MessageTokenUsageList({
   );
 }
 
+/** 为调试场景展示原始 token 用量分项，不改变面向用户的统计口径。 */
 export function MessageTokenUsageDebugList({
   className,
   enabled = false,

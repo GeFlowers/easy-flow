@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# wait-for-port.sh - Wait for a TCP port to become available
+# wait-for-port.sh - 等待 TCP 端口开始监听
 #
-# Usage: ./scripts/wait-for-port.sh <port> [timeout_seconds] [service_name]
+# 用法：./scripts/wait-for-port.sh <port> [timeout_seconds] [service_name]
 #
-# Arguments:
-#   port             - TCP port to wait for (required)
-#   timeout_seconds  - Max seconds to wait (default: 60)
-#   service_name     - Display name for messages (default: "Service")
+# 参数：
+#   port             - 要等待的 TCP 端口（必填）
+#   timeout_seconds  - 最长等待秒数（默认：60）
+#   service_name     - 输出消息中的服务名称（默认："Service"）
 #
-# Exit codes:
-#   0 - Port is listening
-#   1 - Timed out waiting
+# 退出码：
+#   0 - 端口正在监听
+#   1 - 等待超时
 
 PORT="${1:?Usage: wait-for-port.sh <port> [timeout] [service_name]}"
 TIMEOUT="${2:-60}"
@@ -32,6 +32,7 @@ fi
 elapsed=0
 interval=1
 
+# 按 Windows、macOS/Linux 常用工具依次探测端口；缺少某个工具时继续回退。
 is_port_listening() {
     if command -v powershell.exe >/dev/null 2>&1; then
         if WAIT_FOR_PORT_PORT="$PORT" powershell.exe -NoProfile -ExecutionPolicy Bypass -Command "\$ErrorActionPreference='SilentlyContinue'; \$Port = [int]\$env:WAIT_FOR_PORT_PORT; if (Get-NetTCPConnection -LocalPort \$Port -State Listen) { exit 0 } else { exit 1 }" >/dev/null 2>&1; then
@@ -71,4 +72,4 @@ while ! is_port_listening; do
     elapsed=$((elapsed + interval))
 done
 
-printf "\r  %-60s\r" ""   # clear the waiting line
+printf "\r  %-60s\r" ""   # 清除等待进度行

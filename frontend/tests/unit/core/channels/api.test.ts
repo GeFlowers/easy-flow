@@ -20,6 +20,11 @@ import {
 
 const mockedFetch = rs.mocked(fetcher);
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 jsonResponse 的约定。
+
+ */
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -33,6 +38,9 @@ beforeEach(() => {
 });
 
 describe("channels api", () => {
+  /**
+   * 覆盖“loads provider catalog”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("loads provider catalog", async () => {
     mockedFetch.mockResolvedValueOnce(
       jsonResponse(200, {
@@ -70,6 +78,11 @@ describe("channels api", () => {
     expect(mockedFetch).toHaveBeenCalledWith("/backend/api/channels/providers");
   });
 
+  /**
+   * 覆盖“loads current user's connections”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("loads current user's connections", async () => {
     mockedFetch.mockResolvedValueOnce(
       jsonResponse(200, {
@@ -94,6 +107,11 @@ describe("channels api", () => {
     );
   });
 
+  /**
+   * 覆盖“starts a provider connection flow”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("starts a provider connection flow", async () => {
     mockedFetch.mockResolvedValueOnce(
       jsonResponse(200, {
@@ -117,6 +135,11 @@ describe("channels api", () => {
     );
   });
 
+  /**
+   * 覆盖“starts a binding-code connection flow”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("starts a binding-code connection flow", async () => {
     mockedFetch.mockResolvedValueOnce(
       jsonResponse(200, {
@@ -136,6 +159,11 @@ describe("channels api", () => {
       instruction: "Send /connect abc123 to the DeerFlow Slack bot.",
     });
   });
+
+  /**
+   * 覆盖“submits runtime provider configuration”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("submits runtime provider configuration", async () => {
     mockedFetch.mockResolvedValueOnce(
@@ -172,6 +200,11 @@ describe("channels api", () => {
     );
   });
 
+  /**
+   * 覆盖“disconnects a channel connection”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("disconnects a channel connection", async () => {
     mockedFetch.mockResolvedValueOnce(new Response(null, { status: 204 }));
 
@@ -183,6 +216,11 @@ describe("channels api", () => {
       { method: "DELETE" },
     );
   });
+
+  /**
+   * 覆盖“disconnects provider runtime configuration”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("disconnects provider runtime configuration", async () => {
     mockedFetch.mockResolvedValueOnce(
@@ -207,6 +245,11 @@ describe("channels api", () => {
       { method: "DELETE" },
     );
   });
+
+  /**
+   * 覆盖“uses backend detail for failed requests”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("uses backend detail for failed requests", async () => {
     mockedFetch.mockResolvedValueOnce(

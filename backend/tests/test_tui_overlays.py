@@ -1,4 +1,4 @@
-"""Integration tests for modal overlays: /model picker and /threads switcher."""
+'未说明'
 
 import asyncio
 
@@ -10,13 +10,17 @@ from deerflow.tui.cli import LaunchPlan
 
 
 class _FakeClient:
+    '未说明'
     def list_models(self):
+        '未说明'
         return {"models": [{"name": "fast", "display_name": "Fast"}, {"name": "smart", "display_name": "Smart"}]}
 
     def list_skills(self, enabled_only=False):
+        '未说明'
         return {"skills": []}
 
     def list_threads(self, limit=10):
+        '未说明'
         return {
             "thread_list": [
                 {"thread_id": "thread-aaaaaaaa", "title": "Refactor bridge"},
@@ -25,20 +29,26 @@ class _FakeClient:
         }
 
     def stream(self, *args, **kwargs):
+        """处理流相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         yield StreamEvent(type="end", data={})
 
 
 class _FakeSession:
+    '未说明'
     def __init__(self):
+        '未说明'
         self.client = _FakeClient()
 
     def resolve_thread(self, plan):
+        """处理会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     def recent_threads(self, limit=20):
+        '未说明'
         return self.client.list_threads(limit=limit)["thread_list"]
 
     def resolve_ref(self, ref):
+        '未说明'
         threads = self.client.list_threads(limit=100)["thread_list"]
         if any(t["thread_id"] == ref for t in threads):
             return ref
@@ -49,6 +59,7 @@ class _FakeSession:
 
 
 async def _settle(pilot, predicate, timeout=2.0):
+    '未说明'
     elapsed = 0.0
     while elapsed < timeout:
         await pilot.pause()
@@ -61,6 +72,7 @@ async def _settle(pilot, predicate, timeout=2.0):
 
 @pytest.mark.asyncio
 async def test_resume_command_with_title_switches_thread():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -74,6 +86,7 @@ async def test_resume_command_with_title_switches_thread():
 
 def test_resume_without_arg_routes_to_thread_switcher():
     # /resume with no id/title falls back to the thread switcher.
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     calls = []
     app._open_thread_switcher = lambda: calls.append("switcher")
@@ -83,6 +96,7 @@ def test_resume_without_arg_routes_to_thread_switcher():
 
 @pytest.mark.asyncio
 async def test_model_command_opens_picker_and_sets_override():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -99,6 +113,7 @@ async def test_model_command_opens_picker_and_sets_override():
 
 @pytest.mark.asyncio
 async def test_threads_command_opens_switcher_and_resumes():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()
@@ -114,6 +129,7 @@ async def test_threads_command_opens_switcher_and_resumes():
 
 @pytest.mark.asyncio
 async def test_picker_escape_cancels_without_change():
+    '未说明'
     app = DeerFlowTUI(_FakeSession(), LaunchPlan(mode="tui"))
     async with app.run_test() as pilot:
         await pilot.pause()

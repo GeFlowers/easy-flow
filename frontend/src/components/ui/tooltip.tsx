@@ -5,6 +5,7 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 import { cn } from "@/lib/utils";
 
+/** TooltipProvider 内部组件：组织对应的界面结构与交互语义。 */
 function TooltipProvider({
   delayDuration = 0,
   ...props
@@ -18,6 +19,7 @@ function TooltipProvider({
   );
 }
 
+/** Tooltip 内部组件：组织对应的界面结构与交互语义。 */
 function Tooltip({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
@@ -28,12 +30,14 @@ function Tooltip({
   );
 }
 
+/** TooltipTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function TooltipTrigger({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
+/** TooltipContent 内部组件：组织对应的界面结构与交互语义。 */
 function TooltipContent({
   className,
   sideOffset,

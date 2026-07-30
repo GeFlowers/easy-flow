@@ -1,14 +1,4 @@
-"""
-Web and image search tools powered by the Brave Search API.
-
-Brave Search provides web and image results from an independent search index
-via a REST API. An API key is required. Sign up at
-https://brave.com/search/api/ to get one.
-
-Unlike the DuckDuckGo ``backend: brave`` option (which scrapes results via the
-DDGS aggregator), this provider calls the official Brave Search API directly,
-giving structured results, authenticated quota, and a documented SLA.
-"""
+'定义 tools 模块提供的职责与可复用接口。\n\n\nWeb and image search tools powered by the Brave Search API.\n\nBrave Search provides web and image results from an independent search index\nvia a REST API. An API key is required. Sign up at\nhttps://brave.com/search/api/ to get one.\n\nUnlike the DuckDuckGo ``backend: brave`` option (which scrapes results via the\nDDGS aggregator), this provider calls the official Brave Search API directly,\ngiving structured results, authenticated quota, and a documented SLA.\n'
 
 import json
 import logging
@@ -36,6 +26,7 @@ _api_key_warned: set[str] = set()
 
 
 def _get_api_key(tool_name: str = "web_search") -> str | None:
+    '执行 _get_api_key 的明确职责，并返回与调用约定一致的结果'
     config = get_app_config().get_tool_config(tool_name)
     if config is not None:
         api_key = (config.model_extra or {}).get("api_key")
@@ -53,6 +44,7 @@ def _coerce_max_results(
     default: int = _DEFAULT_MAX_RESULTS,
     max_allowed: int = _BRAVE_WEB_MAX_COUNT,
 ) -> int:
+    '执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果'
     try:
         coerced = int(value)
     except (TypeError, ValueError):
@@ -67,6 +59,7 @@ def _coerce_max_results(
 
 
 def _clean_query(query: str, *, max_length: int = 400) -> str:
+    '执行 _clean_query 的明确职责，并返回与调用约定一致的结果'
     query = query.strip()
     if len(query) > max_length:
         query = query[:max_length]
@@ -74,6 +67,7 @@ def _clean_query(query: str, *, max_length: int = 400) -> str:
 
 
 def _missing_key_error(query: str, tool_name: str) -> str:
+    '执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果'
     if tool_name not in _api_key_warned:
         _api_key_warned.add(tool_name)
         logger.warning(
@@ -87,6 +81,7 @@ def _missing_key_error(query: str, tool_name: str) -> str:
 
 
 def _unexpected_format_error(query: str, *, service_name: str = "Brave Search") -> str:
+    '执行 _unexpected_format_error 的明确职责，并返回与调用约定一致的结果'
     return json.dumps(
         {"error": f"{service_name} returned an unexpected response format", "query": query},
         ensure_ascii=False,
@@ -94,12 +89,7 @@ def _unexpected_format_error(query: str, *, service_name: str = "Brave Search") 
 
 
 def _decode_ipv4(host: str) -> IPv4Address | None:
-    """Decode obfuscated IPv4 literals that ``ip_address`` rejects.
-
-    Mirrors the permissive ``inet_aton`` parsing many HTTP clients use, so that
-    integer (``2130706433``), hex (``0x7f000001``) and octal (``0177.0.0.1``)
-    encodings of an address are recognized.
-    """
+    '执行 _decode_ipv4 的明确职责，并返回与调用约定一致的结果。\n\nDecode obfuscated IPv4 literals that ``ip_address`` rejects.\n\n    Mirrors the permissive ``inet_aton`` parsing many HTTP clients use, so that\n    integer (``2130706433``), hex (``0x7f000001``) and octal (``0177.0.0.1``)\n    encodings of an address are recognized.\n    '
     parts = host.split(".")
     if not 1 <= len(parts) <= 4:
         return None
@@ -134,17 +124,12 @@ def _decode_ipv4(host: str) -> IPv4Address | None:
 
 
 def _is_url_present(value: object) -> bool:
+    '执行 _is_url_present 的明确职责，并返回与调用约定一致的结果'
     return isinstance(value, str) and bool(value.strip())
 
 
 def _embedded_ipv4(ip: IPv6Address) -> IPv4Address | None:
-    """Extract an IPv4 address embedded in an IPv6 literal, if any.
-
-    Covers IPv4-mapped (``::ffff:a.b.c.d``), 6to4 (``2002::/16``), NAT64
-    (``64:ff9b::/96``), and IPv4-compatible (``::a.b.c.d``) forms. These all
-    smuggle a v4 destination through the IPv6 path, where ``is_global`` on the
-    v6 literal alone would otherwise report a loopback/private target as safe.
-    """
+    '执行 _embedded_ipv4 的明确职责，并返回与调用约定一致的结果。\n\nExtract an IPv4 address embedded in an IPv6 literal, if any.\n\n    Covers IPv4-mapped (``::ffff:a.b.c.d``), 6to4 (``2002::/16``), NAT64\n    (``64:ff9b::/96``), and IPv4-compatible (``::a.b.c.d``) forms. These all\n    smuggle a v4 destination through the IPv6 path, where ``is_global`` on the\n    v6 literal alone would otherwise report a loopback/private target as safe.\n    '
     if ip.ipv4_mapped is not None:
         return ip.ipv4_mapped
     if ip.sixtofour is not None:
@@ -159,15 +144,7 @@ def _embedded_ipv4(ip: IPv6Address) -> IPv4Address | None:
 
 
 def _safe_public_url(value: object) -> str:
-    """Return ``value`` only if it is a safe, public http(s) URL, else "".
-
-    This is a best-effort SSRF guard that rejects non-http(s) schemes,
-    ``localhost``, and private/non-global IP literals (including obfuscated
-    decimal/hex/octal encodings and IPv6 literals embedding a non-global IPv4).
-    It only inspects the URL string and cannot catch public hostnames that
-    resolve to internal IPs; any consumer that actually downloads these URLs
-    must re-validate the resolved IP at fetch time.
-    """
+    '执行 _safe_public_url 的明确职责，并返回与调用约定一致的结果。\n\nReturn ``value`` only if it is a safe, public http(s) URL, else "".\n\n    This is a best-effort SSRF guard that rejects non-http(s) schemes,\n    ``localhost``, and private/non-global IP literals (including obfuscated\n    decimal/hex/octal encodings and IPv6 literals embedding a non-global IPv4).\n    It only inspects the URL string and cannot catch public hostnames that\n    resolve to internal IPs; any consumer that actually downloads these URLs\n    must re-validate the resolved IP at fetch time.\n    '
     if not isinstance(value, str):
         return ""
     url = value.strip()
@@ -205,6 +182,7 @@ def _brave_get(
     *,
     service_name: str,
 ) -> tuple[dict | None, str | None]:
+    '执行 _brave_get 的明确职责，并返回与调用约定一致的结果'
     headers = {
         "X-Subscription-Token": api_key,
         "Accept": "application/json",
@@ -231,12 +209,7 @@ def _brave_get(
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int = 5) -> str:
-    """Search the web for information using Brave Search.
-
-    Args:
-        query: Search keywords describing what you want to find. Be specific for better results.
-        max_results: Maximum number of search results to return. Default is 5.
-    """
+    '执行 web_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch the web for information using Brave Search.\n\n    Args:\n        query: Search keywords describing what you want to find. Be specific for better results.\n        max_results: Maximum number of search results to return. Default is 5.\n    '
     config = get_app_config().get_tool_config("web_search")
     if config is not None and "max_results" in (config.model_extra or {}):
         max_results = config.model_extra["max_results"]
@@ -277,14 +250,7 @@ def web_search_tool(query: str, max_results: int = 5) -> str:
 
 @tool("image_search", parse_docstring=True)
 def image_search_tool(query: str, max_results: int = 5) -> str:
-    """Search for images online using Brave Image Search. Use this tool BEFORE image generation to find reference images for characters, portraits, objects, scenes, or any content requiring visual accuracy.
-
-    The returned image URLs can be used as reference images in image generation to significantly improve quality.
-
-    Args:
-        query: Search keywords describing the images you want to find. Be specific for better results.
-        max_results: Maximum number of images to return. Default is 5, capped at 200.
-    """
+    '执行 image_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch for images online using Brave Image Search. Use this tool BEFORE image generation to find reference images for characters, portraits, objects, scenes, or any content requiring visual accuracy.\n\n    The returned image URLs can be used as reference images in image generation to significantly improve quality.\n\n    Args:\n        query: Search keywords describing the images you want to find. Be specific for better results.\n        max_results: Maximum number of images to return. Default is 5, capped at 200.\n    '
     config = get_app_config().get_tool_config("image_search")
     extra = (config.model_extra or {}) if config is not None else {}
     if "max_results" in extra:

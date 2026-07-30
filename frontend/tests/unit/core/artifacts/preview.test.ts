@@ -11,6 +11,11 @@ import {
 const ARTIFACT_PATH = "/artifact-fixtures/report.html";
 const UNSUPPORTED_ARTIFACT_PATH = "/artifact-fixtures/data.csv";
 
+/**
+ * 覆盖“allows in-progress write artifacts to render a throttled preview”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("allows in-progress write artifacts to render a throttled preview", () => {
   expect(
     getArtifactViewState({
@@ -22,6 +27,11 @@ test("allows in-progress write artifacts to render a throttled preview", () => {
     initialViewMode: "preview",
   });
 });
+
+/**
+ * 覆盖“allows preview for a write artifact once the tool call has a result”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("allows preview for a write artifact once the tool call has a result", () => {
   expect(
@@ -36,6 +46,11 @@ test("allows preview for a write artifact once the tool call has a result", () =
   });
 });
 
+/**
+ * 覆盖“keeps failed write artifacts in code view”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps failed write artifacts in code view", () => {
   expect(
     getArtifactViewState({
@@ -49,6 +64,11 @@ test("keeps failed write artifacts in code view", () => {
   });
 });
 
+/**
+ * 覆盖“keeps completed artifacts on their existing preview defaults”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps completed artifacts on their existing preview defaults", () => {
   expect(
     getArtifactViewState({
@@ -61,6 +81,11 @@ test("keeps completed artifacts on their existing preview defaults", () => {
   });
 });
 
+/**
+ * 覆盖“keeps unsupported artifacts in code view”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps unsupported artifacts in code view", () => {
   expect(
     getArtifactViewState({
@@ -72,6 +97,11 @@ test("keeps unsupported artifacts in code view", () => {
     initialViewMode: "code",
   });
 });
+
+/**
+ * 覆盖“builds a draft write-file artifact from successful writes plus the selected in-progress append”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("builds a draft write-file artifact from successful writes plus the selected in-progress append", () => {
   const filepath = `write-file:${ARTIFACT_PATH}?message_id=ai-2&tool_call_id=call-2`;
@@ -120,6 +150,11 @@ test("builds a draft write-file artifact from successful writes plus the selecte
     }),
   ).toBe("<!doctype html><html><body><p>追加内容</p>");
 });
+
+/**
+ * 覆盖“does not include failed writes in a draft artifact”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("does not include failed writes in a draft artifact", () => {
   const filepath = `write-file:${ARTIFACT_PATH}?message_id=ai-3&tool_call_id=call-3`;
@@ -191,6 +226,11 @@ test("does not include failed writes in a draft artifact", () => {
   ).toBe("<html></html>");
 });
 
+/**
+ * 覆盖“returns undefined when the selected append failed so the caller can fall back”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("returns undefined when the selected append failed so the caller can fall back", () => {
   const filepath = `write-file:${ARTIFACT_PATH}?message_id=ai-2&tool_call_id=call-2`;
 
@@ -246,6 +286,11 @@ test("returns undefined when the selected append failed so the caller can fall b
   ).toBeUndefined();
 });
 
+/**
+ * 覆盖“injects scroll restoration at the start of the HTML head”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("injects scroll restoration at the start of the HTML head", () => {
   const html =
     '<!doctype html><html><head><meta http-equiv="Content-Security-Policy" content="script-src \'none\'"></head><body><main>content</main></body></html>';
@@ -257,6 +302,11 @@ test("injects scroll restoration at the start of the HTML head", () => {
     "<head><script data-deerflow-artifact-scroll-restoration>",
   );
 });
+
+/**
+ * 覆盖“preserves existing head elements when injecting scroll restoration”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("preserves existing head elements when injecting scroll restoration", () => {
   const html =
@@ -282,6 +332,11 @@ test("preserves existing head elements when injecting scroll restoration", () =>
   );
 });
 
+/**
+ * 覆盖“does not duplicate HTML scroll restoration script”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("does not duplicate HTML scroll restoration script", () => {
   const html = appendHtmlPreviewScrollRestoration(
     "<html><body>x</body></html>",
@@ -293,6 +348,11 @@ test("does not duplicate HTML scroll restoration script", () => {
     ),
   ).toHaveLength(1);
 });
+
+/**
+ * 覆盖“scopes HTML scroll restoration without exposing the artifact path”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("scopes HTML scroll restoration without exposing the artifact path", () => {
   const artifactPath =

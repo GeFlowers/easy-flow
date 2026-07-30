@@ -6,6 +6,7 @@ import * as ResizablePrimitive from "react-resizable-panels";
 
 import { cn } from "@/lib/utils";
 
+/** ResizablePanelGroup 内部组件：组织对应的界面结构与交互语义。 */
 function ResizablePanelGroup({
   className,
   ...props
@@ -22,12 +23,14 @@ function ResizablePanelGroup({
   );
 }
 
+/** ResizablePanel 内部组件：组织对应的界面结构与交互语义。 */
 function ResizablePanel({
   ...props
 }: React.ComponentProps<typeof ResizablePrimitive.Panel>) {
   return <ResizablePrimitive.Panel data-slot="resizable-panel" {...props} />;
 }
 
+/** ResizableHandle 内部组件：组织对应的界面结构与交互语义。 */
 function ResizableHandle({
   withHandle,
   className,

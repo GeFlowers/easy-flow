@@ -1,4 +1,4 @@
-"""Core behavior tests for task tool orchestration."""
+'未说明'
 
 import asyncio
 import importlib
@@ -29,6 +29,7 @@ task_tool_module = importlib.import_module("deerflow.tools.builtins.task_tool")
 
 class FakeSubagentStatus(Enum):
     # Match production enum values so branch comparisons behave identically.
+    '未说明'
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -39,6 +40,7 @@ class FakeSubagentStatus(Enum):
 
 def _make_runtime(*, app_config=None) -> SimpleNamespace:
     # Minimal ToolRuntime-like object; task_tool only reads these three attributes.
+    '未说明'
     context = {"thread_id": "thread-1"}
     if app_config is not None:
         context["app_config"] = app_config
@@ -57,6 +59,7 @@ def _make_runtime(*, app_config=None) -> SimpleNamespace:
 
 
 def _make_subagent_config(name: str = "general-purpose") -> SubagentConfig:
+    '未说明'
     return SubagentConfig(
         name=name,
         description="General helper",
@@ -75,6 +78,7 @@ def _make_result(
     stop_reason: str | None = None,
     token_usage_records: list[dict] | None = None,
 ) -> SimpleNamespace:
+    '未说明'
     return SimpleNamespace(
         status=status,
         ai_messages=ai_messages or [],
@@ -87,7 +91,7 @@ def _make_result(
 
 
 def _run_task_tool(**kwargs) -> str | Command:
-    """Execute the task tool across LangChain sync/async wrapper variants."""
+    '未说明'
     coroutine = getattr(task_tool_module.task_tool, "coroutine", None)
     if coroutine is not None:
         return asyncio.run(coroutine(**kwargs))
@@ -95,6 +99,7 @@ def _run_task_tool(**kwargs) -> str | Command:
 
 
 def _task_tool_message(result: str | Command) -> ToolMessage:
+    '未说明'
     assert isinstance(result, Command)
     assert isinstance(result.update, dict)
     messages = result.update["messages"]
@@ -105,6 +110,7 @@ def _task_tool_message(result: str | Command) -> ToolMessage:
 
 
 def test_task_result_command_derives_content_from_status_payload():
+    '未说明'
     signature = inspect.signature(task_tool_module._task_result_command)
     assert "content" not in signature.parameters
 
@@ -195,12 +201,7 @@ def test_task_result_command_derives_content_from_status_payload():
 
 
 def test_task_result_command_carries_loop_capped_from_real_loop_detection():
-    """Real-path (#3875 Phase 2, ggnnggez review): drive the actual
-    ``LoopDetectionMiddleware`` to a hard stop with repeated identical tool
-    calls, feed the produced ``loop_capped`` through ``_task_result_command``,
-    and assert the final task ``ToolMessage`` carries
-    ``subagent_stop_reason=loop_capped`` — proving the loop cap reaches the wire
-    the lead/ledger read, not just the in-memory result."""
+    '未说明'
     from langchain_core.messages import AIMessage
 
     from deerflow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
@@ -233,15 +234,19 @@ def test_task_result_command_carries_loop_capped_from_real_loop_detection():
 
 
 async def _no_sleep(_: float) -> None:
+    '未说明'
     return None
 
 
 class _DummyScheduledTask:
+    '未说明'
     def add_done_callback(self, _callback):
+        """处理回调相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
 
 def test_task_tool_returns_error_for_unknown_subagent(monkeypatch):
+    '未说明'
     monkeypatch.setattr(task_tool_module, "get_subagent_config", lambda _: None)
     monkeypatch.setattr(task_tool_module, "get_available_subagent_names", lambda: ["general-purpose"])
 
@@ -260,19 +265,19 @@ def test_task_tool_returns_error_for_unknown_subagent(monkeypatch):
 
 
 def test_task_tool_forwards_channel_user_id_to_executor(monkeypatch):
-    """The IM-channel sender identity must survive delegation: in group chats
-    one thread serves many senders, so a subagent's bash commands need the
-    dispatching turn's channel_user_id (same propagation rule as user_role /
-    oauth attribution)."""
+    '未说明'
     runtime = _make_runtime()
     runtime.context["channel_user_id"] = "ou_group_sender_1"
     captured = {}
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             captured["executor_kwargs"] = kwargs
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             return task_id or "generated-task-id"
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -301,6 +306,7 @@ def test_task_tool_forwards_channel_user_id_to_executor(monkeypatch):
 
 
 def test_task_tool_rejects_bash_subagent_when_host_bash_disabled(monkeypatch):
+    '未说明'
     monkeypatch.setattr(task_tool_module, "get_subagent_config", lambda _: _make_subagent_config())
     monkeypatch.setattr(task_tool_module, "is_host_bash_allowed", lambda: False)
 
@@ -320,6 +326,7 @@ def test_task_tool_rejects_bash_subagent_when_host_bash_disabled(monkeypatch):
 
 
 def test_task_tool_threads_runtime_app_config_to_subagent_dependencies(monkeypatch):
+    '未说明'
     app_config = object()
     config = _make_subagent_config(name="bash")
     runtime = _make_runtime(app_config=app_config)
@@ -327,26 +334,33 @@ def test_task_tool_threads_runtime_app_config_to_subagent_dependencies(monkeypat
     captured = {}
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             captured["executor_kwargs"] = kwargs
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             captured["prompt"] = prompt
             return task_id or "generated-task-id"
 
     def fake_get_available_subagent_names(*, app_config):
+        '未说明'
         captured["names_app_config"] = app_config
         return ["bash"]
 
     def fake_get_subagent_config(name, *, app_config):
+        '未说明'
         captured["config_lookup"] = (name, app_config)
         return config
 
     def fake_is_host_bash_allowed(config):
+        '未说明'
         captured["bash_gate_app_config"] = config
         return True
 
     def fake_get_available_tools(**kwargs):
+        '未说明'
         captured["tools_kwargs"] = kwargs
         return ["tool-a"]
 
@@ -383,6 +397,7 @@ def test_task_tool_threads_runtime_app_config_to_subagent_dependencies(monkeypat
 
 
 def test_task_tool_emits_running_and_completed_events(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     runtime = _make_runtime()
     runtime.context["deerflow_trace_id"] = "task-trace-1"
@@ -391,10 +406,13 @@ def test_task_tool_emits_running_and_completed_events(monkeypatch):
     get_available_tools = MagicMock(return_value=["tool-a", "tool-b"])
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             captured["executor_kwargs"] = kwargs
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             captured["prompt"] = prompt
             captured["task_id"] = task_id
             return task_id or "generated-task-id"
@@ -450,6 +468,7 @@ def test_task_tool_emits_running_and_completed_events(monkeypatch):
 
 
 def test_task_tool_emits_cumulative_usage_on_running_event(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     runtime = _make_runtime()
     events = []
@@ -508,7 +527,7 @@ def test_task_tool_emits_cumulative_usage_on_running_event(monkeypatch):
 
 
 def test_task_tool_propagates_tool_groups_to_subagent(monkeypatch):
-    """Verify tool_groups from parent metadata are passed to get_available_tools(groups=...)."""
+    '未说明'
     config = _make_subagent_config()
     parent_tool_groups = ["file:read", "file:write", "bash"]
     runtime = SimpleNamespace(
@@ -523,10 +542,13 @@ def test_task_tool_propagates_tool_groups_to_subagent(monkeypatch):
     get_available_tools = MagicMock(return_value=["tool-a"])
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             pass
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             return task_id or "generated-task-id"
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -555,7 +577,7 @@ def test_task_tool_propagates_tool_groups_to_subagent(monkeypatch):
 
 
 def test_task_tool_uses_subagent_model_override_for_tool_loading(monkeypatch):
-    """Subagent model overrides should drive model-gated tool loading."""
+    '未说明'
     config = SubagentConfig(
         name="general-purpose",
         description="General helper",
@@ -570,10 +592,13 @@ def test_task_tool_uses_subagent_model_override_for_tool_loading(monkeypatch):
     get_available_tools = MagicMock(return_value=[])
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             pass
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             return task_id or "generated-task-id"
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -605,6 +630,7 @@ def test_task_tool_uses_subagent_model_override_for_tool_loading(monkeypatch):
 
 
 def test_task_tool_inherits_parent_skill_allowlist_for_default_subagent(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     runtime = _make_runtime()
     runtime.config["metadata"]["available_skills"] = ["safe-skill"]
@@ -612,10 +638,13 @@ def test_task_tool_inherits_parent_skill_allowlist_for_default_subagent(monkeypa
     captured = {}
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             captured["config"] = kwargs["config"]
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             return task_id or "generated-task-id"
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -643,6 +672,7 @@ def test_task_tool_inherits_parent_skill_allowlist_for_default_subagent(monkeypa
 
 
 def test_task_tool_intersects_parent_and_subagent_skill_allowlists(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     config = SubagentConfig(
         name=config.name,
@@ -658,10 +688,13 @@ def test_task_tool_intersects_parent_and_subagent_skill_allowlists(monkeypatch):
     captured = {}
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             captured["config"] = kwargs["config"]
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             return task_id or "generated-task-id"
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -689,7 +722,7 @@ def test_task_tool_intersects_parent_and_subagent_skill_allowlists(monkeypatch):
 
 
 def test_task_tool_no_tool_groups_passes_none(monkeypatch):
-    """Verify that when metadata has no tool_groups, groups=None is passed (backward compat)."""
+    '未说明'
     config = _make_subagent_config()
     # Default _make_runtime() has no tool_groups in metadata
     runtime = _make_runtime()
@@ -697,10 +730,13 @@ def test_task_tool_no_tool_groups_passes_none(monkeypatch):
     get_available_tools = MagicMock(return_value=[])
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             pass
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             return task_id or "generated-task-id"
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -729,16 +765,19 @@ def test_task_tool_no_tool_groups_passes_none(monkeypatch):
 
 
 def test_task_tool_runtime_none_passes_groups_none(monkeypatch):
-    """Verify that when runtime is None, groups=None is passed (e.g., unknown subagent path exits early, but tools still load correctly)."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     get_available_tools = MagicMock(return_value=[])
 
     class DummyExecutor:
+        '未说明'
         def __init__(self, **kwargs):
+            '未说明'
             pass
 
         def execute_async(self, prompt, task_id=None):
+            '未说明'
             return task_id or "generated-task-id"
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -809,6 +848,7 @@ def test_task_tool_runtime_none_passes_groups_none(monkeypatch):
 
 
 def test_task_tool_returns_timed_out_message(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     events = []
 
@@ -846,10 +886,7 @@ def test_task_tool_returns_timed_out_message(monkeypatch):
 
 
 def test_task_tool_surfaces_stop_reason_for_capped_run(monkeypatch):
-    """#3875 Phase 2: a capped run keeps a normal status (``completed`` when it
-    produced a final answer) and carries the cap on ``subagent_stop_reason``.
-    The polling loop threads ``result.stop_reason`` through so the lead's
-    ToolMessage carries it without parsing the result text."""
+    '未说明'
     config = _make_subagent_config()
     events = []
 
@@ -885,6 +922,7 @@ def test_task_tool_surfaces_stop_reason_for_capped_run(monkeypatch):
 
 
 def test_task_tool_polling_safety_timeout(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     # Keep max_poll_count small for test speed: (1 + 60) // 5 = 12
     config.timeout_seconds = 1
@@ -925,7 +963,7 @@ def test_task_tool_polling_safety_timeout(monkeypatch):
 
 
 def test_cleanup_called_on_completed(monkeypatch):
-    """Verify cleanup_background_task is called when task completes."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     cleanup_calls = []
@@ -965,7 +1003,7 @@ def test_cleanup_called_on_completed(monkeypatch):
 
 
 def test_cleanup_called_on_failed(monkeypatch):
-    """Verify cleanup_background_task is called when task fails."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     cleanup_calls = []
@@ -1005,7 +1043,7 @@ def test_cleanup_called_on_failed(monkeypatch):
 
 
 def test_cleanup_called_on_timed_out(monkeypatch):
-    """Verify cleanup_background_task is called when task times out."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     cleanup_calls = []
@@ -1045,11 +1083,7 @@ def test_cleanup_called_on_timed_out(monkeypatch):
 
 
 def test_cleanup_not_called_on_polling_safety_timeout(monkeypatch):
-    """Verify cleanup_background_task is NOT called directly on polling safety timeout.
-
-    The task is still RUNNING so it cannot be safely removed yet. Instead,
-    cooperative cancellation is requested and a deferred cleanup is scheduled.
-    """
+    '未说明'
     config = _make_subagent_config()
     # Keep max_poll_count small for test speed: (1 + 60) // 5 = 12
     config.timeout_seconds = 1
@@ -1059,10 +1093,13 @@ def test_cleanup_not_called_on_polling_safety_timeout(monkeypatch):
     scheduled_cleanups = []
 
     class DummyCleanupTask:
+        '未说明'
         def add_done_callback(self, _callback):
+            """处理回调相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return None
 
     def fake_create_task(coro):
+        '未说明'
         scheduled_cleanups.append(coro)
         coro.close()
         return DummyCleanupTask()
@@ -1115,13 +1152,14 @@ def test_cleanup_not_called_on_polling_safety_timeout(monkeypatch):
 
 
 def test_cleanup_scheduled_on_cancellation(monkeypatch):
-    """Verify cancellation handler synchronously cleans up after shielded wait."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     cleanup_calls = []
     poll_count = 0
 
     def get_result(_: str):
+        """处理获取 结果相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         nonlocal poll_count
         poll_count += 1
         # Main loop polls RUNNING twice, then shielded wait gets COMPLETED
@@ -1132,6 +1170,7 @@ def test_cleanup_scheduled_on_cancellation(monkeypatch):
     sleep_count = 0
 
     async def cancel_on_second_sleep(_: float) -> None:
+        '未说明'
         nonlocal sleep_count
         sleep_count += 1
         if sleep_count == 2:
@@ -1169,12 +1208,7 @@ def test_cleanup_scheduled_on_cancellation(monkeypatch):
 
 
 def test_cancelled_cleanup_stops_after_timeout(monkeypatch):
-    """Verify cancellation handler survives a shielded-wait timeout gracefully.
-
-    When the subagent never reaches a terminal state, the shielded wait times
-    out (or is interrupted), the handler reports whatever usage it can, calls
-    cleanup (which is a no-op for non-terminal tasks), and re-raises.
-    """
+    '未说明'
     config = _make_subagent_config()
     events = []
     report_calls = []
@@ -1189,19 +1223,25 @@ def test_cancelled_cleanup_stops_after_timeout(monkeypatch):
     )
 
     async def cancel_on_first_sleep(_: float) -> None:
+        '未说明'
         raise asyncio.CancelledError
 
     def fake_report_subagent_usage(runtime, result):
+        '未说明'
         report_calls.append((runtime, result))
 
     class DummyCleanupTask:
+        '未说明'
         def __init__(self, coro):
+            '未说明'
             self.coro = coro
 
         def add_done_callback(self, callback):
+            """处理回调相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             self.callback = callback
 
     def fake_create_task(coro):
+        '未说明'
         scheduled_cleanups.append(coro)
         coro.close()
         return DummyCleanupTask(coro)
@@ -1242,7 +1282,7 @@ def test_cancelled_cleanup_stops_after_timeout(monkeypatch):
 
 
 def test_cancellation_wait_uses_subagent_polling_budget(monkeypatch):
-    """Cancelled parent waits on the existing subagent polling budget, not a fixed timeout."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     report_calls = []
@@ -1252,6 +1292,7 @@ def test_cancellation_wait_uses_subagent_polling_budget(monkeypatch):
     terminal_result = _make_result(FakeSubagentStatus.COMPLETED, result="done")
 
     def get_result(_: str):
+        """处理获取 结果相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         nonlocal result_polls
         result_polls += 1
         if result_polls < 5:
@@ -1259,15 +1300,18 @@ def test_cancellation_wait_uses_subagent_polling_budget(monkeypatch):
         return terminal_result
 
     async def cancel_then_continue(_: float) -> None:
+        '未说明'
         nonlocal sleep_count
         sleep_count += 1
         if sleep_count == 1:
             raise asyncio.CancelledError
 
     def fake_report_subagent_usage(runtime, result):
+        '未说明'
         report_calls.append((runtime, result))
 
     async def fail_on_fixed_timeout(awaitable, *, timeout=None):
+        """处理超时相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise AssertionError(f"cancellation wait should not use fixed timeout={timeout}")
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -1303,12 +1347,13 @@ def test_cancellation_wait_uses_subagent_polling_budget(monkeypatch):
 
 
 def test_cancellation_calls_request_cancel(monkeypatch):
-    """Verify CancelledError path calls request_cancel_background_task(task_id)."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     cancel_requests = []
 
     async def cancel_on_first_sleep(_: float) -> None:
+        '未说明'
         raise asyncio.CancelledError
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -1351,7 +1396,7 @@ def test_cancellation_calls_request_cancel(monkeypatch):
 
 
 def test_task_tool_returns_cancelled_message(monkeypatch):
-    """Verify polling a CANCELLED result emits task_cancelled event and returns message."""
+    '未说明'
     config = _make_subagent_config()
     events = []
     cleanup_calls = []
@@ -1399,6 +1444,7 @@ def test_task_tool_returns_cancelled_message(monkeypatch):
 
 
 def test_task_tool_emits_completed_metadata(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -1432,6 +1478,7 @@ def test_task_tool_emits_completed_metadata(monkeypatch):
 
 
 def test_task_tool_emits_disappeared_task_metadata(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     events = []
 
@@ -1464,6 +1511,7 @@ def test_task_tool_emits_disappeared_task_metadata(monkeypatch):
 
 
 def test_task_tool_bounds_large_result_metadata(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     huge = "x" * 10000
 
@@ -1497,12 +1545,7 @@ def test_task_tool_bounds_large_result_metadata(monkeypatch):
 
 
 def test_cancellation_reports_subagent_usage(monkeypatch):
-    """Verify cancellation handler waits (shielded) for subagent terminal state,
-    then reports the final token usage before re-raising CancelledError.
-
-    The report must happen synchronously within the cancellation handler so
-    the parent worker's finally block sees the updated journal totals.
-    """
+    '未说明'
     config = _make_subagent_config()
     events = []
     report_calls = []
@@ -1516,6 +1559,7 @@ def test_cancellation_reports_subagent_usage(monkeypatch):
     poll_count = 0
 
     def get_result(_: str):
+        """处理获取 结果相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         nonlocal poll_count
         poll_count += 1
         # Main loop polls 3 times (RUNNING each time to keep looping)
@@ -1530,12 +1574,14 @@ def test_cancellation_reports_subagent_usage(monkeypatch):
     sleep_count = 0
 
     async def cancel_on_third_sleep(_: float) -> None:
+        '未说明'
         nonlocal sleep_count
         sleep_count += 1
         if sleep_count == 3:
             raise asyncio.CancelledError
 
     def fake_report_subagent_usage(runtime, result):
+        '未说明'
         report_calls.append((runtime, result))
 
     monkeypatch.setattr(task_tool_module, "SubagentStatus", FakeSubagentStatus)
@@ -1583,7 +1629,7 @@ def test_cancellation_reports_subagent_usage(monkeypatch):
     ],
 )
 def test_terminal_events_include_usage(monkeypatch, status, expected_type):
-    """Terminal task events include a usage summary from token_usage_records."""
+    '未说明'
     config = _make_subagent_config()
     runtime = _make_runtime()
     events = []
@@ -1621,7 +1667,7 @@ def test_terminal_events_include_usage(monkeypatch, status, expected_type):
 
 
 def test_terminal_event_usage_none_when_no_records(monkeypatch):
-    """Terminal event has usage=None when token_usage_records is empty."""
+    '未说明'
     config = _make_subagent_config()
     runtime = _make_runtime()
     events = []
@@ -1651,6 +1697,7 @@ def test_terminal_event_usage_none_when_no_records(monkeypatch):
 
 
 def test_subagent_usage_cache_is_skipped_when_config_file_is_missing(monkeypatch):
+    '未说明'
     monkeypatch.setattr(
         task_tool_module,
         "get_app_config",
@@ -1661,6 +1708,7 @@ def test_subagent_usage_cache_is_skipped_when_config_file_is_missing(monkeypatch
 
 
 def test_subagent_usage_cache_is_skipped_when_token_usage_is_disabled(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     app_config = SimpleNamespace(token_usage=SimpleNamespace(enabled=False))
     runtime = _make_runtime(app_config=app_config)
@@ -1694,6 +1742,7 @@ def test_subagent_usage_cache_is_skipped_when_token_usage_is_disabled(monkeypatc
 
 
 def test_subagent_usage_cache_is_cleared_when_polling_raises(monkeypatch):
+    '未说明'
     config = _make_subagent_config()
     app_config = SimpleNamespace(token_usage=SimpleNamespace(enabled=True))
     runtime = _make_runtime(app_config=app_config)

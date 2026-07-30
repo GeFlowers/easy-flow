@@ -1,20 +1,19 @@
 /**
- * Subtask step model shared by the live (SSE) and reload (fetched) paths.
+ * 实时（SSE）与重载（拉取）路径共享的子任务步骤模型。
  *
- * Issue #3779: the subtask card used to keep only the latest subagent message,
- * so earlier steps flashed by and nothing survived a reload. A `SubtaskStep` is
- * the normalized, renderable unit of subagent progress — one assistant turn
- * (`kind: "ai"`, carrying its tool-call requests) or one tool result
- * (`kind: "tool"`, carrying the tool's output). The backend persists the same
- * shape as `subagent.step` run-event content; `messageToStep` mirrors that
- * shaping for the live `task_running` event, which still carries the raw message.
+ * #3779 之前子任务卡片仅保留最新子代理消息，早期步骤一闪而过，重载后也无法恢复。`SubtaskStep` 是
+ * 经规范化、可渲染的子代理进度单元：一条助手轮次（`kind: "ai"`，含工具调用请求）或一条工具结果
+ * （`kind: "tool"`，含工具输出）。后端以同样形状持久化 `subagent.step` 运行事件内容；实时
+ * `task_running` 仍携带原始消息，`messageToStep` 为其镜像转换。
  */
 
+/** 子任务步骤中记录的单次工具调用请求。 */
 export interface SubtaskStepToolCall {
   name?: string;
   args?: unknown;
 }
 
+/** 可渲染的子代理进度步骤，按消息序号维持时间线顺序。 */
 export interface SubtaskStep {
   message_index: number;
   kind: "ai" | "tool";
@@ -32,6 +31,7 @@ type RawMessage = {
   [key: string]: unknown;
 };
 
+/** 将不同形态的消息内容收敛为用于步骤展示的纯文本。 */
 function contentToText(content: unknown): string {
   if (typeof content === "string") {
     return content;
@@ -54,7 +54,7 @@ function contentToText(content: unknown): string {
   return "";
 }
 
-/** Normalize a raw subagent message (live `task_running` payload) into a step. */
+/** 将实时 `task_running` 载荷中的原始子代理消息规范化为步骤。 */
 export function messageToStep(
   message: RawMessage,
   messageIndex: number,
@@ -79,16 +79,12 @@ export function messageToStep(
 }
 
 /**
- * Steps to render in the subtask card timeline (#3779). Interleaves the
- * subagent's assistant turns and tool steps, ordered by `message_index`:
+ * 子任务卡片时间线要渲染的步骤（#3779），按 `message_index` 交错排列子代理助手轮次与工具步骤：
  *
- * - tool steps are always kept (one "the subagent ran <tool>" row each);
- * - AI steps are kept only when they carry visible reasoning text — a turn that
- *   only requests tools (blank text) adds no information beyond the tool rows
- *   that follow it, so it is dropped;
- * - when the task is `completed`, a trailing AI step with no tool_calls is the
- *   subagent's final answer, which the card already renders as `task.result`,
- *   so it is dropped here to avoid showing the answer twice.
+ * - 始终保留工具步骤（每项均显示一行“子代理运行了 <tool>”）；
+ * - 仅含可见推理文本时保留 AI 步骤；只请求工具的空文本轮次不比后续工具行提供更多信息，故丢弃；
+ * - 任务为 `completed` 时，无 `tool_calls` 的尾部 AI 步骤即子代理最终回答，卡片已通过 `task.result`
+ *   渲染，故此处丢弃以避免重复显示。
  */
 export function stepsForDisplay(
   steps: SubtaskStep[] | undefined,
@@ -114,10 +110,9 @@ type RunEvent = {
 };
 
 /**
- * Map persisted run events (from `GET /{rid}/events`) into the subtask's steps,
- * keeping only `subagent.step` events for `taskId` and ordering by message_index.
- * The persisted `content` already matches the step shape (it is what the backend
- * `build_subagent_step` produced), so this filters, projects, and sorts (#3779).
+ * 将 `GET /{rid}/events` 返回的持久化运行事件映射为子任务步骤，仅保留该 `taskId` 的
+ * `subagent.step` 事件并按 message_index 排序。持久化 `content` 已符合步骤形状（由后端
+ * `build_subagent_step` 生成），因此这里只进行过滤、投影和排序（#3779）。
  */
 export function eventsToSteps(
   events: RunEvent[],
@@ -148,9 +143,8 @@ export function eventsToSteps(
 }
 
 /**
- * Merge `incoming` steps into `existing`, deduping by `message_index` (incoming
- * wins) and keeping the result ordered. Used to reconcile live SSE steps with
- * steps fetched on expand without double-rendering shared indices.
+ * 将 `incoming` 步骤合并到 `existing`，按 `message_index` 去重（以 incoming 为准）并保持排序。
+ * 用于协调实时 SSE 步骤与展开时拉取的步骤，避免共享索引重复渲染。
  */
 export function mergeSteps(
   existing: SubtaskStep[],

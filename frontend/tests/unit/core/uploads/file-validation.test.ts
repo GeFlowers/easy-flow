@@ -14,6 +14,11 @@ const limits = {
   max_total_size: 7,
 };
 
+/**
+ * 覆盖“identifies Finder-style .app bundle uploads as unsupported”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("identifies Finder-style .app bundle uploads as unsupported", () => {
   expect(
     isLikelyMacOSAppBundle({
@@ -22,6 +27,11 @@ test("identifies Finder-style .app bundle uploads as unsupported", () => {
     }),
   ).toBe(true);
 });
+
+/**
+ * 覆盖“keeps normal files and reports rejected app bundles”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("keeps normal files and reports rejected app bundles", () => {
   const files = [
@@ -40,6 +50,11 @@ test("keeps normal files and reports rejected app bundles", () => {
   expect(result.message).toBe(MACOS_APP_BUNDLE_UPLOAD_MESSAGE);
 });
 
+/**
+ * 覆盖“treats empty MIME .app uploads as unsupported”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("treats empty MIME .app uploads as unsupported", () => {
   const result = splitUnsupportedUploadFiles([
     new File(["demo"], "Another.app", { type: "" }),
@@ -50,6 +65,11 @@ test("treats empty MIME .app uploads as unsupported", () => {
   expect(result.message).toBe(MACOS_APP_BUNDLE_UPLOAD_MESSAGE);
 });
 
+/**
+ * 覆盖“returns no message when every file is supported”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("returns no message when every file is supported", () => {
   const result = splitUnsupportedUploadFiles([
     new File(["notes"], "notes.txt", { type: "text/plain" }),
@@ -59,6 +79,11 @@ test("returns no message when every file is supported", () => {
   expect(result.rejected.length).toBe(0);
   expect(result.message).toBeUndefined();
 });
+
+/**
+ * 覆盖“accepts a file at the per-file limit and rejects one byte over”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("accepts a file at the per-file limit and rejects one byte over", () => {
   const atLimit = new File(["12345"], "at-limit.txt");
@@ -72,6 +97,11 @@ test("accepts a file at the per-file limit and rejects one byte over", () => {
     { code: "max_file_size", files: [overLimit], limit: 5 },
   ]);
 });
+
+/**
+ * 覆盖“counts existing files and their size before incoming files”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("counts existing files and their size before incoming files", () => {
   const existing = new File(["12"], "existing.txt");
@@ -88,6 +118,11 @@ test("counts existing files and their size before incoming files", () => {
   expect(result.rejected).toEqual([overCount]);
   expect(result.violations[0]?.code).toBe("max_files");
 });
+
+/**
+ * 覆盖“keeps selection order and aggregates each violation category”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("keeps selection order and aggregates each violation category", () => {
   const first = new File(["1234"], "first.txt");
@@ -108,6 +143,11 @@ test("keeps selection order and aggregates each violation category", () => {
   ]);
 });
 
+/**
+ * 覆盖“does not block files when upload limits are unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("does not block files when upload limits are unavailable", () => {
   const file = new File(["123456"], "fallback.txt");
 
@@ -117,6 +157,11 @@ test("does not block files when upload limits are unavailable", () => {
   expect(result.rejected).toEqual([]);
   expect(result.violations).toEqual([]);
 });
+
+/**
+ * 覆盖“formats binary upload limits for display”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("formats binary upload limits for display", () => {
   expect(formatUploadSize(50 * 1024 * 1024)).toBe("50 MiB");

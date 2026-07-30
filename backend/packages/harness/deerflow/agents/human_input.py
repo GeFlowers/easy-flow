@@ -1,4 +1,4 @@
-"""Structured human-input message metadata helpers."""
+"""定义并校验隐藏消息中携带的人类输入澄清响应。"""
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ HUMAN_INPUT_RESPONSE_KEY = "human_input_response"
 
 
 class HumanInputTextResponse(TypedDict):
+    """描述用户以自由文本提交的版本一澄清响应载荷。"""
     version: Literal[1]
     kind: Literal["human_input_response"]
     source: str
@@ -18,6 +19,7 @@ class HumanInputTextResponse(TypedDict):
 
 
 class HumanInputOptionResponse(TypedDict):
+    """描述用户选择预设选项提交的版本一澄清响应载荷。"""
     version: Literal[1]
     kind: Literal["human_input_response"]
     source: str
@@ -31,11 +33,16 @@ HumanInputResponse = HumanInputTextResponse | HumanInputOptionResponse
 
 
 def _non_empty_string(value: object) -> str | None:
+    """仅在值为去除空白后仍非空的字符串时返回原字符串。"""
     return value if isinstance(value, str) and value.strip() else None
 
 
 def read_human_input_response(additional_kwargs: Mapping[str, object] | None) -> HumanInputResponse | None:
-    """Read a valid human-input response payload from message metadata."""
+    """从附加元数据中解析并规范化有效的人类输入响应。
+
+    仅接受约定的版本、种类和必填非空字段；文本响应与选项响应分别返回其
+    对应的类型化字典，任一校验不通过则返回 ``None``。
+    """
     if not additional_kwargs:
         return None
     raw = additional_kwargs.get(HUMAN_INPUT_RESPONSE_KEY)

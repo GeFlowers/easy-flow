@@ -1,4 +1,4 @@
-"""Tests for describe_skill tool and skill index prompt rendering."""
+'未说明'
 
 from pathlib import Path
 
@@ -22,6 +22,7 @@ def _make_skill(
     category: SkillCategory = SkillCategory.PUBLIC,
     allowed_tools: tuple[str, ...] | None = None,
 ) -> Skill:
+    '未说明'
     base = Path("/mnt/skills") / category.value / name
     return Skill(
         name=name,
@@ -38,6 +39,7 @@ def _make_skill(
 
 @pytest.fixture
 def sample_skills() -> list[Skill]:
+    '未说明'
     return [
         _make_skill("data-analysis", "Analyze data with Python", allowed_tools=("execute_code", "read_file")),
         _make_skill("deep-research", "Multi-source research"),
@@ -47,6 +49,7 @@ def sample_skills() -> list[Skill]:
 
 @pytest.fixture
 def catalog(sample_skills: list[Skill]) -> SkillCatalog:
+    '未说明'
     return SkillCatalog(tuple(sample_skills))
 
 
@@ -54,6 +57,7 @@ def catalog(sample_skills: list[Skill]) -> SkillCatalog:
 
 
 def test_render_metadata_format(sample_skills: list[Skill]):
+    '未说明'
     rendered = _render_skill_metadata(sample_skills[:1], "/mnt/skills")
     assert "## Skill: data-analysis" in rendered
     assert "Description: Analyze data with Python" in rendered
@@ -63,19 +67,21 @@ def test_render_metadata_format(sample_skills: list[Skill]):
 
 
 def test_render_custom_skill_mutability(sample_skills: list[Skill]):
+    '未说明'
     custom = [s for s in sample_skills if s.category == SkillCategory.CUSTOM]
     rendered = _render_skill_metadata(custom, "/mnt/skills")
     assert "[custom, editable]" in rendered
 
 
 def test_render_no_allowed_tools_shows_all(sample_skills: list[Skill]):
-    """Skills without allowed_tools should show '(all)'."""
+    '未说明'
     no_tools = [s for s in sample_skills if s.allowed_tools is None]
     rendered = _render_skill_metadata(no_tools[:1], "/mnt/skills")
     assert "Allowed tools: (all)" in rendered
 
 
 def test_render_multiple_skills(sample_skills: list[Skill]):
+    '未说明'
     rendered = _render_skill_metadata(sample_skills, "/mnt/skills")
     assert "## Skill: data-analysis" in rendered
     assert "## Skill: deep-research" in rendered
@@ -86,22 +92,21 @@ def test_render_multiple_skills(sample_skills: list[Skill]):
 
 
 def test_describe_tool_is_invokable(catalog: SkillCatalog):
+    '未说明'
     tool = build_describe_skill_tool(catalog)
     assert tool.name == "describe_skill"
     assert hasattr(tool, "invoke")
 
 
 def test_describe_tool_docstring(catalog: SkillCatalog):
+    '未说明'
     tool = build_describe_skill_tool(catalog)
     assert "describe_skill" in tool.name
     assert tool.description is not None
 
 
 def test_describe_skill_parameter_name_matches_prompt(catalog: SkillCatalog):
-    """Regression: the tool parameter must be 'name', matching the prompt wording
-    'describe_skill(name)'.  A strict function-calling model submits exactly the
-    parameter name the prompt specifies — any drift silently breaks the flow.
-    """
+    '未说明'
     tool = build_describe_skill_tool(catalog)
     schema = tool.get_input_schema().model_json_schema()
     assert "name" in schema["properties"], "tool must accept 'name' (matching prompt wording)"
@@ -112,30 +117,28 @@ def test_describe_skill_parameter_name_matches_prompt(catalog: SkillCatalog):
 
 
 def test_setup_enabled_with_skills(sample_skills: list[Skill]):
+    '未说明'
     setup = build_skill_search_setup(sample_skills, enabled=True)
     assert setup.describe_skill_tool is not None
     assert setup.skill_names == frozenset(s.name for s in sample_skills)
 
 
 def test_setup_disabled():
+    '未说明'
     setup = build_skill_search_setup([_make_skill("a", "A")], enabled=False)
     assert setup.describe_skill_tool is None
     assert setup.skill_names == frozenset()
 
 
 def test_setup_empty_skills():
+    '未说明'
     setup = build_skill_search_setup([], enabled=True)
     assert setup.describe_skill_tool is None
     assert setup.skill_names == frozenset()
 
 
 def test_setup_frozen():
-    """Empty SkillSearchSetup (describe_skill_tool=None) must be hashable.
-
-    The populated setup contains a BaseTool, which is not hashable by design —
-    so only the disabled/empty path is required to hash.  frozen=True still
-    prevents accidental mutation in both cases.
-    """
+    '未说明'
     setup = build_skill_search_setup([], enabled=True)
     assert hash(setup) is not None
 
@@ -144,6 +147,7 @@ def test_setup_frozen():
 
 
 def test_skill_index_contains_names():
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"data-analysis", "deep-research"}),
     )
@@ -153,7 +157,7 @@ def test_skill_index_contains_names():
 
 
 def test_skill_index_no_description():
-    """Index should NOT contain descriptions (that's the whole point)."""
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"data-analysis"}),
     )
@@ -161,7 +165,7 @@ def test_skill_index_no_description():
 
 
 def test_skill_index_no_location():
-    """Index should NOT contain file paths."""
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"data-analysis"}),
     )
@@ -169,6 +173,7 @@ def test_skill_index_no_location():
 
 
 def test_skill_index_contains_discovery_instructions():
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"data-analysis"}),
     )
@@ -177,16 +182,19 @@ def test_skill_index_contains_discovery_instructions():
 
 
 def test_skill_index_empty_returns_empty():
+    '未说明'
     section = get_skill_index_prompt_section(skill_names=frozenset())
     assert section == ""
 
 
 def test_skill_index_default_returns_empty():
+    '未说明'
     section = get_skill_index_prompt_section()
     assert section == ""
 
 
 def test_skill_index_with_evolution_section():
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"a"}),
         skill_evolution_section="## Skill Self-Evolution\n...",
@@ -195,6 +203,7 @@ def test_skill_index_with_evolution_section():
 
 
 def test_skill_index_without_evolution_section():
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"a"}),
         skill_evolution_section="",
@@ -203,6 +212,7 @@ def test_skill_index_without_evolution_section():
 
 
 def test_skill_index_custom_container_path():
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"a"}),
         container_base_path="/custom/skills",
@@ -211,7 +221,7 @@ def test_skill_index_custom_container_path():
 
 
 def test_skill_index_names_are_sorted():
-    """Names should be sorted for deterministic output."""
+    '未说明'
     section = get_skill_index_prompt_section(
         skill_names=frozenset({"z-skill", "a-skill", "m-skill"}),
     )
@@ -229,7 +239,7 @@ def test_skill_index_names_are_sorted():
 
 
 def test_describe_tool_returns_command_with_tool_message(catalog: SkillCatalog):
-    """describe_skill should return a Command with a ToolMessage."""
+    '未说明'
     tool = build_describe_skill_tool(catalog)
 
     # Tools with InjectedToolCallId must be invoked with a full ToolCall dict
@@ -247,6 +257,7 @@ def test_describe_tool_returns_command_with_tool_message(catalog: SkillCatalog):
 
 
 def test_describe_tool_no_match(catalog: SkillCatalog):
+    '未说明'
     tool = build_describe_skill_tool(catalog)
     result = tool.invoke(
         {"args": {"name": "xyz_nonexistent"}, "name": "describe_skill", "type": "tool_call", "id": "test_call_456"},
@@ -256,6 +267,7 @@ def test_describe_tool_no_match(catalog: SkillCatalog):
 
 
 def test_describe_tool_keyword_search(catalog: SkillCatalog):
+    '未说明'
     tool = build_describe_skill_tool(catalog)
     result = tool.invoke(
         {"args": {"name": "research"}, "name": "describe_skill", "type": "tool_call", "id": "test_call_789"},
@@ -265,7 +277,7 @@ def test_describe_tool_keyword_search(catalog: SkillCatalog):
 
 
 def test_describe_tool_select_uncapped(tmp_path):
-    """select: must return ALL requested skills, not capped at MAX_RESULTS."""
+    '未说明'
     from deerflow.skills.catalog import MAX_RESULTS
 
     # Build more skills than MAX_RESULTS so the cap would visibly truncate

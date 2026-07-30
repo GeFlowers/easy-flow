@@ -1,4 +1,4 @@
-"""Unit tests for shared warm-pool lifecycle mechanics."""
+'未说明'
 
 from __future__ import annotations
 
@@ -10,9 +10,11 @@ from deerflow.community.warm_pool_lifecycle import DEFAULT_IDLE_TIMEOUT, DEFAULT
 
 
 class _Provider(WarmPoolLifecycleMixin[str]):
+    """为提供方提供测试所需的隔离替身或组织结构，不承担生产实现职责。"""
     _idle_checker_thread_name = "test-warm-pool-reaper"
 
     def __init__(self, *, replicas: int = DEFAULT_REPLICAS, idle_timeout: float = DEFAULT_IDLE_TIMEOUT, active_count: int = 0) -> None:
+        '未说明'
         self._lock = threading.Lock()
         self._warm_pool: dict[str, tuple[str, float]] = {}
         self._config: dict[str, Any] = {"replicas": replicas, "idle_timeout": idle_timeout}
@@ -22,13 +24,16 @@ class _Provider(WarmPoolLifecycleMixin[str]):
         self.destroyed: list[tuple[str, str, str]] = []
 
     def _active_count_locked(self) -> int:
+        '未说明'
         return self.active_count
 
     def _destroy_warm_entry(self, sandbox_id: str, entry: str, *, reason: str) -> None:
+        '未说明'
         self.destroyed.append((sandbox_id, entry, reason))
 
 
 def test_replica_count_includes_active_and_warm_entries() -> None:
+    '未说明'
     provider = _Provider(replicas=2, active_count=1)
     provider._warm_pool["warm-1"] = ("entry-1", time.time())
 
@@ -36,6 +41,7 @@ def test_replica_count_includes_active_and_warm_entries() -> None:
 
 
 def test_evict_oldest_warm_removes_and_destroys_oldest_entry() -> None:
+    '未说明'
     provider = _Provider()
     provider._warm_pool["new"] = ("entry-new", 200.0)
     provider._warm_pool["old"] = ("entry-old", 100.0)
@@ -49,6 +55,7 @@ def test_evict_oldest_warm_removes_and_destroys_oldest_entry() -> None:
 
 
 def test_evict_oldest_warm_returns_none_when_pool_empty() -> None:
+    '未说明'
     provider = _Provider()
 
     assert provider._evict_oldest_warm() is None
@@ -56,6 +63,7 @@ def test_evict_oldest_warm_returns_none_when_pool_empty() -> None:
 
 
 def test_reap_expired_warm_destroys_only_expired_entries() -> None:
+    '未说明'
     provider = _Provider()
     now = time.time()
     provider._warm_pool["expired"] = ("entry-expired", now - 100)
@@ -69,6 +77,7 @@ def test_reap_expired_warm_destroys_only_expired_entries() -> None:
 
 
 def test_reap_expired_warm_noops_when_timeout_disabled() -> None:
+    '未说明'
     provider = _Provider(idle_timeout=0)
     provider._warm_pool["expired"] = ("entry-expired", time.time() - 100)
 
@@ -79,6 +88,7 @@ def test_reap_expired_warm_noops_when_timeout_disabled() -> None:
 
 
 def test_start_idle_checker_uses_monkeypatchable_interval(monkeypatch) -> None:
+    '未说明'
     provider = _Provider(idle_timeout=0.01)
     monkeypatch.setattr(_Provider, "IDLE_CHECK_INTERVAL", 0.01)
     provider._warm_pool["expired"] = ("entry-expired", time.time() - 10)

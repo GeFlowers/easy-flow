@@ -1,4 +1,4 @@
-"""Tests for TokenUsageMiddleware attribution annotations."""
+'未说明'
 
 import importlib
 import logging
@@ -14,13 +14,16 @@ from deerflow.agents.middlewares.token_usage_middleware import (
 
 
 def _make_runtime():
+    '未说明'
     runtime = MagicMock()
     runtime.context = {"thread_id": "test-thread"}
     return runtime
 
 
 class TestTokenUsageMiddleware:
+    '未说明'
     def test_logs_cache_token_details(self, caplog):
+        '未说明'
         middleware = TokenUsageMiddleware()
         message = AIMessage(
             content="Here is the final answer.",
@@ -52,7 +55,7 @@ class TestTokenUsageMiddleware:
         assert "output_token_details={'audio': 10, 'reasoning': 200}" in caplog.text
 
     def test_logs_basic_tokens_when_no_detail_fields_in_usage_metadata(self, caplog):
-        """When usage_metadata has only totals (no input_token_details), log just the counts."""
+        '未说明'
         middleware = TokenUsageMiddleware()
         message = AIMessage(
             content="Here is the final answer.",
@@ -74,7 +77,7 @@ class TestTokenUsageMiddleware:
         assert "input_token_details" not in caplog.text
 
     def test_no_log_when_usage_metadata_is_missing(self, caplog):
-        """When usage_metadata is absent, no token usage line is logged."""
+        '未说明'
         middleware = TokenUsageMiddleware()
         message = AIMessage(
             content="Here is the final answer.",
@@ -97,6 +100,7 @@ class TestTokenUsageMiddleware:
         assert "LLM token usage" not in caplog.text
 
     def test_annotates_todo_updates_with_structured_actions(self):
+        '未说明'
         middleware = TokenUsageMiddleware()
         message = AIMessage(
             content="",
@@ -145,6 +149,7 @@ class TestTokenUsageMiddleware:
         ]
 
     def test_annotates_subagent_and_search_steps(self):
+        '未说明'
         middleware = TokenUsageMiddleware()
         message = AIMessage(
             content="",
@@ -187,6 +192,7 @@ class TestTokenUsageMiddleware:
         ]
 
     def test_marks_final_answer_when_no_tools(self):
+        '未说明'
         middleware = TokenUsageMiddleware()
         message = AIMessage(content="Here is the final answer.")
 
@@ -199,6 +205,7 @@ class TestTokenUsageMiddleware:
         assert attribution["actions"] == []
 
     def test_annotates_removed_todos(self):
+        '未说明'
         middleware = TokenUsageMiddleware()
         message = AIMessage(
             content="",
@@ -236,6 +243,7 @@ class TestTokenUsageMiddleware:
         ]
 
     def test_merges_subagent_usage_by_message_position_when_ai_message_ids_are_missing(self, monkeypatch):
+        '未说明'
         middleware = TokenUsageMiddleware()
         first_dispatch = AIMessage(
             content="",
@@ -283,10 +291,9 @@ class TestTokenUsageMiddleware:
 
 
 class TestBuildTodoActions:
+    '未说明'
     def test_duplicate_content_emits_todo_remove(self):
-        """When next_todos has duplicate content entries that exhaust previous_by_content,
-        the positional fallback must not consume an unrelated previous todo as matched.
-        The unrelated previous entry should still produce a todo_remove action."""
+        '未说明'
         previous = [
             {"content": "A", "status": "pending"},
             {"content": "B", "status": "pending"},

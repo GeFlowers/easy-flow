@@ -13,10 +13,12 @@ type ThreadsSearchClient = {
   };
 };
 
+/** 线程搜索接口支持的完整查询参数。 */
 export type ThreadSearchParams = NonNullable<
   Parameters<ThreadsClient["search"]>[0]
 >;
 
+/** 未指定筛选条件时使用的线程搜索参数。 */
 export const DEFAULT_THREAD_SEARCH_PARAMS: ThreadSearchParams = {
   limit: 50,
   sortBy: "updated_at",
@@ -24,10 +26,12 @@ export const DEFAULT_THREAD_SEARCH_PARAMS: ThreadSearchParams = {
   select: ["thread_id", "updated_at", "values", "metadata"],
 };
 
+/** 线程搜索结果的自动刷新间隔（毫秒）。 */
 export const THREAD_SEARCH_REFETCH_INTERVAL_MS = 5000;
 
 type ThreadSearchFilterParams = Pick<ThreadSearchParams, "metadata">;
 
+/** 判断搜索参数是否明确要求包含侧栏线程。 */
 export function shouldIncludeSidecarThreads(params: ThreadSearchFilterParams) {
   const metadata = params.metadata;
   return (
@@ -38,6 +42,7 @@ export function shouldIncludeSidecarThreads(params: ThreadSearchFilterParams) {
   );
 }
 
+/** 按搜索参数筛除默认不展示的侧栏线程。 */
 export function filterThreadSearchResults(
   threads: AgentThread[],
   params: ThreadSearchFilterParams,
@@ -48,6 +53,7 @@ export function filterThreadSearchResults(
   return threads.filter(shouldShowInPrimaryThreadLists);
 }
 
+/** 构建会自动分页拉取线程搜索结果的查询选项。 */
 export function buildThreadsSearchQueryOptions(
   apiClient: ThreadsSearchClient,
   params: ThreadSearchParams = DEFAULT_THREAD_SEARCH_PARAMS,
@@ -59,8 +65,7 @@ export function buildThreadsSearchQueryOptions(
       const initialOffset = params.offset ?? 0;
       const DEFAULT_PAGE_SIZE = 50;
 
-      // Preserve prior semantics: if a non-positive limit is explicitly provided,
-      // delegate to a single search call with the original parameters.
+      // 显式给出非正限制值时保持既有语义：使用原参数只执行一次搜索。
       if (maxResults !== undefined && maxResults <= 0) {
         const response =
           await apiClient.threads.search<AgentThreadState>(params);

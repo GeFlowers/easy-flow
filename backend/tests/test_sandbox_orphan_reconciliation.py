@@ -1,12 +1,4 @@
-"""Tests for sandbox container orphan reconciliation on startup.
-
-Covers:
-- SandboxBackend.list_running() default behavior
-- LocalContainerBackend.list_running() with mocked docker commands
-- _parse_docker_timestamp() / _extract_host_port() helpers
-- AioSandboxProvider._reconcile_orphans() decision logic
-- SIGHUP signal handler registration
-"""
+'未说明'
 
 import importlib
 import json
@@ -24,21 +16,26 @@ from deerflow.community.aio_sandbox.sandbox_info import SandboxInfo
 
 
 def test_backend_list_running_default_returns_empty():
-    """Base SandboxBackend.list_running() returns empty list (backward compat for RemoteSandboxBackend)."""
+    '未说明'
     from deerflow.community.aio_sandbox.backend import SandboxBackend
 
     class StubBackend(SandboxBackend):
+        '未说明'
         def create(self, thread_id, sandbox_id, extra_mounts=None, *, user_id=None):
+            """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             del thread_id, sandbox_id, extra_mounts, user_id
             pass
 
         def destroy(self, info):
+            '未说明'
             pass
 
         def is_alive(self, info):
+            '未说明'
             return False
 
         def discover(self, sandbox_id):
+            '未说明'
             return None
 
     backend = StubBackend()
@@ -49,7 +46,7 @@ def test_backend_list_running_default_returns_empty():
 
 
 def _make_local_backend():
-    """Create a LocalContainerBackend with minimal config."""
+    '未说明'
     from deerflow.community.aio_sandbox.local_backend import LocalContainerBackend
 
     return LocalContainerBackend(
@@ -62,7 +59,7 @@ def _make_local_backend():
 
 
 def _make_inspect_entry(name: str, created: str, host_port: str | None = None) -> dict:
-    """Build a minimal docker inspect JSON entry matching the real schema."""
+    '未说明'
     ports: dict = {}
     if host_port is not None:
         ports["8080/tcp"] = [{"HostIp": "0.0.0.0", "HostPort": host_port}]
@@ -74,10 +71,11 @@ def _make_inspect_entry(name: str, created: str, host_port: str | None = None) -
 
 
 def _mock_ps_and_inspect(monkeypatch, ps_output: str, inspect_payload: list | None):
-    """Patch subprocess.run to serve fixed ps + inspect responses."""
+    '未说明'
     import subprocess
 
     def mock_run(cmd, **kwargs):
+        """处理模拟 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         result = MagicMock()
         if len(cmd) >= 2 and cmd[1] == "ps":
             result.returncode = 0
@@ -106,7 +104,7 @@ def _mock_ps_and_inspect(monkeypatch, ps_output: str, inspect_payload: list | No
 
 
 def test_list_running_returns_containers(monkeypatch):
-    """list_running should enumerate containers via docker ps and batch-inspect them."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
 
@@ -130,7 +128,7 @@ def test_list_running_returns_containers(monkeypatch):
 
 
 def test_list_running_empty_when_no_containers(monkeypatch):
-    """list_running should return empty list when docker ps returns nothing."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
     _mock_ps_and_inspect(monkeypatch, ps_output="", inspect_payload=[])
@@ -139,7 +137,7 @@ def test_list_running_empty_when_no_containers(monkeypatch):
 
 
 def test_list_running_skips_non_matching_names(monkeypatch):
-    """list_running should skip containers whose names don't match the prefix pattern."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
 
@@ -157,7 +155,7 @@ def test_list_running_skips_non_matching_names(monkeypatch):
 
 
 def test_list_running_includes_containers_without_port(monkeypatch):
-    """Containers without a port mapping should still be listed (with empty URL)."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
 
@@ -176,13 +174,14 @@ def test_list_running_includes_containers_without_port(monkeypatch):
 
 
 def test_list_running_handles_docker_failure(monkeypatch):
-    """list_running should return empty list when docker ps fails."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
 
     import subprocess
 
     def mock_run(cmd, **kwargs):
+        """处理模拟 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         result = MagicMock()
         result.returncode = 1
         result.stdout = ""
@@ -195,7 +194,7 @@ def test_list_running_handles_docker_failure(monkeypatch):
 
 
 def test_list_running_handles_inspect_failure(monkeypatch):
-    """list_running should return empty list when batch inspect fails."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
 
@@ -209,13 +208,14 @@ def test_list_running_handles_inspect_failure(monkeypatch):
 
 
 def test_list_running_handles_malformed_inspect_json(monkeypatch):
-    """list_running should return empty list when docker inspect emits invalid JSON."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
 
     import subprocess
 
     def mock_run(cmd, **kwargs):
+        """处理模拟 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         result = MagicMock()
         if len(cmd) >= 2 and cmd[1] == "ps":
             result.returncode = 0
@@ -233,7 +233,7 @@ def test_list_running_handles_malformed_inspect_json(monkeypatch):
 
 
 def test_list_running_uses_single_batch_inspect_call(monkeypatch):
-    """list_running should issue exactly ONE docker inspect call regardless of container count."""
+    '未说明'
     backend = _make_local_backend()
     monkeypatch.setattr(backend, "_runtime", "docker")
 
@@ -242,6 +242,7 @@ def test_list_running_uses_single_batch_inspect_call(monkeypatch):
     import subprocess
 
     def mock_run(cmd, **kwargs):
+        """处理模拟 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         result = MagicMock()
         if len(cmd) >= 2 and cmd[1] == "ps":
             result.returncode = 0
@@ -277,7 +278,7 @@ def test_list_running_uses_single_batch_inspect_call(monkeypatch):
 
 
 def test_parse_docker_timestamp_with_nanoseconds():
-    """Should correctly parse Docker's ISO 8601 timestamp with nanoseconds."""
+    '未说明'
     from deerflow.community.aio_sandbox.local_backend import _parse_docker_timestamp
 
     ts = _parse_docker_timestamp("2026-04-08T01:22:50.123456789Z")
@@ -287,7 +288,7 @@ def test_parse_docker_timestamp_with_nanoseconds():
 
 
 def test_parse_docker_timestamp_without_fractional_seconds():
-    """Should parse plain ISO 8601 timestamps without fractional seconds."""
+    '未说明'
     from deerflow.community.aio_sandbox.local_backend import _parse_docker_timestamp
 
     ts = _parse_docker_timestamp("2026-04-08T01:22:50Z")
@@ -296,6 +297,7 @@ def test_parse_docker_timestamp_without_fractional_seconds():
 
 
 def test_parse_docker_timestamp_empty_returns_zero():
+    '未说明'
     from deerflow.community.aio_sandbox.local_backend import _parse_docker_timestamp
 
     assert _parse_docker_timestamp("") == 0.0
@@ -306,6 +308,7 @@ def test_parse_docker_timestamp_empty_returns_zero():
 
 
 def test_extract_host_port_returns_mapped_port():
+    '未说明'
     from deerflow.community.aio_sandbox.local_backend import _extract_host_port
 
     entry = {"NetworkSettings": {"Ports": {"8080/tcp": [{"HostIp": "0.0.0.0", "HostPort": "8081"}]}}}
@@ -313,6 +316,7 @@ def test_extract_host_port_returns_mapped_port():
 
 
 def test_extract_host_port_returns_none_when_unmapped():
+    '未说明'
     from deerflow.community.aio_sandbox.local_backend import _extract_host_port
 
     entry = {"NetworkSettings": {"Ports": {}}}
@@ -320,6 +324,7 @@ def test_extract_host_port_returns_none_when_unmapped():
 
 
 def test_extract_host_port_handles_missing_fields():
+    '未说明'
     from deerflow.community.aio_sandbox.local_backend import _extract_host_port
 
     assert _extract_host_port({}, 8080) is None
@@ -330,16 +335,7 @@ def test_extract_host_port_handles_missing_fields():
 
 
 def _make_provider_for_reconciliation():
-    """Build a minimal AioSandboxProvider without triggering __init__ side effects.
-
-    WARNING: This helper intentionally bypasses ``__init__`` via ``__new__`` so
-    tests don't depend on Docker or touch the real idle-checker thread.  The
-    downside is that this helper is tightly coupled to the set of attributes
-    set up in ``AioSandboxProvider.__init__``.  If ``__init__`` gains a new
-    attribute that ``_reconcile_orphans`` (or other methods under test) reads,
-    this helper must be updated in lockstep — otherwise tests will fail with a
-    confusing ``AttributeError`` instead of a meaningful assertion failure.
-    """
+    '未说明'
     aio_mod = importlib.import_module("deerflow.community.aio_sandbox.aio_sandbox_provider")
     provider = aio_mod.AioSandboxProvider.__new__(aio_mod.AioSandboxProvider)
     provider._lock = threading.Lock()
@@ -361,7 +357,7 @@ def _make_provider_for_reconciliation():
 
 
 def test_reconcile_adopts_old_containers_into_warm_pool():
-    """All containers are adopted into warm pool regardless of age — idle checker handles cleanup."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     now = time.time()
 
@@ -381,7 +377,7 @@ def test_reconcile_adopts_old_containers_into_warm_pool():
 
 
 def test_reconcile_adopts_young_containers():
-    """Young containers are adopted into warm pool for potential reuse."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     now = time.time()
 
@@ -402,7 +398,7 @@ def test_reconcile_adopts_young_containers():
 
 
 def test_reconcile_mixed_containers_all_adopted():
-    """All containers (old and young) are adopted into warm pool."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     now = time.time()
 
@@ -428,7 +424,7 @@ def test_reconcile_mixed_containers_all_adopted():
 
 
 def test_reconcile_skips_already_tracked_containers():
-    """Containers already in _sandboxes or _warm_pool should be skipped."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     now = time.time()
 
@@ -450,7 +446,7 @@ def test_reconcile_skips_already_tracked_containers():
 
 
 def test_reconcile_handles_backend_failure():
-    """Reconciliation should not crash if backend.list_running() fails."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     provider._backend.list_running.side_effect = RuntimeError("docker not available")
 
@@ -461,7 +457,7 @@ def test_reconcile_handles_backend_failure():
 
 
 def test_reconcile_no_running_containers():
-    """Reconciliation with no running containers is a no-op."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     provider._backend.list_running.return_value = []
 
@@ -472,7 +468,7 @@ def test_reconcile_no_running_containers():
 
 
 def test_reconcile_multiple_containers_all_adopted():
-    """Multiple containers should all be adopted into warm pool."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     now = time.time()
 
@@ -489,7 +485,7 @@ def test_reconcile_multiple_containers_all_adopted():
 
 
 def test_reconcile_zero_created_at_adopted():
-    """Containers with created_at=0 (unknown age) should still be adopted into warm pool."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
 
     info = SandboxInfo(sandbox_id="unknown1", sandbox_url="http://localhost:8081", created_at=0.0)
@@ -502,7 +498,7 @@ def test_reconcile_zero_created_at_adopted():
 
 
 def test_reconcile_idle_timeout_zero_adopts_all():
-    """When idle_timeout=0 (disabled), all containers are still adopted into warm pool."""
+    '未说明'
     provider = _make_provider_for_reconciliation()
     provider._config["idle_timeout"] = 0
     now = time.time()
@@ -522,7 +518,7 @@ def test_reconcile_idle_timeout_zero_adopts_all():
 
 
 def test_sighup_handler_registered():
-    """SIGHUP handler should be registered on Unix systems."""
+    '未说明'
     if not hasattr(signal, "SIGHUP"):
         pytest.skip("SIGHUP not available on this platform")
 

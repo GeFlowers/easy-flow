@@ -19,12 +19,15 @@ import {
 } from "@/core/threads/hooks";
 import type { AgentThread } from "@/core/threads/types";
 
-// Issue #3482: the sidebar and /workspace/chats list used to be capped at
-// 50 threads because `useThreads()` exits as soon as `threads.length >=
-// params.limit`.  These pure helpers back the `useInfiniteThreads()`
-// pagination logic and the mirrored cache writes that keep rename / delete
-// / stream-finish in sync with both the legacy array cache and the new
-// infinite cache.
+// 问题 #3482：侧边栏和 /workspace/chats 列表曾被限制为 50 个线程，因为
+// `useThreads()` 一旦 `threads.length >= params.limit` 就退出。这些纯辅助函数支撑
+// `useInfiniteThreads()` 分页逻辑及镜像缓存写入，使重命名/删除/流结束同时与旧数组缓存
+// 和新无限缓存保持同步。
+
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeThread 的约定。
+
+ */
 
 function makeThread(
   id: string,
@@ -41,9 +44,19 @@ function makeThread(
   } as unknown as AgentThread;
 }
 
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makePage 的约定。
+
+ */
+
 function makePage(start: number, size: number): AgentThread[] {
   return Array.from({ length: size }, (_, i) => makeThread(`t-${start + i}`));
 }
+
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeInfiniteData 的约定。
+
+ */
 
 function makeInfiniteData(pages: AgentThread[][]): InfiniteData<AgentThread[]> {
   return {
@@ -53,12 +66,20 @@ function makeInfiniteData(pages: AgentThread[][]): InfiniteData<AgentThread[]> {
 }
 
 describe("getInfiniteThreadsNextPageParam", () => {
+  /**
+   * 覆盖“returns next offset when the last page is full”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("returns next offset when the last page is full", () => {
     const page1 = makePage(0, INFINITE_THREADS_PAGE_SIZE);
     expect(getInfiniteThreadsNextPageParam(page1, [page1])).toBe(
       INFINITE_THREADS_PAGE_SIZE,
     );
   });
+
+  /**
+   * 覆盖“returns next offset across multiple full pages”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("returns next offset across multiple full pages", () => {
     const page1 = makePage(0, INFINITE_THREADS_PAGE_SIZE);
@@ -71,6 +92,11 @@ describe("getInfiniteThreadsNextPageParam", () => {
     );
   });
 
+  /**
+   * 覆盖“returns undefined when the last page is short (end of list)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("returns undefined when the last page is short (end of list)", () => {
     const page1 = makePage(0, INFINITE_THREADS_PAGE_SIZE);
     const page2 = makePage(INFINITE_THREADS_PAGE_SIZE, 10);
@@ -79,10 +105,20 @@ describe("getInfiniteThreadsNextPageParam", () => {
     ).toBeUndefined();
   });
 
+  /**
+   * 覆盖“returns undefined when the last page is empty”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("returns undefined when the last page is empty", () => {
     const page1 = makePage(0, INFINITE_THREADS_PAGE_SIZE);
     expect(getInfiniteThreadsNextPageParam([], [page1, []])).toBeUndefined();
   });
+
+  /**
+   * 覆盖“respects a custom page size”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("respects a custom page size", () => {
     const page1 = makePage(0, 5);
@@ -92,6 +128,9 @@ describe("getInfiniteThreadsNextPageParam", () => {
 });
 
 describe("fetchInfiniteThreadsPage", () => {
+  /**
+   * 覆盖“fills a visible page while advancing offsets by raw backend rows”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("fills a visible page while advancing offsets by raw backend rows", async () => {
     const search = rs
       .fn()
@@ -127,6 +166,11 @@ describe("fetchInfiniteThreadsPage", () => {
     expect(getInfiniteThreadsNextPageParam(page, [page], 2)).toBe(3);
   });
 
+  /**
+   * 覆盖“keeps sidecar rows when the caller explicitly searches for sidecars”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("keeps sidecar rows when the caller explicitly searches for sidecars", async () => {
     const search = rs.fn().mockResolvedValueOnce([
       makeThread("sidecar-1", "Sidecar", {
@@ -152,9 +196,17 @@ describe("fetchInfiniteThreadsPage", () => {
 });
 
 describe("mapInfiniteThreadsCache", () => {
+  /**
+   * 覆盖“returns undefined when oldData is undefined”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("returns undefined when oldData is undefined", () => {
     expect(mapInfiniteThreadsCache(undefined, (t) => t)).toBeUndefined();
   });
+
+  /**
+   * 覆盖“updates the matching thread across multiple pages”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("updates the matching thread across multiple pages", () => {
     const page1 = [makeThread("a"), makeThread("b")];
@@ -173,6 +225,11 @@ describe("mapInfiniteThreadsCache", () => {
     expect(updated?.pages[1]?.[1]?.values?.title).toBe("Title d");
   });
 
+  /**
+   * 覆盖“preserves pageParams”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("preserves pageParams", () => {
     const data = makeInfiniteData([[makeThread("a")]]);
     const updated = mapInfiniteThreadsCache(data, (t) => t);
@@ -181,9 +238,17 @@ describe("mapInfiniteThreadsCache", () => {
 });
 
 describe("filterInfiniteThreadsCache", () => {
+  /**
+   * 覆盖“returns undefined when oldData is undefined”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("returns undefined when oldData is undefined", () => {
     expect(filterInfiniteThreadsCache(undefined, () => true)).toBeUndefined();
   });
+
+  /**
+   * 覆盖“removes matching threads across all pages”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("removes matching threads across all pages", () => {
     const page1 = [makeThread("a"), makeThread("b")];
@@ -198,6 +263,11 @@ describe("filterInfiniteThreadsCache", () => {
     expect(filtered?.pages[0]?.map((t) => t.thread_id)).toEqual(["a"]);
     expect(filtered?.pages[1]?.map((t) => t.thread_id)).toEqual(["c"]);
   });
+
+  /**
+   * 覆盖“keeps an emptied page as an empty array (does not drop the page)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("keeps an emptied page as an empty array (does not drop the page)", () => {
     const page1 = [makeThread("a")];
@@ -214,8 +284,13 @@ describe("filterInfiniteThreadsCache", () => {
     expect(filtered?.pages[1]?.[0]?.thread_id).toBe("b");
   });
 
+  /**
+   * 覆盖“does not regress next offset when an earlier page has been shrunk by a delete”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("does not regress next offset when an earlier page has been shrunk by a delete", () => {
-    // Simulate two full pages already loaded.
+    // 模拟已加载两个完整页面。
     const page1 = Array.from({ length: 50 }, (_, i) => ({
       thread_id: `a${i}`,
     }));
@@ -223,32 +298,31 @@ describe("filterInfiniteThreadsCache", () => {
       thread_id: `b${i}`,
     }));
 
-    // Offset right after fetching page 2 (this is the value TanStack Query
-    // freezes into pageParams).
+    // 获取第 2 页后紧接着的偏移量（这是 TanStack Query 固化到 pageParams 的值）。
     const offsetAfterPage2 = getInfiniteThreadsNextPageParam(
       page2 as unknown as AgentThread[],
       [page1, page2] as unknown as AgentThread[][],
     );
     expect(offsetAfterPage2).toBe(100);
 
-    // Now a delete mutation runs filterInfiniteThreadsCache and shrinks
-    // page 1 from 50 to 49 entries. TanStack does NOT re-invoke
-    // getNextPageParam on cache mutations; the previously-computed offset
-    // (100) remains the param for the next fetchNextPage() call, so the
-    // helper is consistent with how the library uses its return value.
+    // 此时删除变更运行 filterInfiniteThreadsCache，将第 1 页从 50 项缩减为 49 项。
+    // TanStack 不会在缓存变更时重新调用 getNextPageParam；先前计算的偏移量 (100)
+    // 仍是下一次 fetchNextPage() 调用的参数，因此该辅助函数与库使用其返回值的方式一致。
     const shrunkPage1 = page1.slice(0, 49);
     const recomputed = getInfiniteThreadsNextPageParam(
       page2 as unknown as AgentThread[],
       [shrunkPage1, page2] as unknown as AgentThread[][],
     );
-    // We document the recomputed value for completeness, but in practice
-    // useDeleteThread invalidates the query in onSettled, so pages are
-    // refetched from offset 0 rather than relying on this number.
+    // 为完整起见记录重新计算的值，但实践中 useDeleteThread 会在 onSettled 中使查询失效，
+    // 因此页面会从偏移量 0 重新获取，而不是依赖该数值。
     expect(recomputed).toBe(99);
   });
 });
 
 describe("upsertThreadInInfiniteCache", () => {
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 seedClient 的约定。
+   */
   function seedClient(initial?: InfiniteData<AgentThread[]>): QueryClient {
     const client = new QueryClient();
     if (initial) {
@@ -257,17 +331,32 @@ describe("upsertThreadInInfiniteCache", () => {
     return client;
   }
 
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 readCache 的约定。
+
+   */
+
   function readCache(
     client: QueryClient,
   ): InfiniteData<AgentThread[]> | undefined {
     return client.getQueryData([...INFINITE_THREADS_QUERY_KEY_PREFIX, {}]);
   }
 
+  /**
+   * 覆盖“no-op when the infinite cache has not been initialised yet”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("no-op when the infinite cache has not been initialised yet", () => {
     const client = seedClient();
     upsertThreadInInfiniteCache(client, makeThread("new"));
     expect(readCache(client)).toBeUndefined();
   });
+
+  /**
+   * 覆盖“prepends a brand-new thread to the first page”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("prepends a brand-new thread to the first page", () => {
     const client = seedClient({
@@ -279,15 +368,19 @@ describe("upsertThreadInInfiniteCache", () => {
     expect(cache?.pages[0]?.map((t) => t.thread_id)).toEqual(["new", "a", "b"]);
   });
 
+  /**
+   * 覆盖“merges into the existing entry instead of duplicating it”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("merges into the existing entry instead of duplicating it", () => {
     const existing = makeThread("a", "Old title");
     const client = seedClient({
       pages: [[existing, makeThread("b")]],
       pageParams: [0],
     });
-    // Simulate an onCreated upsert that races with a thread already in cache:
-    // the cache copy should win for title/metadata (it represents later state),
-    // but no duplicate row should appear.
+    // 模拟 onCreated upsert 与缓存中已有线程发生竞争：缓存副本应在标题/元数据上获胜
+    // （它代表较晚状态），但不应出现重复行。
     upsertThreadInInfiniteCache(client, {
       ...makeThread("a", "New title"),
       status: "busy",
@@ -300,6 +393,9 @@ describe("upsertThreadInInfiniteCache", () => {
 });
 
 describe("invalidateStoppedThreadCaches", () => {
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 invalidatedQueryKeys 的约定。
+   */
   function invalidatedQueryKeys(client: QueryClient) {
     const invalidate = rs.spyOn(client, "invalidateQueries");
     return {
@@ -308,6 +404,11 @@ describe("invalidateStoppedThreadCaches", () => {
         invalidate.mock.calls.map(([filters]) => filters?.queryKey),
     };
   }
+
+  /**
+   * 覆盖“refreshes current thread and sidebar caches after fire-and-forget stop”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("refreshes current thread and sidebar caches after fire-and-forget stop", () => {
     const client = new QueryClient();
@@ -327,6 +428,11 @@ describe("invalidateStoppedThreadCaches", () => {
     expect(queryKeys()).toContainEqual(["thread-token-usage", "thread-1"]);
   });
 
+  /**
+   * 覆盖“preserves loaded history pages while invalidating”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("preserves loaded history pages while invalidating", () => {
     const client = new QueryClient();
     const key = ["thread-messages", "thread-1"] as const;
@@ -344,6 +450,11 @@ describe("invalidateStoppedThreadCaches", () => {
       pageParams: [null, 20],
     });
   });
+
+  /**
+   * 覆盖“does not refresh per-thread API caches for mock threads”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("does not refresh per-thread API caches for mock threads", () => {
     const client = new QueryClient();
@@ -363,6 +474,11 @@ describe("invalidateStoppedThreadCaches", () => {
     expect(queryKeys()).not.toContainEqual(["thread-token-usage", "thread-1"]);
   });
 
+  /**
+   * 覆盖“wraps SDK stop and refreshes caches after it resolves”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("wraps SDK stop and refreshes caches after it resolves", async () => {
     const client = new QueryClient();
     const stop = rs.fn(() => Promise.resolve());
@@ -378,6 +494,11 @@ describe("invalidateStoppedThreadCaches", () => {
       false,
     ]);
   });
+
+  /**
+   * 覆盖“still refreshes caches when SDK stop rejects”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("still refreshes caches when SDK stop rejects", async () => {
     const client = new QueryClient();
@@ -399,6 +520,11 @@ describe("invalidateStoppedThreadCaches", () => {
     ]);
   });
 
+  /**
+   * 覆盖“schedules sidebar refetch even if stopped thread id is not known”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("schedules sidebar refetch even if stopped thread id is not known", async () => {
     rs.useFakeTimers();
 
@@ -412,6 +538,11 @@ describe("invalidateStoppedThreadCaches", () => {
         null,
         false,
       );
+
+      /**
+       * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 countSearchInvalidations 约定的逻辑。
+
+       */
 
       const countSearchInvalidations = () =>
         queryKeys().filter(
@@ -434,6 +565,11 @@ describe("invalidateStoppedThreadCaches", () => {
       rs.useRealTimers();
     }
   });
+
+  /**
+   * 覆盖“scheduled refetch lets sidebar receive delayed backend title finalization”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("scheduled refetch lets sidebar receive delayed backend title finalization", async () => {
     rs.useFakeTimers();

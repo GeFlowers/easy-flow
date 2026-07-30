@@ -1,8 +1,4 @@
-"""Tests for the pure TUI view-state reducer.
-
-The reducer is the testable heart of the TUI: a pure function mapping
-(state, action) -> state, with no Textual / rendering dependency.
-"""
+'未说明'
 
 from deerflow.tui.view_state import (
     AssistantDelta,
@@ -21,6 +17,7 @@ from deerflow.tui.view_state import (
 
 
 def test_user_submitted_appends_user_row():
+    '未说明'
     state = reduce(initial_state(), UserSubmitted("hello world"))
     assert len(state.rows) == 1
     row = state.rows[0]
@@ -29,6 +26,7 @@ def test_user_submitted_appends_user_row():
 
 
 def test_run_started_and_ended_toggle_streaming_and_store_usage():
+    '未说明'
     state = reduce(initial_state(), RunStarted())
     assert state.streaming is True
 
@@ -39,6 +37,7 @@ def test_run_started_and_ended_toggle_streaming_and_store_usage():
 
 
 def test_assistant_delta_creates_then_extends_same_id_row():
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="Hel"))
     state = reduce(state, AssistantDelta(id="m1", text="lo"))
@@ -49,6 +48,7 @@ def test_assistant_delta_creates_then_extends_same_id_row():
 
 
 def test_assistant_delta_with_new_id_after_tool_creates_separate_row():
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="thinking"))
     state = reduce(state, ToolStarted(tool_call_id="t1", tool_name="read_file", args={"path": "a.py"}))
@@ -62,6 +62,7 @@ def test_assistant_delta_with_new_id_after_tool_creates_separate_row():
 
 
 def test_tool_started_appends_running_row_and_result_marks_ok():
+    '未说明'
     state = initial_state()
     state = reduce(state, ToolStarted(tool_call_id="t1", tool_name="read_file", args={"path": "x.py"}))
     assert state.rows[0].kind == "tool"
@@ -74,6 +75,7 @@ def test_tool_started_appends_running_row_and_result_marks_ok():
 
 
 def test_tool_result_with_error_marks_error_status():
+    '未说明'
     state = initial_state()
     state = reduce(state, ToolStarted(tool_call_id="t1", tool_name="bash", args={}))
     state = reduce(state, ToolResult(tool_call_id="t1", content="boom", is_error=True))
@@ -83,6 +85,7 @@ def test_tool_result_with_error_marks_error_status():
 def test_tool_result_without_prior_started_creates_a_completed_row():
     # Defensive: if the tool_started chunks were skipped/missed, a tool result
     # should still surface as a completed card rather than vanish.
+    '未说明'
     state = initial_state()
     state = reduce(state, ToolResult(tool_call_id="ghost", content="x", is_error=False, tool_name="bash"))
     tools = [r for r in state.rows if r.kind == "tool"]
@@ -91,6 +94,7 @@ def test_tool_result_without_prior_started_creates_a_completed_row():
 
 
 def test_tool_result_without_call_id_is_ignored():
+    '未说明'
     state = reduce(initial_state(), ToolResult(tool_call_id="", content="x", is_error=False))
     assert state.rows == ()
 
@@ -101,6 +105,7 @@ def test_tool_result_without_call_id_is_ignored():
 
 
 def test_assistant_delta_skips_full_resend_of_same_id():
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="Hey there!\nWhat's up?"))
     state = reduce(state, AssistantDelta(id="m1", text="Hey there!\nWhat's up?"))
@@ -109,6 +114,7 @@ def test_assistant_delta_skips_full_resend_of_same_id():
 
 
 def test_assistant_delta_treats_cumulative_snapshot_as_replace():
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="Hel"))
     state = reduce(state, AssistantDelta(id="m1", text="Hel lo world"))
@@ -116,6 +122,7 @@ def test_assistant_delta_treats_cumulative_snapshot_as_replace():
 
 
 def test_streaming_id_tracks_active_message_not_reemitted_history():
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="answer one"))
     state = reduce(state, RunEnded())
@@ -137,6 +144,7 @@ def test_assistant_resend_of_older_message_updates_in_place_not_duplicated():
     # new turn. A values snapshot can re-emit an OLDER message's full text AFTER
     # a newer message has already started — the reducer must update the old row
     # by id, not append a verbatim duplicate at the end.
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="First answer."))
     state = reduce(state, UserSubmitted("second question"))
@@ -148,6 +156,7 @@ def test_assistant_resend_of_older_message_updates_in_place_not_duplicated():
 
 
 def test_tool_started_dedupes_by_call_id():
+    '未说明'
     state = initial_state()
     state = reduce(state, ToolStarted(tool_call_id="tc1", tool_name="bash", args={"cmd": "l"}))
     state = reduce(state, ToolStarted(tool_call_id="tc1", tool_name="bash", args={"cmd": "ls -la"}))
@@ -157,12 +166,14 @@ def test_tool_started_dedupes_by_call_id():
 
 
 def test_tool_started_with_empty_call_id_is_ignored():
+    '未说明'
     state = initial_state()
     state = reduce(state, ToolStarted(tool_call_id="", tool_name="", args={}))
     assert state.rows == ()
 
 
 def test_tool_started_fills_name_on_a_later_chunk():
+    '未说明'
     state = initial_state()
     state = reduce(state, ToolStarted(tool_call_id="tc1", tool_name="", args={}))
     state = reduce(state, ToolStarted(tool_call_id="tc1", tool_name="web_search", args={"query": "x"}))
@@ -173,6 +184,7 @@ def test_tool_started_fills_name_on_a_later_chunk():
 
 
 def test_assistant_error_appends_error_row():
+    '未说明'
     state = reduce(initial_state(), AssistantError("model exploded"))
     assert state.rows[0].kind == "assistant"
     assert state.rows[0].error is True
@@ -180,12 +192,14 @@ def test_assistant_error_appends_error_row():
 
 
 def test_system_message_appends_with_tone():
+    '未说明'
     state = reduce(initial_state(), SystemMessage("heads up", tone="error"))
     assert state.rows[0].kind == "system"
     assert state.rows[0].tone == "error"
 
 
 def test_clear_rows_empties_transcript():
+    '未说明'
     state = initial_state()
     state = reduce(state, UserSubmitted("hi"))
     state = reduce(state, ClearRows())
@@ -193,6 +207,7 @@ def test_clear_rows_empties_transcript():
 
 
 def test_reduce_is_pure_does_not_mutate_input_state():
+    '未说明'
     state = reduce(initial_state(), UserSubmitted("first"))
     before_len = len(state.rows)
     # Reducing again must not mutate the previous state object.
@@ -206,40 +221,42 @@ def test_reduce_is_pure_does_not_mutate_input_state():
 
 
 def test_merge_stream_text_cjk_reduplication_not_dropped():
-    """Two identical CJK tokens must both accumulate, not collapse to one."""
+    '未说明'
     assert _merge_stream_text("谢", "谢") == "谢谢"
 
 
 def test_merge_stream_text_repeated_token_not_dropped():
-    """Repeated tokens (e.g. 'go' + 'go') must accumulate."""
+    '未说明'
     assert _merge_stream_text("go", "go") == "gogo"
 
 
 def test_merge_stream_text_suffix_matching_tail_not_dropped():
-    """A delta equal to the buffer suffix must append, not be dropped."""
+    '未说明'
     assert _merge_stream_text("hel", "l") == "hell"
 
 
 def test_merge_stream_text_cumulative_longer_snapshot_still_works():
-    """A strictly longer chunk starting with existing is a cumulative re-delivery."""
+    '未说明'
     assert _merge_stream_text("Hel", "Hel lo world") == "Hel lo world"
 
 
 def test_merge_stream_text_empty_existing_returns_incoming():
+    '未说明'
     assert _merge_stream_text("", "Hello") == "Hello"
 
 
 def test_merge_stream_text_empty_incoming_returns_existing():
+    '未说明'
     assert _merge_stream_text("Hello", "") == "Hello"
 
 
 def test_merge_stream_text_newline_split_across_chunks():
-    """'\\n\\n' split into two '\\n' deltas must accumulate."""
+    '未说明'
     assert _merge_stream_text("\n", "\n") == "\n\n"
 
 
 def test_merge_stream_text_genuine_delta_append():
-    """Normal deltas that don't overlap still append."""
+    '未说明'
     assert _merge_stream_text("Hello ", "world") == "Hello world"
 
 
@@ -255,6 +272,7 @@ def test_merge_stream_text_genuine_delta_append():
 
 
 def test_assistant_delta_empty_id_starts_new_row_per_turn_not_merged_with_prior_turn():
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="", text="First turn answer."))
@@ -274,8 +292,7 @@ def test_assistant_delta_empty_id_starts_new_row_per_turn_not_merged_with_prior_
 
 
 def test_assistant_delta_empty_id_coalesces_multiple_chunks_within_same_turn():
-    """An id-less provider still streams token by token; chunks within ONE
-    turn must accumulate into a single row, not fragment into many."""
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="", text="Hel"))
@@ -289,15 +306,7 @@ def test_assistant_delta_empty_id_coalesces_multiple_chunks_within_same_turn():
 
 
 def test_assistant_delta_empty_id_starts_fresh_row_after_interleaved_tool_call():
-    """An empty id has no signal to distinguish "same message, paused for a
-    tool call" from "a new message that happens to also be id-less" -- unlike
-    a genuine id, which naturally changes across a tool round-trip (a new
-    AIMessage gets a new id; see
-    test_assistant_delta_with_new_id_after_tool_creates_separate_row). Once a
-    tool card has been appended, the previous anonymous row is no longer the
-    transcript tail, so the next empty-id delta must start a NEW row rather
-    than reach backward past the tool card and silently prepend text that
-    arrived after the tool ran."""
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="", text="Let me check. "))
@@ -313,9 +322,7 @@ def test_assistant_delta_empty_id_starts_fresh_row_after_interleaved_tool_call()
 
 
 def test_assistant_delta_empty_id_coalesces_consecutive_chunks_before_a_tool_call():
-    """Multiple id-less chunks with NOTHING interleaved (the realistic
-    per-token streaming case) still coalesce into one row up until a tool
-    card breaks the streak."""
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="", text="Let me "))
@@ -331,10 +338,7 @@ def test_assistant_delta_empty_id_coalesces_consecutive_chunks_before_a_tool_cal
 
 
 def test_assistant_delta_empty_id_does_not_disturb_legitimate_id_sequence():
-    """A normal, non-empty id sequence must keep coalescing correctly even
-    after the transcript has already seen an earlier, unrelated empty-id
-    turn (proves the two code paths -- id-keyed vs. anonymous -- don't
-    interfere with each other)."""
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="", text="anonymous turn"))
@@ -351,7 +355,7 @@ def test_assistant_delta_empty_id_does_not_disturb_legitimate_id_sequence():
 
 
 def test_assistant_delta_empty_id_resend_within_turn_is_noop():
-    """Same multi-char no-op re-send semantics apply to the anonymous path."""
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="", text="Hey there!"))
@@ -362,7 +366,7 @@ def test_assistant_delta_empty_id_resend_within_turn_is_noop():
 
 
 def test_clear_rows_resets_anonymous_streaming_index():
-    """A stale anonymous-row index must not resurrect after ClearRows."""
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="", text="before clear"))

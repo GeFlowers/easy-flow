@@ -1,12 +1,12 @@
 import type { LucideIcon } from "lucide-react";
 
 export interface Translations {
-  // Locale meta
+  // 语言区域元信息
   locale: {
     localName: string;
   };
 
-  // Common
+  // 通用
   common: {
     home: string;
     settings: string;
@@ -49,7 +49,7 @@ export interface Translations {
     blog: string;
   };
 
-  // Welcome
+  // 欢迎
   welcome: {
     greeting: string;
     description: string;
@@ -57,7 +57,7 @@ export interface Translations {
     createYourOwnSkillDescription: string;
   };
 
-  // Clipboard
+  // 剪贴板
   clipboard: {
     copyToClipboard: string;
     copiedToClipboard: string;
@@ -65,7 +65,7 @@ export interface Translations {
     linkCopied: string;
   };
 
-  // Citations
+  // 引用来源
   citations: {
     sourcesSummary: (count: number) => string;
     citeCount: (count: number) => string;
@@ -73,7 +73,7 @@ export interface Translations {
     copiedReference: (title: string) => string;
   };
 
-  // Workspace Changes
+  // 工作区变更
   workspaceChanges: {
     title: string;
     editedTitle: (count: number) => string;
@@ -93,7 +93,7 @@ export interface Translations {
     truncatedSummary: string;
   };
 
-  // Input Box
+  // 输入框
   inputBox: {
     placeholder: string;
     createSkillPrompt: string;
@@ -174,7 +174,7 @@ export interface Translations {
     pleaseWaitStreaming: string;
   };
 
-  // Sidebar
+  // 侧边栏
   sidebar: {
     recentChats: string;
     newChat: string;
@@ -186,7 +186,7 @@ export interface Translations {
     channels: string;
   };
 
-  // Scheduled tasks
+  // 定时任务
   scheduledTasks: {
     scheduleType: { cron: string; once: string };
     preset: {
@@ -304,7 +304,7 @@ export interface Translations {
     };
   };
 
-  // Agents
+  // 智能体
   agents: {
     title: string;
     description: string;
@@ -343,13 +343,13 @@ export interface Translations {
     backToGallery: string;
   };
 
-  // Breadcrumb
+  // 面包屑导航
   breadcrumb: {
     workspace: string;
     chats: string;
   };
 
-  // Workspace
+  // 工作区
   workspace: {
     officialWebsite: string;
     githubTooltip: string;
@@ -363,7 +363,7 @@ export interface Translations {
     gatewayUnavailableRetrying: string;
   };
 
-  // Conversation
+  // 会话
   conversation: {
     noMessages: string;
     startConversation: string;
@@ -371,7 +371,7 @@ export interface Translations {
     branchFailed: string;
   };
 
-  // Chats
+  // 聊天
   chats: {
     searchChats: string;
     loadMoreToSearch: string;
@@ -379,7 +379,7 @@ export interface Translations {
     loadOlderChats: string;
   };
 
-  // Sidecar
+  // 侧栏
   sidecar: {
     title: string;
     open: string;
@@ -404,7 +404,7 @@ export interface Translations {
     selectionCrossesMessages: string;
   };
 
-  // Channels
+  // 渠道
   channels: {
     title: string;
     connect: string;
@@ -428,7 +428,7 @@ export interface Translations {
     connectedAs: (name: string) => string;
   };
 
-  // Page titles (document title)
+  // 页面标题（文档标题）
   pages: {
     appName: string;
     chats: string;
@@ -436,7 +436,7 @@ export interface Translations {
     untitled: string;
   };
 
-  // Tool calls
+  // 工具调用
   toolCalls: {
     moreSteps: (count: number) => string;
     lessSteps: string;
@@ -469,7 +469,7 @@ export interface Translations {
     answeredValue: (value: string) => string;
   };
 
-  // Uploads
+  // 上传
   uploads: {
     uploading: string;
     uploadingFiles: string;
@@ -483,7 +483,7 @@ export interface Translations {
     totalSizeTooLarge: (count: number, maxTotalSize: string) => string;
   };
 
-  // Subtasks
+  // 子任务
   subtasks: {
     subtask: string;
     executing: (count: number) => string;
@@ -492,7 +492,7 @@ export interface Translations {
     failed: string;
   };
 
-  // Token Usage
+  // 令牌用量
   tokenUsage: {
     title: string;
     label: string;
@@ -526,7 +526,7 @@ export interface Translations {
     removeTodo: (content: string) => string;
   };
 
-  // Shortcuts
+  // 快捷键
   shortcuts: {
     searchActions: string;
     noResults: string;
@@ -537,7 +537,7 @@ export interface Translations {
     toggleSidebar: string;
   };
 
-  // Settings
+  // 设置
   settings: {
     title: string;
     description: string;
@@ -694,7 +694,7 @@ export interface Translations {
     };
   };
 
-  // Login / Auth
+  // 登录 / 鉴权
   login: {
     signInTitle: string;
     createAccountTitle: string;

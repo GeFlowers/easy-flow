@@ -3,13 +3,15 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Agents feature disabled", () => {
+  /**
+   * 覆盖“shows disabled message and issues no /api/agents requests when feature is off”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("shows disabled message and issues no /api/agents requests when feature is off", async ({
     page,
   }) => {
-    // Track any request to the agents API — there should be none. Anchor the
-    // match so it only catches the real agents routes (/api/agents,
-    // /api/agents/check, /api/agents/{name}) and never a future unrelated
-    // path that merely contains the substring.
+    // 跟踪所有对 agents API 的请求——不应存在任何请求。使用锚定匹配，确保仅捕获真实的
+    // agents 路由（/api/agents、/api/agents/check、/api/agents/{name}），绝不匹配未来仅
+    // 包含该子字符串的无关路径。
     const AGENTS_API = /\/api\/agents(\/|$)/;
     const agentRequests: string[] = [];
     page.on("request", (req) => {
@@ -18,10 +20,10 @@ test.describe("Agents feature disabled", () => {
       }
     });
 
-    // Shell/auth endpoints + the agents API mock (which should never be hit).
+    // Shell/鉴权端点及 agents API mock（后者不应被命中）。
     mockLangGraphAPI(page, { agents: [] });
 
-    // Feature flag reports the agents API as disabled.
+    // 功能开关表明 agents API 已禁用。
     await page.route("**/api/features", (route) =>
       route.fulfill({
         status: 200,
@@ -32,16 +34,20 @@ test.describe("Agents feature disabled", () => {
 
     await page.goto("/workspace/agents");
 
-    // The disabled message renders and directs the user to an administrator
-    // (en-US or zh-CN copy) without leaking backend config details.
+    // 渲染禁用提示并引导用户联系管理员（en-US 或 zh-CN 文案），且不泄露后端配置细节。
     await expect(
       page.getByText(/contact your administrator|联系管理员/i),
     ).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/config\.yaml|agents_api/i)).toHaveCount(0);
 
-    // Gate prevented every agents API call, including direct navigation.
+    // 防护逻辑阻止了所有 agents API 调用，包括直接导航。
     expect(agentRequests).toEqual([]);
   });
+
+  /**
+   * 覆盖“stays disabled (no 403 storm) when /api/features goes down after a known-disabled result”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("stays disabled (no 403 storm) when /api/features goes down after a known-disabled result", async ({
     page,
@@ -56,8 +62,7 @@ test.describe("Agents feature disabled", () => {
 
     mockLangGraphAPI(page, { agents: [] });
 
-    // /api/features first reports disabled, then starts failing — simulating
-    // an outage of the features endpoint after the flag is already known.
+    // /api/features 先报告禁用，随后开始失败——模拟已知该开关状态后的 features 端点故障。
     let featuresUp = true;
     await page.route("**/api/features", (route) =>
       featuresUp
@@ -73,15 +78,14 @@ test.describe("Agents feature disabled", () => {
           }),
     );
 
-    // First visit observes a definitive "disabled" and persists it.
+    // 首次访问观察到明确的“disabled”状态并将其持久化。
     await page.goto("/workspace/agents");
     await expect(
       page.getByText(/contact your administrator|联系管理员/i),
     ).toBeVisible({ timeout: 15_000 });
 
-    // The features endpoint now fails. A reload must NOT fail open and remount
-    // the agents page (which would re-trigger the 403 storm of #3757); the
-    // last-known "disabled" value is sticky.
+    // features 端点现在失败。重新加载绝不能开放失败并重新挂载 agents 页面（否则会再次触发
+    // #3757 中的 403 风暴）；最后已知的“disabled”值必须保持不变。
     featuresUp = false;
     agentRequests.length = 0;
     await page.goto("/workspace/agents");

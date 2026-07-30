@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Install a skill and link it to the project's skills/custom directory
-# Usage: ./skills/install-skill.sh <owner/repo@skill-name>
-# Example: ./skills/install-skill.sh vercel-labs/agent-skills@vercel-react-best-practices
+# 安装技能并链接到项目的 skills/custom 目录。
+# 用法：./skills/install-skill.sh <owner/repo@skill-name>
+# 示例：./skills/install-skill.sh vercel-labs/agent-skills@vercel-react-best-practices
 
 set -e
 
@@ -14,7 +14,7 @@ fi
 
 FULL_SKILL_NAME="$1"
 
-# Extract skill name (the part after @)
+# 提取 @ 后的技能名，供全局安装路径与项目链接使用。
 SKILL_NAME="${FULL_SKILL_NAME##*@}"
 
 if [[ -z "$SKILL_NAME" || "$SKILL_NAME" == "$FULL_SKILL_NAME" ]]; then
@@ -22,7 +22,7 @@ if [[ -z "$SKILL_NAME" || "$SKILL_NAME" == "$FULL_SKILL_NAME" ]]; then
   exit 1
 fi
 
-# Find project root by looking for deer-flow.code-workspace
+# 向上查找 deer-flow.code-workspace 来定位项目根目录，避免依赖当前工作目录。
 find_project_root() {
   local dir="$PWD"
   while [[ "$dir" != "/" ]]; do
@@ -46,16 +46,16 @@ fi
 SKILL_SOURCE="$HOME/.agents/skills/$SKILL_NAME"
 SKILL_TARGET="$PROJECT_ROOT/skills/custom"
 
-# Step 1: Install the skill using npx
+# 第 1 步：用 npx 安装全局技能包。
 npx skills add "$FULL_SKILL_NAME" -g -y > /dev/null 2>&1
 
-# Step 2: Verify installation
+# 第 2 步：确认全局安装目录存在，避免建立悬空链接。
 if [[ ! -d "$SKILL_SOURCE" ]]; then
   echo "Skill '$SKILL_NAME' installation failed"
   exit 1
 fi
 
-# Step 3: Create symlink
+# 第 3 步：创建项目链接，使自定义技能目录引用全局安装结果。
 mkdir -p "$SKILL_TARGET"
 ln -sf "$SKILL_SOURCE" "$SKILL_TARGET/"
 

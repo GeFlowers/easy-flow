@@ -1,15 +1,4 @@
-"""Tests for the console router (cross-thread observability endpoints).
-
-Covers:
-1. /api/console/stats — headline counters
-2. /api/console/runs — cross-thread listing, thread-title join, pagination, status filter
-3. /api/console/usage — daily zero-filled buckets + per-model breakdown (incl. legacy fallback)
-4. user scoping — rows filtered when the request resolves to a user
-5. 503 when no SQL session factory is available (memory backend)
-
-Uses a real temp-file SQLite database (NullPool, so seeding in one event loop
-and serving TestClient requests in another never share a connection).
-"""
+'定义 test_console_router 模块提供的职责与可复用接口。\n\nTests for the console router (cross-thread observability endpoints).\n\nCovers:\n1. /api/console/stats — headline counters\n2. /api/console/runs — cross-thread listing, thread-title join, pagination, status filter\n3. /api/console/usage — daily zero-filled buckets + per-model breakdown (incl. legacy fallback)\n4. user scoping — rows filtered when the request resolves to a user\n5. 503 when no SQL session factory is available (memory backend)\n\nUses a real temp-file SQLite database (NullPool, so seeding in one event loop\nand serving TestClient requests in another never share a connection).\n'
 
 import asyncio
 from datetime import UTC, datetime, timedelta
@@ -37,23 +26,20 @@ NOW = datetime.now(UTC).replace(hour=12, minute=0, second=0, microsecond=0)
 
 
 class _FrozenDatetime(datetime):
-    """``datetime`` subclass whose ``now()`` returns a fixed instant.
-
-    Everything else (``combine``, ``replace``, arithmetic, ``isinstance``) is
-    inherited unchanged from ``datetime``; only ``now`` is redirected so the
-    router derives its day-bucket window and live durations from ``NOW``.
-    """
+    '封装 _FrozenDatetime 的状态、协作关系与公开操作。\n\n``datetime`` subclass whose ``now()`` returns a fixed instant.\n\n    Everything else (``combine``, ``replace``, arithmetic, ``isinstance``) is\n    inherited unchanged from ``datetime``; only ``now`` is redirected so the\n    router derives its day-bucket window and live durations from ``NOW``.\n    '
 
     _frozen: datetime | None = None
 
     @classmethod
     def now(cls, tz=None):
+        '执行 now 的明确职责，并返回与调用约定一致的结果'
         if cls._frozen is None:  # pragma: no cover - defensive fallback
             return super().now(tz)
         return cls._frozen if tz is None else cls._frozen.astimezone(tz)
 
 
 def _seed_rows() -> tuple[list[ThreadMetaRow], list[RunRow]]:
+    '执行 _seed_rows 的明确职责，并返回与调用约定一致的结果'
     threads = [
         ThreadMetaRow(thread_id="t1", user_id="user-a", display_name="调研鹿角再生"),
         ThreadMetaRow(thread_id="t2", user_id="user-a", display_name="Card assistant chat"),
@@ -132,10 +118,12 @@ def _seed_rows() -> tuple[list[ThreadMetaRow], list[RunRow]]:
 
 @pytest.fixture()
 def session_factory(tmp_path):
+    '执行 session_factory 的明确职责，并返回与调用约定一致的结果'
     engine = create_async_engine(f"sqlite+aiosqlite:///{tmp_path / 'console.db'}", poolclass=NullPool)
     sf = async_sessionmaker(engine, expire_on_commit=False)
 
     async def _setup() -> None:
+        '执行 _setup 的明确职责，并返回与调用约定一致的结果'
         async with engine.begin() as conn:
             await conn.run_sync(Base.metadata.create_all)
         threads, runs = _seed_rows()
@@ -151,6 +139,7 @@ def session_factory(tmp_path):
 
 @pytest.fixture()
 def client(session_factory, monkeypatch):
+    '执行 client 的明确职责，并返回与调用约定一致的结果'
     monkeypatch.setattr(console, "get_session_factory", lambda: session_factory)
     monkeypatch.setattr(console, "get_current_user", AsyncMock(return_value=None))
     monkeypatch.setattr(console, "list_custom_agents", lambda: [object(), object()])
@@ -166,7 +155,9 @@ def client(session_factory, monkeypatch):
 
 
 class TestConsoleStats:
+    '组织 TestConsoleStats 场景的行为与边界验证'
     def test_headline_counters(self, client):
+        '验证 headline、counters 场景下的预期行为、边界条件与结果'
         resp = client.get("/api/console/stats")
         assert resp.status_code == 200
         data = resp.json()
@@ -179,7 +170,9 @@ class TestConsoleStats:
 
 
 class TestConsoleRuns:
+    '组织 TestConsoleRuns 场景的行为与边界验证'
     def test_listing_orders_paginates_and_joins_titles(self, client):
+        '验证 listing、orders、paginates、and、joins、titles 场景下的预期行为、边界条件与结果'
         resp = client.get("/api/console/runs", params={"limit": 3})
         assert resp.status_code == 200
         data = resp.json()
@@ -194,12 +187,14 @@ class TestConsoleRuns:
         assert by_id["r2"]["duration_seconds"] > 0
 
     def test_offset_pagination(self, client):
+        '验证 offset、pagination 场景下的预期行为、边界条件与结果'
         resp = client.get("/api/console/runs", params={"limit": 3, "offset": 3})
         data = resp.json()
         assert [r["run_id"] for r in data["runs"]] == ["r3", "r4"]
         assert data["has_more"] is False
 
     def test_status_filter(self, client):
+        '验证 status、filter 场景下的预期行为、边界条件与结果'
         resp = client.get("/api/console/runs", params={"status": "error"})
         data = resp.json()
         assert [r["run_id"] for r in data["runs"]] == ["r3"]
@@ -207,7 +202,9 @@ class TestConsoleRuns:
 
 
 class TestConsoleUsage:
+    '组织 TestConsoleUsage 场景的行为与边界验证'
     def test_daily_buckets_and_model_breakdown(self, client):
+        '验证 daily、buckets、and、model、breakdown 场景下的预期行为、边界条件与结果'
         resp = client.get("/api/console/usage", params={"days": 14})
         assert resp.status_code == 200
         data = resp.json()
@@ -226,6 +223,7 @@ class TestConsoleUsage:
         assert data["by_model"]["gpt-x"]["tokens"] == 50
 
     def test_window_excludes_old_rows_but_stats_include_them(self, client):
+        '验证 window、excludes、old、rows、but、stats、include、them 场景下的预期行为、边界条件与结果'
         usage = client.get("/api/console/usage", params={"days": 7}).json()
         assert all(r != 999 for d in usage["days"] for r in [d["total_tokens"]])
         stats = client.get("/api/console/stats").json()
@@ -233,6 +231,7 @@ class TestConsoleUsage:
 
 
 def _priced_config(*, cache_hit_price: float | None = 0.8):
+    '执行 _priced_config 的明确职责，并返回与调用约定一致的结果'
     pricing = {"currency": "CNY", "input_per_million": 8, "output_per_million": 32}
     if cache_hit_price is not None:
         pricing["input_cache_hit_per_million"] = cache_hit_price
@@ -253,7 +252,9 @@ _R4_COST = 600 * 8e-6 + 399 * 32e-6  # 0.017568
 
 
 class TestPricing:
+    '组织 TestPricing 场景的行为与边界验证'
     def test_costs_use_cache_hit_price(self, client, monkeypatch):
+        '验证 costs、use、cache、hit、price 场景下的预期行为、边界条件与结果'
         monkeypatch.setattr(console, "get_app_config", lambda: _priced_config())
         stats = client.get("/api/console/stats").json()
         assert stats["currency"] == "CNY"
@@ -275,13 +276,14 @@ class TestPricing:
         assert by_id["r3"]["cost"] is None  # unpriced model
 
     def test_cache_hits_billed_at_miss_price_without_hit_price(self, client, monkeypatch):
-        """No input_cache_hit_per_million configured → conservative upper bound."""
+        '验证 cache、hits、billed、at、miss、price、without、hit、price 场景下的预期行为、边界条件与结果。\n\nNo input_cache_hit_per_million configured → conservative upper bound.'
         monkeypatch.setattr(console, "get_app_config", lambda: _priced_config(cache_hit_price=None))
         runs = client.get("/api/console/runs", params={"limit": 50}).json()
         by_id = {r["run_id"]: r for r in runs["runs"]}
         assert by_id["r1"]["cost"] == pytest.approx(_R1_COST_UNCACHED)
 
     def test_costs_null_without_pricing(self, client):
+        '验证 costs、null、without、pricing 场景下的预期行为、边界条件与结果'
         stats = client.get("/api/console/stats").json()
         assert stats["total_cost"] is None
         assert stats["currency"] is None
@@ -292,7 +294,9 @@ class TestPricing:
 
 
 class TestUserScoping:
+    '组织 TestUserScoping 场景的行为与边界验证'
     def test_rows_filtered_by_resolved_user(self, client, monkeypatch):
+        '验证 rows、filtered、by、resolved、user 场景下的预期行为、边界条件与结果'
         monkeypatch.setattr(console, "get_current_user", AsyncMock(return_value="user-a"))
         stats = client.get("/api/console/stats").json()
         assert stats["total_runs"] == 4  # r5 (user-b) excluded
@@ -304,7 +308,9 @@ class TestUserScoping:
 
 
 class TestNoSqlBackend:
+    '组织 TestNoSqlBackend 场景的行为与边界验证'
     def test_503_when_memory_backend(self, session_factory, monkeypatch):
+        '验证 503、when、memory、backend 场景下的预期行为、边界条件与结果'
         monkeypatch.setattr(console, "get_session_factory", lambda: None)
         monkeypatch.setattr(console, "get_current_user", AsyncMock(return_value=None))
         app = make_authed_test_app()

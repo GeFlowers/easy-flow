@@ -1,3 +1,4 @@
+/** 制品详情支持的代码与预览视图模式。 */
 export type ArtifactViewMode = "code" | "preview";
 
 type ArtifactPreviewMessage = {
@@ -13,20 +14,24 @@ type ArtifactPreviewMessage = {
   }>;
 };
 
+/** 判断制品地址是否指向 `write_file` 工具生成的临时制品。 */
 export function isWriteFileArtifact(filepath: string) {
   return filepath.startsWith("write-file:");
 }
 
+/** 判断工具结果是否确认文件写入成功。 */
 function hasSuccessfulWriteResult(toolResult: string | undefined) {
   return toolResult?.trim() === "OK";
 }
 
+/** 判断已有工具结果是否明确表示文件写入失败。 */
 function hasFailedWriteResult(toolResult: string | undefined) {
   return (
     typeof toolResult === "string" && !hasSuccessfulWriteResult(toolResult)
   );
 }
 
+/** 从字符串或消息内容片段中提取并整理文本。 */
 function getTextContent(content: unknown) {
   if (typeof content === "string") {
     return content.trim();
@@ -50,6 +55,7 @@ function getTextContent(content: unknown) {
   return undefined;
 }
 
+/** 在消息序列中查找指定工具调用对应的结果文本。 */
 function findToolResult(
   toolCallId: string,
   messages: ArtifactPreviewMessage[],
@@ -62,6 +68,7 @@ function findToolResult(
   return undefined;
 }
 
+/** 解析临时写文件制品地址中的目标路径和调用标识。 */
 function parseWriteFileArtifact(filepath: string) {
   if (!isWriteFileArtifact(filepath)) {
     return undefined;
@@ -78,6 +85,7 @@ function parseWriteFileArtifact(filepath: string) {
   }
 }
 
+/** 根据历史 `write_file` 调用重建指定制品在写入过程中的草稿内容。 */
 export function buildWriteFileDraftContent({
   filepath,
   messages,
@@ -143,6 +151,7 @@ export function buildWriteFileDraftContent({
   return hasDraft ? draft : undefined;
 }
 
+/** 根据预览支持情况和写入结果确定制品的可预览状态与初始视图。 */
 export function getArtifactViewState({
   filepath,
   isSupportPreview,
@@ -164,6 +173,7 @@ export function getArtifactViewState({
   };
 }
 
+/** 为 HTML 制品补充资源解析所需的 `<base>` 元素，且不覆盖已有元素。 */
 export function appendHtmlPreviewBaseHref(
   content: string,
   url?: string,
@@ -181,6 +191,7 @@ export function appendHtmlPreviewBaseHref(
   return `${baseElement}${content}`;
 }
 
+/** 从制品 URL 计算其所在目录的绝对基础地址。 */
 function htmlBaseHref(url: string, currentHref: string) {
   const baseUrl = new URL(url, currentHref);
   baseUrl.pathname = baseUrl.pathname.replace(/\/[^/]*$/, "/");
@@ -189,13 +200,16 @@ function htmlBaseHref(url: string, currentHref: string) {
   return baseUrl.toString();
 }
 
+/** 转义将写入 HTML 属性的字符。 */
 function escapeHtmlAttribute(value: string) {
   return value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
 }
 
+/** 预览 iframe 与父窗口传递滚动状态时使用的消息来源标识。 */
 export const HTML_PREVIEW_SCROLL_MESSAGE_SOURCE =
   "deerflow-artifact-preview-scroll";
 
+/** 为预览内容生成稳定且紧凑的滚动位置存储键。 */
 export function createHtmlPreviewScrollKey(value: string) {
   let hash = 2166136261;
   for (let index = 0; index < value.length; index += 1) {
@@ -205,6 +219,7 @@ export function createHtmlPreviewScrollKey(value: string) {
   return `artifact-scroll:${(hash >>> 0).toString(36)}`;
 }
 
+/** 将字符串安全地编码为可嵌入内联脚本的 JavaScript 字面量。 */
 function escapeJavaScriptString(value: string) {
   return JSON.stringify(value)
     .replace(/</g, "\\u003C")
@@ -212,6 +227,7 @@ function escapeJavaScriptString(value: string) {
     .replace(/\u2029/g, "\\u2029");
 }
 
+/** 生成与父窗口同步预览滚动位置的内联脚本。 */
 function htmlScrollRestorationScript(messageKey: string) {
   return `<script data-deerflow-artifact-scroll-restoration>
 (() => {
@@ -255,6 +271,7 @@ function htmlScrollRestorationScript(messageKey: string) {
 </script>`;
 }
 
+/** 向 HTML 预览注入滚动位置恢复脚本，并避免重复注入。 */
 export function appendHtmlPreviewScrollRestoration(
   content: string,
   scrollKey = "default",

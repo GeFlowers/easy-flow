@@ -1,3 +1,4 @@
+"""本模块覆盖回放 提供方的行为、边界与回归场景，确保既有契约稳定。"""
 from __future__ import annotations
 
 import json
@@ -8,6 +9,7 @@ from replay_provider import ReplayChatModel, caller_identity, hash_messages, has
 
 
 def _write_fixture(path: Path, turns: list[dict]) -> None:
+    """准备可控测试资源与状态，供后续断言读取。"""
     path.write_text(
         json.dumps(
             {
@@ -24,6 +26,7 @@ def _write_fixture(path: Path, turns: list[dict]) -> None:
 
 
 def test_replay_key_includes_caller_identity(tmp_path: Path):
+    """验证回放 身份在预期条件及边界场景下的可观察行为，防止相关回归。"""
     messages = [HumanMessage(content="same conversation")]
     lead_output = AIMessage(content="lead")
     suggest_output = AIMessage(content="suggest")
@@ -54,6 +57,7 @@ def test_replay_key_includes_caller_identity(tmp_path: Path):
 
 
 def test_replay_supports_legacy_conversation_only_fixture(tmp_path: Path):
+    """验证回放 夹具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     messages = [HumanMessage(content="legacy conversation")]
     fixture_path = tmp_path / "legacy.json"
 
@@ -73,6 +77,7 @@ def test_replay_supports_legacy_conversation_only_fixture(tmp_path: Path):
 
 
 def test_title_run_name_uses_middleware_caller_namespace(tmp_path: Path):
+    """验证标题 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     messages = [HumanMessage(content="title prompt")]
     fixture_path = tmp_path / "fixture.json"
 
@@ -95,6 +100,7 @@ def test_title_run_name_uses_middleware_caller_namespace(tmp_path: Path):
 
 
 def test_replay_uses_single_pending_capture_when_run_manager_is_missing(tmp_path: Path):
+    """验证回放 运行 管理器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     messages = [HumanMessage(content="title prompt")]
     fixture_path = tmp_path / "fixture.json"
 

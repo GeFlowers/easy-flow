@@ -1,3 +1,4 @@
+/** 返回静态站点演示所需的模拟 MCP 服务配置。 */
 export function GET() {
   return Response.json({
     mcp_servers: {

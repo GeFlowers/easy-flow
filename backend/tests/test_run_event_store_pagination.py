@@ -1,4 +1,4 @@
-"""Tests for paginated list_messages_by_run across all RunEventStore backends."""
+"""本模块覆盖运行 事件 存储 分页的行为、边界与回归场景，确保既有契约稳定。"""
 
 import pytest
 
@@ -7,11 +7,13 @@ from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
 @pytest.fixture
 def base_store():
+    """为存储准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     return MemoryRunEventStore()
 
 
 @pytest.mark.anyio
 async def test_list_messages_by_run_default_returns_all(base_store):
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = base_store
     for i in range(7):
         await store.put(
@@ -39,6 +41,7 @@ async def test_list_messages_by_run_default_returns_all(base_store):
 
 @pytest.mark.anyio
 async def test_list_messages_by_run_with_limit(base_store):
+    """验证运行 限制在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = base_store
     for i in range(7):
         await store.put(
@@ -57,6 +60,7 @@ async def test_list_messages_by_run_with_limit(base_store):
 
 @pytest.mark.anyio
 async def test_list_messages_by_run_after_seq(base_store):
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = base_store
     for i in range(7):
         await store.put(
@@ -76,6 +80,7 @@ async def test_list_messages_by_run_after_seq(base_store):
 
 @pytest.mark.anyio
 async def test_list_messages_by_run_before_seq(base_store):
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = base_store
     for i in range(7):
         await store.put(
@@ -95,6 +100,7 @@ async def test_list_messages_by_run_before_seq(base_store):
 
 @pytest.mark.anyio
 async def test_list_messages_by_run_does_not_include_other_run(base_store):
+    """验证运行 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = base_store
     for i in range(7):
         await store.put(
@@ -120,6 +126,7 @@ async def test_list_messages_by_run_does_not_include_other_run(base_store):
 
 @pytest.mark.anyio
 async def test_list_messages_by_run_empty_run(base_store):
+    """验证运行 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = base_store
     msgs = await store.list_messages_by_run("t1", "nonexistent")
     assert msgs == []

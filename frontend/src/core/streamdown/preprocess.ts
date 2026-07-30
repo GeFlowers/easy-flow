@@ -2,34 +2,24 @@ import { normalizeMermaidMarkdown } from "./mermaid";
 
 const MERMAID_BLOCK_HINT_RE = /mermaid/i;
 
-// marked's blockquote tokenizer (used by Streamdown to split content into
-// memoizable blocks) recurses once per nesting level and overflows the call
-// stack at roughly 2,000 levels, replacing the whole chat route with an error
-// page. 100 levels is far beyond any legitimate content while keeping a wide
-// margin below the crash threshold.
+// 标记文本解析器的引用块分词会随嵌套层级递归；约两千层即可耗尽调用栈并使聊天页报错。
+// 限制为 100 层远超正常内容所需，同时为崩溃阈值留出充足余量。
 const MAX_BLOCKQUOTE_DEPTH = 100;
 const DEEP_BLOCKQUOTE_HINT_RE = new RegExp(
   `^(?:[ \\t]*>){${MAX_BLOCKQUOTE_DEPTH + 1}}`,
   "m",
 );
-// Only up to 3 leading spaces can start a blockquote; 4+ (or a tab) is an
-// indented code block, where ">" runs are literal content.
+// 仅前三个前导空格可开启引用块；四个及以上空格或制表符表示缩进代码块，其中 > 是字面内容。
 const BLOCKQUOTE_PREFIX_RE = /^ {0,3}(?:[ \t]*>)+/;
 const CODE_FENCE_RE = /^ {0,3}(?:```|~~~)/;
 const INDENTED_CODE_RE = /^(?: {4}|\t)/;
 
-// marked's list tokenizer recurses once per nesting level too (list ->
-// blockTokens -> list -> ...). In the browser's tighter stack a deeply nested
-// list overflows during render and throws "Maximum call stack size exceeded"
-// from inside Streamdown's lexing useMemo (see issue #3393); on larger stacks
-// the same input instead goes quadratic and exhausts the heap. Each list level
-// requires at least ~2 columns of indentation, so capping leading whitespace at
-// 200 columns bounds the effective nesting near 100 levels — far beyond any
-// legitimate content while keeping marked safe. Anything indented past this is
-// pathological nesting, not prose or code.
+// 标记文本解析器的列表分词同样逐层递归。浏览器中深层列表会在渲染时栈溢出，较大栈则会导致二次复杂度耗尽堆内存。
+// 每层至少需要约两列缩进，将前导空白限制为 200 列即可把有效深度约束在 100 层；超过该范围属于异常嵌套。
 const MAX_LIST_INDENT = 200;
 const DEEP_INDENT_HINT_RE = new RegExp(`^[ \\t]{${MAX_LIST_INDENT + 1},}`, "m");
 
+/** 限制引用块嵌套深度，避免流式渲染产生过深结构。 */
 export function capBlockquoteNesting(markdown: string): string {
   if (!DEEP_BLOCKQUOTE_HINT_RE.test(markdown)) {
     return markdown;
@@ -43,8 +33,7 @@ export function capBlockquoteNesting(markdown: string): string {
         insideFence = !insideFence;
         return line;
       }
-      // ">" runs inside fenced or indented code blocks are literal text, not
-      // nesting — rewriting them would silently corrupt code content.
+      // 围栏或缩进代码块内的 > 是字面文本而非嵌套；改写会悄然损坏代码内容。
       if (insideFence || INDENTED_CODE_RE.test(line)) {
         return line;
       }
@@ -67,6 +56,7 @@ export function capBlockquoteNesting(markdown: string): string {
     .join("\n");
 }
 
+/** 限制列表嵌套深度，保持流式标记文本的可渲染性。 */
 export function capListNesting(markdown: string): string {
   if (!DEEP_INDENT_HINT_RE.test(markdown)) {
     return markdown;
@@ -80,8 +70,7 @@ export function capListNesting(markdown: string): string {
         insideFence = !insideFence;
         return line;
       }
-      // Indentation inside fenced code is literal layout (ASCII art, pasted
-      // source); collapsing it would corrupt the rendered block.
+      // 围栏代码内的缩进是字面布局（如字符图或粘贴源码），折叠会损坏渲染结果。
       if (insideFence) {
         return line;
       }
@@ -94,8 +83,8 @@ export function capListNesting(markdown: string): string {
     .join("\n");
 }
 
-// Cap every runaway nesting construct that can take down a message render
-// before marked sees the content.
+// 在交给标记文本解析器前限制所有可能拖垮消息渲染的失控嵌套结构。
+/** 同时约束引用块与列表的嵌套层级。 */
 export function capMarkdownNesting(markdown: string): string {
   return capListNesting(capBlockquoteNesting(markdown));
 }
@@ -110,6 +99,7 @@ type DelimiterState = {
   inlineCodeDelimiterLength: number | null;
 };
 
+/** 读取当前位置连续反引号的结束索引。 */
 function consumeBacktickRun(line: string, index: number): number {
   let runLength = 0;
   while (line[index + runLength] === "`") {
@@ -118,6 +108,7 @@ function consumeBacktickRun(line: string, index: number): number {
   return runLength;
 }
 
+/** 在非代码片段中将兼容的公式分隔符转换为统一格式。 */
 function convertLatexDelimitersInLine(
   line: string,
   state: DelimiterState,
@@ -145,16 +136,14 @@ function convertLatexDelimitersInLine(
     const two = line.slice(i, i + 2);
     const inInlineCode = inlineCodeDelimiterLength !== null;
 
-    // Consume escaped backslash as a unit — `\\` is never part of a math
-    // delimiter, so skip past both characters to avoid the second `\` being
-    // mis-paired with a following `(` or `[`.
+    // 将转义反斜杠作为整体消费；\\ 不属于数学分隔符，跳过两字符可避免第二个反斜杠与后续括号误配。
     if (two === "\\\\" && !inInlineCode) {
       result += two;
       i += 2;
       continue;
     }
 
-    // Close an open math block
+    // 关闭已开启的数学块。
     if (!inInlineCode && currentBlock?.close === two) {
       result += currentBlock.replacement;
       currentBlock = null;
@@ -162,7 +151,7 @@ function convertLatexDelimitersInLine(
       continue;
     }
 
-    // Open a new math block
+    // 开启新的数学块。
     if (!inInlineCode && !currentBlock && (two === "\\(" || two === "\\[")) {
       const isDisplay = two === "\\[";
       currentBlock = {
@@ -185,18 +174,19 @@ function convertLatexDelimitersInLine(
 }
 
 /**
- * Normalize common LLM LaTeX delimiters for remark-math.
+ * 为数学扩展规范化模型常见的公式分隔符。
  *
- * remark-math recognizes `$...$` and `$$...$$`, but many models output
- * `\(...\)` and `\[...\]`. Convert those delimiters outside fenced/indented
- * code so KaTeX can render equations without corrupting code blocks. The
- * conversion is stateful across lines, because display math normally spans
- * several lines:
+ * 数学扩展识别 `$...$` 与 `$$...$$`，但许多模型输出
+ * `\(...\)` 与 `\[...\]`。在围栏／缩进代码之外转换这些分隔符，
+ * 使公式渲染器能渲染公式而不破坏代码块。转换需跨行保留状态，
+ * 因为显示数学通常跨越
+ * 多行：
  *
  *   \[
  *   ...
  *   \]
  */
+/** 规范化流式标记文本中的行内与块级公式分隔符。 */
 export function normalizeLatexMathDelimiters(markdown: string): string {
   if (!/[\\][([\])]/.test(markdown)) {
     return markdown;
@@ -228,6 +218,7 @@ export function normalizeLatexMathDelimiters(markdown: string): string {
     .join("\n");
 }
 
+/** 判断公式行中是否存在未转义的注释起始符。 */
 function hasUnescapedTexComment(line: string): boolean {
   for (let i = 0; i < line.length; i++) {
     if (line[i] !== "%") {
@@ -247,6 +238,7 @@ function hasUnescapedTexComment(line: string): boolean {
   return false;
 }
 
+/** 压平显示数学块中的空行，同时保留公式注释边界。 */
 function flattenDisplayMathBody(lines: string[]): string[] {
   if (lines.some(hasUnescapedTexComment)) {
     return lines;
@@ -256,16 +248,17 @@ function flattenDisplayMathBody(lines: string[]): string[] {
 }
 
 /**
- * Keep complete display-math blocks atomic for Streamdown.
+ * 保持完整显示数学块在流式渲染组件中不可分割。
  *
- * Streamdown first splits Markdown into render blocks with marked, then runs
- * react-markdown on each block. Multi-line `$$ ... $$` can be split before
- * remark-math sees the matching delimiters, especially in long numbered
- * responses. Compacting the content between the opening and closing `$$`
- * preserves the LaTeX semantics (visual line breaks still come from `\\`,
- * `aligned`, `matrix`, `cases`, etc.) while keeping the display-math block
- * atomic for Streamdown's splitter.
+ * 流式渲染组件会先借助标记文本解析器将标记文本切分为渲染块，再对每个块运行
+ * 标记渲染器。多行 `$$ ... $$` 可能在
+ * 数学扩展看到成对分隔符前被切开，长编号
+ * 回复中尤其明显。压缩起止 `$$` 间内容
+ * 可保留公式语义（视觉换行仍由 `\\`、
+ * 对齐、矩阵、分段等公式控制符），同时让显示数学块
+ * 对流式渲染组件的分割器保持原子性。
  */
+/** 压紧显示数学块，避免流式分段破坏数学渲染。 */
 export function compactDisplayMathBlocks(markdown: string): string {
   if (!markdown.includes("$$")) {
     return markdown;
@@ -313,10 +306,12 @@ export function compactDisplayMathBlocks(markdown: string): string {
   return output.join("\n");
 }
 
+/** 为流式渲染组件依次应用数学相关的标记文本规范化。 */
 export function normalizeStreamdownMathMarkdown(markdown: string): string {
   return compactDisplayMathBlocks(normalizeLatexMathDelimiters(markdown));
 }
 
+/** 在出现异常箭头时规范化流式渲染中的流程图代码块。 */
 export function preprocessStreamdownMarkdown(markdown: string): string {
   if (!MERMAID_BLOCK_HINT_RE.test(markdown) || !markdown.includes("-.->")) {
     return markdown;

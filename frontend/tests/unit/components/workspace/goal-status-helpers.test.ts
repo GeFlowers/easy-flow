@@ -6,6 +6,11 @@ import {
 } from "@/components/workspace/goal-status-helpers";
 import type { GoalState } from "@/core/threads/types";
 
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeGoal 的约定。
+
+ */
+
 function makeGoal(overrides: Partial<GoalState> = {}): GoalState {
   return {
     objective: "ship it",
@@ -21,6 +26,9 @@ function makeGoal(overrides: Partial<GoalState> = {}): GoalState {
 }
 
 describe("getGoalContinuationDisplay", () => {
+  /**
+   * 覆盖“hides the counter before the agent has auto-continued”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("hides the counter before the agent has auto-continued", () => {
     expect(
       getGoalContinuationDisplay({
@@ -29,6 +37,11 @@ describe("getGoalContinuationDisplay", () => {
       }),
     ).toBeNull();
   });
+
+  /**
+   * 覆盖“shows count and max once continuation has started”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("shows count and max once continuation has started", () => {
     expect(
@@ -44,6 +57,11 @@ describe("getGoalContinuationDisplay", () => {
       }),
     ).toEqual({ count: 8, max: 8 });
   });
+
+  /**
+   * 覆盖“treats missing or negative counts as hidden”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("treats missing or negative counts as hidden", () => {
     expect(
@@ -62,15 +80,28 @@ describe("getGoalContinuationDisplay", () => {
 });
 
 describe("goalReconciliationKey", () => {
+  /**
+   * 覆盖“returns a constant sentinel when there is no goal”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("returns a constant sentinel when there is no goal", () => {
     expect(goalReconciliationKey(null)).toBe("none");
   });
+
+  /**
+   * 覆盖“is stable for an unchanged goal”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("is stable for an unchanged goal", () => {
     expect(goalReconciliationKey(makeGoal())).toBe(
       goalReconciliationKey(makeGoal()),
     );
   });
+
+  /**
+   * 覆盖“changes when the agent auto-continues”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("changes when the agent auto-continues", () => {
     expect(goalReconciliationKey(makeGoal({ continuation_count: 0 }))).not.toBe(
@@ -83,11 +114,21 @@ describe("goalReconciliationKey", () => {
     );
   });
 
+  /**
+   * 覆盖“changes when a different goal is set”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("changes when a different goal is set", () => {
     expect(goalReconciliationKey(makeGoal({ objective: "a" }))).not.toBe(
       goalReconciliationKey(makeGoal({ objective: "b" })),
     );
   });
+
+  /**
+   * 覆盖“distinguishes a cleared goal from an active one”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("distinguishes a cleared goal from an active one", () => {
     expect(goalReconciliationKey(null)).not.toBe(

@@ -4,6 +4,7 @@ import type { ComponentProps } from "react";
 
 type ToolbarProps = ComponentProps<typeof NodeToolbar>;
 
+/** Toolbar 组件：提供对应的界面结构与交互语义。 */
 export const Toolbar = ({ className, ...props }: ToolbarProps) => (
   <NodeToolbar
     className={cn(

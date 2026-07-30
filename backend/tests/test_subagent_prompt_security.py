@@ -1,10 +1,11 @@
-"""Tests for subagent availability and prompt exposure under local bash hardening."""
+'未说明'
 
 from deerflow.agents.lead_agent import prompt as prompt_module
 from deerflow.subagents import registry as registry_module
 
 
 def test_get_available_subagent_names_hides_bash_when_host_bash_disabled(monkeypatch) -> None:
+    '未说明'
     monkeypatch.setattr(registry_module, "is_host_bash_allowed", lambda: False)
 
     names = registry_module.get_available_subagent_names()
@@ -13,6 +14,7 @@ def test_get_available_subagent_names_hides_bash_when_host_bash_disabled(monkeyp
 
 
 def test_get_available_subagent_names_keeps_bash_when_allowed(monkeypatch) -> None:
+    '未说明'
     monkeypatch.setattr(registry_module, "is_host_bash_allowed", lambda: True)
 
     names = registry_module.get_available_subagent_names()
@@ -21,6 +23,7 @@ def test_get_available_subagent_names_keeps_bash_when_allowed(monkeypatch) -> No
 
 
 def test_build_subagent_section_hides_bash_examples_when_unavailable(monkeypatch) -> None:
+    '未说明'
     monkeypatch.setattr(prompt_module, "get_available_subagent_names", lambda: ["general-purpose"])
 
     section = prompt_module._build_subagent_section(3)
@@ -34,6 +37,7 @@ def test_build_subagent_section_hides_bash_examples_when_unavailable(monkeypatch
 
 
 def test_build_subagent_section_includes_bash_when_available(monkeypatch) -> None:
+    '未说明'
     monkeypatch.setattr(prompt_module, "get_available_subagent_names", lambda: ["general-purpose", "bash"])
 
     section = prompt_module._build_subagent_section(3)
@@ -44,6 +48,7 @@ def test_build_subagent_section_includes_bash_when_available(monkeypatch) -> Non
 
 
 def test_bash_subagent_prompt_mentions_workspace_relative_paths() -> None:
+    '未说明'
     from deerflow.subagents.builtins.bash_agent import BASH_AGENT_CONFIG
 
     assert "Treat `/mnt/user-data/workspace` as the default working directory for file IO" in BASH_AGENT_CONFIG.system_prompt
@@ -51,6 +56,7 @@ def test_bash_subagent_prompt_mentions_workspace_relative_paths() -> None:
 
 
 def test_general_purpose_subagent_prompt_mentions_workspace_relative_paths() -> None:
+    '未说明'
     from deerflow.subagents.builtins.general_purpose import GENERAL_PURPOSE_CONFIG
 
     assert "Treat `/mnt/user-data/workspace` as the default working directory for coding and file IO" in GENERAL_PURPOSE_CONFIG.system_prompt
@@ -58,11 +64,7 @@ def test_general_purpose_subagent_prompt_mentions_workspace_relative_paths() -> 
 
 
 def test_general_purpose_subagent_prompt_prohibits_task_tool() -> None:
-    """The system prompt must explicitly tell the LLM that `task` is unavailable.
-
-    Without this, subagents may attempt to call `task` after seeing the parent
-    agent use it, triggering a LangGraph tool validation error (#4159).
-    """
+    '未说明'
     from deerflow.subagents.builtins.general_purpose import GENERAL_PURPOSE_CONFIG
 
     prompt = GENERAL_PURPOSE_CONFIG.system_prompt

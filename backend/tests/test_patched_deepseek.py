@@ -1,11 +1,4 @@
-"""Tests for deerflow.models.patched_deepseek.PatchedChatDeepSeek.
-
-Covers:
-- LangChain serialization protocol: is_lc_serializable, lc_secrets, to_json
-- reasoning_content restoration in _get_request_payload (single and multi-turn)
-- Positional fallback when message counts differ
-- No-op when no reasoning_content present
-"""
+"""本模块覆盖适配的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -15,6 +8,7 @@ from langchain_core.messages import AIMessage, HumanMessage
 
 
 def _make_model(**kwargs):
+    """准备可控测试资源与状态，供后续断言读取。"""
     from deerflow.models.patched_deepseek import PatchedChatDeepSeek
 
     return PatchedChatDeepSeek(
@@ -30,12 +24,14 @@ def _make_model(**kwargs):
 
 
 def test_is_lc_serializable_returns_true():
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     from deerflow.models.patched_deepseek import PatchedChatDeepSeek
 
     assert PatchedChatDeepSeek.is_lc_serializable() is True
 
 
 def test_lc_secrets_contains_api_key_mapping():
+    """验证接口在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
     secrets = model.lc_secrets
     assert "api_key" in secrets
@@ -44,6 +40,7 @@ def test_lc_secrets_contains_api_key_mapping():
 
 
 def test_to_json_produces_constructor_type():
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     model = _make_model()
     result = model.to_json()
     assert result["type"] == "constructor"
@@ -51,6 +48,7 @@ def test_to_json_produces_constructor_type():
 
 
 def test_to_json_kwargs_contains_model():
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     model = _make_model()
     result = model.to_json()
     assert result["kwargs"]["model_name"] == "deepseek-v4-pro"
@@ -58,13 +56,14 @@ def test_to_json_kwargs_contains_model():
 
 
 def test_to_json_kwargs_contains_custom_api_base():
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     model = _make_model(api_base="https://ark.cn-beijing.volces.com/api/v3")
     result = model.to_json()
     assert result["kwargs"]["api_base"] == "https://ark.cn-beijing.volces.com/api/v3"
 
 
 def test_to_json_api_key_is_masked():
-    """api_key must not appear as plain text in the serialized output."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     model = _make_model()
     result = model.to_json()
     api_key_value = result["kwargs"].get("api_key") or result["kwargs"].get("openai_api_key")
@@ -77,6 +76,7 @@ def test_to_json_api_key_is_masked():
 
 
 def _make_payload_message(role: str, content: str | None = None, tool_calls: list | None = None) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     msg: dict = {"role": role, "content": content}
     if tool_calls is not None:
         msg["tool_calls"] = tool_calls
@@ -84,7 +84,7 @@ def _make_payload_message(role: str, content: str | None = None, tool_calls: lis
 
 
 def test_reasoning_content_injected_into_assistant_message():
-    """reasoning_content from additional_kwargs is restored in the payload."""
+    """验证推理 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
 
     human = HumanMessage(content="What is 2+2?")
@@ -110,7 +110,7 @@ def test_reasoning_content_injected_into_assistant_message():
 
 
 def test_no_reasoning_content_is_noop():
-    """Messages without reasoning_content are left unchanged."""
+    """验证推理在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
 
     human = HumanMessage(content="hello")
@@ -133,7 +133,7 @@ def test_no_reasoning_content_is_noop():
 
 
 def test_reasoning_content_multi_turn():
-    """All assistant turns each get their own reasoning_content."""
+    """验证推理在预期条件及边界场景下的可观察行为，防止相关回归。"""
     model = _make_model()
 
     human1 = HumanMessage(content="Step 1?")
@@ -161,7 +161,7 @@ def test_reasoning_content_multi_turn():
 
 
 def test_positional_fallback_when_count_differs():
-    """Falls back to positional matching when payload/original message counts differ."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     model = _make_model()
 
     human = HumanMessage(content="hi")

@@ -1,19 +1,9 @@
-"""Memory tools for tool-driven memory mode.
+"""定义工具驱动记忆模式供模型直接调用的记忆工具。
 
-Exposes memory_search, memory_add, memory_update, memory_delete as
-LangChain @tool functions the model can call directly.
-
-When memory.mode == "tool", these tools are registered on the agent
-instead of appending MemoryMiddleware.  The model gains agency over
-its own persistent memory: it decides what to remember, when to
-search, and when to update or remove stale facts.
-
-Backend-agnostic: every tool goes through the ``MemoryManager`` ABC
-(:func:`get_memory_manager`) -- ``search``/``get_memory`` are on the ABC;
-``create_fact``/``update_fact``/``delete_fact`` are backend-internal
-capabilities reached via attribute access (absent -> the tool returns a
-JSON ``error`` instead of crashing). So tool mode works for any backend
-that exposes those ops (DeerMem does; noop returns empty/errors).
+当 ``memory.mode == "tool"`` 时，代理注册搜索、新增、更新和删除记忆工具，
+而不添加 ``MemoryMiddleware``；模型据此自行决定记住、检索、更新或删除过期
+事实的时机。工具经由 ``MemoryManager`` 抽象访问；后端缺少可选写入能力时返回
+包含 ``error`` 的结构化结果，而不会崩溃。
 """
 
 import json
@@ -29,11 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_scope(runtime: Runtime | None = None) -> tuple[str | None, str]:
-    """Resolve agent_name and user_id for tool handler scope.
+    """解析记忆工具处理器所需的代理名和用户标识范围。
 
-    Tool execution receives user and agent metadata through LangGraph runtime
-    context.  Prefer that channel over ContextVar fallback so persistence stays
-    scoped correctly across request/task boundaries.
+    工具执行优先从图运行时上下文取得元数据，以确保跨请求和任务边界的
+    持久化范围正确。
     """
     context = getattr(runtime, "context", None)
     agent_name = None
@@ -43,6 +32,7 @@ def _resolve_scope(runtime: Runtime | None = None) -> tuple[str | None, str]:
 
 
 def _memory_content_key(content: str) -> str:
+    """生成忽略首尾空白与大小写的记忆内容去重键。"""
     return content.strip().casefold()
 
 
@@ -53,21 +43,11 @@ def memory_search_tool(
     category: str | None = None,
     limit: int = 10,
 ) -> str:
-    """Search existing facts by natural language query.
+    """按自然语言查询检索已有事实。
 
-    Use this when you need to check what you already know about the user
-    - their preferences, past corrections, context, or any stored facts.
-
-    Args:
-        query: Natural language query to match against fact content.
-            Case-insensitive substring matching.
-        category: Optional category filter (e.g. "preference", "correction",
-            "context"). Only facts with this exact category are returned.
-        limit: Maximum results to return (default 10).
-
-    Returns:
-        JSON string with "results" (list of fact objects) and "count".
-        Each fact has id, content, category, confidence, createdAt, and source.
+    用于了解已记录的用户偏好、既往纠正、上下文或其他事实。``query`` 与事实
+    内容进行不区分大小写的子串匹配；``category`` 可限定类别；``limit`` 指定
+    最多返回数量。结果为含 ``results`` 与 ``count`` 的结构化字符串。
     """
     agent_name, user_id = _resolve_scope(runtime)
     try:
@@ -91,24 +71,12 @@ def memory_add_tool(
     category: str = "context",
     confidence: float = 0.7,
 ) -> str:
-    """Store a new fact about the user or conversation context.
+    """保存关于用户或会话上下文的新事实。
 
-    Use this when the user shares something worth remembering for future
-    conversations - preferences, corrections, personal details, work context.
-    The fact persists across sessions and will be available via memory_search
-    and automatic context injection.
-
-    Args:
-        content: The fact text to remember. Be specific and factual.
-        category: Category label for organization (default "context").
-            e.g. "preference", "correction", "behavior", "personal".
-        confidence: How certain you are about this fact, 0.0-1.0
-            (default 0.7). Use higher values for explicit user statements,
-            lower for inferences.
-
-    Returns:
-        JSON string with "fact_id" and "status": "added".
-        On duplicate content, returns "error" with explanation.
+    用户提供值得在后续会话记住的偏好、纠正、个人信息或工作上下文时使用。事实
+    跨会话持久保存，可供检索和自动上下文注入。``content`` 应具体且符合事实；
+    ``category`` 为分类标签；``confidence`` 是零到一之间的置信度。结果为含
+    ``fact_id`` 和 ``status`` 的结构化字符串，内容重复时返回 ``error``。
     """
     agent_name, user_id = _resolve_scope(runtime)
     try:
@@ -163,21 +131,11 @@ def memory_update_tool(
     category: str | None = None,
     confidence: float | None = None,
 ) -> str:
-    """Update an existing fact. Only provided fields are changed; omitted
-    fields stay as-is.
+    """更新已有事实，仅修改实际提供的字段。
 
-    Use this when a stored fact is outdated, incorrect, or needs refinement.
-    First use memory_search to find the fact_id, then update it.
-
-    Args:
-        fact_id: Fact ID from memory_search results (required).
-        content: New fact text (unchanged if omitted).
-        category: New category (unchanged if omitted).
-        confidence: New confidence score 0.0-1.0 (unchanged if omitted).
-
-    Returns:
-        JSON string with "fact_id" and "status": "updated".
-        On invalid fact_id, returns "error" with explanation.
+    当事实已过期、不正确或需细化时，先检索得到 ``fact_id`` 再调用此工具。
+    ``content``、``category`` 和 ``confidence`` 未提供时保持原值；结果为含
+    ``fact_id`` 和 ``status`` 的结构化字符串，无效标识时返回 ``error``。
     """
     agent_name, user_id = _resolve_scope(runtime)
     try:
@@ -205,17 +163,10 @@ def memory_update_tool(
 
 @tool("memory_delete", parse_docstring=True)
 def memory_delete_tool(runtime: Runtime, fact_id: str) -> str:
-    """Delete a fact by its ID.
+    """按标识删除不再准确或相关的事实。
 
-    Use this when a fact is no longer accurate or relevant. First use
-    memory_search to find the fact_id, then delete it.
-
-    Args:
-        fact_id: Fact ID to delete (from memory_search results).
-
-    Returns:
-        JSON string with "fact_id" and "status": "deleted".
-        On invalid fact_id, returns "error" with explanation.
+    应先检索得到 ``fact_id`` 再删除。结果为含 ``fact_id`` 和 ``status`` 的结构化字符串，
+    无效标识时返回 ``error``。
     """
     agent_name, user_id = _resolve_scope(runtime)
     try:
@@ -235,9 +186,9 @@ def memory_delete_tool(runtime: Runtime, fact_id: str) -> str:
 
 
 def get_memory_tools() -> list:
-    """Return all memory tools for agent registration.
+    """返回用于代理注册的全部记忆工具。
 
-    Called by agent factory when memory.mode == "tool".
+    代理工厂在 ``memory.mode == "tool"`` 时调用此函数。
     """
     return [
         memory_search_tool,

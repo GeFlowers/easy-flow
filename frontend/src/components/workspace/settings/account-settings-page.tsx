@@ -12,6 +12,7 @@ import { useI18n } from "@/core/i18n/hooks";
 
 import { SettingsSection } from "./settings-section";
 
+/** 提供账户凭据相关设置，并将敏感输入限定在受控表单提交流程内。 */
 export function AccountSettingsPage() {
   const { user, logout } = useAuth();
   const { t } = useI18n();

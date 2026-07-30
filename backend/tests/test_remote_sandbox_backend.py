@@ -1,3 +1,4 @@
+"""本模块覆盖远程 沙箱的行为、边界与回归场景，确保既有契约稳定。"""
 from __future__ import annotations
 
 import pytest
@@ -11,6 +12,7 @@ from deerflow.skills.types import SkillCategory
 
 
 class _StubResponse:
+    """集中覆盖当前测试分支与回归边界。"""
     def __init__(
         self,
         *,
@@ -18,6 +20,7 @@ class _StubResponse:
         payload: object | None = None,
         json_exc: Exception | None = None,
     ):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.status_code = status_code
         self._payload = {} if payload is None else payload
         self._json_exc = json_exc
@@ -25,20 +28,24 @@ class _StubResponse:
         self.text = ""
 
     def raise_for_status(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         if self.status_code >= 400:
             raise requests.HTTPError(f"HTTP {self.status_code}")
 
     def json(self) -> object:
+        """准备可控测试资源与状态，供后续断言读取。"""
         if self._json_exc is not None:
             raise self._json_exc
         return self._payload
 
 
 def test_list_running_delegates_to_provisioner_list(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
     sandbox_info = SandboxInfo(sandbox_id="test-id", sandbox_url="http://localhost:8080")
 
     def mock_list():
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return [sandbox_info]
 
     monkeypatch.setattr(backend, "_provisioner_list", mock_list)
@@ -47,9 +54,11 @@ def test_list_running_delegates_to_provisioner_list(monkeypatch):
 
 
 def test_provisioner_list_returns_sandbox_infos_and_filters_invalid_entries(monkeypatch):
+    """验证预配器 沙箱在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert url == "http://provisioner:8002/api/sandboxes"
         assert timeout == 10
         assert headers == {}
@@ -72,10 +81,12 @@ def test_provisioner_list_returns_sandbox_infos_and_filters_invalid_entries(monk
 
 
 def test_provisioner_list_sends_auth_header_when_api_key_set(monkeypatch):
+    """验证预配器 认证 接口在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002", api_key="secret")
     captured: list[dict] = []
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         captured.append({"headers": headers})
         return _StubResponse(payload={"sandboxes": []})
 
@@ -86,9 +97,11 @@ def test_provisioner_list_sends_auth_header_when_api_key_set(monkeypatch):
 
 
 def test_provisioner_list_returns_empty_on_request_exception(monkeypatch):
+    """验证预配器 请求在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise requests.RequestException("network down")
 
     monkeypatch.setattr(requests, "get", mock_get)
@@ -97,9 +110,11 @@ def test_provisioner_list_returns_empty_on_request_exception(monkeypatch):
 
 
 def test_provisioner_list_returns_empty_when_payload_is_not_dict(monkeypatch):
+    """验证预配器 载荷在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(payload=[{"sandbox_id": "abc", "sandbox_url": "http://k3s:31001"}])
 
     monkeypatch.setattr(requests, "get", mock_get)
@@ -108,9 +123,11 @@ def test_provisioner_list_returns_empty_when_payload_is_not_dict(monkeypatch):
 
 
 def test_provisioner_list_returns_empty_when_sandboxes_is_not_list(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(payload={"sandboxes": {"sandbox_id": "abc"}})
 
     monkeypatch.setattr(requests, "get", mock_get)
@@ -119,9 +136,11 @@ def test_provisioner_list_returns_empty_when_sandboxes_is_not_list(monkeypatch):
 
 
 def test_provisioner_list_skips_non_dict_sandbox_entries(monkeypatch):
+    """验证预配器 沙箱在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(
             payload={
                 "sandboxes": [
@@ -150,8 +169,11 @@ def test_provisioner_list_skips_non_dict_sandbox_entries(monkeypatch):
     ],
 )
 def test_user_should_see_legacy_skills_follows_storage_visibility_rule(monkeypatch, categories, expected):
+    """验证用户在预期条件及边界场景下的可观察行为，防止相关回归。"""
     class _Storage:
+        """集中覆盖当前测试分支与回归边界。"""
         def load_skills(self, *, enabled_only: bool = False):
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             assert enabled_only is False
             return [type("SkillStub", (), {"category": category})() for category in categories]
 
@@ -162,10 +184,12 @@ def test_user_should_see_legacy_skills_follows_storage_visibility_rule(monkeypat
 
 @pytest.mark.parametrize("expected_user_id", [None, "owner-1"])
 def test_create_delegates_to_provisioner_create(monkeypatch, expected_user_id):
+    """验证创建 预配器 创建在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
     expected = SandboxInfo(sandbox_id="abc123", sandbox_url="http://k3s:31001")
 
     def mock_create(thread_id: str, sandbox_id: str, extra_mounts=None, *, user_id=None):
+        """处理模拟 创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert thread_id == "thread-1"
         assert sandbox_id == "abc123"
         assert extra_mounts == [("/host", "/container", False)]
@@ -184,10 +208,12 @@ def test_create_delegates_to_provisioner_create(monkeypatch, expected_user_id):
 
 
 def test_provisioner_create_returns_sandbox_info(monkeypatch):
+    """验证预配器 创建 沙箱在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
     monkeypatch.setattr(remote_backend_mod, "user_should_see_legacy_skills", lambda user_id: True)
 
     def mock_post(url: str, json: dict, timeout: int, headers=None):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert url == "http://provisioner:8002/api/sandboxes"
         assert json == {
             "sandbox_id": "abc123",
@@ -206,10 +232,12 @@ def test_provisioner_create_returns_sandbox_info(monkeypatch):
 
 
 def test_provisioner_create_accepts_anonymous_thread_id(monkeypatch):
+    """验证预配器 创建 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
     monkeypatch.setattr(remote_backend_mod, "user_should_see_legacy_skills", lambda user_id: False)
 
     def mock_post(url: str, json: dict, timeout: int, headers=None):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert url == "http://provisioner:8002/api/sandboxes"
         assert json == {
             "sandbox_id": "anon123",
@@ -228,10 +256,12 @@ def test_provisioner_create_accepts_anonymous_thread_id(monkeypatch):
 
 
 def test_provisioner_create_raises_runtime_error_on_request_exception(monkeypatch):
+    """验证预配器 创建 错误 请求在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
     monkeypatch.setattr(remote_backend_mod, "user_should_see_legacy_skills", lambda user_id: False)
 
     def mock_post(url: str, json: dict, timeout: int, headers=None):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise requests.RequestException("boom")
 
     monkeypatch.setattr(requests, "post", mock_post)
@@ -241,10 +271,12 @@ def test_provisioner_create_raises_runtime_error_on_request_exception(monkeypatc
 
 
 def test_destroy_delegates_to_provisioner_destroy(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
     called: list[str] = []
 
     def mock_destroy(sandbox_id: str):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         called.append(sandbox_id)
 
     monkeypatch.setattr(backend, "_provisioner_destroy", mock_destroy)
@@ -254,9 +286,11 @@ def test_destroy_delegates_to_provisioner_destroy(monkeypatch):
 
 
 def test_provisioner_destroy_calls_delete(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_delete(url: str, timeout: int, headers=None):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert url == "http://provisioner:8002/api/sandboxes/abc123"
         assert timeout == 15
         return _StubResponse(status_code=200)
@@ -267,9 +301,11 @@ def test_provisioner_destroy_calls_delete(monkeypatch):
 
 
 def test_provisioner_destroy_swallows_request_exception(monkeypatch):
+    """验证预配器 请求在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_delete(url: str, timeout: int, headers=None):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise requests.RequestException("network down")
 
     monkeypatch.setattr(requests, "delete", mock_delete)
@@ -278,9 +314,11 @@ def test_provisioner_destroy_swallows_request_exception(monkeypatch):
 
 
 def test_is_alive_delegates_to_provisioner_is_alive(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_is_alive(sandbox_id: str):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert sandbox_id == "abc123"
         return True
 
@@ -291,15 +329,18 @@ def test_is_alive_delegates_to_provisioner_is_alive(monkeypatch):
 
 
 def test_provisioner_is_alive_true_only_when_status_running(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get_running(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(payload={"status": "Running"})
 
     monkeypatch.setattr(requests, "get", mock_get_running)
     assert backend._provisioner_is_alive("abc123") is True
 
     def mock_get_pending(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(payload={"status": "Pending"})
 
     monkeypatch.setattr(requests, "get", mock_get_pending)
@@ -307,9 +348,11 @@ def test_provisioner_is_alive_true_only_when_status_running(monkeypatch):
 
 
 def test_provisioner_is_alive_returns_false_on_404(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(status_code=404)
 
     monkeypatch.setattr(requests, "get", mock_get)
@@ -317,9 +360,11 @@ def test_provisioner_is_alive_returns_false_on_404(monkeypatch):
 
 
 def test_provisioner_is_alive_raises_on_request_exception(monkeypatch):
+    """验证预配器 请求在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise requests.RequestException("boom")
 
     monkeypatch.setattr(requests, "get", mock_get)
@@ -328,9 +373,11 @@ def test_provisioner_is_alive_raises_on_request_exception(monkeypatch):
 
 
 def test_provisioner_is_alive_raises_on_server_error(monkeypatch):
+    """验证预配器 错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         response = _StubResponse(status_code=503)
         response.text = "unavailable"
         return response
@@ -341,10 +388,12 @@ def test_provisioner_is_alive_raises_on_server_error(monkeypatch):
 
 
 def test_discover_delegates_to_provisioner_discover(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
     expected = SandboxInfo(sandbox_id="abc123", sandbox_url="http://k3s:31001")
 
     def mock_discover(sandbox_id: str):
+        """处理模拟相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         assert sandbox_id == "abc123"
         return expected
 
@@ -355,9 +404,11 @@ def test_discover_delegates_to_provisioner_discover(monkeypatch):
 
 
 def test_provisioner_discover_returns_none_on_404(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(status_code=404)
 
     monkeypatch.setattr(requests, "get", mock_get)
@@ -366,9 +417,11 @@ def test_provisioner_discover_returns_none_on_404(monkeypatch):
 
 
 def test_provisioner_discover_returns_info_on_success(monkeypatch):
+    """验证预配器在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return _StubResponse(payload={"sandbox_id": "abc123", "sandbox_url": "http://k3s:31001"})
 
     monkeypatch.setattr(requests, "get", mock_get)
@@ -380,9 +433,11 @@ def test_provisioner_discover_returns_info_on_success(monkeypatch):
 
 
 def test_provisioner_discover_returns_none_on_request_exception(monkeypatch):
+    """验证预配器 请求在预期条件及边界场景下的可观察行为，防止相关回归。"""
     backend = RemoteSandboxBackend("http://provisioner:8002")
 
     def mock_get(url: str, timeout: int, headers=None):
+        """处理模拟 获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise requests.RequestException("boom")
 
     monkeypatch.setattr(requests, "get", mock_get)

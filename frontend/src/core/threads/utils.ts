@@ -2,6 +2,7 @@ import type { Message } from "@langchain/langgraph-sdk";
 
 import type { AgentThread, AgentThreadContext } from "./types";
 
+/** 线程来源渠道的展示信息。 */
 export type ChannelThreadSource = {
   type: "im_channel";
   provider: string;
@@ -16,6 +17,7 @@ type ThreadRouteTarget =
       metadata?: Record<string, unknown> | null;
     };
 
+/** 构建线程在当前语言与代理上下文中的页面路径。 */
 export function pathOfThread(
   thread: ThreadRouteTarget,
   context?: Pick<AgentThreadContext, "agent_name"> | null,
@@ -39,12 +41,13 @@ export function pathOfThread(
     : `/workspace/chats/${threadId}`;
 }
 
+/** 提取消息内容中的紧凑纯文本。 */
 export function textOfMessage(message: Message) {
   if (typeof message.content === "string") {
     return message.content;
   } else if (Array.isArray(message.content)) {
-    // Flat join ("") for single-line consumers (input box, titles); the rendered
-    // body uses extractContentFromMessage, which joins multi-part content with "\n".
+    // 单行使用方（输入框、标题）采用无分隔拼接；正文渲染则由
+    // extractContentFromMessage 使用换行连接多段内容。
     const text = message.content
       .map((part) =>
         typeof part === "string" ? part : part.type === "text" ? part.text : "",
@@ -55,6 +58,7 @@ export function textOfMessage(message: Message) {
   return null;
 }
 
+/** 获取线程标题，缺失时返回本地化的默认标题。 */
 export function titleOfThread(thread: AgentThread) {
   return thread.values?.title ?? "Untitled";
 }
@@ -69,10 +73,12 @@ const CHANNEL_PROVIDER_LABELS: Record<string, string> = {
   wecom: "WeCom",
 };
 
+/** 将渠道提供方标识转换为标题中的显示名称。 */
 function labelOfChannelProvider(provider: string) {
   return CHANNEL_PROVIDER_LABELS[provider] ?? provider;
 }
 
+/** 提取线程来源渠道的显示信息。 */
 export function channelSourceOfThread(
   thread: Pick<AgentThread, "metadata">,
 ): ChannelThreadSource | null {

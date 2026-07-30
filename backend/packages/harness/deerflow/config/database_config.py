@@ -1,33 +1,4 @@
-"""Unified database backend configuration.
-
-Controls BOTH the LangGraph checkpointer and the DeerFlow application
-persistence layer (runs, threads metadata, users, etc.). The user
-configures one backend; the system handles physical separation details.
-
-SQLite mode: checkpointer and app share a single .db file
-({sqlite_dir}/deerflow.db) with WAL journal mode enabled on every
-connection. WAL allows concurrent readers and a single writer without
-blocking, making a unified file safe for both workloads.  Writers
-that contend for the lock wait via the default 5-second sqlite3
-busy timeout rather than failing immediately.
-
-Postgres mode: both use the same database URL but maintain independent
-connection pools with different lifecycles.
-
-Memory mode: checkpointer uses MemorySaver, app uses in-memory stores.
-No database is initialized.
-
-Sensitive values (postgres_url) should use $VAR syntax in config.yaml
-to reference environment variables from .env:
-
-    database:
-      backend: postgres
-      postgres_url: $DATABASE_URL
-
-The $VAR resolution is handled by AppConfig.resolve_env_variables()
-before this config is instantiated -- DatabaseConfig itself does not
-need to do any environment variable processing.
-"""
+"""提供配置、database、配置相关功能。"""
 
 from __future__ import annotations
 
@@ -38,6 +9,7 @@ from pydantic import BaseModel, Field
 
 
 class DatabaseConfig(BaseModel):
+    """\u6267\u884c DatabaseConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     backend: Literal["memory", "sqlite", "postgres"] = Field(
         default="memory",
         description=("Storage backend for both checkpointer and application data. 'memory' for development (no persistence across restarts), 'sqlite' for single-node deployment, 'postgres' for production multi-node deployment."),
@@ -64,34 +36,34 @@ class DatabaseConfig(BaseModel):
         description="Connection pool size for the app ORM engine (postgres only).",
     )
 
-    # -- Derived helpers (not user-configured) --
+        # 中文说明：此处用于执行相关处理。
 
     @property
     def _resolved_sqlite_dir(self) -> str:
-        """Resolve sqlite_dir to an absolute path (relative to CWD)."""
+        """\u6267\u884c _resolved_sqlite_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         from pathlib import Path
 
         return str(Path(self.sqlite_dir).resolve())
 
     @property
     def sqlite_path(self) -> str:
-        """Unified SQLite file path shared by checkpointer and app."""
+        """\u6267\u884c sqlite_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return os.path.join(self._resolved_sqlite_dir, "deerflow.db")
 
-    # Backward-compatible aliases
+        # 中文说明：此处用于执行相关处理。
     @property
     def checkpointer_sqlite_path(self) -> str:
-        """SQLite file path for the LangGraph checkpointer (alias for sqlite_path)."""
+        """\u6267\u884c checkpointer_sqlite_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.sqlite_path
 
     @property
     def app_sqlite_path(self) -> str:
-        """SQLite file path for application ORM data (alias for sqlite_path)."""
+        """\u6267\u884c app_sqlite_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.sqlite_path
 
     @property
     def app_sqlalchemy_url(self) -> str:
-        """SQLAlchemy async URL for the application ORM engine."""
+        """\u6267\u884c app_sqlalchemy_url \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if self.backend == "sqlite":
             return f"sqlite+aiosqlite:///{self.sqlite_path}"
         if self.backend == "postgres":

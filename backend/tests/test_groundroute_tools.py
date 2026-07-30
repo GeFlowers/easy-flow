@@ -1,4 +1,4 @@
-"""Unit tests for the GroundRoute community web search + fetch tools."""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 import json
 from unittest.mock import MagicMock, patch
@@ -9,7 +9,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def reset_api_key_warned():
-    """Reset the per-tool warning set before and after each test."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     import deerflow.community.groundroute.tools as gr_mod
 
     gr_mod._api_key_warned = set()
@@ -19,6 +19,7 @@ def reset_api_key_warned():
 
 @pytest.fixture
 def mock_config_with_key():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
         tool_config = MagicMock()
         tool_config.model_extra = {"api_key": "test-gr-key", "max_results": 5}
@@ -28,6 +29,7 @@ def mock_config_with_key():
 
 @pytest.fixture
 def mock_config_no_key():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
         tool_config = MagicMock()
         tool_config.model_extra = {}
@@ -36,6 +38,7 @@ def mock_config_no_key():
 
 
 def _make_search_response(payload: dict) -> MagicMock:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     mock_resp = MagicMock()
     mock_resp.json.return_value = payload
     mock_resp.raise_for_status = MagicMock()
@@ -43,7 +46,7 @@ def _make_search_response(payload: dict) -> MagicMock:
 
 
 def _patch_post(mock_resp: MagicMock):
-    """Patch httpx.Client so the context-managed .post returns mock_resp."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     patcher = patch("deerflow.community.groundroute.tools.httpx.Client")
     mock_client_cls = patcher.start()
     mock_client_cls.return_value.__enter__.return_value.post.return_value = mock_resp
@@ -51,7 +54,7 @@ def _patch_post(mock_resp: MagicMock):
 
 
 def _per_tool_config(**by_tool):
-    """Build a get_app_config mock whose get_tool_config returns a distinct config per tool name."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     configs = {}
     for tool_name, extra in by_tool.items():
         cfg = MagicMock()
@@ -63,7 +66,9 @@ def _per_tool_config(**by_tool):
 
 
 class TestGetApiKey:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     def test_returns_config_key_when_present(self):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "from-config"}
@@ -74,6 +79,7 @@ class TestGetApiKey:
             assert _get_api_key("web_search") == "from-config"
 
     def test_falls_back_to_env_when_config_key_empty(self):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "   "}
@@ -84,6 +90,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") == "env-key"
 
     def test_returns_none_when_no_key_anywhere(self):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {}, clear=True):
@@ -92,7 +99,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") is None
 
     def test_reads_the_named_tools_config_block(self):
-        """web_fetch must read the web_fetch block, not web_search (multi-engine flows)."""
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             mock.return_value = _per_tool_config(
                 web_search={"api_key": "search-key"},
@@ -105,7 +112,9 @@ class TestGetApiKey:
 
 
 class TestWebSearchTool:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     def test_basic_search_returns_normalized_list_with_source_engine(self, mock_config_with_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         payload = {
             "request_id": "r1",
             "results": [
@@ -133,7 +142,7 @@ class TestWebSearchTool:
         assert {r["source_engine"] for r in parsed} == {"serper", "exa"}
 
     def test_uses_web_search_config_key(self):
-        """web_search authenticates with the web_search config block's key."""
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             mock.return_value = _per_tool_config(
                 web_search={"api_key": "search-key"},
@@ -153,7 +162,7 @@ class TestWebSearchTool:
         assert call.kwargs["json"]["query"] == "hello world"
 
     def test_agent_max_results_is_honored_over_config(self):
-        """A caller-supplied max_results wins over the config value (not silently discarded)."""
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "k", "max_results": 5}
@@ -171,7 +180,7 @@ class TestWebSearchTool:
         assert body["max_results"] == 20
 
     def test_config_max_results_used_when_caller_omits(self, mock_config_with_key):
-        """When the caller omits max_results, the configured value is used."""
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         payload = {"results": [{"url": "u", "title": "t", "snippet": "s", "source_engine": "exa"}]}
         patcher, mock_client_cls = _patch_post(_make_search_response(payload))
         try:
@@ -185,6 +194,7 @@ class TestWebSearchTool:
         assert body["max_results"] == 5
 
     def test_max_results_clamped_to_cap(self):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "k", "max_results": "500"}
@@ -202,6 +212,7 @@ class TestWebSearchTool:
         assert body["max_results"] == 50
 
     def test_empty_results_returns_error_json(self, mock_config_with_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         patcher, _ = _patch_post(_make_search_response({"results": []}))
         try:
             from deerflow.community.groundroute.tools import web_search_tool
@@ -214,6 +225,7 @@ class TestWebSearchTool:
         assert parsed["query"] == "no results"
 
     def test_missing_api_key_returns_error_json(self, mock_config_no_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch.dict("os.environ", {}, clear=True):
             from deerflow.community.groundroute.tools import web_search_tool
 
@@ -223,6 +235,7 @@ class TestWebSearchTool:
         assert "GROUNDROUTE_API_KEY" in parsed["error"]
 
     def test_missing_api_key_logs_warning_once(self, mock_config_no_key, caplog):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         import logging
 
         with patch.dict("os.environ", {}, clear=True):
@@ -236,6 +249,7 @@ class TestWebSearchTool:
         assert len(warnings) == 1
 
     def test_http_error_returns_structured_error(self, mock_config_with_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         mock_resp = MagicMock()
         mock_resp.raise_for_status.side_effect = httpx.HTTPStatusError("402", request=MagicMock(), response=MagicMock(status_code=402, text="Payment Required"))
         patcher, _ = _patch_post(mock_resp)
@@ -250,6 +264,7 @@ class TestWebSearchTool:
         assert "402" in parsed["error"]
 
     def test_network_exception_returns_error_json(self, mock_config_with_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         patcher, mock_client_cls = _patch_post(MagicMock())
         mock_client_cls.return_value.__enter__.return_value.post.side_effect = Exception("timeout")
         try:
@@ -262,6 +277,7 @@ class TestWebSearchTool:
         assert "error" in parsed
 
     def test_partial_fields_default_to_empty_string(self, mock_config_with_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         patcher, _ = _patch_post(_make_search_response({"results": [{}]}))
         try:
             from deerflow.community.groundroute.tools import web_search_tool
@@ -274,7 +290,9 @@ class TestWebSearchTool:
 
 
 class TestWebFetchTool:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     def test_fetch_returns_titled_content(self, mock_config_with_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         payload = {"results": [{"title": "Page", "content": "Body text", "url": "https://ex.com"}]}
         patcher, mock_client_cls = _patch_post(_make_search_response(payload))
         try:
@@ -286,12 +304,12 @@ class TestWebFetchTool:
             patcher.stop()
 
         assert result == "# Page\n\nBody text"
-        # web_fetch uses mode=page with the URL as the query.
+        # 说明当前测试分支所验证的真实行为与边界。
         assert body["mode"] == "page"
         assert body["query"] == "https://ex.com"
 
     def test_fetch_uses_web_fetch_config_key(self):
-        """web_fetch must authenticate with the web_fetch config block's key, not web_search's."""
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch("deerflow.community.groundroute.tools.get_app_config") as mock:
             mock.return_value = _per_tool_config(
                 web_search={"api_key": "search-key"},
@@ -310,6 +328,7 @@ class TestWebFetchTool:
         assert call.kwargs["headers"]["Authorization"] == "Bearer fetch-key"
 
     def test_fetch_missing_key_returns_error(self, mock_config_no_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         with patch.dict("os.environ", {}, clear=True):
             from deerflow.community.groundroute.tools import web_fetch_tool
 
@@ -319,6 +338,7 @@ class TestWebFetchTool:
         assert "GROUNDROUTE_API_KEY" in parsed["error"]
 
     def test_fetch_no_results_returns_error_string(self, mock_config_with_key):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         patcher, _ = _patch_post(_make_search_response({"results": []}))
         try:
             from deerflow.community.groundroute.tools import web_fetch_tool

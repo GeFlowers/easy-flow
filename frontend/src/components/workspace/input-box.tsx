@@ -253,8 +253,8 @@ function buildHiddenConversationQuoteMessage({
     additional_kwargs: {
       hide_from_ui: true,
       conversation_quote_context: true,
-      // Keep ids/roles/count 1:1 parallel with `contexts` so consumers can zip
-      // them safely; do not dedupe ids here.
+      // ids、roles 与数量必须和 `contexts` 一一对应，消费者才能安全地按索引
+      // 配对；此处不可对 id 去重。
       referenced_message_ids: contexts.map(
         (context) => context.messageId ?? "",
       ),
@@ -264,6 +264,7 @@ function buildHiddenConversationQuoteMessage({
   } as Message;
 }
 
+/** 提供线程编辑器，负责命令分流、流式提交、附件和语音输入的交互协调。 */
 export function InputBox({
   className,
   disabled,
@@ -292,11 +293,7 @@ export function InputBox({
     reasoning_effort?: "minimal" | "low" | "medium" | "high";
   };
   extraHeader?: React.ReactNode;
-  /**
-   * Whether to render the input in welcome layout (vertically centered,
-   * with hero + quick action suggestions).  This is purely a visual flag,
-   * decoupled from "the backend has created the thread" — see issue #2746.
-   */
+  /** 是否以欢迎布局渲染输入框（垂直居中，含主视觉和快捷操作建议）。这只是视觉标记，不等同于“后端已创建线程”；见 issue #2746。 */
   isWelcomeMode?: boolean;
   threadId: string;
   initialValue?: string;
@@ -426,7 +423,7 @@ export function InputBox({
     try {
       recognition.abort();
     } catch {
-      // Browser implementations can throw when the recognizer already ended.
+      // 识别器已经结束时，部分浏览器实现会抛出异常。
     }
   }, [cleanupVoiceRecognition]);
 
@@ -695,8 +692,7 @@ export function InputBox({
           const objective = goal?.objective;
           toast.info(
             objective !== undefined
-              ? // Function replacer so a goal containing `$&`/`$1` isn't
-                // interpreted as a replacement pattern.
+              ? // 使用函数替换器，避免目标中的 `$&`/`$1` 被当作替换模式。
                 t.inputBox.goalActive.replace("{goal}", () => objective)
               : t.inputBox.goalNone,
           );
@@ -883,9 +879,8 @@ export function InputBox({
                 contexts: quoteContexts,
               }),
             ],
-            // Clear quotes only once the send genuinely proceeds. If the send
-            // is dropped by the in-flight guard, `onSent` never fires and the
-            // quotes stay attached so they aren't silently lost.
+            // 仅在发送确实发起后清空引用。若发送被进行中守卫丢弃，`onSent`
+            // 不会触发，引用应继续保留，避免被静默丢失。
             onSent: () => {
               sidecar?.clearConversationQuotes(quoteIds);
             },
@@ -893,8 +888,7 @@ export function InputBox({
         : undefined;
       const submit = () => onSubmit?.(message, submitOptions);
 
-      // Guard against submitting before the initial model auto-selection
-      // effect has flushed thread settings to storage/state.
+      // 防止初始模型自动选择副作用尚未把线程设置写入存储/状态前就提交。
       if (resolvedModelName && context.model_name !== resolvedModelName) {
         onContextChange?.({
           ...context,
@@ -951,7 +945,7 @@ export function InputBox({
         setFollowupsHidden(false);
         setFollowupsLoading(false);
         const saved = await handleGoalCommand(submitAction.command);
-        // Only start a run when a goal was actually saved; status/clear never run.
+        // 只有目标确实保存成功才启动运行；查询状态和清除操作绝不启动运行。
         if (saved && submitAction.command.kind === "set") {
           return submitThreadMessage({
             ...message,
@@ -1407,9 +1401,8 @@ export function InputBox({
         return;
       }
 
-      // Applying the rewrite replaces the draft outside the textarea change
-      // handler, so clear any in-progress history browse state; otherwise a
-      // stale index would let the next ArrowDown overwrite the rewrite.
+      // 应用改写会在文本框变更处理器之外替换草稿，须清除进行中的历史浏览状态；
+      // 否则过期索引会让下一次 ArrowDown 覆盖改写结果。
       promptHistoryIndexRef.current = null;
       promptHistoryDraftRef.current = "";
       setPromptHistoryValue(rewrittenText);
@@ -1992,7 +1985,7 @@ export function InputBox({
         </div>
         <PromptInputFooter className="flex flex-wrap gap-2 sm:flex-nowrap">
           <PromptInputTools className="min-w-0 flex-1 flex-wrap">
-            {/* TODO: Add more connectors here
+            {/* 待补充更多连接器。
           <PromptInputActionMenu>
             <PromptInputActionMenuTrigger className="px-2!" />
             <PromptInputActionMenuContent>

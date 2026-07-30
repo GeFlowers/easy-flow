@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 
 const extensionMap: Record<string, string> = {
-  // Text
+  // 文本
   txt: "text",
   csv: "csv",
   log: "text",
@@ -18,7 +18,7 @@ const extensionMap: Record<string, string> = {
   properties: "text",
   props: "text",
 
-  // JavaScript/TypeScript ecosystem
+  // 脚本与类型化脚本生态
   js: "javascript",
   jsx: "jsx",
   ts: "typescript",
@@ -28,7 +28,7 @@ const extensionMap: Record<string, string> = {
   mts: "typescript",
   cts: "typescript",
 
-  // Web
+  // 网页文件
   html: "html",
   htm: "html",
   css: "css",
@@ -39,19 +39,19 @@ const extensionMap: Record<string, string> = {
   svelte: "svelte",
   astro: "astro",
 
-  // Python
+  // 解释型语言
   py: "python",
   pyi: "python",
   pyw: "python",
 
-  // Java/JVM
+  // 虚拟机语言生态
   java: "java",
   kt: "kotlin",
   kts: "kotlin",
   scala: "scala",
   groovy: "groovy",
 
-  // C/C++
+  // 系统级语言
   c: "c",
   h: "c",
   cpp: "cpp",
@@ -61,29 +61,29 @@ const extensionMap: Record<string, string> = {
   hxx: "cpp",
   hh: "cpp",
 
-  // C#
+  // 井号语言
   cs: "csharp",
 
-  // Go
+  // 并发编程语言
   go: "go",
 
-  // Rust
+  // 系统编程语言
   rs: "rust",
 
-  // Ruby
+  // 动态脚本语言
   rb: "ruby",
   rake: "ruby",
 
-  // PHP
+  // 服务器脚本语言
   php: "php",
 
-  // Shell/Bash
+  // 命令行脚本
   sh: "bash",
   bash: "bash",
   zsh: "zsh",
   fish: "fish",
 
-  // Config & Data
+  // 配置与数据
   json: "json",
   jsonc: "jsonc",
   json5: "json5",
@@ -94,15 +94,15 @@ const extensionMap: Record<string, string> = {
   ini: "ini",
   env: "dotenv",
 
-  // Markdown & Docs
+  // 标记文档
   md: "markdown",
   mdx: "mdx",
   rst: "rst",
 
-  // SQL
+  // 结构化查询语言
   sql: "sql",
 
-  // Other languages
+  // 其他语言
   swift: "swift",
   dart: "dart",
   lua: "lua",
@@ -117,23 +117,23 @@ const extensionMap: Record<string, string> = {
   clj: "clojure",
   cljs: "clojure",
 
-  // Infrastructure
+  // 基础设施
   dockerfile: "dockerfile",
   docker: "docker",
   tf: "terraform",
   tfvars: "terraform",
   hcl: "hcl",
 
-  // Build & Config
+  // 构建与配置
   makefile: "makefile",
   cmake: "cmake",
   gradle: "groovy",
 
-  // Git
+  // 版本控制
   gitignore: "git-commit",
   gitattributes: "git-commit",
 
-  // Misc
+  // 其他
   graphql: "graphql",
   gql: "graphql",
   proto: "protobuf",
@@ -166,14 +166,17 @@ const browserPreviewExtensions = new Set([
   "webm",
 ]);
 
+/** 从路径中提取文件名。 */
 export function getFileName(filepath: string) {
   return filepath.split("/").pop()!;
 }
 
+/** 从路径中提取小写文件扩展名。 */
 export function getFileExtension(filepath: string) {
   return filepath.split(".").pop()!.toLocaleLowerCase();
 }
 
+/** 判断文件是否为已知代码文件，并返回语法高亮语言。 */
 export function checkCodeFile(
   filepath: string,
 ):
@@ -193,10 +196,12 @@ export function checkCodeFile(
   };
 }
 
+/** 判断文件扩展名是否可由浏览器直接预览。 */
 export function canBrowserPreviewFile(filepath: string) {
   return browserPreviewExtensions.has(getFileExtension(filepath));
 }
 
+/** 获取适合界面展示的文件类型名称。 */
 export function getFileExtensionDisplayName(filepath: string) {
   const fileName = getFileName(filepath);
   const extension = fileName.split(".").pop()!.toLocaleLowerCase();
@@ -219,6 +224,7 @@ export function getFileExtensionDisplayName(filepath: string) {
   }
 }
 
+/** 根据文件类型返回对应的图标组件。 */
 export function getFileIcon(filepath: string, className?: string) {
   const extension = getFileExtension(filepath);
   const { isCodeFile } = checkCodeFile(filepath);

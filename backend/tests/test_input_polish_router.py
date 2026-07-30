@@ -1,3 +1,4 @@
+'定义 test_input_polish_router 模块提供的职责与可复用接口'
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -15,6 +16,7 @@ def _config(
     max_chars: int = 4000,
     model_name: str | None = None,
 ):
+    '执行 _config 的明确职责，并返回与调用约定一致的结果'
     return SimpleNamespace(
         input_polish=SimpleNamespace(
             enabled=enabled,
@@ -25,6 +27,7 @@ def _config(
 
 
 def test_clean_rewritten_text_removes_think_and_fence():
+    '验证 clean、rewritten、text、removes、think、and、fence 场景下的预期行为、边界条件与结果'
     text = "<think>reasoning</think>\n```text\nrewrite this\n```"
     assert input_polish._clean_rewritten_text(text) == "rewrite this"
 
@@ -33,11 +36,13 @@ def test_clean_rewritten_text_keeps_literal_think_tag():
     # A polished draft may legitimately mention the <think> tag. The cleaner
     # must not truncate at the dangling open tag (which would drop the rest of
     # the rewrite and can surface as a spurious 503).
+    '验证 clean、rewritten、text、keeps、literal、think、tag 场景下的预期行为、边界条件与结果'
     text = "Explain what the <think> tag does in reasoning models."
     assert input_polish._clean_rewritten_text(text) == "Explain what the <think> tag does in reasoning models."
 
 
 def test_polish_input_uses_config_model_and_preserves_response(monkeypatch):
+    '验证 polish、input、uses、config、model、and、preserves、response 场景下的预期行为、边界条件与结果'
     request = input_polish.InputPolishRequest(
         text="/web-dev 做一个页面",
         locale="zh-CN",
@@ -70,6 +75,7 @@ def test_polish_input_uses_config_model_and_preserves_response(monkeypatch):
 
 
 def test_polish_input_uses_default_model_when_config_model_is_missing(monkeypatch):
+    '验证 polish、input、uses、default、model、when、config、model、is、missing 场景下的预期行为、边界条件与结果'
     request = input_polish.InputPolishRequest(text="make this clearer")
     fake_model = MagicMock()
     fake_model.ainvoke = AsyncMock(return_value=MagicMock(content="Make this clearer."))
@@ -91,6 +97,7 @@ def test_polish_input_uses_default_model_when_config_model_is_missing(monkeypatc
 
 
 def test_polish_input_returns_404_when_disabled(monkeypatch):
+    '验证 polish、input、returns、404、when、disabled 场景下的预期行为、边界条件与结果'
     request = input_polish.InputPolishRequest(text="hello")
     fake_model = MagicMock()
     monkeypatch.setattr(oneshot_llm, "create_chat_model", fake_model)
@@ -109,6 +116,7 @@ def test_polish_input_returns_404_when_disabled(monkeypatch):
 
 
 def test_polish_input_rejects_empty_or_too_long_input(monkeypatch):
+    '验证 polish、input、rejects、empty、or、too、long、input 场景下的预期行为、边界条件与结果'
     fake_model = MagicMock()
     monkeypatch.setattr(oneshot_llm, "create_chat_model", fake_model)
 
@@ -135,6 +143,7 @@ def test_polish_input_rejects_empty_or_too_long_input(monkeypatch):
 
 
 def test_polish_input_returns_503_on_model_error(monkeypatch):
+    '验证 polish、input、returns、503、on、model、error 场景下的预期行为、边界条件与结果'
     request = input_polish.InputPolishRequest(text="hello")
     fake_model = MagicMock()
     fake_model.ainvoke = AsyncMock(side_effect=RuntimeError("boom"))
@@ -155,6 +164,7 @@ def test_polish_input_returns_503_on_model_error(monkeypatch):
 def test_polish_input_rejects_whitespace_only_draft(monkeypatch):
     # A padded draft that is empty after normalization is rejected as empty,
     # matching the normalized view used for the model input.
+    '验证 polish、input、rejects、whitespace、only、draft 场景下的预期行为、边界条件与结果'
     fake_model = MagicMock()
     monkeypatch.setattr(oneshot_llm, "create_chat_model", fake_model)
 
@@ -175,6 +185,7 @@ def test_polish_input_validates_and_sends_normalized_text(monkeypatch):
     # The length boundary and the model input must agree on one normalized view:
     # a draft whose raw length exceeds max_chars only due to padding is accepted
     # (strip fits), and the model receives the stripped text, not the padding.
+    '验证 polish、input、validates、and、sends、normalized、text 场景下的预期行为、边界条件与结果'
     raw_draft = "   summarize report   "  # 22 chars raw, 16 chars stripped
     fake_model = MagicMock()
     fake_model.ainvoke = AsyncMock(return_value=MagicMock(content="Please summarize the report clearly."))

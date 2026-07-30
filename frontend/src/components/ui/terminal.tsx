@@ -21,9 +21,11 @@ interface SequenceContextValue {
 
 const SequenceContext = createContext<SequenceContextValue | null>(null);
 
+/** useSequence Hook：封装本模块所需的状态或上下文访问。 */
 const useSequence = () => useContext(SequenceContext);
 
 const ItemIndexContext = createContext<number | null>(null);
+/** useItemIndex Hook：封装本模块所需的状态或上下文访问。 */
 const useItemIndex = () => useContext(ItemIndexContext);
 
 interface AnimatedSpanProps extends MotionProps {
@@ -33,6 +35,7 @@ interface AnimatedSpanProps extends MotionProps {
   startOnView?: boolean;
 }
 
+/** AnimatedSpan 组件：提供对应的界面结构与交互语义。 */
 export const AnimatedSpan = ({
   children,
   delay = 0,
@@ -88,6 +91,7 @@ interface TypingAnimationProps extends MotionProps {
   startOnView?: boolean;
 }
 
+/** TypingAnimation 组件：提供对应的界面结构与交互语义。 */
 export const TypingAnimation = ({
   children,
   className,
@@ -188,6 +192,7 @@ interface TerminalProps {
   startOnView?: boolean;
 }
 
+/** Terminal 组件：提供对应的界面结构与交互语义。 */
 export const Terminal = ({
   children,
   className,

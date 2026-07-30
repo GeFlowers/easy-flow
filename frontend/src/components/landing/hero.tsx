@@ -28,6 +28,7 @@ const HERO_WORDS = [
   "Learn Anything",
 ];
 
+/** Hero 组件：提供对应的界面结构与交互语义。 */
 export function Hero({ className }: { className?: string }) {
   return (
     <div
@@ -90,6 +91,7 @@ export function Hero({ className }: { className?: string }) {
   );
 }
 
+/** HeroWordRotate 内部组件：组织对应的界面结构与交互语义。 */
 function HeroWordRotate({
   words,
   duration = 2200,
@@ -131,6 +133,7 @@ function HeroWordRotate({
   );
 }
 
+/** BytePlusIcon 内部组件：组织对应的界面结构与交互语义。 */
 function BytePlusIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg

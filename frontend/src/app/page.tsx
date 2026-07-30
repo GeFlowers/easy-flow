@@ -7,6 +7,7 @@ import { SandboxSection } from "@/components/landing/sections/sandbox-section";
 import { SkillsSection } from "@/components/landing/sections/skills-section";
 import { WhatsNewSection } from "@/components/landing/sections/whats-new-section";
 
+/** 渲染产品官网首页的各个落地页区块。 */
 export default function LandingPage() {
   return (
     <div className="min-h-screen w-full overflow-x-clip bg-[#0a0a0a]">

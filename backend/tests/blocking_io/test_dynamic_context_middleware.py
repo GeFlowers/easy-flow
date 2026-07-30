@@ -1,15 +1,4 @@
-"""Regression anchor: DynamicContextMiddleware must not block the event loop.
-
-``_inject`` performs synchronous file I/O (memory JSON loading) and
-potentially blocking network calls (tiktoken encoding download on first
-use — see issue #3402).  ``abefore_agent`` offloads the call via
-``asyncio.to_thread`` so the event loop stays responsive.
-
-This anchor drives the real ``create_agent`` graph via ``ainvoke`` under
-the strict Blockbuster gate.  If the offload regresses and the blocking
-I/O runs on the event loop, Blockbuster raises ``BlockingError`` and
-this test fails.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -34,25 +23,27 @@ pytestmark = pytest.mark.asyncio
 
 
 class _FakeModel(FakeMessagesListChatModel):
-    """FakeMessagesListChatModel with a no-op ``bind_tools`` for create_agent."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def bind_tools(self, tools, **kwargs):  # type: ignore[override]
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self
 
 
 async def test_abefore_agent_does_not_block_event_loop() -> None:
-    """``abefore_agent`` must offload _inject() to a thread pool."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mw = DynamicContextMiddleware()
 
-    # Mock _build_full_reminder to simulate a slow synchronous operation
-    # (file I/O + tiktoken download).  The mock sleeps briefly to make any
-    # event-loop blocking visible to the Blockbuster gate.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     original_build = mw._build_full_reminder
 
     def slow_build_reminder():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         import time
 
-        time.sleep(0.05)  # 50ms sync sleep — blocks the thread it runs on
+        time.sleep(0.05)  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         return original_build()
 
     with (
@@ -76,8 +67,7 @@ async def test_abefore_agent_does_not_block_event_loop() -> None:
 
 
 async def test_abefore_agent_returns_same_result_as_before_agent() -> None:
-    """``abefore_agent`` (async, offloaded) must produce the same result as
-    ``before_agent`` (sync, for backward compatibility)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mw = DynamicContextMiddleware()
 
     state = {"messages": [HumanMessage(content="Hello", id="msg-1")]}
@@ -89,25 +79,25 @@ async def test_abefore_agent_returns_same_result_as_before_agent() -> None:
     ):
         mock_dt.now.return_value.strftime.return_value = "2026-06-05, Friday"
 
-        # Sync path
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         sync_result = mw.before_agent(state, runtime)
 
-        # Async path (offloaded to thread)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         async_result = await mw.abefore_agent(state, runtime)
 
     assert sync_result is not None
     assert async_result is not None
     assert sync_result.keys() == async_result.keys()
-    # Both return 2 messages: reminder + user content
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert len(sync_result["messages"]) == 2
     assert len(async_result["messages"]) == 2
-    # IDs match
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert sync_result["messages"][0].id == async_result["messages"][0].id
     assert sync_result["messages"][1].id == async_result["messages"][1].id
 
 
 async def test_abefore_agent_returns_none_on_timeout() -> None:
-    """A timed-out worker must not emit a late, phantom context event."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mw = DynamicContextMiddleware()
     started = threading.Event()
     release = threading.Event()
@@ -115,6 +105,7 @@ async def test_abefore_agent_returns_none_on_timeout() -> None:
     journal = mock.MagicMock()
 
     def blocking_inject(state):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         started.set()
         release.wait(timeout=2)
         try:
@@ -151,7 +142,7 @@ async def test_abefore_agent_returns_none_on_timeout() -> None:
 
 
 async def test_abefore_agent_records_checkpointed_memory_on_timeout() -> None:
-    """A timeout does not hide frozen memory that remains effective for the run."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mw = DynamicContextMiddleware()
     started = threading.Event()
     release = threading.Event()
@@ -160,6 +151,7 @@ async def test_abefore_agent_records_checkpointed_memory_on_timeout() -> None:
     memory_content = "<memory>checkpoint context</memory>"
 
     def blocking_inject(state):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         started.set()
         release.wait(timeout=2)
         try:

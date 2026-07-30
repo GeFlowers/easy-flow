@@ -1,4 +1,4 @@
-"""Configuration for tool output budget protection."""
+"""提供配置、tool、output、配置相关功能。"""
 
 from __future__ import annotations
 
@@ -6,13 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class ToolOutputConfig(BaseModel):
-    """Config section for tool-result output budget enforcement.
-
-    When a tool returns more than ``externalize_min_chars`` characters,
-    the full output is persisted to disk and replaced with a compact
-    preview + file reference.  If disk persistence is unavailable the
-    output falls back to head+tail truncation.
-    """
+    """\u6267\u884c ToolOutputConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=True,

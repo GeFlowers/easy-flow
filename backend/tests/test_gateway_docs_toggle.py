@@ -1,9 +1,4 @@
-"""Tests for GATEWAY_ENABLE_DOCS configuration toggle.
-
-Verifies that Swagger UI (/docs), ReDoc (/redoc), and the OpenAPI schema
-(/openapi.json) can be disabled via the GATEWAY_ENABLE_DOCS environment
-variable for production deployments.
-"""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -15,7 +10,7 @@ from fastapi.testclient import TestClient
 
 
 def _reset_gateway_config():
-    """Reset the cached gateway config so env changes take effect."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     import app.gateway.config as cfg
 
     cfg._gateway_config = None
@@ -23,19 +18,19 @@ def _reset_gateway_config():
 
 @pytest.fixture(autouse=True)
 def _clean_config():
-    """Ensure gateway config cache is cleared before and after each test."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _reset_gateway_config()
     yield
     _reset_gateway_config()
 
 
 # ---------------------------------------------------------------------------
-# Config parsing
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_enable_docs_defaults_to_true():
-    """When GATEWAY_ENABLE_DOCS is not set, enable_docs should be True."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch.dict(os.environ, {}, clear=False):
         if "GATEWAY_ENABLE_DOCS" in os.environ:
             del os.environ["GATEWAY_ENABLE_DOCS"]
@@ -47,7 +42,7 @@ def test_enable_docs_defaults_to_true():
 
 
 def test_enable_docs_false():
-    """GATEWAY_ENABLE_DOCS=false should disable docs."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch.dict(os.environ, {"GATEWAY_ENABLE_DOCS": "false"}):
         _reset_gateway_config()
         from app.gateway.config import get_gateway_config
@@ -57,7 +52,7 @@ def test_enable_docs_false():
 
 
 def test_enable_docs_case_insensitive():
-    """GATEWAY_ENABLE_DOCS is case-insensitive (FALSE, False, false)."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     for value in ("FALSE", "False", "false"):
         with patch.dict(os.environ, {"GATEWAY_ENABLE_DOCS": value}):
             _reset_gateway_config()
@@ -68,7 +63,7 @@ def test_enable_docs_case_insensitive():
 
 
 def test_enable_docs_unexpected_value_disables():
-    """Any non-'true' value should disable docs (fail-closed)."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     for value in ("0", "no", "off", "anything"):
         with patch.dict(os.environ, {"GATEWAY_ENABLE_DOCS": value}):
             _reset_gateway_config()
@@ -79,12 +74,12 @@ def test_enable_docs_unexpected_value_disables():
 
 
 # ---------------------------------------------------------------------------
-# App-level endpoint visibility
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_docs_endpoints_available_by_default():
-    """With enable_docs=True (default), /docs, /redoc, /openapi.json return 200."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch.dict(os.environ, {}, clear=False):
         if "GATEWAY_ENABLE_DOCS" in os.environ:
             del os.environ["GATEWAY_ENABLE_DOCS"]
@@ -99,7 +94,7 @@ def test_docs_endpoints_available_by_default():
 
 
 def test_docs_endpoints_disabled_when_false():
-    """With GATEWAY_ENABLE_DOCS=false, /docs, /redoc, /openapi.json return 404."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch.dict(os.environ, {"GATEWAY_ENABLE_DOCS": "false"}):
         _reset_gateway_config()
         from app.gateway.app import create_app
@@ -112,7 +107,7 @@ def test_docs_endpoints_disabled_when_false():
 
 
 def test_health_still_works_when_docs_disabled():
-    """Disabling docs should NOT affect /health or other normal endpoints."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch.dict(os.environ, {"GATEWAY_ENABLE_DOCS": "false"}):
         _reset_gateway_config()
         from app.gateway.app import create_app
@@ -125,11 +120,12 @@ def test_health_still_works_when_docs_disabled():
 
 
 # ---------------------------------------------------------------------------
-# Runtime CORS behavior
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def _make_gateway_client(cors_origins: str) -> TestClient:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     with patch.dict(os.environ, {"GATEWAY_CORS_ORIGINS": cors_origins}):
         _reset_gateway_config()
         from app.gateway.app import create_app
@@ -138,7 +134,7 @@ def _make_gateway_client(cors_origins: str) -> TestClient:
 
 
 def test_gateway_cors_allows_configured_origin():
-    """GATEWAY_CORS_ORIGINS should control actual browser CORS responses."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     client = _make_gateway_client("https://app.example")
 
     response = client.get("/health", headers={"Origin": "https://app.example"})
@@ -149,6 +145,7 @@ def test_gateway_cors_allows_configured_origin():
 
 
 def test_gateway_cors_rejects_unconfigured_origin():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     client = _make_gateway_client("https://app.example")
 
     response = client.get("/health", headers={"Origin": "https://evil.example"})
@@ -158,6 +155,7 @@ def test_gateway_cors_rejects_unconfigured_origin():
 
 
 def test_gateway_cors_normalizes_configured_default_port():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     client = _make_gateway_client("https://app.example:443")
 
     response = client.get("/health", headers={"Origin": "https://app.example"})

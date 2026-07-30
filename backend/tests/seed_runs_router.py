@@ -1,27 +1,4 @@
-"""Test-only run/message seeder for the multi-run render-order e2e (issue #3352).
-
-Mounted **only** by ``scripts/run_replay_gateway.py`` (the replay e2e gateway)
-and never by the production app, so it cannot ship. It lets a Playwright spec
-stand up a thread with >=2 runs whose per-run messages exercise the frontend's
-reload / history-rebuild ordering path — with no real model, no recording, and
-no API key.
-
-Why a seeder instead of recording a conversation: issue #3352 only reproduces
-when the checkpoint no longer holds the older messages (post-compression), so
-the frontend rebuilds them from the per-run history endpoints. A seeder lets us
-create exactly that precondition deterministically — runs in the run store +
-per-run ``category="message"`` events, and **no checkpoint** — so on reload the
-buggy ``findLatestUnloadedRunIndex`` + prepend in ``core/threads/hooks.ts`` is
-the sole source of truth and its reversed order becomes observable.
-
-It writes through the gateway's OWN ``app.state.run_store`` +
-``app.state.run_event_store`` using the request's auth context, so the seeded
-``user_id`` matches the browser session that reads it back. The event shape
-mirrors exactly what ``runtime/journal.py`` writes for real runs
-(``event_type`` ``llm.human.input`` / ``llm.ai.response``, ``category``
-``"message"``, ``content`` = ``message.model_dump()``, ``metadata.caller`` =
-``"lead_agent"``).
-"""
+'定义 seed_runs_router 模块提供的职责与可复用接口。\n\nTest-only run/message seeder for the multi-run render-order e2e (issue #3352).\n\nMounted **only** by ``scripts/run_replay_gateway.py`` (the replay e2e gateway)\nand never by the production app, so it cannot ship. It lets a Playwright spec\nstand up a thread with >=2 runs whose per-run messages exercise the frontend\'s\nreload / history-rebuild ordering path — with no real model, no recording, and\nno API key.\n\nWhy a seeder instead of recording a conversation: issue #3352 only reproduces\nwhen the checkpoint no longer holds the older messages (post-compression), so\nthe frontend rebuilds them from the per-run history endpoints. A seeder lets us\ncreate exactly that precondition deterministically — runs in the run store +\nper-run ``category="message"`` events, and **no checkpoint** — so on reload the\nbuggy ``findLatestUnloadedRunIndex`` + prepend in ``core/threads/hooks.ts`` is\nthe sole source of truth and its reversed order becomes observable.\n\nIt writes through the gateway\'s OWN ``app.state.run_store`` +\n``app.state.run_event_store`` using the request\'s auth context, so the seeded\n``user_id`` matches the browser session that reads it back. The event shape\nmirrors exactly what ``runtime/journal.py`` writes for real runs\n(``event_type`` ``llm.human.input`` / ``llm.ai.response``, ``category``\n``"message"``, ``content`` = ``message.model_dump()``, ``metadata.caller`` =\n``"lead_agent"``).\n'
 
 from __future__ import annotations
 
@@ -38,12 +15,14 @@ _EVENT_TYPE = {"human": "llm.human.input", "ai": "llm.ai.response"}
 
 
 class SeedMessage(BaseModel):
+    '封装 SeedMessage 的状态、协作关系与公开操作'
     role: Literal["human", "ai"]
     content: str
     id: str
 
 
 class SeedRun(BaseModel):
+    '封装 SeedRun 的状态、协作关系与公开操作'
     run_id: str
     # ISO timestamp; RunManager.list_by_thread sorts newest-first by created_at,
     # so a later created_at must mean a later run for the ordering to be faithful.
@@ -52,18 +31,14 @@ class SeedRun(BaseModel):
 
 
 class SeedRunsBody(BaseModel):
+    '封装 SeedRunsBody 的状态、协作关系与公开操作'
     thread_id: str
     runs: list[SeedRun]
 
 
 @router.post("/seed-runs")
 async def seed_runs(body: SeedRunsBody, request: Request) -> dict:
-    """Seed runs + per-run message events for the authenticated user.
-
-    No checkpoint is written: that is the whole point — it forces the frontend's
-    reload path to rebuild history from the per-run endpoints (the #3352 bug
-    site) instead of the (correctly ordered) checkpoint snapshot.
-    """
+    "执行 seed_runs 的明确职责，并返回与调用约定一致的结果。\n\nSeed runs + per-run message events for the authenticated user.\n\n    No checkpoint is written: that is the whole point — it forces the frontend's\n    reload path to rebuild history from the per-run endpoints (the #3352 bug\n    site) instead of the (correctly ordered) checkpoint snapshot.\n    "
     from langchain_core.messages import AIMessage, HumanMessage
 
     run_store = request.app.state.run_store

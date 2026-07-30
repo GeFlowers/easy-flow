@@ -4,6 +4,11 @@ import { MOCK_THREAD_ID, mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe.configure({ mode: "serial" });
 
+/**
+ * 覆盖“scheduled tasks page is reachable from sidebar”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("scheduled tasks page is reachable from sidebar", async ({ page }) => {
   mockLangGraphAPI(page, {
     threads: [],
@@ -37,6 +42,11 @@ test("scheduled tasks page is reachable from sidebar", async ({ page }) => {
   ).toBeVisible();
   await expect(page.getByTestId("scheduled-task-runs")).toContainText("0 runs");
 });
+
+/**
+ * 覆盖“thread page links to filtered scheduled tasks”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("thread page links to filtered scheduled tasks", async ({ page }) => {
   mockLangGraphAPI(page, {
@@ -76,6 +86,11 @@ test("thread page links to filtered scheduled tasks", async ({ page }) => {
   await page.waitForURL(new RegExp(`thread_id=${MOCK_THREAD_ID}`));
 });
 
+/**
+ * 覆盖“user can create a scheduled task from the page”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("user can create a scheduled task from the page", async ({ page }) => {
   mockLangGraphAPI(page, { threads: [], scheduledTasks: [] });
 
@@ -93,6 +108,11 @@ test("user can create a scheduled task from the page", async ({ page }) => {
     page.getByTestId("scheduled-task-detail").getByText("Summarize thread"),
   ).toBeVisible();
 });
+
+/**
+ * 覆盖“user can pause a scheduled task from the detail pane”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("user can pause a scheduled task from the detail pane", async ({
   page,
@@ -129,6 +149,11 @@ test("user can pause a scheduled task from the detail pane", async ({
   ).toBeVisible();
 });
 
+/**
+ * 覆盖“trigger shows a run entry in the detail pane”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("trigger shows a run entry in the detail pane", async ({ page }) => {
   mockLangGraphAPI(page, {
     threads: [],
@@ -160,6 +185,11 @@ test("trigger shows a run entry in the detail pane", async ({ page }) => {
     page.getByTestId("scheduled-task-run-list").getByText(/Manual · Success/i),
   ).toBeVisible();
 });
+
+/**
+ * 覆盖“detail pane falls back to a visible task after filters hide the selected task”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("detail pane falls back to a visible task after filters hide the selected task", async ({
   page,

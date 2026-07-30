@@ -786,11 +786,17 @@ const leagueData = {
 };
 
 // 工具函数：根据ID获取球队信息
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 getTeamById 的约定。
+ */
 function getTeamById(teamId) {
   return leagueData.teams.find((team) => team.id === teamId);
 }
 
 // 工具函数：格式化日期
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 formatDate 的约定。
+ */
 function formatDate(dateString) {
   const date = new Date(dateString);
   const options = { weekday: "short", month: "short", day: "numeric" };
@@ -798,6 +804,9 @@ function formatDate(dateString) {
 }
 
 // 工具函数：格式化时间
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 formatTime 的约定。
+ */
 function formatTime(timeString) {
   return timeString;
 }

@@ -1,6 +1,4 @@
-"""
-Unit tests for MindIEChatModel adapter.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from unittest.mock import AsyncMock, patch
 
@@ -8,7 +6,7 @@ import pytest
 from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-# ── Import the module under test ──────────────────────────────────────────────
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 from deerflow.models.mindie_provider import (
     MindIEChatModel,
     _fix_messages,
@@ -16,11 +14,12 @@ from deerflow.models.mindie_provider import (
 )
 
 # ═════════════════════════════════════════════════════════════════════════════
-# Helpers
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 def _make_chat_result(content: str, tool_calls=None) -> ChatResult:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     msg = AIMessage(content=content)
     if tool_calls:
         msg.tool_calls = tool_calls
@@ -29,14 +28,16 @@ def _make_chat_result(content: str, tool_calls=None) -> ChatResult:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 1.  _fix_messages
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 class TestFixMessages:
-    # ── list content → str ────────────────────────────────────────────────────
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_list_content_extracted_to_str(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = HumanMessage(
             content=[
                 {"type": "text", "text": "Hello"},
@@ -47,6 +48,7 @@ class TestFixMessages:
         assert result[0].content == "Hello world"
 
     def test_list_content_ignores_non_text_blocks(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = HumanMessage(
             content=[
                 {"type": "image_url", "image_url": "http://x.com/img.png"},
@@ -57,25 +59,29 @@ class TestFixMessages:
         assert result[0].content == "caption"
 
     def test_empty_list_content_becomes_space(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = HumanMessage(content=[])
         result = _fix_messages([msg])
         assert result[0].content == " "
 
-    # ── plain str content ─────────────────────────────────────────────────────
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_plain_string_content_preserved(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = HumanMessage(content="hi there")
         result = _fix_messages([msg])
         assert result[0].content == "hi there"
 
     def test_empty_string_content_becomes_space(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = HumanMessage(content="")
         result = _fix_messages([msg])
         assert result[0].content == " "
 
-    # ── AIMessage with tool_calls → XML ───────────────────────────────────────
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_ai_message_with_tool_calls_serialised_to_xml(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = AIMessage(
             content="Sure",
             tool_calls=[
@@ -95,6 +101,7 @@ class TestFixMessages:
         assert not getattr(out, "tool_calls", [])
 
     def test_ai_message_text_preserved_before_xml(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = AIMessage(
             content="Here you go",
             tool_calls=[{"name": "search", "args": {"q": "pytest"}, "id": "x"}],
@@ -103,6 +110,7 @@ class TestFixMessages:
         assert result[0].content.startswith("Here you go")
 
     def test_ai_message_multiple_tool_calls(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = AIMessage(
             content="",
             tool_calls=[
@@ -117,6 +125,7 @@ class TestFixMessages:
         assert "<function=tool_b>" in content
 
     def test_ai_message_tool_args_are_xml_escaped(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = AIMessage(
             content="",
             tool_calls=[
@@ -132,9 +141,10 @@ class TestFixMessages:
         assert "<function=fn&lt;&amp;&gt;>" in content
         assert "<parameter=k&lt;&amp;&gt;>v&lt;&amp;&gt;</parameter>" in content
 
-    # ── ToolMessage → HumanMessage ────────────────────────────────────────────
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_tool_message_becomes_human_message(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = ToolMessage(content="42 degrees", tool_call_id="call_abc")
         result = _fix_messages([msg])
         out = result[0]
@@ -143,6 +153,7 @@ class TestFixMessages:
         assert "42 degrees" in out.content
 
     def test_tool_message_with_list_content(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = ToolMessage(
             content=[{"type": "text", "text": "result"}],
             tool_call_id="call_xyz",
@@ -151,9 +162,10 @@ class TestFixMessages:
         assert isinstance(result[0], HumanMessage)
         assert "result" in result[0].content
 
-    # ── Mixed message list ────────────────────────────────────────────────────
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_mixed_message_types_ordering_preserved(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msgs = [
             HumanMessage(content="q"),
             AIMessage(content="a"),
@@ -165,27 +177,31 @@ class TestFixMessages:
         assert isinstance(result[2], HumanMessage)
         assert result[3].content == "follow up"
 
-    # ── SystemMessage pass-through ────────────────────────────────────────────
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_system_message_passed_through_unchanged(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         msg = SystemMessage(content="You are helpful.")
         result = _fix_messages([msg])
         assert result[0].content == "You are helpful."
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 2.  _parse_xml_tool_call_to_dict
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 class TestParseXmlToolCalls:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_no_tool_call_returns_original(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "Just a normal reply."
         clean, calls = _parse_xml_tool_call_to_dict(content)
         assert clean == content
         assert calls == []
 
     def test_single_tool_call_parsed(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "<tool_call> <function=search> <parameter=query>pytest</parameter> </function> </tool_call>"
         clean, calls = _parse_xml_tool_call_to_dict(content)
         assert clean == ""
@@ -195,6 +211,7 @@ class TestParseXmlToolCalls:
         assert calls[0]["id"].startswith("call_")
 
     def test_multiple_tool_calls_parsed(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "<tool_call><function=a><parameter=x>1</parameter></function></tool_call><tool_call><function=b><parameter=y>2</parameter></function></tool_call>"
         _, calls = _parse_xml_tool_call_to_dict(content)
         assert len(calls) == 2
@@ -202,6 +219,7 @@ class TestParseXmlToolCalls:
         assert calls[1]["name"] == "b"
 
     def test_nested_tool_call_blocks_do_not_break_parsing(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "<tool_call><function=outer><parameter=q>1</parameter><tool_call><function=inner><parameter=x>2</parameter></function></tool_call></function></tool_call>"
         clean, calls = _parse_xml_tool_call_to_dict(content)
         assert clean == ""
@@ -211,47 +229,56 @@ class TestParseXmlToolCalls:
         assert "x" not in calls[0]["args"]
 
     def test_text_before_tool_call_preserved(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "Here is the answer.\n<tool_call><function=f><parameter=k>v</parameter></function></tool_call>"
         clean, calls = _parse_xml_tool_call_to_dict(content)
         assert clean == "Here is the answer."
         assert len(calls) == 1
 
     def test_integer_param_deserialised(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "<tool_call><function=f><parameter=n>42</parameter></function></tool_call>"
         _, calls = _parse_xml_tool_call_to_dict(content)
         assert calls[0]["args"]["n"] == 42
 
     def test_list_param_deserialised(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = '<tool_call><function=f><parameter=lst>["a","b"]</parameter></function></tool_call>'
         _, calls = _parse_xml_tool_call_to_dict(content)
         assert calls[0]["args"]["lst"] == ["a", "b"]
 
     def test_dict_param_deserialised(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = '<tool_call><function=f><parameter=d>{"k": 1}</parameter></function></tool_call>'
         _, calls = _parse_xml_tool_call_to_dict(content)
         assert calls[0]["args"]["d"] == {"k": 1}
 
     def test_bool_param_deserialised(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "<tool_call><function=f><parameter=flag>true</parameter></function></tool_call>"
         _, calls = _parse_xml_tool_call_to_dict(content)
         assert calls[0]["args"]["flag"] is True
 
     def test_malformed_param_stays_string(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "<tool_call><function=f><parameter=bad>{broken json</parameter></function></tool_call>"
         _, calls = _parse_xml_tool_call_to_dict(content)
         assert calls[0]["args"]["bad"] == "{broken json"
 
     def test_non_string_input_returned_as_is(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         result = _parse_xml_tool_call_to_dict(None)
         assert result == (None, [])
 
     def test_unique_ids_generated(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         block = "<tool_call><function=f><parameter=k>v</parameter></function></tool_call>"
         _, c1 = _parse_xml_tool_call_to_dict(block)
         _, c2 = _parse_xml_tool_call_to_dict(block)
         assert c1[0]["id"] != c2[0]["id"]
 
     def test_escaped_entities_are_unescaped(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = "<tool_call><function=fn&lt;&amp;&gt;><parameter=k&lt;&amp;&gt;>v&lt;&amp;&gt;</parameter></function></tool_call>"
         _, calls = _parse_xml_tool_call_to_dict(content)
         assert calls[0]["name"] == "fn<&>"
@@ -259,29 +286,34 @@ class TestParseXmlToolCalls:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 3.  MindIEChatModel._patch_result_with_tools
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 class TestPatchResult:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def _model(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         with patch.object(MindIEChatModel, "__init__", return_value=None):
             m = MindIEChatModel.__new__(MindIEChatModel)
         return m
 
     def test_escaped_newlines_fixed(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         model = self._model()
         result = _make_chat_result("line1\\nline2")
         patched = model._patch_result_with_tools(result)
         assert patched.generations[0].message.content == "line1\nline2"
 
     def test_escaped_newlines_inside_code_fence_preserved(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         model = self._model()
         result = _make_chat_result('text\\n```json\n{"k":"a\\\\nb"}\n```\\nend')
         patched = model._patch_result_with_tools(result)
         assert patched.generations[0].message.content == 'text\n```json\n{"k":"a\\\\nb"}\n```\nend'
 
     def test_xml_tool_calls_extracted(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         model = self._model()
         content = "<tool_call><function=calc><parameter=expr>1+1</parameter></function></tool_call>"
         result = _make_chat_result(content)
@@ -292,6 +324,7 @@ class TestPatchResult:
         assert msg.tool_calls[0]["name"] == "calc"
 
     def test_patch_result_appends_to_existing_tool_calls(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         model = self._model()
         existing = [{"name": "existing", "args": {}, "id": "e1"}]
         content = "<tool_call><function=new_tool><parameter=k>v</parameter></function></tool_call>"
@@ -304,12 +337,14 @@ class TestPatchResult:
         assert "new_tool" in names
 
     def test_no_tool_call_content_unchanged(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         model = self._model()
         result = _make_chat_result("plain reply")
         patched = model._patch_result_with_tools(result)
         assert patched.generations[0].message.content == "plain reply"
 
     def test_non_string_content_skipped(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         model = self._model()
         msg = AIMessage(content=[{"type": "text", "text": "hi"}])
         gen = ChatGeneration(message=msg)
@@ -319,10 +354,13 @@ class TestPatchResult:
 
 
 class TestMindIEInit:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_timeout_kwargs_are_normalized(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         captured = {}
 
         def fake_init(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
 
         with patch("deerflow.models.mindie_provider.ChatOpenAI.__init__", new=fake_init):
@@ -343,9 +381,11 @@ class TestMindIEInit:
         assert timeout.pool == 4.0
 
     def test_explicit_timeout_takes_precedence(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         captured = {}
 
         def fake_init(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
 
         with patch("deerflow.models.mindie_provider.ChatOpenAI.__init__", new=fake_init):
@@ -363,12 +403,14 @@ class TestMindIEInit:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 4.  MindIEChatModel._generate  (sync)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 class TestGenerate:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_generate_calls_fix_messages_and_patch(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with patch("deerflow.models.mindie_provider.ChatOpenAI._generate") as mock_super_gen, patch.object(MindIEChatModel, "__init__", return_value=None):
             mock_super_gen.return_value = _make_chat_result("hello")
             model = MindIEChatModel.__new__(MindIEChatModel)
@@ -383,13 +425,15 @@ class TestGenerate:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 5.  MindIEChatModel._agenerate  (async)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 class TestAGenerate:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     @pytest.mark.asyncio
     async def test_agenerate_patches_result(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with patch("deerflow.models.mindie_provider.ChatOpenAI._agenerate", new_callable=AsyncMock) as mock_ag, patch.object(MindIEChatModel, "__init__", return_value=None):
             mock_ag.return_value = _make_chat_result("world\\nfoo")
             model = MindIEChatModel.__new__(MindIEChatModel)
@@ -399,12 +443,14 @@ class TestAGenerate:
 
 
 # ═════════════════════════════════════════════════════════════════════════════
-# 6.  MindIEChatModel._astream  (async generator)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ═════════════════════════════════════════════════════════════════════════════
 
 
 class TestAStream:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     async def _collect(self, gen):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         chunks = []
         async for chunk in gen:
             chunks.append(chunk)
@@ -412,10 +458,12 @@ class TestAStream:
 
     @pytest.mark.asyncio
     async def test_no_tools_uses_real_stream(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from langchain_core.messages import AIMessageChunk
         from langchain_core.outputs import ChatGenerationChunk
 
         async def fake_stream(*args, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             for char in ["hel", "lo"]:
                 yield ChatGenerationChunk(message=AIMessageChunk(content=char))
 
@@ -427,10 +475,12 @@ class TestAStream:
 
     @pytest.mark.asyncio
     async def test_no_tools_fixes_escaped_newlines_in_stream(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from langchain_core.messages import AIMessageChunk
         from langchain_core.outputs import ChatGenerationChunk
 
         async def fake_stream(*args, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             yield ChatGenerationChunk(message=AIMessageChunk(content="a\\nb"))
 
         with patch("deerflow.models.mindie_provider.ChatOpenAI._astream", side_effect=fake_stream), patch.object(MindIEChatModel, "__init__", return_value=None):
@@ -441,6 +491,7 @@ class TestAStream:
 
     @pytest.mark.asyncio
     async def test_with_tools_fake_streams_text_in_chunks(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with patch.object(MindIEChatModel, "_agenerate", new_callable=AsyncMock) as mock_ag, patch.object(MindIEChatModel, "__init__", return_value=None):
             long_text = "A" * 50
             mock_ag.return_value = _make_chat_result(long_text)
@@ -454,6 +505,7 @@ class TestAStream:
 
     @pytest.mark.asyncio
     async def test_with_tools_emits_tool_call_chunk(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         tool_calls = [{"name": "fn", "args": {}, "id": "c1"}]
         with patch.object(MindIEChatModel, "_agenerate", new_callable=AsyncMock) as mock_ag, patch.object(MindIEChatModel, "__init__", return_value=None):
             mock_ag.return_value = _make_chat_result("ok", tool_calls=tool_calls)
@@ -467,6 +519,7 @@ class TestAStream:
 
     @pytest.mark.asyncio
     async def test_with_tools_empty_text_still_emits_tool_chunk(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         tool_calls = [{"name": "x", "args": {}, "id": "c2"}]
         with patch.object(MindIEChatModel, "_agenerate", new_callable=AsyncMock) as mock_ag, patch.object(MindIEChatModel, "__init__", return_value=None):
             mock_ag.return_value = _make_chat_result("", tool_calls=tool_calls)

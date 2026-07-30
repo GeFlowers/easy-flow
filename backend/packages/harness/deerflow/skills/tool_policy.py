@@ -1,3 +1,4 @@
+'定义 tool_policy 模块提供的职责与可复用接口'
 import logging
 from typing import Protocol
 
@@ -7,6 +8,7 @@ logger = logging.getLogger(__name__)
 
 
 class NamedTool(Protocol):
+    '封装 NamedTool 的状态、协作关系与公开操作'
     name: str
 
 
@@ -17,13 +19,7 @@ ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES = frozenset({"read_file", "review_skill_pack
 
 
 def allowed_tool_names_for_skills(skills: list[Skill]) -> set[str] | None:
-    """Return the union of explicit skill allowed-tools declarations.
-
-    None means legacy allow-all behavior. It is returned only when no loaded
-    skill declares allowed-tools. Once any skill declares the field, legacy
-    skills without the field contribute no tools instead of disabling the
-    explicit restrictions from other skills.
-    """
+    '执行 allowed_tool_names_for_skills 的明确职责，并返回与调用约定一致的结果。\n\nReturn the union of explicit skill allowed-tools declarations.\n\n    None means legacy allow-all behavior. It is returned only when no loaded\n    skill declares allowed-tools. Once any skill declares the field, legacy\n    skills without the field contribute no tools instead of disabling the\n    explicit restrictions from other skills.\n    '
     if not skills:
         return None
 
@@ -48,6 +44,7 @@ def filter_tools_by_skill_allowed_tools[ToolT: NamedTool](
     *,
     always_allowed_tool_names: set[str] | frozenset[str] = frozenset(),
 ) -> list[ToolT]:
+    '执行 filter_tools_by_skill_allowed_tools 的明确职责，并返回与调用约定一致的结果'
     allowed = allowed_tool_names_for_skills(skills)
     if allowed is None:
         return tools

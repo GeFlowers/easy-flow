@@ -1,17 +1,4 @@
-"""``BoxliteBox`` — DeerFlow :class:`Sandbox` backed by a BoxLite micro-VM.
-
-DeerFlow's ``Sandbox`` contract is synchronous; BoxLite's SDK is async-native and
-its box handles are event-loop-affine. The provider (:mod:`.provider`) owns one
-private asyncio loop on a daemon thread and injects a ``run`` callable that
-marshals each coroutine onto it via ``run_coroutine_threadsafe`` — so every op
-runs on the loop the box was started on, and stays safe no matter which
-``asyncio.to_thread`` worker DeerFlow invokes us from.
-
-Every operation is a shell command run inside the box (``cat`` / ``find`` /
-``grep`` / chunked ``base64``), parsed with the shared ``deerflow.sandbox.search``
-helpers — the same exec-driven approach as ``community/e2b_sandbox``. Commands
-use only busybox-portable flags so any OCI image works.
-"""
+"定义 box 模块提供的职责与可复用接口。\n\n``BoxliteBox`` — DeerFlow :class:`Sandbox` backed by a BoxLite micro-VM.\n\nDeerFlow's ``Sandbox`` contract is synchronous; BoxLite's SDK is async-native and\nits box handles are event-loop-affine. The provider (:mod:`.provider`) owns one\nprivate asyncio loop on a daemon thread and injects a ``run`` callable that\nmarshals each coroutine onto it via ``run_coroutine_threadsafe`` — so every op\nruns on the loop the box was started on, and stays safe no matter which\n``asyncio.to_thread`` worker DeerFlow invokes us from.\n\nEvery operation is a shell command run inside the box (``cat`` / ``find`` /\n``grep`` / chunked ``base64``), parsed with the shared ``deerflow.sandbox.search``\nhelpers — the same exec-driven approach as ``community/e2b_sandbox``. Commands\nuse only busybox-portable flags so any OCI image works.\n"
 
 from __future__ import annotations
 
@@ -45,17 +32,7 @@ _B64_CHUNK = 60000
 
 
 class BoxliteBox(Sandbox):
-    """Adapter that delegates to a running BoxLite ``SimpleBox``.
-
-    Args:
-        id: DeerFlow-side sandbox id (the BoxLite box id).
-        box: A started async ``SimpleBox``. The provider owns its lifecycle; this
-            adapter stops it on :meth:`close`.
-        run: Runs a coroutine on the provider's private loop, returning its result
-            (blocking the caller thread).
-        default_env: Static environment merged into every command, overridden by
-            per-call ``env`` (request-scoped secrets).
-    """
+    "封装 BoxliteBox 的状态、协作关系与公开操作。\n\nAdapter that delegates to a running BoxLite ``SimpleBox``.\n\n    Args:\n        id: DeerFlow-side sandbox id (the BoxLite box id).\n        box: A started async ``SimpleBox``. The provider owns its lifecycle; this\n            adapter stops it on :meth:`close`.\n        run: Runs a coroutine on the provider's private loop, returning its result\n            (blocking the caller thread).\n        default_env: Static environment merged into every command, overridden by\n            per-call ``env`` (request-scoped secrets).\n    "
 
     TERMINAL_ERROR_MARKERS = (
         "vsock",
@@ -83,6 +60,7 @@ class BoxliteBox(Sandbox):
         default_env: dict[str, str] | None = None,
         on_terminal_failure: Callable[[str, str], None] | None = None,
     ) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__(id)
         self._box = box
         self._run = run
@@ -93,6 +71,7 @@ class BoxliteBox(Sandbox):
 
     @classmethod
     def _is_terminal_box_failure(cls, error: Exception) -> bool:
+        '执行 _is_terminal_box_failure 的明确职责，并返回与调用约定一致的结果'
         if isinstance(error, (BrokenPipeError, ConnectionError, EOFError)):
             return True
         if not isinstance(error, RuntimeError | OSError):
@@ -110,6 +89,7 @@ class BoxliteBox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ):
+        '执行 _exec 的明确职责，并返回与调用约定一致的结果'
         try:
             with self._lock:
                 if self._closed:
@@ -130,9 +110,11 @@ class BoxliteBox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ):
+        '执行 _sh 的明确职责，并返回与调用约定一致的结果'
         return self._exec("sh", "-lc", script, env=env, timeout=timeout)
 
     def close(self) -> None:
+        '执行 close 的明确职责，并返回与调用约定一致的结果'
         with self._lock:
             if self._closed:
                 return
@@ -144,6 +126,7 @@ class BoxliteBox(Sandbox):
 
     @property
     def is_closed(self) -> bool:
+        '判断条件是否成立并返回布尔结果，并遵守 is_closed 所表达的接口约束'
         with self._lock:
             return self._closed
 
@@ -151,6 +134,7 @@ class BoxliteBox(Sandbox):
 
     @staticmethod
     def _guard_traversal(path: str) -> str:
+        '执行 _guard_traversal 的明确职责，并返回与调用约定一致的结果'
         if not path:
             raise ValueError("path must be a non-empty string")
         normalized = path.replace("\\", "/")
@@ -162,6 +146,7 @@ class BoxliteBox(Sandbox):
     def _resolve_path(self, path: str) -> str:
         # The provider materialises the /mnt/user-data prefix on the box rootfs,
         # so DeerFlow's virtual paths are used as-is; we only reject traversal.
+        '执行 _resolve_path 的明确职责，并返回与调用约定一致的结果'
         return self._guard_traversal(path)
 
     # ── command execution ───────────────────────────────────────────────
@@ -172,17 +157,7 @@ class BoxliteBox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> str:
-        """Run ``command`` through a shell in the box and return its output.
-
-        DeerFlow passes a bash command *string*; BoxLite's ``exec`` takes argv, so
-        it runs through ``sh -lc``. Per-call ``env`` is layered over the static
-        config environment and scoped to this command only.
-
-        *timeout* bounds both layers: BoxLite's SDK ``exec(timeout=...)`` handles
-        command timeout inside the VM, and the event-loop bridge receives the
-        same value so ``run_coroutine_threadsafe(...).result(timeout)`` cannot
-        block the caller forever if the SDK future itself never resolves.
-        """
+        "执行 execute_command 的明确职责，并返回与调用约定一致的结果。\n\nRun ``command`` through a shell in the box and return its output.\n\n        DeerFlow passes a bash command *string*; BoxLite's ``exec`` takes argv, so\n        it runs through ``sh -lc``. Per-call ``env`` is layered over the static\n        config environment and scoped to this command only.\n\n        *timeout* bounds both layers: BoxLite's SDK ``exec(timeout=...)`` handles\n        command timeout inside the VM, and the event-loop bridge receives the\n        same value so ``run_coroutine_threadsafe(...).result(timeout)`` cannot\n        block the caller forever if the SDK future itself never resolves.\n        "
         _validate_extra_env(env)  # POSIX env-var key rule; raises ValueError on a bad key
         if self.is_closed:
             return "Error: sandbox has been closed"
@@ -206,6 +181,7 @@ class BoxliteBox(Sandbox):
     # ── file operations ─────────────────────────────────────────────────
 
     def read_file(self, path: str) -> str:
+        '执行 read_file 的明确职责，并返回与调用约定一致的结果'
         resolved = self._resolve_path(path)
         try:
             r = self._exec("cat", "--", resolved)
@@ -217,12 +193,15 @@ class BoxliteBox(Sandbox):
         return r.stdout or ""
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
+        '执行 write_file 的明确职责，并返回与调用约定一致的结果'
         self._write_bytes(self._resolve_path(path), content.encode("utf-8"), append=append)
 
     def update_file(self, path: str, content: bytes) -> None:
+        '更新目标状态并返回最新结果，并遵守 update_file 所表达的接口约束'
         self._write_bytes(self._resolve_path(path), content, append=False)
 
     def _write_bytes(self, resolved: str, data: bytes, *, append: bool) -> None:
+        '执行 _write_bytes 的明确职责，并返回与调用约定一致的结果'
         parent = posixpath.dirname(resolved)
         if parent:
             mk = self._sh(f"mkdir -p {shlex.quote(parent)}")
@@ -246,6 +225,7 @@ class BoxliteBox(Sandbox):
             first = False
 
     def download_file(self, path: str) -> bytes:
+        '执行 download_file 的明确职责，并返回与调用约定一致的结果'
         normalized = self._guard_traversal(path)
         stripped = normalized.lstrip("/")
         allowed = VIRTUAL_PATH_PREFIX.lstrip("/")
@@ -272,6 +252,7 @@ class BoxliteBox(Sandbox):
             raise OSError(f"failed to decode '{path}' from box: {e}") from e
 
     def list_dir(self, path: str, max_depth: int = 2) -> list[str]:
+        '收集并返回，并遵守 list_dir 所表达的接口约束'
         resolved = self._resolve_path(path)
         r = self._sh(f"find {shlex.quote(resolved)} -maxdepth {int(max_depth)} \\( -type f -o -type d \\) 2>/dev/null | head -500")
         return [line.strip() for line in (r.stdout or "").splitlines() if line.strip()]
@@ -284,6 +265,7 @@ class BoxliteBox(Sandbox):
         include_dirs: bool = False,
         max_results: int = 200,
     ) -> tuple[list[str], bool]:
+        '执行 glob 的明确职责，并返回与调用约定一致的结果'
         resolved = self._resolve_path(path)
         types = ("f", "d") if include_dirs else ("f",)
         type_expr = " -o ".join(f"-type {t}" for t in types)
@@ -321,6 +303,7 @@ class BoxliteBox(Sandbox):
         # Sanity-check a regex pattern as a Python regex at the boundary (grep uses
         # POSIX ERE, but this catches gross errors); a literal needs no validation.
         # grep receives the RAW pattern: -F matches it literally, -E as a regex.
+        '执行 grep 的明确职责，并返回与调用约定一致的结果'
         if not literal:
             re.compile(pattern, 0 if case_sensitive else re.IGNORECASE)
 

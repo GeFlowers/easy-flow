@@ -1,4 +1,4 @@
-"""Slack connection tests for user-owned channel bindings."""
+'未说明'
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from app.channels.message_bus import MessageBus, OutboundMessage
 
 
 async def _make_repo(tmp_path):
+    '未说明'
     from deerflow.persistence.channel_connections import ChannelConnectionRepository, ChannelCredentialCipher
     from deerflow.persistence.engine import get_session_factory, init_engine
 
@@ -22,11 +23,13 @@ async def _make_repo(tmp_path):
 
 
 def test_slack_connect_command_binds_socket_mode_identity(tmp_path):
+    '未说明'
     import anyio
 
     from app.channels.slack import SlackChannel
 
     async def go():
+        '未说明'
         repo = await _make_repo(tmp_path)
         state = "slack-bind-code"
         await repo.create_oauth_state(
@@ -65,11 +68,13 @@ def test_slack_connect_command_binds_socket_mode_identity(tmp_path):
 
 
 def test_slack_send_uses_connection_bot_token_when_connection_id_is_present():
+    '未说明'
     import anyio
 
     from app.channels.slack import SlackChannel
 
     async def go():
+        '未说明'
         repo = AsyncMock()
         repo.get_credentials.return_value = {"access_token": "xoxb-connection-token"}
         web_client = MagicMock()
@@ -99,6 +104,7 @@ def test_slack_send_uses_connection_bot_token_when_connection_id_is_present():
 
 
 def test_slack_http_events_mode_is_rejected(monkeypatch, caplog):
+    '未说明'
     import anyio
 
     from app.channels.slack import SlackChannel
@@ -114,6 +120,7 @@ def test_slack_http_events_mode_is_rejected(monkeypatch, caplog):
     monkeypatch.setitem(sys.modules, "slack_sdk.socket_mode.response", response)
 
     async def go():
+        '未说明'
         channel = SlackChannel(
             bus=MessageBus(),
             config={

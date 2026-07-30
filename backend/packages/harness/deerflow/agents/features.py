@@ -1,7 +1,4 @@
-"""Declarative feature flags and middleware positioning for create_deerflow_agent.
-
-Pure data classes and decorators — no I/O, no side effects.
-"""
+"""定义代理运行时功能开关与中间件定位装饰器。"""
 
 from __future__ import annotations
 
@@ -16,15 +13,10 @@ if TYPE_CHECKING:
 
 @dataclass
 class RuntimeFeatures:
-    """Declarative feature flags for ``create_deerflow_agent``.
+    """描述 ``create_deerflow_agent`` 可按需启用的内置能力。
 
-    Most features accept:
-    - ``True``: use the built-in default middleware
-    - ``False``: disable
-    - An ``AgentMiddleware`` instance: use this custom implementation instead
-
-    ``summarization`` and ``guardrail`` have no built-in default — they only
-    accept ``False`` (disable) or an ``AgentMiddleware`` instance (custom).
+    每个中间件功能可设为布尔值使用默认实现，或传入中间件实例完成替换；
+    记忆配置供直接创建代理的调用方显式覆盖默认配置。
     """
 
     sandbox: bool | AgentMiddleware = True
@@ -47,11 +39,16 @@ class RuntimeFeatures:
 
 
 def Next(anchor: type[AgentMiddleware]):
-    """Declare this middleware should be placed after *anchor* in the chain."""
+    """标记自定义中间件应紧随指定锚点中间件之后插入。
+
+    仅接受 ``AgentMiddleware`` 子类作为锚点，并把锚点类型记录在被装饰类上，
+    供代理工厂组装额外中间件时解析。
+    """
     if not (isinstance(anchor, type) and issubclass(anchor, AgentMiddleware)):
         raise TypeError(f"@Next expects an AgentMiddleware subclass, got {anchor!r}")
 
     def decorator(cls: type[AgentMiddleware]) -> type[AgentMiddleware]:
+        """把后置锚点元数据写入被装饰的中间件类并返回该类。"""
         cls._next_anchor = anchor  # type: ignore[attr-defined]
         return cls
 
@@ -59,11 +56,16 @@ def Next(anchor: type[AgentMiddleware]):
 
 
 def Prev(anchor: type[AgentMiddleware]):
-    """Declare this middleware should be placed before *anchor* in the chain."""
+    """标记自定义中间件应紧邻指定锚点中间件之前插入。
+
+    仅接受 ``AgentMiddleware`` 子类作为锚点，并把锚点类型记录在被装饰类上，
+    供代理工厂组装额外中间件时解析。
+    """
     if not (isinstance(anchor, type) and issubclass(anchor, AgentMiddleware)):
         raise TypeError(f"@Prev expects an AgentMiddleware subclass, got {anchor!r}")
 
     def decorator(cls: type[AgentMiddleware]) -> type[AgentMiddleware]:
+        """把前置锚点元数据写入被装饰的中间件类并返回该类。"""
         cls._prev_anchor = anchor  # type: ignore[attr-defined]
         return cls
 

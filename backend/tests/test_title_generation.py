@@ -1,4 +1,4 @@
-"""Tests for automatic thread title generation."""
+'未说明'
 
 import pytest
 
@@ -7,10 +7,10 @@ from deerflow.config.title_config import TitleConfig, get_title_config, set_titl
 
 
 class TestTitleConfig:
-    """Tests for TitleConfig."""
+    '未说明'
 
     def test_default_config(self):
-        """Test default configuration values."""
+        '未说明'
         config = TitleConfig()
         assert config.enabled is True
         assert config.max_words == 6
@@ -18,7 +18,7 @@ class TestTitleConfig:
         assert config.model_name is None
 
     def test_custom_config(self):
-        """Test custom configuration."""
+        '未说明'
         config = TitleConfig(
             enabled=False,
             max_words=10,
@@ -31,7 +31,7 @@ class TestTitleConfig:
         assert config.model_name == "gpt-4"
 
     def test_config_validation(self):
-        """Test configuration validation."""
+        '未说明'
         # max_words should be between 1 and 20
         with pytest.raises(ValueError):
             TitleConfig(max_words=0)
@@ -45,7 +45,7 @@ class TestTitleConfig:
             TitleConfig(max_chars=201)
 
     def test_get_set_config(self):
-        """Test global config getter and setter."""
+        '未说明'
         original_config = get_title_config()
 
         # Set new config
@@ -61,10 +61,10 @@ class TestTitleConfig:
 
 
 class TestTitleMiddleware:
-    """Tests for TitleMiddleware."""
+    '未说明'
 
     def test_middleware_initialization(self):
-        """Test middleware can be initialized."""
+        '未说明'
         middleware = TitleMiddleware()
         assert middleware is not None
         assert middleware.state_schema is not None

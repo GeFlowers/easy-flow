@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { fetchWorkspaceChanges } from "./api";
 import type { WorkspaceChangesResponse } from "./types";
 
+/** 构造运行级工作区变更查询的稳定缓存键。 */
 export function workspaceChangesQueryKey(
   threadId: string | undefined,
   runId: string | undefined,
@@ -18,6 +19,7 @@ export function workspaceChangesQueryKey(
   ] as const;
 }
 
+/** 查询指定线程和运行产生的工作区文件变更。 */
 export function useWorkspaceChanges({
   threadId,
   runId,

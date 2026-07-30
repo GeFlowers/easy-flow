@@ -2,6 +2,7 @@ import { getBackendBaseURL } from "@/core/config";
 
 import type { WorkspaceChangesResponse } from "./types";
 
+/** 获取指定运行的工作区文件变更摘要。 */
 export async function fetchWorkspaceChanges({
   threadId,
   runId,

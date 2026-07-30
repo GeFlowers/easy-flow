@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { loadMCPConfig, MCPConfigRequestError, updateMCPConfig } from "./api";
 
+/** 查询 MCP 配置；权限错误不重试，其他请求错误最多重试三次。 */
 export function useMCPConfig() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["mcpConfig"],
@@ -12,6 +13,7 @@ export function useMCPConfig() {
   return { config: data, isLoading, error };
 }
 
+/** 返回切换单个 MCP 服务器启用状态的变更操作。 */
 export function useEnableMCPServer() {
   const queryClient = useQueryClient();
   const { config } = useMCPConfig();

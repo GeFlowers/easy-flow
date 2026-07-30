@@ -5,6 +5,7 @@ import { Header } from "@/components/landing/header";
 import { getBlogIndexData } from "@/core/blog";
 import "nextra-theme-docs/style.css";
 
+/** 使用博客索引数据装配 Nextra 博客布局。 */
 export default async function BlogLayout({ children }) {
   const { pageMap } = await getBlogIndexData();
 

@@ -1,4 +1,4 @@
-"""Tests for the GitHub webhook → prompt translator."""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from app.gateway.github.prompts import build_prompt
 
 
 def test_pull_request_prompt_contains_core_fields() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "opened",
         "pull_request": {
@@ -27,6 +28,7 @@ def test_pull_request_prompt_contains_core_fields() -> None:
 
 
 def test_pull_request_prompt_handles_missing_body() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "opened",
         "pull_request": {"number": 1, "title": "x", "user": {}, "body": None},
@@ -37,6 +39,7 @@ def test_pull_request_prompt_handles_missing_body() -> None:
 
 
 def test_pull_request_prompt_truncates_huge_body() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     huge = "X" * 50000
     payload = {
         "action": "opened",
@@ -49,6 +52,7 @@ def test_pull_request_prompt_truncates_huge_body() -> None:
 
 
 def test_issue_comment_prompt_includes_body_verbatim() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "created",
         "issue": {"number": 11, "pull_request": {"url": "..."}},
@@ -60,12 +64,13 @@ def test_issue_comment_prompt_includes_body_verbatim() -> None:
         "repository": {"full_name": "a/b"},
     }
     prompt = build_prompt("issue_comment", payload)
-    assert "pull request #11" in prompt  # is_pr True
+    assert "pull request #11" in prompt  # 说明当前测试分支所验证的真实行为与边界。
     assert "@coding-llm-gateway please look at this" in prompt
     assert "zhfeng" in prompt
 
 
 def test_issue_comment_plain_issue_says_issue() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "created",
         "issue": {"number": 12},
@@ -76,11 +81,7 @@ def test_issue_comment_plain_issue_says_issue() -> None:
 
 
 def test_issue_comment_prompt_includes_issue_title_and_body() -> None:
-    """The comment alone isn't enough — the agent needs the issue context too.
-
-    The webhook payload already includes the parent issue/PR's title and body
-    on the ``issue`` object; we just have to render them.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "created",
         "issue": {
@@ -98,11 +99,12 @@ def test_issue_comment_prompt_includes_issue_title_and_body() -> None:
     prompt = build_prompt("issue_comment", payload)
     assert "Login button is broken" in prompt
     assert "Clicking login throws a 500" in prompt
-    assert "reporter" in prompt  # issue author, distinct from comment author
+    assert "reporter" in prompt  # 说明当前测试分支所验证的真实行为与边界。
     assert "@bot what do you think?" in prompt
 
 
 def test_pull_request_review_comment_includes_pr_title_and_body() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "created",
         "pull_request": {
@@ -127,6 +129,7 @@ def test_pull_request_review_comment_includes_pr_title_and_body() -> None:
 
 
 def test_pull_request_review_prompt_includes_pr_title_and_body() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "submitted",
         "pull_request": {
@@ -150,6 +153,7 @@ def test_pull_request_review_prompt_includes_pr_title_and_body() -> None:
 
 
 def test_pull_request_review_comment_includes_file_and_diff() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "created",
         "pull_request": {"number": 9},
@@ -169,6 +173,7 @@ def test_pull_request_review_comment_includes_file_and_diff() -> None:
 
 
 def test_pull_request_review_prompt_includes_state() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "submitted",
         "pull_request": {"number": 5},
@@ -186,12 +191,7 @@ def test_pull_request_review_prompt_includes_state() -> None:
 
 
 def test_pull_request_review_prompt_instructs_fetching_inline_comments() -> None:
-    """PR #4131 review (Concern 1, zhfeng): the dispatcher's redundant
-    review-comment gate assumes the agent recovers inline comment content
-    from the parent `pull_request_review` event -- nothing enforced that
-    before this. The prompt must tell the agent how, with the exact
-    `gh api` path GitHub uses for a review's inline comments.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "submitted",
         "pull_request": {"number": 5},
@@ -208,10 +208,7 @@ def test_pull_request_review_prompt_instructs_fetching_inline_comments() -> None
 
 
 def test_pull_request_review_prompt_omits_fetch_hint_without_review_id() -> None:
-    """Guard: never render a broken `.../reviews/None/comments` path when
-    the payload is missing `review.id` (or the PR number) -- omit the
-    instruction entirely rather than pointing the agent at a bad command.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "submitted",
         "pull_request": {"number": 5},
@@ -223,6 +220,7 @@ def test_pull_request_review_prompt_omits_fetch_hint_without_review_id() -> None
 
 
 def test_issues_prompt() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {
         "action": "opened",
         "issue": {
@@ -241,6 +239,7 @@ def test_issues_prompt() -> None:
 
 
 def test_ping_prompt() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     payload = {"zen": "Practicality beats purity.", "hook": {"id": 42}}
     prompt = build_prompt("ping", payload)
     assert "ping" in prompt.lower()
@@ -248,6 +247,7 @@ def test_ping_prompt() -> None:
 
 
 def test_unknown_event_returns_generic_stub() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     prompt = build_prompt("workflow_run", {"action": "completed", "repository": {"full_name": "a/b"}})
     assert "workflow_run" in prompt
     assert "a/b" in prompt

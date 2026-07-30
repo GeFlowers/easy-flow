@@ -1,15 +1,4 @@
-"""Runtime bridge between ``DeerFlowClient`` streaming and the view-state reducer.
-
-Two layers, both kept free of Textual:
-
-* :func:`translate` — pure: one ``StreamEvent`` -> zero or more reducer actions.
-* :func:`stream_actions` — drives ``client.stream()`` and yields a bracketed
-  action sequence (``RunStarted`` … translated actions … ``RunEnded``), turning
-  model errors into an ``AssistantError`` row instead of crashing.
-
-The Textual app runs :func:`stream_actions` in a worker thread and applies each
-yielded action to the reducer on the UI thread.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -29,17 +18,19 @@ from .view_state import (
 
 
 class _StreamEventLike(Protocol):
+    '未说明'
     type: str
     data: dict
 
 
 class _ClientLike(Protocol):
+    '未说明'
     def stream(self, message: str, *, thread_id: str | None = None, **kwargs: Any) -> Iterator[Any]:
-        """Yield streaming events for *message* (see ``DeerFlowClient.stream``)."""
+        '未说明'
 
 
 def translate(event: _StreamEventLike) -> list[Action]:
-    """Map a single ``StreamEvent`` to reducer actions. Pure."""
+    '未说明'
     if event.type == "messages-tuple":
         return _translate_message(event.data)
     if event.type == "end":
@@ -55,6 +46,7 @@ def translate(event: _StreamEventLike) -> list[Action]:
 
 
 def _translate_message(data: Any) -> list[Action]:
+    '未说明'
     if not isinstance(data, dict):
         return []
 
@@ -93,15 +85,12 @@ def _as_str(value: Any) -> str:
     # Provider stream chunks can carry an explicit ``None`` id/name (the key is
     # present, so ``.get(k, "")`` would return None, and ``str(None) == "None"``
     # — a truthy value that would defeat the empty-id guard downstream).
+    '未说明'
     return "" if value is None else str(value)
 
 
 def stream_actions(client: _ClientLike, message: str, *, thread_id: str | None = None, **kwargs: Any) -> Iterator[Action]:
-    """Yield a bracketed action stream for one agent run.
-
-    Always begins with ``RunStarted`` and ends with ``RunEnded`` (even on error,
-    where an ``AssistantError`` row is emitted first).
-    """
+    '未说明'
     yield RunStarted()
     try:
         for event in client.stream(message, thread_id=thread_id, **kwargs):
@@ -115,6 +104,7 @@ def stream_actions(client: _ClientLike, message: str, *, thread_id: str | None =
 
 
 def _extract_text(content: Any) -> str:
+    '未说明'
     if content is None:
         return ""
     if isinstance(content, str):

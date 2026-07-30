@@ -1,3 +1,5 @@
+"""生成图像：选择 Gemini 或 MiniMax，处理参考图 MIME 编码并写入指定输出路径。"""
+
 import base64
 import json
 import os
@@ -5,13 +7,16 @@ import os
 import requests
 
 MINIMAX_DEFAULT_HOST = "https://api.minimaxi.com"
-# MiniMax image-01 caps the prompt at 1500 characters and rejects longer requests
-# with a generic "invalid params" error, so validate before calling the API.
+# MiniMax image-01 的提示词上限为 1500 字符；超限仅返回笼统的参数错误，因此在调用前检查。
 MINIMAX_PROMPT_MAX_CHARS = 1500
 
 
 def validate_image(image_path: str) -> bool:
-    """Validate if an image file can be opened and is not corrupted."""
+    """使用 Pillow 双重打开并校验参考图像。
+
+    首次打开只验证文件完整性，第二次加载确认像素可读；路径不存在、格式不支持或
+    图像损坏时记录警告并返回 ``False``，以便 Gemini 分支跳过该参考图而不中断批处理。
+    """
     from PIL import Image  # lazy import: keeps module importable without Pillow
 
     try:
@@ -26,11 +31,10 @@ def validate_image(image_path: str) -> bool:
 
 
 def _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:
-    """Pick the generation provider.
+    """按显式环境变量、既有服务商凭据、MiniMax 凭据的优先级选择服务商。
 
-    1. Explicit <SKILL>_PROVIDER override wins.
-    2. Otherwise prefer the existing provider when its credentials are present.
-    3. Otherwise fall back to MiniMax when MINIMAX_API_KEY is set.
+    环境变量的值会去空格并转为小写；前两种凭据都不可用时仅在存在
+    ``MINIMAX_API_KEY`` 时回退 MiniMax，否则抛出说明所需密钥的 ``ValueError``。
     """
     override = os.getenv(override_env)
     if override:
@@ -46,10 +50,12 @@ def _resolve_provider(override_env: str, existing_provider: str, has_existing_cr
 
 
 def _minimax_host() -> str:
+    """返回去除尾部斜杠后的 MiniMax API 根地址，允许环境变量覆盖默认端点。"""
     return os.getenv("MINIMAX_API_HOST", MINIMAX_DEFAULT_HOST).rstrip("/")
 
 
 def _check_base_resp(payload: dict) -> None:
+    """检查 MiniMax ``base_resp`` 协议字段；非零状态转换为包含服务端信息的异常。"""
     base = payload.get("base_resp") or {}
     if base.get("status_code", 0) != 0:
         raise Exception(
@@ -58,6 +64,7 @@ def _check_base_resp(payload: dict) -> None:
 
 
 def _guess_mime(image_path: str) -> str:
+    """依据扩展名推断数据 URL 的图像 MIME 类型，未知格式以 JPEG 兼容值处理。"""
     ext = os.path.splitext(image_path)[1].lower()
     return {
         ".png": "image/png",
@@ -69,27 +76,27 @@ def _guess_mime(image_path: str) -> str:
 
 
 def _to_data_url(image_path: str) -> str:
+    """读取本地图像并编码为 MiniMax ``subject_reference`` 所需的 Base64 数据 URL。
+
+    文件读取错误直接向调用方传播；MIME 类型由扩展名推断，不检查图像的实际内容。
+    """
     with open(image_path, "rb") as f:
         b64 = base64.b64encode(f.read()).decode("utf-8")
     return f"data:{_guess_mime(image_path)};base64,{b64}"
 
 
 def _ensure_output_dir(output_file: str) -> None:
-    """Create the output file's parent directory so nested paths don't fail."""
+    """创建输出文件的父目录，避免调用方提供嵌套路径时写入失败。"""
     output_dir = os.path.dirname(output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
 
 
 def _minimax_prompt(raw: str) -> str:
-    """Extract the single text prompt MiniMax image-01 expects.
+    """提取 MiniMax image-01 所需的单段提示词。
 
-    The shared prompt file is structured JSON (a consolidated ``prompt`` plus
-    Gemini-oriented fields like ``style`` / ``composition`` / ``negative_prompt``),
-    but MiniMax consumes one string and expands it via ``prompt_optimizer``. The
-    provider adapts the input itself — the caller never needs to know MiniMax is
-    active. Use the JSON ``prompt`` field; fall back to the raw text for plain-text
-    prompt files or JSON without a ``prompt`` field.
+    共享提示文件可为含 ``prompt``、``style`` 等字段的 JSON，也可为纯文本；仅在
+    JSON 的 ``prompt`` 为非空字符串时取该字段，否则保留原文交给服务端优化器。
     """
     text = raw.strip()
     try:
@@ -106,6 +113,12 @@ def _minimax_prompt(raw: str) -> str:
 def _generate_image_minimax(
     prompt: str, reference_images: list[str], output_file: str, aspect_ratio: str
 ) -> str:
+    """调用 MiniMax 图像接口，并将首张 Base64 结果写入输出路径。
+
+    提示词会提取 JSON 中的 ``prompt`` 字段并受 image-01 字符上限约束；参考图以
+    推断 MIME 的数据 URL 作为角色主体提交。缺少密钥或提示词过长返回状态字符串，
+    HTTP 失败、``base_resp`` 错误、空结果和文件写入错误均向调用方传播。
+    """
     api_key = os.getenv("MINIMAX_API_KEY")
     if not api_key:
         return "MINIMAX_API_KEY is not set"
@@ -125,8 +138,7 @@ def _generate_image_minimax(
         "prompt_optimizer": True,
     }
     if reference_images:
-        # Reference images are passed as character subjects as-is; unlike the Gemini
-        # path we do not pre-validate them — invalid files surface as a MiniMax API error.
+        # MiniMax 将参考图直接作为角色主体提交；不预校验，非法文件由其 API 返回具体错误。
         body["subject_reference"] = [
             {"type": "character", "image_file": _to_data_url(p)} for p in reference_images
         ]
@@ -151,6 +163,11 @@ def _generate_image_minimax(
 def _generate_image_gemini(
     prompt: str, reference_images: list[str], output_file: str, aspect_ratio: str
 ) -> str:
+    """调用 Gemini 图像接口，跳过损坏的参考图并把唯一返回图像写入输出路径。
+
+    有效参考图一律以 JPEG MIME 内嵌；缺少 Gemini 密钥时返回状态字符串。HTTP 错误、
+    响应结构异常、不是恰好一张内嵌图像以及解码或写入错误均向调用方传播。
+    """
     parts = []
     valid_reference_images = []
     for ref_img in reference_images:
@@ -197,6 +214,11 @@ def generate_image(
     output_file: str,
     aspect_ratio: str = "16:9",
 ) -> str:
+    """读取 UTF-8 提示文件，选择图像服务商并将生成结果写入 ``output_file``。
+
+    仅接受 ``gemini``、``google`` 和 ``minimax``；画幅参数传给两个服务商，参考图由
+    各自分支编码。提示文件读取、未知服务商及下游 API 或文件系统异常均不在此吞没。
+    """
     with open(prompt_file, "r", encoding="utf-8") as f:
         prompt = f.read()
     provider = _resolve_provider(

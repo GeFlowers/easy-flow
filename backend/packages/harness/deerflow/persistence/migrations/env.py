@@ -1,16 +1,4 @@
-"""Alembic environment for DeerFlow application tables.
-
-ONLY manages DeerFlow's tables (runs, threads_meta, feedback, users,
-run_events, channel_connections, channel_credentials, channel_oauth_states,
-channel_conversations).
-
-LangGraph's checkpointer tables (``checkpoints``, ``checkpoint_blobs``,
-``checkpoint_writes``, ``checkpoint_migrations``) are managed by LangGraph
-itself -- they have their own schema lifecycle and must not be touched by
-Alembic. The ``include_object`` filter below explicitly excludes them so a
-future ``alembic revision --autogenerate`` will not emit ``drop_table`` for
-tables it does not own.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -48,6 +36,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
+    """执行当前持久化组件提供的操作。"""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -61,6 +50,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection):
+    """执行当前持久化组件提供的操作。"""
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -72,6 +62,7 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
+    """执行当前持久化组件提供的操作。"""
     connectable = create_async_engine(config.get_main_option("sqlalchemy.url"))
 
     # Cross-process bootstrap safety for SQLite: every connection alembic
@@ -86,6 +77,7 @@ async def run_migrations_online() -> None:
 
         @event.listens_for(connectable.sync_engine, "connect")
         def _alembic_sqlite_busy_timeout(dbapi_conn, _record):  # noqa: ARG001
+            """执行持久化流程所需的内部辅助操作。"""
             cursor = dbapi_conn.cursor()
             try:
                 cursor.execute("PRAGMA busy_timeout=30000;")

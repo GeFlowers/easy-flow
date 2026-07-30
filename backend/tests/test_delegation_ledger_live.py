@@ -1,9 +1,4 @@
-"""Live E2E coverage for delegation ledger crossing real summarization.
-
-Run explicitly with real credentials:
-
-    RUN_DEERFLOW_LEDGER_LIVE=1 PYTHONPATH=. uv run pytest tests/test_delegation_ledger_live.py -v -s
-"""
+'定义 test_delegation_ledger_live 模块提供的职责与可复用接口。\n\nLive E2E coverage for delegation ledger crossing real summarization.\n\nRun explicitly with real credentials:\n\n    RUN_DEERFLOW_LEDGER_LIVE=1 PYTHONPATH=. uv run pytest tests/test_delegation_ledger_live.py -v -s\n'
 
 from __future__ import annotations
 
@@ -43,15 +38,17 @@ if _skip_reason:
 
 
 class _RecordModelRequests(AgentMiddleware):
-    """Record real model requests after ledger injection and system coalescing."""
+    '封装 _RecordModelRequests 的状态、协作关系与公开操作。\n\nRecord real model requests after ledger injection and system coalescing.'
 
     def __init__(self) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__()
         self.calls: list[list[BaseMessage]] = []
         self.injected_calls: list[list[BaseMessage]] = []
         self.before_model_states: list[dict[str, Any]] = []
 
     def before_model(self, state: dict[str, Any], runtime: Runtime) -> None:
+        '执行 before_model 的明确职责，并返回与调用约定一致的结果'
         messages = list(state.get("messages", []))
         snapshot = {
             "message_count": len(messages),
@@ -64,6 +61,7 @@ class _RecordModelRequests(AgentMiddleware):
         return None
 
     async def abefore_model(self, state: dict[str, Any], runtime: Runtime) -> None:
+        '执行 abefore_model 的明确职责，并返回与调用约定一致的结果'
         self.before_model(state, runtime)
         return None
 
@@ -72,6 +70,7 @@ class _RecordModelRequests(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
+        '执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果'
         self.calls.append(list(request.messages))
         return handler(request)
 
@@ -80,13 +79,14 @@ class _RecordModelRequests(AgentMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
+        '执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果'
         self.calls.append(list(request.messages))
         return await handler(request)
 
 
 @pytest.fixture
 def live_config_path(tmp_path):
-    """Copy the real config and only lower summary threshold for deterministic E2E."""
+    '执行 live_config_path 的明确职责，并返回与调用约定一致的结果。\n\nCopy the real config and only lower summary threshold for deterministic E2E.'
     config = yaml.safe_load(_ROOT_CONFIG.read_text(encoding="utf-8"))
     config.setdefault("summarization", {})
     config["summarization"]["enabled"] = True
@@ -103,7 +103,7 @@ def live_config_path(tmp_path):
 
 @pytest.fixture
 def real_subagent_executor():
-    """Undo tests/conftest.py's executor mock for this explicit live test."""
+    "执行 real_subagent_executor 的明确职责，并返回与调用约定一致的结果。\n\nUndo tests/conftest.py's executor mock for this explicit live test."
     original_executor_module = sys.modules.get("deerflow.subagents.executor")
     original_subagent_attrs: dict[str, Any] = {}
     original_task_tool_attrs: dict[str, Any] = {}
@@ -145,10 +145,12 @@ def real_subagent_executor():
 
 @pytest.fixture
 def live_client(live_config_path, real_subagent_executor, monkeypatch):
+    '执行 live_client 的明确职责，并返回与调用约定一致的结果'
     recorder = _RecordModelRequests()
     original_inject = DurableContextMiddleware._inject
 
     def recording_inject(self: DurableContextMiddleware, request: ModelRequest) -> ModelRequest:
+        '执行 recording_inject 的明确职责，并返回与调用约定一致的结果'
         updated = original_inject(self, request)
         if updated is not request:
             recorder.injected_calls.append(list(updated.messages))
@@ -165,6 +167,7 @@ def live_client(live_config_path, real_subagent_executor, monkeypatch):
 
 
 def _message_text(message: BaseMessage) -> str:
+    '执行 _message_text 的明确职责，并返回与调用约定一致的结果'
     content = message.content
     if isinstance(content, str):
         return content
@@ -180,6 +183,7 @@ def _message_text(message: BaseMessage) -> str:
 
 
 def _stream_events(client: DeerFlowClient, thread_id: str, prompt: str) -> list[StreamEvent]:
+    '执行 _stream_events 的明确职责，并返回与调用约定一致的结果'
     events: list[StreamEvent] = []
     for event in client.stream(
         prompt,
@@ -199,6 +203,7 @@ def _stream_events(client: DeerFlowClient, thread_id: str, prompt: str) -> list[
 
 
 def _task_calls(events: list[StreamEvent]) -> list[dict[str, Any]]:
+    '执行 _task_calls 的明确职责，并返回与调用约定一致的结果'
     calls: list[dict[str, Any]] = []
     for event in events:
         if event.type != "messages-tuple":
@@ -213,6 +218,7 @@ def _task_calls(events: list[StreamEvent]) -> list[dict[str, Any]]:
 
 
 def _task_ids_in_state(values: dict[str, Any], task_ids: set[str]) -> set[str]:
+    '执行 _task_ids_in_state 的明确职责，并返回与调用约定一致的结果'
     present: set[str] = set()
     for message in values.get("messages", []):
         if isinstance(message, AIMessage):
@@ -226,6 +232,7 @@ def _task_ids_in_state(values: dict[str, Any], task_ids: set[str]) -> set[str]:
 
 
 def _state_values(client: DeerFlowClient, thread_id: str) -> dict[str, Any]:
+    '执行 _state_values 的明确职责，并返回与调用约定一致的结果'
     assert client._agent is not None
     config = client._get_runnable_config(
         thread_id,
@@ -237,22 +244,27 @@ def _state_values(client: DeerFlowClient, thread_id: str) -> dict[str, Any]:
 
 
 def _has_summary_message(values: dict[str, Any]) -> bool:
+    '执行 _has_summary_message 的明确职责，并返回与调用约定一致的结果'
     return any(getattr(message, "name", None) == "summary" for message in values.get("messages", []))
 
 
 def _summary_text(values: dict[str, Any]) -> str:
+    '执行 _summary_text 的明确职责，并返回与调用约定一致的结果'
     return str(values.get("summary_text") or "").strip()
 
 
 def _ledger_entries(values: dict[str, Any]) -> list[dict[str, Any]]:
+    '执行 _ledger_entries 的明确职责，并返回与调用约定一致的结果'
     return list(values.get("delegations") or [])
 
 
 def _skill_paths_in_state(values: dict[str, Any]) -> list[str]:
+    '执行 _skill_paths_in_state 的明确职责，并返回与调用约定一致的结果'
     return [entry["path"] for entry in values.get("skill_context", [])]
 
 
 def _ledger_visible_in_requests(requests: list[list[BaseMessage]], *, after_call_index: int = 0) -> bool:
+    '执行 _ledger_visible_in_requests 的明确职责，并返回与调用约定一致的结果'
     for messages in requests[after_call_index:]:
         text = "\n".join(_message_text(message) for message in messages)
         if "Work already delegated" in text and "ledger alpha fact" in text and "ledger beta fact" in text:
@@ -261,6 +273,7 @@ def _ledger_visible_in_requests(requests: list[list[BaseMessage]], *, after_call
 
 
 def _summary_visible_in_requests(requests: list[list[BaseMessage]], summary_text: str, *, after_call_index: int = 0) -> bool:
+    '执行 _summary_visible_in_requests 的明确职责，并返回与调用约定一致的结果'
     snippet = summary_text[:80]
     if not snippet:
         return False
@@ -272,6 +285,7 @@ def _summary_visible_in_requests(requests: list[list[BaseMessage]], summary_text
 
 
 def test_live_summary_preserves_delegations_and_prevents_repeat(live_client):
+    '验证 live、summary、preserves、delegations、and、prevents、repeat 场景下的预期行为、边界条件与结果'
     client, recorder = live_client
     thread_id = f"live-ledger-{uuid.uuid4().hex[:8]}"
 
@@ -343,6 +357,7 @@ Use already delegated results if they exist; do not repeat an identical delegate
 
 
 def test_skill_context_survives_compaction_live(live_client):
+    '验证 skill、context、survives、compaction、live 场景下的预期行为、边界条件与结果'
     client, recorder = live_client
     thread_id = f"live-skill-{uuid.uuid4().hex[:8]}"
 

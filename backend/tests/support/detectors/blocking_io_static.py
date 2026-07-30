@@ -1,12 +1,4 @@
-"""Static inventory for likely backend event-loop blocking IO.
-
-This detector parses backend business source with AST so untested paths are
-still visible during review. Findings are prioritized static candidates, not
-automatic bug decisions.
-
-Not directly executable: import as `support.detectors.blocking_io_static` or
-run via the CLI shim `scripts/detect_blocking_io_static.py`.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -209,6 +201,7 @@ OPERATION_BASE_PRIORITY = {
 
 @dataclass(frozen=True)
 class BlockingIOStaticFinding:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     category: str
     operation: str
     priority: str
@@ -221,6 +214,7 @@ class BlockingIOStaticFinding:
     code: str
 
     def to_dict(self) -> dict[str, object]:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return {
             "priority": self.priority,
             "location": {
@@ -242,6 +236,7 @@ class BlockingIOStaticFinding:
 
 @dataclass(frozen=True)
 class _FunctionContext:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     qualname: str
     class_name: str | None
     is_async: bool
@@ -249,11 +244,13 @@ class _FunctionContext:
 
 @dataclass(frozen=True)
 class _FunctionInfo:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     is_async: bool
 
 
 @dataclass(frozen=True)
 class _CallRef:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     name: str
     class_name: str | None
     self_method: bool
@@ -261,6 +258,7 @@ class _CallRef:
 
 @dataclass(frozen=True)
 class _PotentialFinding:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     category: str
     operation: str
     path: str
@@ -273,12 +271,14 @@ class _PotentialFinding:
 
 @dataclass(frozen=True)
 class _BlockingRule:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     category: str
     operation: str
     symbol: str
 
 
 def dotted_name(node: ast.AST | None) -> str | None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
@@ -294,6 +294,7 @@ def dotted_name(node: ast.AST | None) -> str | None:
 
 
 def relative_to_repo(path: Path, repo_root: Path = REPO_ROOT) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     try:
         return path.resolve().relative_to(repo_root.resolve()).as_posix()
     except ValueError:
@@ -301,6 +302,7 @@ def relative_to_repo(path: Path, repo_root: Path = REPO_ROOT) -> str:
 
 
 def _source_snippet(source_lines: Sequence[str], line: int) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if not 0 < line <= len(source_lines):
         return ""
     snippet = source_lines[line - 1].strip()
@@ -310,7 +312,9 @@ def _source_snippet(source_lines: Sequence[str], line: int) -> str:
 
 
 class BlockingIOStaticVisitor(ast.NodeVisitor):
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def __init__(self, relative_path: str, source_lines: Sequence[str]) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.relative_path = relative_path
         self.source_lines = source_lines
         self.import_aliases: dict[str, str] = {}
@@ -329,23 +333,28 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
 
     @property
     def current_function(self) -> _FunctionContext | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self.function_stack[-1] if self.function_stack else None
 
     @property
     def current_context(self) -> _FunctionContext:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self.current_function or self.module_context
 
     @property
     def current_sync_http_clients(self) -> dict[str, str]:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self.sync_http_client_stack[-1] if self.sync_http_client_stack else self.module_sync_http_clients
 
     def visit_Import(self, node: ast.Import) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         for alias in node.names:
             local_name = alias.asname or alias.name.split(".", 1)[0]
             canonical_name = alias.name if alias.asname else local_name
             self.import_aliases[local_name] = canonical_name
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if node.module is None:
             return
         for alias in node.names:
@@ -353,6 +362,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
             self.import_aliases[local_name] = f"{node.module}.{alias.name}"
 
     def visit_ClassDef(self, node: ast.ClassDef) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         class_name = ".".join((*self.class_stack, node.name)) if self.class_stack else node.name
         self.class_bases[class_name].update(canonical_name for base in node.bases if (canonical_name := self._canonical_name(dotted_name(base))) is not None)
         self.class_stack.append(node.name)
@@ -360,22 +370,27 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         self.class_stack.pop()
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._visit_function(node, is_async=False)
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._visit_function(node, is_async=True)
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._record_sync_http_client_targets(node.value, node.targets)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._record_path_like_annotation(node.annotation, [node.target])
         if node.value is not None:
             self._record_sync_http_client_targets(node.value, [node.target])
         self.generic_visit(node)
 
     def visit_With(self, node: ast.With) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         temporary_clients: dict[str, str | None] = {}
         current_clients = self.current_sync_http_clients
         for item in node.items:
@@ -398,6 +413,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
                     current_clients[name] = previous
 
     def visit_Call(self, node: ast.Call) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         current = self.current_context
         call_name = self._canonical_name(dotted_name(node.func))
         if call_name is not None:
@@ -406,6 +422,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         self.generic_visit(node)
 
     def _visit_function(self, node: ast.FunctionDef | ast.AsyncFunctionDef, *, is_async: bool) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         qualname = ".".join((*self.class_stack, node.name)) if self.class_stack else node.name
         class_name = self.class_stack[-1] if self.class_stack else None
         context = _FunctionContext(qualname, class_name, is_async)
@@ -422,6 +439,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         self.function_stack.pop()
 
     def _canonical_name(self, name: str | None) -> str | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if name is None:
             return None
         parts = name.split(".")
@@ -430,6 +448,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         return name
 
     def _record_call_ref(self, node: ast.Call, call_name: str, current: _FunctionContext) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if current.qualname == "<module>":
             return
         if isinstance(node.func, ast.Name):
@@ -441,12 +460,13 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         if receiver in {"self", "cls"}:
             self.call_refs[current.qualname].append(_CallRef(node.func.attr, current.class_name, self_method=True))
             return
-        # Keep same-module direct calls through canonical aliases out of the call graph.
-        # External calls are handled as blocking candidates instead.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         if "." not in call_name:
             self.call_refs[current.qualname].append(_CallRef(call_name, current.class_name, self_method=False))
 
     def _record_blocking_candidate(self, node: ast.Call, call_name: str, current: _FunctionContext) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         rule = self._blocking_rule(node, call_name)
         if rule is None:
             return
@@ -467,6 +487,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         )
 
     def _blocking_rule(self, node: ast.Call, call_name: str) -> _BlockingRule | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         sync_client_symbol = self._sync_http_client_method_symbol(call_name)
         if sync_client_symbol is not None:
             return _BlockingRule("BLOCKING_HTTP_IO", "HTTP_REQUEST", sync_client_symbol)
@@ -492,6 +513,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         return None
 
     def _is_path_method_call(self, node: ast.Call) -> bool:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not isinstance(node.func, ast.Attribute):
             return False
         if node.func.attr in AMBIGUOUS_PATH_METHOD_NAMES and node.func.attr == "replace" and len(node.args) >= 2:
@@ -510,14 +532,17 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
 
     @property
     def current_path_like_names(self) -> set[str]:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self.path_like_name_stack[-1] if self.path_like_name_stack else set()
 
     def _record_path_like_annotation(self, annotation: ast.AST, targets: Iterable[ast.AST]) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not self.path_like_name_stack or not _is_path_annotation(annotation, self._canonical_name):
             return
         self.current_path_like_names.update(name for target in targets for name in _iter_assigned_names(target))
 
     def _record_sync_http_client_targets(self, value: ast.AST, targets: Iterable[ast.AST]) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         client_base = self._sync_http_client_factory_base(value)
         if client_base is None:
             return
@@ -527,6 +552,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
                 current_clients[name] = client_base
 
     def _sync_http_client_factory_base(self, node: ast.AST) -> str | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not isinstance(node, ast.Call):
             return None
         call_name = self._canonical_name(dotted_name(node.func))
@@ -535,6 +561,7 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
         return SYNC_HTTP_CLIENT_FACTORIES.get(call_name)
 
     def _sync_http_client_method_symbol(self, call_name: str) -> str | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         parts = call_name.split(".")
         if len(parts) != 2 or parts[1] not in HTTP_METHOD_NAMES:
             return None
@@ -545,14 +572,17 @@ class BlockingIOStaticVisitor(ast.NodeVisitor):
 
 
 def _path_method_operation(method_name: str) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return PATH_METHOD_OPERATIONS.get(method_name, "FILE_METADATA")
 
 
 def _is_constructed_path(node: ast.AST) -> bool:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return isinstance(node, ast.Call) and dotted_name(node.func) in {"Path", "pathlib.Path"}
 
 
 def _looks_like_path_receiver_name(receiver_name: str | None) -> bool:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if receiver_name is None:
         return False
     leaf = receiver_name.rsplit(".", 1)[-1].lower()
@@ -560,6 +590,7 @@ def _looks_like_path_receiver_name(receiver_name: str | None) -> bool:
 
 
 def _is_path_annotation(annotation: ast.AST | None, canonical_name: Callable[[str | None], str | None]) -> bool:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if annotation is None:
         return False
     if isinstance(annotation, ast.BinOp) and isinstance(annotation.op, ast.BitOr):
@@ -574,6 +605,7 @@ def _is_path_annotation(annotation: ast.AST | None, canonical_name: Callable[[st
 
 
 def _path_like_argument_names(arguments: ast.arguments, canonical_name: Callable[[str | None], str | None]) -> Iterable[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     candidates = [*arguments.posonlyargs, *arguments.args, *arguments.kwonlyargs]
     if arguments.vararg is not None:
         candidates.append(arguments.vararg)
@@ -585,6 +617,7 @@ def _path_like_argument_names(arguments: ast.arguments, canonical_name: Callable
 
 
 def _iter_assigned_names(target: ast.AST) -> Iterable[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if isinstance(target, ast.Name):
         yield target.id
         return
@@ -594,6 +627,7 @@ def _iter_assigned_names(target: ast.AST) -> Iterable[str]:
 
 
 def _sync_http_client_chained_method_symbol(call_name: str) -> str | None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     for factory_name, client_base in SYNC_HTTP_CLIENT_FACTORIES.items():
         prefix = f"{factory_name}."
         if not call_name.startswith(prefix):
@@ -605,6 +639,7 @@ def _sync_http_client_chained_method_symbol(call_name: str) -> str | None:
 
 
 def _resolve_call_ref(visitor: BlockingIOStaticVisitor, ref: _CallRef) -> list[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if ref.self_method and ref.class_name is not None:
         qualname = f"{ref.class_name}.{ref.name}"
         return [qualname] if qualname in visitor.function_defs else []
@@ -612,6 +647,7 @@ def _resolve_call_ref(visitor: BlockingIOStaticVisitor, ref: _CallRef) -> list[s
 
 
 def _reachable_functions(visitor: BlockingIOStaticVisitor, roots: Iterable[str]) -> set[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     reachable = set(roots)
     queue: deque[str] = deque(reachable)
     while queue:
@@ -626,6 +662,7 @@ def _reachable_functions(visitor: BlockingIOStaticVisitor, roots: Iterable[str])
 
 
 def _async_reachable_functions(visitor: BlockingIOStaticVisitor) -> set[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return _reachable_functions(
         visitor,
         (qualname for qualname, info in visitor.function_defs.items() if info.is_async),
@@ -633,6 +670,7 @@ def _async_reachable_functions(visitor: BlockingIOStaticVisitor) -> set[str]:
 
 
 def _agent_middleware_classes(visitor: BlockingIOStaticVisitor) -> set[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     middleware_classes: set[str] = set()
     changed = True
     while changed:
@@ -647,11 +685,13 @@ def _agent_middleware_classes(visitor: BlockingIOStaticVisitor) -> set[str]:
 
 
 def _is_agent_middleware_base(base: str, known_middleware_classes: set[str]) -> bool:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     leaf = base.rsplit(".", 1)[-1]
     return leaf == "AgentMiddleware" or leaf in known_middleware_classes
 
 
 def _sync_only_agent_middleware_entrypoints(visitor: BlockingIOStaticVisitor) -> set[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     entrypoints: set[str] = set()
     middleware_classes = _agent_middleware_classes(visitor)
     for class_name in middleware_classes:
@@ -669,6 +709,7 @@ def _event_loop_exposures(
     async_reachable: set[str],
     middleware_reachable: set[str],
 ) -> dict[str, str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     exposures: dict[str, str] = {}
     for qualname, info in visitor.function_defs.items():
         if info.is_async:
@@ -681,10 +722,12 @@ def _event_loop_exposures(
 
 
 def _priority(operation: str) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return OPERATION_BASE_PRIORITY[operation]
 
 
 def _finding_reason(operation: str, exposure: str) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if exposure == "DIRECT_ASYNC":
         return f"{operation} is called directly inside an async function."
     if exposure == "ASYNC_REACHABLE_SAME_FILE":
@@ -695,6 +738,7 @@ def _finding_reason(operation: str, exposure: str) -> str:
 
 
 def _finalize_findings(visitor: BlockingIOStaticVisitor) -> list[BlockingIOStaticFinding]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     reachable = _async_reachable_functions(visitor)
     middleware_reachable = _reachable_functions(visitor, _sync_only_agent_middleware_entrypoints(visitor))
     event_loop_exposures = _event_loop_exposures(visitor, reachable, middleware_reachable)
@@ -721,7 +765,7 @@ def _finalize_findings(visitor: BlockingIOStaticVisitor) -> list[BlockingIOStati
 
 
 def scan_source(source: str, relative_path: str) -> list[BlockingIOStaticFinding]:
-    """Scan one in-memory Python source; `relative_path` is reported verbatim in findings."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     source_lines = source.splitlines()
     try:
         tree = ast.parse(source, filename=relative_path)
@@ -749,14 +793,17 @@ def scan_source(source: str, relative_path: str) -> list[BlockingIOStaticFinding
 
 
 def scan_file(path: Path, *, repo_root: Path = REPO_ROOT) -> list[BlockingIOStaticFinding]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return scan_source(path.read_text(encoding="utf-8"), relative_to_repo(path, repo_root))
 
 
 def is_ignored_path(path: Path) -> bool:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return any(part in IGNORED_DIR_NAMES for part in path.parts)
 
 
 def iter_python_files(paths: Iterable[Path]) -> Iterable[Path]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     for path in paths:
         if not path.exists() or is_ignored_path(path):
             continue
@@ -772,6 +819,7 @@ def iter_python_files(paths: Iterable[Path]) -> Iterable[Path]:
 
 
 def scan_paths(paths: Iterable[Path], *, repo_root: Path = REPO_ROOT) -> list[BlockingIOStaticFinding]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     findings: list[BlockingIOStaticFinding] = []
     for path in sorted(iter_python_files(paths)):
         findings.extend(scan_file(path, repo_root=repo_root))
@@ -779,15 +827,18 @@ def scan_paths(paths: Iterable[Path], *, repo_root: Path = REPO_ROOT) -> list[Bl
 
 
 def findings_to_json(findings: Sequence[BlockingIOStaticFinding]) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return json.dumps([finding.to_dict() for finding in findings], indent=2) + "\n"
 
 
 def write_json_report(findings: Sequence[BlockingIOStaticFinding], output_path: Path) -> None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(findings_to_json(findings), encoding="utf-8")
 
 
 def _scan_root(path: str) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     parts = path.split("/")
     if parts[:4] == ["backend", "packages", "harness", "deerflow"]:
         return "backend/packages/harness/deerflow"
@@ -797,6 +848,7 @@ def _scan_root(path: str) -> str:
 
 
 def _format_counter(title: str, counter: Counter[str], *, limit: int | None = None, order: Sequence[str] | None = None) -> list[str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     lines = [title]
     if order is None:
         items = sorted(counter.items(), key=lambda item: (-item[1], item[0]))
@@ -813,6 +865,7 @@ def _format_counter(title: str, counter: Counter[str], *, limit: int | None = No
 
 
 def format_summary(findings: Sequence[BlockingIOStaticFinding], *, output_path: Path | None = None) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if not findings:
         lines = ["No static blocking IO event-loop risk findings in backend business code."]
     else:
@@ -840,6 +893,7 @@ def format_summary(findings: Sequence[BlockingIOStaticFinding], *, output_path: 
 
 
 def format_text(findings: Sequence[BlockingIOStaticFinding]) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if not findings:
         return "No static blocking IO event-loop risk findings in backend business code."
 
@@ -854,6 +908,7 @@ def format_text(findings: Sequence[BlockingIOStaticFinding]) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     parser = argparse.ArgumentParser(description=("Statically inventory blocking IO calls that may block the backend asyncio event loop. Findings are prioritized review candidates, not automatic bug decisions."))
     parser.add_argument(
         "paths",
@@ -876,6 +931,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     parser = build_parser()
     args = parser.parse_args(argv)
     paths = args.paths or list(DEFAULT_SCAN_PATHS)

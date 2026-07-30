@@ -10,9 +10,11 @@ import { getI18n } from "@/core/i18n/server";
 
 import { useMDXComponents as getMDXComponents } from "../../../../mdx-components";
 
+// Nextra 以未绑定方法暴露包装组件；此处仅保存组件引用。
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const Wrapper = getMDXComponents().wrapper;
 
+/** 为指定博客标签生成页面元数据。 */
 export async function generateMetadata(props) {
   const params = await props.params;
   return {
@@ -21,6 +23,7 @@ export async function generateMetadata(props) {
   };
 }
 
+/** 加载并渲染当前语言下指定标签的文章列表。 */
 export default async function TagPage(props) {
   const params = await props.params;
   const tag = params.tag;

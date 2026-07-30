@@ -1,3 +1,4 @@
+'未说明'
 import asyncio
 import os
 import stat
@@ -16,12 +17,15 @@ from app.gateway.routers import uploads
 
 
 class ChunkedUpload:
+    '未说明'
     def __init__(self, filename: str, chunks: list[bytes]):
+        '未说明'
         self.filename = filename
         self._chunks = list(chunks)
         self.read_calls: list[int | None] = []
 
     async def read(self, size: int | None = None) -> bytes:
+        """处理读取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.read_calls.append(size)
         if size is None:
             raise AssertionError("upload must be read with an explicit chunk size")
@@ -31,12 +35,14 @@ class ChunkedUpload:
 
 
 def _mounted_provider() -> MagicMock:
+    '未说明'
     provider = MagicMock()
     provider.uses_thread_data_mounts = True
     return provider
 
 
 def _symlink_to_or_skip(link_path: Path, target_path: Path) -> None:
+    '未说明'
     try:
         link_path.symlink_to(target_path)
     except OSError as exc:
@@ -46,6 +52,7 @@ def _symlink_to_or_skip(link_path: Path, target_path: Path) -> None:
 
 
 def test_upload_files_writes_thread_storage_and_skips_local_sandbox_sync(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -73,6 +80,7 @@ def test_upload_files_writes_thread_storage_and_skips_local_sandbox_sync(tmp_pat
 
 
 def test_upload_and_list_response_models_expose_size_as_int(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
     (thread_uploads_dir / "notes.txt").write_bytes(b"hello uploads")
@@ -92,6 +100,7 @@ def test_upload_and_list_response_models_expose_size_as_int(tmp_path):
 
 
 def test_upload_openapi_schema_exposes_file_size_as_integer():
+    '未说明'
     upload_schema = uploads.UploadResponse.model_json_schema()
     list_schema = uploads.UploadListResponse.model_json_schema()
 
@@ -100,6 +109,7 @@ def test_upload_openapi_schema_exposes_file_size_as_integer():
 
 
 def test_upload_files_auto_renames_duplicate_form_filenames(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -133,6 +143,7 @@ def test_upload_files_auto_renames_duplicate_form_filenames(tmp_path):
 
 
 def test_upload_files_skips_acquire_when_thread_data_is_mounted(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -154,6 +165,7 @@ def test_upload_files_skips_acquire_when_thread_data_is_mounted(tmp_path):
 
 
 def test_upload_files_does_not_auto_convert_documents_by_default(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -182,6 +194,7 @@ def test_upload_files_does_not_auto_convert_documents_by_default(tmp_path):
 
 
 def test_upload_files_syncs_non_local_sandbox_and_marks_markdown_file(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -193,6 +206,7 @@ def test_upload_files_syncs_non_local_sandbox_and_marks_markdown_file(tmp_path):
     provider.get.return_value = sandbox
 
     async def fake_convert(file_path: Path) -> Path:
+        '未说明'
         md_path = file_path.with_suffix(".md")
         md_path.write_text("converted", encoding="utf-8")
         return md_path
@@ -221,6 +235,7 @@ def test_upload_files_syncs_non_local_sandbox_and_marks_markdown_file(tmp_path):
 
 
 def test_upload_files_makes_non_local_files_sandbox_writable(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -232,6 +247,7 @@ def test_upload_files_makes_non_local_files_sandbox_writable(tmp_path):
     provider.get.return_value = sandbox
 
     async def fake_convert(file_path: Path) -> Path:
+        '未说明'
         md_path = file_path.with_suffix(".md")
         md_path.write_text("converted", encoding="utf-8")
         return md_path
@@ -253,6 +269,7 @@ def test_upload_files_makes_non_local_files_sandbox_writable(tmp_path):
 
 
 def test_upload_files_does_not_adjust_permissions_for_local_sandbox(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -282,6 +299,7 @@ def test_upload_files_does_not_adjust_permissions_for_local_sandbox(tmp_path):
 
 
 def test_upload_files_acquires_non_local_sandbox_before_writing(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -291,6 +309,7 @@ def test_upload_files_acquires_non_local_sandbox_before_writing(tmp_path):
     provider.get.return_value = sandbox
 
     def acquire_before_writes(thread_id: str, *, user_id: str | None = None) -> str:
+        '未说明'
         assert list(thread_uploads_dir.iterdir()) == []
         assert user_id == "owner-upload"
         return "aio-1"
@@ -313,6 +332,7 @@ def test_upload_files_acquires_non_local_sandbox_before_writing(tmp_path):
 
 
 def test_upload_files_fails_before_writing_when_non_local_sandbox_unavailable(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -336,6 +356,7 @@ def test_upload_files_fails_before_writing_when_non_local_sandbox_unavailable(tm
 
 
 def test_upload_files_rejects_too_many_files_before_writing(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -358,6 +379,7 @@ def test_upload_files_rejects_too_many_files_before_writing(tmp_path):
 
 
 def test_upload_files_rejects_oversized_single_file_and_removes_partial_file(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -379,6 +401,7 @@ def test_upload_files_rejects_oversized_single_file_and_removes_partial_file(tmp
 
 
 def test_upload_files_rejects_total_size_over_limit_and_cleans_request_files(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -400,6 +423,7 @@ def test_upload_files_rejects_total_size_over_limit_and_cleans_request_files(tmp
 
 
 def test_upload_files_does_not_sync_non_local_sandbox_when_total_size_exceeds_limit(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -431,6 +455,7 @@ def test_upload_files_does_not_sync_non_local_sandbox_when_total_size_exceeds_li
 
 
 def test_upload_files_does_not_sync_non_local_sandbox_when_conversion_fails(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -461,6 +486,7 @@ def test_upload_files_does_not_sync_non_local_sandbox_when_conversion_fails(tmp_
 
 
 def test_make_file_sandbox_writable_adds_write_bits_for_regular_files(tmp_path):
+    '未说明'
     file_path = tmp_path / "report.pdf"
     file_path.write_bytes(b"pdf-bytes")
     os_chmod_mode = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
@@ -475,6 +501,7 @@ def test_make_file_sandbox_writable_adds_write_bits_for_regular_files(tmp_path):
 
 
 def test_make_file_sandbox_writable_skips_symlinks(tmp_path):
+    '未说明'
     file_path = tmp_path / "target-link.txt"
     file_path.write_text("hello", encoding="utf-8")
     symlink_stat = MagicMock(st_mode=stat.S_IFLNK)
@@ -489,6 +516,7 @@ def test_make_file_sandbox_writable_skips_symlinks(tmp_path):
 
 
 def test_make_file_sandbox_readable_adds_read_bits_for_regular_files(tmp_path):
+    '未说明'
     file_path = tmp_path / "data.csv"
     file_path.write_bytes(b"csv-data")
     # Simulate the 0o600 permissions set by open_upload_file_no_symlink
@@ -503,6 +531,7 @@ def test_make_file_sandbox_readable_adds_read_bits_for_regular_files(tmp_path):
 
 
 def test_make_file_sandbox_readable_skips_symlinks(tmp_path):
+    '未说明'
     file_path = tmp_path / "target-link.txt"
     file_path.write_text("hello", encoding="utf-8")
     symlink_stat = MagicMock(st_mode=stat.S_IFLNK)
@@ -517,6 +546,7 @@ def test_make_file_sandbox_readable_skips_symlinks(tmp_path):
 
 
 def test_upload_files_adjusts_read_permissions_for_mounted_non_local_sandbox(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -542,6 +572,7 @@ def test_upload_files_adjusts_read_permissions_for_mounted_non_local_sandbox(tmp
 
 
 def test_upload_files_rejects_dotdot_and_dot_filenames(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 
@@ -574,6 +605,7 @@ def test_upload_files_rejects_dotdot_and_dot_filenames(tmp_path):
 
 
 def test_upload_files_rejects_preexisting_symlink_destination(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
     outside_file = tmp_path / "outside.txt"
@@ -600,6 +632,7 @@ def test_upload_files_rejects_preexisting_symlink_destination(tmp_path):
 
 
 def test_upload_files_rejects_dangling_symlink_destination(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
     missing_target = tmp_path / "missing-target.txt"
@@ -624,6 +657,7 @@ def test_upload_files_rejects_dangling_symlink_destination(tmp_path):
 
 
 def test_upload_files_rejects_hardlinked_destination_without_truncating(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
     outside_file = tmp_path / "outside.txt"
@@ -649,6 +683,7 @@ def test_upload_files_rejects_hardlinked_destination_without_truncating(tmp_path
 
 
 def test_upload_files_overwrites_existing_regular_file(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
     existing_file = thread_uploads_dir / "notes.txt"
@@ -673,6 +708,7 @@ def test_upload_files_overwrites_existing_regular_file(tmp_path):
 
 
 def test_upload_files_oversized_replacement_preserves_existing_regular_file(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
     existing_file = thread_uploads_dir / "a.txt"
@@ -705,6 +741,7 @@ def test_upload_files_oversized_replacement_preserves_existing_regular_file(tmp_
 
 
 def test_delete_uploaded_file_removes_generated_markdown_companion(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
     (thread_uploads_dir / "report.pdf").write_bytes(b"pdf-bytes")
@@ -719,8 +756,11 @@ def test_delete_uploaded_file_removes_generated_markdown_companion(tmp_path):
 
 
 def test_auto_convert_documents_enabled_defaults_to_false_on_config_errors():
+    '未说明'
     class BrokenConfig:
+        '未说明'
         def __getattribute__(self, name):
+            '未说明'
             if name == "uploads":
                 raise RuntimeError("boom")
             return super().__getattribute__(name)
@@ -729,6 +769,7 @@ def test_auto_convert_documents_enabled_defaults_to_false_on_config_errors():
 
 
 def test_auto_convert_documents_enabled_reads_dict_backed_uploads_config():
+    '未说明'
     cfg = MagicMock()
     cfg.uploads = {"auto_convert_documents": True}
 
@@ -736,6 +777,7 @@ def test_auto_convert_documents_enabled_reads_dict_backed_uploads_config():
 
 
 def test_auto_convert_documents_enabled_accepts_boolean_and_string_truthy_values():
+    '未说明'
     false_cfg = MagicMock()
     false_cfg.uploads = MagicMock(auto_convert_documents=False)
 
@@ -755,6 +797,7 @@ def test_auto_convert_documents_enabled_accepts_boolean_and_string_truthy_values
 
 
 def test_upload_limits_endpoint_reads_uploads_config():
+    '未说明'
     cfg = MagicMock()
     cfg.uploads = {
         "max_files": 15,
@@ -770,6 +813,7 @@ def test_upload_limits_endpoint_reads_uploads_config():
 
 
 def test_upload_limits_endpoint_requires_thread_access():
+    '未说明'
     cfg = MagicMock()
     cfg.uploads = {}
     app = make_authed_test_app(owner_check_passes=False)
@@ -784,6 +828,7 @@ def test_upload_limits_endpoint_requires_thread_access():
 
 
 def test_upload_limits_accept_legacy_config_keys():
+    '未说明'
     cfg = MagicMock()
     cfg.uploads = {
         "max_file_count": 7,
@@ -797,6 +842,7 @@ def test_upload_limits_accept_legacy_config_keys():
 
 
 def test_upload_files_uses_configured_file_count_limit(tmp_path):
+    '未说明'
     thread_uploads_dir = tmp_path / "uploads"
     thread_uploads_dir.mkdir(parents=True)
 

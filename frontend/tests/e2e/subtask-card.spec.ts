@@ -40,6 +40,9 @@ const stoppedSubtaskMessages = [
 ];
 
 test.describe("Subtask card", () => {
+  /**
+   * 覆盖“shows failed after a stopped task thread is reloaded”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("shows failed after a stopped task thread is reloaded", async ({
     page,
   }) => {

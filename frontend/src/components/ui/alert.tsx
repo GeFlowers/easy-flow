@@ -19,6 +19,7 @@ const alertVariants = cva(
   },
 );
 
+/** Alert 内部组件：组织对应的界面结构与交互语义。 */
 function Alert({
   className,
   variant,
@@ -34,6 +35,7 @@ function Alert({
   );
 }
 
+/** AlertTitle 内部组件：组织对应的界面结构与交互语义。 */
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -47,6 +49,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** AlertDescription 内部组件：组织对应的界面结构与交互语义。 */
 function AlertDescription({
   className,
   ...props

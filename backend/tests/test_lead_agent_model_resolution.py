@@ -1,4 +1,4 @@
-"""Tests for lead agent runtime model resolution behavior."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -21,6 +21,7 @@ from deerflow.config.summarization_config import SummarizationConfig
 
 
 def _make_app_config(models: list[ModelConfig], loop_detection: LoopDetectionConfig | None = None) -> AppConfig:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return AppConfig(
         models=models,
         sandbox=SandboxConfig(use="deerflow.sandbox.local:LocalSandboxProvider"),
@@ -29,6 +30,7 @@ def _make_app_config(models: list[ModelConfig], loop_detection: LoopDetectionCon
 
 
 def _make_model(name: str, *, supports_thinking: bool) -> ModelConfig:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return ModelConfig(
         name=name,
         display_name=name,
@@ -41,18 +43,12 @@ def _make_model(name: str, *, supports_thinking: bool) -> ModelConfig:
 
 
 def test_make_lead_agent_signature_matches_langgraph_server_factory_abi():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert list(inspect.signature(lead_agent_module.make_lead_agent).parameters) == ["config"]
 
 
 def test_make_lead_agent_attaches_tracing_callbacks_at_graph_root(monkeypatch):
-    """Regression guard: tracing handlers must be appended to
-    ``config["callbacks"]`` (graph invocation root), and every in-graph
-    ``create_chat_model`` call must pass ``attach_tracing=False``.
-
-    Catches future contributors who forget the flag when adding new
-    in-graph model creation, which would silently produce duplicate
-    spans and break Langfuse session/user propagation.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
 
     import deerflow.tools as tools_module
@@ -67,6 +63,7 @@ def test_make_lead_agent_attaches_tracing_callbacks_at_graph_root(monkeypatch):
     seen_attach_tracing: list[bool] = []
 
     def _fake_create_chat_model(*, name, thinking_enabled, reasoning_effort=None, app_config=None, attach_tracing=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         seen_attach_tracing.append(attach_tracing)
         return object()
 
@@ -76,23 +73,25 @@ def test_make_lead_agent_attaches_tracing_callbacks_at_graph_root(monkeypatch):
     config: dict = {"configurable": {"model_name": "safe-model"}}
     lead_agent_module._make_lead_agent(config, app_config=app_config)
 
-    # Handler must land on the graph invocation config so the Langfuse
-    # CallbackHandler fires ``on_chain_start(parent_run_id=None)`` and
-    # propagates ``session_id`` / ``user_id`` onto the trace.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert sentinel_handler in (config.get("callbacks") or []), "build_tracing_callbacks output must be appended to config['callbacks']"
 
-    # Every in-graph create_chat_model call must opt out of model-level
-    # tracing to avoid duplicate spans.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert seen_attach_tracing, "_make_lead_agent did not call create_chat_model"
     assert all(flag is False for flag in seen_attach_tracing), f"in-graph create_chat_model must pass attach_tracing=False; got {seen_attach_tracing}"
 
 
 def test_internal_make_lead_agent_uses_explicit_app_config(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("explicit-model", supports_thinking=False)])
 
     import deerflow.tools as tools_module
 
     def _raise_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
     monkeypatch.setattr(lead_agent_module, "get_app_config", _raise_get_app_config)
@@ -102,6 +101,7 @@ def test_internal_make_lead_agent_uses_explicit_app_config(monkeypatch):
     captured: dict[str, object] = {}
 
     def _fake_create_chat_model(*, name, thinking_enabled, reasoning_effort=None, app_config=None, attach_tracing=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["name"] = name
         captured["app_config"] = app_config
         return object()
@@ -122,11 +122,13 @@ def test_internal_make_lead_agent_uses_explicit_app_config(monkeypatch):
 
 
 def test_make_lead_agent_uses_runtime_app_config_from_context_without_global_read(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("context-model", supports_thinking=False)])
 
     import deerflow.tools as tools_module
 
     def _raise_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when runtime context already carries app_config")
 
     monkeypatch.setattr(lead_agent_module, "get_app_config", _raise_get_app_config)
@@ -136,6 +138,7 @@ def test_make_lead_agent_uses_runtime_app_config_from_context_without_global_rea
     captured: dict[str, object] = {}
 
     def _fake_create_chat_model(*, name, thinking_enabled, reasoning_effort=None, app_config=None, attach_tracing=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["name"] = name
         captured["app_config"] = app_config
         return object()
@@ -160,6 +163,7 @@ def test_make_lead_agent_uses_runtime_app_config_from_context_without_global_rea
 
 
 def test_resolve_model_name_falls_back_to_default(monkeypatch, caplog):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [
             _make_model("default-model", supports_thinking=False),
@@ -177,6 +181,7 @@ def test_resolve_model_name_falls_back_to_default(monkeypatch, caplog):
 
 
 def test_resolve_model_name_uses_default_when_none(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [
             _make_model("default-model", supports_thinking=False),
@@ -192,6 +197,7 @@ def test_resolve_model_name_uses_default_when_none(monkeypatch):
 
 
 def test_resolve_model_name_raises_when_no_models_configured(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([])
 
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
@@ -204,6 +210,7 @@ def test_resolve_model_name_raises_when_no_models_configured(monkeypatch):
 
 
 def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
 
     import deerflow.tools as tools_module
@@ -215,6 +222,7 @@ def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkey
     captured: dict[str, object] = {}
 
     def _fake_create_chat_model(*, name, thinking_enabled, reasoning_effort=None, app_config=None, attach_tracing=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["name"] = name
         captured["thinking_enabled"] = thinking_enabled
         captured["reasoning_effort"] = reasoning_effort
@@ -242,6 +250,7 @@ def test_make_lead_agent_disables_thinking_when_model_does_not_support_it(monkey
 
 
 def test_make_lead_agent_reads_runtime_options_from_context(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [
             _make_model("default-model", supports_thinking=False),
@@ -259,6 +268,7 @@ def test_make_lead_agent_reads_runtime_options_from_context(monkeypatch):
     captured: dict[str, object] = {}
 
     def _fake_create_chat_model(*, name, thinking_enabled, reasoning_effort=None, app_config=None, attach_tracing=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["name"] = name
         captured["thinking_enabled"] = thinking_enabled
         captured["reasoning_effort"] = reasoning_effort
@@ -292,11 +302,13 @@ def test_make_lead_agent_reads_runtime_options_from_context(monkeypatch):
 
 
 def test_make_lead_agent_filters_clarification_tool_for_non_interactive_runs(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
 
     import deerflow.tools as tools_module
 
     def _named_tool(name: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         tool = MagicMock()
         tool.name = name
         return tool
@@ -326,6 +338,7 @@ def test_make_lead_agent_filters_clarification_tool_for_non_interactive_runs(mon
 
 
 def test_make_lead_agent_rejects_invalid_bootstrap_agent_name(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
 
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: app_config)
@@ -346,6 +359,7 @@ def test_make_lead_agent_rejects_invalid_bootstrap_agent_name(monkeypatch):
 
 
 def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [
             _make_model("stale-model", supports_thinking=False),
@@ -373,10 +387,10 @@ def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
     )
 
     assert any(isinstance(m, lead_agent_module.ViewImageMiddleware) for m in middlewares)
-    # verify the custom middleware is injected correctly.
-    # With this test's default safety config enabled, the tail order is:
-    #   ..., custom, TerminalResponseMiddleware, SafetyFinishReasonMiddleware,
-    #   ClarificationMiddleware, so the custom mock sits at index [-4].
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert len(middlewares) > 0 and isinstance(middlewares[-4], MagicMock)
 
     from deerflow.agents.middlewares.clarification_middleware import ClarificationMiddleware
@@ -389,13 +403,16 @@ def test_build_middlewares_uses_resolved_model_name_for_vision(monkeypatch):
 
 
 def test_build_middlewares_passes_explicit_app_config_to_shared_factory(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
     captured: dict[str, object] = {}
 
     def _raise_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
     def _fake_build_lead_runtime_middlewares(*, app_config, lazy_init):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["app_config"] = app_config
         captured["lazy_init"] = lazy_init
         return ["base-middleware"]
@@ -435,6 +452,7 @@ def test_build_middlewares_passes_explicit_app_config_to_shared_factory(monkeypa
 
 
 def test_build_middlewares_places_mcp_routing_before_deferred_filter(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
     from deerflow.agents.middlewares.mcp_routing_middleware import McpRoutingMiddleware
     from deerflow.tools.builtins.tool_search import DeferredToolSetup
@@ -462,6 +480,7 @@ def test_build_middlewares_places_mcp_routing_before_deferred_filter(monkeypatch
 
 
 def test_build_middlewares_uses_loop_detection_config(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [_make_model("safe-model", supports_thinking=False)],
         loop_detection=LoopDetectionConfig(
@@ -495,6 +514,7 @@ def test_build_middlewares_uses_loop_detection_config(monkeypatch):
 
 
 def test_build_middlewares_omits_loop_detection_when_disabled(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [_make_model("safe-model", supports_thinking=False)],
         loop_detection=LoopDetectionConfig(enabled=False),
@@ -515,6 +535,7 @@ def test_build_middlewares_omits_loop_detection_when_disabled(monkeypatch):
 
 
 def test_build_middlewares_passes_subagent_total_limit_from_app_config(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [_make_model("safe-model", supports_thinking=False)],
         loop_detection=LoopDetectionConfig(enabled=False),
@@ -538,6 +559,7 @@ def test_build_middlewares_passes_subagent_total_limit_from_app_config(monkeypat
 
 
 def test_build_middlewares_allows_runtime_subagent_total_limit_override(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config(
         [_make_model("safe-model", supports_thinking=False)],
         loop_detection=LoopDetectionConfig(enabled=False),
@@ -567,6 +589,7 @@ def test_build_middlewares_allows_runtime_subagent_total_limit_override(monkeypa
 
 
 def test_create_summarization_middleware_uses_configured_model_alias(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("model-masswork", supports_thinking=False)])
     app_config.summarization = SummarizationConfig(enabled=True, model_name="model-masswork")
     app_config.memory = MemoryConfig(enabled=False)
@@ -578,6 +601,7 @@ def test_create_summarization_middleware_uses_configured_model_alias(monkeypatch
     fake_model.with_config.return_value = fake_model
 
     def _fake_create_chat_model(*, name=None, thinking_enabled, reasoning_effort=None, app_config=None, attach_tracing=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["name"] = name
         captured["thinking_enabled"] = thinking_enabled
         captured["reasoning_effort"] = reasoning_effort
@@ -585,6 +609,7 @@ def test_create_summarization_middleware_uses_configured_model_alias(monkeypatch
         return fake_model
 
     def _raise_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
     monkeypatch.setattr(summarization_middleware_module, "get_app_config", _raise_get_app_config)
@@ -601,6 +626,7 @@ def test_create_summarization_middleware_uses_configured_model_alias(monkeypatch
 
 
 def test_create_summarization_middleware_omits_model_name_when_unconfigured(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     app_config = _make_app_config([_make_model("default-model", supports_thinking=False)])
     app_config.summarization = SummarizationConfig(enabled=True, model_name=None)
     app_config.memory = MemoryConfig(enabled=False)
@@ -610,6 +636,7 @@ def test_create_summarization_middleware_omits_model_name_when_unconfigured(monk
     fake_model.with_config.return_value = fake_model
 
     def _fake_create_chat_model(**kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured.update(kwargs)
         return fake_model
 
@@ -625,7 +652,7 @@ def test_create_summarization_middleware_omits_model_name_when_unconfigured(monk
 
 
 def test_create_summarization_middleware_uses_frontend_supported_update_key(monkeypatch):
-    """LangGraph update keys use the middleware class name plus hook name."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     app_config = _make_app_config([_make_model("safe-model", supports_thinking=False)])
     app_config.summarization = SummarizationConfig(enabled=True)
@@ -643,6 +670,7 @@ def test_create_summarization_middleware_uses_frontend_supported_update_key(monk
 
 
 def test_create_summarization_middleware_threads_resolved_app_config_to_model(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     fallback_app_config = _make_app_config([_make_model("fallback-model", supports_thinking=False)])
     fallback_app_config.summarization = SummarizationConfig(enabled=True, model_name="fallback-model")
     fallback_app_config.memory = MemoryConfig(enabled=False)
@@ -654,6 +682,7 @@ def test_create_summarization_middleware_threads_resolved_app_config_to_model(mo
     fake_model.with_config.return_value = fake_model
 
     def _fake_create_chat_model(*, name=None, thinking_enabled, reasoning_effort=None, app_config=None, attach_tracing=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["app_config"] = app_config
         return fake_model
 
@@ -667,10 +696,12 @@ def test_create_summarization_middleware_threads_resolved_app_config_to_model(mo
 
 
 def test_memory_middleware_uses_explicit_memory_config_without_global_read(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.agents.middlewares import memory_middleware as memory_middleware_module
     from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
 
     def _raise_get_memory_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_memory_config() must not be used when memory_config is explicit")
 
     monkeypatch.setattr(memory_middleware_module, "get_memory_config", _raise_get_memory_config)

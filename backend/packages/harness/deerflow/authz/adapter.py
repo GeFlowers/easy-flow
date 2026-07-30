@@ -1,14 +1,4 @@
-"""Adapter that presents an AuthorizationProvider as a GuardrailProvider.
-
-This lets the existing :class:`~deerflow.guardrails.middleware.GuardrailMiddleware`
-enforce :class:`~deerflow.authz.provider.AuthorizationProvider` decisions at
-tool-call time — no new middleware class required (see RFC §6.1).
-
-The adapter maps :class:`~deerflow.guardrails.provider.GuardrailRequest`
-fields to :class:`~deerflow.authz.provider.AuthzRequest` fields, calls the
-authorization provider, and converts the :class:`~deerflow.authz.provider.AuthzDecision`
-back to a :class:`~deerflow.guardrails.provider.GuardrailDecision`.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -17,20 +7,7 @@ from deerflow.guardrails.provider import GuardrailDecision, GuardrailReason, Gua
 
 
 class GuardrailAuthorizationAdapter:
-    """Adapt an :class:`AuthorizationProvider` to the ``GuardrailProvider`` Protocol.
-
-    ``resource_type`` and ``action`` default to ``"tool"`` / ``"call"``,
-    which is correct for the tool-execution path. A different resource/action
-    pair can be injected if the adapter is reused outside the tool path.
-
-    .. note::
-
-        ``Principal.is_internal`` is not populated by this adapter — the
-        correct signal (``auth_source == AUTH_SOURCE_INTERNAL``) lives on
-        ``request.state``, not on :class:`GuardrailRequest`. The field
-        retains its dataclass default (``False``) until Phase 1 threads it
-        into run context, so both layers derive it from one source.
-    """
+    '未说明guardrail?authorization未说明'
 
     name = "authorization"
 
@@ -41,12 +18,13 @@ class GuardrailAuthorizationAdapter:
         resource_type: str = "tool",
         action: str = "call",
     ) -> None:
+        '未说明'
         self._provider = provider
         self._resource_type = resource_type
         self._action = action
 
     def _to_authz(self, gr: GuardrailRequest) -> AuthzRequest:
-        """Map a guardrail request to an authorization request."""
+        '未说明to未说明'
         return AuthzRequest(
             principal=Principal(
                 user_id=gr.user_id,
@@ -70,7 +48,7 @@ class GuardrailAuthorizationAdapter:
 
     @staticmethod
     def _to_guardrail(d: AuthzDecision) -> GuardrailDecision:
-        """Convert an authorization decision to a guardrail decision."""
+        '未说明to?guardrail未说明'
         return GuardrailDecision(
             allow=d.allow,
             reasons=[GuardrailReason(code=r.code, message=r.message) for r in d.reasons],
@@ -79,23 +57,11 @@ class GuardrailAuthorizationAdapter:
         )
 
     def evaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        """Synchronous evaluation: delegate to ``provider.authorize``.
-
-        Provider exceptions are intentionally allowed to propagate. The
-        adapter is consumed by :class:`~deerflow.guardrails.middleware.GuardrailMiddleware`,
-        whose ``wrap_tool_call`` / ``awrap_tool_call`` already applies
-        fail-closed semantics based on its ``fail_closed`` parameter
-        (backed by ``AuthorizationConfig.fail_closed``). Catching exceptions
-        here would duplicate that logic and risk divergent behavior between
-        the two layers.
-        """
+        '未说明evaluate未说明'
         decision = self._provider.authorize(self._to_authz(request))
         return self._to_guardrail(decision)
 
     async def aevaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        """Async evaluation: delegate to ``provider.aauthorize``.
-
-        See :meth:`evaluate` for exception-propagation rationale.
-        """
+        '未说明aevaluate未说明'
         decision = await self._provider.aauthorize(self._to_authz(request))
         return self._to_guardrail(decision)

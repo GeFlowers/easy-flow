@@ -9,11 +9,7 @@ function isExternalUrl(href: string | undefined): boolean {
   return !!href && /^https?:\/\//.test(href);
 }
 
-/**
- * Builds the `a` renderer shared by message content and generic markdown.
- * Passing a `threadId` also resolves `/mnt/` artifact links; without it those
- * links fall through to the default external-link handling.
- */
+/** 创建消息内容和通用 Markdown 共用的 `a` 渲染器；传入 `threadId` 时还会解析 `/mnt/` 产物链接，未传入时则沿用默认外链处理。 */
 export function createMarkdownLinkComponent(threadId?: string) {
   return function MarkdownLink({
     href,

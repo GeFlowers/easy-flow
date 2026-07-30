@@ -5,10 +5,12 @@ const gatewayConfigSchema = z.object({
   trustedOrigins: z.array(z.string()).min(1),
 });
 
+/** 经环境变量解析并校验后的内部 Gateway 配置。 */
 export type GatewayConfig = z.infer<typeof gatewayConfigSchema>;
 
 let _cached: GatewayConfig | null = null;
 
+/** 读取、规范化、校验并缓存内部 Gateway 地址和受信任来源。 */
 export function getGatewayConfig(): GatewayConfig {
   if (_cached) return _cached;
 

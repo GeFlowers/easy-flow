@@ -1,27 +1,4 @@
-"""Gateway router for inbound GitHub webhook deliveries.
-
-Receives GitHub App / repository webhook events at ``POST /api/webhooks/github``.
-This route is intentionally exempt from both the auth and CSRF middleware
-(see ``auth_middleware._PUBLIC_PATH_PREFIXES`` and
-``csrf_middleware.should_check_csrf``) because GitHub neither sends a
-session cookie nor an ``X-CSRF-Token`` header.
-
-Authenticity is enforced via the HMAC-SHA256 signature in the
-``X-Hub-Signature-256`` request header, compared in constant time against
-the shared secret in the ``GITHUB_WEBHOOK_SECRET`` environment variable.
-
-**The route is fail-closed by default.** If ``GITHUB_WEBHOOK_SECRET`` is
-unset, the route is not mounted at all (`/api/webhooks/github` responds
-404) so a misconfigured deployment cannot accept forged deliveries. Set
-``DEER_FLOW_ALLOW_UNVERIFIED_GITHUB_WEBHOOKS=1`` to mount the route
-anyway for local development or loopback testing — every delivery is
-then accepted unverified with a WARNING log line.
-
-After verification the payload is fanned out by :func:`fanout_event` into
-:class:`InboundMessage` instances on the channel bus, one per matching
-custom agent binding. The :class:`GitHubChannel` (registered alongside
-Feishu/Slack/etc.) takes care of posting the agent's reply back to GitHub.
-"""
+"定义 github_webhooks 模块提供的职责与可复用接口。\n\nGateway router for inbound GitHub webhook deliveries.\n\nReceives GitHub App / repository webhook events at ``POST /api/webhooks/github``.\nThis route is intentionally exempt from both the auth and CSRF middleware\n(see ``auth_middleware._PUBLIC_PATH_PREFIXES`` and\n``csrf_middleware.should_check_csrf``) because GitHub neither sends a\nsession cookie nor an ``X-CSRF-Token`` header.\n\nAuthenticity is enforced via the HMAC-SHA256 signature in the\n``X-Hub-Signature-256`` request header, compared in constant time against\nthe shared secret in the ``GITHUB_WEBHOOK_SECRET`` environment variable.\n\n**The route is fail-closed by default.** If ``GITHUB_WEBHOOK_SECRET`` is\nunset, the route is not mounted at all (`/api/webhooks/github` responds\n404) so a misconfigured deployment cannot accept forged deliveries. Set\n``DEER_FLOW_ALLOW_UNVERIFIED_GITHUB_WEBHOOKS=1`` to mount the route\nanyway for local development or loopback testing — every delivery is\nthen accepted unverified with a WARNING log line.\n\nAfter verification the payload is fanned out by :func:`fanout_event` into\n:class:`InboundMessage` instances on the channel bus, one per matching\ncustom agent binding. The :class:`GitHubChannel` (registered alongside\nFeishu/Slack/etc.) takes care of posting the agent's reply back to GitHub.\n"
 
 from __future__ import annotations
 
@@ -58,13 +35,7 @@ _KNOWN_EVENTS: frozenset[str] = frozenset(
 
 
 def _get_webhook_secret() -> str | None:
-    """Return the configured webhook secret, or None if unset.
-
-    Read at request time so operators can rotate the secret without a
-    full process restart. Treats empty strings as "unset" so a stray
-    ``GITHUB_WEBHOOK_SECRET=`` in ``.env`` does not silently disable
-    signature verification.
-    """
+    '执行 _get_webhook_secret 的明确职责，并返回与调用约定一致的结果。\n\nReturn the configured webhook secret, or None if unset.\n\n    Read at request time so operators can rotate the secret without a\n    full process restart. Treats empty strings as "unset" so a stray\n    ``GITHUB_WEBHOOK_SECRET=`` in ``.env`` does not silently disable\n    signature verification.\n    '
     value = os.environ.get(_SECRET_ENV_VAR)
     if value is None:
         return None
@@ -73,37 +44,18 @@ def _get_webhook_secret() -> str | None:
 
 
 def _unverified_webhooks_allowed() -> bool:
-    """Return True iff the explicit dev opt-in for unverified deliveries is set.
-
-    Truthy values: ``1``, ``true``, ``yes``, ``on`` (case-insensitive).
-    Anything else (including unset) is False.
-    """
+    '执行 _unverified_webhooks_allowed 的明确职责，并返回与调用约定一致的结果。\n\nReturn True iff the explicit dev opt-in for unverified deliveries is set.\n\n    Truthy values: ``1``, ``true``, ``yes``, ``on`` (case-insensitive).\n    Anything else (including unset) is False.\n    '
     raw = os.environ.get(_ALLOW_UNVERIFIED_ENV_VAR, "").strip().lower()
     return raw in {"1", "true", "yes", "on"}
 
 
 def is_route_enabled() -> bool:
-    """Return True iff the GitHub webhook route should be mounted.
-
-    Mounted when either:
-        * ``GITHUB_WEBHOOK_SECRET`` is set (production / staging path), or
-        * ``DEER_FLOW_ALLOW_UNVERIFIED_GITHUB_WEBHOOKS=1`` is set
-          (explicit dev/loopback opt-in for testing without a real secret).
-
-    When neither is set the route is intentionally absent — a fresh
-    deployment with no secret in env cannot serve forged deliveries
-    even by accident. Called by :mod:`app.gateway.app` at router
-    inclusion time.
-    """
+    '判断条件是否成立并返回布尔结果，并遵守 is_route_enabled 所表达的接口约束。\n\nReturn True iff the GitHub webhook route should be mounted.\n\n    Mounted when either:\n        * ``GITHUB_WEBHOOK_SECRET`` is set (production / staging path), or\n        * ``DEER_FLOW_ALLOW_UNVERIFIED_GITHUB_WEBHOOKS=1`` is set\n          (explicit dev/loopback opt-in for testing without a real secret).\n\n    When neither is set the route is intentionally absent — a fresh\n    deployment with no secret in env cannot serve forged deliveries\n    even by accident. Called by :mod:`app.gateway.app` at router\n    inclusion time.\n    '
     return _get_webhook_secret() is not None or _unverified_webhooks_allowed()
 
 
 def _verify_signature(secret: str, body: bytes, signature_header: str | None) -> bool:
-    """Verify the GitHub ``X-Hub-Signature-256`` HMAC.
-
-    Expected header format: ``sha256=<hex>``. Returns False if the header
-    is missing, malformed, or fails constant-time comparison.
-    """
+    '执行 _verify_signature 的明确职责，并返回与调用约定一致的结果。\n\nVerify the GitHub ``X-Hub-Signature-256`` HMAC.\n\n    Expected header format: ``sha256=<hex>``. Returns False if the header\n    is missing, malformed, or fails constant-time comparison.\n    '
     if not signature_header:
         return False
     if not signature_header.startswith("sha256="):
@@ -114,11 +66,7 @@ def _verify_signature(secret: str, body: bytes, signature_header: str | None) ->
 
 
 def _summarise_event(event: str, payload: dict[str, Any]) -> str:
-    """Build a short, human-readable summary for the log line.
-
-    Pulls the most useful identifiers per event type. Falls back to the
-    raw action if anything unexpected shows up so we never crash here.
-    """
+    '执行 _summarise_event 的明确职责，并返回与调用约定一致的结果。\n\nBuild a short, human-readable summary for the log line.\n\n    Pulls the most useful identifiers per event type. Falls back to the\n    raw action if anything unexpected shows up so we never crash here.\n    '
     try:
         action = payload.get("action")
         repo = (payload.get("repository") or {}).get("full_name")
@@ -176,32 +124,7 @@ async def receive_github_webhook(
     x_github_delivery: str | None = Header(default=None, alias="X-GitHub-Delivery"),
     x_hub_signature_256: str | None = Header(default=None, alias="X-Hub-Signature-256"),
 ) -> dict[str, Any]:
-    """Receive a GitHub webhook delivery.
-
-    - Verifies the HMAC-SHA256 signature against ``GITHUB_WEBHOOK_SECRET``.
-    - Logs the event + delivery id + a one-line payload summary.
-    - Returns ``{"ok": True, ...}`` on successful (or no-op) dispatch so
-      GitHub marks the delivery successful and does not retry.
-
-    **Transient fan-out failures return 503**, not 200. GitHub retries 5xx
-    deliveries with exponential backoff (up to ~5 attempts over ~8 hours)
-    but does *not* retry 200 OK. A transient registry filesystem error or
-    bus publish failure on a 200 path would silently drop a real webhook
-    forever, so we return 503 instead and let GitHub redeliver — by the
-    time the redelivery lands the underlying outage is usually gone. The
-    `is_route_enabled()` startup check still handles *configuration*
-    errors fail-closed (route absent → 404); 503 is reserved for runtime
-    failures GitHub should retry. Permanent / non-retryable conditions
-    (unknown event, missing channel service) keep returning 200.
-
-    The route is fail-closed: :func:`is_route_enabled` should have already
-    prevented this handler from being mounted when no secret is configured.
-    The runtime guard below is a defense-in-depth fallback in case
-    ``GITHUB_WEBHOOK_SECRET`` was unset *after* startup (e.g. an operator
-    rotating env vars without restarting) — without the secret and without
-    the explicit unverified opt-in, return 503 rather than accept a
-    forgeable delivery.
-    """
+    '执行 receive_github_webhook 的明确职责，并返回与调用约定一致的结果。\n\nReceive a GitHub webhook delivery.\n\n    - Verifies the HMAC-SHA256 signature against ``GITHUB_WEBHOOK_SECRET``.\n    - Logs the event + delivery id + a one-line payload summary.\n    - Returns ``{"ok": True, ...}`` on successful (or no-op) dispatch so\n      GitHub marks the delivery successful and does not retry.\n\n    **Transient fan-out failures return 503**, not 200. GitHub retries 5xx\n    deliveries with exponential backoff (up to ~5 attempts over ~8 hours)\n    but does *not* retry 200 OK. A transient registry filesystem error or\n    bus publish failure on a 200 path would silently drop a real webhook\n    forever, so we return 503 instead and let GitHub redeliver — by the\n    time the redelivery lands the underlying outage is usually gone. The\n    `is_route_enabled()` startup check still handles *configuration*\n    errors fail-closed (route absent → 404); 503 is reserved for runtime\n    failures GitHub should retry. Permanent / non-retryable conditions\n    (unknown event, missing channel service) keep returning 200.\n\n    The route is fail-closed: :func:`is_route_enabled` should have already\n    prevented this handler from being mounted when no secret is configured.\n    The runtime guard below is a defense-in-depth fallback in case\n    ``GITHUB_WEBHOOK_SECRET`` was unset *after* startup (e.g. an operator\n    rotating env vars without restarting) — without the secret and without\n    the explicit unverified opt-in, return 503 rather than accept a\n    forgeable delivery.\n    '
     body = await request.body()
 
     secret = _get_webhook_secret()

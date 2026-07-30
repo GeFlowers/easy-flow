@@ -51,6 +51,7 @@ function getProviderUnavailableReason(
   return provider.unavailable_reason ?? undefined;
 }
 
+/** 在展开的工作区侧栏中列出可配置通道，并协调连接与配置流程。 */
 export function WorkspaceChannelsList() {
   const { open: isSidebarOpen } = useSidebar();
   const { t } = useI18n();

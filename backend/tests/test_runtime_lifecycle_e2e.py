@@ -1,10 +1,4 @@
-"""HTTP/runtime lifecycle E2E tests for the Gateway-owned runs API.
-
-These tests keep the external model out of scope while exercising the real
-FastAPI app, auth middleware, lifespan-created runtime dependencies,
-``start_run()``, ``run_agent()``, StreamBridge, checkpointer, run store, and
-thread metadata store.
-"""
+"""本模块覆盖生命周期 端到端的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -52,9 +46,10 @@ run_events:
 
 
 class _RunController:
-    """Cross-thread controls for the fake async agent."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.started = threading.Event()
         self.checkpoint_written = threading.Event()
         self.cancelled = threading.Event()
@@ -63,15 +58,7 @@ class _RunController:
 
 
 class _ScriptedAgent:
-    """Deterministic runtime double for lifecycle-only tests.
-
-    This is intentionally not a full LangGraph graph. Tests that need
-    controllable blocking, cancellation, and rollback checkpoints use the small
-    ``run_agent`` surface they exercise: ``astream()``, checkpointer/store
-    attachment, metadata, and interrupt node attributes. The real lead-agent
-    graph/tool dispatch path is covered separately by
-    ``test_stream_run_executes_real_lead_agent_setup_agent_business_path``.
-    """
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(
         self,
@@ -83,6 +70,7 @@ class _ScriptedAgent:
         block_before_checkpoint: bool = False,
         write_title: bool = True,
     ) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.controller = controller
         self.title = title
         self.answer = answer
@@ -97,6 +85,7 @@ class _ScriptedAgent:
         self.model = FakeToolCallingModel(responses=[AIMessage(content=self.answer)])
 
     async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del subgraphs
         self.controller.started.set()
 
@@ -132,7 +121,9 @@ class _ScriptedAgent:
 
 
 def _make_agent_factory(controller: _RunController, **agent_kwargs):
+    """准备可控测试资源与状态，供后续断言读取。"""
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del config
         agent = _ScriptedAgent(controller, **agent_kwargs)
         controller.instances.append(agent)
@@ -142,13 +133,10 @@ def _make_agent_factory(controller: _RunController, **agent_kwargs):
 
 
 def _build_fake_setup_agent_model(agent_name: str):
-    """Patch target for lead_agent.agent.create_chat_model.
-
-    The graph, tool registry, ToolNode dispatch, and setup_agent implementation
-    remain production code; this fake only replaces the external LLM call.
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
 
     def fake_create_chat_model(*args: Any, **kwargs: Any) -> FakeToolCallingModel:
+        """处理仿真 创建 模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         del args, kwargs
         return build_single_tool_call_model(
             tool_name="setup_agent",
@@ -165,6 +153,7 @@ def _build_fake_setup_agent_model(agent_name: str):
 
 @pytest.fixture
 def isolated_deer_flow_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
+    """准备可控测试资源与状态，供后续断言读取。"""
     home = tmp_path / "deer-flow-home"
     home.mkdir()
     monkeypatch.setenv("DEER_FLOW_HOME", str(home))
@@ -182,22 +171,7 @@ def isolated_deer_flow_home(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def _reset_process_singletons(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Clear runtime singletons that depend on this test's temporary config.
-
-    The Gateway app/lifespan path reads process-wide caches before wiring
-    request-scoped dependencies. These E2E tests stage a temporary
-    ``config.yaml``/``extensions_config.json`` and ``DEER_FLOW_HOME``, so the
-    caches below must be reset before app creation:
-
-    - app_config / extensions_config: parsed config file caches.
-    - paths: ``DEER_FLOW_HOME``-derived filesystem paths.
-    - persistence.engine: SQLAlchemy engine/session factory for the sqlite dir.
-    - app.gateway.deps: cached local auth provider/repository.
-
-    A shared public reset helper would be cleaner long-term; this test keeps
-    the reset boundary explicit because the PR is focused on runtime lifecycle
-    coverage rather than config-cache API cleanup.
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
 
     from app.gateway import deps as deps_module
     from deerflow.config import app_config as app_config_module
@@ -222,14 +196,7 @@ def _reset_process_singletons(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _preserve_process_config_singletons(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Restore config singletons mutated as a side effect of AppConfig loading.
-
-    ``AppConfig.from_file()`` calls ``_apply_singleton_configs()``, which pushes
-    nested config sections into module-level caches used by middlewares, tool
-    selection, and runtime providers. Snapshotting those attributes with
-    ``monkeypatch`` lets pytest restore the pre-test values during teardown, so
-    loading the isolated test config does not leak into later tests.
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
 
     from deerflow.config import (
         acp_config,
@@ -261,6 +228,7 @@ def _preserve_process_config_singletons(monkeypatch: pytest.MonkeyPatch) -> None
 
 @pytest.fixture
 def isolated_app(isolated_deer_flow_home: Path, monkeypatch: pytest.MonkeyPatch):
+    """准备可控测试资源与状态，供后续断言读取。"""
     _preserve_process_config_singletons(monkeypatch)
     _reset_process_singletons(monkeypatch)
 
@@ -275,7 +243,7 @@ def isolated_app(isolated_deer_flow_home: Path, monkeypatch: pytest.MonkeyPatch)
 
 
 def test_lifespan_uses_sqlite_store_from_database_config(isolated_app):
-    """Gateway startup must bind LangGraph Store to the unified database backend."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     from langgraph.store.sqlite.aio import AsyncSqliteStore
     from starlette.testclient import TestClient
 
@@ -285,6 +253,7 @@ def test_lifespan_uses_sqlite_store_from_database_config(isolated_app):
 
 @pytest.fixture
 def isolated_app_with_title(isolated_deer_flow_home: Path, monkeypatch: pytest.MonkeyPatch):
+    """为标题准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     config_path = isolated_deer_flow_home.parent / "config-title-enabled.yaml"
     config_path.write_text(_MINIMAL_CONFIG_YAML.replace("title:\n  enabled: false", "title:\n  enabled: true"), encoding="utf-8")
     monkeypatch.setenv("DEER_FLOW_CONFIG_PATH", str(config_path))
@@ -303,6 +272,7 @@ def isolated_app_with_title(isolated_deer_flow_home: Path, monkeypatch: pytest.M
 
 
 def _register_user(client, *, email: str = "runtime-e2e@example.com") -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     response = client.post(
         "/api/v1/auth/register",
         json={"email": email, "password": "very-strong-password-123"},
@@ -314,6 +284,7 @@ def _register_user(client, *, email: str = "runtime-e2e@example.com") -> str:
 
 
 def _create_thread(client, csrf_token: str) -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     thread_id = str(uuid.uuid4())
     response = client.post(
         "/api/threads",
@@ -325,6 +296,7 @@ def _create_thread(client, csrf_token: str) -> str:
 
 
 def _run_body(**overrides) -> dict[str, Any]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     body: dict[str, Any] = {
         "assistant_id": "lead_agent",
         "input": {"messages": [{"role": "user", "content": "Run lifecycle E2E prompt"}]},
@@ -336,10 +308,12 @@ def _run_body(**overrides) -> dict[str, Any]:
 
 
 def _drain_stream(response, *, timeout: float = 10.0, max_bytes: int = 1024 * 1024) -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     chunks: queue.Queue[bytes | BaseException | object] = queue.Queue()
     sentinel = object()
 
     def read_stream() -> None:
+        """处理读取 流相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         try:
             for chunk in response.iter_bytes():
                 chunks.put(chunk)
@@ -378,6 +352,7 @@ def _drain_stream(response, *, timeout: float = 10.0, max_bytes: int = 1024 * 10
 
 
 def _parse_sse(transcript: str) -> list[dict[str, Any]]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     events: list[dict[str, Any]] = []
     for raw_frame in transcript.split("\n\n"):
         frame = raw_frame.strip()
@@ -398,12 +373,14 @@ def _parse_sse(transcript: str) -> list[dict[str, Any]]:
 
 
 def _run_id_from_response(response) -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     location = response.headers.get("content-location", "")
     assert location, "run stream response must include Content-Location"
     return location.rstrip("/").split("/")[-1]
 
 
 def _wait_for_status(client, thread_id: str, run_id: str, status: str, *, timeout: float = 5.0) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     deadline = time.monotonic() + timeout
     last: dict | None = None
     while time.monotonic() < deadline:
@@ -417,6 +394,7 @@ def _wait_for_status(client, thread_id: str, run_id: str, status: str, *, timeou
 
 
 def _wait_for_thread_title(client, thread_id: str, expected_title: str, *, timeout: float = 5.0) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     deadline = time.monotonic() + timeout
     last: dict | None = None
     while time.monotonic() < deadline:
@@ -430,6 +408,7 @@ def _wait_for_thread_title(client, thread_id: str, expected_title: str, *, timeo
 
 
 def _wait_for_search_title(client, csrf_token: str, thread_id: str, expected_title: str, *, timeout: float = 5.0) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     deadline = time.monotonic() + timeout
     last_match: dict | None = None
     while time.monotonic() < deadline:
@@ -445,6 +424,7 @@ def _wait_for_search_title(client, csrf_token: str, thread_id: str, expected_tit
 
 
 def _thread_id_from_config(config: dict | None) -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     config = config or {}
     context = config.get("context") if isinstance(config.get("context"), dict) else {}
     configurable = config.get("configurable") if isinstance(config.get("configurable"), dict) else {}
@@ -454,6 +434,7 @@ def _thread_id_from_config(config: dict | None) -> str:
 
 
 def _last_human_text(graph_input: dict) -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     messages = graph_input.get("messages") or []
     if not messages:
         return ""
@@ -465,6 +446,7 @@ def _last_human_text(graph_input: dict) -> str:
 
 
 async def _write_checkpoint(checkpointer: Any, *, thread_id: str, state: dict[str, Any]) -> None:
+    """准备可控测试资源与状态，供后续断言读取。"""
     from langgraph.checkpoint.base import empty_checkpoint
 
     checkpoint = empty_checkpoint()
@@ -484,6 +466,7 @@ async def _write_checkpoint(checkpointer: Any, *, thread_id: str, state: dict[st
 
 
 def _stream_item_for_mode(stream_mode: Any, state: dict[str, Any]) -> Any:
+    """准备可控测试资源与状态，供后续断言读取。"""
     if isinstance(stream_mode, list):
         # ``run_agent`` passes a list when multiple modes/subgraphs are active.
         return stream_mode[0], state
@@ -491,7 +474,7 @@ def _stream_item_for_mode(stream_mode: Any, state: dict[str, Any]) -> Any:
 
 
 def test_stream_run_completes_and_persists_runtime_state(isolated_app):
-    """A streaming run should traverse the real runtime and leave state behind."""
+    """验证流 运行 状态在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from starlette.testclient import TestClient
 
     controller = _RunController()
@@ -544,7 +527,7 @@ def test_stream_run_completes_and_persists_runtime_state(isolated_app):
 
 
 def test_stream_run_executes_real_lead_agent_setup_agent_business_path(isolated_app, isolated_deer_flow_home: Path):
-    """A runtime stream should execute real lead-agent business code and tools."""
+    """验证流 运行 设置 路径在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from starlette.testclient import TestClient
 
     agent_name = "runtime-business-agent"
@@ -604,7 +587,7 @@ def test_stream_run_executes_real_lead_agent_setup_agent_business_path(isolated_
 
 
 def test_cancel_interrupt_stops_running_background_run(isolated_app):
-    """HTTP cancel?action=interrupt should stop the worker and persist interruption."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from starlette.testclient import TestClient
 
     controller = _RunController()
@@ -647,7 +630,7 @@ def test_cancel_interrupt_stops_running_background_run(isolated_app):
 
 
 def test_cancel_interrupt_generates_missing_title_from_checkpoint(isolated_app_with_title):
-    """Interrupted first-turn runs should still persist an automatic thread title."""
+    """验证标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from starlette.testclient import TestClient
 
     controller = _RunController()
@@ -692,7 +675,7 @@ def test_cancel_interrupt_generates_missing_title_from_checkpoint(isolated_app_w
 
 
 def test_cancel_wait_false_generates_title_from_graph_input_before_checkpoint(isolated_app_with_title):
-    """Fire-and-forget cancel should title early interruptions before checkpoint."""
+    """验证标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from starlette.testclient import TestClient
 
     controller = _RunController()
@@ -741,7 +724,7 @@ def test_cancel_wait_false_generates_title_from_graph_input_before_checkpoint(is
 
 @pytest.mark.anyio
 async def test_sse_consumer_disconnect_cancels_inflight_run():
-    """A disconnected SSE request should cancel an in-flight run when configured."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from app.gateway.services import sse_consumer
     from deerflow.runtime import DisconnectMode, MemoryStreamBridge, RunManager, RunStatus
 
@@ -754,6 +737,7 @@ async def test_sse_consumer_disconnect_cancels_inflight_run():
     worker_cancelled = asyncio.Event()
 
     async def _pending_worker() -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         try:
             worker_started.set()
             await asyncio.Event().wait()
@@ -765,9 +749,11 @@ async def test_sse_consumer_disconnect_cancels_inflight_run():
     await asyncio.wait_for(worker_started.wait(), timeout=1.0)
 
     class _DisconnectedRequest:
+        """集中覆盖当前测试分支与回归边界。"""
         headers: dict[str, str] = {}
 
         async def is_disconnected(self) -> bool:
+            """准备可控测试资源与状态，供后续断言读取。"""
             return True
 
     try:
@@ -788,7 +774,7 @@ async def test_sse_consumer_disconnect_cancels_inflight_run():
 
 
 def test_cancel_rollback_restores_pre_run_checkpoint(isolated_app):
-    """HTTP cancel?action=rollback should restore the checkpoint captured before run start."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from starlette.testclient import TestClient
 
     controller = _RunController()

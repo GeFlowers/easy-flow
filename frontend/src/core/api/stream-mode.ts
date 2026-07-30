@@ -12,6 +12,7 @@ const SUPPORTED_RUN_STREAM_MODES = new Set([
 
 const warnedUnsupportedStreamModes = new Set<string>();
 
+/** 每种不支持的 LangGraph 流模式仅警告一次，避免重复日志。 */
 export function warnUnsupportedStreamModes(
   modes: string[],
   warn: (message: string) => void = console.warn,
@@ -33,6 +34,7 @@ export function warnUnsupportedStreamModes(
   );
 }
 
+/** 从运行选项中移除客户端不支持的流模式，并保留其余选项。 */
 export function sanitizeRunStreamOptions<T>(options: T): T {
   if (
     typeof options !== "object" ||

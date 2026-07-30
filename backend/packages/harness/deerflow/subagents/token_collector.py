@@ -1,9 +1,4 @@
-"""Callback handler that collects LLM token usage within a subagent.
-
-Each subagent execution creates its own collector. After the subagent
-finishes, the collected records are transferred to the parent RunJournal
-via :meth:`RunJournal.record_external_llm_usage_records`.
-"""
+"""提供子代理、调度或终端界面的相关功能。"""
 
 from __future__ import annotations
 
@@ -14,9 +9,10 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 
 class SubagentTokenCollector(BaseCallbackHandler):
-    """Lightweight callback handler that collects LLM token usage within a subagent."""
+    """封装当前模块相关的数据与协作职责。"""
 
     def __init__(self, caller: str):
+        """处理当前步骤，并保持既有输入、输出和状态语义。"""
         super().__init__()
         self.caller = caller
         self._records: list[dict[str, int | str | None]] = []
@@ -30,6 +26,7 @@ class SubagentTokenCollector(BaseCallbackHandler):
         tags: list[str] | None = None,
         **kwargs: Any,
     ) -> None:
+        """处理当前步骤，并保持既有输入、输出和状态语义。"""
         rid = str(run_id)
         if rid in self._counted_run_ids:
             return
@@ -79,5 +76,5 @@ class SubagentTokenCollector(BaseCallbackHandler):
                 return
 
     def snapshot_records(self) -> list[dict[str, int | str | None]]:
-        """Return a copy of the accumulated usage records."""
+        """处理当前步骤，并保持既有输入、输出和状态语义。"""
         return list(self._records)

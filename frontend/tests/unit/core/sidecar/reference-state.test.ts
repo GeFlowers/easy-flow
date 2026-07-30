@@ -27,6 +27,11 @@ const secondReference: SidecarReferenceStateItem = {
   },
 };
 
+/**
+ * 覆盖“keeps the existing sidecar thread when adding a new reference”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps the existing sidecar thread when adding a new reference", () => {
   const nextState = getNextSidecarOpenState({
     open: true,
@@ -38,6 +43,11 @@ test("keeps the existing sidecar thread when adding a new reference", () => {
   expect(nextState.sidecarThreadId).toBe("sidecar-thread-1");
   expect(nextState.activeReferences).toEqual([secondReference]);
 });
+
+/**
+ * 覆盖“accumulates references while drafting a new sidecar thread”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("accumulates references while drafting a new sidecar thread", () => {
   const nextState = getNextSidecarOpenState({

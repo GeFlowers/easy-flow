@@ -1,4 +1,4 @@
-"""Tests for file_conversion utilities (PR1: pymupdf4llm + asyncio.to_thread; PR2: extract_outline)."""
+'定义 test_file_conversion 模块提供的职责与可复用接口。\n\nTests for file_conversion utilities (PR1: pymupdf4llm + asyncio.to_thread; PR2: extract_outline).'
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from deerflow.utils.file_conversion import (
 
 
 def _make_pymupdf_mock(page_count: int) -> ModuleType:
-    """Return a fake *pymupdf* module whose ``open()`` reports *page_count* pages."""
+    '执行 _make_pymupdf_mock 的明确职责，并返回与调用约定一致的结果。\n\nReturn a fake *pymupdf* module whose ``open()`` reports *page_count* pages.'
     mock_doc = MagicMock()
     mock_doc.__len__ = MagicMock(return_value=page_count)
     fake_pymupdf = ModuleType("pymupdf")
@@ -29,6 +29,7 @@ def _make_pymupdf_mock(page_count: int) -> ModuleType:
 
 
 def _run(coro):
+    '执行 _run 的明确职责，并返回与调用约定一致的结果'
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(coro)
@@ -42,10 +43,10 @@ def _run(coro):
 
 
 class TestPymupdfOutputTooSparse:
-    """Check the chars-per-page sparsity heuristic."""
+    '组织 TestPymupdfOutputTooSparse 场景的行为与边界验证。\n\nCheck the chars-per-page sparsity heuristic.'
 
     def test_dense_text_pdf_not_sparse(self, tmp_path):
-        """Normal text PDF: many chars per page → not sparse."""
+        '验证 dense、text、pdf、not、sparse 场景下的预期行为、边界条件与结果。\n\nNormal text PDF: many chars per page → not sparse.'
         pdf = tmp_path / "dense.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -55,7 +56,7 @@ class TestPymupdfOutputTooSparse:
         assert result is False
 
     def test_image_based_pdf_is_sparse(self, tmp_path):
-        """Image-based PDF: near-zero chars per page → sparse."""
+        '验证 image、based、pdf、is、sparse 场景下的预期行为、边界条件与结果。\n\nImage-based PDF: near-zero chars per page → sparse.'
         pdf = tmp_path / "image.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -65,7 +66,7 @@ class TestPymupdfOutputTooSparse:
         assert result is True
 
     def test_fallback_when_pymupdf_unavailable(self, tmp_path):
-        """When pymupdf is not installed, fall back to absolute 200-char threshold."""
+        '验证 fallback、when、pymupdf、unavailable 场景下的预期行为、边界条件与结果。\n\nWhen pymupdf is not installed, fall back to absolute 200-char threshold.'
         pdf = tmp_path / "broken.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -79,7 +80,7 @@ class TestPymupdfOutputTooSparse:
         assert not_sparse is False
 
     def test_exactly_at_threshold_is_not_sparse(self, tmp_path):
-        """Chars-per-page == threshold is treated as NOT sparse (boundary inclusive)."""
+        '验证 exactly、at、threshold、is、not、sparse 场景下的预期行为、边界条件与结果。\n\nChars-per-page == threshold is treated as NOT sparse (boundary inclusive).'
         pdf = tmp_path / "boundary.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -95,10 +96,10 @@ class TestPymupdfOutputTooSparse:
 
 
 class TestDoConvert:
-    """Verify that _do_convert routes to the right sub-converter."""
+    '组织 TestDoConvert 场景的行为与边界验证。\n\nVerify that _do_convert routes to the right sub-converter.'
 
     def test_non_pdf_always_uses_markitdown(self, tmp_path):
-        """DOCX / XLSX / PPTX always go through MarkItDown regardless of setting."""
+        '验证 non、pdf、always、uses、markitdown 场景下的预期行为、边界条件与结果。\n\nDOCX / XLSX / PPTX always go through MarkItDown regardless of setting.'
         docx = tmp_path / "report.docx"
         docx.write_bytes(b"PK fake docx")
 
@@ -112,7 +113,7 @@ class TestDoConvert:
         assert result == "# Markdown from MarkItDown"
 
     def test_pdf_auto_uses_pymupdf4llm_when_dense(self, tmp_path):
-        """auto mode: use pymupdf4llm output when it's dense enough."""
+        "验证 pdf、auto、uses、pymupdf4llm、when、dense 场景下的预期行为、边界条件与结果。\n\nauto mode: use pymupdf4llm output when it's dense enough."
         pdf = tmp_path / "report.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -135,7 +136,7 @@ class TestDoConvert:
         assert result == dense_text
 
     def test_pdf_auto_falls_back_when_sparse(self, tmp_path):
-        """auto mode: fall back to MarkItDown when pymupdf4llm output is sparse."""
+        '验证 pdf、auto、falls、back、when、sparse 场景下的预期行为、边界条件与结果。\n\nauto mode: fall back to MarkItDown when pymupdf4llm output is sparse.'
         pdf = tmp_path / "scanned.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -159,7 +160,7 @@ class TestDoConvert:
         assert result == "OCR result via MarkItDown"
 
     def test_pdf_explicit_pymupdf4llm_skips_sparsity_check(self, tmp_path):
-        """'pymupdf4llm' mode: use output as-is even if sparse."""
+        "验证 pdf、explicit、pymupdf4llm、skips、sparsity、check 场景下的预期行为、边界条件与结果。\n\n'pymupdf4llm' mode: use output as-is even if sparse."
         pdf = tmp_path / "explicit.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -178,7 +179,7 @@ class TestDoConvert:
         assert result == sparse_text
 
     def test_pdf_explicit_markitdown_skips_pymupdf4llm(self, tmp_path):
-        """'markitdown' mode: never attempt pymupdf4llm."""
+        "验证 pdf、explicit、markitdown、skips、pymupdf4llm 场景下的预期行为、边界条件与结果。\n\n'markitdown' mode: never attempt pymupdf4llm."
         pdf = tmp_path / "force_md.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -195,7 +196,7 @@ class TestDoConvert:
         assert result == "MarkItDown result"
 
     def test_pdf_auto_falls_back_when_pymupdf4llm_not_installed(self, tmp_path):
-        """auto mode: if pymupdf4llm is not installed, use MarkItDown directly."""
+        '验证 pdf、auto、falls、back、when、pymupdf4llm、not、installed 场景下的预期行为、边界条件与结果。\n\nauto mode: if pymupdf4llm is not installed, use MarkItDown directly.'
         pdf = tmp_path / "no_pymupdf.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -216,7 +217,9 @@ class TestDoConvert:
 
 
 class TestGetPdfConverter:
+    '组织 TestGetPdfConverter 场景的行为与边界验证'
     def test_reads_dict_backed_uploads_config(self):
+        '验证 reads、dict、backed、uploads、config 场景下的预期行为、边界条件与结果'
         cfg = MagicMock()
         cfg.uploads = {"pdf_converter": "markitdown"}
 
@@ -224,6 +227,7 @@ class TestGetPdfConverter:
             assert _get_pdf_converter() == "markitdown"
 
     def test_reads_attribute_backed_uploads_config(self):
+        '验证 reads、attribute、backed、uploads、config 场景下的预期行为、边界条件与结果'
         cfg = MagicMock()
         cfg.uploads = MagicMock(pdf_converter="pymupdf4llm")
 
@@ -231,6 +235,7 @@ class TestGetPdfConverter:
             assert _get_pdf_converter() == "pymupdf4llm"
 
     def test_invalid_value_falls_back_to_auto(self):
+        '验证 invalid、value、falls、back、to、auto 场景下的预期行为、边界条件与结果'
         cfg = MagicMock()
         cfg.uploads = {"pdf_converter": "not-a-real-converter"}
 
@@ -239,8 +244,9 @@ class TestGetPdfConverter:
 
 
 class TestConvertFileToMarkdown:
+    '组织 TestConvertFileToMarkdown 场景的行为与边界验证'
     def test_small_file_runs_synchronously(self, tmp_path):
-        """Small files (< 1 MB) are converted in the event loop thread."""
+        '验证 small、file、runs、synchronously 场景下的预期行为、边界条件与结果。\n\nSmall files (< 1 MB) are converted in the event loop thread.'
         pdf = tmp_path / "small.pdf"
         pdf.write_bytes(b"%PDF-1.4 " + b"x" * 100)  # well under 1 MB
 
@@ -261,12 +267,13 @@ class TestConvertFileToMarkdown:
         assert md_path.read_text() == "# Small PDF"
 
     def test_large_file_offloaded_to_thread(self, tmp_path):
-        """Large files (> 1 MB) are offloaded via asyncio.to_thread."""
+        '验证 large、file、offloaded、to、thread 场景下的预期行为、边界条件与结果。\n\nLarge files (> 1 MB) are offloaded via asyncio.to_thread.'
         pdf = tmp_path / "large.pdf"
         # Write slightly more than the threshold
         pdf.write_bytes(b"%PDF-1.4 " + b"x" * (_ASYNC_THRESHOLD_BYTES + 1))
 
         async def fake_to_thread(fn, *args, **kwargs):
+            '执行 fake_to_thread 的明确职责，并返回与调用约定一致的结果'
             return fn(*args, **kwargs)
 
         with (
@@ -284,7 +291,7 @@ class TestConvertFileToMarkdown:
         assert md_path.read_text() == "# Large PDF"
 
     def test_returns_none_on_conversion_error(self, tmp_path):
-        """If conversion raises, return None without propagating the exception."""
+        '验证 returns、none、on、conversion、error 场景下的预期行为、边界条件与结果。\n\nIf conversion raises, return None without propagating the exception.'
         pdf = tmp_path / "broken.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
 
@@ -300,7 +307,7 @@ class TestConvertFileToMarkdown:
         assert result is None
 
     def test_writes_utf8_markdown_file(self, tmp_path):
-        """Generated .md file is written with UTF-8 encoding."""
+        '验证 writes、utf8、markdown、file 场景下的预期行为、边界条件与结果。\n\nGenerated .md file is written with UTF-8 encoding.'
         pdf = tmp_path / "report.pdf"
         pdf.write_bytes(b"%PDF-1.4 fake")
         chinese_content = "# 中文报告\n\n这是测试内容。"
@@ -324,20 +331,20 @@ class TestConvertFileToMarkdown:
 
 
 class TestExtractOutline:
-    """Tests for extract_outline()."""
+    '组织 TestExtractOutline 场景的行为与边界验证。\n\nTests for extract_outline().'
 
     def test_empty_file_returns_empty(self, tmp_path):
-        """Empty markdown file yields no outline entries."""
+        '验证 empty、file、returns、empty 场景下的预期行为、边界条件与结果。\n\nEmpty markdown file yields no outline entries.'
         md = tmp_path / "empty.md"
         md.write_text("", encoding="utf-8")
         assert extract_outline(md) == []
 
     def test_missing_file_returns_empty(self, tmp_path):
-        """Non-existent path returns [] without raising."""
+        '验证 missing、file、returns、empty 场景下的预期行为、边界条件与结果。\n\nNon-existent path returns [] without raising.'
         assert extract_outline(tmp_path / "nonexistent.md") == []
 
     def test_standard_markdown_headings(self, tmp_path):
-        """# / ## / ### headings are all recognised."""
+        '验证 standard、markdown、headings 场景下的预期行为、边界条件与结果。\n\n# / ## / ### headings are all recognised.'
         md = tmp_path / "doc.md"
         md.write_text(
             "# Chapter One\n\nSome text.\n\n## Section 1.1\n\nMore text.\n\n### Sub 1.1.1\n",
@@ -350,7 +357,7 @@ class TestExtractOutline:
         assert outline[2] == {"title": "Sub 1.1.1", "line": 9}
 
     def test_bold_sec_item_heading(self, tmp_path):
-        """**ITEM N. TITLE** lines in SEC filings are recognised."""
+        '验证 bold、sec、item、heading 场景下的预期行为、边界条件与结果。\n\n**ITEM N. TITLE** lines in SEC filings are recognised.'
         md = tmp_path / "10k.md"
         md.write_text(
             "Cover page text.\n\n**ITEM 1. BUSINESS**\n\nBody.\n\n**ITEM 1A. RISK FACTORS**\n",
@@ -362,7 +369,7 @@ class TestExtractOutline:
         assert outline[1] == {"title": "ITEM 1A. RISK FACTORS", "line": 7}
 
     def test_bold_part_heading(self, tmp_path):
-        """**PART I** / **PART II** headings are recognised."""
+        '验证 bold、part、heading 场景下的预期行为、边界条件与结果。\n\n**PART I** / **PART II** headings are recognised.'
         md = tmp_path / "10k.md"
         md.write_text("**PART I**\n\n**PART II**\n\n**PART III**\n", encoding="utf-8")
         outline = extract_outline(md)
@@ -373,7 +380,7 @@ class TestExtractOutline:
         assert "PART III" in titles
 
     def test_sec_cover_page_boilerplate_excluded(self, tmp_path):
-        """Address lines and short cover boilerplate must NOT appear in outline."""
+        '验证 sec、cover、page、boilerplate、excluded 场景下的预期行为、边界条件与结果。\n\nAddress lines and short cover boilerplate must NOT appear in outline.'
         md = tmp_path / "8k.md"
         md.write_text(
             "## **UNITED STATES SECURITIES AND EXCHANGE COMMISSION**\n\n**WASHINGTON, DC 20549**\n\n**CURRENT REPORT**\n\n**SIGNATURES**\n\n**TESLA, INC.**\n\n**ITEM 2.02. RESULTS OF OPERATIONS**\n",
@@ -390,7 +397,7 @@ class TestExtractOutline:
         assert "ITEM 2.02. RESULTS OF OPERATIONS" in titles
 
     def test_chinese_headings_via_standard_markdown(self, tmp_path):
-        """Chinese annual report headings emitted as # by pymupdf4llm are captured."""
+        '验证 chinese、headings、via、standard、markdown 场景下的预期行为、边界条件与结果。\n\nChinese annual report headings emitted as # by pymupdf4llm are captured.'
         md = tmp_path / "annual.md"
         md.write_text(
             "# 第一节 公司简介\n\n内容。\n\n## 第三节 管理层讨论与分析\n\n分析内容。\n",
@@ -402,7 +409,7 @@ class TestExtractOutline:
         assert outline[1]["title"] == "第三节 管理层讨论与分析"
 
     def test_outline_capped_at_max_entries(self, tmp_path):
-        """When truncated, result has MAX_OUTLINE_ENTRIES real entries + 1 sentinel."""
+        '验证 outline、capped、at、max、entries 场景下的预期行为、边界条件与结果。\n\nWhen truncated, result has MAX_OUTLINE_ENTRIES real entries + 1 sentinel.'
         lines = [f"# Heading {i}" for i in range(MAX_OUTLINE_ENTRIES + 10)]
         md = tmp_path / "long.md"
         md.write_text("\n".join(lines), encoding="utf-8")
@@ -414,7 +421,7 @@ class TestExtractOutline:
         assert len(visible) == MAX_OUTLINE_ENTRIES
 
     def test_no_truncation_sentinel_when_under_limit(self, tmp_path):
-        """Short documents produce no sentinel entry."""
+        '验证 no、truncation、sentinel、when、under、limit 场景下的预期行为、边界条件与结果。\n\nShort documents produce no sentinel entry.'
         lines = [f"# Heading {i}" for i in range(5)]
         md = tmp_path / "short.md"
         md.write_text("\n".join(lines), encoding="utf-8")
@@ -423,7 +430,7 @@ class TestExtractOutline:
         assert not any(e.get("truncated") for e in outline)
 
     def test_no_truncation_sentinel_at_exact_limit(self, tmp_path):
-        """A document with exactly MAX_OUTLINE_ENTRIES headings is not truncated."""
+        '验证 no、truncation、sentinel、at、exact、limit 场景下的预期行为、边界条件与结果。\n\nA document with exactly MAX_OUTLINE_ENTRIES headings is not truncated.'
         lines = [f"# Heading {i}" for i in range(MAX_OUTLINE_ENTRIES)]
         md = tmp_path / "exact.md"
         md.write_text("\n".join(lines), encoding="utf-8")
@@ -432,7 +439,7 @@ class TestExtractOutline:
         assert not any(e.get("truncated") for e in outline)
 
     def test_blank_lines_and_whitespace_ignored(self, tmp_path):
-        """Blank lines between headings do not produce empty entries."""
+        '验证 blank、lines、and、whitespace、ignored 场景下的预期行为、边界条件与结果。\n\nBlank lines between headings do not produce empty entries.'
         md = tmp_path / "spaced.md"
         md.write_text("\n\n# Title One\n\n\n\n# Title Two\n\n", encoding="utf-8")
         outline = extract_outline(md)
@@ -440,7 +447,7 @@ class TestExtractOutline:
         assert all(e["title"] for e in outline)
 
     def test_inline_bold_not_confused_with_heading(self, tmp_path):
-        """Mid-sentence bold text must not be mistaken for a heading."""
+        '验证 inline、bold、not、confused、with、heading 场景下的预期行为、边界条件与结果。\n\nMid-sentence bold text must not be mistaken for a heading.'
         md = tmp_path / "prose.md"
         md.write_text(
             "This sentence has **bold words** inside it.\n\nAnother with **MULTIPLE CAPS** inline.\n",
@@ -450,7 +457,7 @@ class TestExtractOutline:
         assert outline == []
 
     def test_split_bold_heading_academic_paper(self, tmp_path):
-        """**<num>** **<title>** lines from academic papers are recognised (Style 3)."""
+        '验证 split、bold、heading、academic、paper 场景下的预期行为、边界条件与结果。\n\n**<num>** **<title>** lines from academic papers are recognised (Style 3).'
         md = tmp_path / "paper.md"
         md.write_text(
             "## **Attention Is All You Need**\n\n**1** **Introduction**\n\nBody text.\n\n**2** **Background**\n\nMore text.\n\n**3.1** **Encoder and Decoder Stacks**\n",
@@ -463,7 +470,7 @@ class TestExtractOutline:
         assert "3.1 Encoder and Decoder Stacks" in titles
 
     def test_split_bold_year_columns_excluded(self, tmp_path):
-        """Financial table headers like **2023** **2022** **2021** are NOT headings."""
+        '验证 split、bold、year、columns、excluded 场景下的预期行为、边界条件与结果。\n\nFinancial table headers like **2023** **2022** **2021** are NOT headings.'
         md = tmp_path / "annual.md"
         md.write_text(
             "# Financial Summary\n\n**2023** **2022** **2021**\n\nRevenue 100 90 80\n",
@@ -475,7 +482,7 @@ class TestExtractOutline:
         assert titles == ["Financial Summary"]
 
     def test_adjacent_bold_spans_merged_in_markdown_heading(self, tmp_path):
-        """** ** artefacts inside a # heading are merged into clean plain text."""
+        '验证 adjacent、bold、spans、merged、in、markdown、heading 场景下的预期行为、边界条件与结果。\n\n** ** artefacts inside a # heading are merged into clean plain text.'
         md = tmp_path / "sec.md"
         md.write_text(
             "## **UNITED STATES** **SECURITIES AND EXCHANGE COMMISSION**\n\nBody text.\n",

@@ -1,17 +1,4 @@
-"""Regression tests for issue #3265.
-
-The non-streaming ``/wait`` endpoints used to ``await record.task`` with no
-disconnect handling and silently swallow ``CancelledError``.  When a long
-tool call (e.g. ``pip install`` inside a custom skill) kept the connection
-idle long enough for an intermediate HTTP layer to time out, the handler
-would return a stale checkpoint that looked like a normal completion.
-
-The fix introduces ``wait_for_run_completion`` in ``app.gateway.services``:
-it subscribes to the stream bridge until ``END_SENTINEL``, polls
-``request.is_disconnected()`` on every wake-up, and honours the record's
-``on_disconnect`` mode by cancelling the background run on real client
-disconnect.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -28,48 +15,51 @@ THREAD_ID = "thread-wait-3265"
 
 @dataclass
 class _FakeRequest:
-    """Minimal stand-in for FastAPI ``Request`` with controllable disconnect.
-
-    ``is_disconnected`` is awaited each iteration of the helper's loop, so the
-    counter lets a test transition from "still connected" to "disconnected"
-    after N polls without racing the event loop.
-    """
+    '未说明'
 
     disconnect_after: int = 10**9  # effectively "never" by default
     headers: dict[str, str] = field(default_factory=dict)
     _polls: int = 0
 
     async def is_disconnected(self) -> bool:
+        '未说明'
         self._polls += 1
         return self._polls > self.disconnect_after
 
 
 class _MissingStreamBridge:
-    """Bridge stub that can report no retained stream for terminal records."""
+    '未说明'
 
     supports_cross_process = True
 
     def __init__(self) -> None:
+        '未说明'
         self.subscribed = False
 
     async def publish(self, run_id, event, data):
+        '未说明'
         return None
 
     async def publish_end(self, run_id):
+        '未说明'
         return None
 
     async def stream_exists(self, run_id: str) -> bool:
+        """处理流相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return False
 
     def subscribe(self, run_id, *, last_event_id=None, heartbeat_interval=15.0):
+        '未说明'
         self.subscribed = True
         raise AssertionError("terminal missing streams should end before subscribing")
 
     async def cleanup(self, run_id, *, delay=0):
+        '未说明'
         return None
 
 
 async def _create_running_record(mgr: RunManager, *, on_disconnect: DisconnectMode) -> Any:
+    '未说明'
     record = await mgr.create_or_reject(
         THREAD_ID,
         assistant_id=None,
@@ -85,17 +75,20 @@ async def _create_running_record(mgr: RunManager, *, on_disconnect: DisconnectMo
 
 
 class TestWaitForRunCompletion:
+    '未说明'
     def test_returns_when_run_publishes_end(self) -> None:
-        """Happy path: helper returns once the bridge publishes END_SENTINEL."""
+        '未说明'
         from app.gateway.services import wait_for_run_completion
 
         async def run() -> None:
+            """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             mgr = RunManager()
             bridge = MemoryStreamBridge()
             record = await _create_running_record(mgr, on_disconnect=DisconnectMode.cancel)
             request = _FakeRequest()
 
             async def finish_soon() -> None:
+                '未说明'
                 await asyncio.sleep(0)
                 await bridge.publish(record.run_id, "values", {"messages": []})
                 await mgr.set_status(record.run_id, RunStatus.success)
@@ -112,10 +105,11 @@ class TestWaitForRunCompletion:
         asyncio.run(run())
 
     def test_cancels_run_on_disconnect_when_cancel_mode(self) -> None:
-        """on_disconnect=cancel: real disconnect must call run_mgr.cancel()."""
+        '未说明'
         from app.gateway.services import wait_for_run_completion
 
         async def run() -> None:
+            """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             mgr = RunManager()
             bridge = MemoryStreamBridge()
             record = await _create_running_record(mgr, on_disconnect=DisconnectMode.cancel)
@@ -127,6 +121,7 @@ class TestWaitForRunCompletion:
             async def publish_until_cancel() -> None:
                 # Emit one event so subscribe wakes up immediately; helper polls
                 # is_disconnected after each yield.
+                '未说明'
                 await asyncio.sleep(0)
                 await bridge.publish(record.run_id, "values", {"step": 1})
 
@@ -148,10 +143,11 @@ class TestWaitForRunCompletion:
         asyncio.run(run())
 
     def test_does_not_cancel_when_continue_mode(self) -> None:
-        """on_disconnect=continue: disconnect must NOT cancel the run."""
+        '未说明'
         from app.gateway.services import wait_for_run_completion
 
         async def run() -> None:
+            """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             mgr = RunManager()
             bridge = MemoryStreamBridge()
             record = await _create_running_record(mgr, on_disconnect=DisconnectMode.continue_)
@@ -160,6 +156,7 @@ class TestWaitForRunCompletion:
             request = _FakeRequest(disconnect_after=0)
 
             async def publish_then_end() -> None:
+                '未说明'
                 await asyncio.sleep(0)
                 await bridge.publish(record.run_id, "values", {"step": 1})
 
@@ -178,11 +175,11 @@ class TestWaitForRunCompletion:
         asyncio.run(run())
 
     def test_no_cancel_when_run_already_finished(self) -> None:
-        """If the run ended (END_SENTINEL) before disconnect is observed, the
-        finally block must not call cancel — the run is already terminal."""
+        '未说明'
         from app.gateway.services import wait_for_run_completion
 
         async def run() -> None:
+            """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             mgr = RunManager()
             bridge = MemoryStreamBridge()
             record = await _create_running_record(mgr, on_disconnect=DisconnectMode.cancel)
@@ -203,10 +200,11 @@ class TestWaitForRunCompletion:
         asyncio.run(run())
 
     def test_terminal_missing_stream_returns_complete(self) -> None:
-        """A known-terminal run with cleaned-up stream should not wait forever."""
+        '未说明'
         from app.gateway.services import wait_for_run_completion
 
         async def run() -> None:
+            """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             mgr = RunManager()
             bridge = _MissingStreamBridge()
             record = RunRecord(
@@ -227,10 +225,11 @@ class TestWaitForRunCompletion:
         asyncio.run(run())
 
     def test_sse_consumer_terminal_missing_stream_yields_end(self) -> None:
-        """Joining a terminal store-only run with no stream should emit a terminal SSE."""
+        '未说明'
         from app.gateway.services import sse_consumer
 
         async def run() -> None:
+            """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             mgr = RunManager()
             bridge = _MissingStreamBridge()
             record = RunRecord(

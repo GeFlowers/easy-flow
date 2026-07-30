@@ -1,11 +1,12 @@
-// 2026 Horizons - Interactive Features
+// “2026 地平线”演示页的交互功能。
 
+/** 在 DOM 就绪后初始化主题、导航、滚动动画与页脚年份。 */
 document.addEventListener("DOMContentLoaded", function () {
-  // Theme Toggle
+  // 主题切换控件。
   const themeToggle = document.getElementById("themeToggle");
   const themeIcon = themeToggle.querySelector("i");
 
-  // Check for saved theme or prefer-color-scheme
+  // 优先采用已保存的主题，其次采用系统深色偏好。
   const savedTheme = localStorage.getItem("theme");
   const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
 
@@ -14,6 +15,7 @@ document.addEventListener("DOMContentLoaded", function () {
     themeIcon.className = "fas fa-sun";
   }
 
+  /** 在保留用户选择的同时切换深浅主题及对应图标。 */
   themeToggle.addEventListener("click", function () {
     const currentTheme = document.documentElement.getAttribute("data-theme");
 
@@ -28,8 +30,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Smooth scroll for navigation links
+  // 导航锚点平滑滚动。
   document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
+    /** 扣除固定导航栏高度后，平滑滚动到目标锚点。 */
     anchor.addEventListener("click", function (e) {
       e.preventDefault();
 
@@ -49,14 +52,15 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   });
 
-  // Navbar scroll effect
+  // 导航栏滚动效果。
   const navbar = document.querySelector(".navbar");
   let lastScrollTop = 0;
 
+  /** 根据滚动方向隐藏或显示导航栏，并在离开顶部后添加阴影。 */
   window.addEventListener("scroll", function () {
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
 
-    // Hide/show navbar on scroll
+    // 滚动时隐藏或显示导航栏。
     if (scrollTop > lastScrollTop && scrollTop > 100) {
       navbar.style.transform = "translateY(-100%)";
     } else {
@@ -65,7 +69,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
     lastScrollTop = scrollTop;
 
-    // Add shadow when scrolled
+    // 离开顶部后添加阴影。
     if (scrollTop > 10) {
       navbar.style.boxShadow = "var(--shadow-md)";
     } else {
@@ -73,12 +77,13 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  // Animate elements on scroll
+  // 滚动进入视口时播放元素动画。
   const observerOptions = {
     threshold: 0.1,
     rootMargin: "0px 0px -50px 0px",
   };
 
+  /** 为首次进入视口的卡片添加淡入类，并停止继续观察该卡片。 */
   const observer = new IntersectionObserver(function (entries) {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
@@ -88,7 +93,7 @@ document.addEventListener("DOMContentLoaded", function () {
     });
   }, observerOptions);
 
-  // Observe elements to animate
+  // 观察需要播放动画的元素。
   document
     .querySelectorAll(
       ".trend-card, .opportunity-card, .challenge-card, .highlight-card",
@@ -97,10 +102,11 @@ document.addEventListener("DOMContentLoaded", function () {
       observer.observe(el);
     });
 
-  // Stats counter animation
+  // 统计数字递增动画。
   const stats = document.querySelectorAll(".stat-number");
 
   const statsObserver = new IntersectionObserver(
+    /** 在统计数字进入视口时，以固定步数逐渐递增至目标数值。 */
     function (entries) {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
@@ -132,20 +138,22 @@ document.addEventListener("DOMContentLoaded", function () {
     statsObserver.observe(stat);
   });
 
-  // Hover effects for cards
+  // 卡片悬停效果。
   document
     .querySelectorAll(".trend-card, .opportunity-card, .challenge-card")
     .forEach((card) => {
+      /** 鼠标进入卡片时提升其层级，避免被相邻卡片遮挡。 */
       card.addEventListener("mouseenter", function () {
         this.style.zIndex = "10";
       });
 
+      /** 鼠标离开卡片时恢复默认层级。 */
       card.addEventListener("mouseleave", function () {
         this.style.zIndex = "1";
       });
     });
 
-  // Current year in footer
+  // 页脚当前年份。
   const currentYear = new Date().getFullYear();
   const yearElement = document.querySelector(".copyright p");
   if (yearElement) {
@@ -155,13 +163,13 @@ document.addEventListener("DOMContentLoaded", function () {
     );
   }
 
-  // Initialize animations
+  // 初始化页面动画。
   setTimeout(() => {
     document.body.style.opacity = "1";
   }, 100);
 });
 
-// Add CSS for initial load
+// 添加首屏淡入所需的样式。
 const style = document.createElement("style");
 style.textContent = `
     body {

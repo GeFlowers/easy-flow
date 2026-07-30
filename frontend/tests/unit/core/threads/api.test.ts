@@ -10,6 +10,11 @@ beforeEach(() => {
   fetchWithAuth.mockReset();
 });
 
+/**
+ * 覆盖“fetchThreadTokenUsage uses shared auth fetch without JSON GET headers”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("fetchThreadTokenUsage uses shared auth fetch without JSON GET headers", async () => {
   fetchWithAuth.mockResolvedValue({
     ok: true,
@@ -43,6 +48,11 @@ test("fetchThreadTokenUsage uses shared auth fetch without JSON GET headers", as
   );
 });
 
+/**
+ * 覆盖“fetchThreadTokenUsage returns null for unavailable token usage”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("fetchThreadTokenUsage returns null for unavailable token usage", async () => {
   fetchWithAuth.mockResolvedValue({
     ok: false,
@@ -53,6 +63,11 @@ test("fetchThreadTokenUsage returns null for unavailable token usage", async () 
 
   await expect(fetchThreadTokenUsage("thread-1")).resolves.toBeNull();
 });
+
+/**
+ * 覆盖“branchThreadFromTurn posts the selected turn ids to the gateway”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("branchThreadFromTurn posts the selected turn ids to the gateway", async () => {
   fetchWithAuth.mockResolvedValue({
@@ -95,6 +110,11 @@ test("branchThreadFromTurn posts the selected turn ids to the gateway", async ()
   );
 });
 
+/**
+ * 覆盖“branchThreadFromTurn surfaces gateway detail on failure”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("branchThreadFromTurn surfaces gateway detail on failure", async () => {
   fetchWithAuth.mockResolvedValue({
     ok: false,
@@ -112,6 +132,11 @@ test("branchThreadFromTurn surfaces gateway detail on failure", async () => {
     }),
   ).rejects.toThrow("This turn can no longer be branched from.");
 });
+
+/**
+ * 覆盖“compactThreadContext posts agent attribution and abort signal”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("compactThreadContext posts agent attribution and abort signal", async () => {
   const controller = new AbortController();

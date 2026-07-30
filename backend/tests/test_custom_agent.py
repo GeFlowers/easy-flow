@@ -1,4 +1,4 @@
-"""Tests for custom agent support."""
+'定义 test_custom_agent 模块提供的职责与可复用接口。\n\nTests for custom agent support.'
 
 from __future__ import annotations
 
@@ -17,14 +17,14 @@ from deerflow.config.agents_api_config import AgentsApiConfig, get_agents_api_co
 
 
 def _make_paths(base_dir: Path):
-    """Return a Paths instance pointing to base_dir."""
+    '执行 _make_paths 的明确职责，并返回与调用约定一致的结果。\n\nReturn a Paths instance pointing to base_dir.'
     from deerflow.config.paths import Paths
 
     return Paths(base_dir=base_dir)
 
 
 def _write_agent(base_dir: Path, name: str, config: dict, soul: str = "You are helpful.") -> None:
-    """Write an agent directory with config.yaml and SOUL.md."""
+    '执行 _write_agent 的明确职责，并返回与调用约定一致的结果。\n\nWrite an agent directory with config.yaml and SOUL.md.'
     agent_dir = base_dir / "agents" / name
     agent_dir.mkdir(parents=True, exist_ok=True)
 
@@ -44,23 +44,29 @@ def _write_agent(base_dir: Path, name: str, config: dict, soul: str = "You are h
 
 
 class TestPaths:
+    '组织 TestPaths 场景的行为与边界验证'
     def test_agents_dir(self, tmp_path):
+        '验证 agents、dir 场景下的预期行为、边界条件与结果'
         paths = _make_paths(tmp_path)
         assert paths.agents_dir == tmp_path / "agents"
 
     def test_agent_dir(self, tmp_path):
+        '验证 agent、dir 场景下的预期行为、边界条件与结果'
         paths = _make_paths(tmp_path)
         assert paths.agent_dir("code-reviewer") == tmp_path / "agents" / "code-reviewer"
 
     def test_agent_memory_file(self, tmp_path):
+        '验证 agent、memory、file 场景下的预期行为、边界条件与结果'
         paths = _make_paths(tmp_path)
         assert paths.agent_memory_file("code-reviewer") == tmp_path / "agents" / "code-reviewer" / "memory.json"
 
     def test_user_md_file(self, tmp_path):
+        '验证 user、md、file 场景下的预期行为、边界条件与结果'
         paths = _make_paths(tmp_path)
         assert paths.user_md_file == tmp_path / "USER.md"
 
     def test_paths_are_different_from_global(self, tmp_path):
+        '验证 paths、are、different、from、global 场景下的预期行为、边界条件与结果'
         paths = _make_paths(tmp_path)
         assert paths.memory_file != paths.agent_memory_file("my-agent")
         assert paths.memory_file == tmp_path / "memory.json"
@@ -73,7 +79,9 @@ class TestPaths:
 
 
 class TestAgentConfig:
+    '组织 TestAgentConfig 场景的行为与边界验证'
     def test_minimal_config(self):
+        '验证 minimal、config 场景下的预期行为、边界条件与结果'
         from deerflow.config.agents_config import AgentConfig
 
         cfg = AgentConfig(name="my-agent")
@@ -83,6 +91,7 @@ class TestAgentConfig:
         assert cfg.tool_groups is None
 
     def test_full_config(self):
+        '验证 full、config 场景下的预期行为、边界条件与结果'
         from deerflow.config.agents_config import AgentConfig
 
         cfg = AgentConfig(
@@ -96,6 +105,7 @@ class TestAgentConfig:
         assert cfg.tool_groups == ["file:read", "bash"]
 
     def test_config_from_dict(self):
+        '验证 config、from、dict 场景下的预期行为、边界条件与结果'
         from deerflow.config.agents_config import AgentConfig
 
         data = {"name": "test-agent", "description": "A test", "model": "gpt-4"}
@@ -111,7 +121,9 @@ class TestAgentConfig:
 
 
 class TestLoadAgentConfig:
+    '组织 TestLoadAgentConfig 场景的行为与边界验证'
     def test_load_valid_config(self, tmp_path):
+        '验证 load、valid、config 场景下的预期行为、边界条件与结果'
         config_dict = {"name": "code-reviewer", "description": "Code review agent", "model": "deepseek-v3"}
         _write_agent(tmp_path, "code-reviewer", config_dict)
 
@@ -125,6 +137,7 @@ class TestLoadAgentConfig:
         assert cfg.model == "deepseek-v3"
 
     def test_load_missing_agent_raises(self, tmp_path):
+        '验证 load、missing、agent、raises 场景下的预期行为、边界条件与结果'
         with patch("deerflow.config.agents_config.get_paths", return_value=_make_paths(tmp_path)):
             from deerflow.config.agents_config import load_agent_config
 
@@ -133,6 +146,7 @@ class TestLoadAgentConfig:
 
     def test_load_missing_config_yaml_raises(self, tmp_path):
         # Create directory without config.yaml
+        '验证 load、missing、config、yaml、raises 场景下的预期行为、边界条件与结果'
         (tmp_path / "agents" / "broken-agent").mkdir(parents=True)
 
         with patch("deerflow.config.agents_config.get_paths", return_value=_make_paths(tmp_path)):
@@ -142,7 +156,7 @@ class TestLoadAgentConfig:
                 load_agent_config("broken-agent")
 
     def test_load_config_infers_name_from_dir(self, tmp_path):
-        """Config without 'name' field should use directory name."""
+        "验证 load、config、infers、name、from、dir 场景下的预期行为、边界条件与结果。\n\nConfig without 'name' field should use directory name."
         agent_dir = tmp_path / "agents" / "inferred-name"
         agent_dir.mkdir(parents=True)
         (agent_dir / "config.yaml").write_text("description: My agent\n")
@@ -156,6 +170,7 @@ class TestLoadAgentConfig:
         assert cfg.name == "inferred-name"
 
     def test_load_config_with_tool_groups(self, tmp_path):
+        '验证 load、config、with、tool、groups 场景下的预期行为、边界条件与结果'
         config_dict = {"name": "restricted", "tool_groups": ["file:read", "file:write"]}
         _write_agent(tmp_path, "restricted", config_dict)
 
@@ -167,6 +182,7 @@ class TestLoadAgentConfig:
         assert cfg.tool_groups == ["file:read", "file:write"]
 
     def test_load_config_with_skills_empty_list(self, tmp_path):
+        '验证 load、config、with、skills、empty、list 场景下的预期行为、边界条件与结果'
         config_dict = {"name": "no-skills-agent", "skills": []}
         _write_agent(tmp_path, "no-skills-agent", config_dict)
 
@@ -178,6 +194,7 @@ class TestLoadAgentConfig:
         assert cfg.skills == []
 
     def test_load_config_with_skills_omitted(self, tmp_path):
+        '验证 load、config、with、skills、omitted 场景下的预期行为、边界条件与结果'
         config_dict = {"name": "default-skills-agent"}
         _write_agent(tmp_path, "default-skills-agent", config_dict)
 
@@ -189,7 +206,7 @@ class TestLoadAgentConfig:
         assert cfg.skills is None
 
     def test_legacy_prompt_file_field_ignored(self, tmp_path):
-        """Unknown fields like the old prompt_file should be silently ignored."""
+        '验证 legacy、prompt、file、field、ignored 场景下的预期行为、边界条件与结果。\n\nUnknown fields like the old prompt_file should be silently ignored.'
         agent_dir = tmp_path / "agents" / "legacy-agent"
         agent_dir.mkdir(parents=True)
         (agent_dir / "config.yaml").write_text("name: legacy-agent\nprompt_file: system.md\n")
@@ -209,16 +226,10 @@ class TestLoadAgentConfig:
 
 
 class TestResolveAgentDirMemoryOnlyFallback:
-    """Regression tests for #3390.
-
-    When memory is enabled, the first conversation creates a user-isolated
-    agent directory containing only ``memory.json`` (no ``config.yaml``).
-    On the next turn ``resolve_agent_dir`` must fall through to the legacy
-    shared layout instead of returning the incomplete user directory.
-    """
+    '组织 TestResolveAgentDirMemoryOnlyFallback 场景的行为与边界验证。\n\nRegression tests for #3390.\n\n    When memory is enabled, the first conversation creates a user-isolated\n    agent directory containing only ``memory.json`` (no ``config.yaml``).\n    On the next turn ``resolve_agent_dir`` must fall through to the legacy\n    shared layout instead of returning the incomplete user directory.\n    '
 
     def test_user_dir_with_only_memory_falls_back_to_legacy(self, tmp_path):
-        """User dir has memory.json but no config.yaml → use legacy dir."""
+        '验证 user、dir、with、only、memory、falls、back、to、legacy 场景下的预期行为、边界条件与结果。\n\nUser dir has memory.json but no config.yaml → use legacy dir.'
         from deerflow.config.agents_config import resolve_agent_dir
 
         # Legacy agent with full config
@@ -238,7 +249,7 @@ class TestResolveAgentDirMemoryOnlyFallback:
         assert result == legacy_dir
 
     def test_user_dir_with_config_takes_priority(self, tmp_path):
-        """User dir with config.yaml should still win over legacy."""
+        '验证 user、dir、with、config、takes、priority 场景下的预期行为、边界条件与结果。\n\nUser dir with config.yaml should still win over legacy.'
         from deerflow.config.agents_config import resolve_agent_dir
 
         # Legacy
@@ -258,7 +269,7 @@ class TestResolveAgentDirMemoryOnlyFallback:
         assert result == user_dir
 
     def test_load_config_falls_back_when_user_dir_is_memory_only(self, tmp_path):
-        """End-to-end: load_agent_config works when user dir only has memory.json."""
+        '验证 load、config、falls、back、when、user、dir、is、memory、only 场景下的预期行为、边界条件与结果。\n\nEnd-to-end: load_agent_config works when user dir only has memory.json.'
         config_dict = {"name": "my-agent", "description": "Legacy agent", "model": "deepseek-v3"}
         _write_agent(tmp_path, "my-agent", config_dict)
 
@@ -282,7 +293,9 @@ class TestResolveAgentDirMemoryOnlyFallback:
 
 
 class TestLoadAgentSoul:
+    '组织 TestLoadAgentSoul 场景的行为与边界验证'
     def test_reads_soul_file(self, tmp_path):
+        '验证 reads、soul、file 场景下的预期行为、边界条件与结果'
         expected_soul = "You are a specialized code review expert."
         _write_agent(tmp_path, "code-reviewer", {"name": "code-reviewer"}, soul=expected_soul)
 
@@ -295,6 +308,7 @@ class TestLoadAgentSoul:
         assert soul == expected_soul
 
     def test_missing_soul_file_returns_none(self, tmp_path):
+        '验证 missing、soul、file、returns、none 场景下的预期行为、边界条件与结果'
         agent_dir = tmp_path / "agents" / "no-soul"
         agent_dir.mkdir(parents=True)
         (agent_dir / "config.yaml").write_text("name: no-soul\n")
@@ -309,6 +323,7 @@ class TestLoadAgentSoul:
         assert soul is None
 
     def test_empty_soul_file_returns_none(self, tmp_path):
+        '验证 empty、soul、file、returns、none 场景下的预期行为、边界条件与结果'
         agent_dir = tmp_path / "agents" / "empty-soul"
         agent_dir.mkdir(parents=True)
         (agent_dir / "config.yaml").write_text("name: empty-soul\n")
@@ -323,7 +338,7 @@ class TestLoadAgentSoul:
         assert soul is None
 
     def test_loads_soul_without_config_yaml(self, tmp_path):
-        """SOUL.md should load even when the agent dir has no config.yaml (#4135)."""
+        '验证 loads、soul、without、config、yaml 场景下的预期行为、边界条件与结果。\n\nSOUL.md should load even when the agent dir has no config.yaml (#4135).'
         agent_dir = tmp_path / "agents" / "soul-only"
         agent_dir.mkdir(parents=True)
         # Deliberately no config.yaml – the agent is configured externally
@@ -337,14 +352,7 @@ class TestLoadAgentSoul:
         assert soul == "You are a brave agent."
 
     def test_loads_soul_from_user_dir_without_config_yaml(self, tmp_path):
-        """Fallback should find SOUL.md when resolver returns a default dir without it (#4135).
-
-        Setup: per-user agent 'foo' exists as a memory-only directory
-        (no config.yaml, no SOUL.md). Legacy agent 'foo' has SOUL.md but
-        no config.yaml. resolve_agent_dir returns the per-user path as
-        default (neither dir has config.yaml). The fallback then finds
-        SOUL.md in the legacy directory.
-        """
+        "验证 loads、soul、from、user、dir、without、config、yaml 场景下的预期行为、边界条件与结果。\n\nFallback should find SOUL.md when resolver returns a default dir without it (#4135).\n\n        Setup: per-user agent 'foo' exists as a memory-only directory\n        (no config.yaml, no SOUL.md). Legacy agent 'foo' has SOUL.md but\n        no config.yaml. resolve_agent_dir returns the per-user path as\n        default (neither dir has config.yaml). The fallback then finds\n        SOUL.md in the legacy directory.\n        "
         # Per-user dir: memory-only (no config.yaml, no SOUL.md)
         user_dir = tmp_path / "users" / "test-user" / "agents" / "foo"
         user_dir.mkdir(parents=True)
@@ -363,13 +371,7 @@ class TestLoadAgentSoul:
         assert soul == "You are a legacy agent."
 
     def test_soul_not_leaked_from_legacy_when_per_user_has_config(self, tmp_path):
-        """Per-user agent with config.yaml but no SOUL.md should NOT fall back to legacy SOUL.md.
-
-        This verifies the gated condition: fallback only fires when the
-        resolved dir lacks config.yaml. A properly-resolved per-user agent
-        that simply has no SOUL.md returns None, preserving the
-        "per-user entries fully shadow legacy entries" invariant.
-        """
+        '验证 soul、not、leaked、from、legacy、when、per、user、has、config 场景下的预期行为、边界条件与结果。\n\nPer-user agent with config.yaml but no SOUL.md should NOT fall back to legacy SOUL.md.\n\n        This verifies the gated condition: fallback only fires when the\n        resolved dir lacks config.yaml. A properly-resolved per-user agent\n        that simply has no SOUL.md returns None, preserving the\n        "per-user entries fully shadow legacy entries" invariant.\n        '
         # Legacy dir: has SOUL.md
         legacy_dir = tmp_path / "agents" / "foo"
         legacy_dir.mkdir(parents=True)
@@ -396,7 +398,9 @@ class TestLoadAgentSoul:
 
 
 class TestListCustomAgents:
+    '组织 TestListCustomAgents 场景的行为与边界验证'
     def test_empty_when_no_agents_dir(self, tmp_path):
+        '验证 empty、when、no、agents、dir 场景下的预期行为、边界条件与结果'
         with patch("deerflow.config.agents_config.get_paths", return_value=_make_paths(tmp_path)):
             from deerflow.config.agents_config import list_custom_agents
 
@@ -405,6 +409,7 @@ class TestListCustomAgents:
         assert agents == []
 
     def test_discovers_multiple_agents(self, tmp_path):
+        '验证 discovers、multiple、agents 场景下的预期行为、边界条件与结果'
         _write_agent(tmp_path, "agent-a", {"name": "agent-a"})
         _write_agent(tmp_path, "agent-b", {"name": "agent-b", "description": "B"})
 
@@ -419,6 +424,7 @@ class TestListCustomAgents:
 
     def test_skips_dirs_without_config_yaml(self, tmp_path):
         # Valid agent
+        '验证 skips、dirs、without、config、yaml 场景下的预期行为、边界条件与结果'
         _write_agent(tmp_path, "valid-agent", {"name": "valid-agent"})
         # Invalid dir (no config.yaml)
         (tmp_path / "agents" / "invalid-dir").mkdir(parents=True)
@@ -433,6 +439,7 @@ class TestListCustomAgents:
 
     def test_skips_non_directory_entries(self, tmp_path):
         # Create the agents dir with a file (not a dir)
+        '验证 skips、non、directory、entries 场景下的预期行为、边界条件与结果'
         agents_dir = tmp_path / "agents"
         agents_dir.mkdir(parents=True)
         (agents_dir / "not-a-dir.txt").write_text("hello")
@@ -447,6 +454,7 @@ class TestListCustomAgents:
         assert agents[0].name == "real-agent"
 
     def test_returns_sorted_by_name(self, tmp_path):
+        '验证 returns、sorted、by、name 场景下的预期行为、边界条件与结果'
         _write_agent(tmp_path, "z-agent", {"name": "z-agent"})
         _write_agent(tmp_path, "a-agent", {"name": "a-agent"})
         _write_agent(tmp_path, "m-agent", {"name": "m-agent"})
@@ -466,8 +474,9 @@ class TestListCustomAgents:
 
 
 class TestMemoryFilePath:
+    '组织 TestMemoryFilePath 场景的行为与边界验证'
     def test_global_memory_path(self, tmp_path, monkeypatch):
-        """None agent_name should return global memory file."""
+        '验证 global、memory、path 场景下的预期行为、边界条件与结果。\n\nNone agent_name should return global memory file.'
         from deerflow.agents.memory.backends.deermem.deermem.config import DeerMemConfig
         from deerflow.agents.memory.backends.deermem.deermem.core.storage import FileMemoryStorage
 
@@ -477,7 +486,7 @@ class TestMemoryFilePath:
         assert path == tmp_path / "memory.json"
 
     def test_agent_memory_path(self, tmp_path, monkeypatch):
-        """Providing agent_name should return per-agent memory file."""
+        '验证 agent、memory、path 场景下的预期行为、边界条件与结果。\n\nProviding agent_name should return per-agent memory file.'
         from deerflow.agents.memory.backends.deermem.deermem.config import DeerMemConfig
         from deerflow.agents.memory.backends.deermem.deermem.core.storage import FileMemoryStorage
 
@@ -487,6 +496,7 @@ class TestMemoryFilePath:
         assert path == tmp_path / "agents" / "code-reviewer" / "memory.json"
 
     def test_different_paths_for_different_agents(self, tmp_path, monkeypatch):
+        '验证 different、paths、for、different、agents 场景下的预期行为、边界条件与结果'
         from deerflow.agents.memory.backends.deermem.deermem.config import DeerMemConfig
         from deerflow.agents.memory.backends.deermem.deermem.core.storage import FileMemoryStorage
 
@@ -507,7 +517,7 @@ class TestMemoryFilePath:
 
 
 def _make_test_app(tmp_path: Path):
-    """Create a FastAPI app with the agents router, patching paths to tmp_path."""
+    '执行 _make_test_app 的明确职责，并返回与调用约定一致的结果。\n\nCreate a FastAPI app with the agents router, patching paths to tmp_path.'
     from fastapi import FastAPI
 
     from app.gateway.routers.agents import router
@@ -519,7 +529,7 @@ def _make_test_app(tmp_path: Path):
 
 @pytest.fixture()
 def agent_client(tmp_path):
-    """TestClient with agents router, using tmp_path as base_dir."""
+    '执行 agent_client 的明确职责，并返回与调用约定一致的结果。\n\nTestClient with agents router, using tmp_path as base_dir.'
     import app.gateway.routers.agents as agents_router
 
     paths_instance = _make_paths(tmp_path)
@@ -538,7 +548,7 @@ def agent_client(tmp_path):
 
 @pytest.fixture()
 def disabled_agent_client(tmp_path):
-    """TestClient with agents router while the management API is disabled."""
+    '执行 disabled_agent_client 的明确职责，并返回与调用约定一致的结果。\n\nTestClient with agents router while the management API is disabled.'
     import app.gateway.routers.agents as agents_router
 
     paths_instance = _make_paths(tmp_path)
@@ -555,13 +565,16 @@ def disabled_agent_client(tmp_path):
 
 
 class TestAgentsAPI:
+    '组织 TestAgentsAPI 场景的行为与边界验证'
     def test_list_agents_empty(self, agent_client):
+        '验证 list、agents、empty 场景下的预期行为、边界条件与结果'
         response = agent_client.get("/api/agents")
         assert response.status_code == 200
         data = response.json()
         assert data["agents"] == []
 
     def test_create_agent(self, agent_client):
+        '验证 create、agent 场景下的预期行为、边界条件与结果'
         payload = {
             "name": "code-reviewer",
             "description": "Reviews code",
@@ -575,11 +588,13 @@ class TestAgentsAPI:
         assert data["soul"] == "You are a code reviewer."
 
     def test_create_agent_invalid_name(self, agent_client):
+        '验证 create、agent、invalid、name 场景下的预期行为、边界条件与结果'
         payload = {"name": "Code Reviewer!", "soul": "test"}
         response = agent_client.post("/api/agents", json=payload)
         assert response.status_code == 422
 
     def test_create_duplicate_agent_409(self, agent_client):
+        '验证 create、duplicate、agent、409 场景下的预期行为、边界条件与结果'
         payload = {"name": "my-agent", "soul": "test"}
         agent_client.post("/api/agents", json=payload)
 
@@ -588,6 +603,7 @@ class TestAgentsAPI:
         assert response.status_code == 409
 
     def test_list_agents_after_create(self, agent_client):
+        '验证 list、agents、after、create 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "agent-one", "soul": "p1"})
         agent_client.post("/api/agents", json={"name": "agent-two", "soul": "p2"})
 
@@ -598,6 +614,7 @@ class TestAgentsAPI:
         assert "agent-two" in names
 
     def test_list_agents_includes_soul(self, agent_client):
+        '验证 list、agents、includes、soul 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "soul-agent", "soul": "My soul content"})
 
         response = agent_client.get("/api/agents")
@@ -607,6 +624,7 @@ class TestAgentsAPI:
         assert soul_agent["soul"] == "My soul content"
 
     def test_get_agent(self, agent_client):
+        '验证 get、agent 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "test-agent", "soul": "Hello world"})
 
         response = agent_client.get("/api/agents/test-agent")
@@ -616,10 +634,12 @@ class TestAgentsAPI:
         assert data["soul"] == "Hello world"
 
     def test_get_missing_agent_404(self, agent_client):
+        '验证 get、missing、agent、404 场景下的预期行为、边界条件与结果'
         response = agent_client.get("/api/agents/nonexistent")
         assert response.status_code == 404
 
     def test_update_agent_soul(self, agent_client):
+        '验证 update、agent、soul 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "update-me", "soul": "original"})
 
         response = agent_client.put("/api/agents/update-me", json={"soul": "updated"})
@@ -627,6 +647,7 @@ class TestAgentsAPI:
         assert response.json()["soul"] == "updated"
 
     def test_update_agent_description(self, agent_client):
+        '验证 update、agent、description 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "desc-agent", "description": "old desc", "soul": "p"})
 
         response = agent_client.put("/api/agents/desc-agent", json={"description": "new desc"})
@@ -634,19 +655,7 @@ class TestAgentsAPI:
         assert response.json()["description"] == "new desc"
 
     def test_update_agent_preserves_hand_authored_github_block(self, agent_client):
-        """A hand-authored ``github:`` block on disk must survive PATCH.
-
-        The HTTP route does not expose ``github`` as an editable field
-        (and rightly so — the GitHub App credentials and binding triggers
-        are operator-authored, not end-user-editable). But it MUST carry
-        the block forward when rewriting ``config.yaml`` for a description /
-        model / tool_groups / skills change, otherwise an operator who
-        edits the agent's description from the Web UI silently strips the
-        binding and the next webhook delivery silently no-ops.
-
-        Mirrors the same property the harness ``update_agent`` tool enforces
-        via ``preserve_non_managed_fields``; both surfaces share the helper.
-        """
+        "验证 update、agent、preserves、hand、authored、github、block 场景下的预期行为、边界条件与结果。\n\nA hand-authored ``github:`` block on disk must survive PATCH.\n\n        The HTTP route does not expose ``github`` as an editable field\n        (and rightly so — the GitHub App credentials and binding triggers\n        are operator-authored, not end-user-editable). But it MUST carry\n        the block forward when rewriting ``config.yaml`` for a description /\n        model / tool_groups / skills change, otherwise an operator who\n        edits the agent's description from the Web UI silently strips the\n        binding and the next webhook delivery silently no-ops.\n\n        Mirrors the same property the harness ``update_agent`` tool enforces\n        via ``preserve_non_managed_fields``; both surfaces share the helper.\n        "
         # Create an agent through the API, then hand-author a github: block
         # into its config.yaml — exactly the workflow an operator would
         # follow when wiring a new repo binding.
@@ -687,15 +696,7 @@ class TestAgentsAPI:
         }
 
     def test_update_memory_only_user_dir_with_legacy_agent_returns_409(self, agent_client, tmp_path):
-        """Regression for #3390's PUT /api/agents/{name} guard.
-
-        A per-user agent directory can exist containing only memory.json
-        (written the first time this user chats with a legacy shared
-        agent). The stale guard checked bare directory existence and
-        missed this case, letting the route silently fork a brand-new
-        config.yaml/SOUL.md into the memory-only directory instead of
-        blocking with the migration-script guidance.
-        """
+        "验证 update、memory、only、user、dir、with、legacy、agent、returns、409 场景下的预期行为、边界条件与结果。\n\nRegression for #3390's PUT /api/agents/{name} guard.\n\n        A per-user agent directory can exist containing only memory.json\n        (written the first time this user chats with a legacy shared\n        agent). The stale guard checked bare directory existence and\n        missed this case, letting the route silently fork a brand-new\n        config.yaml/SOUL.md into the memory-only directory instead of\n        blocking with the migration-script guidance.\n        "
         legacy_dir = tmp_path / "agents" / "legacy-agent"
         legacy_dir.mkdir(parents=True)
         (legacy_dir / "config.yaml").write_text("name: legacy-agent\ndescription: legacy\n", encoding="utf-8")
@@ -713,10 +714,12 @@ class TestAgentsAPI:
         assert (user_agent_dir / "memory.json").exists(), "the user's existing memory must be left untouched"
 
     def test_update_missing_agent_404(self, agent_client):
+        '验证 update、missing、agent、404 场景下的预期行为、边界条件与结果'
         response = agent_client.put("/api/agents/ghost-agent", json={"soul": "new"})
         assert response.status_code == 404
 
     def test_delete_agent(self, agent_client):
+        '验证 delete、agent 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "del-me", "soul": "bye"})
 
         response = agent_client.delete("/api/agents/del-me")
@@ -727,10 +730,12 @@ class TestAgentsAPI:
         assert response.status_code == 404
 
     def test_delete_missing_agent_404(self, agent_client):
+        '验证 delete、missing、agent、404 场景下的预期行为、边界条件与结果'
         response = agent_client.delete("/api/agents/does-not-exist")
         assert response.status_code == 404
 
     def test_create_agent_with_model_and_tool_groups(self, agent_client):
+        '验证 create、agent、with、model、and、tool、groups 场景下的预期行为、边界条件与结果'
         payload = {
             "name": "specialized",
             "description": "Specialized agent",
@@ -745,6 +750,7 @@ class TestAgentsAPI:
         assert data["tool_groups"] == ["file:read", "bash"]
 
     def test_create_persists_files_on_disk(self, agent_client, tmp_path):
+        '验证 create、persists、files、on、disk 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "disk-check", "soul": "disk soul"})
 
         # tests/conftest.py installs an autouse fixture that sets the
@@ -757,6 +763,7 @@ class TestAgentsAPI:
         assert (agent_dir / "SOUL.md").read_text() == "disk soul"
 
     def test_delete_removes_files_from_disk(self, agent_client, tmp_path):
+        '验证 delete、removes、files、from、disk 场景下的预期行为、边界条件与结果'
         agent_client.post("/api/agents", json={"name": "remove-me", "soul": "bye"})
         agent_dir = tmp_path / "users" / "test-user-autouse" / "agents" / "remove-me"
         assert agent_dir.exists()
@@ -765,8 +772,7 @@ class TestAgentsAPI:
         assert not agent_dir.exists()
 
     def test_create_rejects_legacy_name_collision(self, agent_client, tmp_path):
-        """An unmigrated legacy agent must still block name collision so that
-        running the migration script later won't shadow the legacy entry."""
+        "验证 create、rejects、legacy、name、collision 场景下的预期行为、边界条件与结果。\n\nAn unmigrated legacy agent must still block name collision so that\n        running the migration script later won't shadow the legacy entry."
         legacy_dir = tmp_path / "agents" / "legacy-agent"
         legacy_dir.mkdir(parents=True)
         (legacy_dir / "config.yaml").write_text("name: legacy-agent\n", encoding="utf-8")
@@ -782,12 +788,15 @@ class TestAgentsAPI:
 
 
 class TestUserProfileAPI:
+    '组织 TestUserProfileAPI 场景的行为与边界验证'
     def test_get_user_profile_empty(self, agent_client):
+        '验证 get、user、profile、empty 场景下的预期行为、边界条件与结果'
         response = agent_client.get("/api/user-profile")
         assert response.status_code == 200
         assert response.json()["content"] is None
 
     def test_put_user_profile(self, agent_client, tmp_path):
+        '验证 put、user、profile 场景下的预期行为、边界条件与结果'
         content = "# User Profile\n\nI am a developer."
         response = agent_client.put("/api/user-profile", json={"content": content})
         assert response.status_code == 200
@@ -799,6 +808,7 @@ class TestUserProfileAPI:
         assert user_md.read_text(encoding="utf-8") == content
 
     def test_get_user_profile_after_put(self, agent_client):
+        '验证 get、user、profile、after、put 场景下的预期行为、边界条件与结果'
         content = "# Profile\n\nI work on data science."
         agent_client.put("/api/user-profile", json={"content": content})
 
@@ -807,38 +817,47 @@ class TestUserProfileAPI:
         assert response.json()["content"] == content
 
     def test_put_empty_user_profile_returns_none(self, agent_client):
+        '验证 put、empty、user、profile、returns、none 场景下的预期行为、边界条件与结果'
         response = agent_client.put("/api/user-profile", json={"content": ""})
         assert response.status_code == 200
         assert response.json()["content"] is None
 
 
 class TestAgentsApiDisabled:
+    '组织 TestAgentsApiDisabled 场景的行为与边界验证'
     def test_agents_list_returns_403(self, disabled_agent_client):
+        '验证 agents、list、returns、403 场景下的预期行为、边界条件与结果'
         response = disabled_agent_client.get("/api/agents")
         assert response.status_code == 403
         assert "agents_api.enabled=true" in response.json()["detail"]
 
     def test_agent_get_returns_403(self, disabled_agent_client):
+        '验证 agent、get、returns、403 场景下的预期行为、边界条件与结果'
         response = disabled_agent_client.get("/api/agents/example-agent")
         assert response.status_code == 403
 
     def test_agent_name_check_returns_403(self, disabled_agent_client):
+        '验证 agent、name、check、returns、403 场景下的预期行为、边界条件与结果'
         response = disabled_agent_client.get("/api/agents/check", params={"name": "example-agent"})
         assert response.status_code == 403
 
     def test_agent_create_returns_403(self, disabled_agent_client):
+        '验证 agent、create、returns、403 场景下的预期行为、边界条件与结果'
         response = disabled_agent_client.post("/api/agents", json={"name": "example-agent", "soul": "blocked"})
         assert response.status_code == 403
 
     def test_agent_update_returns_403(self, disabled_agent_client):
+        '验证 agent、update、returns、403 场景下的预期行为、边界条件与结果'
         response = disabled_agent_client.put("/api/agents/example-agent", json={"description": "blocked"})
         assert response.status_code == 403
 
     def test_agent_delete_returns_403(self, disabled_agent_client):
+        '验证 agent、delete、returns、403 场景下的预期行为、边界条件与结果'
         response = disabled_agent_client.delete("/api/agents/example-agent")
         assert response.status_code == 403
 
     def test_user_profile_routes_return_403(self, disabled_agent_client):
+        '验证 user、profile、routes、return、403 场景下的预期行为、边界条件与结果'
         get_response = disabled_agent_client.get("/api/user-profile")
         put_response = disabled_agent_client.put("/api/user-profile", json={"content": "blocked"})
 

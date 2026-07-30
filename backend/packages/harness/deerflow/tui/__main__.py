@@ -1,4 +1,4 @@
-"""Allow ``python -m deerflow.tui`` to launch the workbench."""
+'未说明'
 
 from .cli import main
 

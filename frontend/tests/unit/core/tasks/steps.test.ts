@@ -8,6 +8,9 @@ import {
 } from "@/core/tasks/steps";
 
 describe("messageToStep", () => {
+  /**
+   * 覆盖“normalizes an AI message into an ai step with tool calls”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("normalizes an AI message into an ai step with tool calls", () => {
     const step = messageToStep(
       {
@@ -28,6 +31,11 @@ describe("messageToStep", () => {
     expect(step.tool_name).toBeUndefined();
   });
 
+  /**
+   * 覆盖“normalizes a tool message into a tool step with its output”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("normalizes a tool message into a tool step with its output", () => {
     const step = messageToStep(
       { type: "tool", id: "t-1", name: "web_search", content: "results" },
@@ -39,6 +47,11 @@ describe("messageToStep", () => {
     expect(step.text).toBe("results");
     expect(step.tool_calls).toBeUndefined();
   });
+
+  /**
+   * 覆盖“flattens list-of-blocks content to text”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("flattens list-of-blocks content to text", () => {
     const step = messageToStep(
@@ -58,12 +71,20 @@ describe("messageToStep", () => {
 });
 
 describe("mergeSteps", () => {
+  /**
+   * 覆盖“appends a new step”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("appends a new step", () => {
     const a = messageToStep({ type: "ai", content: "a" }, 1);
     const b = messageToStep({ type: "tool", name: "x", content: "b" }, 2);
 
     expect(mergeSteps([a], [b])).toEqual([a, b]);
   });
+
+  /**
+   * 覆盖“dedupes by message_index, preferring the incoming step”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("dedupes by message_index, preferring the incoming step", () => {
     const old = messageToStep({ type: "ai", content: "old" }, 1);
@@ -74,6 +95,11 @@ describe("mergeSteps", () => {
     expect(merged).toHaveLength(1);
     expect(merged[0]!.text).toBe("fresh");
   });
+
+  /**
+   * 覆盖“keeps steps ordered by message_index”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("keeps steps ordered by message_index", () => {
     const s1 = messageToStep({ type: "ai", content: "1" }, 1);
@@ -87,6 +113,9 @@ describe("mergeSteps", () => {
 });
 
 describe("stepsForDisplay", () => {
+  /**
+   * 覆盖“keeps tool steps and AI steps that have text, ordered by message_index”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("keeps tool steps and AI steps that have text, ordered by message_index", () => {
     const steps = [
       messageToStep(
@@ -109,6 +138,11 @@ describe("stepsForDisplay", () => {
     expect(display.map((s) => s.kind)).toEqual(["ai", "tool"]);
   });
 
+  /**
+   * 覆盖“drops AI steps with blank text even if they have tool_calls”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("drops AI steps with blank text even if they have tool_calls", () => {
     const steps = [
       messageToStep(
@@ -127,6 +161,11 @@ describe("stepsForDisplay", () => {
     ).toEqual([2]);
   });
 
+  /**
+   * 覆盖“drops the trailing final AI answer when completed (already shown as result)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("drops the trailing final AI answer when completed (already shown as result)", () => {
     const steps = [
       messageToStep({ type: "tool", name: "web_search", content: "x" }, 1),
@@ -137,6 +176,11 @@ describe("stepsForDisplay", () => {
       "tool",
     ]);
   });
+
+  /**
+   * 覆盖“keeps the trailing AI step while still in progress”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("keeps the trailing AI step while still in progress", () => {
     const steps = [
@@ -149,6 +193,11 @@ describe("stepsForDisplay", () => {
       "ai",
     ]);
   });
+
+  /**
+   * 覆盖“returns empty for undefined”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("returns empty for undefined", () => {
     expect(stepsForDisplay(undefined, "in_progress")).toEqual([]);
@@ -197,6 +246,11 @@ describe("eventsToSteps", () => {
     },
   ];
 
+  /**
+   * 覆盖“maps subagent.step events for the task into ordered steps”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("maps subagent.step events for the task into ordered steps", () => {
     const steps = eventsToSteps(events, "call_1");
 
@@ -206,12 +260,22 @@ describe("eventsToSteps", () => {
     expect(steps[1]!.tool_name).toBe("web_search");
   });
 
+  /**
+   * 覆盖“ignores steps belonging to other tasks and non-step events”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("ignores steps belonging to other tasks and non-step events", () => {
     const steps = eventsToSteps(events, "call_1");
 
     expect(steps.every((s) => s.text !== "nope")).toBe(true);
     expect(steps).toHaveLength(2);
   });
+
+  /**
+   * 覆盖“returns empty array when no events match”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("returns empty array when no events match", () => {
     expect(eventsToSteps(events, "missing")).toEqual([]);

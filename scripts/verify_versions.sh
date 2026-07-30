@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
-# Verify that every project version source agrees.
+# 校验项目的全部版本来源保持一致，防止发布产物版本漂移。
 #
-# Sources checked:
+# 校验来源：
 #   deploy/helm/deer-flow/Chart.yaml   — version + appVersion
 #   backend/pyproject.toml             — version
 #   frontend/package.json              — version
 #
-# Usage:
-#   scripts/verify_versions.sh             # all sources must be mutually equal
-#   scripts/verify_versions.sh 2.1.0       # all sources must equal 2.1.0
+# 用法：
+#   scripts/verify_versions.sh             # 所有来源必须彼此相等
+#   scripts/verify_versions.sh 2.1.0       # 所有来源必须等于 2.1.0
 #
-# Exit status is 0 when consistent, 1 otherwise. The release workflows
-# (.github/workflows/chart.yaml and container.yaml) call this on v* tags — via
-# the reusable .github/workflows/verify-versions.yml — to gate publishing when
-# a version source was forgotten.
+# 一致时退出码为 0，否则为 1。发布工作流会在 v* tag 上经由
+# .github/workflows/verify-versions.yml 调用它，避免遗漏某个版本来源仍继续发布。
 
 set -uo pipefail
 
@@ -40,8 +38,7 @@ printf 'Chart.yaml appVersion:  %s\n' "$APP_VERSION"
 printf 'backend/pyproject.toml: %s\n' "$PY_VERSION"
 printf 'frontend/package.json:  %s\n' "$JS_VERSION"
 
-# mismatch <name> <actual> <expected>: prints a GitHub Actions annotation and
-# returns 1 when they differ, 0 when equal.
+# 比较一个版本来源；不一致时输出 GitHub Actions 标注并返回 1，便于 CI 聚合全部差异。
 mismatch() {
   if [ "$2" != "$3" ]; then
     echo "::error::$1 is '$2' but expected '$3'." >&2

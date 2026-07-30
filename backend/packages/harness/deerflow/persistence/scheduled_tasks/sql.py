@@ -1,3 +1,4 @@
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
@@ -13,11 +14,14 @@ TERMINAL_TASK_STATUSES: frozenset[str] = frozenset({"completed", "failed", "canc
 
 
 class ScheduledTaskRepository:
+    """定义负责持久化读写及事务边界管理的仓储组件。"""
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self._sf = session_factory
 
     @staticmethod
     def _row_to_dict(row: ScheduledTaskRow) -> dict[str, Any]:
+        """将持久化记录转换为对外使用的字典表示。"""
         data = row.to_dict()
         for key in (
             "created_at",
@@ -45,6 +49,7 @@ class ScheduledTaskRepository:
         timezone: str,
         next_run_at: datetime | None,
     ) -> dict[str, Any]:
+        """创建记录并在成功后提交相应的持久化事务。"""
         now = datetime.now(UTC)
         row = ScheduledTaskRow(
             id=task_id,
@@ -68,6 +73,7 @@ class ScheduledTaskRepository:
             return self._row_to_dict(row)
 
     async def get(self, task_id: str, *, user_id: str) -> dict[str, Any] | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         async with self._sf() as session:
             row = await session.get(ScheduledTaskRow, task_id)
             if row is None or row.user_id != user_id:
@@ -75,6 +81,7 @@ class ScheduledTaskRepository:
             return self._row_to_dict(row)
 
     async def list_by_user(self, user_id: str) -> list[dict[str, Any]]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         stmt = select(ScheduledTaskRow).where(ScheduledTaskRow.user_id == user_id).order_by(ScheduledTaskRow.created_at.desc(), ScheduledTaskRow.id.desc())
         async with self._sf() as session:
             result = await session.execute(stmt)
@@ -87,6 +94,7 @@ class ScheduledTaskRepository:
         user_id: str,
         updates: dict[str, Any],
     ) -> dict[str, Any] | None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         async with self._sf() as session:
             row = await session.get(ScheduledTaskRow, task_id)
             if row is None or row.user_id != user_id:
@@ -100,6 +108,7 @@ class ScheduledTaskRepository:
             return self._row_to_dict(row)
 
     async def delete(self, task_id: str, *, user_id: str) -> bool:
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         async with self._sf() as session:
             row = await session.get(ScheduledTaskRow, task_id)
             if row is None or row.user_id != user_id:
@@ -116,6 +125,7 @@ class ScheduledTaskRepository:
         lease_seconds: int,
         limit: int,
     ) -> list[dict[str, Any]]:
+        """执行当前持久化组件提供的操作。"""
         lease_expires_at = now + timedelta(seconds=lease_seconds)
         stmt = (
             select(ScheduledTaskRow)
@@ -168,6 +178,7 @@ class ScheduledTaskRepository:
         increment_run_count: bool,
         protect_terminal: bool = False,
     ) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         async with self._sf() as session:
             row = await session.get(ScheduledTaskRow, task_id)
             if row is None:
@@ -193,6 +204,7 @@ class ScheduledTaskRepository:
             await session.commit()
 
     async def list_by_user_and_thread(self, user_id: str, thread_id: str) -> list[dict[str, Any]]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         stmt = (
             select(ScheduledTaskRow)
             .where(
@@ -206,15 +218,7 @@ class ScheduledTaskRepository:
             return [self._row_to_dict(row) for row in result.scalars()]
 
     async def cancel_stuck_once_tasks(self, *, error: str) -> int:
-        """Reconcile ``once`` tasks orphaned in ``running`` by a process crash.
-
-        A launched ``once`` task stays ``running`` until the in-process
-        completion hook moves it to a terminal status; its lease was cleared at
-        launch, so the claim query's expired-lease reclaim branch never sees
-        it. After a crash the hook is gone and the task would be stuck forever.
-        Tasks still holding a lease are left alone — they were claimed but not
-        launched, and expired-lease reclaim recovers them safely.
-        """
+        """执行当前持久化组件提供的操作。"""
         stmt = select(ScheduledTaskRow).where(
             ScheduledTaskRow.schedule_type == "once",
             ScheduledTaskRow.status == "running",

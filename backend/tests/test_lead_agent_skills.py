@@ -1,3 +1,4 @@
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -7,11 +8,14 @@ from deerflow.skills.types import Skill
 
 
 class NamedTool:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def __init__(self, name: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.name = name
 
 
 def _make_skill(name: str, allowed_tools: list[str] | None = None, *, enabled: bool = True) -> Skill:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return Skill(
         name=name,
         description=f"Description for {name}",
@@ -26,7 +30,7 @@ def _make_skill(name: str, allowed_tools: list[str] | None = None, *, enabled: b
 
 
 def _mock_skill_storages(monkeypatch, skills):
-    """Patch storage factories and config so get_skills_prompt_section works without config.yaml."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     from types import SimpleNamespace
 
     mock_storage = SimpleNamespace(load_skills=lambda *, enabled_only: skills)
@@ -42,6 +46,7 @@ def _mock_skill_storages(monkeypatch, skills):
 
 
 def test_get_skills_prompt_section_returns_empty_when_no_skills_match(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("skill1"), _make_skill("skill2")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     _mock_skill_storages(monkeypatch, skills)
@@ -51,6 +56,7 @@ def test_get_skills_prompt_section_returns_empty_when_no_skills_match(monkeypatc
 
 
 def test_get_skills_prompt_section_returns_empty_when_available_skills_empty(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("skill1"), _make_skill("skill2")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     _mock_skill_storages(monkeypatch, skills)
@@ -60,6 +66,7 @@ def test_get_skills_prompt_section_returns_empty_when_available_skills_empty(mon
 
 
 def test_get_skills_prompt_section_returns_skills(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("skill1"), _make_skill("skill2")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     _mock_skill_storages(monkeypatch, skills)
@@ -71,6 +78,7 @@ def test_get_skills_prompt_section_returns_skills(monkeypatch):
 
 
 def test_get_skills_prompt_section_returns_all_when_available_skills_is_none(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("skill1"), _make_skill("skill2")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     _mock_skill_storages(monkeypatch, skills)
@@ -81,8 +89,7 @@ def test_get_skills_prompt_section_returns_all_when_available_skills_is_none(mon
 
 
 def test_get_skills_prompt_section_no_arg_cold_cache_loads_enabled_skills(monkeypatch):
-    """#4144: a fresh process calling the no-arg helper must not render an empty
-    enabled-skills list while the synchronously-loaded disabled section is populated."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import threading
 
     from deerflow.agents.lead_agent import prompt as prompt_mod
@@ -98,8 +105,8 @@ def test_get_skills_prompt_section_no_arg_cold_cache_loads_enabled_skills(monkey
             skill_evolution=SimpleNamespace(enabled=False),
         ),
     )
-    # Cold cache: no warmed enabled-skills list, and the background refresh must
-    # not fill it mid-test — the reporter's cold start loses exactly this race.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(prompt_mod, "_enabled_skills_cache", None)
     monkeypatch.setattr(prompt_mod, "_ensure_enabled_skills_cache", lambda: threading.Event())
 
@@ -111,6 +118,7 @@ def test_get_skills_prompt_section_no_arg_cold_cache_loads_enabled_skills(monkey
 
 
 def test_get_skills_prompt_section_includes_slash_activation_guidance(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("data-analysis")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     _mock_skill_storages(monkeypatch, skills)
@@ -123,6 +131,7 @@ def test_get_skills_prompt_section_includes_slash_activation_guidance(monkeypatc
 
 
 def test_get_skills_prompt_section_includes_self_evolution_rules(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("skill1")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_skill_storage", lambda **kwargs: __import__("types").SimpleNamespace(load_skills=lambda *, enabled_only: skills))
@@ -140,6 +149,7 @@ def test_get_skills_prompt_section_includes_self_evolution_rules(monkeypatch):
 
 
 def test_get_skills_prompt_section_includes_self_evolution_rules_without_skills(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: [])
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_skill_storage", lambda **kwargs: __import__("types").SimpleNamespace(load_skills=lambda *, enabled_only: []))
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_user_skill_storage", lambda user_id, **kwargs: __import__("types").SimpleNamespace(load_skills=lambda *, enabled_only: []))
@@ -156,6 +166,7 @@ def test_get_skills_prompt_section_includes_self_evolution_rules_without_skills(
 
 
 def test_get_skills_prompt_section_cache_respects_skill_evolution_toggle(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("skill1")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_skill_storage", lambda **kwargs: __import__("types").SimpleNamespace(load_skills=lambda *, enabled_only: skills))
@@ -175,12 +186,14 @@ def test_get_skills_prompt_section_cache_respects_skill_evolution_toggle(monkeyp
 
 
 def test_get_skills_prompt_section_uses_explicit_config_for_enabled_skills(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     explicit_config = SimpleNamespace(
         skills=SimpleNamespace(container_path="/mnt/alt-skills", use="deerflow.skills.storage.local_skill_storage:LocalSkillStorage", get_skills_path=lambda: Path("/tmp/alt-skills")),
         skill_evolution=SimpleNamespace(enabled=False),
     )
 
     def fail_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: [_make_skill("global-skill")])
@@ -201,7 +214,7 @@ def test_get_skills_prompt_section_uses_explicit_config_for_enabled_skills(monke
 
 
 def test_get_skills_prompt_section_deferred_path_uses_skill_index(monkeypatch):
-    """When skill_names is provided, renders <skill_index> instead of <available_skills>."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("data-analysis"), _make_skill("deep-research")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     monkeypatch.setattr(
@@ -211,12 +224,12 @@ def test_get_skills_prompt_section_deferred_path_uses_skill_index(monkeypatch):
             skill_evolution=SimpleNamespace(enabled=False),
         ),
     )
-    # Deferred path never touches storage, but patch defensively in case of fallback.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     _null_storage = SimpleNamespace(load_skills=lambda *, enabled_only: [])
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_skill_storage", lambda **kw: _null_storage)
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_user_skill_storage", lambda *a, **kw: _null_storage)
 
-    # Deferred path: skill_names provided
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     result = get_skills_prompt_section(
         available_skills=None,
         skill_names=frozenset({"data-analysis", "deep-research"}),
@@ -225,13 +238,13 @@ def test_get_skills_prompt_section_deferred_path_uses_skill_index(monkeypatch):
     assert "data-analysis" in result
     assert "deep-research" in result
     assert "describe_skill" in result
-    # Must NOT contain legacy full-metadata format
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "<available_skills>" not in result
-    assert "Description for data-analysis" not in result  # descriptions excluded from index
+    assert "Description for data-analysis" not in result  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 def test_get_skills_prompt_section_legacy_path_when_skill_names_none(monkeypatch):
-    """When skill_names is None, falls back to legacy <available_skills> rendering."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     skills = [_make_skill("data-analysis")]
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt._get_enabled_skills", lambda: skills)
     monkeypatch.setattr(
@@ -241,12 +254,12 @@ def test_get_skills_prompt_section_legacy_path_when_skill_names_none(monkeypatch
             skill_evolution=SimpleNamespace(enabled=False),
         ),
     )
-    # Legacy path loads ALL skills (enabled + disabled) from storage for the disabled-skills section.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     _storage = SimpleNamespace(load_skills=lambda *, enabled_only: skills)
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_skill_storage", lambda **kw: _storage)
     monkeypatch.setattr("deerflow.agents.lead_agent.prompt.get_or_new_user_skill_storage", lambda *a, **kw: _storage)
 
-    # Legacy path: skill_names not provided
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     result = get_skills_prompt_section(available_skills=None)
     assert "<available_skills>" in result
     assert "data-analysis" in result
@@ -256,11 +269,12 @@ def test_get_skills_prompt_section_legacy_path_when_skill_names_none(monkeypatch
 
 
 def test_make_lead_agent_empty_skills_passed_correctly(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from unittest.mock import MagicMock
 
     from deerflow.agents.lead_agent import agent as lead_agent_module
 
-    # Mock dependencies
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: MagicMock())
     monkeypatch.setattr(lead_agent_module, "_resolve_model_name", lambda x=None, **kwargs: "default-model")
     monkeypatch.setattr(lead_agent_module, "create_chat_model", lambda **kwargs: "model")
@@ -270,6 +284,7 @@ def test_make_lead_agent_empty_skills_passed_correctly(monkeypatch):
     monkeypatch.setattr(lead_agent_module, "create_agent", lambda **kwargs: kwargs)
 
     class MockModelConfig:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         supports_thinking = False
 
     mock_app_config = MagicMock()
@@ -279,28 +294,30 @@ def test_make_lead_agent_empty_skills_passed_correctly(monkeypatch):
     captured_skills = []
 
     def mock_apply_prompt_template(**kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured_skills.append(kwargs.get("available_skills"))
         return "mock_prompt"
 
     monkeypatch.setattr(lead_agent_module, "apply_prompt_template", mock_apply_prompt_template)
 
-    # Case 1: Empty skills list
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(lead_agent_module, "load_agent_config", lambda x: AgentConfig(name="test", skills=[]))
     lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
     assert captured_skills[-1] == set()
 
-    # Case 2: None skills list
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(lead_agent_module, "load_agent_config", lambda x: AgentConfig(name="test", skills=None))
     lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
     assert captured_skills[-1] is None
 
-    # Case 3: Some skills list
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(lead_agent_module, "load_agent_config", lambda x: AgentConfig(name="test", skills=["skill1"]))
     lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
     assert captured_skills[-1] == {"skill1"}
 
 
 def test_make_lead_agent_filters_tools_from_available_skills(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from unittest.mock import MagicMock
 
     from deerflow.agents.lead_agent import agent as lead_agent_module
@@ -318,18 +335,19 @@ def test_make_lead_agent_filters_tools_from_available_skills(monkeypatch):
     mock_app_config.get_model_config.return_value = SimpleNamespace(supports_thinking=False, supports_vision=False)
     mock_app_config.tool_search.enabled = True
     mock_app_config.skills.container_path = "/mnt/skills"
-    mock_app_config.skills.deferred_discovery = True  # describe_skill will be added
+    mock_app_config.skills.deferred_discovery = True  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: mock_app_config)
 
     agent_kwargs = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
 
-    # With skills.deferred_discovery=True, describe_skill is added to tools
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     tool_names = [tool.name for tool in agent_kwargs["tools"]]
     assert "read_file" in tool_names
     assert "describe_skill" in tool_names
 
 
 def test_skill_allowed_tools_default_does_not_preserve_read_file_for_subagents():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.skills.tool_policy import filter_tools_by_skill_allowed_tools
 
     tools = [NamedTool("read_file"), NamedTool("dataagent_query"), NamedTool("bash")]
@@ -341,6 +359,7 @@ def test_skill_allowed_tools_default_does_not_preserve_read_file_for_subagents()
 
 
 def test_make_lead_agent_all_legacy_skills_preserve_all_tools(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from unittest.mock import MagicMock
 
     from deerflow.agents.lead_agent import agent as lead_agent_module
@@ -360,12 +379,13 @@ def test_make_lead_agent_all_legacy_skills_preserve_all_tools(monkeypatch):
 
     agent_kwargs = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
 
-    # describe_skill is appended after skill-allowed-tools filtering (it bypasses policy).
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     tool_names = [tool.name for tool in agent_kwargs["tools"]]
     assert tool_names == ["bash", "read_file", "update_agent", "describe_skill"]
 
 
 def test_make_lead_agent_enforces_allowed_tools_when_skill_cache_is_cold(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from unittest.mock import MagicMock
 
     from deerflow.agents.lead_agent import agent as lead_agent_module
@@ -391,12 +411,13 @@ def test_make_lead_agent_enforces_allowed_tools_when_skill_cache_is_cold(monkeyp
 
     agent_kwargs = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
 
-    # describe_skill is appended after skill-allowed-tools filtering (it bypasses policy).
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     tool_names = [tool.name for tool in agent_kwargs["tools"]]
     assert tool_names == ["read_file", "describe_skill"]
 
 
 def test_make_lead_agent_fails_closed_when_skill_policy_load_fails(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from unittest.mock import MagicMock
 
     import pytest
@@ -414,6 +435,7 @@ def test_make_lead_agent_fails_closed_when_skill_policy_load_fails(monkeypatch):
     mock_app_config.get_model_config.return_value = SimpleNamespace(supports_thinking=False, supports_vision=False)
 
     def fail_storage(*args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise RuntimeError("skill storage unavailable")
 
     monkeypatch.setattr(prompt_module, "get_or_new_skill_storage", fail_storage)
@@ -427,21 +449,7 @@ def test_make_lead_agent_fails_closed_when_skill_policy_load_fails(monkeypatch):
 
 
 def test_make_lead_agent_drops_update_agent_on_github_channel(monkeypatch):
-    """Webhook-channel runs MUST NOT see ``update_agent``.
-
-    The lead-agent prompt actively encourages the model to call
-    ``update_agent`` when the user asks it to change its own skills /
-    tool_groups / SOUL.md. On the GitHub channel, the "user" is whichever
-    external commenter posted the triggering ``@<bot>`` mention — anyone
-    with comment access on the configured repo. Exposing the tool there
-    would let that commenter durably mutate the agent's tool whitelist
-    or persona for every subsequent run. The factory therefore omits the
-    tool from the toolset whenever the run's channel is webhook-shaped.
-
-    This test guards against a future contributor reintroducing the tool
-    unconditionally — that regression would silently re-open the
-    privilege-escalation path.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from unittest.mock import MagicMock
 
     from deerflow.agents.lead_agent import agent as lead_agent_module
@@ -459,25 +467,18 @@ def test_make_lead_agent_drops_update_agent_on_github_channel(monkeypatch):
     mock_app_config.get_model_config.return_value = SimpleNamespace(supports_thinking=False, supports_vision=False)
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: mock_app_config)
 
-    # ``channel_name`` is plumbed onto run_context by ChannelManager and
-    # surfaced via _get_runtime_config alongside the other configurable keys.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     agent_kwargs = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}, "context": {"channel_name": "github"}})
     tool_names = [tool.name for tool in agent_kwargs["tools"]]
     assert "update_agent" not in tool_names
-    # Sanity: regular tools still flow through.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "bash" in tool_names
     assert "read_file" in tool_names
 
 
 def test_make_lead_agent_keeps_update_agent_on_non_webhook_channels(monkeypatch):
-    """Direct invocation and non-webhook channels still get ``update_agent``.
-
-    Sanity check for the inverse of
-    ``test_make_lead_agent_drops_update_agent_on_github_channel``: a chat-UI
-    or default-channel run (or any run with no channel context at all)
-    must keep the tool, otherwise the operator-trusted "change your own
-    skills" workflow would break.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from unittest.mock import MagicMock
 
     from deerflow.agents.lead_agent import agent as lead_agent_module
@@ -495,10 +496,10 @@ def test_make_lead_agent_keeps_update_agent_on_non_webhook_channels(monkeypatch)
     mock_app_config.get_model_config.return_value = SimpleNamespace(supports_thinking=False, supports_vision=False)
     monkeypatch.setattr(lead_agent_module, "get_app_config", lambda: mock_app_config)
 
-    # No channel set — equivalent to a chat-UI or direct invocation.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     kwargs_default = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}})
     assert "update_agent" in [t.name for t in kwargs_default["tools"]]
 
-    # Explicit non-webhook channel — telegram is interactive/trusted-by-operator.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     kwargs_tg = lead_agent_module.make_lead_agent({"configurable": {"agent_name": "test"}, "context": {"channel_name": "telegram"}})
     assert "update_agent" in [t.name for t in kwargs_tg["tools"]]

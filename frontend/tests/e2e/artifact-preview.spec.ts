@@ -13,6 +13,11 @@ const MARKDOWN_ANCHOR_THREAD_ID = "00000000-0000-0000-0000-000000003123";
 const JSON_THREAD_ID = "00000000-0000-0000-0000-000000003122";
 const PRESENTED_THREAD_ID = "00000000-0000-0000-0000-000000003123";
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 writeFileMessages 的约定。
+
+ */
+
 function writeFileMessages({
   path = ARTIFACT_PATH,
   content = "<!doctype html><html><body><h1>Report draft</h1><p>测试内容</p></body></html>",
@@ -59,6 +64,11 @@ function writeFileMessages({
   return messages;
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 presentFilesMessages 的约定。
+
+ */
+
 function presentFilesMessages() {
   return [
     {
@@ -84,6 +94,9 @@ function presentFilesMessages() {
 }
 
 test.describe("Artifact preview stability", () => {
+  /**
+   * 覆盖“renders preview iframe for an in-progress write artifact”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("renders preview iframe for an in-progress write artifact", async ({
     page,
   }) => {
@@ -111,6 +124,11 @@ test.describe("Artifact preview stability", () => {
     ).toBeVisible();
   });
 
+  /**
+   * 覆盖“renders preview iframe after the write artifact succeeds”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("renders preview iframe after the write artifact succeeds", async ({
     page,
   }) => {
@@ -137,6 +155,11 @@ test.describe("Artifact preview stability", () => {
       artifactsPanel.locator('iframe[title="Artifact preview"]'),
     ).toBeVisible();
   });
+
+  /**
+   * 覆盖“renders markdown preview for an in-progress write artifact”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("renders markdown preview for an in-progress write artifact", async ({
     page,
@@ -166,6 +189,11 @@ test.describe("Artifact preview stability", () => {
     await expect(artifactsPanel.getByText("Markdown draft")).toBeVisible();
     await expect(artifactsPanel.getByText("测试内容 1")).toBeVisible();
   });
+
+  /**
+   * 覆盖“scrolls markdown artifact preview to heading anchors”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("scrolls markdown artifact preview to heading anchors", async ({
     page,
@@ -230,6 +258,11 @@ test.describe("Artifact preview stability", () => {
       .toBe(true);
   });
 
+  /**
+   * 覆盖“renders code view for an in-progress non-preview write artifact”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("renders code view for an in-progress non-preview write artifact", async ({
     page,
   }) => {
@@ -261,6 +294,11 @@ test.describe("Artifact preview stability", () => {
       artifactsPanel.getByText('"中文字段": "测试内容"'),
     ).toBeVisible();
   });
+
+  /**
+   * 覆盖“keeps an opened presented artifact in the header dropdown”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("keeps an opened presented artifact in the header dropdown", async ({
     page,
@@ -296,7 +334,7 @@ test.describe("Artifact preview stability", () => {
 
     await page.goto(`/workspace/chats/${PRESENTED_THREAD_ID}`);
 
-    // The file card in the message list shows the basename only.
+    // 消息列表中的文件卡片仅显示文件名。
     await expect(page.getByText("presented-report.md")).toBeVisible({
       timeout: 15_000,
     });

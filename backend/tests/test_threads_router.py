@@ -1,3 +1,4 @@
+'未说明'
 import asyncio
 import re
 from types import SimpleNamespace
@@ -21,43 +22,31 @@ _ISO_TIMESTAMP_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
 
 class _PermissiveThreadMetaStore(MemoryThreadMetaStore):
-    """Memory store that skips user-id filtering for router tests.
-
-    Owner isolation is exercised separately in
-    ``test_memory_thread_meta_isolation.py``. Router tests need to drive
-    the FastAPI surface end-to-end with a single fixed app user, but the
-    stub auth middleware in ``_router_auth_helpers`` stamps a fresh UUID
-    on every request, so the production filtering would reject every
-    pre-seeded record. Bypass that filter so the test can focus on the
-    timestamp wire format.
-    """
+    '未说明'
 
     async def _get_owned_record(self, thread_id, user_id, method_name):  # type: ignore[override]
+        '未说明'
         item = await self._store.aget(THREADS_NS, thread_id)
         return dict(item.value) if item is not None else None
 
     async def check_access(self, thread_id, user_id, *, require_existing=False):  # type: ignore[override]
+        """处理检查相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         item = await self._store.aget(THREADS_NS, thread_id)
         if item is None:
             return not require_existing
         return True
 
     async def create(self, thread_id, *, assistant_id=None, user_id=None, display_name=None, metadata=None):  # type: ignore[override]
+        """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return await super().create(thread_id, assistant_id=assistant_id, user_id=None, display_name=display_name, metadata=metadata)
 
     async def search(self, *, metadata=None, status=None, limit=100, offset=0, user_id=None):  # type: ignore[override]
+        """处理搜索相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return await super().search(metadata=metadata, status=status, limit=limit, offset=offset, user_id=None)
 
 
 def _build_thread_app() -> tuple[FastAPI, InMemoryStore, InMemorySaver]:
-    """Build a stub-authed FastAPI app wired with an in-memory ThreadMetaStore.
-
-    The thread_store on ``app.state`` is a permissive subclass of
-    ``MemoryThreadMetaStore`` so tests can drive ``/api/threads``
-    end-to-end and pre-seed legacy records via the underlying BaseStore.
-
-    Returns ``(app, store, checkpointer)`` for direct seeding/inspection.
-    """
+    '未说明'
     app = make_authed_test_app()
     store = InMemoryStore()
     checkpointer = InMemorySaver()
@@ -77,6 +66,7 @@ async def _write_checkpoint(
     step: int,
     metadata: dict | None = None,
 ) -> dict:
+    '未说明'
     checkpoint = empty_checkpoint()
     checkpoint["id"] = checkpoint_id
     checkpoint["channel_values"] = {"messages": messages}
@@ -98,6 +88,7 @@ async def _write_checkpoint(
 
 
 def test_delete_thread_data_removes_thread_directory(tmp_path):
+    '未说明'
     paths = Paths(tmp_path)
     thread_dir = paths.thread_dir("thread-cleanup")
     workspace = paths.sandbox_work_dir("thread-cleanup")
@@ -119,6 +110,7 @@ def test_delete_thread_data_removes_thread_directory(tmp_path):
 
 
 def test_delete_thread_data_is_idempotent_for_missing_directory(tmp_path):
+    '未说明'
     paths = Paths(tmp_path)
 
     response = threads._delete_thread_data("missing-thread", paths=paths)
@@ -128,6 +120,7 @@ def test_delete_thread_data_is_idempotent_for_missing_directory(tmp_path):
 
 
 def test_delete_thread_data_rejects_invalid_thread_id(tmp_path):
+    '未说明'
     paths = Paths(tmp_path)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -138,6 +131,7 @@ def test_delete_thread_data_rejects_invalid_thread_id(tmp_path):
 
 
 def test_delete_thread_route_cleans_thread_directory(tmp_path):
+    '未说明'
     from deerflow.runtime.user_context import get_effective_user_id
 
     paths = Paths(tmp_path)
@@ -159,6 +153,7 @@ def test_delete_thread_route_cleans_thread_directory(tmp_path):
 
 
 def test_delete_thread_route_rejects_invalid_thread_id(tmp_path):
+    '未说明'
     paths = Paths(tmp_path)
 
     app = make_authed_test_app()
@@ -172,6 +167,7 @@ def test_delete_thread_route_rejects_invalid_thread_id(tmp_path):
 
 
 def test_delete_thread_route_returns_422_for_route_safe_invalid_id(tmp_path):
+    '未说明'
     paths = Paths(tmp_path)
 
     app = make_authed_test_app()
@@ -186,6 +182,7 @@ def test_delete_thread_route_returns_422_for_route_safe_invalid_id(tmp_path):
 
 
 def test_delete_thread_data_returns_generic_500_error(tmp_path):
+    '未说明'
     paths = Paths(tmp_path)
 
     with (
@@ -205,23 +202,24 @@ def test_delete_thread_data_returns_generic_500_error(tmp_path):
 
 
 def test_strip_reserved_metadata_removes_user_id():
-    """Client-supplied user_id is dropped to prevent reflection attacks."""
+    '未说明'
     out = threads._strip_reserved_metadata({"user_id": "victim-id", "title": "ok"})
     assert out == {"title": "ok"}
 
 
 def test_strip_reserved_metadata_passes_through_safe_keys():
-    """Non-reserved keys are preserved verbatim."""
+    '未说明'
     md = {"title": "ok", "tags": ["a", "b"], "custom": {"x": 1}}
     assert threads._strip_reserved_metadata(md) == md
 
 
 def test_strip_reserved_metadata_empty_input():
-    """Empty / None metadata returns same object — no crash."""
+    '未说明'
     assert threads._strip_reserved_metadata({}) == {}
 
 
 def test_strip_reserved_metadata_strips_all_reserved_keys():
+    '未说明'
     out = threads._strip_reserved_metadata({"user_id": "x", "keep": "me"})
     assert out == {"keep": "me"}
 
@@ -239,6 +237,7 @@ def test_strip_reserved_metadata_strips_all_reserved_keys():
 
 
 def test_create_thread_returns_iso_timestamps() -> None:
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -252,28 +251,21 @@ def test_create_thread_returns_iso_timestamps() -> None:
 
 
 def test_create_thread_returns_existing_when_insert_loses_race() -> None:
-    """A concurrent create that loses the INSERT race stays idempotent.
-
-    The idempotency ``get`` check and the ``create`` INSERT are not atomic:
-    a competing request for the same ``thread_id`` can commit in between, and
-    the SQL-backed store then rejects ours on the duplicate primary key. The
-    endpoint documents idempotency ("returns the existing record when
-    ``thread_id`` already exists"), so it must surface the now-present row
-    rather than turning the integrity error into an HTTP 500.
-    """
+    '未说明'
     from sqlalchemy.exc import IntegrityError
 
     app, store, _checkpointer = _build_thread_app()
 
     class _RacingThreadMetaStore(_PermissiveThreadMetaStore):
-        """First create loses the race: the row is committed by a competing
-        request, then our INSERT fails with an integrity violation."""
+        '未说明'
 
         def __init__(self, backing):
+            '未说明'
             super().__init__(backing)
             self._raised = False
 
         async def create(self, thread_id, *, assistant_id=None, user_id=None, display_name=None, metadata=None):  # type: ignore[override]
+            """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             if not self._raised:
                 self._raised = True
                 await super().create(
@@ -311,14 +303,7 @@ def test_create_thread_returns_existing_when_insert_loses_race() -> None:
 
 
 def test_insert_race_recovery_claims_unscoped_row_for_trusted_owner() -> None:
-    """The insert-race recovery mirrors the fast path's owner reconciliation.
-
-    When a competing request commits a legacy unscoped (``user_id=None``) row
-    between our idempotency read and our insert, and our insert then loses the
-    duplicate-key race, a trusted internal owner must still claim the row rather
-    than return it unowned — otherwise ownership of the same thread would depend
-    on whether the fast path or the recovery path resolved it.
-    """
+    '未说明'
     import asyncio
 
     from sqlalchemy.exc import IntegrityError
@@ -329,12 +314,12 @@ def test_insert_race_recovery_claims_unscoped_row_for_trusted_owner() -> None:
     checkpointer = InMemorySaver()
 
     class _RacingOwnerStore(MemoryThreadMetaStore):
-        """Our insert loses to a competing create that already wrote an
-        unscoped row, exactly the interleaving the recovery path exists for."""
+        '未说明'
 
         async def create(self, thread_id, *, assistant_id=None, user_id=None, display_name=None, metadata=None):  # type: ignore[override]
             # The competing request commits its (owner-less) row here, then our
             # insert loses the primary-key race.
+            """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             await super().create(thread_id, user_id=None, metadata=metadata)
             raise IntegrityError(
                 "INSERT INTO threads_meta",
@@ -350,6 +335,7 @@ def test_insert_race_recovery_claims_unscoped_row_for_trusted_owner() -> None:
     )
 
     async def _scenario():
+        '未说明'
         response = await threads.create_thread(
             threads.ThreadCreateRequest(thread_id="channel-thread", metadata={"k": "v"}),
             request,
@@ -368,18 +354,15 @@ def test_insert_race_recovery_claims_unscoped_row_for_trusted_owner() -> None:
 
 
 def test_create_thread_does_not_swallow_non_integrity_errors() -> None:
-    """A non-race insert failure must surface as 500, even when a row now exists.
-
-    The recovery path only rescues the duplicate-key ``IntegrityError`` race; an
-    arbitrary failure that happens to coincide with an existing row must not be
-    silently returned as a 200 (previously the broad ``except`` did exactly that).
-    """
+    '未说明'
     app, store, _checkpointer = _build_thread_app()
 
     class _BrokenAfterWriteStore(_PermissiveThreadMetaStore):
+        '未说明'
         async def create(self, thread_id, *, assistant_id=None, user_id=None, display_name=None, metadata=None):  # type: ignore[override]
             # A row exists after this call, but the insert failed for a reason
             # unrelated to the idempotency race.
+            """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             await super().create(thread_id, metadata=metadata)
             raise RuntimeError("unexpected store failure")
 
@@ -392,6 +375,7 @@ def test_create_thread_does_not_swallow_non_integrity_errors() -> None:
 
 
 def test_put_goal_creates_missing_thread_checkpoint_and_returns_goal() -> None:
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -412,6 +396,7 @@ def test_put_goal_creates_missing_thread_checkpoint_and_returns_goal() -> None:
 
 
 def test_goal_status_and_clear_round_trip() -> None:
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -436,6 +421,7 @@ def test_goal_status_and_clear_round_trip() -> None:
 
 
 def test_internal_owner_header_assigns_thread_to_owner() -> None:
+    '未说明'
     import asyncio
 
     from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME, INTERNAL_SYSTEM_ROLE
@@ -450,6 +436,7 @@ def test_internal_owner_header_assigns_thread_to_owner() -> None:
     )
 
     async def _scenario():
+        '未说明'
         response = await threads.create_thread(
             threads.ThreadCreateRequest(thread_id="channel-thread", metadata={}),
             request,
@@ -467,6 +454,7 @@ def test_internal_owner_header_assigns_thread_to_owner() -> None:
 
 
 def test_goal_thread_creation_uses_internal_owner_header() -> None:
+    '未说明'
     import asyncio
 
     from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME, INTERNAL_SYSTEM_ROLE
@@ -481,6 +469,7 @@ def test_goal_thread_creation_uses_internal_owner_header() -> None:
     )
 
     async def _scenario():
+        '未说明'
         await threads._ensure_thread_for_goal("channel-goal-thread", request)
         owner_row = await thread_store.get("channel-goal-thread", user_id="owner-1")
         internal_row = await thread_store.get("channel-goal-thread", user_id="default")
@@ -496,16 +485,14 @@ def test_goal_thread_creation_uses_internal_owner_header() -> None:
 
 
 def test_get_thread_returns_iso_for_legacy_unix_record() -> None:
-    """A thread record written by older versions stores ``time.time()``
-    floats. ``get_thread`` must transparently surface them as ISO so the
-    frontend's ``new Date(...)`` parser does not break.
-    """
+    '未说明'
     app, store, checkpointer = _build_thread_app()
 
     legacy_thread_id = "legacy-thread"
     legacy_ts = "1777252410.411327"
 
     async def _seed() -> None:
+        '未说明'
         await store.aput(
             THREADS_NS,
             legacy_thread_id,
@@ -540,6 +527,7 @@ def test_get_thread_returns_iso_for_legacy_unix_record() -> None:
 
 
 def test_patch_thread_returns_iso_and_advances_updated_at() -> None:
+    '未说明'
     app, store, _checkpointer = _build_thread_app()
     thread_id = "patch-target"
 
@@ -547,6 +535,7 @@ def test_patch_thread_returns_iso_and_advances_updated_at() -> None:
     legacy_updated = "1777000000.000000"
 
     async def _seed() -> None:
+        '未说明'
         await store.aput(
             THREADS_NS,
             thread_id,
@@ -578,15 +567,12 @@ def test_patch_thread_returns_iso_and_advances_updated_at() -> None:
 
 
 def test_search_threads_normalizes_legacy_unix_seconds_to_iso() -> None:
-    """``MemoryThreadMetaStore`` may hold legacy ``time.time()`` floats
-    written by older Gateway versions. ``/search`` must surface them as
-    ISO via ``coerce_iso`` so the frontend's ``new Date(...)`` parser
-    does not break.
-    """
+    '未说明'
     app, store, _checkpointer = _build_thread_app()
 
     async def _seed() -> None:
         # Legacy unix-second float (the literal value from issue #2594).
+        '未说明'
         await store.aput(
             THREADS_NS,
             "legacy",
@@ -627,16 +613,14 @@ def test_search_threads_normalizes_legacy_unix_seconds_to_iso() -> None:
 
 
 def test_memory_thread_meta_store_writes_iso_on_create() -> None:
-    """``MemoryThreadMetaStore.create`` must emit ISO so newly created
-    threads serialize correctly without depending on the router's
-    ``coerce_iso`` heal path.
-    """
+    '未说明'
     import asyncio
 
     store = InMemoryStore()
     repo = MemoryThreadMetaStore(store)
 
     async def _scenario() -> dict:
+        '未说明'
         await repo.create("fresh", user_id=None, metadata={"a": 1})
         record = (await store.aget(THREADS_NS, "fresh")).value
         return record
@@ -647,16 +631,12 @@ def test_memory_thread_meta_store_writes_iso_on_create() -> None:
 
 
 def test_get_thread_state_returns_iso_for_legacy_checkpoint_metadata() -> None:
-    """Checkpoints written by older Gateway versions stored
-    ``created_at`` as a unix-second float in their metadata. The
-    ``/state`` endpoint must surface that value as ISO so the frontend's
-    ``new Date(...)`` parser does not break — same root cause as the
-    thread-record bug fixed in #2594, but on the checkpoint side.
-    """
+    '未说明'
     app, _store, checkpointer = _build_thread_app()
     thread_id = "legacy-state"
 
     async def _seed() -> None:
+        '未说明'
         from langgraph.checkpoint.base import empty_checkpoint
 
         await checkpointer.aput(
@@ -680,14 +660,12 @@ def test_get_thread_state_returns_iso_for_legacy_checkpoint_metadata() -> None:
 
 
 def test_get_thread_history_returns_iso_for_legacy_checkpoint_metadata() -> None:
-    """``/history`` walks ``checkpointer.alist`` and emits one entry per
-    checkpoint. Each entry's ``created_at`` must come out as ISO even if
-    older checkpoints stored a unix-second float in their metadata.
-    """
+    '未说明'
     app, _store, checkpointer = _build_thread_app()
     thread_id = "legacy-history"
 
     async def _seed() -> None:
+        '未说明'
         from langgraph.checkpoint.base import empty_checkpoint
 
         await checkpointer.aput(
@@ -712,6 +690,7 @@ def test_get_thread_history_returns_iso_for_legacy_checkpoint_metadata() -> None
 
 
 def test_get_thread_history_associates_tool_messages_from_checkpoint_turn() -> None:
+    '未说明'
     app, _store, checkpointer = _build_thread_app()
     thread_id = "history-tool-run"
     messages = [
@@ -747,6 +726,7 @@ def test_get_thread_history_associates_tool_messages_from_checkpoint_turn() -> N
 
 
 def test_get_thread_history_backfills_legacy_durations_with_exact_event_run_id() -> None:
+    '未说明'
     app, _store, checkpointer = _build_thread_app()
     thread_id = "legacy-history-run-id"
     messages = [
@@ -757,6 +737,7 @@ def test_get_thread_history_backfills_legacy_durations_with_exact_event_run_id()
     asyncio.run(_write_checkpoint(checkpointer, thread_id, "00000000-0000-6000-8000-000000000001", messages, step=1))
 
     async def list_by_thread(_: str) -> list[SimpleNamespace]:
+        """处理会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return [
             SimpleNamespace(
                 run_id="boundary-run",
@@ -771,6 +752,7 @@ def test_get_thread_history_backfills_legacy_durations_with_exact_event_run_id()
         ]
 
     async def list_messages(_: str, *, limit: int) -> list[dict]:
+        '未说明'
         assert limit == 1000
         return [{"content": {"type": "ai", "id": "ai-1"}, "run_id": "exact-run"}]
 
@@ -794,6 +776,7 @@ def test_get_thread_history_backfills_legacy_durations_with_exact_event_run_id()
 
 
 def test_ai_message_lacks_duration_only_for_unannotated_ai_messages() -> None:
+    '未说明'
     assert threads._ai_message_lacks_duration({"type": "ai"})
     assert threads._ai_message_lacks_duration({"type": "ai", "additional_kwargs": []})
     assert not threads._ai_message_lacks_duration({"type": "tool"})
@@ -804,6 +787,7 @@ def test_ai_message_lacks_duration_only_for_unannotated_ai_messages() -> None:
 
 
 def test_branch_thread_from_older_assistant_turn_creates_truncated_thread() -> None:
+    '未说明'
     app, store, checkpointer = _build_thread_app()
     source_thread_id = "source-thread"
 
@@ -815,6 +799,7 @@ def test_branch_thread_from_older_assistant_turn_creates_truncated_thread() -> N
     ai_3 = AIMessage(id="ai-3", content="Third answer")
 
     async def _seed() -> None:
+        '未说明'
         await _write_checkpoint(checkpointer, source_thread_id, "0001", [human_1, ai_1], step=1)
         await _write_checkpoint(checkpointer, source_thread_id, "0002", [human_1, ai_1, human_2, ai_2], step=2)
         await _write_checkpoint(checkpointer, source_thread_id, "0003", [human_1, ai_1, human_2, ai_2, human_3, ai_3], step=3)
@@ -866,12 +851,14 @@ def test_branch_thread_from_older_assistant_turn_creates_truncated_thread() -> N
 
 
 def test_branch_display_name_strips_legacy_branch_prefix_only_for_branch_sources() -> None:
+    '未说明'
     assert threads._default_branch_display_name("Original chat") == "Original chat"
     assert threads._default_branch_display_name("Branch: Original chat") == "Branch: Original chat"
     assert threads._default_branch_display_name("Branch: Branch: Original chat", source_is_branch=True) == "Original chat"
 
 
 def test_branch_thread_rejects_sidecar_threads() -> None:
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -891,12 +878,14 @@ def test_branch_thread_rejects_sidecar_threads() -> None:
 
 
 def test_branch_thread_rejects_non_assistant_targets() -> None:
+    '未说明'
     app, _store, checkpointer = _build_thread_app()
     source_thread_id = "source-human-target"
     human = HumanMessage(id="human-1", content="Question")
     ai = AIMessage(id="ai-1", content="Answer")
 
     async def _seed() -> None:
+        '未说明'
         await _write_checkpoint(checkpointer, source_thread_id, "0001", [human, ai], step=1)
 
     asyncio.run(_seed())
@@ -915,6 +904,7 @@ def test_branch_thread_rejects_non_assistant_targets() -> None:
 
 
 def test_branch_thread_best_effort_copies_current_workspace(tmp_path) -> None:
+    '未说明'
     paths = Paths(tmp_path)
     app, _store, checkpointer = _build_thread_app()
     source_thread_id = "source-with-files"
@@ -932,6 +922,7 @@ def test_branch_thread_best_effort_copies_current_workspace(tmp_path) -> None:
     ai = AIMessage(id="ai-file", content="Done")
 
     async def _seed() -> None:
+        '未说明'
         await _write_checkpoint(checkpointer, source_thread_id, "0001", [human, ai], step=1)
 
     asyncio.run(_seed())
@@ -961,12 +952,7 @@ def test_branch_thread_best_effort_copies_current_workspace(tmp_path) -> None:
 
 
 def test_branch_thread_from_historical_turn_skips_workspace_clone(tmp_path) -> None:
-    """Branching from a non-latest turn must not clone the current workspace.
-
-    Workspace files are not checkpointed, so cloning them onto a branch rooted at
-    an older turn would leak files created after that turn (regression for the
-    historical-turn workspace-leak review on PR #3950).
-    """
+    '未说明'
     paths = Paths(tmp_path)
     app, _store, checkpointer = _build_thread_app()
     source_thread_id = "source-historical"
@@ -983,6 +969,7 @@ def test_branch_thread_from_historical_turn_skips_workspace_clone(tmp_path) -> N
     ai_2 = AIMessage(id="ai-2", content="Second answer")
 
     async def _seed() -> None:
+        '未说明'
         await _write_checkpoint(checkpointer, source_thread_id, "0001", [human_1, ai_1], step=1)
         await _write_checkpoint(checkpointer, source_thread_id, "0002", [human_1, ai_1, human_2, ai_2], step=2)
 
@@ -1014,9 +1001,7 @@ def test_branch_thread_from_historical_turn_skips_workspace_clone(tmp_path) -> N
 
 
 def test_search_threads_rejects_invalid_key_at_api_boundary() -> None:
-    """Keys that don't match [A-Za-z0-9_-]+ are rejected by the Pydantic
-    validator on ThreadSearchRequest.metadata — 422 from both backends.
-    """
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -1026,7 +1011,7 @@ def test_search_threads_rejects_invalid_key_at_api_boundary() -> None:
 
 
 def test_search_threads_rejects_unsupported_value_type_at_api_boundary() -> None:
-    """Value types outside (None, bool, int, float, str) are rejected."""
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -1036,13 +1021,12 @@ def test_search_threads_rejects_unsupported_value_type_at_api_boundary() -> None
 
 
 def test_search_threads_returns_400_for_backend_invalid_metadata_filter() -> None:
-    """If the backend still raises InvalidMetadataFilterError (defense in
-    depth), the handler surfaces it as HTTP 400.
-    """
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
     thread_store = app.state.thread_store
 
     async def _raise(**kwargs):
+        '未说明'
         raise InvalidMetadataFilterError("rejected")
 
     with TestClient(app) as client:
@@ -1054,7 +1038,7 @@ def test_search_threads_returns_400_for_backend_invalid_metadata_filter() -> Non
 
 
 def test_search_threads_succeeds_with_valid_metadata() -> None:
-    """Sanity check: valid metadata passes through without error."""
+    '未说明'
     app, _store, _checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -1067,13 +1051,7 @@ def test_search_threads_succeeds_with_valid_metadata() -> None:
 
 
 def test_update_thread_state_inserts_new_checkpoint_each_call() -> None:
-    """Each ``POST /state`` must INSERT a distinct, time-ordered checkpoint.
-
-    Regression for the in-place REPLACE bug: before the fix the new
-    checkpoint reused the previous checkpoint["id"], so InMemorySaver/SQLite
-    overwrote the existing row and history never grew. The fix assigns a
-    fresh uuid6 to checkpoint["id"] before aput.
-    """
+    '未说明'
     app, _store, checkpointer = _build_thread_app()
 
     with TestClient(app) as client:
@@ -1089,6 +1067,7 @@ def test_update_thread_state_inserts_new_checkpoint_each_call() -> None:
     import asyncio
 
     async def _collect():
+        '未说明'
         return [cp async for cp in checkpointer.alist({"configurable": {"thread_id": thread_id}})]
 
     history = asyncio.run(_collect())

@@ -9,8 +9,10 @@ import { cn } from "@/lib/utils";
 import { BookIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
+/** SourcesProps 的公开类型定义。 */
 export type SourcesProps = ComponentProps<"div">;
 
+/** Sources 组件：提供对应的界面结构与交互语义。 */
 export const Sources = ({ className, ...props }: SourcesProps) => (
   <Collapsible
     className={cn("not-prose text-primary mb-4 text-xs", className)}
@@ -18,10 +20,12 @@ export const Sources = ({ className, ...props }: SourcesProps) => (
   />
 );
 
+/** SourcesTriggerProps 的公开类型定义。 */
 export type SourcesTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {
   count: number;
 };
 
+/** SourcesTrigger 组件：提供对应的界面结构与交互语义。 */
 export const SourcesTrigger = ({
   className,
   count,
@@ -41,8 +45,10 @@ export const SourcesTrigger = ({
   </CollapsibleTrigger>
 );
 
+/** SourcesContentProps 的公开类型定义。 */
 export type SourcesContentProps = ComponentProps<typeof CollapsibleContent>;
 
+/** SourcesContent 组件：提供对应的界面结构与交互语义。 */
 export const SourcesContent = ({
   className,
   ...props
@@ -57,8 +63,10 @@ export const SourcesContent = ({
   />
 );
 
+/** SourceProps 的公开类型定义。 */
 export type SourceProps = ComponentProps<"a">;
 
+/** Source 组件：提供对应的界面结构与交互语义。 */
 export const Source = ({ href, title, children, ...props }: SourceProps) => (
   <a
     className="flex items-center gap-2"

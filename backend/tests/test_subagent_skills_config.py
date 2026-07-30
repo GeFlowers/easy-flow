@@ -1,13 +1,4 @@
-"""Tests for subagent per-agent skill configuration and custom subagent types.
-
-Covers:
-- SubagentConfig.skills field
-- SubagentOverrideConfig.skills field
-- CustomSubagentConfig model validation
-- SubagentsAppConfig.custom_agents and get_skills_for()
-- Registry: custom agent lookup, skills override, merged available names
-- Skills filter passthrough in task_tool config assembly
-"""
+'未说明'
 
 from types import SimpleNamespace
 
@@ -28,7 +19,7 @@ from deerflow.subagents.config import SubagentConfig
 
 
 def _reset_subagents_config(**kwargs) -> None:
-    """Reset global subagents config to a known state."""
+    '未说明'
     load_subagents_config_from_dict(kwargs)
 
 
@@ -38,11 +29,14 @@ def _reset_subagents_config(**kwargs) -> None:
 
 
 class TestSubagentConfigSkills:
+    '未说明'
     def test_default_skills_is_none(self):
+        '未说明'
         config = SubagentConfig(name="test", description="test", system_prompt="test")
         assert config.skills is None
 
     def test_skills_whitelist(self):
+        '未说明'
         config = SubagentConfig(
             name="test",
             description="test",
@@ -52,6 +46,7 @@ class TestSubagentConfigSkills:
         assert config.skills == ["data-analysis", "visualization"]
 
     def test_skills_empty_list_means_no_skills(self):
+        '未说明'
         config = SubagentConfig(
             name="test",
             description="test",
@@ -67,19 +62,24 @@ class TestSubagentConfigSkills:
 
 
 class TestSubagentOverrideConfigSkills:
+    '未说明'
     def test_default_skills_is_none(self):
+        '未说明'
         override = SubagentOverrideConfig()
         assert override.skills is None
 
     def test_skills_whitelist(self):
+        '未说明'
         override = SubagentOverrideConfig(skills=["web-search", "data-analysis"])
         assert override.skills == ["web-search", "data-analysis"]
 
     def test_skills_empty_list(self):
+        '未说明'
         override = SubagentOverrideConfig(skills=[])
         assert override.skills == []
 
     def test_skills_coexists_with_other_fields(self):
+        '未说明'
         override = SubagentOverrideConfig(
             timeout_seconds=300,
             model="gpt-5",
@@ -96,7 +96,9 @@ class TestSubagentOverrideConfigSkills:
 
 
 class TestCustomSubagentConfig:
+    '未说明'
     def test_minimal_valid(self):
+        '未说明'
         config = CustomSubagentConfig(
             description="A test agent",
             system_prompt="You are a test agent.",
@@ -111,6 +113,7 @@ class TestCustomSubagentConfig:
         assert config.timeout_seconds == 900
 
     def test_full_configuration(self):
+        '未说明'
         config = CustomSubagentConfig(
             description="Data analysis specialist",
             system_prompt="You are a data analysis subagent.",
@@ -128,6 +131,7 @@ class TestCustomSubagentConfig:
         assert config.timeout_seconds == 600
 
     def test_skills_empty_list_no_skills(self):
+        '未说明'
         config = CustomSubagentConfig(
             description="test",
             system_prompt="test",
@@ -136,6 +140,7 @@ class TestCustomSubagentConfig:
         assert config.skills == []
 
     def test_rejects_zero_max_turns(self):
+        '未说明'
         with pytest.raises(ValueError):
             CustomSubagentConfig(
                 description="test",
@@ -144,6 +149,7 @@ class TestCustomSubagentConfig:
             )
 
     def test_rejects_zero_timeout(self):
+        '未说明'
         with pytest.raises(ValueError):
             CustomSubagentConfig(
                 description="test",
@@ -158,11 +164,14 @@ class TestCustomSubagentConfig:
 
 
 class TestSubagentsAppConfigCustomAgents:
+    '未说明'
     def test_default_custom_agents_empty(self):
+        '未说明'
         config = SubagentsAppConfig()
         assert config.custom_agents == {}
 
     def test_custom_agents_loaded(self):
+        '未说明'
         config = SubagentsAppConfig(
             custom_agents={
                 "analysis": CustomSubagentConfig(
@@ -176,6 +185,7 @@ class TestSubagentsAppConfigCustomAgents:
         assert config.custom_agents["analysis"].skills == ["data-analysis"]
 
     def test_multiple_custom_agents(self):
+        '未说明'
         config = SubagentsAppConfig(
             custom_agents={
                 "analysis": CustomSubagentConfig(
@@ -194,12 +204,15 @@ class TestSubagentsAppConfigCustomAgents:
 
 
 class TestGetSkillsFor:
+    '未说明'
     def test_returns_none_when_no_override(self):
+        '未说明'
         config = SubagentsAppConfig()
         assert config.get_skills_for("general-purpose") is None
         assert config.get_skills_for("unknown") is None
 
     def test_returns_skills_whitelist(self):
+        '未说明'
         config = SubagentsAppConfig(
             agents={
                 "general-purpose": SubagentOverrideConfig(skills=["web-search", "coding"]),
@@ -208,6 +221,7 @@ class TestGetSkillsFor:
         assert config.get_skills_for("general-purpose") == ["web-search", "coding"]
 
     def test_returns_empty_list_for_no_skills(self):
+        '未说明'
         config = SubagentsAppConfig(
             agents={
                 "bash": SubagentOverrideConfig(skills=[]),
@@ -216,6 +230,7 @@ class TestGetSkillsFor:
         assert config.get_skills_for("bash") == []
 
     def test_returns_none_for_unrelated_agent(self):
+        '未说明'
         config = SubagentsAppConfig(
             agents={
                 "bash": SubagentOverrideConfig(skills=["web-search"]),
@@ -224,6 +239,7 @@ class TestGetSkillsFor:
         assert config.get_skills_for("general-purpose") is None
 
     def test_returns_none_when_skills_not_set(self):
+        '未说明'
         config = SubagentsAppConfig(
             agents={
                 "bash": SubagentOverrideConfig(timeout_seconds=300),
@@ -238,10 +254,13 @@ class TestGetSkillsFor:
 
 
 class TestLoadSubagentsConfigWithSkills:
+    '未说明'
     def teardown_method(self):
+        '未说明'
         _reset_subagents_config()
 
     def test_load_with_skills_override(self):
+        '未说明'
         load_subagents_config_from_dict(
             {
                 "timeout_seconds": 900,
@@ -254,6 +273,7 @@ class TestLoadSubagentsConfigWithSkills:
         assert cfg.get_skills_for("general-purpose") == ["web-search", "data-analysis"]
 
     def test_load_with_empty_skills(self):
+        '未说明'
         load_subagents_config_from_dict(
             {
                 "timeout_seconds": 900,
@@ -266,6 +286,7 @@ class TestLoadSubagentsConfigWithSkills:
         assert cfg.get_skills_for("bash") == []
 
     def test_load_with_custom_agents(self):
+        '未说明'
         load_subagents_config_from_dict(
             {
                 "timeout_seconds": 900,
@@ -290,6 +311,7 @@ class TestLoadSubagentsConfigWithSkills:
         assert custom.timeout_seconds == 600
 
     def test_load_with_both_overrides_and_custom(self):
+        '未说明'
         load_subagents_config_from_dict(
             {
                 "timeout_seconds": 900,
@@ -316,10 +338,13 @@ class TestLoadSubagentsConfigWithSkills:
 
 
 class TestRegistryCustomAgentLookup:
+    '未说明'
     def teardown_method(self):
+        '未说明'
         _reset_subagents_config()
 
     def test_custom_agent_found(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict(
@@ -346,9 +371,11 @@ class TestRegistryCustomAgentLookup:
         assert config.model == "inherit"
 
     def test_custom_agent_found_from_explicit_app_config_without_global_config(self, monkeypatch):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         def fail_get_subagents_app_config():
+            """处理获取 配置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             raise AssertionError("ambient get_subagents_app_config() must not be used when app_config is explicit")
 
         monkeypatch.setattr("deerflow.config.subagents_config.get_subagents_app_config", fail_get_subagents_app_config)
@@ -372,18 +399,21 @@ class TestRegistryCustomAgentLookup:
         assert config.skills == ["data-analysis"]
 
     def test_custom_agent_not_found(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         _reset_subagents_config()
         assert get_subagent_config("nonexistent") is None
 
     def test_get_available_subagent_names_falls_back_when_subagents_app_config_lacks_sandbox(self, monkeypatch):
+        '未说明'
         from deerflow.subagents import registry as registry_module
         from deerflow.subagents.registry import get_available_subagent_names
 
         captured: dict[str, tuple] = {}
 
         def fake_is_host_bash_allowed(*args, **kwargs):
+            '未说明'
             captured["args"] = args
             return True
 
@@ -394,7 +424,7 @@ class TestRegistryCustomAgentLookup:
         assert captured["args"] == ()
 
     def test_builtin_takes_priority_over_custom(self):
-        """If a custom agent has the same name as a builtin, builtin wins."""
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -413,7 +443,7 @@ class TestRegistryCustomAgentLookup:
         assert config.description == BUILTIN_SUBAGENTS["general-purpose"].description
 
     def test_custom_agent_with_override(self):
-        """Per-agent overrides also apply to custom agents."""
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict(
@@ -442,10 +472,13 @@ class TestRegistryCustomAgentLookup:
 
 
 class TestRegistrySkillsOverride:
+    '未说明'
     def teardown_method(self):
+        '未说明'
         _reset_subagents_config()
 
     def test_skills_override_applied_to_builtin(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict(
@@ -459,6 +492,7 @@ class TestRegistrySkillsOverride:
         assert config.skills == ["web-search", "data-analysis"]
 
     def test_empty_skills_override(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         load_subagents_config_from_dict(
@@ -472,6 +506,7 @@ class TestRegistrySkillsOverride:
         assert config.skills == []
 
     def test_no_skills_override_keeps_default(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_config
 
         _reset_subagents_config()
@@ -479,6 +514,7 @@ class TestRegistrySkillsOverride:
         assert config.skills is None  # Default: inherit all
 
     def test_skills_override_does_not_mutate_builtin(self):
+        '未说明'
         from deerflow.subagents.builtins import BUILTIN_SUBAGENTS
         from deerflow.subagents.registry import get_subagent_config
 
@@ -499,10 +535,13 @@ class TestRegistrySkillsOverride:
 
 
 class TestRegistryAvailableNames:
+    '未说明'
     def teardown_method(self):
+        '未说明'
         _reset_subagents_config()
 
     def test_includes_builtin_names(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_names
 
         _reset_subagents_config()
@@ -511,6 +550,7 @@ class TestRegistryAvailableNames:
         assert "bash" in names
 
     def test_includes_custom_names(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_names
 
         load_subagents_config_from_dict(
@@ -534,6 +574,7 @@ class TestRegistryAvailableNames:
         assert "researcher" in names
 
     def test_no_duplicates_when_custom_name_matches_builtin(self):
+        '未说明'
         from deerflow.subagents.registry import get_subagent_names
 
         load_subagents_config_from_dict(
@@ -556,10 +597,13 @@ class TestRegistryAvailableNames:
 
 
 class TestRegistryListSubagentsWithCustom:
+    '未说明'
     def teardown_method(self):
+        '未说明'
         _reset_subagents_config()
 
     def test_list_includes_custom_agents(self):
+        '未说明'
         from deerflow.subagents.registry import list_subagents
 
         load_subagents_config_from_dict(
@@ -580,6 +624,7 @@ class TestRegistryListSubagentsWithCustom:
         assert "analysis" in names
 
     def test_list_custom_agent_has_correct_skills(self):
+        '未说明'
         from deerflow.subagents.registry import list_subagents
 
         load_subagents_config_from_dict(
@@ -603,10 +648,10 @@ class TestRegistryListSubagentsWithCustom:
 
 
 class TestSkillsFilterPassthrough:
-    """Test that SubagentConfig.skills is correctly passed to get_skills_prompt_section."""
+    '未说明'
 
     def test_none_skills_passes_none_to_prompt(self):
-        """When config.skills is None, available_skills=None should be passed (inherit all)."""
+        '未说明'
         config = SubagentConfig(
             name="test",
             description="test",
@@ -618,7 +663,7 @@ class TestSkillsFilterPassthrough:
         assert available is None
 
     def test_empty_skills_passes_empty_set(self):
-        """When config.skills is [], available_skills=set() should be passed (no skills)."""
+        '未说明'
         config = SubagentConfig(
             name="test",
             description="test",
@@ -629,7 +674,7 @@ class TestSkillsFilterPassthrough:
         assert available == set()
 
     def test_skills_whitelist_passes_correct_set(self):
-        """When config.skills has values, those should be passed as available_skills."""
+        '未说明'
         config = SubagentConfig(
             name="test",
             description="test",

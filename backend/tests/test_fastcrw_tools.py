@@ -1,4 +1,4 @@
-"""Unit tests for the fastCRW community tools."""
+"""验证当前测试文件覆盖的预期行为与边界条件。"""
 
 import ipaddress
 import json
@@ -6,10 +6,12 @@ from unittest.mock import MagicMock, patch
 
 
 class TestWebSearchTool:
+    """归纳当前测试场景的预期行为。"""
     @patch.dict("os.environ", {}, clear=True)
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_search_uses_web_search_config(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         search_config = MagicMock()
         search_config.model_extra = {"api_key": "fastcrw-search-key", "max_results": 7}
         mock_get_app_config.return_value.get_tool_config.return_value = search_config
@@ -39,6 +41,7 @@ class TestWebSearchTool:
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_search_falls_back_to_env_and_default_max_results(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         mock_get_app_config.return_value.get_tool_config.return_value = None
 
         mock_result = MagicMock()
@@ -57,6 +60,7 @@ class TestWebSearchTool:
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_search_returns_error_string_on_exception(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         mock_get_app_config.return_value.get_tool_config.return_value = None
         mock_fastcrw_cls.return_value.search.side_effect = RuntimeError("boom")
 
@@ -66,14 +70,17 @@ class TestWebSearchTool:
 
 
 class TestWebFetchTool:
+    """归纳当前测试场景的预期行为。"""
     @patch.dict("os.environ", {}, clear=True)
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_fetch_uses_web_fetch_config(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         fetch_config = MagicMock()
         fetch_config.model_extra = {"api_key": "fastcrw-fetch-key", "base_url": "http://localhost:3000"}
 
         def get_tool_config(name):
+            """验证当前测试场景的预期行为。"""
             if name == "web_fetch":
                 return fetch_config
             return None
@@ -101,6 +108,7 @@ class TestWebFetchTool:
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_fetch_returns_error_when_no_content(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         mock_get_app_config.return_value.get_tool_config.return_value = None
 
         mock_scrape_result = MagicMock()
@@ -116,6 +124,7 @@ class TestWebFetchTool:
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_fetch_returns_error_string_on_exception(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         mock_get_app_config.return_value.get_tool_config.return_value = None
         mock_fastcrw_cls.return_value.scrape.side_effect = RuntimeError("scrape failed")
 
@@ -127,6 +136,7 @@ class TestWebFetchTool:
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_fetch_rejects_metadata_ip(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         mock_get_app_config.return_value.get_tool_config.return_value = None
 
         from deerflow.community.fastcrw.tools import web_fetch_tool
@@ -140,6 +150,7 @@ class TestWebFetchTool:
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_fetch_rejects_dns_resolving_to_private(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         mock_get_app_config.return_value.get_tool_config.return_value = None
 
         from deerflow.community.fastcrw.tools import web_fetch_tool
@@ -157,6 +168,7 @@ class TestWebFetchTool:
     @patch("deerflow.community.fastcrw.tools.FirecrawlApp")
     @patch("deerflow.community.fastcrw.tools.get_app_config")
     def test_fetch_allows_private_when_opted_in(self, mock_get_app_config, mock_fastcrw_cls):
+        """验证当前测试场景的预期行为。"""
         fetch_config = MagicMock()
         fetch_config.model_extra = {"allow_private_addresses": True, "base_url": "http://localhost:3000"}
         mock_get_app_config.return_value.get_tool_config.return_value = fetch_config

@@ -1,13 +1,4 @@
-"""Strict Blockbuster runtime context scoped to DeerFlow business code.
-
-Creates a `BlockBuster` instance with `scanned_modules=("app", "deerflow")`
-so that test infrastructure (pytest, langchain, importlib, third-party libs)
-is out of scope and does not produce false positives. Only loop-blocking
-sync IO whose caller stack passes through `app.*` or `deerflow.*` raises
-`BlockingError`.
-
-Used by `backend/tests/blocking_io/conftest.py` to gate the regression suite.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -18,20 +9,21 @@ from blockbuster import BlockBuster, BlockBusterFunction, BlockingError
 
 _SCANNED_MODULES: tuple[str, ...] = ("app", "deerflow")
 
-# Add DeerFlow-local rules here only when Blockbuster's default rule set misses
-# a generic blocking primitive used by production code. If a path is invisible
-# because no test exercises it, add a production-path runtime anchor instead.
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 _PROJECT_BLOCKING_RULES: tuple[tuple[str, BlockBusterFunction], ...] = ()
 
 
 def _install_project_rules(bb: BlockBuster) -> None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     for name, rule in _PROJECT_BLOCKING_RULES:
         bb.functions[name] = rule
 
 
 @contextmanager
 def detect_blocking_io_strict() -> Iterator[BlockBuster]:
-    """Activate Blockbuster scoped to app.* and deerflow.* callers only."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     bb = BlockBuster(scanned_modules=list(_SCANNED_MODULES))
     _install_project_rules(bb)
     try:

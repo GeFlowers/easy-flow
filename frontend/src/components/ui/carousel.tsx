@@ -32,6 +32,7 @@ type CarouselContextProps = {
 
 const CarouselContext = React.createContext<CarouselContextProps | null>(null);
 
+/** useCarousel Hook：封装本模块所需的状态或上下文访问。 */
 function useCarousel() {
   const context = React.useContext(CarouselContext);
 
@@ -42,6 +43,7 @@ function useCarousel() {
   return context;
 }
 
+/** Carousel 内部组件：组织对应的界面结构与交互语义。 */
 function Carousel({
   orientation = "horizontal",
   opts,
@@ -132,6 +134,7 @@ function Carousel({
   );
 }
 
+/** CarouselContent 内部组件：组织对应的界面结构与交互语义。 */
 function CarouselContent({ className, ...props }: React.ComponentProps<"div">) {
   const { carouselRef, orientation } = useCarousel();
 
@@ -153,6 +156,7 @@ function CarouselContent({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** CarouselItem 内部组件：组织对应的界面结构与交互语义。 */
 function CarouselItem({ className, ...props }: React.ComponentProps<"div">) {
   const { orientation } = useCarousel();
 
@@ -171,6 +175,7 @@ function CarouselItem({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** CarouselPrevious 内部组件：组织对应的界面结构与交互语义。 */
 function CarouselPrevious({
   className,
   variant = "outline",
@@ -201,6 +206,7 @@ function CarouselPrevious({
   );
 }
 
+/** CarouselNext 内部组件：组织对应的界面结构与交互语义。 */
 function CarouselNext({
   className,
   variant = "outline",

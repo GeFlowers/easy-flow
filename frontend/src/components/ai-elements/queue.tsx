@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDownIcon, PaperclipIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
+/** QueueMessagePart 的公开类型定义。 */
 export type QueueMessagePart = {
   type: string;
   text?: string;
@@ -19,11 +20,13 @@ export type QueueMessagePart = {
   mediaType?: string;
 };
 
+/** QueueMessage 的公开类型定义。 */
 export type QueueMessage = {
   id: string;
   parts: QueueMessagePart[];
 };
 
+/** QueueTodo 的公开类型定义。 */
 export type QueueTodo = {
   id: string;
   title: string;
@@ -31,8 +34,10 @@ export type QueueTodo = {
   status?: "pending" | "completed";
 };
 
+/** QueueItemProps 的公开类型定义。 */
 export type QueueItemProps = ComponentProps<"li">;
 
+/** QueueItem 组件：提供对应的界面结构与交互语义。 */
 export const QueueItem = ({ className, ...props }: QueueItemProps) => (
   <li
     className={cn(
@@ -43,10 +48,12 @@ export const QueueItem = ({ className, ...props }: QueueItemProps) => (
   />
 );
 
+/** QueueItemIndicatorProps 的公开类型定义。 */
 export type QueueItemIndicatorProps = ComponentProps<"span"> & {
   completed?: boolean;
 };
 
+/** QueueItemIndicator 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemIndicator = ({
   completed = false,
   className,
@@ -64,10 +71,12 @@ export const QueueItemIndicator = ({
   />
 );
 
+/** QueueItemContentProps 的公开类型定义。 */
 export type QueueItemContentProps = ComponentProps<"span"> & {
   completed?: boolean;
 };
 
+/** QueueItemContent 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemContent = ({
   completed = false,
   className,
@@ -85,10 +94,12 @@ export const QueueItemContent = ({
   />
 );
 
+/** QueueItemDescriptionProps 的公开类型定义。 */
 export type QueueItemDescriptionProps = ComponentProps<"div"> & {
   completed?: boolean;
 };
 
+/** QueueItemDescription 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemDescription = ({
   completed = false,
   className,
@@ -106,8 +117,10 @@ export const QueueItemDescription = ({
   />
 );
 
+/** QueueItemActionsProps 的公开类型定义。 */
 export type QueueItemActionsProps = ComponentProps<"div">;
 
+/** QueueItemActions 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemActions = ({
   className,
   ...props
@@ -115,11 +128,13 @@ export const QueueItemActions = ({
   <div className={cn("flex gap-1", className)} {...props} />
 );
 
+/** QueueItemActionProps 的公开类型定义。 */
 export type QueueItemActionProps = Omit<
   ComponentProps<typeof Button>,
   "variant" | "size"
 >;
 
+/** QueueItemAction 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemAction = ({
   className,
   ...props
@@ -136,8 +151,10 @@ export const QueueItemAction = ({
   />
 );
 
+/** QueueItemAttachmentProps 的公开类型定义。 */
 export type QueueItemAttachmentProps = ComponentProps<"div">;
 
+/** QueueItemAttachment 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemAttachment = ({
   className,
   ...props
@@ -145,8 +162,10 @@ export const QueueItemAttachment = ({
   <div className={cn("mt-1 flex flex-wrap gap-2", className)} {...props} />
 );
 
+/** QueueItemImageProps 的公开类型定义。 */
 export type QueueItemImageProps = ComponentProps<"img">;
 
+/** QueueItemImage 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemImage = ({
   className,
   ...props
@@ -160,8 +179,10 @@ export const QueueItemImage = ({
   />
 );
 
+/** QueueItemFileProps 的公开类型定义。 */
 export type QueueItemFileProps = ComponentProps<"span">;
 
+/** QueueItemFile 组件：提供对应的界面结构与交互语义。 */
 export const QueueItemFile = ({
   children,
   className,
@@ -179,8 +200,10 @@ export const QueueItemFile = ({
   </span>
 );
 
+/** QueueListProps 的公开类型定义。 */
 export type QueueListProps = ComponentProps<typeof ScrollArea>;
 
+/** QueueList 组件：提供对应的界面结构与交互语义。 */
 export const QueueList = ({
   children,
   className,
@@ -193,9 +216,11 @@ export const QueueList = ({
   </ScrollArea>
 );
 
-// QueueSection - collapsible section container
+// QueueSection：可折叠分区容器。
+/** QueueSectionProps 的公开类型定义。 */
 export type QueueSectionProps = ComponentProps<typeof Collapsible>;
 
+/** QueueSection 组件：提供对应的界面结构与交互语义。 */
 export const QueueSection = ({
   className,
   defaultOpen = true,
@@ -204,9 +229,11 @@ export const QueueSection = ({
   <Collapsible className={cn(className)} defaultOpen={defaultOpen} {...props} />
 );
 
-// QueueSectionTrigger - section header/trigger
+// QueueSectionTrigger：分区标题与触发器。
+/** QueueSectionTriggerProps 的公开类型定义。 */
 export type QueueSectionTriggerProps = ComponentProps<"button">;
 
+/** QueueSectionTrigger 组件：提供对应的界面结构与交互语义。 */
 export const QueueSectionTrigger = ({
   children,
   className,
@@ -226,13 +253,15 @@ export const QueueSectionTrigger = ({
   </CollapsibleTrigger>
 );
 
-// QueueSectionLabel - label content with icon and count
+// QueueSectionLabel：含图标和数量的标签内容。
+/** QueueSectionLabelProps 的公开类型定义。 */
 export type QueueSectionLabelProps = ComponentProps<"span"> & {
   count?: number;
   label: string;
   icon?: React.ReactNode;
 };
 
+/** QueueSectionLabel 组件：提供对应的界面结构与交互语义。 */
 export const QueueSectionLabel = ({
   count,
   label,
@@ -249,11 +278,13 @@ export const QueueSectionLabel = ({
   </span>
 );
 
-// QueueSectionContent - collapsible content area
+// QueueSectionContent：可折叠内容区域。
+/** QueueSectionContentProps 的公开类型定义。 */
 export type QueueSectionContentProps = ComponentProps<
   typeof CollapsibleContent
 >;
 
+/** QueueSectionContent 组件：提供对应的界面结构与交互语义。 */
 export const QueueSectionContent = ({
   className,
   ...props
@@ -261,8 +292,10 @@ export const QueueSectionContent = ({
   <CollapsibleContent className={cn(className)} {...props} />
 );
 
+/** QueueProps 的公开类型定义。 */
 export type QueueProps = ComponentProps<"div">;
 
+/** Queue 组件：提供对应的界面结构与交互语义。 */
 export const Queue = ({ className, ...props }: QueueProps) => (
   <div
     className={cn(

@@ -1,3 +1,4 @@
+"""提供配置、paths相关功能。"""
 import hashlib
 import logging
 import os
@@ -7,7 +8,7 @@ from pathlib import Path, PureWindowsPath
 
 from deerflow.config.runtime_paths import runtime_home
 
-# Virtual path prefix seen by agents inside the sandbox
+# 中文说明：此处用于执行相关处理。
 VIRTUAL_PATH_PREFIX = "/mnt/user-data"
 
 _SAFE_THREAD_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
@@ -19,32 +20,26 @@ logger = logging.getLogger(__name__)
 
 
 def _default_local_base_dir() -> Path:
-    """Return the caller project's writable DeerFlow state directory."""
+    """\u6267\u884c _default_local_base_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return runtime_home()
 
 
 def _validate_thread_id(thread_id: str) -> str:
-    """Validate a thread ID before using it in filesystem paths."""
+    """\u6267\u884c _validate_thread_id \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     if not _SAFE_THREAD_ID_RE.match(thread_id):
         raise ValueError(f"Invalid thread_id {thread_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
     return thread_id
 
 
 def _validate_user_id(user_id: str) -> str:
-    """Validate a user ID before using it in filesystem paths."""
+    """\u6267\u884c _validate_user_id \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     if not _SAFE_USER_ID_RE.match(user_id):
         raise ValueError(f"Invalid user_id {user_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
     return user_id
 
 
 def make_safe_user_id(raw: str) -> str:
-    """Normalize an external identity into the user-id charset (``[A-Za-z0-9_-]``).
-
-    IM channel ids (Feishu/Slack/Telegram) may contain characters that
-    :func:`_validate_user_id` rejects. Already-safe ids pass through unchanged;
-    lossy ones get a short digest suffix so two distinct inputs never share a
-    storage bucket.
-    """
+    """\u6267\u884c make_safe_user_id \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     if not raw:
         raise ValueError("user_id must be a non-empty string.")
     sanitized = _UNSAFE_USER_ID_CHAR_RE.sub("-", raw)
@@ -55,19 +50,13 @@ def make_safe_user_id(raw: str) -> str:
 
 
 def _legacy_safe_user_id(raw: str, sanitized: str) -> str:
-    """Bucket name produced by the previous (SHA-1) digest revision for ``raw``."""
+    """\u6267\u884c _legacy_safe_user_id \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     digest = hashlib.sha1(raw.encode("utf-8"), usedforsecurity=False).hexdigest()[:_SAFE_USER_ID_DIGEST_HEX_LEN]
     return f"{sanitized}-{digest}"
 
 
 def _join_host_path(base: str, *parts: str) -> str:
-    """Join host filesystem path segments while preserving native style.
-
-    Docker Desktop on Windows expects bind mount sources to stay in Windows
-    path form (for example ``C:\\repo\\backend\\.deer-flow``).  Using
-    ``Path(base) / ...`` on a POSIX host can accidentally rewrite those paths
-    with mixed separators, so this helper preserves the original style.
-    """
+    """\u6267\u884c _join_host_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     if not parts:
         return base
 
@@ -84,63 +73,33 @@ def _join_host_path(base: str, *parts: str) -> str:
 
 
 def join_host_path(base: str, *parts: str) -> str:
-    """Join host filesystem path segments while preserving native style."""
+    """\u6267\u884c join_host_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return _join_host_path(base, *parts)
 
 
 class Paths:
-    """
-    Centralized path configuration for DeerFlow application data.
-
-    Directory layout (host side):
-        {base_dir}/
-        ├── memory.json
-        ├── USER.md          <-- global user profile (injected into all agents)
-        ├── agents/
-        │   └── {agent_name}/
-        │       ├── config.yaml
-        │       ├── SOUL.md  <-- agent personality/identity (injected alongside lead prompt)
-        │       └── memory.json
-        └── threads/
-            └── {thread_id}/
-                └── user-data/         <-- mounted as /mnt/user-data/ inside sandbox
-                    ├── workspace/     <-- /mnt/user-data/workspace/
-                    ├── uploads/       <-- /mnt/user-data/uploads/
-                    └── outputs/       <-- /mnt/user-data/outputs/
-
-    BaseDir resolution (in priority order):
-        1. Constructor argument `base_dir`
-        2. DEER_FLOW_HOME environment variable
-        3. Caller project fallback: `{project_root}/.deer-flow`
-    """
+    """\u6267\u884c Paths \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     def __init__(self, base_dir: str | Path | None = None) -> None:
+        """\u6267\u884c __init__ \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         self._base_dir = Path(base_dir).resolve() if base_dir is not None else None
 
     @property
     def host_base_dir(self) -> Path:
-        """Host-visible base dir for Docker volume mount sources.
-
-        When running inside Docker with a mounted Docker socket (DooD), the Docker
-        daemon runs on the host and resolves mount paths against the host filesystem.
-        Set DEER_FLOW_HOST_BASE_DIR to the host-side path that corresponds to this
-        container's base_dir so that sandbox container volume mounts work correctly.
-
-        Falls back to base_dir when the env var is not set (native/local execution).
-        """
+        """\u6267\u884c host_base_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if env := os.getenv("DEER_FLOW_HOST_BASE_DIR"):
             return Path(env)
         return self.base_dir
 
     def _host_base_dir_str(self) -> str:
-        """Return the host base dir as a raw string for bind mounts."""
+        """\u6267\u884c _host_base_dir_str \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if env := os.getenv("DEER_FLOW_HOST_BASE_DIR"):
             return env
         return str(self.base_dir)
 
     @property
     def base_dir(self) -> Path:
-        """Root directory for all application data."""
+        """\u6267\u884c base_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if self._base_dir is not None:
             return self._base_dir
 
@@ -151,45 +110,33 @@ class Paths:
 
     @property
     def memory_file(self) -> Path:
-        """Path to the persisted memory file: `{base_dir}/memory.json`."""
+        """\u6267\u884c memory_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.base_dir / "memory.json"
 
     @property
     def user_md_file(self) -> Path:
-        """Path to the global user profile file: `{base_dir}/USER.md`."""
+        """\u6267\u884c user_md_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.base_dir / "USER.md"
 
     @property
     def agents_dir(self) -> Path:
-        """Legacy root for shared (pre user-isolation) custom agents: `{base_dir}/agents/`.
-
-        New code should use :meth:`user_agents_dir` instead. This property remains
-        only as a read-side fallback for installations that have not yet run the
-        ``migrate_user_isolation.py`` script.
-        """
+        """\u6267\u884c agents_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.base_dir / "agents"
 
     def agent_dir(self, name: str) -> Path:
-        """Legacy per-agent directory (no user isolation): `{base_dir}/agents/{name}/`."""
+        """\u6267\u884c agent_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.agents_dir / name.lower()
 
     def agent_memory_file(self, name: str) -> Path:
-        """Legacy per-agent memory file: `{base_dir}/agents/{name}/memory.json`."""
+        """\u6267\u884c agent_memory_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.agent_dir(name) / "memory.json"
 
     def user_dir(self, user_id: str) -> Path:
-        """Directory for a specific user: `{base_dir}/users/{user_id}/`."""
+        """\u6267\u884c user_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.base_dir / "users" / _validate_user_id(user_id)
 
     def prepare_user_dir_for_raw_id(self, raw_user_id: str) -> str:
-        """Return the safe user ID and migrate this ID's legacy unsafe-id bucket.
-
-        A previous branch revision used SHA-1 for unsafe external user IDs.
-        New IDs use SHA-256; the legacy bucket name is recomputed from the same
-        raw ID, so only this user's own old bucket can ever be moved — a
-        different raw ID sharing the sanitized prefix produces a different
-        legacy digest and is never touched.
-        """
+        """\u6267\u884c prepare_user_dir_for_raw_id \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         safe_user_id = make_safe_user_id(raw_user_id)
         sanitized = _UNSAFE_USER_ID_CHAR_RE.sub("-", raw_user_id)
         if safe_user_id == raw_user_id:
@@ -208,136 +155,83 @@ class Paths:
         return safe_user_id
 
     def user_memory_file(self, user_id: str) -> Path:
-        """Per-user memory file: `{base_dir}/users/{user_id}/memory.json`."""
+        """\u6267\u884c user_memory_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.user_dir(user_id) / "memory.json"
 
     def user_agents_dir(self, user_id: str) -> Path:
-        """Per-user root for that user's custom agents: `{base_dir}/users/{user_id}/agents/`."""
+        """\u6267\u884c user_agents_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.user_dir(user_id) / "agents"
 
     def user_agent_dir(self, user_id: str, agent_name: str) -> Path:
-        """Per-user per-agent directory: `{base_dir}/users/{user_id}/agents/{name}/`."""
+        """\u6267\u884c user_agent_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.user_agents_dir(user_id) / agent_name.lower()
 
     def user_agent_memory_file(self, user_id: str, agent_name: str) -> Path:
-        """Per-user per-agent memory: `{base_dir}/users/{user_id}/agents/{name}/memory.json`."""
+        """\u6267\u884c user_agent_memory_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.user_agent_dir(user_id, agent_name) / "memory.json"
 
     def user_skills_dir(self, user_id: str) -> Path:
-        """Per-user root for that user's custom skills: `{base_dir}/users/{user_id}/skills/`."""
+        """\u6267\u884c user_skills_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.user_dir(user_id) / "skills"
 
     def user_custom_skills_dir(self, user_id: str) -> Path:
-        """Per-user custom skills directory: `{base_dir}/users/{user_id}/skills/custom/`.
-
-        This is the user-scoped replacement for the global ``{base_dir}/skills/custom/``
-        directory. Custom skills are written here; public skills remain under the
-        global ``{base_dir}/skills/public/`` (read-only).
-        """
+        """\u6267\u884c user_custom_skills_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.user_skills_dir(user_id) / "custom"
 
     def thread_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
-        """
-        Host path for a thread's data.
-
-        When *user_id* is provided:
-            `{base_dir}/users/{user_id}/threads/{thread_id}/`
-        Otherwise (legacy layout):
-            `{base_dir}/threads/{thread_id}/`
-
-        This directory contains a `user-data/` subdirectory that is mounted
-        as `/mnt/user-data/` inside the sandbox.
-
-        Raises:
-            ValueError: If `thread_id` or `user_id` contains unsafe characters (path
-                        separators or `..`) that could cause directory traversal.
-        """
+        """\u6267\u884c thread_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if user_id is not None:
             return self.user_dir(user_id) / "threads" / _validate_thread_id(thread_id)
         return self.base_dir / "threads" / _validate_thread_id(thread_id)
 
     def sandbox_work_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
-        """
-        Host path for the agent's workspace directory.
-        Host: `{base_dir}/threads/{thread_id}/user-data/workspace/`
-        Sandbox: `/mnt/user-data/workspace/`
-        """
+        """\u6267\u884c sandbox_work_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.thread_dir(thread_id, user_id=user_id) / "user-data" / "workspace"
 
     def sandbox_uploads_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
-        """
-        Host path for user-uploaded files.
-        Host: `{base_dir}/threads/{thread_id}/user-data/uploads/`
-        Sandbox: `/mnt/user-data/uploads/`
-        """
+        """\u6267\u884c sandbox_uploads_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.thread_dir(thread_id, user_id=user_id) / "user-data" / "uploads"
 
     def sandbox_outputs_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
-        """
-        Host path for agent-generated artifacts.
-        Host: `{base_dir}/threads/{thread_id}/user-data/outputs/`
-        Sandbox: `/mnt/user-data/outputs/`
-        """
+        """\u6267\u884c sandbox_outputs_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.thread_dir(thread_id, user_id=user_id) / "user-data" / "outputs"
 
     def acp_workspace_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
-        """
-        Host path for the ACP workspace of a specific thread.
-        Host: `{base_dir}/threads/{thread_id}/acp-workspace/`
-        Sandbox: `/mnt/acp-workspace/`
-
-        Each thread gets its own isolated ACP workspace so that concurrent
-        sessions cannot read each other's ACP agent outputs.
-        """
+        """\u6267\u884c acp_workspace_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.thread_dir(thread_id, user_id=user_id) / "acp-workspace"
 
     def sandbox_user_data_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
-        """
-        Host path for the user-data root.
-        Host: `{base_dir}/threads/{thread_id}/user-data/`
-        Sandbox: `/mnt/user-data/`
-        """
+        """\u6267\u884c sandbox_user_data_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.thread_dir(thread_id, user_id=user_id) / "user-data"
 
     def host_thread_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
-        """Host path for a thread directory, preserving Windows path syntax."""
+        """\u6267\u884c host_thread_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if user_id is not None:
             return _join_host_path(self._host_base_dir_str(), "users", _validate_user_id(user_id), "threads", _validate_thread_id(thread_id))
         return _join_host_path(self._host_base_dir_str(), "threads", _validate_thread_id(thread_id))
 
     def host_sandbox_user_data_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
-        """Host path for a thread's user-data root."""
+        """\u6267\u884c host_sandbox_user_data_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return _join_host_path(self.host_thread_dir(thread_id, user_id=user_id), "user-data")
 
     def host_sandbox_work_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
-        """Host path for the workspace mount source."""
+        """\u6267\u884c host_sandbox_work_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return _join_host_path(self.host_sandbox_user_data_dir(thread_id, user_id=user_id), "workspace")
 
     def host_sandbox_uploads_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
-        """Host path for the uploads mount source."""
+        """\u6267\u884c host_sandbox_uploads_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return _join_host_path(self.host_sandbox_user_data_dir(thread_id, user_id=user_id), "uploads")
 
     def host_sandbox_outputs_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
-        """Host path for the outputs mount source."""
+        """\u6267\u884c host_sandbox_outputs_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return _join_host_path(self.host_sandbox_user_data_dir(thread_id, user_id=user_id), "outputs")
 
     def host_acp_workspace_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
-        """Host path for the ACP workspace mount source."""
+        """\u6267\u884c host_acp_workspace_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return _join_host_path(self.host_thread_dir(thread_id, user_id=user_id), "acp-workspace")
 
     def ensure_thread_dirs(self, thread_id: str, *, user_id: str | None = None) -> None:
-        """Create all standard sandbox directories for a thread.
-
-        Directories are created with mode 0o777 so that sandbox containers
-        (which may run as a different UID than the host backend process) can
-        write to the volume-mounted paths without "Permission denied" errors.
-        The explicit chmod() call is necessary because Path.mkdir(mode=...) is
-        subject to the process umask and may not yield the intended permissions.
-
-        Includes the ACP workspace directory so it can be volume-mounted into
-        the sandbox container at ``/mnt/acp-workspace`` even before the first
-        ACP agent invocation.
-        """
+        """\u6267\u884c ensure_thread_dirs \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         for d in [
             self.sandbox_work_dir(thread_id, user_id=user_id),
             self.sandbox_uploads_dir(thread_id, user_id=user_id),
@@ -348,36 +242,18 @@ class Paths:
             d.chmod(0o777)
 
     def delete_thread_dir(self, thread_id: str, *, user_id: str | None = None) -> None:
-        """Delete all persisted data for a thread.
-
-        The operation is idempotent: missing thread directories are ignored.
-        """
+        """\u6267\u884c delete_thread_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         thread_dir = self.thread_dir(thread_id, user_id=user_id)
         if thread_dir.exists():
             shutil.rmtree(thread_dir)
 
     def resolve_virtual_path(self, thread_id: str, virtual_path: str, *, user_id: str | None = None) -> Path:
-        """Resolve a sandbox virtual path to the actual host filesystem path.
-
-        Args:
-            thread_id: The thread ID.
-            virtual_path: Virtual path as seen inside the sandbox, e.g.
-                          ``/mnt/user-data/outputs/report.pdf``.
-                          Leading slashes are stripped before matching.
-            user_id: Optional user ID for user-scoped path resolution.
-
-        Returns:
-            The resolved absolute host filesystem path.
-
-        Raises:
-            ValueError: If the path does not start with the expected virtual
-                        prefix or a path-traversal attempt is detected.
-        """
+        """\u6267\u884c resolve_virtual_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         stripped = virtual_path.lstrip("/")
         prefix = VIRTUAL_PATH_PREFIX.lstrip("/")
 
-        # Require an exact segment-boundary match to avoid prefix confusion
-        # (e.g. reject paths like "mnt/user-dataX/...").
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
         if stripped != prefix and not stripped.startswith(prefix + "/"):
             raise ValueError(f"Path must start with /{prefix}")
 
@@ -393,13 +269,13 @@ class Paths:
         return actual
 
 
-# ── Singleton ────────────────────────────────────────────────────────────
+# 中文说明：此处用于执行相关处理。
 
 _paths: Paths | None = None
 
 
 def get_paths() -> Paths:
-    """Return the global Paths singleton (lazy-initialized)."""
+    """\u6267\u884c get_paths \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _paths
     if _paths is None:
         _paths = Paths()
@@ -407,11 +283,7 @@ def get_paths() -> Paths:
 
 
 def resolve_path(path: str) -> Path:
-    """Resolve *path* to an absolute ``Path``.
-
-    Relative paths are resolved relative to the application base directory.
-    Absolute paths are returned as-is (after normalisation).
-    """
+    """\u6267\u884c resolve_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     p = Path(path)
     if not p.is_absolute():
         p = get_paths().base_dir / path

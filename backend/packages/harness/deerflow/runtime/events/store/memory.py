@@ -1,8 +1,4 @@
-"""In-memory RunEventStore. Used when run_events.backend=memory (default) and in tests.
-
-Thread-safe for single-process async usage (no threading locks needed
-since all mutations happen within the same event loop).
-"""
+'定义 memory 模块提供的职责与可复用接口。\n\nIn-memory RunEventStore. Used when run_events.backend=memory (default) and in tests.\n\nThread-safe for single-process async usage (no threading locks needed\nsince all mutations happen within the same event loop).\n'
 
 from __future__ import annotations
 
@@ -14,7 +10,9 @@ from deerflow.runtime.user_context import AUTO, _AutoSentinel
 
 
 class MemoryRunEventStore(RunEventStore):
+    '封装 MemoryRunEventStore 的状态、协作关系与公开操作'
     def __init__(self) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self._events: dict[str, list[dict]] = {}  # thread_id -> seq-sorted event list
         # Messages-only projection of ``_events`` (same dict objects, no copies),
         # kept in seq order so message pagination is O(log m + page) via bisect
@@ -31,6 +29,7 @@ class MemoryRunEventStore(RunEventStore):
         self._seq_counters: dict[str, int] = {}  # thread_id -> last assigned seq
 
     def _next_seq(self, thread_id: str) -> int:
+        '执行 _next_seq 的明确职责，并返回与调用约定一致的结果'
         current = self._seq_counters.get(thread_id, 0)
         next_val = current + 1
         self._seq_counters[thread_id] = next_val
@@ -47,6 +46,7 @@ class MemoryRunEventStore(RunEventStore):
         metadata: dict | None = None,
         created_at: str | None = None,
     ) -> dict:
+        '执行 _put_one 的明确职责，并返回与调用约定一致的结果'
         seq = self._next_seq(thread_id)
         record = {
             "thread_id": thread_id,
@@ -76,6 +76,7 @@ class MemoryRunEventStore(RunEventStore):
         metadata=None,
         created_at=None,
     ):
+        '执行 put 的明确职责，并返回与调用约定一致的结果'
         return self._put_one(
             thread_id=thread_id,
             run_id=run_id,
@@ -87,6 +88,7 @@ class MemoryRunEventStore(RunEventStore):
         )
 
     async def put_batch(self, events):
+        '执行 put_batch 的明确职责，并返回与调用约定一致的结果'
         results = []
         for ev in events:
             record = self._put_one(**ev)
@@ -96,6 +98,7 @@ class MemoryRunEventStore(RunEventStore):
     async def list_messages(self, thread_id, *, limit=50, before_seq=None, after_seq=None, user_id: str | None | _AutoSentinel = AUTO):
         # ``messages`` is messages-only and seq-sorted, so the seq window is a
         # contiguous slice located with bisect (O(log m)) rather than a full scan.
+        '收集并返回，并遵守 list_messages 所表达的接口约束'
         messages = self._messages.get(thread_id, [])
 
         if before_seq is not None:
@@ -113,6 +116,7 @@ class MemoryRunEventStore(RunEventStore):
     async def list_events(self, thread_id, run_id, *, event_types=None, task_id=None, limit=500, after_seq=None):
         # ``_events_by_run`` is already scoped to this run and seq-ordered, so we
         # touch only this run's events instead of scanning the whole thread.
+        '收集并返回，并遵守 list_events 所表达的接口约束'
         run_events = self._events_by_run.get(thread_id, {}).get(run_id, [])
         if event_types is not None:
             run_events = [e for e in run_events if e["event_type"] in event_types]
@@ -126,6 +130,7 @@ class MemoryRunEventStore(RunEventStore):
         # Per-run, messages-only, seq-sorted: the seq window is a contiguous
         # slice located with bisect (O(log m_run)) over only this run's
         # messages, instead of re-scanning the whole thread's event log.
+        '收集并返回，并遵守 list_messages_by_run 所表达的接口约束'
         messages = self._messages_by_run.get(thread_id, {}).get(run_id, [])
         lo = 0 if after_seq is None else bisect.bisect_right(messages, after_seq, key=lambda e: e["seq"])
         hi = len(messages) if before_seq is None else bisect.bisect_left(messages, before_seq, key=lambda e: e["seq"])
@@ -138,6 +143,7 @@ class MemoryRunEventStore(RunEventStore):
         return window[-limit:]
 
     async def get_last_visible_ai_seq_by_run(self, thread_id, run_ids, *, user_id: str | None | _AutoSentinel = AUTO):
+        '读取并返回，并遵守 get_last_visible_ai_seq_by_run 所表达的接口约束'
         result: dict[str, int] = {}
         messages_by_run = self._messages_by_run.get(thread_id, {})
         for run_id in run_ids:
@@ -149,9 +155,11 @@ class MemoryRunEventStore(RunEventStore):
         return result
 
     async def count_messages(self, thread_id):
+        '执行 count_messages 的明确职责，并返回与调用约定一致的结果'
         return len(self._messages.get(thread_id, []))
 
     async def delete_by_thread(self, thread_id):
+        '删除目标资源并返回操作结果，并遵守 delete_by_thread 所表达的接口约束'
         events = self._events.pop(thread_id, [])
         self._messages.pop(thread_id, None)
         self._events_by_run.pop(thread_id, None)
@@ -160,6 +168,7 @@ class MemoryRunEventStore(RunEventStore):
         return len(events)
 
     async def delete_by_run(self, thread_id, run_id):
+        '删除目标资源并返回操作结果，并遵守 delete_by_run 所表达的接口约束'
         all_events = self._events.get(thread_id, [])
         if not all_events:
             return 0

@@ -1,8 +1,4 @@
-"""Tests for the shared-persistence writer (thread_meta visibility).
-
-Uses the in-memory ThreadMetaStore so no SQL engine is required, but exercises
-the real async store + background-loop wiring used by the TUI.
-"""
+'未说明'
 
 import pytest
 from langgraph.store.memory import InMemoryStore
@@ -13,6 +9,7 @@ from deerflow.tui.persistence import ThreadMetaWriter, _LoopThread
 
 @pytest.fixture
 def writer_store_loop():
+    """为存储准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     loop = _LoopThread()
     store = make_thread_store(None, store=InMemoryStore())
     writer = ThreadMetaWriter(loop, store)
@@ -23,12 +20,14 @@ def writer_store_loop():
 
 
 def test_writer_is_enabled_with_a_store(writer_store_loop):
+    '未说明'
     writer, _store, _loop = writer_store_loop
     assert writer.enabled is True
     assert writer.user_id == "default"
 
 
 def test_ensure_created_writes_row_owned_by_default_user(writer_store_loop):
+    '未说明'
     writer, store, loop = writer_store_loop
     writer.ensure_created("th-1", assistant_id="lead-agent", metadata={"source": "tui"})
     rows = loop.run(store.search(user_id="default"))
@@ -36,6 +35,7 @@ def test_ensure_created_writes_row_owned_by_default_user(writer_store_loop):
 
 
 def test_ensure_created_is_idempotent(writer_store_loop):
+    '未说明'
     writer, store, loop = writer_store_loop
     writer.ensure_created("th-1")
     writer.ensure_created("th-1")
@@ -44,6 +44,7 @@ def test_ensure_created_is_idempotent(writer_store_loop):
 
 
 def test_set_title_updates_display_name(writer_store_loop):
+    '未说明'
     writer, store, loop = writer_store_loop
     writer.ensure_created("th-1")
     writer.set_title("th-1", "Refactor the bridge")
@@ -52,6 +53,7 @@ def test_set_title_updates_display_name(writer_store_loop):
 
 
 def test_disabled_writer_is_a_silent_noop():
+    '未说明'
     loop = _LoopThread()
     try:
         writer = ThreadMetaWriter(loop, None)

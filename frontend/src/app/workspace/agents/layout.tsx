@@ -6,6 +6,7 @@ import { AgentsFeatureDisabled } from "@/components/workspace/agents/agents-feat
 import { useAgentsApiEnabled } from "@/core/agents";
 import { useI18n } from "@/core/i18n/hooks";
 
+/** 在代理 API 可用时渲染代理页面，否则展示禁用状态。 */
 export default function AgentsLayout({ children }: { children: ReactNode }) {
   const { t } = useI18n();
   const { enabled, isLoading } = useAgentsApiEnabled();

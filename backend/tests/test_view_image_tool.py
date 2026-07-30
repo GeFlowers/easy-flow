@@ -1,3 +1,4 @@
+'未说明'
 import base64
 import importlib
 import os
@@ -14,6 +15,7 @@ PNG_BYTES = base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADU
 
 
 def _make_thread_data(tmp_path: Path) -> dict[str, str]:
+    '未说明'
     user_data = tmp_path / "threads" / "thread-1" / "user-data"
     workspace = user_data / "workspace"
     uploads = user_data / "uploads"
@@ -29,6 +31,7 @@ def _make_thread_data(tmp_path: Path) -> dict[str, str]:
 
 
 def _make_runtime(thread_data: dict[str, str]) -> SimpleNamespace:
+    '未说明'
     return SimpleNamespace(
         state={"thread_data": thread_data},
         context={"thread_id": "thread-1"},
@@ -37,10 +40,12 @@ def _make_runtime(thread_data: dict[str, str]) -> SimpleNamespace:
 
 
 def _message_content(result) -> str:
+    '未说明'
     return result.update["messages"][0].content
 
 
 def test_view_image_rejects_external_absolute_path(tmp_path: Path) -> None:
+    '未说明'
     thread_data = _make_thread_data(tmp_path)
     outside_image = tmp_path / "outside.png"
     outside_image.write_bytes(PNG_BYTES)
@@ -56,6 +61,7 @@ def test_view_image_rejects_external_absolute_path(tmp_path: Path) -> None:
 
 
 def test_view_image_reads_virtual_uploads_path(tmp_path: Path) -> None:
+    '未说明'
     thread_data = _make_thread_data(tmp_path)
     image_path = Path(thread_data["uploads_path"]) / "sample.png"
     image_path.write_bytes(PNG_BYTES)
@@ -74,6 +80,7 @@ def test_view_image_reads_virtual_uploads_path(tmp_path: Path) -> None:
 
 
 def test_view_image_rejects_spoofed_extension(tmp_path: Path) -> None:
+    '未说明'
     thread_data = _make_thread_data(tmp_path)
     image_path = Path(thread_data["uploads_path"]) / "not-really.png"
     image_path.write_bytes(b"not an image")
@@ -89,6 +96,7 @@ def test_view_image_rejects_spoofed_extension(tmp_path: Path) -> None:
 
 
 def test_view_image_rejects_mismatched_magic_bytes(tmp_path: Path) -> None:
+    '未说明'
     thread_data = _make_thread_data(tmp_path)
     image_path = Path(thread_data["uploads_path"]) / "jpeg-named-png.png"
     image_path.write_bytes(b"\xff\xd8\xff\xe0fake-jpeg")
@@ -104,6 +112,7 @@ def test_view_image_rejects_mismatched_magic_bytes(tmp_path: Path) -> None:
 
 
 def test_view_image_rejects_oversized_image(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    '未说明'
     thread_data = _make_thread_data(tmp_path)
     image_path = Path(thread_data["uploads_path"]) / "sample.png"
     image_path.write_bytes(PNG_BYTES)
@@ -120,11 +129,13 @@ def test_view_image_rejects_oversized_image(tmp_path: Path, monkeypatch: pytest.
 
 
 def test_view_image_sanitizes_read_errors(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    '未说明'
     thread_data = _make_thread_data(tmp_path)
     image_path = Path(thread_data["uploads_path"]) / "sample.png"
     image_path.write_bytes(PNG_BYTES)
 
     def _open(*args, **kwargs):
+        '未说明'
         raise PermissionError(f"permission denied: {image_path}")
 
     monkeypatch.setattr("builtins.open", _open)
@@ -145,6 +156,7 @@ def test_view_image_sanitizes_read_errors(tmp_path: Path, monkeypatch: pytest.Mo
 
 @pytest.mark.skipif(os.name == "nt", reason="symlink semantics differ on Windows")
 def test_view_image_rejects_uploads_symlink_escape(tmp_path: Path) -> None:
+    '未说明'
     thread_data = _make_thread_data(tmp_path)
     outside_image = tmp_path / "outside-target.png"
     outside_image.write_bytes(PNG_BYTES)

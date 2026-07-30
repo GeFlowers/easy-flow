@@ -1,13 +1,4 @@
-"""Runs endpoints — create, stream, wait, cancel.
-
-Implements the LangGraph Platform runs API on top of
-:class:`deerflow.agents.runs.RunManager` and
-:class:`deerflow.agents.stream_bridge.StreamBridge`.
-
-SSE format is aligned with the LangGraph Platform protocol so that
-the ``useStream`` React hook from ``@langchain/langgraph-sdk/react``
-works without modification.
-"""
+'定义 thread_runs 模块提供的职责与可复用接口。\n\nRuns endpoints — create, stream, wait, cancel.\n\nImplements the LangGraph Platform runs API on top of\n:class:`deerflow.agents.runs.RunManager` and\n:class:`deerflow.agents.stream_bridge.StreamBridge`.\n\nSSE format is aligned with the LangGraph Platform protocol so that\nthe ``useStream`` React hook from ``@langchain/langgraph-sdk/react``\nworks without modification.\n'
 
 from __future__ import annotations
 
@@ -40,13 +31,14 @@ THREAD_MESSAGE_PAGE_SCAN_BATCH = 201
 
 
 def _is_duration_only_checkpoint(checkpoint_tuple: Any) -> bool:
+    """判断检查点是否只写入运行耗时补充信息。"""
     metadata = getattr(checkpoint_tuple, "metadata", None)
     writes = metadata.get("writes") if isinstance(metadata, dict) else None
     return isinstance(writes, dict) and "runtime_run_duration" in writes
 
 
 def compute_run_durations(runs) -> dict[str, int]:
-    """Map run_id -> duration in seconds from run timestamps."""
+    '执行 compute_run_durations 的明确职责，并返回与调用约定一致的结果。\n\nMap run_id -> duration in seconds from run timestamps.'
     from datetime import datetime
 
     durations: dict[str, int] = {}
@@ -69,6 +61,7 @@ def compute_run_durations(runs) -> dict[str, int]:
 
 
 class RunCreateRequest(BaseModel):
+    """定义 LangGraph 兼容运行创建请求。"""
     assistant_id: str | None = Field(default=None, description="Agent / assistant to use")
     input: dict[str, Any] | None = Field(default=None, description="Graph input (e.g. {messages: [...]})")
     command: dict[str, Any] | None = Field(default=None, description="LangGraph Command")
@@ -92,10 +85,12 @@ class RunCreateRequest(BaseModel):
 
 
 class RegeneratePrepareRequest(BaseModel):
+    """定义为重新生成定位助手消息的请求。"""
     message_id: str = Field(..., min_length=1, description="Assistant message id to regenerate")
 
 
 class RegeneratePrepareResponse(BaseModel):
+    """返回重新生成所需的图输入与基准检查点。"""
     input: dict[str, Any]
     checkpoint: dict[str, Any]
     metadata: dict[str, Any]
@@ -103,12 +98,14 @@ class RegeneratePrepareResponse(BaseModel):
 
 
 class ThreadMessagesPageResponse(BaseModel):
+    """表示线程消息分页结果。"""
     data: list[dict[str, Any]]
     has_more: bool
     next_before_seq: int | None = None
 
 
 class RunResponse(BaseModel):
+    """表示 LangGraph 兼容运行的状态响应。"""
     run_id: str
     thread_id: str
     assistant_id: str | None = None
@@ -130,6 +127,7 @@ class RunResponse(BaseModel):
 
 
 class ThreadTokenUsageModelBreakdown(BaseModel):
+    """按模型汇总线程运行令牌使用量。"""
     tokens: int = 0
     runs: int = Field(
         default=0,
@@ -138,12 +136,14 @@ class ThreadTokenUsageModelBreakdown(BaseModel):
 
 
 class ThreadTokenUsageCallerBreakdown(BaseModel):
+    """按主代理与子代理汇总令牌使用量。"""
     lead_agent: int = 0
     subagent: int = 0
     middleware: int = 0
 
 
 class ThreadTokenUsageResponse(BaseModel):
+    """表示线程令牌使用量及其拆分结果。"""
     thread_id: str
     total_tokens: int = 0
     total_input_tokens: int = 0
@@ -159,22 +159,14 @@ class ThreadTokenUsageResponse(BaseModel):
 
 
 def _cancel_conflict_detail(run_id: str, record: RunRecord) -> str:
+    """为无法取消的运行构造与其状态一致的冲突说明。"""
     if record.status in (RunStatus.pending, RunStatus.running):
         return f"Run {run_id} is not active on this worker and cannot be cancelled"
     return f"Run {run_id} is not cancellable (status: {record.status.value})"
 
 
 def _compute_retry_after(lease_expires_at: str | None, grace_seconds: int) -> int | None:
-    """Return seconds until the lease expires + grace, for ``Retry-After``.
-
-    Returns ``None`` when the lease is NULL or unparseable so the caller
-    can decide whether to send a generic 409 without the header.
-
-    The ``max(1, ...)`` floor means a lease just about to expire yields
-    ``Retry-After: 1``.  This is a lower bound, not a recommended poll
-    interval — clients that honour this header should apply minimum
-    backoff / jitter rather than retrying every second.
-    """
+    '执行 _compute_retry_after 的明确职责，并返回与调用约定一致的结果。\n\nReturn seconds until the lease expires + grace, for ``Retry-After``.\n\n    Returns ``None`` when the lease is NULL or unparseable so the caller\n    can decide whether to send a generic 409 without the header.\n\n    The ``max(1, ...)`` floor means a lease just about to expire yields\n    ``Retry-After: 1``.  This is a lower bound, not a recommended poll\n    interval — clients that honour this header should apply minimum\n    backoff / jitter rather than retrying every second.\n    '
     if lease_expires_at is None:
         return None
     try:
@@ -192,12 +184,7 @@ async def _raise_lease_valid_elsewhere(
     run_mgr,  # RunManager (avoid import for testability)
     record: RunRecord,
 ) -> None:
-    """Re-fetch the lease and raise HTTP 409 + Retry-After.
-
-    ``record.lease_expires_at`` may be stale (fetched at request start while
-    the owner renewed between our read and the conditional UPDATE). Re-read
-    from the store to get the fresh value so ``Retry-After`` is accurate.
-    """
+    '执行 _raise_lease_valid_elsewhere 的明确职责，并返回与调用约定一致的结果。\n\nRe-fetch the lease and raise HTTP 409 + Retry-After.\n\n    ``record.lease_expires_at`` may be stale (fetched at request start while\n    the owner renewed between our read and the conditional UPDATE). Re-read\n    from the store to get the fresh value so ``Retry-After`` is accurate.\n    '
     fresh = await run_mgr.get(run_id)
     if fresh is not None:
         record = fresh
@@ -213,6 +200,7 @@ async def _raise_lease_valid_elsewhere(
 
 
 def _record_to_response(record: RunRecord) -> RunResponse:
+    """将内部运行记录转换为兼容 API 响应模型。"""
     return RunResponse(
         run_id=record.run_id,
         thread_id=record.thread_id,
@@ -236,6 +224,7 @@ def _record_to_response(record: RunRecord) -> RunResponse:
 
 
 def _message_id(message: Any) -> str | None:
+    """从消息对象或字典读取标识。"""
     value = getattr(message, "id", None)
     if value is None and isinstance(message, dict):
         value = message.get("id")
@@ -243,6 +232,7 @@ def _message_id(message: Any) -> str | None:
 
 
 def _message_type(message: Any) -> str | None:
+    """从消息对象或字典读取类型。"""
     value = getattr(message, "type", None)
     if value is None and isinstance(message, dict):
         value = message.get("type") or message.get("role")
@@ -252,6 +242,7 @@ def _message_type(message: Any) -> str | None:
 
 
 def _message_name(message: Any) -> str | None:
+    """从消息对象或字典读取名称。"""
     value = getattr(message, "name", None)
     if value is None and isinstance(message, dict):
         value = message.get("name")
@@ -259,16 +250,19 @@ def _message_name(message: Any) -> str | None:
 
 
 def _message_content(message: Any) -> Any:
+    """从消息对象或字典读取内容字段。"""
     if isinstance(message, dict):
         return message.get("content")
     return getattr(message, "content", None)
 
 
 def _message_text(message: Any) -> str:
+    """将任意消息内容转换为用于比较的纯文本。"""
     return message_to_text(message)
 
 
 def _message_additional_kwargs(message: Any) -> dict[str, Any]:
+    """从消息对象或字典读取附加元数据。"""
     value = getattr(message, "additional_kwargs", None)
     if value is None and isinstance(message, dict):
         value = message.get("additional_kwargs")
@@ -276,24 +270,29 @@ def _message_additional_kwargs(message: Any) -> dict[str, Any]:
 
 
 def _is_hidden_or_control_message(message: Any) -> bool:
+    """判断消息是否为不应向客户端展示的控制消息。"""
     message_type = _message_type(message)
     additional_kwargs = _message_additional_kwargs(message)
     return message_type == "remove" or _message_name(message) == "summary" or additional_kwargs.get("hide_from_ui") is True
 
 
 def _is_visible_human_message(message: Any) -> bool:
+    """判断消息是否为可展示的用户消息。"""
     return _message_type(message) == "human" and not _is_hidden_or_control_message(message)
 
 
 def _is_visible_ai_message(message: Any) -> bool:
+    """判断消息是否为可展示的助手消息。"""
     return _message_type(message) == "ai" and not _is_hidden_or_control_message(message)
 
 
 def _is_middleware_message_row(row: dict[str, Any]) -> bool:
+    """判断事件存储行是否由中间件写入。"""
     return str((row.get("metadata") or {}).get("caller", "")).startswith("middleware:")
 
 
 def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
+    """从检查点中读取消息通道内容。"""
     checkpoint = getattr(checkpoint_tuple, "checkpoint", None) or {}
     channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
     messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
@@ -301,12 +300,14 @@ def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
 
 
 def _checkpoint_configurable(checkpoint_tuple: Any) -> dict[str, Any]:
+    """从检查点配置提取 configurable 字典。"""
     config = getattr(checkpoint_tuple, "config", None) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     return dict(configurable) if isinstance(configurable, dict) else {}
 
 
 def _checkpoint_response(checkpoint_tuple: Any) -> dict[str, Any]:
+    """将检查点转换为兼容 API 的精简响应。"""
     configurable = _checkpoint_configurable(checkpoint_tuple)
     checkpoint_id = configurable.get("checkpoint_id")
     if not checkpoint_id:
@@ -319,6 +320,7 @@ def _checkpoint_response(checkpoint_tuple: Any) -> dict[str, Any]:
 
 
 def _clean_human_message_for_regenerate(message: Any) -> dict[str, Any]:
+    """清除用户消息中的运行控制信息，保留可重新执行的原始内容。"""
     additional_kwargs = _message_additional_kwargs(message)
     content = get_original_user_content_text(_message_content(message), additional_kwargs)
     additional_kwargs.pop(ORIGINAL_USER_CONTENT_KEY, None)
@@ -339,6 +341,7 @@ def _clean_human_message_for_regenerate(message: Any) -> dict[str, Any]:
 
 
 def _event_message_id(row: dict[str, Any]) -> str | None:
+    """从持久化事件行内容中提取消息标识。"""
     content = row.get("content")
     if isinstance(content, BaseMessage):
         return _message_id(content)
@@ -348,6 +351,7 @@ def _event_message_id(row: dict[str, Any]) -> str | None:
 
 
 def _run_last_ai_matches_message(record: RunRecord, message: Any) -> bool:
+    """判断运行末条助手文本是否对应目标消息。"""
     last_ai_message = (record.last_ai_message or "").strip()
     if not last_ai_message:
         return False
@@ -358,6 +362,7 @@ def _run_last_ai_matches_message(record: RunRecord, message: Any) -> bool:
 
 
 async def _find_target_run_id(thread_id: str, message_id: str, target_message: Any, request: Request) -> str:
+    """在受线程权限保护的事件历史中定位目标消息所属运行。"""
     event_store = get_run_event_store(request)
     rows = await event_store.list_messages(thread_id, limit=REGENERATE_HISTORY_SCAN_LIMIT)
     for row in reversed(rows):
@@ -387,6 +392,7 @@ async def _find_target_run_id(thread_id: str, message_id: str, target_message: A
 
 
 async def _find_base_checkpoint_before_human(thread_id: str, human_message_id: str, request: Request) -> Any:
+    """查找目标用户消息之前可用于重新生成的检查点。"""
     checkpointer = get_checkpointer(request)
     base_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
@@ -424,6 +430,7 @@ async def _find_base_checkpoint_before_human(thread_id: str, human_message_id: s
 
 
 async def _prepare_regenerate_payload(thread_id: str, message_id: str, request: Request) -> RegeneratePrepareResponse:
+    """构造 LangGraph 兼容重新生成接口所需的输入和检查点载荷。"""
     checkpointer = get_checkpointer(request)
     latest_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
@@ -481,14 +488,14 @@ async def prepare_regenerate_run(
     body: RegeneratePrepareRequest,
     request: Request,
 ) -> RegeneratePrepareResponse:
-    """Prepare input and checkpoint for regenerating the latest assistant turn."""
+    '执行 prepare_regenerate_run 的明确职责，并返回与调用约定一致的结果。\n\nPrepare input and checkpoint for regenerating the latest assistant turn.'
     return await _prepare_regenerate_payload(thread_id, body.message_id, request)
 
 
 @router.post("/{thread_id}/runs", response_model=RunResponse)
 @require_permission("runs", "create", owner_check=True, require_existing=True)
 async def create_run(thread_id: str, body: RunCreateRequest, request: Request) -> RunResponse:
-    """Create a background run (returns immediately)."""
+    '创建并返回，并遵守 create_run 所表达的接口约束。\n\nCreate a background run (returns immediately).'
     record = await start_run(body, thread_id, request)
     return _record_to_response(record)
 
@@ -496,12 +503,7 @@ async def create_run(thread_id: str, body: RunCreateRequest, request: Request) -
 @router.post("/{thread_id}/runs/stream")
 @require_permission("runs", "create", owner_check=True, require_existing=True)
 async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -> StreamingResponse:
-    """Create a run and stream events via SSE.
-
-    The response includes a ``Content-Location`` header with the run's
-    resource URL, matching the LangGraph Platform protocol.  The
-    ``useStream`` React hook uses this to extract run metadata.
-    """
+    "持续产出流式结果并传递终止状态，并遵守 stream_run 所表达的接口约束。\n\nCreate a run and stream events via SSE.\n\n    The response includes a ``Content-Location`` header with the run's\n    resource URL, matching the LangGraph Platform protocol.  The\n    ``useStream`` React hook uses this to extract run metadata.\n    "
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     record = await start_run(body, thread_id, request)
@@ -524,7 +526,7 @@ async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -
 @router.post("/{thread_id}/runs/wait", response_model=dict)
 @require_permission("runs", "create", owner_check=True, require_existing=True)
 async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> dict:
-    """Create a run and block until it completes, returning the final state."""
+    '执行 wait_run 的明确职责，并返回与调用约定一致的结果。\n\nCreate a run and block until it completes, returning the final state.'
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     record = await start_run(body, thread_id, request)
@@ -551,7 +553,7 @@ async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> 
 @router.get("/{thread_id}/runs", response_model=list[RunResponse])
 @require_permission("runs", "read", owner_check=True)
 async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
-    """List all runs for a thread."""
+    '收集并返回，并遵守 list_runs 所表达的接口约束。\n\nList all runs for a thread.'
     run_mgr = get_run_manager(request)
     user_id = await get_current_user(request)
     records = await run_mgr.list_by_thread(thread_id, user_id=user_id)
@@ -561,7 +563,7 @@ async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
 @router.get("/{thread_id}/runs/{run_id}", response_model=RunResponse)
 @require_permission("runs", "read", owner_check=True)
 async def get_run(thread_id: str, run_id: str, request: Request) -> RunResponse:
-    """Get details of a specific run."""
+    '读取并返回，并遵守 get_run 所表达的接口约束。\n\nGet details of a specific run.'
     run_mgr = get_run_manager(request)
     user_id = await get_current_user(request)
     record = await run_mgr.get(run_id, user_id=user_id)
@@ -579,17 +581,7 @@ async def cancel_run(
     wait: bool = Query(default=False, description="Block until run completes after cancel"),
     action: Literal["interrupt", "rollback"] = Query(default="interrupt", description="Cancel action"),
 ) -> Response:
-    """Cancel a running or pending run.
-
-    - action=interrupt: Stop execution, keep current checkpoint (can be resumed)
-    - action=rollback: Stop execution, revert to pre-run checkpoint state
-    - wait=true: Block until the run fully stops, return 204
-    - wait=false: Return immediately with 202
-
-    In multi-worker deployments, a cancel landing on a non-owning worker
-    can take over the run when the owner's lease has expired.  When the
-    lease is still valid a 409 + ``Retry-After`` header is returned.
-    """
+    "执行 cancel_run 的明确职责，并返回与调用约定一致的结果。\n\nCancel a running or pending run.\n\n    - action=interrupt: Stop execution, keep current checkpoint (can be resumed)\n    - action=rollback: Stop execution, revert to pre-run checkpoint state\n    - wait=true: Block until the run fully stops, return 204\n    - wait=false: Return immediately with 202\n\n    In multi-worker deployments, a cancel landing on a non-owning worker\n    can take over the run when the owner's lease has expired.  When the\n    lease is still valid a 409 + ``Retry-After`` header is returned.\n    "
     run_mgr = get_run_manager(request)
     record = await run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -618,7 +610,7 @@ async def cancel_run(
 @router.get("/{thread_id}/runs/{run_id}/join")
 @require_permission("runs", "read", owner_check=True)
 async def join_run(thread_id: str, run_id: str, request: Request) -> StreamingResponse:
-    """Join an existing run's SSE stream."""
+    "执行 join_run 的明确职责，并返回与调用约定一致的结果。\n\nJoin an existing run's SSE stream."
     run_mgr = get_run_manager(request)
     record = await run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -652,13 +644,7 @@ async def stream_existing_run(
     action: Literal["interrupt", "rollback"] | None = Query(default=None, description="Cancel action"),
     wait: int = Query(default=0, description="Block until cancelled (1) or return immediately (0)"),
 ):
-    """Join an existing run's SSE stream (GET), or cancel-then-stream (POST).
-
-    The LangGraph SDK's ``joinStream`` and ``useStream`` stop button both use
-    ``POST`` to this endpoint.  When ``action=interrupt`` or ``action=rollback``
-    is present the run is cancelled first; the response then streams any
-    remaining buffered events so the client observes a clean shutdown.
-    """
+    "持续产出流式结果并传递终止状态，并遵守 stream_existing_run 所表达的接口约束。\n\nJoin an existing run's SSE stream (GET), or cancel-then-stream (POST).\n\n    The LangGraph SDK's ``joinStream`` and ``useStream`` stop button both use\n    ``POST`` to this endpoint.  When ``action=interrupt`` or ``action=rollback``\n    is present the run is cancelled first; the response then streams any\n    remaining buffered events so the client observes a clean shutdown.\n    "
     run_mgr = get_run_manager(request)
     record = await run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -712,7 +698,7 @@ async def list_thread_messages(
     before_seq: int | None = Query(default=None),
     after_seq: int | None = Query(default=None),
 ) -> list[dict]:
-    """Return displayable messages for a thread (across all runs), with feedback attached."""
+    '收集并返回，并遵守 list_thread_messages 所表达的接口约束。\n\nReturn displayable messages for a thread (across all runs), with feedback attached.'
     event_store = get_run_event_store(request)
     messages = await event_store.list_messages(thread_id, limit=limit, before_seq=before_seq, after_seq=after_seq)
 
@@ -778,7 +764,7 @@ async def _scan_thread_message_page(
     request: Request,
     user_id: str | None,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """Select the newest ``limit + 1`` page-eligible rows before a cursor."""
+    '执行 _scan_thread_message_page 的明确职责，并返回与调用约定一致的结果。\n\nSelect the newest ``limit + 1`` page-eligible rows before a cursor.'
     event_store = get_run_event_store(request)
     run_mgr = get_run_manager(request)
     superseded_run_ids = await run_mgr.list_successful_regenerate_sources(thread_id, user_id=user_id)
@@ -839,7 +825,7 @@ async def _enrich_thread_message_page(
     request: Request,
     user_id: str | None,
 ) -> list[dict[str, Any]]:
-    """Attach run-scoped duration and feedback without mutating store rows."""
+    '执行 _enrich_thread_message_page 的明确职责，并返回与调用约定一致的结果。\n\nAttach run-scoped duration and feedback without mutating store rows.'
     data = deepcopy(rows)
     if not data:
         return data
@@ -883,7 +869,7 @@ async def list_thread_messages_page(
     limit: int = Query(default=50, ge=1, le=200),
     before_seq: int | None = Query(default=None, ge=1),
 ) -> ThreadMessagesPageResponse:
-    """Return a backward page ordered by the thread-global event sequence."""
+    '收集并返回，并遵守 list_thread_messages_page 所表达的接口约束。\n\nReturn a backward page ordered by the thread-global event sequence.'
     if "after_seq" in request.query_params:
         raise HTTPException(status_code=422, detail="after_seq is not supported by this backward-only endpoint")
 
@@ -913,10 +899,7 @@ async def list_run_messages(
     before_seq: int | None = Query(default=None),
     after_seq: int | None = Query(default=None),
 ) -> dict:
-    """Return paginated messages for a specific run.
-
-    Response: { data: [...], has_more: bool }
-    """
+    '收集并返回，并遵守 list_run_messages 所表达的接口约束。\n\nReturn paginated messages for a specific run.\n\n    Response: { data: [...], has_more: bool }\n    '
     event_store = get_run_event_store(request)
     rows = await event_store.list_messages_by_run(
         thread_id,
@@ -957,11 +940,7 @@ async def list_run_events(
     limit: int = Query(default=500, le=2000),
     after_seq: int | None = Query(default=None),
 ) -> list[dict]:
-    """Return the full event stream for a run (debug/audit).
-
-    ``task_id`` + ``after_seq`` let the subtask card page through one subagent
-    task's persisted steps without the run-wide ``limit`` truncating the tail (#3779).
-    """
+    "收集并返回，并遵守 list_run_events 所表达的接口约束。\n\nReturn the full event stream for a run (debug/audit).\n\n    ``task_id`` + ``after_seq`` let the subtask card page through one subagent\n    task's persisted steps without the run-wide ``limit`` truncating the tail (#3779).\n    "
     event_store = get_run_event_store(request)
     types = event_types.split(",") if event_types else None
     return await event_store.list_events(thread_id, run_id, event_types=types, task_id=task_id, limit=limit, after_seq=after_seq)
@@ -976,7 +955,7 @@ async def get_run_workspace_changes(
     include_files: bool = Query(default=True),
     include_diff: bool = Query(default=True),
 ) -> dict:
-    """Return workspace/output file changes recorded for one run."""
+    '读取并返回，并遵守 get_run_workspace_changes 所表达的接口约束。\n\nReturn workspace/output file changes recorded for one run.'
     event_store = get_run_event_store(request)
     return await get_workspace_changes_response(
         event_store,
@@ -994,7 +973,7 @@ async def thread_token_usage(
     request: Request,
     include_active: bool = Query(default=False, description="Include running run progress snapshots"),
 ) -> ThreadTokenUsageResponse:
-    """Thread-level token usage aggregation."""
+    '执行 thread_token_usage 的明确职责，并返回与调用约定一致的结果。\n\nThread-level token usage aggregation.'
     run_store = get_run_store(request)
     if include_active:
         agg = await run_store.aggregate_tokens_by_thread(thread_id, include_active=True)

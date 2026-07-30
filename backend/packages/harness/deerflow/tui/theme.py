@@ -1,9 +1,4 @@
-"""Restrained colour + symbol palette for the TUI.
-
-A Tokyo-Night-ish palette: calm, readable on dark terminals, with a few accent
-hues to distinguish speakers and tool state. Rich-compatible hex colours so the
-same constants drive both Rich renderables and Textual CSS variables.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -12,6 +7,7 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Theme:
+    '未说明'
     bg: str = "#1a1b26"
     panel: str = "#1f2335"
     border: str = "#2f334d"

@@ -1,16 +1,4 @@
-"""Regression tests for the generated OpenAPI spec.
-
-The Gateway exposes its FastAPI ``app.openapi()`` schema at ``/openapi.json``
-and downstream tooling (SDK codegen, schema validators, client generators)
-relies on ``operationId`` values being globally unique. FastAPI emits a
-``UserWarning`` during spec generation when two routes share the same
-``operationId`` — concretely this happens when ``@router.api_route`` registers
-one route for multiple HTTP methods, because the auto-generated unique id is
-computed from a single method picked out of ``route.methods`` while OpenAPI
-generation iterates over every method on that route.
-
-These tests pin that invariant so the warning cannot silently come back.
-"""
+"""验证 OpenAPI 文档中操作标识的唯一性及流式运行路由的双方法声明。"""
 
 from __future__ import annotations
 
@@ -21,17 +9,16 @@ import pytest
 
 @pytest.fixture(scope="module")
 def openapi_spec() -> dict:
-    """Build the OpenAPI spec for the Gateway app once per module."""
+    """生成模块级 OpenAPI 快照；每次夹具初始化前清除应用缓存。"""
     from app.gateway.app import app
 
-    # ``app.openapi()`` caches the result on the FastAPI instance, so reset to
-    # force a fresh generation pass that triggers any duplicate-id warnings.
+    # ``app.openapi()`` 会在 FastAPI 实例上缓存结果；重置缓存可强制重新生成并触发重复标识警告。
     app.openapi_schema = None
     return app.openapi()
 
 
 def test_openapi_spec_has_no_duplicate_operation_warnings() -> None:
-    """Generating the OpenAPI schema must not emit any ``Duplicate Operation ID`` UserWarning."""
+    """验证重新生成 OpenAPI 文档时不会发出重复 operationId 警告。"""
     from app.gateway.app import app
 
     app.openapi_schema = None
@@ -44,7 +31,7 @@ def test_openapi_spec_has_no_duplicate_operation_warnings() -> None:
 
 
 def test_openapi_operation_ids_are_unique(openapi_spec: dict) -> None:
-    """Every (path, method) operation in the spec must carry a unique ``operationId``."""
+    """验证 OpenAPI 中每个 operationId 至多对应一个路径和 HTTP 方法。"""
     op_id_to_locations: dict[str, list[tuple[str, str]]] = {}
 
     for path, path_item in openapi_spec.get("paths", {}).items():
@@ -61,11 +48,7 @@ def test_openapi_operation_ids_are_unique(openapi_spec: dict) -> None:
 
 
 def test_stream_existing_run_exposes_distinct_get_and_post(openapi_spec: dict) -> None:
-    """The ``/runs/{run_id}/stream`` endpoint must expose GET and POST as distinct operations.
-
-    LangGraph SDK ``joinStream`` uses GET while ``useStream``'s stop button uses POST, so
-    both methods must remain registered with their own ``operationId``.
-    """
+    """验证既有运行的流式端点同时声明 GET、POST 且二者的 operationId 不同。"""
     path = "/api/threads/{thread_id}/runs/{run_id}/stream"
     path_item = openapi_spec["paths"].get(path)
     assert path_item is not None, f"Expected {path} to be present in the OpenAPI spec"

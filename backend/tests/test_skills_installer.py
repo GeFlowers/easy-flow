@@ -1,4 +1,4 @@
-"""Tests for deerflow.skills.installer — shared skill installation logic."""
+'未说明'
 
 import asyncio
 import shutil
@@ -27,23 +27,29 @@ from deerflow.skills.storage import get_or_new_skill_storage
 
 
 class TestIsUnsafeZipMember:
+    '未说明'
     def test_absolute_path(self):
+        '未说明'
         info = zipfile.ZipInfo("/etc/passwd")
         assert is_unsafe_zip_member(info) is True
 
     def test_windows_absolute_path(self):
+        '未说明'
         info = zipfile.ZipInfo("C:\\Windows\\system32\\drivers\\etc\\hosts")
         assert is_unsafe_zip_member(info) is True
 
     def test_dotdot_traversal(self):
+        '未说明'
         info = zipfile.ZipInfo("foo/../../../etc/passwd")
         assert is_unsafe_zip_member(info) is True
 
     def test_safe_member(self):
+        '未说明'
         info = zipfile.ZipInfo("my-skill/SKILL.md")
         assert is_unsafe_zip_member(info) is False
 
     def test_empty_filename(self):
+        '未说明'
         info = zipfile.ZipInfo("")
         assert is_unsafe_zip_member(info) is False
 
@@ -54,12 +60,15 @@ class TestIsUnsafeZipMember:
 
 
 class TestIsSymlinkMember:
+    '未说明'
     def test_detects_symlink(self):
+        '未说明'
         info = zipfile.ZipInfo("link.txt")
         info.external_attr = (stat.S_IFLNK | 0o777) << 16
         assert is_symlink_member(info) is True
 
     def test_regular_file(self):
+        '未说明'
         info = zipfile.ZipInfo("file.txt")
         info.external_attr = (stat.S_IFREG | 0o644) << 16
         assert is_symlink_member(info) is False
@@ -71,13 +80,17 @@ class TestIsSymlinkMember:
 
 
 class TestShouldIgnoreArchiveEntry:
+    '未说明'
     def test_macosx_ignored(self):
+        '未说明'
         assert should_ignore_archive_entry(Path("__MACOSX")) is True
 
     def test_dotfile_ignored(self):
+        '未说明'
         assert should_ignore_archive_entry(Path(".DS_Store")) is True
 
     def test_normal_dir_not_ignored(self):
+        '未说明'
         assert should_ignore_archive_entry(Path("my-skill")) is False
 
 
@@ -87,18 +100,22 @@ class TestShouldIgnoreArchiveEntry:
 
 
 class TestResolveSkillDir:
+    '未说明'
     def test_single_dir(self, tmp_path):
+        '未说明'
         (tmp_path / "my-skill").mkdir()
         (tmp_path / "my-skill" / "SKILL.md").write_text("content")
         assert resolve_skill_dir_from_archive(tmp_path) == tmp_path / "my-skill"
 
     def test_with_macosx(self, tmp_path):
+        '未说明'
         (tmp_path / "my-skill").mkdir()
         (tmp_path / "my-skill" / "SKILL.md").write_text("content")
         (tmp_path / "__MACOSX").mkdir()
         assert resolve_skill_dir_from_archive(tmp_path) == tmp_path / "my-skill"
 
     def test_empty_after_filter(self, tmp_path):
+        '未说明'
         (tmp_path / "__MACOSX").mkdir()
         (tmp_path / ".DS_Store").write_text("meta")
         with pytest.raises(ValueError, match="empty"):
@@ -111,8 +128,9 @@ class TestResolveSkillDir:
 
 
 class TestSafeExtract:
+    '未说明'
     def _make_zip(self, tmp_path, members: dict[str, str | bytes]) -> Path:
-        """Create a zip with given filename->content entries."""
+        '未说明'
         zip_path = tmp_path / "test.zip"
         with zipfile.ZipFile(zip_path, "w") as zf:
             for name, content in members.items():
@@ -122,6 +140,7 @@ class TestSafeExtract:
         return zip_path
 
     def test_rejects_zip_bomb(self, tmp_path):
+        '未说明'
         zip_path = self._make_zip(tmp_path, {"big.txt": "x" * 1000})
         dest = tmp_path / "out"
         dest.mkdir()
@@ -130,6 +149,7 @@ class TestSafeExtract:
                 safe_extract_skill_archive(zf, dest, max_total_size=100)
 
     def test_rejects_absolute_path(self, tmp_path):
+        '未说明'
         zip_path = tmp_path / "abs.zip"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("/etc/passwd", "root:x:0:0")
@@ -140,6 +160,7 @@ class TestSafeExtract:
                 safe_extract_skill_archive(zf, dest)
 
     def test_skips_symlinks(self, tmp_path):
+        '未说明'
         zip_path = tmp_path / "sym.zip"
         with zipfile.ZipFile(zip_path, "w") as zf:
             info = zipfile.ZipInfo("link.txt")
@@ -154,6 +175,7 @@ class TestSafeExtract:
         assert not (dest / "link.txt").exists()
 
     def test_normal_archive(self, tmp_path):
+        '未说明'
         zip_path = self._make_zip(
             tmp_path,
             {
@@ -184,6 +206,7 @@ class TestSafeExtract:
         ],
     )
     def test_rejects_executable_binary(self, tmp_path, magic):
+        '未说明'
         zip_path = self._make_zip(
             tmp_path,
             {
@@ -198,6 +221,7 @@ class TestSafeExtract:
                 safe_extract_skill_archive(zf, dest)
 
     def test_allows_non_executable_binary_assets(self, tmp_path):
+        '未说明'
         zip_path = self._make_zip(
             tmp_path,
             {
@@ -212,7 +236,7 @@ class TestSafeExtract:
         assert (dest / "my-skill" / "assets" / "logo.png").exists()
 
     def test_allows_asset_sharing_a_partial_magic_prefix(self, tmp_path):
-        """Only full 4-byte magics are executable; \\xfe\\xed\\xfa + other byte is data."""
+        '未说明'
         zip_path = self._make_zip(
             tmp_path,
             {
@@ -233,15 +257,18 @@ class TestSafeExtract:
 
 
 class TestInstallSkillFromArchive:
+    '未说明'
     @pytest.fixture(autouse=True)
     def _allow_security_scan(self, monkeypatch):
+        """为安全 扫描准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
         async def _scan(*args, **kwargs):
+            '未说明'
             return ScanResult(decision="allow", reason="ok")
 
         monkeypatch.setattr("deerflow.skills.installer.scan_skill_content", _scan)
 
     def _make_skill_zip(self, tmp_path: Path, skill_name: str = "test-skill") -> Path:
-        """Create a valid .skill archive."""
+        '未说明'
         zip_path = tmp_path / f"{skill_name}.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr(
@@ -251,6 +278,7 @@ class TestInstallSkillFromArchive:
         return zip_path
 
     def test_success(self, tmp_path):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path)
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
@@ -260,6 +288,7 @@ class TestInstallSkillFromArchive:
         assert (skills_root / "custom" / "test-skill" / "SKILL.md").exists()
 
     def test_install_with_warning_findings_succeeds_and_writes_only_the_skill(self, tmp_path, monkeypatch):
+        '未说明'
         monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path / "runtime-home"))
         zip_path = tmp_path / "warning-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
@@ -278,6 +307,7 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "warning-skill" / ".skillscan.json").exists()
 
     def test_installed_skill_tree_is_readable_by_sandbox_mount(self, tmp_path):
+        '未说明'
         zip_path = tmp_path / "test-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test-skill/SKILL.md", "---\nname: test-skill\ndescription: A test skill\n---\n\n# test-skill\n")
@@ -298,12 +328,14 @@ class TestInstallSkillFromArchive:
         assert stat.S_IMODE(guide_file.stat().st_mode) & 0o044 == 0o044
 
     def test_scans_skill_markdown_before_install(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path)
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
         calls = []
 
         async def _scan(content, *, executable, location, static_findings=None):
+            '未说明'
             calls.append({"content": content, "executable": executable, "location": location})
             return ScanResult(decision="allow", reason="ok")
 
@@ -320,6 +352,7 @@ class TestInstallSkillFromArchive:
         ]
 
     def test_scans_support_files_and_scripts_before_install(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = tmp_path / "test-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test-skill/SKILL.md", "---\nname: test-skill\ndescription: A test skill\n---\n\n# test-skill\n")
@@ -334,6 +367,7 @@ class TestInstallSkillFromArchive:
         calls = []
 
         async def _scan(content, *, executable, location, static_findings=None):
+            '未说明'
             calls.append({"content": content, "executable": executable, "location": location})
             return ScanResult(decision="allow", reason="ok")
 
@@ -366,6 +400,7 @@ class TestInstallSkillFromArchive:
         assert all("secret" not in call["content"] for call in calls)
 
     def test_scans_code_files_anywhere_in_tree(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = tmp_path / "test-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test-skill/SKILL.md", "---\nname: test-skill\ndescription: A test skill\n---\n\n# test-skill\n")
@@ -379,6 +414,7 @@ class TestInstallSkillFromArchive:
         calls = []
 
         async def _scan(content, *, executable, location, static_findings=None):
+            '未说明'
             calls.append({"executable": executable, "location": location})
             return ScanResult(decision="allow", reason="ok")
 
@@ -394,7 +430,7 @@ class TestInstallSkillFromArchive:
         assert "test-skill/assets/data.txt" not in scanned_locations
 
     def test_shebang_sniff_only_reads_extensionless_files(self, tmp_path, monkeypatch):
-        """Suffix/scripts classification is name-based; only extensionless files are opened."""
+        '未说明'
         import deerflow.skills.installer as installer_module
 
         zip_path = tmp_path / "test-skill.skill"
@@ -410,6 +446,7 @@ class TestInstallSkillFromArchive:
         original_has_shebang = installer_module._has_shebang
 
         def _tracking_has_shebang(path):
+            '未说明'
             sniffed.append(path.name)
             return original_has_shebang(path)
 
@@ -420,6 +457,7 @@ class TestInstallSkillFromArchive:
         assert sniffed == ["tool"]
 
     def test_code_file_outside_scripts_warn_prevents_install(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = tmp_path / "test-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test-skill/SKILL.md", "---\nname: test-skill\ndescription: A test skill\n---\n\n# test-skill\n")
@@ -430,6 +468,7 @@ class TestInstallSkillFromArchive:
         skills_root.mkdir()
 
         async def _scan(*args, executable, **kwargs):
+            '未说明'
             if executable:
                 return ScanResult(decision="warn", reason="code needs review")
             return ScanResult(decision="allow", reason="ok")
@@ -442,6 +481,7 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "test-skill").exists()
 
     def test_executable_binary_prevents_install(self, tmp_path):
+        '未说明'
         zip_path = tmp_path / "test-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test-skill/SKILL.md", "---\nname: test-skill\ndescription: A test skill\n---\n\n# test-skill\n")
@@ -455,6 +495,7 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "test-skill").exists()
 
     def test_nested_skill_markdown_prevents_install(self, tmp_path):
+        '未说明'
         zip_path = tmp_path / "test-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test-skill/SKILL.md", "---\nname: test-skill\ndescription: A test skill\n---\n\n# test-skill\n")
@@ -468,6 +509,7 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "test-skill").exists()
 
     def test_script_warn_prevents_install(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = tmp_path / "test-skill.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("test-skill/SKILL.md", "---\nname: test-skill\ndescription: A test skill\n---\n\n# test-skill\n")
@@ -476,6 +518,7 @@ class TestInstallSkillFromArchive:
         skills_root.mkdir()
 
         async def _scan(*args, executable, **kwargs):
+            '未说明'
             if executable:
                 return ScanResult(decision="warn", reason="script needs review")
             return ScanResult(decision="allow", reason="ok")
@@ -488,11 +531,13 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "test-skill").exists()
 
     def test_security_scan_block_prevents_install(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path, skill_name="blocked-skill")
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
 
         async def _scan(*args, **kwargs):
+            '未说明'
             return ScanResult(decision="block", reason="prompt injection")
 
         monkeypatch.setattr("deerflow.skills.installer.scan_skill_content", _scan)
@@ -503,6 +548,7 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "blocked-skill").exists()
 
     def test_static_critical_scan_blocks_before_llm_scan(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = tmp_path / "blocked-static.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr(
@@ -514,6 +560,7 @@ class TestInstallSkillFromArchive:
         llm_calls = []
 
         async def _scan(*args, **kwargs):
+            '未说明'
             llm_calls.append({"args": args, "kwargs": kwargs})
             return ScanResult(decision="allow", reason="ok")
 
@@ -530,15 +577,18 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "blocked-static").exists()
 
     def test_static_scan_failure_blocks_install_before_llm_scan(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path, skill_name="scanner-failure-skill")
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
         llm_calls = []
 
         def _broken_static_scan(skill_dir, *, skill_name=None, app_config=None):
+            '未说明'
             raise StaticScannerError("native scanner unavailable")
 
         async def _scan(*args, **kwargs):
+            '未说明'
             llm_calls.append({"args": args, "kwargs": kwargs})
             return ScanResult(decision="allow", reason="ok")
 
@@ -554,6 +604,7 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "scanner-failure-skill").exists()
 
     def test_static_scan_runs_off_event_loop_thread(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path, skill_name="threaded-skill")
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
@@ -561,16 +612,19 @@ class TestInstallSkillFromArchive:
         static_thread_ids = []
 
         def _static_scan(skill_dir, *, skill_name=None, app_config=None):
+            '未说明'
             static_thread_ids.append(threading.get_ident())
             return []
 
         async def _scan(*args, **kwargs):
+            '未说明'
             return ScanResult(decision="allow", reason="ok")
 
         monkeypatch.setattr("deerflow.skills.installer.enforce_static_scan", _static_scan)
         monkeypatch.setattr("deerflow.skills.installer.scan_skill_content", _scan)
 
         async def _install():
+            '未说明'
             return await get_or_new_skill_storage(skills_path=skills_root).ainstall_skill_from_archive(zip_path)
 
         result = asyncio.run(_install())
@@ -580,12 +634,14 @@ class TestInstallSkillFromArchive:
         assert all(thread_id != loop_thread_id for thread_id in static_thread_ids)
 
     def test_copy_failure_does_not_leave_partial_install(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path)
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
         monkeypatch.setattr("deerflow.skills.installer.enforce_static_scan", lambda skill_dir, *, skill_name=None, app_config=None: [])
 
         def _copytree(src, dst):
+            '未说明'
             partial = Path(dst)
             partial.mkdir(parents=True)
             (partial / "partial.txt").write_text("partial", encoding="utf-8")
@@ -601,6 +657,7 @@ class TestInstallSkillFromArchive:
         assert not [path for path in custom_dir.iterdir() if path.name.startswith(".installing-test-skill-")]
 
     def test_concurrent_target_creation_does_not_get_clobbered(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path)
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
@@ -609,6 +666,7 @@ class TestInstallSkillFromArchive:
         monkeypatch.setattr("deerflow.skills.installer.enforce_static_scan", lambda skill_dir, *, skill_name=None, app_config=None: [])
 
         def _copytree(src, dst):
+            '未说明'
             target.mkdir(parents=True)
             (target / "marker.txt").write_text("external", encoding="utf-8")
             return original_copytree(src, dst)
@@ -622,11 +680,13 @@ class TestInstallSkillFromArchive:
         assert not (target / "SKILL.md").exists()
 
     def test_move_failure_cleans_reserved_target(self, tmp_path, monkeypatch):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path)
         skills_root = tmp_path / "skills"
         skills_root.mkdir()
 
         def _move(src, dst):
+            '未说明'
             Path(dst).write_text("partial", encoding="utf-8")
             raise OSError("move failed")
 
@@ -638,6 +698,7 @@ class TestInstallSkillFromArchive:
         assert not (skills_root / "custom" / "test-skill").exists()
 
     def test_duplicate_raises(self, tmp_path):
+        '未说明'
         zip_path = self._make_skill_zip(tmp_path)
         skills_root = tmp_path / "skills"
         (skills_root / "custom" / "test-skill").mkdir(parents=True)
@@ -645,12 +706,14 @@ class TestInstallSkillFromArchive:
             get_or_new_skill_storage(skills_path=skills_root).install_skill_from_archive(zip_path)
 
     def test_invalid_extension(self, tmp_path):
+        '未说明'
         bad_path = tmp_path / "bad.zip"
         bad_path.write_text("not a skill")
         with pytest.raises(ValueError, match=".skill"):
             get_or_new_skill_storage(skills_path=tmp_path).install_skill_from_archive(bad_path)
 
     def test_bad_frontmatter(self, tmp_path):
+        '未说明'
         zip_path = tmp_path / "bad.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("bad/SKILL.md", "no frontmatter here")
@@ -660,11 +723,12 @@ class TestInstallSkillFromArchive:
             get_or_new_skill_storage(skills_path=skills_root).install_skill_from_archive(zip_path)
 
     def test_nonexistent_file(self, tmp_path):
+        '未说明'
         with pytest.raises(FileNotFoundError):
             get_or_new_skill_storage(skills_path=tmp_path).install_skill_from_archive(Path("/nonexistent/path.skill"))
 
     def test_macosx_filtered_during_resolve(self, tmp_path):
-        """Archive with __MACOSX dir still installs correctly."""
+        '未说明'
         zip_path = tmp_path / "mac.skill"
         with zipfile.ZipFile(zip_path, "w") as zf:
             zf.writestr("my-skill/SKILL.md", "---\nname: my-skill\ndescription: desc\n---\n# My Skill\n")

@@ -1,29 +1,4 @@
-"""Real-LLM end-to-end verification for issue #2884.
-
-Drives a real ``langchain.agents.create_agent`` graph against a real OpenAI-
-compatible LLM (one-api gateway), bound through ``DeferredToolFilterMiddleware``
-and the production ``get_available_tools`` pipeline. The only thing we mock is
-the MCP tool source — we hand-roll two ``@tool``s and inject them through
-``deerflow.mcp.cache.get_cached_mcp_tools``.
-
-The flow exercised:
-  1. Turn 1: agent sees ``tool_search`` (plus a ``fake_subagent_trigger``
-     that re-enters ``get_available_tools`` on the same task — this is the
-     code path issue #2884 reports). It must call ``tool_search`` to
-     discover the deferred ``fake_calculator`` tool.
-  2. Tool batch: ``tool_search`` promotes ``fake_calculator``;
-     ``fake_subagent_trigger`` re-enters ``get_available_tools``.
-  3. Turn 2: the promoted ``fake_calculator`` schema must reach the model
-     so it can actually call it. Without this PR's fix, the re-entry wipes
-     the promotion and the model can no longer invoke the tool.
-
-Skipped unless ``ONEAPI_E2E=1`` is set so this doesn't burn credits on every
-test run. Run with::
-
-    ONEAPI_E2E=1 OPENAI_API_KEY=... OPENAI_API_BASE=... \
-        PYTHONPATH=. uv run pytest \
-        tests/test_deferred_tool_promotion_real_llm.py -v -s
-"""
+"定义 test_deferred_tool_promotion_real_llm 模块提供的职责与可复用接口。\n\nReal-LLM end-to-end verification for issue #2884.\n\nDrives a real ``langchain.agents.create_agent`` graph against a real OpenAI-\ncompatible LLM (one-api gateway), bound through ``DeferredToolFilterMiddleware``\nand the production ``get_available_tools`` pipeline. The only thing we mock is\nthe MCP tool source — we hand-roll two ``@tool``s and inject them through\n``deerflow.mcp.cache.get_cached_mcp_tools``.\n\nThe flow exercised:\n  1. Turn 1: agent sees ``tool_search`` (plus a ``fake_subagent_trigger``\n     that re-enters ``get_available_tools`` on the same task — this is the\n     code path issue #2884 reports). It must call ``tool_search`` to\n     discover the deferred ``fake_calculator`` tool.\n  2. Tool batch: ``tool_search`` promotes ``fake_calculator``;\n     ``fake_subagent_trigger`` re-enters ``get_available_tools``.\n  3. Turn 2: the promoted ``fake_calculator`` schema must reach the model\n     so it can actually call it. Without this PR's fix, the re-entry wipes\n     the promotion and the model can no longer invoke the tool.\n\nSkipped unless ``ONEAPI_E2E=1`` is set so this doesn't burn credits on every\ntest run. Run with::\n\n    ONEAPI_E2E=1 OPENAI_API_KEY=... OPENAI_API_BASE=...         PYTHONPATH=. uv run pytest         tests/test_deferred_tool_promotion_real_llm.py -v -s\n"
 
 from __future__ import annotations
 
@@ -55,10 +30,7 @@ _calls: list[str] = []
 
 @as_tool
 def fake_calculator(expression: str) -> str:
-    """Evaluate a tiny arithmetic expression like '2 + 2'.
-
-    Reserved for the user — only call this if the user asks for arithmetic.
-    """
+    "执行 fake_calculator 的明确职责，并返回与调用约定一致的结果。\n\nEvaluate a tiny arithmetic expression like '2 + 2'.\n\n    Reserved for the user — only call this if the user asks for arithmetic.\n    "
     _calls.append(f"fake_calculator:{expression}")
     try:
         # Trivially safe-eval just for the e2e check
@@ -72,7 +44,7 @@ def fake_calculator(expression: str) -> str:
 
 @as_tool
 def fake_translator(text: str, target_lang: str) -> str:
-    """Translate text into the given language code. Decorative — not used."""
+    '执行 fake_translator 的明确职责，并返回与调用约定一致的结果。\n\nTranslate text into the given language code. Decorative — not used.'
     _calls.append(f"fake_translator:{text}:{target_lang}")
     return f"[{target_lang}] {text}"
 
@@ -83,6 +55,7 @@ def fake_translator(text: str, target_lang: str) -> str:
 
 
 def _patch_mcp_pipeline(monkeypatch: pytest.MonkeyPatch, mcp_tools: list) -> None:
+    '执行 _patch_mcp_pipeline 的明确职责，并返回与调用约定一致的结果'
     from deerflow.config.extensions_config import ExtensionsConfig, McpServerConfig
 
     real_ext = ExtensionsConfig(
@@ -96,9 +69,7 @@ def _patch_mcp_pipeline(monkeypatch: pytest.MonkeyPatch, mcp_tools: list) -> Non
 
 
 def _force_tool_search_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Build a minimal mock AppConfig and patch the symbol — never call the
-    real loader, which would trigger ``_apply_singleton_configs`` and
-    permanently mutate cross-test singletons (memory, title, …)."""
+    '执行 _force_tool_search_enabled 的明确职责，并返回与调用约定一致的结果。\n\nBuild a minimal mock AppConfig and patch the symbol — never call the\n    real loader, which would trigger ``_apply_singleton_configs`` and\n    permanently mutate cross-test singletons (memory, title, …).'
     from deerflow.config.app_config import AppConfig
     from deerflow.config.tool_search_config import ToolSearchConfig
 
@@ -120,18 +91,7 @@ def _force_tool_search_enabled(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_real_llm_promotes_then_invokes_with_subagent_reentry(monkeypatch: pytest.MonkeyPatch):
-    """End-to-end against a real OpenAI-compatible LLM.
-
-    The model must:
-      Turn 1 — see ``tool_search`` (deferred tools aren't bound yet) and
-               batch-call BOTH ``tool_search(select:fake_calculator)`` AND
-               ``fake_subagent_trigger(...)``.
-      Turn 2 — call ``fake_calculator`` and finish.
-
-    Pass criterion: ``fake_calculator`` actually gets invoked at the tool
-    layer — recorded in ``_calls`` — which proves the model received the
-    promoted schema after the re-entrant ``get_available_tools`` call.
-    """
+    "验证 real、llm、promotes、then、invokes、with、subagent、reentry 场景下的预期行为、边界条件与结果。\n\nEnd-to-end against a real OpenAI-compatible LLM.\n\n    The model must:\n      Turn 1 — see ``tool_search`` (deferred tools aren't bound yet) and\n               batch-call BOTH ``tool_search(select:fake_calculator)`` AND\n               ``fake_subagent_trigger(...)``.\n      Turn 2 — call ``fake_calculator`` and finish.\n\n    Pass criterion: ``fake_calculator`` actually gets invoked at the tool\n    layer — recorded in ``_calls`` — which proves the model received the\n    promoted schema after the re-entrant ``get_available_tools`` call.\n    "
     from langchain.agents import create_agent
     from langchain_openai import ChatOpenAI
 
@@ -145,11 +105,7 @@ async def test_real_llm_promotes_then_invokes_with_subagent_reentry(monkeypatch:
 
     @as_tool
     async def fake_subagent_trigger(prompt: str) -> str:
-        """Pretend to spawn a subagent. Internally rebuilds the toolset.
-
-        Use this whenever the user asks you to delegate work — pass a short
-        description as ``prompt``.
-        """
+        '执行 fake_subagent_trigger 的明确职责，并返回与调用约定一致的结果。\n\nPretend to spawn a subagent. Internally rebuilds the toolset.\n\n        Use this whenever the user asks you to delegate work — pass a short\n        description as ``prompt``.\n        '
         # ``task_tool`` does this internally. With the closure + graph-state
         # design there is no shared registry/ContextVar, so a re-entrant
         # ``get_available_tools`` call here cannot affect the lead agent's

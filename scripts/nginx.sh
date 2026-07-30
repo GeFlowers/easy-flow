@@ -1,11 +1,10 @@
 #!/usr/bin/env bash
 #
-# nginx.sh — Start nginx alone in the foreground with the local dev config.
+# nginx.sh — 使用本地开发配置在前台单独启动 nginx。
 #
-# Mirrors how scripts/serve.sh launches nginx (same prefix, config, and
-# pre-created directories) — keep the two in sync.
+# 与 scripts/serve.sh 保持相同的前缀、配置和预建目录，避免单独启动与完整启动的权限行为不同。
 #
-# Usage: make nginx  (or ./scripts/nginx.sh from anywhere)
+# 用法：make nginx（或从任意目录执行 ./scripts/nginx.sh）
 
 set -e
 

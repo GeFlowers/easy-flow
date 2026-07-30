@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 import importlib.util
@@ -7,6 +8,7 @@ from pathlib import Path
 
 
 def _load_module():
+    '未说明'
     repo_root = Path(__file__).resolve().parents[2]
     script_path = repo_root / "scripts" / "sandbox_memory_profile.py"
     spec = importlib.util.spec_from_file_location("sandbox_memory_profile", script_path)
@@ -19,6 +21,7 @@ def _load_module():
 
 
 def test_parse_memory_bytes_handles_kubernetes_units():
+    '未说明'
     mod = _load_module()
 
     assert mod.parse_memory_bytes("512Ki") == 512 * 1024
@@ -30,6 +33,7 @@ def test_parse_memory_bytes_handles_kubernetes_units():
 
 
 def test_parse_top_pods_skips_header_and_preserves_raw_values():
+    '未说明'
     mod = _load_module()
 
     pods = mod.parse_top_pods(
@@ -46,6 +50,7 @@ sandbox-def 1 501Mi
 
 
 def test_parse_processes_sorts_by_rss_and_limits_results():
+    '未说明'
     mod = _load_module()
 
     processes = mod.parse_processes(
@@ -65,6 +70,7 @@ def test_parse_processes_sorts_by_rss_and_limits_results():
 
 
 def test_parse_processes_rejects_invalid_limit():
+    '未说明'
     mod = _load_module()
 
     try:
@@ -76,6 +82,7 @@ def test_parse_processes_rejects_invalid_limit():
 
 
 def test_build_report_merges_top_and_pod_metadata():
+    '未说明'
     mod = _load_module()
     top_pods = mod.parse_top_pods("sandbox-abc 29m 792Mi\n")
     pod_json = {
@@ -127,6 +134,7 @@ def test_build_report_merges_top_and_pod_metadata():
 
 
 def test_render_markdown_escapes_process_command_pipes():
+    '未说明'
     mod = _load_module()
     report = mod.build_report(
         namespace="deer-flow",
@@ -147,6 +155,7 @@ def test_render_markdown_escapes_process_command_pipes():
 
 
 def test_build_report_counts_unparsed_memory_values():
+    '未说明'
     mod = _load_module()
     report = mod.build_report(
         namespace="deer-flow",
@@ -164,6 +173,7 @@ def test_build_report_counts_unparsed_memory_values():
 
 
 def test_build_report_includes_process_sample_errors():
+    '未说明'
     mod = _load_module()
     report = mod.build_report(
         namespace="deer-flow",
@@ -179,6 +189,7 @@ def test_build_report_includes_process_sample_errors():
 
 
 def test_collect_process_samples_records_errors_and_continues(monkeypatch):
+    '未说明'
     mod = _load_module()
     pods = [
         mod.TopPod("sandbox-ok", "1m", "1Mi", 1, 1024 * 1024),
@@ -186,6 +197,7 @@ def test_collect_process_samples_records_errors_and_continues(monkeypatch):
     ]
 
     def fake_run_kubectl(args, *, kubectl, timeout=mod.DEFAULT_KUBECTL_TIMEOUT):
+        '未说明'
         if "sandbox-denied" in args:
             raise subprocess.CalledProcessError(1, args, stderr="exec denied")
         return "PID PPID RSS COMMAND\n20 1 2048 python worker.py\n"
@@ -204,6 +216,7 @@ def test_collect_process_samples_records_errors_and_continues(monkeypatch):
 
 
 def test_collect_process_samples_records_timeout_and_continues(monkeypatch):
+    '未说明'
     mod = _load_module()
     pods = [
         mod.TopPod("sandbox-timeout", "1m", "1Mi", 1, 1024 * 1024),
@@ -211,6 +224,7 @@ def test_collect_process_samples_records_timeout_and_continues(monkeypatch):
     ]
 
     def fake_run_kubectl(args, *, kubectl, timeout=mod.DEFAULT_KUBECTL_TIMEOUT):
+        '未说明'
         if "sandbox-timeout" in args:
             raise subprocess.TimeoutExpired(args, timeout)
         return "PID PPID RSS COMMAND\n20 1 2048 python worker.py\n"
@@ -230,6 +244,7 @@ def test_collect_process_samples_records_timeout_and_continues(monkeypatch):
 
 
 def test_render_markdown_includes_sample_and_notes():
+    '未说明'
     mod = _load_module()
     report = mod.build_report(
         namespace="deer-flow",
@@ -249,6 +264,7 @@ def test_render_markdown_includes_sample_and_notes():
 
 
 def test_collect_rejects_invalid_kubectl_timeout():
+    '未说明'
     mod = _load_module()
 
     try:

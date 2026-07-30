@@ -1,9 +1,4 @@
-"""Thread-scoped goal state and evaluator helpers.
-
-This module implements the Claude Code-style goal loop primitives used by
-Gateway runs and thin API surfaces. It intentionally lives in ``deerflow`` so
-the harness can evaluate and continue runs without importing the FastAPI app.
-"""
+'定义 goal 模块提供的职责与可复用接口。\n\nThread-scoped goal state and evaluator helpers.\n\nThis module implements the Claude Code-style goal loop primitives used by\nGateway runs and thin API surfaces. It intentionally lives in ``deerflow`` so\nthe harness can evaluate and continue runs without importing the FastAPI app.\n'
 
 from __future__ import annotations
 
@@ -61,12 +56,12 @@ _goal_locks_by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[s
 
 
 class GoalWriteConflict(RuntimeError):
-    """Raised when a goal write is based on a stale checkpoint."""
+    '封装 GoalWriteConflict 的状态、协作关系与公开操作。\n\nRaised when a goal write is based on a stale checkpoint.'
 
 
 @asynccontextmanager
 async def goal_thread_lock(thread_id: str) -> AsyncIterator[None]:
-    """Serialize goal read-modify-write sequences within the current event loop."""
+    '执行 goal_thread_lock 的明确职责，并返回与调用约定一致的结果。\n\nSerialize goal read-modify-write sequences within the current event loop.'
     loop = asyncio.get_running_loop()
     with _goal_locks_guard:
         locks = _goal_locks_by_loop.get(loop)
@@ -83,20 +78,14 @@ async def goal_thread_lock(thread_id: str) -> AsyncIterator[None]:
 
 
 class GoalCommand(NamedTuple):
-    """Parsed intent of a ``/goal`` slash command argument string."""
+    '封装 GoalCommand 的状态、协作关系与公开操作。\n\nParsed intent of a ``/goal`` slash command argument string.'
 
     kind: Literal["status", "clear", "set"]
     objective: str = ""
 
 
 def parse_goal_command(args: str) -> GoalCommand:
-    """Parse the argument string of a ``/goal`` command into an intent.
-
-    Shared by the TUI and IM-channel surfaces so the three-way semantics stay in
-    one place: empty shows the active goal, ``clear``/``reset``/``off`` clears it,
-    and anything else sets the goal to that (trimmed) objective. The frontend
-    keeps a parallel TypeScript copy in ``input-box-helpers.ts``.
-    """
+    '解析输入并返回结构化结果，并遵守 parse_goal_command 所表达的接口约束。\n\nParse the argument string of a ``/goal`` command into an intent.\n\n    Shared by the TUI and IM-channel surfaces so the three-way semantics stay in\n    one place: empty shows the active goal, ``clear``/``reset``/``off`` clears it,\n    and anything else sets the goal to that (trimmed) objective. The frontend\n    keeps a parallel TypeScript copy in ``input-box-helpers.ts``.\n    '
     stripped = args.strip()
     if not stripped:
         return GoalCommand("status")
@@ -106,7 +95,7 @@ def parse_goal_command(args: str) -> GoalCommand:
 
 
 def normalize_goal_objective(objective: str) -> str:
-    """Normalize and validate user-provided goal text."""
+    '执行 normalize_goal_objective 的明确职责，并返回与调用约定一致的结果。\n\nNormalize and validate user-provided goal text.'
     normalized = " ".join(objective.strip().split())
     if not normalized:
         raise ValueError("Goal objective must not be empty.")
@@ -122,7 +111,7 @@ def build_goal_state(
     max_no_progress_continuations: int = DEFAULT_MAX_NO_PROGRESS_CONTINUATIONS,
     now: str | None = None,
 ) -> GoalState:
-    """Create a fresh active goal state for a thread."""
+    '构建并返回，并遵守 build_goal_state 所表达的接口约束。\n\nCreate a fresh active goal state for a thread.'
     objective = normalize_goal_objective(objective)
     capped_max = max(0, min(int(max_continuations), DEFAULT_MAX_GOAL_CONTINUATIONS))
     timestamp = now or now_iso()
@@ -139,7 +128,7 @@ def build_goal_state(
 
 
 def parse_goal_evaluation_response(text: str) -> GoalEvaluation:
-    """Parse the evaluator's JSON object response."""
+    "解析输入并返回结构化结果，并遵守 parse_goal_evaluation_response 所表达的接口约束。\n\nParse the evaluator's JSON object response."
     candidate = _strip_markdown_code_fence(_strip_think_blocks(text))
     start = candidate.find("{")
     end = candidate.rfind("}")
@@ -166,12 +155,14 @@ def parse_goal_evaluation_response(text: str) -> GoalEvaluation:
 
 
 def _normalize_evaluation_text(value: object, *, max_chars: int) -> str:
+    '执行 _normalize_evaluation_text 的明确职责，并返回与调用约定一致的结果'
     if not isinstance(value, str):
         return ""
     return " ".join(value.strip().split())[:max_chars]
 
 
 def _normalize_goal_blocker(value: object, *, satisfied: bool) -> GoalBlocker:
+    '执行 _normalize_goal_blocker 的明确职责，并返回与调用约定一致的结果'
     if satisfied:
         return "none"
     if isinstance(value, str) and value in GOAL_BLOCKERS and value != "none":
@@ -180,6 +171,7 @@ def _normalize_goal_blocker(value: object, *, satisfied: bool) -> GoalBlocker:
 
 
 def _message_type(message: Any) -> str | None:
+    '执行 _message_type 的明确职责，并返回与调用约定一致的结果'
     value = getattr(message, "type", None)
     if value is None and isinstance(message, dict):
         value = message.get("type") or message.get("role")
@@ -191,6 +183,7 @@ def _message_type(message: Any) -> str | None:
 
 
 def _additional_kwargs(message: Any) -> dict[str, Any]:
+    '执行 _additional_kwargs 的明确职责，并返回与调用约定一致的结果'
     value = getattr(message, "additional_kwargs", None)
     if value is None and isinstance(message, dict):
         value = message.get("additional_kwargs")
@@ -198,18 +191,19 @@ def _additional_kwargs(message: Any) -> dict[str, Any]:
 
 
 def _is_visible_message(message: Any) -> bool:
+    '执行 _is_visible_message 的明确职责，并返回与调用约定一致的结果'
     if _additional_kwargs(message).get("hide_from_ui") is True:
         return False
     return _message_type(message) in {"human", "ai"}
 
 
 def has_visible_assistant_evidence(messages: list[Any]) -> bool:
-    """Return true when the evaluator can inspect at least one visible AI reply."""
+    '判断目标是否具备指定特征并返回布尔结果，并遵守 has_visible_assistant_evidence 所表达的接口约束。\n\nReturn true when the evaluator can inspect at least one visible AI reply.'
     return any(_is_visible_message(message) and _message_type(message) == "ai" and bool(message_to_text(message).strip()) for message in messages)
 
 
 def visible_conversation_signature(messages: list[Any]) -> str:
-    """Return a stable lightweight signature for the visible evaluator evidence."""
+    '执行 visible_conversation_signature 的明确职责，并返回与调用约定一致的结果。\n\nReturn a stable lightweight signature for the visible evaluator evidence.'
     visible = []
     for message in messages:
         if not _is_visible_message(message):
@@ -224,7 +218,7 @@ def visible_conversation_signature(messages: list[Any]) -> str:
 
 
 def format_visible_conversation(messages: list[Any]) -> str:
-    """Return the user-visible conversation evidence for goal evaluation."""
+    '格式化输入并返回规范化文本，并遵守 format_visible_conversation 所表达的接口约束。\n\nReturn the user-visible conversation evidence for goal evaluation.'
     lines: list[str] = []
     visible = [message for message in messages if _is_visible_message(message)]
     for message in visible[-MAX_GOAL_CONVERSATION_MESSAGES:]:
@@ -244,17 +238,7 @@ def create_goal_evaluator_model(
     model_name: str | None = None,
     app_config: Any | None = None,
 ) -> Any:
-    """Create the non-thinking chat model used by the goal evaluator.
-
-    The evaluator runs from ``runtime/runs/worker.py`` after the main graph
-    run has already completed, so — unlike ``make_lead_agent``/
-    ``DeerFlowClient.stream``, which attach ``build_tracing_callbacks()`` at
-    the graph root and correctly pass ``attach_tracing=False`` to avoid
-    double-attaching — there is no graph root here for the evaluator's model
-    call to inherit tracing from. It must attach its own model-level tracing
-    callbacks, same as the other standalone, non-graph callers
-    (``oneshot_llm.run_oneshot_llm``, ``MemoryUpdater``).
-    """
+    "创建并返回，并遵守 create_goal_evaluator_model 所表达的接口约束。\n\nCreate the non-thinking chat model used by the goal evaluator.\n\n    The evaluator runs from ``runtime/runs/worker.py`` after the main graph\n    run has already completed, so — unlike ``make_lead_agent``/\n    ``DeerFlowClient.stream``, which attach ``build_tracing_callbacks()`` at\n    the graph root and correctly pass ``attach_tracing=False`` to avoid\n    double-attaching — there is no graph root here for the evaluator's model\n    call to inherit tracing from. It must attach its own model-level tracing\n    callbacks, same as the other standalone, non-graph callers\n    (``oneshot_llm.run_oneshot_llm``, ``MemoryUpdater``).\n    "
     return create_chat_model(
         name=model_name,
         thinking_enabled=False,
@@ -264,6 +248,7 @@ def create_goal_evaluator_model(
 
 
 def _resolve_environment() -> str | None:
+    '执行 _resolve_environment 的明确职责，并返回与调用约定一致的结果'
     return os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT")
 
 
@@ -278,15 +263,7 @@ async def evaluate_goal_completion(
     user_id: str | None = None,
     deerflow_trace_id: str | None = None,
 ) -> GoalEvaluation:
-    """Ask a small non-thinking model whether the active goal is satisfied.
-
-    ``thread_id``/``user_id``/``deerflow_trace_id`` are forwarded to Langfuse
-    trace metadata only (mirrors ``oneshot_llm.run_oneshot_llm``): this is a
-    standalone model call outside the main graph, so it must inject its own
-    Langfuse session/user attribution instead of relying on graph-root
-    callbacks to lift it — same fix as PR #2944 (main graph) and PR #3902
-    (memory_agent/suggest_agent).
-    """
+    '执行 evaluate_goal_completion 的明确职责，并返回与调用约定一致的结果。\n\nAsk a small non-thinking model whether the active goal is satisfied.\n\n    ``thread_id``/``user_id``/``deerflow_trace_id`` are forwarded to Langfuse\n    trace metadata only (mirrors ``oneshot_llm.run_oneshot_llm``): this is a\n    standalone model call outside the main graph, so it must inject its own\n    Langfuse session/user attribution instead of relying on graph-root\n    callbacks to lift it — same fix as PR #2944 (main graph) and PR #3902\n    (memory_agent/suggest_agent).\n    '
     conversation = format_visible_conversation(messages)
     if not conversation or not has_visible_assistant_evidence(messages):
         return GoalEvaluation(
@@ -328,7 +305,7 @@ async def evaluate_goal_completion(
 
 
 def should_continue_goal(goal: GoalState, evaluation: GoalEvaluation, *, no_progress_count: int | None = None) -> bool:
-    """Return whether another hidden continuation turn should run."""
+    '执行 should_continue_goal 的明确职责，并返回与调用约定一致的结果。\n\nReturn whether another hidden continuation turn should run.'
     if evaluation["satisfied"]:
         return False
     if evaluation["blocker"] not in CONTINUABLE_GOAL_BLOCKERS:
@@ -341,15 +318,7 @@ def should_continue_goal(goal: GoalState, evaluation: GoalEvaluation, *, no_prog
 
 
 def latest_visible_assistant_signature(messages: list[Any]) -> str:
-    """Return a stable signature of the latest visible assistant evidence.
-
-    The "no progress" breaker keys on what the agent actually produced — the
-    text of the most recent user-visible assistant message — not on the
-    evaluator's free-text ``reason``/``evidence_summary`` (which an LLM rewords
-    on every turn, so it almost never repeats byte-for-byte). When a
-    continuation adds no new visible assistant output, the signature is
-    unchanged and the breaker can recognise the stalled turn.
-    """
+    '执行 latest_visible_assistant_signature 的明确职责，并返回与调用约定一致的结果。\n\nReturn a stable signature of the latest visible assistant evidence.\n\n    The "no progress" breaker keys on what the agent actually produced — the\n    text of the most recent user-visible assistant message — not on the\n    evaluator\'s free-text ``reason``/``evidence_summary`` (which an LLM rewords\n    on every turn, so it almost never repeats byte-for-byte). When a\n    continuation adds no new visible assistant output, the signature is\n    unchanged and the breaker can recognise the stalled turn.\n    '
     for message in reversed(messages):
         if not _is_visible_message(message) or _message_type(message) != "ai":
             continue
@@ -360,12 +329,7 @@ def latest_visible_assistant_signature(messages: list[Any]) -> str:
 
 
 def compute_goal_progress_key(evaluation: GoalEvaluation, *, evidence_signature: str = "") -> str:
-    """Return a stable key used to detect repeated non-progress evaluations.
-
-    Keyed on the typed ``blocker`` plus a signature of the visible assistant
-    evidence, so a stalled goal is detected even when the evaluator rewords its
-    free-text ``reason``/``evidence_summary``.
-    """
+    '执行 compute_goal_progress_key 的明确职责，并返回与调用约定一致的结果。\n\nReturn a stable key used to detect repeated non-progress evaluations.\n\n    Keyed on the typed ``blocker`` plus a signature of the visible assistant\n    evidence, so a stalled goal is detected even when the evaluator rewords its\n    free-text ``reason``/``evidence_summary``.\n    '
     return json.dumps(
         {
             "satisfied": evaluation["satisfied"],
@@ -378,7 +342,7 @@ def compute_goal_progress_key(evaluation: GoalEvaluation, *, evidence_signature:
 
 
 def compute_no_progress_count(goal: GoalState, evaluation: GoalEvaluation, *, evidence_signature: str = "") -> int:
-    """Increment repeated-progress count when visible evidence has not advanced."""
+    '执行 compute_no_progress_count 的明确职责，并返回与调用约定一致的结果。\n\nIncrement repeated-progress count when visible evidence has not advanced.'
     if evaluation["satisfied"]:
         return 0
     progress_key = compute_goal_progress_key(evaluation, evidence_signature=evidence_signature)
@@ -389,7 +353,7 @@ def compute_no_progress_count(goal: GoalState, evaluation: GoalEvaluation, *, ev
 
 
 def make_goal_continuation_message(goal: GoalState, evaluation: GoalEvaluation) -> HumanMessage:
-    """Build the hidden user message that asks the agent to keep working."""
+    '构造并返回，并遵守 make_goal_continuation_message 所表达的接口约束。\n\nBuild the hidden user message that asks the agent to keep working.'
     content = (
         "<goal_continuation>\n"
         f"Active goal: {goal['objective']}\n"
@@ -409,6 +373,7 @@ def make_goal_continuation_message(goal: GoalState, evaluation: GoalEvaluation) 
 
 
 async def _call_checkpointer_method(checkpointer: Any, async_name: str, sync_name: str, *args: Any, **kwargs: Any) -> Any:
+    '执行 _call_checkpointer_method 的明确职责，并返回与调用约定一致的结果'
     async_method = getattr(checkpointer, async_name, None)
     if async_method is not None:
         result = async_method(*args, **kwargs)
@@ -423,6 +388,7 @@ async def _call_checkpointer_method(checkpointer: Any, async_name: str, sync_nam
 
 
 def _next_channel_version(checkpointer: Any, current_version: Any) -> Any:
+    '执行 _next_channel_version 的明确职责，并返回与调用约定一致的结果'
     get_next_version = getattr(checkpointer, "get_next_version", None)
     if callable(get_next_version):
         return get_next_version(current_version, None)
@@ -432,7 +398,7 @@ def _next_channel_version(checkpointer: Any, current_version: Any) -> Any:
 
 
 async def ensure_thread_checkpoint(checkpointer: Any, thread_id: str) -> None:
-    """Create an empty root checkpoint for *thread_id* when none exists."""
+    '执行 ensure_thread_checkpoint 的明确职责，并返回与调用约定一致的结果。\n\nCreate an empty root checkpoint for *thread_id* when none exists.'
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     checkpoint_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", config)
     if checkpoint_tuple is not None:
@@ -448,6 +414,7 @@ async def ensure_thread_checkpoint(checkpointer: Any, thread_id: str) -> None:
 
 
 def _checkpoint_id_from_tuple(checkpoint_tuple: Any) -> str | None:
+    '执行 _checkpoint_id_from_tuple 的明确职责，并返回与调用约定一致的结果'
     config = getattr(checkpoint_tuple, "config", {}) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     checkpoint_id = configurable.get("checkpoint_id") if isinstance(configurable, dict) else None
@@ -460,7 +427,7 @@ def _checkpoint_id_from_tuple(checkpoint_tuple: Any) -> str | None:
 
 
 async def read_thread_goal(checkpointer: Any, thread_id: str) -> GoalState | None:
-    """Read the latest thread goal from checkpoint state."""
+    '执行 read_thread_goal 的明确职责，并返回与调用约定一致的结果。\n\nRead the latest thread goal from checkpoint state.'
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     checkpoint_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", config)
     if checkpoint_tuple is None:
@@ -480,10 +447,7 @@ async def write_thread_goal(
     create_if_missing: bool = False,
     expected_checkpoint_id: str | None = None,
 ) -> dict[str, Any]:
-    """Write a new checkpoint with the thread goal set or cleared.
-
-    Returns the updated channel values.
-    """
+    '执行 write_thread_goal 的明确职责，并返回与调用约定一致的结果。\n\nWrite a new checkpoint with the thread goal set or cleared.\n\n    Returns the updated channel values.\n    '
     if create_if_missing:
         await ensure_thread_checkpoint(checkpointer, thread_id)
 
@@ -541,7 +505,7 @@ def attach_goal_evaluation(
     stand_down_reason: str | None = None,
     evidence_signature: str = "",
 ) -> GoalState:
-    """Return a goal copy with the latest evaluator result attached."""
+    '执行 attach_goal_evaluation 的明确职责，并返回与调用约定一致的结果。\n\nReturn a goal copy with the latest evaluator result attached.'
     next_goal = copy.deepcopy(goal)
     if continuation_count is not None:
         next_goal["continuation_count"] = continuation_count

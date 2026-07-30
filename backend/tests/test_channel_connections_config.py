@@ -1,9 +1,10 @@
-"""Tests for user-facing IM channel connection configuration."""
+"""本模块覆盖相关测试，固定公开行为、失败处理与状态边界。"""
 
 from deerflow.config.channel_connections_config import ChannelConnectionsConfig
 
 
 def test_channel_connections_disabled_by_default():
+    """验证当前场景的同步调用：使用受控输入与依赖替身，通过9项断言固定返回、状态或副作用边界。"""
     config = ChannelConnectionsConfig()
 
     assert config.enabled is False
@@ -18,6 +19,7 @@ def test_channel_connections_disabled_by_default():
 
 
 def test_enabled_channel_connections_do_not_require_public_url_or_encryption_key():
+    """验证当前场景的同步调用：使用受控输入与依赖替身，通过8项断言固定返回、状态或副作用边界。"""
     config = ChannelConnectionsConfig.model_validate(
         {
             "enabled": True,
@@ -45,6 +47,7 @@ def test_enabled_channel_connections_do_not_require_public_url_or_encryption_key
 
 
 def test_require_bound_identity_can_be_disabled_for_legacy_open_bot_mode():
+    """验证当前场景的同步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
     config = ChannelConnectionsConfig.model_validate({"enabled": True, "require_bound_identity": False})
 
     assert config.enabled is True
@@ -52,6 +55,7 @@ def test_require_bound_identity_can_be_disabled_for_legacy_open_bot_mode():
 
 
 def test_provider_status_reports_disabled_and_unknown_providers():
+    """验证当前场景的同步调用：使用受控输入与依赖替身，通过8项断言固定返回、状态或副作用边界。"""
     config = ChannelConnectionsConfig.model_validate({"enabled": True})
 
     assert config.provider_status("slack") == {"enabled": False, "configured": False}

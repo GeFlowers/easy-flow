@@ -6,6 +6,7 @@ type CanvasProps = ReactFlowProps & {
   children?: ReactNode;
 };
 
+/** Canvas 组件：提供对应的界面结构与交互语义。 */
 export const Canvas = ({ children, ...props }: CanvasProps) => (
   <ReactFlow
     deleteKeyCode={["Backspace", "Delete"]}

@@ -1,9 +1,4 @@
-"""run ownership.
-
-Revision ID: 0004_run_ownership
-Revises: 0003_scheduled_tasks
-Create Date: 2026-07-07
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -22,20 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def _dedupe_active_runs_per_thread() -> None:
-    """Cancel superseded active rows so the partial unique index can be built.
-
-    ``uq_runs_thread_active`` enforces at most one pending/running row per
-    ``thread_id``. A DB that already has two+ active rows for the same thread
-    (reachable in the field: Postgres deployments had reconciliation skipped
-    by the old sqlite-only gate, and anyone who ran ``GATEWAY_WORKERS>1``
-    before this PR can have duplicates) would fail ``CREATE UNIQUE INDEX``
-    and abort the alembic upgrade, blocking gateway startup.
-
-    Keep the newest active row per ``thread_id`` (by ``created_at`` DESC,
-    ``run_id`` DESC as a deterministic tiebreaker) and mark the rest as
-    ``error``. Cancelled rows get an explanatory ``error`` string so
-    operators can see why the run was killed.
-    """
+    """执行持久化流程所需的内部辅助操作。"""
     bind = op.get_bind()
     cancel_message = "cancelled during migration 0004_run_ownership: superseded by a newer active run for the same thread (partial unique index uq_runs_thread_active)"
     find_dupe_rows = sa.text(
@@ -88,6 +70,7 @@ def _dedupe_active_runs_per_thread() -> None:
 
 
 def upgrade() -> None:
+    """执行本迁移版本定义的数据库架构升级操作。"""
     from deerflow.persistence.migrations._helpers import safe_add_column
 
     safe_add_column("runs", sa.Column("owner_worker_id", sa.String(length=128), nullable=True))
@@ -118,6 +101,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    """执行本迁移版本定义的数据库架构回退操作。"""
     bind = op.get_bind()
     insp = sa.inspect(bind)
     existing = {ix["name"] for ix in insp.get_indexes("runs")}

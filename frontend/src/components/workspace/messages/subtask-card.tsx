@@ -38,6 +38,7 @@ import { FlipDisplay } from "../flip-display";
 
 import { MarkdownContent } from "./markdown-content";
 
+/** 展示子代理的运行状态、累计步骤和可按需回填的历史时间线。 */
 export function SubtaskCard({
   className,
   taskId,
@@ -69,13 +70,12 @@ export function SubtaskCard({
         : t.tokenUsage.unavailableShort
     : undefined;
 
-  // The card shows the subagent's step timeline (#3779): its reasoning turns
-  // (AI text) interleaved with the tools it ran (by name). See stepsForDisplay
-  // for what is kept/dropped.
+  // 卡片展示子代理的步骤时间线（#3779）：推理轮次（AI 文本）与其调用的工具
+  // （按名称）交错排列；保留与过滤规则见 stepsForDisplay。
   const displaySteps = stepsForDisplay(task.steps, task.status);
 
-  // Backfill step history on expand for historical runs (#3779). Live runs
-  // already have steps from SSE, so the `steps.length` guard skips the fetch.
+  // 展开历史运行时回填步骤记录（#3779）。实时运行已通过 SSE 获取步骤，
+  // 因此 `steps.length` 守卫会跳过请求。
   const stepsCount = task.steps?.length ?? 0;
   const backfilledRef = useRef(false);
   useEffect(() => {
@@ -93,7 +93,7 @@ export function SubtaskCard({
         }
       })
       .catch(() => {
-        // Allow a retry on the next expand if the fetch failed.
+        // 请求失败时允许下次展开重试。
         backfilledRef.current = false;
       });
   }, [collapsed, stepsCount, threadId, runId, taskId, updateSubtask]);

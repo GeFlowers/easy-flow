@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 
+/** Section 组件：提供对应的界面结构与交互语义。 */
 export function Section({
   className,
   title,

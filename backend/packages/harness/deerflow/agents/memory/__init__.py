@@ -1,15 +1,12 @@
-"""Pluggable memory for DeerFlow.
+"""提供可插拔的记忆系统。
 
-The shared, backend-agnostic core: the :class:`MemoryManager` contract, the
-:func:`get_memory_manager` singleton factory, and :func:`reset_memory_manager`.
-Backends live under :mod:`backends` (each self-contained, exposing
-``MANAGER_CLASS``); the default DeerMem backend's functional modules live in
-``backends/deermem/core/``. Swap backend = drop a ``backends/<name>/`` folder +
-set ``MemoryConfig.manager_class`` -- nothing else in deer-flow changes.
+此包包含与后端无关的共享核心：记忆管理器契约、单例工厂及其重置入口。
+后端位于后端子包中，每个后端都自包含并暴露管理器类；默认记忆后端的功能
+模块位于其核心目录。替换后端只需新增对应目录并在记忆配置中指定名称，其他
+宿主代码无需改动。
 
-DeerMem-private symbols (``format_memory_for_injection``, ``get_memory_data``,
-``MemoryUpdater``, ``FileMemoryStorage``, ...) are NOT re-exported here -- import
-them directly from ``deerflow.agents.memory.backends.deermem.deermem.core.*``.
+默认后端的私有格式化、数据访问、更新器和文件存储等符号不在此重新导出，
+应从该后端的核心模块直接导入。
 """
 
 from deerflow.agents.memory.manager import (

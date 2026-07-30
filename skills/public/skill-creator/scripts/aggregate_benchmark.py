@@ -1,37 +1,7 @@
 #!/usr/bin/env python3
-"""
-Aggregate individual run results into benchmark summary statistics.
+"""将单次运行结果汇总为基准统计数据。
 
-Reads grading.json files from run directories and produces:
-- run_summary with mean, stddev, min, max for each metric
-- delta between with_skill and without_skill configurations
-
-Usage:
-    python aggregate_benchmark.py <benchmark_dir>
-
-Example:
-    python aggregate_benchmark.py benchmarks/2026-01-15T10-30-00/
-
-The script supports two directory layouts:
-
-    Workspace layout (from skill-creator iterations):
-    <benchmark_dir>/
-    └── eval-N/
-        ├── with_skill/
-        │   ├── run-1/grading.json
-        │   └── run-2/grading.json
-        └── without_skill/
-            ├── run-1/grading.json
-            └── run-2/grading.json
-
-    Legacy layout (with runs/ subdirectory):
-    <benchmark_dir>/
-    └── runs/
-        └── eval-N/
-            ├── with_skill/
-            │   └── run-1/grading.json
-            └── without_skill/
-                └── run-1/grading.json
+脚本读取运行目录中的评分文件，为每种配置计算通过率、耗时和令牌数的均值、标准差、最小值与最大值，并计算前两种配置的差值。兼容评估目录直接位于基准目录，以及评估目录位于专用运行目录下的两种布局。
 """
 
 import argparse
@@ -43,7 +13,7 @@ from pathlib import Path
 
 
 def calculate_stats(values: list[float]) -> dict:
-    """Calculate mean, stddev, min, max for a list of values."""
+    """计算数值列表的均值、样本标准差、最小值和最大值；空列表统一返回零值统计。"""
     if not values:
         return {"mean": 0.0, "stddev": 0.0, "min": 0.0, "max": 0.0}
 
@@ -65,12 +35,7 @@ def calculate_stats(values: list[float]) -> dict:
 
 
 def load_run_results(benchmark_dir: Path) -> dict:
-    """
-    Load all run results from a benchmark directory.
-
-    Returns dict keyed by config name (e.g. "with_skill"/"without_skill",
-    or "new_skill"/"old_skill"), each containing a list of run results.
-    """
+    """从基准目录的两种兼容布局读取评分文件，按配置名称归集每次运行的指标和期望详情。"""
     # Support both layouts: eval dirs directly under benchmark_dir, or under runs/
     runs_dir = benchmark_dir / "runs"
     if runs_dir.exists():
@@ -174,11 +139,7 @@ def load_run_results(benchmark_dir: Path) -> dict:
 
 
 def aggregate_results(results: dict) -> dict:
-    """
-    Aggregate run results into summary statistics.
-
-    Returns run_summary with stats for each configuration and delta.
-    """
+    """汇总每种配置的指标统计，并以第一种配置减第二种配置的方式计算通过率、耗时和令牌数差值。"""
     run_summary = {}
     configs = list(results.keys())
 
@@ -225,9 +186,7 @@ def aggregate_results(results: dict) -> dict:
 
 
 def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: str = "") -> dict:
-    """
-    Generate complete benchmark.json from run results.
-    """
+    """整合原始运行记录、统计摘要和基准元数据，生成可供评审页与分析器消费的完整基准对象。"""
     results = load_run_results(benchmark_dir)
     run_summary = aggregate_results(results)
 
@@ -279,7 +238,7 @@ def generate_benchmark(benchmark_dir: Path, skill_name: str = "", skill_path: st
 
 
 def generate_markdown(benchmark: dict) -> str:
-    """Generate human-readable benchmark.md from benchmark data."""
+    """将基准对象转为包含配置对比表和可选说明的可读标记文档。"""
     metadata = benchmark["metadata"]
     run_summary = benchmark["run_summary"]
 
@@ -336,6 +295,7 @@ def generate_markdown(benchmark: dict) -> str:
 
 
 def main():
+    """解析基准目录和可选技能元数据，写出结构化基准文件及其可读摘要，并在终端打印核心差值。"""
     parser = argparse.ArgumentParser(
         description="Aggregate benchmark run results into summary statistics"
     )

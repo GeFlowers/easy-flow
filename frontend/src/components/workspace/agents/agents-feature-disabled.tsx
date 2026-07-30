@@ -4,6 +4,7 @@ import { BotOffIcon } from "lucide-react";
 
 import { useI18n } from "@/core/i18n/hooks";
 
+/** 在自定义代理功能关闭时呈现不可用原因，避免显示无效操作入口。 */
 export function AgentsFeatureDisabled() {
   const { t } = useI18n();
   return (

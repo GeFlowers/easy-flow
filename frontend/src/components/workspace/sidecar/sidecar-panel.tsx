@@ -146,6 +146,7 @@ function promptMessageFiles(message: PromptInputMessage) {
   );
 }
 
+/** 渲染可独立操作的侧边对话面板，并隔离其草稿、引用与删除确认状态。 */
 export function SidecarPanel({ className }: { className?: string }) {
   const { t } = useI18n();
   const sidecar = useSidecar();
@@ -431,8 +432,8 @@ export function SidecarPanel({ className }: { className?: string }) {
       sidecar.sidecarThreadId,
       nextSubmit.message,
       nextSubmit.references,
-      // Clear references only once the send genuinely proceeds; a send dropped
-      // by the in-flight guard leaves them attached instead of losing them.
+      // 仅在发送确实发起后清空引用；若发送被进行中守卫丢弃，引用应继续附着，
+      // 以免丢失。
       () => {
         if (nextSubmit.references.length > 0) {
           sidecar.clearActiveReferences();
@@ -508,8 +509,8 @@ export function SidecarPanel({ className }: { className?: string }) {
 
   const handleDelete = useCallback(async () => {
     const threadId = sidecar.sidecarThreadId;
-    // Guard: the trash button only opens this dialog once a thread exists, so a
-    // missing id here means the draft was cleared underneath us — just close.
+    // 防御处理：删除按钮仅在线程存在时打开此对话框，因此此处缺少 id 表示草稿已被
+    // 其他流程清除，只需关闭即可。
     if (!threadId) {
       discardDraftAndClose();
       setDeleteDialogOpen(false);
@@ -564,8 +565,8 @@ export function SidecarPanel({ className }: { className?: string }) {
             </Button>
           </Tooltip>
         ) : (
-          // No conversation yet — nothing to delete, so this just discards the
-          // draft and closes the panel. A plain X (no confirm) keeps it light.
+          // 尚无对话，无需删除；只丢弃草稿并关闭面板。使用无需确认的普通 X，
+          // 保持操作轻量。
           <Tooltip content={t.common.close}>
             <Button
               aria-label={t.common.close}
@@ -682,9 +683,8 @@ export function SidecarPanel({ className }: { className?: string }) {
       <Dialog
         open={deleteDialogOpen}
         onOpenChange={(open) => {
-          // While the delete is in flight the only way out is the (disabled)
-          // Cancel button, so ignore overlay/Esc/close-button dismissals that
-          // would otherwise hide the dialog and imply the delete was cancelled.
+          // 删除进行中时仅保留（已禁用的）取消按钮，忽略遮罩、Esc 和关闭按钮的
+          // 关闭请求，避免对话框消失而误导用户以为删除已取消。
           if (!open && isDeleting) {
             return;
           }

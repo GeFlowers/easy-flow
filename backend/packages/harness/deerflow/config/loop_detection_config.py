@@ -1,28 +1,24 @@
-"""Configuration for loop detection middleware."""
+"""提供配置、loop、detection、配置相关功能。"""
 
 from pydantic import BaseModel, Field, model_validator
 
 
 class ToolFreqOverride(BaseModel):
-    """Per-tool frequency threshold override.
-
-    Can be higher or lower than the global defaults. Commonly used to raise
-    thresholds for high-frequency tools like bash in batch workflows (e.g.
-    RNA-seq pipelines) without weakening protection on every other tool.
-    """
+    """\u6267\u884c ToolFreqOverride \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     warn: int = Field(ge=1)
     hard_limit: int = Field(ge=1)
 
     @model_validator(mode="after")
     def _validate(self) -> "ToolFreqOverride":
+        """\u6267\u884c _validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if self.hard_limit < self.warn:
             raise ValueError("hard_limit must be >= warn")
         return self
 
 
 class LoopDetectionConfig(BaseModel):
-    """Configuration for repetitive tool-call loop detection."""
+    """\u6267\u884c LoopDetectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=True,
@@ -65,7 +61,7 @@ class LoopDetectionConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_thresholds(self) -> "LoopDetectionConfig":
-        """Ensure hard stop cannot happen before the warning threshold."""
+        """\u6267\u884c validate_thresholds \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if self.hard_limit < self.warn_threshold:
             raise ValueError("hard_limit must be greater than or equal to warn_threshold")
         if self.tool_freq_hard_limit < self.tool_freq_warn:

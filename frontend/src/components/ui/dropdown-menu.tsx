@@ -6,12 +6,14 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+/** DropdownMenu 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenu({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
 }
 
+/** DropdownMenuPortal 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuPortal({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
@@ -20,6 +22,7 @@ function DropdownMenuPortal({
   );
 }
 
+/** DropdownMenuTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuTrigger({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
@@ -31,6 +34,7 @@ function DropdownMenuTrigger({
   );
 }
 
+/** DropdownMenuContent 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuContent({
   className,
   sideOffset = 4,
@@ -51,6 +55,7 @@ function DropdownMenuContent({
   );
 }
 
+/** DropdownMenuGroup 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Group>) {
@@ -59,6 +64,7 @@ function DropdownMenuGroup({
   );
 }
 
+/** DropdownMenuItem 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuItem({
   className,
   inset,
@@ -82,6 +88,7 @@ function DropdownMenuItem({
   );
 }
 
+/** DropdownMenuCheckboxItem 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -108,6 +115,7 @@ function DropdownMenuCheckboxItem({
   );
 }
 
+/** DropdownMenuRadioGroup 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuRadioGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
@@ -119,6 +127,7 @@ function DropdownMenuRadioGroup({
   );
 }
 
+/** DropdownMenuRadioItem 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuRadioItem({
   className,
   children,
@@ -143,6 +152,7 @@ function DropdownMenuRadioItem({
   );
 }
 
+/** DropdownMenuLabel 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuLabel({
   className,
   inset,
@@ -163,6 +173,7 @@ function DropdownMenuLabel({
   );
 }
 
+/** DropdownMenuSeparator 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuSeparator({
   className,
   ...props
@@ -176,6 +187,7 @@ function DropdownMenuSeparator({
   );
 }
 
+/** DropdownMenuShortcut 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuShortcut({
   className,
   ...props
@@ -192,12 +204,14 @@ function DropdownMenuShortcut({
   );
 }
 
+/** DropdownMenuSub 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuSub({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
   return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />;
 }
 
+/** DropdownMenuSubTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuSubTrigger({
   className,
   inset,
@@ -222,6 +236,7 @@ function DropdownMenuSubTrigger({
   );
 }
 
+/** DropdownMenuSubContent 内部组件：组织对应的界面结构与交互语义。 */
 function DropdownMenuSubContent({
   className,
   ...props

@@ -1,21 +1,4 @@
-"""Sync checkpointer factory.
-
-Provides a **sync singleton** and a **sync context manager** for LangGraph
-graph compilation and CLI tools.
-
-Supported backends: memory, sqlite, postgres.
-
-Usage::
-
-    from deerflow.runtime.checkpointer.provider import get_checkpointer, checkpointer_context
-
-    # Singleton — reused across calls, closed on process exit
-    cp = get_checkpointer()
-
-    # One-shot — fresh connection, closed on block exit
-    with checkpointer_context() as cp:
-        graph.invoke(input, config={"configurable": {"thread_id": "1"}})
-"""
+'定义 provider 模块提供的职责与可复用接口。\n\nSync checkpointer factory.\n\nProvides a **sync singleton** and a **sync context manager** for LangGraph\ngraph compilation and CLI tools.\n\nSupported backends: memory, sqlite, postgres.\n\nUsage::\n\n    from deerflow.runtime.checkpointer.provider import get_checkpointer, checkpointer_context\n\n    # Singleton — reused across calls, closed on process exit\n    cp = get_checkpointer()\n\n    # One-shot — fresh connection, closed on block exit\n    with checkpointer_context() as cp:\n        graph.invoke(input, config={"configurable": {"thread_id": "1"}})\n'
 
 from __future__ import annotations
 
@@ -49,14 +32,7 @@ POSTGRES_CONN_REQUIRED = "checkpointer.connection_string is required for the pos
 
 
 def _resolve_checkpointer_config(app_config: AppConfig) -> CheckpointerConfig:
-    """Resolve the checkpointer backend from legacy or unified application config.
-
-    The legacy ``checkpointer`` section remains authoritative when present so
-    Checkpointer and Store keep using the same backend. Otherwise the unified
-    ``database`` section drives the checkpointer, matching the async
-    :func:`~deerflow.runtime.checkpointer.async_provider.make_checkpointer`
-    factory and the sync Store provider's ``_resolve_store_config``.
-    """
+    "执行 _resolve_checkpointer_config 的明确职责，并返回与调用约定一致的结果。\n\nResolve the checkpointer backend from legacy or unified application config.\n\n    The legacy ``checkpointer`` section remains authoritative when present so\n    Checkpointer and Store keep using the same backend. Otherwise the unified\n    ``database`` section drives the checkpointer, matching the async\n    :func:`~deerflow.runtime.checkpointer.async_provider.make_checkpointer`\n    factory and the sync Store provider's ``_resolve_store_config``.\n    "
     if app_config.checkpointer is not None:
         return app_config.checkpointer
 
@@ -73,7 +49,7 @@ def _resolve_checkpointer_config(app_config: AppConfig) -> CheckpointerConfig:
 
 
 def _get_checkpointer_config() -> CheckpointerConfig:
-    """Load checkpointer config without holding the provider singleton lock."""
+    '执行 _get_checkpointer_config 的明确职责，并返回与调用约定一致的结果。\n\nLoad checkpointer config without holding the provider singleton lock.'
     ensure_config_loaded()
 
     # Preserve callers that initialise the legacy config singleton directly.
@@ -94,13 +70,7 @@ def _get_checkpointer_config() -> CheckpointerConfig:
 
 @contextlib.contextmanager
 def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
-    """Context manager that creates and tears down a sync checkpointer.
-
-    Returns a configured ``Checkpointer`` instance. Resource cleanup for any
-    underlying connections or pools is handled by higher-level helpers in
-    this module (such as the singleton factory or context manager); this
-    function does not return a separate cleanup callback.
-    """
+    '执行 _sync_checkpointer_cm 的明确职责，并返回与调用约定一致的结果。\n\nContext manager that creates and tears down a sync checkpointer.\n\n    Returns a configured ``Checkpointer`` instance. Resource cleanup for any\n    underlying connections or pools is handled by higher-level helpers in\n    this module (such as the singleton factory or context manager); this\n    function does not return a separate cleanup callback.\n    '
     if config.type == "memory":
         from langgraph.checkpoint.memory import InMemorySaver
 
@@ -150,16 +120,7 @@ _checkpointer_lock = threading.Lock()
 
 
 def get_checkpointer() -> Checkpointer:
-    """Return the global sync checkpointer singleton, creating it on first call.
-
-    The legacy ``checkpointer`` section takes precedence when configured;
-    otherwise the unified ``database`` section selects the backend. Returns an
-    ``InMemorySaver`` when neither selects a persistent backend.
-
-    Raises:
-        ImportError: If the required package for the configured backend is not installed.
-        ValueError: If ``connection_string`` is missing for a backend that requires it.
-    """
+    '读取并返回，并遵守 get_checkpointer 所表达的接口约束。\n\nReturn the global sync checkpointer singleton, creating it on first call.\n\n    The legacy ``checkpointer`` section takes precedence when configured;\n    otherwise the unified ``database`` section selects the backend. Returns an\n    ``InMemorySaver`` when neither selects a persistent backend.\n\n    Raises:\n        ImportError: If the required package for the configured backend is not installed.\n        ValueError: If ``connection_string`` is missing for a backend that requires it.\n    '
     global _checkpointer, _checkpointer_ctx
 
     if _checkpointer is not None:
@@ -182,11 +143,7 @@ def get_checkpointer() -> Checkpointer:
 
 
 def reset_checkpointer() -> None:
-    """Reset the sync singleton, forcing recreation on the next call.
-
-    Closes any open backend connections and clears the cached instance.
-    Useful in tests or after a configuration change.
-    """
+    '执行 reset_checkpointer 的明确职责，并返回与调用约定一致的结果。\n\nReset the sync singleton, forcing recreation on the next call.\n\n    Closes any open backend connections and clears the cached instance.\n    Useful in tests or after a configuration change.\n    '
     global _checkpointer, _checkpointer_ctx
     with _checkpointer_lock:
         if _checkpointer_ctx is not None:
@@ -205,19 +162,7 @@ def reset_checkpointer() -> None:
 
 @contextlib.contextmanager
 def checkpointer_context() -> Iterator[Checkpointer]:
-    """Sync context manager that yields a checkpointer and cleans up on exit.
-
-    Unlike :func:`get_checkpointer`, this does **not** cache the instance —
-    each ``with`` block creates and destroys its own connection.  Use it in
-    CLI scripts or tests where you want deterministic cleanup::
-
-        with checkpointer_context() as cp:
-            graph.invoke(input, config={"configurable": {"thread_id": "1"}})
-
-    The legacy ``checkpointer`` section takes precedence when configured;
-    otherwise the unified ``database`` section selects the backend. Yields an
-    ``InMemorySaver`` when neither selects a persistent backend.
-    """
+    '执行 checkpointer_context 的明确职责，并返回与调用约定一致的结果。\n\nSync context manager that yields a checkpointer and cleans up on exit.\n\n    Unlike :func:`get_checkpointer`, this does **not** cache the instance —\n    each ``with`` block creates and destroys its own connection.  Use it in\n    CLI scripts or tests where you want deterministic cleanup::\n\n        with checkpointer_context() as cp:\n            graph.invoke(input, config={"configurable": {"thread_id": "1"}})\n\n    The legacy ``checkpointer`` section takes precedence when configured;\n    otherwise the unified ``database`` section selects the backend. Yields an\n    ``InMemorySaver`` when neither selects a persistent backend.\n    '
 
     config = _resolve_checkpointer_config(get_app_config())
     with _sync_checkpointer_cm(config) as saver:

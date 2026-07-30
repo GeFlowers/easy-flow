@@ -1,11 +1,7 @@
-"""Write initial admin credentials to a restricted file instead of logs.
+"""将初始管理员凭据写入受限文件，避免记录到日志。
 
-Logging secrets to stdout/stderr is a well-known CodeQL finding
-(py/clear-text-logging-sensitive-data) — in production those logs
-get collected into ELK/Splunk/etc and become a secret sprawl
-source. This helper writes the credential to a 0600 file that only
-the process user can read, and returns the path so the caller can
-log **the path** (not the password) for the operator to pick up.
+明文密钥写入标准输出或标准错误会被生产日志系统收集并扩散。本辅助函数
+将凭据写入仅进程用户可读的 0600 文件，并仅返回文件路径供调用方记录。
 """
 
 from __future__ import annotations
@@ -19,17 +15,12 @@ _CREDENTIAL_FILENAME = "admin_initial_credentials.txt"
 
 
 def write_initial_credentials(email: str, password: str, *, label: str = "initial") -> Path:
-    """Write the admin email + password to ``{base_dir}/admin_initial_credentials.txt``.
+    """将管理员邮箱和密码写入 ``{base_dir}/admin_initial_credentials.txt``。
 
-    The file is created **atomically** with mode 0600 via ``os.open``
-    so the password is never world-readable, even for the single syscall
-    window between ``write_text`` and ``chmod``.
+    文件通过 ``os.open`` 以 0600 权限原子创建，避免写入与改权限之间的窗口
+    使密码被其他用户读取。``label`` 在文件头区分初始创建和密码重置事件。
 
-    ``label`` distinguishes "initial" (fresh creation) from "reset"
-    (password reset) in the file header so an operator picking up the
-    file after a restart can tell which event produced it.
-
-    Returns the absolute :class:`Path` to the file.
+    返回凭据文件的绝对 :class:`Path`。
     """
     target = get_paths().base_dir / _CREDENTIAL_FILENAME
     target.parent.mkdir(parents=True, exist_ok=True)
@@ -38,9 +29,8 @@ def write_initial_credentials(email: str, password: str, *, label: str = "initia
         f"# DeerFlow admin {label} credentials\n# This file is generated on first boot or password reset.\n# Change the password after login via Settings -> Account,\n# then delete this file.\n#\nemail: {email}\npassword: {password}\n"
     )
 
-    # Atomic 0600 create-or-truncate. O_TRUNC (not O_EXCL) so the
-    # reset-password path can rewrite an existing file without a
-    # separate unlink-then-create dance.
+    # 以 0600 权限原子创建或截断；采用截断现有文件的方式，
+    # 以便重置密码流程可直接改写已有文件，无需先删除再创建。
     fd = os.open(target, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
     with os.fdopen(fd, "w", encoding="utf-8") as fh:
         fh.write(content)

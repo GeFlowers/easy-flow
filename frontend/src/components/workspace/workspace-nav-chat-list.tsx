@@ -18,6 +18,7 @@ import {
 import { useAgentsApiEnabled } from "@/core/agents";
 import { useI18n } from "@/core/i18n/hooks";
 
+/** 在侧栏渲染聊天导航列表，并为禁用入口保留可访问的原因说明。 */
 export function WorkspaceNavChatList() {
   const { t } = useI18n();
   const pathname = usePathname();
@@ -45,16 +46,13 @@ export function WorkspaceNavChatList() {
               </Link>
             </SidebarMenuButton>
           ) : (
-            // Disabled: aria-disabled drives the sidebar CVA to suppress
-            // pointer events on the button, so wrap it in a hoverable span
-            // that still surfaces the "feature not enabled" tooltip for mouse
-            // users. The button stays in the tab order (no tabIndex={-1}) and
-            // is wired via aria-describedby to a visually-hidden reason, so
-            // keyboard and screen-reader users also learn why it is disabled.
+            // 禁用状态下，aria-disabled 会让侧栏 CVA 阻止按钮的指针事件，因此用
+            // 可悬停的 span 包裹它，仍向鼠标用户显示“功能未启用”提示。按钮保留在
+            // Tab 顺序中（不设 tabIndex={-1}），并通过 aria-describedby 关联到
+            // 视觉隐藏的原因，确保键盘与读屏用户同样知道禁用缘由。
             <Tooltip>
               <TooltipTrigger asChild>
-                {/* cursor-not-allowed lives on the span (the element that
-                    still receives pointer events), not the inert button. */}
+                {/* `cursor-not-allowed` 设在仍接收指针事件的 span 上，而非不可交互的按钮。 */}
                 <span className="block w-full cursor-not-allowed">
                   <SidebarMenuButton
                     className="text-muted-foreground/50"

@@ -3,6 +3,7 @@ import path from "path";
 
 import type { NextRequest } from "next/server";
 
+/** 提供指定演示会话的本地制品文件，并支持下载和视频媒体类型。 */
 export async function GET(
   request: NextRequest,
   {
@@ -23,7 +24,7 @@ export async function GET(
     );
     if (fs.existsSync(artifactPath)) {
       if (request.nextUrl.searchParams.get("download") === "true") {
-        // Attach the file to the response
+        // 使用附件响应头触发浏览器下载，而不是内联预览。
         const headers = new Headers();
         headers.set(
           "Content-Disposition",

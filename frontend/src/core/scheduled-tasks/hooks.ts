@@ -16,6 +16,7 @@ import {
   type ScheduledTaskPayload,
 } from "./api";
 
+/** 查询全部定时任务。 */
 export function useScheduledTasks() {
   return useQuery({
     queryKey: ["scheduled-tasks"],
@@ -25,6 +26,7 @@ export function useScheduledTasks() {
   });
 }
 
+/** 查询与给定线程关联的定时任务。 */
 export function useThreadScheduledTasks(threadId: string | null | undefined) {
   return useQuery({
     queryKey: ["scheduled-tasks", "thread", threadId],
@@ -33,6 +35,7 @@ export function useThreadScheduledTasks(threadId: string | null | undefined) {
   });
 }
 
+/** 查询指定定时任务的运行历史。 */
 export function useScheduledTaskRuns(taskId: string | null | undefined) {
   return useQuery({
     queryKey: ["scheduled-tasks", "runs", taskId],
@@ -43,6 +46,7 @@ export function useScheduledTaskRuns(taskId: string | null | undefined) {
   });
 }
 
+/** 创建定时任务并失效相关列表缓存。 */
 export function useCreateScheduledTask() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -57,6 +61,7 @@ export function useCreateScheduledTask() {
   });
 }
 
+/** 更新定时任务并刷新任务与线程列表缓存。 */
 export function useUpdateScheduledTask(taskId: string) {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -78,6 +83,7 @@ export function useUpdateScheduledTask(taskId: string) {
   });
 }
 
+/** 暂停定时任务并刷新列表缓存。 */
 export function usePauseScheduledTask() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -95,6 +101,7 @@ export function usePauseScheduledTask() {
   });
 }
 
+/** 恢复定时任务并刷新列表缓存。 */
 export function useResumeScheduledTask() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -112,6 +119,7 @@ export function useResumeScheduledTask() {
   });
 }
 
+/** 触发一次即时运行并刷新任务与运行记录缓存。 */
 export function useTriggerScheduledTask() {
   const queryClient = useQueryClient();
   const { t } = useI18n();
@@ -132,6 +140,7 @@ export function useTriggerScheduledTask() {
   });
 }
 
+/** 删除定时任务并移除相关缓存。 */
 export function useDeleteScheduledTask() {
   const queryClient = useQueryClient();
   const { t } = useI18n();

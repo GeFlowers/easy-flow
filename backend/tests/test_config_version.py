@@ -1,4 +1,4 @@
-"""Tests for config version check and upgrade logic."""
+'定义 test_config_version 模块提供的职责与可复用接口。\n\nTests for config version check and upgrade logic.'
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from deerflow.config.app_config import AppConfig
 
 
 def _make_config_files(tmpdir: Path, user_config: dict, example_config: dict) -> Path:
-    """Write user config.yaml and config.example.yaml to a temp dir, return config path."""
+    '执行 _make_config_files 的明确职责，并返回与调用约定一致的结果。\n\nWrite user config.yaml and config.example.yaml to a temp dir, return config path.'
     config_path = tmpdir / "config.yaml"
     example_path = tmpdir / "config.example.yaml"
 
-    # Minimal valid config needs sandbox
+    # 最小有效配置需要沙箱
     defaults = {
         "sandbox": {"use": "deerflow.sandbox.local:LocalSandboxProvider"},
     }
@@ -33,7 +33,7 @@ def _make_config_files(tmpdir: Path, user_config: dict, example_config: dict) ->
 
 
 def test_missing_version_treated_as_zero(caplog):
-    """Config without config_version should be treated as version 0."""
+    '验证 missing、version、treated、as、zero 场景下的预期行为、边界条件与结果。\n\nConfig without config_version should be treated as version 0.'
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = _make_config_files(
             Path(tmpdir),
@@ -51,7 +51,7 @@ def test_missing_version_treated_as_zero(caplog):
 
 
 def test_matching_version_no_warning(caplog):
-    """Config with matching version should not emit a warning."""
+    '验证 matching、version、no、warning 场景下的预期行为、边界条件与结果。\n\nConfig with matching version should not emit a warning.'
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = _make_config_files(
             Path(tmpdir),
@@ -67,7 +67,7 @@ def test_matching_version_no_warning(caplog):
 
 
 def test_outdated_version_emits_warning(caplog):
-    """Config with lower version should emit a warning."""
+    '验证 outdated、version、emits、warning 场景下的预期行为、边界条件与结果。\n\nConfig with lower version should emit a warning.'
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = _make_config_files(
             Path(tmpdir),
@@ -85,12 +85,12 @@ def test_outdated_version_emits_warning(caplog):
 
 
 def test_no_example_file_no_warning(caplog):
-    """If config.example.yaml doesn't exist, no warning should be emitted."""
+    "验证 no、example、file、no、warning 场景下的预期行为、边界条件与结果。\n\nIf config.example.yaml doesn't exist, no warning should be emitted."
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = Path(tmpdir) / "config.yaml"
         with open(config_path, "w", encoding="utf-8") as f:
             yaml.dump({"sandbox": {"use": "test"}}, f)
-        # No config.example.yaml created
+        # 未创建 config.example.yaml
 
         with caplog.at_level(logging.WARNING, logger="deerflow.config.app_config"):
             AppConfig._check_config_version({}, config_path)
@@ -98,19 +98,19 @@ def test_no_example_file_no_warning(caplog):
 
 
 def test_string_config_version_does_not_raise_type_error(caplog):
-    """config_version stored as a YAML string should not raise TypeError on comparison."""
+    '验证 string、config、version、does、not、raise、type、error 场景下的预期行为、边界条件与结果。\n\nconfig_version stored as a YAML string should not raise TypeError on comparison.'
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = _make_config_files(
             Path(tmpdir),
             user_config={"config_version": "1"},  # string, as YAML can produce
             example_config={"config_version": 2},
         )
-        # Must not raise TypeError: '<' not supported between instances of 'str' and 'int'
+        # 不得引发 TypeError：“str”和“int”实例之间不支持“<”
         AppConfig._check_config_version({"config_version": "1"}, config_path)
 
 
 def test_newer_user_version_no_warning(caplog):
-    """If user has a newer version than example (edge case), no warning."""
+    '验证 newer、user、version、no、warning 场景下的预期行为、边界条件与结果。\n\nIf user has a newer version than example (edge case), no warning.'
     with tempfile.TemporaryDirectory() as tmpdir:
         config_path = _make_config_files(
             Path(tmpdir),

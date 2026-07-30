@@ -1,15 +1,4 @@
-"""Regression test: skill loading must remain releasable to a worker thread.
-
-Anchors the production offload from `subagents/executor.py:_load_skills`,
-where both `get_or_new_skill_storage` and the sync `storage.load_skills(...)`
-method are dispatched via `asyncio.to_thread`. That fix addressed #1917,
-where `os.walk` inside `load_skills` blocked the LangGraph async event loop.
-
-This test invokes the production `_load_skills()` call path under the strict
-Blockbuster context against a real `LocalSkillStorage` instance pointed at
-a tmp directory. If the production `asyncio.to_thread` offload is removed,
-Blockbuster raises `BlockingError` and this test fails.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -34,6 +23,7 @@ _EXECUTOR_IMPORT_MOCKS = (
 
 
 def _seed_skill(skills_root: Path) -> None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     skill = skills_root / "public" / "demo"
     skill.mkdir(parents=True, exist_ok=True)
     (skill / "SKILL.md").write_text(
@@ -44,7 +34,7 @@ def _seed_skill(skills_root: Path) -> None:
 
 @contextmanager
 def _real_subagent_executor() -> Iterator[type]:
-    """Import the real executor despite the suite-level circular-import mock."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     original_modules = {name: sys.modules.get(name, _MISSING) for name in _EXECUTOR_IMPORT_MOCKS}
     original_executor = sys.modules.get("deerflow.subagents.executor", _MISSING)
     parent_module = sys.modules.get("deerflow.subagents")
@@ -80,6 +70,7 @@ def _real_subagent_executor() -> Iterator[type]:
 
 
 async def test_load_skills_via_to_thread_does_not_block_event_loop(tmp_path: Path) -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.config.skills_config import SkillsConfig
     from deerflow.subagents.config import SubagentConfig
 

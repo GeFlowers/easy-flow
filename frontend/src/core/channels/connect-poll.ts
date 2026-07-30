@@ -1,33 +1,34 @@
 import type { ChannelConnection, ChannelProviderId } from "./types";
 
+/** 频道连接状态轮询的默认间隔，单位为毫秒。 */
 export const CONNECT_POLL_INTERVAL_MS = 2000;
-// Fallback bind window used when the backend response omits or garbles
-// `expires_in`, so a non-finite value can never produce an unbounded poll loop.
+// 后端遗漏或损坏 `expires_in` 时使用的绑定时长，确保非有限值不会造成无限轮询。
 const DEFAULT_CONNECT_EXPIRES_S = 600;
 
+/** 提供取消轮询任务的控制句柄。 */
 export interface ConnectPollHandle {
+  /** 取消尚未执行的轮询并阻止后续调度。 */
   cancel: () => void;
 }
 
+/** 描述连接状态轮询所需的提供商、时限和回调。 */
 export interface ConnectPollOptions {
   provider: ChannelProviderId;
   expiresInSeconds: number;
-  /** Fetch the latest connections — the single source of truth for "connected". */
+  /** 获取最新连接列表；它是判断“已连接”的唯一事实来源。 */
   fetchConnections: () => Promise<ChannelConnection[]>;
-  /** Invoked once when the provider's connection resolves to "connected". */
+  /** 提供商连接变为“已连接”时仅调用一次。 */
   onConnected: () => void;
   intervalMs?: number;
   now?: () => number;
 }
 
 /**
- * Poll the connections endpoint until the given provider reports `connected`
- * or the bind window elapses. Returns a handle whose `cancel()` stops the loop
- * (used to dedup repeated connects and to clean up on unmount).
+ * 轮询连接端点，直至指定提供商报告 `connected` 或绑定时限到期。返回的句柄可
+ * 通过 `cancel()` 停止循环，用于合并重复连接请求和组件卸载清理。
  *
- * Only the connections endpoint is polled; `onConnected` lets the caller refresh
- * derived provider state exactly once when the bind lands, instead of fetching
- * both endpoints on every tick.
+ * 仅轮询连接端点；绑定完成时由 `onConnected` 让调用方恰好刷新一次派生的
+ * 提供商状态，无需在每个轮询周期同时请求两个端点。
  */
 export function startConnectionPoll(
   options: ConnectPollOptions,

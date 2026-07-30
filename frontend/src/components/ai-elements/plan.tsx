@@ -27,6 +27,7 @@ type PlanContextValue = {
 
 const PlanContext = createContext<PlanContextValue | null>(null);
 
+/** usePlan Hook：封装本模块所需的状态或上下文访问。 */
 const usePlan = () => {
   const context = useContext(PlanContext);
   if (!context) {
@@ -35,10 +36,12 @@ const usePlan = () => {
   return context;
 };
 
+/** PlanProps 的公开类型定义。 */
 export type PlanProps = ComponentProps<typeof Collapsible> & {
   isStreaming?: boolean;
 };
 
+/** Plan 组件：提供对应的界面结构与交互语义。 */
 export const Plan = ({
   className,
   isStreaming = false,
@@ -52,8 +55,10 @@ export const Plan = ({
   </PlanContext.Provider>
 );
 
+/** PlanHeaderProps 的公开类型定义。 */
 export type PlanHeaderProps = ComponentProps<typeof CardHeader>;
 
+/** PlanHeader 组件：提供对应的界面结构与交互语义。 */
 export const PlanHeader = ({ className, ...props }: PlanHeaderProps) => (
   <CardHeader
     className={cn("flex items-start justify-between", className)}
@@ -62,6 +67,7 @@ export const PlanHeader = ({ className, ...props }: PlanHeaderProps) => (
   />
 );
 
+/** PlanTitleProps 的公开类型定义。 */
 export type PlanTitleProps = Omit<
   ComponentProps<typeof CardTitle>,
   "children"
@@ -69,6 +75,7 @@ export type PlanTitleProps = Omit<
   children: string;
 };
 
+/** PlanTitle 组件：提供对应的界面结构与交互语义。 */
 export const PlanTitle = ({ children, ...props }: PlanTitleProps) => {
   const { isStreaming } = usePlan();
 
@@ -79,6 +86,7 @@ export const PlanTitle = ({ children, ...props }: PlanTitleProps) => {
   );
 };
 
+/** PlanDescriptionProps 的公开类型定义。 */
 export type PlanDescriptionProps = Omit<
   ComponentProps<typeof CardDescription>,
   "children"
@@ -86,6 +94,7 @@ export type PlanDescriptionProps = Omit<
   children: string;
 };
 
+/** PlanDescription 组件：提供对应的界面结构与交互语义。 */
 export const PlanDescription = ({
   className,
   children,
@@ -104,28 +113,36 @@ export const PlanDescription = ({
   );
 };
 
+/** PlanActionProps 的公开类型定义。 */
 export type PlanActionProps = ComponentProps<typeof CardAction>;
 
+/** PlanAction 组件：提供对应的界面结构与交互语义。 */
 export const PlanAction = (props: PlanActionProps) => (
   <CardAction data-slot="plan-action" {...props} />
 );
 
+/** PlanContentProps 的公开类型定义。 */
 export type PlanContentProps = ComponentProps<typeof CardContent>;
 
+/** PlanContent 组件：提供对应的界面结构与交互语义。 */
 export const PlanContent = (props: PlanContentProps) => (
   <CollapsibleContent asChild>
     <CardContent data-slot="plan-content" {...props} />
   </CollapsibleContent>
 );
 
+/** PlanFooterProps 的公开类型定义。 */
 export type PlanFooterProps = ComponentProps<"div">;
 
+/** PlanFooter 组件：提供对应的界面结构与交互语义。 */
 export const PlanFooter = (props: PlanFooterProps) => (
   <CardFooter data-slot="plan-footer" {...props} />
 );
 
+/** PlanTriggerProps 的公开类型定义。 */
 export type PlanTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 
+/** PlanTrigger 组件：提供对应的界面结构与交互语义。 */
 export const PlanTrigger = ({ className, ...props }: PlanTriggerProps) => (
   <CollapsibleTrigger asChild>
     <Button

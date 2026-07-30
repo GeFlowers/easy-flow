@@ -5,6 +5,7 @@ type LoaderIconProps = {
   size?: number;
 };
 
+/** LoaderIcon 内部组件：组织对应的界面结构与交互语义。 */
 const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
   <svg
     height={size}
@@ -79,10 +80,12 @@ const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
   </svg>
 );
 
+/** LoaderProps 的公开类型定义。 */
 export type LoaderProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 };
 
+/** Loader 组件：提供对应的界面结构与交互语义。 */
 export const Loader = ({ className, size = 16, ...props }: LoaderProps) => (
   <div
     className={cn(

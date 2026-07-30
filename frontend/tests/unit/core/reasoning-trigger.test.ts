@@ -13,6 +13,11 @@ import {
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
 
+/**
+ * 覆盖“ReasoningTrigger default message uses phrasing content”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("ReasoningTrigger default message uses phrasing content", () => {
   const html = renderToStaticMarkup(
     createElement(

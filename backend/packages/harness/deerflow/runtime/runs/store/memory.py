@@ -1,7 +1,4 @@
-"""In-memory RunStore. Used when database.backend=memory (default) and in tests.
-
-Equivalent to the original RunManager._runs dict behavior.
-"""
+'定义 memory 模块提供的职责与可复用接口。\n\nIn-memory RunStore. Used when database.backend=memory (default) and in tests.\n\nEquivalent to the original RunManager._runs dict behavior.\n'
 
 from __future__ import annotations
 
@@ -12,7 +9,9 @@ from deerflow.runtime.runs.store.base import RunStore
 
 
 class MemoryRunStore(RunStore):
+    '封装 MemoryRunStore 的状态、协作关系与公开操作'
     def __init__(self) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self._runs: dict[str, dict[str, Any]] = {}
         # Secondary index: thread_id -> insertion-ordered run_id set (a dict is
         # used as an ordered set), maintained in lockstep with ``_runs`` so
@@ -21,11 +20,11 @@ class MemoryRunStore(RunStore):
         self._runs_by_thread: dict[str, dict[str, None]] = {}
 
     def _index_run(self, run_id: str, thread_id: str) -> None:
-        """Register *run_id* under *thread_id* in the secondary index."""
+        '执行 _index_run 的明确职责，并返回与调用约定一致的结果。\n\nRegister *run_id* under *thread_id* in the secondary index.'
         self._runs_by_thread.setdefault(thread_id, {})[run_id] = None
 
     def _unindex_run(self, run_id: str, thread_id: str) -> None:
-        """Drop *run_id* from the *thread_id* bucket, removing the bucket when empty."""
+        '执行 _unindex_run 的明确职责，并返回与调用约定一致的结果。\n\nDrop *run_id* from the *thread_id* bucket, removing the bucket when empty.'
         bucket = self._runs_by_thread.get(thread_id)
         if bucket is not None:
             bucket.pop(run_id, None)
@@ -50,6 +49,7 @@ class MemoryRunStore(RunStore):
         owner_worker_id=None,
         lease_expires_at=None,
     ):
+        '执行 put 的明确职责，并返回与调用约定一致的结果'
         now = datetime.now(UTC).isoformat()
         self._runs[run_id] = {
             "run_id": run_id,
@@ -71,6 +71,7 @@ class MemoryRunStore(RunStore):
         self._index_run(run_id, thread_id)
 
     async def get(self, run_id, *, user_id=None):
+        '读取并返回，并遵守 get 所表达的接口约束'
         run = self._runs.get(run_id)
         if run is None:
             return None
@@ -82,6 +83,7 @@ class MemoryRunStore(RunStore):
         # Use the thread index for an O(runs-in-thread) lookup instead of
         # scanning every run. ``self._runs.get`` is defense-in-depth: it drops a
         # stale id still in the index but already gone from ``_runs``.
+        '收集并返回，并遵守 list_by_thread 所表达的接口约束'
         run_ids = self._runs_by_thread.get(thread_id)
         if not run_ids:
             return []
@@ -90,6 +92,7 @@ class MemoryRunStore(RunStore):
         return results[:limit]
 
     async def list_successful_regenerate_sources(self, thread_id, *, user_id=None):
+        '收集并返回，并遵守 list_successful_regenerate_sources 所表达的接口约束'
         run_ids = self._runs_by_thread.get(thread_id) or ()
         sources: set[str] = set()
         for run_id in run_ids:
@@ -104,10 +107,12 @@ class MemoryRunStore(RunStore):
         return sources
 
     async def get_many_by_thread(self, thread_id, run_ids, *, user_id=None):
+        '读取并返回，并遵守 get_many_by_thread 所表达的接口约束'
         thread_run_ids = self._runs_by_thread.get(thread_id) or ()
         return {run_id: run for run_id in thread_run_ids if run_id in run_ids and (run := self._runs.get(run_id)) is not None and (user_id is None or run.get("user_id") == user_id)}
 
     async def update_status(self, run_id, status, *, error=None, stop_reason=None):
+        '更新目标状态并返回最新结果，并遵守 update_status 所表达的接口约束'
         run = self._runs.get(run_id)
         if run is None:
             return False
@@ -124,16 +129,19 @@ class MemoryRunStore(RunStore):
         return True
 
     async def update_model_name(self, run_id, model_name):
+        '更新目标状态并返回最新结果，并遵守 update_model_name 所表达的接口约束'
         if run_id in self._runs:
             self._runs[run_id]["model_name"] = model_name
             self._runs[run_id]["updated_at"] = datetime.now(UTC).isoformat()
 
     async def delete(self, run_id):
+        '删除目标资源并返回操作结果，并遵守 delete 所表达的接口约束'
         run = self._runs.pop(run_id, None)
         if run is not None:
             self._unindex_run(run_id, run["thread_id"])
 
     async def update_run_completion(self, run_id, *, status, **kwargs):
+        '更新目标状态并返回最新结果，并遵守 update_run_completion 所表达的接口约束'
         if run_id in self._runs:
             self._runs[run_id]["status"] = status
             for key, value in kwargs.items():
@@ -144,6 +152,7 @@ class MemoryRunStore(RunStore):
         return False
 
     async def update_run_progress(self, run_id, **kwargs):
+        '更新目标状态并返回最新结果，并遵守 update_run_progress 所表达的接口约束'
         if run_id in self._runs and self._runs[run_id].get("status") == "running":
             for key, value in kwargs.items():
                 if value is not None:
@@ -151,18 +160,21 @@ class MemoryRunStore(RunStore):
             self._runs[run_id]["updated_at"] = datetime.now(UTC).isoformat()
 
     async def list_pending(self, *, before=None):
+        '收集并返回，并遵守 list_pending 所表达的接口约束'
         now = before or datetime.now(UTC).isoformat()
         results = [r for r in self._runs.values() if r["status"] == "pending" and r["created_at"] <= now]
         results.sort(key=lambda r: r["created_at"])
         return results
 
     async def list_inflight(self, *, before=None):
+        '收集并返回，并遵守 list_inflight 所表达的接口约束'
         now = before or datetime.now(UTC).isoformat()
         results = [r for r in self._runs.values() if r["status"] in ("pending", "running") and r["created_at"] <= now]
         results.sort(key=lambda r: r["created_at"])
         return results
 
     async def aggregate_tokens_by_thread(self, thread_id: str, *, include_active: bool = False) -> dict[str, Any]:
+        '执行 aggregate_tokens_by_thread 的明确职责，并返回与调用约定一致的结果'
         statuses = ("success", "error", "running") if include_active else ("success", "error")
         # Use the thread index for an O(runs-in-thread) lookup instead of
         # scanning every run in the process (mirrors ``list_by_thread``).
@@ -209,6 +221,7 @@ class MemoryRunStore(RunStore):
         owner_worker_id: str,
         lease_expires_at: str,
     ) -> bool:
+        '更新目标状态并返回最新结果，并遵守 update_lease 所表达的接口约束'
         run = self._runs.get(run_id)
         if run is None:
             return False
@@ -228,6 +241,7 @@ class MemoryRunStore(RunStore):
         grace_seconds: int,
         error: str,
     ) -> bool:
+        '执行 claim_for_takeover 的明确职责，并返回与调用约定一致的结果'
         from deerflow.utils.time import is_lease_expired
 
         run = self._runs.get(run_id)
@@ -249,6 +263,7 @@ class MemoryRunStore(RunStore):
         before: str | None = None,
         grace_seconds: int = 10,
     ) -> list[dict[str, Any]]:
+        '收集并返回，并遵守 list_inflight_with_expired_lease 所表达的接口约束'
         now_dt = datetime.fromisoformat(before) if before else datetime.now(UTC)
         cutoff = datetime.now(UTC) - timedelta(seconds=grace_seconds)
         results = []
@@ -301,6 +316,7 @@ class MemoryRunStore(RunStore):
         created_at: str | None = None,
         grace_seconds: int = 10,
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+        '创建并返回，并遵守 create_run_atomic 所表达的接口约束'
         from deerflow.runtime.runs.manager import ConflictError
 
         now = datetime.now(UTC).isoformat()

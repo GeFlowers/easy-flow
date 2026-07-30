@@ -1,13 +1,4 @@
-"""Regression tests for MemoryRunEventStore's run-keyed event/message index.
-
-``list_events`` and ``list_messages_by_run`` are served from per-run
-projections so a single run's reads cost O(events-in-run) instead of
-re-scanning O(events-in-thread). These tests pin the indexed implementation to
-the exact semantics of a brute-force full-thread scan -- including interleaved
-trace events (non-contiguous message seqs), both cursors supplied at once, and
-index upkeep after ``delete_by_run`` -- so the optimization can never silently
-drift from the reference behavior.
-"""
+"""本模块覆盖运行 事件 存储 运行的行为、边界与回归场景，确保既有契约稳定。"""
 
 import pytest
 
@@ -15,7 +6,7 @@ from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
 
 def _ref_messages_by_run(records, thread_id, run_id, *, limit=50, before_seq=None, after_seq=None):
-    """Brute-force reference: the pre-index full-thread scan it replaced."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     filtered = [e for e in records if e["thread_id"] == thread_id and e["run_id"] == run_id and e["category"] == "message"]
     if before_seq is not None:
         filtered = [e for e in filtered if e["seq"] < before_seq]
@@ -27,6 +18,7 @@ def _ref_messages_by_run(records, thread_id, run_id, *, limit=50, before_seq=Non
 
 
 def _ref_events(records, thread_id, run_id, *, event_types=None, limit=500):
+    """准备可控测试资源与状态，供后续断言读取。"""
     filtered = [e for e in records if e["thread_id"] == thread_id and e["run_id"] == run_id]
     if event_types is not None:
         filtered = [e for e in filtered if e["event_type"] in event_types]
@@ -34,8 +26,7 @@ def _ref_events(records, thread_id, run_id, *, event_types=None, limit=500):
 
 
 async def _seed(store):
-    """Two runs interleaved within one thread; messages and traces mixed so
-    each run's message seqs are non-contiguous (the bisect must handle gaps)."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     plan = [
         ("run-a", "message"),
         ("run-a", "trace"),
@@ -59,6 +50,7 @@ async def _seed(store):
 
 @pytest.mark.anyio
 async def test_list_messages_by_run_matches_reference_across_cursors():
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunEventStore()
     records = await _seed(store)
     seqs = [r["seq"] for r in records]
@@ -74,6 +66,7 @@ async def test_list_messages_by_run_matches_reference_across_cursors():
 
 @pytest.mark.anyio
 async def test_list_events_matches_reference_with_filters():
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     store = MemoryRunEventStore()
     records = await _seed(store)
     all_types = sorted({r["event_type"] for r in records})
@@ -86,8 +79,7 @@ async def test_list_events_matches_reference_with_filters():
 
 @pytest.mark.anyio
 async def test_run_keyed_index_partitions_every_event():
-    """Every stored event is filed under exactly its (thread, run), each run's
-    list is seq-ordered, and the union reconstructs the flat event log."""
+    """验证运行 事件在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunEventStore()
     records = await _seed(store)
     indexed = [e for run_events in store._events_by_run["t1"].values() for e in run_events]
@@ -101,6 +93,7 @@ async def test_run_keyed_index_partitions_every_event():
 
 @pytest.mark.anyio
 async def test_run_index_stays_in_lockstep_after_delete_by_run():
+    """验证运行 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunEventStore()
     await _seed(store)
     removed = await store.delete_by_run("t1", "run-a")
@@ -121,6 +114,7 @@ async def test_run_index_stays_in_lockstep_after_delete_by_run():
 
 @pytest.mark.anyio
 async def test_delete_by_thread_clears_run_indexes():
+    """验证会话 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunEventStore()
     await _seed(store)
     await store.delete_by_thread("t1")

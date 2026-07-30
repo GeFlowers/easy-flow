@@ -24,34 +24,47 @@ const SVG_PROMPT_MARKER = "LEAK-STRICT-SVG-PROMPT-SHOULD-DISAPPEAR";
 const OPTIMISTIC_PROMPT_MARKER = "LEAK-OPTIMISTIC-SVG-PROMPT-SHOULD-DISAPPEAR";
 
 test.describe("Thread history", () => {
+  /**
+   * 覆盖“sidebar shows existing threads”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("sidebar shows existing threads", async ({ page }) => {
     mockLangGraphAPI(page, { threads: THREADS });
 
     await page.goto("/workspace/chats/new");
 
-    // Both thread titles should appear in the sidebar
+    // 两个线程标题都应出现在侧边栏中。
     await expect(page.getByText("First conversation")).toBeVisible({
       timeout: 15_000,
     });
     await expect(page.getByText("Second conversation")).toBeVisible();
   });
 
+  /**
+   * 覆盖“clicking a thread in sidebar navigates to it”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("clicking a thread in sidebar navigates to it", async ({ page }) => {
     mockLangGraphAPI(page, { threads: THREADS });
 
     await page.goto("/workspace/chats/new");
 
-    // Wait for sidebar to populate
+    // 等待侧边栏填充完成。
     const firstThread = page.getByText("First conversation");
     await expect(firstThread).toBeVisible({ timeout: 15_000 });
 
-    // Click on the first thread
+    // 点击第一个线程。
     await firstThread.click();
 
-    // Should navigate to that thread's URL
+    // 应导航至该线程的 URL。
     await page.waitForURL(`**/workspace/chats/${MOCK_THREAD_ID}`);
     await expect(page).toHaveURL(new RegExp(MOCK_THREAD_ID));
   });
+
+  /**
+   * 覆盖“clicking blank space in a sidebar thread row navigates to it”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("clicking blank space in a sidebar thread row navigates to it", async ({
     page,
@@ -82,17 +95,27 @@ test.describe("Thread history", () => {
     await expect(page).toHaveURL(new RegExp(MOCK_THREAD_ID));
   });
 
+  /**
+   * 覆盖“existing thread loads historical messages”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("existing thread loads historical messages", async ({ page }) => {
     mockLangGraphAPI(page, { threads: THREADS });
 
-    // Navigate directly to an existing thread
+    // 直接导航至已有线程。
     await page.goto(`/workspace/chats/${MOCK_THREAD_ID}`);
 
-    // The historical AI response should be displayed
+    // 应显示历史 AI 回复。
     await expect(
       page.getByText("Response in thread First conversation"),
     ).toBeVisible({ timeout: 15_000 });
   });
+
+  /**
+   * 覆盖“input box recalls previous prompts with arrow keys”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("input box recalls previous prompts with arrow keys", async ({
     page,
@@ -158,6 +181,11 @@ test.describe("Thread history", () => {
     await expect(textarea).toHaveValue("draft should not be overwritten");
   });
 
+  /**
+   * 覆盖“deleting an inactive chat keeps the current chat open”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("deleting an inactive chat keeps the current chat open", async ({
     page,
   }) => {
@@ -187,6 +215,11 @@ test.describe("Thread history", () => {
     ).toBeVisible();
     await expect(sidebar.getByText("Second conversation")).toHaveCount(0);
   });
+
+  /**
+   * 覆盖“new chat does not show previous thread messages after client-side navigation”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("new chat does not show previous thread messages after client-side navigation", async ({
     page,
@@ -232,6 +265,11 @@ test.describe("Thread history", () => {
     await expect(page.getByPlaceholder(/how can i assist you/i)).toBeVisible();
   });
 
+  /**
+   * 覆盖“new chat does not show previous optimistic user message after client-side navigation”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("new chat does not show previous optimistic user message after client-side navigation", async ({
     page,
   }) => {
@@ -244,6 +282,11 @@ test.describe("Thread history", () => {
         },
       ],
     });
+
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 metadataOnlyStream 约定的逻辑。
+
+     */
 
     const metadataOnlyStream = async (route: Route) => {
       const body = [
@@ -295,6 +338,11 @@ test.describe("Thread history", () => {
     await expect(page.getByPlaceholder(/how can i assist you/i)).toBeVisible();
   });
 
+  /**
+   * 覆盖“new chat resets immediately after a history-only thread URL update”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("new chat resets immediately after a history-only thread URL update", async ({
     page,
   }) => {
@@ -309,9 +357,8 @@ test.describe("Thread history", () => {
       timeout: 15_000,
     });
 
-    // A newly created chat changes the URL with history.replaceState so the
-    // active stream is not remounted. Reproduce that history-only transition:
-    // the canonical pathname becomes the UUID while useParams can stay "new".
+    // 新创建的聊天通过 history.replaceState 修改 URL，避免重新挂载活跃流。复现这一仅由
+    // history 驱动的转换：规范 pathname 变为 UUID，而 useParams 仍可保持“new”。
     await page.evaluate((threadId) => {
       history.replaceState(null, "", `/workspace/chats/${threadId}`);
     }, MOCK_THREAD_ID);
@@ -324,13 +371,17 @@ test.describe("Thread history", () => {
     );
     await expect(newChatLink).toHaveAttribute("data-active", "false");
 
-    // One click must reset the chat without a second click or unrelated UI
-    // interaction forcing another render.
+    // 一次点击必须重置聊天，无需再次点击或通过无关 UI 交互强制再次渲染。
     await newChatLink.click();
     await expect(page).toHaveURL(/\/workspace\/chats\/new$/);
     await expect(page.getByText("Hello from DeerFlow!")).toHaveCount(0);
     await expect(textarea).toBeVisible();
   });
+
+  /**
+   * 覆盖“deleting the active newly created chat returns to the new chat screen”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("deleting the active newly created chat returns to the new chat screen", async ({
     page,
@@ -380,6 +431,11 @@ test.describe("Thread history", () => {
     await expect(page.getByText("Hello from DeerFlow!")).toHaveCount(0);
     await expect(page.getByPlaceholder(/how can i assist you/i)).toBeVisible();
   });
+
+  /**
+   * 覆盖“mock thread does not load real backend run history”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("mock thread does not load real backend run history", async ({
     page,
@@ -459,18 +515,28 @@ test.describe("Thread history", () => {
     expect(backendRunHistoryUrls).toEqual([]);
   });
 
+  /**
+   * 覆盖“chats list page shows all threads”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("chats list page shows all threads", async ({ page }) => {
     mockLangGraphAPI(page, { threads: THREADS });
 
     await page.goto("/workspace/chats");
 
-    // Both threads should be listed in the main content area
+    // 主内容区域应列出两个线程。
     const main = page.locator("main");
     await expect(main.getByText("First conversation")).toBeVisible({
       timeout: 15_000,
     });
     await expect(main.getByText("Second conversation")).toBeVisible();
   });
+
+  /**
+   * 覆盖“IM channel threads show their source in thread lists”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("IM channel threads show their source in thread lists", async ({
     page,

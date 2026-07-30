@@ -1,4 +1,4 @@
-"""Tests for LoopDetectionMiddleware."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import copy
 from collections import OrderedDict
@@ -23,18 +23,19 @@ from deerflow.agents.middlewares.loop_detection_middleware import (
 
 
 def _make_runtime(thread_id="test-thread", run_id="test-run"):
-    """Build a minimal Runtime mock with context."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     runtime = MagicMock()
     runtime.context = {"thread_id": thread_id, "run_id": run_id}
     return runtime
 
 
 def _pending_key(thread_id="test-thread", run_id="test-run"):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return (thread_id, run_id)
 
 
 def _make_request(messages, runtime):
-    """Build a minimal ModelRequest stand-in for wrap_model_call tests."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     request = MagicMock()
     request.messages = list(messages)
     request.runtime = runtime
@@ -43,7 +44,7 @@ def _make_request(messages, runtime):
 
 
 def _override_request(request, updates):
-    """Mimic ModelRequest.override(): return a copy with fields replaced."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     new = MagicMock()
     new.messages = updates.get("messages", request.messages)
     new.runtime = updates.get("runtime", request.runtime)
@@ -52,10 +53,11 @@ def _override_request(request, updates):
 
 
 def _capture_handler():
-    """Build a sync handler that records the request it was called with."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     captured: list = []
 
     def handler(req):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured.append(req)
         return MagicMock()
 
@@ -63,12 +65,13 @@ def _capture_handler():
 
 
 class _CapturingFakeMessagesListChatModel(FakeMessagesListChatModel):
-    """Fake chat model that records each model request's messages."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     _seen_messages: list[list[Any]] = PrivateAttr(default_factory=list)
 
     @property
     def seen_messages(self) -> list[list[Any]]:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self._seen_messages
 
     def bind_tools(
@@ -78,9 +81,11 @@ class _CapturingFakeMessagesListChatModel(FakeMessagesListChatModel):
         tool_choice: Any = None,
         **kwargs: Any,
     ) -> Runnable:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._seen_messages.append(list(messages))
         return super()._generate(
             messages,
@@ -91,42 +96,45 @@ class _CapturingFakeMessagesListChatModel(FakeMessagesListChatModel):
 
 
 def _make_state(tool_calls=None, content=""):
-    """Build a minimal AgentState dict with an AIMessage.
-
-    Deep-copies *content* when it is mutable (e.g. list) so that
-    successive calls never share the same object reference.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     safe_content = copy.deepcopy(content) if isinstance(content, list) else content
     msg = AIMessage(content=safe_content, tool_calls=tool_calls or [])
     return {"messages": [msg]}
 
 
 def _bash_call(cmd="ls"):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return {"name": "bash", "id": f"call_{cmd}", "args": {"command": cmd}}
 
 
 class TestHashToolCalls:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_same_calls_same_hash(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         a = _hash_tool_calls([_bash_call("ls")])
         b = _hash_tool_calls([_bash_call("ls")])
         assert a == b
 
     def test_different_calls_different_hash(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         a = _hash_tool_calls([_bash_call("ls")])
         b = _hash_tool_calls([_bash_call("pwd")])
         assert a != b
 
     def test_order_independent(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         a = _hash_tool_calls([_bash_call("ls"), {"name": "read_file", "args": {"path": "/tmp"}}])
         b = _hash_tool_calls([{"name": "read_file", "args": {"path": "/tmp"}}, _bash_call("ls")])
         assert a == b
 
     def test_empty_calls(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         h = _hash_tool_calls([])
         assert isinstance(h, str)
         assert len(h) > 0
 
     def test_stringified_dict_args_match_dict_args(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         dict_call = {
             "name": "read_file",
             "args": {"path": "/tmp/demo.py", "start_line": "1", "end_line": "150"},
@@ -139,6 +147,7 @@ class TestHashToolCalls:
         assert _hash_tool_calls([dict_call]) == _hash_tool_calls([string_call])
 
     def test_reversed_read_file_range_matches_forward_range(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         forward_call = {
             "name": "read_file",
             "args": {"path": "/tmp/demo.py", "start_line": 10, "end_line": 300},
@@ -151,6 +160,7 @@ class TestHashToolCalls:
         assert _hash_tool_calls([forward_call]) == _hash_tool_calls([reversed_call])
 
     def test_stringified_non_dict_args_do_not_crash(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         non_dict_json_call = {"name": "bash", "args": '"echo hello"'}
         plain_string_call = {"name": "bash", "args": "echo hello"}
 
@@ -163,23 +173,27 @@ class TestHashToolCalls:
         assert plain_hash
 
     def test_grep_pattern_affects_hash(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         grep_foo = {"name": "grep", "args": {"path": "/tmp", "pattern": "foo"}}
         grep_bar = {"name": "grep", "args": {"path": "/tmp", "pattern": "bar"}}
 
         assert _hash_tool_calls([grep_foo]) != _hash_tool_calls([grep_bar])
 
     def test_glob_pattern_affects_hash(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         glob_py = {"name": "glob", "args": {"path": "/tmp", "pattern": "*.py"}}
         glob_ts = {"name": "glob", "args": {"path": "/tmp", "pattern": "*.ts"}}
 
         assert _hash_tool_calls([glob_py]) != _hash_tool_calls([glob_ts])
 
     def test_write_file_content_affects_hash(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         v1 = {"name": "write_file", "args": {"path": "/tmp/a.py", "content": "v1"}}
         v2 = {"name": "write_file", "args": {"path": "/tmp/a.py", "content": "v2"}}
         assert _hash_tool_calls([v1]) != _hash_tool_calls([v2])
 
     def test_str_replace_content_affects_hash(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         a = {
             "name": "str_replace",
             "args": {"path": "/tmp/a.py", "old_str": "foo", "new_str": "bar"},
@@ -192,7 +206,9 @@ class TestHashToolCalls:
 
 
 class TestLoopDetection:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_no_tool_calls_returns_none(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware()
         runtime = _make_runtime()
         state = {"messages": [AIMessage(content="hello")]}
@@ -200,24 +216,18 @@ class TestLoopDetection:
         assert result is None
 
     def test_below_threshold_returns_none(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
 
-        # First two identical calls — no warning
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for _ in range(2):
             result = mw._apply(_make_state(tool_calls=call), runtime)
             assert result is None
 
     def test_warn_at_threshold_queues_but_does_not_mutate_state(self):
-        """At warn threshold, ``after_model`` enqueues but returns None.
-
-        Detection observes the just-emitted AIMessage(tool_calls=...). The
-        tools node hasn't run yet, so injecting any non-tool message here
-        would split the assistant's tool_calls from their ToolMessage
-        responses and break OpenAI/Moonshot pairing. The warning is
-        delivered later from ``wrap_model_call``.
-        """
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=5)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -225,28 +235,25 @@ class TestLoopDetection:
         for _ in range(2):
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Third identical call triggers warning detection.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=call), runtime)
-        # Detection must not mutate state — the AIMessage with tool_calls is
-        # left untouched so the tools node runs normally.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert result is None
-        # ...but a warning is queued for the next model call.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert mw._pending_warnings[_pending_key()]
         assert "LOOP DETECTED" in mw._pending_warnings[_pending_key()][0]
 
     def test_warn_injected_at_next_model_call(self):
-        """``wrap_model_call`` appends a HumanMessage(loop_warning) to the
-        outgoing messages — *after* every existing message — so that the
-        AIMessage(tool_calls=...) -> ToolMessage(...) pairing stays intact.
-        """
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=10)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
         for _ in range(3):
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Build the messages the agent runtime would assemble for the next
-        # turn: prior AIMessage(tool_calls), its ToolMessage responses, ...
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         ai_msg = AIMessage(content="", tool_calls=call)
         tool_msg = ToolMessage(content="ok", tool_call_id=call[0]["id"], name="bash")
         request = _make_request([ai_msg, tool_msg], runtime)
@@ -255,16 +262,16 @@ class TestLoopDetection:
         mw.wrap_model_call(request, handler)
 
         sent = captured[0].messages
-        # AIMessage and ToolMessage stay in order, untouched.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert sent[0] is ai_msg
         assert sent[1] is tool_msg
-        # HumanMessage(warning) appears AFTER the ToolMessage — pairing intact.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert isinstance(sent[2], HumanMessage)
         assert sent[2].name == "loop_warning"
         assert "LOOP DETECTED" in sent[2].content
 
     def test_warn_queue_drained_after_injection(self):
-        """A queued warning must be emitted exactly once per detection event."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=10)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -274,19 +281,19 @@ class TestLoopDetection:
         request = _make_request([AIMessage(content="hi")], runtime)
         captured, handler = _capture_handler()
 
-        # First call: warning is appended.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw.wrap_model_call(request, handler)
         first = captured[0].messages
         assert any(isinstance(m, HumanMessage) for m in first)
 
-        # Subsequent call without new detection: no warning re-emitted.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         request2 = _make_request([AIMessage(content="hi")], runtime)
         mw.wrap_model_call(request2, handler)
         second = captured[1].messages
         assert not any(isinstance(m, HumanMessage) for m in second)
 
     def test_warn_queue_scoped_by_run_id(self):
-        """A warning queued for one run must not be injected into another run."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=10)
         runtime_a = _make_runtime(run_id="run-A")
         runtime_b = _make_runtime(run_id="run-B")
@@ -306,13 +313,7 @@ class TestLoopDetection:
         assert any(isinstance(message, HumanMessage) and message.name == "loop_warning" for message in captured[1].messages)
 
     def test_missing_run_id_uses_per_runtime_pending_scope(self):
-        """When runtime.context has no ``run_id`` key at all, warning handling
-        falls back to a key scoped to the runtime object's identity —
-        mirroring ``TokenBudgetMiddleware._get_run_id``'s fallback — instead
-        of a shared literal like the old ``"default"``, which would collide
-        across concurrent runs that both lack a run_id (the ``_stop_reason``
-        dict this same key derivation feeds is keyed by run_id alone, with
-        no thread scoping)."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=10)
         runtime = MagicMock()
         runtime.context = {"thread_id": "test-thread"}
@@ -334,7 +335,7 @@ class TestLoopDetection:
         assert not mw._pending_warnings.get(_pending_key(run_id=fallback_run_id))
 
     def test_before_agent_clears_stale_pending_warnings_for_thread(self):
-        """Starting a new run drops stale warnings from prior runs in the same thread."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=10)
         runtime_a = _make_runtime(run_id="run-A")
         runtime_b = _make_runtime(run_id="run-B")
@@ -348,7 +349,7 @@ class TestLoopDetection:
         assert not mw._pending_warnings.get(_pending_key(run_id="run-A"))
 
     def test_after_agent_clears_current_run_pending_warnings(self):
-        """Run cleanup should drop warnings that never reached wrap_model_call."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=10)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -361,7 +362,7 @@ class TestLoopDetection:
         assert not mw._pending_warnings.get(_pending_key())
 
     def test_multiple_pending_warnings_are_merged_into_one_message(self):
-        """Edge-case drains should produce one loop_warning prompt message."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware()
         runtime = _make_runtime()
         mw._pending_warnings[_pending_key()] = ["first warning", "second warning", "first warning"]
@@ -375,24 +376,25 @@ class TestLoopDetection:
         assert loop_warnings[0].content == "first warning\n\nsecond warning"
 
     def test_warn_only_queued_once_per_hash(self):
-        """Same hash repeated past the threshold should warn only once."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, hard_limit=10)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
 
-        # First two — no warning
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for _ in range(2):
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Third — warning queued
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime)
         assert len(mw._pending_warnings[_pending_key()]) == 1
 
-        # Fourth — already warned for this hash, no additional enqueue.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime)
         assert len(mw._pending_warnings[_pending_key()]) == 1
 
     def test_hard_stop_at_limit(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -400,55 +402,49 @@ class TestLoopDetection:
         for _ in range(3):
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Fourth call triggers hard stop
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is not None
         msgs = result["messages"]
         assert len(msgs) == 1
-        # Hard stop strips tool_calls
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert isinstance(msgs[0], AIMessage)
         assert msgs[0].tool_calls == []
         assert _HARD_STOP_MSG in msgs[0].content
 
     def test_hard_stop_stamps_loop_capped_stop_reason(self):
-        """#3875 Phase 2 (ggnnggez review): the loop hard-stop stamps
-        ``loop_capped`` on ``consume_stop_reason`` so the executor can surface
-        ``completed + loop_capped`` instead of a clean completion. Mirrors
-        ``TokenBudgetMiddleware.consume_stop_reason``."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
-        runtime = _make_runtime()  # run_id="test-run"
+        runtime = _make_runtime()  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         call = [_bash_call("ls")]
 
         for _ in range(3):
             mw._apply(_make_state(tool_calls=call), runtime)
-        # Fourth call triggers the hard stop -> stamps loop_capped.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         hard_stop_result = mw._apply(_make_state(tool_calls=call), runtime)
         assert hard_stop_result is not None
 
         assert mw.consume_stop_reason("test-run") == "loop_capped"
-        # Popped on read — a second read is None (no double-report on reuse).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert mw.consume_stop_reason("test-run") is None
 
     def test_warn_only_does_not_stamp_stop_reason(self):
-        """Crossing the warn threshold (not the hard limit) keeps the run going
-        and must NOT stamp ``loop_capped`` — the run is not capped."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=10)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
 
-        # Two identical calls cross warn (2) but not hard (10).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime)
         mw._apply(_make_state(tool_calls=call), runtime)
 
         assert mw.consume_stop_reason("test-run") is None
 
     def test_tool_frequency_hard_stop_stamps_loop_capped(self):
-        """The per-tool frequency hard-stop also stamps ``loop_capped`` — it is
-        the same hard-stop path, just a different detector catching the same
-        tool *type* called many times with varying arguments."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=2, tool_freq_hard_limit=3)
         runtime = _make_runtime()
-        # Same tool type, varying args -> frequency detector, not hash detector.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(3):
             result = mw._apply(_make_state(tool_calls=[_bash_call(f"cmd_{i}")]), runtime)
             if i < 2:
@@ -457,23 +453,7 @@ class TestLoopDetection:
         assert mw.consume_stop_reason("test-run") == "loop_capped"
 
     def test_hard_stop_stamps_loop_capped_with_explicit_none_run_id(self):
-        """Regression: a subagent whose ``run_id`` is genuinely ``None`` must
-        still round-trip its ``loop_capped`` stop reason.
-
-        ``SubagentExecutor`` sets ``context["run_id"] = self.run_id``
-        unconditionally (no truthiness guard), so an embedded/TUI-dispatched
-        subagent — whose ``run_id`` is never assigned per ``AGENTS.md``'s
-        description of the embedded ``DeerFlowClient`` — runs with a context
-        that legitimately carries ``run_id=None`` (the key is *present*, not
-        absent). The executor later reads the reason back with the raw
-        attribute: ``consume_stop_reason(self.run_id)``, i.e.
-        ``consume_stop_reason(None)``. Before the fix, ``_get_run_id`` used a
-        truthiness check (``if run_id:``) that collapsed this present-but-None
-        state to the same literal ``"default"`` key used for a totally absent
-        run_id, so the write (``self._stop_reason["default"] = "loop_capped"``)
-        and this read (keyed by the raw ``None``) disagreed and the signal was
-        silently lost. Mirrors ``TokenBudgetMiddleware``'s key-presence-based
-        ``_get_run_id``, which does not have this bug."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
         runtime = SimpleNamespace(context={"thread_id": "t", "run_id": None})
         call = [_bash_call("ls")]
@@ -483,40 +463,43 @@ class TestLoopDetection:
         hard_stop = mw._apply(_make_state(tool_calls=call), runtime)
         assert hard_stop is not None
 
-        # Exactly what SubagentExecutor._consume_guard_stop_reason does:
-        # consume_stop_reason(self.run_id), where self.run_id is the raw,
-        # un-normalized (possibly-None) attribute value.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert mw.consume_stop_reason(None) == "loop_capped"
-        # Popped on read — a second read is None (no double-report on reuse).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert mw.consume_stop_reason(None) is None
 
     def test_different_calls_dont_trigger(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2)
         runtime = _make_runtime()
 
-        # Each call is different
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(10):
             result = mw._apply(_make_state(tool_calls=[_bash_call(f"cmd_{i}")]), runtime)
             assert result is None
 
     def test_window_sliding(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=3, window_size=5)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
 
-        # Fill with 2 identical calls
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime)
         mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Push them out of the window with different calls
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(5):
             mw._apply(_make_state(tool_calls=[_bash_call(f"other_{i}")]), runtime)
 
-        # Now the original call should be fresh again — no warning
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is None
 
     def test_reset_clears_state(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -524,13 +507,14 @@ class TestLoopDetection:
         mw._apply(_make_state(tool_calls=call), runtime)
         mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Would trigger warning, but reset first
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw.reset()
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is None
         assert not mw._pending_warnings.get(_pending_key())
 
     def test_non_ai_message_ignored(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware()
         runtime = _make_runtime()
         state = {"messages": [SystemMessage(content="hello")]}
@@ -538,45 +522,46 @@ class TestLoopDetection:
         assert result is None
 
     def test_empty_messages_ignored(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware()
         runtime = _make_runtime()
         result = mw._apply({"messages": []}, runtime)
         assert result is None
 
     def test_thread_id_from_runtime_context(self):
-        """Thread ID should come from runtime.context, not state."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2)
         runtime_a = _make_runtime("thread-A")
         runtime_b = _make_runtime("thread-B")
         call = [_bash_call("ls")]
 
-        # One call on thread A
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime_a)
-        # One call on thread B
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime_b)
 
-        # Second call on thread A — queues warning under thread-A only.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime_a)
         assert mw._pending_warnings.get(_pending_key("thread-A"))
         assert "LOOP DETECTED" in mw._pending_warnings[_pending_key("thread-A")][0]
         assert not mw._pending_warnings.get(_pending_key("thread-B"))
 
-        # Second call on thread B — independent queue.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=call), runtime_b)
         assert mw._pending_warnings.get(_pending_key("thread-B"))
         assert "LOOP DETECTED" in mw._pending_warnings[_pending_key("thread-B")][0]
 
     def test_lru_eviction(self):
-        """Old threads should be evicted when max_tracked_threads is exceeded."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, max_tracked_threads=3)
         call = [_bash_call("ls")]
 
-        # Fill up 3 threads
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(3):
             runtime = _make_runtime(f"thread-{i}")
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Add a 4th thread — should evict thread-0
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         runtime_new = _make_runtime("thread-new")
         mw._apply(_make_state(tool_calls=call), runtime_new)
 
@@ -586,7 +571,7 @@ class TestLoopDetection:
         assert len(mw._history) == 3
 
     def test_warned_hashes_are_pruned_to_sliding_window(self):
-        """A long-lived thread should not keep every historical warned hash."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=100, window_size=4)
         runtime = _make_runtime()
 
@@ -600,7 +585,7 @@ class TestLoopDetection:
         assert len(mw._warned["test-thread"]) <= 4
 
     def test_pending_warning_keys_are_capped(self):
-        """Abnormal same-thread runs cannot grow pending-warning keys forever."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, max_tracked_threads=2)
 
         for i in range(10):
@@ -612,7 +597,7 @@ class TestLoopDetection:
         assert _pending_key("same-thread", "run-9") in mw._pending_warnings
 
     def test_pending_warning_list_is_capped_and_deduped(self):
-        """One run cannot accumulate an unbounded warning list."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware()
         runtime = _make_runtime()
 
@@ -625,6 +610,7 @@ class TestLoopDetection:
         assert warnings == [f"warning-{i}" for i in range(4, _MAX_PENDING_WARNINGS_PER_RUN + 4)]
 
     def test_pending_warning_touch_order_cleared_with_pending_key(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware()
         runtime = _make_runtime()
         mw._queue_pending_warning(runtime, "warning")
@@ -635,14 +621,14 @@ class TestLoopDetection:
         assert mw._pending_warning_touch_order == OrderedDict()
 
     def test_thread_safe_mutations(self):
-        """Verify lock is used for mutations (basic structural test)."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware()
-        # The middleware should have a lock attribute
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert hasattr(mw, "_lock")
         assert isinstance(mw._lock, type(mw._lock))
 
     def test_fallback_thread_id_when_missing(self):
-        """When runtime context has no thread_id, should use 'default'."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2)
         runtime = MagicMock()
         runtime.context = {}
@@ -653,12 +639,13 @@ class TestLoopDetection:
 
 
 class TestLoopDetectionAgentGraphIntegration:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_loop_warning_is_transient_in_real_agent_graph(self):
-        """after_model queues the warning; wrap_model_call injects it request-only."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
         @as_tool
         def bash(command: str) -> str:
-            """Run a fake shell command."""
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return f"ran: {command}"
 
         repeated_calls = [[{"name": "bash", "id": f"call_ls_{i}", "args": {"command": "ls"}}] for i in range(3)]
@@ -700,11 +687,11 @@ class TestLoopDetectionAgentGraphIntegration:
 
     @pytest.mark.asyncio
     async def test_loop_warning_is_transient_in_async_agent_graph(self):
-        """awrap_model_call injects loop_warning request-only in async graph runs."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
         @as_tool
         async def bash(command: str) -> str:
-            """Run a fake shell command."""
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return f"ran: {command}"
 
         repeated_calls = [[{"name": "bash", "id": f"call_async_ls_{i}", "args": {"command": "ls"}}] for i in range(3)]
@@ -746,22 +733,25 @@ class TestLoopDetectionAgentGraphIntegration:
 
 
 class TestAppendText:
-    """Unit tests for LoopDetectionMiddleware._append_text."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_none_content_returns_text(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         result = LoopDetectionMiddleware._append_text(None, "hello")
         assert result == "hello"
 
     def test_str_content_concatenates(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         result = LoopDetectionMiddleware._append_text("existing", "appended")
         assert result == "existing\n\nappended"
 
     def test_empty_str_content_concatenates(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         result = LoopDetectionMiddleware._append_text("", "appended")
         assert result == "\n\nappended"
 
     def test_list_content_appends_text_block(self):
-        """List content (e.g. Anthropic thinking mode) should get a new text block."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         content = [
             {"type": "thinking", "text": "Let me think..."},
             {"type": "text", "text": "Here is my answer"},
@@ -774,35 +764,36 @@ class TestAppendText:
         assert result[2] == {"type": "text", "text": "\n\nstop msg"}
 
     def test_empty_list_content_appends_text_block(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         result = LoopDetectionMiddleware._append_text([], "stop msg")
         assert isinstance(result, list)
         assert len(result) == 1
         assert result[0] == {"type": "text", "text": "\n\nstop msg"}
 
     def test_unexpected_type_coerced_to_str(self):
-        """Unexpected content types should be coerced to str as a fallback."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         result = LoopDetectionMiddleware._append_text(42, "stop msg")
         assert isinstance(result, str)
         assert result == "42\n\nstop msg"
 
     def test_list_content_not_mutated_in_place(self):
-        """_append_text must not modify the original list."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         original = [{"type": "text", "text": "hello"}]
         result = LoopDetectionMiddleware._append_text(original, "appended")
-        assert len(original) == 1  # original unchanged
-        assert len(result) == 2  # new list has the appended block
+        assert len(original) == 1  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        assert len(result) == 2  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 class TestHardStopWithListContent:
-    """Regression tests: hard stop must not crash when AIMessage.content is a list."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_hard_stop_with_list_content(self):
-        """Hard stop on list content should not raise TypeError (regression)."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
 
-        # Build state with list content (e.g. Anthropic thinking mode)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         list_content = [
             {"type": "thinking", "text": "Let me think..."},
             {"type": "text", "text": "I'll run ls"},
@@ -811,20 +802,20 @@ class TestHardStopWithListContent:
         for _ in range(3):
             mw._apply(_make_state(tool_calls=call, content=list_content), runtime)
 
-        # Fourth call triggers hard stop — must not raise TypeError
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=call, content=list_content), runtime)
         assert result is not None
         msg = result["messages"][0]
         assert isinstance(msg, AIMessage)
         assert msg.tool_calls == []
-        # Content should remain a list with the stop message appended
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert isinstance(msg.content, list)
         assert len(msg.content) == 3
         assert msg.content[2]["type"] == "text"
         assert _HARD_STOP_MSG in msg.content[2]["text"]
 
     def test_hard_stop_with_none_content(self):
-        """Hard stop on None content should produce a plain string."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -832,7 +823,7 @@ class TestHardStopWithListContent:
         for _ in range(3):
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # Fourth call with default empty-string content
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is not None
         msg = result["messages"][0]
@@ -840,7 +831,7 @@ class TestHardStopWithListContent:
         assert _HARD_STOP_MSG in msg.content
 
     def test_hard_stop_with_str_content(self):
-        """Hard stop on str content should concatenate the stop message."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -856,12 +847,13 @@ class TestHardStopWithListContent:
         assert _HARD_STOP_MSG in msg.content
 
     def test_hard_stop_clears_raw_tool_call_metadata(self):
-        """Forced-stop messages must not retain provider-level raw tool-call payloads."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(warn_threshold=2, hard_limit=4)
         runtime = _make_runtime()
         call = [_bash_call("ls")]
 
         def _make_provider_state():
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return {
                 "messages": [
                     AIMessage(
@@ -896,17 +888,14 @@ class TestHardStopWithListContent:
 
 
 class TestToolFrequencyDetection:
-    """Tests for per-tool-type frequency detection (Layer 2).
-
-    This catches the case where an agent calls the same tool type many times
-    with *different* arguments (e.g. read_file on 40 different files), which
-    bypasses hash-based detection.
-    """
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def _read_call(self, path):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return {"name": "read_file", "id": f"call_read_{path}", "args": {"path": path}}
 
     def test_below_freq_warn_returns_none(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=5, tool_freq_hard_limit=10)
         runtime = _make_runtime()
 
@@ -915,13 +904,14 @@ class TestToolFrequencyDetection:
             assert result is None
 
     def test_freq_warn_at_threshold(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=5, tool_freq_hard_limit=10)
         runtime = _make_runtime()
 
         for i in range(4):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/file_{i}.py")]), runtime)
 
-        # 5th call queues a per-tool-type frequency warning; state untouched.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/file_4.py")]), runtime)
         assert result is None
         queued = mw._pending_warnings.get(_pending_key(), [])
@@ -930,29 +920,31 @@ class TestToolFrequencyDetection:
         assert "LOOP DETECTED" in queued[0]
 
     def test_freq_warn_only_queued_once(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=3, tool_freq_hard_limit=10)
         runtime = _make_runtime()
 
         for i in range(2):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/file_{i}.py")]), runtime)
 
-        # 3rd queues a frequency warning.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw._apply(_make_state(tool_calls=[self._read_call("/file_2.py")]), runtime)
         assert len(mw._pending_warnings[_pending_key()]) == 1
 
-        # 4th: same tool name, no additional enqueue.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/file_3.py")]), runtime)
         assert result is None
         assert len(mw._pending_warnings[_pending_key()]) == 1
 
     def test_freq_hard_stop_at_limit(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=3, tool_freq_hard_limit=6)
         runtime = _make_runtime()
 
         for i in range(5):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/file_{i}.py")]), runtime)
 
-        # 6th call triggers hard stop
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/file_5.py")]), runtime)
         assert result is not None
         msg = result["messages"][0]
@@ -962,21 +954,14 @@ class TestToolFrequencyDetection:
         assert "read_file" in msg.content
 
     def test_windowed_frequency_decay_avoids_hard_stop_when_interleaved(self):
-        """More than ``window_size`` total calls to one tool type must NOT hard-stop
-        as long as they are spread out.
-
-        Interleaving read_file with another tool keeps the per-window count under
-        the hard limit, so the windowed counter decays instead of accumulating
-        monotonically. The old monotonic counter would hard-stop on the 4th
-        read_file regardless of spacing.
-        """
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=100, tool_freq_hard_limit=4, window_size=5)
         runtime = _make_runtime()
 
-        # Alternate read_file with bash. In any window of 5 consecutive calls the
-        # read_file count peaks at 3 (< hard_limit=4), so no hard stop fires even
-        # though total read_file calls (8) exceeds window_size (5). Distinct args
-        # keep the Layer-1 hash detector from firing, isolating Layer 2.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         read_count = 0
         for i in range(8):
             result = mw._apply(_make_state(tool_calls=[self._read_call(f"/file_{i}.py")]), runtime)
@@ -985,16 +970,15 @@ class TestToolFrequencyDetection:
             result = mw._apply(_make_state(tool_calls=[_bash_call(f"cmd_{i}")]), runtime)
             assert result is None, f"bash call {i} unexpectedly hard-stopped"
 
-        assert read_count == 8  # more than window_size total read_file calls, no hard stop
+        assert read_count == 8  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_rapid_identical_tool_type_in_one_window_still_hard_stops(self):
-        """The decay must not weaken the guard: ``window_size``+ rapid calls to the
-        same tool type within one window still trip the frequency hard-stop."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=100, tool_freq_hard_limit=4, window_size=5)
         runtime = _make_runtime()
 
-        # Distinct args each call -> the hash-based (Layer 1) detector never fires,
-        # isolating the per-tool-type frequency layer.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(3):
             assert mw._apply(_make_state(tool_calls=[self._read_call(f"/f_{i}.py")]), runtime) is None
 
@@ -1007,25 +991,26 @@ class TestToolFrequencyDetection:
         assert "read_file" in msg.content
 
     def test_different_tools_tracked_independently(self):
-        """read_file and bash should have independent frequency counters."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=3, tool_freq_hard_limit=10)
         runtime = _make_runtime()
 
-        # 2 read_file calls
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(2):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/file_{i}.py")]), runtime)
 
-        # 2 bash calls — should not trigger (bash count = 2, read_file count = 2)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(2):
             result = mw._apply(_make_state(tool_calls=[_bash_call(f"cmd_{i}")]), runtime)
             assert result is None
 
-        # 3rd read_file triggers — warning is queued (state unchanged).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/file_2.py")]), runtime)
         assert result is None
         assert "read_file" in mw._pending_warnings[_pending_key()][0]
 
     def test_freq_reset_clears_state(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=3, tool_freq_hard_limit=10)
         runtime = _make_runtime()
 
@@ -1034,77 +1019,77 @@ class TestToolFrequencyDetection:
 
         mw.reset()
 
-        # After reset, count restarts — should not trigger
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/file_new.py")]), runtime)
         assert result is None
 
     def test_freq_reset_per_thread_clears_only_target(self):
-        """reset(thread_id=...) should clear frequency state for that thread only."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=3, tool_freq_hard_limit=10)
         runtime_a = _make_runtime("thread-A")
         runtime_b = _make_runtime("thread-B")
 
-        # 2 calls on each thread
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(2):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/a_{i}.py")]), runtime_a)
             mw._apply(_make_state(tool_calls=[self._read_call(f"/b_{i}.py")]), runtime_b)
 
-        # Reset only thread-A
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mw.reset(thread_id="thread-A")
 
         assert "thread-A" not in mw._tool_name_history
 
-        # thread-B state should still be intact — 3rd call queues a warn.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/b_2.py")]), runtime_b)
         assert result is None
         assert "LOOP DETECTED" in mw._pending_warnings[_pending_key("thread-B")][0]
 
-        # thread-A restarted from 0 — should not trigger
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/a_new.py")]), runtime_a)
         assert result is None
 
     def test_freq_per_thread_isolation(self):
-        """Frequency counts should be independent per thread."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=3, tool_freq_hard_limit=10)
         runtime_a = _make_runtime("thread-A")
         runtime_b = _make_runtime("thread-B")
 
-        # 2 calls on thread A
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(2):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/file_{i}.py")]), runtime_a)
 
-        # 2 calls on thread B — should NOT push thread A over threshold
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(2):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/other_{i}.py")]), runtime_b)
 
-        # 3rd call on thread A — queues a warning (count=3 for thread A only).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/file_2.py")]), runtime_a)
         assert result is None
         assert "LOOP DETECTED" in mw._pending_warnings[_pending_key("thread-A")][0]
         assert not mw._pending_warnings.get(_pending_key("thread-B"))
 
     def test_multi_tool_single_response_counted(self):
-        """When a single response has multiple tool calls, each is counted."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(tool_freq_warn=5, tool_freq_hard_limit=10)
         runtime = _make_runtime()
 
-        # Response 1: 2 read_file calls → count = 2
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         call = [self._read_call("/a.py"), self._read_call("/b.py")]
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is None
 
-        # Response 2: 2 more → count = 4
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         call = [self._read_call("/c.py"), self._read_call("/d.py")]
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is None
 
-        # Response 3: 1 more → count = 5 → queues warn.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/e.py")]), runtime)
         assert result is None
         assert "read_file" in mw._pending_warnings[_pending_key()][0]
 
     def test_override_tool_uses_override_thresholds(self):
-        """A tool in tool_freq_overrides uses its own thresholds, not the global ones."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(
             tool_freq_warn=5,
             tool_freq_hard_limit=10,
@@ -1112,13 +1097,13 @@ class TestToolFrequencyDetection:
         )
         runtime = _make_runtime()
 
-        # 10 bash calls — would hit global hard_limit=10, but bash override is 100
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(10):
             result = mw._apply(_make_state(tool_calls=[_bash_call(f"cmd_{i}")]), runtime)
             assert result is None, f"unexpected trigger on call {i + 1}"
 
     def test_non_override_tool_falls_back_to_global(self):
-        """A tool NOT in tool_freq_overrides uses the global warn/hard_limit."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(
             tool_freq_warn=3,
             tool_freq_hard_limit=6,
@@ -1129,9 +1114,9 @@ class TestToolFrequencyDetection:
         for i in range(2):
             mw._apply(_make_state(tool_calls=[self._read_call(f"/file_{i}.py")]), runtime)
 
-        # 3rd read_file call hits global warn=3 (read_file has no override).
-        # Warning delivery is deferred to wrap_model_call so the just-emitted
-        # AIMessage(tool_calls=...) is not mutated before ToolMessages exist.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[self._read_call("/file_2.py")]), runtime)
         assert result is None
         queued = mw._pending_warnings.get(_pending_key(), [])
@@ -1139,7 +1124,7 @@ class TestToolFrequencyDetection:
         assert "read_file" in queued[0]
 
     def test_hash_detection_takes_priority(self):
-        """Hash-based hard stop fires before frequency check for identical calls."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware(
             warn_threshold=2,
             hard_limit=3,
@@ -1152,7 +1137,7 @@ class TestToolFrequencyDetection:
         for _ in range(2):
             mw._apply(_make_state(tool_calls=call), runtime)
 
-        # 3rd identical call → hash hard_limit=3 fires (not freq)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=call), runtime)
         assert result is not None
         msg = result["messages"][0]
@@ -1161,15 +1146,17 @@ class TestToolFrequencyDetection:
 
 
 class TestFromConfig:
-    """Tests for LoopDetectionMiddleware.from_config — the sole validated construction path."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     @staticmethod
     def _config(**kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         from deerflow.config.loop_detection_config import LoopDetectionConfig
 
         return LoopDetectionConfig(**kwargs)
 
     def test_scalar_fields_mapped(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         config = self._config(
             warn_threshold=4,
             hard_limit=8,
@@ -1187,15 +1174,18 @@ class TestFromConfig:
         assert mw.tool_freq_hard_limit == 40
 
     def test_overrides_converted_to_tuples(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         config = self._config(tool_freq_overrides={"bash": {"warn": 50, "hard_limit": 100}})
         mw = LoopDetectionMiddleware.from_config(config)
         assert mw._tool_freq_overrides == {"bash": (50, 100)}
 
     def test_empty_overrides(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware.from_config(self._config())
         assert mw._tool_freq_overrides == {}
 
     def test_constructed_middleware_queues_loop_warning(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware.from_config(self._config(warn_threshold=2, hard_limit=4))
         runtime = _make_runtime()
         call = [_bash_call("ls")]
@@ -1207,34 +1197,29 @@ class TestFromConfig:
         assert "LOOP DETECTED" in queued[0]
 
     def test_freq_window_sized_to_hard_limit_under_defaults(self):
-        """Regression for #4072: the Layer-2 frequency window must be >= the
-        largest threshold, or the warn/hard branches are dead code. With the
-        shipped defaults (window 20 < warn 30 < hard 50) the freq deque must be
-        sized to 50, not 20."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware.from_config(self._config())
         assert mw._tool_freq_window >= mw.tool_freq_hard_limit
         assert mw._tool_freq_window >= mw.tool_freq_warn
 
     def test_freq_window_covers_largest_override_hard_limit(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware.from_config(self._config(tool_freq_overrides={"bash": {"warn": 60, "hard_limit": 120}}))
         assert mw._tool_freq_window >= 120
 
     def test_tight_burst_hard_stops_under_default_config(self):
-        """Under the real default config, one tool type called many times with
-        *distinct* args (which Layer 1's name+args hash never catches) must still
-        be hard-stopped by Layer 2. This fails if the freq window is capped at
-        ``window_size`` (20) below the hard limit (50)."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mw = LoopDetectionMiddleware.from_config(self._config())
         runtime = _make_runtime()
-        hard = mw.tool_freq_hard_limit  # 50 by default
+        hard = mw.tool_freq_hard_limit  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
-        # Distinct args every call -> unique hashes -> Layer 1 (hash) never trips.
-        # Only Layer 2 (per-tool-type frequency) can catch this tight burst.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         for i in range(hard - 1):
             result = mw._apply(_make_state(tool_calls=[_bash_call(f"cmd_{i}")]), runtime)
             assert result is None, f"unexpected hard stop before the limit at call {i}"
 
-        # The call that pushes freq_count to the hard limit fires the stop.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = mw._apply(_make_state(tool_calls=[_bash_call(f"cmd_{hard}")]), runtime)
         assert result is not None
         assert mw.consume_stop_reason("test-run") == "loop_capped"

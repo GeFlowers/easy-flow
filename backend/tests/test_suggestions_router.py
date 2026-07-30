@@ -1,3 +1,4 @@
+'未说明'
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -11,6 +12,7 @@ from deerflow.utils import oneshot_llm
 
 @pytest.fixture(autouse=True)
 def _clear_langfuse_env(monkeypatch):
+    '未说明'
     from deerflow.config.tracing_config import reset_tracing_config
 
     for name in ("LANGFUSE_TRACING", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL", "DEER_FLOW_ENV", "ENVIRONMENT"):
@@ -21,42 +23,50 @@ def _clear_langfuse_env(monkeypatch):
 
 
 def test_strip_markdown_code_fence_removes_wrapping():
+    '未说明'
     text = '```json\n["a"]\n```'
     assert suggestions._strip_markdown_code_fence(text) == '["a"]'
 
 
 def test_strip_markdown_code_fence_no_fence_keeps_content():
+    '未说明'
     text = '  ["a"]  '
     assert suggestions._strip_markdown_code_fence(text) == '["a"]'
 
 
 def test_parse_json_string_list_filters_invalid_items():
+    '未说明'
     text = '```json\n["a", " ", 1, "b"]\n```'
     assert suggestions._parse_json_string_list(text) == ["a", "b"]
 
 
 def test_parse_json_string_list_rejects_non_list():
+    '未说明'
     text = '{"a": 1}'
     assert suggestions._parse_json_string_list(text) is None
 
 
 def test_strip_think_blocks_removes_complete_block():
+    '未说明'
     text = "<think>\nreasoning here\n</think>\nanswer"
     assert suggestions._strip_think_blocks(text) == "answer"
 
 
 def test_strip_think_blocks_is_case_insensitive():
+    '未说明'
     text = "<Think>reasoning</THINK>\nanswer"
     assert suggestions._strip_think_blocks(text) == "answer"
 
 
 def test_strip_think_blocks_drops_unclosed_block():
     # Reasoning models truncated at max_tokens emit an unclosed <think>.
+    '未说明'
     text = "<think>\nreasoning that never finished because tokens ran out"
     assert suggestions._strip_think_blocks(text) == ""
 
 
 def test_strip_think_blocks_keeps_text_without_think():
+    '未说明'
     text = '["a", "b"]'
     assert suggestions._strip_think_blocks(text) == '["a", "b"]'
 
@@ -65,17 +75,20 @@ def test_parse_json_string_list_ignores_brackets_inside_think_block():
     # MiniMax-M3 inlines its chain-of-thought as <think>...</think> in content
     # (reasoning_split=false). When that reasoning contains '[' / ']', the old
     # find('[')/rfind(']') logic grabbed the wrong span and parsing failed.
+    '未说明'
     text = '<think>\nMaybe a list like ["x", "y"] could work. Let me craft 3.\n</think>\n["Q1", "Q2", "Q3"]'
     assert suggestions._parse_json_string_list(text) == ["Q1", "Q2", "Q3"]
 
 
 def test_parse_json_string_list_strips_think_then_code_fence():
+    '未说明'
     text = '<think>reasoning</think>\n```json\n["Q1", "Q2"]\n```'
     assert suggestions._parse_json_string_list(text) == ["Q1", "Q2"]
 
 
 def test_generate_suggestions_strips_inline_think_block(monkeypatch):
     # End-to-end: model returns thinking inline followed by the JSON array.
+    '未说明'
     req = suggestions.SuggestionsRequest(
         messages=[
             suggestions.SuggestionMessage(role="user", content="介绍深度学习"),
@@ -95,6 +108,7 @@ def test_generate_suggestions_strips_inline_think_block(monkeypatch):
 
 
 def test_format_conversation_formats_roles():
+    '未说明'
     messages = [
         suggestions.SuggestionMessage(role="User", content="Hi"),
         suggestions.SuggestionMessage(role="assistant", content="Hello"),
@@ -104,6 +118,7 @@ def test_format_conversation_formats_roles():
 
 
 def test_generate_suggestions_parses_and_limits(monkeypatch):
+    '未说明'
     req = suggestions.SuggestionsRequest(
         messages=[
             suggestions.SuggestionMessage(role="user", content="Hi"),
@@ -126,6 +141,7 @@ def test_generate_suggestions_parses_and_limits(monkeypatch):
 
 
 def test_generate_suggestions_injects_deerflow_trace_metadata_when_langfuse_enabled(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -158,6 +174,7 @@ def test_generate_suggestions_injects_deerflow_trace_metadata_when_langfuse_enab
 
 
 def test_generate_suggestions_parses_list_block_content(monkeypatch):
+    '未说明'
     req = suggestions.SuggestionsRequest(
         messages=[
             suggestions.SuggestionMessage(role="user", content="Hi"),
@@ -180,6 +197,7 @@ def test_generate_suggestions_parses_list_block_content(monkeypatch):
 
 
 def test_generate_suggestions_parses_output_text_block_content(monkeypatch):
+    '未说明'
     req = suggestions.SuggestionsRequest(
         messages=[
             suggestions.SuggestionMessage(role="user", content="Hi"),
@@ -202,6 +220,7 @@ def test_generate_suggestions_parses_output_text_block_content(monkeypatch):
 
 
 def test_generate_suggestions_returns_empty_on_model_error(monkeypatch):
+    '未说明'
     req = suggestions.SuggestionsRequest(
         messages=[suggestions.SuggestionMessage(role="user", content="Hi")],
         n=2,
@@ -219,7 +238,7 @@ def test_generate_suggestions_returns_empty_on_model_error(monkeypatch):
 
 
 def test_generate_suggestions_returns_empty_when_disabled(monkeypatch):
-    """Ensure suggestions are bypassed and returned an empty list when disabled in config."""
+    '未说明'
     req = suggestions.SuggestionsRequest(
         messages=[
             suggestions.SuggestionMessage(role="user", content="Hi"),
@@ -242,7 +261,7 @@ def test_generate_suggestions_returns_empty_when_disabled(monkeypatch):
 
 
 def test_get_suggestions_config():
-    """Ensure the GET /config endpoint correctly returns the boolean state."""
+    '未说明'
 
     # Test when enabled
     mock_config_true = SimpleNamespace(suggestions=SimpleNamespace(enabled=True))

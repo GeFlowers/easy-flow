@@ -1,15 +1,4 @@
-"""Single source of truth for the MCP-tool metadata tag.
-
-A tool is "MCP-sourced" when it carries the ``deerflow_mcp`` metadata flag.
-The tag is *written* where MCP tools are loaded (``tools.py``) and *read* by
-deferred-tool assembly (``tool_search.py``) and the agent build site
-(``agent.py``). Keeping the key, the tagger, and the predicate here means the
-magic string lives in exactly one place, and readers import a public predicate
-instead of a private cross-module helper.
-
-This is a leaf module by design: it depends only on ``BaseTool`` so that any
-module (including the tool loader) can import it without an import cycle.
-"""
+"""管理 MCP 工具来源与路由信息的元数据标记。"""
 
 from __future__ import annotations
 
@@ -23,18 +12,18 @@ MCP_TOOL_ROUTING_METADATA_KEY = "deerflow_mcp_routing"
 
 
 def tag_mcp_tool(tool: BaseTool) -> BaseTool:
-    """Mark ``tool`` as MCP-sourced. Mutates in place and returns it for chaining."""
+    """为工具写入 MCP 来源标记并返回该工具。"""
     tool.metadata = {**(tool.metadata or {}), MCP_TOOL_METADATA_KEY: True}
     return tool
 
 
 def is_mcp_tool(tool: BaseTool) -> bool:
-    """True when ``tool`` carries the MCP-source tag written by :func:`tag_mcp_tool`."""
+    """判断工具是否带有 MCP 来源标记。"""
     return (getattr(tool, "metadata", None) or {}).get(MCP_TOOL_METADATA_KEY) is True
 
 
 def tag_mcp_routing(tool: BaseTool, routing: Mapping[str, Any]) -> BaseTool:
-    """Attach serialized MCP routing metadata to ``tool``."""
+    """为 MCP 工具附加路由元数据并返回该工具。"""
     tool.metadata = {
         **(tool.metadata or {}),
         MCP_TOOL_ROUTING_METADATA_KEY: dict(routing),
@@ -43,7 +32,7 @@ def tag_mcp_routing(tool: BaseTool, routing: Mapping[str, Any]) -> BaseTool:
 
 
 def get_mcp_routing(tool: BaseTool) -> dict[str, Any] | None:
-    """Return routing metadata only for MCP tools whose routing mode is active."""
+    """仅当 MCP 工具的路由模式启用时返回其路由元数据。"""
     if not is_mcp_tool(tool):
         return None
     routing = (getattr(tool, "metadata", None) or {}).get(MCP_TOOL_ROUTING_METADATA_KEY)

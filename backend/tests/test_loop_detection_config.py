@@ -1,4 +1,4 @@
-"""Tests for loop detection configuration."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import pytest
 
@@ -6,7 +6,9 @@ from deerflow.config.loop_detection_config import LoopDetectionConfig
 
 
 class TestLoopDetectionConfig:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_defaults_match_middleware_defaults(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         config = LoopDetectionConfig()
 
         assert config.enabled is True
@@ -18,6 +20,7 @@ class TestLoopDetectionConfig:
         assert config.tool_freq_hard_limit == 50
 
     def test_accepts_custom_values(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         config = LoopDetectionConfig(
             enabled=False,
             warn_threshold=10,
@@ -37,6 +40,7 @@ class TestLoopDetectionConfig:
         assert config.tool_freq_hard_limit == 80
 
     def test_rejects_zero_thresholds(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with pytest.raises(ValueError):
             LoopDetectionConfig(warn_threshold=0)
 
@@ -50,23 +54,28 @@ class TestLoopDetectionConfig:
             LoopDetectionConfig(tool_freq_hard_limit=0)
 
     def test_rejects_hard_limit_below_warn_threshold(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with pytest.raises(ValueError, match="hard_limit"):
             LoopDetectionConfig(warn_threshold=5, hard_limit=4)
 
     def test_rejects_tool_freq_hard_limit_below_warn_threshold(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with pytest.raises(ValueError, match="tool_freq_hard_limit"):
             LoopDetectionConfig(tool_freq_warn=5, tool_freq_hard_limit=4)
 
     def test_tool_freq_override_valid(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         config = LoopDetectionConfig(tool_freq_overrides={"bash": {"warn": 150, "hard_limit": 300}})
         override = config.tool_freq_overrides["bash"]
         assert override.warn == 150
         assert override.hard_limit == 300
 
     def test_tool_freq_override_rejects_zero_warn(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with pytest.raises(ValueError):
             LoopDetectionConfig(tool_freq_overrides={"bash": {"warn": 0, "hard_limit": 10}})
 
     def test_tool_freq_override_rejects_hard_limit_below_warn(self):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         with pytest.raises(ValueError, match="hard_limit"):
             LoopDetectionConfig(tool_freq_overrides={"bash": {"warn": 100, "hard_limit": 50}})

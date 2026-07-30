@@ -1,31 +1,4 @@
-"""Middleware to enforce per-run token budget limits.
-Tracks cumulative token usage (input, output, total) across model calls within
-a single agent run and enforces configurable soft-warning and hard-stop
-thresholds.
-Detection strategy:
-  1. After each model response, sum the `usage_metadata` of all `AIMessage`s
-     in the current thread history. This automatically captures tokens from
-     subagents because `TokenUsageMiddleware` retroactively adds them to the
-     history.
-  2. If the highest fraction (input, output, or total) >= warn_threshold,
-     queue a warning.
-  3. If the highest fraction >= hard_stop_threshold, strip tool_calls.
-Warning injection uses the deferred pattern:
-  - after_model queues the warning (does NOT mutate state).
-  - wrap_model_call injects it as a HumanMessage at the next model call.
-This preserves AIMessage(tool_calls) → ToolMessage pairing.
-
-Stop-reason surfacing (#3875 Phase 2):
-  The hard stop does NOT raise — it strips tool_calls so the agent loop
-  terminates naturally and produces a final answer. To let the caller (e.g.
-  the subagent executor) distinguish a budget-capped completion from a clean
-  one, the run that triggered the hard stop is recorded in ``_stop_reason``
-  and exposed via :meth:`consume_stop_reason`. That dict is intentionally NOT
-  cleared by ``after_agent``/``_clear_run_state`` so the executor can read it
-  after the run returns; the bounded dict prevents unbounded growth on
-  abandoned runs, and each subagent run builds a fresh middleware instance so
-  there is no cross-run contamination.
-"""
+'定义 token_budget_middleware 模块提供的职责与可复用接口。\n\nMiddleware to enforce per-run token budget limits.\nTracks cumulative token usage (input, output, total) across model calls within\na single agent run and enforces configurable soft-warning and hard-stop\nthresholds.\nDetection strategy:\n  1. After each model response, sum the `usage_metadata` of all `AIMessage`s\n     in the current thread history. This automatically captures tokens from\n     subagents because `TokenUsageMiddleware` retroactively adds them to the\n     history.\n  2. If the highest fraction (input, output, or total) >= warn_threshold,\n     queue a warning.\n  3. If the highest fraction >= hard_stop_threshold, strip tool_calls.\nWarning injection uses the deferred pattern:\n  - after_model queues the warning (does NOT mutate state).\n  - wrap_model_call injects it as a HumanMessage at the next model call.\nThis preserves AIMessage(tool_calls) → ToolMessage pairing.\n\nStop-reason surfacing (#3875 Phase 2):\n  The hard stop does NOT raise — it strips tool_calls so the agent loop\n  terminates naturally and produces a final answer. To let the caller (e.g.\n  the subagent executor) distinguish a budget-capped completion from a clean\n  one, the run that triggered the hard stop is recorded in ``_stop_reason``\n  and exposed via :meth:`consume_stop_reason`. That dict is intentionally NOT\n  cleared by ``after_agent``/``_clear_run_state`` so the executor can read it\n  after the run returns; the bounded dict prevents unbounded growth on\n  abandoned runs, and each subagent run builds a fresh middleware instance so\n  there is no cross-run contamination.\n'
 
 from __future__ import annotations
 
@@ -54,15 +27,17 @@ _BUDGET_EXCEEDED_MSG = "[TOKEN BUDGET EXCEEDED] The {reason} token usage ({used:
 
 @dataclass
 class TokenUsage:
+    '封装 TokenUsage 的状态、协作关系与公开操作'
     input: int = 0
     output: int = 0
     total: int = 0
 
 
 class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
-    """Enforce per-run token budget limits."""
+    '封装 TokenBudgetMiddleware 的状态、协作关系与公开操作。\n\nEnforce per-run token budget limits.'
 
     def __init__(self, config: TokenBudgetConfig) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__()
         self._config = config
         self._lock = threading.Lock()
@@ -79,9 +54,11 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @classmethod
     def from_config(cls, config: TokenBudgetConfig) -> TokenBudgetMiddleware:
+        '执行 from_config 的明确职责，并返回与调用约定一致的结果'
         return cls(config=config)
 
     def reset(self) -> None:
+        '执行 reset 的明确职责，并返回与调用约定一致的结果'
         with self._lock:
             self._warned.clear()
             self._pending_warnings.clear()
@@ -90,19 +67,13 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
             self._stop_reason.clear()
 
     def consume_stop_reason(self, run_id: str | None) -> str | None:
-        """Pop and return the stop reason the hard-stop set for this run.
-
-        Returns ``"token_capped"`` when the budget hard-stop fired during the
-        run, otherwise ``None``. The executor calls this after the run returns
-        to decide whether a completed subagent was actually budget-capped
-        (and should carry ``stop_reason=token_capped`` to the lead). Popping
-        keeps the dict from accumulating across runs on a reused instance.
-        """
+        '执行 consume_stop_reason 的明确职责，并返回与调用约定一致的结果。\n\nPop and return the stop reason the hard-stop set for this run.\n\n        Returns ``"token_capped"`` when the budget hard-stop fired during the\n        run, otherwise ``None``. The executor calls this after the run returns\n        to decide whether a completed subagent was actually budget-capped\n        (and should carry ``stop_reason=token_capped`` to the lead). Popping\n        keeps the dict from accumulating across runs on a reused instance.\n        '
         with self._lock:
             return self._stop_reason.pop(run_id, None)
 
     @staticmethod
     def _get_run_id(runtime: Runtime) -> str:
+        '执行 _get_run_id 的明确职责，并返回与调用约定一致的结果'
         ctx = getattr(runtime, "context", None)
         if isinstance(ctx, dict) and "run_id" in ctx:
             return ctx["run_id"]
@@ -110,6 +81,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         return str(id(runtime))
 
     def _clear_run_state(self, run_id: str) -> None:
+        '执行 _clear_run_state 的明确职责，并返回与调用约定一致的结果'
         with self._lock:
             self._warned.pop(run_id, None)
             self._pending_warnings.pop(run_id, None)
@@ -118,6 +90,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> None:
+        '执行 before_agent 的明确职责，并返回与调用约定一致的结果'
         if not self._config.enabled:
             return
 
@@ -140,21 +113,24 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> None:
+        '执行 abefore_agent 的明确职责，并返回与调用约定一致的结果'
         self.before_agent(state, runtime)
 
     @override
     def after_agent(self, state: AgentState, runtime: Runtime) -> None:
+        '执行 after_agent 的明确职责，并返回与调用约定一致的结果'
         if not self._config.enabled:
             return
         self._clear_run_state(self._get_run_id(runtime))
 
     @override
     async def aafter_agent(self, state: AgentState, runtime: Runtime) -> None:
+        '执行 aafter_agent 的明确职责，并返回与调用约定一致的结果'
         self.after_agent(state, runtime)
 
     @staticmethod
     def _append_text(content: str | list[dict | None] | None, stop_msg: str) -> str | list[dict | str]:
-        """Append a stop message to an AIMessage.content field."""
+        '执行 _append_text 的明确职责，并返回与调用约定一致的结果。\n\nAppend a stop message to an AIMessage.content field.'
         if content is None:
             return stop_msg
         if isinstance(content, str):
@@ -168,7 +144,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         return f"{content}\n\n{stop_msg}"
 
     def _build_hard_stop_update(self, msg: AIMessage, stop_msg: str) -> dict[str, Any]:
-        """Build the state update dictionary for a hard stop."""
+        '执行 _build_hard_stop_update 的明确职责，并返回与调用约定一致的结果。\n\nBuild the state update dictionary for a hard stop.'
         updated_content = self._append_text(msg.content, stop_msg)
         kwargs = dict(msg.additional_kwargs) if msg.additional_kwargs else {}
         if "tool_calls" in kwargs:
@@ -185,6 +161,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         return {"messages": [stopped_msg]}
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '执行 _apply 的明确职责，并返回与调用约定一致的结果'
         if not self._config.enabled:
             return None
 
@@ -273,13 +250,16 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '执行 after_model 的明确职责，并返回与调用约定一致的结果'
         return self._apply(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '执行 aafter_model 的明确职责，并返回与调用约定一致的结果'
         return self._apply(state, runtime)
 
     def _drain_pending_warnings(self, runtime: Runtime) -> list[str]:
+        '执行 _drain_pending_warnings 的明确职责，并返回与调用约定一致的结果'
         if not self._config.enabled:
             return []
 
@@ -289,6 +269,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         return warnings or []
 
     def _inject_warnings(self, request: ModelRequest, warnings: list[str]) -> ModelRequest:
+        '执行 _inject_warnings 的明确职责，并返回与调用约定一致的结果'
         if not warnings:
             return request
 
@@ -302,6 +283,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
     @override
     def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
 
+        '执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果'
         warnings = self._drain_pending_warnings(request.runtime)
         request = self._inject_warnings(request, warnings)
 
@@ -309,6 +291,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     async def awrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]) -> ModelCallResult:
+        '执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果'
         warnings = self._drain_pending_warnings(request.runtime)
         request = self._inject_warnings(request, warnings)
         return await handler(request)

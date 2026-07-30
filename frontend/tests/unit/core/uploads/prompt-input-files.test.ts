@@ -10,9 +10,19 @@ afterEach(() => {
   rs.unstubAllGlobals();
 });
 
+/**
+ * 覆盖“exports the prompt-input file conversion helper”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("exports the prompt-input file conversion helper", () => {
   expect(typeof promptInputFilePartToFile).toBe("function");
 });
+
+/**
+ * 覆盖“reuses the original File when a prompt attachment already has one”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("reuses the original File when a prompt attachment already has one", async () => {
   const file = new File(["hello"], "note.txt", { type: "text/plain" });
@@ -35,6 +45,11 @@ test("reuses the original File when a prompt attachment already has one", async 
   expect(converted).toBe(file);
 });
 
+/**
+ * 覆盖“reconstructs a File from a data URL when no original File is present”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("reconstructs a File from a data URL when no original File is present", async () => {
   const converted = await promptInputFilePartToFile({
     type: "file",
@@ -48,6 +63,11 @@ test("reconstructs a File from a data URL when no original File is present", asy
   expect(converted!.type).toBe("text/plain");
   expect(await converted!.text()).toBe("hello");
 });
+
+/**
+ * 覆盖“rewraps the original File when the prompt metadata changes”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("rewraps the original File when the prompt metadata changes", async () => {
   const file = new File(["hello"], "note.txt", { type: "text/plain" });
@@ -66,6 +86,11 @@ test("rewraps the original File when the prompt metadata changes", async () => {
   expect(await converted!.text()).toBe("hello");
 });
 
+/**
+ * 覆盖“returns null when upload preparation is missing required data”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("returns null when upload preparation is missing required data", async () => {
   const converted = await promptInputFilePartToFile({
     type: "file",
@@ -74,6 +99,11 @@ test("returns null when upload preparation is missing required data", async () =
 
   expect(converted).toBeNull();
 });
+
+/**
+ * 覆盖“returns null when the URL fallback fetch fails”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("returns null when the URL fallback fetch fails", async () => {
   const warnSpy = rs.spyOn(console, "warn").mockImplementation(() => ({}));
@@ -94,6 +124,11 @@ test("returns null when the URL fallback fetch fails", async () => {
   expect(converted).toBeNull();
   expect(warnSpy).toHaveBeenCalledOnce();
 });
+
+/**
+ * 覆盖“returns null when the URL fallback fetch response is non-ok”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("returns null when the URL fallback fetch response is non-ok", async () => {
   const warnSpy = rs.spyOn(console, "warn").mockImplementation(() => ({}));

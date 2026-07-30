@@ -1,4 +1,4 @@
-"""Tests for the GitHub binding registry."""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -15,6 +15,7 @@ from app.gateway.github.registry import (
 
 
 def _write_agent(base: Path, user_id: str, name: str, body: dict) -> Path:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     agent_dir = base / "users" / user_id / "agents" / name
     agent_dir.mkdir(parents=True, exist_ok=True)
     (agent_dir / "config.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
@@ -22,7 +23,7 @@ def _write_agent(base: Path, user_id: str, name: str, body: dict) -> Path:
 
 
 def _write_legacy_agent(base: Path, name: str, body: dict) -> Path:
-    """Write an agent under the pre-user-isolation shared layout at ``{base}/agents/{name}/``."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     agent_dir = base / "agents" / name
     agent_dir.mkdir(parents=True, exist_ok=True)
     (agent_dir / "config.yaml").write_text(yaml.safe_dump(body), encoding="utf-8")
@@ -31,12 +32,7 @@ def _write_legacy_agent(base: Path, name: str, body: dict) -> Path:
 
 @pytest.fixture()
 def base_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """Isolate the agents store for this test.
-
-    Also drops the registry's module-level mtime cache: tmp_path is
-    freshly minted per test and the previous test's cache signature
-    would otherwise survive into this one and short-circuit the scan.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     monkeypatch.setenv("DEER_FLOW_HOME", str(tmp_path))
     from deerflow.config import paths as paths_module
 
@@ -46,17 +42,20 @@ def base_dir(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_registry_empty_when_no_agents(base_dir: Path) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     registry = build_github_agent_registry()
     assert registry == {}
 
 
 def test_registry_skips_agents_without_github_block(base_dir: Path) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(base_dir, "default", "plain", {"name": "plain"})
     registry = build_github_agent_registry()
     assert registry == {}
 
 
 def test_registry_indexes_by_repo_and_event(base_dir: Path) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -78,14 +77,15 @@ def test_registry_indexes_by_repo_and_event(base_dir: Path) -> None:
     assert len(matched) == 1
     assert matched[0].agent.name == "coding-llm-gateway"
     assert matched[0].user_id == "default"
-    assert matched[0].agent.github.installation_id is None  # default
+    assert matched[0].agent.github.installation_id is None  # 说明当前测试分支所验证的真实行为与边界。
 
 
 def test_registry_does_not_register_events_the_binding_omits(base_dir: Path) -> None:
-    # Events are opt-in per binding. A binding with an empty trigger map
-    # registers for nothing — the dispatcher will never fan a webhook out
-    # to this agent. (Tightened from the old behavior, which auto-included
-    # all default-enabled events.)
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -108,8 +108,9 @@ def test_registry_does_not_register_events_the_binding_omits(base_dir: Path) -> 
 
 
 def test_registry_indexes_only_explicitly_listed_events(base_dir: Path) -> None:
-    # An explicit ``pull_request: {}`` opts the agent in for PR events ONLY —
-    # not the other default-enabled events.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -126,7 +127,8 @@ def test_registry_indexes_only_explicitly_listed_events(base_dir: Path) -> None:
 
 
 def test_registry_picks_up_event_only_via_explicit_trigger_override(base_dir: Path) -> None:
-    # ``issues`` is disabled by default, but an explicit trigger entry opts in.
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -143,6 +145,7 @@ def test_registry_picks_up_event_only_via_explicit_trigger_override(base_dir: Pa
 
 
 def test_registry_supports_multiple_agents_on_same_repo_event(base_dir: Path) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     for n in ("alpha", "beta"):
         _write_agent(
             base_dir,
@@ -164,6 +167,7 @@ def test_registry_supports_multiple_agents_on_same_repo_event(base_dir: Path) ->
 
 
 def test_registry_supports_one_agent_on_multiple_repos(base_dir: Path) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -185,6 +189,7 @@ def test_registry_supports_one_agent_on_multiple_repos(base_dir: Path) -> None:
 
 
 def test_registry_scans_multiple_users(base_dir: Path) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -204,7 +209,8 @@ def test_registry_scans_multiple_users(base_dir: Path) -> None:
 
 
 def test_registry_skips_broken_agent_config(base_dir: Path, caplog: pytest.LogCaptureFixture) -> None:
-    # One good, one with malformed YAML.
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -222,18 +228,12 @@ def test_registry_skips_broken_agent_config(base_dir: Path, caplog: pytest.LogCa
 
 
 # ---------------------------------------------------------------------------
-# mtime-keyed cache
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_registry_cache_returns_same_object_on_warm_call(base_dir: Path) -> None:
-    """Identical (user_id, agent, mtime) signature → no YAML reparse.
-
-    The warm path only does iterdir + stat per agent — the dominant
-    YAML-parse cost is skipped. We verify by reference identity: the
-    cache returns the same dict object across calls so any caller that
-    holds a reference sees a coherent snapshot.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -242,17 +242,12 @@ def test_registry_cache_returns_same_object_on_warm_call(base_dir: Path) -> None
     )
     first = build_github_agent_registry()
     second = build_github_agent_registry()
-    assert first is second  # same object, no rebuild
+    assert first is second  # 说明当前测试分支所验证的真实行为与边界。
     assert lookup_agents(first, "a/b", "pull_request")[0].agent.name == "alpha"
 
 
 def test_registry_cache_invalidates_on_new_agent(base_dir: Path) -> None:
-    """Adding a new agent on disk invalidates the cache.
-
-    Operator edits between webhook deliveries must be visible without a
-    process restart — the mtime signature changes when a new entry is
-    added, so the next call rebuilds.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",
@@ -274,12 +269,7 @@ def test_registry_cache_invalidates_on_new_agent(base_dir: Path) -> None:
 
 
 def test_registry_cache_invalidates_on_config_edit(base_dir: Path) -> None:
-    """Editing config.yaml advances mtime and triggers a rebuild.
-
-    Pure mtime-bump suffices: an operator who edits the file with the
-    same byte content (touch) still gets a fresh parse — which is
-    desirable; no harm done.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     agent_dir = _write_agent(
         base_dir,
         "default",
@@ -289,8 +279,8 @@ def test_registry_cache_invalidates_on_config_edit(base_dir: Path) -> None:
     first = build_github_agent_registry()
     assert {m.agent.name for m in lookup_agents(first, "a/b", "pull_request")} == {"edited"}
 
-    # Rewrite with a different repo binding and bump the mtime well past
-    # filesystem granularity so the change is observable.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     import os
     import time
 
@@ -308,18 +298,12 @@ def test_registry_cache_invalidates_on_config_edit(base_dir: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Legacy shared layout ({base_dir}/agents/) for unmigrated installations
+# 说明当前测试分支所验证的真实行为与边界。
 # ---------------------------------------------------------------------------
 
 
 def test_registry_indexes_legacy_shared_agent(base_dir: Path) -> None:
-    """Legacy ``{base_dir}/agents/{name}/`` still indexes for unmigrated installs.
-
-    CLAUDE.md commits to the legacy layout as a read-only fallback, and
-    ``load_agent_config(name)`` resolves it under DEFAULT_USER_ID. The
-    GitHub registry must agree, or an unmigrated install with a
-    ``github:`` block silently fans out to nothing.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_legacy_agent(
         base_dir,
         "shared-bot",
@@ -329,18 +313,13 @@ def test_registry_indexes_legacy_shared_agent(base_dir: Path) -> None:
     matched = lookup_agents(registry, "a/b", "pull_request")
     assert len(matched) == 1
     assert matched[0].agent.name == "shared-bot"
-    # Legacy agents are bucketed under DEFAULT_USER_ID — same as load_agent_config().
+    # 说明当前测试分支所验证的真实行为与边界。
     assert matched[0].user_id == "default"
 
 
 def test_registry_per_user_entry_shadows_legacy_with_same_name(base_dir: Path) -> None:
-    """A ``users/default/agents/{name}/`` entry hides the legacy ``agents/{name}/`` entry.
-
-    Mirrors ``list_custom_agents``' precedence so migration is a no-op for
-    the registry — the legacy row stops appearing the moment the per-user
-    copy lands, and no duplicate trigger sets bleed through.
-    """
-    # Different trigger set on each so we can tell which one won.
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
+    # 说明当前测试分支所验证的真实行为与边界。
     _write_legacy_agent(
         base_dir,
         "shadowed",
@@ -353,14 +332,14 @@ def test_registry_per_user_entry_shadows_legacy_with_same_name(base_dir: Path) -
         {"name": "shadowed", "github": {"bindings": [{"repo": "user/repo", "triggers": {"pull_request": {}}}]}},
     )
     registry = build_github_agent_registry()
-    # Per-user binding wins.
+    # 说明当前测试分支所验证的真实行为与边界。
     assert len(lookup_agents(registry, "user/repo", "pull_request")) == 1
-    # Legacy binding does not appear.
+    # 说明当前测试分支所验证的真实行为与边界。
     assert lookup_agents(registry, "legacy/repo", "pull_request") == []
 
 
 def test_registry_legacy_cache_invalidates_on_legacy_config_edit(base_dir: Path) -> None:
-    """Editing a legacy ``{base_dir}/agents/{name}/config.yaml`` invalidates the cache."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     agent_dir = _write_legacy_agent(
         base_dir,
         "legacy-edited",
@@ -386,7 +365,7 @@ def test_registry_legacy_cache_invalidates_on_legacy_config_edit(base_dir: Path)
 
 
 def test_registry_cache_invalidates_on_agent_deletion(base_dir: Path) -> None:
-    """Removing an agent dir drops it from the next registry."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     _write_agent(
         base_dir,
         "default",

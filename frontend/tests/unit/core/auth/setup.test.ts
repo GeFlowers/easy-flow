@@ -12,12 +12,22 @@ describe("auth setup helpers", () => {
     rs.unstubAllGlobals();
   });
 
+  /**
+   * 覆盖“setup-status requests bypass browser caches”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("setup-status requests bypass browser caches", () => {
     expect(setupStatusFetchInit).toMatchObject({
       cache: "no-store",
       credentials: "include",
     });
   });
+
+  /**
+   * 覆盖“fetchSetupStatus uses the shared no-store request options”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("fetchSetupStatus uses the shared no-store request options", async () => {
     const fetchMock = rs.fn(() =>
@@ -37,6 +47,11 @@ describe("auth setup helpers", () => {
     );
   });
 
+  /**
+   * 覆盖“regular sign-up is disabled only while setup is required or unknown”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("regular sign-up is disabled only while setup is required or unknown", () => {
     expect(canCreateRegularAccount({ checked: false, status: null })).toBe(
       false,
@@ -55,6 +70,11 @@ describe("auth setup helpers", () => {
     ).toBe(true);
     expect(canCreateRegularAccount({ checked: true, status: null })).toBe(true);
   });
+
+  /**
+   * 覆盖“detects already-initialized setup conflicts”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("detects already-initialized setup conflicts", () => {
     expect(

@@ -1,10 +1,4 @@
-"""Turn a record-through-browser JSONL capture into a replay fixture.
-
-The recording gateway (``record_gateway.py``) appends ``{input_hash, output}``
-lines as the frontend drives a real run; the record spec writes a ``.meta.json``
-sidecar with ``{scenario, mode, prompt}``. This stitches them into the fixture
-the replay provider + tests consume.
-"""
+"""本脚本负责构建 夹具。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -14,6 +8,7 @@ from pathlib import Path
 
 
 def main() -> int:
+    '未说明'
     parser = argparse.ArgumentParser()
     parser.add_argument("--jsonl", required=True)
     parser.add_argument("--meta", required=True)

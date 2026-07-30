@@ -36,6 +36,7 @@ export type ActiveGoalRequest = {
   threadId: string;
 };
 
+/** 创建用于隔离不同线程目标请求的本地状态。 */
 export function createGoalRequestState(): GoalRequestState {
   return {
     controller: null,
@@ -44,6 +45,7 @@ export function createGoalRequestState(): GoalRequestState {
   };
 }
 
+/** 开始请求并递增令牌，使旧响应无法覆盖当前线程的状态。 */
 export function beginGoalRequest(
   state: GoalRequestState,
   threadId: string,
@@ -61,6 +63,7 @@ export function beginGoalRequest(
   return request;
 }
 
+/** 中止尚未完成的目标请求，避免卸载或切线程后的陈旧更新。 */
 export function abortGoalRequest(state: GoalRequestState): void {
   state.controller?.abort();
   state.controller = null;
@@ -68,6 +71,7 @@ export function abortGoalRequest(state: GoalRequestState): void {
   state.threadId = null;
 }
 
+/** 仅在请求仍为当前请求时清理其控制器。 */
 export function finishGoalRequest(
   state: GoalRequestState,
   request: ActiveGoalRequest,
@@ -80,6 +84,7 @@ export function finishGoalRequest(
   }
 }
 
+/** 判断异步响应是否仍归属于当前线程和当前请求令牌。 */
 export function isCurrentGoalRequest(
   state: GoalRequestState,
   request: ActiveGoalRequest,
@@ -93,6 +98,7 @@ export function isCurrentGoalRequest(
   );
 }
 
+/** 判断错误是否由主动中止请求引起。 */
 export function isAbortError(error: unknown): boolean {
   return (
     (error instanceof DOMException && error.name === "AbortError") ||
@@ -102,6 +108,7 @@ export function isAbortError(error: unknown): boolean {
   );
 }
 
+/** 从输入开头提取尚未提交的斜杠技能查询。 */
 export function getLeadingSlashSkillQuery(value: string): string | null {
   if (!value.startsWith("/")) {
     return null;
@@ -115,6 +122,7 @@ export function getLeadingSlashSkillQuery(value: string): string | null {
   return query;
 }
 
+/** 按输入查询筛选并排序内置命令与技能建议。 */
 export function getMatchingSkillSuggestions(
   skills: Skill[],
   query: string,
@@ -168,6 +176,7 @@ export function getMatchingSkillSuggestions(
   return [...skillMatches, ...builtinMatches].slice(0, MAX_SKILL_SUGGESTIONS);
 }
 
+/** 解析 `/goal` 命令及其设置、查询或清除意图。 */
 export function parseGoalCommand(value: string): GoalCommand | null {
   const trimmed = value.trim();
   const match = /^\/goal(?:\s+|$)/i.exec(trimmed);
@@ -185,21 +194,23 @@ export function parseGoalCommand(value: string): GoalCommand | null {
   return { kind: "set", objective: args };
 }
 
+/** 判断输入是否为需要独立处理的 `/compact` 命令。 */
 export function parseCompactCommand(value: string): boolean {
   return /^\/(?:compact|context\s+compact)\s*$/i.test(value.trim());
 }
 
+/** 判断草稿是否可交给输入润色流程处理。 */
 export function canPolishInput(value: string): boolean {
   const trimmed = value.trim();
   if (!trimmed) {
     return false;
   }
-  // Reserved builtin command lines are routed to their own handlers, not the
-  // LLM, so they must not be rewritten. Reuse the same parsers the composer
-  // uses to dispatch them instead of maintaining a third parallel list.
+  // 保留的内置命令会路由到专属处理器而非 LLM，因此不能被改写。这里复用
+  // 编辑器分发命令时使用的解析器，避免维护第三份并行的命令列表。
   return parseGoalCommand(trimmed) === null && !parseCompactCommand(trimmed);
 }
 
+/** 根据输入、命令与状态确定编辑器应执行的提交动作。 */
 export function getInputSubmitAction({
   text,
   fileCount,
@@ -225,6 +236,7 @@ export function getInputSubmitAction({
   return { kind: "message" };
 }
 
+/** 从目标接口响应中提取可展示的失败原因。 */
 export async function readGoalResponseError(
   response: Response,
 ): Promise<string> {
@@ -234,7 +246,7 @@ export async function readGoalResponseError(
       return body.detail;
     }
   } catch {
-    // Fall through to generic message.
+    // 未获得详情时回退到通用提示。
   }
   return `HTTP ${response.status}`;
 }

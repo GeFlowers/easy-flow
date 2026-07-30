@@ -1,9 +1,4 @@
-"""Tests for MCP config secret masking and preservation.
-
-Verifies that GET /api/mcp/config masks sensitive fields (env values,
-header values, OAuth secrets) and that PUT /api/mcp/config correctly
-preserves existing secrets when the frontend round-trips masked values.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -30,12 +25,12 @@ from app.gateway.routers.mcp import (
 from deerflow.config.extensions_config import ExtensionsConfig
 
 # ---------------------------------------------------------------------------
-# _mask_server_config
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_mask_replaces_env_values_with_asterisks():
-    """Env dict values should be replaced with '***'."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse(
         env={"GITHUB_TOKEN": "ghp_real_secret_123", "API_KEY": "sk-abc"},
     )
@@ -44,7 +39,7 @@ def test_mask_replaces_env_values_with_asterisks():
 
 
 def test_mask_replaces_header_values_with_asterisks():
-    """Header dict values should be replaced with '***'."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse(
         headers={"Authorization": "Bearer tok_123", "X-API-Key": "key_456"},
     )
@@ -53,7 +48,7 @@ def test_mask_replaces_header_values_with_asterisks():
 
 
 def test_mask_removes_oauth_secrets():
-    """OAuth client_secret and refresh_token should be set to None."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse(
         oauth=McpOAuthConfigResponse(
             client_id="my-client",
@@ -66,13 +61,13 @@ def test_mask_removes_oauth_secrets():
     assert masked.oauth is not None
     assert masked.oauth.client_secret is None
     assert masked.oauth.refresh_token is None
-    # Non-secret fields preserved
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert masked.oauth.client_id == "my-client"
     assert masked.oauth.token_url == "https://auth.example.com/token"
 
 
 def test_mask_preserves_non_secret_fields():
-    """Non-sensitive fields should pass through unchanged."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse(
         enabled=True,
         type="stdio",
@@ -90,7 +85,7 @@ def test_mask_preserves_non_secret_fields():
 
 
 def test_mask_handles_empty_env_and_headers():
-    """Empty env/headers dicts should remain empty."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse()
     masked = _mask_server_config(server)
     assert masked.env == {}
@@ -98,14 +93,14 @@ def test_mask_handles_empty_env_and_headers():
 
 
 def test_mask_handles_no_oauth():
-    """Server without OAuth should remain None."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse(oauth=None)
     masked = _mask_server_config(server)
     assert masked.oauth is None
 
 
 def test_mask_does_not_mutate_original():
-    """Masking should return a new object, not modify the original."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse(env={"KEY": "secret"})
     masked = _mask_server_config(server)
     assert server.env["KEY"] == "secret"
@@ -113,7 +108,7 @@ def test_mask_does_not_mutate_original():
 
 
 def test_mask_scrubs_sensitive_extra_fields_but_preserves_safe_extra_fields():
-    """Unknown advanced fields are preserved, but secret-shaped keys are masked."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     server = McpServerConfigResponse(
         cwd="/srv/mcp-workdir",
         customFlag="keep-me",
@@ -133,12 +128,12 @@ def test_mask_scrubs_sensitive_extra_fields_but_preserves_safe_extra_fields():
 
 
 # ---------------------------------------------------------------------------
-# _merge_preserving_secrets
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_merge_preserves_masked_env_values():
-    """Incoming '***' env values should be replaced with existing secrets."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(env={"KEY": "***"})
     existing = McpServerConfigResponse(env={"KEY": "real_secret"})
     merged = _merge_preserving_secrets(incoming, existing)
@@ -146,7 +141,7 @@ def test_merge_preserves_masked_env_values():
 
 
 def test_merge_preserves_masked_header_values():
-    """Incoming '***' header values should be replaced with existing secrets."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(headers={"Authorization": "***"})
     existing = McpServerConfigResponse(headers={"Authorization": "Bearer real"})
     merged = _merge_preserving_secrets(incoming, existing)
@@ -154,7 +149,7 @@ def test_merge_preserves_masked_header_values():
 
 
 def test_merge_preserves_oauth_secrets_when_none():
-    """Incoming None oauth secrets should preserve existing values."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(
         oauth=McpOAuthConfigResponse(
             client_secret=None,
@@ -176,7 +171,7 @@ def test_merge_preserves_oauth_secrets_when_none():
 
 
 def test_merge_accepts_new_secret_values():
-    """Incoming real secret values should replace existing ones."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(
         env={"KEY": "new_secret"},
         oauth=McpOAuthConfigResponse(
@@ -200,7 +195,7 @@ def test_merge_accepts_new_secret_values():
 
 
 def test_merge_handles_no_existing_oauth():
-    """When existing has no oauth but incoming does, keep incoming."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(
         oauth=McpOAuthConfigResponse(
             client_secret="new-secret",
@@ -214,7 +209,7 @@ def test_merge_handles_no_existing_oauth():
 
 
 def test_merge_does_not_mutate_original():
-    """Merge should return a new object, not modify the original."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(env={"KEY": "***"})
     existing = McpServerConfigResponse(env={"KEY": "secret"})
     merged = _merge_preserving_secrets(incoming, existing)
@@ -224,7 +219,7 @@ def test_merge_does_not_mutate_original():
 
 
 def test_merge_preserves_masked_sensitive_extra_values():
-    """Masked secret-shaped extra fields should round-trip to existing values."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(
         cwd="/srv/new-workdir",
         api_key="***",
@@ -247,7 +242,7 @@ def test_merge_preserves_masked_sensitive_extra_values():
 
 
 def test_merge_rejects_masked_sensitive_extra_value_for_new_key():
-    """A new unknown secret field must provide a real value, not a mask."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(api_key="***")
     existing = McpServerConfigResponse()
 
@@ -259,12 +254,12 @@ def test_merge_rejects_masked_sensitive_extra_value_for_new_key():
 
 
 # ---------------------------------------------------------------------------
-# Comment 2 fix: masked value for new key is rejected
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_merge_rejects_masked_value_for_new_env_key():
-    """Sending '***' for a key that doesn't exist in existing should raise 400."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from fastapi import HTTPException
 
     incoming = McpServerConfigResponse(env={"NEW_KEY": "***"})
@@ -276,7 +271,7 @@ def test_merge_rejects_masked_value_for_new_env_key():
 
 
 def test_merge_rejects_masked_value_for_new_header_key():
-    """Sending '***' for a header key that doesn't exist should raise 400."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from fastapi import HTTPException
 
     incoming = McpServerConfigResponse(headers={"X-New-Auth": "***"})
@@ -288,12 +283,12 @@ def test_merge_rejects_masked_value_for_new_header_key():
 
 
 # ---------------------------------------------------------------------------
-# Comment 4 fix: empty string clears OAuth secrets
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_merge_empty_string_clears_oauth_client_secret():
-    """Sending '' for client_secret should clear the stored value."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(
         oauth=McpOAuthConfigResponse(
             client_secret="",
@@ -314,7 +309,7 @@ def test_merge_empty_string_clears_oauth_client_secret():
 
 
 def test_merge_empty_string_clears_oauth_refresh_token():
-    """Sending '' for refresh_token should clear the stored value."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     incoming = McpServerConfigResponse(
         oauth=McpOAuthConfigResponse(
             client_secret=None,
@@ -335,12 +330,12 @@ def test_merge_empty_string_clears_oauth_refresh_token():
 
 
 # ---------------------------------------------------------------------------
-# Round-trip integration: mask → merge should preserve original secrets
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_roundtrip_mask_then_merge_preserves_original_secrets():
-    """Simulates the full frontend round-trip: GET (masked) → toggle → PUT."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     original = McpServerConfigResponse(
         enabled=True,
         env={"GITHUB_TOKEN": "ghp_real_secret"},
@@ -354,31 +349,32 @@ def test_roundtrip_mask_then_merge_preserves_original_secrets():
         description="GitHub MCP server",
     )
 
-    # Step 1: Server returns masked config (simulates GET response)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     masked = _mask_server_config(original)
     assert masked.env["GITHUB_TOKEN"] == "***"
     assert masked.oauth.client_secret is None
 
-    # Step 2: Frontend toggles enabled and sends back (simulates PUT request)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     from_frontend = masked.model_copy(update={"enabled": False})
 
-    # Step 3: Server merges with existing secrets (simulates PUT handler)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     restored = _merge_preserving_secrets(from_frontend, original)
     assert restored.enabled is False
     assert restored.env["GITHUB_TOKEN"] == "ghp_real_secret"
     assert restored.headers["Authorization"] == "Bearer real_token"
     assert restored.oauth.client_secret == "oauth-secret"
     assert restored.oauth.refresh_token == "refresh-abc"
-    # Non-secret fields from the update are preserved
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert restored.description == "GitHub MCP server"
 
 
 # ---------------------------------------------------------------------------
-# Security hardening: MCP config API authorization and stdio command policy
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def _request_with_role(system_role: str):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return SimpleNamespace(
         state=SimpleNamespace(
             user=SimpleNamespace(
@@ -391,7 +387,7 @@ def _request_with_role(system_role: str):
 
 @pytest.mark.asyncio
 async def test_mcp_config_requires_admin_user():
-    """MCP config is system-level executable configuration, not a normal user setting."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     await require_admin_user(_request_with_role("admin"), detail=_ADMIN_REQUIRED_DETAIL)
 
     with pytest.raises(HTTPException) as exc_info:
@@ -402,9 +398,11 @@ async def test_mcp_config_requires_admin_user():
 
 @pytest.mark.asyncio
 async def test_reset_mcp_tools_cache_endpoint_requires_admin_user(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     called = False
 
     def fake_reset_mcp_tools_cache():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         nonlocal called
         called = True
 
@@ -424,6 +422,7 @@ async def test_reset_mcp_tools_cache_endpoint_requires_admin_user(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_update_mcp_configuration_resets_tools_cache(monkeypatch, tmp_path):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     reset_calls = 0
     config_path = tmp_path / "extensions_config.json"
     config_path.write_text('{"mcpServers": {}, "skills": {}}', encoding="utf-8")
@@ -440,6 +439,7 @@ async def test_update_mcp_configuration_resets_tools_cache(monkeypatch, tmp_path
     )
 
     def fake_reset_mcp_tools_cache():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         nonlocal reset_calls
         reset_calls += 1
 
@@ -467,7 +467,7 @@ async def test_update_mcp_configuration_resets_tools_cache(monkeypatch, tmp_path
 
 @pytest.mark.asyncio
 async def test_update_mcp_configuration_preserves_omitted_routing_and_tools(monkeypatch, tmp_path):
-    """Frontend toggles must not erase hand-authored MCP routing hints."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config_path = tmp_path / "extensions_config.json"
     config_path.write_text(
         json.dumps(
@@ -502,6 +502,7 @@ async def test_update_mcp_configuration_preserves_omitted_routing_and_tools(monk
     current_config = SimpleNamespace(skills={}, mcp_servers={})
 
     def fake_reload_extensions_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return ExtensionsConfig.model_validate(json.loads(config_path.read_text(encoding="utf-8")))
 
     monkeypatch.setattr(mcp_router.ExtensionsConfig, "resolve_config_path", lambda: config_path)
@@ -533,7 +534,7 @@ async def test_update_mcp_configuration_preserves_omitted_routing_and_tools(monk
 
 @pytest.mark.asyncio
 async def test_update_mcp_configuration_preserves_server_extra_fields(monkeypatch, tmp_path):
-    """Gateway round-trips must preserve advanced server fields unknown to the API model."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config_path = tmp_path / "extensions_config.json"
     config_path.write_text(
         json.dumps(
@@ -558,6 +559,7 @@ async def test_update_mcp_configuration_preserves_server_extra_fields(monkeypatc
     current_config = SimpleNamespace(skills={}, mcp_servers={})
 
     def fake_reload_extensions_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return ExtensionsConfig.model_validate(json.loads(config_path.read_text(encoding="utf-8")))
 
     monkeypatch.setattr(mcp_router.ExtensionsConfig, "resolve_config_path", lambda: config_path)
@@ -590,6 +592,7 @@ async def test_update_mcp_configuration_preserves_server_extra_fields(monkeypatc
 
 
 def test_validate_mcp_update_allows_default_npx_stdio_command(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.delenv(_MCP_STDIO_COMMAND_ALLOWLIST_ENV, raising=False)
     request = McpConfigUpdateRequest(
         mcp_servers={
@@ -605,6 +608,7 @@ def test_validate_mcp_update_allows_default_npx_stdio_command(monkeypatch):
 
 
 def test_validate_mcp_update_rejects_shell_stdio_command(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.delenv(_MCP_STDIO_COMMAND_ALLOWLIST_ENV, raising=False)
     request = McpConfigUpdateRequest(
         mcp_servers={
@@ -624,6 +628,7 @@ def test_validate_mcp_update_rejects_shell_stdio_command(monkeypatch):
 
 
 def test_validate_mcp_update_rejects_inline_shell_command(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.delenv(_MCP_STDIO_COMMAND_ALLOWLIST_ENV, raising=False)
     request = McpConfigUpdateRequest(
         mcp_servers={
@@ -643,6 +648,7 @@ def test_validate_mcp_update_rejects_inline_shell_command(monkeypatch):
 
 
 def test_validate_mcp_update_rejects_path_with_allowed_basename(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv(_MCP_STDIO_COMMAND_ALLOWLIST_ENV, "npx")
     request = McpConfigUpdateRequest(
         mcp_servers={
@@ -662,6 +668,7 @@ def test_validate_mcp_update_rejects_path_with_allowed_basename(monkeypatch):
 
 
 def test_validate_mcp_update_uses_explicit_stdio_allowlist(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv(_MCP_STDIO_COMMAND_ALLOWLIST_ENV, "python,npx")
     request = McpConfigUpdateRequest(
         mcp_servers={
@@ -677,6 +684,7 @@ def test_validate_mcp_update_uses_explicit_stdio_allowlist(monkeypatch):
 
 
 def test_validate_mcp_update_ignores_remote_transports(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.delenv(_MCP_STDIO_COMMAND_ALLOWLIST_ENV, raising=False)
     request = McpConfigUpdateRequest(
         mcp_servers={

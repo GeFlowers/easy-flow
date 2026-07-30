@@ -1,9 +1,4 @@
-"""Unified tool result semantics for structured signal production.
-
-Every tool result that passes through ToolErrorHandlingMiddleware gets a
-``deerflow_tool_meta`` entry in additional_kwargs. Downstream consumers
-(ToolProgressMiddleware, etc.) read this key instead of parsing text.
-"""
+'定义 tool_result_meta 模块提供的职责与可复用接口。\n\nUnified tool result semantics for structured signal production.\n\nEvery tool result that passes through ToolErrorHandlingMiddleware gets a\n``deerflow_tool_meta`` entry in additional_kwargs. Downstream consumers\n(ToolProgressMiddleware, etc.) read this key instead of parsing text.\n'
 
 from __future__ import annotations
 
@@ -33,6 +28,7 @@ _PARTIAL_MARKERS = (
 
 @dataclass(frozen=True, slots=True)
 class ToolResultMeta:
+    '封装 ToolResultMeta 的状态、协作关系与公开操作'
     status: Literal["success", "error", "partial_success"]
     error_type: str | None
     recoverable_by_model: bool
@@ -91,14 +87,7 @@ _SEMANTIC_ZERO_ERROR_STRINGS: frozenset[str] = frozenset({"none", "null", "false
 
 
 def _extract_json_error_text(content: str) -> str | None:
-    """Return the error string from a JSON-wrapped error like {"error": "...", "query": "..."}.
-
-    Returns None when the ``error`` field is falsy (JSON null / 0 / false / empty
-    string) or is a sentinel string that conventionally means "no error" (e.g.
-    ``"none"``, ``"null"``, ``"false"``).  This prevents tools that return
-    ``{"error": "none", "results": [...]}`` on success from being misclassified
-    as errors.
-    """
+    '执行 _extract_json_error_text 的明确职责，并返回与调用约定一致的结果。\n\nReturn the error string from a JSON-wrapped error like {"error": "...", "query": "..."}.\n\n    Returns None when the ``error`` field is falsy (JSON null / 0 / false / empty\n    string) or is a sentinel string that conventionally means "no error" (e.g.\n    ``"none"``, ``"null"``, ``"false"``).  This prevents tools that return\n    ``{"error": "none", "results": [...]}`` on success from being misclassified\n    as errors.\n    '
     try:
         data = json.loads(content)
     except (json.JSONDecodeError, ValueError):
@@ -115,13 +104,14 @@ def _extract_json_error_text(content: str) -> str | None:
 
 
 def _match_keyword(kw: str, lower: str) -> bool:
-    """Match a keyword against lowercased text, using word boundaries for numeric codes."""
+    '执行 _match_keyword 的明确职责，并返回与调用约定一致的结果。\n\nMatch a keyword against lowercased text, using word boundaries for numeric codes.'
     if kw.isdigit():
         return bool(_NUMERIC_KW_RE[kw].search(lower))
     return kw in lower
 
 
 def _classify_error_text(text: str) -> dict[str, object]:
+    '执行 _classify_error_text 的明确职责，并返回与调用约定一致的结果'
     lower = text.lower()
     for keywords, attrs in _ERROR_RULES:
         if any(_match_keyword(kw, lower) for kw in keywords):
@@ -130,6 +120,7 @@ def _classify_error_text(text: str) -> dict[str, object]:
 
 
 def _make_meta(*, status: str, source: str, error_type: str | None = None, recoverable_by_model: bool = True, recommended_next_action: str = "continue") -> dict[str, object]:
+    '执行 _make_meta 的明确职责，并返回与调用约定一致的结果'
     return {
         "status": status,
         "error_type": error_type,
@@ -140,12 +131,7 @@ def _make_meta(*, status: str, source: str, error_type: str | None = None, recov
 
 
 def stamp_exception_meta(msg: ToolMessage, exc_info: str) -> ToolMessage:
-    """Stamp deerflow_tool_meta with source='exception' onto an exception-derived ToolMessage.
-
-    Unlike normalize_tool_message (which preserves existing stamps), this function always
-    overwrites any pre-existing TOOL_META_KEY entry.  Exception-derived classification is
-    more authoritative than a tool's own return-time stamp.
-    """
+    "执行 stamp_exception_meta 的明确职责，并返回与调用约定一致的结果。\n\nStamp deerflow_tool_meta with source='exception' onto an exception-derived ToolMessage.\n\n    Unlike normalize_tool_message (which preserves existing stamps), this function always\n    overwrites any pre-existing TOOL_META_KEY entry.  Exception-derived classification is\n    more authoritative than a tool's own return-time stamp.\n    "
     attrs = _classify_error_text(exc_info)
     updated_kwargs = dict(msg.additional_kwargs or {})
     updated_kwargs[TOOL_META_KEY] = _make_meta(status="error", source="exception", **attrs)
@@ -154,7 +140,7 @@ def stamp_exception_meta(msg: ToolMessage, exc_info: str) -> ToolMessage:
 
 
 def normalize_tool_message(msg: ToolMessage) -> ToolMessage:
-    """Attach deerflow_tool_meta to a ToolMessage if not already present."""
+    '执行 normalize_tool_message 的明确职责，并返回与调用约定一致的结果。\n\nAttach deerflow_tool_meta to a ToolMessage if not already present.'
     existing = (msg.additional_kwargs or {}).get(TOOL_META_KEY)
     if existing is not None:
         return msg
@@ -206,7 +192,7 @@ def normalize_tool_message(msg: ToolMessage) -> ToolMessage:
 
 
 def normalize_tool_result(result: ToolMessage | Command) -> ToolMessage | Command:
-    """Normalize a tool result, handling Command wrappers transparently."""
+    '执行 normalize_tool_result 的明确职责，并返回与调用约定一致的结果。\n\nNormalize a tool result, handling Command wrappers transparently.'
     if isinstance(result, ToolMessage):
         return normalize_tool_message(result)
     return result

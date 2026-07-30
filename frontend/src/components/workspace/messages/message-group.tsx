@@ -44,6 +44,7 @@ import { Tooltip } from "../tooltip";
 
 import { MarkdownContent } from "./markdown-content";
 
+/** 将同一助手轮次拆分为推理、工具调用与可见文本步骤后进行渲染。 */
 export function MessageGroup({
   className,
   messages,

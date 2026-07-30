@@ -7,17 +7,30 @@ import {
 } from "@/core/agents/feature-cache";
 
 describe("resolveAgentsApiEnabled", () => {
+  /**
+   * 覆盖“a live value always wins over the cache”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("a live value always wins over the cache", () => {
     expect(resolveAgentsApiEnabled(true, false)).toBe(true);
     expect(resolveAgentsApiEnabled(false, true)).toBe(false);
   });
 
+  /**
+   * 覆盖“falls back to the cached value when live is unknown (sticky)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("falls back to the cached value when live is unknown (sticky)", () => {
-    // Disabled stays disabled during an /api/features outage, so the 403
-    // storm (#3757) does not come back.
+    // `/api/features` 不可用期间，已禁用状态仍保持禁用，以免 403 风暴（#3757）
+    // 重现。
     expect(resolveAgentsApiEnabled(undefined, false)).toBe(false);
     expect(resolveAgentsApiEnabled(undefined, true)).toBe(true);
   });
+
+  /**
+   * 覆盖“fails open only when nothing has ever been observed”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("fails open only when nothing has ever been observed", () => {
     expect(resolveAgentsApiEnabled(undefined, undefined)).toBe(true);
@@ -43,6 +56,11 @@ describe("agents_api feature cache persistence", () => {
     delete (globalThis as { window?: unknown }).window;
   });
 
+  /**
+   * 覆盖“round-trips a persisted value”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("round-trips a persisted value", () => {
     (globalThis as { window?: unknown }).window = fakeWindow;
     writeCachedAgentsApiEnabled(false);
@@ -51,13 +69,23 @@ describe("agents_api feature cache persistence", () => {
     expect(readCachedAgentsApiEnabled()).toBe(true);
   });
 
+  /**
+   * 覆盖“returns undefined when nothing is stored”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("returns undefined when nothing is stored", () => {
     (globalThis as { window?: unknown }).window = fakeWindow;
     expect(readCachedAgentsApiEnabled()).toBeUndefined();
   });
 
+  /**
+   * 覆盖“no-ops without a browser environment (SSR)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("no-ops without a browser environment (SSR)", () => {
-    // window is undefined in the node test environment.
+    // 在 node 测试环境中，window 为 undefined。
     expect(readCachedAgentsApiEnabled()).toBeUndefined();
     expect(() => writeCachedAgentsApiEnabled(true)).not.toThrow();
   });

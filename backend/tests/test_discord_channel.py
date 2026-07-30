@@ -1,4 +1,4 @@
-"""Tests for Discord channel integration wiring."""
+'定义 test_discord_channel 模块提供的职责与可复用接口。\n\nTests for Discord channel integration wiring.'
 
 from __future__ import annotations
 
@@ -17,14 +17,17 @@ from app.channels.service import _CHANNEL_REGISTRY
 
 
 def test_discord_channel_registered() -> None:
+    '验证 discord、channel、registered 场景下的预期行为、边界条件与结果'
     assert "discord" in _CHANNEL_REGISTRY
 
 
 def test_discord_channel_capabilities() -> None:
+    '验证 discord、channel、capabilities 场景下的预期行为、边界条件与结果'
     assert "discord" in CHANNEL_CAPABILITIES
 
 
 def test_discord_channel_init() -> None:
+    '验证 discord、channel、init 场景下的预期行为、边界条件与结果'
     bus = MessageBus()
     channel = DiscordChannel(bus=bus, config={"bot_token": "token"})
 
@@ -32,6 +35,7 @@ def test_discord_channel_init() -> None:
 
 
 def _make_discord_message(text: str):
+    '执行 _make_discord_message 的明确职责，并返回与调用约定一致的结果'
     return SimpleNamespace(
         id=111,
         content=text,
@@ -44,6 +48,7 @@ def _make_discord_message(text: str):
 
 @pytest.mark.asyncio
 async def test_discord_bot_mention_slash_skill_routes_as_chat() -> None:
+    '验证 discord、bot、mention、slash、skill、routes、as、chat 场景下的预期行为、边界条件与结果'
     bus = MessageBus()
     channel = DiscordChannel(bus=bus, config={"bot_token": "token"})
     captured = []
@@ -53,6 +58,7 @@ async def test_discord_bot_mention_slash_skill_routes_as_chat() -> None:
     channel._publish = captured.append
 
     async def noop(*_args, **_kwargs):
+        '执行 noop 的明确职责，并返回与调用约定一致的结果'
         return None
 
     channel._start_typing = noop
@@ -69,6 +75,7 @@ async def test_discord_bot_mention_slash_skill_routes_as_chat() -> None:
 
 @pytest.mark.asyncio
 async def test_discord_bot_mention_known_command_routes_as_command() -> None:
+    '验证 discord、bot、mention、known、command、routes、as、command 场景下的预期行为、边界条件与结果'
     bus = MessageBus()
     channel = DiscordChannel(bus=bus, config={"bot_token": "token"})
     captured = []
@@ -78,6 +85,7 @@ async def test_discord_bot_mention_known_command_routes_as_command() -> None:
     channel._publish = captured.append
 
     async def noop(*_args, **_kwargs):
+        '执行 noop 的明确职责，并返回与调用约定一致的结果'
         return None
 
     channel._start_typing = noop
@@ -93,21 +101,17 @@ async def test_discord_bot_mention_known_command_routes_as_command() -> None:
 
 
 # ---------------------------------------------------------------------------
-# send_file file-handle lifecycle
+# send_file 文件句柄生命周期
 # ---------------------------------------------------------------------------
 
 
 def _start_bg_loop() -> tuple[asyncio.AbstractEventLoop, threading.Thread]:
-    """Spin up a real background event loop, mirroring ``DiscordChannel._discord_loop``.
-
-    ``send_file`` schedules work onto ``_discord_loop`` via
-    ``run_coroutine_threadsafe`` and awaits the result with ``wrap_future``, so a
-    real running loop is the most faithful way to exercise that path.
-    """
+    '执行 _start_bg_loop 的明确职责，并返回与调用约定一致的结果。\n\nSpin up a real background event loop, mirroring ``DiscordChannel._discord_loop``.\n\n    ``send_file`` schedules work onto ``_discord_loop`` via\n    ``run_coroutine_threadsafe`` and awaits the result with ``wrap_future``, so a\n    real running loop is the most faithful way to exercise that path.\n    '
     loop = asyncio.new_event_loop()
     ready = threading.Event()
 
     def _runner() -> None:
+        '执行 _runner 的明确职责，并返回与调用约定一致的结果'
         loop.call_soon(ready.set)
         loop.run_forever()
 
@@ -118,17 +122,20 @@ def _start_bg_loop() -> tuple[asyncio.AbstractEventLoop, threading.Thread]:
 
 
 def _stop_bg_loop(loop: asyncio.AbstractEventLoop, thread: threading.Thread) -> None:
+    '执行 _stop_bg_loop 的明确职责，并返回与调用约定一致的结果'
     loop.call_soon_threadsafe(loop.stop)
     thread.join(timeout=5)
     loop.close()
 
 
 def _build_send_file_channel(bg_loop: asyncio.AbstractEventLoop) -> DiscordChannel:
+    '执行 _build_send_file_channel 的明确职责，并返回与调用约定一致的结果'
     channel = DiscordChannel(bus=MessageBus(), config={"bot_token": "token"})
     channel._discord_loop = bg_loop
     channel._discord_module = SimpleNamespace(File=lambda fp, filename=None: fp)
 
     async def _noop(*_args, **_kwargs):
+        '执行 _noop 的明确职责，并返回与调用约定一致的结果'
         return None
 
     channel._stop_typing = _noop
@@ -136,11 +143,12 @@ def _build_send_file_channel(bg_loop: asyncio.AbstractEventLoop) -> DiscordChann
 
 
 def _tracking_open():
-    """Wrap ``builtins.open`` to record every handle it returns."""
+    '执行 _tracking_open 的明确职责，并返回与调用约定一致的结果。\n\nWrap ``builtins.open`` to record every handle it returns.'
     handles: list = []
     real_open = builtins.open
 
     def _open(path, *args, **kwargs):
+        '执行 _open 的明确职责，并返回与调用约定一致的结果'
         handle = real_open(path, *args, **kwargs)
         handles.append(handle)
         return handle
@@ -149,11 +157,14 @@ def _tracking_open():
 
 
 async def _noop_coro(*_args, **_kwargs):
+    '执行 _noop_coro 的明确职责，并返回与调用约定一致的结果'
     return None
 
 
 def _resolve_to(target):
+    '执行 _resolve_to 的明确职责，并返回与调用约定一致的结果'
     async def _resolve_target(_msg):
+        '执行 _resolve_target 的明确职责，并返回与调用约定一致的结果'
         return target
 
     return _resolve_target
@@ -161,7 +172,7 @@ def _resolve_to(target):
 
 @pytest.mark.asyncio
 async def test_send_file_closes_file_handle(tmp_path) -> None:
-    """The file handle opened for upload is closed once send_file returns (success path)."""
+    '验证 send、file、closes、file、handle 场景下的预期行为、边界条件与结果。\n\nThe file handle opened for upload is closed once send_file returns (success path).'
     bg_loop, bg_thread = _start_bg_loop()
     try:
         channel = _build_send_file_channel(bg_loop)
@@ -186,12 +197,13 @@ async def test_send_file_closes_file_handle(tmp_path) -> None:
 
 @pytest.mark.asyncio
 async def test_send_file_closes_handle_when_send_fails(tmp_path) -> None:
-    """The file handle is still closed when target.send raises (failure path)."""
+    '验证 send、file、closes、handle、when、send、fails 场景下的预期行为、边界条件与结果。\n\nThe file handle is still closed when target.send raises (failure path).'
     bg_loop, bg_thread = _start_bg_loop()
     try:
         channel = _build_send_file_channel(bg_loop)
 
         async def _failing_send(*, file=None):
+            '执行 _failing_send 的明确职责，并返回与调用约定一致的结果'
             raise RuntimeError("upload failed")
 
         target = SimpleNamespace(send=_failing_send)

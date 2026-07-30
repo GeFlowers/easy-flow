@@ -7,6 +7,7 @@ import { CommandPalette } from "@/components/workspace/command-palette";
 import { GatewayOfflineBanner } from "@/components/workspace/gateway-offline-banner";
 import { WorkspaceSidebar } from "@/components/workspace/workspace-sidebar";
 
+/** 将侧边栏 Cookie 值转换为可供组件使用的布尔初始状态。 */
 function parseSidebarOpenCookie(
   value: string | undefined,
 ): boolean | undefined {
@@ -15,6 +16,7 @@ function parseSidebarOpenCookie(
   return undefined;
 }
 
+/** 装配工作区共享的查询、侧栏、命令面板与通知上下文。 */
 export async function WorkspaceContent({
   children,
   gatewayUnavailable = false,

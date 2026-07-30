@@ -1,4 +1,4 @@
-"""Local email/password authentication provider."""
+"""本地邮箱与密码认证提供者。"""
 
 import logging
 
@@ -11,25 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class LocalAuthProvider(AuthProvider):
-    """Email/password authentication provider using local database."""
+    """使用本地数据库验证邮箱和密码的认证提供者。"""
 
     def __init__(self, repository: UserRepository):
-        """Initialize with a UserRepository.
-
-        Args:
-            repository: UserRepository implementation (SQLite)
-        """
+        """使用指定的 ``UserRepository`` 初始化认证提供者。"""
         self._repo = repository
 
     async def authenticate(self, credentials: dict) -> User | None:
-        """Authenticate with email and password.
-
-        Args:
-            credentials: dict with 'email' and 'password' keys
-
-        Returns:
-            User if authentication succeeds, None otherwise
-        """
+        """使用凭据中的邮箱和密码认证，失败时返回 ``None``。"""
         email = credentials.get("email")
         password = credentials.get("password")
 
@@ -41,7 +30,7 @@ class LocalAuthProvider(AuthProvider):
             return None
 
         if user.password_hash is None:
-            # OAuth user without local password
+            # 第三方登录用户没有本地密码，不能通过本地密码流程登录。
             return None
 
         if not await verify_password_async(password, user.password_hash):
@@ -52,28 +41,17 @@ class LocalAuthProvider(AuthProvider):
                 user.password_hash = await hash_password_async(password)
                 await self._repo.update_user(user)
             except Exception:
-                # Rehash is an opportunistic upgrade; a transient DB error must not
-                # prevent an otherwise-valid login from succeeding.
+                # 重哈希只是机会性升级；暂时的数据库错误不能阻止本应成功的登录。
                 logger.warning("Failed to rehash password for user %s; login will still succeed", user.email, exc_info=True)
 
         return user
 
     async def get_user(self, user_id: str) -> User | None:
-        """Get user by ID."""
+        """按用户 ID 查询用户。"""
         return await self._repo.get_user_by_id(user_id)
 
     async def create_user(self, email: str, password: str | None = None, system_role: str = "user", needs_setup: bool = False) -> User:
-        """Create a new local user.
-
-        Args:
-            email: User email address
-            password: Plain text password (will be hashed)
-            system_role: Role to assign ("admin" or "user")
-            needs_setup: If True, user must complete setup on first login
-
-        Returns:
-            Created User instance
-        """
+        """创建本地用户，并在提供密码时先安全地计算密码哈希。"""
         password_hash = await hash_password_async(password) if password else None
         user = User(
             email=email,
@@ -84,23 +62,23 @@ class LocalAuthProvider(AuthProvider):
         return await self._repo.create_user(user)
 
     async def get_user_by_oauth(self, provider: str, oauth_id: str) -> User | None:
-        """Get user by OAuth provider and ID."""
+        """按 OAuth 提供者和其用户标识查询用户。"""
         return await self._repo.get_user_by_oauth(provider, oauth_id)
 
     async def count_users(self) -> int:
-        """Return total number of registered users."""
+        """返回已注册用户总数。"""
         return await self._repo.count_users()
 
     async def count_admin_users(self) -> int:
-        """Return number of admin users."""
+        """返回管理员用户数量。"""
         return await self._repo.count_admin_users()
 
     async def update_user(self, user: User) -> User:
-        """Update an existing user."""
+        """更新已有用户。"""
         return await self._repo.update_user(user)
 
     async def get_user_by_email(self, email: str) -> User | None:
-        """Get user by email."""
+        """按邮箱查询用户。"""
         return await self._repo.get_user_by_email(email)
 
     async def create_oauth_user(
@@ -110,17 +88,7 @@ class LocalAuthProvider(AuthProvider):
         oauth_id: str,
         system_role: str = "user",
     ) -> User:
-        """Create a new user from an OAuth/OIDC login.
-
-        Args:
-            email: Verified email from the OIDC provider
-            oauth_provider: Provider ID (e.g. 'keycloak', 'google')
-            oauth_id: User's subject claim from the ID token
-            system_role: Role to assign ("admin" or "user")
-
-        Returns:
-            Created User instance
-        """
+        """根据 OAuth/OIDC 登录身份创建没有本地密码的新用户。"""
         user = User(
             email=email,
             password_hash=None,

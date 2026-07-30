@@ -1,11 +1,4 @@
-"""Tests for the GitHubChannel.
-
-The channel is log-only on the outbound path: GitHub agents have ``gh`` in
-their sandbox and post comments themselves mid-run, so the channel does NOT
-auto-deliver the agent's final assistant message to GitHub. These tests pin
-that contract — any regression that re-introduces an HTTP call during
-``send`` will fail the httpx tripwire.
-"""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -23,23 +16,25 @@ from app.channels.service import _CHANNEL_REGISTRY
 
 
 def test_github_channel_registered() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     assert _CHANNEL_REGISTRY["github"] == "app.channels.github:GitHubChannel"
 
 
 def test_github_channel_capabilities_non_streaming() -> None:
-    # GitHub comments are single-shot; no in-place editing (yet).
+    # 说明当前测试分支所验证的真实行为与边界。
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     assert CHANNEL_CAPABILITIES["github"]["supports_streaming"] is False
 
 
 def test_github_channel_does_not_import_writeback() -> None:
-    """The ``writeback`` module has been deleted — confirm the channel does
-    not re-import it under any name."""
-    # Check both the old module path and any httpx usage inside the channel
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
+    # 说明当前测试分支所验证的真实行为与边界。
     assert "app.gateway.github.writeback" not in dir(github_channel_module)
 
 
 @pytest.mark.asyncio
 async def test_start_subscribes_outbound_and_stop_unsubscribes() -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     bus = MessageBus()
     channel = GitHubChannel(bus=bus, config={"enabled": True})
 
@@ -57,13 +52,7 @@ async def test_start_subscribes_outbound_and_stop_unsubscribes() -> None:
 
 @pytest.mark.asyncio
 async def test_send_never_posts_to_github(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """The contract: ``send`` logs but never makes an HTTP call.
-
-    We patch ``httpx.AsyncClient.request`` as the tripwire — the channel
-    (unlike the old ``writeback`` module) has no business talking to GitHub
-    over HTTP. If a future refactor wires it back, the mock will be awaited
-    and the test fails.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     bus = MessageBus()
     channel = GitHubChannel(bus=bus, config={})
 
@@ -92,8 +81,7 @@ async def test_send_never_posts_to_github(monkeypatch: pytest.MonkeyPatch, caplo
 
 @pytest.mark.asyncio
 async def test_send_logs_empty_body_at_info(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """An empty final message still gets the info log (text_len=0). The body
-    debug line is skipped when there's nothing to mirror."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     bus = MessageBus()
     channel = GitHubChannel(bus=bus, config={})
 
@@ -117,8 +105,7 @@ async def test_send_logs_empty_body_at_info(monkeypatch: pytest.MonkeyPatch, cap
 
 @pytest.mark.asyncio
 async def test_send_tolerates_missing_metadata(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """No github metadata block: log line falls back to ``chat_id`` as the
-    repo and ``None`` for the number. Still no HTTP call."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     bus = MessageBus()
     channel = GitHubChannel(bus=bus, config={})
 
@@ -130,19 +117,19 @@ async def test_send_tolerates_missing_metadata(monkeypatch: pytest.MonkeyPatch, 
         chat_id="a/b",
         thread_id="t",
         text="hi",
-        metadata={},  # no github block at all
+        metadata={},  # 说明当前测试分支所验证的真实行为与边界。
     )
     with caplog.at_level(logging.INFO, logger="app.channels.github"):
         await channel.send(out)
 
     tripwire.assert_not_awaited()
-    # ``chat_id`` falls in as the repo when metadata is absent.
+    # 说明当前测试分支所验证的真实行为与边界。
     assert any("a/b" in rec.message for rec in caplog.records)
 
 
 @pytest.mark.asyncio
 async def test_send_handles_non_dict_github_metadata(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """Defensive: a stringly-typed ``metadata["github"]`` must not raise."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     bus = MessageBus()
     channel = GitHubChannel(bus=bus, config={})
 

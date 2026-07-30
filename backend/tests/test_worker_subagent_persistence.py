@@ -1,13 +1,4 @@
-"""Worker-side persistence of subagent step events (issue #3779).
-
-The worker streams ``task_*`` custom events to the SSE bridge for live display.
-``_SubagentEventBuffer`` additionally writes them to the RunEventStore so the
-subtask card's full step history survives a reload. This module tests that glue:
-recognized events are buffered and flushed via ``put_batch`` (not per-event
-``put``, which the store documents as a low-frequency path), unknown chunks are
-skipped, a missing store is a no-op, terminal events flush eagerly, and store
-failures never bubble into the stream loop.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -21,12 +12,7 @@ from deerflow.runtime.runs.worker import _SubagentEventBuffer
 
 
 def test_worker_imports_first_without_circular_import():
-    """Gateway startup imports worker early; importing it first must not trigger
-    a circular import through deerflow.subagents (regression for the #3779 fix).
-
-    pytest preloads many modules, so the cycle only reproduces when worker is the
-    first deerflow import — hence a clean subprocess.
-    """
+    '未说明'
     repo_backend = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     env = {**os.environ, "PYTHONPATH": repo_backend}
     result = subprocess.run(
@@ -39,26 +25,33 @@ def test_worker_imports_first_without_circular_import():
 
 
 class _FakeStore:
+    '未说明'
     def __init__(self):
+        '未说明'
         self.puts: list[dict] = []
         self.batches: list[list[dict]] = []
 
     async def put(self, **kwargs):
+        '未说明'
         self.puts.append(kwargs)
         return kwargs
 
     async def put_batch(self, events):
         # Copy so later buffer reuse can't mutate what we recorded.
+        '未说明'
         self.batches.append([dict(e) for e in events])
         return list(events)
 
 
 class _BoomStore:
+    '未说明'
     async def put_batch(self, events):
+        '未说明'
         raise RuntimeError("db down")
 
 
 def _running_step(task_id="call_1", message_index=1):
+    '未说明'
     return {
         "type": "task_running",
         "task_id": task_id,
@@ -70,6 +63,7 @@ def _running_step(task_id="call_1", message_index=1):
 @pytest.mark.asyncio
 async def test_steps_are_buffered_not_put_per_event():
     # Steps must not hit the low-frequency put() path; they accumulate until flush.
+    '未说明'
     store = _FakeStore()
     buffer = _SubagentEventBuffer(store, "thread_1", "run_1")
 
@@ -90,6 +84,7 @@ async def test_steps_are_buffered_not_put_per_event():
 
 @pytest.mark.asyncio
 async def test_flush_is_idempotent_when_empty():
+    '未说明'
     store = _FakeStore()
     buffer = _SubagentEventBuffer(store, "t", "r")
 
@@ -103,6 +98,7 @@ async def test_flush_is_idempotent_when_empty():
 async def test_terminal_event_flushes_eagerly():
     # A completed subagent's steps should be durable promptly, not stuck in the
     # buffer until the whole run ends.
+    '未说明'
     store = _FakeStore()
     buffer = _SubagentEventBuffer(store, "thread_1", "run_1")
 
@@ -116,6 +112,7 @@ async def test_terminal_event_flushes_eagerly():
 
 @pytest.mark.asyncio
 async def test_size_threshold_triggers_flush():
+    '未说明'
     store = _FakeStore()
     buffer = _SubagentEventBuffer(store, "thread_1", "run_1")
 
@@ -129,6 +126,7 @@ async def test_size_threshold_triggers_flush():
 
 @pytest.mark.asyncio
 async def test_skips_non_task_chunk():
+    '未说明'
     store = _FakeStore()
     buffer = _SubagentEventBuffer(store, "t", "r")
 
@@ -141,6 +139,7 @@ async def test_skips_non_task_chunk():
 @pytest.mark.asyncio
 async def test_missing_store_is_noop():
     # Must not raise when run_events is not configured.
+    '未说明'
     buffer = _SubagentEventBuffer(None, "t", "r")
     await buffer.add({"type": "task_started", "task_id": "c1"})
     await buffer.flush()
@@ -149,6 +148,7 @@ async def test_missing_store_is_noop():
 @pytest.mark.asyncio
 async def test_store_errors_do_not_propagate():
     # A persistence failure must never break the live stream loop.
+    '未说明'
     buffer = _SubagentEventBuffer(_BoomStore(), "t", "r")
     await buffer.add(_running_step())
     await buffer.flush()  # BoomStore raises inside; must be swallowed
@@ -158,6 +158,7 @@ async def test_store_errors_do_not_propagate():
 async def test_flush_rebuffers_batch_on_store_failure():
     # A failed put_batch must re-buffer the events instead of dropping them, so a
     # transient store error does not silently lose subagent step history.
+    '未说明'
     buffer = _SubagentEventBuffer(_BoomStore(), "thread_1", "run_1")
     await buffer.add(_running_step(message_index=1))
     await buffer.add(_running_step(message_index=2))
@@ -168,13 +169,15 @@ async def test_flush_rebuffers_batch_on_store_failure():
 
 
 class _FailOnceStore:
-    """Raises on the first put_batch, then records subsequent batches."""
+    '未说明'
 
     def __init__(self):
+        '未说明'
         self.calls = 0
         self.batches: list[list[dict]] = []
 
     async def put_batch(self, events):
+        '未说明'
         self.calls += 1
         if self.calls == 1:
             raise RuntimeError("transient db error")
@@ -186,6 +189,7 @@ class _FailOnceStore:
 async def test_rebuffered_batch_is_prepended_ahead_of_new_events():
     # After a failed flush the retained batch is prepended, so once the store
     # recovers the events persist in original order ahead of later arrivals.
+    '未说明'
     store = _FailOnceStore()
     buffer = _SubagentEventBuffer(store, "thread_1", "run_1")
 
@@ -205,6 +209,7 @@ async def test_roundtrip_step_is_listable_but_not_in_message_feed():
     # End-to-end against the real in-memory store: a persisted subagent step is
     # retrievable via list_events (fetch-on-expand) yet never leaks into the
     # thread message feed (list_messages), which filters category == "message".
+    '未说明'
     from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
     store = MemoryRunEventStore()

@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Generate an HTML report from run_loop.py output.
+"""从评估优化循环的输出生成可视化报告。
 
-Takes the JSON output from run_loop.py and generates a visual HTML report
-showing each description attempt with check/x for each test case.
-Distinguishes between train and test queries.
+报告展示每次描述尝试在训练集和保留测试集上的逐查询结果、聚合得分和最佳迭代，便于比较优化过程。
 """
 
 import argparse
@@ -14,7 +12,7 @@ from pathlib import Path
 
 
 def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") -> str:
-    """Generate HTML report from loop output data. If auto_refresh is True, adds a meta refresh tag."""
+    """根据循环输出构建报告页面；启用自动刷新时加入页面刷新标签，以展示仍在运行的评估进度。"""
     history = data.get("history", [])
     holdout = data.get("holdout", 0)
     title_prefix = html.escape(skill_name + " \u2014 ") if skill_name else ""
@@ -225,6 +223,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
 
         # Compute aggregate correct/total runs across all retries
         def aggregate_runs(results: list[dict]) -> tuple[int, int]:
+            """汇总各查询的重复执行次数，按预期触发与预期不触发分别计算正确次数和总次数。"""
             correct = 0
             total = 0
             for r in results:
@@ -242,6 +241,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
 
         # Determine score classes
         def score_class(correct: int, total: int) -> str:
+            """依据正确率选择高、中、低三档分数样式，供报告中的训练和测试得分使用。"""
             if total > 0:
                 ratio = correct / total
                 if ratio >= 0.8:
@@ -302,6 +302,7 @@ def generate_html(data: dict, auto_refresh: bool = False, skill_name: str = "") 
 
 
 def main():
+    """读取循环输出文件或标准输入，生成报告页面并输出到指定文件或标准输出。"""
     parser = argparse.ArgumentParser(description="Generate HTML report from run_loop output")
     parser.add_argument("input", help="Path to JSON output from run_loop.py (or - for stdin)")
     parser.add_argument("-o", "--output", default=None, help="Output HTML file (default: stdout)")

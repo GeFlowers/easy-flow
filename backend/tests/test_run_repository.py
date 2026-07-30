@@ -1,7 +1,4 @@
-"""Tests for RunRepository (SQLAlchemy-backed RunStore).
-
-Uses a temp SQLite DB to test ORM-backed CRUD operations.
-"""
+"""本模块覆盖运行 仓库的行为、边界与回归场景，确保既有契约稳定。"""
 
 from datetime import UTC, datetime, timedelta
 
@@ -15,6 +12,7 @@ from deerflow.runtime.runs.store.base import RunStore
 
 
 async def _make_repo(tmp_path):
+    """准备可控测试资源与状态，供后续断言读取。"""
     from deerflow.persistence.engine import get_session_factory, init_engine
 
     url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
@@ -23,65 +21,84 @@ async def _make_repo(tmp_path):
 
 
 async def _cleanup():
+    """准备可控测试资源与状态，供后续断言读取。"""
     from deerflow.persistence.engine import close_engine
 
     await close_engine()
 
 
 class _CustomRunStoreWithoutProgress(RunStore):
+    """集中覆盖当前测试分支与回归边界。"""
     async def put(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return None
 
     async def get(self, *args, **kwargs):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     async def list_by_thread(self, *args, **kwargs):
+        """处理会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return []
 
     async def update_status(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return None
 
     async def delete(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return None
 
     async def update_model_name(self, *args, **kwargs):
+        """处理模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     async def update_run_completion(self, *args, **kwargs):
+        """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     async def list_pending(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return []
 
     async def list_inflight(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return []
 
     async def aggregate_tokens_by_thread(self, *args, **kwargs):
+        """处理会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return {}
 
     async def update_lease(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return True
 
     async def list_inflight_with_expired_lease(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return []
 
     async def create_run_atomic(self, *args, **kwargs):
+        """处理创建 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return {}, []
 
     async def claim_for_takeover(self, *args, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return False
 
 
 @pytest.mark.anyio
 async def test_update_run_progress_defaults_to_noop_for_custom_store():
+    """验证运行 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = _CustomRunStoreWithoutProgress()
 
     await store.update_run_progress("r1", total_tokens=1)
 
 
 class TestRunRepository:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_put_and_get(self, tmp_path):
+        """验证获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="pending")
         row = await repo.get("r1")
@@ -93,6 +110,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_put_is_idempotent_for_retried_writes(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", assistant_id="old-agent", status="pending")
 
@@ -106,12 +124,14 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_get_missing_returns_none(self, tmp_path):
+        """验证获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         assert await repo.get("nope") is None
         await _cleanup()
 
     @pytest.mark.anyio
     async def test_update_status(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1")
         updated = await repo.update_status("r1", "running")
@@ -122,6 +142,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_status_returns_false_for_missing_row(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         updated = await repo.update_status("missing", "error", error="lost")
         assert updated is False
@@ -129,6 +150,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_status_with_error(self, tmp_path):
+        """验证错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1")
         await repo.update_status("r1", "error", error="boom")
@@ -139,6 +161,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_list_by_thread(self, tmp_path):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="success")
         await repo.put("r2", thread_id="t1", status="pending")
@@ -150,6 +173,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_list_by_thread_owner_filter(self, tmp_path):
+        """验证会话 所有者在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", user_id="alice", status="success")
         await repo.put("r2", thread_id="t1", user_id="bob", status="pending")
@@ -160,6 +184,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_delete(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1")
         await repo.delete("r1")
@@ -168,12 +193,14 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_delete_nonexistent_is_noop(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         await repo.delete("nope")  # should not raise
         await _cleanup()
 
     @pytest.mark.anyio
     async def test_list_pending(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="pending")
         await repo.put("r2", thread_id="t2", status="running")
@@ -185,6 +212,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_list_inflight_returns_pending_and_running_before_cutoff(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         # Each thread can hold at most one pending/running row (partial unique
         # index ``uq_runs_thread_active``), so spread the inflight rows across
@@ -201,6 +229,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_run_completion(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="running")
         updated = await repo.update_run_completion(
@@ -230,6 +259,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_run_completion_returns_false_for_missing_row(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         updated = await repo.update_run_completion("missing", status="error", total_tokens=1)
         assert updated is False
@@ -237,6 +267,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_metadata_preserved(self, tmp_path):
+        """验证元数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", metadata={"key": "value"})
         row = await repo.get("r1")
@@ -245,10 +276,11 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_kwargs_with_non_serializable(self, tmp_path):
-        """kwargs containing non-JSON-serializable objects should be safely handled."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
 
         class Dummy:
+            """集中覆盖当前测试分支与回归边界。"""
             pass
 
         await repo.put("r1", thread_id="t1", kwargs={"obj": Dummy()})
@@ -258,7 +290,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_run_completion_preserves_existing_fields(self, tmp_path):
-        """update_run_completion does not overwrite thread_id or assistant_id."""
+        """验证运行 已有在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", assistant_id="agent1", status="running")
         await repo.update_run_completion("r1", status="success", total_tokens=100)
@@ -270,6 +302,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_run_progress_keeps_status_running(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="running")
         await repo.update_run_progress(
@@ -291,6 +324,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_run_progress_preserves_omitted_fields(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="running")
         await repo.update_run_progress(
@@ -319,6 +353,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_run_progress_skips_terminal_runs(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="running")
         await repo.update_run_completion("r1", status="success", total_tokens=100, llm_call_count=1)
@@ -333,6 +368,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_counts_completed_runs_only(self, tmp_path):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("success-run", thread_id="t1", status="running")
         await repo.update_run_completion(
@@ -388,6 +424,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_can_include_active_runs(self, tmp_path):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("success-run", thread_id="t1", status="running")
         await repo.update_run_completion("success-run", status="success", total_tokens=100, lead_agent_tokens=100)
@@ -410,7 +447,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_list_by_thread_ordered_desc(self, tmp_path):
-        """list_by_thread returns newest first."""
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", status="success", created_at="2024-01-01T00:00:00+00:00")
         await repo.put("r2", thread_id="t1", status="pending", created_at="2024-01-02T00:00:00+00:00")
@@ -421,6 +458,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_list_by_thread_limit(self, tmp_path):
+        """验证会话 限制在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         # Only one row can be pending/running per thread; mark earlier ones
         # terminal so the partial unique index still holds.
@@ -433,6 +471,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_owner_none_returns_all(self, tmp_path):
+        """验证所有者在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", user_id="alice", status="success")
         await repo.put("r2", thread_id="t1", user_id="bob", status="pending")
@@ -442,7 +481,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_model_name_persistence(self, tmp_path):
-        """RunRepository should persist, normalize, and truncate model_name correctly via SQL."""
+        """验证模型 持久化在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.persistence.engine import get_session_factory, init_engine
 
         url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
@@ -471,26 +510,30 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_returns_zeros_when_no_rows(self):
-        """Empty thread aggregates to all-zero totals, no model buckets, and a
-        single query — replaces the older test that pinned the now-removed
-        ``GROUP BY coalesce(model_name)`` shape (issue #3645 reduces by_model
-        in Python from each row's per-model JSON column instead)."""
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         captured = []
 
         class FakeResult:
+            """集中覆盖当前测试分支与回归边界。"""
             def all(self):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 return []
 
         class FakeSession:
+            """集中覆盖当前测试分支与回归边界。"""
             async def execute(self, stmt):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 captured.append(stmt)
                 return FakeResult()
 
         class FakeSessionContext:
+            """集中覆盖当前测试分支与回归边界。"""
             async def __aenter__(self):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 return FakeSession()
 
             async def __aexit__(self, exc_type, exc, tb):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 return None
 
         repo = RunRepository(lambda: FakeSessionContext())
@@ -508,34 +551,31 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_compiles_on_postgres_dialect(self):
-        """Compile-smoke the new SELECT on the postgres dialect.
-
-        The project ships both SQLite and Postgres backends. The new aggregation
-        projects ``RunRow.token_usage_by_model`` (a JSON column) directly into
-        the row set instead of grouping on a scalar, so the SQL needs to compile
-        cleanly under PG's JSON/JSONB binding too. Pins:
-          * the JSON column is selected by name (PG would otherwise need a
-            ``::jsonb`` cast or coalesce around it)
-          * there is no GROUP BY / aggregate function left (the per-model
-            reduction now happens in Python — see issue #3645)
-        """
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
 
         captured = []
 
         class FakeResult:
+            """集中覆盖当前测试分支与回归边界。"""
             def all(self):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 return []
 
         class FakeSession:
+            """集中覆盖当前测试分支与回归边界。"""
             async def execute(self, stmt):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 captured.append(stmt)
                 return FakeResult()
 
         class FakeSessionContext:
+            """集中覆盖当前测试分支与回归边界。"""
             async def __aenter__(self):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 return FakeSession()
 
             async def __aexit__(self, exc_type, exc, tb):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 return None
 
         repo = RunRepository(lambda: FakeSessionContext())
@@ -547,7 +587,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_run_manager_hydrates_store_only_run_from_sql(self, tmp_path):
-        """RunManager should hydrate historical runs from SQL-backed store."""
+        """验证运行 管理器 存储 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put(
             "sql-store-only",
@@ -574,7 +614,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_run_manager_cancel_persists_interrupted_status_to_sql(self, tmp_path):
-        """RunManager.cancel should write interrupted status to SQL-backed store."""
+        """验证运行 管理器在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         manager = RunManager(store=repo)
         record = await manager.create("thread-1")
@@ -590,7 +630,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_model_name(self, tmp_path):
-        """RunRepository.update_model_name should update model_name for existing run."""
+        """验证模型在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", model_name="initial-model")
         await repo.update_model_name("r1", "updated-model")
@@ -600,7 +640,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_model_name_normalizes_value(self, tmp_path):
-        """RunRepository.update_model_name should normalize and truncate model_name."""
+        """验证模型在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1")
         long_name = "a" * 200
@@ -611,7 +651,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_update_model_name_to_none(self, tmp_path):
-        """RunRepository.update_model_name should allow setting model_name to None."""
+        """验证模型在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         await repo.put("r1", thread_id="t1", model_name="initial-model")
         await repo.update_model_name("r1", None)
@@ -621,7 +661,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_run_manager_update_model_name_persists_to_sql(self, tmp_path):
-        """RunManager.update_model_name should persist to SQL-backed store without integrity error."""
+        """验证运行 管理器 模型在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         manager = RunManager(store=repo)
         record = await manager.create("thread-1")
@@ -635,7 +675,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_run_manager_update_model_name_twice(self, tmp_path):
-        """RunManager.update_model_name should support multiple updates."""
+        """验证运行 管理器 模型在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         manager = RunManager(store=repo)
         record = await manager.create("thread-1")
@@ -649,18 +689,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_create_run_atomic_reject_propagates_conflict_on_unique_violation(self, tmp_path):
-        """reject path against a real SQLite-backed store must surface as ConflictError, not raw IntegrityError.
-
-        The partial unique index ``uq_runs_thread_active`` is created by
-        ``Base.metadata.create_all`` on SQLite too. Every other atomic-create
-        test in the suite uses ``MemoryRunStore``, which raises ConflictError
-        directly and never exercises the manager's
-        ``_is_unique_violation``-based conversion. This test is the load-bearing
-        coverage for that branch on a real DB: pre-insert an active run on
-        thread T, then attempt a reject-strategy create for the same thread,
-        and assert ConflictError (HTTP 409) — not a leaking IntegrityError
-        (HTTP 500).
-        """
+        """验证创建 运行 唯一在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from datetime import UTC, datetime, timedelta
 
         from deerflow.config.run_ownership_config import RunOwnershipConfig
@@ -699,16 +728,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_is_unique_violation_detects_real_sqlite_integrity_error(self, tmp_path):
-        """``_is_unique_violation`` must return True for a real SQLite IntegrityError.
-
-        SQLite raises ``UNIQUE constraint failed: runs.uq_runs_thread_active``
-        which contains "unique" but neither "violat" nor "duplicate" — the
-        previous substring-only heuristic returned False on SQLite, leaking the
-        raw IntegrityError. This test triggers a real violation against the
-        partial unique index and feeds the resulting SQLAlchemy IntegrityError
-        (with the wrapped sqlite3.IntegrityError on ``.orig``) through the
-        detector to assert True.
-        """
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         import sqlite3
 
         from sqlalchemy.exc import IntegrityError
@@ -736,16 +756,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_is_unique_violation_does_not_misclassify_application_exception(self):
-        """Message fallbacks must not fire on non-IntegrityError exceptions.
-
-        A ``ValueError`` / ``RuntimeError`` whose ``str()`` happens to
-        contain ``"duplicate key"`` or ``"unique" + "violat"`` substrings
-        must NOT be classified as a unique violation — that would silently
-        mask real application bugs as HTTP 409 conflicts instead of 500.
-        Pre-fix the substring-only fallback fired regardless of exception
-        type. The fix gates the fallback on
-        ``isinstance(current, (SAIntegrityError, sqlite3.IntegrityError))``.
-        """
+        """验证唯一在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.runtime.runs.manager import _is_unique_violation
 
         assert _is_unique_violation(ValueError("duplicate key in input data: 'email'")) is False
@@ -754,12 +765,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_is_unique_violation_detects_psycopg3_sqlstate(self):
-        """psycopg3 exposes the error code via ``sqlstate``, not ``pgcode``.
-
-        On Postgres (the only supported multi-worker backend), psycopg3's
-        ``sqlstate=23505`` must be detected as a unique violation without
-        falling through to the message-substring fallback.
-        """
+        """验证唯一在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from sqlalchemy.exc import IntegrityError as SAIntegrityError
 
         from deerflow.runtime.runs.manager import _is_unique_violation
@@ -778,21 +784,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_create_run_atomic_interrupt_tolerates_tz_naive_lease_on_sqlite(self, tmp_path):
-        """Interrupt path must not raise TypeError comparing naive vs aware datetimes.
-
-        SQLite drops tzinfo on read despite ``DateTime(timezone=True)`` (see
-        the comment in ``RunRepository._row_to_dict``). The interrupt branch
-        of ``create_run_atomic`` compares ``row.lease_expires_at`` against
-        the aware ``cutoff = datetime.now(UTC) - ...`` in Python. Under
-        default config (heartbeat disabled) leases are always NULL so the
-        ``is not None`` check short-circuits, but there is no guard against
-        ``heartbeat_enabled=true`` on SQLite — a naive lease would raise
-        ``TypeError: can't compare offset-naive and offset-aware datetimes``
-        and surface as an opaque 500.
-
-        Pre-fix this test fails with TypeError; post-fix it raises
-        ConflictError (the live other-worker run blocks the interrupt).
-        """
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from datetime import UTC, datetime, timedelta
 
         repo = await _make_repo(tmp_path)
@@ -830,6 +822,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_claim_for_takeover_succeeds_with_expired_lease(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         grace = 10
         expired = (datetime.now(UTC) - timedelta(seconds=grace + 5)).isoformat()
@@ -845,6 +838,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_claim_for_takeover_fails_on_valid_lease(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         grace = 10
         valid = (datetime.now(UTC) + timedelta(seconds=30)).isoformat()
@@ -859,6 +853,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_claim_for_takeover_succeeds_with_null_lease(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         await repo.put("run-null", thread_id="t1", status="running", created_at=datetime.now(UTC).isoformat())
 
@@ -871,6 +866,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_claim_for_takeover_fails_on_terminal_row(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         repo = await _make_repo(tmp_path)
         await repo.put("run-done", thread_id="t1", status="success", created_at=datetime.now(UTC).isoformat())
 
@@ -880,6 +876,7 @@ class TestRunRepository:
 
     @pytest.mark.anyio
     async def test_claim_for_takeover_nonexistent_run(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         repo = await _make_repo(tmp_path)
         ok = await repo.claim_for_takeover("no-such-run", grace_seconds=10, error="claimed")
         assert ok is False

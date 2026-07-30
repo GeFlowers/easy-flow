@@ -1,7 +1,9 @@
 import type { ScheduleValue } from "@/components/workspace/scheduled-task-schedule-input";
 
+/** 定时任务预设标题对应的本地化键。 */
 export type RecipeTitleKey = "trending" | "news" | "issues" | "weekly";
 
+/** 可一键套用到定时任务表单的前端预设。 */
 export type Recipe = {
   id: string;
   icon: string;
@@ -10,10 +12,10 @@ export type Recipe = {
   schedule: ScheduleValue;
 };
 
-// Front-end-only starter recipes. The schedule's timezone is left empty so the
-// ScheduleInput falls back to the browser-detected timezone when applied.
-// `{{repo}}` style placeholders are intentional — the user fills them in the
-// prompt field after applying the recipe.
+/**
+ * 仅供前端使用的起始预设。计划时区留空，应用时由计划输入组件回退到浏览器检测的时区；
+ * 仓库占位符有意保留，用户套用后会在提示词字段中填写。
+ */
 export const RECIPES: Recipe[] = [
   {
     id: "trending",

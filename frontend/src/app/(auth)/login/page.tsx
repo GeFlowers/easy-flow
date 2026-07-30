@@ -17,22 +17,18 @@ import {
 import { parseAuthError } from "@/core/auth/types";
 import { useI18n } from "@/core/i18n/hooks";
 
-/**
- * Validate next parameter
- * Prevent open redirect attacks
- * Per RFC-001: Only allow relative paths starting with /
- */
+/** 仅接受站内相对跳转地址，防止登录完成后发生开放重定向。 */
 function validateNextParam(next: string | null): string | null {
   if (!next) {
     return null;
   }
 
-  // Need start with / (relative path)
+  // 必须以斜杠开头，确保是相对路径。
   if (!next.startsWith("/")) {
     return null;
   }
 
-  // Disallow protocol-relative URLs
+  // 禁止协议相对 URL，避免绕过站内跳转校验。
   if (
     next.startsWith("//") ||
     next.startsWith("http://") ||
@@ -41,15 +37,16 @@ function validateNextParam(next: string | null): string | null {
     return null;
   }
 
-  // Disallow URLs with different protocols (e.g., javascript:, data:, etc)
+  // 拒绝任何协议形式，例如 javascript: 与 data:。
   if (next.includes(":") && !next.startsWith("/")) {
     return null;
   }
 
-  // Valid relative path
+  // 至此为可安全跳转的站内相对路径。
   return next;
 }
 
+/** 渲染本地账号与 SSO 登录入口，并在成功后跳转至经校验的站内地址。 */
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -68,7 +65,7 @@ export default function LoginPage() {
   );
   const [setupStatusChecked, setSetupStatusChecked] = useState(false);
 
-  // Extract error from query params (e.g., ?error=sso_failed)
+  // 读取查询参数中的认证错误，例如 ?error=sso_failed。
   const errorParam = searchParams.get("error");
   const [error, setError] = useState(
     errorParam
@@ -76,14 +73,11 @@ export default function LoginPage() {
           t.login.authFailed)
       : "",
   );
-  // Soft hint shown after a failed login when SSO is configured: an SSO-only
-  // account has no local password, so the backend returns a generic
-  // "incorrect email or password" (deliberately, to avoid account enumeration).
-  // Nudge the user toward the SSO buttons without confirming the account exists.
+  // 配置 SSO 后本地登录失败时仅展示温和提示：不确认账号是否存在，避免账号枚举。
   const [showSsoHint, setShowSsoHint] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Get next parameter for validated redirect
+  // 先校验回跳地址，再决定登录成功后的落点。
   const nextParam = searchParams.get("next");
   const redirectPath = validateNextParam(nextParam) ?? "/workspace";
   const regularSignupAllowed = canCreateRegularAccount({
@@ -92,14 +86,14 @@ export default function LoginPage() {
   });
   const systemNeedsAdminSetup = setupStatus?.needs_setup === true;
 
-  // Redirect if already authenticated (client-side, post-login)
+  // 已登录用户无需重复访问登录页，直接跳转到安全的目标页。
   useEffect(() => {
     if (isAuthenticated) {
       router.push(redirectPath);
     }
   }, [isAuthenticated, redirectPath, router]);
 
-  // Fetch setup state and SSO providers
+  // 并行加载系统初始化状态与可用 SSO 提供商。
   useEffect(() => {
     let cancelled = false;
 
@@ -134,7 +128,7 @@ export default function LoginPage() {
         },
       )
       .catch(() => {
-        // Ignore errors; no SSO providers shown
+        // 忽略加载错误，页面仅不展示 SSO 入口。
       });
 
     return () => {
@@ -142,6 +136,7 @@ export default function LoginPage() {
     };
   }, []);
 
+  /** 提交本地登录或注册，并根据认证结果更新表单状态。 */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
@@ -170,22 +165,21 @@ export default function LoginPage() {
         method: "POST",
         headers,
         body,
-        credentials: "include", // Important: include HttpOnly cookie
+        credentials: "include", // 必须携带 HttpOnly Cookie 以建立登录态。
       });
 
       if (!res.ok) {
         const data = await res.json();
         const authError = parseAuthError(data);
         setError(authError.message);
-        // On a failed login with SSO configured, surface a hint pointing at the
-        // SSO buttons — the "wrong password" may really mean "this is an SSO account".
+        // SSO 账号没有本地密码；仅在失败后引导至 SSO 按钮，不泄露账号归属。
         if (isLogin && ssoProviders.length > 0) {
           setShowSsoHint(true);
         }
         return;
       }
 
-      // Both login and register set a cookie — redirect to workspace
+      // 登录与注册都会写入 Cookie，随后进入已校验的工作区路径。
       router.push(redirectPath);
     } catch {
       setError(t.login.networkError);

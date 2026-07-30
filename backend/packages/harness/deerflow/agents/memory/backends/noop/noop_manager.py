@@ -1,40 +1,4 @@
-"""Noop memory backend -- a functional empty :class:`MemoryManager`.
-
-Proves the pluggable mechanism end-to-end (factory + drop-in discovery + config
-switch) and doubles as the **template** for a new backend.
-
-Portability golden rule (see ``config.py`` for the full version): a backend
-receives ALL host info through (1) the ABC method args and (2) the
-``backend_config`` dict. The ONLY ``from deerflow`` import allowed in this
-folder is the ABC contract line below -- change that one line to port the
-backend to another agent. Do NOT import deer-flow path helpers, config
-singletons, or models; get everything from ``backend_config``.
-
-Writing a new backend:
-  1. Copy this folder to ``backends/<yourname>/``.
-  2. ``config.py``: declare your config knobs + ``from_backend_config`` (parse
-     ``backend_config``; read ``storage_path`` from it, NOT from deer-flow).
-  3. ``<yourname>_manager.py``: rename the class; ``__init__`` parses
-     ``backend_config`` into your config; implement the 9 ABC methods against
-     your memory system.
-  4. (Optional) implement the DeerMem-internal capability methods at the bottom
-     (``create_fact`` / ``delete_fact`` / ``update_fact`` / ``reload_memory`` /
-     ``warm``) so the host gateway's ``hasattr`` probes find them and the
-     fact-CRUD / reload / warm-up UI works.
-  5. ``__init__.py``: set ``MANAGER_CLASS = YourManager`` (relative import).
-  6. ``config.yaml``: ``manager_class: <yourname>``.
-
-Return-shape note: the host gateway casts ``get_memory`` / ``export_memory`` /
-``clear_memory`` / ``import_memory`` returns to a DeerMem-shape response
-(``version`` / ``lastUpdated`` / ``user`` / ``history`` / ``facts[]``). A real
-backend returns a dict castable to that shape (a non-DeerMem backend maps
-its native records into this shape). Noop returns the minimal ``{"facts": []}`` -- the
-gateway fills the rest with defaults.
-
-With ``manager_class: noop`` the system runs with an empty memory: nothing is
-stored, nothing is injected, every read returns empty. Useful for tests, for
-disabling memory without touching ``enabled``, and as a baseline.
-"""
+'定义 noop_manager 模块提供的职责与可复用接口。\n\nNoop memory backend -- a functional empty :class:`MemoryManager`.\n\nProves the pluggable mechanism end-to-end (factory + drop-in discovery + config\nswitch) and doubles as the **template** for a new backend.\n\nPortability golden rule (see ``config.py`` for the full version): a backend\nreceives ALL host info through (1) the ABC method args and (2) the\n``backend_config`` dict. The ONLY ``from deerflow`` import allowed in this\nfolder is the ABC contract line below -- change that one line to port the\nbackend to another agent. Do NOT import deer-flow path helpers, config\nsingletons, or models; get everything from ``backend_config``.\n\nWriting a new backend:\n  1. Copy this folder to ``backends/<yourname>/``.\n  2. ``config.py``: declare your config knobs + ``from_backend_config`` (parse\n     ``backend_config``; read ``storage_path`` from it, NOT from deer-flow).\n  3. ``<yourname>_manager.py``: rename the class; ``__init__`` parses\n     ``backend_config`` into your config; implement the 9 ABC methods against\n     your memory system.\n  4. (Optional) implement the DeerMem-internal capability methods at the bottom\n     (``create_fact`` / ``delete_fact`` / ``update_fact`` / ``reload_memory`` /\n     ``warm``) so the host gateway\'s ``hasattr`` probes find them and the\n     fact-CRUD / reload / warm-up UI works.\n  5. ``__init__.py``: set ``MANAGER_CLASS = YourManager`` (relative import).\n  6. ``config.yaml``: ``manager_class: <yourname>``.\n\nReturn-shape note: the host gateway casts ``get_memory`` / ``export_memory`` /\n``clear_memory`` / ``import_memory`` returns to a DeerMem-shape response\n(``version`` / ``lastUpdated`` / ``user`` / ``history`` / ``facts[]``). A real\nbackend returns a dict castable to that shape (a non-DeerMem backend maps\nits native records into this shape). Noop returns the minimal ``{"facts": []}`` -- the\ngateway fills the rest with defaults.\n\nWith ``manager_class: noop`` the system runs with an empty memory: nothing is\nstored, nothing is injected, every read returns empty. Useful for tests, for\ndisabling memory without touching ``enabled``, and as a baseline.\n'
 
 from __future__ import annotations
 
@@ -48,24 +12,15 @@ from .config import NoopConfig
 
 
 def _empty_memory() -> dict[str, Any]:
-    """A fresh empty memory document (callers may mutate).
-
-    Minimal shape; the host gateway fills ``version`` / ``lastUpdated`` /
-    ``user`` / ``history`` with defaults. A real backend returns the full
-    DeerMem-shape doc (see the return-shape note in the module docstring).
-    """
+    '执行 _empty_memory 的明确职责，并返回与调用约定一致的结果。\n\nA fresh empty memory document (callers may mutate).\n\n    Minimal shape; the host gateway fills ``version`` / ``lastUpdated`` /\n    ``user`` / ``history`` with defaults. A real backend returns the full\n    DeerMem-shape doc (see the return-shape note in the module docstring).\n    '
     return {"facts": []}
 
 
 class NoopMemoryManager(MemoryManager):
-    """Backend that stores and recalls nothing.
-
-    ``__init__`` parses ``backend_config`` into a :class:`NoopConfig` purely to
-    demonstrate the pattern -- noop ignores every field. A real backend reads
-    its knobs (storage root, model, ...) from ``self._config``.
-    """
+    '封装 NoopMemoryManager 的状态、协作关系与公开操作。\n\nBackend that stores and recalls nothing.\n\n    ``__init__`` parses ``backend_config`` into a :class:`NoopConfig` purely to\n    demonstrate the pattern -- noop ignores every field. A real backend reads\n    its knobs (storage root, model, ...) from ``self._config``.\n    '
 
     def __init__(self, backend_config: dict[str, Any] | None = None) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__(backend_config)
         # Parse backend_config into a typed config. Noop ignores it; a real
         # backend uses self._config.* for storage root, model, etc. storage_path
@@ -82,6 +37,7 @@ class NoopMemoryManager(MemoryManager):
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> None:
+        '执行 add 的明确职责，并返回与调用约定一致的结果'
         return None
 
     def add_nowait(
@@ -92,6 +48,7 @@ class NoopMemoryManager(MemoryManager):
         agent_name: str | None = None,
         user_id: str | None = None,
     ) -> None:
+        '执行 add_nowait 的明确职责，并返回与调用约定一致的结果'
         return None
 
     # ── Read ─────────────────────────────────────────────────────────────
@@ -102,6 +59,7 @@ class NoopMemoryManager(MemoryManager):
         agent_name: str | None = None,
         thread_id: str | None = None,
     ) -> str:
+        '读取并返回，并遵守 get_context 所表达的接口约束'
         return ""
 
     def search(
@@ -113,6 +71,7 @@ class NoopMemoryManager(MemoryManager):
         agent_name: str | None = None,
         category: str | None = None,
     ) -> list[dict[str, Any]]:
+        '执行 search 的明确职责，并返回与调用约定一致的结果'
         return []
 
     # ── Manage ───────────────────────────────────────────────────────────
@@ -122,6 +81,7 @@ class NoopMemoryManager(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
+        '读取并返回，并遵守 get_memory 所表达的接口约束'
         return _empty_memory()
 
     def delete_memory(
@@ -130,6 +90,7 @@ class NoopMemoryManager(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> None:
+        '删除目标资源并返回操作结果，并遵守 delete_memory 所表达的接口约束'
         return None
 
     def clear_memory(
@@ -138,6 +99,7 @@ class NoopMemoryManager(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
+        '执行 clear_memory 的明确职责，并返回与调用约定一致的结果'
         return _empty_memory()
 
     def import_memory(
@@ -147,6 +109,7 @@ class NoopMemoryManager(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
+        '执行 import_memory 的明确职责，并返回与调用约定一致的结果'
         return _empty_memory()
 
     def export_memory(
@@ -155,11 +118,12 @@ class NoopMemoryManager(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
+        '执行 export_memory 的明确职责，并返回与调用约定一致的结果'
         return _empty_memory()
 
     # ── Lifecycle ───────────────────────────────────────────────────────
     def shutdown_flush(self, timeout: float) -> bool:
-        """Nothing is ever queued, so shutdown drain is a clean no-op success."""
+        '执行 shutdown_flush 的明确职责，并返回与调用约定一致的结果。\n\nNothing is ever queued, so shutdown drain is a clean no-op success.'
         return True
 
     # ── Optional DeerMem-internal capabilities (NOT on the ABC) ──────────

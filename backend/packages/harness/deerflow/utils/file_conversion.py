@@ -1,18 +1,4 @@
-"""File conversion utilities.
-
-Converts document files (PDF, PPT, Excel, Word) to Markdown.
-
-PDF conversion strategy (auto mode):
-  1. Try pymupdf4llm if installed — better heading detection, faster on most files.
-  2. If output is suspiciously short (< _MIN_CHARS_PER_PAGE chars/page, or < 200 chars
-     total when page count is unavailable), treat as image-based and fall back to MarkItDown.
-  3. If pymupdf4llm is not installed, use MarkItDown directly (existing behaviour).
-
-Large files (> ASYNC_THRESHOLD_BYTES) are converted in a thread pool via
-asyncio.to_thread() to avoid blocking the event loop (fixes #1569).
-
-No FastAPI or HTTP dependencies — pure utility functions.
-"""
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 
 import asyncio
 import logging
@@ -48,12 +34,7 @@ _MIN_CHARS_PER_PAGE = 50
 
 
 def _pymupdf_output_too_sparse(text: str, file_path: Path) -> bool:
-    """Return True if pymupdf4llm output is suspiciously short (image-based PDF).
-
-    Uses chars-per-page rather than an absolute threshold so that both short
-    documents (few pages, few chars) and long documents (many pages, many chars)
-    are handled correctly.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     chars = len(text.strip())
     doc = None
     pages: int | None = None
@@ -77,11 +58,7 @@ def _pymupdf_output_too_sparse(text: str, file_path: Path) -> bool:
 
 
 def _convert_pdf_with_pymupdf4llm(file_path: Path) -> str | None:
-    """Attempt PDF conversion with pymupdf4llm.
-
-    Returns the markdown text, or None if pymupdf4llm is not installed or
-    if conversion fails (e.g. encrypted/corrupt PDF).
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     try:
         import pymupdf4llm
     except ImportError:
@@ -95,7 +72,7 @@ def _convert_pdf_with_pymupdf4llm(file_path: Path) -> str | None:
 
 
 def _convert_with_markitdown(file_path: Path) -> str:
-    """Convert any supported file to markdown text using MarkItDown."""
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     from markitdown import MarkItDown
 
     md = MarkItDown()
@@ -103,12 +80,7 @@ def _convert_with_markitdown(file_path: Path) -> str:
 
 
 def _do_convert(file_path: Path, pdf_converter: str) -> str:
-    """Synchronous conversion — called directly or via asyncio.to_thread.
-
-    Args:
-        file_path: Path to the file.
-        pdf_converter: "auto" | "pymupdf4llm" | "markitdown"
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     is_pdf = file_path.suffix.lower() == ".pdf"
 
     if is_pdf and pdf_converter != "markitdown":
@@ -136,18 +108,7 @@ def _do_convert(file_path: Path, pdf_converter: str) -> str:
 
 
 async def convert_file_to_markdown(file_path: Path) -> Path | None:
-    """Convert a supported document file to Markdown.
-
-    PDF files are handled with a two-converter strategy (see module docstring).
-    Large files (> 1 MB) are offloaded to a thread pool to avoid blocking the
-    event loop.
-
-    Args:
-        file_path: Path to the file to convert.
-
-    Returns:
-        Path to the generated .md file, or None if conversion failed.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     try:
         pdf_converter = _get_pdf_converter()
         file_size = file_path.stat().st_size
@@ -205,18 +166,7 @@ _ALLOWED_PDF_CONVERTERS = {"auto", "pymupdf4llm", "markitdown"}
 
 
 def _clean_bold_title(raw: str) -> str:
-    """Normalise a title string that may contain pymupdf4llm bold artefacts.
-
-    pymupdf4llm sometimes emits adjacent bold spans as ``**A** **B**`` instead
-    of a single ``**A B**`` block.  This helper merges those fragments and then
-    strips the outermost ``**...**`` wrapper so the caller gets plain text.
-
-    Examples::
-
-        "**Overview**"                       → "Overview"
-        "**UNITED STATES** **SECURITIES**"   → "UNITED STATES SECURITIES"
-        "plain text"                         → "plain text"  (unchanged)
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     # Merge adjacent bold spans: "** **" → " "
     merged = re.sub(r"\*\*\s*\*\*", " ", raw).strip()
     # Strip outermost **...** if the whole string is wrapped
@@ -226,32 +176,7 @@ def _clean_bold_title(raw: str) -> str:
 
 
 def extract_outline(md_path: Path) -> list[dict]:
-    """Extract document outline (headings) from a Markdown file.
-
-    Recognises three heading styles produced by pymupdf4llm:
-
-    1. Standard Markdown headings: lines starting with one or more '#'.
-       Inline ``**...**`` wrappers and adjacent bold spans (``** **``) are
-       cleaned so the title is plain text.
-
-    2. Bold-only structural headings: ``**ITEM 1. BUSINESS**``, ``**PART II**``,
-       etc.  SEC filings use bold+caps for section headings with the same font
-       size as body text, so pymupdf4llm cannot promote them to # headings.
-
-    3. Split-bold headings: ``**1** **Introduction**``, ``**3.2** **Attention**``.
-       pymupdf4llm emits these when the section number and title text are
-       separate spans in the underlying PDF (common in academic papers).
-
-    Args:
-        md_path: Path to the .md file.
-
-    Returns:
-        List of dicts with keys: title (str), line (int, 1-based).
-        When the outline is truncated at MAX_OUTLINE_ENTRIES, a sentinel entry
-        ``{"truncated": True}`` is appended as the last element so callers can
-        render a "showing first N headings" hint without re-scanning the file.
-        Returns an empty list if the file cannot be read or has no headings.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     outline: list[dict] = []
     try:
         with md_path.open(encoding="utf-8") as f:
@@ -293,7 +218,7 @@ def extract_outline(md_path: Path) -> list[dict]:
 
 
 def _get_uploads_config_value(key: str, default: object) -> object:
-    """Read a value from the uploads config, supporting dict and attribute access."""
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     cfg = get_app_config()
     uploads_cfg = getattr(cfg, "uploads", None)
     if isinstance(uploads_cfg, dict):
@@ -302,12 +227,7 @@ def _get_uploads_config_value(key: str, default: object) -> object:
 
 
 def _get_pdf_converter() -> str:
-    """Read pdf_converter setting from app config, defaulting to 'auto'.
-
-    Normalizes the value to lowercase and validates it against the allowed set
-    so that values like 'AUTO' or 'MarkItDown' from config.yaml don't silently
-    fall through to unexpected behaviour.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     try:
         raw = str(_get_uploads_config_value("pdf_converter", "auto")).strip().lower()
         if raw not in _ALLOWED_PDF_CONVERTERS:

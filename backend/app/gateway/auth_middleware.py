@@ -1,12 +1,8 @@
-"""Global authentication middleware — fail-closed safety net.
+"""全局认证中间件，以失败关闭方式作为安全兜底。
 
-Rejects unauthenticated requests to non-public paths with 401. When a
-request passes the cookie check, resolves the JWT payload to a real
-``User`` object and stamps it into both ``request.state.user`` and the
-``deerflow.runtime.user_context`` contextvar so that repository-layer
-owner filtering works automatically via the sentinel pattern.
-
-Fine-grained permission checks remain in authz.py decorators.
+该中间件为非公开路径拒绝未认证请求，并将已验证 JWT 对应的 ``User`` 写入
+``request.state.user`` 与用户上下文，以自动执行仓储层所有者过滤；细粒度权限
+控制仍由 ``authz.py`` 的装饰器完成。
 """
 
 from collections.abc import Callable
@@ -28,7 +24,7 @@ from app.gateway.authz import _ALL_PERMISSIONS, AuthContext
 from app.gateway.internal_auth import INTERNAL_AUTH_HEADER_NAME, get_internal_user, is_valid_internal_auth_token
 from deerflow.runtime.user_context import reset_current_user, set_current_user
 
-# Paths that never require authentication.
+# 永远不要求认证的路径。
 _PUBLIC_PATH_PREFIXES: tuple[str, ...] = (
     "/health",
     "/docs",
@@ -36,13 +32,12 @@ _PUBLIC_PATH_PREFIXES: tuple[str, ...] = (
     "/openapi.json",
     "/api/v1/auth/oauth/",
     "/api/v1/auth/callback/",
-    # Inbound webhooks authenticate themselves via provider-specific signatures
-    # (e.g. GitHub's X-Hub-Signature-256), not session cookies.
+    # 入站回调通过提供者专属签名认证，而非会话凭据。
     "/api/webhooks/",
 )
 
-# Exact auth paths that are public (login/register/status check).
-# /api/v1/auth/me, /api/v1/auth/change-password etc. are NOT public.
+# 精确匹配的公开认证路径（登录、注册和状态检查）。
+# 查询当前用户、修改密码等路径不公开。
 _PUBLIC_EXACT_PATHS: frozenset[str] = frozenset(
     {
         "/api/v1/auth/login/local",
@@ -56,6 +51,7 @@ _PUBLIC_EXACT_PATHS: frozenset[str] = frozenset(
 
 
 def _is_public(path: str) -> bool:
+    """判断请求路径是否属于无需认证的公开路径。"""
     stripped = path.rstrip("/")
     if stripped in _PUBLIC_EXACT_PATHS:
         return True
@@ -63,39 +59,27 @@ def _is_public(path: str) -> bool:
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """Strict auth gate: reject requests without a valid session.
+    """严格认证关卡，拒绝没有有效会话的请求。
 
-    Two-stage check for non-public paths:
-
-    1. Cookie presence — return 401 NOT_AUTHENTICATED if missing
-    2. JWT validation via ``get_optional_user_from_request`` — return 401
-       TOKEN_INVALID if the token is absent, malformed, expired, or the
-       signed user does not exist / is stale
-
-    On success, stamps ``request.state.user`` and the
-    ``deerflow.runtime.user_context`` contextvar so that repository-layer
-    owner filters work downstream without every route needing a
-    ``@require_auth`` decorator. Routes that need per-resource
-    authorization (e.g. "user A cannot read user B's thread by guessing
-    the URL") should additionally use ``@require_permission(...,
-    owner_check=True)`` for explicit enforcement — but authentication
-    itself is fully handled here.
+    对非公开路径先检查 Cookie 是否存在，再严格验证 JWT；成功后写入请求状态和
+    用户上下文，使仓储层所有者过滤自动生效。资源级授权仍应使用
+    ``@require_permission(..., owner_check=True)`` 显式检查。
     """
 
     def __init__(self, app: ASGIApp) -> None:
+        """使用 ASGI 应用初始化认证中间件。"""
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
+        """认证请求、建立用户上下文，并将请求交给后续中间件或处理器。"""
         if _is_public(request.url.path):
             return await call_next(request)
 
         internal_user = None
         if is_valid_internal_auth_token(request.headers.get(INTERNAL_AUTH_HEADER_NAME)):
-            # Extract the channel owner user ID from the trusted header.
-            # When present, the synthetic internal user carries the actual
-            # owner identity so that get_effective_user_id() and per-user
-            # filesystem paths (custom skills, memory, thread data) resolve
-            # to the IM channel user instead of falling back to "default".
+            # 从可信头部提取频道所有者标识。存在时，合成内部用户携带实际所有者
+            # 身份，使有效用户标识及每用户文件路径（自定义技能、记忆、线程数据）
+            # 解析为即时通信频道用户而非回退到默认用户。
             from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME
 
             owner_user_id = request.headers.get(INTERNAL_OWNER_USER_ID_HEADER_NAME)
@@ -106,22 +90,14 @@ class AuthMiddleware(BaseHTTPMiddleware):
         auth_source = AUTH_SOURCE_SESSION
         access_token = request.cookies.get("access_token")
 
-        # Non-public path: require session cookie
+        # 非公开路径必须有会话凭据，或使用已验证的内部认证。
         if internal_user is not None:
             user = internal_user
             auth_source = AUTH_SOURCE_INTERNAL
         elif access_token:
-            # Strict JWT validation: reject junk/expired tokens with 401
-            # right here instead of silently passing through. This closes
-            # the "junk cookie bypass" gap (AUTH_TEST_PLAN test 7.5.8):
-            # without this, non-isolation routes like /api/models would
-            # accept any cookie-shaped string as authentication.
-            #
-            # We call the *strict* resolver so that fine-grained error
-            # codes (token_expired, token_invalid, user_not_found, …)
-            # propagate from AuthErrorCode, not get flattened into one
-            # generic code. BaseHTTPMiddleware doesn't let HTTPException
-            # bubble up, so we catch and render it as JSONResponse here.
+            # 严格验证令牌：立即以 401 拒绝无效或过期令牌，避免任意形似会话凭据的
+            # 字符串绕过认证并访问非隔离路由。调用严格解析器可保留细分错误码；
+            # 当前中间件基类不能让异常向外冒泡，故在此渲染结构化响应。
             from app.gateway.deps import get_current_user_from_request
 
             try:
@@ -145,10 +121,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 },
             )
 
-        # Stamp both request.state.user (for the contextvar pattern)
-        # and request.state.auth (so @require_permission's "auth is
-        # None" branch short-circuits instead of running the entire
-        # JWT-decode + DB-lookup pipeline a second time per request).
+        # 同时写入用户状态和认证状态，使权限检查不会在同一请求中再次执行令牌解码和数据库查询。
         request.state.user = user
         request.state.auth_source = auth_source
         request.state.auth = AuthContext(user=user, permissions=_ALL_PERMISSIONS)

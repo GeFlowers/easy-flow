@@ -1,3 +1,4 @@
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -14,11 +15,14 @@ ACTIVE_RUN_STATUSES: tuple[str, ...] = ("queued", "running")
 
 
 class ScheduledTaskRunRepository:
+    """定义负责持久化读写及事务边界管理的仓储组件。"""
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self._sf = session_factory
 
     @staticmethod
     def _row_to_dict(row: ScheduledTaskRunRow) -> dict[str, Any]:
+        """将持久化记录转换为对外使用的字典表示。"""
         data = row.to_dict()
         for key in ("scheduled_for", "started_at", "finished_at", "created_at"):
             if data.get(key) is not None:
@@ -35,6 +39,7 @@ class ScheduledTaskRunRepository:
         trigger: str,
         status: str,
     ) -> dict[str, Any]:
+        """创建记录并在成功后提交相应的持久化事务。"""
         row = ScheduledTaskRunRow(
             id=run_record_id,
             task_id=task_id,
@@ -51,6 +56,7 @@ class ScheduledTaskRunRepository:
             return self._row_to_dict(row)
 
     async def list_by_task(self, task_id: str, *, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         stmt = (
             select(ScheduledTaskRunRow)
             .where(ScheduledTaskRunRow.task_id == task_id)
@@ -66,7 +72,7 @@ class ScheduledTaskRunRepository:
             return [self._row_to_dict(row) for row in result.scalars()]
 
     async def count_active_runs(self) -> int:
-        """Global count of queued/running rows, used to bound cross-task concurrency."""
+        """执行当前持久化组件提供的操作。"""
         stmt = select(func.count()).select_from(ScheduledTaskRunRow).where(ScheduledTaskRunRow.status.in_(ACTIVE_RUN_STATUSES))
         async with self._sf() as session:
             result = await session.execute(stmt)
@@ -83,6 +89,7 @@ class ScheduledTaskRunRepository:
         finished_at: datetime | None = None,
         protect_terminal: bool = False,
     ) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         async with self._sf() as session:
             row = await session.get(ScheduledTaskRunRow, run_record_id)
             if row is None:
@@ -107,6 +114,7 @@ class ScheduledTaskRunRepository:
             await session.commit()
 
     async def has_active_runs(self, task_id: str) -> bool:
+        """执行当前持久化组件提供的操作。"""
         stmt = (
             select(ScheduledTaskRunRow.id)
             .where(
@@ -120,12 +128,7 @@ class ScheduledTaskRunRepository:
             return result.scalars().first() is not None
 
     async def mark_stale_active_runs(self, *, error: str) -> int:
-        """Fail-fast bookkeeping for runs orphaned by a process crash.
-
-        Agent runs execute in-process, so any ``queued``/``running`` row found
-        at scheduler startup belongs to a run whose process is gone. Only valid
-        under the MVP's single-scheduler-instance assumption.
-        """
+        """执行当前持久化组件提供的操作。"""
         stmt = select(ScheduledTaskRunRow).where(ScheduledTaskRunRow.status.in_(ACTIVE_RUN_STATUSES))
         now = datetime.now(UTC)
         async with self._sf() as session:

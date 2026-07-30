@@ -1,22 +1,4 @@
-"""Middleware to fix dangling tool calls and orphan tool results in message history.
-
-A dangling tool call occurs when an AIMessage contains tool_calls but there are
-no corresponding ToolMessages in the history (e.g., due to user interruption or
-request cancellation). An orphan ToolMessage occurs when a tool result exists
-without a matching AIMessage tool_call (e.g., after summarization/branching
-dropped the upstream AIMessage). Both cause strict-provider rejections.
-
-This middleware intercepts the model call to:
-- Sanitize malformed tool-call names and arguments before provider serialization
-- Insert synthetic ToolMessages with an error indicator for each dangling AIMessage
-  tool_call, ensuring correct message ordering
-- Drop orphan ToolMessages whose originating tool_call is no longer present in the
-  request, preventing strict OpenAI-compatible backends from returning HTTP 400
-
-Note: Uses wrap_model_call instead of before_model to ensure patches are inserted
-at the correct positions (immediately after each dangling AIMessage), not appended
-to the end of the message list as before_model + add_messages reducer would do.
-"""
+'定义 dangling_tool_call_middleware 模块提供的职责与可复用接口。\n\nMiddleware to fix dangling tool calls and orphan tool results in message history.\n\nA dangling tool call occurs when an AIMessage contains tool_calls but there are\nno corresponding ToolMessages in the history (e.g., due to user interruption or\nrequest cancellation). An orphan ToolMessage occurs when a tool result exists\nwithout a matching AIMessage tool_call (e.g., after summarization/branching\ndropped the upstream AIMessage). Both cause strict-provider rejections.\n\nThis middleware intercepts the model call to:\n- Sanitize malformed tool-call names and arguments before provider serialization\n- Insert synthetic ToolMessages with an error indicator for each dangling AIMessage\n  tool_call, ensuring correct message ordering\n- Drop orphan ToolMessages whose originating tool_call is no longer present in the\n  request, preventing strict OpenAI-compatible backends from returning HTTP 400\n\nNote: Uses wrap_model_call instead of before_model to ensure patches are inserted\nat the correct positions (immediately after each dangling AIMessage), not appended\nto the end of the message list as before_model + add_messages reducer would do.\n'
 
 import json
 import logging
@@ -40,19 +22,22 @@ _EMPTY_TOOL_NAME_ERROR = "Tool call could not be executed because its name was m
 
 
 def _valid_tool_name(name: object) -> bool:
+    """判断工具名称是否为非空白字符串。"""
     return isinstance(name, str) and bool(name.strip())
 
 
 def _normalize_tool_name(name: object) -> str:
+    """返回去除首尾空白的有效名称，或统一的未知工具名称。"""
     return name.strip() if _valid_tool_name(name) else _UNKNOWN_TOOL_NAME
 
 
 def _has_invalid_tool_name(name: object) -> bool:
+    """判断工具名称是否无效。"""
     return not _valid_tool_name(name)
 
 
 def _parse_json_object(value: object) -> dict | None:
-    """Parse a JSON-object string, returning None for other inputs."""
+    '执行 _parse_json_object 的明确职责，并返回与调用约定一致的结果。\n\nParse a JSON-object string, returning None for other inputs.'
     if not isinstance(value, str):
         return None
     try:
@@ -63,7 +48,7 @@ def _parse_json_object(value: object) -> dict | None:
 
 
 def _normalize_tool_arguments(arguments: object) -> str:
-    """Return a JSON-object string safe for OpenAI-compatible replay."""
+    '执行 _normalize_tool_arguments 的明确职责，并返回与调用约定一致的结果。\n\nReturn a JSON-object string safe for OpenAI-compatible replay.'
     if isinstance(arguments, dict):
         try:
             return json.dumps(arguments, ensure_ascii=False, allow_nan=False)
@@ -73,27 +58,11 @@ def _normalize_tool_arguments(arguments: object) -> str:
 
 
 class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
-    """Inserts placeholder ToolMessages for dangling tool calls and drops orphan
-    ToolMessages (tool results whose originating AIMessage tool_call is gone).
-
-    Scans the message history for:
-    - AIMessages whose tool_calls lack corresponding ToolMessages, and injects
-      synthetic error responses immediately after the offending AIMessage
-    - ToolMessages with no matching AIMessage tool_call (orphans), and drops
-      them so strict OpenAI-compatible backends do not reject the request
-    """
+    '封装 DanglingToolCallMiddleware 的状态、协作关系与公开操作。\n\nInserts placeholder ToolMessages for dangling tool calls and drops orphan\n    ToolMessages (tool results whose originating AIMessage tool_call is gone).\n\n    Scans the message history for:\n    - AIMessages whose tool_calls lack corresponding ToolMessages, and injects\n      synthetic error responses immediately after the offending AIMessage\n    - ToolMessages with no matching AIMessage tool_call (orphans), and drops\n      them so strict OpenAI-compatible backends do not reject the request\n    '
 
     @staticmethod
     def _message_tool_calls(msg) -> list[dict]:
-        """Return normalized tool calls from structured fields or raw provider payloads.
-
-        LangChain stores malformed provider function calls in ``invalid_tool_calls``.
-        They do not execute, but provider adapters may still serialize enough of
-        the call id/name back into the next request that strict OpenAI-compatible
-        validators expect a matching ToolMessage. Treat them as dangling calls so
-        the next model request stays well-formed and the model sees a recoverable
-        tool error instead of another provider 400.
-        """
+        '执行 _message_tool_calls 的明确职责，并返回与调用约定一致的结果。\n\nReturn normalized tool calls from structured fields or raw provider payloads.\n\n        LangChain stores malformed provider function calls in ``invalid_tool_calls``.\n        They do not execute, but provider adapters may still serialize enough of\n        the call id/name back into the next request that strict OpenAI-compatible\n        validators expect a matching ToolMessage. Treat them as dangling calls so\n        the next model request stays well-formed and the model sees a recoverable\n        tool error instead of another provider 400.\n        '
         normalized: list[dict] = []
 
         tool_calls = getattr(msg, "tool_calls", None) or []
@@ -152,6 +121,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _synthetic_tool_message_content(tool_call: dict) -> str:
+        """为未执行的工具调用构造简短且可恢复的合成错误内容。"""
         if tool_call.get("invalid_tool_name"):
             return f"[{_EMPTY_TOOL_NAME_ERROR} Use one of the available tool names when retrying.]"
         if tool_call.get("invalid"):
@@ -179,7 +149,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _sanitize_ai_message_tool_calls(msg):
-        """Return an AIMessage with model-bound tool calls safe to serialize."""
+        '执行 _sanitize_ai_message_tool_calls 的明确职责，并返回与调用约定一致的结果。\n\nReturn an AIMessage with model-bound tool calls safe to serialize.'
         if getattr(msg, "type", None) != "ai":
             return msg
 
@@ -268,11 +238,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         return msg.model_copy(update=update)
 
     def _build_patched_messages(self, messages: list) -> list | None:
-        """Return messages with tool results grouped after their tool-call AIMessage.
-
-        This normalizes model-bound causal order before provider serialization while
-        preserving already-valid transcripts unchanged.
-        """
+        '执行 _build_patched_messages 的明确职责，并返回与调用约定一致的结果。\n\nReturn messages with tool results grouped after their tool-call AIMessage.\n\n        This normalizes model-bound causal order before provider serialization while\n        preserving already-valid transcripts unchanged.\n        '
         tool_messages_by_id: dict[str, deque[ToolMessage]] = defaultdict(deque)
         for msg in messages:
             if isinstance(msg, ToolMessage):
@@ -347,6 +313,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
+        """在同步模型调用前修补工具消息顺序并交由后续处理器执行。"""
         patched = self._build_patched_messages(request.messages)
         if patched is not None:
             request = request.override(messages=patched)
@@ -358,6 +325,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
+        """在异步模型调用前修补工具消息顺序并等待后续处理器执行。"""
         patched = self._build_patched_messages(request.messages)
         if patched is not None:
             request = request.override(messages=patched)

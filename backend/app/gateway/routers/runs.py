@@ -1,9 +1,4 @@
-"""Stateless runs endpoints -- stream and wait without a pre-existing thread.
-
-These endpoints auto-create a temporary thread when no ``thread_id`` is
-supplied in the request body.  When a ``thread_id`` **is** provided, it
-is reused so that conversation history is preserved across calls.
-"""
+'定义 runs 模块提供的职责与可复用接口。\n\nStateless runs endpoints -- stream and wait without a pre-existing thread.\n\nThese endpoints auto-create a temporary thread when no ``thread_id`` is\nsupplied in the request body.  When a ``thread_id`` **is** provided, it\nis reused so that conversation history is preserved across calls.\n'
 
 from __future__ import annotations
 
@@ -25,7 +20,7 @@ router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 
 def _resolve_thread_id(body: RunCreateRequest) -> str:
-    """Return the thread_id from the request body, or generate a new one."""
+    '执行 _resolve_thread_id 的明确职责，并返回与调用约定一致的结果。\n\nReturn the thread_id from the request body, or generate a new one.'
     thread_id = (body.config or {}).get("configurable", {}).get("thread_id")
     if thread_id:
         return str(thread_id)
@@ -34,12 +29,7 @@ def _resolve_thread_id(body: RunCreateRequest) -> str:
 
 @router.post("/stream")
 async def stateless_stream(body: RunCreateRequest, request: Request) -> StreamingResponse:
-    """Create a run and stream events via SSE.
-
-    If ``config.configurable.thread_id`` is provided, the run is created
-    on the given thread so that conversation history is preserved.
-    Otherwise a new temporary thread is created.
-    """
+    '执行 stateless_stream 的明确职责，并返回与调用约定一致的结果。\n\nCreate a run and stream events via SSE.\n\n    If ``config.configurable.thread_id`` is provided, the run is created\n    on the given thread so that conversation history is preserved.\n    Otherwise a new temporary thread is created.\n    '
     thread_id = _resolve_thread_id(body)
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
@@ -59,12 +49,7 @@ async def stateless_stream(body: RunCreateRequest, request: Request) -> Streamin
 
 @router.post("/wait", response_model=dict)
 async def stateless_wait(body: RunCreateRequest, request: Request) -> dict:
-    """Create a run and block until completion.
-
-    If ``config.configurable.thread_id`` is provided, the run is created
-    on the given thread so that conversation history is preserved.
-    Otherwise a new temporary thread is created.
-    """
+    '执行 stateless_wait 的明确职责，并返回与调用约定一致的结果。\n\nCreate a run and block until completion.\n\n    If ``config.configurable.thread_id`` is provided, the run is created\n    on the given thread so that conversation history is preserved.\n    Otherwise a new temporary thread is created.\n    '
     thread_id = _resolve_thread_id(body)
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
@@ -95,7 +80,7 @@ async def stateless_wait(body: RunCreateRequest, request: Request) -> dict:
 
 
 async def _resolve_run(run_id: str, request: Request) -> dict:
-    """Fetch run by run_id with user ownership check. Raises 404 if not found."""
+    '执行 _resolve_run 的明确职责，并返回与调用约定一致的结果。\n\nFetch run by run_id with user ownership check. Raises 404 if not found.'
     run_store = get_run_store(request)
     record = await run_store.get(run_id)  # user_id=AUTO filters by contextvar
     if record is None:
@@ -112,15 +97,7 @@ async def run_messages(
     before_seq: int | None = Query(default=None),
     after_seq: int | None = Query(default=None),
 ) -> dict:
-    """Return paginated messages for a run (cursor-based).
-
-    Pagination:
-    - after_seq: messages with seq > after_seq (forward)
-    - before_seq: messages with seq < before_seq (backward)
-    - neither: latest messages
-
-    Response: { data: [...], has_more: bool }
-    """
+    '执行任务并返回执行结果，并遵守 run_messages 所表达的接口约束。\n\nReturn paginated messages for a run (cursor-based).\n\n    Pagination:\n    - after_seq: messages with seq > after_seq (forward)\n    - before_seq: messages with seq < before_seq (backward)\n    - neither: latest messages\n\n    Response: { data: [...], has_more: bool }\n    '
     run = await _resolve_run(run_id, request)
     event_store = get_run_event_store(request)
     rows = await event_store.list_messages_by_run(
@@ -137,7 +114,7 @@ async def run_messages(
 @router.get("/{run_id}/feedback")
 @require_permission("runs", "read")
 async def run_feedback(run_id: str, request: Request) -> list[dict]:
-    """Return all feedback for a run."""
+    '执行任务并返回执行结果，并遵守 run_feedback 所表达的接口约束。\n\nReturn all feedback for a run.'
     run = await _resolve_run(run_id, request)
     feedback_repo = get_feedback_repo(request)
     return await feedback_repo.list_by_run(run["thread_id"], run_id)

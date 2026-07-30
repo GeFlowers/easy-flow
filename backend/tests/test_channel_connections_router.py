@@ -1,4 +1,4 @@
-"""Router tests for browser-connectable IM channels."""
+"""浏览器可连接即时通信渠道的路由测试。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from deerflow.config.channel_connections_config import ChannelConnectionsConfig
 
 @pytest.fixture(autouse=True)
 def _stub_app_config(monkeypatch):
-    """Keep router tests independent from a developer-local config.yaml."""
+    """隔离本地配置，确保路由测试使用固定的应用设置。"""
     monkeypatch.setenv("DEER_FLOW_AUTH_DISABLED", "0")
     set_app_config(AppConfig.model_validate({"sandbox": {"use": "deerflow.sandbox.local:LocalSandboxProvider"}}))
     yield
@@ -28,6 +28,7 @@ def _stub_app_config(monkeypatch):
 
 
 def _user() -> User:
+    """构造具备管理员权限的测试用户。"""
     return User(
         id=UUID("11111111-2222-3333-4444-555555555555"),
         email="alice@example.com",
@@ -37,6 +38,7 @@ def _user() -> User:
 
 
 def _non_admin_user() -> User:
+    """构造不具备管理员权限的测试用户。"""
     return User(
         id=UUID("99999999-8888-7777-6666-555555555555"),
         email="bob@example.com",
@@ -46,6 +48,7 @@ def _non_admin_user() -> User:
 
 
 async def _make_repo(tmp_path):
+    """初始化临时 SQLite 数据库并返回渠道连接仓储。"""
     from deerflow.persistence.channel_connections import ChannelConnectionRepository
     from deerflow.persistence.engine import get_session_factory, init_engine
 
@@ -61,6 +64,7 @@ def _make_app(
     runtime_config_store: ChannelRuntimeConfigStore | None = None,
     set_channels_config_state: bool = True,
 ):
+    """创建注入渠道运行时依赖的认证测试应用。"""
     app = make_authed_test_app(user_factory=_user)
     app.state.channel_connections_config = config
     app.state.channel_connection_repo = repo
@@ -76,6 +80,7 @@ def _make_app(
 
 
 def _enabled_connections_config() -> ChannelConnectionsConfig:
+    """返回所有受支持渠道均启用的连接配置。"""
     return ChannelConnectionsConfig.model_validate(
         {
             "enabled": True,
@@ -91,6 +96,7 @@ def _enabled_connections_config() -> ChannelConnectionsConfig:
 
 
 def _channels_config() -> dict:
+    """返回包含各渠道有效凭据的运行时配置。"""
     return {
         "telegram": {"enabled": True, "bot_token": "telegram-token"},
         "slack": {"enabled": True, "bot_token": "xoxb-operator", "app_token": "xapp-operator"},
@@ -103,6 +109,7 @@ def _channels_config() -> dict:
 
 
 def test_get_providers_only_returns_enabled_channels_and_setup_fields(tmp_path):
+    """验证提供者列表仅返回启用渠道及其配置字段。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -143,11 +150,11 @@ def test_get_providers_only_returns_enabled_channels_and_setup_fields(tmp_path):
 
 
 def test_get_providers_uses_existing_channels_config(tmp_path):
+    """验证提供者列表读取现有渠道配置并掩码敏感凭据。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
     app = _make_app(_enabled_connections_config(), repo, _channels_config())
-
     with TestClient(app) as client:
         response = client.get("/api/channels/providers")
 
@@ -199,6 +206,7 @@ def test_get_providers_uses_existing_channels_config(tmp_path):
 
 
 def test_get_providers_degrades_when_persistence_is_unavailable(monkeypatch):
+    """验证持久层不可用时提供者列表仍可正常降级返回。"""
     monkeypatch.setattr(channel_connections, "get_session_factory", lambda: None)
     app = _make_app(_enabled_connections_config(), None, _channels_config())
 
@@ -213,6 +221,7 @@ def test_get_providers_degrades_when_persistence_is_unavailable(monkeypatch):
 
 
 def test_get_providers_reports_connected_without_binding_in_auth_disabled_mode(tmp_path, monkeypatch):
+    """验证禁用认证时已运行渠道无需绑定即显示为已连接。"""
     import anyio
 
     monkeypatch.setenv("DEER_FLOW_AUTH_DISABLED", "1")
@@ -226,8 +235,7 @@ def test_get_providers_reports_connected_without_binding_in_auth_disabled_mode(t
 
     assert response.status_code == 200
     by_provider = {item["provider"]: item for item in response.json()["providers"]}
-    # Auth-disabled local mode routes channel messages to the default user, so
-    # a configured running channel is effectively connected without a binding.
+    # 禁用认证的本地模式会将渠道消息路由给默认用户，因此已配置且运行中的渠道无需绑定即可视为已连接。
     assert by_provider["slack"]["connection_status"] == "connected"
     assert by_provider["feishu"]["connection_status"] == "connected"
 
@@ -235,6 +243,7 @@ def test_get_providers_reports_connected_without_binding_in_auth_disabled_mode(t
 
 
 def test_get_providers_reports_unconfigured_when_runtime_channel_is_missing(tmp_path):
+    """验证缺少运行时渠道配置时提供者被标记为未配置。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -264,6 +273,7 @@ def test_get_providers_reports_unconfigured_when_runtime_channel_is_missing(tmp_
 
 
 def test_get_providers_reports_configured_channel_not_running(tmp_path, monkeypatch):
+    """验证已配置但未运行的渠道不可连接。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -295,11 +305,13 @@ def test_get_providers_reports_configured_channel_not_running(tmp_path, monkeypa
 
 
 def test_get_providers_provider_unavailable_overrides_stale_connected_row(tmp_path):
+    """验证不可用提供者会覆盖过期的已连接记录状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
 
     async def seed_connection():
+        """写入一条过期的 Slack 已连接记录。"""
         await repo.upsert_connection(
             owner_user_id=str(_user().id),
             provider="slack",
@@ -330,6 +342,7 @@ def test_get_providers_provider_unavailable_overrides_stale_connected_row(tmp_pa
 
 
 def test_get_providers_restarts_configured_channel_when_service_can_reconcile(tmp_path, monkeypatch):
+    """验证服务可协调时会重启已配置但未运行的渠道。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -359,6 +372,7 @@ def test_get_providers_restarts_configured_channel_when_service_can_reconcile(tm
     reconciled: list[tuple[str, dict]] = []
 
     async def ensure_channel_ready(provider, runtime_config):
+        """模拟渠道协调完成并更新其运行状态。"""
         reconciled.append((provider, dict(runtime_config)))
         status["channels"][provider]["running"] = True
         return True
@@ -384,11 +398,13 @@ def test_get_providers_restarts_configured_channel_when_service_can_reconcile(tm
 
 
 def test_get_providers_uses_newest_connection_status_per_provider(tmp_path):
+    """验证每个提供者展示最新连接记录的状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
 
     async def seed_connections():
+        """依次写入同一提供者的旧撤销记录和新连接记录。"""
         await repo.upsert_connection(
             owner_user_id=str(_user().id),
             provider="slack",
@@ -419,11 +435,13 @@ def test_get_providers_uses_newest_connection_status_per_provider(tmp_path):
 
 
 def test_get_connections_returns_current_user_connections_only(tmp_path):
+    """验证连接列表仅返回当前用户拥有的连接。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
 
     async def seed_connections():
+        """为当前用户和其他用户分别写入连接记录。"""
         await repo.upsert_connection(
             owner_user_id=str(_user().id),
             provider="telegram",
@@ -455,6 +473,7 @@ def test_get_connections_returns_current_user_connections_only(tmp_path):
 
 
 def test_connect_telegram_returns_deep_link_and_persists_state(tmp_path):
+    """验证 Telegram 连接返回深链接并保存待连接状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -472,6 +491,7 @@ def test_connect_telegram_returns_deep_link_and_persists_state(tmp_path):
     assert "/start" in body["instruction"]
 
     async def count_states():
+        """统计 Telegram 的待连接状态数量。"""
         return await repo.count_oauth_states(owner_user_id=str(_user().id), provider="telegram")
 
     assert anyio.run(count_states) == 1
@@ -480,6 +500,7 @@ def test_connect_telegram_returns_deep_link_and_persists_state(tmp_path):
 
 
 def test_connect_slack_returns_binding_command_and_persists_state(tmp_path):
+    """验证 Slack 连接返回绑定命令并保存待连接状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -497,6 +518,7 @@ def test_connect_slack_returns_binding_command_and_persists_state(tmp_path):
     assert body["instruction"] == f"Send /connect {body['code']} to the DeerFlow Slack bot."
 
     async def count_states():
+        """统计 Slack 的待连接状态数量。"""
         return await repo.count_oauth_states(owner_user_id=str(_user().id), provider="slack")
 
     assert anyio.run(count_states) == 1
@@ -505,6 +527,7 @@ def test_connect_slack_returns_binding_command_and_persists_state(tmp_path):
 
 
 def test_connect_binding_code_caps_pending_states_per_provider(tmp_path):
+    """验证单个提供者的待绑定状态数量受上限保护。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -518,6 +541,7 @@ def test_connect_binding_code_caps_pending_states_per_provider(tmp_path):
     assert "Too many pending channel connection codes" in responses[5].json()["detail"]
 
     async def count_states():
+        """统计 Slack 的待绑定状态数量。"""
         return await repo.count_oauth_states(owner_user_id=str(_user().id), provider="slack")
 
     assert anyio.run(count_states) == 5
@@ -526,6 +550,7 @@ def test_connect_binding_code_caps_pending_states_per_provider(tmp_path):
 
 
 def test_connect_discord_returns_binding_command_and_persists_state(tmp_path):
+    """验证 Discord 连接返回绑定命令并保存待连接状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -543,6 +568,7 @@ def test_connect_discord_returns_binding_command_and_persists_state(tmp_path):
     assert body["instruction"] == f"Send /connect {body['code']} to the DeerFlow Discord bot."
 
     async def count_states():
+        """统计 Discord 的待连接状态数量。"""
         return await repo.count_oauth_states(owner_user_id=str(_user().id), provider="discord")
 
     assert anyio.run(count_states) == 1
@@ -551,6 +577,7 @@ def test_connect_discord_returns_binding_command_and_persists_state(tmp_path):
 
 
 def test_connect_existing_binding_code_channels_return_command_and_persist_state(tmp_path):
+    """验证现有绑定码渠道均返回命令并保存待连接状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -576,6 +603,7 @@ def test_connect_existing_binding_code_channels_return_command_and_persist_state
         assert body["instruction"] == f"Send /connect {body['code']} to the DeerFlow {expected_display_name} bot."
 
         async def count_states(provider=provider):
+            """统计当前渠道的待连接状态数量。"""
             return await repo.count_oauth_states(owner_user_id=str(_user().id), provider=provider)
 
         assert anyio.run(count_states) == 1
@@ -584,6 +612,7 @@ def test_connect_existing_binding_code_channels_return_command_and_persist_state
 
 
 def test_connect_unconfigured_runtime_channel_returns_400(tmp_path):
+    """验证连接未配置的运行时渠道会返回 400。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -596,19 +625,12 @@ def test_connect_unconfigured_runtime_channel_returns_400(tmp_path):
     assert "Slack credentials" in response.json()["detail"]
 
     anyio.run(repo.close)
-
-
 @pytest.mark.parametrize("provider", ["enabled", "require_bound_identity", "provider_status", "unknown_provider"])
 def test_connect_rejects_non_provider_config_attribute_with_404(tmp_path, provider):
+    """验证非提供者配置属性不能作为渠道名称访问。"""
     import anyio
 
-    # A request-supplied provider name that collides with a real (non-provider)
-    # ChannelConnectionsConfig attribute -- e.g. the "enabled" /
-    # "require_bound_identity" bool fields, or the "provider_status" method --
-    # must resolve to the intended 404. Before the allowlist check, an
-    # unrestricted getattr returned that attribute instead of falling through to
-    # the 404, and the connect handler then dereferenced it as a provider config
-    # (AttributeError -> HTTP 500) for any authenticated user.
+    # 与真实但非提供者的配置属性同名的请求必须返回预期的 404，避免处理器把属性误当作渠道配置而导致 500。
     repo = anyio.run(_make_repo, tmp_path)
     app = _make_app(_enabled_connections_config(), repo, _channels_config())
 
@@ -622,6 +644,7 @@ def test_connect_rejects_non_provider_config_attribute_with_404(tmp_path, provid
 
 
 def test_configure_provider_runtime_credentials_enables_connect_without_file_edits(tmp_path):
+    """验证配置运行时凭据后无需改文件即可连接渠道。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -658,6 +681,7 @@ def test_configure_provider_runtime_credentials_enables_connect_without_file_edi
 
 
 def test_runtime_config_endpoints_require_admin(tmp_path):
+    """验证运行时配置接口仅允许管理员访问。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -687,13 +711,14 @@ def test_runtime_config_endpoints_require_admin(tmp_path):
     assert configure_response.status_code == 403
     assert "Admin privileges" in configure_response.json()["detail"]
     assert disconnect_response.status_code == 403
-    # Read-only provider listing stays available to regular users.
+    # 只读的提供者列表仍应对普通用户开放。
     assert providers_response.status_code == 200
 
     anyio.run(repo.close)
 
 
 def test_configure_provider_runtime_rolls_back_visible_state_when_start_fails(tmp_path, monkeypatch):
+    """验证渠道启动失败时可见的运行时配置会回滚。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -742,6 +767,7 @@ def test_configure_provider_runtime_rolls_back_visible_state_when_start_fails(tm
 
 
 def test_configure_telegram_runtime_uses_new_bot_username_for_deep_link_without_mutating_config(tmp_path):
+    """验证 Telegram 深链接使用新用户名且不修改原始配置对象。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -764,13 +790,14 @@ def test_configure_telegram_runtime_uses_new_bot_username_for_deep_link_without_
     assert configure_response.json()["credential_values"]["bot_username"] == "new_bot"
     assert connect_response.status_code == 200
     assert connect_response.json()["url"].startswith("https://t.me/new_bot?start=")
-    # The original config object cached by get_app_config() must stay untouched.
+    # 应用配置缓存中的原始配置对象必须保持不变。
     assert config.telegram.bot_username == "old_bot"
 
     anyio.run(repo.close)
 
 
 def test_configure_provider_runtime_credentials_survive_local_restart(tmp_path):
+    """验证运行时凭据在本地应用重启后仍会被加载。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -821,6 +848,7 @@ def test_configure_provider_runtime_credentials_survive_local_restart(tmp_path):
 
 
 def test_configure_provider_runtime_credentials_preserves_masked_secrets(tmp_path):
+    """验证提交掩码密钥时保留已保存的真实密钥。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -877,6 +905,7 @@ def test_configure_provider_runtime_credentials_preserves_masked_secrets(tmp_pat
 
 
 def test_disconnect_provider_runtime_config_clears_connected_state(tmp_path):
+    """验证断开运行时渠道配置会清除其已连接状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -917,6 +946,7 @@ def test_disconnect_provider_runtime_config_clears_connected_state(tmp_path):
 
 
 def test_disconnect_provider_runtime_config_suppresses_file_config_and_stops_channel(tmp_path, monkeypatch):
+    """验证断开运行时配置会屏蔽文件配置并停止渠道。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -990,11 +1020,13 @@ def test_disconnect_provider_runtime_config_suppresses_file_config_and_stops_cha
 
 
 def test_disconnect_provider_runtime_config_revokes_all_provider_connections(tmp_path):
+    """验证断开渠道配置会撤销该提供者的所有连接。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
 
     async def seed_connection():
+        """写入不同用户及提供者的连接记录。"""
         await repo.upsert_connection(
             owner_user_id=str(_user().id),
             provider="slack",
@@ -1035,6 +1067,7 @@ def test_disconnect_provider_runtime_config_revokes_all_provider_connections(tmp
     assert disconnect_response.status_code == 200
 
     async def get_connection_statuses():
+        """读取管理员和其他用户的连接状态。"""
         return {
             "admin_slack": (await repo.list_connections(str(_user().id)))[0]["status"],
             "other": {item["provider"]: item["status"] for item in await repo.list_connections("other-user")},
@@ -1046,14 +1079,14 @@ def test_disconnect_provider_runtime_config_revokes_all_provider_connections(tmp
     assert statuses["other"]["telegram"] == "connected"
 
     anyio.run(repo.close)
-
-
 def test_get_providers_preserves_revoked_status_when_provider_unavailable(tmp_path):
+    """验证提供者不可用时仍保留已撤销连接的状态。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
 
     async def seed_connection():
+        """写入一条 Slack 已撤销连接记录。"""
         await repo.upsert_connection(
             owner_user_id=str(_user().id),
             provider="slack",
@@ -1068,7 +1101,7 @@ def test_get_providers_preserves_revoked_status_when_provider_unavailable(tmp_pa
             "slack": {"enabled": True},
         }
     )
-    # No runtime channels_config -> the slack provider is unavailable.
+    # 未提供运行时渠道配置时，该提供者不可用。
     app = _make_app(config, repo, {})
 
     with TestClient(app) as client:
@@ -1078,14 +1111,14 @@ def test_get_providers_preserves_revoked_status_when_provider_unavailable(tmp_pa
     by_provider = {item["provider"]: item for item in response.json()["providers"]}
     assert by_provider["slack"]["connectable"] is False
     assert by_provider["slack"]["unavailable_reason"] is not None
-    # A revoked binding must stay distinguishable from a never-connected one,
-    # even when the runtime provider is currently unavailable.
+    # 已撤销绑定必须与从未连接的状态区分开，即使运行时提供者当前不可用。
     assert by_provider["slack"]["connection_status"] == "revoked"
 
     anyio.run(repo.close)
 
 
 def test_configure_provider_runtime_does_not_clobber_concurrent_config_update(tmp_path, monkeypatch):
+    """验证配置一个渠道时不会覆盖并发更新的其他渠道配置。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -1100,8 +1133,8 @@ def test_configure_provider_runtime_does_not_clobber_concurrent_config_update(tm
     app = _make_app(config, repo, {}, runtime_config_store=runtime_config_store)
 
     async def configure_channel(provider, runtime_config):
-        # Simulate a concurrent admin request for a *different* provider whose
-        # write to app.state lands while this request awaits the worker restart.
+        """模拟等待重启期间其他管理员更新 Telegram 配置。"""
+        # 模拟对其他提供者的并发管理员请求在当前请求等待工作器重启时写入应用状态。
         app.state.channels_config = {
             **app.state.channels_config,
             "telegram": {"enabled": True, "bot_token": "tg-token"},
@@ -1118,7 +1151,7 @@ def test_configure_provider_runtime_does_not_clobber_concurrent_config_update(tm
         )
 
     assert response.status_code == 200
-    # The concurrent telegram write must survive alongside the slack write.
+    # 并发写入的其他渠道配置必须与当前渠道配置同时保留。
     assert app.state.channels_config["slack"]["bot_token"] == "xoxb-ui"
     assert app.state.channels_config["telegram"]["bot_token"] == "tg-token"
 
@@ -1126,6 +1159,7 @@ def test_configure_provider_runtime_does_not_clobber_concurrent_config_update(tm
 
 
 def test_disconnect_provider_runtime_keeps_state_consistent_when_revoke_fails(tmp_path):
+    """验证撤销连接失败时缓存和存储仍保持一致。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
@@ -1151,9 +1185,7 @@ def test_disconnect_provider_runtime_keeps_state_consistent_when_revoke_fails(tm
         disconnect_response = client.delete("/api/channels/slack/runtime-config")
 
     assert disconnect_response.status_code == 500
-    # When the DB revoke fails, the store/cache must not be left diverged from
-    # the DB: the provider stays configured so a later re-configure cannot
-    # silently reactivate un-revoked connection rows.
+    # 数据库撤销失败时，存储和缓存不得与数据库状态分离；渠道应保持已配置，避免后续重配静默重新激活未撤销记录。
     assert app.state.channels_config["slack"]["bot_token"] == "xoxb-ui"
     assert runtime_config_store.get_provider_config("slack") == {
         "enabled": True,
@@ -1165,11 +1197,13 @@ def test_disconnect_provider_runtime_keeps_state_consistent_when_revoke_fails(tm
 
 
 def test_disconnect_connection_revokes_current_user_connection(tmp_path):
+    """验证当前用户可撤销自己拥有的连接。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
 
     async def seed_connection():
+        """写入当前用户的 Telegram 连接并返回其标识。"""
         connection = await repo.upsert_connection(
             owner_user_id=str(_user().id),
             provider="telegram",
@@ -1187,6 +1221,7 @@ def test_disconnect_connection_revokes_current_user_connection(tmp_path):
     assert response.status_code == 204
 
     async def get_connection_status():
+        """读取当前用户连接的撤销状态。"""
         return (await repo.list_connections(str(_user().id)))[0]["status"]
 
     assert anyio.run(get_connection_status) == "revoked"
@@ -1195,11 +1230,13 @@ def test_disconnect_connection_revokes_current_user_connection(tmp_path):
 
 
 def test_disconnect_connection_is_current_user_scoped(tmp_path):
+    """验证用户不能撤销其他用户拥有的连接。"""
     import anyio
 
     repo = anyio.run(_make_repo, tmp_path)
 
     async def seed_connection():
+        """写入其他用户的 Telegram 连接并返回其标识。"""
         connection = await repo.upsert_connection(
             owner_user_id="other-user",
             provider="telegram",
@@ -1217,6 +1254,7 @@ def test_disconnect_connection_is_current_user_scoped(tmp_path):
     assert response.status_code == 404
 
     async def get_connection_status():
+        """读取其他用户连接的当前状态。"""
         return (await repo.list_connections("other-user"))[0]["status"]
 
     assert anyio.run(get_connection_status) == "connected"

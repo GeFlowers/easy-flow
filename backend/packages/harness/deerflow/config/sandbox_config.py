@@ -1,8 +1,9 @@
+"""提供配置、沙箱、配置相关功能。"""
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class VolumeMountConfig(BaseModel):
-    """Configuration for a volume mount."""
+    """\u6267\u884c VolumeMountConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     host_path: str = Field(
         ...,
@@ -23,27 +24,7 @@ class VolumeMountConfig(BaseModel):
 
 
 class SandboxConfig(BaseModel):
-    """Config section for a sandbox.
-
-    Common options:
-        use: Class path of the sandbox provider (required)
-        allow_host_bash: Enable host-side bash execution for LocalSandboxProvider.
-            Dangerous and intended only for fully trusted local workflows.
-
-    AioSandboxProvider and BoxliteProvider shared options:
-        image: Sandbox image to use (Docker/AIO image or BoxLite OCI image)
-        replicas: Maximum active + warm sandboxes/VMs per gateway process (default: 3). When the limit is reached, warm/least-recently-used sandboxes are evicted to make room; active sandboxes are not forcibly stopped.
-        idle_timeout: Idle timeout in seconds before released warm sandboxes/VMs are stopped (default: 600 = 10 minutes). Set to 0 to disable.
-        environment: Environment variables to inject into the sandbox (values starting with $ are resolved from host env)
-
-    BoxliteProvider specific options:
-        health_check_skip_seconds: Optional reclaim-time skip window in seconds for recently released warm VMs. Default behavior is 0.0 = always validate before reuse.
-
-    AioSandboxProvider specific options:
-        port: Base port for sandbox containers (default: 8080)
-        container_prefix: Prefix for container names (default: deer-flow-sandbox)
-        mounts: List of volume mounts to share directories with the container
-    """
+    """\u6267\u884c SandboxConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     use: str = Field(
         ...,

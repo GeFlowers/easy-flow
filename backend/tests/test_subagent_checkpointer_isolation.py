@@ -1,15 +1,4 @@
-"""Regression test: subagent _create_agent() must isolate from parent run checkpointer.
-
-When a parent run carries a synchronous checkpointer (e.g. SqliteSaver via
-DeerFlowClient), the subagent's ``agent.astream()`` inherits it through
-``copy_context()`` + ``ensure_config()``. Without ``checkpointer=False``
-at compile time, LangGraph's resolution prioritizes the inherited value
-and calls the sync checkpointer's async methods, raising NotImplementedError.
-
-The subagent is a one-shot delegation — it rebuilds state, calls astream
-once, and extracts the last AIMessage. It never resumes, so persistence
-is unnecessary and inheriting the parent checkpointer is harmful.
-"""
+'未说明'
 
 import sys
 from types import ModuleType, SimpleNamespace
@@ -32,10 +21,12 @@ _MOCKED_MODULE_NAMES = [
 
 
 def _default_app_config():
+    '未说明'
     return SimpleNamespace(tool_search=SimpleNamespace(enabled=False))
 
 
 def _clear_stale_executor_package_attr() -> None:
+    '未说明'
     subagents_pkg = sys.modules.get("deerflow.subagents")
     if subagents_pkg is not None and hasattr(subagents_pkg, "executor"):
         delattr(subagents_pkg, "executor")
@@ -43,7 +34,7 @@ def _clear_stale_executor_package_attr() -> None:
 
 @pytest.fixture(autouse=True)
 def _setup_executor_module():
-    """Set up mocked modules and import the real executor (same pattern as test_subagent_executor.py)."""
+    """为设置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     original_modules = {name: sys.modules.get(name) for name in _MOCKED_MODULE_NAMES}
     original_executor = sys.modules.get("deerflow.subagents.executor")
 
@@ -82,14 +73,14 @@ def _setup_executor_module():
 
 
 class TestSubagentCheckpointerIsolation:
-    """Verify _create_agent() unconditionally passes checkpointer=False to create_agent()."""
+    '未说明'
 
     def test_create_agent_receives_checkpointer_false(
         self,
         _setup_executor_module,
         monkeypatch: pytest.MonkeyPatch,
     ):
-        """Assert checkpointer=False is always passed to create_agent()."""
+        '未说明'
         SubagentConfig = _setup_executor_module["SubagentConfig"]
         SubagentExecutor = _setup_executor_module["SubagentExecutor"]
         executor_module = _setup_executor_module["executor_module"]
@@ -97,12 +88,14 @@ class TestSubagentCheckpointerIsolation:
         captured_kwargs: dict = {}
 
         def fake_create_agent(**kwargs):
+            '未说明'
             captured_kwargs.update(kwargs)
             agent = MagicMock()
             agent.checkpointer = False
             return agent
 
         def fake_build_subagent_runtime_middlewares(**kwargs):
+            '未说明'
             return []
 
         monkeypatch.setattr(executor_module, "create_agent", fake_create_agent)
@@ -125,6 +118,7 @@ class TestSubagentCheckpointerIsolation:
 
         # Simulate lazy model_name resolution
         def fake_create_chat_model(**kwargs):
+            '未说明'
             return MagicMock()
 
         executor.model_name = "test-model"

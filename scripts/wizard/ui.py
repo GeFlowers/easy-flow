@@ -1,4 +1,4 @@
-"""Terminal UI helpers for the Setup Wizard."""
+'未说明'
 
 from __future__ import annotations
 
@@ -16,42 +16,51 @@ except ImportError:  # pragma: no cover - non-Unix fallback
 # ── ANSI colours ──────────────────────────────────────────────────────────────
 
 def _supports_color() -> bool:
+    '未说明'
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
 def _c(text: str, code: str) -> str:
+    '未说明'
     if _supports_color():
         return f"\033[{code}m{text}\033[0m"
     return text
 
 
 def green(text: str) -> str:
+    '未说明'
     return _c(text, "32")
 
 
 def red(text: str) -> str:
+    '未说明'
     return _c(text, "31")
 
 
 def yellow(text: str) -> str:
+    '未说明'
     return _c(text, "33")
 
 
 def cyan(text: str) -> str:
+    '未说明'
     return _c(text, "36")
 
 
 def bold(text: str) -> str:
+    '未说明'
     return _c(text, "1")
 
 
 def inverse(text: str) -> str:
+    '未说明'
     return _c(text, "7")
 
 
 # ── UI primitives ─────────────────────────────────────────────────────────────
 
 def print_header(title: str) -> None:
+    '未说明'
     width = max(len(title) + 4, 44)
     bar = "═" * width
     print()
@@ -62,28 +71,34 @@ def print_header(title: str) -> None:
 
 
 def print_section(title: str) -> None:
+    '未说明'
     print()
     print(bold(f"── {title} ──"))
     print()
 
 
 def print_success(message: str) -> None:
+    '未说明'
     print(f"  {green('✓')} {message}")
 
 
 def print_warning(message: str) -> None:
+    '未说明'
     print(f"  {yellow('!')} {message}")
 
 
 def print_error(message: str) -> None:
+    """执行错误对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     print(f"  {red('✗')} {message}")
 
 
 def print_info(message: str) -> None:
+    '未说明'
     print(f"  {cyan('→')} {message}")
 
 
 def _ask_choice_with_numbers(prompt: str, options: list[str], default: int | None = None) -> int:
+    '未说明'
     for i, opt in enumerate(options, 1):
         marker = f" {green('*')}" if default is not None and i - 1 == default else "  "
         print(f"{marker} {i}. {opt}")
@@ -102,6 +117,7 @@ def _ask_choice_with_numbers(prompt: str, options: list[str], default: int | Non
 
 
 def _supports_arrow_menu() -> bool:
+    '未说明'
     return (
         termios is not None
         and tty is not None
@@ -114,6 +130,7 @@ def _supports_arrow_menu() -> bool:
 
 
 def _clear_rendered_lines(count: int) -> None:
+    '未说明'
     if count <= 0:
         return
     sys.stdout.write("\x1b[2K\r")
@@ -122,6 +139,7 @@ def _clear_rendered_lines(count: int) -> None:
 
 
 def _read_key(fd: int) -> str:
+    '未说明'
     first = sys.stdin.read(1)
     if first != "\x1b":
         return first
@@ -135,10 +153,12 @@ def _read_key(fd: int) -> str:
 
 
 def _terminal_width() -> int:
+    '未说明'
     return max(shutil.get_terminal_size(fallback=(80, 24)).columns, 40)
 
 
 def _truncate_line(text: str, max_width: int) -> str:
+    '未说明'
     if len(text) <= max_width:
         return text
     if max_width <= 1:
@@ -147,6 +167,7 @@ def _truncate_line(text: str, max_width: int) -> str:
 
 
 def _render_choice_menu(options: list[str], selected: int) -> int:
+    '未说明'
     number_width = len(str(len(options)))
     menu_width = _terminal_width()
     content_width = max(menu_width - 3, 20)
@@ -161,6 +182,7 @@ def _render_choice_menu(options: list[str], selected: int) -> int:
 
 
 def _ask_choice_with_arrows(prompt: str, options: list[str], default: int | None = None) -> int:
+    '未说明'
     selected = default if default is not None else 0
     typed = ""
     fd = sys.stdin.fileno()
@@ -218,14 +240,14 @@ def _ask_choice_with_arrows(prompt: str, options: list[str], default: int | None
 
 
 def ask_choice(prompt: str, options: list[str], default: int | None = None) -> int:
-    """Present a menu and return the 0-based index of the selected option."""
+    '未说明'
     if _supports_arrow_menu():
         return _ask_choice_with_arrows(prompt, options, default=default)
     return _ask_choice_with_numbers(prompt, options, default=default)
 
 
 def ask_multi_choice(prompt: str, options: list[str], default: list[int] | None = None) -> list[int]:
-    """Present a numbered multi-select menu and return 0-based indexes."""
+    '未说明'
     has_default = default is not None
     default_indexes = list(default or [])
     for i, opt in enumerate(options, 1):
@@ -268,7 +290,7 @@ def ask_multi_choice(prompt: str, options: list[str], default: list[int] | None 
 
 
 def ask_text(prompt: str, default: str = "", required: bool = False) -> str:
-    """Ask for a text value, returning default if the user presses Enter."""
+    '未说明'
     suffix = f" [{default}]" if default else ""
     while True:
         value = input(f"{prompt}{suffix}: ").strip()
@@ -282,7 +304,7 @@ def ask_text(prompt: str, default: str = "", required: bool = False) -> str:
 
 
 def ask_secret(prompt: str) -> str:
-    """Ask for a secret value (hidden input)."""
+    '未说明'
     while True:
         value = getpass.getpass(f"{prompt}: ").strip()
         if value:
@@ -291,7 +313,7 @@ def ask_secret(prompt: str) -> str:
 
 
 def ask_yes_no(prompt: str, default: bool = True) -> bool:
-    """Ask a yes/no question."""
+    '未说明'
     suffix = "[Y/N]"
     while True:
         raw = input(f"{prompt} {suffix}: ").strip().lower()

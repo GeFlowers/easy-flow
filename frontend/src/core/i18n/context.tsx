@@ -11,6 +11,7 @@ export interface I18nContextType {
 
 export const I18nContext = createContext<I18nContextType | null>(null);
 
+/** 实现 I18nProvider 的受限辅助逻辑。 */
 export function I18nProvider({
   children,
   initialLocale,
@@ -32,6 +33,7 @@ export function I18nProvider({
   );
 }
 
+/** 提供 useI18nContext 对应的 React Hook。 */
 export function useI18nContext() {
   const context = useContext(I18nContext);
   if (!context) {

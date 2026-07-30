@@ -1,10 +1,8 @@
-"""Pluggable memory backends.
+"""提供可插拔的记忆后端。
 
-Each subpackage is a self-contained backend that exposes
-``MANAGER_CLASS`` (a :class:`~deerflow.agents.memory.manager.MemoryManager`
-subclass) in its ``__init__``. The drop-in contract: folder name ==
-backend name == ``MemoryConfig.manager_class`` value.
+每个子包都是自包含后端，并在初始化模块中暴露记忆管理器的子类。其即插即用
+契约为：目录名、后端名和记忆配置中的管理器类取值必须一致。
 
-Add a new backend by dropping a new folder here and setting
-``manager_class: <name>`` -- no other deer-flow code changes.
+新增后端时，在此创建目录并设置相应的管理器类取值即可，无需修改其他
+DeerFlow 代码。
 """

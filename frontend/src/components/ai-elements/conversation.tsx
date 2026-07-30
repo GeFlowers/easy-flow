@@ -7,8 +7,10 @@ import type { ComponentProps } from "react";
 import { useCallback } from "react";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 
+/** ConversationProps 的公开类型定义。 */
 export type ConversationProps = ComponentProps<typeof StickToBottom>;
 
+/** Conversation 组件：提供对应的界面结构与交互语义。 */
 export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
     className={cn("relative flex-1 overflow-y-hidden", className)}
@@ -19,10 +21,12 @@ export const Conversation = ({ className, ...props }: ConversationProps) => (
   />
 );
 
+/** ConversationContentProps 的公开类型定义。 */
 export type ConversationContentProps = ComponentProps<
   typeof StickToBottom.Content
 >;
 
+/** ConversationContent 组件：提供对应的界面结构与交互语义。 */
 export const ConversationContent = ({
   className,
   ...props
@@ -33,12 +37,14 @@ export const ConversationContent = ({
   />
 );
 
+/** ConversationEmptyStateProps 的公开类型定义。 */
 export type ConversationEmptyStateProps = ComponentProps<"div"> & {
   title?: string;
   description?: string;
   icon?: React.ReactNode;
 };
 
+/** ConversationEmptyState 组件：提供对应的界面结构与交互语义。 */
 export const ConversationEmptyState = ({
   className,
   title = "No messages yet",
@@ -68,8 +74,10 @@ export const ConversationEmptyState = ({
   </div>
 );
 
+/** ConversationScrollButtonProps 的公开类型定义。 */
 export type ConversationScrollButtonProps = ComponentProps<typeof Button>;
 
+/** ConversationScrollButton 组件：提供对应的界面结构与交互语义。 */
 export const ConversationScrollButton = ({
   className,
   ...props

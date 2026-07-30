@@ -1,4 +1,4 @@
-"""Compatibility exports for the native SkillScan implementation."""
+'定义 security_static_scanner 模块提供的职责与可复用接口。\n\nCompatibility exports for the native SkillScan implementation.'
 
 from deerflow.skills.skillscan import (
     SecurityFinding as StaticFinding,

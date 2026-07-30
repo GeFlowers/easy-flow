@@ -1,4 +1,4 @@
-"""Gateway import regression tests."""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def test_gateway_app_imports_first_without_subagent_import_cycle() -> None:
-    """The replay gateway imports app.gateway.app in a clean process."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     backend_root = Path(__file__).resolve().parents[1]
     env = {**os.environ, "PYTHONPATH": str(backend_root)}
     result = subprocess.run(
@@ -22,7 +22,7 @@ def test_gateway_app_imports_first_without_subagent_import_cycle() -> None:
 
 
 def test_subagent_package_public_executor_exports_are_lazy_importable() -> None:
-    """The package-level executor exports must not re-enter their own import."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     backend_root = Path(__file__).resolve().parents[1]
     env = {**os.environ, "PYTHONPATH": str(backend_root)}
     result = subprocess.run(

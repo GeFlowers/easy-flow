@@ -1,7 +1,8 @@
 import { z } from "zod";
 
-// ── User schema (single source of truth) ──────────────────────────
+// ── 用户 Schema（唯一事实来源）────────────────────────────────────
 
+/** 用户认证数据的运行时校验 Schema。 */
 export const userSchema = z.object({
   id: z.string(),
   email: z.string().email(),
@@ -10,12 +11,14 @@ export const userSchema = z.object({
   oauth_provider: z.string().nullable().optional().default(null),
 });
 
+/** 前端使用的已认证用户数据，其中 OAuth 提供方字段可选。 */
 export type User = Omit<z.infer<typeof userSchema>, "oauth_provider"> & {
   oauth_provider?: string | null;
 };
 
-// ── SSR auth result (tagged union) ────────────────────────────────
+// ── SSR 认证结果（带标签联合）──────────────────────────────────────
 
+/** 服务端认证守卫的全部可判别结果。 */
 export type AuthResult =
   | { tag: "authenticated"; user: User }
   | { tag: "needs_setup"; user: User }
@@ -24,15 +27,17 @@ export type AuthResult =
   | { tag: "gateway_unavailable" }
   | { tag: "config_error"; message: string };
 
+/** 在穷尽式认证结果处理遗漏分支时抛出错误。 */
 export function assertNever(x: never): never {
   throw new Error(`Unexpected auth result: ${JSON.stringify(x)}`);
 }
 
+/** 为指定返回路径构造登录地址，并对路径进行 URL 编码。 */
 export function buildLoginUrl(returnPath: string): string {
   return `/login?next=${encodeURIComponent(returnPath)}`;
 }
 
-// ── Backend error response parsing ────────────────────────────────
+// ── 后端错误响应解析 ──────────────────────────────────────────────
 
 const AUTH_ERROR_CODES = [
   "invalid_credentials",
@@ -45,8 +50,10 @@ const AUTH_ERROR_CODES = [
   "system_already_initialized",
 ] as const;
 
+/** 后端认证接口可能返回的规范错误码。 */
 export type AuthErrorCode = (typeof AUTH_ERROR_CODES)[number];
 
+/** 解析后的后端认证错误响应。 */
 export interface AuthErrorResponse {
   code: AuthErrorCode;
   message: string;
@@ -63,21 +70,22 @@ const ErrorDetailSchema = z.object({
   loc: z.array(z.string()),
 });
 
+/** 解析多种 FastAPI 错误信封，并归一化为认证错误响应。 */
 export function parseAuthError(data: unknown): AuthErrorResponse {
-  // Try top-level {code, message} first
+  // 优先尝试顶层 {code, message}。
   const parsed = AuthErrorSchema.safeParse(data);
   if (parsed.success) return parsed.data;
 
-  // Unwrap FastAPI's {detail: {code, message}} envelope
+  // 解开 FastAPI 的 {detail: {code, message}} 信封。
   if (typeof data === "object" && data !== null && "detail" in data) {
     const detail = (data as Record<string, unknown>).detail;
     const nested = AuthErrorSchema.safeParse(detail);
     if (nested.success) return nested.data;
-    // Legacy string-detail responses
+    // 兼容旧版字符串 detail 响应。
     if (typeof detail === "string") {
       return { code: "invalid_credentials", message: detail };
     } else if (Array.isArray(detail)) {
-      // Handle list of error details (e.g. from Pydantic validation)
+      // 处理错误详情列表（例如 Pydantic 校验产生的列表）。
       const firstDetail = detail[0];
       if (typeof firstDetail === "object" && firstDetail !== null) {
         const errorDetail = ErrorDetailSchema.safeParse(firstDetail);

@@ -1,12 +1,4 @@
-"""Inventory async/thread boundary points for developer review.
-
-This detector is intentionally non-invasive: it parses Python source with AST
-and reports places where code crosses sync/async/thread boundaries. Findings
-are review evidence, not automatic bug decisions.
-
-Not directly executable: import as `support.detectors.thread_boundaries` or
-run via the CLI shim `scripts/detect_thread_boundaries.py`.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -39,6 +31,7 @@ SEVERITY_ORDER = {"INFO": 0, "WARN": 1, "FAIL": 2}
 
 @dataclass(frozen=True)
 class BoundaryFinding:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     severity: str
     category: str
     path: str
@@ -51,17 +44,20 @@ class BoundaryFinding:
     code: str
 
     def to_dict(self) -> dict[str, object]:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return asdict(self)
 
 
 @dataclass(frozen=True)
 class _FunctionContext:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     name: str
     is_async: bool
 
 
 @dataclass(frozen=True)
 class _CallRule:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     severity: str
     category: str
     message: str
@@ -168,6 +164,7 @@ ASYNC_BLOCKING_CALL_RULES: dict[str, _CallRule] = {
 
 
 def dotted_name(node: ast.AST | None) -> str | None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if isinstance(node, ast.Name):
         return node.id
     if isinstance(node, ast.Attribute):
@@ -179,17 +176,21 @@ def dotted_name(node: ast.AST | None) -> str | None:
 
 
 def call_receiver_name(node: ast.Call) -> str | None:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if not isinstance(node.func, ast.Attribute):
         return None
     return dotted_name(node.func.value)
 
 
 def is_none_node(node: ast.AST | None) -> bool:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return isinstance(node, ast.Constant) and node.value is None
 
 
 class BoundaryVisitor(ast.NodeVisitor):
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def __init__(self, path: Path, relative_path: str, source_lines: Sequence[str]) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.path = path
         self.relative_path = relative_path
         self.source_lines = source_lines
@@ -200,21 +201,25 @@ class BoundaryVisitor(ast.NodeVisitor):
 
     @property
     def current_function(self) -> str:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not self.function_stack:
             return "<module>"
         return ".".join(context.name for context in self.function_stack)
 
     @property
     def in_async_context(self) -> bool:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return bool(self.function_stack and self.function_stack[-1].is_async)
 
     def visit_Import(self, node: ast.Import) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         for alias in node.names:
             local_name = alias.asname or alias.name.split(".", 1)[0]
             canonical_name = alias.name if alias.asname else local_name
             self.import_aliases[local_name] = canonical_name
 
     def visit_ImportFrom(self, node: ast.ImportFrom) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if node.module is None:
             return
         for alias in node.names:
@@ -222,26 +227,31 @@ class BoundaryVisitor(ast.NodeVisitor):
             self.import_aliases[local_name] = f"{node.module}.{alias.name}"
 
     def visit_Assign(self, node: ast.Assign) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._record_executor_targets(node.value, node.targets)
         self.generic_visit(node)
 
     def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if node.value is not None:
             self._record_executor_targets(node.value, [node.target])
         self.generic_visit(node)
 
     def visit_With(self, node: ast.With) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         for item in node.items:
             if item.optional_vars is not None:
                 self._record_executor_targets(item.context_expr, [item.optional_vars])
         self.generic_visit(node)
 
     def visit_FunctionDef(self, node: ast.FunctionDef) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.function_stack.append(_FunctionContext(node.name, is_async=False))
         self.generic_visit(node)
         self.function_stack.pop()
 
     def visit_AsyncFunctionDef(self, node: ast.AsyncFunctionDef) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.function_stack.append(_FunctionContext(node.name, is_async=True))
         try:
             self._check_async_tool_definition(node)
@@ -250,12 +260,14 @@ class BoundaryVisitor(ast.NodeVisitor):
             self.function_stack.pop()
 
     def visit_Call(self, node: ast.Call) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         call_name = self._canonical_name(dotted_name(node.func))
         if call_name:
             self._check_call(node, call_name)
         self.generic_visit(node)
 
     def _check_async_tool_definition(self, node: ast.AsyncFunctionDef) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         for decorator in node.decorator_list:
             decorator_call = decorator.func if isinstance(decorator, ast.Call) else decorator
             decorator_name = self._canonical_name(dotted_name(decorator_call))
@@ -270,6 +282,7 @@ class BoundaryVisitor(ast.NodeVisitor):
                 return
 
     def _check_call(self, node: ast.Call, call_name: str) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         rule = EXACT_CALL_RULES.get(call_name)
         if rule:
             self._emit_rule(node, call_name, rule)
@@ -324,6 +337,7 @@ class BoundaryVisitor(ast.NodeVisitor):
             )
 
     def _canonical_name(self, name: str | None) -> str | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if name is None:
             return None
         parts = name.split(".")
@@ -332,6 +346,7 @@ class BoundaryVisitor(ast.NodeVisitor):
         return name
 
     def _record_executor_targets(self, value: ast.AST, targets: Sequence[ast.AST]) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not isinstance(value, ast.Call):
             return
         call_name = self._canonical_name(dotted_name(value.func))
@@ -342,6 +357,7 @@ class BoundaryVisitor(ast.NodeVisitor):
                 self.executor_names.add(name)
 
     def _target_names(self, target: ast.AST) -> Iterable[str]:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if isinstance(target, ast.Name):
             yield target.id
         elif isinstance(target, (ast.Tuple, ast.List)):
@@ -349,12 +365,14 @@ class BoundaryVisitor(ast.NodeVisitor):
                 yield from self._target_names(element)
 
     def _is_executor_submit(self, node: ast.Call, call_name: str) -> bool:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not call_name.endswith(".submit"):
             return False
         receiver_name = call_receiver_name(node)
         return receiver_name in self.executor_names
 
     def _is_langchain_invoke(self, node: ast.Call, call_name: str, *, method_name: str) -> bool:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not call_name.endswith(f".{method_name}"):
             return False
         receiver_name = call_receiver_name(node)
@@ -364,6 +382,7 @@ class BoundaryVisitor(ast.NodeVisitor):
         return receiver_leaf in LANGCHAIN_INVOKE_RECEIVER_NAMES or receiver_leaf.endswith(LANGCHAIN_INVOKE_RECEIVER_SUFFIXES)
 
     def _emit_rule(self, node: ast.AST, symbol: str, rule: _CallRule) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._emit(
             node,
             severity=rule.severity,
@@ -373,6 +392,7 @@ class BoundaryVisitor(ast.NodeVisitor):
         )
 
     def _emit(self, node: ast.AST, *, severity: str, category: str, symbol: str, message: str) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         line = getattr(node, "lineno", 0)
         column = getattr(node, "col_offset", 0)
         code = ""
@@ -395,6 +415,7 @@ class BoundaryVisitor(ast.NodeVisitor):
 
 
 def relative_to_repo(path: Path, repo_root: Path = REPO_ROOT) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     try:
         return path.resolve().relative_to(repo_root.resolve()).as_posix()
     except ValueError:
@@ -402,6 +423,7 @@ def relative_to_repo(path: Path, repo_root: Path = REPO_ROOT) -> str:
 
 
 def scan_file(path: Path, *, repo_root: Path = REPO_ROOT) -> list[BoundaryFinding]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     source = path.read_text(encoding="utf-8")
     source_lines = source.splitlines()
     relative_path = relative_to_repo(path, repo_root)
@@ -431,10 +453,12 @@ def scan_file(path: Path, *, repo_root: Path = REPO_ROOT) -> list[BoundaryFindin
 
 
 def is_ignored_path(path: Path) -> bool:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return any(part in IGNORED_DIR_NAMES for part in path.parts)
 
 
 def iter_python_files(paths: Iterable[Path]) -> Iterable[Path]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     for path in paths:
         if not path.exists() or is_ignored_path(path):
             continue
@@ -450,6 +474,7 @@ def iter_python_files(paths: Iterable[Path]) -> Iterable[Path]:
 
 
 def scan_paths(paths: Iterable[Path], *, repo_root: Path = REPO_ROOT) -> list[BoundaryFinding]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     findings: list[BoundaryFinding] = []
     for path in sorted(iter_python_files(paths)):
         findings.extend(scan_file(path, repo_root=repo_root))
@@ -457,11 +482,13 @@ def scan_paths(paths: Iterable[Path], *, repo_root: Path = REPO_ROOT) -> list[Bo
 
 
 def filter_findings(findings: Iterable[BoundaryFinding], min_severity: str) -> list[BoundaryFinding]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     threshold = SEVERITY_ORDER[min_severity]
     return [finding for finding in findings if SEVERITY_ORDER[finding.severity] >= threshold]
 
 
 def format_text(findings: Sequence[BoundaryFinding]) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if not findings:
         return "No async/thread boundary findings."
 
@@ -476,6 +503,7 @@ def format_text(findings: Sequence[BoundaryFinding]) -> str:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     parser = argparse.ArgumentParser(description=("Detect async/thread boundary points for developer review. Findings are an inventory, not automatic bug decisions."))
     parser.add_argument(
         "paths",
@@ -499,6 +527,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     parser = build_parser()
     args = parser.parse_args(argv)
     paths = args.paths or list(DEFAULT_SCAN_PATHS)

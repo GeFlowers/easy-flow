@@ -44,6 +44,7 @@ type SettingsDialogProps = React.ComponentProps<typeof Dialog> & {
   defaultSection?: SettingsSection;
 };
 
+/** 承载工作区设置分区，并在打开时同步调用方指定的初始页面。 */
 export function SettingsDialog(props: SettingsDialogProps) {
   const { defaultSection = "appearance", ...dialogProps } = props;
   const { t } = useI18n();
@@ -51,8 +52,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
     useState<SettingsSection>(defaultSection);
 
   useEffect(() => {
-    // When opening the dialog, ensure the active section follows the caller's intent.
-    // This allows triggers like "About" to open the dialog directly on that page.
+    // 打开时让活动分区跟随调用方意图，使“关于”等触发器可直接定位到对应页面。
     if (dialogProps.open) {
       setActiveSection(defaultSection);
     }

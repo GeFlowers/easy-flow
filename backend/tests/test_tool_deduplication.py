@@ -1,10 +1,4 @@
-"""Tests for tool name deduplication in get_available_tools() (issue #1803).
-
-Duplicate tool registrations previously passed through silently and could
-produce mangled function-name schemas that caused 100% tool call failures.
-``get_available_tools()`` now deduplicates by name, config-loaded tools taking
-priority, and logs a warning for every skipped duplicate.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -21,18 +15,19 @@ from deerflow.tools.tools import get_available_tools
 
 
 class AsyncToolArgs(BaseModel):
+    '未说明'
     x: int = Field(..., description="test input")
 
 
 @tool
 def _tool_alpha(x: str) -> str:
-    """Alpha tool."""
+    '未说明'
     return x
 
 
 @tool
 def _tool_alpha_dup(x: str) -> str:
-    """Duplicate of alpha — same name, different object."""
+    '未说明'
     return x
 
 
@@ -42,7 +37,7 @@ _tool_alpha_dup.name = _tool_alpha.name  # type: ignore[attr-defined]
 
 @tool
 def _tool_beta(x: str) -> str:
-    """Beta tool."""
+    '未说明'
     return x
 
 
@@ -52,7 +47,7 @@ def _tool_beta(x: str) -> str:
 
 
 def _make_minimal_config(tools):
-    """Return an AppConfig-like mock with the given tools list."""
+    '未说明'
     config = MagicMock()
     config.tools = tools
     config.models = []
@@ -66,9 +61,10 @@ def _make_minimal_config(tools):
 @patch("deerflow.tools.tools.get_app_config")
 @patch("deerflow.tools.tools.is_host_bash_allowed", return_value=True)
 def test_config_loaded_async_only_tool_gets_sync_wrapper(mock_bash, mock_cfg):
-    """Config-loaded async-only tools can still be invoked by sync clients."""
+    '未说明'
 
     async def async_tool_impl(x: int) -> str:
+        """处理工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return f"result: {x}"
 
     async_tool = StructuredTool(
@@ -98,9 +94,10 @@ def test_config_loaded_async_only_tool_gets_sync_wrapper(mock_bash, mock_cfg):
 @patch("deerflow.tools.tools.get_app_config")
 @patch("deerflow.tools.tools.is_host_bash_allowed", return_value=True)
 def test_subagent_async_only_tool_gets_sync_wrapper(mock_bash, mock_cfg):
-    """Async-only tools added through the subagent path can be invoked by sync clients."""
+    '未说明'
 
     async def async_tool_impl(x: int) -> str:
+        """处理工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return f"subagent: {x}"
 
     async_tool = StructuredTool(
@@ -126,9 +123,10 @@ def test_subagent_async_only_tool_gets_sync_wrapper(mock_bash, mock_cfg):
 @patch("deerflow.tools.tools.get_app_config")
 @patch("deerflow.tools.tools.is_host_bash_allowed", return_value=True)
 def test_acp_async_only_tool_gets_sync_wrapper(mock_bash, mock_cfg):
-    """Async-only ACP tools can be invoked by sync clients."""
+    '未说明'
 
     async def async_tool_impl(x: int) -> str:
+        """处理工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return f"acp: {x}"
 
     async_tool = StructuredTool(
@@ -156,7 +154,7 @@ def test_acp_async_only_tool_gets_sync_wrapper(mock_bash, mock_cfg):
 @patch("deerflow.tools.tools.get_app_config")
 @patch("deerflow.tools.tools.is_host_bash_allowed", return_value=True)
 def test_no_duplicates_returned(mock_bash, mock_cfg):
-    """get_available_tools() never returns two tools with the same name."""
+    '未说明'
     mock_cfg.return_value = _make_minimal_config([])
 
     # Patch the builtin tools so we control exactly what comes back.
@@ -170,7 +168,7 @@ def test_no_duplicates_returned(mock_bash, mock_cfg):
 @patch("deerflow.tools.tools.get_app_config")
 @patch("deerflow.tools.tools.is_host_bash_allowed", return_value=True)
 def test_first_occurrence_wins(mock_bash, mock_cfg):
-    """When duplicates exist, the first occurrence is kept."""
+    '未说明'
     mock_cfg.return_value = _make_minimal_config([])
 
     sentinel_alpha = MagicMock(spec=BaseTool, name="_sentinel")
@@ -188,7 +186,7 @@ def test_first_occurrence_wins(mock_bash, mock_cfg):
 @patch("deerflow.tools.tools.get_app_config")
 @patch("deerflow.tools.tools.is_host_bash_allowed", return_value=True)
 def test_duplicate_triggers_warning(mock_bash, mock_cfg, caplog):
-    """A warning is logged for every skipped duplicate."""
+    '未说明'
     import logging
 
     mock_cfg.return_value = _make_minimal_config([])

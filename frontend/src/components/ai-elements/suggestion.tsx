@@ -10,8 +10,10 @@ import { cn } from "@/lib/utils";
 const STAGGER_DELAY_MS = 60;
 const STAGGER_DELAY_MS_OFFSET = 250;
 
+/** SuggestionsProps 的公开类型定义。 */
 export type SuggestionsProps = ComponentProps<typeof ScrollArea>;
 
+/** Suggestions 组件：提供对应的界面结构与交互语义。 */
 export const Suggestions = ({
   className,
   children,
@@ -41,12 +43,14 @@ export const Suggestions = ({
   </ScrollArea>
 );
 
+/** SuggestionProps 的公开类型定义。 */
 export type SuggestionProps = Omit<ComponentProps<typeof Button>, "onClick"> & {
   suggestion: React.ReactNode;
   icon?: LucideIcon;
   onClick?: () => void;
 };
 
+/** Suggestion 组件：提供对应的界面结构与交互语义。 */
 export const Suggestion = ({
   suggestion,
   onClick,

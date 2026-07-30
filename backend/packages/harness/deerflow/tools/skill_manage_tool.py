@@ -1,4 +1,4 @@
-"""Tool for creating and evolving custom skills."""
+"""提供创建和演进自定义技能的安全管理工具。"""
 
 from __future__ import annotations
 
@@ -30,11 +30,12 @@ from deerflow.tools.types import Runtime
 
 logger = logging.getLogger(__name__)
 
-# Lock granularity: (user_id, skill_name) to avoid cross-user blocking.
+# 中文说明：此处用于执行相关处理。
 _skill_locks: WeakValueDictionary[tuple[str, str], asyncio.Lock] = WeakValueDictionary()
 
 
 def _get_lock(user_id: str, name: str) -> asyncio.Lock:
+    """取得指定用户和技能名称对应的异步锁。"""
     key = (user_id, name)
     lock = _skill_locks.get(key)
     if lock is None:
@@ -44,6 +45,7 @@ def _get_lock(user_id: str, name: str) -> asyncio.Lock:
 
 
 def _get_thread_id(runtime: Runtime | None) -> str | None:
+    """从运行时中提取线程标识。"""
     if runtime is None:
         return None
     if runtime.context and runtime.context.get("thread_id"):
@@ -52,6 +54,7 @@ def _get_thread_id(runtime: Runtime | None) -> str | None:
 
 
 def _history_record(*, action: str, file_path: str, prev_content: str | None, new_content: str | None, thread_id: str | None, scanner: dict[str, Any]) -> dict[str, Any]:
+    """创建一条记录技能文件变更前后内容的历史条目。"""
     return {
         "action": action,
         "author": "agent",
@@ -64,6 +67,7 @@ def _history_record(*, action: str, file_path: str, prev_content: str | None, ne
 
 
 async def _scan_or_raise(content: str, *, executable: bool, location: str, static_findings: list[StaticFinding] | None = None) -> dict[str, Any]:
+    """扫描技能内容；安全扫描阻止时抛出异常。"""
     result = await scan_skill_content(content, executable=executable, location=location, static_findings=static_findings or [])
     if result.decision == "block":
         raise ValueError(f"Security scan blocked the write: {result.reason}")
@@ -73,6 +77,7 @@ async def _scan_or_raise(content: str, *, executable: bool, location: str, stati
 
 
 def _raise_static_block(error: StaticScanBlockedError) -> NoReturn:
+    """将静态扫描阻止结果转换为调用方可见的异常。"""
     payload = {
         "skill_name": error.skill_name,
         "findings": error.findings,
@@ -81,11 +86,14 @@ def _raise_static_block(error: StaticScanBlockedError) -> NoReturn:
 
 
 def _raise_static_scan_failure(name: str, error: StaticScannerError) -> NoReturn:
+    """将静态扫描执行失败转换为调用方可见的异常。"""
     raise ValueError(f"Static security scan failed for skill '{name}': {error}") from error
 
 
 async def _scan_static_candidate_or_raise(name: str, updates: dict[str, str], skill_storage: SkillStorage | None = None) -> list[StaticFinding]:
+    """在临时技能副本上执行静态扫描，并在失败时阻止写入。"""
     def _scan_candidate() -> list[StaticFinding]:
+        """构建候选技能目录并返回静态扫描发现项。"""
         with tempfile.TemporaryDirectory() as tmp:
             skill_dir = Path(tmp) / name
             if skill_storage is None:
@@ -107,6 +115,7 @@ async def _scan_static_candidate_or_raise(name: str, updates: dict[str, str], sk
 
 
 async def _to_thread(func, /, *args, **kwargs):
+    """在线程中执行同步函数，避免阻塞事件循环。"""
     return await asyncio.to_thread(func, *args, **kwargs)
 
 
@@ -120,17 +129,7 @@ async def _skill_manage_impl(
     replace: str | None = None,
     expected_count: int | None = None,
 ) -> str:
-    """Manage custom skills under skills/custom/.
-
-    Args:
-        action: One of create, patch, edit, delete, write_file, remove_file.
-        name: Skill name in hyphen-case.
-        content: New file content for create, edit, or write_file.
-        path: Supporting file path for write_file or remove_file.
-        find: Existing text to replace for patch.
-        replace: Replacement text for patch.
-        expected_count: Optional expected number of replacements for patch.
-    """
+    """执行自定义技能的创建、编辑、补丁和文件管理操作。"""
     name = SkillStorage.validate_skill_name(name)
     user_id = resolve_runtime_user_id(runtime)
     lock = _get_lock(user_id, name)
@@ -254,9 +253,9 @@ async def _skill_manage_impl(
             return f"Removed '{path}' from custom skill '{name}'."
 
         if await _to_thread(skill_storage.public_skill_exists, name):
-            # public_skill_exists covers both built-in (PUBLIC) and legacy (LEGACY)
-            # skills; the UserScopedSkillStorage override distinguishes them in
-            # ensure_custom_skill_is_editable with category-specific messages.
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
             raise ValueError(f"'{name}' is a read-only skill (built-in or legacy shared). To customise it, create your own version with the same name.")
         raise ValueError(f"Unsupported action '{action}'.")
 
@@ -272,17 +271,7 @@ async def skill_manage_tool(
     replace: str | None = None,
     expected_count: int | None = None,
 ) -> str:
-    """Manage custom skills under skills/custom/.
-
-    Args:
-        action: One of create, patch, edit, delete, write_file, remove_file.
-        name: Skill name in hyphen-case.
-        content: New file content for create, edit, or write_file.
-        path: Supporting file path for write_file or remove_file.
-        find: Existing text to replace for patch.
-        replace: Replacement text for patch.
-        expected_count: Optional expected number of replacements for patch.
-    """
+    """提供自定义技能的创建、编辑、补丁和文件管理入口。"""
     return await _skill_manage_impl(
         runtime=runtime,
         action=action,

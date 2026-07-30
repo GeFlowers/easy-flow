@@ -1,4 +1,4 @@
-"""Regression tests for the skills sandbox container root default."""
+'未说明'
 
 from __future__ import annotations
 
@@ -7,6 +7,7 @@ from pathlib import Path
 
 
 def test_mnt_skills_literal_is_owned_by_skill_constants_module():
+    '未说明'
     package_root = Path(__file__).parents[1] / "packages" / "harness" / "deerflow"
     allowed = {package_root / "constants.py"}
     offenders: list[str] = []
@@ -23,6 +24,7 @@ def test_mnt_skills_literal_is_owned_by_skill_constants_module():
 
 
 def test_runtime_middlewares_use_top_level_skills_container_constant():
+    '未说明'
     package_root = Path(__file__).parents[1] / "packages" / "harness" / "deerflow"
     offenders: list[str] = []
 

@@ -1,4 +1,4 @@
-"""Tests for ClarificationMiddleware, focusing on options type coercion."""
+'定义 test_clarification_middleware 模块提供的职责与可复用接口。\n\nTests for ClarificationMiddleware, focusing on options type coercion.'
 
 import json
 from types import SimpleNamespace
@@ -11,14 +11,15 @@ from deerflow.agents.middlewares.clarification_middleware import ClarificationMi
 
 @pytest.fixture
 def middleware():
+    '执行 middleware 的明确职责，并返回与调用约定一致的结果'
     return ClarificationMiddleware()
 
 
 class TestFormatClarificationMessage:
-    """Tests for _format_clarification_message options handling."""
+    '组织 TestFormatClarificationMessage 场景的行为与边界验证。\n\nTests for _format_clarification_message options handling.'
 
     def test_options_as_native_list(self, middleware):
-        """Normal case: options is already a list."""
+        '验证 options、as、native、list 场景下的预期行为、边界条件与结果。\n\nNormal case: options is already a list.'
         args = {
             "question": "Which env?",
             "clarification_type": "approach_choice",
@@ -30,7 +31,7 @@ class TestFormatClarificationMessage:
         assert "3. prod" in result
 
     def test_options_as_json_string(self, middleware):
-        """Bug case (#1995): model serializes options as a JSON string."""
+        '验证 options、as、json、string 场景下的预期行为、边界条件与结果。\n\nBug case (#1995): model serializes options as a JSON string.'
         args = {
             "question": "Which env?",
             "clarification_type": "approach_choice",
@@ -45,7 +46,7 @@ class TestFormatClarificationMessage:
         assert '2. "' not in result
 
     def test_options_as_json_string_scalar(self, middleware):
-        """JSON string decoding to a non-list scalar is treated as one option."""
+        '验证 options、as、json、string、scalar 场景下的预期行为、边界条件与结果。\n\nJSON string decoding to a non-list scalar is treated as one option.'
         args = {
             "question": "Which env?",
             "clarification_type": "approach_choice",
@@ -57,7 +58,7 @@ class TestFormatClarificationMessage:
         assert "2." not in result
 
     def test_options_as_plain_string(self, middleware):
-        """Edge case: options is a non-JSON string, treated as single option."""
+        '验证 options、as、plain、string 场景下的预期行为、边界条件与结果。\n\nEdge case: options is a non-JSON string, treated as single option.'
         args = {
             "question": "Which env?",
             "clarification_type": "approach_choice",
@@ -67,7 +68,7 @@ class TestFormatClarificationMessage:
         assert "1. just one option" in result
 
     def test_options_none(self, middleware):
-        """Options is None — no options section rendered."""
+        '验证 options、none 场景下的预期行为、边界条件与结果。\n\nOptions is None — no options section rendered.'
         args = {
             "question": "Tell me more",
             "clarification_type": "missing_info",
@@ -77,7 +78,7 @@ class TestFormatClarificationMessage:
         assert "1." not in result
 
     def test_options_empty_list(self, middleware):
-        """Options is an empty list — no options section rendered."""
+        '验证 options、empty、list 场景下的预期行为、边界条件与结果。\n\nOptions is an empty list — no options section rendered.'
         args = {
             "question": "Tell me more",
             "clarification_type": "missing_info",
@@ -87,7 +88,7 @@ class TestFormatClarificationMessage:
         assert "1." not in result
 
     def test_options_missing(self, middleware):
-        """Options key is absent — defaults to empty list."""
+        '验证 options、missing 场景下的预期行为、边界条件与结果。\n\nOptions key is absent — defaults to empty list.'
         args = {
             "question": "Tell me more",
             "clarification_type": "missing_info",
@@ -96,7 +97,7 @@ class TestFormatClarificationMessage:
         assert "1." not in result
 
     def test_context_included(self, middleware):
-        """Context is rendered before the question."""
+        '验证 context、included 场景下的预期行为、边界条件与结果。\n\nContext is rendered before the question.'
         args = {
             "question": "Which env?",
             "clarification_type": "approach_choice",
@@ -109,7 +110,7 @@ class TestFormatClarificationMessage:
         assert "1. dev" in result
 
     def test_json_string_with_mixed_types(self, middleware):
-        """JSON string containing non-string elements still works."""
+        '验证 json、string、with、mixed、types 场景下的预期行为、边界条件与结果。\n\nJSON string containing non-string elements still works.'
         args = {
             "question": "Pick one",
             "clarification_type": "approach_choice",
@@ -123,9 +124,10 @@ class TestFormatClarificationMessage:
 
 
 class TestHumanInputPayload:
-    """Tests for structured human input request payloads."""
+    '组织 TestHumanInputPayload 场景的行为与边界验证。\n\nTests for structured human input request payloads.'
 
     def test_payload_with_native_options(self, middleware):
+        '验证 payload、with、native、options 场景下的预期行为、边界条件与结果'
         payload = middleware._build_human_input_payload(
             {
                 "question": "Which environment should I deploy to?",
@@ -155,6 +157,7 @@ class TestHumanInputPayload:
         }
 
     def test_payload_with_json_string_options(self, middleware):
+        '验证 payload、with、json、string、options 场景下的预期行为、边界条件与结果'
         payload = middleware._build_human_input_payload(
             {
                 "question": "Pick one",
@@ -174,6 +177,7 @@ class TestHumanInputPayload:
         ]
 
     def test_payload_with_plain_string_option(self, middleware):
+        '验证 payload、with、plain、string、option 场景下的预期行为、边界条件与结果'
         payload = middleware._build_human_input_payload(
             {
                 "question": "Pick one",
@@ -188,6 +192,7 @@ class TestHumanInputPayload:
         assert payload["options"] == [{"id": "option-1", "label": "just one option", "value": "just one option"}]
 
     def test_payload_without_options_is_free_text(self, middleware):
+        '验证 payload、without、options、is、free、text 场景下的预期行为、边界条件与结果'
         payload = middleware._build_human_input_payload(
             {
                 "question": "Tell me more",
@@ -202,6 +207,7 @@ class TestHumanInputPayload:
         assert "options" not in payload
 
     def test_payload_missing_options_is_free_text(self, middleware):
+        '验证 payload、missing、options、is、free、text 场景下的预期行为、边界条件与结果'
         payload = middleware._build_human_input_payload(
             {
                 "question": "Tell me more",
@@ -216,9 +222,10 @@ class TestHumanInputPayload:
 
 
 class TestClarificationCommandIdempotency:
-    """Clarification tool-call retries should not duplicate messages in state."""
+    '组织 TestClarificationCommandIdempotency 场景的行为与边界验证。\n\nClarification tool-call retries should not duplicate messages in state.'
 
     def test_repeated_tool_call_uses_stable_message_id(self, middleware):
+        '验证 repeated、tool、call、uses、stable、message、id 场景下的预期行为、边界条件与结果'
         request = SimpleNamespace(
             tool_call={
                 "name": "ask_clarification",
@@ -253,6 +260,7 @@ class TestClarificationCommandIdempotency:
         assert merged[0].artifact == first_message.artifact
 
     def test_tool_message_model_dump_preserves_human_input_artifact(self, middleware):
+        '验证 tool、message、model、dump、preserves、human、input、artifact 场景下的预期行为、边界条件与结果'
         request = SimpleNamespace(
             tool_call={
                 "name": "ask_clarification",
@@ -278,11 +286,10 @@ class TestClarificationCommandIdempotency:
 
 
 class TestClarificationDisabled:
-    """When ``disable_clarification`` is set in runtime context, a clarification
-    must NOT interrupt the run — it returns a ToolMessage nudging the agent to
-    proceed, so non-interactive channels (GitHub) don't dead-end."""
+    "组织 TestClarificationDisabled 场景的行为与边界验证。\n\nWhen ``disable_clarification`` is set in runtime context, a clarification\n    must NOT interrupt the run — it returns a ToolMessage nudging the agent to\n    proceed, so non-interactive channels (GitHub) don't dead-end."
 
     def _request(self, *, runtime_context):
+        '执行 _request 的明确职责，并返回与调用约定一致的结果'
         return SimpleNamespace(
             tool_call={
                 "name": "ask_clarification",
@@ -293,6 +300,7 @@ class TestClarificationDisabled:
         )
 
     def test_disabled_returns_toolmessage_not_command(self, middleware):
+        '验证 disabled、returns、toolmessage、not、command 场景下的预期行为、边界条件与结果'
         request = self._request(runtime_context={"disable_clarification": True})
         result = middleware.wrap_tool_call(request, lambda _req: pytest.fail("handler should not be called"))
         # Not a Command(goto=END) — a plain ToolMessage so the loop continues.
@@ -303,15 +311,18 @@ class TestClarificationDisabled:
         assert result.artifact is None
 
     def test_disabled_message_tells_agent_to_proceed(self, middleware):
+        '验证 disabled、message、tells、agent、to、proceed 场景下的预期行为、边界条件与结果'
         request = self._request(runtime_context={"disable_clarification": True})
         result = middleware.wrap_tool_call(request, lambda _req: pytest.fail("handler should not be called"))
         assert "disabled" in result.content.lower()
         assert "proceed" in result.content.lower()
 
     def test_disabled_async_path(self, middleware):
+        '验证 disabled、async、path 场景下的预期行为、边界条件与结果'
         request = self._request(runtime_context={"disable_clarification": True})
 
         async def handler(_req):
+            '处理请求并返回可供调用方消费的结果，并遵守 handler 所表达的接口约束'
             return pytest.fail("handler should not be called")
 
         import asyncio
@@ -322,7 +333,7 @@ class TestClarificationDisabled:
         assert isinstance(result, ToolMessage)
 
     def test_not_disabled_still_interrupts(self, middleware):
-        """Without the flag, the original goto=END behavior is preserved."""
+        '验证 not、disabled、still、interrupts 场景下的预期行为、边界条件与结果。\n\nWithout the flag, the original goto=END behavior is preserved.'
         from langgraph.types import Command
 
         request = self._request(runtime_context={})  # no disable_clarification
@@ -331,7 +342,7 @@ class TestClarificationDisabled:
         assert result.goto == "__end__"
 
     def test_no_runtime_context_still_interrupts(self, middleware):
-        """Defensive: missing runtime/context falls back to interrupting."""
+        '验证 no、runtime、context、still、interrupts 场景下的预期行为、边界条件与结果。\n\nDefensive: missing runtime/context falls back to interrupting.'
         from langgraph.types import Command
 
         request = SimpleNamespace(
@@ -346,7 +357,7 @@ class TestClarificationDisabled:
         assert isinstance(result, Command)
 
     def test_non_clarification_tool_call_unaffected_by_flag(self, middleware):
-        """The flag only affects ask_clarification; other tools run normally."""
+        '验证 non、clarification、tool、call、unaffected、by、flag 场景下的预期行为、边界条件与结果。\n\nThe flag only affects ask_clarification; other tools run normally.'
         other = SimpleNamespace(
             tool_call={"name": "bash", "id": "b1", "args": {"command": "echo hi"}},
             runtime=SimpleNamespace(context={"disable_clarification": True}),
@@ -356,6 +367,7 @@ class TestClarificationDisabled:
         assert result == sentinel
 
     def test_missing_tool_call_id_still_gets_stable_message_id(self, middleware):
+        '验证 missing、tool、call、id、still、gets、stable、message、id 场景下的预期行为、边界条件与结果'
         request = SimpleNamespace(
             tool_call={
                 "name": "ask_clarification",

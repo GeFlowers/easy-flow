@@ -18,6 +18,7 @@ interface AssistantClarificationGroup extends GenericMessageGroup<"assistant:cla
 
 interface AssistantSubagentGroup extends GenericMessageGroup<"assistant:subagent"> {}
 
+/** 按人类回合、助手处理、回答、澄清、文件展示或子代理划分的消息组。 */
 export type MessageGroup =
   | HumanMessageGroup
   | AssistantProcessingGroup
@@ -33,6 +34,7 @@ const HIDDEN_CONTROL_MESSAGE_NAMES = new Set([
   "todo_completion_reminder",
 ]);
 
+/** 过滤隐藏消息，并按 UI 语义将消息归组以保持工具调用关联。 */
 export function getMessageGroups(messages: Message[]): MessageGroup[] {
   if (messages.length === 0) {
     return [];
@@ -40,8 +42,7 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
 
   const groups: MessageGroup[] = [];
 
-  // Returns the last group if it can still accept tool messages
-  // (i.e. it's an in-flight processing group, not a terminal human/assistant group).
+  // 若最后一个分组仍可接收工具消息则返回它，即正在处理中的分组，而非终态的人类或助手分组。
   function lastOpenGroup() {
     const last = groups[groups.length - 1];
     if (
@@ -67,8 +68,7 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
 
     if (message.type === "tool") {
       if (isClarificationToolMessage(message)) {
-        // Add to the preceding processing group to preserve tool-call association,
-        // then also open a standalone clarification group for prominent display.
+        // 加入前一个处理分组以保留工具调用关联，同时新建独立的澄清分组以突出显示。
         lastOpenGroup()?.messages.push(message);
         groups.push({
           id: message.id,
@@ -80,21 +80,17 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
         if (open) {
           open.messages.push(message);
         } else {
-          // Fallback for orphan tool messages — LangGraph `messages-tuple` can
-          // emit tool-result events out of order or replay them from subagent
-          // state (e.g. bash subagent under LocalSandboxProvider with
-          // allow_host_bash). When that happens, the tool message arrives after
-          // a terminal group and lastOpenGroup() returns null. Previously we
-          // dropped the message with console.error, silently hiding the tool
-          // result from the UI. Attach to the most recent group instead so the
-          // user can still see what the agent did.
+          // 孤立工具消息的回退处理：LangGraph `messages-tuple` 可能乱序发送工具结果
+          // 事件，或从子代理状态重放它们（例如 LocalSandboxProvider 下启用
+          // allow_host_bash 的 bash 子代理）。此时工具消息会出现在终态分组之后，
+          // lastOpenGroup() 返回 null。此前会用 console.error 丢弃该消息，使工具
+          // 结果在 UI 中被悄然隐藏；现改为附加至最近分组，确保用户仍能看到代理所做的操作。
           const lastGroup = groups[groups.length - 1];
           if (lastGroup) {
             lastGroup.messages.push(message);
           } else {
-            // groups is empty (shouldn't happen — the outer for loop is guarded
-            // by `messages.length === 0 -> return []`), but keep the diagnostic
-            // just in case.
+            // groups 为空本不应发生：外层循环已由 `messages.length === 0 -> return []`
+            // 保护；仍保留诊断信息以防万一。
             console.error(
               "Unexpected tool message with no preceding group",
               message,
@@ -106,13 +102,10 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
     }
 
     if (message.type === "ai") {
-      // A message with answer content and no tool calls becomes its own
-      // assistant bubble below, which already renders the message's
-      // reasoning_content inside the bubble's <Reasoning> collapsible. Such a
-      // message must NOT also feed the processing group, or the ChainOfThought
-      // panel above the bubble paints the identical reasoning a second time
-      // (#3868). Intermediate reasoning (no content) and tool-calling steps
-      // still belong in the processing group.
+      // 含回答内容且没有工具调用的消息会成为下方独立的助手气泡；该气泡已在其
+      // <Reasoning> 折叠区渲染消息的 reasoning_content。此类消息不得再进入处理分组，
+      // 否则气泡上方的 ChainOfThought 面板会重复渲染相同推理（#3868）。不含内容的
+      // 中间推理以及工具调用步骤仍应归入处理分组。
       const becomesAssistantBubble =
         hasContent(message) && !hasToolCalls(message);
 
@@ -133,7 +126,7 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
         (hasReasoning(message) || hasToolCalls(message))
       ) {
         const lastGroup = groups[groups.length - 1];
-        // Accumulate consecutive intermediate AI messages into one processing group.
+        // 将连续的中间 AI 消息累积到同一个处理分组中。
         if (lastGroup?.type !== "assistant:processing") {
           groups.push({
             id: message.id,
@@ -154,15 +147,14 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
   return groups;
 }
 
+/** 找出每个已完成可见回合中允许从最终助手回答分支的分组 ID。 */
 export function getBranchableAssistantGroupIds(
   groups: MessageGroup[],
   isCurrentTurnLoading: boolean,
 ): Set<string> {
-  // Hidden messages were already removed by getMessageGroups, matching the
-  // backend's branch checkpoint visibility rules. Within each visible human
-  // turn, branching is exposed only when the final AI-bearing group is a
-  // terminal assistant text group. Processing, present-files, and subagent
-  // groups do not render assistant actions.
+  // getMessageGroups 已移除隐藏消息，与后端分支检查点的可见性规则一致。每个可见
+  // 人类回合中，只有最后一个包含 AI 消息的分组为终态助手文本分组时才提供分支操作。
+  // 处理、文件展示和子代理分组均不渲染助手操作。
   const branchableGroupIds = new Set<string>();
   let lastAIGroup: MessageGroup | null = null;
 
@@ -191,6 +183,7 @@ export function getBranchableAssistantGroupIds(
   return branchableGroupIds;
 }
 
+/** 按 UI 消息分组映射结果并移除空值。 */
 export function groupMessages<T>(
   messages: Message[],
   mapper: (group: MessageGroup) => T,
@@ -200,6 +193,7 @@ export function groupMessages<T>(
     .filter((result) => result !== undefined && result !== null) as T[];
 }
 
+/** 为每个助手回合结束分组收集该回合全部 AI 消息，以归集令牌用量。 */
 export function getAssistantTurnUsageMessages(groups: MessageGroup[]) {
   const usageMessagesByGroupIndex: Array<Message[] | null> = Array.from(
     { length: groups.length },
@@ -239,11 +233,13 @@ type MessageMetadataLookup = (
   index: number,
 ) => { streamMetadata?: Record<string, unknown> } | undefined;
 
+/** 以消息 ID 和对象引用双重识别流式消息的查询表。 */
 export type StreamingMessageLookup = {
   ids: ReadonlySet<string>;
   messages: ReadonlySet<Message>;
 };
 
+/** 从流元数据建立流式消息查询表，兼容 ID 与对象引用两种匹配方式。 */
 export function getStreamingMessageLookup(
   messages: Message[],
   isStreaming: boolean,
@@ -276,6 +272,7 @@ export function getStreamingMessageLookup(
   };
 }
 
+/** 判断助手消息组中是否包含仍在流式输出的 AI 消息。 */
 export function isAssistantMessageGroupStreaming(
   groupMessages: Message[],
   streamingMessages: StreamingMessageLookup,
@@ -294,6 +291,7 @@ export function isAssistantMessageGroupStreaming(
   });
 }
 
+/** 返回助手回合最后一段可复制内容；流式期间不提供复制数据。 */
 export function getAssistantTurnCopyData(
   messages: Message[],
   { isStreaming = false }: { isStreaming?: boolean } = {},
@@ -314,6 +312,7 @@ export function getAssistantTurnCopyData(
   );
 }
 
+/** 提取单条消息的可复制内容，并移除人类消息中的上传文件标签。 */
 export function getMessageCopyData(message: Message) {
   const content = extractContentFromMessage(message);
   if (message.type === "human") {
@@ -325,6 +324,7 @@ export function getMessageCopyData(message: Message) {
   return extractReasoningContentFromMessage(message) ?? "";
 }
 
+/** 解析并提取 extractTextFromMessage 所需的数据。 */
 export function extractTextFromMessage(message: Message) {
   if (typeof message.content === "string") {
     return (
@@ -350,11 +350,11 @@ export function extractTextFromMessage(message: Message) {
 const THINK_OPEN_TAG = "<think>";
 const THINK_TAG_RE = /<think>\s*([\s\S]*?)\s*<\/think>/g;
 
+/** 拆分 splitInlineReasoning 所需的内容片段。 */
 function splitInlineReasoning(content: string) {
   const reasoningParts: string[] = [];
 
-  // First pass: strip every fully closed `<think>...</think>` pair and
-  // collect its body as reasoning.
+  // 第一轮：移除每一对完整闭合的 `<think>...</think>`，并将其内容收集为推理。
   let cleaned = content.replace(THINK_TAG_RE, (_, reasoning: string) => {
     const normalized = reasoning.trim();
     if (normalized) {
@@ -363,15 +363,12 @@ function splitInlineReasoning(content: string) {
     return "";
   });
 
-  // Streaming-safe pass: a `<think>` opener whose `</think>` has not arrived
-  // yet means the rest of the chunk is reasoning in flight. Route it into the
-  // reasoning slot instead of letting it render as message content (the
-  // raw-HTML markdown pipeline would otherwise paint the inner text on
-  // screen until the closing tag lands).
+  // 流式安全处理：尚未收到 `</think>` 的 `<think>` 起始标记意味着该片段余下部分
+  // 是正在输出的推理。将它放入推理区域而非作为消息内容渲染，否则原始 HTML 的
+  // Markdown 管线会在闭合标记到达前将内部文本显示到屏幕上。
   //
-  // Skip when the opener sits right after a backtick — that is the model
-  // talking about `<think>` literally inside markdown inline code, not
-  // actually streaming reasoning.
+  // 若起始标记紧跟反引号则跳过：这表示模型在 Markdown 内联代码中原样讨论
+  // `<think>`，并非实际流式输出推理。
   const openTagIndex = cleaned.indexOf(THINK_OPEN_TAG);
   if (openTagIndex !== -1 && cleaned[openTagIndex - 1] !== "`") {
     const tail = cleaned.slice(openTagIndex + THINK_OPEN_TAG.length).trim();
@@ -387,6 +384,7 @@ function splitInlineReasoning(content: string) {
   };
 }
 
+/** 拆分 splitInlineReasoningFromAIMessage 所需的内容片段。 */
 function splitInlineReasoningFromAIMessage(message: Message) {
   if (message.type !== "ai" || typeof message.content !== "string") {
     return null;
@@ -394,6 +392,7 @@ function splitInlineReasoningFromAIMessage(message: Message) {
   return splitInlineReasoning(message.content);
 }
 
+/** 提取消息的展示内容，同时从 AI 字符串内容中剥离内联推理。 */
 export function extractContentFromMessage(message: Message) {
   if (typeof message.content === "string") {
     return (
@@ -423,6 +422,7 @@ export function extractContentFromMessage(message: Message) {
   return "";
 }
 
+/** 提取 AI 消息的推理内容，兼容元数据、内容块和内联 `<think>` 标记。 */
 export function extractReasoningContentFromMessage(message: Message) {
   if (message.type !== "ai") {
     return null;
@@ -445,6 +445,7 @@ export function extractReasoningContentFromMessage(message: Message) {
   return null;
 }
 
+/** 从 AI 消息的附加参数中删除已处理的 reasoning_content。 */
 export function removeReasoningContentFromMessage(message: Message) {
   if (message.type !== "ai" || !message.additional_kwargs) {
     return;
@@ -452,6 +453,7 @@ export function removeReasoningContentFromMessage(message: Message) {
   delete message.additional_kwargs.reasoning_content;
 }
 
+/** 解析并提取 extractURLFromImageURLContent 所需的数据。 */
 export function extractURLFromImageURLContent(
   content:
     | string
@@ -465,6 +467,7 @@ export function extractURLFromImageURLContent(
   return content.url;
 }
 
+/** 判断消息是否包含可展示的非推理内容。 */
 export function hasContent(message: Message) {
   if (typeof message.content === "string") {
     return (
@@ -480,6 +483,7 @@ export function hasContent(message: Message) {
   return false;
 }
 
+/** 判断 AI 消息是否携带推理内容。 */
 export function hasReasoning(message: Message) {
   if (message.type !== "ai") {
     return false;
@@ -489,7 +493,7 @@ export function hasReasoning(message: Message) {
   }
   if (Array.isArray(message.content)) {
     const part = message.content[0];
-    // Compatible with the Anthropic gateway
+    // 兼容 Anthropic 网关。
     return (part as unknown as { type: "thinking" })?.type === "thinking";
   }
   if (typeof message.content === "string") {
@@ -498,12 +502,14 @@ export function hasReasoning(message: Message) {
   return false;
 }
 
+/** 判断 AI 消息是否携带工具调用。 */
 export function hasToolCalls(message: Message) {
   return (
     message.type === "ai" && message.tool_calls && message.tool_calls.length > 0
   );
 }
 
+/** 判断 AI 消息是否调用 present_files。 */
 export function hasPresentFiles(message: Message) {
   return (
     message.type === "ai" &&
@@ -511,10 +517,12 @@ export function hasPresentFiles(message: Message) {
   );
 }
 
+/** 判断工具消息是否来自 ask_clarification。 */
 export function isClarificationToolMessage(message: Message) {
   return message.type === "tool" && message.name === "ask_clarification";
 }
 
+/** 提取 present_files 工具调用中声明的文件路径。 */
 export function extractPresentFilesFromMessage(message: Message) {
   if (message.type !== "ai" || !hasPresentFiles(message)) {
     return [];
@@ -531,6 +539,7 @@ export function extractPresentFilesFromMessage(message: Message) {
   return files;
 }
 
+/** 判断 AI 消息是否通过 task 工具派发子代理。 */
 export function hasSubagent(message: AIMessage) {
   for (const toolCall of message.tool_calls ?? []) {
     if (toolCall.name === "task") {
@@ -540,6 +549,7 @@ export function hasSubagent(message: AIMessage) {
   return false;
 }
 
+/** 在消息列表中查找指定工具调用 ID 的首个非空文本结果。 */
 export function findToolCallResult(toolCallId: string, messages: Message[]) {
   for (const message of messages) {
     if (message.type === "tool" && message.tool_call_id === toolCallId) {
@@ -552,6 +562,7 @@ export function findToolCallResult(toolCallId: string, messages: Message[]) {
   return undefined;
 }
 
+/** 判断消息是否应因隐藏标记、控制消息名或纯技能激活内容而不在 UI 展示。 */
 export function isHiddenFromUIMessage(message: Message) {
   const content = extractTextFromMessage(message);
   return (
@@ -565,20 +576,19 @@ export function isHiddenFromUIMessage(message: Message) {
 }
 
 /**
- * Represents a file stored in message additional_kwargs.files.
- * Used for optimistic UI (uploading state) and structured file metadata.
+ * 表示存放在消息 additional_kwargs.files 中的文件。
+ * 用于乐观 UI（上传状态）和结构化文件元数据。
  */
 export interface FileInMessage {
   filename: string;
-  size: number; // bytes
-  path?: string; // virtual path, may not be set during upload
+  size: number; // 字节数
+  path?: string; // 虚拟路径，上传期间可能尚未设置
   status?: "uploading" | "uploaded";
 }
 
 /**
- * Strip backend-injected human context tags from message content.
- * Kept under its historical name because callers use it for uploaded-file
- * display cleanup.
+ * 从消息内容中移除后端注入的人类上下文标签。
+ * 因调用方使用它清理上传文件展示，故保留其历史名称。
  */
 export function stripUploadedFilesTag(content: string): string {
   return content
@@ -587,23 +597,19 @@ export function stripUploadedFilesTag(content: string): string {
 }
 
 /**
- * Tag names that backend middlewares wrap around internal payloads before
- * letting them ride along inside LangGraph message ``content``.
+ * 后端中间件在内部载荷外包裹的标签名，随后这些载荷会随 LangGraph 消息 ``content`` 传递。
  *
- * These markers are *not* user copy — they come from:
+ * 这些标记不是用户文案，来源如下：
  *
  * - ``UploadsMiddleware`` → ``<uploaded_files>``
  * - ``SkillActivationMiddleware`` → ``<slash_skill_activation>``
- * - ``DynamicContextMiddleware`` → ``<system-reminder>`` (carrying
- *   ``<memory>`` / ``<current_date>`` inside)
- * - ``TodoListMiddleware`` / ``LoopDetectionMiddleware`` style reminders
- *   live in ``hide_from_ui`` HumanMessages, but their inner payload uses
- *   the same tag vocabulary.
+ * - ``DynamicContextMiddleware`` → ``<system-reminder>``（内部携带
+ *   ``<memory>`` / ``<current_date>``）
+ * - ``TodoListMiddleware`` / ``LoopDetectionMiddleware`` 风格的提醒存放在
+ *   ``hide_from_ui`` HumanMessages 中，但其内部载荷使用同一套标签词汇。
  *
- * The primary export filter is {@link isHiddenFromUIMessage}. This list is
- * the defence-in-depth strip for any message that — by middleware bug,
- * provider quirk, or merge-conflict regression — slips through without
- * its ``hide_from_ui`` flag set.
+ * 主要的导出过滤器是 {@link isHiddenFromUIMessage}。若因中间件缺陷、供应商特性或
+ * 合并冲突回归导致某条消息未设置 ``hide_from_ui`` 标记便漏网，本列表提供纵深清理。
  */
 export const INTERNAL_MARKER_TAGS = [
   "uploaded_files",
@@ -619,21 +625,20 @@ const INTERNAL_MARKER_RE = new RegExp(
 );
 
 /**
- * Strip every known backend-injected marker from message content.
+ * 从消息内容中移除全部已知的后端注入标记。
  *
- * Intended for the chat export path where a marker leaking through is a
- * privacy regression. UI render paths should keep using
- * {@link stripUploadedFilesTag} — they receive ``hide_from_ui`` messages
- * via a separate filter and the narrower function avoids stripping content
- * a user might legitimately type into a meta-discussion (e.g. asking the
- * model about its own ``<memory>`` system).
+ * 此函数用于聊天导出路径，标记泄漏到该路径属于隐私回归。UI 渲染路径应继续使用
+ * {@link stripUploadedFilesTag}：其通过独立过滤器处理 ``hide_from_ui`` 消息，且更
+ * 窄的函数避免删去用户可能在元讨论中合法输入的内容（例如询问模型自身的
+ * ``<memory>`` 系统）。
  */
 export function stripInternalMarkers(content: string): string {
   return content.replace(INTERNAL_MARKER_RE, "").trim();
 }
 
+/** 从 `<uploaded_files>` 标签的后端格式中解析上传文件元数据。 */
 export function parseUploadedFiles(content: string): FileInMessage[] {
-  // Match <uploaded_files>...</uploaded_files> tag
+  // 匹配 <uploaded_files>...</uploaded_files> 标签。
   const uploadedFilesRegex = /<uploaded_files>([\s\S]*?)<\/uploaded_files>/;
   // eslint-disable-next-line @typescript-eslint/prefer-regexp-exec
   const match = content.match(uploadedFilesRegex);
@@ -644,18 +649,18 @@ export function parseUploadedFiles(content: string): FileInMessage[] {
 
   const uploadedFilesContent = match[1];
 
-  // Check if it's "No files have been uploaded yet."
+  // 检查是否为“尚未上传文件”的后端占位内容。
   if (uploadedFilesContent?.includes("No files have been uploaded yet.")) {
     return [];
   }
 
-  // Check if the backend reported no new files were uploaded in this message
+  // 检查后端是否报告此消息没有新增上传文件。
   if (uploadedFilesContent?.includes("(empty)")) {
     return [];
   }
 
-  // Parse file list
-  // Format: - filename (size)\n  Path: /path/to/file
+  // 解析文件列表。
+  // 格式：- filename (size)\n  Path: /path/to/file
   const fileRegex = /- ([^\n(]+)\s*\(([^)]+)\)\s*\n\s*Path:\s*([^\n]+)/g;
   const files: FileInMessage[] = [];
   let fileMatch;

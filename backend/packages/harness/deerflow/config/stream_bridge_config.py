@@ -1,4 +1,4 @@
-"""Configuration for stream bridge."""
+"""提供配置、stream、bridge、配置相关功能。"""
 
 from typing import Literal
 
@@ -8,7 +8,7 @@ StreamBridgeType = Literal["memory", "redis"]
 
 
 class StreamBridgeConfig(BaseModel):
-    """Configuration for the stream bridge that connects agent workers to SSE endpoints."""
+    """\u6267\u884c StreamBridgeConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     type: StreamBridgeType = Field(
         default="memory",
@@ -48,24 +48,24 @@ class StreamBridgeConfig(BaseModel):
     )
 
 
-# Global configuration instance — None means no stream bridge is configured
-# (falls back to memory with defaults).
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
 _stream_bridge_config: StreamBridgeConfig | None = None
 
 
 def get_stream_bridge_config() -> StreamBridgeConfig | None:
-    """Get the current stream bridge configuration, or None if not configured."""
+    """\u6267\u884c get_stream_bridge_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return _stream_bridge_config
 
 
 def set_stream_bridge_config(config: StreamBridgeConfig | None) -> None:
-    """Set the stream bridge configuration."""
+    """\u6267\u884c set_stream_bridge_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _stream_bridge_config
     _stream_bridge_config = config
 
 
 def load_stream_bridge_config_from_dict(config_dict: dict | None) -> None:
-    """Load stream bridge configuration from a dictionary."""
+    """\u6267\u884c load_stream_bridge_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _stream_bridge_config
     if config_dict is None:
         _stream_bridge_config = None

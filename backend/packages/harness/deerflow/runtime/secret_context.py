@@ -1,16 +1,4 @@
-"""Request-scoped secret carrier in the run context (issue #3861).
-
-Callers pass per-request secrets out-of-band in ``config.context.secrets`` — a
-mapping of name -> value. The value never enters the prompt, tool arguments, or
-the executed command string; it is injected as an environment variable into a
-skill's sandbox subprocess only when an activated skill declares it via the
-``required-secrets`` frontmatter field.
-
-This module centralises the reserved key name and safe extraction so the carrier
-contract lives in one place, consumed by the skill-activation middleware (to
-build the per-turn injection set) and the tracing redactor (to strip it from
-trace payloads).
-"""
+"定义 secret_context 模块提供的职责与可复用接口。\n\nRequest-scoped secret carrier in the run context (issue #3861).\n\nCallers pass per-request secrets out-of-band in ``config.context.secrets`` — a\nmapping of name -> value. The value never enters the prompt, tool arguments, or\nthe executed command string; it is injected as an environment variable into a\nskill's sandbox subprocess only when an activated skill declares it via the\n``required-secrets`` frontmatter field.\n\nThis module centralises the reserved key name and safe extraction so the carrier\ncontract lives in one place, consumed by the skill-activation middleware (to\nbuild the per-turn injection set) and the tracing redactor (to strip it from\ntrace payloads).\n"
 
 from __future__ import annotations
 
@@ -27,25 +15,21 @@ ACTIVE_SECRETS_CONTEXT_KEY = "__active_skill_secrets"
 
 
 def _string_pairs(raw: Any) -> dict[str, str]:
+    '执行 _string_pairs 的明确职责，并返回与调用约定一致的结果'
     if not isinstance(raw, dict):
         return {}
     return {key: value for key, value in raw.items() if isinstance(key, str) and isinstance(value, str)}
 
 
 def extract_request_secrets(context: Any) -> dict[str, str]:
-    """Return the caller-supplied request-scoped secrets mapping, or ``{}``.
-
-    Only string-keyed, string-valued entries are kept; anything else is ignored
-    so a malformed carrier can never crash secret resolution or injection.
-    """
+    '执行 extract_request_secrets 的明确职责，并返回与调用约定一致的结果。\n\nReturn the caller-supplied request-scoped secrets mapping, or ``{}``.\n\n    Only string-keyed, string-valued entries are kept; anything else is ignored\n    so a malformed carrier can never crash secret resolution or injection.\n    '
     if not isinstance(context, dict):
         return {}
     return _string_pairs(context.get(SECRETS_CONTEXT_KEY))
 
 
 def read_active_secrets(context: Any) -> dict[str, str]:
-    """Return the secrets resolved for the active skill (the per-run injection
-    set), or ``{}``. Read by the bash tool to build the subprocess env."""
+    '执行 read_active_secrets 的明确职责，并返回与调用约定一致的结果。\n\nReturn the secrets resolved for the active skill (the per-run injection\n    set), or ``{}``. Read by the bash tool to build the subprocess env.'
     if not isinstance(context, dict):
         return {}
     return _string_pairs(context.get(ACTIVE_SECRETS_CONTEXT_KEY))
@@ -83,27 +67,14 @@ REDACTED_CONTEXT_KEYS = frozenset(
 
 
 def redact_secret_context_keys(context: Any) -> Any:
-    """Return a shallow copy of ``context`` with secret-bearing keys removed.
-
-    Defensive helper for any code path that serializes the run context into an
-    observable surface. DeerFlow's own trace-metadata builder never copies the
-    context, so this is belt-and-suspenders for future call sites and custom
-    tracer configurations.
-    """
+    "执行 redact_secret_context_keys 的明确职责，并返回与调用约定一致的结果。\n\nReturn a shallow copy of ``context`` with secret-bearing keys removed.\n\n    Defensive helper for any code path that serializes the run context into an\n    observable surface. DeerFlow's own trace-metadata builder never copies the\n    context, so this is belt-and-suspenders for future call sites and custom\n    tracer configurations.\n    "
     if not isinstance(context, dict):
         return context
     return {key: value for key, value in context.items() if key not in REDACTED_CONTEXT_KEYS}
 
 
 def redact_config_secrets(config: Any) -> Any:
-    """Return a copy of a run config safe to persist or echo back to clients.
-
-    The request config (``body.config``) is stored verbatim on the run record
-    (``runs.kwargs_json``) and echoed by the run API. Strip the secret-bearing
-    keys from its ``context`` so a request-scoped secret is never persisted or
-    returned, while the live config that drives the run (built separately) keeps
-    them. Non-dict / context-less configs pass through unchanged.
-    """
+    '执行 redact_config_secrets 的明确职责，并返回与调用约定一致的结果。\n\nReturn a copy of a run config safe to persist or echo back to clients.\n\n    The request config (``body.config``) is stored verbatim on the run record\n    (``runs.kwargs_json``) and echoed by the run API. Strip the secret-bearing\n    keys from its ``context`` so a request-scoped secret is never persisted or\n    returned, while the live config that drives the run (built separately) keeps\n    them. Non-dict / context-less configs pass through unchanged.\n    '
     if not isinstance(config, dict):
         return config
     context = config.get("context")

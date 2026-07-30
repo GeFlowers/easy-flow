@@ -5,6 +5,7 @@ import * as SeparatorPrimitive from "@radix-ui/react-separator";
 
 import { cn } from "@/lib/utils";
 
+/** Separator 内部组件：组织对应的界面结构与交互语义。 */
 function Separator({
   className,
   orientation = "horizontal",

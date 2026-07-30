@@ -33,6 +33,11 @@ const SAMPLE_TASK = {
   updated_at: "2026-07-01T00:00:00+00:00",
 };
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 jsonResponse 的约定。
+
+ */
+
 function jsonResponse(body: unknown, ok = true): Response {
   return {
     ok,
@@ -41,6 +46,11 @@ function jsonResponse(body: unknown, ok = true): Response {
     json: async () => body,
   } as Response;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 errorResponse 的约定。
+
+ */
 
 function errorResponse(
   detail: string,
@@ -60,6 +70,11 @@ describe("scheduled tasks api", () => {
     mockedFetch.mockReset();
   });
 
+  /**
+   * 覆盖“fetchScheduledTasks hits GET /api/scheduled-tasks”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("fetchScheduledTasks hits GET /api/scheduled-tasks", async () => {
     mockedFetch.mockResolvedValue(jsonResponse([SAMPLE_TASK]));
 
@@ -73,6 +88,11 @@ describe("scheduled tasks api", () => {
     expect(call?.[1]?.method).toBeUndefined();
     expect(result).toEqual([SAMPLE_TASK]);
   });
+
+  /**
+   * 覆盖“createScheduledTask hits POST /api/scheduled-tasks with payload”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("createScheduledTask hits POST /api/scheduled-tasks with payload", async () => {
     mockedFetch.mockResolvedValue(jsonResponse(SAMPLE_TASK));
@@ -99,6 +119,11 @@ describe("scheduled tasks api", () => {
     expect(result).toEqual(SAMPLE_TASK);
   });
 
+  /**
+   * 覆盖“throws an Error carrying backend detail on failure”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("throws an Error carrying backend detail on failure", async () => {
     mockedFetch.mockResolvedValue(
       errorResponse("Cron expression is invalid", 422, "Unprocessable Entity"),
@@ -109,12 +134,17 @@ describe("scheduled tasks api", () => {
     );
   });
 
+  /**
+   * 覆盖“falls back to a generic message when detail is missing”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("falls back to a generic message when detail is missing", async () => {
     mockedFetch.mockResolvedValue({
       ok: false,
       status: 502,
       statusText: "Bad Gateway",
-      // body is not valid JSON → body.detail is undefined → fallback used
+      // body 不是有效 JSON → body.detail 为 undefined → 使用回退值
       json: async () => {
         throw new SyntaxError("Unexpected token");
       },

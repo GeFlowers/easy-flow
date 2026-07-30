@@ -3,6 +3,9 @@ import { expect, test } from "@playwright/test";
 import { MOCK_THREAD_ID, mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("UI polish mobile regressions", () => {
+  /**
+   * 覆盖“workspace exposes mobile sidebar navigation from the chat header”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("workspace exposes mobile sidebar navigation from the chat header", async ({
     page,
   }) => {
@@ -19,6 +22,11 @@ test.describe("UI polish mobile regressions", () => {
       .poll(() => page.evaluate(() => document.documentElement.scrollWidth))
       .toBeLessThanOrEqual(375);
   });
+
+  /**
+   * 覆盖“mobile artifacts open in a drawer without horizontal overflow”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("mobile artifacts open in a drawer without horizontal overflow", async ({
     page,
@@ -46,11 +54,21 @@ test.describe("UI polish mobile regressions", () => {
       .toBeLessThanOrEqual(375);
   });
 
+  /**
+   * 覆盖“global focus ring tokens are visible in light and dark themes”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("global focus ring tokens are visible in light and dark themes", async ({
     page,
   }) => {
     mockLangGraphAPI(page);
     await page.goto("/workspace/chats/new");
+
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 readRing 约定的逻辑。
+
+     */
 
     const readRing = () =>
       page.evaluate(() =>
@@ -71,8 +89,7 @@ test.describe("UI polish mobile regressions", () => {
     expect(darkRing).not.toBe("transparent");
     expect(darkRing).not.toBe("");
 
-    // The two themes must resolve to different ring tokens, otherwise the test
-    // would pass trivially if <html> were stuck in one mode.
+    // 两个主题必须解析为不同的 ring token，否则若 <html> 固定在某一种模式下，测试会轻易通过。
     expect(darkRing).not.toBe(lightRing);
   });
 });

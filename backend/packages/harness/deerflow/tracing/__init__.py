@@ -1,3 +1,4 @@
+'定义 __init__ 模块提供的职责与可复用接口'
 from .factory import build_tracing_callbacks
 from .metadata import build_langfuse_trace_metadata, inject_langfuse_metadata
 from .monocle import setup_monocle_tracing_if_enabled

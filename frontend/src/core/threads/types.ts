@@ -2,6 +2,7 @@ import type { Message, Thread } from "@langchain/langgraph-sdk";
 
 import type { Todo } from "../todos";
 
+/** 线程目标的当前状态及最近一次评估结果。 */
 export interface GoalState {
   objective: string;
   status: "active";
@@ -29,6 +30,7 @@ export interface GoalState {
   };
 }
 
+/** 智能体线程在运行时维护的可渲染状态。 */
 export interface AgentThreadState extends Record<string, unknown> {
   title: string;
   messages: Message[];
@@ -37,6 +39,7 @@ export interface AgentThreadState extends Record<string, unknown> {
   goal?: GoalState | null;
 }
 
+/** 提交线程运行时附带的智能体与模型上下文。 */
 export interface AgentThreadContext extends Record<string, unknown> {
   thread_id: string;
   model_name: string | undefined;
@@ -47,10 +50,12 @@ export interface AgentThreadContext extends Record<string, unknown> {
   agent_name?: string;
 }
 
+/** 带有 DeerFlow 状态和上下文的 LangGraph 线程。 */
 export interface AgentThread extends Thread<AgentThreadState> {
   context?: AgentThreadContext;
 }
 
+/** 持久化运行事件中的单条消息及其元数据。 */
 export interface RunMessage {
   run_id: string;
   seq?: number;
@@ -62,6 +67,7 @@ export interface RunMessage {
   created_at: string;
 }
 
+/** 线程累计令牌用量接口的响应结构。 */
 export interface ThreadTokenUsageResponse {
   thread_id: string;
   total_tokens: number;

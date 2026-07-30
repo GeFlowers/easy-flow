@@ -7,6 +7,11 @@ import {
   MOCK_THREAD_ID_2,
 } from "./utils/mock-api";
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 textFromContent 的约定。
+
+ */
+
 function textFromContent(content: unknown) {
   if (typeof content === "string") {
     return content;
@@ -25,6 +30,11 @@ function textFromContent(content: unknown) {
     )
     .join("");
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 selectTextOnPage 的约定。
+
+ */
 
 async function selectTextOnPage(
   page: Page,
@@ -68,6 +78,11 @@ async function selectTextOnPage(
   await expect(page.locator("[data-sidecar-selection-toolbar]")).toBeVisible();
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 clickSelectionToolbarButton 的约定。
+
+ */
+
 async function clickSelectionToolbarButton(page: Page, label: string) {
   const clicked = await page.evaluate((buttonLabel) => {
     const button = Array.from(
@@ -85,6 +100,11 @@ async function clickSelectionToolbarButton(page: Page, label: string) {
   }, label);
   expect(clicked).toBe(true);
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 selectTextAndClickToolbarButton 的约定。
+
+ */
 
 async function selectTextAndClickToolbarButton(
   page: Page,
@@ -104,6 +124,11 @@ async function selectTextAndClickToolbarButton(
   }
   throw lastError;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 expectSidecarSelectionToolbarActions 的约定。
+
+ */
 
 async function expectSidecarSelectionToolbarActions(page: Page, text: string) {
   let lastError: unknown;
@@ -131,8 +156,16 @@ async function expectSidecarSelectionToolbarActions(page: Page, text: string) {
   throw lastError;
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 expectComposerHeightsEqual 的约定。
+
+ */
+
 async function expectComposerHeightsEqual(page: Page) {
   const metrics = await page.evaluate(() => {
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 findFormByPlaceholder 约定的逻辑。
+     */
     const findFormByPlaceholder = (pattern: RegExp) => {
       const textarea = Array.from(document.querySelectorAll("textarea")).find(
         (element) => pattern.test(element.getAttribute("placeholder") ?? ""),
@@ -160,8 +193,16 @@ async function expectComposerHeightsEqual(page: Page) {
   expect(metrics.sidecar?.bottomGap).toBe(metrics.main?.bottomGap);
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 expectSidecarModelPinnedToSubmit 的约定。
+
+ */
+
 async function expectSidecarModelPinnedToSubmit(page: Page) {
   const metrics = await page.evaluate(() => {
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 getComposerMetrics 约定的逻辑。
+     */
     const getComposerMetrics = (placeholderPattern: RegExp) => {
       const textarea = Array.from(document.querySelectorAll("textarea")).find(
         (element) =>
@@ -236,6 +277,11 @@ async function expectSidecarModelPinnedToSubmit(page: Page) {
   expect(sidecar.overflows).toBe(false);
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 expectSidecarModelHiddenWhenCompact 的约定。
+
+ */
+
 async function expectSidecarModelHiddenWhenCompact(page: Page) {
   const metrics = await page.evaluate(() => {
     const sideTextarea = Array.from(document.querySelectorAll("textarea")).find(
@@ -286,6 +332,11 @@ async function expectSidecarModelHiddenWhenCompact(page: Page) {
   expect(metrics!.overflows).toBe(false);
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 expectSidecarScrollDoesNotAnimateAfterOpen 的约定。
+
+ */
+
 async function expectSidecarScrollDoesNotAnimateAfterOpen(page: Page) {
   await page.waitForFunction(() => {
     const root = document.querySelector('[data-testid="sidecar-message-list"]');
@@ -321,6 +372,11 @@ async function expectSidecarScrollDoesNotAnimateAfterOpen(page: Page) {
 
   expect(secondScrollTop).toBe(firstScrollTop);
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 openSidecarAndExpectNoAnimatedScroll 的约定。
+
+ */
 
 async function openSidecarAndExpectNoAnimatedScroll(page: Page) {
   await page.evaluate(() => {
@@ -403,6 +459,9 @@ async function openSidecarAndExpectNoAnimatedScroll(page: Page) {
 }
 
 test.describe("Side chat", () => {
+  /**
+   * 覆盖“creates a hidden sidecar thread from selected quoted text”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("creates a hidden sidecar thread from selected quoted text", async ({
     page,
   }) => {
@@ -695,6 +754,9 @@ test.describe("Side chat", () => {
         });
       },
     );
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 fulfillSidecarRunStream 约定的逻辑。
+     */
     const fulfillSidecarRunStream = (route: Route) => {
       const body = route.request().postDataJSON() as typeof streamBody;
       if (body?.input?.messages) {
@@ -785,8 +847,8 @@ test.describe("Side chat", () => {
     await expect(
       page.getByRole("heading", { name: "Ask a follow-up" }),
     ).toBeVisible();
-    // Draft state (no thread created yet): the header shows a plain close (X),
-    // not the destructive delete — there is nothing persisted to delete.
+    // 草稿状态（尚未创建线程）：页头显示普通关闭按钮（X），而不是破坏性的删除操作，
+    // 因为没有已持久化内容可删除。
     await expect(page.getByTestId("sidecar-close-button")).toBeVisible();
     await expect(page.getByTestId("sidecar-delete-button")).toBeHidden();
     const sidecarReference = page.getByTestId("sidecar-reference-attachment");
@@ -951,8 +1013,7 @@ test.describe("Side chat", () => {
     await expectComposerHeightsEqual(page);
     await expect(page.getByTestId("sidecar-header-trigger")).toBeVisible();
 
-    // Hiding the side chat is owned by the header trigger; the panel's own
-    // button deletes the side chat instead of hiding it.
+    // 隐藏侧边聊天由页头触发器负责；面板自身按钮会删除侧边聊天，而非仅将其隐藏。
     await expect(
       page.getByTestId("sidecar-header-trigger"),
     ).toHaveAccessibleName("Close side chat");
@@ -971,9 +1032,8 @@ test.describe("Side chat", () => {
         .first(),
     ).toBeVisible();
 
-    // Selecting text inside the side chat itself only offers "Add to
-    // conversation" (no "Ask in side chat"), and the snippet attaches to the
-    // side chat's own composer rather than the main composer's quotes.
+    // 在侧边聊天内部选中文本只提供“Add to conversation”（不提供“Ask in side chat”），
+    // 且片段附加到侧边聊天自己的编辑器，而不是主编辑器的引用。
     await expectSidecarSelectionToolbarActions(page, "Hello from DeerFlow!");
     await selectTextAndClickToolbarButton(
       page,
@@ -1071,6 +1131,11 @@ test.describe("Side chat", () => {
       .toBe(1);
   });
 
+  /**
+   * 覆盖“shows reference summary on visible messages with reference metadata”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("shows reference summary on visible messages with reference metadata", async ({
     page,
   }) => {
@@ -1128,6 +1193,11 @@ test.describe("Side chat", () => {
       /max-w-\[min\(18rem,100%\)\]/,
     );
   });
+
+  /**
+   * 覆盖“opens restored side chat history without animated scroll”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("opens restored side chat history without animated scroll", async ({
     page,
@@ -1205,6 +1275,11 @@ test.describe("Side chat", () => {
     await openSidecarAndExpectNoAnimatedScroll(page);
   });
 
+  /**
+   * 覆盖“self-heals the trigger when the sidecar thread is deleted elsewhere”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("self-heals the trigger when the sidecar thread is deleted elsewhere", async ({
     page,
   }) => {
@@ -1260,8 +1335,7 @@ test.describe("Side chat", () => {
       timeout: 10_000,
     });
 
-    // Simulate the sidecar thread being deleted from another surface: the
-    // backend search now returns no matching sidecar thread.
+    // 模拟侧边栏线程被其他界面删除：后端搜索现在不返回匹配的侧边栏线程。
     await page.route("**/api/langgraph/threads/search", (route) => {
       if (route.request().method() !== "POST") {
         return route.fallback();
@@ -1273,14 +1347,19 @@ test.describe("Side chat", () => {
       });
     });
 
-    // Clicking the (still-cached) trigger forces a re-query; because the thread
-    // is gone the trigger hides itself instead of opening a dead thread (#3555).
+    // 点击仍在缓存中的触发器会强制重新查询；线程已不存在，因此触发器会自行隐藏，
+    // 而不会打开失效线程（#3555）。
     await page.getByTestId("sidecar-header-trigger").click();
     await expect(page.getByTestId("sidecar-panel")).toBeHidden();
     await expect(page.getByTestId("sidecar-header-trigger")).toBeHidden({
       timeout: 10_000,
     });
   });
+
+  /**
+   * 覆盖“deletes the side chat from the panel's own button”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("deletes the side chat from the panel's own button", async ({
     page,
@@ -1337,11 +1416,11 @@ test.describe("Side chat", () => {
       timeout: 10_000,
     });
 
-    // Open the side chat panel via the header trigger.
+    // 通过页头触发器打开侧边聊天面板。
     await page.getByTestId("sidecar-header-trigger").click();
     await expect(page.getByTestId("sidecar-panel")).toBeVisible();
 
-    // The panel's own button deletes the side chat (it does not merely hide it).
+    // 面板自身按钮会删除侧边聊天（并非仅隐藏）。
     await page.getByTestId("sidecar-delete-button").click();
     await expect(
       page.getByText("This action cannot be undone", { exact: false }),
@@ -1355,13 +1434,17 @@ test.describe("Side chat", () => {
     await page.getByTestId("sidecar-delete-confirm-button").click();
     await deleteRequestPromise;
 
-    // The panel closes and, because the sidecar thread is gone, the header
-    // trigger unmounts too — hiding is owned by the trigger, deleting by this.
+    // 面板关闭；侧边栏线程已消失，页头触发器也会卸载：隐藏由触发器负责，删除由此按钮负责。
     await expect(page.getByTestId("sidecar-panel")).toBeHidden();
     await expect(page.getByTestId("sidecar-header-trigger")).toBeHidden({
       timeout: 10_000,
     });
   });
+
+  /**
+   * 覆盖“keeps the delete dialog open while the delete is in flight”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("keeps the delete dialog open while the delete is in flight", async ({
     page,
@@ -1410,8 +1493,7 @@ test.describe("Side chat", () => {
       ],
     });
 
-    // Hold the local-delete step open so the mutation stays pending while we
-    // probe every dismissal path Radix would otherwise honor.
+    // 阻塞本地删除步骤，使 mutation 在探测 Radix 原本允许的每种关闭路径时保持 pending。
     let releaseDelete: (() => void) | undefined;
     const deleteGate = new Promise<void>((resolve) => {
       releaseDelete = resolve;
@@ -1438,24 +1520,24 @@ test.describe("Side chat", () => {
     await page.getByTestId("sidecar-delete-button").click();
     const dialogTitle = page.getByRole("heading", { name: "Delete side chat" });
     await expect(dialogTitle).toBeVisible();
-    // The built-in Radix close (X) is present before the delete starts.
+    // 删除开始前，内置 Radix 关闭按钮（X）存在。
     await expect(
       page.locator('[data-slot="dialog-content"] [data-slot="dialog-close"]'),
     ).toHaveCount(1);
 
     await page.getByTestId("sidecar-delete-confirm-button").click();
 
-    // Delete is in flight: confirm shows the loading label and Cancel disables.
+    // 删除进行中：确认按钮显示加载标签，取消按钮禁用。
     await expect(
       page.getByTestId("sidecar-delete-confirm-button"),
     ).toBeDisabled();
     await expect(page.getByRole("button", { name: "Cancel" })).toBeDisabled();
-    // The built-in close (X) is removed so it can't imply a cancel.
+    // 移除内置关闭按钮（X），避免其暗示可取消操作。
     await expect(
       page.locator('[data-slot="dialog-content"] [data-slot="dialog-close"]'),
     ).toHaveCount(0);
 
-    // Esc and overlay clicks must not dismiss the dialog mid-delete.
+    // 删除过程中，Esc 和点击遮罩层均不得关闭对话框。
     await page.keyboard.press("Escape");
     await expect(dialogTitle).toBeVisible();
     await page
@@ -1463,11 +1545,16 @@ test.describe("Side chat", () => {
       .click({ position: { x: 5, y: 5 } });
     await expect(dialogTitle).toBeVisible();
 
-    // Once the delete resolves the dialog closes and the panel goes away.
+    // 删除完成后，对话框关闭且面板消失。
     releaseDelete?.();
     await expect(dialogTitle).toBeHidden({ timeout: 10_000 });
     await expect(page.getByTestId("sidecar-panel")).toBeHidden();
   });
+
+  /**
+   * 覆盖“closes the draft side chat without deleting when no conversation exists”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("closes the draft side chat without deleting when no conversation exists", async ({
     page,
@@ -1530,7 +1617,7 @@ test.describe("Side chat", () => {
       page.getByText("Build it as a side conversation."),
     ).toBeVisible({ timeout: 15_000 });
 
-    // Open the side chat as a draft (references only, no thread created yet).
+    // 以草稿方式打开侧边聊天（仅引用，尚未创建线程）。
     await selectTextAndClickToolbarButton(
       page,
       "Build it as a side conversation.",
@@ -1541,13 +1628,12 @@ test.describe("Side chat", () => {
       page.getByTestId("sidecar-reference-attachment"),
     ).toBeVisible();
 
-    // The draft has no persisted thread, so the header offers a plain close (X)
-    // instead of the destructive delete button.
+    // 草稿没有已持久化线程，因此页头提供普通关闭按钮（X），而非破坏性的删除按钮。
     await expect(page.getByTestId("sidecar-delete-button")).toBeHidden();
     await page.getByTestId("sidecar-close-button").click();
 
     await expect(page.getByTestId("sidecar-panel")).toBeHidden();
-    // No thread was ever created, so closing must not issue a DELETE request.
+    // 从未创建线程，因此关闭不得发起 DELETE 请求。
     expect(deleteRequestFired).toBe(false);
   });
 });

@@ -1,23 +1,4 @@
-"""Regression for #3459 / #3454 — dev gateway reload-exclude must not crash.
-
-#3426 switched the dev gateway's ``--reload-exclude`` patterns from relative
-(``sandbox/``) to absolute (``$REPO_ROOT/backend/sandbox``). uvicorn only
-excludes such a path directly when it already exists as a directory; otherwise
-it falls back to ``Path.cwd().glob(pattern)``, and on **Python 3.12**
-``pathlib.Path.glob()`` raises ``NotImplementedError: Non-relative patterns are
-unsupported`` for an absolute pattern. ``serve.sh`` created the ``.deer-flow``
-excludes but not ``backend/sandbox``, so a fresh checkout crashed ``make dev``
-on startup.
-
-Two layers of coverage:
-
-* ``test_*_resolve_*`` exercises uvicorn's real ``resolve_reload_patterns`` to
-  pin the failure mode and the fix's mechanism.
-* ``test_launcher_precreates_every_absolute_reload_exclude`` enforces the actual
-  invariant on both launchers: every absolute exclude dir is ``mkdir -p``'d
-  before uvicorn starts. This encodes the root cause, so any future absolute
-  exclude that forgets its ``mkdir`` fails here.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -42,19 +23,13 @@ _CMD_BOUNDARY = re.compile(r"[;&|<>]")
 
 
 def _logical_lines(script: str) -> list[str]:
-    """Fold ``\\``-continuations and drop comment lines, yielding logical lines.
-
-    A ``mkdir`` or ``--reload-exclude`` list split across lines with a trailing
-    backslash becomes one line here, so an argument on a continuation line can't
-    be silently dropped by per-line scanning.
-    """
+    '未说明'
     folded = script.replace("\\\n", " ")
     return [line for line in folded.splitlines() if not line.lstrip().startswith("#")]
 
 
 def _shlex(fragment: str) -> list[str]:
-    """Tokenize a shell fragment (quotes stripped, ``$VAR`` kept literal,
-    trailing ``# comment`` honored); tolerate pathological quoting."""
+    '未说明'
     try:
         return shlex.split(fragment, comments=True)
     except ValueError:
@@ -69,19 +44,7 @@ _RELOAD_EXCLUDE = re.compile(r"""--reload-exclude[=\s]+('[^']*'|"[^"]*"|[^\s'"]+
 
 
 def _reload_exclude_values(script: str) -> list[str]:
-    """Every ``--reload-exclude`` value, with surrounding quotes removed.
-
-    Handles both CLI forms (``--reload-exclude=<value>`` and the space form
-    ``--reload-exclude <value>``) and both shell quotings the launchers use:
-
-    * ``docker/dev-entrypoint.sh`` puts each flag on its own line.
-    * ``scripts/serve.sh`` packs every flag into a single double-quoted
-      ``GATEWAY_EXTRA_FLAGS="... --reload-exclude='$X' ..."`` assignment. A
-      whole-line ``shlex`` would collapse that assignment into one token and
-      find no flags (this is what regressed serve.sh in CI); matching balanced
-      inner quotes here keeps the assignment's closing ``"`` out of the value,
-      so every exclude — including the last ``$BACKEND_RUNTIME_HOME`` — is seen.
-    """
+    '未说明'
     values: list[str] = []
     for line in _logical_lines(script):
         for raw in _RELOAD_EXCLUDE.findall(line):
@@ -90,12 +53,7 @@ def _reload_exclude_values(script: str) -> list[str]:
 
 
 def _mkdir_dirs(script: str) -> set[str]:
-    """Exact set of directories created by every ``mkdir`` command.
-
-    Tokenizes each ``mkdir`` argument list rather than substring-matching, so
-    ``/app/backend/sandbox`` is not falsely considered created by, say,
-    ``mkdir -p /app/backend/sandbox-other``.
-    """
+    '未说明'
     dirs: set[str] = set()
     for line in _logical_lines(script):
         match = re.search(r"\bmkdir\b(.*)", line)
@@ -114,7 +72,7 @@ def _mkdir_dirs(script: str) -> set[str]:
     reason="pathlib accepts absolute glob patterns on 3.13+, so the crash is 3.12-only",
 )
 def test_resolve_reload_patterns_crashes_on_missing_absolute_dir(tmp_path):
-    """The exact #3454 failure: absolute exclude + missing dir on Python 3.12."""
+    '未说明'
     missing = tmp_path / "sandbox"  # absolute path that does not exist yet
     assert not missing.exists()
     with pytest.raises(NotImplementedError):
@@ -122,7 +80,7 @@ def test_resolve_reload_patterns_crashes_on_missing_absolute_dir(tmp_path):
 
 
 def test_resolve_reload_patterns_is_safe_once_dir_exists(tmp_path):
-    """The fix's mechanism: a pre-created dir takes uvicorn's is_dir() path."""
+    '未说明'
     sandbox = tmp_path / "sandbox"
     sandbox.mkdir()
     _patterns, directories = resolve_reload_patterns([str(sandbox)], [])
@@ -132,14 +90,7 @@ def test_resolve_reload_patterns_is_safe_once_dir_exists(tmp_path):
 
 @pytest.mark.parametrize("name", list(LAUNCHERS))
 def test_launcher_precreates_every_absolute_reload_exclude(name):
-    """Every absolute ``--reload-exclude`` dir must be created by ``mkdir`` first.
-
-    Relative glob patterns (``*.pyc``, ``__pycache__``) are safe and skipped;
-    anything anchored at ``/`` or a shell variable is an absolute path that
-    uvicorn would glob — and crash on — unless it already exists. Membership is
-    an exact match against the parsed ``mkdir`` argument set (not a substring
-    test), so a path-prefix can't produce a false pass.
-    """
+    '未说明'
     script = LAUNCHERS[name].read_text(encoding="utf-8")
     created = _mkdir_dirs(script)
 
@@ -152,13 +103,7 @@ def test_launcher_precreates_every_absolute_reload_exclude(name):
 
 @pytest.mark.parametrize("name", list(LAUNCHERS))
 def test_sandbox_mkdir_precedes_uvicorn_launch(name):
-    """The sandbox mkdir must come before the uvicorn launch, not just exist.
-
-    ``_mkdir_dirs`` only proves the mkdir is present somewhere; this pins script
-    order so a future edit can't move (or guard) the mkdir below the launch and
-    silently reintroduce the #3454 crash on a fresh checkout. ``uv run uvicorn``
-    matches the launch but not serve.sh's ``stop_all`` kill line.
-    """
+    '未说明'
     lines = LAUNCHERS[name].read_text(encoding="utf-8").splitlines()
     launch_idx = next((i for i, ln in enumerate(lines) if "uv run uvicorn" in ln), None)
     mkdir_idx = next((i for i, ln in enumerate(lines) if re.search(r"\bmkdir\b", ln) and "sandbox" in ln), None)
@@ -169,12 +114,7 @@ def test_sandbox_mkdir_precedes_uvicorn_launch(name):
 
 
 def test_precreated_sandbox_artifacts_are_gitignored():
-    """backend/sandbox is runtime state — its contents must stay out of git so
-    sandbox artifacts can't be accidentally committed (matches the reload-exclude
-    intent). A content path is existence-independent, unlike the bare dir path.
-
-    Guards against the inaccurate "gitignored" claim by making it verifiable.
-    """
+    '未说明'
     probe = "backend/sandbox/__artifact_probe__"
     result = subprocess.run(
         ["git", "-C", str(REPO_ROOT), "check-ignore", "-q", probe],

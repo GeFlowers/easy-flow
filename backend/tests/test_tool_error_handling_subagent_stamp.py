@@ -1,4 +1,4 @@
-"""Tests for task exception metadata produced by ToolErrorHandlingMiddleware."""
+'未说明'
 
 from __future__ import annotations
 
@@ -17,17 +17,20 @@ from deerflow.subagents.status_contract import (
 
 
 class _FakeRequest:
-    """Stand-in for ``ToolCallRequest`` used by the middleware."""
+    '未说明'
 
     def __init__(self, tool_name: str, tool_call_id: str = "call-1") -> None:
+        '未说明'
         self.tool_call = {"name": tool_name, "id": tool_call_id}
 
 
 def test_task_tool_exception_returns_failed_metadata():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     request = _FakeRequest("task")
 
     def handler(_req):
+        '未说明'
         raise RuntimeError("blew up during execution")
 
     result = middleware.wrap_tool_call(request, handler)
@@ -38,10 +41,12 @@ def test_task_tool_exception_returns_failed_metadata():
 
 
 def test_async_task_tool_exception_returns_failed_metadata():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     request = _FakeRequest("task")
 
     async def handler(_req):
+        '未说明'
         raise RuntimeError("async boom")
 
     result = asyncio.run(middleware.awrap_tool_call(request, handler))
@@ -52,10 +57,12 @@ def test_async_task_tool_exception_returns_failed_metadata():
 
 
 def test_successful_plain_task_tool_message_is_not_stamped_from_content():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     request = _FakeRequest("task")
 
     def handler(_req):
+        '未说明'
         return ToolMessage(content="Task Succeeded. Result: ok", tool_call_id="call-1", name="task")
 
     result = middleware.wrap_tool_call(request, handler)
@@ -65,10 +72,12 @@ def test_successful_plain_task_tool_message_is_not_stamped_from_content():
 
 
 def test_does_not_stamp_non_task_tool_exception():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     request = _FakeRequest("bash")
 
     def handler(_req):
+        '未说明'
         raise RuntimeError("command failed")
 
     result = middleware.wrap_tool_call(request, handler)
@@ -78,6 +87,7 @@ def test_does_not_stamp_non_task_tool_exception():
 
 
 def test_task_command_with_metadata_bypasses_middleware_stamp():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     request = _FakeRequest("task")
     command = Command(
@@ -97,6 +107,7 @@ def test_task_command_with_metadata_bypasses_middleware_stamp():
 
 
 def test_additional_kwargs_round_trip_via_json():
+    '未说明'
     msg = ToolMessage(
         content="Task Succeeded. Result: ok",
         tool_call_id="call-1",

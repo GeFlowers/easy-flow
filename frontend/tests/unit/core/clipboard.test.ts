@@ -45,6 +45,11 @@ afterEach(() => {
   }
 });
 
+/**
+ * 覆盖“writes text with the Clipboard API when available”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("writes text with the Clipboard API when available", async () => {
   const writeText = rs.fn().mockResolvedValue(undefined);
   Object.defineProperty(globalThis, "navigator", {
@@ -60,6 +65,11 @@ test("writes text with the Clipboard API when available", async () => {
   expect(writeText).toHaveBeenCalledWith("hello");
 });
 
+/**
+ * 覆盖“returns false when Clipboard API is unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("returns false when Clipboard API is unavailable", async () => {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -72,6 +82,11 @@ test("returns false when Clipboard API is unavailable", async () => {
 
   await expect(writeTextToClipboard("hello")).resolves.toBe(false);
 });
+
+/**
+ * 覆盖“falls back to execCommand when Clipboard API is unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("falls back to execCommand when Clipboard API is unavailable", async () => {
   const textarea = {
@@ -107,6 +122,11 @@ test("falls back to execCommand when Clipboard API is unavailable", async () => 
   expect(textarea.remove).toHaveBeenCalled();
 });
 
+/**
+ * 覆盖“falls back to parent removal when textarea.remove is unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("falls back to parent removal when textarea.remove is unavailable", async () => {
   const parentNode = {
     removeChild: rs.fn(),
@@ -139,6 +159,11 @@ test("falls back to parent removal when textarea.remove is unavailable", async (
   expect(parentNode.removeChild).toHaveBeenCalledWith(textarea);
 });
 
+/**
+ * 覆盖“does not fail cleanup when textarea removal APIs are unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("does not fail cleanup when textarea removal APIs are unavailable", async () => {
   const textarea = {
     parentNode: {},
@@ -165,6 +190,11 @@ test("does not fail cleanup when textarea removal APIs are unavailable", async (
 
   await expect(writeTextToClipboard("hello")).resolves.toBe(true);
 });
+
+/**
+ * 覆盖“cleans up the textarea when selecting text fails”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("cleans up the textarea when selecting text fails", async () => {
   const textarea = {
@@ -196,6 +226,11 @@ test("cleans up the textarea when selecting text fails", async () => {
   expect(textarea.remove).toHaveBeenCalled();
 });
 
+/**
+ * 覆盖“returns false when execCommand fallback fails”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("returns false when execCommand fallback fails", async () => {
   const textarea = {
     remove: rs.fn(),
@@ -224,6 +259,11 @@ test("returns false when execCommand fallback fails", async () => {
   expect(textarea.remove).toHaveBeenCalled();
 });
 
+/**
+ * 覆盖“returns false when execCommand fallback cannot create an element”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("returns false when execCommand fallback cannot create an element", async () => {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -242,6 +282,11 @@ test("returns false when execCommand fallback cannot create an element", async (
   await expect(writeTextToClipboard("hello")).resolves.toBe(false);
 });
 
+/**
+ * 覆盖“returns false when navigator is unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("returns false when navigator is unavailable", async () => {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -254,6 +299,11 @@ test("returns false when navigator is unavailable", async () => {
 
   await expect(writeTextToClipboard("hello")).resolves.toBe(false);
 });
+
+/**
+ * 覆盖“returns false when Clipboard API rejects”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("returns false when Clipboard API rejects", async () => {
   const writeText = rs.fn().mockRejectedValue(new Error("denied"));
@@ -268,6 +318,11 @@ test("returns false when Clipboard API rejects", async () => {
 
   await expect(writeTextToClipboard("hello")).resolves.toBe(false);
 });
+
+/**
+ * 覆盖“installs a writeText fallback when Clipboard API is unavailable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installs a writeText fallback when Clipboard API is unavailable", async () => {
   const textarea = {
@@ -307,6 +362,11 @@ test("installs a writeText fallback when Clipboard API is unavailable", async ()
   expect(textarea.remove).toHaveBeenCalled();
 });
 
+/**
+ * 覆盖“installed writeText fallback rejects instead of throwing synchronously”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installed writeText fallback rejects instead of throwing synchronously", async () => {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -323,6 +383,11 @@ test("installed writeText fallback rejects instead of throwing synchronously", a
   expect(result).toBeInstanceOf(Promise);
   await expect(result).rejects.toThrow("Clipboard DOM fallback not available");
 });
+
+/**
+ * 覆盖“installed writeText fallback converts thrown DOM failures to rejections”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installed writeText fallback converts thrown DOM failures to rejections", async () => {
   Object.defineProperty(globalThis, "navigator", {
@@ -348,6 +413,11 @@ test("installed writeText fallback converts thrown DOM failures to rejections", 
   expect(result).toBeInstanceOf(Promise);
   await expect(result).rejects.toThrow("dom unavailable");
 });
+
+/**
+ * 覆盖“installed writeText fallback distinguishes copy command failure”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installed writeText fallback distinguishes copy command failure", async () => {
   Object.defineProperty(globalThis, "navigator", {
@@ -377,6 +447,11 @@ test("installed writeText fallback distinguishes copy command failure", async ()
     globalThis.navigator.clipboard.writeText("hello"),
   ).rejects.toThrow("Clipboard copy command failed");
 });
+
+/**
+ * 覆盖“installs a write fallback for ClipboardItem text/plain payloads”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installs a write fallback for ClipboardItem text/plain payloads", async () => {
   const textarea = {
@@ -417,6 +492,11 @@ test("installs a write fallback for ClipboardItem text/plain payloads", async ()
   expect(execCommand).toHaveBeenCalledWith("copy");
 });
 
+/**
+ * 覆盖“installed write fallback rejects when ClipboardItem lacks text/plain”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installed write fallback rejects when ClipboardItem lacks text/plain", async () => {
   const execCommand = rs.fn().mockReturnValue(true);
 
@@ -452,6 +532,11 @@ test("installed write fallback rejects when ClipboardItem lacks text/plain", asy
   );
   expect(execCommand).not.toHaveBeenCalled();
 });
+
+/**
+ * 覆盖“installed write fallback rejects when getType cannot provide text/plain”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installed write fallback rejects when getType cannot provide text/plain", async () => {
   const execCommand = rs.fn().mockReturnValue(true);
@@ -490,6 +575,11 @@ test("installed write fallback rejects when getType cannot provide text/plain", 
   expect(execCommand).not.toHaveBeenCalled();
 });
 
+/**
+ * 覆盖“installed write fallback rejects before getType when item types exclude text/plain”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installed write fallback rejects before getType when item types exclude text/plain", async () => {
   const getType = rs.fn().mockResolvedValue(new Blob(["ignored"]));
   Object.defineProperty(globalThis, "navigator", {
@@ -514,6 +604,11 @@ test("installed write fallback rejects before getType when item types exclude te
   expect(getType).not.toHaveBeenCalled();
 });
 
+/**
+ * 覆盖“installed write fallback rejects when getType is missing”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installed write fallback rejects when getType is missing", async () => {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -534,6 +629,11 @@ test("installed write fallback rejects when getType is missing", async () => {
     ]),
   ).rejects.toThrow("Clipboard item cannot read text/plain data");
 });
+
+/**
+ * 覆盖“installed write fallback rejects when getType returns a non-Blob”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installed write fallback rejects when getType returns a non-Blob", async () => {
   Object.defineProperty(globalThis, "navigator", {
@@ -556,6 +656,11 @@ test("installed write fallback rejects when getType returns a non-Blob", async (
     ]),
   ).rejects.toThrow("Clipboard item text/plain data is not a Blob");
 });
+
+/**
+ * 覆盖“installed write fallback preserves existing clipboard prototype methods”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installed write fallback preserves existing clipboard prototype methods", async () => {
   const readText = rs.fn().mockResolvedValue("existing");
@@ -587,6 +692,11 @@ test("installed write fallback preserves existing clipboard prototype methods", 
   ).rejects.toThrow("Clipboard DOM fallback not available");
 });
 
+/**
+ * 覆盖“installClipboardFallback does not replace existing clipboard methods when only ClipboardItem is missing”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installClipboardFallback does not replace existing clipboard methods when only ClipboardItem is missing", async () => {
   const write = rs.fn().mockResolvedValue(undefined);
   const writeText = rs.fn().mockResolvedValue(undefined);
@@ -613,6 +723,11 @@ test("installClipboardFallback does not replace existing clipboard methods when 
   expect(typeof globalThis.ClipboardItem).toBe("function");
 });
 
+/**
+ * 覆盖“installClipboardFallback is idempotent for the same navigator”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installClipboardFallback is idempotent for the same navigator", async () => {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -633,6 +748,11 @@ test("installClipboardFallback is idempotent for the same navigator", async () =
   expect(globalThis.navigator.clipboard).toBe(clipboard);
   expect(globalThis.ClipboardItem).toBe(ClipboardItemFallback);
 });
+
+/**
+ * 覆盖“installClipboardFallback can recover when the same navigator loses fallback globals”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installClipboardFallback can recover when the same navigator loses fallback globals", async () => {
   const navigator = {};
@@ -656,6 +776,11 @@ test("installClipboardFallback can recover when the same navigator loses fallbac
   expect(typeof globalThis.ClipboardItem).toBe("function");
 });
 
+/**
+ * 覆盖“installClipboardFallback defines writable fallback methods”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installClipboardFallback defines writable fallback methods", async () => {
   Object.defineProperty(globalThis, "navigator", {
     configurable: true,
@@ -678,6 +803,11 @@ test("installClipboardFallback defines writable fallback methods", async () => {
   ).toBe(true);
 });
 
+/**
+ * 覆盖“installClipboardFallback skips missing clipboard on non-extensible navigator while installing ClipboardItem”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("installClipboardFallback skips missing clipboard on non-extensible navigator while installing ClipboardItem", async () => {
   const navigator = {};
   Object.preventExtensions(navigator);
@@ -692,6 +822,11 @@ test("installClipboardFallback skips missing clipboard on non-extensible navigat
   expect("clipboard" in globalThis.navigator).toBe(false);
   expect(typeof globalThis.ClipboardItem).toBe("function");
 });
+
+/**
+ * 覆盖“installClipboardFallback handles non-object navigator.clipboard values”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installClipboardFallback handles non-object navigator.clipboard values", async () => {
   const navigator = {};
@@ -715,6 +850,11 @@ test("installClipboardFallback handles non-object navigator.clipboard values", a
     globalThis.navigator.clipboard.writeText("hello"),
   ).rejects.toThrow("Clipboard DOM fallback not available");
 });
+
+/**
+ * 覆盖“installClipboardFallback does not throw when ClipboardItem cannot be defined”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installClipboardFallback does not throw when ClipboardItem cannot be defined", async () => {
   const originalDefineProperty = Object.defineProperty;
@@ -740,6 +880,11 @@ test("installClipboardFallback does not throw when ClipboardItem cannot be defin
   expect(typeof globalThis.navigator.clipboard.writeText).toBe("function");
   expect("ClipboardItem" in globalThis).toBe(false);
 });
+
+/**
+ * 覆盖“installs ClipboardItem fallback when the global property exists but is unusable”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("installs ClipboardItem fallback when the global property exists but is unusable", async () => {
   Object.defineProperty(globalThis, "navigator", {

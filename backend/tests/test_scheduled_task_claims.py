@@ -1,3 +1,4 @@
+'未说明'
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -9,6 +10,7 @@ from deerflow.persistence.scheduled_tasks import ScheduledTaskRepository
 
 @pytest.mark.asyncio
 async def test_claim_due_tasks_claims_only_due_rows(tmp_path):
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -57,12 +59,7 @@ async def test_claim_due_tasks_claims_only_due_rows(tmp_path):
 
 @pytest.mark.asyncio
 async def test_claim_reclaims_task_stuck_in_running_with_expired_lease(tmp_path):
-    """A task whose claiming process died mid-dispatch must stay reclaimable.
-
-    Regression for the lease dead-end bug: claim flips status to ``running``,
-    and the old claim query only selected ``status == 'enabled'``, so a crash
-    between claim and dispatch left the task permanently un-triggerable.
-    """
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None
@@ -110,7 +107,7 @@ async def test_claim_reclaims_task_stuck_in_running_with_expired_lease(tmp_path)
 
 @pytest.mark.asyncio
 async def test_claim_skips_task_with_active_lease(tmp_path):
-    """A task whose lease has not expired must not be reclaimed."""
+    '未说明'
     await init_engine_from_config(DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path)))
     sf = get_session_factory()
     assert sf is not None

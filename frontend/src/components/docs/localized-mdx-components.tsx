@@ -11,11 +11,13 @@ import { localizeDocsHref } from "./localized-links";
 const DOCS_LINK_CLASS_NAME =
   "x:text-primary-600 x:underline x:hover:no-underline x:decoration-from-font x:[text-underline-position:from-font]";
 
+/** useDocumentLanguage Hook：封装本模块所需的状态或上下文访问。 */
 function useDocumentLanguage(): string | undefined {
   const { lang } = useParams<{ lang?: string }>();
   return lang;
 }
 
+/** LocalizedDocsLink 组件：提供对应的界面结构与交互语义。 */
 export function LocalizedDocsLink({
   href,
   className,
@@ -34,6 +36,7 @@ export function LocalizedDocsLink({
   );
 }
 
+/** LocalizedCard 组件：提供对应的界面结构与交互语义。 */
 export function LocalizedCard({
   href,
   ...props

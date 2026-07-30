@@ -50,6 +50,7 @@ function NavMenuButtonContent({
   );
 }
 
+/** 渲染工作区主导航菜单，依据当前能力开关决定可用入口。 */
 export function WorkspaceNavMenu() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [settingsDefaultSection, setSettingsDefaultSection] = useState<

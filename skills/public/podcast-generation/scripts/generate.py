@@ -1,3 +1,11 @@
+"""生成播客：选择火山引擎或 MiniMax TTS、重试合成、合并音频并可写出 Markdown 逐字稿。
+
+服务商由显式环境变量、完整火山引擎凭据和 MiniMax 凭据依次决定。每行文本在服务商
+控制的线程池中合成，瞬时请求错误会退避重试；任何一行失败即停止输出完整播客，以避免
+产生不完整文件。音频和逐字稿的父目录会按需创建，文件、JSON、网络与响应格式错误会
+在相应边界返回 ``None``、记录日志或向调用方抛出。
+"""
+
 import argparse
 import base64
 import json
@@ -23,18 +31,28 @@ DEFAULT_MINIMAX_MAX_WORKERS = 1
 
 
 class ScriptLine:
+    """表示一段待合成的播客台词，保存说话人性别标记和原始段落文本。"""
+
     def __init__(self, speaker: Literal["male", "female"] = "male", paragraph: str = ""):
+        """以默认男性说话人和空段落创建台词对象，不验证调用方传入的字段值。"""
         self.speaker = speaker
         self.paragraph = paragraph
 
 
 class Script:
+    """表示播客脚本，包含语言标记和按原始顺序排列的台词列表。"""
+
     def __init__(self, locale: Literal["en", "zh"] = "en", lines: Optional[list[ScriptLine]] = None):
+        """创建脚本；未传入台词列表时使用新的空列表，避免共享可变默认值。"""
         self.locale = locale
         self.lines = lines or []
 
     @classmethod
     def from_dict(cls, data: dict) -> "Script":
+        """从 JSON 反序列化字典构造脚本，缺失字段回退为英文、男性和空段落。
+
+        本方法不校验字段类型或可选值，畸形结构产生的访问错误将向调用方传播。
+        """
         script = cls(locale=data.get("locale", "en"))
         for line in data.get("lines", []):
             script.lines.append(
@@ -45,6 +63,11 @@ class Script:
 
 
 def _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:
+    """按显式环境变量、既有服务商凭据、MiniMax 凭据的优先级选择 TTS 服务商。
+
+    环境变量值会去空格并转小写；无可用凭据时抛出说明火山引擎和 MiniMax 凭据要求的
+    ``ValueError``，不在此处校验服务商名称是否合法。
+    """
     override = os.getenv(override_env)
     if override:
         return override.strip().lower()
@@ -60,6 +83,10 @@ def _resolve_provider(override_env: str, existing_provider: str, has_existing_cr
 
 
 def _resolve_tts_provider() -> str:
+    """解析播客 TTS 服务商，并只允许 ``volcengine`` 或 ``minimax``。
+
+    火山引擎必须同时具备应用 ID 与访问令牌才算可用；未知服务商抛出 ``ValueError``。
+    """
     has_volc = bool(
         os.getenv("VOLCENGINE_TTS_APPID") and os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
     )
@@ -72,6 +99,7 @@ def _resolve_tts_provider() -> str:
 
 
 def _default_max_retries() -> int:
+    """读取 MiniMax TTS 最大重试次数；环境变量不是整数时回退默认值。"""
     try:
         return int(os.getenv("MINIMAX_TTS_MAX_RETRIES", str(DEFAULT_TTS_MAX_RETRIES)))
     except ValueError:
@@ -79,8 +107,9 @@ def _default_max_retries() -> int:
 
 
 def _default_max_workers(provider: str) -> int:
-    """Each provider owns its own concurrency: MiniMax stays low to avoid rate
-    limits, Volcengine keeps the historical default. Not user-tunable by design.
+    """返回服务商拥有的并发数：MiniMax 保持较低以避免限流，火山引擎使用既有默认值。
+
+    并发数刻意不提供给调用方配置；未识别的服务商也按火山引擎默认值处理。
     """
     if provider == "minimax":
         return DEFAULT_MINIMAX_MAX_WORKERS
@@ -88,7 +117,7 @@ def _default_max_workers(provider: str) -> int:
 
 
 def _parse_retry_after(response) -> Optional[float]:
-    """Return the server-provided Retry-After (seconds), if any."""
+    """解析响应头中的 ``Retry-After`` 秒数；缺失或不可转换时返回 ``None``。"""
     headers = getattr(response, "headers", None) or {}
     value = headers.get("Retry-After")
     try:
@@ -98,10 +127,9 @@ def _parse_retry_after(response) -> Optional[float]:
 
 
 def _backoff_sleep(attempt: int, retry_after: Optional[float]) -> None:
-    """Sleep with exponential backoff + jitter, honoring Retry-After when present.
+    """按服务端 ``Retry-After`` 或指数退避加随机抖动后休眠。
 
-    Jitter de-synchronizes concurrent workers that all got rate-limited at once,
-    avoiding a thundering-herd retry storm.
+    随机抖动使同时被限流的并发工作线程错开重试，避免形成惊群式重试风暴。
     """
     base = retry_after if retry_after else min(2 ** attempt, 30)
     time.sleep(base + random.uniform(0, 1))
@@ -110,9 +138,10 @@ def _backoff_sleep(attempt: int, retry_after: Optional[float]) -> None:
 def text_to_speech_volcengine(
     text: str, voice_type: str, max_retries: Optional[int] = None
 ) -> Optional[bytes]:
-    """Convert text to speech using Volcengine TTS (returns base64-decoded mp3 bytes).
+    """调用火山引擎 TTS 将文本转换为 Base64 解码后的 MP3 字节。
 
-    Retries with exponential backoff on transient HTTP errors (429 / 5xx).
+    对网络异常及 HTTP 429/5xx 按指数退避重试，尊重 ``Retry-After``；其他 HTTP、业务
+    协议、空音频或耗尽重试均记录日志并返回 ``None``，不向并行工作线程抛出请求异常。
     """
     app_id = os.getenv("VOLCENGINE_TTS_APPID")
     access_token = os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
@@ -163,11 +192,11 @@ def text_to_speech_volcengine(
 def text_to_speech_minimax(
     text: str, voice_id: str, max_retries: Optional[int] = None
 ) -> Optional[bytes]:
-    """Convert text to speech using MiniMax t2a_v2 (returns hex-decoded mp3 bytes).
+    """调用 MiniMax ``t2a_v2`` 将文本转换为十六进制解码后的 MP3 字节。
 
-    Retries with exponential backoff on HTTP 429/5xx and on retryable base_resp
-    codes (rate/TPM limits, timeouts). Permanent errors (auth, balance, bad input)
-    are not retried.
+    对网络异常、HTTP 429/5xx 和可重试 ``base_resp``（限流、超时）进行指数退避重试；
+    鉴权、余额和输入等永久错误不重试。业务失败、空音频或耗尽重试记录日志并返回
+    ``None``，而环境变量缺失不会在本函数预先校验。
     """
     api_key = os.getenv("MINIMAX_API_KEY")
     host = os.getenv("MINIMAX_API_HOST", MINIMAX_DEFAULT_HOST).rstrip("/")
@@ -229,7 +258,11 @@ def text_to_speech_minimax(
 
 
 def _process_line(args: tuple[int, ScriptLine, int, str]) -> tuple[int, Optional[bytes]]:
-    """Process a single script line for TTS. Returns (index, audio_bytes)."""
+    """按服务商与说话人选择音色，合成单行台词并返回 ``(索引, 音频字节或 None)``。
+
+    MiniMax 音色可由环境变量覆盖，火山引擎使用固定男女音色；合成失败仅记录警告，
+    由上层统一判定是否中止整个播客。
+    """
     i, line, total, provider = args
     logger.info(f"Processing line {i + 1}/{total} ({line.speaker}) via {provider}")
     if provider == "minimax":
@@ -250,12 +283,10 @@ def _process_line(args: tuple[int, ScriptLine, int, str]) -> tuple[int, Optional
 
 
 def tts_node(script: Script) -> list[bytes]:
-    """Convert script lines to audio chunks using TTS with multi-threading.
+    """在服务商控制的线程池中将脚本台词合成为保持原始顺序的音频片段。
 
-    Concurrency is owned by the resolved provider (see _default_max_workers);
-    there is no caller-facing knob. Fails loudly: if any line cannot be
-    synthesized (even after retries), raise rather than silently emitting an
-    incomplete podcast.
+    MiniMax 低并发、火山引擎既有默认并发，调用方不能覆盖；空脚本、缺失所选凭据或
+    任一行在重试后仍合成失败时抛出 ``ValueError``，绝不静默产出不完整播客。
     """
     total = len(script.lines)
     if total == 0:
@@ -298,7 +329,10 @@ def tts_node(script: Script) -> list[bytes]:
 
 
 def mix_audio(audio_chunks: list[bytes]) -> bytes:
-    """Combine audio chunks into a single audio file."""
+    """按顺序拼接 MP3 音频片段并返回字节串，不做重编码或格式混音。
+
+    空列表或拼接后为空时抛出 ``ValueError``，以避免将无效输出写入播客路径。
+    """
     if not audio_chunks:
         raise ValueError("No audio chunks to mix - TTS generation may have failed")
     output = b"".join(audio_chunks)
@@ -309,6 +343,7 @@ def mix_audio(audio_chunks: list[bytes]) -> bytes:
 
 
 def generate_markdown(script: Script, title: str = "Podcast Script") -> str:
+    """将脚本按说话人名称渲染为 Markdown 逐字稿，并保留台词顺序和段落分隔。"""
     lines = [f"# {title}", ""]
     for line in script.lines:
         speaker_name = "**Host (Male)**" if line.speaker == "male" else "**Host (Female)**"
@@ -319,6 +354,12 @@ def generate_markdown(script: Script, title: str = "Podcast Script") -> str:
 
 def generate_podcast(script_file: str, output_file: str,
                      transcript_file: Optional[str] = None) -> str:
+    """从 UTF-8 JSON 脚本生成播客 MP3，并可选写入 Markdown 逐字稿。
+
+    脚本必须包含 ``lines``；若请求逐字稿，先创建其父目录并写入，再合成全部台词、拼接
+    音频并创建 ``output_file`` 的父目录。JSON、脚本结构、TTS、音频、网络与文件系统
+    异常均向调用方传播，只有底层单行 TTS 失败被转换为统一的 ``ValueError``。
+    """
     with open(script_file, "r", encoding="utf-8") as f:
         script_json = json.load(f)
     if "lines" not in script_json:

@@ -1,4 +1,4 @@
-"""Tests for scripts/support_bundle.py."""
+'未说明'
 
 from __future__ import annotations
 
@@ -10,11 +10,13 @@ import support_bundle
 
 
 def _zip_text(zip_path, name: str) -> str:
+    '未说明'
     with zipfile.ZipFile(zip_path) as zf:
         return zf.read(name).decode("utf-8")
 
 
 def test_redact_data_recursively_masks_secret_like_keys():
+    '未说明'
     data = {
         "models": [
             {
@@ -42,6 +44,7 @@ def test_redact_data_recursively_masks_secret_like_keys():
 
 
 def test_redact_data_masks_url_credentials_and_cli_flag_secrets():
+    '未说明'
     data = {
         "models": [
             {"name": "m", "base_url": "https://admin:S3cr3tPass@proxy.internal/v1"},
@@ -68,6 +71,7 @@ def test_redact_data_masks_url_credentials_and_cli_flag_secrets():
 
 
 def test_redact_data_masks_inline_and_credential_only_url_secrets():
+    '未说明'
     data = {
         "mcpServers": {
             "svc": {"command": "npx", "args": ["server", "--api-key=LIVE-COMBINED-SECRET"]},
@@ -84,6 +88,7 @@ def test_redact_data_masks_inline_and_credential_only_url_secrets():
 
 
 def test_redact_text_masks_url_userinfo_and_query_secrets():
+    '未说明'
     text = "\n".join(
         [
             "base_url: https://admin:S3cr3tPass@proxy.internal/v1",
@@ -102,11 +107,13 @@ def test_redact_text_masks_url_userinfo_and_query_secrets():
 
 
 def test_redact_keeps_non_secret_flags_visible():
+    '未说明'
     redacted = support_bundle.redact_data(["--model", "gpt-4o", "--verbose"])
     assert redacted == ["--model", "gpt-4o", "--verbose"]
 
 
 def test_redact_text_masks_env_assignments_and_bearer_tokens():
+    '未说明'
     text = "\n".join(
         [
             "OPENAI_API_KEY=sk-live-secret",
@@ -127,6 +134,7 @@ def test_redact_text_masks_env_assignments_and_bearer_tokens():
 
 
 def test_redact_text_masks_home_directory_paths():
+    '未说明'
     text = "\n".join(
         [
             "/Users/alice/deer-flow/config.yaml",
@@ -146,6 +154,7 @@ def test_redact_text_masks_home_directory_paths():
 
 
 def test_redact_data_masks_non_keyword_env_secrets_but_keeps_var_references():
+    '未说明'
     data = {
         "mcpServers": {
             "supabase": {
@@ -177,6 +186,7 @@ def test_redact_data_masks_non_keyword_env_secrets_but_keeps_var_references():
 
 
 def test_redact_data_masks_broadened_secret_key_names():
+    '未说明'
     data = {
         "aws_access_key_id": "AKIAIOSFODNN7EXAMPLE",
         "db_pwd": "hunter2",
@@ -191,6 +201,7 @@ def test_redact_data_masks_broadened_secret_key_names():
 
 
 def test_create_support_bundle_masks_hardcoded_env_secret(tmp_path):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
     (project_root / "config.yaml").write_text(
@@ -234,6 +245,7 @@ def test_create_support_bundle_masks_hardcoded_env_secret(tmp_path):
 
 
 def test_create_support_bundle_writes_sanitized_zip(tmp_path):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
     (project_root / "config.yaml").write_text(
@@ -309,6 +321,7 @@ channels:
 
 
 def test_create_support_bundle_writes_ai_triage_entrypoints(tmp_path, monkeypatch):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
 
@@ -449,6 +462,7 @@ def test_create_support_bundle_writes_ai_triage_entrypoints(tmp_path, monkeypatc
 
 
 def test_triage_flags_config_parse_errors(tmp_path):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
     (project_root / "config.yaml").write_text("models: [", encoding="utf-8")
@@ -467,6 +481,7 @@ def test_triage_flags_config_parse_errors(tmp_path):
 
 
 def test_triage_flags_extensions_parse_errors(tmp_path):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
     (project_root / "config.yaml").write_text(
@@ -490,6 +505,7 @@ def test_triage_flags_extensions_parse_errors(tmp_path):
 
 
 def test_thread_summary_lists_files_without_file_contents(tmp_path):
+    '未说明'
     project_root = tmp_path / "project"
     outputs = project_root / ".deer-flow" / "threads" / "thread-123" / "user-data" / "outputs"
     uploads = project_root / ".deer-flow" / "threads" / "thread-123" / "user-data" / "uploads"
@@ -522,6 +538,7 @@ def test_thread_summary_lists_files_without_file_contents(tmp_path):
 
 
 def test_missing_thread_summary_does_not_leak_absolute_checked_paths(tmp_path):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
 
@@ -534,6 +551,7 @@ def test_missing_thread_summary_does_not_leak_absolute_checked_paths(tmp_path):
 
 
 def test_thread_summary_rejects_path_like_thread_id(tmp_path):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
 
@@ -543,16 +561,19 @@ def test_thread_summary_rejects_path_like_thread_id(tmp_path):
 
 @pytest.mark.parametrize("thread_id", ["..", ".", "...", "a..b", "....", "..%2f"])
 def test_validate_thread_id_rejects_dot_traversal(thread_id):
+    '未说明'
     with pytest.raises(ValueError, match="Invalid thread_id"):
         support_bundle._validate_thread_id(thread_id)
 
 
 def test_validate_thread_id_accepts_safe_ids():
+    '未说明'
     support_bundle._validate_thread_id("thread-123")
     support_bundle._validate_thread_id("a.b_c-1")
 
 
 def test_main_reports_invalid_thread_id_without_traceback(tmp_path, capsys):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
 
@@ -574,6 +595,7 @@ def test_main_reports_invalid_thread_id_without_traceback(tmp_path, capsys):
 
 
 def test_main_prints_reporter_next_steps_and_optional_upload(tmp_path, capsys):
+    '未说明'
     project_root = tmp_path / "project"
     project_root.mkdir()
 

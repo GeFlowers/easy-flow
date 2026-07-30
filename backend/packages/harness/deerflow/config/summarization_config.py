@@ -1,4 +1,4 @@
-"""Configuration for conversation summarization."""
+"""提供配置、summarization、配置相关功能。"""
 
 from typing import Literal
 
@@ -9,18 +9,18 @@ DEFAULT_SKILL_FILE_READ_TOOL_NAMES: tuple[str, ...] = ("read_file", "read", "vie
 
 
 class ContextSize(BaseModel):
-    """Context size specification for trigger or keep parameters."""
+    """\u6267\u884c ContextSize \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     type: ContextSizeType = Field(description="Type of context size specification")
     value: int | float = Field(description="Value for the context size specification")
 
     def to_tuple(self) -> tuple[ContextSizeType, int | float]:
-        """Convert to tuple format expected by SummarizationMiddleware."""
+        """\u6267\u884c to_tuple \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return (self.type, self.value)
 
 
 class SummarizationConfig(BaseModel):
-    """Configuration for automatic conversation summarization."""
+    """\u6267\u884c SummarizationConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=False,
@@ -58,22 +58,22 @@ class SummarizationConfig(BaseModel):
     )
 
 
-# Global configuration instance
+# 中文说明：此处用于执行相关处理。
 _summarization_config: SummarizationConfig = SummarizationConfig()
 
 
 def get_summarization_config() -> SummarizationConfig:
-    """Get the current summarization configuration."""
+    """\u6267\u884c get_summarization_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return _summarization_config
 
 
 def set_summarization_config(config: SummarizationConfig) -> None:
-    """Set the summarization configuration."""
+    """\u6267\u884c set_summarization_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _summarization_config
     _summarization_config = config
 
 
 def load_summarization_config_from_dict(config_dict: dict) -> None:
-    """Load summarization configuration from a dictionary."""
+    """\u6267\u884c load_summarization_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _summarization_config
     _summarization_config = SummarizationConfig(**config_dict)

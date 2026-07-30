@@ -1,3 +1,4 @@
+'定义 tools 模块提供的职责与可复用接口'
 import json
 import logging
 
@@ -11,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _get_tool_config(tool_name: str) -> dict | None:
-    """Get tool config extras safely, returning None if not configured."""
+    '执行 _get_tool_config 的明确职责，并返回与调用约定一致的结果。\n\nGet tool config extras safely, returning None if not configured.'
     config = get_app_config().get_tool_config(tool_name)
     if config is None:
         return None
@@ -20,6 +21,7 @@ def _get_tool_config(tool_name: str) -> dict | None:
 
 
 def _get_searxng_client() -> SearxngClient:
+    '执行 _get_searxng_client 的明确职责，并返回与调用约定一致的结果'
     cfg = _get_tool_config("web_search")
     base_url = "http://localhost:8088"
     if cfg is not None:
@@ -29,11 +31,7 @@ def _get_searxng_client() -> SearxngClient:
 
 @tool("web_search", parse_docstring=True)
 async def web_search_tool(query: str) -> str:
-    """Search the web using SearXNG.
-
-    Args:
-        query: The query to search for.
-    """
+    '执行 web_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch the web using SearXNG.\n\n    Args:\n        query: The query to search for.\n    '
     try:
         cfg = _get_tool_config("web_search")
         max_results = 5

@@ -1,3 +1,4 @@
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 import logging
 import re
 import subprocess
@@ -10,13 +11,16 @@ logger = logging.getLogger(__name__)
 
 
 class Article:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     url: str
 
     def __init__(self, title: str, html_content: str):
+        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
         self.title = title
         self.html_content = html_content
 
     def to_markdown(self, including_title: bool = True) -> str:
+        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
         markdown = ""
         if including_title:
             markdown += f"# {self.title}\n\n"
@@ -29,6 +33,7 @@ class Article:
         return markdown
 
     def to_message(self) -> list[dict]:
+        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
         image_pattern = r"!\[.*?\]\((.*?)\)"
 
         content: list[dict[str, str]] = []
@@ -48,7 +53,7 @@ class Article:
                 if text_part:
                     content.append({"type": "text", "text": text_part})
 
-        # If after processing all parts, content is still empty, provide a fallback message.
+                # ????????????????
         if not content:
             content = [{"type": "text", "text": "No content available"}]
 
@@ -56,7 +61,9 @@ class Article:
 
 
 class ReadabilityExtractor:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     def extract_article(self, html: str) -> Article:
+        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
         try:
             article = simple_json_from_html_string(html, use_readability=True)
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:

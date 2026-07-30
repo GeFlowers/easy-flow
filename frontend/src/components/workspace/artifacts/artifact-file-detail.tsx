@@ -65,6 +65,7 @@ import { artifactMarkdownPlugins } from "./markdown-preview-plugins";
 
 const WRITE_FILE_PREVIEW_REFRESH_INTERVAL_MS = 3000;
 
+/** 展示选中产物的内容、预览及相关操作，并隔离线程切换期间的本地展示状态。 */
 export function ArtifactFileDetail({
   className,
   filepath: filepathFromProps,
@@ -89,7 +90,7 @@ export function ArtifactFileDetail({
     }
     return filepathFromProps;
   }, [filepathFromProps, isWriteFile]);
-  // Keep these local because ChatBox replaces context artifacts with thread state.
+  // 此状态保留在本组件内：ChatBox 会用线程状态替换上下文中的 artifacts。
   const [openedPresentedFilepaths, setOpenedPresentedFilepaths] = useState<
     string[]
   >(() => {
@@ -133,7 +134,7 @@ export function ArtifactFileDetail({
       language ??= "text";
       return { isCodeFile: true, language };
     }
-    // Treat .skill files as markdown (they contain SKILL.md)
+    // `.skill` 文件包含 SKILL.md，因此按 Markdown 文件处理。
     if (isSkillFile) {
       return { isCodeFile: true, language: "markdown" };
     }
@@ -420,6 +421,7 @@ function ArtifactDownloadFallback({
   );
 }
 
+/** 根据文件类型选择安全的代码、Markdown 或媒体预览器。 */
 export function ArtifactFilePreview({
   content,
   language,

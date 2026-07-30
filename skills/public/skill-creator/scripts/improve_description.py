@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
-"""Improve a skill description based on eval results.
+"""依据触发评估结果改进技能描述。
 
-Takes eval results (from run_eval.py) and generates an improved description
-by calling `claude -p` as a subprocess (same auth pattern as run_eval.py —
-uses the session's Claude Code auth, no separate ANTHROPIC_API_KEY needed).
+脚本通过子进程调用命令行模型，沿用当前会话的认证方式，根据失败样例、历史尝试和技能内容生成更准确且长度受限的描述。
 """
 
 import argparse
@@ -18,11 +16,7 @@ from scripts.utils import parse_skill_md
 
 
 def _call_claude(prompt: str, model: str | None, timeout: int = 300) -> str:
-    """Run `claude -p` with the prompt on stdin and return the text response.
-
-    Prompt goes over stdin (not argv) because it embeds the full SKILL.md
-    body and can easily exceed comfortable argv length.
-    """
+    """经标准输入调用命令行模型并返回文本响应，避免完整技能内容超过命令行参数长度限制。"""
     cmd = ["claude", "-p", "--output-format", "text"]
     if model:
         cmd.extend(["--model", model])
@@ -58,7 +52,7 @@ def improve_description(
     log_dir: Path | None = None,
     iteration: int | None = None,
 ) -> str:
-    """Call Claude to improve the description based on eval results."""
+    """根据训练与可选测试结果、历史尝试和技能正文请求模型改写描述，并记录超长改写过程。"""
     failed_triggers = [
         r for r in eval_results["results"]
         if r["should_trigger"] and not r["pass"]
@@ -192,6 +186,7 @@ Please respond with only the new description text in <new_description> tags, not
 
 
 def main():
+    """读取评估结果和技能元数据，执行描述改进，并将新描述及更新后的历史记录输出为结构化数据。"""
     parser = argparse.ArgumentParser(description="Improve a skill description based on eval results")
     parser.add_argument("--eval-results", required=True, help="Path to eval results JSON (from run_eval.py)")
     parser.add_argument("--skill-path", required=True, help="Path to skill directory")

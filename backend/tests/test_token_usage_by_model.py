@@ -1,20 +1,4 @@
-"""Per-model token usage regression tests (issue #3645).
-
-Covers the full path that powers ``GET /api/threads/{id}/token-usage``'s
-``by_model`` field:
-
-* ``RunJournal`` capturing each LLM call's real ``response_metadata.model_name``
-  for both the lead agent / middleware path (``on_llm_end``) and the subagent
-  external-records path (``record_external_llm_usage_records``).
-* ``RunJournal.get_completion_data`` exposing the per-model breakdown so it can
-  be threaded into the run store on completion.
-* ``MemoryRunStore`` and ``RunRepository`` (SQLAlchemy) returning the same
-  ``by_model`` shape from ``aggregate_tokens_by_thread``, with the invariant
-  ``sum(by_model[*].tokens) == total_tokens``.
-* Legacy rows written before this fix (``token_usage_by_model`` empty) falling
-  back to the old ``model_name + total_tokens`` attribution instead of being
-  silently dropped.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -34,7 +18,7 @@ from deerflow.runtime.runs.store.memory import MemoryRunStore
 
 
 def _make_llm_response(*, usage: dict | None, model_name: str | None = "lead-model"):
-    """Build a minimal LLM response carrying the bits journal/collector read."""
+    '未说明'
     msg = MagicMock()
     msg.type = "ai"
     msg.content = ""
@@ -64,6 +48,7 @@ def _make_llm_response(*, usage: dict | None, model_name: str | None = "lead-mod
 
 
 def _journal() -> RunJournal:
+    '未说明'
     return RunJournal("r1", "t1", MemoryRunEventStore(), flush_threshold=100)
 
 
@@ -73,7 +58,9 @@ def _journal() -> RunJournal:
 
 
 class TestJournalByModel:
+    '未说明'
     def test_lead_agent_call_lands_on_real_model(self) -> None:
+        '未说明'
         j = _journal()
         j.on_llm_end(
             _make_llm_response(usage={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}, model_name="lead-model"),
@@ -89,7 +76,7 @@ class TestJournalByModel:
         assert data["total_tokens"] == 15
 
     def test_middleware_call_lands_on_its_own_model(self) -> None:
-        """A middleware (e.g. title/summarization) on a different model gets its own bucket."""
+        '未说明'
         j = _journal()
         j.on_llm_end(
             _make_llm_response(usage={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}, model_name="lead-model"),
@@ -112,6 +99,7 @@ class TestJournalByModel:
         assert data["middleware_tokens"] == 5
 
     def test_missing_model_name_falls_back_to_unknown(self) -> None:
+        '未说明'
         j = _journal()
         j.on_llm_end(
             _make_llm_response(usage={"input_tokens": 3, "output_tokens": 2, "total_tokens": 5}, model_name=None),
@@ -125,6 +113,7 @@ class TestJournalByModel:
         }
 
     def test_same_model_aggregates_across_calls(self) -> None:
+        '未说明'
         j = _journal()
         for _ in range(2):
             j.on_llm_end(
@@ -139,8 +128,7 @@ class TestJournalByModel:
         }
 
     def test_subagent_external_records_attribute_to_real_model(self) -> None:
-        """The fix's headline behavior: subagent on a different model no longer
-        steals tokens from the lead model bucket."""
+        '未说明'
         j = _journal()
         # Lead emits 10 tokens on lead-model.
         j.on_llm_end(
@@ -176,6 +164,7 @@ class TestJournalByModel:
         assert sum(b["total_tokens"] for b in data["token_usage_by_model"].values()) == data["total_tokens"]
 
     def test_subagent_record_without_model_falls_back_to_unknown(self) -> None:
+        '未说明'
         j = _journal()
         j.record_external_llm_usage_records(
             [
@@ -194,6 +183,7 @@ class TestJournalByModel:
         }
 
     def test_on_llm_end_dedup_does_not_double_count_model(self) -> None:
+        '未说明'
         j = _journal()
         rid = uuid4()
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
@@ -208,6 +198,7 @@ class TestJournalByModel:
         }
 
     def test_external_records_dedup_does_not_double_count_model(self) -> None:
+        '未说明'
         j = _journal()
         record = {
             "source_run_id": "sub-1",
@@ -226,6 +217,7 @@ class TestJournalByModel:
         }
 
     def test_track_tokens_disabled_keeps_by_model_empty(self) -> None:
+        '未说明'
         store = MemoryRunEventStore()
         j = RunJournal("r1", "t1", store, track_token_usage=False, flush_threshold=100)
         j.on_llm_end(
@@ -260,7 +252,7 @@ def _completed_run(
     mw: int = 0,
     by_model: dict | None = None,
 ) -> dict:
-    """Shape that both stores accept for completion writes (kwargs to update_run_completion)."""
+    '未说明'
     return {
         "run_id": run_id,
         "model_name": model_name,
@@ -280,6 +272,7 @@ def _completed_run(
 
 
 async def _seed_run(store, *, run_id: str, model_name: str | None, completion: dict) -> None:
+    '未说明'
     await store.put(run_id, thread_id=_THREAD, status="pending", model_name=model_name)
     await store.update_run_completion(run_id, **completion)
 
@@ -323,12 +316,13 @@ _RUN_FIXTURES = [
 
 
 async def _seed_all(store) -> None:
+    '未说明'
     for fix in _RUN_FIXTURES:
         await _seed_run(store, run_id=fix["run_id"], model_name=fix["model_name"], completion=fix["completion"])
 
 
 def _assert_aggregate_shape(agg: dict) -> None:
-    """Pin the contract that powers /api/threads/{id}/token-usage."""
+    '未说明'
     # The headline totals stay the simple SUMs.
     assert agg["total_tokens"] == 300 + 80 + 42
     assert agg["total_runs"] == 3
@@ -352,6 +346,7 @@ def _assert_aggregate_shape(agg: dict) -> None:
 
 @pytest.mark.anyio
 async def test_memory_store_by_model_invariant_and_fallback():
+    '未说明'
     store = MemoryRunStore()
     await _seed_all(store)
     agg = await store.aggregate_tokens_by_thread(_THREAD)
@@ -359,6 +354,7 @@ async def test_memory_store_by_model_invariant_and_fallback():
 
 
 async def _make_sql_repo(tmp_path):
+    '未说明'
     from deerflow.persistence.engine import get_session_factory, init_engine
 
     url = f"sqlite+aiosqlite:///{tmp_path / 'by-model.db'}"
@@ -367,6 +363,7 @@ async def _make_sql_repo(tmp_path):
 
 
 async def _close_sql_engine() -> None:
+    '未说明'
     from deerflow.persistence.engine import close_engine
 
     await close_engine()
@@ -374,6 +371,7 @@ async def _close_sql_engine() -> None:
 
 @pytest.mark.anyio
 async def test_sql_store_by_model_invariant_and_fallback(tmp_path):
+    '未说明'
     repo = await _make_sql_repo(tmp_path)
     try:
         await _seed_all(repo)
@@ -385,8 +383,7 @@ async def test_sql_store_by_model_invariant_and_fallback(tmp_path):
 
 @pytest.mark.anyio
 async def test_memory_and_sql_stores_agree(tmp_path):
-    """Memory and SQL stores must return byte-identical aggregations so
-    behavior does not silently diverge based on database.backend choice."""
+    '未说明'
     mem = MemoryRunStore()
     sql = await _make_sql_repo(tmp_path)
     try:
@@ -401,8 +398,7 @@ async def test_memory_and_sql_stores_agree(tmp_path):
 
 @pytest.mark.anyio
 async def test_include_active_picks_up_running_progress_snapshot(tmp_path):
-    """``update_run_progress`` must persist ``token_usage_by_model`` so the
-    ``include_active=true`` view of /token-usage reflects in-flight tokens."""
+    '未说明'
     repo = await _make_sql_repo(tmp_path)
     try:
         await repo.put("run-active", thread_id=_THREAD, status="pending")
@@ -440,7 +436,9 @@ async def test_include_active_picks_up_running_progress_snapshot(tmp_path):
 
 
 class TestJournalCacheRead:
+    '未说明'
     def test_cache_read_accumulates_as_sparse_key(self) -> None:
+        '未说明'
         j = _journal()
         j.on_llm_end(
             _make_llm_response(
@@ -467,6 +465,7 @@ class TestJournalCacheRead:
         }
 
     def test_bucket_without_cache_hits_keeps_legacy_shape(self) -> None:
+        '未说明'
         j = _journal()
         j.on_llm_end(
             _make_llm_response(usage={"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}, model_name="m"),
@@ -481,6 +480,7 @@ class TestJournalCacheRead:
         }
 
     def test_external_records_carry_cache_read(self) -> None:
+        '未说明'
         j = _journal()
         j.record_external_llm_usage_records(
             [
@@ -498,15 +498,7 @@ class TestJournalCacheRead:
         assert j.get_completion_data()["token_usage_by_model"]["sub-m"]["cache_read_tokens"] == 25
 
     def test_deepseek_raw_usage_normalizes_to_cache_read(self) -> None:
-        """Pin the DeepSeek chat-completions shape end-to-end: the raw
-        ``prompt_tokens_details.cached_tokens`` field is what langchain-openai's
-        ``_create_usage_metadata`` normalizes into
-        ``input_token_details.cache_read`` (DeepSeek's top-level
-        ``prompt_cache_hit/miss_tokens`` are redundant aliases LangChain does
-        not read), and the journal captures it. The derived cache-miss count
-        (input − cache_read) must equal DeepSeek's own
-        ``prompt_cache_miss_tokens``, which is what cache-aware pricing bills
-        at the full input price."""
+        '未说明'
         from langchain_openai.chat_models.base import _create_usage_metadata
 
         raw = {
@@ -535,6 +527,7 @@ class TestJournalCacheRead:
         assert bucket["input_tokens"] - bucket["cache_read_tokens"] == raw["prompt_cache_miss_tokens"]
 
     def test_collector_extracts_cache_read_from_usage_metadata(self) -> None:
+        '未说明'
         from deerflow.subagents.token_collector import SubagentTokenCollector
 
         collector = SubagentTokenCollector("subagent:general-purpose")
@@ -550,6 +543,7 @@ class TestJournalCacheRead:
         assert records[0]["cache_read_tokens"] == 20
 
     def test_collector_omits_cache_read_key_when_no_cache_hits(self) -> None:
+        '未说明'
         from deerflow.subagents.token_collector import SubagentTokenCollector
 
         collector = SubagentTokenCollector("subagent:general-purpose")

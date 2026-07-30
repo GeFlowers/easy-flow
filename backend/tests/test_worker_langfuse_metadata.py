@@ -1,9 +1,4 @@
-"""Integration test: worker.run_agent injects Langfuse trace metadata.
-
-Verifies that the agent factory's resulting graph receives a
-``RunnableConfig`` whose ``metadata`` carries the Langfuse reserved keys
-(``langfuse_session_id`` / ``langfuse_user_id`` / ``langfuse_trace_name``).
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -18,9 +13,10 @@ from deerflow.trace_context import DEERFLOW_TRACE_METADATA_KEY, request_trace_co
 
 
 class _FakeAgent:
-    """Minimal LangGraph-like graph that captures the runnable config."""
+    '未说明'
 
     def __init__(self) -> None:
+        '未说明'
         self.captured_config: dict | None = None
         self.metadata: dict = {}
         # Worker may assign these attributes; need them to exist.
@@ -30,6 +26,7 @@ class _FakeAgent:
         self.interrupt_after_nodes: list[str] = []
 
     async def astream(self, graph_input, *, config, stream_mode, **kwargs):
+        '未说明'
         self.captured_config = config
         # Empty async generator — no chunks produced.
         return
@@ -37,41 +34,54 @@ class _FakeAgent:
 
 
 class _FakeRunManager:
+    '未说明'
     async def wait_for_prior_finalizing(self, *_args, **_kwargs) -> None:
+        '未说明'
         return None
 
     async def has_later_run(self, *_args, **_kwargs) -> bool:
+        """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return False
 
     async def has_later_started_run(self, *_args, **_kwargs) -> bool:
+        """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return False
 
     async def set_status(self, *_args, **_kwargs) -> None:
+        '未说明'
         return None
 
     async def update_model_name(self, *_args, **_kwargs) -> None:
+        """处理模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     async def update_run_completion(self, *_args, **_kwargs) -> None:
+        """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
 
 class _FakeBridge:
+    '未说明'
     def __init__(self) -> None:
+        '未说明'
         self.events: list[tuple[str, object]] = []
 
     async def publish(self, _run_id, event, payload) -> None:
+        '未说明'
         self.events.append((event, payload))
 
     async def publish_end(self, _run_id) -> None:
+        '未说明'
         self.events.append(("end", None))
 
     async def cleanup(self, _run_id, *, delay: int = 0) -> None:
+        '未说明'
         return None
 
 
 @pytest.fixture(autouse=True)
 def _clear_tracing_env(monkeypatch):
+    '未说明'
     from deerflow.config.tracing_config import reset_tracing_config
 
     for name in ("LANGFUSE_TRACING", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL"):
@@ -83,6 +93,7 @@ def _clear_tracing_env(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_agent_injects_langfuse_metadata(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -93,6 +104,7 @@ async def test_run_agent_injects_langfuse_metadata(monkeypatch):
     fake_agent = _FakeAgent()
 
     def agent_factory(config):
+        '未说明'
         return fake_agent
 
     record = RunRecord(
@@ -133,14 +145,7 @@ async def test_run_agent_injects_langfuse_metadata(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_agent_uses_context_user_id_over_contextvar(monkeypatch):
-    """A run carrying ``context.user_id`` traces to that user, not the contextvar.
-
-    Internal-token callers invoke a run on behalf of an end user, so the
-    ``_current_user`` ContextVar is never that end user. The caller instead
-    carries the real owner in the run request's ``config['context']['user_id']``,
-    which ``resolve_runtime_user_id(runtime)`` must prefer over the contextvar —
-    even though conftest's autouse fixture injects ``test-user-autouse`` into it.
-    """
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -151,6 +156,7 @@ async def test_run_agent_uses_context_user_id_over_contextvar(monkeypatch):
     fake_agent = _FakeAgent()
 
     def agent_factory(config):
+        '未说明'
         return fake_agent
 
     record = RunRecord(
@@ -183,19 +189,7 @@ async def test_run_agent_uses_context_user_id_over_contextvar(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_agent_falls_back_to_default_user_when_unset(monkeypatch):
-    """When no user is in the contextvar (and no context.user_id), langfuse_user_id
-    falls back to 'default'.
-
-    Uses ``monkeypatch.setattr`` to redirect ``get_effective_user_id`` to return
-    ``"default"`` rather than directly mutating the contextvar — direct contextvar
-    operations across pytest test boundaries have produced spooky cross-file
-    pollution when combined with the langfuse OTel global tracer provider.
-
-    The worker resolves the trace user via ``resolve_runtime_user_id(runtime)``;
-    with no ``context.user_id`` it falls back to ``get_effective_user_id()`` — so
-    we patch that fallback at its definition module (``user_context``), which is
-    the name ``resolve_runtime_user_id`` actually calls.
-    """
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -209,6 +203,7 @@ async def test_run_agent_falls_back_to_default_user_when_unset(monkeypatch):
     fake_agent = _FakeAgent()
 
     def agent_factory(config):
+        '未说明'
         return fake_agent
 
     record = RunRecord(
@@ -237,7 +232,7 @@ async def test_run_agent_falls_back_to_default_user_when_unset(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_agent_preserves_caller_metadata_overrides(monkeypatch):
-    """Caller-provided langfuse_* keys must NOT be overridden by the default injection."""
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -248,6 +243,7 @@ async def test_run_agent_preserves_caller_metadata_overrides(monkeypatch):
     fake_agent = _FakeAgent()
 
     def agent_factory(config):
+        '未说明'
         return fake_agent
 
     record = RunRecord(
@@ -289,9 +285,11 @@ async def test_run_agent_preserves_caller_metadata_overrides(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_agent_skips_metadata_when_langfuse_disabled(monkeypatch):
+    '未说明'
     fake_agent = _FakeAgent()
 
     def agent_factory(config):
+        '未说明'
         return fake_agent
 
     record = RunRecord(

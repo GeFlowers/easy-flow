@@ -1,4 +1,4 @@
-"""Monocle telemetry: initialized once from the Gateway lifespan when ``MONOCLE_TRACING`` is set."""
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 
 from __future__ import annotations
 
@@ -18,16 +18,12 @@ _setup_completed = False
 
 
 def is_monocle_setup_completed() -> bool:
-    """Whether :func:`setup_monocle_tracing_if_enabled` ran in this process."""
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     return _setup_completed
 
 
 def setup_monocle_tracing_if_enabled() -> bool:
-    """Initialize Monocle telemetry when ``MONOCLE_TRACING`` is enabled; a no-op otherwise.
-
-    ``monocle_apptrace.setup_monocle_telemetry()`` is idempotent, so this stays a thin,
-    config-gated wrapper. Returns ``True`` when enabled.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if not is_monocle_tracing_enabled():
         return False
 

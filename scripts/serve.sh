@@ -1,35 +1,35 @@
 #!/usr/bin/env bash
 #
-# serve.sh — Unified DeerFlow service launcher
+# serve.sh — DeerFlow 统一服务启动器
 #
-# Usage:
+# 用法：
 #   ./scripts/serve.sh [--dev|--prod] [--daemon] [--stop|--restart]
 #
-# Modes:
-#   --dev       Development mode with hot-reload (default)
-#   --prod      Production mode, pre-built frontend, no hot-reload
-#   --daemon    Run all services in background (nohup), exit after startup
+# 模式：
+#   --dev       开发模式，启用热重载（默认）
+#   --prod      生产模式，使用预构建前端且不热重载
+#   --daemon    使用 nohup 在后台运行全部服务，启动后退出
 #
-# Actions:
-#   --skip-install  Skip dependency installation (faster restart)
-#   --stop      Stop all running services and exit
-#   --restart   Stop all services, then start with the given mode flags
+# 操作：
+#   --skip-install  跳过依赖安装，加快重启
+#   --stop      停止全部运行中服务后退出
+#   --restart   先停止全部服务，再按给定模式启动
 #
-# Examples:
+# 示例：
 #   ./scripts/serve.sh --dev                 # Gateway dev, hot reload
 #   ./scripts/serve.sh --prod                # Gateway prod
 #   ./scripts/serve.sh --dev --daemon        # Gateway dev, background
 #   ./scripts/serve.sh --stop                # Stop all services
 #   ./scripts/serve.sh --restart --dev       # Restart dev services
 #
-# Must be run from the repo root directory.
+# 脚本会切换到仓库根目录，因此调用位置不影响路径解析。
 
 set -e
 
 REPO_ROOT="$(builtin cd "$(dirname "${BASH_SOURCE[0]}")/.." >/dev/null 2>&1 && pwd -P)"
 cd "$REPO_ROOT"
 
-# ── Load .env ────────────────────────────────────────────────────────────────
+# ── 加载 .env ────────────────────────────────────────────────────────────────
 
 if [ -f "$REPO_ROOT/.env" ]; then
     set -a
@@ -37,6 +37,7 @@ if [ -f "$REPO_ROOT/.env" ]; then
     set +a
 fi
 
+# 选择可执行的 Python 3；Windows/Git Bash 下依次回退不同命令名。
 _pick_python() {
     local candidate
     for candidate in python3 python py; do
@@ -48,7 +49,7 @@ _pick_python() {
     return 1
 }
 
-# ── Argument parsing ─────────────────────────────────────────────────────────
+# ── 参数解析 ─────────────────────────────────────────────────────────────────
 
 DEV_MODE=true
 DAEMON_MODE=false
@@ -71,17 +72,12 @@ for arg in "$@"; do
     esac
 done
 
-# ── Stop helper ──────────────────────────────────────────────────────────────
+# ── 停止辅助逻辑 ──────────────────────────────────────────────────────────────
 
-# Every deer-flow worktree (the main checkout + each linked worktree) hardcodes
-# the same dev ports (8001/3000/2026), so a service started from ANY of them
-# must be reclaimable from here — otherwise `make stop`/`make dev` in this
-# worktree can neither kill nor take over a port held by a sibling worktree.
-# DEERFLOW_ROOTS is that set of roots; processes living outside all of them
-# (e.g. an unrelated project on port 3000) are still never touched.
-# Sorted most-specific-first (longest path first): a linked worktree lives
-# under the main checkout, so both roots are substrings of its files — checking
-# the deeper root first attributes a reclaimed port to the right worktree.
+# 所有 deer-flow worktree（主检出与关联 worktree）均使用 8001/3000/2026 开发端口，
+# 因而需要能够回收任一检出的服务；否则本检出的 `make stop`/`make dev` 无法接管同级
+# worktree 占用的端口。DEERFLOW_ROOTS 是允许处理的根目录集合，集合外的进程（如另一个
+# 项目占用 3000）绝不触及。按路径长度从长到短排序，使嵌套的关联 worktree 归属准确。
 DEERFLOW_ROOTS="$(
     {
         printf '%s\n' "$REPO_ROOT"
@@ -90,16 +86,13 @@ DEERFLOW_ROOTS="$(
     } | awk 'NF && !seen[$0]++ {print length($0)"\t"$0}' | sort -rn | sed 's/^[0-9]*\t//'
 )"
 
-# True if PID has an open file/cwd under any deer-flow worktree root. The
-# trailing slash keeps a sibling dir like ".../deer-flow-notes" from matching
-# the ".../deer-flow" root.
+# 判断 PID 是否在任一 deer-flow worktree 根目录下打开文件或以其为 cwd；路径末尾的
+# 斜杠避免将 ".../deer-flow-notes" 这类同级目录误判为 ".../deer-flow"。
 _is_deerflow_pid() {
     local pid=$1 files root
 
-    # Daemon children inherit DEERFLOW_DAEMON_ROOT from run_service. Checking
-    # it (Linux only — macOS has no /proc) identifies processes like
-    # next-server that lsof misses, so the name/port reaps in stop_all can
-    # claim them.
+    # 守护子进程从 run_service 继承 DEERFLOW_DAEMON_ROOT。Linux 上检查 /proc 环境
+    # 可识别 lsof 漏掉的 next-server 等进程；macOS 无 /proc 时回退到 lsof。
     if [ -r "/proc/$pid/environ" ] &&
         tr '\0' '\n' < "/proc/$pid/environ" 2>/dev/null | grep -Fxq "DEERFLOW_DAEMON_ROOT=$REPO_ROOT"; then
         return 0
@@ -115,8 +108,7 @@ _is_deerflow_pid() {
     return 1
 }
 
-# Report ports about to be reclaimed from a *different* worktree, so stopping
-# (or starting, which stops first) isn't silently killing someone else's run.
+# 在回收其他 worktree 的端口前显式报告，避免停止（或启动前停止）时静默中断他人进程。
 _report_reclaimed_ports() {
     local port pid files root owner
     for port in 8001 3000 2026; do
@@ -135,6 +127,7 @@ _report_reclaimed_ports() {
     done
 }
 
+# 仅终止同时匹配命令特征与仓库归属的进程，避免按名称误杀其他项目。
 _kill_repo_processes() {
     local pattern=$1
     local pid
@@ -154,6 +147,7 @@ _kill_repo_processes() {
     fi
 }
 
+# 对仍占用服务端口且归属仓库的进程执行最终强制清理。
 _kill_repo_port() {
     local port=$1
     local pid
@@ -173,6 +167,7 @@ _kill_repo_port() {
     fi
 }
 
+# 按可用工具探测监听端口；lsof 缺失时回退 ss，再回退 netstat。
 _is_port_listening() {
     local port=$1
 
@@ -197,14 +192,14 @@ _is_port_listening() {
     return 1
 }
 
+# 校验 nginx PID 属于 DeerFlow 配置，兼容 macOS 对 nginx 进程名的改写。
 _is_repo_nginx_pid() {
     local pid=$1
     local command
     local args
 
     command=$(ps -p "$pid" -o comm= 2>/dev/null) || return 1
-    # nginx rewrites argv[0] for master/worker processes. On macOS,
-    # `ps -o comm=` can report that rewritten form instead of the binary name.
+    # nginx 会改写 master/worker 的 argv[0]；macOS 的 `ps -o comm=` 可能报告该形式而非二进制名。
     case "$command" in
         nginx|*/nginx|nginx:*) ;;
         *) return 1 ;;
@@ -222,6 +217,7 @@ _is_repo_nginx_pid() {
     _is_deerflow_pid "$pid"
 }
 
+# 先从 pid 文件、再从进程列表定位本仓库 nginx，避免清理无关 nginx 实例。
 _kill_repo_nginx() {
     local pid
     local pids=""
@@ -247,6 +243,7 @@ _kill_repo_nginx() {
     fi
 }
 
+# 以温和退出优先、强制端口回收兜底的顺序停止本项目服务。
 stop_all() {
     echo "Stopping all services..."
     _report_reclaimed_ports
@@ -257,10 +254,8 @@ stop_all() {
     nginx -c "$REPO_ROOT/docker/nginx/nginx.local.conf" -p "$REPO_ROOT" -s quit 2>/dev/null || true
     sleep 1
     _kill_repo_nginx
-    # Force-kill any survivors still holding the service ports. 2026 is included
-    # so a lingering nginx (or any deer-flow process) that _kill_repo_nginx did
-    # not match by name still gets reclaimed — otherwise `make dev` fails its
-    # nginx port preflight.
+    # 对仍占用服务端口的残留进程强制清理。包含 2026，确保未被名称识别的 nginx
+    # 或其他 deer-flow 进程也会被回收，否则 `make dev` 的 nginx 端口预检会失败。
     _kill_repo_port 8001
     _kill_repo_port 3000
     _kill_repo_port 2026
@@ -268,7 +263,7 @@ stop_all() {
     echo "✓ All services stopped"
 }
 
-# ── Action routing ───────────────────────────────────────────────────────────
+# ── 操作路由 ─────────────────────────────────────────────────────────────────
 
 if [ "$ACTION" = "stop" ]; then
     stop_all
@@ -282,7 +277,7 @@ if [ "$ACTION" = "restart" ]; then
     ALREADY_STOPPED=true
 fi
 
-# Mode label for banner
+# 启动横幅使用的模式标签。
 if $DEV_MODE; then
     MODE_LABEL="DEV (Gateway runtime, hot-reload enabled)"
 else
@@ -293,7 +288,7 @@ if $DAEMON_MODE; then
     MODE_LABEL="$MODE_LABEL [daemon]"
 fi
 
-# Frontend command
+# 根据模式选择前端启动命令；生产预览生成进程内认证密钥。
 if $DEV_MODE; then
     FRONTEND_CMD="pnpm run dev"
 else
@@ -304,9 +299,8 @@ else
     FRONTEND_CMD="env BETTER_AUTH_SECRET=$($PYTHON_BIN -c 'import secrets; print(secrets.token_hex(16))') pnpm run preview"
 fi
 
-# Runtime path defaults. Local `make dev` launches Gateway from `backend/`,
-# so pin DeerFlow-owned state to the expected backend runtime directory and
-# create it before uvicorn builds its reload exclude filter.
+# 运行时路径默认值：本地 `make dev` 从 `backend/` 启动 Gateway，因此将 DeerFlow
+# 自有状态固定在预期后端目录，并在 uvicorn 构建热重载排除规则前创建该目录。
 if [ -z "$DEER_FLOW_PROJECT_ROOT" ]; then
     export DEER_FLOW_PROJECT_ROOT="$REPO_ROOT"
 fi
@@ -316,31 +310,30 @@ if [ -z "$DEER_FLOW_HOME" ]; then
     export DEER_FLOW_HOME="$BACKEND_RUNTIME_HOME"
 fi
 
-# `backend/sandbox` is excluded from uvicorn's reload watcher below. uvicorn only
-# excludes an absolute path directly when it already exists as a directory;
-# otherwise it globs the pattern, and Python 3.12's pathlib rejects absolute glob
-# patterns with NotImplementedError, crashing `make dev` on a fresh checkout
-# (#3459 / #3454). Creating it here keeps every absolute exclude on the is_dir path.
+# 下方会从 uvicorn 热重载监听中排除 `backend/sandbox`。绝对路径仅在目录已存在时才会
+# 被 uvicorn 直接排除；否则会按 glob 处理，而 Python 3.12 的 pathlib 会拒绝绝对 glob，
+# 导致新检出执行 `make dev` 时出现 NotImplementedError（#3459 / #3454）。提前创建目录
+# 可确保所有绝对排除路径均走 is_dir 分支。
 mkdir -p "$DEER_FLOW_HOME" "$BACKEND_RUNTIME_HOME" "$REPO_ROOT/backend/sandbox"
 DEER_FLOW_HOME="$(cd "$DEER_FLOW_HOME" && pwd -P)"
 BACKEND_RUNTIME_HOME="$(cd "$BACKEND_RUNTIME_HOME" && pwd -P)"
 export DEER_FLOW_HOME
 
-# Extra flags for uvicorn
+# 仅前台开发模式启用 uvicorn 热重载，并排除运行时高频写入目录。
 if $DEV_MODE && ! $DAEMON_MODE; then
     GATEWAY_EXTRA_FLAGS="--reload --reload-include='*.yaml' --reload-include='.env' --reload-exclude='*.pyc' --reload-exclude='__pycache__' --reload-exclude='$REPO_ROOT/backend/sandbox' --reload-exclude='$DEER_FLOW_HOME' --reload-exclude='$BACKEND_RUNTIME_HOME'"
 else
     GATEWAY_EXTRA_FLAGS=""
 fi
 
-# ── Stop existing services (skip if restart already did it) ──────────────────
+# ── 停止既有服务（restart 已停止时跳过） ──────────────────────────────────────
 
 if ! $ALREADY_STOPPED; then
     stop_all
     sleep 1
 fi
 
-# ── Config check ─────────────────────────────────────────────────────────────
+# ── 配置检查 ─────────────────────────────────────────────────────────────────
 
 if ! { \
         [ -n "$DEER_FLOW_CONFIG_PATH" ] && [ -f "$DEER_FLOW_CONFIG_PATH" ] || \
@@ -354,24 +347,19 @@ fi
 
 "$REPO_ROOT/scripts/config-upgrade.sh"
 
-# ── Install dependencies ────────────────────────────────────────────────────
+# ── 安装依赖 ─────────────────────────────────────────────────────────────────
 
-# Pick a runnable Python for the extras detector. On Windows/Git Bash,
-# `python3` can resolve to the Microsoft Store alias in WindowsApps, which is
-# present on PATH but not executable from Bash.
+# 为 extras 探测器选择可执行的 Python。Windows/Git Bash 中 `python3` 可能解析到
+# WindowsApps 的 Microsoft Store 别名；它虽在 PATH 中，却无法从 Bash 执行。
 DETECT_PYTHON="$(_pick_python || true)"
 
-# Resolve uv extras (postgres, etc.) from UV_EXTRAS or config.yaml so that
-# `uv sync` does not wipe out optional dependencies on every restart. See
-# scripts/detect_uv_extras.py and Issue #2754 for context. The detector
-# whitelists extra names against `^[A-Za-z][A-Za-z0-9_-]*$`, so the unquoted
-# splat below only sees valid uv argument tokens.
+# 从 UV_EXTRAS 或 config.yaml 解析 uv extras（如 postgres），避免每次重启时 `uv sync`
+# 清除可选依赖。详见 scripts/detect_uv_extras.py 与 Issue #2754。探测器按
+# `^[A-Za-z][A-Za-z0-9_-]*$` 白名单校验名称，因此下方未加引号的展开仅包含有效 uv 参数。
 #
-# Stderr is intentionally NOT redirected so the user sees:
-#   - whitelist warnings (e.g. "ignoring invalid UV_EXTRAS entry ';'");
-#   - detector crashes (e.g. unexpected Python error).
-# `|| true` keeps `set -e` from killing dev startup on a detector failure;
-# the result is just an empty UV_EXTRAS_FLAGS, which means "no extras".
+# 有意不重定向 stderr，以让用户看到白名单警告（如 "ignoring invalid UV_EXTRAS entry ';'"）
+# 与探测器崩溃（如意外的 Python 错误）。`|| true` 防止 `set -e` 因探测失败终止开发启动；
+# 此时仅得到空 UV_EXTRAS_FLAGS，即“不使用 extras”。
 UV_EXTRAS_FLAGS=""
 if [ -n "$DETECT_PYTHON" ]; then
     UV_EXTRAS_FLAGS=$("$DETECT_PYTHON" "$REPO_ROOT/scripts/detect_uv_extras.py" || { echo "[serve.sh] detect_uv_extras.py failed (exit $?) — proceeding without extras" >&2; echo ""; })
@@ -382,9 +370,8 @@ if ! $SKIP_INSTALL; then
     if [ -n "$UV_EXTRAS_FLAGS" ]; then
         echo "  • uv extras: $UV_EXTRAS_FLAGS"
     fi
-    # `--all-packages` propagates extras into workspace members (deerflow-harness
-    # in particular). Required for postgres extras — see PR #2584.
-    # Intentionally unquoted to splat multiple `--extra X` pairs.
+    # `--all-packages` 将 extras 传递至 workspace 成员（尤其 deerflow-harness），
+    # postgres extras 依赖该行为，详见 PR #2584。此处有意不加引号以展开多个 `--extra X` 参数对。
     (cd backend && uv sync --quiet --all-packages $UV_EXTRAS_FLAGS) || { echo "✗ Backend dependency install failed"; exit 1; }
     (cd frontend && pnpm install --silent) || { echo "✗ Frontend dependency install failed"; exit 1; }
     echo "✓ Dependencies synced"
@@ -392,7 +379,7 @@ else
     echo "⏩ Skipping dependency install (--skip-install)"
 fi
 
-# ── Banner ───────────────────────────────────────────────────────────────────
+# ── 启动横幅 ─────────────────────────────────────────────────────────────────
 
 echo ""
 echo "=========================================="
@@ -407,8 +394,9 @@ echo "    Frontend    → localhost:3000  (Next.js)"
 echo "    Nginx       → localhost:2026  (reverse proxy)"
 echo ""
 
-# ── Cleanup handler ──────────────────────────────────────────────────────────
+# ── 清理处理器 ────────────────────────────────────────────────────────────────
 
+# 接收信号时移除 trap 再停止服务，防止清理过程被同一信号递归打断。
 cleanup() {
     local status="${1:-0}"
     trap - INT TERM
@@ -420,10 +408,9 @@ cleanup() {
 trap 'cleanup 130' INT
 trap 'cleanup 143' TERM
 
-# ── Helper: start a service ──────────────────────────────────────────────────
+# ── 服务启动辅助逻辑 ──────────────────────────────────────────────────────────
 
-# run_service NAME COMMAND PORT TIMEOUT
-# In daemon mode, wraps with nohup. Waits for port to be ready.
+# 启动单个服务，守护模式使用 nohup，并等待指定端口就绪后才继续下游服务。
 run_service() {
     local name="$1" cmd="$2" port="$3" timeout="$4"
 
@@ -435,9 +422,8 @@ run_service() {
 
     echo "Starting $name..."
     if $DAEMON_MODE; then
-        # Tag the daemon so every descendant (pnpm → next → next-server)
-        # carries DEERFLOW_DAEMON_ROOT in its environment, letting
-        # _is_deerflow_pid recognize it at stop time.
+        # 给守护进程打标，使每个子进程（pnpm → next → next-server）均继承
+        # DEERFLOW_DAEMON_ROOT，供停止时的 _is_deerflow_pid 安全识别。
         nohup env DEERFLOW_DAEMON_ROOT="$REPO_ROOT" sh -c "$cmd" > /dev/null 2>&1 &
     else
         sh -c "$cmd" &
@@ -452,27 +438,27 @@ run_service() {
     echo "✓ $name started on localhost:$port"
 }
 
-# ── Start services ───────────────────────────────────────────────────────────
+# ── 启动服务 ─────────────────────────────────────────────────────────────────
 
 mkdir -p logs
 mkdir -p temp/client_body_temp temp/proxy_temp temp/fastcgi_temp temp/uwsgi_temp temp/scgi_temp
 
-# 1. Gateway API
+# 1. Gateway API：先启动，供后续代理健康检查使用。
 run_service "Gateway" \
     "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001 $GATEWAY_EXTRA_FLAGS > ../logs/gateway.log 2>&1" \
     8001 30
 
-# 2. Frontend
+# 2. Frontend：在 Gateway 启动后运行。
 run_service "Frontend" \
     "cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1" \
     3000 120
 
-# 3. Nginx
+# 3. Nginx：最后启动统一入口，避免代理至尚未就绪的上游。
 run_service "Nginx" \
     "nginx -g 'daemon off;' -c '$REPO_ROOT/docker/nginx/nginx.local.conf' -p '$REPO_ROOT' > logs/nginx.log 2>&1" \
     2026 10
 
-# ── Ready ────────────────────────────────────────────────────────────────────
+# ── 就绪信息 ─────────────────────────────────────────────────────────────────
 
 echo ""
 echo "=========================================="
@@ -490,7 +476,7 @@ echo ""
 
 if $DAEMON_MODE; then
     echo "  🛑 Stop: make stop"
-    # Detach — trap is no longer needed
+    # 已脱离前台，后续无需保留信号清理 trap。
     trap - INT TERM
 else
     echo "  Press Ctrl+C to stop all services"

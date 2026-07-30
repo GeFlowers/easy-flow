@@ -1,3 +1,4 @@
+"""覆盖本模块的可回归测试，固定关键输入、失败分支与资源生命周期，避免后续改动破坏既有契约。"""
 import asyncio
 import zipfile
 from pathlib import Path
@@ -22,10 +23,12 @@ ACTIVE_ARTIFACT_CASES = [
 
 
 def _make_request(query_string: bytes = b"") -> Request:
+    """为“构造请求”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     return Request({"type": "http", "method": "GET", "path": "/", "headers": [], "query_string": query_string})
 
 
 def test_get_artifact_reads_utf8_text_file_on_windows_locale(tmp_path, monkeypatch) -> None:
+    """验证“获取制品该项统一编码文本文件该项视窗系统区域设置”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     artifact_path = tmp_path / "note.txt"
     text = "Curly quotes: \u201cutf8\u201d"
     artifact_path.write_text(text, encoding="utf-8")
@@ -33,6 +36,7 @@ def test_get_artifact_reads_utf8_text_file_on_windows_locale(tmp_path, monkeypat
     original_read_text = Path.read_text
 
     def read_text_with_gbk_default(self, *args, **kwargs):
+        """为“读取文本使用该项默认值”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         kwargs.setdefault("encoding", "gbk")
         return original_read_text(self, *args, **kwargs)
 
@@ -48,6 +52,7 @@ def test_get_artifact_reads_utf8_text_file_on_windows_locale(tmp_path, monkeypat
 
 @pytest.mark.parametrize(("filename", "content"), ACTIVE_ARTIFACT_CASES)
 def test_get_artifact_forces_download_for_active_content(tmp_path, monkeypatch, filename: str, content: str) -> None:
+    """验证“获取制品该项下载该项活动内容”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     artifact_path = tmp_path / filename
     artifact_path.write_text(content, encoding="utf-8")
 
@@ -61,6 +66,7 @@ def test_get_artifact_forces_download_for_active_content(tmp_path, monkeypatch, 
 
 @pytest.mark.parametrize(("filename", "content"), ACTIVE_ARTIFACT_CASES)
 def test_get_artifact_forces_download_for_active_content_in_skill_archive(tmp_path, monkeypatch, filename: str, content: str) -> None:
+    """验证“获取制品该项下载该项活动内容该项该项归档”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     skill_path = tmp_path / "sample.skill"
     with zipfile.ZipFile(skill_path, "w") as zip_ref:
         zip_ref.writestr(filename, content)
@@ -74,6 +80,7 @@ def test_get_artifact_forces_download_for_active_content_in_skill_archive(tmp_pa
 
 
 def test_get_artifact_download_false_does_not_force_attachment(tmp_path, monkeypatch) -> None:
+    """验证“获取制品下载该项该项该项该项附件”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     artifact_path = tmp_path / "note.txt"
     artifact_path.write_text("hello", encoding="utf-8")
 
@@ -91,6 +98,7 @@ def test_get_artifact_download_false_does_not_force_attachment(tmp_path, monkeyp
 
 
 def test_get_artifact_download_true_forces_attachment_for_skill_archive(tmp_path, monkeypatch) -> None:
+    """验证“获取制品下载该项该项附件该项该项归档”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     skill_path = tmp_path / "sample.skill"
     with zipfile.ZipFile(skill_path, "w") as zip_ref:
         zip_ref.writestr("notes.txt", "hello")
@@ -109,12 +117,7 @@ def test_get_artifact_download_true_forces_attachment_for_skill_archive(tmp_path
 
 
 def _make_internal_request(owner: str | None, *, system_role: str = INTERNAL_SYSTEM_ROLE) -> Request:
-    """A request as it arrives from a trusted internal caller.
-
-    ``system_role`` is stamped onto ``request.state.user`` the way
-    ``AuthMiddleware`` does after validating the internal token. When *owner*
-    is given it is carried in the owner-user-id header.
-    """
+    """为“构造内部请求”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     headers: list[tuple[bytes, bytes]] = []
     if owner is not None:
         headers.append((INTERNAL_OWNER_USER_ID_HEADER_NAME.lower().encode(), owner.encode()))
@@ -124,12 +127,13 @@ def _make_internal_request(owner: str | None, *, system_role: str = INTERNAL_SYS
 
 
 def _capture_resolved_user_id(monkeypatch, tmp_path) -> dict:
-    """Patch resolve_thread_virtual_path to record the user_id it is called with."""
+    """为“捕获该项用户标识”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     artifact_path = tmp_path / "index.html"
     artifact_path.write_text("<html>", encoding="utf-8")
     seen: dict = {}
 
     def fake_resolve(_thread_id, _path, user_id=None):
+        """为“该项该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         seen["user_id"] = user_id
         return artifact_path
 
@@ -138,8 +142,9 @@ def _capture_resolved_user_id(monkeypatch, tmp_path) -> dict:
 
 
 def test_get_artifact_scopes_to_trusted_owner_header(tmp_path, monkeypatch) -> None:
-    # An internal caller acting for an owner must resolve the artifact under
-    # that owner's storage, not the synthetic internal user.
+    # 代表所有者的内部调用者必须解析下的工件
+    # 所有者的存储，而不是合成内部用户。
+    """验证“获取制品该项该项可信所有者标头”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     seen = _capture_resolved_user_id(monkeypatch, tmp_path)
     request = _make_internal_request("owner-123")
 
@@ -149,10 +154,11 @@ def test_get_artifact_scopes_to_trusted_owner_header(tmp_path, monkeypatch) -> N
 
 
 def test_get_artifact_normalizes_raw_owner_id_from_trusted_header(tmp_path, monkeypatch) -> None:
-    # The trusted header carries the raw platform owner id (channel workers
-    # send it unsanitized; see ChannelManager._owner_headers), while run files
-    # live under the make_safe_user_id bucket — so a raw id with chars outside
-    # [A-Za-z0-9_-] must resolve to the normalized bucket, not the raw one.
+    # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
+    # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
+    # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
+    # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
+    """验证“获取制品标准化原始所有者标识该项可信标头”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     seen = _capture_resolved_user_id(monkeypatch, tmp_path)
     raw_owner = "ou_7d8a.6e6d@example:id"
     request = _make_internal_request(raw_owner)
@@ -164,8 +170,9 @@ def test_get_artifact_normalizes_raw_owner_id_from_trusted_header(tmp_path, monk
 
 
 def test_get_artifact_without_owner_header_falls_back_to_effective_user(tmp_path, monkeypatch) -> None:
-    # No owner header → no override; resolution falls back to the effective user
-    # (user_id=None lets resolve_thread_virtual_path apply its default).
+    # 无所有者标头 → 无覆盖；解决方案回落给有效用户
+    # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
+    """验证“获取制品不使用所有者标头该项该项该项有效用户”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     seen = _capture_resolved_user_id(monkeypatch, tmp_path)
     request = _make_internal_request(None)
 
@@ -175,8 +182,10 @@ def test_get_artifact_without_owner_header_falls_back_to_effective_user(tmp_path
 
 
 def test_get_artifact_ignores_owner_header_for_non_internal_caller(tmp_path, monkeypatch) -> None:
-    # The owner header is only trusted for internal callers; a normal user
-    # carrying it must not be able to read another user's storage.
+    # 所有者标头仅对内部调用者可信；普通用户
+    # 携带它的
+    # 不能读取其他用户的存储。
+    """验证“获取制品忽略所有者标头该项该项内部该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     seen = _capture_resolved_user_id(monkeypatch, tmp_path)
     request = _make_internal_request("owner-123", system_role="user")
 
@@ -186,6 +195,7 @@ def test_get_artifact_ignores_owner_header_for_non_internal_caller(tmp_path, mon
 
 
 def test_skill_archive_preview_rejects_oversized_member_before_decompression(tmp_path) -> None:
+    """验证“该项归档预览拒绝该项成员该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     skill_path = tmp_path / "sample.skill"
     payload = b"A" * (artifacts_router.MAX_SKILL_ARCHIVE_MEMBER_BYTES + 1)
     with zipfile.ZipFile(skill_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zip_ref:

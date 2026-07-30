@@ -1,11 +1,4 @@
-"""Regression for the thread-messages feedback attachment.
-
-GET /api/threads/{thread_id}/messages attaches user feedback to the last AI
-message of each run. AI messages are stored by RunJournal with event_type
-"llm.ai.response"; the endpoint previously matched the non-existent
-"ai_message", so feedback was never attached and the grouped-feedback query
-ran on every request for nothing.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -18,6 +11,7 @@ from app.gateway.routers import thread_runs
 
 
 def _make_app(messages, feedback_grouped):
+    '未说明'
     app = make_authed_test_app()
     app.include_router(thread_runs.router)
 
@@ -39,14 +33,17 @@ def _make_app(messages, feedback_grouped):
 
 
 def _ai(run_id: str, seq: int, content: str) -> dict:
+    '未说明'
     return {"seq": seq, "run_id": run_id, "event_type": "llm.ai.response", "category": "message", "content": content}
 
 
 def _human(run_id: str, seq: int) -> dict:
+    '未说明'
     return {"seq": seq, "run_id": run_id, "event_type": "llm.human.input", "category": "message", "content": "hi"}
 
 
 def test_feedback_attached_to_last_ai_message_per_run():
+    '未说明'
     messages = [
         _human("r1", 1),
         _ai("r1", 2, "first"),
@@ -72,6 +69,7 @@ def test_feedback_attached_to_last_ai_message_per_run():
 
 
 def test_no_feedback_query_when_thread_has_no_ai_message():
+    '未说明'
     messages = [_human("r1", 1)]
     app, feedback_repo = _make_app(messages, {})
 

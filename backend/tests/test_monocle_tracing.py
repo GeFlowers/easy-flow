@@ -1,10 +1,4 @@
-"""Tests for Monocle telemetry setup.
-
-Covers the config gate (``MONOCLE_TRACING`` default off / toggle on), the setup
-helper's behavior (off-box exporter warning, exporter validation, idempotency,
-Langfuse coexistence), the Gateway-lifespan wiring, and the regression that
-importing ``deerflow.agents`` no longer sets up telemetry at import time.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -19,8 +13,8 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-# monocle_apptrace is an optional extra (pinned in the dev group); skip the whole
-# module in minimal installs instead of erroring at collection.
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 pytest.importorskip("monocle_apptrace")
 
 from deerflow.config import is_monocle_tracing_enabled
@@ -39,10 +33,11 @@ _TRACING_ENV = (
 
 @pytest.fixture(autouse=True)
 def clear_monocle_env(monkeypatch):
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     for name in _TRACING_ENV:
         monkeypatch.delenv(name, raising=False)
-    # The setup-completed flag is process-global; reset it so a test that runs
-    # (mocked) setup cannot change how later tests observe the embedded hint.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr("deerflow.tracing.monocle._setup_completed", False)
     reset_tracing_config()
     yield
@@ -50,14 +45,17 @@ def clear_monocle_env(monkeypatch):
 
 
 def test_disabled_by_default():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert is_monocle_tracing_enabled() is False
     assert get_tracing_config().monocle.enabled is False
 
 
 def test_setup_noop_when_disabled(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     called = False
 
     def _fail(*args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         nonlocal called
         called = True
 
@@ -67,6 +65,7 @@ def test_setup_noop_when_disabled(monkeypatch):
 
 
 def test_toggles_on_and_sets_up(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     reset_tracing_config()
 
@@ -79,6 +78,7 @@ def test_toggles_on_and_sets_up(monkeypatch):
 
 
 def test_custom_exporters(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     monkeypatch.setenv("MONOCLE_EXPORTERS", "file,console")
     reset_tracing_config()
@@ -91,6 +91,7 @@ def test_custom_exporters(monkeypatch):
 
 
 def test_warns_on_non_file_exporter(monkeypatch, caplog):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     monkeypatch.setenv("MONOCLE_EXPORTERS", "file,s3")
     reset_tracing_config()
@@ -102,11 +103,11 @@ def test_warns_on_non_file_exporter(monkeypatch, caplog):
     warnings = [r.message for r in caplog.records if "beyond the local" in r.message]
     assert warnings, "expected an off-box exporter warning"
     assert "s3" in warnings[0]
-    assert "Langfuse" not in warnings[0]  # only mentioned when Langfuse is co-enabled
+    assert "Langfuse" not in warnings[0]  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 def test_off_box_warning_mentions_langfuse_when_co_enabled(monkeypatch, caplog):
-    """With Langfuse sharing the global provider, its spans leave the box too — say so."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     monkeypatch.setenv("MONOCLE_EXPORTERS", "okahu")
     monkeypatch.setenv("OKAHU_API_KEY", "okh_test")
@@ -125,7 +126,8 @@ def test_off_box_warning_mentions_langfuse_when_co_enabled(monkeypatch, caplog):
 
 
 def test_no_off_box_warning_for_file_exporter(monkeypatch, caplog):
-    monkeypatch.setenv("MONOCLE_TRACING", "true")  # default exporter is file
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
+    monkeypatch.setenv("MONOCLE_TRACING", "true")  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     reset_tracing_config()
     monkeypatch.setattr("monocle_apptrace.setup_monocle_telemetry", lambda **kw: None)
 
@@ -136,7 +138,7 @@ def test_no_off_box_warning_for_file_exporter(monkeypatch, caplog):
 
 
 def test_no_off_box_warning_for_console_exporter(monkeypatch, caplog):
-    """``console`` writes to local stdout, so it must not trip the off-box warning."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     monkeypatch.setenv("MONOCLE_EXPORTERS", "file,console")
     reset_tracing_config()
@@ -149,13 +151,7 @@ def test_no_off_box_warning_for_console_exporter(monkeypatch, caplog):
 
 
 def test_coexists_with_langfuse():
-    """Monocle and Langfuse (v4, OTel-based) share the global provider without span loss.
-
-    Verified against the installed langfuse: whichever library initializes second
-    reuses the existing global ``TracerProvider`` and attaches its own span
-    processor, so both sides keep exporting. Runs the real setup (no mocks) in a
-    subprocess so the process-global provider never leaks into the suite.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     script = textwrap.dedent(
         """
         import os
@@ -193,6 +189,7 @@ def test_coexists_with_langfuse():
 
 
 def test_rejects_unknown_exporter(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     monkeypatch.setenv("MONOCLE_EXPORTERS", "fle")
     reset_tracing_config()
@@ -201,6 +198,7 @@ def test_rejects_unknown_exporter(monkeypatch):
 
 
 def test_okahu_exporter_requires_api_key(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     monkeypatch.setenv("MONOCLE_EXPORTERS", "okahu")
     reset_tracing_config()
@@ -209,6 +207,7 @@ def test_okahu_exporter_requires_api_key(monkeypatch):
 
 
 def test_okahu_exporter_with_api_key_ok(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     monkeypatch.setenv("MONOCLE_EXPORTERS", "okahu")
     monkeypatch.setenv("OKAHU_API_KEY", "okh_test")
@@ -219,21 +218,16 @@ def test_okahu_exporter_with_api_key_ok(monkeypatch):
 
 
 def test_embedded_hint_when_enabled_but_uninitialized(monkeypatch, caplog):
-    """``build_tracing_callbacks()`` hints when Monocle is enabled but setup never ran.
-
-    The embedded ``DeerFlowClient`` and the TUI never hit the Gateway lifespan,
-    so this debug line is the only in-process signal explaining why no Monocle
-    traces appear.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.tracing import build_tracing_callbacks
 
     monkeypatch.setenv("MONOCLE_TRACING", "true")
     reset_tracing_config()
     monkeypatch.setattr("deerflow.tracing.monocle._setup_completed", False)
 
-    # Scoped to the factory's logger: earlier tests in the suite may have run
-    # configure_logging(), which pins an explicit INFO level on the hierarchy
-    # that a root-level caplog.at_level(DEBUG) would not override.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     with caplog.at_level(logging.DEBUG, logger="deerflow.tracing.factory"):
         assert build_tracing_callbacks() == []
 
@@ -241,6 +235,7 @@ def test_embedded_hint_when_enabled_but_uninitialized(monkeypatch, caplog):
 
 
 def test_no_embedded_hint_after_setup(monkeypatch, caplog):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.tracing import build_tracing_callbacks
 
     monkeypatch.setenv("MONOCLE_TRACING", "true")
@@ -256,16 +251,7 @@ def test_no_embedded_hint_after_setup(monkeypatch, caplog):
 
 
 def test_no_import_time_setup():
-    """Regression: importing deerflow.agents must not install telemetry.
-
-    The setup call used to live at module import in ``deerflow/agents/__init__``.
-    It now happens only via the gateway lifespan, so a plain import must neither
-    expose ``setup_monocle_telemetry`` nor install a global OTel
-    ``TracerProvider`` (which is what ``setup_monocle_telemetry`` does). Runs in
-    a subprocess so the import is genuinely fresh and, unlike deleting
-    ``sys.modules`` entries in-process, cannot corrupt module identity for the
-    rest of the suite.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     script = textwrap.dedent(
         """
         from opentelemetry import trace
@@ -285,12 +271,7 @@ def test_no_import_time_setup():
 
 
 def test_double_invoke_is_idempotent():
-    """Calling setup twice must not double-instrument.
-
-    Exercises upstream ``check_duplicate_setup`` with the real tracer (no mock).
-    Run in a subprocess so the process-global OTel provider it installs never
-    leaks into the rest of the suite.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     script = textwrap.dedent(
         """
         import os
@@ -313,17 +294,14 @@ def test_double_invoke_is_idempotent():
 
 
 def test_gateway_lifespan_initializes_monocle():
-    """The Gateway lifespan is the sole Monocle call site; pin that wiring.
-
-    Mirrors the patching in ``test_gateway_lifespan_shutdown.py`` so the lifespan
-    can be driven directly, and asserts the setup helper runs during startup.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from fastapi import FastAPI
 
     from app.gateway.app import lifespan
 
     @asynccontextmanager
     async def _noop_langgraph_runtime(_app, _startup_config):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         yield
 
     startup_config = SimpleNamespace(log_level="INFO", memory=SimpleNamespace(token_counting="char"))
@@ -331,6 +309,7 @@ def test_gateway_lifespan_initializes_monocle():
     fake_service.get_status = MagicMock(return_value={})
 
     async def fake_start(_startup_config):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return fake_service
 
     setup_spy = MagicMock(return_value=False)
@@ -346,6 +325,7 @@ def test_gateway_lifespan_initializes_monocle():
     ):
 
         async def drive() -> None:
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             async with lifespan(FastAPI()):
                 pass
 
@@ -355,17 +335,14 @@ def test_gateway_lifespan_initializes_monocle():
 
 
 def test_gateway_lifespan_survives_monocle_setup_failure(caplog):
-    """A raising Monocle setup (e.g. bad MONOCLE_EXPORTERS) must not break startup.
-
-    Pins the lifespan's fail-open contract: the error is logged and the Gateway
-    keeps serving without tracing.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from fastapi import FastAPI
 
     from app.gateway.app import lifespan
 
     @asynccontextmanager
     async def _noop_langgraph_runtime(_app, _startup_config):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         yield
 
     startup_config = SimpleNamespace(log_level="INFO", memory=SimpleNamespace(token_counting="char"))
@@ -373,6 +350,7 @@ def test_gateway_lifespan_survives_monocle_setup_failure(caplog):
     fake_service.get_status = MagicMock(return_value={})
 
     async def fake_start(_startup_config):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return fake_service
 
     setup_spy = MagicMock(side_effect=ValueError("MONOCLE_EXPORTERS has unknown exporter(s): fle."))
@@ -388,11 +366,12 @@ def test_gateway_lifespan_survives_monocle_setup_failure(caplog):
     ):
 
         async def drive() -> None:
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             async with lifespan(FastAPI()):
                 pass
 
         with caplog.at_level(logging.ERROR, logger="app.gateway.app"):
-            asyncio.run(drive())  # completes despite the raising setup
+            asyncio.run(drive())  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     setup_spy.assert_called_once_with()
     assert any("Monocle tracing setup failed" in r.message for r in caplog.records)

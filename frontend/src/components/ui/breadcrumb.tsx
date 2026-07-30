@@ -4,10 +4,12 @@ import { ChevronRight, MoreHorizontal } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+/** Breadcrumb 内部组件：组织对应的界面结构与交互语义。 */
 function Breadcrumb({ ...props }: React.ComponentProps<"nav">) {
   return <nav aria-label="breadcrumb" data-slot="breadcrumb" {...props} />;
 }
 
+/** BreadcrumbList 内部组件：组织对应的界面结构与交互语义。 */
 function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
   return (
     <ol
@@ -21,6 +23,7 @@ function BreadcrumbList({ className, ...props }: React.ComponentProps<"ol">) {
   );
 }
 
+/** BreadcrumbItem 内部组件：组织对应的界面结构与交互语义。 */
 function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li
@@ -31,6 +34,7 @@ function BreadcrumbItem({ className, ...props }: React.ComponentProps<"li">) {
   );
 }
 
+/** BreadcrumbLink 内部组件：组织对应的界面结构与交互语义。 */
 function BreadcrumbLink({
   asChild,
   className,
@@ -49,6 +53,7 @@ function BreadcrumbLink({
   );
 }
 
+/** BreadcrumbPage 内部组件：组织对应的界面结构与交互语义。 */
 function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -62,6 +67,7 @@ function BreadcrumbPage({ className, ...props }: React.ComponentProps<"span">) {
   );
 }
 
+/** BreadcrumbSeparator 内部组件：组织对应的界面结构与交互语义。 */
 function BreadcrumbSeparator({
   children,
   className,
@@ -80,6 +86,7 @@ function BreadcrumbSeparator({
   );
 }
 
+/** BreadcrumbEllipsis 内部组件：组织对应的界面结构与交互语义。 */
 function BreadcrumbEllipsis({
   className,
   ...props

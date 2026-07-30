@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Export Claude Code OAuth credentials from macOS Keychain on purpose.
-
-This helper is intentionally manual. DeerFlow runtime does not probe Keychain.
-Use this script when you want to bridge an existing Claude Code login into an
-environment variable or an exported credentials file for DeerFlow.
-"""
+"""本脚本负责导出。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -22,6 +17,7 @@ from typing import Any
 
 
 def claude_code_oauth_file_suffix() -> str:
+    """执行文件对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if os.getenv("CLAUDE_CODE_CUSTOM_OAUTH_URL"):
         return "-custom-oauth"
     if os.getenv("USE_LOCAL_OAUTH") or os.getenv("LOCAL_BRIDGE"):
@@ -32,6 +28,7 @@ def claude_code_oauth_file_suffix() -> str:
 
 
 def default_service_name() -> str:
+    """执行服务对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     service = f"Claude Code{claude_code_oauth_file_suffix()}-credentials"
     config_dir = os.getenv("CLAUDE_CONFIG_DIR")
     if config_dir:
@@ -41,10 +38,12 @@ def default_service_name() -> str:
 
 
 def default_account_name() -> str:
+    """执行账户对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return os.getenv("USER") or "claude-code-user"
 
 
 def load_keychain_container(service: str, account: str) -> dict[str, Any]:
+    """执行加载对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if platform.system() != "Darwin":
         raise RuntimeError("Claude Code Keychain export is only supported on macOS.")
 
@@ -79,6 +78,7 @@ def load_keychain_container(service: str, account: str) -> dict[str, Any]:
 
 
 def write_credentials_file(output_path: Path, data: dict[str, Any]) -> None:
+    """执行写入 文件对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     output_path.parent.mkdir(parents=True, exist_ok=True)
     fd, tmp_name = tempfile.mkstemp(prefix=f"{output_path.name}.", suffix=".tmp", dir=output_path.parent)
     try:
@@ -91,6 +91,7 @@ def write_credentials_file(output_path: Path, data: dict[str, Any]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
+    '未说明'
     parser = argparse.ArgumentParser(
         description="Manually export Claude Code OAuth credentials from macOS Keychain for DeerFlow.",
     )
@@ -128,6 +129,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
+    '未说明'
     args = parse_args()
 
     if args.show_target:

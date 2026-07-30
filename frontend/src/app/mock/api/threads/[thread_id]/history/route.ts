@@ -3,6 +3,7 @@ import path from "path";
 
 import type { NextRequest } from "next/server";
 
+/** 读取指定演示会话的本地历史数据，并兼容数组与单对象格式。 */
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ thread_id: string }> },

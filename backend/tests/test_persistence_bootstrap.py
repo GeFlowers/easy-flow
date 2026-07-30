@@ -1,23 +1,4 @@
-"""Tests for ``deerflow.persistence.bootstrap.bootstrap_schema``.
-
-Covers the three-branch decision table:
-
-| DB state                              | Action                                  |
-|---------------------------------------|-----------------------------------------|
-| empty                                 | create_all + stamp head                 |
-| legacy (DeerFlow tables, no alembic_version) | create_all (baseline tables only, backfill) + stamp baseline + upgrade head |
-| versioned                             | upgrade head                            |
-
-Each test seeds a temp SQLite to the relevant pre-state, runs
-``bootstrap_schema``, and asserts both the resulting schema and the
-``alembic_version`` row.
-
-The legacy branch is exercised across three scenarios: token-usage column
-missing, token-usage column already present, and a baseline-era table
-missing entirely (the ``channel_*`` backfill case). The first two prove the
-column-level idempotent helpers handle both sub-cases; the third proves the
-table-level backfill works.
-"""
+"""本模块覆盖持久化的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -53,20 +34,24 @@ BASELINE = "0001_baseline"
 
 
 def _url(tmp_path: Path, name: str = "test.db") -> str:
+    """准备可控测试资源与状态，供后续断言读取。"""
     return f"sqlite+aiosqlite:///{(tmp_path / name).as_posix()}"
 
 
 async def _table_names(engine) -> set[str]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.connect() as conn:
         return await conn.run_sync(lambda c: set(sa.inspect(c).get_table_names()))
 
 
 async def _runs_columns(engine) -> set[str]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.connect() as conn:
         return await conn.run_sync(lambda c: {col["name"] for col in sa.inspect(c).get_columns("runs")})
 
 
 async def _runs_column_meta(engine, column_name: str) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.connect() as conn:
         cols = await conn.run_sync(lambda c: sa.inspect(c).get_columns("runs"))
     for c in cols:
@@ -76,18 +61,20 @@ async def _runs_column_meta(engine, column_name: str) -> dict:
 
 
 async def _runs_index_names(engine) -> set[str]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.connect() as conn:
         return await conn.run_sync(lambda c: {ix["name"] for ix in sa.inspect(c).get_indexes("runs")})
 
 
 async def _alembic_version(engine) -> str | None:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.connect() as conn:
         row = await conn.execute(sa.text("SELECT version_num FROM alembic_version"))
         return row.scalar()
 
 
 async def _seed_legacy_without_column(engine) -> None:
-    """Build the pre-#3658 schema: create_all, then drop the new column."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with engine.begin() as conn:
@@ -97,19 +84,13 @@ async def _seed_legacy_without_column(engine) -> None:
 
 
 async def _seed_legacy_with_column(engine) -> None:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
 
 async def _seed_legacy_missing_channel_tables(engine) -> None:
-    """Build a pre-#1930 schema: baseline tables exist but ``channel_*`` do not.
-
-    Models the worst-case legacy DB the bootstrap layer has to repair -- a
-    user who upgraded across multiple releases and never had the channel_*
-    tables provisioned in the first place. We achieve it by running the full
-    ``create_all`` and then dropping the channel_* tables in FK-dependency
-    order (credentials/conversations reference channel_connections).
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     async with engine.begin() as conn:
@@ -129,6 +110,7 @@ async def _seed_legacy_missing_channel_tables(engine) -> None:
 
 @asyncio_test
 async def test_empty_branch_creates_all_and_stamps_head(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         await bootstrap_schema(engine, backend="sqlite")
@@ -165,6 +147,7 @@ async def test_empty_branch_creates_all_and_stamps_head(tmp_path: Path) -> None:
 
 @asyncio_test
 async def test_legacy_without_column_branch_upgrades(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         await _seed_legacy_without_column(engine)
@@ -190,6 +173,7 @@ async def test_legacy_without_column_branch_upgrades(tmp_path: Path) -> None:
 
 @asyncio_test
 async def test_legacy_missing_channel_tables_get_backfilled(tmp_path: Path) -> None:
+    """验证通道 获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         await _seed_legacy_missing_channel_tables(engine)
@@ -233,6 +217,7 @@ async def test_legacy_missing_channel_tables_get_backfilled(tmp_path: Path) -> N
 
 @asyncio_test
 async def test_legacy_with_column_branch_upgrade_is_idempotent(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         await _seed_legacy_with_column(engine)
@@ -266,6 +251,7 @@ async def test_legacy_with_manual_workaround_column_warns_on_drift(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         # Pre-#3658 schema with a workaround-style re-add: nullable JSON,
@@ -304,11 +290,7 @@ async def test_legacy_with_wrong_type_workaround_warns_on_type_drift(
     tmp_path: Path,
     caplog: pytest.LogCaptureFixture,
 ) -> None:
-    """The precise reviewer scenario: nullability + server_default match the
-    model, only the type is wrong. Pre-family-check, this returned zero
-    warning (silent JSON-vs-TEXT drift). The family check in
-    ``_type_equivalent`` must catch this while leaving JSON/JSONB pairs
-    equivalent so Postgres dialect synonyms don't false-positive."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         # Reviewer's exact workaround: right nullability/default, wrong type.
@@ -347,6 +329,7 @@ async def test_legacy_with_wrong_type_workaround_warns_on_type_drift(
 
 
 def test_type_equivalent_matches_known_dialect_synonyms() -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     from deerflow.persistence.migrations._helpers import _type_equivalent
 
     # JSON ↔ JSONB (Postgres dialect difference, operationally interchangeable
@@ -357,6 +340,7 @@ def test_type_equivalent_matches_known_dialect_synonyms() -> None:
 
 
 def test_type_equivalent_catches_wholesale_type_mismatch() -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     from deerflow.persistence.migrations._helpers import _type_equivalent
 
     # The reviewer scenario: TEXT NOT NULL DEFAULT '{}' workaround.
@@ -367,8 +351,7 @@ def test_type_equivalent_catches_wholesale_type_mismatch() -> None:
 
 
 def test_type_equivalent_ignores_type_parameters() -> None:
-    """Length / precision differences are out of scope for this helper --
-    the goal is wholesale-type drift, not dialect-rendered size defaults."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     from deerflow.persistence.migrations._helpers import _type_equivalent
 
     assert _type_equivalent("VARCHAR(255)", "VARCHAR(500)") is True
@@ -376,7 +359,7 @@ def test_type_equivalent_ignores_type_parameters() -> None:
 
 
 def test_type_equivalent_returns_true_on_missing_info() -> None:
-    """Missing reflected info must not false-positive into a noisy warning."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     from deerflow.persistence.migrations._helpers import _type_equivalent
 
     assert _type_equivalent(None, sa.JSON()) is True
@@ -391,6 +374,7 @@ def test_type_equivalent_returns_true_on_missing_info() -> None:
 
 @asyncio_test
 async def test_versioned_branch_is_noop_at_head(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         # First bootstrap takes us through the empty branch.
@@ -415,6 +399,7 @@ async def test_versioned_branch_is_noop_at_head(tmp_path: Path) -> None:
 
 @asyncio_test
 async def test_token_usage_column_parity_between_fresh_and_upgraded(tmp_path: Path) -> None:
+    """验证令牌在预期条件及边界场景下的可观察行为，防止相关回归。"""
     fresh = create_async_engine(_url(tmp_path, "fresh.db"))
     upgraded = create_async_engine(_url(tmp_path, "upgraded.db"))
     try:
@@ -464,6 +449,7 @@ async def test_token_usage_column_parity_between_fresh_and_upgraded(tmp_path: Pa
 
 
 def _reflect_columns_sync(sync_conn) -> dict[str, dict[str, dict]]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     insp = sa.inspect(sync_conn)
     out: dict[str, dict[str, dict]] = {}
     for table in insp.get_table_names():
@@ -478,12 +464,14 @@ def _reflect_columns_sync(sync_conn) -> dict[str, dict[str, dict]]:
 
 
 async def _reflect_columns(engine) -> dict[str, dict[str, dict]]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.connect() as conn:
         return await conn.run_sync(_reflect_columns_sync)
 
 
 @asyncio_test
 async def test_create_all_and_alembic_upgrade_produce_same_schema(tmp_path: Path) -> None:
+    """验证创建在预期条件及边界场景下的可观察行为，防止相关回归。"""
     fresh = create_async_engine(_url(tmp_path, "fresh.db"))
     upgraded = create_async_engine(_url(tmp_path, "upgraded.db"))
     try:
@@ -542,6 +530,7 @@ async def test_create_all_and_alembic_upgrade_produce_same_schema(tmp_path: Path
 
 @asyncio_test
 async def test_baseline_table_names_constant_matches_0001(tmp_path: Path) -> None:
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         cfg = _get_alembic_config(engine)
@@ -561,11 +550,7 @@ async def test_baseline_table_names_constant_matches_0001(tmp_path: Path) -> Non
 
 @asyncio_test
 async def test_baseline_index_names_constant_matches_0001(tmp_path: Path) -> None:
-    """Guard: ``_BASELINE_INDEX_NAMES`` must match the set of indexes that
-    ``0001_baseline.upgrade()`` actually creates. Editing 0001 (or adding an
-    index to the ORM model without a corresponding migration guard) without
-    updating this constant fires this test.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         cfg = _get_alembic_config(engine)
@@ -590,12 +575,7 @@ async def test_baseline_index_names_constant_matches_0001(tmp_path: Path) -> Non
 
 @asyncio_test
 async def test_legacy_backfill_skips_non_baseline_tables(tmp_path: Path) -> None:
-    """Regression: legacy backfill must not create tables outside the baseline
-    set, because a later ``op.create_table`` revision for the same name would
-    fail. We synthesise a phantom table on ``Base.metadata`` (modelling a
-    future model addition), run the backfill helper, and assert the phantom
-    is absent from the resulting DB.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     phantom_name = "phantom_future_table_for_test"
     phantom = sa.Table(
         phantom_name,
@@ -633,12 +613,14 @@ async def test_legacy_backfill_skips_non_baseline_tables(tmp_path: Path) -> None
 
 
 async def _channel_connections_index_names(engine) -> set[str]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     async with engine.connect() as conn:
         return await conn.run_sync(lambda c: {ix["name"] for ix in sa.inspect(c).get_indexes("channel_connections")})
 
 
 @asyncio_test
 async def test_legacy_backfill_creates_missing_index_on_existing_table(tmp_path: Path) -> None:
+    """验证已有在预期条件及边界场景下的可观察行为，防止相关回归。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         # Simulate a legacy DB where ``channel_connections`` was provisioned
@@ -667,7 +649,7 @@ async def test_legacy_backfill_creates_missing_index_on_existing_table(tmp_path:
 
 @asyncio_test
 async def test_legacy_backfill_idempotent_when_index_already_exists(tmp_path: Path) -> None:
-    """The explicit index-creation pass must not raise when the index is already present."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         async with engine.begin() as conn:
@@ -688,17 +670,7 @@ async def test_legacy_backfill_idempotent_when_index_already_exists(tmp_path: Pa
 
 @asyncio_test
 async def test_legacy_backfill_rejects_post_baseline_indexes(tmp_path: Path) -> None:
-    """Regression: the index loop must not create post-baseline indexes (e.g.
-    ``uq_runs_thread_active`` from 0004) that have data prerequisites. If the
-    backfill creates a partial unique index before the owning revision runs its
-    dedup step, duplicate rows in the legacy DB raise ``IntegrityError`` and
-    crash bootstrap.
-
-    We seed two active (status='pending') runs on the same thread -- the exact
-    case revision 0004's ``_dedupe_active_runs_per_thread`` was written for --
-    and assert the backfill helper succeeds without error, then confirm
-    0004 still runs correctly (dedup + index creation) during upgrade.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         # 1. Simulate a legacy DB: create baseline schema (0001 only), then
@@ -757,15 +729,7 @@ async def test_legacy_backfill_rejects_post_baseline_indexes(tmp_path: Path) -> 
 async def test_legacy_backfill_duplicate_channel_connections_does_not_crash(
     tmp_path: Path,
 ) -> None:
-    """The target index ``uq_channel_connection_active_identity`` is a baseline
-    partial UNIQUE. Seeding duplicate non-revoked channel connections must
-    NOT crash the backfill with ``IntegrityError``, since no revision dedupes
-    channel connections (unlike runs). A crash would brick bootstrap with no
-    self-heal path.
-
-    The backfill catches the creation error and logs a warning; the operator
-    must fix the duplicate data and re-run.
-    """
+    """验证通道在预期条件及边界场景下的可观察行为，防止相关回归。"""
     engine = create_async_engine(_url(tmp_path))
     try:
         cfg = _get_alembic_config(engine)
@@ -818,7 +782,9 @@ async def test_legacy_backfill_duplicate_channel_connections_does_not_crash(
 
 
 class TestDecideState:
+    """集中覆盖当前测试分支与回归边界。"""
     def test_empty(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         assert _decide_state({"has_alembic_version": False, "has_deerflow_tables": False}) == "empty"
 
     def test_empty_with_unrelated_tables(self):
@@ -826,12 +792,15 @@ class TestDecideState:
         # ``has_deerflow_tables`` is derived from the metadata intersection in
         # production, so the only thing the decision function needs is the
         # bool itself.
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         assert _decide_state({"has_alembic_version": False, "has_deerflow_tables": False}) == "empty"
 
     def test_legacy(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         assert _decide_state({"has_alembic_version": False, "has_deerflow_tables": True}) == "legacy"
 
     def test_versioned(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         assert _decide_state({"has_alembic_version": True, "has_deerflow_tables": True}) == "versioned"
 
     def test_versioned_takes_precedence_over_empty(self):
@@ -839,6 +808,7 @@ class TestDecideState:
         # (e.g. someone restored only the alembic_version table from backup).
         # We still go versioned -> upgrade head, which is the right thing:
         # alembic will run every revision from base.
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         assert _decide_state({"has_alembic_version": True, "has_deerflow_tables": False}) == "versioned"
 
 
@@ -848,13 +818,12 @@ class TestDecideState:
 
 
 def test_head_revision_is_token_usage_revision() -> None:
+    """验证版本修订 令牌 版本修订在预期条件及边界场景下的可观察行为，防止相关回归。"""
     assert _get_head_revision() == HEAD
 
 
 def test_baseline_revision_id_is_known() -> None:
-    """Detect a baseline rename: the bootstrap code hardcodes ``0001_baseline``
-    as the stamp target for the legacy branch, so a rename would silently
-    break that branch unless caught here."""
+    """验证版本修订在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from pathlib import Path  # noqa: PLC0415
 
     from alembic.config import Config  # noqa: PLC0415

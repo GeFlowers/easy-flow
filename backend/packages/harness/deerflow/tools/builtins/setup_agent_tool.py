@@ -1,3 +1,4 @@
+"""提供创建并配置自定义代理的内置工具。"""
 import logging
 
 import yaml
@@ -20,21 +21,15 @@ def setup_agent(
     runtime: Runtime,
     skills: list[str] | None = None,
 ) -> Command:
-    """Setup the custom DeerFlow agent.
+    """创建用户隔离的自定义代理配置与角色说明文件。"""
 
-    Args:
-        soul: Full SOUL.md content defining the agent's personality and behavior.
-        description: One-line description of what the agent does.
-        skills: Optional list of skill names this agent should use. None means use all enabled skills, empty list means no skills.
-    """
-
-    # Reject empty / whitespace-only soul before touching the filesystem.
-    # Without this guard the tool would happily persist an empty SOUL.md and
-    # still report success, which caused the frontend to enter the "agent
-    # created" state for an unusable agent (issue #3549). Failing loud lets
-    # the model retry instead of silently producing a broken artifact and,
-    # together with the upstream agent_name fix, prevents the global default
-    # SOUL.md from being overwritten with empty content.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     if not soul or not soul.strip():
         return Command(
             update={
@@ -55,18 +50,18 @@ def setup_agent(
         agent_name = validate_agent_name(agent_name)
         paths = get_paths()
         if agent_name:
-            # Custom agents are persisted under the current user's bucket so
-            # different users do not see each other's agents.
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
             user_id = resolve_runtime_user_id(runtime)
             agent_dir = paths.user_agent_dir(user_id, agent_name)
         else:
-            # Default agent (no agent_name): SOUL.md lives at the global base dir.
+                        # 中文说明：此处用于执行相关处理。
             agent_dir = paths.base_dir
         is_new_dir = not agent_dir.exists()
         agent_dir.mkdir(parents=True, exist_ok=True)
 
         if agent_name:
-            # If agent_name is provided, we are creating a custom agent in the agents/ directory
+                        # 中文说明：此处用于执行相关处理。
             config_data: dict = {"name": agent_name}
             if description:
                 config_data["description"] = description
@@ -92,7 +87,7 @@ def setup_agent(
         import shutil
 
         if agent_name and is_new_dir and agent_dir is not None and agent_dir.exists():
-            # Cleanup the custom agent directory only if it was newly created during this call
+                        # 中文说明：此处用于执行相关处理。
             shutil.rmtree(agent_dir)
         logger.error(f"[agent_creator] Failed to create agent '{agent_name}': {e}", exc_info=True)
         return Command(update={"messages": [ToolMessage(content=f"Error: {e}", tool_call_id=runtime.tool_call_id)]})

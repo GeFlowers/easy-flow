@@ -1,9 +1,4 @@
-"""SQLAlchemy-backed RunStore implementation.
-
-Each method acquires and releases its own short-lived session.
-Run status updates happen from background workers that may live
-minutes -- we don't hold connections across long execution.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -21,17 +16,19 @@ from deerflow.utils.time import coerce_iso
 
 
 def _lease_expired_or_null(lease_col, cutoff: datetime):
-    """SQLAlchemy filter: True when the lease is NULL or has expired past *cutoff*."""
+    """处理运行记录的租约查询、更新或接管操作。"""
     return or_(lease_col.is_(None), lease_col < cutoff)
 
 
 class RunRepository(RunStore):
+    """定义负责持久化读写及事务边界管理的仓储组件。"""
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self._sf = session_factory
 
     @staticmethod
     def _normalize_model_name(model_name: str | None) -> str | None:
-        """Normalize model_name for storage: strip whitespace, truncate to 128 chars."""
+        """执行持久化流程所需的内部辅助操作。"""
         if model_name is None:
             return None
         if not isinstance(model_name, str):
@@ -43,7 +40,7 @@ class RunRepository(RunStore):
 
     @staticmethod
     def _safe_json(obj: Any) -> Any:
-        """Ensure obj is JSON-serializable. Falls back to model_dump() or str()."""
+        """处理持久化层使用的结构化数据校验、绑定或比较。"""
         if obj is None:
             return None
         if isinstance(obj, (str, int, float, bool)):
@@ -70,6 +67,7 @@ class RunRepository(RunStore):
 
     @staticmethod
     def _row_to_dict(row: RunRow) -> dict[str, Any]:
+        """将持久化记录转换为对外使用的字典表示。"""
         d = row.to_dict()
         # Remap JSON columns to match RunStore interface
         d["metadata"] = d.pop("metadata_json", {})
@@ -102,12 +100,7 @@ class RunRepository(RunStore):
         owner_worker_id: str | None = None,
         lease_expires_at: str | None = None,
     ):
-        """Insert or update a run row.
-
-        ``RunManager`` retries ``put`` after transient SQLite failures.  Making
-        this operation idempotent prevents a successful-but-unacknowledged first
-        commit from turning the retry into a primary-key failure.
-        """
+        """执行当前持久化组件提供的操作。"""
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.put")
         now = datetime.now(UTC)
         created = datetime.fromisoformat(created_at) if created_at else now
@@ -143,6 +136,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """按给定条件查询并返回对应的持久化记录。"""
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.get")
         async with self._sf() as session:
             row = await session.get(RunRow, run_id)
@@ -159,6 +153,7 @@ class RunRepository(RunStore):
         user_id: str | None | _AutoSentinel = AUTO,
         limit=100,
     ):
+        """查询并返回满足给定条件的持久化记录集合。"""
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.list_by_thread")
         stmt = select(RunRow).where(RunRow.thread_id == thread_id)
         if resolved_user_id is not None:
@@ -174,6 +169,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """查询并返回满足给定条件的持久化记录集合。"""
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.list_successful_regenerate_sources")
         source = RunRow.metadata_json["regenerate_from_run_id"].as_string()
         stmt = select(source).where(
@@ -195,6 +191,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """按给定条件查询并返回对应的持久化记录。"""
         if not run_ids:
             return {}
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.get_many_by_thread")
@@ -206,6 +203,7 @@ class RunRepository(RunStore):
             return {row.run_id: self._row_to_dict(row) for row in result.scalars()}
 
     async def update_status(self, run_id, status, *, error=None, stop_reason=None) -> bool:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         values: dict[str, Any] = {"status": status, "updated_at": datetime.now(UTC)}
         if error is not None:
             values["error"] = error
@@ -222,6 +220,7 @@ class RunRepository(RunStore):
             return result.rowcount != 0
 
     async def update_model_name(self, run_id, model_name):
+        """更新指定持久化记录的状态或字段并提交事务。"""
         async with self._sf() as session:
             await session.execute(update(RunRow).where(RunRow.run_id == run_id).values(model_name=self._normalize_model_name(model_name), updated_at=datetime.now(UTC)))
             await session.commit()
@@ -232,6 +231,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.delete")
         async with self._sf() as session:
             row = await session.get(RunRow, run_id)
@@ -243,6 +243,7 @@ class RunRepository(RunStore):
             await session.commit()
 
     async def list_pending(self, *, before=None):
+        """查询并返回满足给定条件的持久化记录集合。"""
         if before is None:
             before_dt = datetime.now(UTC)
         elif isinstance(before, datetime):
@@ -255,7 +256,7 @@ class RunRepository(RunStore):
             return [self._row_to_dict(r) for r in result.scalars()]
 
     async def list_inflight(self, *, before=None):
-        """Return persisted active runs for startup recovery."""
+        """查询并返回满足给定条件的持久化记录集合。"""
         if before is None:
             before_dt = datetime.now(UTC)
         elif isinstance(before, datetime):
@@ -292,10 +293,7 @@ class RunRepository(RunStore):
         first_human_message: str | None = None,
         error: str | None = None,
     ) -> bool:
-        """Update status + token usage + convenience fields on run completion.
-
-        Returns ``False`` when no run row matched the requested ``run_id``.
-        """
+        """更新指定持久化记录的状态或字段并提交事务。"""
         values: dict[str, Any] = {
             "status": status,
             "total_input_tokens": total_input_tokens,
@@ -336,7 +334,7 @@ class RunRepository(RunStore):
         last_ai_message: str | None = None,
         first_human_message: str | None = None,
     ) -> None:
-        """Update token usage + convenience fields while a run is still active."""
+        """更新指定持久化记录的状态或字段并提交事务。"""
         values: dict[str, Any] = {"updated_at": datetime.now(UTC)}
         optional_counters = {
             "total_input_tokens": total_input_tokens,
@@ -362,19 +360,7 @@ class RunRepository(RunStore):
             await session.commit()
 
     async def aggregate_tokens_by_thread(self, thread_id: str, *, include_active: bool = False) -> dict[str, Any]:
-        """Aggregate token usage for a thread.
-
-        ``by_model`` is reduced in Python from each row's ``token_usage_by_model``
-        JSON column so subagent / middleware tokens land on the model that
-        actually produced them (issue #3645). Rows written before that column
-        existed fall back to ``RunRow.model_name`` + ``RunRow.total_tokens``,
-        preserving the legacy lead-only behavior instead of dropping the data.
-
-        Headline totals (``total_tokens``, ``total_input_tokens``,
-        ``total_output_tokens``) and the ``by_caller`` bucket are summed from
-        their own columns and are therefore unaffected by the JSON column being
-        empty.
-        """
+        """执行当前持久化组件提供的操作。"""
         statuses = ("success", "error", "running") if include_active else ("success", "error")
         _completed = RunRow.status.in_(statuses)
         _thread = RunRow.thread_id == thread_id
@@ -444,6 +430,7 @@ class RunRepository(RunStore):
         owner_worker_id: str,
         lease_expires_at: str,
     ) -> bool:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         lease_dt = datetime.fromisoformat(lease_expires_at)
         values: dict[str, Any] = {
             "owner_worker_id": owner_worker_id,
@@ -462,6 +449,7 @@ class RunRepository(RunStore):
         grace_seconds: int,
         error: str,
     ) -> bool:
+        """执行当前持久化组件提供的操作。"""
         cutoff = datetime.now(UTC) - timedelta(seconds=grace_seconds)
         async with self._sf() as session:
             result = await session.execute(
@@ -482,6 +470,7 @@ class RunRepository(RunStore):
         before: str | None = None,
         grace_seconds: int = 10,
     ) -> list[dict[str, Any]]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         if before is None:
             before_dt = datetime.now(UTC)
         elif isinstance(before, datetime):
@@ -518,19 +507,7 @@ class RunRepository(RunStore):
         created_at: str | None = None,
         grace_seconds: int = 10,
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """Atomically create a run with cross-process thread-uniqueness.
-
-        - For ``reject``: INSERT, let the partial unique index enforce
-          single-active-run. Returns ``(row_dict, [])`` on success, raises
-          ``IntegrityError`` on conflict.
-        - For ``interrupt`` / ``rollback``: SELECT FOR UPDATE inflight
-          rows for the thread, cancel them (unless their lease is still valid),
-          then INSERT the new row — all in one transaction. Returns
-          ``(row_dict, claimed_row_dicts)``.
-
-        Returns:
-            Tuple of ``(new_run_dict, claimed_run_dicts)``.
-        """
+        """创建记录并在成功后提交相应的持久化事务。"""
         from deerflow.runtime.runs.manager import ConflictError
 
         resolved_user_id = resolve_user_id(user_id or AUTO, method_name="RunRepository.create_run_atomic")

@@ -1,18 +1,10 @@
-"""Centralized accessors for singleton objects stored on ``app.state``.
+"""集中访问存储于 ``app.state`` 的单例对象。
 
-**Getters** (used by routers): raise 503 when a required dependency is
-missing, except ``get_store`` which returns ``None``.
-
-``AppConfig`` is intentionally *not* cached on ``app.state``. Routers and the
-run path resolve it through :func:`deerflow.config.app_config.get_app_config`,
-which performs mtime-based hot reload, so edits to ``config.yaml`` take
-effect on the next request without a process restart. The engines created in
-:func:`langgraph_runtime` (stream bridge, persistence, checkpointer, store,
-run-event store) accept a ``startup_config`` snapshot — they are
-restart-required by design and stay bound to that snapshot to keep the live
-process consistent with itself.
-
-Initialization is handled directly in ``app.py`` via :class:`AsyncExitStack`.
+供路由使用的获取器在必需依赖缺失时返回 503，唯有 ``get_store`` 可返回 ``None``。
+``AppConfig`` 刻意不缓存于 ``app.state``，路由和运行路径经由支持 mtime 热重载的
+``get_app_config`` 解析，使 config.yaml 修改在下一请求生效。``langgraph_runtime`` 创建的
+流桥、持久化、检查点、存储及运行事件存储使用启动快照，按设计必须重启后才更新，以确保
+正在运行的进程内部一致。初始化由 app.py 通过 ``AsyncExitStack`` 直接完成。
 """
 
 from __future__ import annotations
@@ -35,32 +27,19 @@ from deerflow.runtime.runs.store.base import RunStore
 
 logger = logging.getLogger(__name__)
 
-# Upper bound (seconds) for draining in-flight runs during shutdown, before the
-# AsyncExitStack tears down the checkpointer (and its connection pool). Kept
-# local to avoid an app -> deps -> app import cycle. This is a *separate* budget
-# from ``app.gateway.app._SHUTDOWN_HOOK_TIMEOUT_SECONDS`` (currently also 5.0s,
-# which bounds channel-service stop): the two govern independent teardown steps
-# and may diverge, but both count toward the lifespan shutdown window — revisit
-# them together if their sum must stay within the server's graceful-shutdown
-# timeout.
+# 在 AsyncExitStack 销毁检查点及连接池前，关闭期间排空在途运行的最长秒数。将它保留在
+# 本模块可避免 app → deps → app 的导入环。它与 app.py 的频道服务停止时限独立，两者均计入
+# 生命周期关闭窗口；若总和必须受服务器优雅关闭时限约束，应一并调整。
 _RUN_DRAIN_TIMEOUT_SECONDS = 5.0
 
 
 def _enforce_postgres_for_multi_worker(config: AppConfig) -> None:
-    """Refuse to start when GATEWAY_WORKERS > 1 and safety preconditions are not met.
+    """多工作进程安全前提不满足时，拒绝以 ``GATEWAY_WORKERS > 1`` 启动。
 
-    Two checks (both must pass for multi-worker):
-
-    1. The DB backend must be Postgres — SQLite write-locks cannot support
-       concurrent multi-process access.
-    2. ``run_ownership.heartbeat_enabled`` must be True — without heartbeat,
-       every run has a NULL lease, so reconciliation treats all inflight
-       runs as orphans and Worker B would kill Worker A's live runs on
-       every rolling update or scale-up.
-
-    This gate runs once at startup before any persistence engine is
-    initialised so the error message is clear and the process exits
-    immediately.
+    多工作进程必须同时使用 Postgres（SQLite 写锁不支持多进程并发）并启用
+    ``run_ownership.heartbeat_enabled``；否则运行均无租约，协调过程会将所有在途运行视作
+    无主运行，工作进程 B 可能在滚动更新或扩容时终止工作进程 A 的存活运行。该门禁在任何
+    持久化引擎初始化前仅于启动时执行一次，以便清晰报错并立即退出。
     """
     try:
         workers = int(os.environ.get("GATEWAY_WORKERS", "1"))
@@ -86,22 +65,17 @@ def _enforce_postgres_for_multi_worker(config: AppConfig) -> None:
 
 
 async def _drain_inflight_runs(run_manager: RunManager) -> None:
-    """Drain in-flight runs before the checkpointer is torn down (issue #3373).
+    """在销毁检查点前排空在途运行，避免运行任务仍写入检查点时关闭其连接池。
 
-    Shields the (internally-bounded) drain so that even if the lifespan
-    coroutine is itself cancelled mid-shutdown — a second SIGINT or the server's
-    graceful-shutdown timeout, i.e. the same signal storm behind #3373 — the
-    checkpointer pool is not closed while run tasks are still writing
-    checkpoints. On such a cancellation we let the already-running drain finish
-    (it is bounded by ``RunManager.shutdown``'s own timeout) and then propagate
-    the cancellation.
+    对有内部时限的排空操作做屏蔽；即使生命周期协程在关闭中因第二个 SIGINT 或服务器
+    优雅关闭超时而被取消，也允许已启动的排空在 ``RunManager.shutdown`` 的时限内完成，
+    随后再传播取消。
     """
     drain = asyncio.create_task(run_manager.shutdown(timeout=_RUN_DRAIN_TIMEOUT_SECONDS))
     try:
         await asyncio.shield(drain)
     except asyncio.CancelledError:
-        # Re-shield so this second wait does not abandon the in-flight drain;
-        # it is bounded, so this cannot hang. Then re-raise to honour shutdown.
+        # 再次屏蔽，避免第二次等待放弃在途排空；它有时限，不会卡死，随后重新抛出以遵循关闭。
         try:
             await asyncio.shield(drain)
         except Exception:
@@ -117,7 +91,7 @@ async def _publish_recovered_run_stream_end(
     *,
     cleanup_delay: float = 60.0,
 ) -> None:
-    """Terminate retained streams for runs recovered as orphaned at startup."""
+    """为启动时恢复为无主状态的运行终止保留事件流。"""
     for record in recovered_runs:
         stream_exists = getattr(bridge, "stream_exists", None)
         if stream_exists is not None:
@@ -141,6 +115,7 @@ async def _publish_recovered_run_stream_end(
 
 
 def _log_recovered_stream_cleanup_result(task: asyncio.Task[None], run_id: str) -> None:
+    """记录恢复运行的延迟事件流清理任务异常，取消任务无需额外处理。"""
     if task.cancelled():
         return
     try:
@@ -164,7 +139,7 @@ async def _mark_latest_recovered_threads_error(
     thread_store: ThreadMetaStore,
     recovered_runs: list[RunRecord],
 ) -> None:
-    """Mark thread status as error only when its newest run was recovered."""
+    """仅当线程最新运行被恢复时才将其状态标记为错误。"""
     recovered_by_thread: dict[str, set[str]] = {}
     for record in recovered_runs:
         recovered_by_thread.setdefault(record.thread_id, set()).add(record.run_id)
@@ -184,7 +159,7 @@ async def _mark_latest_recovered_threads_error(
 
 
 def get_config() -> AppConfig:
-    """Return the freshest ``AppConfig`` for the current request.
+    """返回当前请求的最新 ``AppConfig``。
 
     Routes through :func:`deerflow.config.app_config.get_app_config`, which
     honours runtime ``ContextVar`` overrides and reloads ``config.yaml`` from
@@ -214,14 +189,14 @@ def get_config() -> AppConfig:
     """
     try:
         return get_app_config()
-    except Exception as exc:  # noqa: BLE001 - request boundary: log and degrade gracefully
+    except Exception as exc:  # noqa: BLE001 - 请求边界：记录日志并优雅降级。
         logger.exception("Failed to load AppConfig at request time")
         raise HTTPException(status_code=503, detail="Configuration not available") from exc
 
 
 @asynccontextmanager
 async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGenerator[None, None]:
-    """Bootstrap and tear down all LangGraph runtime singletons.
+    """引导并销毁所有 LangGraph 运行时单例。
 
     ``startup_config`` is the ``AppConfig`` snapshot taken once during
     ``lifespan()`` for one-shot infrastructure bootstrap. The engines and
@@ -250,8 +225,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
     from deerflow.runtime.events.store import make_run_event_store
 
     # ------------------------------------------------------------------
-    # Multi-worker safety gate: reject SQLite when GATEWAY_WORKERS > 1.
-    # SQLite write-locks cannot support concurrent multi-process access.
+    # 多工作进程安全门禁：GATEWAY_WORKERS > 1 时拒绝 SQLite，其写锁不支持多进程并发。
     # ------------------------------------------------------------------
     _enforce_postgres_for_multi_worker(startup_config)
 
@@ -260,14 +234,13 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
 
         app.state.stream_bridge = await stack.enter_async_context(make_stream_bridge(config))
 
-        # Initialize persistence engine BEFORE checkpointer so that
-        # auto-create-database logic runs first (postgres backend).
+        # 在检查点前初始化持久化引擎，使数据库自动创建逻辑优先运行（Postgres 后端）。
         await init_engine_from_config(config.database)
 
         app.state.checkpointer = await stack.enter_async_context(make_checkpointer(config))
         app.state.store = await stack.enter_async_context(make_store(config))
 
-        # Initialize repositories — one get_session_factory() call for all.
+        # 初始化仓库，所有仓库共用一次 get_session_factory() 调用。
         sf = get_session_factory()
         if sf is not None:
             from deerflow.persistence.feedback import FeedbackRepository
@@ -296,25 +269,21 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             app.state.scheduled_task_repo = None
             app.state.scheduled_task_run_repo = None
 
-        # Run event store. The store and the matching ``run_events_config`` are
-        # both frozen at startup so ``get_run_context`` does not combine a
-        # freshly-reloaded ``AppConfig.run_events`` with a store still bound to
-        # the previous backend.
+        # 运行事件存储及配套 ``run_events_config`` 都在启动时冻结，避免 get_run_context
+        # 将刚重载的 AppConfig.run_events 与仍绑定旧后端的存储组合。
         run_events_config = getattr(config, "run_events", None)
         app.state.run_events_config = run_events_config
         app.state.run_event_store = make_run_event_store(run_events_config)
 
-        # RunManager with store backing for persistence
+        # 使用存储作为持久化后端的 RunManager。
         run_ownership_config = getattr(config, "run_ownership", None)
         app.state.run_manager = RunManager(
             store=app.state.run_store,
             run_ownership_config=run_ownership_config,
         )
-        # Startup recovery: mark inflight runs whose lease has expired as error.
-        # In single-worker mode (SQLite / backend=memory), no run has a lease, so
-        # all inflight rows are reclaimed (unchanged behaviour). In multi-worker
-        # mode (Postgres), only runs with an expired lease are reclaimed; runs
-        # owned by another live worker are skipped.
+        # 启动恢复：将租约已过期的在途运行标记为错误。单工作进程模式（SQLite / memory）
+        # 中运行没有租约，故回收所有在途行；多工作进程模式（Postgres）只回收租约过期的
+        # 运行，并跳过归属其他存活工作进程的运行。
         from deerflow.utils.time import now_iso
 
         recovered_runs = await app.state.run_manager.reconcile_orphaned_inflight_runs(
@@ -326,17 +295,14 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         await _publish_recovered_run_stream_end(app.state.stream_bridge, recovered_runs, cleanup_delay=cleanup_delay)
         await _mark_latest_recovered_threads_error(app.state.run_manager, app.state.thread_store, recovered_runs)
 
-        # Start the lease heartbeat if enabled (multi-worker deployments).
+        # 多工作进程部署中若启用则启动租约心跳。
         await app.state.run_manager.start_heartbeat()
 
         try:
             yield
         finally:
-            # Drain in-flight run tasks BEFORE the AsyncExitStack tears down the
-            # checkpointer (and its connection pool). A run still mid-graph would
-            # otherwise leak into asyncio.run() shutdown, where langgraph's
-            # _checkpointer_put_after_previous aput races the closed pool and
-            # raises PoolClosed (issue #3373).
+            # 在 AsyncExitStack 销毁检查点及连接池前排空在途运行任务；否则尚在图中执行的
+            # 运行会泄漏至 asyncio.run() 关闭阶段，与已关闭连接池竞争并引发 PoolClosed。
             run_manager = getattr(app.state, "run_manager", None)
             if run_manager is not None:
                 await _drain_inflight_runs(run_manager)
@@ -344,14 +310,15 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
 
 
 # ---------------------------------------------------------------------------
-# Getters – called by routers per-request
+# 供路由按请求调用的获取器。
 # ---------------------------------------------------------------------------
 
 
 def _require(attr: str, label: str) -> Callable[[Request], T]:
-    """Create a FastAPI dependency that returns ``app.state.<attr>`` or 503."""
+    """创建返回 ``app.state.<attr>`` 的 FastAPI 依赖；缺失时返回 503。"""
 
     def dep(request: Request) -> T:
+        """从应用状态读取已初始化依赖；缺失时向当前请求返回 503。"""
         val = getattr(request.app.state, attr, None)
         if val is None:
             raise HTTPException(status_code=503, detail=f"{label} not available")
@@ -370,12 +337,12 @@ get_run_store: Callable[[Request], RunStore] = _require("run_store", "Run store"
 
 
 def get_store(request: Request):
-    """Return the global store (may be ``None`` if not configured)."""
+    """返回全局存储；未配置时可能为 ``None``。"""
     return getattr(request.app.state, "store", None)
 
 
 def get_thread_store(request: Request) -> ThreadMetaStore:
-    """Return the thread metadata store (SQL or memory-backed)."""
+    """返回线程元数据存储，可由 SQL 或内存后端支撑。"""
     val = getattr(request.app.state, "thread_store", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Thread metadata store not available")
@@ -383,6 +350,7 @@ def get_thread_store(request: Request) -> ThreadMetaStore:
 
 
 def get_scheduled_task_repo(request: Request):
+    """返回调度任务持久化仓库，供路由在当前应用生命周期内访问。"""
     val = getattr(request.app.state, "scheduled_task_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Scheduled task repo not available")
@@ -390,6 +358,7 @@ def get_scheduled_task_repo(request: Request):
 
 
 def get_scheduled_task_run_repo(request: Request):
+    """返回调度任务运行记录仓库，保留执行历史的持久化边界。"""
     val = getattr(request.app.state, "scheduled_task_run_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Scheduled task run repo not available")
@@ -397,6 +366,7 @@ def get_scheduled_task_run_repo(request: Request):
 
 
 def get_scheduled_task_service(request: Request):
+    """返回已初始化的调度服务，用于创建、变更和触发后台任务。"""
     val = getattr(request.app.state, "scheduled_task_service", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Scheduled task service not available")
@@ -404,7 +374,7 @@ def get_scheduled_task_service(request: Request):
 
 
 def get_run_context(request: Request) -> RunContext:
-    """Build a :class:`RunContext` from ``app.state`` singletons.
+    """从 ``app.state`` 单例构建 :class:`RunContext`。
 
     Returns a *base* context with infrastructure dependencies. The
     ``app_config`` field is resolved live so per-run fields (e.g.
@@ -425,16 +395,16 @@ def get_run_context(request: Request) -> RunContext:
 
 
 # ---------------------------------------------------------------------------
-# Auth helpers (used by authz.py and auth middleware)
+# 认证辅助函数，供 authz.py 与认证中间件使用。
 # ---------------------------------------------------------------------------
 
-# Cached singletons to avoid repeated instantiation per request
+# 缓存单例，避免每个请求重复实例化。
 _cached_local_provider: LocalAuthProvider | None = None
 _cached_repo: SQLiteUserRepository | None = None
 
 
 def get_local_provider() -> LocalAuthProvider:
-    """Get or create the cached LocalAuthProvider singleton.
+    """获取或创建缓存的 LocalAuthProvider 单例。
 
     Must be called after ``init_engine_from_config()`` — the shared
     session factory is required to construct the user repository.
@@ -456,7 +426,7 @@ def get_local_provider() -> LocalAuthProvider:
 
 
 async def get_current_user_from_request(request: Request):
-    """Get the current authenticated user from the request cookie.
+    """从请求 Cookie 获取当前已认证用户。
 
     Raises HTTPException 401 if not authenticated.
     """
@@ -496,7 +466,7 @@ async def get_current_user_from_request(request: Request):
             detail=AuthErrorResponse(code=AuthErrorCode.USER_NOT_FOUND, message="User not found").model_dump(),
         )
 
-    # Token version mismatch → password was changed, token is stale
+    # 令牌版本不匹配表示密码已变更，令牌已过期。
     if user.token_version != payload.ver:
         raise HTTPException(
             status_code=401,
@@ -507,7 +477,7 @@ async def get_current_user_from_request(request: Request):
 
 
 async def require_admin_user(request: Request, *, detail: str) -> None:
-    """Require the authenticated caller to be an admin user.
+    """要求已认证调用方为管理员用户。
 
     ``AuthMiddleware`` normally stamps ``request.state.user`` before the request
     reaches a router. Falling back to the strict dependency keeps the route safe
@@ -529,7 +499,7 @@ async def require_admin_user(request: Request, *, detail: str) -> None:
 
 
 async def get_optional_user_from_request(request: Request):
-    """Get optional authenticated user from request.
+    """从请求获取可选的已认证用户。
 
     Returns None if not authenticated.
     """
@@ -540,7 +510,7 @@ async def get_optional_user_from_request(request: Request):
 
 
 async def get_current_user(request: Request) -> str | None:
-    """Extract user_id from request cookie, or None if not authenticated.
+    """从请求 Cookie 提取 user_id；未认证时返回 None。
 
     Thin adapter that returns the string id for callers that only need
     identification (e.g., ``feedback.py``). Full-user callers should use

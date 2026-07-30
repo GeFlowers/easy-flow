@@ -1,69 +1,4 @@
-"""Replay a recorded LLM trace deterministically — the "replay" half of
-record/replay e2e (mirrors open-design's ``mocks/`` golden traces).
-
-A fixture is a JSON file capturing the *real* model calls of one scenario,
-keyed by a normalized hash of the **caller + input** each call received::
-
-    {
-      "scenario": "write_read_file",
-      "mode": "ultra",
-      "model": "gpt-5.5",
-      "turns": [
-        {
-          "caller": "lead_agent",
-          "conversation_hash": "<sha256>",
-          "input_hash": "<sha256>",
-          "output": <message dict>,
-        },
-        ...
-      ]
-    }
-
-Why hash-by-input (not turn index)
-----------------------------------
-A real run makes model calls from several callers — the lead agent's own turns,
-``TitleMiddleware`` (auto-title), memory, and possibly subagents. They interleave
-and their count/order is not something we want a replay to depend on. Matching by
-a normalized hash of the *input messages* means each call gets back exactly the
-output that was recorded for that input, regardless of order or which middleware
-issued it. The caller name (``lead_agent``, ``middleware:title``,
-``suggest_agent``, ``subagent:*``, ...) is included so two different model
-callers with the same conversation text do not compete for the same replay
-bucket. That keeps the in-graph, deterministic title call part of the recording;
-memory/summarization, by contrast, are disabled in the replay config
-(``_replay_fixture.py``) because their background, debounced timing is not
-reproducible across runs.
-
-Volatile fields (UUID thread/run/user ids, timestamps, dates, tmp/home paths)
-are normalized out before hashing so a recording replays across processes with
-different temp dirs. The same ``hash_messages`` is used by the recorder
-(``scripts/record_gateway.py``) and here, so record and replay agree by
-construction.
-
-This lives in ``tests/`` (not in the publishable ``deerflow-harness`` package),
-matching the repo convention for test-only fakes (cf. ``FakeToolCallingModel`` in
-``_agent_e2e_helpers.py``). In-process tests get ``tests/`` on ``sys.path`` for
-free via pytest; a standalone replay gateway just needs ``PYTHONPATH`` to include
-``backend/tests`` so the config ``use:`` below resolves.
-
-Point a config model's ``use`` at this class and set the fixture via env::
-
-    models:
-      - name: replay-model
-        use: replay_provider:ReplayChatModel
-        model: gpt-5.5            # placeholder; ignored
-
-    DEERFLOW_REPLAY_FIXTURE=/path/to/write_read_file.ultra.json
-
-A cache miss raises loudly with a diagnostic — that is the signal that the
-replayed run diverged from the recording (graph changed, a new volatile field
-slipped through normalization, or a non-deterministic tool result changed a
-downstream input). Re-record or extend normalization; never pass silently.
-
-Recording lives outside production code too (``scripts/record_gateway.py`` +
-``scripts/build_fixture_from_jsonl.py``); CI consumes the fixtures through this
-replay side with no API key.
-"""
+'定义 replay_provider 模块提供的职责与可复用接口。\n\nReplay a recorded LLM trace deterministically — the "replay" half of\nrecord/replay e2e (mirrors open-design\'s ``mocks/`` golden traces).\n\nA fixture is a JSON file capturing the *real* model calls of one scenario,\nkeyed by a normalized hash of the **caller + input** each call received::\n\n    {\n      "scenario": "write_read_file",\n      "mode": "ultra",\n      "model": "gpt-5.5",\n      "turns": [\n        {\n          "caller": "lead_agent",\n          "conversation_hash": "<sha256>",\n          "input_hash": "<sha256>",\n          "output": <message dict>,\n        },\n        ...\n      ]\n    }\n\nWhy hash-by-input (not turn index)\n----------------------------------\nA real run makes model calls from several callers — the lead agent\'s own turns,\n``TitleMiddleware`` (auto-title), memory, and possibly subagents. They interleave\nand their count/order is not something we want a replay to depend on. Matching by\na normalized hash of the *input messages* means each call gets back exactly the\noutput that was recorded for that input, regardless of order or which middleware\nissued it. The caller name (``lead_agent``, ``middleware:title``,\n``suggest_agent``, ``subagent:*``, ...) is included so two different model\ncallers with the same conversation text do not compete for the same replay\nbucket. That keeps the in-graph, deterministic title call part of the recording;\nmemory/summarization, by contrast, are disabled in the replay config\n(``_replay_fixture.py``) because their background, debounced timing is not\nreproducible across runs.\n\nVolatile fields (UUID thread/run/user ids, timestamps, dates, tmp/home paths)\nare normalized out before hashing so a recording replays across processes with\ndifferent temp dirs. The same ``hash_messages`` is used by the recorder\n(``scripts/record_gateway.py``) and here, so record and replay agree by\nconstruction.\n\nThis lives in ``tests/`` (not in the publishable ``deerflow-harness`` package),\nmatching the repo convention for test-only fakes (cf. ``FakeToolCallingModel`` in\n``_agent_e2e_helpers.py``). In-process tests get ``tests/`` on ``sys.path`` for\nfree via pytest; a standalone replay gateway just needs ``PYTHONPATH`` to include\n``backend/tests`` so the config ``use:`` below resolves.\n\nPoint a config model\'s ``use`` at this class and set the fixture via env::\n\n    models:\n      - name: replay-model\n        use: replay_provider:ReplayChatModel\n        model: gpt-5.5            # placeholder; ignored\n\n    DEERFLOW_REPLAY_FIXTURE=/path/to/write_read_file.ultra.json\n\nA cache miss raises loudly with a diagnostic — that is the signal that the\nreplayed run diverged from the recording (graph changed, a new volatile field\nslipped through normalization, or a non-deterministic tool result changed a\ndownstream input). Re-record or extend normalization; never pass silently.\n\nRecording lives outside production code too (``scripts/record_gateway.py`` +\n``scripts/build_fixture_from_jsonl.py``); CI consumes the fixtures through this\nreplay side with no API key.\n'
 
 from __future__ import annotations
 
@@ -102,15 +37,17 @@ _replay_misses: list[str] = []
 
 
 def replay_misses() -> list[str]:
-    """Hashes that missed the fixture since the last reset (see ``_replay_misses``)."""
+    '执行 replay_misses 的明确职责，并返回与调用约定一致的结果。\n\nHashes that missed the fixture since the last reset (see ``_replay_misses``).'
     return list(_replay_misses)
 
 
 def reset_replay_misses() -> None:
+    '执行 reset_replay_misses 的明确职责，并返回与调用约定一致的结果'
     _replay_misses.clear()
 
 
 def _normalize_caller(caller: str | None) -> str:
+    '执行 _normalize_caller 的明确职责，并返回与调用约定一致的结果'
     value = _normalize_text(str(caller or "").strip())
     if not value:
         return _DEFAULT_CALLER
@@ -118,6 +55,7 @@ def _normalize_caller(caller: str | None) -> str:
 
 
 def _caller_from_tags(tags: list[str] | None) -> str | None:
+    '执行 _caller_from_tags 的明确职责，并返回与调用约定一致的结果'
     for tag in tags or []:
         if isinstance(tag, str) and (tag == _DEFAULT_CALLER or tag.startswith(_CALLER_TAG_PREFIXES)):
             return tag
@@ -125,12 +63,7 @@ def _caller_from_tags(tags: list[str] | None) -> str | None:
 
 
 def caller_identity(*, name: str | None = None, tags: list[str] | None = None) -> str:
-    """Stable model-caller identity shared by record and replay.
-
-    Tags win because graph middleware and subagents already use them as the
-    explicit caller marker. ``run_name`` is exposed to callbacks as ``name`` and
-    covers route-level callers such as ``suggest_agent``.
-    """
+    '执行 caller_identity 的明确职责，并返回与调用约定一致的结果。\n\nStable model-caller identity shared by record and replay.\n\n    Tags win because graph middleware and subagents already use them as the\n    explicit caller marker. ``run_name`` is exposed to callbacks as ``name`` and\n    covers route-level callers such as ``suggest_agent``.\n    '
     return _normalize_caller(_caller_from_tags(tags) or name)
 
 
@@ -165,6 +98,7 @@ _EMPTY_ROLE_LINE_RE = re.compile(r"^(User|Assistant):\s*$\n?", re.MULTILINE)
 
 
 def _normalize_text(text: str) -> str:
+    '执行 _normalize_text 的明确职责，并返回与调用约定一致的结果'
     text = _SYSTEM_REMINDER_RE.sub("", text)
     text = _EMPTY_ROLE_LINE_RE.sub("", text)
     text = _BOUNDARY_BEGIN_RE.sub("", text)
@@ -177,6 +111,7 @@ def _normalize_text(text: str) -> str:
 
 
 def _content_to_text(content: Any) -> str:
+    '执行 _content_to_text 的明确职责，并返回与调用约定一致的结果'
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -191,20 +126,7 @@ def _content_to_text(content: Any) -> str:
 
 
 def _canonical_messages(messages: list[BaseMessage]) -> str:
-    """Project messages to a stable shape that excludes volatile metadata/ids.
-
-    Keeps only what determines which recorded turn to replay: the conversation
-    (human / ai / tool messages — role, text content, tool-call name+args). Drops
-    ``id``, ``response_metadata``, ``usage_metadata``, ``tool_call_id`` (all
-    volatile), then normalizes embedded volatile substrings.
-
-    **The system message is excluded entirely.** The lead-agent system prompt is
-    a living, frequently-edited implementation detail (its wording changes across
-    PRs), not part of the front-back contract this harness verifies. Hashing it
-    would make every fixture go stale — and red-fail on unrelated PRs — the moment
-    anyone edits the prompt. The conversation flow (user input -> tool calls ->
-    results -> answer) is the stable key that identifies a recorded turn.
-    """
+    '执行 _canonical_messages 的明确职责，并返回与调用约定一致的结果。\n\nProject messages to a stable shape that excludes volatile metadata/ids.\n\n    Keeps only what determines which recorded turn to replay: the conversation\n    (human / ai / tool messages — role, text content, tool-call name+args). Drops\n    ``id``, ``response_metadata``, ``usage_metadata``, ``tool_call_id`` (all\n    volatile), then normalizes embedded volatile substrings.\n\n    **The system message is excluded entirely.** The lead-agent system prompt is\n    a living, frequently-edited implementation detail (its wording changes across\n    PRs), not part of the front-back contract this harness verifies. Hashing it\n    would make every fixture go stale — and red-fail on unrelated PRs — the moment\n    anyone edits the prompt. The conversation flow (user input -> tool calls ->\n    results -> answer) is the stable key that identifies a recorded turn.\n    '
     projected: list[dict[str, Any]] = []
     for message in messages:
         # Exclude the system prompt from the match key — see docstring. It is the
@@ -243,22 +165,17 @@ def _canonical_messages(messages: list[BaseMessage]) -> str:
 
 
 def hash_messages(messages: list[BaseMessage]) -> str:
-    """Legacy stable hash of only a model call's conversation input."""
+    "执行 hash_messages 的明确职责，并返回与调用约定一致的结果。\n\nLegacy stable hash of only a model call's conversation input."
     return hashlib.sha256(_canonical_messages(messages).encode("utf-8")).hexdigest()
 
 
 def hash_replay_input(messages: list[BaseMessage], *, caller: str | None) -> str:
-    """Stable replay key for a caller-specific model input."""
+    '执行 hash_replay_input 的明确职责，并返回与调用约定一致的结果。\n\nStable replay key for a caller-specific model input.'
     return hash_input_key(hash_messages(messages), caller=caller)
 
 
 def hash_input_key(conversation_hash: str, *, caller: str | None) -> str:
-    """Namespace a conversation hash by caller identity.
-
-    Keeping this as ``hash(caller + legacy_conversation_hash)`` lets existing
-    fixtures migrate without a live-model re-record: their old ``input_hash`` is
-    exactly the conversation hash.
-    """
+    '执行 hash_input_key 的明确职责，并返回与调用约定一致的结果。\n\nNamespace a conversation hash by caller identity.\n\n    Keeping this as ``hash(caller + legacy_conversation_hash)`` lets existing\n    fixtures migrate without a live-model re-record: their old ``input_hash`` is\n    exactly the conversation hash.\n    '
     payload = json.dumps(
         {"caller": _normalize_caller(caller), "conversation_hash": conversation_hash},
         sort_keys=True,
@@ -268,6 +185,7 @@ def hash_input_key(conversation_hash: str, *, caller: str | None) -> str:
 
 
 def _load_fixture(fixture_path: str) -> dict[str, deque[AIMessage]]:
+    '执行 _load_fixture 的明确职责，并返回与调用约定一致的结果'
     with open(fixture_path, encoding="utf-8") as handle:
         payload = json.load(handle)
     table: dict[str, deque[AIMessage]] = {}
@@ -281,12 +199,7 @@ def _load_fixture(fixture_path: str) -> dict[str, deque[AIMessage]]:
 
 
 class ReplayChatModel(BaseChatModel):
-    """Returns the recorded assistant output whose input matches this call.
-
-    ``bind_tools`` is a no-op returning ``self`` — recorded turns already carry
-    the real ``tool_calls``, so the agent dispatches them as if a live model had
-    produced them.
-    """
+    '封装 ReplayChatModel 的状态、协作关系与公开操作。\n\nReturns the recorded assistant output whose input matches this call.\n\n    ``bind_tools`` is a no-op returning ``self`` — recorded turns already carry\n    the real ``tool_calls``, so the agent dispatches them as if a live model had\n    produced them.\n    '
 
     _table: dict[str, deque] = PrivateAttr(default_factory=dict)
     _fixture_path: str = PrivateAttr(default="")
@@ -295,6 +208,7 @@ class ReplayChatModel(BaseChatModel):
     def __init__(self, **kwargs: Any) -> None:
         # Ignore provider noise the factory forwards from config (model, api_key,
         # base_url, ...). Fixture path comes from the ``fixture`` kwarg or env.
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         fixture_path = kwargs.pop("fixture", None) or os.environ.get(_FIXTURE_ENV)
         callbacks = kwargs.pop("callbacks", None)
         super().__init__(callbacks=callbacks)
@@ -306,9 +220,11 @@ class ReplayChatModel(BaseChatModel):
 
     @property
     def _llm_type(self) -> str:
+        '执行 _llm_type 的明确职责，并返回与调用约定一致的结果'
         return "deerflow-replay"
 
     def _caller_from_run_manager(self, run_manager: CallbackManagerForLLMRun | None) -> str:
+        '执行 _caller_from_run_manager 的明确职责，并返回与调用约定一致的结果'
         if run_manager is None:
             if len(self._run_callers) == 1:
                 # Some async LangGraph paths fire on_chat_model_start with the
@@ -328,6 +244,7 @@ class ReplayChatModel(BaseChatModel):
         )
 
     def _match(self, messages: list[BaseMessage], run_manager: CallbackManagerForLLMRun | None = None) -> AIMessage:
+        '执行 _match 的明确职责，并返回与调用约定一致的结果'
         caller = self._caller_from_run_manager(run_manager)
         key = hash_replay_input(messages, caller=caller)
         bucket = self._table.get(key)
@@ -358,6 +275,7 @@ class ReplayChatModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
+        '执行 _generate 的明确职责，并返回与调用约定一致的结果'
         return ChatResult(generations=[ChatGeneration(message=self._match(messages, run_manager))])
 
     def _stream(
@@ -367,6 +285,7 @@ class ReplayChatModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> Iterator[ChatGenerationChunk]:
+        '执行 _stream 的明确职责，并返回与调用约定一致的结果'
         turn = self._match(messages, run_manager)
         text = turn.content if isinstance(turn.content, str) else ""
         chunk = ChatGenerationChunk(
@@ -382,11 +301,14 @@ class ReplayChatModel(BaseChatModel):
         yield chunk
 
     def bind_tools(self, tools: Any, **kwargs: Any) -> Runnable:  # type: ignore[override]
+        '执行 bind_tools 的明确职责，并返回与调用约定一致的结果'
         return self
 
 
 class _ReplayCallerCapture(BaseCallbackHandler):
+    '封装 _ReplayCallerCapture 的状态、协作关系与公开操作'
     def __init__(self, run_callers: dict[str, str]) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self._run_callers = run_callers
 
     def on_chat_model_start(
@@ -399,6 +321,7 @@ class _ReplayCallerCapture(BaseCallbackHandler):
         name: str | None = None,
         **kwargs: Any,
     ) -> None:
+        '执行 on_chat_model_start 的明确职责，并返回与调用约定一致的结果'
         if run_id is not None:
             self._run_callers[str(run_id)] = caller_identity(name=name, tags=tags)
 

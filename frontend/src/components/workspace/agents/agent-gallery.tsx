@@ -9,6 +9,7 @@ import { useI18n } from "@/core/i18n/hooks";
 
 import { AgentCard } from "./agent-card";
 
+/** 加载并展示代理库，统一处理创建入口、加载态与空状态。 */
 export function AgentGallery() {
   const { t } = useI18n();
   const { agents, isLoading } = useAgents();
@@ -20,7 +21,7 @@ export function AgentGallery() {
 
   return (
     <div className="flex size-full flex-col">
-      {/* Page header */}
+      {/* 页面标题区 */}
       <div className="flex items-center justify-between border-b px-6 py-4">
         <div>
           <h1 className="text-xl font-semibold">{t.agents.title}</h1>
@@ -34,7 +35,7 @@ export function AgentGallery() {
         </Button>
       </div>
 
-      {/* Content */}
+      {/* 内容区 */}
       <div className="flex-1 overflow-y-auto p-6">
         {isLoading ? (
           <div className="text-muted-foreground flex h-40 items-center justify-center text-sm">

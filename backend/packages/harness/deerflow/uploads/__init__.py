@@ -1,3 +1,4 @@
+'定义 __init__ 模块提供的职责与可复用接口'
 from .manager import (
     UPLOAD_STAGING_PREFIX,
     UPLOAD_STAGING_SUFFIX,

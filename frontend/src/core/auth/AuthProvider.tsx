@@ -14,11 +14,11 @@ import { isStaticWebsiteOnly } from "../static-mode";
 
 import { type User, buildLoginUrl } from "./types";
 
-// Re-export for consumers
+// 为使用方重新导出用户类型。
 export type { User };
 
 /**
- * Authentication context provided to consuming components
+ * 提供给消费组件的认证上下文。
  */
 interface AuthContextType {
   user: User | null;
@@ -31,18 +31,19 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+/** AuthProvider 所需的初始服务端用户和子组件。 */
 interface AuthProviderProps {
   children: ReactNode;
   initialUser: User | null;
 }
 
 /**
- * AuthProvider - Unified authentication context for the application
+ * 应用的统一认证上下文提供组件。
  *
- * Per RFC-001:
- * - Only holds display information (user), never JWT or tokens
- * - initialUser comes from server-side guard, avoiding client flicker
- * - Provides logout and refresh capabilities
+ * 遵循 RFC-001：
+ * - 仅保存用于展示的用户信息，绝不保存 JWT 或令牌；
+ * - ``initialUser`` 来自服务端守卫，避免客户端界面闪烁；
+ * - 提供登出和刷新用户信息的能力。
  */
 export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(initialUser);
@@ -54,17 +55,16 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const isAuthenticated = user !== null;
 
   /**
-   * Apply a user value supplied by a caller (e.g. banner probe) that has
-   * already fetched it. Equivalent to setUser, exposed with a stable name
-   * so consumers don't reach into React internals.
+   * 应用调用方（例如横幅探测）已获取的用户值。该操作等价于 setUser，但以稳定名称
+   * 对外暴露，使消费方无需接触 React 内部实现。
    */
   const applyUser = useCallback((next: User | null) => {
     setUser(next);
   }, []);
 
   /**
-   * Fetch current user from FastAPI
-   * Used when initialUser might be stale (e.g., after tab was inactive)
+   * 从 FastAPI 获取当前用户。
+   * 当 ``initialUser`` 可能陈旧时使用（例如标签页曾处于非活动状态）。
    */
   const refreshUser = useCallback(async () => {
     if (staticMode) return;
@@ -79,9 +79,9 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
         const data = await res.json();
         setUser(data);
       } else if (res.status === 401) {
-        // Session expired or invalid
+        // 会话已过期或无效。
         setUser(null);
-        // Redirect to login if on a protected route
+        // 仅在受保护路由中跳转至登录页。
         if (pathname?.startsWith("/workspace")) {
           router.push(buildLoginUrl(pathname));
         }
@@ -95,18 +95,16 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   }, [staticMode, pathname, router]);
 
   /**
-   * Logout - call FastAPI logout endpoint and clear local state
-   * Per RFC-001: Immediately clear local state, don't wait for server confirmation
+   * 登出：调用 FastAPI 登出端点并清除本地状态。
+   * 遵循 RFC-001：立即清除本地状态，不等待服务端确认。
    *
-   * When the gateway is unreachable the fetch silently fails — the SPA
-   * router.push("/") would leave the user on "/" still holding stale
-   * React state and any in-flight SSE / fetch / query subscriptions.
-   * We therefore fall back to a hard navigation (window.location.href),
-   * which discards all client state the same way the legacy form-POST
-   * logout used to.
+   * Gateway 不可达时，fetch 会静默失败；SPA 的 ``router.push("/")`` 会让用户停留在
+   * ``/``，同时仍持有陈旧的 React 状态以及所有进行中的 SSE / fetch / 查询订阅。
+   * 因此回退为硬导航（``window.location.href``），像旧版表单 POST 登出一样丢弃全部
+   * 客户端状态。
    */
   const logout = useCallback(async () => {
-    // Immediately clear local state to prevent UI flicker
+    // 立即清除本地状态，防止界面闪烁。
     setUser(null);
 
     if (staticMode) {
@@ -127,19 +125,18 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     }
 
     if (logoutFailed && typeof window !== "undefined") {
-      // Hard navigation ensures every in-flight subscription is torn down,
-      // matching the legacy form-POST logout behaviour during a gateway outage.
+      // 硬导航确保拆除全部进行中的订阅，与 Gateway 故障期间旧版表单 POST 登出的行为一致。
       window.location.href = "/";
       return;
     }
 
-    // Redirect to home page
+    // 跳转至首页。
     router.push("/");
   }, [staticMode, router]);
 
   /**
-   * Handle visibility change - refresh user when tab becomes visible again.
-   * Throttled to at most once per 60 s to avoid spamming the backend on rapid tab switches.
+   * 处理可见性变化：标签页重新可见时刷新用户。
+   * 节流为最多每 60 秒一次，避免快速切换标签页时频繁请求后端。
    */
   const lastCheckRef = React.useRef(0);
 
@@ -173,8 +170,8 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 }
 
 /**
- * Hook to access authentication context
- * Throws if used outside AuthProvider - this is intentional for proper usage
+ * 访问认证上下文的 Hook。
+ * 在 AuthProvider 外使用会抛出异常，这是为保证正确使用方式而有意设计的。
  */
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext);
@@ -185,8 +182,8 @@ export function useAuth(): AuthContextType {
 }
 
 /**
- * Hook to require authentication - redirects to login if not authenticated
- * Useful for client-side checks in addition to server-side guards
+ * 强制要求认证的 Hook：未认证时跳转至登录页。
+ * 可作为服务端守卫之外的客户端侧检查。
  */
 export function useRequireAuth(): AuthContextType {
   const auth = useAuth();
@@ -196,7 +193,7 @@ export function useRequireAuth(): AuthContextType {
   useEffect(() => {
     if (isStaticWebsiteOnly()) return;
 
-    // Only redirect if we're sure user is not authenticated (not just loading)
+    // 仅在确定用户未认证时跳转，不能仅因仍在加载就跳转。
     if (!auth.isLoading && !auth.isAuthenticated) {
       router.push(buildLoginUrl(pathname || "/workspace"));
     }

@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 import asyncio
@@ -20,45 +21,57 @@ from deerflow.sandbox.tools import ls_tool
 
 
 class _SyncProvider(SandboxProvider):
+    '未说明'
     def __init__(self) -> None:
+        '未说明'
         self.thread_ids: list[str | None] = []
         self.user_ids: list[str | None] = []
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        '未说明'
         self.thread_ids.append(thread_id)
         self.user_ids.append(user_id)
         return "sync-sandbox"
 
     def get(self, sandbox_id: str) -> Sandbox | None:
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     def release(self, sandbox_id: str) -> None:
+        '未说明'
         return None
 
 
 class _SandboxStub(Sandbox):
+    '未说明'
     def execute_command(
         self,
         command: str,
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> str:
+        '未说明'
         del env, timeout
         return "OK"
 
     def read_file(self, path: str) -> str:
+        """处理读取 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return "content"
 
     def download_file(self, path: str) -> bytes:
+        """处理文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return b"content"
 
     def list_dir(self, path: str, max_depth: int = 2) -> list[str]:
+        '未说明'
         return ["/mnt/user-data/workspace/file.txt"]
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
+        """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
     def glob(self, path: str, pattern: str, *, include_dirs: bool = False, max_results: int = 200) -> tuple[list[str], bool]:
+        '未说明'
         return [], False
 
     def grep(
@@ -71,40 +84,48 @@ class _SandboxStub(Sandbox):
         case_sensitive: bool = False,
         max_results: int = 100,
     ) -> tuple[list[GrepMatch], bool]:
+        '未说明'
         return [], False
 
     def update_file(self, path: str, content: bytes) -> None:
+        """处理文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
 
 class _AsyncOnlyProvider(SandboxProvider):
+    '未说明'
     def __init__(self) -> None:
+        '未说明'
         self.thread_ids: list[str | None] = []
         self.user_ids: list[str | None] = []
         self.released_ids: list[str] = []
         self.sandbox = _SandboxStub("async-sandbox")
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        '未说明'
         del user_id
         raise AssertionError("async middleware should not call sync acquire")
 
     async def acquire_async(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        '未说明'
         self.thread_ids.append(thread_id)
         self.user_ids.append(user_id)
         return "async-sandbox"
 
     def get(self, sandbox_id: str) -> Sandbox | None:
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         if sandbox_id == "async-sandbox":
             return self.sandbox
         return None
 
     def release(self, sandbox_id: str) -> None:
+        '未说明'
         self.released_ids.append(sandbox_id)
         return None
 
 
 def test_sandbox_middleware_state_matches_thread_state_sandbox_field() -> None:
-    """Middleware-local schema must not drift from ThreadState.sandbox."""
+    '未说明'
     middleware_hints = get_type_hints(SandboxMiddlewareState, include_extras=True)
     thread_hints = get_type_hints(ThreadState, include_extras=True)
 
@@ -113,10 +134,12 @@ def test_sandbox_middleware_state_matches_thread_state_sandbox_field() -> None:
 
 @pytest.mark.anyio
 async def test_provider_default_acquire_async_offloads_sync_acquire(monkeypatch: pytest.MonkeyPatch) -> None:
+    '未说明'
     provider = _SyncProvider()
     calls: list[tuple[object, tuple[object, ...]]] = []
 
     async def fake_to_thread(func, /, *args, **kwargs):
+        '未说明'
         calls.append((func, args, kwargs))
         return func(*args, **kwargs)
 
@@ -132,6 +155,7 @@ async def test_provider_default_acquire_async_offloads_sync_acquire(monkeypatch:
 
 @pytest.mark.anyio
 async def test_abefore_agent_uses_async_provider_acquire() -> None:
+    '未说明'
     provider = _AsyncOnlyProvider()
     set_sandbox_provider(provider)
     try:
@@ -161,9 +185,11 @@ async def test_abefore_agent_delegates_to_super_when_not_acquiring(
     state: dict,
     runtime: Runtime,
 ) -> None:
+    '未说明'
     calls: list[tuple[dict, Runtime]] = []
 
     async def fake_super_abefore_agent(self, state_arg, runtime_arg):
+        '未说明'
         calls.append((state_arg, runtime_arg))
         return {"delegated": True}
 
@@ -177,6 +203,7 @@ async def test_abefore_agent_delegates_to_super_when_not_acquiring(
 
 @pytest.mark.anyio
 async def test_default_lazy_tool_acquisition_uses_async_provider() -> None:
+    '未说明'
     provider = _AsyncOnlyProvider()
     set_sandbox_provider(provider)
     try:
@@ -215,10 +242,12 @@ async def test_aafter_agent_releases_sandbox_off_thread(
     runtime: Runtime,
     expected_sandbox_id: str,
 ) -> None:
+    '未说明'
     provider = _AsyncOnlyProvider()
     to_thread_calls: list[tuple[object, tuple[object, ...]]] = []
 
     async def fake_to_thread(func, /, *args):
+        '未说明'
         to_thread_calls.append((func, args))
         return func(*args)
 
@@ -236,9 +265,11 @@ async def test_aafter_agent_releases_sandbox_off_thread(
 
 @pytest.mark.anyio
 async def test_aafter_agent_delegates_to_super_when_no_sandbox(monkeypatch: pytest.MonkeyPatch) -> None:
+    '未说明'
     calls: list[tuple[dict, Runtime]] = []
 
     async def fake_super_aafter_agent(self, state_arg, runtime_arg):
+        '未说明'
         calls.append((state_arg, runtime_arg))
         return {"delegated": True}
 
@@ -258,7 +289,7 @@ async def test_aafter_agent_delegates_to_super_when_no_sandbox(monkeypatch: pyte
 
 
 def _make_tool_call_request(state: dict) -> ToolCallRequest:
-    """Build a minimal ToolCallRequest backed by a real ToolRuntime."""
+    '未说明'
     runtime = ToolRuntime(
         state=state,
         context={},
@@ -277,12 +308,14 @@ def _make_tool_call_request(state: dict) -> ToolCallRequest:
 
 
 def test_wrap_tool_call_emits_command_when_lazy_init_happens() -> None:
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {}
     request = _make_tool_call_request(state)
 
     def handler(req: ToolCallRequest) -> ToolMessage:
         # Simulate ensure_sandbox_initialized() mutating runtime.state in-place.
+        '未说明'
         req.runtime.state["sandbox"] = {"sandbox_id": "new-sandbox"}
         return ToolMessage(content="ok", tool_call_id="call-1", name="bash")
 
@@ -298,12 +331,14 @@ def test_wrap_tool_call_emits_command_when_lazy_init_happens() -> None:
 
 
 def test_wrap_tool_call_passthrough_when_sandbox_already_in_state() -> None:
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {"sandbox": {"sandbox_id": "existing"}}
     request = _make_tool_call_request(state)
     original = ToolMessage(content="ok", tool_call_id="call-1", name="bash")
 
     def handler(req: ToolCallRequest) -> ToolMessage:
+        '未说明'
         return original
 
     result = middleware.wrap_tool_call(request, handler)
@@ -312,12 +347,14 @@ def test_wrap_tool_call_passthrough_when_sandbox_already_in_state() -> None:
 
 
 def test_wrap_tool_call_passthrough_when_handler_did_not_initialize_sandbox() -> None:
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {}
     request = _make_tool_call_request(state)
     original = ToolMessage(content="ok", tool_call_id="call-1", name="bash")
 
     def handler(req: ToolCallRequest) -> ToolMessage:
+        '未说明'
         return original
 
     result = middleware.wrap_tool_call(request, handler)
@@ -326,12 +363,14 @@ def test_wrap_tool_call_passthrough_when_handler_did_not_initialize_sandbox() ->
 
 
 def test_wrap_tool_call_merges_with_existing_command_update() -> None:
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {}
     request = _make_tool_call_request(state)
     tool_msg = ToolMessage(content="ok", tool_call_id="call-1", name="bash")
 
     def handler(req: ToolCallRequest) -> Command:
+        '未说明'
         req.runtime.state["sandbox"] = {"sandbox_id": "new-sandbox"}
         return Command(
             update={
@@ -352,12 +391,14 @@ def test_wrap_tool_call_merges_with_existing_command_update() -> None:
 
 
 def test_wrap_tool_call_does_not_override_non_dict_update() -> None:
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {}
     request = _make_tool_call_request(state)
     cmd = Command(update=[("messages", [ToolMessage(content="x", tool_call_id="c", name="bash")])])
 
     def handler(req: ToolCallRequest) -> Command:
+        '未说明'
         req.runtime.state["sandbox"] = {"sandbox_id": "new-sandbox"}
         return cmd
 
@@ -369,11 +410,13 @@ def test_wrap_tool_call_does_not_override_non_dict_update() -> None:
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_emits_command_when_lazy_init_happens() -> None:
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {}
     request = _make_tool_call_request(state)
 
     async def handler(req: ToolCallRequest) -> ToolMessage:
+        '未说明'
         req.runtime.state["sandbox"] = {"sandbox_id": "async-new"}
         return ToolMessage(content="ok", tool_call_id="call-1", name="bash")
 
@@ -389,12 +432,14 @@ async def test_awrap_tool_call_emits_command_when_lazy_init_happens() -> None:
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_passthrough_when_sandbox_already_in_state() -> None:
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {"sandbox": {"sandbox_id": "existing"}}
     request = _make_tool_call_request(state)
     original = ToolMessage(content="ok", tool_call_id="call-1", name="bash")
 
     async def handler(req: ToolCallRequest) -> ToolMessage:
+        '未说明'
         return original
 
     result = await middleware.awrap_tool_call(request, handler)
@@ -403,14 +448,13 @@ async def test_awrap_tool_call_passthrough_when_sandbox_already_in_state() -> No
 
 
 def test_wrap_tool_call_preserves_existing_command_fields_when_merging() -> None:
-    """Regression: when merging sandbox_update into an existing Command,
-    all other Command fields (e.g. graph, goto, resume) must be preserved.
-    """
+    '未说明'
     middleware = SandboxMiddleware()
     state: dict = {}
     request = _make_tool_call_request(state)
 
     def handler(req: ToolCallRequest) -> Command:
+        '未说明'
         req.runtime.state["sandbox"] = {"sandbox_id": "sbx-merge"}
         return Command(
             update={"existing_key": "existing_value"},

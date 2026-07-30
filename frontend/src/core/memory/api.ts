@@ -7,6 +7,7 @@ import type {
   UserMemory,
 } from "./types";
 
+/** 解析记忆接口响应；失败时尽可能保留后端返回的可读错误详情。 */
 async function readMemoryResponse(
   response: Response,
   fallbackMessage: string,
@@ -80,11 +81,13 @@ async function readMemoryResponse(
   return response.json() as Promise<UserMemory>;
 }
 
+/** 获取当前用户的完整记忆数据。 */
 export async function loadMemory(): Promise<UserMemory> {
   const response = await fetch(`${getBackendBaseURL()}/api/memory`);
   return readMemoryResponse(response, "Failed to fetch memory");
 }
 
+/** 清空当前用户的全部记忆并返回更新后的数据。 */
 export async function clearMemory(): Promise<UserMemory> {
   const response = await fetch(`${getBackendBaseURL()}/api/memory`, {
     method: "DELETE",
@@ -92,6 +95,7 @@ export async function clearMemory(): Promise<UserMemory> {
   return readMemoryResponse(response, "Failed to clear memory");
 }
 
+/** 删除指定记忆事实并返回更新后的记忆数据。 */
 export async function deleteMemoryFact(factId: string): Promise<UserMemory> {
   const response = await fetch(
     `${getBackendBaseURL()}/api/memory/facts/${encodeURIComponent(factId)}`,
@@ -102,11 +106,13 @@ export async function deleteMemoryFact(factId: string): Promise<UserMemory> {
   return readMemoryResponse(response, "Failed to delete memory fact");
 }
 
+/** 导出当前用户的完整记忆数据。 */
 export async function exportMemory(): Promise<UserMemory> {
   const response = await fetch(`${getBackendBaseURL()}/api/memory/export`);
   return readMemoryResponse(response, "Failed to export memory");
 }
 
+/** 导入完整记忆数据并返回服务端保存后的版本。 */
 export async function importMemory(memory: UserMemory): Promise<UserMemory> {
   const response = await fetch(`${getBackendBaseURL()}/api/memory/import`, {
     method: "POST",
@@ -118,6 +124,7 @@ export async function importMemory(memory: UserMemory): Promise<UserMemory> {
   return readMemoryResponse(response, "Failed to import memory");
 }
 
+/** 创建一条记忆事实并返回更新后的记忆数据。 */
 export async function createMemoryFact(
   input: MemoryFactInput,
 ): Promise<UserMemory> {
@@ -131,6 +138,7 @@ export async function createMemoryFact(
   return readMemoryResponse(response, "Failed to create memory fact");
 }
 
+/** 更新指定记忆事实并返回更新后的记忆数据。 */
 export async function updateMemoryFact(
   factId: string,
   input: MemoryFactPatchInput,

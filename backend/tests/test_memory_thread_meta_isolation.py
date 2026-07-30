@@ -1,8 +1,4 @@
-"""Owner isolation tests for MemoryThreadMetaStore.
-
-Mirrors the SQL-backed tests in test_owner_isolation.py but exercises
-the in-memory LangGraph Store backend used when database.backend=memory.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -19,12 +15,16 @@ USER_B = SimpleNamespace(id="user-b", email="b@test.local")
 
 
 def _as_user(user):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     class _Ctx:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __enter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self._token = set_current_user(user)
             return user
 
         def __exit__(self, *exc):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             reset_current_user(self._token)
 
     return _Ctx()
@@ -32,13 +32,14 @@ def _as_user(user):
 
 @pytest.fixture
 def store():
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     return MemoryThreadMetaStore(InMemoryStore())
 
 
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_search_isolation(store):
-    """search() returns only threads owned by the current user."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with _as_user(USER_A):
         await store.create("t-alpha", display_name="A's thread")
     with _as_user(USER_B):
@@ -56,7 +57,7 @@ async def test_search_isolation(store):
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_get_isolation(store):
-    """get() returns None for threads owned by another user."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with _as_user(USER_A):
         await store.create("t-alpha", display_name="A's thread")
 
@@ -72,7 +73,7 @@ async def test_get_isolation(store):
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_update_display_name_denied(store):
-    """User B cannot rename User A's thread."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with _as_user(USER_A):
         await store.create("t-alpha", display_name="original")
 
@@ -88,7 +89,7 @@ async def test_update_display_name_denied(store):
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_update_status_denied(store):
-    """User B cannot change status of User A's thread."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with _as_user(USER_A):
         await store.create("t-alpha")
 
@@ -104,7 +105,7 @@ async def test_update_status_denied(store):
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_update_metadata_denied(store):
-    """User B cannot modify metadata of User A's thread."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with _as_user(USER_A):
         await store.create("t-alpha", metadata={"key": "original"})
 
@@ -120,7 +121,7 @@ async def test_update_metadata_denied(store):
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_delete_denied(store):
-    """User B cannot delete User A's thread."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with _as_user(USER_A):
         await store.create("t-alpha")
 
@@ -135,7 +136,7 @@ async def test_delete_denied(store):
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_no_context_raises(store):
-    """Calling methods without user context raises RuntimeError."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(RuntimeError, match="no user context is set"):
         await store.search()
 
@@ -143,7 +144,7 @@ async def test_no_context_raises(store):
 @pytest.mark.anyio
 @pytest.mark.no_auto_user
 async def test_explicit_none_bypasses_filter(store):
-    """user_id=None bypasses isolation (migration/CLI escape hatch)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with _as_user(USER_A):
         await store.create("t-alpha")
     with _as_user(USER_B):

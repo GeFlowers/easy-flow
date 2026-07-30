@@ -1,15 +1,4 @@
-"""Start a hermetic *replay* gateway for the full-stack (Layer 2) e2e.
-
-Builds an ephemeral config that points the model at ``ReplayChatModel`` + a
-recorded fixture, then runs uvicorn — no API key, deterministic. Used as a
-Playwright ``webServer`` (see ``frontend/playwright.real-backend.config.ts``) and
-runnable standalone for debugging::
-
-    uv run python scripts/run_replay_gateway.py --port 8011
-
-``tests/`` is put on the path so the config ``use: replay_provider:ReplayChatModel``
-resolves; ``GATEWAY_CORS_ORIGINS`` is set so the frontend on :3000 can talk to it.
-"""
+"""本脚本负责运行 回放 网关。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -25,6 +14,7 @@ sys.path.insert(0, str(_BACKEND / "tests"))  # replay_provider + build_config_ya
 
 
 def main() -> int:
+    '未说明'
     parser = argparse.ArgumentParser()
     parser.add_argument("--port", type=int, default=8011)
     parser.add_argument("--fixture", default=str(_BACKEND / "tests" / "fixtures" / "replay" / "write_read_file.ultra.json"))

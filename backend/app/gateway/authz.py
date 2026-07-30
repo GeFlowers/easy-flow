@@ -1,30 +1,8 @@
-"""Authorization decorators and context for DeerFlow.
+"""DeerFlow 的授权装饰器与请求认证上下文。
 
-Inspired by LangGraph Auth system: https://github.com/langchain-ai/langgraph/blob/main/libs/sdk-py/langgraph_sdk/auth/__init__.py
-
-**Usage:**
-
-1. Use ``@require_auth`` on routes that need authentication
-2. Use ``@require_permission("resource", "action", filter_key=...)`` for permission checks
-3. The decorator chain processes from bottom to top
-
-**Example:**
-
-    @router.get("/{thread_id}")
-    @require_auth
-    @require_permission("threads", "read", owner_check=True)
-    async def get_thread(thread_id: str, request: Request):
-        # User is authenticated and has threads:read permission
-        ...
-
-**Permission Model:**
-
-- threads:read   - View thread
-- threads:write  - Create/update thread
-- threads:delete - Delete thread
-- runs:create   - Run agent
-- runs:read     - View run
-- runs:cancel   - Cancel run
+路由可使用 ``@require_auth`` 要求认证，并使用
+``@require_permission("资源", "操作", ...)`` 检查权限；装饰器链由下至上处理。
+权限包括线程的读写删及运行的创建、读取和取消。
 """
 
 from __future__ import annotations
@@ -44,68 +22,50 @@ P = ParamSpec("P")
 T = TypeVar("T")
 
 
-# Permission constants
+# 权限常量
 class Permissions:
-    """Permission constants for resource:action format."""
+    """使用 ``资源:操作`` 格式表示的权限常量。"""
 
-    # Threads
+    # 线程
     THREADS_READ = "threads:read"
     THREADS_WRITE = "threads:write"
     THREADS_DELETE = "threads:delete"
 
-    # Runs
+    # 运行
     RUNS_CREATE = "runs:create"
     RUNS_READ = "runs:read"
     RUNS_CANCEL = "runs:cancel"
 
 
 class AuthContext:
-    """Authentication context for the current request.
-
-    Stored in request.state.auth after require_auth decoration.
-
-    Attributes:
-        user: The authenticated user, or None if anonymous
-        permissions: List of permission strings (e.g., "threads:read")
-    """
+    """当前请求的认证上下文，由认证装饰器写入 ``request.state.auth``。"""
 
     __slots__ = ("user", "permissions")
 
     def __init__(self, user: User | None = None, permissions: list[str] | None = None):
+        """使用已认证用户及其权限集合初始化请求上下文。"""
         self.user = user
         self.permissions = permissions or []
 
     @property
     def is_authenticated(self) -> bool:
-        """Check if user is authenticated."""
+        """判断上下文中是否存在已认证用户。"""
         return self.user is not None
 
     def has_permission(self, resource: str, action: str) -> bool:
-        """Check if context has permission for resource:action.
-
-        Args:
-            resource: Resource name (e.g., "threads")
-            action: Action name (e.g., "read")
-
-        Returns:
-            True if user has permission
-        """
+        """判断上下文是否拥有指定资源操作的权限。"""
         permission = f"{resource}:{action}"
         return permission in self.permissions
 
     def require_user(self) -> User:
-        """Get user or raise 401.
-
-        Raises:
-            HTTPException 401 if not authenticated
-        """
+        """返回已认证用户；不存在时抛出 401。"""
         if not self.user:
             raise HTTPException(status_code=401, detail="Authentication required")
         return self.user
 
 
 def get_auth_context(request: Request) -> AuthContext | None:
-    """Get AuthContext from request state."""
+    """从请求状态取得认证上下文。"""
     return getattr(request.state, "auth", None)
 
 
@@ -120,59 +80,36 @@ _ALL_PERMISSIONS: list[str] = [
 
 
 def _make_test_request_stub() -> Any:
-    """Create a minimal request-like object for direct unit calls.
-
-    Used when decorated route handlers are invoked without FastAPI's
-    request injection. Includes fields accessed by auth helpers.
-    """
+    """为直接单元调用创建最小请求对象，包含认证辅助函数访问的字段。"""
     return SimpleNamespace(state=SimpleNamespace(), cookies={}, _deerflow_test_bypass_auth=True)
 
 
 async def _authenticate(request: Request) -> AuthContext:
-    """Authenticate request and return AuthContext.
-
-    Delegates to deps.get_optional_user_from_request() for the JWT→User pipeline.
-    Returns AuthContext with user=None for anonymous requests.
-    """
+    """认证请求并返回认证上下文；匿名请求的 ``user`` 为 ``None``。"""
     from app.gateway.deps import get_optional_user_from_request
 
     user = await get_optional_user_from_request(request)
     if user is None:
         return AuthContext(user=None, permissions=[])
 
-    # In future, permissions could be stored in user record
+    # 未来可将权限存储在用户记录中。
     return AuthContext(user=user, permissions=_ALL_PERMISSIONS)
 
 
 def require_auth[**P, T](func: Callable[P, T]) -> Callable[P, T]:
-    """Decorator that authenticates the request and enforces authentication.
+    """认证请求并强制要求已认证，与 ASGI 栈是否安装认证中间件无关。
 
-    Independently raises HTTP 401 for unauthenticated requests, regardless of
-    whether ``AuthMiddleware`` is present in the ASGI stack. Sets the resolved
-    ``AuthContext`` on ``request.state.auth`` for downstream handlers.
-
-    Must be placed ABOVE other decorators (executes after them).
-
-    Usage:
-        @router.get("/{thread_id}")
-        @require_auth  # Bottom decorator (executes first after permission check)
-        @require_permission("threads", "read")
-        async def get_thread(thread_id: str, request: Request):
-            auth: AuthContext = request.state.auth
-            ...
-
-    Raises:
-        HTTPException: 401 if the request is unauthenticated.
-        ValueError: If 'request' parameter is missing.
+    将解析出的 ``AuthContext`` 写入 ``request.state.auth`` 供下游使用；该装饰器
+    必须置于其他装饰器之上。未认证时抛出 401，缺少 ``request`` 参数时抛出 ValueError。
     """
 
     @functools.wraps(func)
     async def wrapper(*args: Any, **kwargs: Any) -> Any:
+        """补齐测试请求、认证调用方并执行被装饰的处理器。"""
         request = kwargs.get("request")
         if request is None:
-            # Unit tests may call decorated handlers directly without a
-            # FastAPI Request object. Inject a minimal request stub when
-            # the wrapped function declares `request`.
+            # 单元测试可直接调用已装饰处理器而不构造请求对象；被包装函数声明请求
+            # 参数时注入最小请求替身。
             if "request" in inspect.signature(func).parameters:
                 kwargs["request"] = _make_test_request_stub()
             else:
@@ -182,7 +119,7 @@ def require_auth[**P, T](func: Callable[P, T]) -> Callable[P, T]:
         if getattr(request, "_deerflow_test_bypass_auth", False):
             return await func(*args, **kwargs)
 
-        # Authenticate and set context
+        # 完成认证并写入请求上下文。
         auth_context = await _authenticate(request)
         request.state.auth = auth_context
 
@@ -200,48 +137,22 @@ def require_permission(
     owner_check: bool = False,
     require_existing: bool = False,
 ) -> Callable[[Callable[P, T]], Callable[P, T]]:
-    """Decorator that checks permission for resource:action.
+    """创建检查 ``资源:操作`` 权限的装饰器，必须用于 ``@require_auth`` 之后。
 
-    Must be used AFTER @require_auth.
-
-    Args:
-        resource: Resource name (e.g., "threads", "runs")
-        action: Action name (e.g., "read", "write", "delete")
-        owner_check: If True, validates that the current user owns the resource.
-                     Requires 'thread_id' path parameter and performs ownership check.
-        require_existing: Only meaningful with ``owner_check=True``. If True, a
-                          missing ``threads_meta`` row counts as a denial (404)
-                          instead of "untracked legacy thread, allow". Use on
-                          **destructive / mutating** routes (DELETE, PATCH,
-                          state-update) so a deleted thread can't be re-targeted
-                          by another user via the missing-row code path.
-
-    Usage:
-        # Read-style: legacy untracked threads are allowed
-        @require_permission("threads", "read", owner_check=True)
-        async def get_thread(thread_id: str, request: Request):
-            ...
-
-        # Destructive: thread row MUST exist and be owned by caller
-        @require_permission("threads", "delete", owner_check=True, require_existing=True)
-        async def delete_thread(thread_id: str, request: Request):
-            ...
-
-    Raises:
-        HTTPException 401: If authentication required but user is anonymous
-        HTTPException 403: If user lacks permission
-        HTTPException 404: If owner_check=True but user doesn't own the thread
-        ValueError: If owner_check=True but 'thread_id' parameter is missing
+    ``owner_check`` 会验证调用者拥有 ``thread_id`` 指定资源；在破坏性或修改性路由上
+    设置 ``require_existing``，使缺失的 ``threads_meta`` 行按 404 拒绝，防止其他用户
+    经缺行路径重新定位已删除线程。
     """
 
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
+        """为具体路由处理器创建权限检查包装器。"""
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            """认证调用方、检查权限及资源归属后执行处理器。"""
             request = kwargs.get("request")
             if request is None:
-                # Unit tests may call decorated route handlers directly without
-                # constructing a FastAPI Request object. Inject a minimal stub
-                # when the wrapped function declares `request`.
+                # 单元测试可直接调用路由处理器而不构造请求对象；被包装函数声明请求
+                # 参数时注入最小替身。
                 if "request" in inspect.signature(func).parameters:
                     kwargs["request"] = _make_test_request_stub()
                 else:
@@ -259,22 +170,16 @@ def require_permission(
             if not auth.is_authenticated:
                 raise HTTPException(status_code=401, detail="Authentication required")
 
-            # Check permission
+            # 检查资源操作权限。
             if not auth.has_permission(resource, action):
                 raise HTTPException(
                     status_code=403,
                     detail=f"Permission denied: {resource}:{action}",
                 )
 
-            # Owner check for thread-specific resources.
-            #
-            # 2.0-rc moved thread metadata into the SQL persistence layer
-            # (``threads_meta`` table). We verify ownership via
-            # ``ThreadMetaStore.check_access``: it returns True for
-            # missing rows (untracked legacy thread) and for rows whose
-            # ``user_id`` is NULL (shared / pre-auth data), so this is
-            # strict-deny rather than strict-allow — only an *existing*
-            # row with a *different* user_id triggers 404.
+            # 检查线程专属资源的所有权。候选版已将线程元数据迁入持久化层；访问检查
+            # 对缺失行（未跟踪的旧线程）及所有者为空的行（共享或认证前数据）允许访问，
+            # 因而只有已存在且所有者不同的行会触发严格拒绝的 404。
             if owner_check:
                 from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME, INTERNAL_SYSTEM_ROLE
 
@@ -291,14 +196,10 @@ def require_permission(
                     require_existing=require_existing,
                 )
                 if not allowed and getattr(auth.user, "system_role", None) == INTERNAL_SYSTEM_ROLE:
-                    # Trusted internal callers (channel workers) also act for
-                    # the connection owner carried in X-DeerFlow-Owner-User-Id.
-                    # Scope the check to that owner instead of bypassing it; a
-                    # leaked internal token must not grant cross-user thread
-                    # access. The header is honored only after ``auth`` proved
-                    # the caller holds the internal token (mirrors
-                    # get_trusted_internal_owner_user_id, which keys off the
-                    # middleware-stamped ``request.state.user``).
+                    # 可信内部调用方（频道工作进程）也代表头部中携带的连接所有者执行。
+                    # 必须以该所有者的范围检查而非绕过检查，泄漏的内部令牌不得授予跨用户
+                    # 线程访问。仅在认证状态已验证内部令牌后信任该头部，与基于中间件
+                    # 写入用户状态的可信所有者解析规则一致。
                     header_owner = (request.headers.get(INTERNAL_OWNER_USER_ID_HEADER_NAME) or "").strip()
                     if header_owner:
                         allowed = await thread_store.check_access(

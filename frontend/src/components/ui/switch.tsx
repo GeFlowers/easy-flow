@@ -5,6 +5,7 @@ import * as SwitchPrimitive from "@radix-ui/react-switch";
 
 import { cn } from "@/lib/utils";
 
+/** Switch 内部组件：组织对应的界面结构与交互语义。 */
 function Switch({
   className,
   ...props

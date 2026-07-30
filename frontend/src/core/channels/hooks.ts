@@ -12,9 +12,12 @@ import {
 import { startConnectionPoll, type ConnectPollHandle } from "./connect-poll";
 import type { ChannelProviderId, ChannelRuntimeConfigValues } from "./types";
 
+/** 频道提供商查询使用的稳定缓存键。 */
 export const channelProviderQueryKey = ["channelProviders"] as const;
+/** 频道连接查询使用的稳定缓存键。 */
 export const channelConnectionsQueryKey = ["channelConnections"] as const;
 
+/** 查询频道提供商列表，并提供查询状态。 */
 export function useChannelProviders() {
   const { data, isLoading, error } = useQuery({
     queryKey: channelProviderQueryKey,
@@ -28,6 +31,7 @@ export function useChannelProviders() {
   };
 }
 
+/** 查询已建立的频道连接，并提供查询状态。 */
 export function useChannelConnections() {
   const { data, isLoading, error } = useQuery({
     queryKey: channelConnectionsQueryKey,
@@ -36,13 +40,14 @@ export function useChannelConnections() {
   return { connections: data ?? [], isLoading, error };
 }
 
+/** 发起频道连接，并在连接完成前管理每个提供商唯一的轮询任务。 */
 export function useConnectChannelProvider() {
   const queryClient = useQueryClient();
   const pollersRef = useRef<Map<ChannelProviderId, ConnectPollHandle>>(
     new Map(),
   );
 
-  // Cancel any in-flight polls when the component using this hook unmounts.
+  // 使用该 Hook 的组件卸载时取消所有进行中的轮询。
   useEffect(() => {
     const pollers = pollersRef.current;
     return () => {
@@ -60,8 +65,7 @@ export function useConnectChannelProvider() {
         queryKey: channelConnectionsQueryKey,
       });
 
-      // Replace any existing poll for this provider so repeated Connect clicks
-      // don't spawn parallel polling chains racing on the same query keys.
+      // 替换该提供商已有轮询，避免重复点击连接后产生竞争同一查询键的并行轮询链。
       pollersRef.current.get(provider)?.cancel();
       pollersRef.current.set(
         provider,
@@ -74,7 +78,7 @@ export function useConnectChannelProvider() {
               queryFn: () => listChannelConnections(),
             }),
           onConnected: () => {
-            // Refresh derived provider state exactly once when the bind lands.
+            // 绑定成功后只刷新一次派生的提供商状态。
             void queryClient.invalidateQueries({
               queryKey: channelProviderQueryKey,
             });
@@ -85,6 +89,7 @@ export function useConnectChannelProvider() {
   });
 }
 
+/** 返回保存频道运行时配置的变更操作，并在成功后刷新提供商缓存。 */
 export function useConfigureChannelProvider() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -104,6 +109,7 @@ export function useConfigureChannelProvider() {
   });
 }
 
+/** 返回断开单个频道连接的变更操作，并在成功后刷新连接与提供商缓存。 */
 export function useDisconnectChannelConnection() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -118,6 +124,7 @@ export function useDisconnectChannelConnection() {
   });
 }
 
+/** 返回断开某提供商全部连接的变更操作，并在成功后刷新相关缓存。 */
 export function useDisconnectChannelProvider() {
   const queryClient = useQueryClient();
   return useMutation({

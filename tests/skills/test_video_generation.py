@@ -1,3 +1,4 @@
+'未说明'
 import sys
 from pathlib import Path
 
@@ -12,6 +13,7 @@ vid = load("video-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
+    '未说明'
     for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "VIDEO_GENERATION_PROVIDER",
               "MINIMAX_API_HOST", "MINIMAX_VIDEO_MODEL"]:
         monkeypatch.delenv(k, raising=False)
@@ -19,20 +21,24 @@ def clean_env(monkeypatch):
 
 
 def test_resolve_prefers_gemini():
+    '未说明'
     assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "gemini"
 
 
 def test_resolve_falls_back_to_minimax(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", False) == "minimax"
 
 
 def test_resolve_override(monkeypatch):
+    '未说明'
     monkeypatch.setenv("VIDEO_GENERATION_PROVIDER", "minimax")
     assert vid._resolve_provider("VIDEO_GENERATION_PROVIDER", "gemini", True) == "minimax"
 
 
 def test_unknown_provider_raises(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("VIDEO_GENERATION_PROVIDER", "openai")
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     pf = tmp_path / "p.json"
@@ -42,15 +48,18 @@ def test_unknown_provider_raises(monkeypatch, tmp_path):
 
 
 def test_minimax_full_flow(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     posts = {}
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         posts["url"] = url
         posts["json"] = json
         return FakeResp({"task_id": "T1", "base_resp": {"status_code": 0}})
 
     def fake_get(url, headers=None, params=None, **kw):
+        '未说明'
         if url.endswith("/v1/query/video_generation"):
             assert params["task_id"] == "T1"
             return FakeResp({"status": "Success", "file_id": "F1",
@@ -76,14 +85,17 @@ def test_minimax_full_flow(monkeypatch, tmp_path):
 
 
 def test_minimax_reference_first_frame(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     posts = {}
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         posts["json"] = json
         return FakeResp({"task_id": "T1", "base_resp": {"status_code": 0}})
 
     def fake_get(url, headers=None, params=None, **kw):
+        '未说明'
         if url.endswith("/v1/query/video_generation"):
             return FakeResp({"status": "Success", "file_id": "F1", "base_resp": {"status_code": 0}})
         if url.endswith("/v1/files/retrieve"):
@@ -101,12 +113,15 @@ def test_minimax_reference_first_frame(monkeypatch, tmp_path):
 
 
 def test_minimax_task_fail(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"task_id": "T1", "base_resp": {"status_code": 0}})
 
     def fake_get(url, headers=None, params=None, **kw):
+        '未说明'
         return FakeResp({"status": "Fail", "base_resp": {"status_code": 1027, "status_msg": "blocked"}})
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
@@ -118,7 +133,9 @@ def test_minimax_task_fail(monkeypatch, tmp_path):
 
 
 def test_minimax_poll_timeout(monkeypatch):
+    '未说明'
     def fake_get(url, headers=None, params=None, **kw):
+        '未说明'
         return FakeResp({"status": "Processing", "base_resp": {"status_code": 0}})
 
     monkeypatch.setattr(vid.requests, "get", fake_get)
@@ -130,12 +147,15 @@ def test_minimax_poll_timeout(monkeypatch):
 def test_minimax_task_fail_keeps_task_context(monkeypatch, tmp_path):
     # A Fail status takes priority over the generic base_resp check, so the
     # error keeps the task_id and the task-level failure message.
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"task_id": "T1", "base_resp": {"status_code": 0}})
 
     def fake_get(url, headers=None, params=None, **kw):
+        '未说明'
         return FakeResp({"status": "Fail", "base_resp": {"status_code": 1027, "status_msg": "blocked"}})
 
     monkeypatch.setattr(vid.requests, "post", fake_post)
@@ -147,10 +167,12 @@ def test_minimax_task_fail_keeps_task_context(monkeypatch, tmp_path):
 
 
 def test_gemini_download_raises_on_http_error(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     calls = {}
 
     def fake_get(url, headers=None, **kw):
+        '未说明'
         calls["timeout"] = kw.get("timeout")
         return FakeResp(content=b"error page", status_code=500)
 
@@ -163,9 +185,11 @@ def test_gemini_download_raises_on_http_error(monkeypatch, tmp_path):
 
 
 def test_gemini_download_writes_nested_dir(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("GEMINI_API_KEY", "g")
 
     def fake_get(url, headers=None, **kw):
+        '未说明'
         return FakeResp(content=b"VIDEO")
 
     monkeypatch.setattr(vid.requests, "get", fake_get)
@@ -175,9 +199,11 @@ def test_gemini_download_writes_nested_dir(monkeypatch, tmp_path):
 
 
 def test_gemini_post_raises_on_http_error(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("GEMINI_API_KEY", "g")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp(status_code=503)
 
     monkeypatch.setattr(vid.requests, "post", fake_post)

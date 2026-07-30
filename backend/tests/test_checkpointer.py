@@ -1,4 +1,4 @@
-"""Unit tests for checkpointer config, packaging metadata, and factories."""
+'定义 test_checkpointer 模块提供的职责与可复用接口。\n\nUnit tests for checkpointer config, packaging metadata, and factories.'
 
 import sys
 import tomllib
@@ -28,7 +28,7 @@ from deerflow.runtime.store.provider import POSTGRES_STORE_INSTALL
 
 @pytest.fixture(autouse=True)
 def reset_state():
-    """Reset singleton state before each test."""
+    '执行 reset_state 的明确职责，并返回与调用约定一致的结果。\n\nReset singleton state before each test.'
     app_config_module._app_config = None
     set_checkpointer_config(None)
     reset_checkpointer()
@@ -41,13 +41,16 @@ def reset_state():
 
 
 class _BlockingSingletonContext:
+    '封装 _BlockingSingletonContext 的状态、协作关系与公开操作'
     def __init__(self, value: object, entered: Event, release: Event, stats: dict[str, object]):
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self._value = value
         self._entered = entered
         self._release = release
         self._stats = stats
 
     def __enter__(self):
+        '实现 __enter__ 协议方法，保持对象交互语义一致'
         with self._stats["lock"]:
             self._stats["enters"] += 1
             self._entered.set()
@@ -55,60 +58,75 @@ class _BlockingSingletonContext:
         return self._value
 
     def __exit__(self, exc_type, exc, tb):
+        '实现 __exit__ 协议方法，保持对象交互语义一致'
         with self._stats["lock"]:
             self._stats["exits"] += 1
         return False
 
 
 class _BlockingSingletonFactory:
+    '封装 _BlockingSingletonFactory 的状态、协作关系与公开操作'
     def __init__(self):
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self.value = object()
         self.entered = Event()
         self.release = Event()
         self.stats = {"enters": 0, "exits": 0, "lock": Lock()}
 
     def context_manager(self, _config):
+        '执行 context_manager 的明确职责，并返回与调用约定一致的结果'
         return _BlockingSingletonContext(self.value, self.entered, self.release, self.stats)
 
     def enter_count(self) -> int:
+        '执行 enter_count 的明确职责，并返回与调用约定一致的结果'
         with self.stats["lock"]:
             return self.stats["enters"]
 
     def exit_count(self) -> int:
+        '执行 exit_count 的明确职责，并返回与调用约定一致的结果'
         with self.stats["lock"]:
             return self.stats["exits"]
 
 
 class _TrackingLock:
+    '封装 _TrackingLock 的状态、协作关系与公开操作'
     def __init__(self):
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self._lock = Lock()
         self.acquired = Event()
 
     def acquire(self, *args, **kwargs):
+        '执行 acquire 的明确职责，并返回与调用约定一致的结果'
         acquired = self._lock.acquire(*args, **kwargs)
         if acquired:
             self.acquired.set()
         return acquired
 
     def release(self):
+        '执行 release 的明确职责，并返回与调用约定一致的结果'
         self._lock.release()
 
     def __enter__(self):
+        '实现 __enter__ 协议方法，保持对象交互语义一致'
         self.acquire()
         return self
 
     def __exit__(self, exc_type, exc, tb):
+        '实现 __exit__ 协议方法，保持对象交互语义一致'
         self.release()
         return False
 
     def locked(self) -> bool:
+        '执行 locked 的明确职责，并返回与调用约定一致的结果'
         return self._lock.locked()
 
 
 def _call_getter_concurrently(getter, workers: int = 8) -> list[object]:
+    '执行 _call_getter_concurrently 的明确职责，并返回与调用约定一致的结果'
     ready = Barrier(workers + 1)
 
     def worker():
+        '执行 worker 的明确职责，并返回与调用约定一致的结果'
         ready.wait(timeout=3)
         return getter()
 
@@ -124,7 +142,9 @@ def _call_getter_concurrently(getter, workers: int = 8) -> list[object]:
 
 
 class TestCheckpointerConfig:
+    '组织 TestCheckpointerConfig 场景的行为与边界验证'
     def test_load_memory_config(self):
+        '验证 load、memory、config 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         config = get_checkpointer_config()
         assert config is not None
@@ -132,6 +152,7 @@ class TestCheckpointerConfig:
         assert config.connection_string is None
 
     def test_load_sqlite_config(self):
+        '验证 load、sqlite、config 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "sqlite", "connection_string": "/tmp/test.db"})
         config = get_checkpointer_config()
         assert config is not None
@@ -139,6 +160,7 @@ class TestCheckpointerConfig:
         assert config.connection_string == "/tmp/test.db"
 
     def test_load_postgres_config(self):
+        '验证 load、postgres、config 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "postgres", "connection_string": "postgresql://localhost/db"})
         config = get_checkpointer_config()
         assert config is not None
@@ -146,16 +168,20 @@ class TestCheckpointerConfig:
         assert config.connection_string == "postgresql://localhost/db"
 
     def test_default_connection_string_is_none(self):
+        '验证 default、connection、string、is、none 场景下的预期行为、边界条件与结果'
         config = CheckpointerConfig(type="memory")
         assert config.connection_string is None
 
     def test_set_config_to_none(self):
+        '验证 set、config、to、none 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         set_checkpointer_config(None)
         assert get_checkpointer_config() is None
 
     def test_ensure_config_loaded_loads_app_config_when_uninitialized(self):
+        '验证 ensure、config、loaded、loads、app、config、when、uninitialized 场景下的预期行为、边界条件与结果'
         def fake_get_app_config():
+            '执行 fake_get_app_config 的明确职责，并返回与调用约定一致的结果'
             load_checkpointer_config_from_dict({"type": "memory"})
 
         with patch("deerflow.config.app_config.get_app_config", side_effect=fake_get_app_config) as mock_get_app_config:
@@ -167,6 +193,7 @@ class TestCheckpointerConfig:
         assert config.type == "memory"
 
     def test_ensure_config_loaded_skips_explicit_config(self):
+        '验证 ensure、config、loaded、skips、explicit、config 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
 
         with patch("deerflow.config.app_config.get_app_config") as mock_get_app_config:
@@ -175,10 +202,12 @@ class TestCheckpointerConfig:
         mock_get_app_config.assert_not_called()
 
     def test_invalid_type_raises(self):
+        '验证 invalid、type、raises 场景下的预期行为、边界条件与结果'
         with pytest.raises(Exception):
             load_checkpointer_config_from_dict({"type": "unknown"})
 
     def test_connection_string_description_matches_runtime_defaults(self):
+        '验证 connection、string、description、matches、runtime、defaults 场景下的预期行为、边界条件与结果'
         description = CheckpointerConfig.model_fields["connection_string"].description
 
         assert description is not None
@@ -188,7 +217,9 @@ class TestCheckpointerConfig:
 
 
 class TestHarnessPackaging:
+    '组织 TestHarnessPackaging 场景的行为与边界验证'
     def test_pyproject_declares_postgres_extra(self):
+        '验证 pyproject、declares、postgres、extra 场景下的预期行为、边界条件与结果'
         pyproject_path = Path(__file__).resolve().parents[1] / "packages" / "harness" / "pyproject.toml"
         data = tomllib.loads(pyproject_path.read_text())
 
@@ -202,6 +233,7 @@ class TestHarnessPackaging:
         ]
 
     def test_workspace_pyproject_forwards_postgres_extra_to_harness(self):
+        '验证 workspace、pyproject、forwards、postgres、extra、to、harness 场景下的预期行为、边界条件与结果'
         pyproject_path = Path(__file__).resolve().parents[1] / "pyproject.toml"
         data = tomllib.loads(pyproject_path.read_text())
 
@@ -209,6 +241,7 @@ class TestHarnessPackaging:
         assert optional_dependencies["postgres"] == ["deerflow-harness[postgres]"]
 
     def test_postgres_missing_dependency_messages_recommend_package_extra(self):
+        '验证 postgres、missing、dependency、messages、recommend、package、extra 场景下的预期行为、边界条件与结果'
         assert "deerflow-harness[postgres]" in POSTGRES_INSTALL
         assert "deerflow-harness[postgres]" in POSTGRES_STORE_INSTALL
         assert "uv sync --all-packages --extra postgres" in POSTGRES_INSTALL
@@ -221,8 +254,9 @@ class TestHarnessPackaging:
 
 
 class TestGetCheckpointer:
+    '组织 TestGetCheckpointer 场景的行为与边界验证'
     def test_returns_in_memory_saver_when_not_configured(self):
-        """get_checkpointer should return InMemorySaver when not configured."""
+        '验证 returns、in、memory、saver、when、not、configured 场景下的预期行为、边界条件与结果。\n\nget_checkpointer should return InMemorySaver when not configured.'
         from langgraph.checkpoint.memory import InMemorySaver
 
         with patch("deerflow.config.app_config.get_app_config", side_effect=FileNotFoundError):
@@ -231,6 +265,7 @@ class TestGetCheckpointer:
         assert isinstance(cp, InMemorySaver)
 
     def test_memory_returns_in_memory_saver(self):
+        '验证 memory、returns、in、memory、saver 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         from langgraph.checkpoint.memory import InMemorySaver
 
@@ -238,12 +273,14 @@ class TestGetCheckpointer:
         assert isinstance(cp, InMemorySaver)
 
     def test_memory_singleton(self):
+        '验证 memory、singleton 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         cp1 = get_checkpointer()
         cp2 = get_checkpointer()
         assert cp1 is cp2
 
     def test_reset_clears_singleton(self):
+        '验证 reset、clears、singleton 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         cp1 = get_checkpointer()
         reset_checkpointer()
@@ -251,6 +288,7 @@ class TestGetCheckpointer:
         assert cp1 is not cp2
 
     def test_sqlite_raises_when_package_missing(self):
+        '验证 sqlite、raises、when、package、missing 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "sqlite", "connection_string": "/tmp/test.db"})
         with patch.dict(sys.modules, {"langgraph.checkpoint.sqlite": None}):
             reset_checkpointer()
@@ -258,6 +296,7 @@ class TestGetCheckpointer:
                 get_checkpointer()
 
     def test_postgres_raises_when_package_missing(self):
+        '验证 postgres、raises、when、package、missing 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "postgres", "connection_string": "postgresql://localhost/db"})
         with patch.dict(sys.modules, {"langgraph.checkpoint.postgres": None}):
             reset_checkpointer()
@@ -265,6 +304,7 @@ class TestGetCheckpointer:
                 get_checkpointer()
 
     def test_postgres_raises_when_connection_string_missing(self):
+        '验证 postgres、raises、when、connection、string、missing 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "postgres"})
         mock_saver = MagicMock()
         mock_module = MagicMock()
@@ -275,7 +315,7 @@ class TestGetCheckpointer:
                 get_checkpointer()
 
     def test_sqlite_creates_saver(self):
-        """SQLite checkpointer is created when package is available."""
+        '验证 sqlite、creates、saver 场景下的预期行为、边界条件与结果。\n\nSQLite checkpointer is created when package is available.'
         load_checkpointer_config_from_dict({"type": "sqlite", "connection_string": "/tmp/test.db"})
 
         mock_saver_instance = MagicMock()
@@ -298,14 +338,7 @@ class TestGetCheckpointer:
         mock_saver_instance.setup.assert_called_once()
 
     def test_sqlite_creates_parent_dir(self):
-        """Sync SQLite checkpointer should call ensure_sqlite_parent_dir before connecting.
-
-        This mirrors the async checkpointer's behaviour and prevents
-        'sqlite3.OperationalError: unable to open database file' when the
-        parent directory for the database file does not yet exist (e.g. when
-        using the harness package from an external virtualenv where the
-        .deer-flow directory has not been created).
-        """
+        "验证 sqlite、creates、parent、dir 场景下的预期行为、边界条件与结果。\n\nSync SQLite checkpointer should call ensure_sqlite_parent_dir before connecting.\n\n        This mirrors the async checkpointer's behaviour and prevents\n        'sqlite3.OperationalError: unable to open database file' when the\n        parent directory for the database file does not yet exist (e.g. when\n        using the harness package from an external virtualenv where the\n        .deer-flow directory has not been created).\n        "
         load_checkpointer_config_from_dict({"type": "sqlite", "connection_string": "relative/test.db"})
 
         mock_saver_instance = MagicMock()
@@ -335,7 +368,7 @@ class TestGetCheckpointer:
         mock_saver_cls.from_conn_string.assert_called_once_with("/tmp/resolved/relative/test.db")
 
     def test_sqlite_ensure_parent_dir_before_connect(self):
-        """ensure_sqlite_parent_dir must be called before from_conn_string."""
+        '验证 sqlite、ensure、parent、dir、before、connect 场景下的预期行为、边界条件与结果。\n\nensure_sqlite_parent_dir must be called before from_conn_string.'
         load_checkpointer_config_from_dict({"type": "sqlite", "connection_string": "relative/test.db"})
 
         call_order = []
@@ -352,6 +385,7 @@ class TestGetCheckpointer:
         mock_module.SqliteSaver = mock_saver_cls
 
         def record_ensure(*a, **kw):
+            '执行 record_ensure 的明确职责，并返回与调用约定一致的结果'
             call_order.append("ensure")
 
         with (
@@ -371,7 +405,7 @@ class TestGetCheckpointer:
         assert call_order == ["ensure", "connect"]
 
     def test_postgres_creates_saver(self):
-        """Postgres checkpointer is created when packages are available."""
+        '验证 postgres、creates、saver 场景下的预期行为、边界条件与结果。\n\nPostgres checkpointer is created when packages are available.'
         load_checkpointer_config_from_dict({"type": "postgres", "connection_string": "postgresql://localhost/db"})
 
         mock_saver_instance = MagicMock()
@@ -395,7 +429,9 @@ class TestGetCheckpointer:
 
 
 class TestSyncSingletonThreadSafety:
+    '组织 TestSyncSingletonThreadSafety 场景的行为与边界验证'
     def test_store_reset_clears_singleton(self):
+        '验证 store、reset、clears、singleton 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         store1 = get_store()
         reset_store()
@@ -403,6 +439,7 @@ class TestSyncSingletonThreadSafety:
         assert store1 is not store2
 
     def test_concurrent_checkpointer_getter_creates_one_instance(self):
+        '验证 concurrent、checkpointer、getter、creates、one、instance 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         factory = _BlockingSingletonFactory()
 
@@ -421,6 +458,7 @@ class TestSyncSingletonThreadSafety:
         assert factory.enter_count() == 1
 
     def test_concurrent_store_getter_creates_one_instance(self):
+        '验证 concurrent、store、getter、creates、one、instance 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         factory = _BlockingSingletonFactory()
 
@@ -439,9 +477,11 @@ class TestSyncSingletonThreadSafety:
         assert factory.enter_count() == 1
 
     def test_checkpointer_loads_config_outside_singleton_lock(self):
+        '验证 checkpointer、loads、config、outside、singleton、lock 场景下的预期行为、边界条件与结果'
         tracking_lock = _TrackingLock()
 
         def fake_ensure_config_loaded():
+            '执行 fake_ensure_config_loaded 的明确职责，并返回与调用约定一致的结果'
             assert not tracking_lock.locked()
             load_checkpointer_config_from_dict({"type": "memory"})
 
@@ -455,9 +495,11 @@ class TestSyncSingletonThreadSafety:
         assert tracking_lock.acquired.is_set()
 
     def test_store_loads_config_outside_singleton_lock(self):
+        '验证 store、loads、config、outside、singleton、lock 场景下的预期行为、边界条件与结果'
         tracking_lock = _TrackingLock()
 
         def fake_ensure_config_loaded():
+            '执行 fake_ensure_config_loaded 的明确职责，并返回与调用约定一致的结果'
             assert not tracking_lock.locked()
             load_checkpointer_config_from_dict({"type": "memory"})
 
@@ -471,6 +513,7 @@ class TestSyncSingletonThreadSafety:
         assert tracking_lock.acquired.is_set()
 
     def test_checkpointer_reset_waits_for_initialization(self):
+        '验证 checkpointer、reset、waits、for、initialization 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         factory = _BlockingSingletonFactory()
 
@@ -484,6 +527,7 @@ class TestSyncSingletonThreadSafety:
             reset_started = Event()
 
             def reset_worker():
+                '执行 reset_worker 的明确职责，并返回与调用约定一致的结果'
                 reset_started.set()
                 reset_checkpointer()
 
@@ -501,6 +545,7 @@ class TestSyncSingletonThreadSafety:
         assert factory.exit_count() == 1
 
     def test_store_reset_waits_for_initialization(self):
+        '验证 store、reset、waits、for、initialization 场景下的预期行为、边界条件与结果'
         load_checkpointer_config_from_dict({"type": "memory"})
         factory = _BlockingSingletonFactory()
 
@@ -514,6 +559,7 @@ class TestSyncSingletonThreadSafety:
             reset_started = Event()
 
             def reset_worker():
+                '执行 reset_worker 的明确职责，并返回与调用约定一致的结果'
                 reset_started.set()
                 reset_store()
 
@@ -532,9 +578,10 @@ class TestSyncSingletonThreadSafety:
 
 
 class TestAsyncCheckpointer:
+    '组织 TestAsyncCheckpointer 场景的行为与边界验证'
     @pytest.mark.anyio
     async def test_sqlite_creates_parent_dir_via_to_thread(self):
-        """Async SQLite setup should move mkdir off the event loop."""
+        '验证 sqlite、creates、parent、dir、via、to、thread 场景下的预期行为、边界条件与结果。\n\nAsync SQLite setup should move mkdir off the event loop.'
         from deerflow.runtime.checkpointer.async_provider import _prepare_sqlite_checkpointer_path, make_checkpointer
 
         mock_config = MagicMock()
@@ -572,7 +619,7 @@ class TestAsyncCheckpointer:
 
     @pytest.mark.anyio
     async def test_postgres_uses_connection_pool(self):
-        """Async postgres checkpointer should use AsyncConnectionPool, not a single connection."""
+        '验证 postgres、uses、connection、pool 场景下的预期行为、边界条件与结果。\n\nAsync postgres checkpointer should use AsyncConnectionPool, not a single connection.'
         from deerflow.runtime.checkpointer.async_provider import make_checkpointer
 
         mock_config = MagicMock()
@@ -619,7 +666,7 @@ class TestAsyncCheckpointer:
 
     @pytest.mark.anyio
     async def test_database_postgres_uses_connection_pool(self):
-        """Unified database postgres path should use AsyncConnectionPool with keepalive."""
+        '验证 database、postgres、uses、connection、pool 场景下的预期行为、边界条件与结果。\n\nUnified database postgres path should use AsyncConnectionPool with keepalive.'
         from deerflow.config.database_config import DatabaseConfig
         from deerflow.runtime.checkpointer.async_provider import make_checkpointer
 
@@ -665,7 +712,7 @@ class TestAsyncCheckpointer:
 
     @pytest.mark.anyio
     async def test_database_sqlite_creates_parent_dir_via_to_thread(self):
-        """Unified database SQLite setup should also move path IO off the event loop."""
+        '验证 database、sqlite、creates、parent、dir、via、to、thread 场景下的预期行为、边界条件与结果。\n\nUnified database SQLite setup should also move path IO off the event loop.'
         from deerflow.config.database_config import DatabaseConfig
         from deerflow.runtime.checkpointer.async_provider import _prepare_database_sqlite_checkpointer_path, make_checkpointer
 
@@ -706,19 +753,10 @@ class TestAsyncCheckpointer:
 
 
 class TestCheckpointerDatabaseConfig:
-    """The sync checkpointer must follow the unified ``database`` section when no
-    legacy ``checkpointer`` section is configured — matching the async
-    ``make_checkpointer`` factory and the sync Store provider.
-
-    Regression: ``get_checkpointer`` / ``checkpointer_context`` previously read
-    only the legacy ``checkpointer`` section and fell back to ``InMemorySaver``,
-    silently ignoring ``database``. Embedded callers (``DeerFlowClient``) and the
-    TUI then persisted Store rows to sqlite/postgres while checkpoints went to an
-    in-memory saver and were lost on exit.
-    """
+    '组织 TestCheckpointerDatabaseConfig 场景的行为与边界验证。\n\nThe sync checkpointer must follow the unified ``database`` section when no\n    legacy ``checkpointer`` section is configured — matching the async\n    ``make_checkpointer`` factory and the sync Store provider.\n\n    Regression: ``get_checkpointer`` / ``checkpointer_context`` previously read\n    only the legacy ``checkpointer`` section and fell back to ``InMemorySaver``,\n    silently ignoring ``database``. Embedded callers (``DeerFlowClient``) and the\n    TUI then persisted Store rows to sqlite/postgres while checkpoints went to an\n    in-memory saver and were lost on exit.\n    '
 
     def test_sync_checkpointer_context_uses_database_config(self):
-        """The one-shot sync checkpointer factory must follow unified database config."""
+        '验证 sync、checkpointer、context、uses、database、config 场景下的预期行为、边界条件与结果。\n\nThe one-shot sync checkpointer factory must follow unified database config.'
         from deerflow.runtime.checkpointer.provider import checkpointer_context
 
         app_config = SimpleNamespace(
@@ -740,7 +778,7 @@ class TestCheckpointerDatabaseConfig:
         assert resolved.connection_string == "postgresql://localhost/db"
 
     def test_sync_checkpointer_context_uses_sqlite_database_config(self, tmp_path):
-        """The one-shot sync checkpointer factory must resolve the sqlite branch too, not just postgres."""
+        '验证 sync、checkpointer、context、uses、sqlite、database、config 场景下的预期行为、边界条件与结果。\n\nThe one-shot sync checkpointer factory must resolve the sqlite branch too, not just postgres.'
         from deerflow.runtime.checkpointer.provider import checkpointer_context
 
         db_config = DatabaseConfig(backend="sqlite", sqlite_dir=str(tmp_path))
@@ -760,7 +798,7 @@ class TestCheckpointerDatabaseConfig:
         assert resolved.connection_string == db_config.checkpointer_sqlite_path
 
     def test_sync_checkpointer_singleton_uses_database_config(self):
-        """The cached sync checkpointer factory must resolve database config before locking."""
+        '验证 sync、checkpointer、singleton、uses、database、config 场景下的预期行为、边界条件与结果。\n\nThe cached sync checkpointer factory must resolve database config before locking.'
         app_config = SimpleNamespace(
             checkpointer=None,
             database=DatabaseConfig(backend="postgres", postgres_url="postgresql://localhost/db"),
@@ -780,7 +818,7 @@ class TestCheckpointerDatabaseConfig:
         assert resolved.connection_string == "postgresql://localhost/db"
 
     def test_sync_checkpointer_falls_back_to_memory_when_config_file_is_missing(self):
-        """The sync checkpointer keeps its no-config fallback for embedded callers."""
+        '验证 sync、checkpointer、falls、back、to、memory、when、config、file、is、missing 场景下的预期行为、边界条件与结果。\n\nThe sync checkpointer keeps its no-config fallback for embedded callers.'
         from langgraph.checkpoint.memory import InMemorySaver
 
         with (
@@ -791,7 +829,7 @@ class TestCheckpointerDatabaseConfig:
             assert isinstance(get_checkpointer(), InMemorySaver)
 
     def test_legacy_checkpointer_config_takes_precedence(self):
-        """Backward-compatible checkpointer config must override database."""
+        '验证 legacy、checkpointer、config、takes、precedence 场景下的预期行为、边界条件与结果。\n\nBackward-compatible checkpointer config must override database.'
         from deerflow.runtime.checkpointer.provider import checkpointer_context
 
         app_config = SimpleNamespace(
@@ -813,7 +851,7 @@ class TestCheckpointerDatabaseConfig:
         assert resolved.connection_string is None
 
     def test_explicit_memory_database_uses_in_memory_saver(self):
-        """Explicit memory mode remains an intentional non-persistent checkpointer."""
+        '验证 explicit、memory、database、uses、in、memory、saver 场景下的预期行为、边界条件与结果。\n\nExplicit memory mode remains an intentional non-persistent checkpointer.'
         from langgraph.checkpoint.memory import InMemorySaver
 
         from deerflow.runtime.checkpointer.provider import checkpointer_context
@@ -828,8 +866,9 @@ class TestCheckpointerDatabaseConfig:
 
 
 class TestStoreDatabaseConfig:
+    '组织 TestStoreDatabaseConfig 场景的行为与边界验证'
     def test_sync_store_falls_back_to_memory_when_config_file_is_missing(self):
-        """The sync Store keeps its no-config fallback for embedded callers."""
+        '验证 sync、store、falls、back、to、memory、when、config、file、is、missing 场景下的预期行为、边界条件与结果。\n\nThe sync Store keeps its no-config fallback for embedded callers.'
         from langgraph.store.memory import InMemoryStore
 
         with (
@@ -841,7 +880,7 @@ class TestStoreDatabaseConfig:
 
     @pytest.mark.anyio
     async def test_async_postgres_store_uses_database_config(self, caplog):
-        """Unified database postgres config must not fall back to InMemoryStore."""
+        '验证 async、postgres、store、uses、database、config 场景下的预期行为、边界条件与结果。\n\nUnified database postgres config must not fall back to InMemoryStore.'
         from deerflow.runtime.store.async_provider import make_store
 
         caplog.set_level("WARNING", logger="deerflow.runtime.store.async_provider")
@@ -867,7 +906,7 @@ class TestStoreDatabaseConfig:
 
     @pytest.mark.anyio
     async def test_async_sqlite_store_uses_unified_database_path(self, tmp_path):
-        """Unified database SQLite config must use the shared deerflow.db path."""
+        '验证 async、sqlite、store、uses、unified、database、path 场景下的预期行为、边界条件与结果。\n\nUnified database SQLite config must use the shared deerflow.db path.'
         from deerflow.runtime.store.async_provider import make_store
         from deerflow.runtime.store.provider import ensure_sqlite_parent_dir
 
@@ -899,7 +938,7 @@ class TestStoreDatabaseConfig:
         mock_store.setup.assert_awaited_once()
 
     def test_sync_store_context_uses_database_config(self):
-        """The one-shot sync Store factory must follow unified database config."""
+        '验证 sync、store、context、uses、database、config 场景下的预期行为、边界条件与结果。\n\nThe one-shot sync Store factory must follow unified database config.'
         from deerflow.runtime.store.provider import store_context
 
         app_config = SimpleNamespace(
@@ -921,7 +960,7 @@ class TestStoreDatabaseConfig:
         assert resolved.connection_string == "postgresql://localhost/db"
 
     def test_sync_store_singleton_uses_database_config(self):
-        """The cached sync Store factory must resolve database config before locking."""
+        '验证 sync、store、singleton、uses、database、config 场景下的预期行为、边界条件与结果。\n\nThe cached sync Store factory must resolve database config before locking.'
         app_config = SimpleNamespace(
             checkpointer=None,
             database=DatabaseConfig(backend="postgres", postgres_url="postgresql://localhost/db"),
@@ -941,7 +980,7 @@ class TestStoreDatabaseConfig:
         assert resolved.connection_string == "postgresql://localhost/db"
 
     def test_legacy_checkpointer_config_takes_precedence_for_store(self):
-        """Backward-compatible checkpointer config must override database for Store."""
+        '验证 legacy、checkpointer、config、takes、precedence、for、store 场景下的预期行为、边界条件与结果。\n\nBackward-compatible checkpointer config must override database for Store.'
         from deerflow.runtime.store.provider import store_context
 
         app_config = SimpleNamespace(
@@ -963,7 +1002,7 @@ class TestStoreDatabaseConfig:
         assert resolved.connection_string is None
 
     def test_explicit_memory_database_uses_in_memory_store(self):
-        """Explicit memory mode remains an intentional non-persistent Store."""
+        '验证 explicit、memory、database、uses、in、memory、store 场景下的预期行为、边界条件与结果。\n\nExplicit memory mode remains an intentional non-persistent Store.'
         from langgraph.store.memory import InMemoryStore
 
         from deerflow.runtime.store.provider import store_context
@@ -983,8 +1022,9 @@ class TestStoreDatabaseConfig:
 
 
 class TestAppConfigLoadsCheckpointer:
+    '组织 TestAppConfigLoadsCheckpointer 场景的行为与边界验证'
     def test_load_checkpointer_section(self):
-        """load_checkpointer_config_from_dict populates the global config."""
+        '验证 load、checkpointer、section 场景下的预期行为、边界条件与结果。\n\nload_checkpointer_config_from_dict populates the global config.'
         set_checkpointer_config(None)
         load_checkpointer_config_from_dict({"type": "memory"})
         cfg = get_checkpointer_config()
@@ -998,8 +1038,9 @@ class TestAppConfigLoadsCheckpointer:
 
 
 class TestClientCheckpointerFallback:
+    '组织 TestClientCheckpointerFallback 场景的行为与边界验证'
     def test_client_uses_config_checkpointer_when_none_provided(self):
-        """DeerFlowClient._ensure_agent falls back to get_checkpointer() when checkpointer=None."""
+        '验证 client、uses、config、checkpointer、when、none、provided 场景下的预期行为、边界条件与结果。\n\nDeerFlowClient._ensure_agent falls back to get_checkpointer() when checkpointer=None.'
         from langgraph.checkpoint.memory import InMemorySaver
 
         from deerflow.client import DeerFlowClient
@@ -1009,6 +1050,7 @@ class TestClientCheckpointerFallback:
         captured_kwargs = {}
 
         def fake_create_agent(**kwargs):
+            '执行 fake_create_agent 的明确职责，并返回与调用约定一致的结果'
             captured_kwargs.update(kwargs)
             return MagicMock()
 
@@ -1039,7 +1081,7 @@ class TestClientCheckpointerFallback:
         assert isinstance(captured_kwargs["checkpointer"], InMemorySaver)
 
     def test_client_explicit_checkpointer_takes_precedence(self):
-        """An explicitly provided checkpointer is used even when config checkpointer is set."""
+        '验证 client、explicit、checkpointer、takes、precedence 场景下的预期行为、边界条件与结果。\n\nAn explicitly provided checkpointer is used even when config checkpointer is set.'
         from deerflow.client import DeerFlowClient
 
         load_checkpointer_config_from_dict({"type": "memory"})
@@ -1048,6 +1090,7 @@ class TestClientCheckpointerFallback:
         captured_kwargs = {}
 
         def fake_create_agent(**kwargs):
+            '执行 fake_create_agent 的明确职责，并返回与调用约定一致的结果'
             captured_kwargs.update(kwargs)
             return MagicMock()
 

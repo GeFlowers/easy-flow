@@ -1,4 +1,4 @@
-"""Built-in tool for invoking external ACP-compatible agents."""
+"""提供工具、builtins、invoke、acp、agent、tool相关功能。"""
 
 import logging
 import os
@@ -13,25 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 class _InvokeACPAgentInput(BaseModel):
+    """\u6267\u884c _InvokeACPAgentInput \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     agent: str = Field(description="Name of the ACP agent to invoke")
     prompt: str = Field(description="The concise task prompt to send to the agent")
 
 
 def _get_work_dir(thread_id: str | None) -> str:
-    """Get the per-thread ACP workspace directory.
-
-    Each thread gets an isolated workspace under
-    ``{base_dir}/threads/{thread_id}/acp-workspace/`` so that concurrent
-    sessions cannot read or overwrite each other's ACP agent outputs.
-
-    Falls back to the legacy global ``{base_dir}/acp-workspace/`` when
-    ``thread_id`` is not available (e.g. embedded / direct invocation).
-
-    The directory is created automatically if it does not exist.
-
-    Returns:
-        An absolute physical filesystem path to use as the working directory.
-    """
+    """\u6267\u884c _get_work_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     from deerflow.config.paths import get_paths
     from deerflow.runtime.user_context import get_effective_user_id
 
@@ -51,7 +39,7 @@ def _get_work_dir(thread_id: str | None) -> str:
 
 
 def _build_mcp_servers() -> dict[str, dict[str, Any]]:
-    """Build ACP ``mcpServers`` config from DeerFlow's enabled MCP servers."""
+    """\u6267\u884c _build_mcp_servers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     from deerflow.config.extensions_config import ExtensionsConfig
     from deerflow.mcp.client import build_servers_config
 
@@ -59,12 +47,7 @@ def _build_mcp_servers() -> dict[str, dict[str, Any]]:
 
 
 def _build_acp_mcp_servers() -> list[dict[str, Any]]:
-    """Build ACP ``mcpServers`` payload for ``new_session``.
-
-    The ACP client expects a list of server objects, while DeerFlow's MCP helper
-    returns a name -> config mapping for the LangChain MCP adapter. This helper
-    converts the enabled servers into the ACP wire format.
-    """
+    """\u6267\u884c _build_acp_mcp_servers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     from deerflow.config.extensions_config import ExtensionsConfig
 
     extensions_config = ExtensionsConfig.from_file()
@@ -95,13 +78,7 @@ def _build_acp_mcp_servers() -> list[dict[str, Any]]:
 
 
 def _build_permission_response(options: list[Any], *, auto_approve: bool) -> Any:
-    """Build an ACP permission response.
-
-    When ``auto_approve`` is True, selects the first ``allow_once`` (preferred)
-    or ``allow_always`` option.  When False (the default), always cancels —
-    permission requests must be handled by the ACP agent's own policy or the
-    agent must be configured to operate without requesting permissions.
-    """
+    """\u6267\u884c _build_permission_response \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     from acp import RequestPermissionResponse
     from acp.schema import AllowedOutcome, DeniedOutcome
 
@@ -125,7 +102,7 @@ def _build_permission_response(options: list[Any], *, auto_approve: bool) -> Any
 
 
 def _format_invocation_error(agent: str, cmd: str, exc: Exception) -> str:
-    """Return a user-facing ACP invocation error with actionable remediation."""
+    """\u6267\u884c _format_invocation_error \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     if not isinstance(exc, FileNotFoundError):
         return f"Error invoking ACP agent '{agent}': {exc}"
 
@@ -137,17 +114,7 @@ def _format_invocation_error(agent: str, cmd: str, exc: Exception) -> str:
 
 
 def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
-    """Create the ``invoke_acp_agent`` tool with a description generated from configured agents.
-
-    The tool description includes the list of available agents so that the LLM
-    knows which agents it can invoke without requiring hardcoded names.
-
-    Args:
-        agents: Mapping of agent name -> ``ACPAgentConfig``.
-
-    Returns:
-        A LangChain ``BaseTool`` ready to be included in the tool list.
-    """
+    """\u6267\u884c build_invoke_acp_agent_tool \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     agent_lines = "\n".join(f"- {name}: {cfg.description}" for name, cfg in agents.items())
     description = (
         "Invoke an external ACP-compatible agent and return its final response.\n\n"
@@ -159,10 +126,11 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
         "After the agent completes, its output files are accessible at /mnt/acp-workspace/ (read-only)."
     )
 
-    # Capture agents in closure so the function can reference it
+        # 中文说明：此处用于执行相关处理。
     _agents = dict(agents)
 
     async def _invoke(agent: str, prompt: str, config: Annotated[RunnableConfig, InjectedToolArg] = None) -> str:
+        """\u6267\u884c _invoke \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         logger.info("Invoking ACP agent %s (prompt length: %d)", agent, len(prompt))
         logger.debug("Invoking ACP agent %s with prompt: %.200s%s", agent, prompt, "..." if len(prompt) > 200 else "")
         if agent not in _agents:
@@ -179,16 +147,19 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
             return "Error: agent-client-protocol package is not installed. Run `uv sync` to install project dependencies."
 
         class _CollectingClient(Client):
-            """Minimal ACP Client that collects streamed text from session updates."""
+            """\u6267\u884c _CollectingClient \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
             def __init__(self) -> None:
+                """\u6267\u884c __init__ \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
                 self._chunks: list[str] = []
 
             @property
             def collected_text(self) -> str:
+                """\u6267\u884c collected_text \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
                 return "".join(self._chunks)
 
             async def session_update(self, session_id: str, update, **kwargs) -> None:  # type: ignore[override]
+                """\u6267\u884c session_update \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
                 try:
                     from acp.schema import TextContentBlock
 
@@ -198,6 +169,7 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
                     pass
 
             async def request_permission(self, options, session_id: str, tool_call, **kwargs):  # type: ignore[override]
+                """\u6267\u884c request_permission \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
                 response = _build_permission_response(options, auto_approve=agent_config.auto_approve_permissions)
                 outcome = response.outcome.outcome
                 if outcome == "selected":

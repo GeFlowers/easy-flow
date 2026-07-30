@@ -1,13 +1,4 @@
-"""End-to-end tests for three-way skills mount across sandbox providers.
-
-Verifies that (a) public, (b) per-user custom, and (c) legacy global-custom
-skills all resolve to correct container paths that the sandbox providers
-actually mount — covering ``LocalSandboxProvider`` and
-``AioSandboxProvider`` (DooD / local-backend path).
-
-Includes a full-pipeline test that exercises the actual path the model
-takes: ``UserScopedSkillStorage`` category assignment → ``Skill.get_container_file_path()`` → ``sandbox.read_file()``.
-"""
+'未说明'
 
 import importlib
 from pathlib import Path
@@ -26,6 +17,7 @@ _AIO_GET_CONFIG = f"{_AIO_MODULE}.get_app_config"
 
 
 def _write_skill(base: Path, name: str, description: str = "test skill") -> Path:
+    '未说明'
     skill_dir = base / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     skill_md = skill_dir / SKILL_MD_FILE
@@ -37,6 +29,7 @@ def _write_skill(base: Path, name: str, description: str = "test skill") -> Path
 
 
 def _build_config(skills_root: Path):
+    '未说明'
     from deerflow.config.sandbox_config import SandboxConfig
 
     return SimpleNamespace(
@@ -53,12 +46,14 @@ def _build_config(skills_root: Path):
 
 
 def _local_mounts(provider: LocalSandboxProvider, thread_id: str, user_id: str) -> dict[str, PathMapping]:
+    '未说明'
     mappings = list(provider._path_mappings) + provider._build_thread_path_mappings(thread_id, user_id=user_id)
     return {m.container_path: m for m in mappings}
 
 
 @pytest.fixture
 def skills_fs(tmp_path: Path) -> dict:
+    '未说明'
     root = tmp_path / "skills"
     pub = root / "public"
     legacy = root / "custom"
@@ -79,13 +74,16 @@ def skills_fs(tmp_path: Path) -> dict:
 
 @pytest.fixture
 def aio_mod():
+    '未说明'
     return importlib.import_module(_AIO_MODULE)
 
 
 class TestThreeWayMountEndToEnd:
     # ── LocalSandboxProvider: mount structure ──────────────────────────
 
+    '未说明'
     def test_local_public_skill_mounted(self, skills_fs):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         with patch("deerflow.config.get_app_config", return_value=cfg), patch("deerflow.config.paths.get_paths", return_value=paths):
@@ -95,6 +93,7 @@ class TestThreeWayMountEndToEnd:
         assert idx["/mnt/skills/public"].read_only is True
 
     def test_local_per_user_custom_skill_mounted(self, skills_fs):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         with patch("deerflow.config.get_app_config", return_value=cfg), patch("deerflow.config.paths.get_paths", return_value=paths):
@@ -104,6 +103,7 @@ class TestThreeWayMountEndToEnd:
         assert str(skills_fs["user_custom"]) in idx["/mnt/skills/custom"].local_path
 
     def test_local_legacy_mounted_for_user_without_custom(self, skills_fs):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         with patch("deerflow.config.get_app_config", return_value=cfg), patch("deerflow.config.paths.get_paths", return_value=paths):
@@ -113,6 +113,7 @@ class TestThreeWayMountEndToEnd:
         assert str(skills_fs["legacy_global"]) in idx["/mnt/skills/legacy"].local_path
 
     def test_local_legacy_not_mounted_when_user_has_custom(self, skills_fs):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         with patch("deerflow.config.get_app_config", return_value=cfg), patch("deerflow.config.paths.get_paths", return_value=paths):
@@ -121,6 +122,7 @@ class TestThreeWayMountEndToEnd:
         assert "/mnt/skills/legacy" not in idx
 
     def test_local_legacy_still_mounted_when_user_has_only_non_skill_subdir(self, skills_fs):
+        '未说明'
         (skills_fs["users_dir"] / "ghost" / "skills" / "custom" / "dangling-dir").mkdir(parents=True, exist_ok=True)
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
@@ -132,6 +134,7 @@ class TestThreeWayMountEndToEnd:
     # ── LocalSandboxProvider: read_file on container paths ─────────────
 
     def test_local_read_file_resolves_public_and_custom(self, skills_fs):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         with patch("deerflow.config.get_app_config", return_value=cfg), patch("deerflow.config.paths.get_paths", return_value=paths):
@@ -142,6 +145,7 @@ class TestThreeWayMountEndToEnd:
         assert "usr-skill" in sandbox.read_file("/mnt/skills/custom/usr-skill/SKILL.md")
 
     def test_local_read_file_resolves_legacy_skill(self, skills_fs):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         with patch("deerflow.config.get_app_config", return_value=cfg), patch("deerflow.config.paths.get_paths", return_value=paths):
@@ -153,7 +157,7 @@ class TestThreeWayMountEndToEnd:
     # ── Full pipeline: registry → container path → sandbox read ────────
 
     def test_registry_to_sandbox_full_pipeline(self, skills_fs):
-        """Model's exact path: storage category → get_container_file_path → sandbox.read_file."""
+        '未说明'
         from deerflow.skills.storage.user_scoped_skill_storage import UserScopedSkillStorage
 
         cfg = _build_config(skills_fs["root"])
@@ -207,6 +211,7 @@ class TestThreeWayMountEndToEnd:
     # ── AioSandboxProvider ──────────────────────────────────────────────
 
     def test_aio_public_skill_mount(self, skills_fs, aio_mod):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         with patch(_AIO_GET_CONFIG, return_value=cfg):
             mounts = aio_mod.AioSandboxProvider._get_skills_mounts(user_id="user-1")
@@ -214,6 +219,7 @@ class TestThreeWayMountEndToEnd:
         assert "/mnt/skills/public" in idx
 
     def test_aio_per_user_custom_skill_mount(self, skills_fs, aio_mod, monkeypatch):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         monkeypatch.setattr(aio_mod, "get_paths", lambda: paths)
@@ -225,6 +231,7 @@ class TestThreeWayMountEndToEnd:
         assert "users/user-1/skills/custom" in host.replace("\\", "/")
 
     def test_aio_legacy_mounted_for_user_without_custom(self, skills_fs, aio_mod, monkeypatch):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         monkeypatch.setattr(aio_mod, "get_paths", lambda: paths)
@@ -234,6 +241,7 @@ class TestThreeWayMountEndToEnd:
         assert "/mnt/skills/legacy" in idx
 
     def test_aio_legacy_not_mounted_when_user_has_custom(self, skills_fs, aio_mod, monkeypatch):
+        '未说明'
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
         monkeypatch.setattr(aio_mod, "get_paths", lambda: paths)
@@ -243,6 +251,7 @@ class TestThreeWayMountEndToEnd:
         assert "/mnt/skills/legacy" not in idx
 
     def test_aio_legacy_still_mounted_when_user_has_only_non_skill_subdir(self, skills_fs, aio_mod, monkeypatch):
+        '未说明'
         (skills_fs["users_dir"] / "ghost" / "skills" / "custom" / "dangling-dir").mkdir(parents=True, exist_ok=True)
         cfg = _build_config(skills_fs["root"])
         paths = Paths(base_dir=skills_fs["users_dir"].parent)
@@ -255,7 +264,7 @@ class TestThreeWayMountEndToEnd:
     # ── AIO → Docker --mount translation ───────────────────────────────
 
     def test_aio_extra_mounts_translate_to_docker_bind_mounts(self, skills_fs, aio_mod, monkeypatch):
-        """extra_mounts → _format_container_mount → correct Docker --mount args."""
+        '未说明'
         from deerflow.community.aio_sandbox.local_backend import _format_container_mount
 
         cfg = _build_config(skills_fs["root"])
@@ -295,6 +304,7 @@ class TestThreeWayMountEndToEnd:
     # ── Path alignment ──────────────────────────────────────────────────
 
     def test_skill_container_paths_match_expected_mounts(self, skills_fs):
+        '未说明'
         cr = "/mnt/skills"
         assert (
             Skill(

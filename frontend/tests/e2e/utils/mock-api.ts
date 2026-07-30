@@ -1,15 +1,14 @@
 /**
- * Shared mock helpers for E2E tests.
+ * E2E 测试共用的 mock 辅助函数。
  *
- * Intercepts all LangGraph / Backend API endpoints so tests can run without
- * a real backend.  Each test file imports `mockLangGraphAPI` and
- * `handleRunStream` from here.
+ * 拦截全部 LangGraph / 后端 API 端点，让测试无需真实后端即可运行；每个测试文件从此处
+ * 导入 `mockLangGraphAPI` 与 `handleRunStream`。
  */
 
 import type { Page, Route } from "@playwright/test";
 
 // ---------------------------------------------------------------------------
-// Constants — deterministic IDs used across tests
+// 常量：测试间共用的确定性 ID
 // ---------------------------------------------------------------------------
 
 export const MOCK_THREAD_ID = "00000000-0000-0000-0000-000000000001";
@@ -25,7 +24,7 @@ const MOCK_AUTH_USER = {
 };
 
 // ---------------------------------------------------------------------------
-// Types
+// 类型
 // ---------------------------------------------------------------------------
 
 export type MockThread = {
@@ -110,6 +109,11 @@ const DEFAULT_SKILLS: MockSkill[] = [
   },
 ];
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 isHiddenInputMessage 的约定。
+
+ */
+
 function isHiddenInputMessage(message: unknown) {
   if (typeof message !== "object" || message === null) {
     return false;
@@ -122,9 +126,19 @@ function isHiddenInputMessage(message: unknown) {
   );
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 visibleInputMessages 的约定。
+
+ */
+
 function visibleInputMessages(messages: unknown[]) {
   return messages.filter((message) => !isHiddenInputMessage(message));
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 visibleRunInputMessages 的约定。
+
+ */
 
 function visibleRunInputMessages(route: Route) {
   try {
@@ -137,6 +151,11 @@ function visibleRunInputMessages(route: Route) {
   }
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 messageId 的约定。
+
+ */
+
 function messageId(message: unknown): string | undefined {
   if (typeof message !== "object" || message === null) {
     return undefined;
@@ -144,6 +163,11 @@ function messageId(message: unknown): string | undefined {
   const raw = Reflect.get(message, "id");
   return typeof raw === "string" ? raw : undefined;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 branchMessagesFromTurn 的约定。
+
+ */
 
 function branchMessagesFromTurn(messages: unknown[], targetIds: Set<string>) {
   let targetEndIndex = -1;
@@ -155,6 +179,11 @@ function branchMessagesFromTurn(messages: unknown[], targetIds: Set<string>) {
   }
   return targetEndIndex >= 0 ? messages.slice(0, targetEndIndex + 1) : messages;
 }
+
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 mockStreamMessages 的约定。
+
+ */
 
 function mockStreamMessages(route?: Route, inputMessages?: unknown[]) {
   const submittedMessages = inputMessages
@@ -180,6 +209,11 @@ function mockStreamMessages(route?: Route, inputMessages?: unknown[]) {
     responseMessage,
   ];
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 runStreamThreadId 的约定。
+
+ */
 
 function runStreamThreadId(route: Route) {
   const pathThreadId = /\/threads\/([^/]+)\/runs\/stream/.exec(
@@ -213,9 +247,8 @@ function runStreamThreadId(route: Route) {
 // ---------------------------------------------------------------------------
 
 /**
- * Mock all LangGraph API endpoints that the frontend calls on page load and
- * during message sending.  Without these mocks the pages would hang waiting
- * for a real backend.
+ * Mock 前端在页面加载及发送消息期间调用的全部 LangGraph API 端点；缺少这些 mock 时，
+ * 页面会因等待真实后端而挂起。
  */
 export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
   let threads = [...(options?.threads ?? [])];
@@ -245,12 +278,22 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     max_total_size: 100 * 1024 * 1024,
   };
 
+  /**
+   * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 upsertThread 约定的逻辑。
+
+   */
+
   const upsertThread = (thread: MockThread) => {
     threads = [
       thread,
       ...threads.filter((existing) => existing.thread_id !== thread.thread_id),
     ];
   };
+
+  /**
+   * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 threadSearchResult 约定的逻辑。
+
+   */
 
   const threadSearchResult = (thread: MockThread) => ({
     thread_id: thread.thread_id,
@@ -264,7 +307,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     values: { title: thread.title ?? "Untitled", goal: thread.goal ?? null },
   });
 
-  // Auth — keep workspace tests independent from a real gateway session.
+  // 认证：使工作区测试不依赖真实 Gateway 会话。
   void page.route("**/api/v1/auth/me", (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
@@ -555,7 +598,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Thread search — sidebar thread list & chats list page
+  // 线程搜索：侧边栏线程列表和聊天列表页。
   void page.route("**/api/langgraph/threads/search", async (route) => {
     let body = threads.map(threadSearchResult);
 
@@ -583,7 +626,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
         }
       }
     } catch {
-      // No / invalid JSON body — fall back to returning the full list.
+      // 缺少 JSON 请求体或请求体无效时，回退为返回完整列表。
     }
 
     const sliced =
@@ -596,7 +639,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     });
   });
 
-  // Thread create — called when user sends first message in a new chat
+  // 创建线程：用户在新聊天中发送首条消息时调用。
   void page.route("**/api/langgraph/threads", (route) => {
     if (route.request().method() === "POST") {
       upsertThread({
@@ -621,7 +664,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Thread update (PATCH) — metadata update after creation
+  // 更新线程（PATCH）：创建后的元数据更新。
   void page.route("**/api/langgraph/threads/*", (route) => {
     const threadId = decodeURIComponent(
       new URL(route.request().url()).pathname.split("/").at(-1) ?? "",
@@ -694,11 +737,9 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
       const threadId = decodeURIComponent(
         new URL(route.request().url()).pathname.split("/").at(-1) ?? "",
       );
-      // Mirror the gateway's `require_existing=True` ownership guard: deleting
-      // an already-removed thread 404s. `useDeleteThread` first deletes via the
-      // LangGraph route (which drops the thread_meta row) and then hits this
-      // route, so this reproduces the real double-delete 404 the frontend must
-      // treat as idempotent success.
+      // 对齐 Gateway 的 `require_existing=True` 所有权保护：删除已移除的线程会返回 404。
+      // `useDeleteThread` 先经 LangGraph 路由删除（该操作会移除 thread_meta 行），随后请求此路由，
+      // 因而这里复现前端必须视为幂等成功的真实重复删除 404。
       if (!threads.some((thread) => thread.thread_id === threadId)) {
         return route.fulfill({
           status: 404,
@@ -836,11 +877,11 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Thread history — useStream fetches state history on mount
+  // 线程历史：useStream 挂载时获取状态历史。
   void page.route("**/api/langgraph/threads/*/history", (route) => {
     const url = route.request().url();
 
-    // For threads that exist in our mock data, return history with messages
+    // 对存在于 mock 数据中的线程，返回带消息的历史记录。
     const matchingThread = threads.find((t) => url.includes(t.thread_id));
     if (matchingThread) {
       return route.fulfill({
@@ -874,7 +915,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
       });
     }
 
-    // New threads — empty history
+    // 新线程：空历史记录。
     return route.fulfill({
       status: 200,
       contentType: "application/json",
@@ -882,7 +923,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     });
   });
 
-  // Thread state — getState for individual thread
+  // 线程状态：获取单个线程的 getState。
   void page.route("**/api/langgraph/threads/*/state", (route) => {
     if (route.request().method() === "GET") {
       const url = route.request().url();
@@ -919,9 +960,8 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // The URL carries a query string (e.g. `?limit=10&offset=0`), which Playwright
-  // glob `*` does NOT cross, so we match with a regex anchored to `/runs`
-  // followed by `?` or end-of-string.  This must NOT match `/runs/stream`.
+  // URL 带有查询字符串（例如 `?limit=10&offset=0`），而 Playwright 的 glob `*` 无法跨越它，
+  // 因此使用锚定在 `/runs` 后接 `?` 或字符串结尾的正则匹配；绝不能匹配 `/runs/stream`。
   void page.route(/\/api\/langgraph\/threads\/[^/]+\/runs(\?|$)/, (route) => {
     if (route.request().method() === "GET") {
       const url = route.request().url();
@@ -976,7 +1016,10 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Run stream — returns a minimal SSE response with an AI message
+  // 运行流：返回含一条 AI 消息的最小 SSE 响应。
+  /**
+   * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 handleMockRunStream 约定的逻辑。
+   */
   const handleMockRunStream = (route: Route) => {
     const threadId = runStreamThreadId(route);
     const existingThread = threads.find(
@@ -1001,7 +1044,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     handleMockRunStream,
   );
 
-  // Models list — model picker dropdown
+  // 模型列表：模型选择器下拉菜单。
   void page.route("**/api/models", (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
@@ -1016,9 +1059,8 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Feature flags — frontend gates UI (e.g. agents) on these. Default to
-  // enabled so existing tests exercise the normal path; tests that need the
-  // disabled state override this route after calling mockLangGraphAPI.
+  // 功能开关：前端据此控制 UI（例如 agents）。默认启用以让既有测试覆盖正常路径；需要
+  // 禁用状态的测试会在调用 mockLangGraphAPI 后覆盖此路由。
   void page.route("**/api/features", (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
@@ -1030,7 +1072,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Skills list — settings page and slash autocomplete
+  // 技能列表：设置页和斜杠自动补全。
   void page.route("**/api/skills", (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
@@ -1042,7 +1084,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Follow-up suggestions — input box auto-suggest after AI response
+  // 后续建议：AI 回复后输入框的自动建议。
   void page.route("**/api/threads/*/suggestions", (route) => {
     if (route.request().method() === "POST") {
       return route.fulfill({
@@ -1054,7 +1096,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Agents list — sidebar & gallery page
+  // Agent 列表：侧边栏和图库页。
   void page.route("**/api/agents", (route) => {
     if (route.request().method() === "GET") {
       return route.fulfill({
@@ -1066,7 +1108,7 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
     return route.fallback();
   });
 
-  // Individual agent — agent chat page
+  // 单个 Agent：Agent 聊天页。
   void page.route("**/api/agents/*", (route) => {
     if (route.request().method() === "GET") {
       const url = route.request().url();
@@ -1092,8 +1134,8 @@ export function mockLangGraphAPI(page: Page, options?: MockAPIOptions) {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a minimal SSE stream that the LangGraph SDK can parse.
- * The stream returns a single AI message: "Hello from DeerFlow!".
+ * 构造可由 LangGraph SDK 解析的最小 SSE 流。
+ * 该流返回一条 AI 消息："Hello from DeerFlow!"。
  */
 export function handleRunStream(
   route: Route,

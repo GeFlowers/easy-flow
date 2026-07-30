@@ -1,3 +1,4 @@
+"""实现带路径映射、访问隔离和命令回收的本地文件系统沙箱。"""
 import errno
 import logging
 import ntpath
@@ -32,9 +33,10 @@ _PIPE_DRAIN_JOIN_TIMEOUT_SECONDS = 0.2
 
 
 class _BoundedPipeCapture:
-    """Drain a subprocess pipe while keeping only bounded output in memory."""
+    """持续读取子进程管道，并仅在内存中保留受限大小的输出。"""
 
     def __init__(self, *, limit_bytes: int = _COMMAND_CAPTURE_LIMIT_BYTES) -> None:
+        """以给定的最大保留字节数初始化输出捕获器。"""
         self._limit_bytes = limit_bytes
         self._chunks: list[bytes] = []
         self._kept_bytes = 0
@@ -42,6 +44,7 @@ class _BoundedPipeCapture:
         self._lock = threading.Lock()
 
     def append(self, chunk: bytes) -> None:
+        """追加一段管道输出，并丢弃超出内存上限的部分。"""
         with self._lock:
             self._total_bytes += len(chunk)
             if self._kept_bytes >= self._limit_bytes:
@@ -52,6 +55,7 @@ class _BoundedPipeCapture:
             self._kept_bytes += len(kept)
 
     def read(self) -> str:
+        """返回已捕获的输出；若发生截断则附加说明。"""
         with self._lock:
             data = b"".join(self._chunks)
             truncated = self._total_bytes > self._kept_bytes
@@ -67,7 +71,7 @@ class _BoundedPipeCapture:
 
 @dataclass(frozen=True)
 class PathMapping:
-    """A path mapping from a container path to a local path with optional read-only flag."""
+    """表示从容器虚拟路径到本地路径的映射，并可标记为只读。"""
 
     container_path: str
     local_path: str
@@ -75,36 +79,39 @@ class PathMapping:
 
 
 class ResolvedPath(NamedTuple):
+    """表示路径解析结果及其命中的路径映射。"""
     path: str
     mapping: PathMapping | None
 
 
 class LocalSandbox(Sandbox):
+    """本地文件系统沙箱实现。"""
+
     @staticmethod
     def _shell_name(shell: str) -> str:
-        """Return the executable name for a shell path or command."""
+        """返回命令解释器路径或命令对应的可执行文件名。"""
         return shell.replace("\\", "/").rsplit("/", 1)[-1].lower()
 
     @staticmethod
     def _is_powershell(shell: str) -> bool:
-        """Return whether the selected shell is a PowerShell executable."""
+        """判断选定的命令解释器是否为 PowerShell 可执行文件。"""
         return LocalSandbox._shell_name(shell) in {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}
 
     @staticmethod
     def _is_cmd_shell(shell: str) -> bool:
-        """Return whether the selected shell is cmd.exe."""
+        """判断选定的命令解释器是否为 cmd.exe。"""
         return LocalSandbox._shell_name(shell) in {"cmd", "cmd.exe"}
 
     @staticmethod
     def _is_msys_shell(shell: str) -> bool:
-        """Return whether the selected shell is a Git Bash/MSYS shell."""
+        """判断选定的命令解释器是否为 Git Bash 或 MSYS 命令解释器。"""
         normalized = shell.replace("\\", "/").lower()
         shell_name = LocalSandbox._shell_name(shell)
         return shell_name in {"sh.exe", "bash.exe"} and any(part in normalized for part in ("/git/", "/mingw", "/msys"))
 
     @staticmethod
     def _find_first_available_shell(candidates: tuple[str, ...]) -> str | None:
-        """Return the first executable shell path or command found from candidates."""
+        """从候选项中返回第一个可执行的命令解释器路径或命令。"""
         for shell in candidates:
             if os.path.isabs(shell):
                 if os.path.isfile(shell) and os.access(shell, os.X_OK):
@@ -119,6 +126,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _format_timeout_duration(timeout: float) -> str:
+        """将超时秒数格式化为面向用户的时长文本。"""
         seconds = float(timeout)
         if seconds.is_integer():
             amount = str(int(seconds))
@@ -129,6 +137,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _format_timeout_notice(timeout: float) -> str:
+        """构造命令超时及后台运行长生命周期进程的提示文本。"""
         return (
             f"Command timed out after {LocalSandbox._format_timeout_duration(timeout)} and was terminated. "
             "To run a long-lived process such as a web server, start it in the background "
@@ -137,6 +146,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _coerce_process_output(value: str | bytes | None) -> str:
+        """将子进程的空值、字节或文本输出统一转换为文本。"""
         if value is None:
             return ""
         if isinstance(value, bytes):
@@ -145,6 +155,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _drain_pipe(fd: int, capture: _BoundedPipeCapture) -> None:
+        """持续读取文件描述符并把数据交给受限输出捕获器。"""
         try:
             while chunk := os.read(fd, 8192):
                 capture.append(chunk)
@@ -159,6 +170,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _start_pipe_drain(fd: int, name: str) -> tuple[_BoundedPipeCapture, threading.Thread]:
+        """启动守护线程以读取管道，并返回捕获器和线程。"""
         capture = _BoundedPipeCapture()
         thread = threading.Thread(target=LocalSandbox._drain_pipe, args=(fd, capture), name=name, daemon=True)
         thread.start()
@@ -166,6 +178,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _process_group_exists(pgid: int | None) -> bool:
+        """判断给定的进程组是否仍然存在。"""
         if pgid is None:
             return False
         try:
@@ -180,12 +193,11 @@ class LocalSandbox(Sandbox):
 
     def __init__(self, id: str, path_mappings: list[PathMapping] | None = None):
         """
-        Initialize local sandbox with optional path mappings.
+        使用可选路径映射初始化本地沙箱。
 
-        Args:
-            id: Sandbox identifier
-            path_mappings: List of path mappings with optional read-only flag.
-                          Skills directory is read-only by default.
+        参数：
+            id：沙箱标识。
+            path_mappings：带可选只读标记的路径映射列表；技能目录默认只读。
         """
         super().__init__(id)
         self.path_mappings = path_mappings or []
@@ -200,7 +212,7 @@ class LocalSandbox(Sandbox):
 
     @cached_property
     def _command_pattern(self) -> re.Pattern[str] | None:
-        """Compiled matcher for container paths in shell commands (shell-aware boundaries)."""
+        """返回命令中容器路径的已编译匹配器，并使用命令解释器边界。"""
         mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
         if not mappings:
             return None
@@ -211,7 +223,7 @@ class LocalSandbox(Sandbox):
 
     @cached_property
     def _content_pattern(self) -> re.Pattern[str] | None:
-        """Compiled matcher for container paths in plain file content (text boundaries)."""
+        """返回普通文件内容中容器路径的已编译匹配器，并使用文本边界。"""
         mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
         if not mappings:
             return None
@@ -220,7 +232,7 @@ class LocalSandbox(Sandbox):
 
     @cached_property
     def _reverse_output_patterns(self) -> list[re.Pattern[str]]:
-        """Compiled matchers for local paths in command output (longest local path first)."""
+        """返回命令输出中本地路径的已编译匹配器，最长路径优先。"""
         # The rule — segment boundary plus path tail — is owned by
         # ``deerflow.sandbox.path_patterns`` and shared with
         # ``sandbox.tools._compiled_mask_patterns``, the other site that rewrites host
@@ -240,27 +252,21 @@ class LocalSandbox(Sandbox):
 
     @cached_property
     def _resolved_local_paths(self) -> dict[PathMapping, str]:
-        """Filesystem-resolved local root per mapping. ``Path.resolve()`` hits the
-        disk, and the mounted directories don't move, so resolve once and reuse."""
+        """返回每个映射解析后的本地根目录，并缓存结果以避免重复访问磁盘。"""
         return {m: str(Path(m.local_path).resolve()) for m in self.path_mappings}
 
     @cached_property
     def _mappings_by_container_specificity(self) -> list[PathMapping]:
-        """Mappings ordered most-specific-container-first (for forward resolution)."""
+        """返回按容器路径具体程度降序排列的映射，用于正向解析。"""
         return sorted(self.path_mappings, key=lambda m: len(m.container_path.rstrip("/") or "/"), reverse=True)
 
     @cached_property
     def _mappings_by_local_specificity(self) -> list[PathMapping]:
-        """Mappings ordered longest-local-path-first (for reverse resolution)."""
+        """返回按本地路径长度降序排列的映射，用于反向解析。"""
         return sorted(self.path_mappings, key=lambda m: len(m.local_path), reverse=True)
 
     def _is_read_only_path(self, resolved_path: str) -> bool:
-        """Check if a resolved path is under a read-only mount.
-
-        When multiple mappings match (nested mounts), prefer the most specific
-        mapping (i.e. the one whose local_path is the longest prefix of the
-        resolved path), similar to how ``_resolve_path`` handles container paths.
-        """
+        """判断解析路径是否处于只读挂载下；嵌套映射时优先选择最具体的映射。"""
         resolved = str(Path(resolved_path).resolve())
 
         best_mapping: PathMapping | None = None
@@ -280,6 +286,7 @@ class LocalSandbox(Sandbox):
         return best_mapping.read_only
 
     def _find_path_mapping(self, path: str) -> tuple[PathMapping, str] | None:
+        """查找覆盖给定容器路径的最具体路径映射及其相对路径。"""
         path_str = str(path)
 
         for mapping in self._mappings_by_container_specificity:
@@ -297,13 +304,9 @@ class LocalSandbox(Sandbox):
 
     def _resolve_path_with_mapping(self, path: str) -> ResolvedPath:
         """
-        Resolve container path to actual local path using mappings.
+        使用映射将容器路径解析为实际本地路径。
 
-        Args:
-            path: Path that might be a container path
-
-        Returns:
-            Resolved local path and the matched mapping, if any
+        返回解析后的本地路径及命中的映射（如有）。
         """
         path_str = str(path)
 
@@ -323,20 +326,18 @@ class LocalSandbox(Sandbox):
         return ResolvedPath(str(resolved_path), mapping)
 
     def _resolve_path(self, path: str) -> str:
+        """将容器路径解析为本地路径。"""
         return self._resolve_path_with_mapping(path).path
 
     def _is_resolved_path_read_only(self, resolved: ResolvedPath) -> bool:
+        """判断解析结果是否命中只读映射或只读挂载。"""
         return bool(resolved.mapping and resolved.mapping.read_only) or self._is_read_only_path(resolved.path)
 
     def _reverse_resolve_path(self, path: str) -> str:
         """
-        Reverse resolve local path back to container path using mappings.
+        使用映射将本地路径反向解析为容器路径。
 
-        Args:
-            path: Local path that might need to be mapped to container path
-
-        Returns:
-            Container path if mapping exists, otherwise original path
+        若存在映射则返回容器路径，否则返回原路径。
         """
         normalized_path = path.replace("\\", "/")
         path_str = str(Path(normalized_path).resolve())
@@ -366,13 +367,9 @@ class LocalSandbox(Sandbox):
 
     def _reverse_resolve_paths_in_output(self, output: str) -> str:
         """
-        Reverse resolve local paths back to container paths in output string.
+        将输出文本中的本地路径反向解析为容器路径。
 
-        Args:
-            output: Output string that may contain local paths
-
-        Returns:
-            Output with local paths resolved to container paths
+        返回已将本地路径替换为容器路径的输出文本。
         """
         # Patterns are compiled once per sandbox (longest local path first for
         # correct prefix matching) and reused across calls.
@@ -380,6 +377,7 @@ class LocalSandbox(Sandbox):
         for pattern in self._reverse_output_patterns:
 
             def replace_match(match: re.Match) -> str:
+                """将一个匹配到的本地路径替换为对应容器路径。"""
                 matched_path = match.group(0)
                 return self._reverse_resolve_path(matched_path)
 
@@ -389,19 +387,16 @@ class LocalSandbox(Sandbox):
 
     def _resolve_paths_in_command(self, command: str) -> str:
         """
-        Resolve container paths to local paths in a command string.
+        将命令字符串中的容器路径解析为本地路径。
 
-        Args:
-            command: Command string that may contain container paths
-
-        Returns:
-            Command with container paths resolved to local paths
+        返回已将容器路径解析为本地路径的命令字符串。
         """
         pattern = self._command_pattern
         if pattern is None:
             return command
 
         def replace_match(match: re.Match) -> str:
+            """将一个匹配到的容器路径替换为本地路径。"""
             matched_path = match.group(0)
             # Normalize to forward slashes so bash doesn't interpret Windows
             # backslash sequences (\\U, \\a, \\d, \\s, \\n, \\t) as escapes.
@@ -410,25 +405,17 @@ class LocalSandbox(Sandbox):
         return pattern.sub(replace_match, command)
 
     def _resolve_paths_in_content(self, content: str) -> str:
-        """Resolve container paths to local paths in arbitrary file content.
+        """将任意文件内容中的容器路径解析为使用正斜杠的本地路径。
 
-        Unlike ``_resolve_paths_in_command`` which uses shell-aware boundary
-        characters, this method treats the content as plain text and resolves
-        every occurrence of a container path prefix.  Resolved paths are
-        normalized to forward slashes to avoid backslash-escape issues on
-        Windows hosts (e.g. ``C:\\Users\\..`` breaking Python string literals).
-
-        Args:
-            content: File content that may contain container paths.
-
-        Returns:
-            Content with container paths resolved to local paths (forward slashes).
+        本方法按普通文本处理每个容器路径前缀，不采用命令解析使用的命令解释器边界，
+        以避免 Windows 反斜杠在源文件中形成转义序列。
         """
         pattern = self._content_pattern
         if pattern is None:
             return content
 
         def replace_match(match: re.Match) -> str:
+            """将一个内容中的容器路径替换为正斜杠形式的本地路径。"""
             matched_path = match.group(0)
             resolved = self._resolve_path(matched_path)
             # Normalize to forward slashes so that Windows backslash paths
@@ -439,7 +426,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _get_shell() -> str:
-        """Detect available shell executable with fallback."""
+        """探测可用的命令解释器，并按平台使用回退项。"""
         shell = LocalSandbox._find_first_available_shell(("/bin/zsh", "/bin/bash", "/bin/sh", "sh"))
         if shell is not None:
             return shell
@@ -476,6 +463,7 @@ class LocalSandbox(Sandbox):
         # which DOES splice keys into ``export <k>=<v>``. Enforcing the same
         # rule on both implementations keeps the contract consistent and forces
         # any new caller to use safe key names.
+        """在本地沙箱中执行命令，并隔离环境、超时和路径映射。"""
         _validate_extra_env(env)
         # Resolve container paths in command before execution
         resolved_command = self._resolve_paths_in_command(command)
@@ -540,24 +528,15 @@ class LocalSandbox(Sandbox):
         timeout: float,
         env: dict[str, str] | None = None,
     ) -> tuple[str, str, int, bool]:
-        """Run a command on POSIX with bounded pipe capture.
+        """在 POSIX 平台上以受限管道捕获运行命令。
 
-        ``subprocess.communicate()`` cannot be used here: a backgrounded
-        long-lived process (``server &``) inherits stdout/stderr and keeps the
-        pipes open, so ``communicate()`` would block until timeout even though
-        the foreground shell already returned. Instead, daemon drain threads
-        keep the pipes flowing while retaining only bounded output in memory.
-        This lets the call return as soon as the foreground shell exits without
-        handing backgrounded processes anonymous temp files that can grow
-        invisibly. ``stdin`` is taken from ``/dev/null`` so commands that read
-        stdin get immediate EOF, and ``start_new_session`` puts the command in
-        its own process group so a genuinely blocking foreground command can be
-        killed in full (children included) when it times out.
+        后台长生命周期进程会继承标准输出和标准错误，不能使用会等待管道关闭的
+        ``subprocess.communicate()``。因此通过守护读取线程持续排空管道，同时只保留
+        有上限的内存输出；前台命令解释器退出即可返回。标准输入来自 ``/dev/null``，
+        并为命令创建独立进程组，以便超时时连同子进程一并终止。
 
-        ``env`` is forwarded to :class:`subprocess.Popen`; ``None`` means
-        inherit the current process environment (the common case).
-
-        Returns ``(stdout, stderr, returncode, timed_out)``.
+        ``env`` 会传给 ``subprocess.Popen``；传入空值表示继承当前进程环境。
+        返回 ``(stdout, stderr, returncode, timed_out)``。
         """
         timed_out = False
         stdout_read_fd, stdout_write_fd = os.pipe()
@@ -615,11 +594,7 @@ class LocalSandbox(Sandbox):
 
     @staticmethod
     def _terminate_process_group(process: subprocess.Popen) -> None:
-        """Kill the command's whole process group, then reap it.
-
-        Falls back to killing just the direct child if the group is already
-        gone (e.g. the command exited between the timeout and this call).
-        """
+        """终止并回收命令的整个进程组；进程组已消失时回退为终止直接子进程。"""
         try:
             os.killpg(os.getpgid(process.pid), signal.SIGKILL)
         except (ProcessLookupError, PermissionError, OSError):
@@ -637,6 +612,7 @@ class LocalSandbox(Sandbox):
             logger.warning("Process group for pid %s did not exit after SIGKILL", process.pid)
 
     def list_dir(self, path: str, max_depth=2) -> list[str]:
+        """列出路径内容，并将本地路径和虚拟挂载显示为容器路径。"""
         resolved_path = self._resolve_path(path)
         entries = list_dir(resolved_path, max_depth)
         # Reverse resolve local paths back to container paths and preserve
@@ -679,6 +655,7 @@ class LocalSandbox(Sandbox):
         return sorted(result)
 
     def read_file(self, path: str) -> str:
+        """读取文本文件；仅对智能体写入的内容反向解析本地路径。"""
         resolved_path = self._resolve_path(path)
         try:
             with open(resolved_path, encoding="utf-8") as f:
@@ -695,6 +672,7 @@ class LocalSandbox(Sandbox):
             raise type(e)(e.errno, e.strerror, path) from None
 
     def download_file(self, path: str) -> bytes:
+        """下载允许虚拟目录内的文件，并强制执行大小限制。"""
         normalised = path.replace("\\", "/")
         stripped_path = normalised.lstrip("/")
         allowed_prefix = VIRTUAL_PATH_PREFIX.lstrip("/")
@@ -717,6 +695,7 @@ class LocalSandbox(Sandbox):
             raise type(e)(e.errno, e.strerror, path) from None
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
+        """写入或追加文本文件，并拒绝写入只读映射。"""
         resolved = self._resolve_path_with_mapping(path)
         resolved_path = resolved.path
         if self._is_resolved_path_read_only(resolved):
@@ -740,6 +719,7 @@ class LocalSandbox(Sandbox):
             raise type(e)(e.errno, e.strerror, path) from None
 
     def glob(self, path: str, pattern: str, *, include_dirs: bool = False, max_results: int = 200) -> tuple[list[str], bool]:
+        """查找匹配通配模式的文件，并将结果转换回容器路径。"""
         resolved_path = Path(self._resolve_path(path))
         matches, truncated = find_glob_matches(resolved_path, pattern, include_dirs=include_dirs, max_results=max_results)
         return [self._reverse_resolve_path(match) for match in matches], truncated
@@ -754,6 +734,7 @@ class LocalSandbox(Sandbox):
         case_sensitive: bool = False,
         max_results: int = 100,
     ) -> tuple[list[GrepMatch], bool]:
+        """在文本文件中搜索匹配行，并将结果路径转换回容器路径。"""
         resolved_path = Path(self._resolve_path(path))
         matches, truncated = find_grep_matches(
             resolved_path,
@@ -773,6 +754,7 @@ class LocalSandbox(Sandbox):
         ], truncated
 
     def update_file(self, path: str, content: bytes) -> None:
+        """以字节内容更新文件，并拒绝写入只读映射。"""
         resolved = self._resolve_path_with_mapping(path)
         resolved_path = resolved.path
         if self._is_resolved_path_read_only(resolved):

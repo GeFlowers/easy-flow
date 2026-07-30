@@ -1,10 +1,4 @@
-"""Configuration for SafetyFinishReasonMiddleware.
-
-Mirrors the shape of GuardrailsConfig: detectors are loaded by class path
-through ``deerflow.reflection.resolve_variable`` (same loader the
-``guardrails.provider`` config uses) so users can drop in custom provider
-detectors without modifying core code.
-"""
+"""提供配置、safety、finish、reason、配置相关功能。"""
 
 from __future__ import annotations
 
@@ -12,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class SafetyDetectorConfig(BaseModel):
-    """One detector entry under ``safety_finish_reason.detectors``."""
+    """\u6267\u884c SafetyDetectorConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     use: str = Field(
         description=("Class path of a SafetyTerminationDetector implementation (e.g. 'deerflow.agents.middlewares.safety_termination_detectors:OpenAICompatibleContentFilterDetector')."),
@@ -24,13 +18,7 @@ class SafetyDetectorConfig(BaseModel):
 
 
 class SafetyFinishReasonConfig(BaseModel):
-    """Configuration for the SafetyFinishReasonMiddleware.
-
-    The middleware intercepts AIMessages where the provider signaled a
-    safety-related termination (e.g. OpenAI ``finish_reason='content_filter'``)
-    while still returning tool calls, and suppresses those tool calls so the
-    half-truncated arguments never execute.
-    """
+    """\u6267\u884c SafetyFinishReasonConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=True,

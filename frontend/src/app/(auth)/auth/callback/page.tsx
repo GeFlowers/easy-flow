@@ -3,9 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState, useCallback, useRef } from "react";
 
-/**
- * Validates the next parameter — only allows relative paths starting with /.
- */
+/** 校验 SSO 回跳地址，只允许站内相对路径以避免开放重定向。 */
 function validateNextParam(next: string | null): string {
   if (!next) return "/workspace";
   if (!next.startsWith("/") || next.startsWith("//")) return "/workspace";
@@ -15,6 +13,7 @@ function validateNextParam(next: string | null): string {
   return next;
 }
 
+/** 确认 SSO 会话已写入后，显示结果并跳转到安全的目标地址。 */
 export default function AuthCallbackPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -23,6 +22,7 @@ export default function AuthCallbackPage() {
   );
   const calledRef = useRef(false);
 
+  /** 仅执行一次认证状态确认，避免开发模式重复 Effect 导致多次跳转。 */
   const doAuthCheck = useCallback(async () => {
     if (calledRef.current) return;
     calledRef.current = true;
@@ -34,7 +34,7 @@ export default function AuthCallbackPage() {
 
       if (res.ok) {
         setStatus("success");
-        // Small delay so the user sees the success message
+        // 短暂展示成功状态，避免页面看起来无反馈地立即跳转。
         setTimeout(() => router.replace(next), 300);
       } else {
         setStatus("error");

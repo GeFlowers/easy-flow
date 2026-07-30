@@ -9,6 +9,7 @@ type ThreadChannelIconProps = {
   className?: string;
 };
 
+/** 按线程来源通道渲染图标，使跨渠道消息在列表中可快速辨识。 */
 export function ThreadChannelIcon({
   source,
   className,
@@ -33,6 +34,7 @@ type ThreadChannelBadgeProps = {
   className?: string;
 };
 
+/** 以紧凑徽标标识线程的外部通道来源，缺少来源时不渲染。 */
 export function ThreadChannelBadge({
   source,
   className,

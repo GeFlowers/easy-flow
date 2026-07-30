@@ -11,8 +11,10 @@ import { cn } from "@/lib/utils";
 import { type LucideIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 
+/** ArtifactProps 的公开类型定义。 */
 export type ArtifactProps = HTMLAttributes<HTMLDivElement>;
 
+/** Artifact 组件：提供对应的界面结构与交互语义。 */
 export const Artifact = ({ className, ...props }: ArtifactProps) => (
   <div
     className={cn(
@@ -23,8 +25,10 @@ export const Artifact = ({ className, ...props }: ArtifactProps) => (
   />
 );
 
+/** ArtifactHeaderProps 的公开类型定义。 */
 export type ArtifactHeaderProps = HTMLAttributes<HTMLDivElement>;
 
+/** ArtifactHeader 组件：提供对应的界面结构与交互语义。 */
 export const ArtifactHeader = ({
   className,
   ...props
@@ -38,8 +42,10 @@ export const ArtifactHeader = ({
   />
 );
 
+/** ArtifactCloseProps 的公开类型定义。 */
 export type ArtifactCloseProps = ComponentProps<typeof Button>;
 
+/** ArtifactClose 组件：提供对应的界面结构与交互语义。 */
 export const ArtifactClose = ({
   className,
   children,
@@ -62,8 +68,10 @@ export const ArtifactClose = ({
   </Button>
 );
 
+/** ArtifactTitleProps 的公开类型定义。 */
 export type ArtifactTitleProps = HTMLAttributes<HTMLParagraphElement>;
 
+/** ArtifactTitle 组件：提供对应的界面结构与交互语义。 */
 export const ArtifactTitle = ({ className, ...props }: ArtifactTitleProps) => (
   <div
     className={cn("text-foreground text-sm font-medium", className)}
@@ -71,8 +79,10 @@ export const ArtifactTitle = ({ className, ...props }: ArtifactTitleProps) => (
   />
 );
 
+/** ArtifactDescriptionProps 的公开类型定义。 */
 export type ArtifactDescriptionProps = HTMLAttributes<HTMLParagraphElement>;
 
+/** ArtifactDescription 组件：提供对应的界面结构与交互语义。 */
 export const ArtifactDescription = ({
   className,
   ...props
@@ -80,8 +90,10 @@ export const ArtifactDescription = ({
   <p className={cn("text-muted-foreground text-sm", className)} {...props} />
 );
 
+/** ArtifactActionsProps 的公开类型定义。 */
 export type ArtifactActionsProps = HTMLAttributes<HTMLDivElement>;
 
+/** ArtifactActions 组件：提供对应的界面结构与交互语义。 */
 export const ArtifactActions = ({
   className,
   ...props
@@ -89,12 +101,14 @@ export const ArtifactActions = ({
   <div className={cn("flex items-center gap-1", className)} {...props} />
 );
 
+/** ArtifactActionProps 的公开类型定义。 */
 export type ArtifactActionProps = ComponentProps<typeof Button> & {
   tooltip?: string;
   label?: string;
   icon?: LucideIcon;
 };
 
+/** ArtifactAction 组件：提供对应的界面结构与交互语义。 */
 export const ArtifactAction = ({
   tooltip,
   label,
@@ -137,8 +151,10 @@ export const ArtifactAction = ({
   return button;
 };
 
+/** ArtifactContentProps 的公开类型定义。 */
 export type ArtifactContentProps = HTMLAttributes<HTMLDivElement>;
 
+/** ArtifactContent 组件：提供对应的界面结构与交互语义。 */
 export const ArtifactContent = ({
   className,
   ...props

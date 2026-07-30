@@ -4,6 +4,7 @@ import type { AIMessage } from "@langchain/langgraph-sdk";
 import type { Translations } from "../i18n";
 import { hasToolCalls } from "../messages/utils";
 
+/** 为消息中的最后一次工具调用生成本地化说明。 */
 export function explainLastToolCall(message: AIMessage, t: Translations) {
   if (hasToolCalls(message)) {
     const lastToolCall = message.tool_calls![message.tool_calls!.length - 1]!;
@@ -12,6 +13,7 @@ export function explainLastToolCall(message: AIMessage, t: Translations) {
   return t.common.thinking;
 }
 
+/** 为单次工具调用解析对应的本地化说明。 */
 export function explainToolCall(toolCall: ToolCall, t: Translations) {
   if (toolCall.name === "web_search" || toolCall.name === "image_search") {
     return t.toolCalls.searchFor(toolCall.args.query);

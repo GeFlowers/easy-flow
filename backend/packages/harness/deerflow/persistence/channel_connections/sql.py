@@ -1,4 +1,4 @@
-"""SQL repository for user-owned IM channel connections."""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -25,30 +25,34 @@ from deerflow.utils.time import coerce_iso
 
 logger = logging.getLogger(__name__)
 
-# Bounded retries for upsert_connection when a concurrent writer commits a
-# conflicting row first (same owner identity, or the same active external
-# identity guarded by the partial unique index). Each retry re-reads the
-# now-visible state, so a small bound converges under realistic contention.
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
 _UPSERT_MAX_ATTEMPTS = 3
 
 
 class ChannelCredentialCipher:
-    """Encrypts provider credentials before they are persisted."""
+    """定义用于保护持久化凭据内容的加密组件。"""
 
     def __init__(self, fernet: Fernet) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self._fernet = fernet
 
     @classmethod
     def from_key(cls, key: str) -> ChannelCredentialCipher:
+        """执行当前持久化组件提供的操作。"""
         digest = hashlib.sha256(key.encode("utf-8")).digest()
         return cls(Fernet(base64.urlsafe_b64encode(digest)))
 
     def encrypt_text(self, value: str | None) -> str | None:
+        """加密待持久化的敏感文本内容。"""
         if value is None:
             return None
         return "fernet:v1:" + self._fernet.encrypt(value.encode("utf-8")).decode("ascii")
 
     def decrypt_text(self, value: str | None) -> str | None:
+        """解密从持久化记录中读取的敏感文本内容。"""
         if value is None:
             return None
         token = value.removeprefix("fernet:v1:")
@@ -56,7 +60,7 @@ class ChannelCredentialCipher:
 
 
 class ChannelConnectionRepository:
-    """Persistence facade for channel connections, credentials, and conversations."""
+    """定义负责持久化读写及事务边界管理的仓储组件。"""
 
     def __init__(
         self,
@@ -64,29 +68,35 @@ class ChannelConnectionRepository:
         *,
         cipher: ChannelCredentialCipher | None = None,
     ) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self.session_factory = session_factory
         self._cipher = cipher
 
     async def close(self) -> None:
+        """执行当前持久化组件提供的操作。"""
         from deerflow.persistence.engine import close_engine
 
         await close_engine()
 
     @staticmethod
     def _new_id() -> str:
+        """执行持久化流程所需的内部辅助操作。"""
         return uuid.uuid4().hex
 
     @staticmethod
     def _normalize_optional_identity(value: str | None) -> str:
+        """执行持久化流程所需的内部辅助操作。"""
         return value or ""
 
     @staticmethod
     def _coerce_datetime(value: datetime | None) -> datetime | None:
+        """执行持久化流程所需的内部辅助操作。"""
         if value is None or value.tzinfo is not None:
             return value
         return value.replace(tzinfo=UTC)
 
     def _encrypt_optional_secret(self, value: str | None) -> str | None:
+        """执行持久化流程所需的内部辅助操作。"""
         if value is None:
             return None
         if self._cipher is None:
@@ -95,6 +105,7 @@ class ChannelConnectionRepository:
 
     @staticmethod
     def _connection_to_dict(row: ChannelConnectionRow) -> dict[str, Any]:
+        """将持久化记录转换为对外使用的字典表示。"""
         data = row.to_dict()
         data["external_account_id"] = data["external_account_id"] or None
         data["workspace_id"] = data["workspace_id"] or None
@@ -122,10 +133,12 @@ class ChannelConnectionRepository:
         metadata: dict[str, Any] | None = None,
         status: str = "connected",
     ) -> dict[str, Any]:
+        """执行当前持久化组件提供的操作。"""
         external_account_id_value = self._normalize_optional_identity(external_account_id)
         workspace_id_value = self._normalize_optional_identity(workspace_id)
 
         def _apply(row: ChannelConnectionRow) -> None:
+            """执行持久化流程所需的内部辅助操作。"""
             row.status = status
             row.external_account_name = external_account_name
             row.workspace_name = workspace_name
@@ -135,6 +148,7 @@ class ChannelConnectionRepository:
             row.metadata_json = dict(metadata or {})
 
         async def _revoke_other_active_owners(session: AsyncSession) -> None:
+            """执行持久化流程所需的内部辅助操作。"""
             if status != "connected":
                 return
             with session.no_autoflush:
@@ -165,9 +179,9 @@ class ChannelConnectionRepository:
             for _ in range(_UPSERT_MAX_ATTEMPTS):
                 try:
                     row = (await session.execute(stmt)).scalar_one_or_none()
-                    # Revoke any other owner's active row for this external identity
-                    # *before* our connected row is flushed, so the partial unique
-                    # index on active identities is satisfied at commit time.
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
                     await _revoke_other_active_owners(session)
                     if row is None:
                         row = ChannelConnectionRow(
@@ -183,20 +197,22 @@ class ChannelConnectionRepository:
                     await session.refresh(row)
                     return self._connection_to_dict(row)
                 except IntegrityError as exc:
-                    # A concurrent writer committed a conflicting row first (this
-                    # owner's identity, or the same active external identity). Roll
-                    # back and retry: the next pass re-reads the now-visible state,
-                    # revokes the newly-committed owner, and writes our row.
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
                     last_error = exc
                     await session.rollback()
             raise last_error  # type: ignore[misc]  # loop runs at least once
 
     async def list_connections(self, owner_user_id: str) -> list[dict[str, Any]]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         async with self.session_factory() as session:
             result = await session.execute(select(ChannelConnectionRow).where(ChannelConnectionRow.owner_user_id == owner_user_id).order_by(ChannelConnectionRow.updated_at.desc(), ChannelConnectionRow.id.desc()))
             return [self._connection_to_dict(row) for row in result.scalars()]
 
     async def disconnect_connection(self, *, connection_id: str, owner_user_id: str) -> bool:
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         async with self.session_factory() as session:
             row = await session.get(ChannelConnectionRow, connection_id)
             if row is None or row.owner_user_id != owner_user_id:
@@ -210,7 +226,7 @@ class ChannelConnectionRepository:
             return True
 
     async def disconnect_provider_connections(self, *, provider: str) -> int:
-        """Revoke all active user connections for an instance-wide provider removal."""
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         async with self.session_factory() as session:
             result = await session.execute(
                 select(ChannelConnectionRow.id).where(
@@ -238,6 +254,7 @@ class ChannelConnectionRepository:
         refresh_expires_at: datetime | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
+        """执行当前持久化组件提供的操作。"""
         if self._cipher is None:
             raise RuntimeError("channel connection encryption key is required")
         async with self.session_factory() as session:
@@ -255,6 +272,7 @@ class ChannelConnectionRepository:
             await session.commit()
 
     async def get_credentials(self, connection_id: str) -> dict[str, Any] | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         if self._cipher is None:
             return None
         async with self.session_factory() as session:
@@ -281,6 +299,7 @@ class ChannelConnectionRepository:
 
     @staticmethod
     def hash_state(state: str) -> str:
+        """计算可安全存储和比较的摘要值。"""
         return hashlib.sha256(state.encode("utf-8")).hexdigest()
 
     async def create_oauth_state(
@@ -296,6 +315,7 @@ class ChannelConnectionRepository:
         requested_scopes: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
+        """创建记录并在成功后提交相应的持久化事务。"""
         row = ChannelOAuthStateRow(
             state_hash=self.hash_state(state),
             owner_user_id=owner_user_id,
@@ -326,26 +346,16 @@ class ChannelConnectionRepository:
         requested_scopes: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> bool:
-        """Atomically enforce the per-(owner, provider) pending cap, then insert.
-
-        delete-expired + count + insert run in a single transaction serialized
-        per (owner, provider), so concurrent connect requests cannot each
-        observe ``count < max_pending`` and all insert (which would leak past
-        the cap). PostgreSQL takes a transaction-scoped advisory lock; SQLite
-        serializes writers through the write lock the leading DELETE acquires.
-
-        Returns ``True`` when the row was inserted, ``False`` when the cap is
-        already reached.
-        """
+        """创建记录并在成功后提交相应的持久化事务。"""
         current_time = now or datetime.now(UTC)
         async with self.session_factory() as session:
             await self._serialize_oauth_owner_scope(session, owner_user_id, provider)
-            # Prune only this owner/provider's expired codes (the ones that affect
-            # this cap), not every user's — avoids a global DELETE on each connect
-            # POST. Issuing this write first also takes the SQLite database write
-            # lock so the count below cannot race a concurrent inserter between
-            # count and commit. Stale codes for other owners are pruned globally
-            # by consume_oauth_state / delete_expired_oauth_states.
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
             await session.execute(
                 delete(ChannelOAuthStateRow).where(
                     ChannelOAuthStateRow.owner_user_id == owner_user_id,
@@ -383,13 +393,7 @@ class ChannelConnectionRepository:
             return True
 
     async def _serialize_oauth_owner_scope(self, session: AsyncSession, owner_user_id: str, provider: str) -> None:
-        """Serialize concurrent pending-cap transactions for one (owner, provider).
-
-        On PostgreSQL this takes a transaction-scoped advisory lock so concurrent
-        issuers run their count+insert one at a time. On SQLite the leading
-        DELETE in the caller's transaction already acquires the database write
-        lock, which serializes writers, so no extra lock is required.
-        """
+        """执行持久化流程所需的内部辅助操作。"""
         try:
             dialect = session.bind.dialect.name if session.bind is not None else ""
         except Exception:
@@ -399,11 +403,13 @@ class ChannelConnectionRepository:
 
     @staticmethod
     def _oauth_scope_lock_key(owner_user_id: str, provider: str) -> int:
+        """获取并管理数据库架构操作所需的并发互斥锁。"""
         digest = hashlib.sha256(f"{owner_user_id}\x00{provider}".encode()).digest()
-        # 63-bit non-negative key for pg_advisory_xact_lock(bigint).
+                # 中文说明：此处用于执行相关处理。
         return int.from_bytes(digest[:8], "big") & 0x7FFFFFFFFFFFFFFF
 
     async def delete_expired_oauth_states(self, *, now: datetime | None = None) -> int:
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         current_time = now or datetime.now(UTC)
         async with self.session_factory() as session:
             result = await session.execute(delete(ChannelOAuthStateRow).where(ChannelOAuthStateRow.expires_at < current_time))
@@ -418,6 +424,7 @@ class ChannelConnectionRepository:
         active_only: bool = False,
         now: datetime | None = None,
     ) -> int:
+        """执行当前持久化组件提供的操作。"""
         current_time = now or datetime.now(UTC)
         conditions = [
             ChannelOAuthStateRow.owner_user_id == owner_user_id,
@@ -442,6 +449,7 @@ class ChannelConnectionRepository:
         state: str,
         now: datetime | None = None,
     ) -> dict[str, Any] | None:
+        """执行当前持久化组件提供的操作。"""
         current_time = now or datetime.now(UTC)
         state_hash = self.hash_state(state)
         async with self.session_factory() as session:
@@ -455,9 +463,9 @@ class ChannelConnectionRepository:
                 await session.commit()
                 return None
 
-            # Conditional UPDATE so two concurrent workers cannot both consume
-            # the same binding code: only the writer that flips consumed_at
-            # from NULL wins.
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
+                        # 中文说明：此处用于执行相关处理。
             result = await session.execute(
                 update(ChannelOAuthStateRow)
                 .where(
@@ -484,6 +492,7 @@ class ChannelConnectionRepository:
         external_account_id: str,
         workspace_id: str | None = None,
     ) -> dict[str, Any] | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         async with self.session_factory() as session:
             result = await session.execute(
                 select(ChannelConnectionRow)
@@ -509,6 +518,7 @@ class ChannelConnectionRepository:
         thread_id: str,
         external_topic_id: str | None = None,
     ) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         topic_id = external_topic_id or ""
         async with self.session_factory() as session:
             stmt = select(ChannelConversationRow).where(
@@ -540,6 +550,7 @@ class ChannelConnectionRepository:
         external_conversation_id: str,
         external_topic_id: str | None = None,
     ) -> str | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         async with self.session_factory() as session:
             stmt = select(ChannelConversationRow.thread_id).where(
                 ChannelConversationRow.connection_id == connection_id,

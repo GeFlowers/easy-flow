@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-Quick validation script for skills - minimal version
-"""
+"""对技能目录执行最小化静态校验，不打包也不改写技能文件。"""
 
 import sys
 import re
@@ -9,27 +7,27 @@ import yaml
 from pathlib import Path
 
 def validate_skill(skill_path):
-    """Basic validation of a skill"""
+    """验证技能说明文件的头信息、字段白名单、名称规范和描述长度，返回布尔结果与具体消息。"""
     skill_path = Path(skill_path)
 
-    # Check SKILL.md exists
+    # 确认技能说明文件存在。
     skill_md = skill_path / 'SKILL.md'
     if not skill_md.exists():
         return False, "SKILL.md not found"
 
-    # Read and validate frontmatter
+    # 读取并校验 YAML 头信息。
     content = skill_md.read_text()
     if not content.startswith('---'):
         return False, "No YAML frontmatter found"
 
-    # Extract frontmatter
+    # 提取头信息文本。
     match = re.match(r'^---\n(.*?)\n---', content, re.DOTALL)
     if not match:
         return False, "Invalid frontmatter format"
 
     frontmatter_text = match.group(1)
 
-    # Parse YAML frontmatter
+    # 解析 YAML 头信息。
     try:
         frontmatter = yaml.safe_load(frontmatter_text)
         if not isinstance(frontmatter, dict):

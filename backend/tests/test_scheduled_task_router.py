@@ -1,3 +1,4 @@
+'未说明'
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -5,6 +6,7 @@ from app.gateway.routers import scheduled_tasks
 
 
 def test_router_registers_list_endpoint():
+    '未说明'
     app = FastAPI()
     app.include_router(scheduled_tasks.router)
     client = TestClient(app)
@@ -13,6 +15,7 @@ def test_router_registers_list_endpoint():
 
 
 def test_router_registers_trigger_route():
+    '未说明'
     app = FastAPI()
     app.include_router(scheduled_tasks.router)
     client = TestClient(app)
@@ -21,6 +24,7 @@ def test_router_registers_trigger_route():
 
 
 def test_router_registers_create_route():
+    '未说明'
     app = FastAPI()
     app.include_router(scheduled_tasks.router)
     client = TestClient(app)

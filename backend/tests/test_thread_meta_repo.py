@@ -1,4 +1,4 @@
-"""Tests for ThreadMetaRepository (SQLAlchemy-backed)."""
+'未说明'
 
 import logging
 
@@ -9,6 +9,7 @@ from deerflow.persistence.thread_meta import InvalidMetadataFilterError, ThreadM
 
 @pytest.fixture
 async def repo(tmp_path):
+    '未说明'
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
 
     url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
@@ -18,8 +19,10 @@ async def repo(tmp_path):
 
 
 class TestThreadMetaRepository:
+    '未说明'
     @pytest.mark.anyio
     async def test_create_and_get(self, repo):
+        '未说明'
         record = await repo.create("t1")
         assert record["thread_id"] == "t1"
         assert record["status"] == "idle"
@@ -31,35 +34,42 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_create_with_assistant_id(self, repo):
+        '未说明'
         record = await repo.create("t1", assistant_id="agent1")
         assert record["assistant_id"] == "agent1"
 
     @pytest.mark.anyio
     async def test_create_with_owner_and_display_name(self, repo):
+        '未说明'
         record = await repo.create("t1", user_id="user1", display_name="My Thread")
         assert record["user_id"] == "user1"
         assert record["display_name"] == "My Thread"
 
     @pytest.mark.anyio
     async def test_create_with_metadata(self, repo):
+        '未说明'
         record = await repo.create("t1", metadata={"key": "value"})
         assert record["metadata"] == {"key": "value"}
 
     @pytest.mark.anyio
     async def test_get_nonexistent(self, repo):
+        '未说明'
         assert await repo.get("nonexistent") is None
 
     @pytest.mark.anyio
     async def test_check_access_no_record_allows(self, repo):
+        '未说明'
         assert await repo.check_access("unknown", "user1") is True
 
     @pytest.mark.anyio
     async def test_check_access_owner_matches(self, repo):
+        '未说明'
         await repo.create("t1", user_id="user1")
         assert await repo.check_access("t1", "user1") is True
 
     @pytest.mark.anyio
     async def test_check_access_owner_mismatch(self, repo):
+        '未说明'
         await repo.create("t1", user_id="user1")
         assert await repo.check_access("t1", "user2") is False
 
@@ -67,42 +77,36 @@ class TestThreadMetaRepository:
     async def test_check_access_no_owner_allows_all(self, repo):
         # Explicit user_id=None to bypass the new AUTO default that
         # would otherwise pick up the test user from the autouse fixture.
+        '未说明'
         await repo.create("t1", user_id=None)
         assert await repo.check_access("t1", "anyone") is True
 
     @pytest.mark.anyio
     async def test_check_access_strict_missing_row_denied(self, repo):
-        """require_existing=True flips the missing-row case to *denied*.
-
-        Closes the delete-idempotence cross-user gap: after a thread is
-        deleted, the row is gone, and the permissive default would let any
-        caller "claim" it as untracked. The strict mode demands a row.
-        """
+        '未说明'
         assert await repo.check_access("never-existed", "user1", require_existing=True) is False
 
     @pytest.mark.anyio
     async def test_check_access_strict_owner_match_allowed(self, repo):
+        '未说明'
         await repo.create("t1", user_id="user1")
         assert await repo.check_access("t1", "user1", require_existing=True) is True
 
     @pytest.mark.anyio
     async def test_check_access_strict_owner_mismatch_denied(self, repo):
+        '未说明'
         await repo.create("t1", user_id="user1")
         assert await repo.check_access("t1", "user2", require_existing=True) is False
 
     @pytest.mark.anyio
     async def test_check_access_strict_null_owner_still_allowed(self, repo):
-        """Even in strict mode, a row with NULL user_id stays shared.
-
-        The strict flag tightens the *missing row* case, not the *shared
-        row* case — legacy pre-auth rows that survived a clean migration
-        without an owner are still everyone's.
-        """
+        '未说明'
         await repo.create("t1", user_id=None)
         assert await repo.check_access("t1", "anyone", require_existing=True) is True
 
     @pytest.mark.anyio
     async def test_update_status(self, repo):
+        '未说明'
         await repo.create("t1")
         await repo.update_status("t1", "busy")
         record = await repo.get("t1")
@@ -110,16 +114,19 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_delete(self, repo):
+        '未说明'
         await repo.create("t1")
         await repo.delete("t1")
         assert await repo.get("t1") is None
 
     @pytest.mark.anyio
     async def test_delete_nonexistent_is_noop(self, repo):
+        '未说明'
         await repo.delete("nonexistent")  # should not raise
 
     @pytest.mark.anyio
     async def test_update_metadata_merges(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"a": 1, "b": 2})
         await repo.update_metadata("t1", {"b": 99, "c": 3})
         record = await repo.get("t1")
@@ -128,6 +135,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_update_metadata_on_empty(self, repo):
+        '未说明'
         await repo.create("t1")
         await repo.update_metadata("t1", {"k": "v"})
         record = await repo.get("t1")
@@ -135,10 +143,12 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_update_metadata_nonexistent_is_noop(self, repo):
+        '未说明'
         await repo.update_metadata("nonexistent", {"k": "v"})  # should not raise
 
     @pytest.mark.anyio
     async def test_update_owner_with_bypass_moves_row(self, repo):
+        '未说明'
         await repo.create("t1", user_id="default", metadata={"source": "channel"})
         await repo.update_owner("t1", "owner-1", user_id=None)
 
@@ -154,6 +164,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_filter_string(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2", metadata={"env": "staging"})
         await repo.create("t3", metadata={"env": "prod", "region": "us"})
@@ -164,6 +175,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_filter_numeric(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"priority": 1})
         await repo.create("t2", metadata={"priority": 2})
         await repo.create("t3", metadata={"priority": 1, "extra": "x"})
@@ -174,6 +186,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_filter_multiple_keys(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"env": "prod", "region": "us"})
         await repo.create("t2", metadata={"env": "prod", "region": "eu"})
         await repo.create("t3", metadata={"env": "staging", "region": "us"})
@@ -184,6 +197,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_no_match(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
 
         results = await repo.search(metadata={"env": "dev"})
@@ -191,7 +205,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_pagination_correct(self, repo):
-        """Regression: SQL push-down makes limit/offset exact even when most rows don't match."""
+        '未说明'
         for i in range(30):
             meta = {"target": "yes"} if i % 3 == 0 else {"target": "no"}
             await repo.create(f"t{i:03d}", metadata=meta)
@@ -219,6 +233,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_with_status_filter(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2", metadata={"env": "prod"})
         await repo.update_status("t1", "busy")
@@ -229,6 +244,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_without_metadata_still_works(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2")
 
@@ -237,7 +253,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_missing_key_no_match(self, repo):
-        """Rows without the requested metadata key should not match."""
+        '未说明'
         await repo.create("t1", metadata={"other": "val"})
         await repo.create("t2", metadata={"env": "prod"})
 
@@ -247,7 +263,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_all_unsafe_keys_raises(self, repo, caplog):
-        """When ALL metadata keys are unsafe, raises InvalidMetadataFilterError."""
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2", metadata={"env": "staging"})
 
@@ -260,7 +276,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_partial_unsafe_key_skipped(self, repo, caplog):
-        """Valid keys filter rows; only the invalid key is warned and skipped."""
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2", metadata={"env": "staging"})
 
@@ -272,7 +288,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_filter_boolean(self, repo):
-        """True matches only boolean true, not integer 1."""
+        '未说明'
         await repo.create("t1", metadata={"active": True})
         await repo.create("t2", metadata={"active": False})
         await repo.create("t3", metadata={"active": True, "extra": "x"})
@@ -284,7 +300,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_filter_none(self, repo):
-        """Only rows with explicit JSON null match; missing key does not."""
+        '未说明'
         await repo.create("t1", metadata={"tag": None})
         await repo.create("t2", metadata={"tag": "present"})
         await repo.create("t3", metadata={"other": "val"})
@@ -295,7 +311,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_non_string_key_skipped(self, repo, caplog):
-        """Non-string keys raise ValueError from isinstance check; should be warned and skipped."""
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2", metadata={"env": "staging"})
 
@@ -306,7 +322,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_unsupported_value_type_skipped(self, repo, caplog):
-        """Unsupported value types (list, dict) raise TypeError; should be warned and skipped."""
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2", metadata={"env": "staging"})
 
@@ -316,7 +332,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_dotted_key_raises(self, repo, caplog):
-        """Dotted keys are rejected; when ALL keys are dotted, raises ValueError."""
+        '未说明'
         await repo.create("t1", metadata={"env": "prod"})
         await repo.create("t2", metadata={"env": "staging"})
 
@@ -329,7 +345,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_bool_vs_int_distinction(self, repo):
-        """True must not match 1; False must not match 0."""
+        '未说明'
         await repo.create("bool_true", metadata={"flag": True})
         await repo.create("bool_false", metadata={"flag": False})
         await repo.create("int_one", metadata={"flag": 1})
@@ -343,7 +359,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_int_does_not_match_bool(self, repo):
-        """Integer 1 must not match boolean True."""
+        '未说明'
         await repo.create("bool_true", metadata={"val": True})
         await repo.create("int_one", metadata={"val": 1})
 
@@ -352,7 +368,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_none_excludes_missing_key(self, repo):
-        """Filtering by None matches explicit JSON null only, not missing key or empty {}."""
+        '未说明'
         await repo.create("explicit_null", metadata={"k": None})
         await repo.create("missing_key", metadata={"other": "x"})
         await repo.create("empty_obj", metadata={})
@@ -362,6 +378,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_float_value(self, repo):
+        '未说明'
         await repo.create("t1", metadata={"score": 3.14})
         await repo.create("t2", metadata={"score": 2.71})
         await repo.create("t3", metadata={"score": 3.14})
@@ -371,7 +388,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_mixed_types_same_key(self, repo):
-        """Each type query only matches its own type, even when the key is shared."""
+        '未说明'
         await repo.create("str_row", metadata={"x": "hello"})
         await repo.create("int_row", metadata={"x": 42})
         await repo.create("bool_row", metadata={"x": True})
@@ -384,7 +401,7 @@ class TestThreadMetaRepository:
 
     @pytest.mark.anyio
     async def test_search_metadata_large_int_precision(self, repo):
-        """Integers beyond float precision (> 2**53) must match exactly."""
+        '未说明'
         large = 2**53 + 1
         await repo.create("t1", metadata={"id": large})
         await repo.create("t2", metadata={"id": large - 1})
@@ -394,9 +411,10 @@ class TestThreadMetaRepository:
 
 
 class TestJsonMatchCompilation:
-    """Verify compiled SQL for both SQLite and PostgreSQL dialects."""
+    '未说明'
 
     def test_json_match_compiles_sqlite(self):
+        '未说明'
         from sqlalchemy import Column, MetaData, String, Table, create_engine
         from sqlalchemy.types import JSON
 
@@ -437,6 +455,7 @@ class TestJsonMatchCompilation:
         assert "'text'" in sql
 
     def test_json_match_compiles_pg(self):
+        '未说明'
         from sqlalchemy import Column, MetaData, String, Table
         from sqlalchemy.dialects import postgresql
         from sqlalchemy.types import JSON
@@ -479,6 +498,7 @@ class TestJsonMatchCompilation:
         assert "'string'" in sql
 
     def test_json_match_rejects_unsafe_key(self):
+        '未说明'
         from sqlalchemy import Column, MetaData, String, Table
         from sqlalchemy.types import JSON
 
@@ -497,6 +517,7 @@ class TestJsonMatchCompilation:
                 json_match(t.c.data, non_str_key, "x")
 
     def test_json_match_rejects_unsupported_value_type(self):
+        '未说明'
         from sqlalchemy import Column, MetaData, String, Table
         from sqlalchemy.types import JSON
 
@@ -510,6 +531,7 @@ class TestJsonMatchCompilation:
                 json_match(t.c.data, "k", bad_value)
 
     def test_json_match_unsupported_dialect_raises(self):
+        '未说明'
         from sqlalchemy import Column, MetaData, String, Table
         from sqlalchemy.dialects import mysql
         from sqlalchemy.types import JSON
@@ -524,6 +546,7 @@ class TestJsonMatchCompilation:
             str(expr.compile(dialect=mysql.dialect(), compile_kwargs={"literal_binds": True}))
 
     def test_json_match_rejects_out_of_range_int(self):
+        '未说明'
         from sqlalchemy import Column, MetaData, String, Table
         from sqlalchemy.types import JSON
 
@@ -542,7 +565,7 @@ class TestJsonMatchCompilation:
                 json_match(t.c.data, "k", out_of_range)
 
     def test_compiler_raises_on_escaped_key(self):
-        """Compiler raises ValueError even when __init__ validation is bypassed."""
+        '未说明'
         from sqlalchemy import Column, MetaData, String, Table, create_engine
         from sqlalchemy.dialects import postgresql
         from sqlalchemy.types import JSON

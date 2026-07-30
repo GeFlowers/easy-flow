@@ -1,19 +1,7 @@
-"""Tool search — deferred tool discovery at runtime.
+"""在运行时搜索并发现延迟加载的工具。
 
-Contains:
-- DeferredToolCatalog: immutable, searchable catalog of deferred tools.
-- build_tool_search_tool: builds the `tool_search` tool as a closure over a
-  catalog; it records promotions into graph state via ``Command``.
-- build_deferred_tool_setup: assembles the catalog + tool from a
-  policy-filtered tool list (call AFTER tool-policy filtering).
-- build_mcp_routing_middleware: builds the PR2 auto-promote middleware from
-  serialized routing metadata on policy-filtered deferred tools.
-
-The agent sees deferred tool names in <available-deferred-tools> but cannot
-call them until it fetches their full schema via the tool_search tool. The
-deferred set rides on a build-time closure and promotion lives in per-thread
-graph state — there is no ContextVar. Source-agnostic: a tool is "deferred"
-when it carries the ``deerflow_mcp`` metadata tag.
+本模块构建不可变的延迟工具目录、搜索工具和路由中间件。代理先看到工具名称，
+再通过搜索工具取得完整模式；提升状态保存在每个线程的图状态中。
 """
 
 import hashlib
@@ -43,11 +31,7 @@ MAX_RESULTS = 5  # Max tools returned per search
 
 
 def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
-    """Compile ``pattern`` case-insensitively, falling back to a literal match.
-
-    Search queries come from the model, so an invalid regex (e.g. an unbalanced
-    paren) must degrade to a literal substring match rather than raise.
-    """
+    """不区分大小写地编译模式；无效模式退化为字面量匹配而不抛出异常。"""
     try:
         return re.compile(pattern, re.IGNORECASE)
     except re.error:
@@ -62,21 +46,24 @@ def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
 # the frozen __setattr__). Do NOT add slots=True or hash/names break at runtime.
 @dataclass(frozen=True)
 class DeferredToolCatalog:
-    """Immutable catalog of deferred tools. Pure search, no mutation."""
+    """不可变的延迟工具目录，仅提供无副作用的搜索。"""
 
     tools: tuple[BaseTool, ...]
 
     @cached_property
     def names(self) -> frozenset[str]:
+        """返回目录中全部工具名称的不可变集合。"""
         return frozenset(t.name for t in self.tools)
 
     @cached_property
     def hash(self) -> str:
+        """返回由目录工具模式计算出的稳定短哈希。"""
         canon = [{"name": t.name, "schema": convert_to_openai_function(t)} for t in sorted(self.tools, key=lambda t: t.name)]
         blob = json.dumps(canon, sort_keys=True, ensure_ascii=False, default=str)
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
     def search(self, query: str) -> list[BaseTool]:
+        """按照查询语法返回匹配的延迟工具。"""
         query = query.strip()
         if not query:
             return []
@@ -110,6 +97,7 @@ class DeferredToolCatalog:
 
 
 def _catalog_regex_score(pattern: str, t: BaseTool) -> int:
+    """计算模式在工具名称及描述中的匹配次数。"""
     regex = _compile_catalog_regex(pattern)
     return len(regex.findall(f"{t.name} {t.description or ''}"))
 
@@ -119,18 +107,9 @@ def _catalog_regex_score(pattern: str, t: BaseTool) -> int:
 
 @dataclass(frozen=True)
 class DeferredToolSetup:
-    """Result of assembling deferred-tool support for one agent build.
+    """一次代理构建所需的延迟工具配置。
 
-    The three fields move as a unit, so callers branch on ``tool_search_tool``:
-
-    - **Empty** ``(None, frozenset(), None)``: deferral is disabled, or no MCP
-      tool survived policy filtering. Nothing is deferred — bind tools as-is.
-    - **Populated**: ``tool_search_tool`` is appended to the agent's tools,
-      ``deferred_names`` are withheld from the model until promoted, and
-      ``catalog_hash`` scopes those promotions in graph state.
-
-    Invariant: ``tool_search_tool is None`` ⟺ ``deferred_names`` is empty ⟺
-    ``catalog_hash is None``.
+    三个字段必须保持一致：没有搜索工具时，延迟名称集合为空且目录哈希为空。
     """
 
     tool_search_tool: BaseTool | None
@@ -139,21 +118,14 @@ class DeferredToolSetup:
 
 
 def build_tool_search_tool(catalog: DeferredToolCatalog) -> BaseTool:
+    """基于延迟工具目录构建工具搜索工具。"""
     catalog_hash = catalog.hash
 
     @tool
     def tool_search(query: str, tool_call_id: Annotated[str, InjectedToolCallId]) -> Command:
-        """Fetches full schema definitions for deferred tools so they can be called.
+        """取得延迟工具的完整模式定义，使其可以被调用。
 
-        Deferred tools appear by name in <available-deferred-tools> in the system
-        prompt. Until fetched, only the name is known. This tool matches a query
-        against the deferred tools and returns the matched tools complete schemas;
-        once returned, a tool becomes callable.
-
-        Query forms:
-          - "select:Read,Edit" -- fetch these exact tools by name
-          - "notebook jupyter" -- keyword search, up to max_results best matches
-          - "+slack send" -- require "slack" in the name, rank by remaining terms
+        支持按确切名称选择、按关键字搜索，以及以加号开头的名称限定搜索。
         """
         matched = catalog.search(query)
         if not matched:
@@ -172,14 +144,9 @@ def build_tool_search_tool(catalog: DeferredToolCatalog) -> BaseTool:
 
 
 def build_deferred_tool_setup(filtered_tools: list[BaseTool], *, enabled: bool) -> DeferredToolSetup:
-    """Build the deferred-tool setup from a POLICY-FILTERED tool list.
+    """从已通过策略过滤的工具列表构建延迟工具配置。
 
-    Must be called after skill/agent tool-policy filtering so the catalog never
-    exposes a tool the current agent is not allowed to use.
-
-    Returns an empty setup (see :class:`DeferredToolSetup`) in two distinct
-    cases: deferral is disabled, or it is enabled but no MCP tool survived
-    filtering.
+    必须在策略过滤后调用，确保目录不会暴露当前代理无权使用的工具。
     """
     if not enabled:
         # Deferral disabled: defer nothing; the model binds every tool as before.
@@ -193,15 +160,9 @@ def build_deferred_tool_setup(filtered_tools: list[BaseTool], *, enabled: bool) 
 
 
 def assemble_deferred_tools(filtered_tools: list[BaseTool], *, enabled: bool) -> tuple[list[BaseTool], DeferredToolSetup]:
-    """Build the final tool list + deferred setup from a POLICY-FILTERED list.
+    """从已通过策略过滤的列表构建最终工具列表及延迟工具配置。
 
-    Call AFTER tool-policy filtering so the deferred catalog never exposes a tool
-    the agent is not allowed to use. Fail-closed: if tool_search is enabled and
-    MCP tools survived filtering but no deferred set was recovered, raise rather
-    than silently binding their full schemas to the model.
-
-    Shared by every agent-build path (lead, embedded client, subagent) so they
-    all get the same fail-closed guarantee from one place.
+    若启用延迟加载但无法恢复应延迟的 MCP 工具集合，则拒绝绑定其模式。
     """
     deferred_setup = build_deferred_tool_setup(filtered_tools, enabled=enabled)
     if enabled and not deferred_setup.deferred_names and any(is_mcp_tool(t) for t in filtered_tools):
@@ -216,6 +177,7 @@ def _routing_priority(value: Any) -> int:
     # Produces the typed priority stored in the routing index. McpRoutingMiddleware
     # ._normalize_index re-parses this defensively (it is built to accept arbitrary
     # serialized data), so keep the two coercion rules in sync if either changes.
+    """将路由优先级安全转换为整数。"""
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -225,6 +187,7 @@ def _routing_priority(value: Any) -> int:
 def _routing_keywords(value: Any) -> list[str]:
     # See _routing_priority: McpRoutingMiddleware._normalize_index re-normalizes
     # keywords defensively; keep both coercion rules aligned.
+    """将路由关键字安全规范化为字符串列表。"""
     if not isinstance(value, list):
         return []
     return [keyword for keyword in (str(item).strip() for item in value) if keyword]
@@ -236,10 +199,9 @@ def build_mcp_routing_middleware(
     *,
     top_k: int,
 ) -> "AgentMiddleware | None":
-    """Build PR2 auto-promotion middleware from policy-filtered deferred tools.
+    """从已通过策略过滤的延迟工具构建自动提升路由中间件。
 
-    The builder may inspect ``BaseTool.metadata`` at construction time, but the
-    returned middleware receives only a flat serializable routing index.
+    构建时可读取工具元数据，返回的中间件只接收可序列化的扁平路由索引。
     """
     if deferred_setup.catalog_hash is None or not deferred_setup.deferred_names:
         return None
@@ -274,15 +236,9 @@ def build_mcp_routing_middleware(
 
 
 def get_deferred_tools_prompt_section(*, deferred_names: frozenset[str] = frozenset()) -> str:
-    """Generate <available-deferred-tools> from an explicit deferred-name set.
+    """根据明确的延迟工具名称集合生成可用工具提示区段。
 
-    Lists only names so the agent knows what exists and can use tool_search to
-    load them. Returns empty string when there are no deferred tools. The set is
-    computed at agent build time (after tool-policy filtering) and passed in.
-
-    Lives here, next to the assembly that produces ``deferred_names``, so every
-    agent-build path (lead, embedded client, subagent) renders the section the
-    same way without coupling back to ``lead_agent.prompt``.
+    仅列出名称；没有延迟工具时返回空字符串，名称会在输出前进行转义。
     """
     if not deferred_names:
         return ""
@@ -294,17 +250,16 @@ def get_deferred_tools_prompt_section(*, deferred_names: frozenset[str] = frozen
 
 
 def _format_keyword_list(keywords: list[str]) -> str:
+    """将关键字列表格式化为自然语言短语。"""
     if len(keywords) == 1:
         return keywords[0]
     return f"{', '.join(keywords[:-1])}, or {keywords[-1]}"
 
 
 def get_mcp_routing_hints_prompt_section(tools: Iterable[BaseTool], *, deferred_names: frozenset[str] = frozenset()) -> str:
-    """Render <mcp_routing_hints> from MCP tools carrying routing metadata.
+    """从携带路由元数据的 MCP 工具渲染路由提示区段。
 
-    When tool_search has deferred an MCP tool, the hint must point the model at
-    promotion first; otherwise it may try to call a schema that is hidden from
-    the bound model request.
+    已延迟的工具会提示代理先提升工具，再尝试调用其模式。
     """
     hints: list[tuple[int, str, list[str]]] = []
     for candidate in tools:

@@ -1,4 +1,4 @@
-"""Regression coverage for #3758: macOS nginx argv rewriting broke make stop."""
+'未说明'
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ SERVE_SH = REPO_ROOT / "scripts" / "serve.sh"
 
 
 def _extract_shell_function(name: str) -> str:
+    '未说明'
     text = SERVE_SH.read_text(encoding="utf-8")
     marker = f"{name}() {{"
     start = text.index(marker)
@@ -36,6 +37,7 @@ def _is_repo_nginx_pid(
     repo_root: Path,
     deerflow_pid: bool = False,
 ) -> bool:
+    '未说明'
     bash = shutil.which("bash")
     if bash is None:
         pytest.skip("bash is required to exercise serve.sh helpers")
@@ -69,6 +71,7 @@ _is_repo_nginx_pid 12345
 
 
 def test_repo_nginx_pid_accepts_macos_rewritten_master_command(tmp_path):
+    '未说明'
     repo_root = tmp_path / "deer-flow"
     nginx_conf = repo_root / "docker" / "nginx" / "nginx.local.conf"
 
@@ -80,6 +83,7 @@ def test_repo_nginx_pid_accepts_macos_rewritten_master_command(tmp_path):
 
 
 def test_repo_nginx_pid_accepts_macos_rewritten_worker_after_repo_check(tmp_path):
+    '未说明'
     repo_root = tmp_path / "deer-flow"
 
     assert _is_repo_nginx_pid(
@@ -103,6 +107,7 @@ def test_repo_nginx_pid_rejects_unowned_or_non_nginx_processes(
     args: str,
     deerflow_pid: bool,
 ):
+    '未说明'
     assert not _is_repo_nginx_pid(
         command=command,
         args=args,

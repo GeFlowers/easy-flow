@@ -16,6 +16,7 @@ import { env } from "@/env";
 
 import { SettingsSection } from "./settings-section";
 
+/** 管理工具可用性设置，避免将配置读取与界面交互分散到多个入口。 */
 export function ToolSettingsPage() {
   const { t } = useI18n();
   const { config, isLoading, error } = useMCPConfig();

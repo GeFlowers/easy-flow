@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Bump the project version across every version source in lockstep.
+# 同步递增所有版本来源中的项目版本，防止发布元数据漂移。
 #
-# Usage:
+# 用法：
 #   scripts/bump_version.sh <version>     # e.g. scripts/bump_version.sh 2.2.0
 #
-# Updates:
+# 更新范围：
 #   backend/pyproject.toml              (version = "...")
 #   frontend/package.json               ("version": "...")
 #   deploy/helm/deer-flow/Chart.yaml    (version: + appVersion:)
 #
-# This does NOT edit CHANGELOG.md or create/push a git tag — keep those manual.
-# After running, commit and tag v<version> to trigger the release workflows
-# (container.yaml + chart.yaml), which gate on scripts/verify_versions.sh.
+# 本脚本不会编辑 CHANGELOG.md，也不会创建或推送 git tag；这些步骤仍需人工确认。
+# 执行后提交并创建 v<version> tag 才会触发发布工作流（container.yaml + chart.yaml），
+# 而工作流会以 scripts/verify_versions.sh 作为发布门禁。
 
 set -euo pipefail
 
@@ -54,7 +54,7 @@ if new == src:
 with open(pyproject, "w") as f:
     f.write(new)
 
-# frontend/package.json — "version": "..." (preserve indentation; minimal diff)
+# frontend/package.json — "version": "..."（保留缩进，最小化差异）
 with open(package) as f:
     src = f.read()
 new = re.sub(
@@ -68,7 +68,7 @@ if new == src:
 with open(package, "w") as f:
     f.write(new)
 
-# deploy/helm/deer-flow/Chart.yaml — version: X.Y.Z and appVersion: "X.Y.Z"
+# deploy/helm/deer-flow/Chart.yaml — version: X.Y.Z 与 appVersion: "X.Y.Z"
 with open(chart) as f:
     src = f.read()
 new = re.sub(r'(?m)^version:\s*\S+', f'version: {version}', src, count=1)

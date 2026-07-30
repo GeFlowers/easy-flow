@@ -1,4 +1,4 @@
-"""Tests for deerflow.models.factory.create_chat_model."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -13,11 +13,12 @@ from deerflow.models import openai_codex_provider as codex_provider_module
 from deerflow.reflection import resolve_class
 
 # ---------------------------------------------------------------------------
-# Helpers
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def _make_app_config(models: list[ModelConfig]) -> AppConfig:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return AppConfig(
         models=models,
         sandbox=SandboxConfig(use="deerflow.sandbox.local:LocalSandboxProvider"),
@@ -35,6 +36,7 @@ def _make_model(
     thinking: dict | None = None,
     max_tokens: int | None = None,
 ) -> ModelConfig:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return ModelConfig(
         name=name,
         display_name=name,
@@ -52,47 +54,44 @@ def _make_model(
 
 
 class FakeChatModel(BaseChatModel):
-    """Minimal BaseChatModel stub that records the kwargs it was called with."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     captured_kwargs: dict = {}
 
     def __init__(self, **kwargs):
-        # Store kwargs before pydantic processes them
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         FakeChatModel.captured_kwargs = dict(kwargs)
         super().__init__(**kwargs)
 
     @property
     def _llm_type(self) -> str:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return "fake"
 
     def _generate(self, *args, **kwargs):  # type: ignore[override]
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise NotImplementedError
 
     def _stream(self, *args, **kwargs):  # type: ignore[override]
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise NotImplementedError
 
 
 def _patch_factory(monkeypatch, app_config: AppConfig, model_class=FakeChatModel):
-    """Patch get_app_config, resolve_class, and tracing for isolated unit tests."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     monkeypatch.setattr(factory_module, "get_app_config", lambda: app_config)
     monkeypatch.setattr(factory_module, "resolve_class", lambda path, base: model_class)
     monkeypatch.setattr(factory_module, "build_tracing_callbacks", lambda: [])
 
 
 def _capturing_class(base_cls: type, captured: dict) -> type:
-    """Build a kwargs-capturing subclass of a REAL provider class.
-
-    ``_apply_stream_chunk_timeout_default`` gates on ``issubclass(model_class,
-    BaseChatOpenAI)``, so the resolved class must genuinely subclass the real
-    provider for the test to exercise that gate. ``__init__`` only records the
-    constructor kwargs and deliberately skips the provider's real ``__init__`` (so no
-    api_key / network / event loop is required); the factory never reads the returned
-    instance's fields when tracing is patched to ``[]``, so a bare instance is safe
-    for these config-level assertions.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
 
     class _Capturing(base_cls):  # type: ignore[valid-type,misc]
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.clear()
             captured.update(kwargs)
 
@@ -100,22 +99,24 @@ def _capturing_class(base_cls: type, captured: dict) -> type:
 
 
 # ---------------------------------------------------------------------------
-# Model selection
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_uses_first_model_when_name_is_none(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("alpha"), _make_model("beta")])
     _patch_factory(monkeypatch, cfg)
 
     FakeChatModel.captured_kwargs = {}
     factory_module.create_chat_model(name=None)
 
-    # resolve_class is called — if we reach here without ValueError, the correct model was used
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert FakeChatModel.captured_kwargs.get("model") == "alpha"
 
 
 def test_raises_when_model_not_found(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("only-model")])
     monkeypatch.setattr(factory_module, "get_app_config", lambda: cfg)
     monkeypatch.setattr(factory_module, "build_tracing_callbacks", lambda: [])
@@ -125,12 +126,9 @@ def test_raises_when_model_not_found(monkeypatch):
 
 
 def test_pricing_metadata_never_reaches_the_provider_client(monkeypatch):
-    """`models[*].pricing` is console-only metadata (issue: ChatOpenAI forwards
-    unknown kwargs into the completion request payload, so an un-stripped
-    `pricing` block breaks every live LLM call with
-    ``Completions.create() got an unexpected keyword argument 'pricing'``)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     model = _make_model("priced")
-    # ModelConfig is extra="allow" — pricing rides along as an extra field.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     model.pricing = {"currency": "CNY", "input_per_million": 8, "output_per_million": 32, "input_cache_hit_per_million": 0.8}
     cfg = _make_app_config([model])
     _patch_factory(monkeypatch, cfg)
@@ -142,6 +140,7 @@ def test_pricing_metadata_never_reaches_the_provider_client(monkeypatch):
 
 
 def test_appends_all_tracing_callbacks(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("alpha")])
     _patch_factory(monkeypatch, cfg)
     monkeypatch.setattr(factory_module, "build_tracing_callbacks", lambda: ["smith-callback", "langfuse-callback"])
@@ -153,13 +152,12 @@ def test_appends_all_tracing_callbacks(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# thinking_enabled=True
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_thinking_enabled_raises_when_not_supported_but_when_thinking_enabled_is_set(monkeypatch):
-    """supports_thinking guard fires only when when_thinking_enabled is configured —
-    the factory uses that as the signal that the caller explicitly expects thinking to work."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"thinking": {"type": "enabled", "budget_tokens": 5000}}
     cfg = _make_app_config([_make_model("no-think", supports_thinking=False, when_thinking_enabled=wte)])
     _patch_factory(monkeypatch, cfg)
@@ -169,9 +167,7 @@ def test_thinking_enabled_raises_when_not_supported_but_when_thinking_enabled_is
 
 
 def test_thinking_enabled_raises_for_empty_when_thinking_enabled_explicitly_set(monkeypatch):
-    """supports_thinking guard fires when when_thinking_enabled is set to an empty dict —
-    the user explicitly provided the section, so the guard must still fire even though
-    effective_wte would be falsy."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("no-think-empty", supports_thinking=False, when_thinking_enabled={})])
     _patch_factory(monkeypatch, cfg)
 
@@ -180,6 +176,7 @@ def test_thinking_enabled_raises_for_empty_when_thinking_enabled_explicitly_set(
 
 
 def test_thinking_enabled_merges_when_thinking_enabled_settings(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"temperature": 1.0, "max_tokens": 16000}
     cfg = _make_app_config([_make_model("thinker", supports_thinking=True, when_thinking_enabled=wte)])
     _patch_factory(monkeypatch, cfg)
@@ -192,13 +189,12 @@ def test_thinking_enabled_merges_when_thinking_enabled_settings(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# thinking_enabled=False — disable logic
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_thinking_disabled_openai_gateway_format(monkeypatch):
-    """When thinking is configured via extra_body (OpenAI-compatible gateway),
-    disabling must inject extra_body.thinking.type=disabled and reasoning_effort=minimal."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"thinking": {"type": "enabled", "budget_tokens": 10000}}}
     cfg = _make_app_config(
         [
@@ -215,7 +211,9 @@ def test_thinking_disabled_openai_gateway_format(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -225,12 +223,11 @@ def test_thinking_disabled_openai_gateway_format(monkeypatch):
 
     assert captured.get("extra_body") == {"thinking": {"type": "disabled"}}
     assert captured.get("reasoning_effort") == "minimal"
-    assert "thinking" not in captured  # must NOT set the direct thinking param
+    assert "thinking" not in captured  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 def test_thinking_disabled_langchain_anthropic_format(monkeypatch):
-    """When thinking is configured as a direct param (langchain_anthropic),
-    disabling must inject thinking.type=disabled WITHOUT touching extra_body or reasoning_effort."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"thinking": {"type": "enabled", "budget_tokens": 8000}}
     cfg = _make_app_config(
         [
@@ -248,7 +245,9 @@ def test_thinking_disabled_langchain_anthropic_format(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -258,19 +257,21 @@ def test_thinking_disabled_langchain_anthropic_format(monkeypatch):
 
     assert captured.get("thinking") == {"type": "disabled"}
     assert "extra_body" not in captured
-    # reasoning_effort must be cleared (supports_reasoning_effort=False)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("reasoning_effort") is None
 
 
 def test_thinking_disabled_no_when_thinking_enabled_does_nothing(monkeypatch):
-    """If when_thinking_enabled is not set, disabling thinking must not inject any kwargs."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("plain", supports_thinking=True, when_thinking_enabled=None)])
     _patch_factory(monkeypatch, cfg)
 
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -280,18 +281,17 @@ def test_thinking_disabled_no_when_thinking_enabled_does_nothing(monkeypatch):
 
     assert "extra_body" not in captured
     assert "thinking" not in captured
-    # reasoning_effort not forced (supports_reasoning_effort defaults to False → cleared)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("reasoning_effort") is None
 
 
 # ---------------------------------------------------------------------------
-# when_thinking_disabled config
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_when_thinking_disabled_takes_precedence_over_hardcoded_disable(monkeypatch):
-    """When when_thinking_disabled is set, it takes full precedence over the
-    hardcoded disable logic (extra_body.thinking.type=disabled etc.)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"thinking": {"type": "enabled", "budget_tokens": 10000}}}
     wtd = {"extra_body": {"thinking": {"type": "disabled"}}, "reasoning_effort": "low"}
     cfg = _make_app_config(
@@ -310,7 +310,9 @@ def test_when_thinking_disabled_takes_precedence_over_hardcoded_disable(monkeypa
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -319,12 +321,12 @@ def test_when_thinking_disabled_takes_precedence_over_hardcoded_disable(monkeypa
     factory_module.create_chat_model(name="custom-disable", thinking_enabled=False)
 
     assert captured.get("extra_body") == {"thinking": {"type": "disabled"}}
-    # User overrode the hardcoded "minimal" with "low"
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("reasoning_effort") == "low"
 
 
 def test_when_thinking_disabled_not_used_when_thinking_enabled(monkeypatch):
-    """when_thinking_disabled must have no effect when thinking_enabled=True."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"thinking": {"type": "enabled"}}}
     wtd = {"extra_body": {"thinking": {"type": "disabled"}}}
     cfg = _make_app_config(
@@ -342,7 +344,9 @@ def test_when_thinking_disabled_not_used_when_thinking_enabled(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -350,12 +354,12 @@ def test_when_thinking_disabled_not_used_when_thinking_enabled(monkeypatch):
 
     factory_module.create_chat_model(name="wtd-ignored", thinking_enabled=True)
 
-    # when_thinking_enabled should apply, NOT when_thinking_disabled
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("extra_body") == {"thinking": {"type": "enabled"}}
 
 
 def test_when_thinking_disabled_without_when_thinking_enabled_still_applies(monkeypatch):
-    """when_thinking_disabled alone (no when_thinking_enabled) should still apply its settings."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config(
         [
             _make_model(
@@ -371,7 +375,9 @@ def test_when_thinking_disabled_without_when_thinking_enabled_still_applies(monk
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -379,12 +385,12 @@ def test_when_thinking_disabled_without_when_thinking_enabled_still_applies(monk
 
     factory_module.create_chat_model(name="wtd-only", thinking_enabled=False)
 
-    # when_thinking_disabled is now gated independently of has_thinking_settings
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("reasoning_effort") == "low"
 
 
 def test_when_thinking_disabled_excluded_from_model_dump(monkeypatch):
-    """when_thinking_disabled must not leak into the model constructor kwargs."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"thinking": {"type": "enabled"}}}
     wtd = {"extra_body": {"thinking": {"type": "disabled"}}}
     cfg = _make_app_config(
@@ -402,7 +408,9 @@ def test_when_thinking_disabled_excluded_from_model_dump(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -410,23 +418,26 @@ def test_when_thinking_disabled_excluded_from_model_dump(monkeypatch):
 
     factory_module.create_chat_model(name="no-leak-wtd", thinking_enabled=True)
 
-    # when_thinking_disabled value must NOT appear as a raw key
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "when_thinking_disabled" not in captured
 
 
 # ---------------------------------------------------------------------------
-# reasoning_effort stripping
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_reasoning_effort_cleared_when_not_supported(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("no-effort", supports_reasoning_effort=False)])
     _patch_factory(monkeypatch, cfg)
 
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -438,6 +449,7 @@ def test_reasoning_effort_cleared_when_not_supported(monkeypatch):
 
 
 def test_reasoning_effort_preserved_when_supported(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"thinking": {"type": "enabled", "budget_tokens": 5000}}}
     cfg = _make_app_config(
         [
@@ -454,7 +466,9 @@ def test_reasoning_effort_preserved_when_supported(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -462,18 +476,18 @@ def test_reasoning_effort_preserved_when_supported(monkeypatch):
 
     factory_module.create_chat_model(name="effort-model", thinking_enabled=False)
 
-    # When supports_reasoning_effort=True, it should NOT be cleared to None
-    # The disable path sets it to "minimal"; supports_reasoning_effort=True keeps it
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("reasoning_effort") == "minimal"
 
 
 # ---------------------------------------------------------------------------
-# thinking shortcut field
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_thinking_shortcut_enables_thinking_when_thinking_enabled(monkeypatch):
-    """thinking shortcut alone should act as when_thinking_enabled with a `thinking` key."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     thinking_settings = {"type": "enabled", "budget_tokens": 8000}
     cfg = _make_app_config(
         [
@@ -490,7 +504,9 @@ def test_thinking_shortcut_enables_thinking_when_thinking_enabled(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -502,7 +518,7 @@ def test_thinking_shortcut_enables_thinking_when_thinking_enabled(monkeypatch):
 
 
 def test_thinking_shortcut_disables_thinking_when_thinking_disabled(monkeypatch):
-    """thinking shortcut should participate in the disable path (langchain_anthropic format)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     thinking_settings = {"type": "enabled", "budget_tokens": 8000}
     cfg = _make_app_config(
         [
@@ -520,7 +536,9 @@ def test_thinking_shortcut_disables_thinking_when_thinking_disabled(monkeypatch)
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -533,7 +551,7 @@ def test_thinking_shortcut_disables_thinking_when_thinking_disabled(monkeypatch)
 
 
 def test_thinking_shortcut_merges_with_when_thinking_enabled(monkeypatch):
-    """thinking shortcut should be merged into when_thinking_enabled when both are provided."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     thinking_settings = {"type": "enabled", "budget_tokens": 8000}
     wte = {"max_tokens": 16000}
     cfg = _make_app_config(
@@ -552,7 +570,9 @@ def test_thinking_shortcut_merges_with_when_thinking_enabled(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -560,13 +580,13 @@ def test_thinking_shortcut_merges_with_when_thinking_enabled(monkeypatch):
 
     factory_module.create_chat_model(name="merge-model", thinking_enabled=True)
 
-    # Both the thinking shortcut and when_thinking_enabled settings should be applied
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("thinking") == thinking_settings
     assert captured.get("max_tokens") == 16000
 
 
 def test_thinking_shortcut_not_leaked_into_model_when_disabled(monkeypatch):
-    """thinking shortcut must not be passed raw to the model constructor (excluded from model_dump)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     thinking_settings = {"type": "enabled", "budget_tokens": 8000}
     cfg = _make_app_config(
         [
@@ -584,7 +604,9 @@ def test_thinking_shortcut_not_leaked_into_model_when_disabled(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -592,17 +614,17 @@ def test_thinking_shortcut_not_leaked_into_model_when_disabled(monkeypatch):
 
     factory_module.create_chat_model(name="no-leak", thinking_enabled=False)
 
-    # The disable path should have set thinking to disabled (not the raw enabled shortcut)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("thinking") == {"type": "disabled"}
 
 
 # ---------------------------------------------------------------------------
-# OpenAI-compatible providers (MiniMax, Novita, etc.)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_openai_compatible_provider_passes_base_url(monkeypatch):
-    """OpenAI-compatible providers like MiniMax should pass base_url through to the model."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     model = ModelConfig(
         name="minimax-m3",
         display_name="MiniMax M3",
@@ -620,8 +642,8 @@ def test_openai_compatible_provider_passes_base_url(monkeypatch):
 
     cfg = _make_app_config([model])
     captured: dict = {}
-    # Real ChatOpenAI: it declares the stream_usage field, so the factory's
-    # class-field default path (not a use-path allowlist) enables it.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     _patch_factory(monkeypatch, cfg, model_class=_capturing_class(ChatOpenAI, captured))
 
     factory_module.create_chat_model(name="minimax-m3")
@@ -635,7 +657,7 @@ def test_openai_compatible_provider_passes_base_url(monkeypatch):
 
 
 def test_openai_compatible_provider_respects_explicit_stream_usage(monkeypatch):
-    """Explicit stream_usage should not be overwritten by the factory default."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     model = ModelConfig(
         name="minimax-m3",
         display_name="MiniMax M3",
@@ -654,7 +676,9 @@ def test_openai_compatible_provider_respects_explicit_stream_usage(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -666,7 +690,7 @@ def test_openai_compatible_provider_respects_explicit_stream_usage(monkeypatch):
 
 
 def test_openai_compatible_provider_enables_stream_usage_for_openai_api_base(monkeypatch):
-    """openai_api_base should trigger stream_usage default for ChatOpenAI."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     model = ModelConfig(
         name="openai-compatible",
         display_name="OpenAI-Compatible",
@@ -691,7 +715,7 @@ def test_openai_compatible_provider_enables_stream_usage_for_openai_api_base(mon
 
 
 def test_non_openai_provider_does_not_receive_stream_usage_default(monkeypatch):
-    """Non-OpenAI providers with base_url should not receive stream_usage by default."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     model = ModelConfig(
         name="ollama-local",
         display_name="Ollama Local",
@@ -708,7 +732,9 @@ def test_non_openai_provider_does_not_receive_stream_usage_default(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -721,7 +747,7 @@ def test_non_openai_provider_does_not_receive_stream_usage_default(monkeypatch):
 
 
 def test_openai_compatible_provider_multiple_models(monkeypatch):
-    """Multiple models from the same OpenAI-compatible provider should coexist."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     m1 = ModelConfig(
         name="minimax-m3",
         display_name="MiniMax M3",
@@ -743,7 +769,7 @@ def test_openai_compatible_provider_multiple_models(monkeypatch):
         base_url="https://api.minimax.io/v1",
         api_key="test-key",
         temperature=1.0,
-        supports_vision=False,  # M2.7 is text-only; M3 supports vision
+        supports_vision=False,  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         supports_thinking=False,
     )
     cfg = _make_app_config([m1, m2])
@@ -752,31 +778,35 @@ def test_openai_compatible_provider_multiple_models(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
     monkeypatch.setattr(factory_module, "resolve_class", lambda path, base: CapturingModel)
 
-    # Create first model
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     factory_module.create_chat_model(name="minimax-m3")
     assert captured.get("model") == "MiniMax-M3"
 
-    # Create second model
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     factory_module.create_chat_model(name="minimax-m2.7-highspeed")
     assert captured.get("model") == "MiniMax-M2.7-highspeed"
 
 
 # ---------------------------------------------------------------------------
-# Codex provider reasoning_effort mapping
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 class FakeCodexChatModel(FakeChatModel):
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     pass
 
 
 def test_codex_provider_disables_reasoning_when_thinking_disabled(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config(
         [
             _make_model(
@@ -797,6 +827,7 @@ def test_codex_provider_disables_reasoning_when_thinking_disabled(monkeypatch):
 
 
 def test_codex_provider_preserves_explicit_reasoning_effort(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config(
         [
             _make_model(
@@ -817,6 +848,7 @@ def test_codex_provider_preserves_explicit_reasoning_effort(monkeypatch):
 
 
 def test_codex_provider_defaults_reasoning_effort_to_medium(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config(
         [
             _make_model(
@@ -837,6 +869,7 @@ def test_codex_provider_defaults_reasoning_effort_to_medium(monkeypatch):
 
 
 def test_codex_provider_strips_unsupported_max_tokens(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config(
         [
             _make_model(
@@ -858,6 +891,7 @@ def test_codex_provider_strips_unsupported_max_tokens(monkeypatch):
 
 
 def test_thinking_disabled_vllm_chat_template_format(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"chat_template_kwargs": {"thinking": True}}}
     model = _make_model(
         "vllm-qwen",
@@ -872,7 +906,9 @@ def test_thinking_disabled_vllm_chat_template_format(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -885,6 +921,7 @@ def test_thinking_disabled_vllm_chat_template_format(monkeypatch):
 
 
 def test_thinking_disabled_vllm_enable_thinking_format(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"chat_template_kwargs": {"enable_thinking": True}}}
     model = _make_model(
         "vllm-qwen-enable",
@@ -899,7 +936,9 @@ def test_thinking_disabled_vllm_enable_thinking_format(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -915,25 +954,27 @@ def test_thinking_disabled_vllm_enable_thinking_format(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# stream_usage injection
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 class _FakeWithStreamUsage(FakeChatModel):
-    """Fake model that declares stream_usage in model_fields (like BaseChatOpenAI)."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     stream_usage: bool | None = None
 
 
 def test_stream_usage_injected_for_openai_compatible_model(monkeypatch):
-    """Factory should set stream_usage=True for models with stream_usage field."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("deepseek", use="langchain_deepseek:ChatDeepSeek")])
     _patch_factory(monkeypatch, cfg, model_class=_FakeWithStreamUsage)
 
     captured: dict = {}
 
     class CapturingModel(_FakeWithStreamUsage):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -945,14 +986,16 @@ def test_stream_usage_injected_for_openai_compatible_model(monkeypatch):
 
 
 def test_stream_usage_not_injected_for_non_openai_model(monkeypatch):
-    """Factory should NOT inject stream_usage for models without the field."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("claude", use="langchain_anthropic:ChatAnthropic")])
     _patch_factory(monkeypatch, cfg)
 
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -964,23 +1007,26 @@ def test_stream_usage_not_injected_for_non_openai_model(monkeypatch):
 
 
 def test_stream_usage_not_overridden_when_explicitly_set_in_config(monkeypatch):
-    """If config dumps stream_usage=False, factory should respect it."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("deepseek", use="langchain_deepseek:ChatDeepSeek")])
     _patch_factory(monkeypatch, cfg, model_class=_FakeWithStreamUsage)
 
     captured: dict = {}
 
     class CapturingModel(_FakeWithStreamUsage):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
     monkeypatch.setattr(factory_module, "resolve_class", lambda path, base: CapturingModel)
 
-    # Simulate config having stream_usage explicitly set by patching model_dump
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     original_get_model_config = cfg.get_model_config
 
     def patched_get_model_config(name):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         mc = original_get_model_config(name)
         mc.stream_usage = False  # type: ignore[attr-defined]
         return mc
@@ -993,6 +1039,7 @@ def test_stream_usage_not_overridden_when_explicitly_set_in_config(monkeypatch):
 
 
 def test_openai_responses_api_settings_are_passed_to_chatopenai(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     model = ModelConfig(
         name="gpt-5-responses",
         display_name="GPT-5 Responses",
@@ -1011,7 +1058,9 @@ def test_openai_responses_api_settings_are_passed_to_chatopenai(monkeypatch):
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
@@ -1024,12 +1073,13 @@ def test_openai_responses_api_settings_are_passed_to_chatopenai(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# Provider class path resolution
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.parametrize("model_id", ["mimo-v2.5-pro", "mimo-v2.5", "mimo-v2-flash"])
 def test_create_chat_model_resolves_patched_mimo_provider(model_id):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.models.patched_mimo import PatchedChatMiMo
 
     model = ModelConfig(
@@ -1059,23 +1109,21 @@ def test_create_chat_model_resolves_patched_mimo_provider(model_id):
 
 
 # ---------------------------------------------------------------------------
-# Duplicate keyword argument collision (issue #1977)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_no_duplicate_kwarg_when_reasoning_effort_in_config_and_thinking_disabled(monkeypatch):
-    """When reasoning_effort is set in config.yaml (extra field) AND the thinking-disabled
-    path also injects reasoning_effort=minimal into kwargs, the factory must not raise
-    TypeError: got multiple values for keyword argument 'reasoning_effort'."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     wte = {"extra_body": {"thinking": {"type": "enabled", "budget_tokens": 5000}}}
-    # ModelConfig.extra="allow" means extra fields from config.yaml land in model_dump()
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     model = ModelConfig(
         name="doubao-model",
         display_name="Doubao 1.8",
         description=None,
         use="deerflow.models.patched_deepseek:PatchedChatDeepSeek",
         model="doubao-seed-1-8-250315",
-        reasoning_effort="high",  # user-set extra field in config.yaml
+        reasoning_effort="high",  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         supports_thinking=True,
         supports_reasoning_effort=True,
         when_thinking_enabled=wte,
@@ -1086,29 +1134,28 @@ def test_no_duplicate_kwarg_when_reasoning_effort_in_config_and_thinking_disable
     captured: dict = {}
 
     class CapturingModel(FakeChatModel):
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured.update(kwargs)
             BaseChatModel.__init__(self, **kwargs)
 
     _patch_factory(monkeypatch, cfg, model_class=CapturingModel)
 
-    # Must not raise TypeError
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     factory_module.create_chat_model(name="doubao-model", thinking_enabled=False)
 
-    # kwargs (runtime) takes precedence: thinking-disabled path sets reasoning_effort=minimal
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("reasoning_effort") == "minimal"
 
 
 # ---------------------------------------------------------------------------
-# stream_chunk_timeout default injection (issue #3189)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def test_stream_chunk_timeout_defaults_to_240_for_openai_compatible_model(monkeypatch):
-    """A bare ChatOpenAI client must receive a generous 240s chunk-gap budget by
-    default, so reasoning models with long thinking pauses don't trip
-    langchain-openai's aggressive built-in default.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_openai import ChatOpenAI
 
     model = _make_model(use="langchain_openai:ChatOpenAI")
@@ -1122,10 +1169,7 @@ def test_stream_chunk_timeout_defaults_to_240_for_openai_compatible_model(monkey
 
 
 def test_stream_chunk_timeout_user_value_not_overridden(monkeypatch):
-    """If the user explicitly sets stream_chunk_timeout in config.yaml, the
-    factory must not overwrite it with the default — even if the value is
-    smaller (60s) or larger (600s) than the default.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_openai import ChatOpenAI
 
     model = ModelConfig(
@@ -1134,7 +1178,7 @@ def test_stream_chunk_timeout_user_value_not_overridden(monkeypatch):
         description=None,
         use="langchain_openai:ChatOpenAI",
         model="gpt-4o-mini",
-        stream_chunk_timeout=60.0,  # user-set explicit value
+        stream_chunk_timeout=60.0,  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     )
     cfg = _make_app_config([model])
 
@@ -1146,10 +1190,7 @@ def test_stream_chunk_timeout_user_value_not_overridden(monkeypatch):
 
 
 def test_stream_chunk_timeout_not_injected_for_non_openai_provider(monkeypatch):
-    """Only BaseChatOpenAI subclasses receive the default. A genuinely non-OpenAI
-    client (ChatAnthropic) that does not declare this kwarg must not be polluted
-    with it.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_anthropic import ChatAnthropic
 
     model = _make_model(use="langchain_anthropic:ChatAnthropic")
@@ -1163,20 +1204,12 @@ def test_stream_chunk_timeout_not_injected_for_non_openai_provider(monkeypatch):
 
 
 def test_stream_chunk_timeout_default_constant_is_documented():
-    """Lock the default value at 240s. If we ever want to change this, the
-    deliberate update here (and the docstring on _apply_stream_chunk_timeout_default)
-    forces a paired review of the rationale comment block above the constant.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert factory_module._DEFAULT_STREAM_CHUNK_TIMEOUT_SECONDS == 240.0
 
 
 def test_stream_chunk_timeout_popped_for_non_openai_provider_when_user_set_it(monkeypatch):
-    """Regression for CR feedback on issue #3189: if a user accidentally sets
-    ``stream_chunk_timeout`` on a non-OpenAI provider, the factory must drop the
-    kwarg before forwarding it to the model constructor. ChatAnthropic does not
-    declare the field, so it would otherwise divert the value into ``model_kwargs``
-    and fail at request time.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_anthropic import ChatAnthropic
 
     model = ModelConfig(
@@ -1185,7 +1218,7 @@ def test_stream_chunk_timeout_popped_for_non_openai_provider_when_user_set_it(mo
         description=None,
         use="langchain_anthropic:ChatAnthropic",
         model="claude-sonnet-4",
-        stream_chunk_timeout=60.0,  # user-set on a non-OpenAI provider — must be dropped
+        stream_chunk_timeout=60.0,  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     )
     cfg = _make_app_config([model])
 
@@ -1197,14 +1230,14 @@ def test_stream_chunk_timeout_popped_for_non_openai_provider_when_user_set_it(mo
 
 
 # ---------------------------------------------------------------------------
-# stream_chunk_timeout applies to ALL BaseChatOpenAI subclasses, not just the
-# ChatOpenAI/PatchedChatOpenAI class-path allowlist (issue #3189 was reported on
-# mimo-v2.5 → PatchedChatMiMo, which the original #3195 allowlist excluded).
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
-# Every in-repo provider that subclasses BaseChatOpenAI (and therefore inherits the
-# stream_chunk_timeout mechanism) but was NOT in the original ChatOpenAI /
-# PatchedChatOpenAI allowlist.
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 _STREAM_TIMEOUT_OPENAI_SUBCLASS_USE_PATHS = [
     "deerflow.models.vllm_provider:VllmChatModel",
     "deerflow.models.mindie_provider:MindIEChatModel",
@@ -1217,11 +1250,7 @@ _STREAM_TIMEOUT_OPENAI_SUBCLASS_USE_PATHS = [
 
 @pytest.mark.parametrize("use_path", _STREAM_TIMEOUT_OPENAI_SUBCLASS_USE_PATHS)
 def test_stream_chunk_timeout_defaults_to_240_for_all_openai_subclasses(monkeypatch, use_path):
-    """Every BaseChatOpenAI subclass provider — not just ChatOpenAI — must receive
-    the 240s default when the user leaves stream_chunk_timeout unset. These classes
-    were silently excluded by the original class-path allowlist and fell back to
-    langchain-openai's aggressive built-in gap timeout.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     real_cls = resolve_class(use_path, BaseChatModel)
     model = _make_model(use=use_path)
     cfg = _make_app_config([model])
@@ -1235,10 +1264,7 @@ def test_stream_chunk_timeout_defaults_to_240_for_all_openai_subclasses(monkeypa
 
 @pytest.mark.parametrize("use_path", _STREAM_TIMEOUT_OPENAI_SUBCLASS_USE_PATHS)
 def test_stream_chunk_timeout_user_override_honored_for_all_openai_subclasses(monkeypatch, use_path):
-    """A user's explicit stream_chunk_timeout must survive for every BaseChatOpenAI
-    subclass provider. The original allowlist popped it unconditionally for these
-    classes, silently discarding a config.yaml override with no warning.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     real_cls = resolve_class(use_path, BaseChatModel)
     model = ModelConfig(
         name="override-model",
@@ -1246,7 +1272,7 @@ def test_stream_chunk_timeout_user_override_honored_for_all_openai_subclasses(mo
         description=None,
         use=use_path,
         model="reasoning-model",
-        stream_chunk_timeout=300.0,  # explicit user override
+        stream_chunk_timeout=300.0,  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     )
     cfg = _make_app_config([model])
 
@@ -1258,12 +1284,7 @@ def test_stream_chunk_timeout_user_override_honored_for_all_openai_subclasses(mo
 
 
 def test_stream_chunk_timeout_240_reaches_real_mimo_constructor(monkeypatch):
-    """End-to-end anchor for issue #3189 (reported on mimo-v2.5): the 240s default
-    must be accepted as a genuine ``stream_chunk_timeout`` field by the real
-    ``PatchedChatMiMo`` constructor — not diverted into ``model_kwargs`` — so the
-    streaming layer actually honors it. Builds the real class (no network / dummy
-    key) instead of a capturing stub.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     model = _make_model_with_extras(
         "mimo",
         use="deerflow.models.patched_mimo:PatchedChatMiMo",
@@ -1271,7 +1292,7 @@ def test_stream_chunk_timeout_240_reaches_real_mimo_constructor(monkeypatch):
         base_url="http://localhost:8000/v1",
     )
     cfg = _make_app_config([model])
-    # Do NOT patch resolve_class — construct the real PatchedChatMiMo class.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(factory_module, "get_app_config", lambda: cfg)
     monkeypatch.setattr(factory_module, "build_tracing_callbacks", lambda: [])
 
@@ -1281,13 +1302,13 @@ def test_stream_chunk_timeout_240_reaches_real_mimo_constructor(monkeypatch):
 
 
 # ---------------------------------------------------------------------------
-# OpenAI base_url normalization + unknown-key warning
-# (regression: api_base copied onto a ChatOpenAI model crashed at request time)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 
 def _make_model_with_extras(name="extra-model", *, use="langchain_openai:ChatOpenAI", **extras):
-    """Build a ModelConfig with arbitrary extra keys (ModelConfig is extra='allow')."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return ModelConfig(
         name=name,
         display_name=name,
@@ -1302,7 +1323,7 @@ def _make_model_with_extras(name="extra-model", *, use="langchain_openai:ChatOpe
 
 
 def test_api_base_normalized_to_base_url_for_chatopenai(monkeypatch):
-    """A config that sets api_base on a ChatOpenAI model should reach the constructor as base_url."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_openai import ChatOpenAI
 
     cfg = _make_app_config([_make_model_with_extras("oai", api_base="http://localhost:4001/v1")])
@@ -1316,7 +1337,7 @@ def test_api_base_normalized_to_base_url_for_chatopenai(monkeypatch):
 
 
 def test_base_url_takes_precedence_when_both_set(monkeypatch):
-    """When both base_url and api_base are present, base_url wins and api_base is dropped."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_openai import ChatOpenAI
 
     cfg = _make_app_config([_make_model_with_extras("oai", base_url="http://canonical/v1", api_base="http://alias/v1")])
@@ -1330,13 +1351,7 @@ def test_base_url_takes_precedence_when_both_set(monkeypatch):
 
 
 def test_api_base_preserved_for_provider_that_declares_it(monkeypatch):
-    """PatchedChatDeepSeek declares ``api_base`` as its own field, so the key is canonical there.
-
-    This is the guard against over-widening the normalization. ``PatchedChatDeepSeek`` *is* a
-    ``BaseChatOpenAI`` subclass, so a naive ``issubclass`` gate would rewrite its ``api_base`` into
-    ``base_url`` and break every Doubao / Kimi config in ``config.example.yaml``, which document
-    ``api_base`` for exactly this class.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.models.patched_deepseek import PatchedChatDeepSeek
 
     cfg = _make_app_config([_make_model_with_extras("ds", use="deerflow.models.patched_deepseek:PatchedChatDeepSeek", api_base="http://ds/v3")])
@@ -1350,7 +1365,7 @@ def test_api_base_preserved_for_provider_that_declares_it(monkeypatch):
 
 
 def test_no_op_when_neither_base_url_nor_api_base(monkeypatch):
-    """Normalization is a no-op when the model declares no endpoint override."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config([_make_model("plain")])
     _patch_factory(monkeypatch, cfg)
 
@@ -1362,11 +1377,7 @@ def test_no_op_when_neither_base_url_nor_api_base(monkeypatch):
 
 
 def test_unknown_config_key_emits_warning(monkeypatch, caplog):
-    """A typo'd config key should produce a heads-up warning naming the offending key.
-
-    Uses the real ChatOpenAI class (not the stub) so the field/alias schema is realistic — the
-    warning's whole value is that it matches what LangChain will actually divert to model_kwargs.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import logging
 
     from langchain_openai import ChatOpenAI
@@ -1381,7 +1392,7 @@ def test_unknown_config_key_emits_warning(monkeypatch, caplog):
 
 
 def test_known_config_keys_emit_no_warning(monkeypatch, caplog):
-    """Recognized keys (model, base_url alias, max_tokens, factory-injected kwargs) must not warn."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import logging
 
     from langchain_openai import ChatOpenAI
@@ -1396,7 +1407,7 @@ def test_known_config_keys_emit_no_warning(monkeypatch, caplog):
 
 
 def test_api_base_normalized_for_patched_chatopenai(monkeypatch):
-    """The PatchedChatOpenAI subclass is in the OpenAI-compatible family and must normalize too."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.models.patched_openai import PatchedChatOpenAI
 
     cfg = _make_app_config([_make_model_with_extras("patched", use="deerflow.models.patched_openai:PatchedChatOpenAI", api_base="http://localhost:4001/v1")])
@@ -1410,7 +1421,7 @@ def test_api_base_normalized_for_patched_chatopenai(monkeypatch):
 
 
 def test_api_base_dropped_when_openai_api_base_field_name_set(monkeypatch):
-    """If the field-name openai_api_base is set alongside api_base, the alias is dropped (no dup)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from langchain_openai import ChatOpenAI
 
     cfg = _make_app_config([_make_model_with_extras("oai", openai_api_base="http://canonical/v1", api_base="http://alias/v1")])
@@ -1425,11 +1436,7 @@ def test_api_base_dropped_when_openai_api_base_field_name_set(monkeypatch):
 
 
 def test_no_unknown_key_warning_for_non_openai_class(monkeypatch, caplog):
-    """The unknown-key warning is scoped to the OpenAI family; other providers must not false-positive.
-
-    Regression: a ChatAnthropic model with a legit kwarg like frequency_penalty (which LangChain
-    routes into model_kwargs for that provider) previously tripped the 'not recognized' warning.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import logging
 
     from langchain_anthropic import ChatAnthropic
@@ -1442,23 +1449,23 @@ def test_no_unknown_key_warning_for_non_openai_class(monkeypatch, caplog):
         factory_module.create_chat_model(name="anthropic")
 
     assert not any("not recognized parameters" in rec.message for rec in caplog.records)
-    # api_base normalization is likewise scoped to the OpenAI family: a non-BaseChatOpenAI
-    # provider must never have its keys rewritten. The config sets api_base, so this
-    # actually exercises the normalization-skip path (not just its absence): the alias
-    # is passed through verbatim and never rewritten to base_url.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert captured.get("api_base") == "http://x/v1"
     assert "base_url" not in captured
 
 
 # ---------------------------------------------------------------------------
-# The OpenAI-compatible family is issubclass(BaseChatOpenAI), not a class-path allowlist
-# (regression: six in-repo BaseChatOpenAI subclasses were excluded from api_base
-#  normalization and from the unknown-key warning)
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
-# Every in-repo BaseChatOpenAI subclass that inherits only `openai_api_base` (alias `base_url`)
-# and was NOT in the original ChatOpenAI / PatchedChatOpenAI allowlist. PatchedChatDeepSeek is
-# deliberately absent: it declares `api_base` itself and is covered by the preservation test above.
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 _OPENAI_SUBCLASS_USE_PATHS_WITHOUT_API_BASE = [
     "deerflow.models.vllm_provider:VllmChatModel",
     "deerflow.models.mindie_provider:MindIEChatModel",
@@ -1470,15 +1477,7 @@ _OPENAI_SUBCLASS_USE_PATHS_WITHOUT_API_BASE = [
 
 @pytest.mark.parametrize("use_path", _OPENAI_SUBCLASS_USE_PATHS_WITHOUT_API_BASE)
 def test_api_base_normalized_for_all_openai_subclasses(monkeypatch, use_path):
-    """`api_base` must become `base_url` for every BaseChatOpenAI subclass, not just the two
-    stock OpenAI paths.
-
-    These classes inherit the endpoint field as `openai_api_base` (alias `base_url`) and do not
-    declare `api_base`. Excluded by the old class-path allowlist, a user's `api_base` was diverted
-    into `model_kwargs` — so the endpoint override was silently dropped (the client fell back to
-    the default OpenAI endpoint) and the stray key was spread into every `Completions.create()`
-    call, failing at request time with an opaque `unexpected keyword argument 'api_base'`.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     real_cls = resolve_class(use_path, BaseChatModel)
     cfg = _make_app_config([_make_model_with_extras("m", use=use_path, api_base="http://gw.example/v1")])
     captured: dict = {}
@@ -1492,12 +1491,7 @@ def test_api_base_normalized_for_all_openai_subclasses(monkeypatch, use_path):
 
 @pytest.mark.parametrize("use_path", _OPENAI_SUBCLASS_USE_PATHS_WITHOUT_API_BASE)
 def test_unknown_config_key_warns_for_all_openai_subclasses(monkeypatch, use_path, caplog):
-    """The unknown-key warning must fire for every BaseChatOpenAI subclass.
-
-    The `model_kwargs` divert-and-crash behaviour is implemented in `BaseChatOpenAI`, so every
-    subclass inherits it. Scoping the warning to the two stock paths meant the diagnostic that
-    exists to surface this failure was disabled for exactly the classes that suffer it.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import logging
 
     real_cls = resolve_class(use_path, BaseChatModel)
@@ -1512,12 +1506,7 @@ def test_unknown_config_key_warns_for_all_openai_subclasses(monkeypatch, use_pat
 
 
 def test_api_base_reaches_real_minimax_constructor_as_base_url(monkeypatch):
-    """End-to-end anchor on a real provider class, nothing stubbed.
-
-    Builds the genuine `PatchedChatMiniMax` (dummy key, no network) from a config that sets
-    `api_base`, and asserts the endpoint actually lands on the client's `openai_api_base` field
-    instead of being diverted into `model_kwargs`.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = _make_app_config(
         [
             _make_model_with_extras(
@@ -1528,7 +1517,7 @@ def test_api_base_reaches_real_minimax_constructor_as_base_url(monkeypatch):
             )
         ]
     )
-    # Do NOT patch resolve_class — construct the real PatchedChatMiniMax class.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(factory_module, "get_app_config", lambda: cfg)
     monkeypatch.setattr(factory_module, "build_tracing_callbacks", lambda: [])
 

@@ -1,15 +1,4 @@
-"""Slash-command registry for the DeerFlow TUI (pure).
-
-Normalizes two command sources into one searchable list:
-
-* **Built-ins** — TUI-owned affordances (``/help``, ``/model``, ``/threads`` …).
-* **Skills** — one ``/<skill-name>`` per enabled skill, preserving DeerFlow's
-  existing slash-skill activation semantics.
-
-The picker filters this list; :func:`resolve` classifies a submitted line as a
-built-in command, a skill activation, an unknown command, or a plain message.
-No Textual dependency.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -19,6 +8,7 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class Command:
+    '未说明'
     name: str  # without leading slash
     description: str
     category: Literal["builtin", "skill"] = "builtin"
@@ -26,6 +16,7 @@ class Command:
 
 @dataclass(frozen=True)
 class Resolution:
+    '未说明'
     kind: Literal["builtin", "skill", "unknown", "message"]
     name: str = ""
     args: str = ""
@@ -57,7 +48,7 @@ _BUILTIN_NAMES = frozenset(c.name for c in BUILTIN_COMMANDS)
 
 
 def build_registry(skills: list[dict]) -> list[Command]:
-    """Merge built-ins with one command per enabled skill."""
+    '未说明'
     commands = list(BUILTIN_COMMANDS)
     for skill in skills:
         if not skill.get("enabled", False):
@@ -70,11 +61,7 @@ def build_registry(skills: list[dict]) -> list[Command]:
 
 
 def filter_commands(commands: list[Command], query: str) -> list[Command]:
-    """Filter + rank commands for the picker.
-
-    Ranking: name-prefix matches first, then name-substring, then
-    description-substring. Original order is preserved within a rank tier.
-    """
+    '未说明'
     q = query.strip().lower()
     if not q:
         return commands
@@ -94,7 +81,7 @@ def filter_commands(commands: list[Command], query: str) -> list[Command]:
 
 
 def resolve(text: str, skills: list[str] | None = None) -> Resolution:
-    """Classify a submitted input line."""
+    '未说明'
     stripped = text.strip()
     if not stripped.startswith("/"):
         return Resolution(kind="message", text=text)

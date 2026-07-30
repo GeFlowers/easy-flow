@@ -1,18 +1,4 @@
-"""DeerMem backend configuration (parsed from ``MemoryConfig.backend_config``).
-
-DeerMem-private config lives here, NOT on the shared ``MemoryConfig`` (which
-only carries host-shared fields: ``enabled`` / ``injection_enabled`` /
-``manager_class`` / ``backend_config``). The factory passes ``backend_config``
-(a dict) to ``DeerMem.__init__``, which parses it into a ``DeerMemConfig``.
-Defaults let DeerMem run with zero ``backend_config``.
-
-Field names mirror the pre-abstraction ``MemoryConfig`` private fields so the
-migration is a pure move (config.yaml ``memory.<field>`` ->
-``memory.backend_config.<field>``). ``model`` is a nested ``DeerMemModelConfig``
-(provider/model/api_key/base_url/temperature) consumed by ``core/llm.py``;
-``tracing_callback`` (step 14) and ``should_keep_hidden_message`` (step 15) are
-optional host-injected hooks (None = DeerMem defaults).
-"""
+'定义 config 模块提供的职责与可复用接口。\n\nDeerMem backend configuration (parsed from ``MemoryConfig.backend_config``).\n\nDeerMem-private config lives here, NOT on the shared ``MemoryConfig`` (which\nonly carries host-shared fields: ``enabled`` / ``injection_enabled`` /\n``manager_class`` / ``backend_config``). The factory passes ``backend_config``\n(a dict) to ``DeerMem.__init__``, which parses it into a ``DeerMemConfig``.\nDefaults let DeerMem run with zero ``backend_config``.\n\nField names mirror the pre-abstraction ``MemoryConfig`` private fields so the\nmigration is a pure move (config.yaml ``memory.<field>`` ->\n``memory.backend_config.<field>``). ``model`` is a nested ``DeerMemModelConfig``\n(provider/model/api_key/base_url/temperature) consumed by ``core/llm.py``;\n``tracing_callback`` (step 14) and ``should_keep_hidden_message`` (step 15) are\noptional host-injected hooks (None = DeerMem defaults).\n'
 
 from __future__ import annotations
 
@@ -25,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeerMemModelConfig(BaseModel):
-    """DeerMem's memory-update LLM config (langchain ``init_chat_model`` params)."""
+    "封装 DeerMemModelConfig 的状态、协作关系与公开操作。\n\nDeerMem's memory-update LLM config (langchain ``init_chat_model`` params)."
 
     provider: str | None = Field(
         default=None,
@@ -41,7 +27,7 @@ class DeerMemModelConfig(BaseModel):
 
 
 class DeerMemConfig(BaseModel):
-    """DeerMem-private configuration (self-contained, host-agnostic)."""
+    '封装 DeerMemConfig 的状态、协作关系与公开操作。\n\nDeerMem-private configuration (self-contained, host-agnostic).'
 
     # ── Storage ──────────────────────────────────────────────────────────
     storage_path: str = Field(
@@ -230,19 +216,7 @@ class DeerMemConfig(BaseModel):
 
     @classmethod
     def from_backend_config(cls, backend_config: dict[str, Any] | None) -> DeerMemConfig:
-        """Parse a ``backend_config`` dict.
-
-        Unknown keys are ignored (forward-compat) but logged at WARNING so a
-        typo (e.g. ``storage_pat`` missing the ``h``) does not silently fall
-        back to the default and write memory to an unintended location --
-        mirrors the host layer's ``load_memory_config_from_dict`` warning.
-
-        ``None`` values are dropped so they fall back to the field default:
-        YAML renders an empty key (``model:`` with only commented children, as
-        shipped in ``config.example.yaml``) as ``None``, which non-Optional
-        fields like ``model`` would otherwise reject even though omitting the
-        key entirely is valid.
-        """
+        "执行 from_backend_config 的明确职责，并返回与调用约定一致的结果。\n\nParse a ``backend_config`` dict.\n\n        Unknown keys are ignored (forward-compat) but logged at WARNING so a\n        typo (e.g. ``storage_pat`` missing the ``h``) does not silently fall\n        back to the default and write memory to an unintended location --\n        mirrors the host layer's ``load_memory_config_from_dict`` warning.\n\n        ``None`` values are dropped so they fall back to the field default:\n        YAML renders an empty key (``model:`` with only commented children, as\n        shipped in ``config.example.yaml``) as ``None``, which non-Optional\n        fields like ``model`` would otherwise reject even though omitting the\n        key entirely is valid.\n        "
         if not backend_config:
             return cls()
         known = {k: v for k, v in backend_config.items() if k in cls.model_fields and v is not None}

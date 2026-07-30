@@ -1,3 +1,4 @@
+'未说明'
 import json
 from pathlib import Path
 
@@ -10,6 +11,7 @@ SKILL_DIR = REPO_ROOT / "skills" / "public" / "skill-reviewer"
 
 
 def test_skill_reviewer_public_skill_parses():
+    '未说明'
     skill = parse_skill_file(SKILL_DIR / "SKILL.md", SkillCategory.PUBLIC, Path("skill-reviewer"))
 
     assert skill is not None
@@ -18,6 +20,7 @@ def test_skill_reviewer_public_skill_parses():
 
 
 def test_skill_reviewer_declares_review_tool_boundary():
+    '未说明'
     text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
 
     assert "Always inspect the target through `review_skill_package`" in text
@@ -26,6 +29,7 @@ def test_skill_reviewer_declares_review_tool_boundary():
 
 
 def test_skill_reviewer_references_exist():
+    '未说明'
     for rel in [
         "references/review-rubric.md",
         "references/review-checklist.md",
@@ -38,6 +42,7 @@ def test_skill_reviewer_references_exist():
 
 
 def test_skill_reviewer_eval_manifest_has_required_fixtures():
+    '未说明'
     payload = json.loads((SKILL_DIR / "evals" / "evals.json").read_text(encoding="utf-8"))
     case_ids = {case["id"] for case in payload["cases"]}
 
@@ -49,6 +54,7 @@ def test_skill_reviewer_eval_manifest_has_required_fixtures():
 
 
 def test_skill_reviewer_package_review_keeps_root_identity_visible():
+    '未说明'
     facts = analyze_skill_package(LocalDirectoryReader(SKILL_DIR).read())
 
     assert facts["subject"]["declared_name"] == "skill-reviewer"

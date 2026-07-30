@@ -59,7 +59,7 @@ function detectBrowserTimezone(): string {
       return tz;
     }
   } catch {
-    // resolvedOptions unavailable
+    // 浏览器不支持 resolvedOptions 时回退到 UTC。
   }
   return "UTC";
 }
@@ -78,6 +78,7 @@ function timezoneOptions(): string[] {
 
 const TIMEZONE_OPTIONS = timezoneOptions();
 
+/** 编辑定时任务的执行方式、时区与 cron，并持续向父组件输出规范化值。 */
 export function ScheduledTaskScheduleInput({
   initial,
   onChange,
@@ -112,16 +113,13 @@ export function ScheduledTaskScheduleInput({
     initial.timezone || detectBrowserTimezone(),
   );
 
-  // Hold the latest onChange in a ref so the effect below does not depend on
-  // it. This avoids a re-render loop: if the parent passes an inline
-  // onChange (new reference each render), depending on it directly would
-  // re-fire the effect every render and call onChange again, looping.
+  // 将最新 onChange 存入 ref，避免下方副作用依赖它。父组件若传入每次渲染均新建
+  // 的内联 onChange，直接依赖会令副作用每次重跑并再次调用 onChange，形成循环。
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  // Emit on every change including mount. On mount this syncs the parent with
-  // the browser-detected timezone and the canonicalized cron, so the submitted
-  // value always matches what the user sees in the preview.
+  // 挂载及每次变更都通知父组件；首次通知会同步浏览器检测的时区和规范化 cron，
+  // 从而保证提交值始终与预览所示一致。
   useEffect(() => {
     if (scheduleType === "once") {
       const runAt = runAtLocal ? zonedLocalToUtcIso(runAtLocal, timezone) : "";

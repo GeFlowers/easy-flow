@@ -10,6 +10,7 @@ import {
   useMemo,
 } from "react";
 
+/** TextShimmerProps 的公开类型定义。 */
 export type TextShimmerProps = {
   children: string;
   as?: ElementType;
@@ -61,4 +62,5 @@ const ShimmerComponent = ({
   );
 };
 
+/** Shimmer 组件：提供对应的界面结构与交互语义。 */
 export const Shimmer = memo(ShimmerComponent);

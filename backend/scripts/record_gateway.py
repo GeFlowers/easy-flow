@@ -1,16 +1,4 @@
-"""Recording gateway for *record-through-browser* (Plan A).
-
-Runs the gateway with a REAL model and a callback that appends every model
-call's ``(input_hash, output)`` to a JSONL file. Because the run is driven by
-the real frontend (Playwright), the captured inputs are EXACTLY what the
-frontend produces (date system-reminder, suggestions/title calls, ...), so the
-resulting fixture replays cleanly against the browser.
-
-Used by ``frontend/playwright.record.config.ts``. Env:
-  OPENAI_API_KEY / OPENAI_API_BASE  - the real upstream (never committed)
-  DEERFLOW_RECORD_OUT               - JSONL path to append captured turns to
-  RECORD_PORT (default 8012), RECORD_MODEL (default gpt-5.5)
-"""
+"""本脚本负责录制 网关。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -26,6 +14,7 @@ sys.path.insert(0, str(_BACKEND / "tests"))
 
 
 def _install_capture(out_path: Path) -> None:
+    '未说明'
     from langchain_core.callbacks import BaseCallbackHandler
     from langchain_core.messages import messages_to_dict
     from replay_provider import caller_identity, hash_messages, hash_replay_input
@@ -33,7 +22,9 @@ def _install_capture(out_path: Path) -> None:
     import deerflow.models.factory as factory_mod
 
     class Capture(BaseCallbackHandler):
+        '未说明'
         def __init__(self) -> None:
+            '未说明'
             self.inputs: dict[str, tuple[list, str]] = {}
 
         def on_chat_model_start(  # noqa: ANN001
@@ -46,12 +37,14 @@ def _install_capture(out_path: Path) -> None:
             name=None,
             **kwargs,
         ):
+            """执行模型对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
             self.inputs[str(run_id)] = (
                 messages[0] if messages else [],
                 caller_identity(name=name, tags=tags),
             )
 
         def on_llm_end(self, response, *, run_id=None, **kwargs):  # noqa: ANN001
+            '未说明'
             captured = self.inputs.pop(str(run_id), None)
             if captured is None:
                 return
@@ -75,6 +68,7 @@ def _install_capture(out_path: Path) -> None:
     original = factory_mod.create_chat_model
 
     def wrapped(*args, **kwargs):
+        '未说明'
         model = original(*args, **kwargs)
         model.callbacks = (model.callbacks or []) + [cb]
         return model
@@ -86,6 +80,7 @@ def _install_capture(out_path: Path) -> None:
 
 
 def main() -> int:
+    '未说明'
     if not os.environ.get("OPENAI_API_KEY") or not os.environ.get("OPENAI_API_BASE"):
         print("ERROR: set OPENAI_API_KEY and OPENAI_API_BASE (an OpenAI-compatible /v1 endpoint)", file=sys.stderr)
         return 2

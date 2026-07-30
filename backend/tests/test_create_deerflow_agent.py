@@ -1,4 +1,4 @@
-"""Tests for create_deerflow_agent SDK entry point."""
+'定义 test_create_deerflow_agent 模块提供的职责与可复用接口。\n\nTests for create_deerflow_agent SDK entry point.'
 
 from typing import get_type_hints
 from unittest.mock import MagicMock, patch
@@ -12,20 +12,23 @@ from deerflow.agents.thread_state import ThreadState
 
 
 def _make_mock_model():
+    '执行 _make_mock_model 的明确职责，并返回与调用约定一致的结果'
     return MagicMock(name="mock_model")
 
 
 def _make_mock_tool(name: str = "my_tool"):
+    '执行 _make_mock_tool 的明确职责，并返回与调用约定一致的结果'
     tool = MagicMock(name=name)
     tool.name = name
     return tool
 
 
 # ---------------------------------------------------------------------------
-# 1. Minimal creation — only model
+# 1. 最小化创建——仅模型
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_minimal_creation(mock_create_agent):
+    '验证 minimal、creation 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock(name="compiled_graph")
     model = _make_mock_model()
 
@@ -39,10 +42,11 @@ def test_minimal_creation(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 2. With tools
+# 2. 使用工具
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_with_tools(mock_create_agent):
+    '验证 with、tools 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     model = _make_mock_model()
     tool = _make_mock_tool("search")
@@ -55,10 +59,11 @@ def test_with_tools(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 3. With system_prompt
+# 3. 使用 system_prompt
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_with_system_prompt(mock_create_agent):
+    '验证 with、system、prompt 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     prompt = "You are a helpful assistant."
 
@@ -69,10 +74,11 @@ def test_with_system_prompt(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 4. Features mode — auto-assemble middleware chain
+# 4. 特性模式——自动组装中间件链
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_features_mode(mock_create_agent):
+    '验证 features、mode 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     feat = RuntimeFeatures(sandbox=True, auto_title=True)
 
@@ -89,10 +95,11 @@ def test_features_mode(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 5. Middleware full takeover
+# 5.中间件全面接管
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_middleware_takeover(mock_create_agent):
+    '验证 middleware、takeover 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     custom_mw = MagicMock(name="custom_middleware")
     custom_mw.name = "custom"
@@ -104,9 +111,10 @@ def test_middleware_takeover(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 6. Conflict — middleware + features raises ValueError
+# 6. 冲突 — 中间件 + 功能引发 ValueError
 # ---------------------------------------------------------------------------
 def test_middleware_and_features_conflict():
+    '验证 middleware、and、features、conflict 场景下的预期行为、边界条件与结果'
     with pytest.raises(ValueError, match="Cannot specify both"):
         create_deerflow_agent(
             _make_mock_model(),
@@ -116,10 +124,11 @@ def test_middleware_and_features_conflict():
 
 
 # ---------------------------------------------------------------------------
-# 7. Vision feature auto-injects view_image_tool when thread data is available
+# 7. 当线程数据可用时，视觉功能自动注入 view_image_tool
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_vision_injects_view_image_tool(mock_create_agent):
+    '验证 vision、injects、view、image、tool 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     feat = RuntimeFeatures(vision=True, sandbox=True)
 
@@ -132,6 +141,7 @@ def test_vision_injects_view_image_tool(mock_create_agent):
 
 @patch("deerflow.agents.factory.create_agent")
 def test_vision_without_sandbox_does_not_inject_view_image_tool(mock_create_agent):
+    '验证 vision、without、sandbox、does、not、inject、view、image、tool 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     feat = RuntimeFeatures(vision=True, sandbox=False)
 
@@ -143,6 +153,7 @@ def test_vision_without_sandbox_does_not_inject_view_image_tool(mock_create_agen
 
 
 def test_view_image_middleware_preserves_viewed_images_reducer():
+    '验证 view、image、middleware、preserves、viewed、images、reducer 场景下的预期行为、边界条件与结果'
     middleware_hints = get_type_hints(ViewImageMiddleware.state_schema, include_extras=True)
     thread_hints = get_type_hints(ThreadState, include_extras=True)
 
@@ -150,10 +161,11 @@ def test_view_image_middleware_preserves_viewed_images_reducer():
 
 
 # ---------------------------------------------------------------------------
-# 8. Subagent feature auto-injects task_tool
+# 8.子代理功能自动注入task_tool
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_subagent_injects_task_tool(mock_create_agent):
+    '验证 subagent、injects、task、tool 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     feat = RuntimeFeatures(subagent=True, sandbox=False)
 
@@ -165,10 +177,11 @@ def test_subagent_injects_task_tool(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 9. Middleware ordering — ClarificationMiddleware always last
+# 9. 中间件排序 — ClarificationMiddleware 始终位于最后
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_clarification_always_last(mock_create_agent):
+    '验证 clarification、always、last 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     feat = RuntimeFeatures(sandbox=True, memory=True, vision=True)
 
@@ -181,9 +194,10 @@ def test_clarification_always_last(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 10. RuntimeFeatures default values
+# 10. RuntimeFeatures 默认值
 # ---------------------------------------------------------------------------
 def test_agent_features_defaults():
+    '验证 agent、features、defaults 场景下的预期行为、边界条件与结果'
     f = RuntimeFeatures()
     assert f.sandbox is True
     assert f.memory is False
@@ -196,11 +210,11 @@ def test_agent_features_defaults():
 
 
 # ---------------------------------------------------------------------------
-# 11. Tool deduplication — user-provided tools take priority
+# 11.工具重复数据删除——用户提供的工具优先
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_tool_deduplication(mock_create_agent):
-    """If user provides a tool with the same name as an auto-injected one, no duplicate."""
+    '验证 tool、deduplication 场景下的预期行为、边界条件与结果。\n\nIf user provides a tool with the same name as an auto-injected one, no duplicate.'
     mock_create_agent.return_value = MagicMock()
     user_clarification = _make_mock_tool("ask_clarification")
 
@@ -209,15 +223,16 @@ def test_tool_deduplication(mock_create_agent):
     call_kwargs = mock_create_agent.call_args[1]
     names = [t.name for t in call_kwargs["tools"]]
     assert names.count("ask_clarification") == 1
-    # The first one should be the user-provided tool
+    # 第一个应该是用户提供的工具
     assert call_kwargs["tools"][0] is user_clarification
 
 
 # ---------------------------------------------------------------------------
-# 12. Sandbox disabled — no ThreadData/Uploads/Sandbox middleware
+# 12. 沙箱已禁用 — 无 ThreadData/Uploads/Sandbox 中间件
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_sandbox_disabled(mock_create_agent):
+    '验证 sandbox、disabled 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     feat = RuntimeFeatures(sandbox=False)
 
@@ -231,10 +246,11 @@ def test_sandbox_disabled(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 13. Checkpointer passed through
+# 13. 检查点通过
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_checkpointer_passthrough(mock_create_agent):
+    '验证 checkpointer、passthrough 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     cp = MagicMock(name="checkpointer")
 
@@ -245,16 +261,17 @@ def test_checkpointer_passthrough(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 14. Custom AgentMiddleware instance replaces default
+# 14.自定义AgentMiddleware实例替换默认实例
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_custom_middleware_replaces_default(mock_create_agent):
-    """Passing an AgentMiddleware instance uses it directly instead of the built-in default."""
+    '验证 custom、middleware、replaces、default 场景下的预期行为、边界条件与结果。\n\nPassing an AgentMiddleware instance uses it directly instead of the built-in default.'
     from langchain.agents.middleware import AgentMiddleware
 
     mock_create_agent.return_value = MagicMock()
 
     class MyMemoryMiddleware(AgentMiddleware):
+        '封装 MyMemoryMiddleware 的状态、协作关系与公开操作'
         pass
 
     custom_memory = MyMemoryMiddleware()
@@ -265,22 +282,23 @@ def test_custom_middleware_replaces_default(mock_create_agent):
     call_kwargs = mock_create_agent.call_args[1]
     middleware = call_kwargs["middleware"]
     assert custom_memory in middleware
-    # Should NOT have the default MemoryMiddleware
+    # 不应该有默认的 MemoryMiddleware
     mw_types = [type(m).__name__ for m in middleware]
     assert "MemoryMiddleware" not in mw_types
 
 
 # ---------------------------------------------------------------------------
-# 15. Custom sandbox middleware replaces the 3-middleware group
+# 15.自定义沙箱中间件替换3-中间件组
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_custom_sandbox_replaces_group(mock_create_agent):
-    """Passing an AgentMiddleware for sandbox replaces ThreadData+Uploads+Sandbox with one."""
+    '验证 custom、sandbox、replaces、group 场景下的预期行为、边界条件与结果。\n\nPassing an AgentMiddleware for sandbox replaces ThreadData+Uploads+Sandbox with one.'
     from langchain.agents.middleware import AgentMiddleware
 
     mock_create_agent.return_value = MagicMock()
 
     class MySandbox(AgentMiddleware):
+        '封装 MySandbox 的状态、协作关系与公开操作'
         pass
 
     custom_sb = MySandbox()
@@ -298,10 +316,11 @@ def test_custom_sandbox_replaces_group(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 16. Always-on error handling middlewares are present
+# 16. 存在始终在线的错误处理中间件
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_always_on_error_handling(mock_create_agent):
+    '验证 always、on、error、handling 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     feat = RuntimeFeatures(sandbox=False)
 
@@ -317,16 +336,17 @@ def test_always_on_error_handling(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 17. Vision with custom middleware follows thread-data availability
+# 17. 自定义中间件的愿景遵循线程数据可用性
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_vision_custom_middleware_without_sandbox_does_not_inject_tool(mock_create_agent):
-    """Custom vision middleware without thread data does not get view_image_tool auto-injected."""
+    '验证 vision、custom、middleware、without、sandbox、does、not、inject、tool 场景下的预期行为、边界条件与结果。\n\nCustom vision middleware without thread data does not get view_image_tool auto-injected.'
     from langchain.agents.middleware import AgentMiddleware
 
     mock_create_agent.return_value = MagicMock()
 
     class MyVision(AgentMiddleware):
+        '封装 MyVision 的状态、协作关系与公开操作'
         pass
 
     feat = RuntimeFeatures(sandbox=False, vision=MyVision())
@@ -339,47 +359,54 @@ def test_vision_custom_middleware_without_sandbox_does_not_inject_tool(mock_crea
 
 
 # ===========================================================================
-# @Next / @Prev decorators and extra_middleware insertion
+# @Next / @Prev 装饰器和 extra_middleware 插入
 # ===========================================================================
 
 
 # ---------------------------------------------------------------------------
-# 18. @Next decorator sets _next_anchor
+# 18.@Next 装饰器设置 _next_anchor
 # ---------------------------------------------------------------------------
 def test_next_decorator():
+    '验证 next、decorator 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     class Anchor(AgentMiddleware):
+        '封装 Anchor 的状态、协作关系与公开操作'
         pass
 
     @Next(Anchor)
     class MyMW(AgentMiddleware):
+        '封装 MyMW 的状态、协作关系与公开操作'
         pass
 
     assert MyMW._next_anchor is Anchor
 
 
 # ---------------------------------------------------------------------------
-# 19. @Prev decorator sets _prev_anchor
+# 19. @Prev 装饰器设置 _prev_anchor
 # ---------------------------------------------------------------------------
 def test_prev_decorator():
+    '验证 prev、decorator 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     class Anchor(AgentMiddleware):
+        '封装 Anchor 的状态、协作关系与公开操作'
         pass
 
     @Prev(Anchor)
     class MyMW(AgentMiddleware):
+        '封装 MyMW 的状态、协作关系与公开操作'
         pass
 
     assert MyMW._prev_anchor is Anchor
 
 
 # ---------------------------------------------------------------------------
-# 20. extra_middleware with @Next inserts after anchor
+# 20.带有@Next的extra_middleware在锚点后插入
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_extra_next_inserts_after_anchor(mock_create_agent):
+    '验证 extra、next、inserts、after、anchor 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
@@ -388,6 +415,7 @@ def test_extra_next_inserts_after_anchor(mock_create_agent):
 
     @Next(DanglingToolCallMiddleware)
     class MyAudit(AgentMiddleware):
+        '封装 MyAudit 的状态、协作关系与公开操作'
         pass
 
     audit = MyAudit()
@@ -406,10 +434,11 @@ def test_extra_next_inserts_after_anchor(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 21. extra_middleware with @Prev inserts before anchor
+# 21.带有@Prev的extra_middleware在锚点之前插入
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_extra_prev_inserts_before_anchor(mock_create_agent):
+    '验证 extra、prev、inserts、before、anchor 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.clarification_middleware import ClarificationMiddleware
@@ -418,6 +447,7 @@ def test_extra_prev_inserts_before_anchor(mock_create_agent):
 
     @Prev(ClarificationMiddleware)
     class MyFilter(AgentMiddleware):
+        '封装 MyFilter 的状态、协作关系与公开操作'
         pass
 
     filt = MyFilter()
@@ -436,15 +466,17 @@ def test_extra_prev_inserts_before_anchor(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 22. Unanchored extra_middleware goes before ClarificationMiddleware
+# 22. 未锚定的 extra_middleware 位于 ClarificationMiddleware 之前
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_extra_unanchored_before_clarification(mock_create_agent):
+    '验证 extra、unanchored、before、clarification 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     mock_create_agent.return_value = MagicMock()
 
     class MyPlain(AgentMiddleware):
+        '封装 MyPlain 的状态、协作关系与公开操作'
         pass
 
     plain = MyPlain()
@@ -462,19 +494,22 @@ def test_extra_unanchored_before_clarification(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 23. Conflict: two extras @Next same anchor → ValueError
+# 23. 冲突：两个额外的 @Next 相同的锚 → ValueError
 # ---------------------------------------------------------------------------
 def test_extra_conflict_same_next_target():
+    '验证 extra、conflict、same、next、target 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
 
     @Next(DanglingToolCallMiddleware)
     class MW1(AgentMiddleware):
+        '封装 MW1 的状态、协作关系与公开操作'
         pass
 
     @Next(DanglingToolCallMiddleware)
     class MW2(AgentMiddleware):
+        '封装 MW2 的状态、协作关系与公开操作'
         pass
 
     with pytest.raises(ValueError, match="Conflict"):
@@ -486,19 +521,22 @@ def test_extra_conflict_same_next_target():
 
 
 # ---------------------------------------------------------------------------
-# 24. Conflict: two extras @Prev same anchor → ValueError
+# 24. 冲突：两个额外的 @Prev 相同的锚 → ValueError
 # ---------------------------------------------------------------------------
 def test_extra_conflict_same_prev_target():
+    '验证 extra、conflict、same、prev、target 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.clarification_middleware import ClarificationMiddleware
 
     @Prev(ClarificationMiddleware)
     class MW1(AgentMiddleware):
+        '封装 MW1 的状态、协作关系与公开操作'
         pass
 
     @Prev(ClarificationMiddleware)
     class MW2(AgentMiddleware):
+        '封装 MW2 的状态、协作关系与公开操作'
         pass
 
     with pytest.raises(ValueError, match="Conflict"):
@@ -510,15 +548,17 @@ def test_extra_conflict_same_prev_target():
 
 
 # ---------------------------------------------------------------------------
-# 25. Both @Next and @Prev on same class → ValueError
+# 25. @Next 和 @Prev 都在同一个类上 → ValueError
 # ---------------------------------------------------------------------------
 def test_extra_both_next_and_prev_error():
+    '验证 extra、both、next、and、prev、error 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.clarification_middleware import ClarificationMiddleware
     from deerflow.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
 
     class MW(AgentMiddleware):
+        '封装 MW 的状态、协作关系与公开操作'
         pass
 
     MW._next_anchor = DanglingToolCallMiddleware
@@ -533,10 +573,11 @@ def test_extra_both_next_and_prev_error():
 
 
 # ---------------------------------------------------------------------------
-# 26. Cross-external anchoring: extra anchors to another extra
+# 26. 交叉外部锚定：额外的锚点到另一个额外的锚点
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_extra_cross_external_anchoring(mock_create_agent):
+    '验证 extra、cross、external、anchoring 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
@@ -545,10 +586,12 @@ def test_extra_cross_external_anchoring(mock_create_agent):
 
     @Next(DanglingToolCallMiddleware)
     class First(AgentMiddleware):
+        '封装 First 的状态、协作关系与公开操作'
         pass
 
     @Next(First)
     class Second(AgentMiddleware):
+        '封装 Second 的状态、协作关系与公开操作'
         pass
 
     create_deerflow_agent(
@@ -568,16 +611,19 @@ def test_extra_cross_external_anchoring(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 27. Unresolvable anchor → ValueError
+# 27. 无法解析的锚 → ValueError
 # ---------------------------------------------------------------------------
 def test_extra_unresolvable_anchor():
+    '验证 extra、unresolvable、anchor 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     class Ghost(AgentMiddleware):
+        '封装 Ghost 的状态、协作关系与公开操作'
         pass
 
     @Next(Ghost)
     class MW(AgentMiddleware):
+        '封装 MW 的状态、协作关系与公开操作'
         pass
 
     with pytest.raises(ValueError, match="Cannot resolve"):
@@ -589,9 +635,10 @@ def test_extra_unresolvable_anchor():
 
 
 # ---------------------------------------------------------------------------
-# 28. extra_middleware + middleware (full takeover) → ValueError
+# 28. extra_middleware + 中间件（完全接管）→ ValueError
 # ---------------------------------------------------------------------------
 def test_extra_with_middleware_takeover_conflict():
+    '验证 extra、with、middleware、takeover、conflict 场景下的预期行为、边界条件与结果'
     with pytest.raises(ValueError, match="full takeover"):
         create_deerflow_agent(
             _make_mock_model(),
@@ -601,15 +648,16 @@ def test_extra_with_middleware_takeover_conflict():
 
 
 # ===========================================================================
-# LoopDetection, TodoMiddleware, GuardrailMiddleware
+# LoopDetection、TodoMiddleware、GuardrailMiddleware
 # ===========================================================================
 
 
 # ---------------------------------------------------------------------------
-# 29. LoopDetectionMiddleware is always present
+# 29. LoopDetectionMiddleware 始终存在
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_loop_detection_always_present(mock_create_agent):
+    '验证 loop、detection、always、present 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     create_deerflow_agent(_make_mock_model(), features=RuntimeFeatures(sandbox=False))
 
@@ -619,10 +667,11 @@ def test_loop_detection_always_present(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 30. LoopDetection before Clarification
+# 30. 澄清之前的 LoopDetection
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_loop_detection_before_clarification(mock_create_agent):
+    '验证 loop、detection、before、clarification 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     create_deerflow_agent(_make_mock_model(), features=RuntimeFeatures(sandbox=False))
 
@@ -635,10 +684,11 @@ def test_loop_detection_before_clarification(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 30b. loop_detection=False skips LoopDetectionMiddleware
+# 30b。 Loop_Detection=False 跳过 LoopDetectionMiddleware
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_loop_detection_disabled(mock_create_agent):
+    '验证 loop、detection、disabled 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     create_deerflow_agent(
         _make_mock_model(),
@@ -651,15 +701,17 @@ def test_loop_detection_disabled(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 30c. loop_detection=<custom AgentMiddleware> replaces the default
+# 30c。 Loop_Detection=<自定义AgentMiddleware>替换默认的
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_loop_detection_custom_middleware(mock_create_agent):
+    '验证 loop、detection、custom、middleware 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware as AM
 
     mock_create_agent.return_value = MagicMock()
 
     class MyLoopDetection(AM):
+        '封装 MyLoopDetection 的状态、协作关系与公开操作'
         pass
 
     custom = MyLoopDetection()
@@ -672,18 +724,19 @@ def test_loop_detection_custom_middleware(mock_create_agent):
     middleware = call_kwargs["middleware"]
     assert custom in middleware
     mw_types = [type(m).__name__ for m in middleware]
-    # Default LoopDetectionMiddleware must not also appear.
+    # 默认 LoopDetectionMiddleware 也不得出现。
     assert "LoopDetectionMiddleware" not in mw_types
-    # Custom replacement sits immediately before TokenBudgetMiddleware and ClarificationMiddleware.
+    # 自定义替换位于 TokenBudgetMiddleware 和 ClarificationMiddleware 之前。
     assert mw_types[-1] == "ClarificationMiddleware"
     assert mw_types[-2] == "MyLoopDetection"
 
 
 # ---------------------------------------------------------------------------
-# 31. plan_mode=True adds TodoMiddleware
+# 31. plan_mode=True 添加 TodoMiddleware
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_plan_mode_adds_todo_middleware(mock_create_agent):
+    '验证 plan、mode、adds、todo、middleware 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     create_deerflow_agent(_make_mock_model(), features=RuntimeFeatures(sandbox=False), plan_mode=True)
 
@@ -693,10 +746,11 @@ def test_plan_mode_adds_todo_middleware(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 32. plan_mode=False (default) — no TodoMiddleware
+# 32. plan_mode=False（默认）— 无 TodoMiddleware
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_plan_mode_default_no_todo(mock_create_agent):
+    '验证 plan、mode、default、no、todo 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     create_deerflow_agent(_make_mock_model(), features=RuntimeFeatures(sandbox=False))
 
@@ -706,9 +760,10 @@ def test_plan_mode_default_no_todo(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 33. summarization=True without model → ValueError
+# 33. 摘要=没有模型的 True → ValueError
 # ---------------------------------------------------------------------------
 def test_summarization_true_raises():
+    '验证 summarization、true、raises 场景下的预期行为、边界条件与结果'
     with pytest.raises(ValueError, match="requires a custom AgentMiddleware"):
         create_deerflow_agent(
             _make_mock_model(),
@@ -717,9 +772,10 @@ def test_summarization_true_raises():
 
 
 # ---------------------------------------------------------------------------
-# 34. guardrail=True without built-in → ValueError
+# 34.guardrail=True 不带内置 → ValueError
 # ---------------------------------------------------------------------------
 def test_guardrail_true_raises():
+    '验证 guardrail、true、raises 场景下的预期行为、边界条件与结果'
     with pytest.raises(ValueError, match="requires a custom AgentMiddleware"):
         create_deerflow_agent(
             _make_mock_model(),
@@ -728,15 +784,17 @@ def test_guardrail_true_raises():
 
 
 # ---------------------------------------------------------------------------
-# 34. guardrail with custom AgentMiddleware replaces default
+# 34.用自定义AgentMiddleware替换默认的护栏
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_guardrail_custom_middleware(mock_create_agent):
+    '验证 guardrail、custom、middleware 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware as AM
 
     mock_create_agent.return_value = MagicMock()
 
     class MyGuardrail(AM):
+        '封装 MyGuardrail 的状态、协作关系与公开操作'
         pass
 
     custom = MyGuardrail()
@@ -753,10 +811,11 @@ def test_guardrail_custom_middleware(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 35. guardrail=False (default) — no GuardrailMiddleware
+# 35.guardrail=False（默认）— 无 GuardrailMiddleware
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_guardrail_default_off(mock_create_agent):
+    '验证 guardrail、default、off 场景下的预期行为、边界条件与结果'
     mock_create_agent.return_value = MagicMock()
     create_deerflow_agent(_make_mock_model(), features=RuntimeFeatures(sandbox=False))
 
@@ -766,18 +825,21 @@ def test_guardrail_default_off(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 36. Full chain order matches make_lead_agent (all features on)
+# 36. 全链顺序匹配 make_lead_agent （所有功能开启）
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_full_chain_order(mock_create_agent):
+    '验证 full、chain、order 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware as AM
 
     mock_create_agent.return_value = MagicMock()
 
     class MyGuardrail(AM):
+        '封装 MyGuardrail 的状态、协作关系与公开操作'
         pass
 
     class MySummarization(AM):
+        '封装 MySummarization 的状态、协作关系与公开操作'
         pass
 
     feat = RuntimeFeatures(
@@ -814,11 +876,11 @@ def test_full_chain_order(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 37. @Next(ClarificationMiddleware) does not break tail invariant
+# 37. @Next(ClarificationMiddleware) 不会破坏尾部不变式
 # ---------------------------------------------------------------------------
 @patch("deerflow.agents.factory.create_agent")
 def test_next_clarification_preserves_tail_invariant(mock_create_agent):
-    """Even with @Next(ClarificationMiddleware), Clarification stays last."""
+    '验证 next、clarification、preserves、tail、invariant 场景下的预期行为、边界条件与结果。\n\nEven with @Next(ClarificationMiddleware), Clarification stays last.'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.clarification_middleware import ClarificationMiddleware
@@ -827,6 +889,7 @@ def test_next_clarification_preserves_tail_invariant(mock_create_agent):
 
     @Next(ClarificationMiddleware)
     class AfterClar(AgentMiddleware):
+        '封装 AfterClar 的状态、协作关系与公开操作'
         pass
 
     create_deerflow_agent(
@@ -843,19 +906,22 @@ def test_next_clarification_preserves_tail_invariant(mock_create_agent):
 
 
 # ---------------------------------------------------------------------------
-# 38. @Next(X) + @Prev(X) on same anchor from different extras → ValueError
+# 38.来自不同额外内容的同一锚点上的 @Next(X) + @Prev(X) → ValueError
 # ---------------------------------------------------------------------------
 def test_extra_opposite_direction_same_anchor_conflict():
+    '验证 extra、opposite、direction、same、anchor、conflict 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     from deerflow.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
 
     @Next(DanglingToolCallMiddleware)
     class AfterDangling(AgentMiddleware):
+        '封装 AfterDangling 的状态、协作关系与公开操作'
         pass
 
     @Prev(DanglingToolCallMiddleware)
     class BeforeDangling(AgentMiddleware):
+        '封装 BeforeDangling 的状态、协作关系与公开操作'
         pass
 
     with pytest.raises(ValueError, match="cross-anchoring"):
@@ -867,36 +933,41 @@ def test_extra_opposite_direction_same_anchor_conflict():
 
 
 # ===========================================================================
-# Input validation and error message hardening
+# 输入验证和错误消息强化
 # ===========================================================================
 
 
 # ---------------------------------------------------------------------------
-# 39. @Next with non-AgentMiddleware anchor → TypeError
+# 39. @Next 带有非 AgentMiddleware 锚 → TypeError
 # ---------------------------------------------------------------------------
 def test_next_bad_anchor_type():
+    '验证 next、bad、anchor、type 场景下的预期行为、边界条件与结果'
     with pytest.raises(TypeError, match="AgentMiddleware subclass"):
 
         @Next(str)  # type: ignore[arg-type]
         class MW:
+            '封装 MW 的状态、协作关系与公开操作'
             pass
 
 
 # ---------------------------------------------------------------------------
-# 40. @Prev with non-AgentMiddleware anchor → TypeError
+# 40. @Prev 带有非 AgentMiddleware 锚 → TypeError
 # ---------------------------------------------------------------------------
 def test_prev_bad_anchor_type():
+    '验证 prev、bad、anchor、type 场景下的预期行为、边界条件与结果'
     with pytest.raises(TypeError, match="AgentMiddleware subclass"):
 
         @Prev(42)  # type: ignore[arg-type]
         class MW:
+            '封装 MW 的状态、协作关系与公开操作'
             pass
 
 
 # ---------------------------------------------------------------------------
-# 41. extra_middleware with non-AgentMiddleware item → TypeError
+# 41.带有非 AgentMiddleware 项的 extra_middleware → TypeError
 # ---------------------------------------------------------------------------
 def test_extra_middleware_bad_type():
+    '验证 extra、middleware、bad、type 场景下的预期行为、边界条件与结果'
     with pytest.raises(TypeError, match="AgentMiddleware instances"):
         create_deerflow_agent(
             _make_mock_model(),
@@ -906,15 +977,18 @@ def test_extra_middleware_bad_type():
 
 
 # ---------------------------------------------------------------------------
-# 42. Circular dependency among extras → clear error message
+# 42. extras 之间的循环依赖 → 清除错误消息
 # ---------------------------------------------------------------------------
 def test_extra_circular_dependency():
+    '验证 extra、circular、dependency 场景下的预期行为、边界条件与结果'
     from langchain.agents.middleware import AgentMiddleware
 
     class MW_A(AgentMiddleware):
+        '封装 MW_A 的状态、协作关系与公开操作'
         pass
 
     class MW_B(AgentMiddleware):
+        '封装 MW_B 的状态、协作关系与公开操作'
         pass
 
     MW_A._next_anchor = MW_B  # type: ignore[attr-defined]

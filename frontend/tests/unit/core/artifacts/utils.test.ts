@@ -16,6 +16,11 @@ type EnvSnapshot = Partial<
   Record<(typeof ENV_KEYS)[number], string | undefined>
 >;
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 snapshotEnv 的约定。
+
+ */
+
 function snapshotEnv(): EnvSnapshot {
   const snapshot: EnvSnapshot = {};
   for (const key of ENV_KEYS) {
@@ -23,6 +28,11 @@ function snapshotEnv(): EnvSnapshot {
   }
   return snapshot;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 setEnv 的约定。
+
+ */
 
 function setEnv(key: (typeof ENV_KEYS)[number], value: string | undefined) {
   const env = process.env as Record<string, string | undefined>;
@@ -33,11 +43,21 @@ function setEnv(key: (typeof ENV_KEYS)[number], value: string | undefined) {
   }
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 restoreEnv 的约定。
+
+ */
+
 function restoreEnv(snapshot: EnvSnapshot) {
   for (const key of ENV_KEYS) {
     setEnv(key, snapshot[key]);
   }
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 loadFreshArtifactUtils 的约定。
+
+ */
 
 async function loadFreshArtifactUtils() {
   rs.resetModules();
@@ -57,6 +77,11 @@ describe("artifact URL helpers", () => {
     restoreEnv(saved);
   });
 
+  /**
+   * 覆盖“maps static demo artifact paths to bundled public files”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("maps static demo artifact paths to bundled public files", async () => {
     setEnv("NEXT_PUBLIC_STATIC_WEBSITE_ONLY", "true");
 
@@ -74,6 +99,11 @@ describe("artifact URL helpers", () => {
     ).toBe("/demo/threads/thread-1/user-data/outputs/style.css");
   });
 
+  /**
+   * 覆盖“returns stable artifact path references”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("returns stable artifact path references", async () => {
     const { extractArtifactsFromThread } = await loadFreshArtifactUtils();
     const threadWithoutArtifacts = { values: {} };
@@ -86,6 +116,11 @@ describe("artifact URL helpers", () => {
       artifacts,
     );
   });
+
+  /**
+   * 覆盖“resolves absolute and relative message image paths”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("resolves absolute and relative message image paths", async () => {
     const { resolveMessageImageURL } = await loadFreshArtifactUtils();
@@ -120,6 +155,11 @@ describe("artifact URL helpers", () => {
       resolveMessageImageURL("outputs/chart.png", "thread-1", artifacts),
     ).toBe("/api/threads/thread-1/artifacts/mnt/user-data/outputs/chart.png");
   });
+
+  /**
+   * 覆盖“does not rewrite unregistered, ambiguous, or external message images”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("does not rewrite unregistered, ambiguous, or external message images", async () => {
     const { resolveMessageImageURL } = await loadFreshArtifactUtils();

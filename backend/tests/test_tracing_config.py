@@ -1,4 +1,4 @@
-"""Tests for deerflow.config.tracing_config."""
+'未说明'
 
 from __future__ import annotations
 
@@ -9,11 +9,13 @@ from deerflow.config.tracing_config import reset_tracing_config
 
 
 def _reset_tracing_cache() -> None:
+    '未说明'
     reset_tracing_config()
 
 
 @pytest.fixture(autouse=True)
 def clear_tracing_env(monkeypatch):
+    '未说明'
     for name in (
         "LANGSMITH_TRACING",
         "LANGCHAIN_TRACING_V2",
@@ -39,6 +41,7 @@ def clear_tracing_env(monkeypatch):
 
 
 def test_prefers_langsmith_env_names(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGSMITH_TRACING", "true")
     monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_key")
     monkeypatch.setenv("LANGSMITH_PROJECT", "smith-project")
@@ -56,6 +59,7 @@ def test_prefers_langsmith_env_names(monkeypatch):
 
 
 def test_falls_back_to_langchain_env_names(monkeypatch):
+    '未说明'
     monkeypatch.delenv("LANGSMITH_TRACING", raising=False)
     monkeypatch.delenv("LANGSMITH_API_KEY", raising=False)
     monkeypatch.delenv("LANGSMITH_PROJECT", raising=False)
@@ -78,7 +82,7 @@ def test_falls_back_to_langchain_env_names(monkeypatch):
 
 
 def test_langsmith_tracing_false_overrides_langchain_tracing_v2_true(monkeypatch):
-    """LANGSMITH_TRACING=false must win over LANGCHAIN_TRACING_V2=true."""
+    '未说明'
     monkeypatch.setenv("LANGSMITH_TRACING", "false")
     monkeypatch.setenv("LANGCHAIN_TRACING_V2", "true")
     monkeypatch.setenv("LANGSMITH_API_KEY", "some-key")
@@ -92,6 +96,7 @@ def test_langsmith_tracing_false_overrides_langchain_tracing_v2_true(monkeypatch
 
 
 def test_defaults_when_project_not_set(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGSMITH_TRACING", "yes")
     monkeypatch.setenv("LANGSMITH_API_KEY", "key")
     monkeypatch.delenv("LANGSMITH_PROJECT", raising=False)
@@ -104,6 +109,7 @@ def test_defaults_when_project_not_set(monkeypatch):
 
 
 def test_langfuse_config_is_loaded(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -120,6 +126,7 @@ def test_langfuse_config_is_loaded(monkeypatch):
 
 
 def test_dual_provider_config_is_loaded(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGSMITH_TRACING", "true")
     monkeypatch.setenv("LANGSMITH_API_KEY", "lsv2_key")
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
@@ -136,6 +143,7 @@ def test_dual_provider_config_is_loaded(monkeypatch):
 
 
 def test_langfuse_enabled_requires_public_and_secret_keys(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.delenv("LANGFUSE_PUBLIC_KEY", raising=False)
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")

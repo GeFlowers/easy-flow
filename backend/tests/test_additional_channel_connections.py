@@ -1,4 +1,4 @@
-"""Connection binding tests for browser-connectable IM channels beyond Telegram/Slack/Discord."""
+"""覆盖本模块的可回归测试，固定关键输入、失败分支与资源生命周期，避免后续改动破坏既有契约。"""
 
 from __future__ import annotations
 
@@ -10,33 +10,39 @@ from app.channels.message_bus import InboundMessage, MessageBus, OutboundMessage
 
 
 class _StubChannel(Channel):
-    """Minimal concrete Channel used to exercise base-class helpers directly."""
+    """归集“该项通道”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     async def start(self) -> None:  # pragma: no cover - not exercised
+        """为“启动”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         pass
 
     async def stop(self) -> None:  # pragma: no cover - not exercised
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         pass
 
     async def send(self, msg: OutboundMessage) -> None:  # pragma: no cover - not exercised
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         pass
 
 
 def test_pending_connect_code_extracts_code_when_connections_configured():
+    """验证“待处理连接该项该项该项当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     channel = _StubChannel(name="stub", bus=MessageBus(), config={"connection_repo": object()})
-    # A connect command yields its code; ordinary text does not.
+    # 连接命令产生其代码；普通文本则不然。
     assert channel._pending_connect_code("/connect abc123") == "abc123"
     assert channel._pending_connect_code("hello world") is None
 
 
 def test_pending_connect_code_is_none_when_connections_disabled():
-    # With no connection repo, binding is not configured and connect codes are
-    # ignored so the message falls through to normal handling.
+    # 如果没有连接存储库，则不会配置绑定，并且连接代码为
+    # 被忽略，因此消息无法正常处理。
+    """验证“待处理连接该项该项空值当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     channel = _StubChannel(name="stub", bus=MessageBus(), config={})
     assert channel._pending_connect_code("/connect abc123") is None
 
 
 async def _make_repo(tmp_path, name: str):
+    """为“构造该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     from deerflow.persistence.channel_connections import ChannelConnectionRepository
     from deerflow.persistence.engine import get_session_factory, init_engine
 
@@ -45,6 +51,7 @@ async def _make_repo(tmp_path, name: str):
 
 
 async def _seed_state(repo, provider: str, state: str, owner_user_id: str = "deerflow-user-1") -> None:
+    """为“初始化状态”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     await repo.create_oauth_state(
         owner_user_id=owner_user_id,
         provider=provider,
@@ -54,11 +61,13 @@ async def _seed_state(repo, provider: str, state: str, owner_user_id: str = "dee
 
 
 def test_feishu_connect_command_binds_identity(tmp_path):
+    """验证“该项连接命令绑定身份”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     import anyio
 
     from app.channels.feishu import FeishuChannel
 
     async def go():
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         repo = await _make_repo(tmp_path, "feishu")
         state = "feishu-bind-code"
         await _seed_state(repo, "feishu", state)
@@ -88,11 +97,13 @@ def test_feishu_connect_command_binds_identity(tmp_path):
 
 
 def test_dingtalk_connect_command_binds_identity(tmp_path):
+    """验证“该项连接命令绑定身份”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     import anyio
 
     from app.channels.dingtalk import _CONVERSATION_TYPE_GROUP, DingTalkChannel
 
     async def go():
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         repo = await _make_repo(tmp_path, "dingtalk")
         state = "dingtalk-bind-code"
         await _seed_state(repo, "dingtalk", state)
@@ -124,11 +135,13 @@ def test_dingtalk_connect_command_binds_identity(tmp_path):
 
 
 def test_wechat_connect_command_binds_identity(tmp_path):
+    """验证“该项连接命令绑定身份”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     import anyio
 
     from app.channels.wechat import WechatChannel
 
     async def go():
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         repo = await _make_repo(tmp_path, "wechat")
         state = "wechat-bind-code"
         await _seed_state(repo, "wechat", state)
@@ -157,11 +170,13 @@ def test_wechat_connect_command_binds_identity(tmp_path):
 
 
 def test_wecom_connect_command_binds_identity(tmp_path):
+    """验证“该项连接命令绑定身份”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     import anyio
 
     from app.channels.wecom import WeComChannel
 
     async def go():
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         repo = await _make_repo(tmp_path, "wecom")
         state = "wecom-bind-code"
         await _seed_state(repo, "wecom", state)
@@ -192,6 +207,7 @@ def test_wecom_connect_command_binds_identity(tmp_path):
 
 
 def test_additional_channels_attach_owner_identity(tmp_path):
+    """验证“额外该项该项所有者身份”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     import anyio
 
     from app.channels.dingtalk import _CONVERSATION_TYPE_GROUP, DingTalkChannel
@@ -200,6 +216,7 @@ def test_additional_channels_attach_owner_identity(tmp_path):
     from app.channels.wecom import WeComChannel
 
     async def go():
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         repo = await _make_repo(tmp_path, "additional-identity")
         await repo.upsert_connection(
             owner_user_id="deerflow-user-1",

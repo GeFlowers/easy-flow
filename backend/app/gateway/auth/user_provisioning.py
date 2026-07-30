@@ -1,9 +1,7 @@
-"""User provisioning for OIDC logins.
+"""为 OIDC 登录配置用户。
 
-Handles the logic of finding existing users, auto-creating new ones, and
-enforcing email domain restrictions. A pre-existing local account is never
-auto-linked to an OIDC identity: an email collision blocks the SSO login with
-a 409 instead, so an SSO login can never seize a local password account.
+本模块查找已有用户、按规则自动创建用户并限制邮箱域名。已有本地账户绝不自动
+绑定 OIDC 身份；邮箱冲突会以 409 阻止 SSO 登录，避免 SSO 身份接管密码账户。
 """
 
 from __future__ import annotations
@@ -25,22 +23,13 @@ async def get_or_provision_oidc_user(
     identity: OIDCIdentity,
     local_provider: LocalAuthProvider,
 ) -> dict:
-    """Resolve an OIDC identity to a DeerFlow user.
-
-    Flow:
-    1. Look up existing user by (provider, subject)
-    2. If not found, enforce domain/email-verified rules
-    3. Block if a local account already owns the email (never auto-link)
-    4. Auto-create if enabled
-
-    Returns a dict with ``user`` (the User model instance) and ``created`` (bool).
-    """
-    # 1. Existing OAuth link
+    """将 OIDC 身份解析为 DeerFlow 用户，并保持本地账户与 SSO 身份隔离。"""
+    # 1. 已有关联的第三方登录身份
     existing = await local_provider.get_user_by_oauth(provider_id, identity.subject)
     if existing:
         return {"user": existing, "created": False}
 
-    # 2. Verified email requirement
+    # 2. 必须满足已验证邮箱要求
     if provider_config.require_verified_email and not identity.email_verified:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -55,7 +44,7 @@ async def get_or_provision_oidc_user(
 
     email = identity.email.lower()
 
-    # 3. Domain restriction
+    # 3. 邮箱域名限制
     if provider_config.allowed_email_domains:
         domain = email.rsplit("@", 1)[-1]
         if domain not in {d.lower().lstrip("@") for d in provider_config.allowed_email_domains}:
@@ -64,9 +53,8 @@ async def get_or_provision_oidc_user(
                 detail="Your email domain is not allowed. Please use an approved email address.",
             )
 
-    # 4. Block if a local account already owns this email. We never auto-link an
-    # SSO identity onto a pre-existing local account, since that would let an SSO
-    # login take over a password account that happens to share the email.
+    # 4. 若本地账户已占用该邮箱则阻止登录。绝不把单点登录身份自动关联到已有本地
+    # 账户，否则同邮箱的单点登录可能接管该密码账户。
     local_user = await local_provider.get_user_by_email(email)
 
     if local_user:
@@ -75,7 +63,7 @@ async def get_or_provision_oidc_user(
             detail=("An account with this email already exists. Contact your administrator to link it to your SSO account."),
         )
 
-    # 5. Auto-create
+    # 5. 自动创建用户
     if not provider_config.auto_create_users:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -91,10 +79,8 @@ async def get_or_provision_oidc_user(
             system_role=role,
         )
     except ValueError:
-        # Lost a race: a concurrent callback (double-click, replayed code) already
-        # inserted a row that collides on the unique index. Re-resolve instead of
-        # bubbling a raw 500. If the winner created this same identity, return it;
-        # otherwise the email now belongs to a different account → 409.
+        # 并发回调（双击或重放授权码）可能已插入触发唯一索引冲突的行。重新解析而
+        # 非抛出原始 500：若胜者创建了同一身份则返回它，否则邮箱现属另一账户并返回 409。
         existing = await local_provider.get_user_by_oauth(provider_id, identity.subject)
         if existing:
             return {"user": existing, "created": False}
@@ -107,6 +93,6 @@ async def get_or_provision_oidc_user(
 
 
 def _resolve_role(email: str, admin_emails: list[str]) -> str:
-    """Return ``admin`` if the email is in the admin list, otherwise ``user``."""
+    """邮箱在管理员名单中时返回 ``admin``，否则返回 ``user``。"""
     email_lower = email.lower()
     return "admin" if any(e.lower() == email_lower for e in admin_emails) else "user"

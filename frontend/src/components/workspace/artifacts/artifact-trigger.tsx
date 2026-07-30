@@ -8,6 +8,7 @@ import { useMaybeSidecar } from "../sidecar/context";
 
 import { useArtifacts } from "./context";
 
+/** 渲染打开产物面板的触发器，复用产物上下文的选择状态。 */
 export const ArtifactTrigger = () => {
   const { t } = useI18n();
   const { artifacts, setOpen: setArtifactsOpen } = useArtifacts();

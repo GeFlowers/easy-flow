@@ -1,38 +1,4 @@
-"""Idempotent helpers for alembic column revisions.
-
-Column revisions in ``versions/`` should use these helpers instead of raw
-``op.add_column`` / ``op.drop_column`` so re-running a column change against a
-DB that already has (or has already removed) the column is a safe no-op.
-
-Two reasons we need idempotency:
-
-1. **Defence-in-depth on top of bootstrap locking.** ``bootstrap_schema()``
-   serialises Postgres with an advisory lock and SQLite within one process
-   with an ``asyncio.Lock``. If a retry happens anyway (manual ALTER,
-   misconfiguration, SQLite cross-process contention), the revision must still
-   be safe to re-run.
-
-2. **Same posture that made ``Base.metadata.create_all`` forgiving.**
-   ``create_all`` skips existing tables. Column migrations should mirror that
-   forgiving behavior by skipping columns already in the desired state.
-
-Drift warning
--------------
-
-Name-match alone can hide a column that a manual ``ALTER`` (for example the
-#3682 workaround that ran ``ALTER TABLE runs ADD COLUMN token_usage_by_model
-JSON`` without ``NOT NULL DEFAULT '{}'``, or the wrong-type variant
-``ALTER TABLE runs ADD COLUMN token_usage_by_model TEXT NOT NULL DEFAULT
-'{}'``) left in a shape that diverges from what ``Base.metadata.create_all``
-would produce on a fresh DB. To surface that silent drift, ``safe_add_column``
-compares the existing column's ``nullable`` / ``server_default`` / ``type``
-against the desired ``sa.Column`` and emits ``logger.warning`` on mismatch.
-Type comparison goes through ``_type_equivalent``, which treats known
-dialect-synonym pairs (e.g. ``JSON`` vs ``JSONB``) as equivalent to avoid
-false positives while still catching wholesale type mismatches like
-``TEXT`` vs ``JSON``. We do not auto-repair -- a warning is enough for
-operators to notice and decide.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -45,18 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 def _inspector() -> sa.Inspector:
+    """执行持久化流程所需的内部辅助操作。"""
     return sa.inspect(op.get_bind())
 
 
 def _normalize_default(value: object) -> str | None:
-    """Normalize a server-default value for cross-source comparison.
-
-    The desired value comes from ``sa.Column.server_default`` (a
-    ``DefaultClause`` / ``TextClause`` literal, ``None``, or a Python literal);
-    the reflected value comes from ``Inspector.get_columns()['default']`` as a
-    dialect-rendered string. Strip outer parens / whitespace / Postgres-style
-    type casts so textually-equivalent forms compare equal across dialects.
-    """
+    """执行持久化流程所需的内部辅助操作。"""
     if value is None:
         return None
     if isinstance(value, sa.sql.elements.TextClause):
@@ -76,15 +36,7 @@ def _normalize_default(value: object) -> str | None:
 
 
 def _normalize_type(value: object) -> str:
-    """Normalize a SQLAlchemy ``TypeEngine`` (or reflected type) for comparison.
-
-    Returns the upper-cased type-class name with any parameters stripped
-    (e.g. ``JSON()`` → ``"JSON"``, ``VARCHAR(255)`` → ``"VARCHAR"``). Length
-    parameters are dropped on purpose: drift warnings target wholesale type
-    misconfigurations (the JSON-vs-TEXT review case), not dialect-rendered
-    size defaults. An empty string signals "missing info" -- callers should
-    not equality-check empty strings.
-    """
+    """执行持久化流程所需的内部辅助操作。"""
     if value is None:
         return ""
     s = value if isinstance(value, str) else repr(value)
@@ -105,11 +57,7 @@ _EQUIVALENT_TYPE_FAMILIES: tuple[frozenset[str], ...] = (frozenset({"JSON", "JSO
 
 
 def _type_equivalent(actual: object, desired: object) -> bool:
-    """True if *actual* and *desired* are the same type or a known equivalent.
-
-    Returns True when either side is missing reflected info so missing-data
-    cases never false-positive into a noisy warning.
-    """
+    """执行持久化流程所需的内部辅助操作。"""
     a = _normalize_type(actual)
     d = _normalize_type(desired)
     if not a or not d:
@@ -121,15 +69,7 @@ def _type_equivalent(actual: object, desired: object) -> bool:
 
 
 def _check_column_drift(table: str, desired: sa.Column, actual: dict) -> None:
-    """Warn if an existing column's attributes diverge from the desired model.
-
-    Equality is checked on ``nullable`` and ``server_default`` directly, and
-    on ``type`` via ``_type_equivalent`` (which treats known dialect-synonym
-    pairs like ``JSON`` vs ``JSONB`` as equivalent). The reflected and
-    desired type reprs are also echoed in the warning payload regardless of
-    whether type was the failing dimension, so an operator triaging the log
-    line sees the type context at a glance.
-    """
+    """执行持久化流程所需的内部辅助操作。"""
     diffs: list[str] = []
 
     desired_nullable = True if desired.nullable is None else bool(desired.nullable)
@@ -157,15 +97,7 @@ def _check_column_drift(table: str, desired: sa.Column, actual: dict) -> None:
 
 
 def safe_add_column(table: str, column: sa.Column) -> None:
-    """``op.add_column`` that no-ops when the table or column is missing/present.
-
-    - Missing table => nothing to add to. Skip silently because bootstrap only
-      supports legacy DBs that already have the baseline table set.
-    - Column already exists => no-op. Before returning, ``_check_column_drift``
-      compares the existing column's nullability / server_default / type
-      against the desired ``column`` and ``logger.warning``\\ s on mismatch so
-      manually-applied workarounds do not silently survive as latent drift.
-    """
+    """执行当前持久化组件提供的操作。"""
     insp = _inspector()
     if table not in insp.get_table_names():
         return
@@ -178,7 +110,7 @@ def safe_add_column(table: str, column: sa.Column) -> None:
 
 
 def safe_drop_column(table: str, column_name: str) -> None:
-    """``op.drop_column`` that no-ops when the table or column is already gone."""
+    """执行当前持久化组件提供的操作。"""
     insp = _inspector()
     if table not in insp.get_table_names():
         return

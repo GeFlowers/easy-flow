@@ -1,3 +1,4 @@
+'未说明'
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from unittest.mock import AsyncMock
@@ -8,17 +9,22 @@ from app.gateway.routers import scheduled_tasks
 
 
 class _Repo:
+    '未说明'
     def __init__(self) -> None:
+        '未说明'
         self.created = []
         self.items = {}
 
     async def list_by_user(self, user_id: str):
+        """处理用户相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return [item for item in self.items.values() if item["user_id"] == user_id]
 
     async def list_by_user_and_thread(self, user_id: str, thread_id: str):
+        """处理用户 会话相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return [item for item in self.items.values() if item["user_id"] == user_id and item["thread_id"] == thread_id]
 
     async def create(self, **kwargs):
+        """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         item = {
             "id": kwargs["task_id"],
             "user_id": kwargs["user_id"],
@@ -37,12 +43,14 @@ class _Repo:
         return item
 
     async def get(self, task_id: str, *, user_id: str):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         item = self.items.get(task_id)
         if item is None or item["user_id"] != user_id:
             return None
         return item
 
     async def update(self, task_id: str, *, user_id: str, updates):
+        '未说明'
         item = await self.get(task_id, user_id=user_id)
         if item is None:
             return None
@@ -50,6 +58,7 @@ class _Repo:
         return item
 
     async def delete(self, task_id: str, *, user_id: str):
+        '未说明'
         item = await self.get(task_id, user_id=user_id)
         if item is None:
             return False
@@ -57,24 +66,31 @@ class _Repo:
         return True
 
     async def list_by_task(self, task_id: str):
+        """处理任务相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return []
 
 
 class _Service:
+    """为服务提供测试所需的隔离替身或组织结构，不承担生产实现职责。"""
     def __init__(self) -> None:
+        '未说明'
         self.calls = []
         self.result = {"outcome": "launched"}
 
     async def dispatch_task(self, task, *, now, trigger):
+        """处理任务相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.calls.append((task, now, trigger))
         return self.result
 
 
 class _RunStore:
+    '未说明'
     def __init__(self, runs):
+        '未说明'
         self.runs = runs
 
     async def get(self, run_id: str, *, user_id: str):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         run = self.runs.get(run_id)
         if run is None or run.get("user_id") != user_id:
             return None
@@ -82,12 +98,15 @@ class _RunStore:
 
 
 class _Config:
+    """为配置提供测试所需的隔离替身或组织结构，不承担生产实现职责。"""
     def __init__(self, min_once_delay_seconds: int = 60) -> None:
+        '未说明'
         self.scheduler = SimpleNamespace(min_once_delay_seconds=min_once_delay_seconds)
 
 
 @pytest.mark.asyncio
 async def test_create_scheduled_task_uses_repo():
+    '未说明'
     repo = _Repo()
     request = SimpleNamespace()
     body = scheduled_tasks.ScheduledTaskCreateRequest(
@@ -130,6 +149,7 @@ async def test_create_scheduled_task_uses_repo():
 
 @pytest.mark.asyncio
 async def test_create_fresh_thread_task_does_not_require_thread_id():
+    '未说明'
     repo = _Repo()
     request = SimpleNamespace()
     body = scheduled_tasks.ScheduledTaskCreateRequest(
@@ -172,6 +192,7 @@ async def test_create_fresh_thread_task_does_not_require_thread_id():
 
 @pytest.mark.asyncio
 async def test_trigger_scheduled_task_dispatches_manual_run():
+    '未说明'
     repo = _Repo()
     service = _Service()
     task = await repo.create(
@@ -214,6 +235,7 @@ async def test_trigger_scheduled_task_dispatches_manual_run():
 
 @pytest.mark.asyncio
 async def test_trigger_scheduled_task_returns_conflict_when_dispatch_conflicts():
+    '未说明'
     repo = _Repo()
     service = _Service()
     service.result = {"outcome": "conflict", "error": "Thread thread-1 already has an active run"}
@@ -256,6 +278,7 @@ async def test_trigger_scheduled_task_returns_conflict_when_dispatch_conflicts()
 
 @pytest.mark.asyncio
 async def test_update_scheduled_task_writes_repo():
+    '未说明'
     repo = _Repo()
     task = await repo.create(
         task_id="task-1",
@@ -301,6 +324,7 @@ async def test_update_scheduled_task_writes_repo():
 
 @pytest.mark.asyncio
 async def test_delete_scheduled_task_deletes_repo_row():
+    '未说明'
     repo = _Repo()
     task = await repo.create(
         task_id="task-1",
@@ -338,6 +362,7 @@ async def test_delete_scheduled_task_deletes_repo_row():
 
 @pytest.mark.asyncio
 async def test_pause_and_resume_scheduled_task_update_status():
+    '未说明'
     repo = _Repo()
     task = await repo.create(
         task_id="task-1",
@@ -380,6 +405,7 @@ async def test_pause_and_resume_scheduled_task_update_status():
 
 @pytest.mark.asyncio
 async def test_pause_rejects_running_task():
+    '未说明'
     repo = _Repo()
     task = await repo.create(
         task_id="task-1",
@@ -418,6 +444,7 @@ async def test_pause_rejects_running_task():
 
 @pytest.mark.asyncio
 async def test_update_rejects_running_task():
+    '未说明'
     repo = _Repo()
     task = await repo.create(
         task_id="task-1",
@@ -465,6 +492,7 @@ async def test_update_rejects_running_task():
 
 @pytest.mark.asyncio
 async def test_list_thread_scheduled_tasks_filters_by_thread_id():
+    '未说明'
     repo = _Repo()
     await repo.create(
         task_id="task-1",
@@ -515,6 +543,7 @@ async def test_list_thread_scheduled_tasks_filters_by_thread_id():
 
 @pytest.mark.asyncio
 async def test_list_scheduled_task_runs_returns_persisted_rows_without_side_effects():
+    '未说明'
     repo = _Repo()
     task = await repo.create(
         task_id="task-1",
@@ -568,6 +597,7 @@ async def test_list_scheduled_task_runs_returns_persisted_rows_without_side_effe
 
 @pytest.mark.asyncio
 async def test_create_once_task_enforces_minimum_delay():
+    '未说明'
     repo = _Repo()
     request = SimpleNamespace()
     body = scheduled_tasks.ScheduledTaskCreateRequest(
@@ -608,9 +638,7 @@ async def test_create_once_task_enforces_minimum_delay():
 
 @pytest.mark.asyncio
 async def test_update_terminal_once_task_with_future_run_at_rearms_it():
-    """PATCHing a fresh future run_at onto a completed/failed/cancelled once
-    task must reset status to enabled — claim_due_tasks only admits enabled
-    rows, so keeping the terminal status returns a next_run_at that never fires."""
+    '未说明'
     repo = _Repo()
     task = await repo.create(
         task_id="task-terminal",

@@ -92,7 +92,7 @@ function StreamingCode({
   );
 }
 
-/** Renders markdown content. */
+/** 在受控插件集合中渲染 Markdown 内容，并在流式状态下保持安全的解析边界。 */
 export function MarkdownContent({
   content,
   isLoading,

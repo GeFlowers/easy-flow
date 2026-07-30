@@ -1,7 +1,4 @@
-"""Tests for RunJournal callback handler.
-
-Uses MemoryRunEventStore as the backend for direct event inspection.
-"""
+"""本模块覆盖运行 日志的行为、边界与回归场景，确保既有契约稳定。"""
 
 import asyncio
 from unittest.mock import MagicMock
@@ -17,16 +14,14 @@ from deerflow.utils.messages import ORIGINAL_USER_CONTENT_KEY
 
 @pytest.fixture
 def journal_setup():
+    """为日志 设置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     store = MemoryRunEventStore()
     j = RunJournal("r1", "t1", store, flush_threshold=100)
     return j, store
 
 
 def _make_llm_response(content="Hello", usage=None, tool_calls=None, additional_kwargs=None):
-    """Create a mock LLM response with a message.
-
-    model_dump() returns checkpoint-aligned format matching real AIMessage.
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
     msg = MagicMock()
     msg.type = "ai"
     msg.content = content
@@ -59,8 +54,10 @@ def _make_llm_response(content="Hello", usage=None, tool_calls=None, additional_
 
 
 class TestLlmCallbacks:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_on_chat_model_start_persists_original_user_input_without_mutating_model_message(self, journal_setup):
+        """验证模型 用户 模型 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         wrapped_content = "--- BEGIN USER INPUT ---\nShow revenue\n--- END USER INPUT ---"
         model_message = HumanMessage(
@@ -83,6 +80,7 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_on_llm_end_produces_trace_event(self, journal_setup):
+        """验证追踪 事件在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         run_id = uuid4()
         j.on_llm_start({}, [], run_id=run_id, tags=["lead_agent"])
@@ -95,6 +93,7 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_on_llm_end_lead_agent_produces_ai_message(self, journal_setup):
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         run_id = uuid4()
         j.on_llm_start({}, [], run_id=run_id, tags=["lead_agent"])
@@ -109,7 +108,7 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_on_llm_end_with_tool_calls_produces_ai_tool_call(self, journal_setup):
-        """LLM response with pending tool_calls emits llm.ai.response with tool_calls in content."""
+        """验证工具 工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         run_id = uuid4()
         j.on_llm_end(
@@ -126,6 +125,7 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_on_llm_end_subagent_no_ai_message(self, journal_setup):
+        """验证子代理 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         run_id = uuid4()
         j.on_llm_start({}, [], run_id=run_id, tags=["subagent:research"])
@@ -137,6 +137,7 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_token_accumulation(self, journal_setup):
+        """验证令牌在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         usage1 = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         usage2 = {"input_tokens": 20, "output_tokens": 10, "total_tokens": 30}
@@ -149,7 +150,7 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_total_tokens_computed_from_input_output(self, journal_setup):
-        """If total_tokens is 0, it should be computed from input + output."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, store = journal_setup
         j.on_llm_end(
             _make_llm_response("Hi", usage={"input_tokens": 100, "output_tokens": 50, "total_tokens": 0}),
@@ -161,6 +162,7 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_caller_token_classification(self, journal_setup):
+        """验证令牌在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         j.on_llm_end(_make_llm_response("A", usage=usage), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
@@ -172,12 +174,14 @@ class TestLlmCallbacks:
 
     @pytest.mark.anyio
     async def test_usage_metadata_none_no_crash(self, journal_setup):
+        """验证元数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         j.on_llm_end(_make_llm_response("No usage", usage=None), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
         await j.flush()
 
     @pytest.mark.anyio
     async def test_latency_tracking(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, store = journal_setup
         run_id = uuid4()
         j.on_llm_start({}, [], run_id=run_id, tags=["lead_agent"])
@@ -190,8 +194,10 @@ class TestLlmCallbacks:
 
 
 class TestLifecycleCallbacks:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_chain_start_end_produce_trace_events(self, journal_setup):
+        """验证追踪在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         j.on_chain_start({}, {}, run_id=uuid4(), parent_run_id=None)
         j.on_chain_end({}, run_id=uuid4())
@@ -204,7 +210,7 @@ class TestLifecycleCallbacks:
 
     @pytest.mark.anyio
     async def test_nested_chain_no_run_lifecycle_events(self, journal_setup):
-        """Nested chains (parent_run_id set) should NOT produce root run lifecycle events."""
+        """验证运行 生命周期在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         parent_id = uuid4()
         j.on_chain_start({}, {}, run_id=uuid4(), parent_run_id=parent_id)
@@ -216,9 +222,10 @@ class TestLifecycleCallbacks:
 
 
 class TestToolCallbacks:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_tool_end_with_tool_message(self, journal_setup):
-        """on_tool_end with a ToolMessage stores it as llm.tool.result."""
+        """验证工具 工具 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import ToolMessage
 
         j, store = journal_setup
@@ -232,7 +239,7 @@ class TestToolCallbacks:
 
     @pytest.mark.anyio
     async def test_tool_end_with_command_unwraps_tool_message(self, journal_setup):
-        """on_tool_end with Command(update={'messages':[ToolMessage]}) unwraps inner message."""
+        """验证工具 工具 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import ToolMessage
         from langgraph.types import Command
 
@@ -248,7 +255,7 @@ class TestToolCallbacks:
 
     @pytest.mark.anyio
     async def test_on_tool_error_no_crash(self, journal_setup):
-        """on_tool_error should not crash (no event emitted by default)."""
+        """验证工具 错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         j.on_tool_error(TimeoutError("timeout"), run_id=uuid4(), name="web_fetch")
         await j.flush()
@@ -258,8 +265,10 @@ class TestToolCallbacks:
 
 
 class TestFinalToolMessageReconciliation:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_root_chain_end_reconciles_missing_ask_clarification_tool_message(self, journal_setup):
+        """验证工具 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import ToolMessage
 
         j, store = journal_setup
@@ -287,6 +296,7 @@ class TestFinalToolMessageReconciliation:
 
     @pytest.mark.anyio
     async def test_root_chain_end_does_not_duplicate_tool_message_captured_by_on_tool_end(self, journal_setup):
+        """验证工具 消息 工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import ToolMessage
 
         j, store = journal_setup
@@ -308,6 +318,7 @@ class TestFinalToolMessageReconciliation:
 
     @pytest.mark.anyio
     async def test_root_chain_end_ignores_retained_old_tool_message_from_previous_run(self, journal_setup):
+        """验证工具 消息 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import ToolMessage
 
         j, store = journal_setup
@@ -327,6 +338,7 @@ class TestFinalToolMessageReconciliation:
 
     @pytest.mark.anyio
     async def test_root_chain_end_ignores_non_allowlisted_tool_message(self, journal_setup):
+        """验证工具 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import ToolMessage
 
         j, store = journal_setup
@@ -346,6 +358,7 @@ class TestFinalToolMessageReconciliation:
 
     @pytest.mark.anyio
     async def test_root_chain_end_ignores_hidden_ask_clarification_tool_message(self, journal_setup):
+        """验证工具 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import ToolMessage
 
         j, store = journal_setup
@@ -370,9 +383,10 @@ class TestFinalToolMessageReconciliation:
 
 
 class TestCustomEvents:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_on_custom_event_not_implemented(self, journal_setup):
-        """RunJournal does not implement on_custom_event — no crash expected."""
+        """验证事件在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         # BaseCallbackHandler.on_custom_event is a no-op by default
         j.on_custom_event("task_running", {"task_id": "t1"}, run_id=uuid4())
@@ -382,8 +396,10 @@ class TestCustomEvents:
 
 
 class TestBufferFlush:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_flush_threshold(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, store = journal_setup
         j._flush_threshold = 2
         # Each on_llm_end emits 1 event
@@ -397,14 +413,14 @@ class TestBufferFlush:
 
     @pytest.mark.anyio
     async def test_events_retained_when_no_loop(self, journal_setup):
-        """Events buffered in a sync (no-loop) context should survive
-        until the async flush() in the finally block."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, store = journal_setup
         j._flush_threshold = 1
 
         original = asyncio.get_running_loop
 
         def no_loop():
+            """准备可控测试资源与状态，供后续断言读取。"""
             raise RuntimeError("no running event loop")
 
         asyncio.get_running_loop = no_loop
@@ -420,27 +436,34 @@ class TestBufferFlush:
 
 
 class TestIdentifyCaller:
+    """集中覆盖当前测试分支与回归边界。"""
     def test_lead_agent_tag(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         assert j._identify_caller(["lead_agent"]) == "lead_agent"
 
     def test_subagent_tag(self, journal_setup):
+        """验证子代理在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         assert j._identify_caller(["subagent:research"]) == "subagent:research"
 
     def test_middleware_tag(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         assert j._identify_caller(["middleware:summarization"]) == "middleware:summarization"
 
     def test_no_tags_returns_lead_agent(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         assert j._identify_caller([]) == "lead_agent"
         assert j._identify_caller(None) == "lead_agent"
 
 
 class TestChainErrorCallback:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_on_chain_error_writes_run_error(self, journal_setup):
+        """验证错误 运行 错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         j.on_chain_error(ValueError("boom"), run_id=uuid4())
         await asyncio.sleep(0.05)
@@ -453,8 +476,10 @@ class TestChainErrorCallback:
 
 
 class TestTokenTrackingDisabled:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_track_token_usage_false(self):
+        """验证令牌在预期条件及边界场景下的可观察行为，防止相关回归。"""
         store = MemoryRunEventStore()
         j = RunJournal("r1", "t1", store, track_token_usage=False, flush_threshold=100)
         j.on_llm_end(
@@ -469,8 +494,10 @@ class TestTokenTrackingDisabled:
 
 
 class TestConvenienceFields:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_first_human_message_via_set(self, journal_setup):
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         j.set_first_human_message("What is AI?")
         data = j.get_completion_data()
@@ -478,6 +505,7 @@ class TestConvenienceFields:
 
     @pytest.mark.anyio
     async def test_completion_data_counts_human_ai_and_tool_messages(self, journal_setup):
+        """验证数据 工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage, ToolMessage
 
         j, _ = journal_setup
@@ -493,6 +521,7 @@ class TestConvenienceFields:
 
     @pytest.mark.anyio
     async def test_tool_call_only_ai_does_not_clear_last_ai_message(self, journal_setup):
+        """验证工具 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         j.on_llm_end(_make_llm_response("Useful answer"), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
         j.on_llm_end(
@@ -509,6 +538,7 @@ class TestConvenienceFields:
 
     @pytest.mark.anyio
     async def test_last_ai_message_extracts_mixed_content_without_extra_newlines(self, journal_setup):
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         j.on_llm_end(
             _make_llm_response(
@@ -531,6 +561,7 @@ class TestConvenienceFields:
 
     @pytest.mark.anyio
     async def test_last_ai_message_extracts_mapping_content(self, journal_setup):
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         j.on_llm_end(_make_llm_response({"content": "Nested answer"}), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
 
@@ -541,6 +572,7 @@ class TestConvenienceFields:
 
     @pytest.mark.anyio
     async def test_duplicate_llm_run_id_does_not_double_count_message_summary(self, journal_setup):
+        """验证运行 消息 摘要在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         run_id = uuid4()
 
@@ -560,6 +592,7 @@ class TestConvenienceFields:
 
     @pytest.mark.anyio
     async def test_subagent_ai_does_not_overwrite_lead_last_ai_message(self, journal_setup):
+        """验证子代理 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         j.on_llm_end(_make_llm_response("Lead answer"), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
         j.on_llm_end(_make_llm_response("Subagent detail"), run_id=uuid4(), parent_run_id=None, tags=["subagent:research"])
@@ -571,6 +604,7 @@ class TestConvenienceFields:
 
     @pytest.mark.anyio
     async def test_get_completion_data(self, journal_setup):
+        """验证获取 数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         j._total_tokens = 100
         j._msg_count = 5
@@ -580,8 +614,10 @@ class TestConvenienceFields:
 
 
 class TestMiddlewareEvents:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_record_middleware_uses_middleware_category(self, journal_setup):
+        """验证录制在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         j.record_middleware(
             "title",
@@ -602,7 +638,7 @@ class TestMiddlewareEvents:
 
     @pytest.mark.anyio
     async def test_middleware_tag_variants(self, journal_setup):
-        """Different middleware tags produce distinct event_types."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, store = journal_setup
         j.record_middleware("title", name="TitleMiddleware", hook="after_model", action="generate_title", changes={})
         j.record_middleware("guardrail", name="GuardrailMiddleware", hook="before_tool", action="deny", changes={})
@@ -614,8 +650,10 @@ class TestMiddlewareEvents:
 
 
 class TestContextEvents:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_record_memory_context_is_readable_from_public_store_contract(self, journal_setup):
+        """验证录制 内存 上下文 公开 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
 
         j.record_memory_context(
@@ -635,11 +673,13 @@ class TestContextEvents:
 
     @pytest.mark.anyio
     async def test_record_memory_context_can_retry_after_buffer_failure(self, journal_setup, monkeypatch):
+        """验证录制 内存 上下文在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, store = journal_setup
         original_put = j._put
         attempts = 0
 
         def fail_once(**kwargs):
+            """准备可控测试资源与状态，供后续断言读取。"""
             nonlocal attempts
             attempts += 1
             if attempts == 1:
@@ -659,9 +699,10 @@ class TestContextEvents:
 
 
 class TestCallerBucketing:
-    """Tests for caller-bucketed token accumulation (lead_agent / subagent / middleware)."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def test_lead_agent_bucketing(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         j.on_llm_end(_make_llm_response("A", usage=usage), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
@@ -670,6 +711,7 @@ class TestCallerBucketing:
         assert j._middleware_tokens == 0
 
     def test_subagent_bucketing(self, journal_setup):
+        """验证子代理在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         usage = {"input_tokens": 20, "output_tokens": 10, "total_tokens": 30}
         j.on_llm_end(_make_llm_response("B", usage=usage), run_id=uuid4(), parent_run_id=None, tags=["subagent:research"])
@@ -678,6 +720,7 @@ class TestCallerBucketing:
         assert j._middleware_tokens == 0
 
     def test_middleware_bucketing(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         usage = {"input_tokens": 5, "output_tokens": 2, "total_tokens": 7}
         j.on_llm_end(_make_llm_response("C", usage=usage), run_id=uuid4(), parent_run_id=None, tags=["middleware:summarize"])
@@ -686,6 +729,7 @@ class TestCallerBucketing:
         assert j._subagent_tokens == 0
 
     def test_mixed_callers_sum_independently(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         j.on_llm_end(_make_llm_response("A", usage=usage), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
@@ -697,6 +741,7 @@ class TestCallerBucketing:
         assert j._total_tokens == 45
 
     def test_get_completion_data_includes_buckets(self, journal_setup):
+        """验证获取 数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         j._lead_agent_tokens = 100
         j._subagent_tokens = 200
@@ -707,7 +752,7 @@ class TestCallerBucketing:
         assert data["middleware_tokens"] == 50
 
     def test_dedup_same_run_id(self, journal_setup):
-        """Same langchain run_id in on_llm_end must not double-count."""
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         run_id = uuid4()
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
@@ -718,7 +763,7 @@ class TestCallerBucketing:
         assert j._llm_call_count == 1
 
     def test_first_no_usage_second_with_usage(self, journal_setup):
-        """First callback with no usage must not block second callback with usage for same run_id."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         run_id = uuid4()
         j.on_llm_end(_make_llm_response("A", usage=None), run_id=run_id, parent_run_id=None, tags=["lead_agent"])
@@ -730,7 +775,7 @@ class TestCallerBucketing:
         assert j._lead_agent_tokens == 15
 
     def test_track_token_usage_false_skips_buckets(self):
-        """When token tracking is disabled, caller buckets stay at 0."""
+        """验证令牌在预期条件及边界场景下的可观察行为，防止相关回归。"""
         store = MemoryRunEventStore()
         j = RunJournal("r1", "t1", store, track_token_usage=False, flush_threshold=100)
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
@@ -739,7 +784,7 @@ class TestCallerBucketing:
         assert j._lead_agent_tokens == 0
 
     def test_default_no_tags_buckets_as_lead_agent(self, journal_setup):
-        """LLM calls without explicit tags default to lead_agent bucket."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         usage = {"input_tokens": 5, "output_tokens": 5, "total_tokens": 10}
         j.on_llm_end(_make_llm_response("Hi", usage=usage), run_id=uuid4(), parent_run_id=None)
@@ -748,7 +793,7 @@ class TestCallerBucketing:
         assert j._middleware_tokens == 0
 
     def test_unknown_tag_buckets_as_lead_agent(self, journal_setup):
-        """Calls with unrecognized tags (not lead_agent/subagent:/middleware:) go to lead_agent."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         usage = {"input_tokens": 5, "output_tokens": 5, "total_tokens": 10}
         j.on_llm_end(_make_llm_response("Hi", usage=usage), run_id=uuid4(), parent_run_id=None, tags=["some_random_tag"])
@@ -756,9 +801,10 @@ class TestCallerBucketing:
 
 
 class TestExternalUsageRecords:
-    """Tests for record_external_llm_usage_records."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def test_records_added_to_subagent_bucket(self, journal_setup):
+        """验证子代理在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         records = [
             {
@@ -776,6 +822,7 @@ class TestExternalUsageRecords:
         assert j._total_output_tokens == 50
 
     def test_records_added_to_middleware_bucket(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         records = [
             {
@@ -792,6 +839,7 @@ class TestExternalUsageRecords:
         assert j._subagent_tokens == 0
 
     def test_records_added_to_lead_agent_bucket(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         records = [
             {
@@ -806,7 +854,7 @@ class TestExternalUsageRecords:
         assert j._lead_agent_tokens == 15
 
     def test_dedup_same_source_run_id(self, journal_setup):
-        """Same source_run_id must not be double-counted."""
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         records = [
             {
@@ -823,6 +871,7 @@ class TestExternalUsageRecords:
         assert j._total_tokens == 75
 
     def test_total_tokens_missing_computed_from_input_output(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         records = [
             {
@@ -838,7 +887,7 @@ class TestExternalUsageRecords:
         assert j._total_tokens == 300
 
     def test_total_tokens_zero_no_count(self, journal_setup):
-        """Records with zero total and zero input+output must not be counted."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         records = [
             {
@@ -854,6 +903,7 @@ class TestExternalUsageRecords:
         assert j._subagent_tokens == 0
 
     def test_empty_source_run_id_skipped(self, journal_setup):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         j, _ = journal_setup
         records = [
             {
@@ -868,6 +918,7 @@ class TestExternalUsageRecords:
         assert j._total_tokens == 0
 
     def test_multiple_records_in_single_call(self, journal_setup):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         records = [
             {"source_run_id": "r1", "caller": "subagent:gp", "input_tokens": 10, "output_tokens": 5, "total_tokens": 15},
@@ -878,7 +929,7 @@ class TestExternalUsageRecords:
         assert j._total_tokens == 45
 
     def test_external_records_coexist_with_inline_callbacks(self, journal_setup):
-        """External records and inline on_llm_end must not interfere."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, _ = journal_setup
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         j.on_llm_end(_make_llm_response("A", usage=usage), run_id=uuid4(), parent_run_id=None, tags=["lead_agent"])
@@ -888,7 +939,7 @@ class TestExternalUsageRecords:
         assert j._total_tokens == 165
 
     def test_track_token_usage_false_skips_external_records(self):
-        """When token tracking is disabled, external records must not accumulate."""
+        """验证令牌在预期条件及边界场景下的可观察行为，防止相关回归。"""
         store = MemoryRunEventStore()
         j = RunJournal("r1", "t1", store, track_token_usage=False, flush_threshold=100)
         j.record_external_llm_usage_records([{"source_run_id": "ext-7", "caller": "subagent:gp", "input_tokens": 100, "output_tokens": 50, "total_tokens": 150}])
@@ -897,11 +948,14 @@ class TestExternalUsageRecords:
 
 
 class TestProgressSnapshots:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_on_llm_end_reports_progress_snapshot(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         snapshots: list[dict] = []
 
         async def reporter(snapshot: dict) -> None:
+            """准备可控测试资源与状态，供后续断言读取。"""
             snapshots.append(snapshot)
 
         store = MemoryRunEventStore()
@@ -925,10 +979,12 @@ class TestProgressSnapshots:
 
     @pytest.mark.anyio
     async def test_throttled_progress_flush_emits_trailing_snapshot(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         snapshots: list[dict] = []
         trailing_seen = asyncio.Event()
 
         async def reporter(snapshot: dict) -> None:
+            """准备可控测试资源与状态，供后续断言读取。"""
             snapshots.append(snapshot)
             if snapshot["total_tokens"] == 45:
                 trailing_seen.set()
@@ -964,9 +1020,11 @@ class TestProgressSnapshots:
 
     @pytest.mark.anyio
     async def test_flush_cancels_delayed_progress_without_final_progress_write(self):
+        """验证写入在预期条件及边界场景下的可观察行为，防止相关回归。"""
         snapshots: list[dict] = []
 
         async def reporter(snapshot: dict) -> None:
+            """准备可控测试资源与状态，供后续断言读取。"""
             snapshots.append(snapshot)
 
         store = MemoryRunEventStore()
@@ -1001,10 +1059,11 @@ class TestProgressSnapshots:
 
 
 class TestChatModelStartHumanMessage:
-    """Tests for on_chat_model_start extracting the first human message."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     @staticmethod
     def _human_input_response(source: str = "ask_clarification") -> dict:
+        """准备可控测试资源与状态，供后续断言读取。"""
         return {
             "version": 1,
             "kind": "human_input_response",
@@ -1017,7 +1076,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_extracts_first_human_message(self, journal_setup):
-        """on_chat_model_start captures the first HumanMessage from prompts."""
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import AIMessage, HumanMessage
 
         j, store = journal_setup
@@ -1035,7 +1094,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_skips_hidden_human_messages(self, journal_setup):
-        """HumanMessages hidden from the UI are internal context, not user input."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1061,7 +1120,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_only_hidden_human_messages_are_not_captured(self, journal_setup):
-        """A prompt containing only internal HumanMessages has no user input."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1079,7 +1138,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_hidden_human_input_response_is_captured(self, journal_setup):
-        """Hidden HumanInputCard replies are user-authored and must survive compaction."""
+        """验证响应在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1103,7 +1162,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_hidden_human_input_response_wins_over_older_visible_prompt(self, journal_setup):
-        """The latest hidden card reply is the run input, not an older visible prompt."""
+        """验证响应在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1126,7 +1185,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_hidden_human_input_response_ignores_non_allowlisted_source(self, journal_setup):
-        """Only explicit HumanInputCard sources are persisted while hidden."""
+        """验证响应在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1147,7 +1206,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_legacy_summary_message_is_not_captured_as_user_input(self, journal_setup):
-        """Legacy synthetic summaries are internal context even if hide_from_ui is absent."""
+        """验证摘要 消息 用户在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1162,7 +1221,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_visible_human_message_after_hidden_only_prompt_is_captured(self, journal_setup):
-        """Skipping an internal-only prompt does not block later user input."""
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1188,7 +1247,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_summarization_prompt_does_not_capture_first_human_message(self, journal_setup):
-        """Internal summarization prompts must not replace the run's real user input."""
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1220,7 +1279,7 @@ class TestChatModelStartHumanMessage:
     @pytest.mark.anyio
     @pytest.mark.parametrize("tags", [["middleware:summarize"], ["subagent:research"]])
     async def test_non_lead_human_prompts_are_not_captured_as_user_input(self, journal_setup, tags):
-        """Only lead-agent LLM starts create UI-facing human input events."""
+        """验证用户在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1239,7 +1298,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_only_first_human_message_captured(self, journal_setup):
-        """Subsequent on_chat_model_start calls do not overwrite the first message."""
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from langchain_core.messages import HumanMessage
 
         j, store = journal_setup
@@ -1254,7 +1313,7 @@ class TestChatModelStartHumanMessage:
 
     @pytest.mark.anyio
     async def test_empty_messages_no_crash(self, journal_setup):
-        """on_chat_model_start with empty messages does not crash."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         j, store = journal_setup
         j.on_chat_model_start({}, [], run_id=uuid4(), tags=["lead_agent"])
         await j.flush()

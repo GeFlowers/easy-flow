@@ -3,6 +3,7 @@ import { getBackendBaseURL } from "@/core/config";
 
 import type { ThreadTokenUsageResponse } from "./types";
 
+/** 线程上下文压缩接口返回的数据。 */
 export type ThreadCompactResponse = {
   thread_id: string;
   compacted: boolean;
@@ -14,11 +15,13 @@ export type ThreadCompactResponse = {
   total_tokens: number;
 };
 
+/** 请求压缩线程上下文时可传入的选项。 */
 export type CompactThreadContextOptions = {
   signal?: AbortSignal;
   agentName?: string | null;
 };
 
+/** 从消息轮次分叉线程接口返回的数据。 */
 export type ThreadBranchResponse = {
   thread_id: string;
   parent_thread_id: string;
@@ -27,12 +30,14 @@ export type ThreadBranchResponse = {
   workspace_clone_mode: string;
 };
 
+/** 创建分叉线程所需的来源消息与可选标题。 */
 export type BranchThreadFromTurnInput = {
   messageId: string;
   messageIds?: string[];
   title?: string;
 };
 
+/** 从线程接口失败响应中读取错误详情。 */
 async function readThreadAPIError(
   response: Response,
   fallback: string,
@@ -43,11 +48,12 @@ async function readThreadAPIError(
       return body.detail;
     }
   } catch {
-    // Fall through to the caller-provided message.
+    // 无法读取响应体时，使用调用方提供的回退消息。
   }
   return fallback;
 }
 
+/** 获取线程的累计令牌用量。 */
 export async function fetchThreadTokenUsage(
   threadId: string,
 ): Promise<ThreadTokenUsageResponse | null> {
@@ -68,6 +74,7 @@ export async function fetchThreadTokenUsage(
   return (await response.json()) as ThreadTokenUsageResponse;
 }
 
+/** 从指定消息轮次创建分叉线程。 */
 export async function branchThreadFromTurn(
   threadId: string,
   input: BranchThreadFromTurnInput,
@@ -96,6 +103,7 @@ export async function branchThreadFromTurn(
   return (await response.json()) as ThreadBranchResponse;
 }
 
+/** 请求后端压缩指定线程的旧上下文。 */
 export async function compactThreadContext(
   threadId: string,
   options: CompactThreadContextOptions = {},

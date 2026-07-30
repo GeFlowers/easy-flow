@@ -1,4 +1,4 @@
-"""JWT token creation and verification."""
+"""JWT 令牌的创建与验证。"""
 
 from datetime import UTC, datetime, timedelta
 
@@ -10,7 +10,7 @@ from app.gateway.auth.errors import TokenError
 
 
 class TokenPayload(BaseModel):
-    """JWT token payload."""
+    """JWT 令牌负载。"""
 
     sub: str  # user_id
     exp: datetime
@@ -19,16 +19,7 @@ class TokenPayload(BaseModel):
 
 
 def create_access_token(user_id: str, expires_delta: timedelta | None = None, token_version: int = 0) -> str:
-    """Create a JWT access token.
-
-    Args:
-        user_id: The user's UUID as string
-        expires_delta: Optional custom expiry, defaults to 7 days
-        token_version: User's current token_version for invalidation
-
-    Returns:
-        Encoded JWT string
-    """
+    """为用户创建访问 JWT，并写入过期时间与令牌版本以支持失效控制。"""
     config = get_auth_config()
     expiry = expires_delta or timedelta(days=config.token_expiry_days)
 
@@ -38,11 +29,7 @@ def create_access_token(user_id: str, expires_delta: timedelta | None = None, to
 
 
 def decode_token(token: str) -> TokenPayload | TokenError:
-    """Decode and validate a JWT token.
-
-    Returns:
-        TokenPayload if valid, or a specific TokenError variant.
-    """
+    """解码并验证 JWT；成功返回负载，失败返回具体 ``TokenError``。"""
     config = get_auth_config()
     try:
         payload = jwt.decode(token, config.jwt_secret, algorithms=["HS256"])

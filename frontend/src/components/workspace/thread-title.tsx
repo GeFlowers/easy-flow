@@ -7,6 +7,7 @@ import type { AgentThreadState } from "@/core/threads";
 import { useThreadChat } from "./chats";
 import { FlipDisplay } from "./flip-display";
 
+/** 展示线程标题，并在标题未就绪时提供与侧栏一致的紧凑占位。 */
 export function ThreadTitle({
   threadId,
   thread,

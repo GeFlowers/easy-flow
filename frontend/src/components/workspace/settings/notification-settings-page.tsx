@@ -10,6 +10,7 @@ import { useLocalSettings } from "@/core/settings";
 
 import { SettingsSection } from "./settings-section";
 
+/** 设置通知偏好，并保持各开关与持久化配置的一致性。 */
 export function NotificationSettingsPage() {
   const { t } = useI18n();
   const { permission, isSupported, requestPermission, showNotification } =

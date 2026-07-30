@@ -1,4 +1,4 @@
-"""Step: execution mode and safety-related capabilities."""
+'未说明'
 
 from __future__ import annotations
 
@@ -12,6 +12,7 @@ CONTAINER_SANDBOX = "deerflow.community.aio_sandbox:AioSandboxProvider"
 
 @dataclass
 class ExecutionStepResult:
+    '未说明'
     sandbox_use: str
     allow_host_bash: bool
     include_bash_tool: bool
@@ -19,6 +20,7 @@ class ExecutionStepResult:
 
 
 def run_execution_step(step_label: str = "Step 3/4") -> ExecutionStepResult:
+    """执行运行对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     print_header(f"{step_label} · Execution & Safety")
     print_info("Choose how much execution power DeerFlow should have in this workspace.")
 

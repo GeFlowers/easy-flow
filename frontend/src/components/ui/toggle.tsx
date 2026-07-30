@@ -28,6 +28,7 @@ const toggleVariants = cva(
   },
 );
 
+/** Toggle 内部组件：组织对应的界面结构与交互语义。 */
 function Toggle({
   className,
   variant,

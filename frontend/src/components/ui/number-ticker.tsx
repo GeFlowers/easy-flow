@@ -13,6 +13,7 @@ interface NumberTickerProps extends ComponentPropsWithoutRef<"span"> {
   decimalPlaces?: number;
 }
 
+/** NumberTicker 组件：提供对应的界面结构与交互语义。 */
 export function NumberTicker({
   value,
   startValue = 0,

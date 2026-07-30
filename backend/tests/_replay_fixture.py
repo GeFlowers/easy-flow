@@ -1,13 +1,4 @@
-"""Shared config + gateway-drive helpers for the record/replay e2e.
-
-Record (``scripts/record_gateway.py`` + ``scripts/build_fixture_from_jsonl.py``)
-and replay (``tests/test_replay_golden.py``)
-MUST drive the gateway through an identical, prompt-affecting config — otherwise
-the system prompt differs and the recorded input hashes never match on replay.
-Centralising the config builder + drive loop here makes that identity hold by
-construction; only the ``models[].use`` block differs (real model vs
-``ReplayChatModel``).
-"""
+'定义 _replay_fixture 模块提供的职责与可复用接口。\n\nShared config + gateway-drive helpers for the record/replay e2e.\n\nRecord (``scripts/record_gateway.py`` + ``scripts/build_fixture_from_jsonl.py``)\nand replay (``tests/test_replay_golden.py``)\nMUST drive the gateway through an identical, prompt-affecting config — otherwise\nthe system prompt differs and the recorded input hashes never match on replay.\nCentralising the config builder + drive loop here makes that identity hold by\nconstruction; only the ``models[].use`` block differs (real model vs\n``ReplayChatModel``).\n'
 
 from __future__ import annotations
 
@@ -37,6 +28,7 @@ REPLAY_MODEL_BLOCK = """\
 
 
 def real_model_block(model: str) -> str:
+    '执行 real_model_block 的明确职责，并返回与调用约定一致的结果'
     return f"""\
   - name: scenario-model
     display_name: Scenario Model
@@ -47,17 +39,7 @@ def real_model_block(model: str) -> str:
 
 
 def build_config_yaml(*, model_block: str, home: Path) -> str:
-    """Full gateway config. Only ``model_block`` varies between record/replay.
-
-    Everything that shapes the system prompt is pinned so record, replay, and CI
-    produce byte-identical prompts regardless of the machine:
-    - sandbox / tool_groups / tools — fixed here
-    - skills — pointed at an empty ``<home>/skills`` so filesystem skills (incl.
-      gitignored custom skills present only on a dev box) never leak into the
-      prompt. Pair with an empty ``extensions_config.json`` (no MCP) via
-      :func:`prepare_hermetic_extras`.
-    - memory / summarization — disabled (background, non-deterministic timing)
-    """
+    '构建并返回，并遵守 build_config_yaml 所表达的接口约束。\n\nFull gateway config. Only ``model_block`` varies between record/replay.\n\n    Everything that shapes the system prompt is pinned so record, replay, and CI\n    produce byte-identical prompts regardless of the machine:\n    - sandbox / tool_groups / tools — fixed here\n    - skills — pointed at an empty ``<home>/skills`` so filesystem skills (incl.\n      gitignored custom skills present only on a dev box) never leak into the\n      prompt. Pair with an empty ``extensions_config.json`` (no MCP) via\n      :func:`prepare_hermetic_extras`.\n    - memory / summarization — disabled (background, non-deterministic timing)\n    '
     return f"""\
 log_level: warning
 models:
@@ -98,12 +80,7 @@ database:
 
 
 def prepare_hermetic_extras(home: Path) -> Path:
-    """Create the empty skills tree + an empty extensions_config.json so the
-    system prompt has no environment-dependent skills/MCP content.
-
-    Returns the extensions-config path; the caller must point
-    ``DEER_FLOW_EXTENSIONS_CONFIG_PATH`` at it. Call before starting the gateway.
-    """
+    '执行 prepare_hermetic_extras 的明确职责，并返回与调用约定一致的结果。\n\nCreate the empty skills tree + an empty extensions_config.json so the\n    system prompt has no environment-dependent skills/MCP content.\n\n    Returns the extensions-config path; the caller must point\n    ``DEER_FLOW_EXTENSIONS_CONFIG_PATH`` at it. Call before starting the gateway.\n    '
     (home / "skills" / "public").mkdir(parents=True, exist_ok=True)
     (home / "skills" / "custom").mkdir(parents=True, exist_ok=True)
     extensions = home / "extensions_config.json"
@@ -112,11 +89,7 @@ def prepare_hermetic_extras(home: Path) -> Path:
 
 
 def sse_event_shapes(resp) -> list[dict]:
-    """Reduce an SSE stream to (event name, sorted top-level data keys).
-
-    Snapshots the *shape* of the stream, not volatile values, so the golden is
-    stable across runs while still catching event-sequence / payload-shape drift.
-    """
+    '执行 sse_event_shapes 的明确职责，并返回与调用约定一致的结果。\n\nReduce an SSE stream to (event name, sorted top-level data keys).\n\n    Snapshots the *shape* of the stream, not volatile values, so the golden is\n    stable across runs while still catching event-sequence / payload-shape drift.\n    '
     events: list[dict] = []
     current: str | None = None
     for line in resp.iter_lines():
@@ -133,11 +106,7 @@ def sse_event_shapes(resp) -> list[dict]:
 
 
 def drive_gateway(app, *, prompt: str, context: dict) -> list[dict]:
-    """Register -> create thread -> POST /runs/stream; return SSE event shapes.
-
-    This is the exact wire path the React frontend uses (LangGraph SDK), driven
-    in-process via Starlette's TestClient with the real auth flow.
-    """
+    "执行 drive_gateway 的明确职责，并返回与调用约定一致的结果。\n\nRegister -> create thread -> POST /runs/stream; return SSE event shapes.\n\n    This is the exact wire path the React frontend uses (LangGraph SDK), driven\n    in-process via Starlette's TestClient with the real auth flow.\n    "
     from starlette.testclient import TestClient
 
     with TestClient(app) as client:

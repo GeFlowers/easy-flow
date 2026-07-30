@@ -1,4 +1,4 @@
-"""Unit tests for SafetyFinishReasonMiddleware."""
+'未说明'
 
 from unittest.mock import MagicMock
 
@@ -16,6 +16,7 @@ from deerflow.config.safety_finish_reason_config import (
 
 
 def _runtime(thread_id="t-1"):
+    '未说明'
     runtime = MagicMock()
     runtime.context = {"thread_id": thread_id}
     return runtime
@@ -28,6 +29,7 @@ def _ai(
     response_metadata=None,
     additional_kwargs=None,
 ):
+    '未说明'
     return AIMessage(
         content=content,
         tool_calls=tool_calls or [],
@@ -37,6 +39,7 @@ def _ai(
 
 
 def _write_call(idx=1, content_text="半截"):
+    '未说明'
     return {
         "id": f"call_write_{idx}",
         "name": "write_file",
@@ -45,16 +48,18 @@ def _write_call(idx=1, content_text="半截"):
 
 
 class AlwaysHitDetector:
-    """Test fixture: always reports the given termination."""
+    '未说明'
 
     name = "always_hit"
 
     def __init__(self, *, reason_field="finish_reason", reason_value="content_filter", extras=None):
+        '未说明'
         self.reason_field = reason_field
         self.reason_value = reason_value
         self.extras = extras or {}
 
     def detect(self, message):
+        """处理检测相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return SafetyTermination(
             detector=self.name,
             reason_field=self.reason_field,
@@ -64,16 +69,20 @@ class AlwaysHitDetector:
 
 
 class NeverHitDetector:
+    '未说明'
     name = "never_hit"
 
     def detect(self, message):
+        """处理检测相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return None
 
 
 class RaisingDetector:
+    '未说明'
     name = "raising"
 
     def detect(self, message):
+        """处理检测相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise RuntimeError("boom")
 
 
@@ -83,7 +92,9 @@ class RaisingDetector:
 
 
 class TestTriggerCriteria:
+    '未说明'
     def test_content_filter_with_tool_calls_triggers(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -100,8 +111,7 @@ class TestTriggerCriteria:
         assert patched.tool_calls == []
 
     def test_content_filter_without_tool_calls_passes_through(self):
-        """issue scope: when there are no tool calls the partial text is a
-        legitimate final response and should not be rewritten."""
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -114,6 +124,7 @@ class TestTriggerCriteria:
         assert mw._apply(state, _runtime()) is None
 
     def test_normal_tool_calls_pass_through(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -127,6 +138,7 @@ class TestTriggerCriteria:
 
     def test_normal_stop_with_tool_calls_pass_through(self):
         # Some providers report finish_reason='stop' for tool-call messages.
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -139,15 +151,18 @@ class TestTriggerCriteria:
         assert mw._apply(state, _runtime()) is None
 
     def test_empty_message_list_passes_through(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         assert mw._apply({"messages": []}, _runtime()) is None
 
     def test_non_ai_last_message_passes_through(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {"messages": [HumanMessage(content="hi"), SystemMessage(content="sys")]}
         assert mw._apply(state, _runtime()) is None
 
     def test_anthropic_refusal_with_tool_calls_triggers(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -162,6 +177,7 @@ class TestTriggerCriteria:
         assert result["messages"][0].tool_calls == []
 
     def test_gemini_safety_with_tool_calls_triggers(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -182,7 +198,9 @@ class TestTriggerCriteria:
 
 
 class TestMessageRewrite:
+    '未说明'
     def test_clears_structured_tool_calls(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -197,10 +215,7 @@ class TestMessageRewrite:
         assert patched.tool_calls == []
 
     def test_clears_raw_additional_kwargs_tool_calls(self):
-        """Critical defence-in-depth: DanglingToolCallMiddleware will recover
-        tool calls from additional_kwargs.tool_calls if we forget them, which
-        would re-emit a synthetic ToolMessage downstream and confuse the
-        model. We must wipe both."""
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         raw_tool_calls = [
             {
@@ -229,6 +244,7 @@ class TestMessageRewrite:
     def test_preserves_other_additional_kwargs(self):
         # vLLM puts reasoning under additional_kwargs.reasoning; Anthropic
         # may carry other provider-specific keys. They must not be wiped.
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -247,6 +263,7 @@ class TestMessageRewrite:
         assert patched.additional_kwargs["custom_provider_field"] == {"x": 1}
 
     def test_writes_observability_field(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -265,8 +282,7 @@ class TestMessageRewrite:
         assert record["suppressed_tool_call_names"] == ["write_file", "write_file"]
 
     def test_preserves_response_metadata_finish_reason(self):
-        """Downstream SSE converters read response_metadata.finish_reason —
-        we want them to see the *real* provider reason, not 'stop'."""
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -281,6 +297,7 @@ class TestMessageRewrite:
         assert patched.response_metadata["model_name"] == "kimi-k2"
 
     def test_appends_user_facing_explanation_to_str_content(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -297,6 +314,7 @@ class TestMessageRewrite:
         assert "safety-related signal" in patched.content
 
     def test_handles_empty_content(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -312,8 +330,7 @@ class TestMessageRewrite:
         assert "safety-related signal" in patched.content
 
     def test_handles_list_content_thinking_blocks(self):
-        """Anthropic thinking / vLLM reasoning models emit content blocks.
-        Naively concatenating a string would raise TypeError."""
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         thinking_blocks = [
             {"type": "thinking", "text": "let me consider..."},
@@ -337,6 +354,7 @@ class TestMessageRewrite:
     def test_idempotent_on_already_cleared_message(self):
         # Re-running the middleware on a message we already cleared must not
         # re-trigger (tool_calls is now empty → fast passthrough).
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         state = {
             "messages": [
@@ -352,8 +370,7 @@ class TestMessageRewrite:
         assert second is None
 
     def test_preserves_message_id_for_add_messages_replacement(self):
-        """LangGraph's add_messages reducer treats same-id messages as
-        replacements. model_copy keeps id by default."""
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         original = _ai(
             tool_calls=[_write_call()],
@@ -372,7 +389,9 @@ class TestMessageRewrite:
 
 
 class TestDetectorWiring:
+    '未说明'
     def test_iterates_detectors_in_order(self):
+        '未说明'
         first = AlwaysHitDetector(reason_value="first")
         second = AlwaysHitDetector(reason_value="second")
         mw = SafetyFinishReasonMiddleware(detectors=[first, second])
@@ -381,6 +400,7 @@ class TestDetectorWiring:
         assert patched.additional_kwargs["safety_termination"]["reason_value"] == "first"
 
     def test_returns_none_when_no_detector_matches(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware(detectors=[NeverHitDetector(), NeverHitDetector()])
         state = {
             "messages": [
@@ -393,6 +413,7 @@ class TestDetectorWiring:
         assert mw._apply(state, _runtime()) is None
 
     def test_buggy_detector_does_not_break_run(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware(detectors=[RaisingDetector(), AlwaysHitDetector()])
         state = {"messages": [_ai(tool_calls=[_write_call()])]}
         result = mw._apply(state, _runtime())
@@ -400,7 +421,7 @@ class TestDetectorWiring:
         assert result["messages"][0].additional_kwargs["safety_termination"]["detector"] == "always_hit"
 
     def test_constructor_copies_detectors(self):
-        """Caller mutation after construction must not leak into us."""
+        '未说明'
         detectors = [AlwaysHitDetector()]
         mw = SafetyFinishReasonMiddleware(detectors=detectors)
         detectors.clear()
@@ -414,13 +435,16 @@ class TestDetectorWiring:
 
 
 class TestFromConfig:
+    '未说明'
     def test_default_config_uses_builtin_detectors(self):
+        '未说明'
         mw = SafetyFinishReasonMiddleware.from_config(SafetyFinishReasonConfig())
         assert len(mw._detectors) == 3
         names = {d.name for d in mw._detectors}
         assert names == {"openai_compatible_content_filter", "anthropic_refusal", "gemini_safety"}
 
     def test_custom_detectors_loaded_via_reflection(self):
+        '未说明'
         cfg = SafetyFinishReasonConfig(
             detectors=[
                 SafetyDetectorConfig(
@@ -453,11 +477,13 @@ class TestFromConfig:
         assert mw._apply(state2, _runtime()) is None
 
     def test_empty_detector_list_rejected(self):
+        '未说明'
         cfg = SafetyFinishReasonConfig(detectors=[])
         with pytest.raises(ValueError, match="enabled=false"):
             SafetyFinishReasonMiddleware.from_config(cfg)
 
     def test_non_detector_class_rejected(self):
+        '未说明'
         cfg = SafetyFinishReasonConfig(
             detectors=[SafetyDetectorConfig(use="builtins:dict")],
         )
@@ -471,21 +497,16 @@ class TestFromConfig:
 
 
 class TestAuditEvent:
-    """Verify SafetyFinishReasonMiddleware records a `middleware:safety_termination`
-    audit event via RunJournal.record_middleware when the run-scoped journal is
-    exposed under runtime.context["__run_journal"].
-
-    Background: review on PR #3035 — SSE custom event handles live consumers,
-    but post-run audit needs a row in run_events that can be queried with one
-    SQL statement (no JOIN against message body).
-    """
+    '未说明'
 
     def _runtime_with_journal(self, journal):
+        '未说明'
         runtime = MagicMock()
         runtime.context = {"thread_id": "t-audit", "__run_journal": journal}
         return runtime
 
     def test_records_audit_event_when_journal_present(self):
+        '未说明'
         journal = MagicMock()
         mw = SafetyFinishReasonMiddleware()
         tc = _write_call(1)
@@ -520,8 +541,7 @@ class TestAuditEvent:
         assert isinstance(changes["extras"], dict)
 
     def test_audit_event_never_carries_tool_arguments(self):
-        """PR #3035 review IMPORTANT: tool args are the filtered content itself
-        and must NOT be persisted to run_events under any circumstance."""
+        '未说明'
         journal = MagicMock()
         mw = SafetyFinishReasonMiddleware()
         sensitive_tc = {
@@ -543,9 +563,7 @@ class TestAuditEvent:
         assert "args" not in journal.record_middleware.call_args.kwargs["changes"]
 
     def test_no_journal_in_runtime_context_is_silently_skipped(self):
-        """Subagent runtime / unit tests / no-event-store paths have no journal.
-        Middleware must still intervene and clear tool_calls — only the audit
-        event is skipped."""
+        '未说明'
         mw = SafetyFinishReasonMiddleware()
         runtime = MagicMock()
         runtime.context = {"thread_id": "t-noj"}  # no __run_journal
@@ -563,7 +581,7 @@ class TestAuditEvent:
         assert result["messages"][0].tool_calls == []
 
     def test_journal_record_exception_does_not_break_run(self):
-        """Buggy journal must never propagate an exception into the agent loop."""
+        '未说明'
         journal = MagicMock()
         journal.record_middleware.side_effect = RuntimeError("db down")
         mw = SafetyFinishReasonMiddleware()
@@ -581,7 +599,7 @@ class TestAuditEvent:
         assert result["messages"][0].tool_calls == []
 
     def test_no_record_when_passthrough(self):
-        """When the middleware does NOT intervene, no audit event is written."""
+        '未说明'
         journal = MagicMock()
         mw = SafetyFinishReasonMiddleware()
         state = {
@@ -597,10 +615,13 @@ class TestAuditEvent:
 
 
 class TestStreamEvent:
+    '未说明'
     def test_emits_event_when_writer_available(self, monkeypatch):
+        '未说明'
         captured: list = []
 
         def fake_writer(payload):
+            '未说明'
             captured.append(payload)
 
         # Patch get_stream_writer at the symbol-resolution site.
@@ -630,9 +651,11 @@ class TestStreamEvent:
         assert payload["thread_id"] == "t-stream"
 
     def test_writer_unavailable_does_not_break(self, monkeypatch):
+        '未说明'
         import langgraph.config
 
         def boom():
+            '未说明'
             raise LookupError("not in a stream context")
 
         monkeypatch.setattr(langgraph.config, "get_stream_writer", boom)

@@ -22,6 +22,11 @@ beforeEach(() => {
   fetchWithAuth.mockReset();
 });
 
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeThread 的约定。
+
+ */
+
 function makeThread(
   threadId: string,
   metadata: Record<string, unknown> = {},
@@ -35,6 +40,11 @@ function makeThread(
     values: { title: threadId, messages: [] },
   } as unknown as AgentThread;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 threadResponse 的约定。
+
+ */
 
 function threadResponse(threadId: string): Response {
   return new Response(JSON.stringify(makeThread(threadId)), {
@@ -50,6 +60,11 @@ const context: SidecarContext = {
   role: "assistant",
   content: "Answer",
 };
+
+/**
+ * 覆盖“finds the latest sidecar thread for a parent thread”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("finds the latest sidecar thread for a parent thread", async () => {
   const sidecar = makeThread("sidecar-1", {
@@ -77,6 +92,11 @@ test("finds the latest sidecar thread for a parent thread", async () => {
   });
 });
 
+/**
+ * 覆盖“ignores malformed sidecar search results”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("ignores malformed sidecar search results", async () => {
   const search = rs.fn().mockResolvedValue([makeThread("primary-1")]);
 
@@ -87,6 +107,11 @@ test("ignores malformed sidecar search results", async () => {
     }),
   ).resolves.toBeNull();
 });
+
+/**
+ * 覆盖“ignores sidecar search results from another parent thread”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("ignores sidecar search results from another parent thread", async () => {
   const search = rs.fn().mockResolvedValue([
@@ -103,6 +128,11 @@ test("ignores sidecar search results from another parent thread", async () => {
     }),
   ).resolves.toBeNull();
 });
+
+/**
+ * 覆盖“coalesces concurrent creates for the same parent into one request”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("coalesces concurrent creates for the same parent into one request", async () => {
   let resolveFetch: ((value: Response) => void) | undefined;
@@ -123,6 +153,11 @@ test("coalesces concurrent creates for the same parent into one request", async 
   expect(firstThread).toEqual(secondThread);
 });
 
+/**
+ * 覆盖“allows a new create after the in-flight request settles”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("allows a new create after the in-flight request settles", async () => {
   fetchWithAuth
     .mockResolvedValueOnce(threadResponse("s-1"))
@@ -133,6 +168,11 @@ test("allows a new create after the in-flight request settles", async () => {
 
   expect(fetchWithAuth).toHaveBeenCalledTimes(2);
 });
+
+/**
+ * 覆盖“clears the in-flight entry when a create fails”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("clears the in-flight entry when a create fails", async () => {
   fetchWithAuth

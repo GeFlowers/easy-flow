@@ -5,6 +5,7 @@ import * as ProgressPrimitive from "@radix-ui/react-progress";
 
 import { cn } from "@/lib/utils";
 
+/** Progress 内部组件：组织对应的界面结构与交互语义。 */
 function Progress({
   className,
   value,

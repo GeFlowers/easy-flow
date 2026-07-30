@@ -1,12 +1,4 @@
-"""Tests for tiktoken encoding cache and _count_tokens fallback.
-
-Verifies:
-- Module-level cache avoids repeated ``get_encoding`` calls.
-- ``_count_tokens`` falls back to character estimation when tiktoken is
-  unavailable or the encoding fails to load.
-- ``warm_tiktoken_cache`` populates the cache on success.
-- An in-flight tiktoken load prevents duplicate blocking downloads.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -27,14 +19,16 @@ from deerflow.agents.memory.backends.deermem.deermem.core.prompt import (
 
 
 class TestGetTiktokenEncoding:
-    """Tests for _get_tiktoken_encoding caching and fallback."""
+    '未说明'
 
     def test_returns_none_when_tiktoken_unavailable(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr("deerflow.agents.memory.backends.deermem.deermem.core.prompt.TIKTOKEN_AVAILABLE", False)
         assert _get_tiktoken_encoding("cl100k_base") is None
 
     def test_returns_encoding_on_success(self, monkeypatch):
         # Clear cache to ensure a fresh call
+        '未说明'
         _tiktoken_encoding_cache.pop("cl100k_base", None)
 
         fake_enc = mock.Mock()
@@ -44,6 +38,7 @@ class TestGetTiktokenEncoding:
         assert enc is fake_enc
 
     def test_populates_cache_on_success(self, monkeypatch):
+        '未说明'
         _tiktoken_encoding_cache.pop("cl100k_base", None)
 
         fake_enc = mock.Mock()
@@ -53,6 +48,7 @@ class TestGetTiktokenEncoding:
         assert _tiktoken_encoding_cache["cl100k_base"] is fake_enc
 
     def test_returns_cached_encoding_without_calling_get_encoding(self, monkeypatch):
+        '未说明'
         fake_enc = mock.Mock()
         monkeypatch.setitem(_tiktoken_encoding_cache, "cl100k_base", fake_enc)
 
@@ -66,7 +62,7 @@ class TestGetTiktokenEncoding:
         tiktoken.get_encoding.assert_not_called()
 
     def test_returns_none_and_caches_failure_sentinel(self, monkeypatch):
-        """A failed load is cached (with a timestamp) so it is not re-attempted (no repeated network download)."""
+        '未说明'
         _tiktoken_encoding_cache.pop("bogus_encoding", None)
         import tiktoken
 
@@ -91,7 +87,7 @@ class TestGetTiktokenEncoding:
         _tiktoken_encoding_cache.pop("bogus_encoding", None)
 
     def test_failure_self_heals_after_cooldown(self, monkeypatch):
-        """After the retry cooldown expires, a transient failure is re-attempted and can recover."""
+        '未说明'
         _tiktoken_encoding_cache.pop("flaky_encoding", None)
         import tiktoken
 
@@ -124,7 +120,7 @@ class TestGetTiktokenEncoding:
         _tiktoken_encoding_cache.pop("flaky_encoding", None)
 
     def test_in_flight_load_returns_none_without_duplicate_get_encoding(self, monkeypatch):
-        """Concurrent callers must not start duplicate blocking BPE downloads."""
+        '未说明'
         _tiktoken_encoding_cache.pop("slow_encoding", None)
         import tiktoken
 
@@ -133,6 +129,7 @@ class TestGetTiktokenEncoding:
         fake_enc = mock.Mock()
 
         def slow_get_encoding(_name):
+            """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             started.set()
             assert release.wait(timeout=2), "test timed out waiting to release slow get_encoding"
             return fake_enc
@@ -143,6 +140,7 @@ class TestGetTiktokenEncoding:
         result: dict[str, object | None] = {}
 
         def load_encoding():
+            """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             result["encoding"] = _get_tiktoken_encoding("slow_encoding")
 
         thread = threading.Thread(target=load_encoding)
@@ -170,15 +168,17 @@ class TestGetTiktokenEncoding:
 
 
 class TestCountTokens:
-    """Tests for _count_tokens fallback behaviour."""
+    '未说明'
 
     def test_returns_character_estimate_when_tiktoken_unavailable(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr("deerflow.agents.memory.backends.deermem.deermem.core.prompt.TIKTOKEN_AVAILABLE", False)
         text = "Hello, world! This is a test."
         result = _count_tokens(text)
         assert result == len(text) // 4
 
     def test_returns_character_estimate_when_encoding_fails(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr(
             "deerflow.agents.memory.backends.deermem.deermem.core.prompt._get_tiktoken_encoding",
             lambda _name=None: None,
@@ -188,6 +188,7 @@ class TestCountTokens:
         assert result == len(text) // 4
 
     def test_returns_token_count_on_success(self, monkeypatch):
+        '未说明'
         fake_enc = mock.Mock()
         fake_enc.encode.return_value = [0, 1, 2, 3]
         monkeypatch.setattr("deerflow.agents.memory.backends.deermem.deermem.core.prompt._get_tiktoken_encoding", mock.Mock(return_value=fake_enc))
@@ -199,6 +200,7 @@ class TestCountTokens:
 
     def test_falls_back_on_encode_exception(self, monkeypatch):
         # Cache an encoding whose .encode raises
+        '未说明'
         fake_enc = mock.Mock()
         fake_enc.encode.side_effect = RuntimeError("encode failed")
         monkeypatch.setitem(_tiktoken_encoding_cache, "test_enc", fake_enc)
@@ -208,7 +210,7 @@ class TestCountTokens:
         assert result == len(text) // 4
 
     def test_use_tiktoken_false_returns_char_estimate_without_touching_tiktoken(self, monkeypatch):
-        """use_tiktoken=False must never call tiktoken (guarantees no BPE download)."""
+        '未说明'
         # Spy on both the encoding loader and tiktoken.get_encoding directly.
         get_encoding_spy = mock.Mock(side_effect=AssertionError("get_encoding must not be called"))
         loader_spy = mock.Mock(side_effect=AssertionError("_get_tiktoken_encoding must not be called"))
@@ -222,11 +224,7 @@ class TestCountTokens:
         loader_spy.assert_not_called()
 
     def test_cjk_estimate_is_denser_than_plain_quarter(self, monkeypatch):
-        """CJK text should estimate more tokens than the plain len // 4 heuristic.
-
-        CJK characters are ~2 chars/token, so the char-based estimate must not
-        under-fill the budget the way ``len(text) // 4`` would.
-        """
+        '未说明'
         monkeypatch.setattr("deerflow.agents.memory.backends.deermem.deermem.core.prompt.TIKTOKEN_AVAILABLE", False)
         # "User prefers concise answers" rendered in CJK (Chinese) characters.
         text = "\u7528\u6237\u504f\u597d\u7b80\u6d01\u7684\u4e2d\u6587\u56de\u7b54\u5e76\u5173\u6ce8\u91d1\u878d\u9886\u57df"
@@ -236,7 +234,7 @@ class TestCountTokens:
         assert result > len(text) // 4
 
     def test_cjk_estimate_combines_cjk_and_non_cjk_characters(self, monkeypatch):
-        """Mixed-language text should apply the CJK density only to CJK chars."""
+        '未说明'
         monkeypatch.setattr("deerflow.agents.memory.backends.deermem.deermem.core.prompt.TIKTOKEN_AVAILABLE", False)
         # ASCII words mixed with CJK (Chinese) characters: "User" + "likes" + "Python and data analysis".
         text = "User\u559c\u6b22Python\u548c\u6570\u636e\u5206\u6790"
@@ -253,9 +251,10 @@ class TestCountTokens:
 
 
 class TestWarmTiktokenCache:
-    """Tests for warm_tiktoken_cache startup helper."""
+    '未说明'
 
     def test_returns_true_on_success(self, monkeypatch):
+        '未说明'
         _tiktoken_encoding_cache.pop("cl100k_base", None)
 
         fake_enc = mock.Mock()
@@ -265,6 +264,7 @@ class TestWarmTiktokenCache:
         assert _tiktoken_encoding_cache["cl100k_base"] is fake_enc
 
     def test_returns_true_if_already_cached(self, monkeypatch):
+        '未说明'
         fake_enc = mock.Mock()
         monkeypatch.setitem(_tiktoken_encoding_cache, "cl100k_base", fake_enc)
 
@@ -275,6 +275,7 @@ class TestWarmTiktokenCache:
         tiktoken.get_encoding.assert_not_called()
 
     def test_returns_false_when_tiktoken_unavailable(self, monkeypatch):
+        '未说明'
         monkeypatch.setattr("deerflow.agents.memory.backends.deermem.deermem.core.prompt.TIKTOKEN_AVAILABLE", False)
         assert warm_tiktoken_cache() is False
 
@@ -285,10 +286,11 @@ class TestWarmTiktokenCache:
 
 
 class TestFormatMemoryForInjectionTokenCounting:
-    """Verify the use_tiktoken flag is honoured end-to-end."""
+    '未说明'
 
     @staticmethod
     def _sample_memory() -> dict:
+        '未说明'
         return {
             "facts": [
                 {"content": "User prefers concise answers.", "category": "preference", "confidence": 0.9},
@@ -297,7 +299,7 @@ class TestFormatMemoryForInjectionTokenCounting:
         }
 
     def test_use_tiktoken_false_never_touches_tiktoken(self, monkeypatch):
-        """With use_tiktoken=False, formatting must not call tiktoken at all."""
+        '未说明'
         get_encoding_spy = mock.Mock(side_effect=AssertionError("get_encoding must not be called"))
         monkeypatch.setattr("deerflow.agents.memory.backends.deermem.deermem.core.prompt.tiktoken.get_encoding", get_encoding_spy)
 
@@ -306,7 +308,7 @@ class TestFormatMemoryForInjectionTokenCounting:
         get_encoding_spy.assert_not_called()
 
     def test_use_tiktoken_true_uses_encoding(self, monkeypatch):
-        """With use_tiktoken=True (default), the cached encoding is used for counting."""
+        '未说明'
         fake_enc = mock.Mock()
         fake_enc.encode.side_effect = lambda text: list(range(len(text)))
         monkeypatch.setattr(
@@ -319,6 +321,7 @@ class TestFormatMemoryForInjectionTokenCounting:
         assert fake_enc.encode.called
 
     def test_empty_memory_returns_empty(self):
+        '未说明'
         assert format_memory_for_injection({}, max_tokens=2000, use_tiktoken=False) == ""
 
 
@@ -328,19 +331,22 @@ class TestFormatMemoryForInjectionTokenCounting:
 
 
 class TestDeerMemConfigTokenCounting:
-    """Verify DeerMemConfig.token_counting defaults and validation (moved from MemoryConfig in step 11)."""
+    '未说明'
 
     def test_default_is_tiktoken(self):
+        '未说明'
         from deerflow.agents.memory.backends.deermem.deermem.config import DeerMemConfig
 
         assert DeerMemConfig().token_counting == "tiktoken"
 
     def test_accepts_char(self):
+        '未说明'
         from deerflow.agents.memory.backends.deermem.deermem.config import DeerMemConfig
 
         assert DeerMemConfig(token_counting="char").token_counting == "char"
 
     def test_rejects_invalid_value(self):
+        '未说明'
         import pytest
         from pydantic import ValidationError
 

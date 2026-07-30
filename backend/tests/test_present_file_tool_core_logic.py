@@ -1,4 +1,4 @@
-"""Core behavior tests for present_files path normalization."""
+"""本模块覆盖文件 工具 核心 逻辑的行为、边界与回归场景，确保既有契约稳定。"""
 
 import importlib
 from types import SimpleNamespace
@@ -7,6 +7,7 @@ present_file_tool_module = importlib.import_module("deerflow.tools.builtins.pres
 
 
 def _make_runtime(outputs_path: str) -> SimpleNamespace:
+    """准备可控测试资源与状态，供后续断言读取。"""
     return SimpleNamespace(
         state={"thread_data": {"outputs_path": outputs_path}},
         context={"thread_id": "thread-1"},
@@ -15,6 +16,7 @@ def _make_runtime(outputs_path: str) -> SimpleNamespace:
 
 
 def test_present_files_normalizes_host_outputs_path(tmp_path):
+    """验证路径在预期条件及边界场景下的可观察行为，防止相关回归。"""
     outputs_dir = tmp_path / "threads" / "thread-1" / "user-data" / "outputs"
     outputs_dir.mkdir(parents=True)
     artifact_path = outputs_dir / "report.md"
@@ -31,6 +33,7 @@ def test_present_files_normalizes_host_outputs_path(tmp_path):
 
 
 def test_present_files_keeps_virtual_outputs_path(tmp_path, monkeypatch):
+    """验证路径在预期条件及边界场景下的可观察行为，防止相关回归。"""
     outputs_dir = tmp_path / "threads" / "thread-1" / "user-data" / "outputs"
     outputs_dir.mkdir(parents=True)
     artifact_path = outputs_dir / "summary.json"
@@ -52,6 +55,7 @@ def test_present_files_keeps_virtual_outputs_path(tmp_path, monkeypatch):
 
 
 def test_present_files_uses_config_thread_id_when_context_missing(tmp_path, monkeypatch):
+    """验证配置 会话 上下文在预期条件及边界场景下的可观察行为，防止相关回归。"""
     outputs_dir = tmp_path / "threads" / "thread-from-config" / "user-data" / "outputs"
     outputs_dir.mkdir(parents=True)
     artifact_path = outputs_dir / "summary.json"
@@ -80,6 +84,7 @@ def test_present_files_uses_config_thread_id_when_context_missing(tmp_path, monk
 
 
 def test_present_files_rejects_paths_outside_outputs(tmp_path):
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     outputs_dir = tmp_path / "threads" / "thread-1" / "user-data" / "outputs"
     workspace_dir = tmp_path / "threads" / "thread-1" / "user-data" / "workspace"
     outputs_dir.mkdir(parents=True)

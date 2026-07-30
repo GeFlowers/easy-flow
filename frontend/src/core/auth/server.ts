@@ -10,8 +10,8 @@ import { type AuthResult, userSchema } from "./types";
 const SSR_AUTH_TIMEOUT_MS = 5_000;
 
 /**
- * Fetch the authenticated user from the gateway using the request's cookies.
- * Returns a tagged AuthResult — callers use exhaustive switch, no try/catch.
+ * 使用当前请求的 Cookie 从 Gateway 获取已认证用户。
+ * 返回带标签的 AuthResult；调用方应使用穷尽式 switch，无需 try/catch。
  */
 export async function getServerSideUser(): Promise<AuthResult> {
   if (isStaticWebsiteOnly()) {
@@ -39,7 +39,7 @@ export async function getServerSideUser(): Promise<AuthResult> {
   }
 
   if (!sessionCookie) {
-    // No session — check whether the system has been initialised yet.
+    // 没有会话时，检查系统是否尚未完成初始化。
     const setupController = new AbortController();
     const setupTimeout = setTimeout(
       () => setupController.abort(),
@@ -62,7 +62,7 @@ export async function getServerSideUser(): Promise<AuthResult> {
       }
     } catch {
       clearTimeout(setupTimeout);
-      // If setup-status is unreachable/times out, fall through to unauthenticated.
+      // setup-status 不可达或超时时，继续按未认证状态处理。
     }
     return { tag: "unauthenticated" };
   }
@@ -76,7 +76,7 @@ export async function getServerSideUser(): Promise<AuthResult> {
       cache: "no-store",
       signal: controller.signal,
     });
-    clearTimeout(timeout); // Clear immediately — covers all response branches
+    clearTimeout(timeout); // 立即清除，覆盖所有响应分支。
 
     if (res.ok) {
       const parsed = userSchema.safeParse(await res.json());

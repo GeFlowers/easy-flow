@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 
+/** 提供设置页通用分区结构，统一标题、说明与内容的语义层级。 */
 export function SettingsSection({
   className,
   title,

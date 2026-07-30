@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 from pathlib import Path
@@ -22,6 +23,7 @@ from deerflow.workspace_changes.scanner import SAMPLE_BYTES, is_sensitive_worksp
 
 
 def _roots(tmp_path):
+    '未说明'
     workspace = tmp_path / "workspace"
     outputs = tmp_path / "outputs"
     workspace.mkdir()
@@ -41,6 +43,7 @@ def _roots(tmp_path):
 
 
 def test_compare_snapshots_reports_text_file_changes(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
     outputs = roots[1].host_path
@@ -71,6 +74,7 @@ def test_compare_snapshots_reports_text_file_changes(tmp_path):
 
 
 def test_compare_snapshots_treats_utf16_markdown_as_text(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
 
@@ -88,6 +92,7 @@ def test_compare_snapshots_treats_utf16_markdown_as_text(tmp_path):
 
 
 def test_compare_snapshots_reads_cached_utf16_markdown_baseline(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
     cache_dir = tmp_path / "cache"
@@ -109,6 +114,7 @@ def test_compare_snapshots_reads_cached_utf16_markdown_baseline(tmp_path):
 def test_compare_snapshots_treats_utf8_markdown_crossing_sample_boundary_as_text(
     tmp_path,
 ):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
 
@@ -127,6 +133,7 @@ def test_compare_snapshots_treats_utf8_markdown_crossing_sample_boundary_as_text
 
 
 def test_compare_snapshots_strips_utf8_bom(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
 
@@ -146,6 +153,7 @@ def test_compare_snapshots_strips_utf8_bom(tmp_path):
 
 
 def test_compare_snapshots_keeps_nul_bytes_classified_as_binary(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
 
@@ -163,6 +171,7 @@ def test_compare_snapshots_keeps_nul_bytes_classified_as_binary(tmp_path):
 
 
 def test_count_diff_lines_ignores_only_real_headers():
+    '未说明'
     from deerflow.workspace_changes.diff import _count_diff_lines
 
     lines = [
@@ -183,6 +192,7 @@ def test_count_diff_lines_ignores_only_real_headers():
 
 
 def test_scan_workspace_roots_skips_excluded_directories(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
     (workspace / "visible.txt").write_text("visible", encoding="utf-8")
@@ -199,6 +209,7 @@ def test_scan_workspace_roots_skips_excluded_directories(tmp_path):
 
 
 def test_scan_workspace_roots_can_skip_text_loading(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
     (workspace / "visible.txt").write_text("visible", encoding="utf-8")
@@ -212,6 +223,7 @@ def test_scan_workspace_roots_can_skip_text_loading(tmp_path):
 
 
 def test_sensitive_workspace_path_covers_common_secret_names():
+    '未说明'
     for filename in (
         "password.txt",
         "api_key.txt",
@@ -222,6 +234,7 @@ def test_sensitive_workspace_path_covers_common_secret_names():
 
 
 def test_compare_snapshots_hides_sensitive_and_binary_file_content(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
 
@@ -247,6 +260,7 @@ def test_compare_snapshots_hides_sensitive_and_binary_file_content(tmp_path):
 
 
 def test_compare_snapshots_truncates_large_text_diffs(tmp_path):
+    '未说明'
     roots = _roots(tmp_path)
     workspace = roots[0].host_path
     before = scan_workspace_roots(roots)
@@ -269,6 +283,7 @@ def test_compare_snapshots_truncates_large_text_diffs(tmp_path):
 
 @pytest.mark.asyncio
 async def test_workspace_changes_response_returns_summary_only_and_full_payload():
+    '未说明'
     store = MemoryRunEventStore()
     payload = {
         "version": 1,
@@ -343,6 +358,7 @@ async def test_workspace_changes_response_returns_summary_only_and_full_payload(
 
 @pytest.mark.asyncio
 async def test_workspace_changes_response_is_empty_when_no_event_exists():
+    '未说明'
     response = await get_workspace_changes_response(
         MemoryRunEventStore(),
         "thread-1",
@@ -363,6 +379,7 @@ async def test_workspace_changes_response_is_empty_when_no_event_exists():
 
 @pytest.mark.anyio
 async def test_run_agent_records_workspace_changes_event(tmp_path, monkeypatch):
+    '未说明'
     from deerflow.config import paths as paths_module
 
     monkeypatch.setattr(paths_module, "_paths", Paths(tmp_path))
@@ -374,22 +391,29 @@ async def test_run_agent_records_workspace_changes_event(tmp_path, monkeypatch):
     paths_module.get_paths().ensure_thread_dirs("thread-1", user_id=user_id)
 
     class DummyBridge:
+        '未说明'
         async def publish(self, run_id, event, data):
+            '未说明'
             return None
 
         async def publish_end(self, run_id):
+            '未说明'
             return None
 
         async def cleanup(self, run_id, delay):
+            '未说明'
             return None
 
     class DummyAgent:
+        '未说明'
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            '未说明'
             workspace = paths_module.get_paths().sandbox_work_dir("thread-1", user_id=user_id)
             (workspace / "report.md").write_text("# Report\n\nReady\n", encoding="utf-8")
             yield {"messages": []}
 
     def factory(*, config):
+        '未说明'
         return DummyAgent()
 
     await run_agent(
@@ -416,6 +440,7 @@ async def test_run_agent_records_workspace_changes_event(tmp_path, monkeypatch):
 
 @pytest.mark.anyio
 async def test_record_workspace_changes_content_uses_total_changed_count(tmp_path, monkeypatch):
+    '未说明'
     from deerflow.config import paths as paths_module
 
     monkeypatch.setattr(paths_module, "_paths", Paths(tmp_path))
@@ -453,6 +478,7 @@ async def test_record_workspace_changes_content_uses_total_changed_count(tmp_pat
 
 @pytest.mark.anyio
 async def test_record_workspace_changes_uses_cached_baseline_for_modified_diff(tmp_path, monkeypatch):
+    '未说明'
     from deerflow.config import paths as paths_module
 
     monkeypatch.setattr(paths_module, "_paths", Paths(tmp_path))
@@ -487,12 +513,15 @@ async def test_record_workspace_changes_uses_cached_baseline_for_modified_diff(t
 
 @pytest.mark.anyio
 async def test_workspace_changes_route_forwards_include_files_flag():
+    '未说明'
     from app.gateway.routers.thread_runs import get_run_workspace_changes
 
     calls: dict = {}
 
     class FakeStore:
+        '未说明'
         async def list_events(self, thread_id, run_id, *, event_types=None, task_id=None, limit=500, after_seq=None):
+            '未说明'
             calls.update(thread_id=thread_id, run_id=run_id, event_types=event_types)
             return [
                 {
@@ -515,12 +544,15 @@ async def test_workspace_changes_route_forwards_include_files_flag():
             ]
 
     class FakeState:
+        '未说明'
         run_event_store = FakeStore()
 
     class FakeApp:
+        '未说明'
         state = FakeState()
 
     class FakeRequest:
+        '未说明'
         app = FakeApp()
         _deerflow_test_bypass_auth = True
 

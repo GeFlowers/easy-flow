@@ -1,30 +1,5 @@
 #!/usr/bin/env python3
-"""Resolve uv extras for local `uv sync` based on environment + config.yaml.
-
-Order of resolution:
-1. `UV_EXTRAS` env var. Comma- or whitespace-separated names so multiple
-   extras can be layered (e.g. ``UV_EXTRAS=postgres,ollama``). The same
-   parsing semantics apply in the Docker dev container via
-   ``docker/dev-entrypoint.sh`` and in the production Docker image build via
-   ``backend/Dockerfile``.
-2. Auto-detection from config.yaml — currently maps:
-   - database.backend == postgres        -> postgres
-   - checkpointer.type == postgres       -> postgres
-   - stream_bridge.type == redis         -> redis
-3. Runtime environment toggles that enable optional backends:
-   - DEER_FLOW_STREAM_BRIDGE_REDIS_URL   -> redis
-
-Each extra name is validated against ``^[A-Za-z][A-Za-z0-9_-]*$`` (the same
-shape uv enforces for `[project.optional-dependencies]` keys). Anything else
-is dropped with a stderr warning so a stray shell metacharacter in `.env`
-cannot reach the `uv sync` invocation downstream.
-
-Output: space-separated `--extra <name>` flags ready for splat into
-`uv sync`, e.g. `--extra postgres`. Empty output means "no extras".
-
-Intentionally implemented with the standard library only: this script must run
-*before* `uv sync` has populated the venv, so it cannot depend on PyYAML.
-"""
+"""本脚本负责检测。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -40,6 +15,7 @@ _EXTRA_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 
 
 def _validate_extras(names: list[str]) -> list[str]:
+    '未说明'
     valid: list[str] = []
     for name in names:
         if _EXTRA_NAME_RE.match(name):
@@ -53,13 +29,13 @@ def _validate_extras(names: list[str]) -> list[str]:
 
 
 def parse_env_extras(value: str) -> list[str]:
-    """Split UV_EXTRAS into a list, accepting comma or whitespace separators."""
+    '未说明'
     parts = re.split(r"[\s,]+", value.strip())
     return _validate_extras([p for p in parts if p])
 
 
 def find_config_file() -> Path | None:
-    """Locate config.yaml using the same precedence as serve.sh."""
+    """执行配置 文件对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     explicit = os.environ.get("DEER_FLOW_CONFIG_PATH")
     if explicit:
         candidate = Path(explicit)
@@ -77,7 +53,7 @@ _KEY_RE = re.compile(r"^\s+([A-Za-z_][\w-]*)\s*:\s*(\S.*?)\s*$")
 
 
 def _strip_comment(line: str) -> str:
-    """Drop trailing `#` comments while preserving `#` inside quoted strings."""
+    '未说明'
     in_quote: str | None = None
     out: list[str] = []
     for ch in line:
@@ -97,20 +73,14 @@ def _strip_comment(line: str) -> str:
 
 
 def _unquote(value: str) -> str:
+    '未说明'
     if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
         return value[1:-1]
     return value
 
 
 def section_value(lines: list[str], section: str, key: str) -> str | None:
-    """Return the value of `section.key` from a flat-ish YAML, or None.
-
-    Only handles the shallow shape DeerFlow uses for these settings:
-        database:
-          backend: postgres
-    Nested mappings deeper than the immediate child level are ignored on
-    purpose — that keeps this parser predictable without a full YAML stack.
-    """
+    '未说明'
     inside = False
     child_indent: int | None = None
     for raw in lines:
@@ -143,13 +113,7 @@ def section_value(lines: list[str], section: str, key: str) -> str | None:
 
 
 def nested_section_value(lines: list[str], section_path: str, key: str) -> str | None:
-    """Return the value of a nested YAML key like ``channels.discord.enabled``.
-
-    Handles two levels of nesting:
-        channels:
-          discord:
-            enabled: true
-    """
+    '未说明'
     parts = section_path.split(".")
     if len(parts) != 2:
         return None
@@ -221,6 +185,7 @@ def nested_section_value(lines: list[str], section_path: str, key: str) -> str |
 
 
 def detect_from_config(path: Path) -> list[str]:
+    """执行检测 配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     try:
         text = path.read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -239,6 +204,7 @@ def detect_from_config(path: Path) -> list[str]:
 
 
 def detect_from_runtime_env() -> list[str]:
+    """执行检测对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     extras: set[str] = set()
     if os.environ.get("DEER_FLOW_STREAM_BRIDGE_REDIS_URL", "").strip():
         extras.add("redis")
@@ -246,6 +212,7 @@ def detect_from_runtime_env() -> list[str]:
 
 
 def merge_extras(*groups: list[str]) -> list[str]:
+    '未说明'
     merged: list[str] = []
     seen: set[str] = set()
     for group in groups:
@@ -258,6 +225,7 @@ def merge_extras(*groups: list[str]) -> list[str]:
 
 
 def resolve_extras() -> list[str]:
+    '未说明'
     runtime_env_extras = detect_from_runtime_env()
     env = os.environ.get("UV_EXTRAS", "")
     if env.strip():
@@ -269,10 +237,12 @@ def resolve_extras() -> list[str]:
 
 
 def format_flags(extras: list[str]) -> str:
+    """执行格式对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return " ".join(f"--extra {e}" for e in extras)
 
 
 def main() -> int:
+    '未说明'
     extras = resolve_extras()
     if extras:
         sys.stdout.write(format_flags(extras))

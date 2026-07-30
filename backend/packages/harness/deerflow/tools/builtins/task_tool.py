@@ -1,4 +1,4 @@
-"""Task tool for delegating work to subagents."""
+"""提供将任务委派给子代理的工具。"""
 
 import asyncio
 import logging
@@ -43,6 +43,7 @@ _subagent_usage_cache: dict[str, dict[str, int]] = {}
 
 
 def _token_usage_cache_enabled(app_config: "AppConfig | None") -> bool:
+    """判断是否启用子代理令牌用量缓存。"""
     if app_config is None:
         try:
             app_config = get_app_config()
@@ -52,21 +53,23 @@ def _token_usage_cache_enabled(app_config: "AppConfig | None") -> bool:
 
 
 def _cache_subagent_usage(tool_call_id: str, usage: dict | None, *, enabled: bool = True) -> None:
+    """在启用时按工具调用标识缓存子代理用量。"""
     if enabled and usage:
         _subagent_usage_cache[tool_call_id] = usage
 
 
 def pop_cached_subagent_usage(tool_call_id: str) -> dict | None:
+    """取出并删除指定工具调用的缓存用量。"""
     return _subagent_usage_cache.pop(tool_call_id, None)
 
 
 def _is_subagent_terminal(result: Any) -> bool:
-    """Return whether a background subagent result is safe to clean up."""
+    """判断后台子代理结果是否已终止且可以安全清理。"""
     return result.status in {SubagentStatus.COMPLETED, SubagentStatus.FAILED, SubagentStatus.CANCELLED, SubagentStatus.TIMED_OUT} or getattr(result, "completed_at", None) is not None
 
 
 async def _await_subagent_terminal(task_id: str, max_polls: int) -> Any | None:
-    """Poll until the background subagent reaches a terminal status or we run out of polls."""
+    """轮询后台子代理，直至其终止或耗尽允许的轮询次数。"""
     for _ in range(max_polls):
         result = get_background_task_result(task_id)
         if result is None:
@@ -78,7 +81,7 @@ async def _await_subagent_terminal(task_id: str, max_polls: int) -> Any | None:
 
 
 async def _deferred_cleanup_subagent_task(task_id: str, trace_id: str, max_polls: int) -> None:
-    """Keep polling a cancelled subagent until it can be safely removed."""
+    """持续轮询已取消的子代理，直至可以安全移除。"""
     cleanup_poll_count = 0
     while True:
         result = get_background_task_result(task_id)
@@ -95,6 +98,7 @@ async def _deferred_cleanup_subagent_task(task_id: str, trace_id: str, max_polls
 
 
 def _log_cleanup_failure(cleanup_task: asyncio.Task[None], *, trace_id: str, task_id: str) -> None:
+    """记录延后清理任务执行失败的异常。"""
     if cleanup_task.cancelled():
         return
 
@@ -104,13 +108,14 @@ def _log_cleanup_failure(cleanup_task: asyncio.Task[None], *, trace_id: str, tas
 
 
 def _schedule_deferred_subagent_cleanup(task_id: str, trace_id: str, max_polls: int) -> None:
+    """为已取消的子代理安排延后清理任务。"""
     logger.debug(f"[trace={trace_id}] Scheduling deferred cleanup for cancelled task {task_id}")
     cleanup_task = asyncio.create_task(_deferred_cleanup_subagent_task(task_id, trace_id, max_polls))
     cleanup_task.add_done_callback(lambda task: _log_cleanup_failure(task, trace_id=trace_id, task_id=task_id))
 
 
 def _find_usage_recorder(runtime: Any) -> Any | None:
-    """Find a callback handler with ``record_external_llm_usage_records`` in the runtime config.
+    """从运行时配置中查找实现 ``record_external_llm_usage_records`` 的回调处理器。
 
     LangChain may pass ``config["callbacks"]`` in three different shapes:
 
@@ -142,7 +147,7 @@ def _find_usage_recorder(runtime: Any) -> Any | None:
 
 
 def _summarize_usage(records: list[dict] | None) -> dict | None:
-    """Summarize token usage records into a compact dict for SSE events."""
+    """将令牌用量记录汇总为适用于 SSE 事件的紧凑字典。"""
     if not records:
         return None
     return {
@@ -153,7 +158,7 @@ def _summarize_usage(records: list[dict] | None) -> dict | None:
 
 
 def _report_subagent_usage(runtime: Any, result: Any) -> None:
-    """Report subagent token usage to the parent RunJournal, if available.
+    """在可用时向父级运行日志报告子代理的令牌用量。
 
     Each subagent task must be reported only once (guarded by usage_reported).
     """
@@ -174,6 +179,7 @@ def _report_subagent_usage(runtime: Any, result: Any) -> None:
 
 
 def _get_runtime_app_config(runtime: Any) -> "AppConfig | None":
+    """从运行时上下文取得应用配置。"""
     context = getattr(runtime, "context", None)
     if isinstance(context, dict):
         app_config = context.get("app_config")
@@ -183,7 +189,7 @@ def _get_runtime_app_config(runtime: Any) -> "AppConfig | None":
 
 
 def _merge_skill_allowlists(parent: list[str] | None, child: list[str] | None) -> list[str] | None:
-    """Return the effective subagent skill allowlist under the parent policy."""
+    """在父级策略约束下返回有效的子代理技能白名单。"""
     if parent is None:
         return child
     if child is None:
@@ -203,6 +209,7 @@ def _task_result_command(
     model_name: str | None = None,
     usage: dict[str, int] | None = None,
 ) -> Command:
+    """构造携带子代理任务结果及其元数据的状态更新命令。"""
     content, metadata_error = format_subagent_result_message(status, result=result, error=error, stop_reason=stop_reason)
     return Command(
         update={
@@ -233,7 +240,7 @@ async def task_tool(
     subagent_type: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> str | Command:
-    """Delegate a task to a specialized subagent that runs in its own context.
+    """将任务委派给在独立上下文中运行的专用子代理。
 
     Subagents help you:
     - Preserve context by keeping exploration and implementation separate

@@ -1,9 +1,10 @@
+'定义 __init__ 模块提供的职责与可复用接口'
 from deerflow.runtime.events.store.base import RunEventStore
 from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
 
 def make_run_event_store(config=None) -> RunEventStore:
-    """Create a RunEventStore based on run_events.backend configuration."""
+    '构造并返回，并遵守 make_run_event_store 所表达的接口约束。\n\nCreate a RunEventStore based on run_events.backend configuration.'
     if config is None or config.backend == "memory":
         return MemoryRunEventStore()
     if config.backend == "db":

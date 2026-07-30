@@ -1,11 +1,4 @@
-"""Durable-context middleware: inject summary, delegation ledger, and skills.
-
-Capture enumerates task delegations and loaded skill files into checkpointed
-state channels. Injection renders static authority rules as a SystemMessage and
-renders untrusted channel values (`summary_text`, `delegations`,
-`skill_context`) as one hidden <durable_context_data> HumanMessage, never
-written back to state.
-"""
+'定义 durable_context_middleware 模块提供的职责与可复用接口。\n\nDurable-context middleware: inject summary, delegation ledger, and skills.\n\nCapture enumerates task delegations and loaded skill files into checkpointed\nstate channels. Injection renders static authority rules as a SystemMessage and\nrenders untrusted channel values (`summary_text`, `delegations`,\n`skill_context`) as one hidden <durable_context_data> HumanMessage, never\nwritten back to state.\n'
 
 from __future__ import annotations
 
@@ -41,10 +34,12 @@ _DELEGATION_STABLE_FIELDS = ("description", "subagent_type", "status", "run_id",
 
 
 def _normalize_skills_root(skills_container_path: str | None) -> str:
+    """规范化技能容器根目录，缺失时使用默认路径。"""
     return posixpath.normpath(skills_container_path or DEFAULT_SKILLS_CONTAINER_PATH)
 
 
 def _bound_text(text: str, cap: int) -> str:
+    """在字符上限内以首尾保留方式确定性截断文本。"""
     if len(text) <= cap:
         return text
     if cap <= 0:
@@ -60,6 +55,7 @@ def _bound_text(text: str, cap: int) -> str:
 
 
 def _insert_after_leading_system_messages(messages: list, injected: list) -> list:
+    """将注入消息放在连续前导系统消息之后。"""
     index = 0
     while index < len(messages) and isinstance(messages[index], SystemMessage):
         index += 1
@@ -67,6 +63,7 @@ def _insert_after_leading_system_messages(messages: list, injected: list) -> lis
 
 
 def _render_durable_context_data(summary_text: str | None, ledger: list, skills: list) -> str:
+    """将摘要、委派账本和技能信息渲染为隐藏的持久上下文数据块。"""
     data_parts: list[str] = []
     if summary_text:
         bounded_summary = _bound_text(str(summary_text), _SUMMARY_RENDER_CHAR_BUDGET)
@@ -86,6 +83,7 @@ def _render_durable_context_data(summary_text: str | None, ledger: list, skills:
 
 
 def _retained_delegation_window(delegations: list[dict], existing: list[dict]) -> list[dict]:
+    """按已保留账本边界截取仍需比较的委派窗口。"""
     if len(existing) < _DELEGATION_LEDGER_MAX_ENTRIES or not existing:
         return delegations
 
@@ -99,6 +97,7 @@ def _retained_delegation_window(delegations: list[dict], existing: list[dict]) -
 
 
 def _filter_changed_delegations(delegations: list[dict], existing: list[dict]) -> list[dict]:
+    """筛选相对已保存记录发生变化且允许更新的委派。"""
     comparable_delegations = _retained_delegation_window(delegations, existing)
     existing_by_id = {entry.get("id"): entry for entry in existing if isinstance(entry, dict)}
     changed: list[dict] = []
@@ -115,6 +114,7 @@ def _filter_changed_delegations(delegations: list[dict], existing: list[dict]) -
 
 
 def _runtime_run_id(runtime: Runtime | None) -> str | None:
+    """从运行时上下文中读取当前运行 ID。"""
     context = getattr(runtime, "context", None)
     if not isinstance(context, dict):
         return None
@@ -123,6 +123,7 @@ def _runtime_run_id(runtime: Runtime | None) -> str | None:
 
 
 def _runtime_pre_existing_message_ids(runtime: Runtime | None) -> frozenset[str]:
+    """从运行时上下文中读取本次运行前已有的消息 ID 集合。"""
     context = getattr(runtime, "context", None)
     if not isinstance(context, dict):
         return frozenset()
@@ -133,6 +134,7 @@ def _runtime_pre_existing_message_ids(runtime: Runtime | None) -> frozenset[str]
 
 
 def _message_id(message: object) -> str | None:
+    """从字典或消息对象中读取 ID，并在缺失时返回 None。"""
     if isinstance(message, dict):
         message_id = message.get("id")
     else:
@@ -141,6 +143,7 @@ def _message_id(message: object) -> str | None:
 
 
 def _messages_after_pre_existing_boundary(messages: list[AnyMessage], pre_existing_message_ids: frozenset[str]) -> list[AnyMessage]:
+    """返回最后一个运行前消息之后追加的消息。"""
     if not pre_existing_message_ids:
         return []
     for index in range(len(messages) - 1, -1, -1):
@@ -150,13 +153,7 @@ def _messages_after_pre_existing_boundary(messages: list[AnyMessage], pre_existi
 
 
 def _current_run_messages(messages: list[AnyMessage], run_id: str | None, pre_existing_message_ids: frozenset[str]) -> list[AnyMessage]:
-    """Return the message tail where this invocation may have emitted tasks.
-
-    A resumed run may not append a new HumanMessage marker. In that case the
-    latest HumanMessage can belong to an older run. The worker supplies the
-    message ids that existed before this run so we can capture only newly
-    appended messages instead of re-tagging old task calls.
-    """
+    '执行 _current_run_messages 的明确职责，并返回与调用约定一致的结果。\n\nReturn the message tail where this invocation may have emitted tasks.\n\n    A resumed run may not append a new HumanMessage marker. In that case the\n    latest HumanMessage can belong to an older run. The worker supplies the\n    message ids that existed before this run so we can capture only newly\n    appended messages instead of re-tagging old task calls.\n    '
     if run_id is None:
         return messages
     for index in range(len(messages) - 1, -1, -1):
@@ -175,7 +172,7 @@ def _current_run_messages(messages: list[AnyMessage], run_id: str | None, pre_ex
 
 
 def _with_run_id(delegations: list[dict], run_id: str | None, existing: list[dict]) -> list[dict]:
-    """Tag only new delegation ids with the current run_id."""
+    '执行 _with_run_id 的明确职责，并返回与调用约定一致的结果。\n\nTag only new delegation ids with the current run_id.'
     if run_id is None:
         return delegations
     existing_by_id = {entry.get("id"): entry for entry in existing if isinstance(entry, dict)}
@@ -194,7 +191,7 @@ def _with_run_id(delegations: list[dict], run_id: str | None, existing: list[dic
 
 
 class DurableContextMiddleware(AgentMiddleware[AgentState]):
-    """Capture delegations + loaded skills; inject durable context ephemerally."""
+    '封装 DurableContextMiddleware 的状态、协作关系与公开操作。\n\nCapture delegations + loaded skills; inject durable context ephemerally.'
 
     def __init__(
         self,
@@ -202,27 +199,33 @@ class DurableContextMiddleware(AgentMiddleware[AgentState]):
         skills_container_path: str | None = None,
         skill_file_read_tool_names: Collection[str] | None = None,
     ) -> None:
+        """使用技能根目录和可识别的技能读取工具名称初始化中间件。"""
         super().__init__()
         self._skills_root = _normalize_skills_root(skills_container_path)
         self._skill_read_tool_names = frozenset(DEFAULT_SKILL_FILE_READ_TOOL_NAMES if skill_file_read_tool_names is None else skill_file_read_tool_names)
 
     @override
     def before_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        """在模型调用前捕获新增委派和已加载技能上下文。"""
         return self._capture(state, runtime)
 
     @override
     async def abefore_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        """异步执行模型调用前的委派与技能上下文捕获。"""
         return self._capture(state, runtime)
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        """在模型调用后捕获本轮产生或更新的委派记录。"""
         return self._capture_delegations(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        """异步执行模型调用后的委派记录捕获。"""
         return self._capture_delegations(state, runtime)
 
     def _capture_delegations(self, state: AgentState, runtime: Runtime | None) -> dict | None:
+        """从当前运行新增消息中提取并返回发生变化的委派状态。"""
         run_id = _runtime_run_id(runtime)
         pre_existing_message_ids = _runtime_pre_existing_message_ids(runtime)
         messages = _current_run_messages(state["messages"], run_id, pre_existing_message_ids)
@@ -236,6 +239,7 @@ class DurableContextMiddleware(AgentMiddleware[AgentState]):
         return None
 
     def _capture(self, state: AgentState, runtime: Runtime | None) -> dict | None:
+        """汇集需持久化的委派和技能上下文状态更新。"""
         messages = state["messages"]
         updates: dict = {}
         delegation_update = self._capture_delegations(state, runtime)
@@ -247,6 +251,7 @@ class DurableContextMiddleware(AgentMiddleware[AgentState]):
         return updates or None
 
     def _inject(self, request: ModelRequest) -> ModelRequest:
+        """将持久上下文以临时隐藏消息注入模型请求。"""
         state = request.state or {}
         data_block = _render_durable_context_data(
             state.get("summary_text"),
@@ -276,6 +281,7 @@ class DurableContextMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
+        """注入持久上下文后执行同步模型调用。"""
         return handler(self._inject(request))
 
     @override
@@ -284,4 +290,5 @@ class DurableContextMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
+        """注入持久上下文后等待异步模型调用。"""
         return await handler(self._inject(request))

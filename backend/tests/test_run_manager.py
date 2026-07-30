@@ -1,4 +1,4 @@
-"""Tests for RunManager."""
+"""本模块覆盖运行 管理器的行为、边界与回归场景，确保既有契约稳定。"""
 
 import asyncio
 import logging
@@ -18,18 +18,21 @@ ISO_RE = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}")
 
 @pytest.fixture
 def manager() -> RunManager:
+    """为管理器准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     return RunManager()
 
 
 class FlakyStatusRunStore(MemoryRunStore):
-    """Memory run store that simulates transient SQLite status-write failures."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self, *, status_failures: int) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         super().__init__()
         self.status_failures = status_failures
         self.status_update_attempts = 0
 
     async def update_status(self, run_id, status, *, error=None, stop_reason=None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.status_update_attempts += 1
         if self.status_failures > 0:
             self.status_failures -= 1
@@ -38,21 +41,24 @@ class FlakyStatusRunStore(MemoryRunStore):
 
 
 class MissingRowStatusRunStore(MemoryRunStore):
-    """Memory run store that reports a missing row for status updates."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     async def update_status(self, run_id, status, *, error=None, stop_reason=None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         await super().update_status(run_id, status, error=error, stop_reason=stop_reason)
         return False
 
 
 class PermanentStatusRunStore(MemoryRunStore):
-    """Memory run store that simulates a permanent SQLAlchemy write failure."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         super().__init__()
         self.status_update_attempts = 0
 
     async def update_status(self, run_id, status, *, error=None, stop_reason=None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.status_update_attempts += 1
         raise SQLAlchemyDatabaseError(
             "UPDATE runs SET status = :status WHERE run_id = :run_id",
@@ -62,25 +68,29 @@ class PermanentStatusRunStore(MemoryRunStore):
 
 
 class FailingStatusRunStore(MemoryRunStore):
-    """Memory run store that always fails status updates."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         super().__init__()
         self.status_update_attempts = 0
 
     async def update_status(self, run_id, status, *, error=None, stop_reason=None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.status_update_attempts += 1
         raise sqlite3.OperationalError("database is locked")
 
 
 class MissingCompletionRunStore(MemoryRunStore):
-    """Memory run store that reports one missing row for completion updates."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         super().__init__()
         self.completion_update_attempts = 0
 
     async def update_run_completion(self, run_id, *, status, **kwargs):
+        """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.completion_update_attempts += 1
         if self.completion_update_attempts == 1:
             return False
@@ -88,18 +98,21 @@ class MissingCompletionRunStore(MemoryRunStore):
 
 
 class AlwaysMissingCompletionRunStore(MemoryRunStore):
-    """Memory run store that keeps reporting missing rows for completion updates."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self) -> None:
+        """准备可控测试资源与状态，供后续断言读取。"""
         super().__init__()
         self.completion_update_attempts = 0
 
     async def update_run_completion(self, run_id, *, status, **kwargs):
+        """处理运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.completion_update_attempts += 1
         return False
 
 
 async def _stored_statuses(store: MemoryRunStore, *run_ids: str) -> dict[str, Any]:
+    """准备可控测试资源与状态，供后续断言读取。"""
     rows = {}
     for run_id in run_ids:
         row = await store.get(run_id)
@@ -109,7 +122,7 @@ async def _stored_statuses(store: MemoryRunStore, *run_ids: str) -> dict[str, An
 
 @pytest.mark.anyio
 async def test_create_and_get(manager: RunManager):
-    """Created run should be retrievable with new fields."""
+    """验证创建 获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
     record = await manager.create(
         "thread-1",
         "lead_agent",
@@ -132,7 +145,7 @@ async def test_create_and_get(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_status_transitions(manager: RunManager):
-    """Status should transition pending -> running -> success."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     record = await manager.create("thread-1")
     assert record.status == RunStatus.pending
 
@@ -146,7 +159,7 @@ async def test_status_transitions(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_cancel(manager: RunManager):
-    """Cancel should set abort_event and transition to interrupted."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     record = await manager.create("thread-1")
     await manager.set_status(record.run_id, RunStatus.running)
 
@@ -158,7 +171,7 @@ async def test_cancel(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_cancel_persists_interrupted_status_to_store():
-    """Cancel should persist interrupted status to the backing store."""
+    """验证存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     manager = RunManager(store=store)
     record = await manager.create("thread-1")
@@ -174,7 +187,7 @@ async def test_cancel_persists_interrupted_status_to_store():
 
 @pytest.mark.anyio
 async def test_status_persistence_retries_transient_sqlite_lock():
-    """Transient SQLite lock errors should not leave a final status stale."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     store = FlakyStatusRunStore(status_failures=2)
     manager = RunManager(store=store)
     record = await manager.create("thread-1")
@@ -190,7 +203,7 @@ async def test_status_persistence_retries_transient_sqlite_lock():
 
 @pytest.mark.anyio
 async def test_status_persistence_recreates_missing_store_row():
-    """A final status update should recreate a run row if initial persistence was lost."""
+    """验证持久化 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MissingRowStatusRunStore()
     manager = RunManager(store=store)
     record = await manager.create("thread-1")
@@ -206,7 +219,7 @@ async def test_status_persistence_recreates_missing_store_row():
 
 @pytest.mark.anyio
 async def test_status_persistence_does_not_retry_permanent_sqlalchemy_errors():
-    """Permanent SQLAlchemy failures should not be retried as SQLite pressure."""
+    """验证持久化在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = PermanentStatusRunStore()
     manager = RunManager(
         store=store,
@@ -221,7 +234,7 @@ async def test_status_persistence_does_not_retry_permanent_sqlalchemy_errors():
 
 @pytest.mark.anyio
 async def test_completion_persistence_recreates_missing_store_row():
-    """Completion updates should recreate a missing row and persist final counters."""
+    """验证持久化 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MissingCompletionRunStore()
     manager = RunManager(store=store)
     record = await manager.create("thread-1")
@@ -248,7 +261,7 @@ async def test_completion_persistence_recreates_missing_store_row():
 
 @pytest.mark.anyio
 async def test_completion_persistence_warns_when_recreated_row_still_missing(caplog):
-    """A second zero-row completion update after recreation should not be silent."""
+    """验证持久化在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = AlwaysMissingCompletionRunStore()
     manager = RunManager(store=store)
     record = await manager.create("thread-1")
@@ -263,7 +276,7 @@ async def test_completion_persistence_warns_when_recreated_row_still_missing(cap
 
 @pytest.mark.anyio
 async def test_reconcile_orphaned_inflight_runs_marks_stale_rows_error():
-    """Startup recovery should turn persisted active rows into explicit errors."""
+    """验证错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     await store.put("pending-run", thread_id="thread-1", status="pending", created_at="2026-01-01T00:00:00+00:00")
     await store.put("running-run", thread_id="thread-1", status="running", created_at="2026-01-01T00:00:01+00:00")
@@ -285,7 +298,7 @@ async def test_reconcile_orphaned_inflight_runs_marks_stale_rows_error():
 
 @pytest.mark.anyio
 async def test_reconcile_orphaned_inflight_runs_skips_live_local_run():
-    """Startup recovery should not mark an active row orphaned when this worker owns it."""
+    """验证本地 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     manager = RunManager(store=store)
     record = await manager.create("thread-1")
@@ -302,7 +315,7 @@ async def test_reconcile_orphaned_inflight_runs_skips_live_local_run():
 
 @pytest.mark.anyio
 async def test_reconcile_orphaned_inflight_runs_skips_rows_when_error_status_is_not_persisted():
-    """Startup recovery must not report a row as recovered if the error update failed."""
+    """验证错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = FailingStatusRunStore()
     await store.put("running-run", thread_id="thread-1", status="running", created_at="2026-01-01T00:00:00+00:00")
     manager = RunManager(
@@ -323,7 +336,7 @@ async def test_reconcile_orphaned_inflight_runs_skips_rows_when_error_status_is_
 
 @pytest.mark.anyio
 async def test_cancel_not_inflight(manager: RunManager):
-    """Cancelling a completed run should return not_cancellable."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     record = await manager.create("thread-1")
     await manager.set_status(record.run_id, RunStatus.success)
 
@@ -333,7 +346,7 @@ async def test_cancel_not_inflight(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_list_by_thread(manager: RunManager):
-    """Same thread should return multiple runs."""
+    """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     r1 = await manager.create("thread-1")
     r2 = await manager.create("thread-1")
     await manager.create("thread-2")
@@ -347,7 +360,7 @@ async def test_list_by_thread(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_list_by_thread_is_stable_when_timestamps_tie(manager: RunManager, monkeypatch: pytest.MonkeyPatch):
-    """Ordering should be stable (insertion order) even when timestamps tie."""
+    """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     monkeypatch.setattr("deerflow.runtime.runs.manager._now_iso", lambda: "2026-01-01T00:00:00+00:00")
 
     r1 = await manager.create("thread-1")
@@ -359,7 +372,7 @@ async def test_list_by_thread_is_stable_when_timestamps_tie(manager: RunManager,
 
 @pytest.mark.anyio
 async def test_has_inflight(manager: RunManager):
-    """has_inflight should be True when a run is pending or running."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     record = await manager.create("thread-1")
     assert await manager.has_inflight("thread-1") is True
 
@@ -369,7 +382,7 @@ async def test_has_inflight(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_cleanup(manager: RunManager):
-    """After cleanup, the run should be gone."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     record = await manager.create("thread-1")
     run_id = record.run_id
 
@@ -379,7 +392,7 @@ async def test_cleanup(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_set_status_with_error(manager: RunManager):
-    """Error message should be stored on the record."""
+    """验证错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
     record = await manager.create("thread-1")
     await manager.set_status(record.run_id, RunStatus.error, error="Something went wrong")
     assert record.status == RunStatus.error
@@ -388,13 +401,13 @@ async def test_set_status_with_error(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_get_nonexistent(manager: RunManager):
-    """Getting a nonexistent run should return None."""
+    """验证获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
     assert await manager.get("does-not-exist") is None
 
 
 @pytest.mark.anyio
 async def test_get_hydrates_store_only_run():
-    """Store-only runs should be readable after process restart."""
+    """验证获取 存储 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     await store.put(
         "run-store-only",
@@ -426,7 +439,7 @@ async def test_get_hydrates_store_only_run():
 
 @pytest.mark.anyio
 async def test_get_hydrates_run_with_null_enum_fields():
-    """Rows with NULL status/on_disconnect must hydrate with safe defaults, not raise."""
+    """验证获取 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     # Simulate a SQL row where the nullable status column is NULL
     await store.put(
@@ -447,7 +460,7 @@ async def test_get_hydrates_run_with_null_enum_fields():
 
 @pytest.mark.anyio
 async def test_list_by_thread_hydrates_run_with_null_enum_fields():
-    """list_by_thread must not skip rows with NULL status; applies safe defaults."""
+    """验证会话 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     await store.put(
         "run-null-status-list",
@@ -467,14 +480,14 @@ async def test_list_by_thread_hydrates_run_with_null_enum_fields():
 
 @pytest.mark.anyio
 async def test_create_record_is_not_store_only(manager: RunManager):
-    """In-memory records created via create() must have store_only=False."""
+    """验证创建 录制 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     record = await manager.create("thread-1")
     assert record.store_only is False
 
 
 @pytest.mark.anyio
 async def test_create_rolls_back_in_memory_record_on_store_failure():
-    """create() must fail and hide the run when the initial store write fails."""
+    """验证创建 内存 录制 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from unittest.mock import AsyncMock
 
     store = MemoryRunStore()
@@ -490,10 +503,11 @@ async def test_create_rolls_back_in_memory_record_on_store_failure():
 
 @pytest.mark.anyio
 async def test_create_rolls_back_in_memory_record_on_store_cancellation():
-    """create() must also roll back when cancelled during the initial store write."""
+    """验证创建 内存 录制 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
 
     async def cancelled_put(run_id, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         raise asyncio.CancelledError
 
     store.put = cancelled_put
@@ -508,7 +522,7 @@ async def test_create_rolls_back_in_memory_record_on_store_cancellation():
 
 @pytest.mark.anyio
 async def test_create_does_not_expose_run_until_store_persist_completes():
-    """Concurrent readers must wait until the new run has been persisted."""
+    """验证创建 运行 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     manager = RunManager(store=store)
     original_put = store.put
@@ -516,6 +530,7 @@ async def test_create_does_not_expose_run_until_store_persist_completes():
     allow_put = asyncio.Event()
 
     async def blocking_put(run_id, **kwargs):
+        """处理阻塞相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         put_started.set()
         await allow_put.wait()
         return await original_put(run_id, **kwargs)
@@ -549,7 +564,7 @@ async def test_create_does_not_expose_run_until_store_persist_completes():
 
 @pytest.mark.anyio
 async def test_get_prefers_in_memory_record_over_store():
-    """In-memory records retain task/control state when store has same run."""
+    """验证获取 内存 录制 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     manager = RunManager(store=store)
     record = await manager.create("thread-1")
@@ -563,7 +578,7 @@ async def test_get_prefers_in_memory_record_over_store():
 
 @pytest.mark.anyio
 async def test_list_by_thread_merges_store_runs_newest_first():
-    """list_by_thread should merge memory and store rows with memory precedence."""
+    """验证会话 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     await store.put("old-store", thread_id="thread-1", status="success", created_at="2026-01-01T00:00:00+00:00")
     await store.put("other-thread", thread_id="thread-2", status="success", created_at="2026-01-03T00:00:00+00:00")
@@ -578,7 +593,7 @@ async def test_list_by_thread_merges_store_runs_newest_first():
 
 @pytest.mark.anyio
 async def test_create_defaults(manager: RunManager):
-    """Create with no optional args should use defaults."""
+    """验证创建在预期条件及边界场景下的可观察行为，防止相关回归。"""
     record = await manager.create("thread-1")
     assert record.metadata == {}
     assert record.kwargs == {}
@@ -588,7 +603,7 @@ async def test_create_defaults(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_model_name_create_or_reject():
-    """create_or_reject should accept and persist model_name."""
+    """验证模型 创建在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.runtime.runs.schemas import DisconnectMode
 
     store = MemoryRunStore()
@@ -619,7 +634,7 @@ async def test_model_name_create_or_reject():
 
 @pytest.mark.anyio
 async def test_create_or_reject_interrupt_persists_interrupted_status_to_store():
-    """interrupt strategy should persist interrupted status for old runs."""
+    """验证创建 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     manager = RunManager(store=store)
     old = await manager.create("thread-1")
@@ -636,7 +651,7 @@ async def test_create_or_reject_interrupt_persists_interrupted_status_to_store()
 
 @pytest.mark.anyio
 async def test_create_or_reject_does_not_interrupt_old_run_when_new_run_store_write_fails():
-    """A failed new-run persist must not cancel the existing inflight run."""
+    """验证创建 运行 运行 存储 写入在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from unittest.mock import AsyncMock
 
     store = MemoryRunStore()
@@ -658,13 +673,14 @@ async def test_create_or_reject_does_not_interrupt_old_run_when_new_run_store_wr
 
 @pytest.mark.anyio
 async def test_create_or_reject_does_not_interrupt_old_run_when_new_run_store_write_is_cancelled():
-    """Cancellation during new-run persist must not cancel the existing run."""
+    """验证创建 运行 运行 存储 写入在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     manager = RunManager(store=store)
     old = await manager.create("thread-1")
     await manager.set_status(old.run_id, RunStatus.running)
 
     async def cancelled_create(run_id, **kwargs):
+        """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise asyncio.CancelledError
 
     store.create_run_atomic = cancelled_create
@@ -682,7 +698,7 @@ async def test_create_or_reject_does_not_interrupt_old_run_when_new_run_store_wr
 
 @pytest.mark.anyio
 async def test_create_or_reject_rollback_persists_interrupted_status_to_store():
-    """rollback strategy should persist interrupted status for old runs."""
+    """验证创建 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     manager = RunManager(store=store)
     old = await manager.create("thread-1")
@@ -699,7 +715,7 @@ async def test_create_or_reject_rollback_persists_interrupted_status_to_store():
 
 @pytest.mark.anyio
 async def test_model_name_default_is_none():
-    """create_or_reject without model_name should default to None."""
+    """验证模型在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.runtime.runs.schemas import DisconnectMode
 
     store = MemoryRunStore()
@@ -723,14 +739,13 @@ async def test_model_name_default_is_none():
 
 @pytest.fixture
 def manager_with_store() -> RunManager:
-    """RunManager backed by a MemoryRunStore."""
+    """为管理器 存储准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     return RunManager(store=MemoryRunStore())
 
 
 @pytest.mark.anyio
 async def test_list_by_thread_returns_store_records_after_restart(manager_with_store: RunManager):
-    """After in-memory state is cleared (simulating restart), list_by_thread
-    should still return runs from the persistent store."""
+    """验证会话 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     mgr = manager_with_store
     r1 = await mgr.create("thread-1", "agent-1")
     await mgr.set_status(r1.run_id, RunStatus.success)
@@ -753,7 +768,7 @@ async def test_list_by_thread_returns_store_records_after_restart(manager_with_s
 
 @pytest.mark.anyio
 async def test_list_by_thread_merges_in_memory_and_store(manager_with_store: RunManager):
-    """In-memory runs should be included alongside store-only records."""
+    """验证会话 内存 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     mgr = manager_with_store
 
     # Create a run and let it complete (will be in both memory and store)
@@ -777,7 +792,7 @@ async def test_list_by_thread_merges_in_memory_and_store(manager_with_store: Run
 
 @pytest.mark.anyio
 async def test_list_by_thread_no_store():
-    """Without a store, list_by_thread should only return in-memory runs."""
+    """验证会话 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     mgr = RunManager()
     await mgr.create("thread-1")
 
@@ -788,7 +803,7 @@ async def test_list_by_thread_no_store():
 
 @pytest.mark.anyio
 async def test_aget_returns_in_memory_record(manager_with_store: RunManager):
-    """aget should return the in-memory record when available."""
+    """验证内存 录制在预期条件及边界场景下的可观察行为，防止相关回归。"""
     mgr = manager_with_store
     r1 = await mgr.create("thread-1", "agent-1")
 
@@ -798,7 +813,7 @@ async def test_aget_returns_in_memory_record(manager_with_store: RunManager):
 
 @pytest.mark.anyio
 async def test_aget_falls_back_to_store(manager_with_store: RunManager):
-    """aget should return a record from the store when not in memory."""
+    """验证存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     mgr = manager_with_store
     r1 = await mgr.create("thread-1", "agent-1")
     await mgr.set_status(r1.run_id, RunStatus.success)
@@ -815,7 +830,7 @@ async def test_aget_falls_back_to_store(manager_with_store: RunManager):
 
 @pytest.mark.anyio
 async def test_aget_falls_back_to_store_with_user_filter():
-    """aget should honor user_id when reading store-only records."""
+    """验证存储 用户在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     await store.put("run-1", thread_id="thread-1", user_id="user-1", status="success")
     mgr = RunManager(store=store)
@@ -828,14 +843,14 @@ async def test_aget_falls_back_to_store_with_user_filter():
 
 @pytest.mark.anyio
 async def test_aget_returns_none_for_unknown(manager_with_store: RunManager):
-    """aget should return None for a run ID that doesn't exist anywhere."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     result = await manager_with_store.aget("nonexistent-run-id")
     assert result is None
 
 
 @pytest.mark.anyio
 async def test_aget_store_failure_is_graceful():
-    """If the store raises, aget should return None instead of propagating."""
+    """验证存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from unittest.mock import AsyncMock
 
     store = MemoryRunStore()
@@ -848,7 +863,7 @@ async def test_aget_store_failure_is_graceful():
 
 @pytest.mark.anyio
 async def test_list_by_thread_store_failure_is_graceful():
-    """If the store raises, list_by_thread should return only in-memory runs."""
+    """验证会话 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from unittest.mock import AsyncMock
 
     store = MemoryRunStore()
@@ -863,7 +878,7 @@ async def test_list_by_thread_store_failure_is_graceful():
 
 @pytest.mark.anyio
 async def test_list_by_thread_falls_back_to_store_with_user_filter():
-    """list_by_thread should return only the requesting user's store records."""
+    """验证会话 存储 用户在预期条件及边界场景下的可观察行为，防止相关回归。"""
     store = MemoryRunStore()
     await store.put("run-1", thread_id="thread-1", user_id="user-1", status="success")
     await store.put("run-2", thread_id="thread-1", user_id="user-2", status="success")
@@ -881,17 +896,20 @@ async def test_list_by_thread_falls_back_to_store_with_user_filter():
 
 
 class _FailingPutRunStore(MemoryRunStore):
-    """Memory run store whose every ``put`` and ``create_run_atomic`` fails (non-retryably)."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     async def put(self, run_id, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         raise ValueError("simulated persist failure")
 
     async def create_run_atomic(self, run_id, **kwargs):
+        """处理创建 运行相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise ValueError("simulated persist failure")
 
 
 @pytest.mark.anyio
 async def test_thread_index_scopes_runs_per_thread(manager: RunManager):
+    """验证会话 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     a1 = await manager.create("thread-a")
     a2 = await manager.create("thread-a")
     b1 = await manager.create("thread-b")
@@ -910,6 +928,7 @@ async def test_thread_index_scopes_runs_per_thread(manager: RunManager):
 async def test_thread_index_preserves_insertion_order(manager: RunManager):
     # The index is insertion-ordered (dict-as-ordered-set) so list_by_thread
     # keeps the stable tie-breaking the full-scan implementation guaranteed.
+    """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     first = await manager.create("thread-a")
     second = await manager.create("thread-a")
     assert list(manager._runs_by_thread["thread-a"]) == [first.run_id, second.run_id]
@@ -917,6 +936,7 @@ async def test_thread_index_preserves_insertion_order(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_thread_index_cleanup_prunes_run_and_empty_bucket(manager: RunManager):
+    """验证会话 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     a1 = await manager.create("thread-a")
     a2 = await manager.create("thread-a")
 
@@ -932,6 +952,7 @@ async def test_thread_index_cleanup_prunes_run_and_empty_bucket(manager: RunMana
 
 @pytest.mark.anyio
 async def test_has_inflight_reflects_index(manager: RunManager):
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     record = await manager.create("thread-a")
     assert await manager.has_inflight("thread-a") is True
     assert await manager.has_inflight("thread-b") is False
@@ -942,6 +963,7 @@ async def test_has_inflight_reflects_index(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_create_or_reject_inflight_is_thread_scoped(manager: RunManager):
+    """验证创建 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     await manager.create_or_reject("thread-a", multitask_strategy="reject")
     # A different thread is unaffected by thread-a's active run.
     await manager.create_or_reject("thread-b", multitask_strategy="reject")
@@ -952,6 +974,7 @@ async def test_create_or_reject_inflight_is_thread_scoped(manager: RunManager):
 
 @pytest.mark.anyio
 async def test_failed_create_unindexes_run():
+    """验证创建 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     manager = RunManager(store=_FailingPutRunStore())
     with pytest.raises(ValueError):
         await manager.create("thread-a")
@@ -966,6 +989,7 @@ async def test_failed_create_or_reject_unindexes_run():
     # insert + rollback-unindex site, so a persist failure there must also leave
     # neither _runs nor the index holding the rolled-back run. This closes the last
     # mutation path not exercised by an index-consistency test.
+    """验证创建 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     manager = RunManager(store=_FailingPutRunStore())
     with pytest.raises(ValueError):
         await manager.create_or_reject("thread-a", multitask_strategy="reject")

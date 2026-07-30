@@ -1,3 +1,4 @@
+'定义 resolvers 模块提供的职责与可复用接口'
 from importlib import import_module
 
 MODULE_TO_PACKAGE_HINTS = {
@@ -9,7 +10,7 @@ MODULE_TO_PACKAGE_HINTS = {
 
 
 def _build_missing_dependency_hint(module_path: str, err: ImportError) -> str:
-    """Build an actionable hint when module import fails."""
+    '执行 _build_missing_dependency_hint 的明确职责，并返回与调用约定一致的结果。\n\nBuild an actionable hint when module import fails.'
     module_root = module_path.split(".", 1)[0]
     missing_module = getattr(err, "name", None) or module_root
 
@@ -26,20 +27,7 @@ def resolve_variable[T](
     variable_path: str,
     expected_type: type[T] | tuple[type, ...] | None = None,
 ) -> T:
-    """Resolve a variable from a path.
-
-    Args:
-        variable_path: The path to the variable (e.g. "parent_package_name.sub_package_name.module_name:variable_name").
-        expected_type: Optional type or tuple of types to validate the resolved variable against.
-            If provided, uses isinstance() to check if the variable is an instance of the expected type(s).
-
-    Returns:
-        The resolved variable.
-
-    Raises:
-        ImportError: If the module path is invalid or the attribute doesn't exist.
-        ValueError: If the resolved variable doesn't pass the validation checks.
-    """
+    '执行 resolve_variable 的明确职责，并返回与调用约定一致的结果。\n\nResolve a variable from a path.\n\n    Args:\n        variable_path: The path to the variable (e.g. "parent_package_name.sub_package_name.module_name:variable_name").\n        expected_type: Optional type or tuple of types to validate the resolved variable against.\n            If provided, uses isinstance() to check if the variable is an instance of the expected type(s).\n\n    Returns:\n        The resolved variable.\n\n    Raises:\n        ImportError: If the module path is invalid or the attribute doesn\'t exist.\n        ValueError: If the resolved variable doesn\'t pass the validation checks.\n    '
     try:
         module_path, variable_name = variable_path.rsplit(":", 1)
     except ValueError as err:
@@ -71,19 +59,7 @@ def resolve_variable[T](
 
 
 def resolve_class[T](class_path: str, base_class: type[T] | None = None) -> type[T]:
-    """Resolve a class from a module path and class name.
-
-    Args:
-        class_path: The path to the class (e.g. "langchain_openai:ChatOpenAI").
-        base_class: The base class to check if the resolved class is a subclass of.
-
-    Returns:
-        The resolved class.
-
-    Raises:
-        ImportError: If the module path is invalid or the attribute doesn't exist.
-        ValueError: If the resolved object is not a class or not a subclass of base_class.
-    """
+    '执行 resolve_class 的明确职责，并返回与调用约定一致的结果。\n\nResolve a class from a module path and class name.\n\n    Args:\n        class_path: The path to the class (e.g. "langchain_openai:ChatOpenAI").\n        base_class: The base class to check if the resolved class is a subclass of.\n\n    Returns:\n        The resolved class.\n\n    Raises:\n        ImportError: If the module path is invalid or the attribute doesn\'t exist.\n        ValueError: If the resolved object is not a class or not a subclass of base_class.\n    '
     model_class = resolve_variable(class_path, expected_type=type)
 
     if not isinstance(model_class, type):

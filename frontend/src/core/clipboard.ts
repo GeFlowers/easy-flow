@@ -1,9 +1,11 @@
+/** 兼容原生与回退实现的最小剪贴板条目结构。 */
 type ClipboardItemLike = {
   types?: readonly string[];
   getType?: (type: string) => Promise<Blob>;
   items?: Record<string, Blob | string>;
 };
 
+/** 在 Clipboard API 不可用时，通过临时文本域与 `execCommand` 复制纯文本。 */
 function copyTextWithExecCommand(text: string): boolean {
   const document = globalThis.document;
   if (
@@ -42,6 +44,7 @@ function copyTextWithExecCommand(text: string): boolean {
   return copied;
 }
 
+/** 优先使用浏览器 Clipboard API 写入文本，并在受限环境中回退到兼容方案。 */
 export async function writeTextToClipboard(text: string): Promise<boolean> {
   try {
     const clipboard = globalThis.navigator?.clipboard;
@@ -56,6 +59,7 @@ export async function writeTextToClipboard(text: string): Promise<boolean> {
   }
 }
 
+/** 调用 `execCommand` 兼容方案；复制失败时返回拒绝的 Promise 以保持 API 语义一致。 */
 function fallbackWriteText(text: string): Promise<void> {
   try {
     if (!copyTextWithExecCommand(text)) {
@@ -69,10 +73,12 @@ function fallbackWriteText(text: string): Promise<void> {
   return Promise.resolve();
 }
 
+/** 判断运行环境是否已提供可构造的 `ClipboardItem`。 */
 function hasUsableClipboardItem(): boolean {
   return typeof globalThis.ClipboardItem === "function";
 }
 
+/** 从单个 ClipboardItem 中读取可用的 `text/plain` 内容。 */
 async function readPlainTextFromClipboardItem(
   item: ClipboardItemLike,
 ): Promise<string> {
@@ -100,6 +106,7 @@ async function readPlainTextFromClipboardItem(
   throw new Error("Clipboard item text/plain data is not a Blob");
 }
 
+/** 判断当前 `navigator` 是否允许定义或替换 `clipboard` 属性。 */
 function canDefineNavigatorClipboard(
   navigator: Navigator,
   descriptor: PropertyDescriptor | undefined,
@@ -111,8 +118,8 @@ function canDefineNavigatorClipboard(
 }
 
 /**
- * Installs browser clipboard fallbacks for Streamdown copy controls by patching
- * missing navigator.clipboard methods and ClipboardItem when the host permits it.
+ * 为 Streamdown 复制控件补齐浏览器剪贴板兼容能力；仅在宿主允许时填补缺失的
+ * `navigator.clipboard` 方法和 `ClipboardItem`。
  */
 export function installClipboardFallback(): void {
   const navigator = globalThis.navigator;
@@ -183,7 +190,7 @@ export function installClipboardFallback(): void {
     }
   } catch {
     if (!canDefineNavigatorClipboard(navigator, clipboardDescriptor)) {
-      // The ClipboardItem fallback below is independent from navigator.clipboard.
+      // 下方的 ClipboardItem 兼容分支不依赖 navigator.clipboard。
       if (hasClipboardItem) {
         return;
       }
@@ -217,12 +224,13 @@ export function installClipboardFallback(): void {
           value: replacement,
         });
       } catch {
-        // The ClipboardItem fallback below is independent from navigator.clipboard.
+        // 下方的 ClipboardItem 兼容分支不依赖 navigator.clipboard。
       }
     }
   }
 
   if (!hasClipboardItem) {
+    /** 为缺少原生构造器的浏览器提供最小 `ClipboardItem` 兼容实现。 */
     class ClipboardItemFallback {
       items: Record<string, Blob | string>;
       types: string[];

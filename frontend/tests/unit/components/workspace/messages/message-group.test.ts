@@ -21,6 +21,9 @@ rs.mock("@/components/workspace/artifacts", () => ({
 }));
 
 describe("MessageGroup", () => {
+  /**
+   * 覆盖“renders assistant text attached to a tool-calling processing message”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("renders assistant text attached to a tool-calling processing message", () => {
     const html = renderGroup([
       {
@@ -42,6 +45,11 @@ describe("MessageGroup", () => {
     );
     expect(html).toContain("DeerFlow issue 4027");
   });
+
+  /**
+   * 覆盖“keeps assistant text visible while older tool steps stay collapsed”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("keeps assistant text visible while older tool steps stay collapsed", () => {
     const html = renderGroup([
@@ -92,6 +100,11 @@ describe("MessageGroup", () => {
     expect(html).toContain("1 more step");
   });
 
+  /**
+   * 覆盖“keeps tool-calling assistant text visible when reasoning is also present”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("keeps tool-calling assistant text visible when reasoning is also present", () => {
     const html = renderGroup([
       {
@@ -122,6 +135,11 @@ describe("MessageGroup", () => {
     expect(html).not.toContain("Check how processing groups convert messages.");
   });
 });
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderGroup 的约定。
+
+ */
 
 function renderGroup(messages: Message[]) {
   return renderToStaticMarkup(

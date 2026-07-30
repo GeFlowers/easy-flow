@@ -3,18 +3,18 @@ import { expect, test } from "@playwright/test";
 import { handleRunStream, mockLangGraphAPI } from "./utils/mock-api";
 
 /**
- * Regression for https://github.com/bytedance/deer-flow/issues/2746.
+ * https://github.com/bytedance/deer-flow/issues/2746 的回归测试。
  *
- * On a brand-new chat, the LangGraph SDK's useStream eagerly fetches
- * `/threads/{id}/history` the moment it receives a thread id, and the
- * frontend's own `useThreadRuns` fires `GET /threads/{id}/runs` for the same
- * reason.  Both endpoints assume the thread already exists on the backend;
- * if the frontend forwards the (client-generated) thread id before
- * `POST /runs/stream` has actually created the thread, both calls 404 in
- * production.  This test pins the request ordering so the regression cannot
- * re-appear silently.
+ * 在全新聊天中，LangGraph SDK 的 useStream 收到线程 ID 后会立即获取
+ * `/threads/{id}/history`，前端自身的 `useThreadRuns` 也会基于同一原因发起
+ * `GET /threads/{id}/runs`。两端点都假定后端已有该线程；若前端在
+ * `POST /runs/stream` 真正创建线程前转发客户端生成的线程 ID，生产环境中两次调用都会 404。
+ * 本测试固定请求顺序，防止回归悄然重现。
  */
 test.describe("Chat: thread API request ordering on first send", () => {
+  /**
+   * 覆盖“does not call /history or GET /runs before /runs/stream is initiated”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("does not call /history or GET /runs before /runs/stream is initiated", async ({
     page,
   }) => {
@@ -25,9 +25,8 @@ test.describe("Chat: thread API request ordering on first send", () => {
       seq: number;
     };
     const events: EventLog[] = [];
-    // Monotonic sequence number — Date.now() is millisecond-resolution and
-    // would let two requests share a timestamp, which would defeat the
-    // strict-ordering assertions below.
+    // 单调递增序号：Date.now() 只有毫秒精度，两个请求可能共享时间戳，从而破坏下方的
+    // 严格顺序断言。
     let nextSeq = 0;
 
     page.on("request", (req) => {
@@ -49,9 +48,8 @@ test.describe("Chat: thread API request ordering on first send", () => {
 
     mockLangGraphAPI(page);
 
-    // Slow down /runs/stream so any pre-create /history or /runs request
-    // would land well before the stream returns metadata, widening the
-    // race window the bug used to exploit.
+    // 放慢 /runs/stream，使任何创建前的 /history 或 /runs 请求都会在流返回元数据前很早
+    // 到达，从而扩大该缺陷曾利用的竞态窗口。
     await page.route(
       "**/api/langgraph/threads/*/runs/stream",
       async (route) => {
@@ -71,16 +69,27 @@ test.describe("Chat: thread API request ordering on first send", () => {
     await textarea.fill("Hello");
     await textarea.press("Enter");
 
-    // Wait for streaming response so all init requests have a chance to fire.
+    // 等待流式响应，确保所有初始化请求都有机会发出。
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
       timeout: 15_000,
     });
 
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 isHistory 约定的逻辑。
+
+     */
+
     const isHistory = (url: string) =>
       /\/api\/langgraph\/threads\/[^/]+\/history/.test(url);
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 isRunsList 约定的逻辑。
+     */
     const isRunsList = (url: string, method: string) =>
       method === "GET" &&
       /\/api\/langgraph\/threads\/[^/]+\/runs(\?|$)/.test(url);
+    /**
+     * 封装局部测试或脚本流程中的具名操作，避免调用处重复实现 isRunsStream 约定的逻辑。
+     */
     const isRunsStream = (url: string, method: string) =>
       method === "POST" && /\/runs\/stream(\?|$)/.test(url);
 

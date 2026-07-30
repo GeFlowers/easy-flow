@@ -1,20 +1,4 @@
-"""GroundRoute community web search + fetch tools.
-
-GroundRoute (https://groundroute.ai) is a meta search layer: one API in front of
-six search engines (Serper, Brave, Exa, Tavily, Firecrawl, Perplexity). It routes
-each query to the cheapest engine that clears a quality bar and caches repeats, so
-high-volume research runs keep working when one engine is down and pay no more than
-going to a single engine direct. Pricing is gain-share: the caller keeps about half
-of any cache savings.
-
-This module is self-contained (httpx only, no GroundRoute SDK). The /v1/search
-request and response mapping mirrors the GroundRoute MCP server and the verified
-Langflow component:
-  results[] = {url, title, snippet, content, source_engine, published_at}
-
-`web_search` returns a normalized JSON list of {title, url, snippet, source_engine}.
-`web_fetch` reads one URL via GroundRoute mode=page and returns its extracted text.
-"""
+'定义 tools 模块提供的职责与可复用接口。\n\nGroundRoute community web search + fetch tools.\n\nGroundRoute (https://groundroute.ai) is a meta search layer: one API in front of\nsix search engines (Serper, Brave, Exa, Tavily, Firecrawl, Perplexity). It routes\neach query to the cheapest engine that clears a quality bar and caches repeats, so\nhigh-volume research runs keep working when one engine is down and pay no more than\ngoing to a single engine direct. Pricing is gain-share: the caller keeps about half\nof any cache savings.\n\nThis module is self-contained (httpx only, no GroundRoute SDK). The /v1/search\nrequest and response mapping mirrors the GroundRoute MCP server and the verified\nLangflow component:\n  results[] = {url, title, snippet, content, source_engine, published_at}\n\n`web_search` returns a normalized JSON list of {title, url, snippet, source_engine}.\n`web_fetch` reads one URL via GroundRoute mode=page and returns its extracted text.\n'
 
 import json
 import logging
@@ -38,12 +22,7 @@ _api_key_warned: set[str] = set()
 
 
 def _get_api_key(tool_name: str) -> str | None:
-    """Resolve the GroundRoute key from a given tool's config block, then the env var.
-
-    `tool_name` is the config section to read (web_search vs web_fetch) so a flow that
-    runs GroundRoute for fetch but a different engine for search still reads the right
-    key. Mirrors serper/exa/firecrawl, which all take the tool name.
-    """
+    "执行 _get_api_key 的明确职责，并返回与调用约定一致的结果。\n\nResolve the GroundRoute key from a given tool's config block, then the env var.\n\n    `tool_name` is the config section to read (web_search vs web_fetch) so a flow that\n    runs GroundRoute for fetch but a different engine for search still reads the right\n    key. Mirrors serper/exa/firecrawl, which all take the tool name.\n    "
     config = get_app_config().get_tool_config(tool_name)
     if config is not None:
         api_key = (config.model_extra or {}).get("api_key")
@@ -53,6 +32,7 @@ def _get_api_key(tool_name: str) -> str | None:
 
 
 def _coerce_max_results(value: object, *, default: int = _DEFAULT_MAX_RESULTS) -> int:
+    '执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果'
     try:
         coerced = int(value)
     except (TypeError, ValueError):
@@ -62,6 +42,7 @@ def _coerce_max_results(value: object, *, default: int = _DEFAULT_MAX_RESULTS) -
 
 
 def _missing_key_error(tool_name: str, **context: str) -> str:
+    '执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果'
     if tool_name not in _api_key_warned:
         _api_key_warned.add(tool_name)
         logger.warning(
@@ -72,6 +53,7 @@ def _missing_key_error(tool_name: str, **context: str) -> str:
 
 
 def _post_search(api_key: str, body: dict) -> dict:
+    '执行 _post_search 的明确职责，并返回与调用约定一致的结果'
     with httpx.Client(timeout=_TIMEOUT_S) as client:
         response = client.post(
             _GROUNDROUTE_ENDPOINT,
@@ -84,15 +66,7 @@ def _post_search(api_key: str, body: dict) -> dict:
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int | None = None) -> str:
-    """Search the web for information using GroundRoute.
-
-    GroundRoute routes the query across six search engines and returns the result
-    set from the engine it selected, with failover if one engine is unavailable.
-
-    Args:
-        query: Search keywords describing what you want to find. Be specific for better results.
-        max_results: Maximum number of search results to return. If omitted, uses the configured value (default 5). Clamped to 1-50.
-    """
+    '执行 web_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch the web for information using GroundRoute.\n\n    GroundRoute routes the query across six search engines and returns the result\n    set from the engine it selected, with failover if one engine is unavailable.\n\n    Args:\n        query: Search keywords describing what you want to find. Be specific for better results.\n        max_results: Maximum number of search results to return. If omitted, uses the configured value (default 5). Clamped to 1-50.\n    '
     # Honor the caller-supplied max_results; fall back to config only when omitted.
     if max_results is None:
         config = get_app_config().get_tool_config("web_search")
@@ -134,15 +108,7 @@ def web_search_tool(query: str, max_results: int | None = None) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 def web_fetch_tool(url: str) -> str:
-    """Fetch the contents of a web page at a given URL via GroundRoute.
-    Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
-    This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
-    Do NOT add www. to URLs that do NOT have them.
-    URLs must include the schema: https://example.com is a valid URL while example.com is an invalid URL.
-
-    Args:
-        url: The URL to fetch the contents of.
-    """
+    '执行 web_fetch_tool 的明确职责，并返回与调用约定一致的结果。\n\nFetch the contents of a web page at a given URL via GroundRoute.\n    Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.\n    This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.\n    Do NOT add www. to URLs that do NOT have them.\n    URLs must include the schema: https://example.com is a valid URL while example.com is an invalid URL.\n\n    Args:\n        url: The URL to fetch the contents of.\n    '
     api_key = _get_api_key("web_fetch")
     if not api_key:
         return _missing_key_error("web_fetch", url=url)

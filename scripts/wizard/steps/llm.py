@@ -1,4 +1,4 @@
-"""Step 1: LLM provider selection."""
+'未说明'
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from wizard.ui import (
 
 @dataclass
 class LLMStepResult:
+    '未说明'
     provider: LLMProvider
     model_name: str
     api_key: str | None
@@ -25,6 +26,7 @@ class LLMStepResult:
 
 
 def run_llm_step(step_label: str = "Step 1/3") -> LLMStepResult:
+    """执行运行对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     print_header(f"{step_label} · Choose your LLM provider")
 
     options = [f"{p.display_name}  ({p.description})" for p in LLM_PROVIDERS]

@@ -10,6 +10,11 @@ import { MCPConfigRequestError, loadMCPConfig } from "@/core/mcp/api";
 
 const mockedFetch = rs.mocked(fetch);
 
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeClient 的约定。
+
+ */
+
 function makeClient() {
   return new QueryClient({
     defaultOptions: {
@@ -24,6 +29,11 @@ describe("useMCPConfig retry policy", () => {
   beforeEach(() => {
     mockedFetch.mockReset();
   });
+
+  /**
+   * 覆盖“does not retry when loadMCPConfig throws MCPConfigRequestError (403)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("does not retry when loadMCPConfig throws MCPConfigRequestError (403)", async () => {
     mockedFetch.mockResolvedValue({
@@ -45,6 +55,11 @@ describe("useMCPConfig retry policy", () => {
     expect(mockedFetch).toHaveBeenCalledTimes(1);
   });
 
+  /**
+   * 覆盖“retries up to 3 times on generic errors”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("retries up to 3 times on generic errors", async () => {
     mockedFetch.mockRejectedValue(new Error("network down"));
 
@@ -58,9 +73,14 @@ describe("useMCPConfig retry policy", () => {
       }),
     ).rejects.toThrow("network down");
 
-    // initial + 3 retries = 4 calls
+    // 初次调用 + 3 次重试 = 4 次调用
     expect(mockedFetch).toHaveBeenCalledTimes(4);
   });
+
+  /**
+   * 覆盖“does not retry on MCPConfigRequestError 5xx either (deterministic typed error)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("does not retry on MCPConfigRequestError 5xx either (deterministic typed error)", async () => {
     mockedFetch.mockResolvedValue({

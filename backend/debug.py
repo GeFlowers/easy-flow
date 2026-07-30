@@ -1,19 +1,5 @@
 #!/usr/bin/env python
-"""
-Debug script for lead_agent.
-Run this file directly in VS Code with breakpoints.
-
-Requirements:
-    Run with `uv run` from the backend/ directory so that the uv workspace
-    resolves deerflow-harness and app packages correctly:
-
-        cd backend && PYTHONPATH=. uv run python debug.py
-
-Usage:
-    1. Set breakpoints in agent.py or other files
-    2. Press F5 or use "Run and Debug" panel
-    3. Input messages in the terminal to interact with the agent
-"""
+'定义 debug 模块提供的职责与可复用接口。\n\n\nDebug script for lead_agent.\nRun this file directly in VS Code with breakpoints.\n\nRequirements:\n    Run with `uv run` from the backend/ directory so that the uv workspace\n    resolves deerflow-harness and app packages correctly:\n\n        cd backend && PYTHONPATH=. uv run python debug.py\n\nUsage:\n    1. Set breakpoints in agent.py or other files\n    2. Press F5 or use "Run and Debug" panel\n    3. Input messages in the terminal to interact with the agent\n'
 
 import asyncio
 import logging
@@ -35,19 +21,7 @@ _LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
 def _setup_logging(log_level: int = logging.INFO) -> None:
-    """Route logs to ``debug.log`` using *log_level* for the initial root/file setup.
-
-    This configures the root logger and the ``debug.log`` file handler so logs do
-    not print on the interactive console. It is idempotent: any pre-existing
-    handlers on the root logger (e.g. installed by ``logging.basicConfig`` in
-    transitively imported modules) are removed so the debug session output only
-    lands in ``debug.log``.
-
-    Note: later config-driven logging adjustments may change named logger
-    verbosity without raising the root logger or file-handler thresholds set
-    here, so the eventual contents of ``debug.log`` may not be filtered solely by
-    this function's ``log_level`` argument.
-    """
+    "执行 _setup_logging 的明确职责，并返回与调用约定一致的结果。\n\nRoute logs to ``debug.log`` using *log_level* for the initial root/file setup.\n\n    This configures the root logger and the ``debug.log`` file handler so logs do\n    not print on the interactive console. It is idempotent: any pre-existing\n    handlers on the root logger (e.g. installed by ``logging.basicConfig`` in\n    transitively imported modules) are removed so the debug session output only\n    lands in ``debug.log``.\n\n    Note: later config-driven logging adjustments may change named logger\n    verbosity without raising the root logger or file-handler thresholds set\n    here, so the eventual contents of ``debug.log`` may not be filtered solely by\n    this function's ``log_level`` argument.\n    "
     root = logging.root
     for h in list(root.handlers):
         root.removeHandler(h)
@@ -63,6 +37,7 @@ def _setup_logging(log_level: int = logging.INFO) -> None:
 async def main():
     # Install file logging first so warnings emitted while loading config do not
     # leak onto the interactive terminal via Python's lastResort handler.
+    '执行 main 的明确职责，并返回与调用约定一致的结果'
     _setup_logging()
 
     from deerflow.config import get_app_config

@@ -1,3 +1,4 @@
+/** 返回静态站点演示所需的模拟技能列表。 */
 export function GET() {
   return Response.json({
     skills: [

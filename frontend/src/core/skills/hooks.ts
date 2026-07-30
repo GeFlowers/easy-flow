@@ -4,6 +4,7 @@ import { enableSkill, SkillRequestError } from "./api";
 
 import { loadSkills } from ".";
 
+/** 查询技能列表。 */
 export function useSkills() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["skills"],
@@ -13,6 +14,7 @@ export function useSkills() {
   return { skills: data ?? [], isLoading, error };
 }
 
+/** 创建切换技能启用状态的变更操作。 */
 export function useEnableSkill() {
   const queryClient = useQueryClient();
   return useMutation({

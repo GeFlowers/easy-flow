@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 
+/** 通过轻量动画指示消息仍在流式生成，且不承担文本内容语义。 */
 export function StreamingIndicator({
   className,
   size = "normal",

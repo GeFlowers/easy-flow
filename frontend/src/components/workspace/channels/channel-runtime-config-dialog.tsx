@@ -44,6 +44,7 @@ const SECRET_INPUT_STYLE: SecretInputStyle = {
   WebkitTextSecurity: "disc",
 };
 
+/** 编辑通道运行时配置；仅在调用方选定提供方后开放提交交互。 */
 export function ChannelRuntimeConfigDialog({
   provider,
   open,

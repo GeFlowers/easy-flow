@@ -1,3 +1,4 @@
+'未说明'
 from datetime import UTC, datetime
 
 import pytest
@@ -10,24 +11,29 @@ from deerflow.scheduler.schedules import (
 
 
 def test_validate_timezone_accepts_iana_name():
+    '未说明'
     assert validate_timezone("Asia/Shanghai") == "Asia/Shanghai"
 
 
 def test_validate_timezone_rejects_unknown_name():
+    '未说明'
     with pytest.raises(ValueError):
         validate_timezone("Mars/Base")
 
 
 def test_normalize_cron_accepts_five_fields():
+    '未说明'
     assert normalize_cron_expression("0 9 * * 1") == "0 9 * * 1"
 
 
 def test_normalize_cron_rejects_seconds_field():
+    '未说明'
     with pytest.raises(ValueError):
         normalize_cron_expression("0 0 9 * * 1")
 
 
 def test_next_run_at_for_once_returns_none_after_fire_time():
+    '未说明'
     now = datetime(2026, 7, 2, 2, 0, tzinfo=UTC)
     result = next_run_at(
         "once",
@@ -39,6 +45,7 @@ def test_next_run_at_for_once_returns_none_after_fire_time():
 
 
 def test_next_run_at_for_cron_uses_timezone():
+    '未说明'
     now = datetime(2026, 7, 1, 0, 30, tzinfo=UTC)
     result = next_run_at(
         "cron",

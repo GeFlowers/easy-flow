@@ -52,6 +52,7 @@ type SidecarContextValue = {
 
 const SidecarContextObject = createContext<SidecarContextValue | null>(null);
 
+/** 提供侧边对话的线程、草稿与引用状态，并负责与后端恢复结果协调。 */
 export function SidecarProvider({
   children,
   parentThreadId,
@@ -108,9 +109,8 @@ export function SidecarProvider({
 
   const restoreSidecarThread = useCallback(
     async (options?: { force?: boolean }) => {
-      // A non-forced restore trusts the cached id; a forced restore always
-      // re-queries the backend so a sidecar deleted elsewhere reconciles to
-      // null instead of pointing the trigger at a dead thread (#3555).
+      // 非强制恢复信任缓存 id；强制恢复始终重新查询后端，使其他位置删除的
+      // 侧边线程能协调为 null，而不是让触发器指向失效线程（#3555）。
       if (!options?.force && sidecarThreadIdRef.current) {
         return sidecarThreadIdRef.current;
       }
@@ -129,9 +129,8 @@ export function SidecarProvider({
           if (parentThreadIdRef.current !== parentThreadId) {
             return null;
           }
-          // Reconcile the cache with the backend: adopt a freshly found
-          // thread, and on a forced refresh clear a stale id when the backend
-          // no longer has a matching sidecar thread.
+          // 将缓存与后端协调：采用新发现的线程；强制刷新时，若后端已无匹配的
+          // 侧边线程，则清除过期 id。
           if (threadId) {
             if (!sidecarThreadIdRef.current) {
               updateSidecarThreadId(threadId);
@@ -273,10 +272,12 @@ export function SidecarProvider({
   );
 }
 
+/** 在可选的侧边对话上下文中读取状态，缺失时返回 undefined。 */
 export function useMaybeSidecar() {
   return useContext(SidecarContextObject);
 }
 
+/** 读取必需的侧边对话上下文，未被 Provider 包裹时抛出错误。 */
 export function useSidecar() {
   const context = useMaybeSidecar();
   if (!context) {

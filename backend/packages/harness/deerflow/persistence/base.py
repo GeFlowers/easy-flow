@@ -1,11 +1,4 @@
-"""SQLAlchemy declarative base with automatic to_dict support.
-
-All DeerFlow ORM models inherit from this Base. It provides a generic
-to_dict() method via SQLAlchemy's inspect() so individual models don't
-need to write their own serialization logic.
-
-LangGraph's checkpointer tables are NOT managed by this Base.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -17,39 +10,21 @@ from sqlalchemy.orm import DeclarativeBase
 
 @cache
 def _column_keys(cls: type) -> tuple[str, ...]:
-    """Mapped column keys for an ORM class, in mapper order.
-
-    ``to_dict``/``__repr__`` run per row (e.g. once per event when serializing a
-    messages page), so the SQLAlchemy mapper reflection is cached per class —
-    the mapping is fixed at class-definition time, so this never goes stale.
-    """
+    """执行持久化流程所需的内部辅助操作。"""
     return tuple(c.key for c in sa_inspect(cls).mapper.column_attrs)
 
 
 class Base(DeclarativeBase):
-    """Base class for all DeerFlow ORM models.
-
-    Provides:
-    - Automatic to_dict() via SQLAlchemy column inspection.
-    - Standard __repr__() showing all column values.
-    """
+    """定义持久化层使用的数据模型、配置或辅助组件。"""
 
     def to_dict(self, *, exclude: set[str] | None = None) -> dict:
-        """Convert ORM instance to plain dict.
-
-        Uses cached mapped-column keys (see :func:`_column_keys`).
-
-        Args:
-            exclude: Optional set of column keys to omit.
-
-        Returns:
-            Dict of {column_key: value} for all mapped columns.
-        """
+        """将持久化记录转换为对外使用的字典表示。"""
         keys = _column_keys(type(self))
         if exclude:
             return {k: getattr(self, k) for k in keys if k not in exclude}
         return {k: getattr(self, k) for k in keys}
 
     def __repr__(self) -> str:
+        """返回便于调试的对象文本表示。"""
         cols = ", ".join(f"{k}={getattr(self, k)!r}" for k in _column_keys(type(self)))
         return f"{type(self).__name__}({cols})"

@@ -43,11 +43,13 @@ import type {
   ThreadTokenUsageResponse,
 } from "./types";
 
+/** 工具执行结束时通知监听器的事件数据。 */
 export type ToolEndEvent = {
   name: string;
   data: unknown;
 };
 
+/** 配置线程流 Hook 的运行上下文、监听器与提交行为。 */
 export type ThreadStreamOptions = {
   threadId?: string | null | undefined;
   displayThreadId?: string | null | undefined;
@@ -63,10 +65,8 @@ type SendMessageOptions = {
   additionalKwargs?: Record<string, unknown>;
   additionalInputMessages?: Message[];
   /**
-   * Invoked exactly once when the send passes the in-flight guard and is
-   * genuinely dispatched. It never fires on the early-return path, so callers
-   * can safely perform one-time cleanup (e.g. clearing quoted references)
-   * without losing state when a concurrent send is dropped.
+ * 仅在发送通过进行中保护并实际派发时调用一次。提前返回路径绝不触发，因此调用方可安全执行一次性清理
+ * （例如清空引用内容），且并发发送被丢弃时不会丢失状态。
    */
   onSent?: () => void;
 };
@@ -95,6 +95,7 @@ type RegeneratePrepareResponse = {
   target_run_id: string;
 };
 
+/** 构造发送到线程运行接口的用户消息列表。 */
 export function buildThreadSubmitMessages({
   text,
   additionalKwargs,
@@ -131,6 +132,7 @@ const EMPTY_THREAD_VALUES: AgentThreadState = {
   todos: [],
 };
 
+/** 判断可选字符串是否为非空字符串。 */
 function isNonEmptyString(value: string | undefined): value is string {
   return typeof value === "string" && value.length > 0;
 }
@@ -140,6 +142,7 @@ const SUMMARIZATION_MIDDLEWARE_UPDATE_KEYS = new Set([
   "DeerFlowSummarizationMiddleware.before_model",
 ]);
 
+/** 提取可跨历史、实时流和乐观消息稳定匹配的消息标识。 */
 function messageIdentity(message: Message): string | undefined {
   if (
     "tool_call_id" in message &&
@@ -154,15 +157,13 @@ function messageIdentity(message: Message): string | undefined {
   return undefined;
 }
 
+/** 按消息标识去重，并优先保留适合界面展示的最新副本。 */
 function dedupeMessagesByIdentity(messages: Message[]): Message[] {
   const lastIndexByIdentity = new Map<string, number>();
   const lastVisibleIndexByIdentity = new Map<string, number>();
 
-  // This is a UI-display dedupe rule, not a general LangChain message-stream
-  // contract. Hidden messages that share an identity with a visible message are
-  // treated as control messages for this merged view; hidden messages carrying
-  // independent tracing/task semantics should use a distinct id or a custom
-  // stream/state channel instead of relying on message dedupe preservation.
+// 这是 UI 展示去重规则，不是通用 LangChain 消息流契约。与可见消息共享标识的隐藏消息在此合并视图中
+// 视为控制消息；携带独立追踪／任务语义的隐藏消息应使用不同 id 或自定义流／状态通道，不能依赖消息去重保留。
   const preservedTurnDurations = new Map<string, number>();
   messages.forEach((message, index) => {
     const identity = messageIdentity(message);
@@ -211,6 +212,7 @@ function dedupeMessagesByIdentity(messages: Message[]): Message[] {
     });
 }
 
+/** 按运行与消息标识对持久化消息行去重。 */
 function dedupeRunMessagesByIdentity(messages: RunMessage[]): RunMessage[] {
   const lastIndexByIdentity = new Map<string, number>();
   messages.forEach((message, index) => {
@@ -229,6 +231,7 @@ function dedupeRunMessagesByIdentity(messages: RunMessage[]): RunMessage[] {
   });
 }
 
+/** 返回移除指定元素后的集合副本。 */
 export function removeSetItems<T>(
   values: ReadonlySet<T>,
   itemsToRemove: Iterable<T>,
@@ -240,6 +243,7 @@ export function removeSetItems<T>(
   return next;
 }
 
+/** 过滤已替代运行，并生成可展示的历史消息。 */
 export function buildVisibleHistoryMessages(
   messageRows: RunMessage[],
   supersededRunIds: ReadonlySet<string>,
@@ -248,9 +252,8 @@ export function buildVisibleHistoryMessages(
     (message) => !supersededRunIds.has(message.run_id),
   );
   return dedupeMessagesByIdentity([
-    // Carry the owning run_id onto the content message so historical subtask
-    // cards can fetch their persisted step history on expand (#3779). run_id
-    // lives on the RunMessage wrapper and would otherwise be dropped here.
+// 将所属 run_id 带到内容消息上，使历史子任务卡片展开时能拉取持久化步骤历史（#3779）。run_id 位于
+// RunMessage 包装层，否则会在此处丢失。
     ...visibleRows.map((message) => ({
       ...message.content,
       run_id: message.run_id,
@@ -258,12 +261,14 @@ export function buildVisibleHistoryMessages(
   ]);
 }
 
+/** 线程消息历史分页接口返回的数据。 */
 export type ThreadMessagesPageResponse = {
   data: RunMessage[];
   has_more: boolean;
   next_before_seq: number | null;
 };
 
+/** 从历史页响应提取下一页游标。 */
 export function getThreadHistoryNextPageParam(
   lastPage: ThreadMessagesPageResponse,
 ): number | undefined {
@@ -279,9 +284,11 @@ export function getThreadHistoryNextPageParam(
   return lastPage.next_before_seq;
 }
 
+/** 生成线程历史无限查询的缓存键。 */
 export const threadHistoryQueryKey = (threadId: string) =>
   ["thread-messages", threadId] as const;
 
+/** 生成带可选序列游标的线程历史分页地址。 */
 export function buildThreadMessagesPageUrl(
   baseUrl: string,
   threadId: string,
@@ -299,6 +306,7 @@ export function buildThreadMessagesPageUrl(
   return normalizedBaseUrl ? url.toString() : `${url.pathname}${url.search}`;
 }
 
+/** 按正向时间顺序拍平历史分页并去重。 */
 export function flattenThreadHistoryPages(
   pages: ThreadMessagesPageResponse[],
 ): RunMessage[] {
@@ -310,6 +318,7 @@ export function flattenThreadHistoryPages(
   );
 }
 
+/** 合并持久化、实时与乐观消息，并保持历史锚点顺序。 */
 export function mergeMessages(
   historyMessages: Message[],
   threadMessages: Message[],
@@ -335,20 +344,16 @@ export function mergeMessages(
     }),
   );
   const replacementByIdentity = new Map<string, Message>();
-  // This uses the same identity-anchor weaving shape as
-  // resolveTransientHistoryBridge, but intentionally remains separate: live
-  // messages may replace canonical copies and identity-less entries survive.
+// 此处采用与 resolveTransientHistoryBridge 相同的标识锚点编织方式，但有意保持独立：实时消息可替换
+// 规范副本，且无标识条目必须保留。
   const beforeAnchor = new Map<string, Message[]>();
   let pending: Message[] = [];
   let lastAnchorIdentity: string | undefined;
   let hasSharedAnchor = false;
 
-  // A summarized checkpoint is not necessarily a contiguous history suffix:
-  // middleware may retain protected prompt/input messages at the front and a
-  // recent tail at the back. Treat every shared identity as an ordering anchor,
-  // replacing the canonical copy in place. New live messages are woven before
-  // the next shared anchor (or after the last one), so a protected early input
-  // can never be moved to the tail by global last-copy deduplication.
+// 摘要化检查点不一定是连续历史后缀：中间件可在前方保留受保护的提示／输入消息，并在后方保留近期尾部。
+// 每个共享标识都是排序锚点，原位替换规范副本。新的实时消息编织到下一个共享锚点之前（或最后一个之后），
+// 从而全局“最后副本”去重永远不会把受保护的早期输入移到尾部。
   for (const message of live) {
     const identity = messageIdentity(message);
     const canonicalMessage = identity
@@ -365,16 +370,14 @@ export function mergeMessages(
         ...pending,
       ]);
     }
-    // A summarized checkpoint may start with a protected message whose true
-    // canonical position is separated from this anchor by unloaded pages.
-    // Suppress that ambiguous prefix instead of visually collapsing the gap.
+// 摘要化检查点可从受保护消息开始，其真实规范位置与此锚点之间可能隔着尚未加载的页面。应抑制该不确定前缀，
+// 而非在视觉上折叠未知间隙。
     pending = [];
     hasSharedAnchor = true;
     lastAnchorIdentity = identity;
 
-    // A hidden checkpoint control message must not replace a visible canonical
-    // user turn that happens to reuse its identity. In every other case the
-    // live checkpoint copy is fresher and replaces history without moving it.
+// 隐藏检查点控制消息不得替换恰巧复用其标识的可见规范用户轮次。其余情况下实时检查点副本更新，应替换历史
+// 但不改变其位置。
     if (
       !isHiddenFromUIMessage(message) ||
       isHiddenFromUIMessage(canonicalMessage)
@@ -398,10 +401,8 @@ export function mergeMessages(
         : undefined;
       canonicalAndLive.push(replacement ?? message);
     }
-    // A trailing live-only segment is known to come after the last shared
-    // anchor, but that anchor may not be the end of canonical history (for
-    // example, another client may have persisted newer rows). Preserve the
-    // canonical source order before appending the live tail.
+// 仅实时的尾段确定在最后共享锚点之后，但该锚点未必是规范历史末尾（例如其他客户端已持久化较新记录）。
+// 追加实时尾部前必须保留规范来源顺序。
     canonicalAndLive.push(...pending);
   }
 
@@ -430,14 +431,12 @@ export function mergeMessages(
 }
 
 /**
- * Derive the live turns that context summarization is about to drop and that
- * therefore need a short-lived visual bridge until run-event history catches up.
+ * 推导上下文摘要即将删除的实时轮次；在运行事件历史追上前，这些轮次需要短暂的视觉桥接。
  *
- * Summarization emits `RemoveMessage(ALL)` + a hidden summary + the retained
- * tail. Everything in the current live thread before the first retained visible
- * message is being removed; we keep those (minus the summary control messages
- * already tracked) so the UI can still show the full conversation (#3825).
+ * 摘要会发出 `RemoveMessage(ALL)`、隐藏摘要及保留尾部。当前实时线程中第一个保留可见消息之前的内容均将
+ * 被移除；保留它们（去除已跟踪的摘要控制消息）以使 UI 仍显示完整会话（#3825）。
  */
+/** 计算压缩检查点中暂未写入历史页的消息桥接缓存。 */
 export function computeSummarizationTransientMessages(
   currentMessages: Message[],
   summarizationMessages: Message[],
@@ -465,21 +464,16 @@ export function computeSummarizationTransientMessages(
 }
 
 /**
- * Overlay messages rescued from context summarization on top of the
- * (possibly stale) visible history so the merged view never drops them.
+ * 将从上下文摘要中救回的消息叠加到（可能过时的）可见历史上，确保合并视图绝不丢失它们。
  *
- * Background (#3825): after summarization the backend removes every live
- * message (`RemoveMessage(ALL)`) while canonical run events can still be
- * waiting for the journal flush/refetch lifecycle. Reading the captured turns
- * from a synchronous transient buffer keeps the merge correct during that gap.
+ * 背景（#3825）：摘要后后端删除所有实时消息（`RemoveMessage(ALL)`），规范运行事件可能仍在等待日志
+ * 刷新／重新拉取。该间隙中从同步临时缓冲读取已捕获轮次，可保持合并正确。
  *
- * Canonical history is cursor-paginated from newest to oldest. A rescued turn
- * can therefore be older than the first row in the currently loaded page even
- * though both came from the same pre-compression checkpoint. ``bridgeOrder``
- * retains identities that canonical history has already confirmed so missing
- * rescued turns can be inserted next to an overlapping anchor instead of being
- * blindly appended after the newest page. Canonical copies always win.
+ * 规范历史按游标从新到旧分页。因此同一压缩前检查点的救回轮次可能早于当前已加载页第一行。
+ * ``bridgeOrder`` 保留规范历史已确认的标识，使缺失的救回轮次插入重叠锚点旁，而不是盲目追加到最新页后；
+ * 始终以规范副本为准。
  */
+/** 将暂存消息桥接到已加载历史的可靠位置。 */
 export function resolveTransientHistoryBridge(
   visibleHistory: Message[],
   transientMessages: Message[],
@@ -495,10 +489,8 @@ export function resolveTransientHistoryBridge(
   );
   const missing = transientMessages.filter((message) => {
     const identity = messageIdentity(message);
-    // Identity-less messages are intentionally skipped: without a stable
-    // identity they cannot be matched against history to drain or dedupe, so
-    // overlaying them would risk a permanent duplicate. Canonical history will
-    // surface them after the run journal is flushed and the page refetches.
+// 有意跳过无标识消息：缺少稳定标识就无法与历史匹配、释放或去重，叠加会产生永久重复；规范历史会在运行日志
+// 刷新并重新拉取页面后呈现它们。
     return identity !== undefined && !presentIdentities.has(identity);
   });
   if (missing.length === 0) {
@@ -511,9 +503,7 @@ export function resolveTransientHistoryBridge(
       return identity ? [[identity, message] as const] : [];
     }),
   );
-  // This mirrors mergeMessages' identity-anchor weaving shape, but transient
-  // messages never replace canonical copies and identity-less entries are
-  // intentionally excluded to avoid permanent duplicates.
+// 此处镜像 mergeMessages 的标识锚点编织方式，但临时消息绝不替换规范副本，并有意排除无标识条目以免永久重复。
   const beforeAnchor = new Map<string, Message[]>();
   const emittedMissingIdentities = new Set<string>();
   let pending: Message[] = [];
@@ -528,8 +518,7 @@ export function resolveTransientHistoryBridge(
           ...pending,
         ]);
       }
-      // The prefix before the first loaded anchor has no trustworthy position:
-      // cursor pages containing its intervening history may not be loaded yet.
+// 第一个已加载锚点之前的前缀没有可信位置：包含其中间历史的游标页可能尚未加载。
       pending = [];
       hasCanonicalAnchor = true;
       lastAnchorIdentity = identity;
@@ -542,16 +531,12 @@ export function resolveTransientHistoryBridge(
     }
   }
 
-  // No bridge identity overlaps canonical history. This is the original
-  // persistence-gap case: loaded history is older and the rescued live turns
-  // belong after it.
+// 没有桥接标识与规范历史重叠。这是原始持久化间隙场景：已加载历史较旧，救回的实时轮次属于其后。
   if (!lastAnchorIdentity) {
     return [...visibleHistory, ...missing];
   }
 
-  // A candidate added before its ordering snapshot (or carrying an identity
-  // absent from that snapshot) cannot be anchored. Keep it in capture order at
-  // the trailing edge of the anchored bridge rather than dropping it.
+// 在排序快照前新增的候选项（或携带快照中不存在的标识）无法锚定。应按捕获顺序保留在已锚定桥接的尾缘，不能丢弃。
   for (const message of missing) {
     const identity = messageIdentity(message);
     if (identity && !emittedMissingIdentities.has(identity)) {
@@ -574,6 +559,7 @@ export function resolveTransientHistoryBridge(
   return resolved;
 }
 
+/** 合并新旧暂存桥接消息，保留最早捕获的顺序。 */
 export function mergeTransientHistoryBridge(
   currentBridge: Message[],
   capturedMessages: Message[],
@@ -603,9 +589,7 @@ export function mergeTransientHistoryBridge(
       existing &&
       (!isHiddenFromUIMessage(captured) || isHiddenFromUIMessage(existing))
     ) {
-      // Refresh the buffered snapshot without moving its first-known
-      // chronological position. Repeated compression can recapture protected
-      // prefix messages before a newer tail.
+// 刷新缓冲快照而不移动其首次已知的时间顺序位置；重复压缩可在较新尾部前再次捕获受保护前缀消息。
       merged[existingIndex] = captured;
     }
   }
@@ -613,10 +597,9 @@ export function mergeTransientHistoryBridge(
 }
 
 /**
- * Preserve the complete checkpoint-relative identity order independently from
- * bridge candidates. Confirmed candidates are pruned from the render buffer,
- * but their identities remain useful as non-rendering pagination anchors.
+ * 独立于桥接候选项保存完整的检查点相对标识顺序。已确认候选项会从渲染缓冲裁剪，但其标识仍作为非渲染分页锚点。
  */
+/** 合并暂存桥接的身份顺序快照。 */
 export function mergeTransientHistoryBridgeOrder(
   currentOrder: readonly string[],
   capturedMessages: Message[],
@@ -635,6 +618,7 @@ export function mergeTransientHistoryBridgeOrder(
   return merged;
 }
 
+/** 为线程消息解析当前可渲染的暂存历史桥接。 */
 export function resolveThreadTransientHistoryBridge(
   visibleHistory: Message[],
   transientMessages: Message[],
@@ -653,12 +637,10 @@ export function resolveThreadTransientHistoryBridge(
 }
 
 /**
- * Drop transient-buffer entries that canonical history has already
- * absorbed. This keeps the buffer a transient bridge across the async gap
- * rather than a second long-lived source of truth — otherwise a stale copy
- * could resurrect a message that history later filtered out (e.g. a superseded
- * or regenerated run).
+ * 删除规范历史已吸收的临时缓冲条目，使缓冲仅作为跨越异步间隙的临时桥接而非第二个长期事实来源；否则过时副本
+ * 可能复活历史随后过滤的消息（如被替换或重新生成的运行）。
  */
+/** 移除已被持久化历史确认的暂存消息。 */
 export function pruneConfirmedTransientMessages(
   transientMessages: Message[],
   visibleHistory: Message[],
@@ -675,6 +657,7 @@ export function pruneConfirmedTransientMessages(
   });
 }
 
+/** 提取相对流开始基线新增的消息。 */
 function getMessagesAfterBaseline(
   messages: Message[],
   baselineMessageIds: ReadonlySet<string>,
@@ -685,6 +668,7 @@ function getMessagesAfterBaseline(
   });
 }
 
+/** 筛选尚未被服务端消息确认的乐观消息。 */
 export function getVisibleOptimisticMessages(
   optimisticMessages: Message[],
   previousHumanMessageCount: number,
@@ -699,6 +683,7 @@ export function getVisibleOptimisticMessages(
   return optimisticMessages;
 }
 
+/** 从流事件中识别摘要中间件写入的消息。 */
 export function getSummarizationMiddlewareMessages(
   data: unknown,
 ): Message[] | undefined {
@@ -723,6 +708,7 @@ export function getSummarizationMiddlewareMessages(
   return undefined;
 }
 
+/** 在普通线程搜索缓存中插入或更新线程。 */
 export function upsertThreadInSearchCache(
   queryClient: QueryClient,
   thread: AgentThread,
@@ -765,6 +751,7 @@ export function upsertThreadInSearchCache(
   );
 }
 
+/** 在无限分页线程缓存中插入或更新线程。 */
 export function upsertThreadInInfiniteCache(
   queryClient: QueryClient,
   thread: AgentThread,
@@ -815,6 +802,7 @@ export function upsertThreadInInfiniteCache(
   );
 }
 
+/** 使停止运行后可能陈旧的线程相关缓存失效。 */
 export function invalidateStoppedThreadCaches(
   queryClient: QueryClient,
   threadId: string | null | undefined,
@@ -841,8 +829,10 @@ export function invalidateStoppedThreadCaches(
   });
 }
 
+/** 停止运行后补充刷新最终状态前的等待时长（毫秒）。 */
 export const STOP_THREAD_FINALIZATION_REFETCH_DELAY_MS = 1500;
 
+/** 延后补充刷新停止运行可能尚未落库的最终状态。 */
 function scheduleStoppedThreadFinalizationRefetch(
   queryClient: QueryClient,
   threadId: string | null | undefined,
@@ -856,6 +846,7 @@ function scheduleStoppedThreadFinalizationRefetch(
   }, STOP_THREAD_FINALIZATION_REFETCH_DELAY_MS);
 }
 
+/** 停止线程运行，并刷新关联的客户端缓存。 */
 export async function stopThreadAndInvalidateCaches(
   queryClient: QueryClient,
   stop: () => Promise<void> | void,
@@ -870,6 +861,7 @@ export async function stopThreadAndInvalidateCaches(
   }
 }
 
+/** 将流异常转换为用户可读的错误消息。 */
 function getStreamErrorMessage(error: unknown): string {
   if (typeof error === "string" && error.trim()) {
     return error;
@@ -893,6 +885,7 @@ function getStreamErrorMessage(error: unknown): string {
   return "Request failed.";
 }
 
+/** 从失败 HTTP 响应中读取错误消息。 */
 async function readResponseErrorMessage(
   response: Response,
   fallback = "Request failed.",
@@ -903,11 +896,12 @@ async function readResponseErrorMessage(
       return data.detail;
     }
   } catch {
-    // Use the fallback below when the response body is not JSON.
+// 响应体不是 JSON 时使用下方回退值。
   }
   return response.statusText || fallback;
 }
 
+/** 尝试从未知异常对象提取 HTTP 状态码。 */
 function getHttpStatus(error: unknown): number | undefined {
   if (typeof error !== "object" || error === null) {
     return undefined;
@@ -929,13 +923,14 @@ function getHttpStatus(error: unknown): number | undefined {
   return undefined;
 }
 
+/** 判断异常是否表示线程不存在或当前用户无权访问。 */
 function isThreadMissingError(error: unknown): boolean {
   const status = getHttpStatus(error);
-  // Treat 403 like 404 here to avoid disclosing whether an inaccessible thread
-  // exists; callers redirect stale/inaccessible URLs back to a blank chat.
+// 此处将 403 等同 404，避免泄露无权访问的线程是否存在；调用方会把过时／不可访问 URL 重定向到空白聊天。
   return status === 403 || status === 404;
 }
 
+/** 管理线程运行的流式状态、乐观消息和缓存同步。 */
 export function useThreadStream({
   threadId,
   displayThreadId,
@@ -950,7 +945,7 @@ export function useThreadStream({
   const currentViewThreadId = displayThreadId ?? threadId ?? null;
   const currentViewThreadIdRef = useRef(currentViewThreadId);
   currentViewThreadIdRef.current = currentViewThreadId;
-  // Optimistic messages shown before the server stream responds.
+// 服务端流响应前展示的乐观消息。
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const [optimisticThreadId, setOptimisticThreadId] = useState<string | null>(
     null,
@@ -964,10 +959,9 @@ export function useThreadStream({
   const [pendingSupersededMessageIds, setPendingSupersededMessageIds] =
     useState<ReadonlySet<string>>(() => new Set());
   const [isUploading, setIsUploading] = useState(false);
-  // Track the thread ID that is currently streaming to handle thread changes during streaming
+// 跟踪当前流式线程 ID，以处理流式期间的线程切换。
   const [onStreamThreadId, setOnStreamThreadId] = useState(() => threadId);
-  // Ref to track current thread ID across async callbacks without causing re-renders,
-  // and to allow access to the current thread id in onUpdateEvent
+// 此引用可跨异步回调跟踪当前线程 ID 而不触发重渲染，并让 onUpdateEvent 读取当前线程 ID。
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const startedRef = useRef(false);
   const pendingUsageBaselineMessageIdsRef = useRef<Set<string>>(new Set());
@@ -988,7 +982,7 @@ export function useThreadStream({
     pendingSupersededRunIds,
   });
 
-  // Keep listeners ref updated with latest callbacks
+// 使监听器引用始终指向最新回调。
   useEffect(() => {
     listeners.current = { onSend, onStart, onFinish, onToolEnd };
   }, [onSend, onStart, onFinish, onToolEnd]);
@@ -996,7 +990,7 @@ export function useThreadStream({
   useEffect(() => {
     const normalizedThreadId = threadId ?? null;
     if (!normalizedThreadId) {
-      // Reset when the UI moves back to a brand new unsaved thread.
+// UI 切回全新的未保存线程时重置。
       startedRef.current = false;
       setOnStreamThreadId(normalizedThreadId);
     } else {
@@ -1094,9 +1088,9 @@ export function useThreadStream({
       const _messages = getSummarizationMiddlewareMessages(data);
       if (_messages && _messages.length >= 2) {
         for (const m of _messages) {
-          // Backward-compat shim: pre-PR2 threads may still carry a synthetic
-          // HumanMessage(name="summary") from the old summarization path. New
-          // threads keep the summary in ThreadState.summary_text instead.
+          // 向后兼容：PR2 之前的线程可能仍携带旧摘要路径生成的
+          // HumanMessage(name="summary")。新线程改为将摘要保存在
+          // ThreadState.summary_text 中。
           if (m.name === "summary" && m.type === "human") {
             summarizedRef.current?.add(m.id ?? "");
           }
@@ -1168,9 +1162,8 @@ export function useThreadStream({
       }
     },
     onCustomEvent(event: unknown) {
-      // Narrow `event.type` once; taskEventToSubtaskUpdate already validated the
-      // task_* events, so the per-branch re-narrowing below reads this single
-      // source of truth instead of re-checking the object shape each time.
+      // 仅收窄一次 `event.type`；taskEventToSubtaskUpdate 已验证 task_* 事件，
+      // 因此下方各分支从这一唯一事实来源读取，避免每次都重新检查对象结构。
       const eventType =
         typeof event === "object" && event !== null && "type" in event
           ? (event as { type: unknown }).type
@@ -1188,9 +1181,8 @@ export function useThreadStream({
           message: AIMessage;
           message_index?: number;
         };
-        // Accumulate the full step history instead of overwriting (#3779): keep
-        // latestMessage for the collapsed-header tool-call hint, and append the
-        // normalized step (assistant turn or tool output) to the timeline.
+        // 累积完整步骤历史而非覆盖（#3779）：保留 latestMessage 供折叠标题显示
+        // 工具调用提示，并将规范化步骤（助手轮次或工具输出）追加到时间线。
         updateSubtask({
           id: e.task_id,
           latestMessage: e.message,
@@ -1271,27 +1263,23 @@ export function useThreadStream({
   const latestMessageCountsRef = useRef({ humanMessageCount });
   const sendInFlightRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
-  // Current-stream lifecycle bridge for messages removed from the checkpoint
-  // tail before the canonical run-event page refetch observes the journal
-  // flush. It is never appended into useThreadHistory's persisted pages.
+  // 当前流的生命周期桥接：检查点尾部删除消息后，到规范运行事件页重新获取并观察到
+  // 日志刷写之前暂存这些消息；它绝不会追加到 useThreadHistory 的持久化分页中。
   const transientHistoryBridgeRef = useRef<Message[]>([]);
-  // Full identity order of each captured checkpoint. Confirmed bridge entries
-  // are pruned from the message buffer, but remain here as non-rendering
-  // anchors so an older rescue can be placed before a newest-first page.
+  // 每个已捕获检查点的完整标识顺序。已确认的桥接条目会从消息缓冲中裁剪，但仍在此处
+  // 作为非渲染锚点保留，以便将较早的救回消息置于按最新优先排序的页面之前。
   const transientHistoryOrderRef = useRef<string[]>([]);
   const transientHistoryThreadIdRef = useRef<string | null>(null);
   const summarizedRef = useRef<Set<string>>(null);
-  // Track human message count before sending to prevent clearing optimistic
-  // messages before the server's human message arrives (e.g. when AI messages
-  // from "messages-tuple" events arrive before the input human message from
-  // "values" events).
+  // 发送前记录人工消息数量，防止服务端人工消息尚未到达就清除乐观消息（例如
+  // "messages-tuple" 事件中的 AI 消息早于 "values" 事件中的输入人工消息到达时）。
   const prevHumanMsgCountRef = useRef(humanMessageCount);
 
   latestMessageCountsRef.current = { humanMessageCount };
   summarizedRef.current ??= new Set<string>();
 
-  // Reset thread-local pending UI state when switching between threads so
-  // optimistic messages and in-flight guards do not leak across chat views.
+  // 在线程间切换时重置线程本地的待处理 UI 状态，避免乐观消息与发送中守卫泄漏到
+  // 其他聊天视图。
   useEffect(() => {
     startedRef.current = false;
     sendInFlightRef.current = false;
@@ -1307,9 +1295,8 @@ export function useThreadStream({
       latestMessageCountsRef.current.humanMessageCount;
   }, [threadId]);
 
-  // Release entries individually once canonical history confirms their stable
-  // identities. Keep unconfirmed entries across failure/refetch within this
-  // page lifecycle so a temporary persistence gap cannot hide a turn.
+  // 规范历史确认稳定标识后逐条释放条目。在当前页面生命周期内跨失败／重新获取保留
+  // 未确认条目，避免暂时的持久化间隙隐藏某个对话轮次。
   useEffect(() => {
     transientHistoryBridgeRef.current = pruneConfirmedTransientMessages(
       transientHistoryBridgeRef.current,
@@ -1331,9 +1318,8 @@ export function useThreadStream({
     }
   }, [currentViewThreadId, liveMessagesThreadId, optimisticThreadId]);
 
-  // When streaming starts without a baseline (e.g. reconnection, run started
-  // from another client, or page reload mid-stream), snapshot the current
-  // messages so only *new* messages are treated as "pending" for token usage.
+  // 流式传输在没有基线时开始（例如重连、另一客户端启动运行，或流式期间页面重载），
+  // 则快照当前消息，使令牌用量仅将*新增*消息视为“待处理”。
   useEffect(() => {
     if (
       thread.isLoading &&
@@ -1347,11 +1333,10 @@ export function useThreadStream({
     }
   }, [persistedMessages, thread.isLoading]);
 
-  // Clear optimistic when server messages arrive.
-  // For messages with a human optimistic message, wait until the server's
-  // human message has arrived to avoid clearing before the input message
-  // appears in the stream (the input message may arrive via "values" events
-  // after individual "messages-tuple" events for AI messages).
+  // 服务端消息到达后清除乐观消息。
+  // 若包含人工乐观消息，须等待服务端的人工消息到达，避免输入消息尚未出现在流中就
+  // 清除（输入消息可能在 AI 消息的单独 "messages-tuple" 事件之后，才通过
+  // "values" 事件到达）。
   const optimisticMessageCount = optimisticMessages.length;
   const hasHumanOptimistic = optimisticMessages.some((m) => m.type === "human");
   useEffect(() => {
@@ -1377,14 +1362,12 @@ export function useThreadStream({
       }
       sendInFlightRef.current = true;
 
-      // The send has genuinely proceeded past the in-flight guard, so callers
-      // can now run one-time cleanup that must not fire on the dropped path.
+      // 发送确实已越过发送中守卫，调用方现在可以执行一次性清理；被丢弃路径不得触发它。
       options?.onSent?.();
 
       const text = message.text.trim();
 
-      // Capture the current human message count before showing optimistic
-      // messages so we can wait for the server's copy of the user input.
+      // 展示乐观消息前捕获当前人工消息数量，以便等待服务端写入的用户输入副本。
       prevHumanMsgCountRef.current = humanMessageCount;
       pendingUsageBaselineMessageIdsRef.current = new Set(
         persistedMessages
@@ -1392,7 +1375,7 @@ export function useThreadStream({
           .filter((id): id is string => Boolean(id)),
       );
 
-      // Build optimistic files list with uploading status
+      // 构建状态为上传中的乐观文件列表。
       const optimisticFiles: FileInMessage[] = (message.files ?? []).map(
         (f) => ({
           filename: f.filename ?? "",
@@ -1418,7 +1401,7 @@ export function useThreadStream({
       }
 
       if (optimisticFiles.length > 0 && !hideFromUI) {
-        // Mock AI message while files are being uploaded
+        // 文件上传期间显示模拟的 AI 消息。
         newOptimistic.push({
           type: "ai",
           id: `opt-ai-${Date.now()}`,
@@ -1435,7 +1418,7 @@ export function useThreadStream({
       let uploadedFileInfo: UploadedFileInfo[] = [];
 
       try {
-        // Upload files first if any
+        // 若有文件，先完成上传。
         if (message.files && message.files.length > 0) {
           setIsUploading(true);
           try {
@@ -1463,7 +1446,7 @@ export function useThreadStream({
               const uploadResponse = await uploadFiles(threadId, files);
               uploadedFileInfo = uploadResponse.files;
 
-              // Update optimistic human message with uploaded status + paths
+              // 用已上传状态与路径更新乐观人工消息。
               const uploadedFiles: FileInMessage[] = uploadedFileInfo.map(
                 (info) => ({
                   filename: info.filename,
@@ -1501,7 +1484,7 @@ export function useThreadStream({
           }
         }
 
-        // Build files metadata for submission (included in additional_kwargs)
+        // 构建提交所需的文件元数据（放入 additional_kwargs）。
         const filesForSubmit: FileInMessage[] = uploadedFileInfo.map(
           (info) => ({
             filename: info.filename,
@@ -1677,8 +1660,8 @@ export function useThreadStream({
     [context, humanMessageCount, persistedMessages, queryClient, thread],
   );
 
-  // Cache the latest thread messages in a ref to compare against incoming history messages for deduplication,
-  // and to allow access to the full message list in onUpdateEvent without causing re-renders.
+  // 在引用中缓存最新线程消息，用于与传入历史消息去重，并使 onUpdateEvent 可访问完整
+  // 消息列表而不触发重新渲染。
   if (persistedMessages.length >= messagesRef.current.length) {
     messagesRef.current = persistedMessages;
   }
@@ -1698,9 +1681,8 @@ export function useThreadStream({
         )
       : transientHistoryOrderRef.current;
 
-  // Commit the extended non-rendering order skeleton after React commits this
-  // render. The local value above keeps this render correctly anchored without
-  // mutating a ref during render.
+  // React 提交本次渲染后再写入扩展后的非渲染顺序骨架。上方局部值在渲染期间不修改
+  // 引用的前提下，保证本次渲染正确锚定。
   useEffect(() => {
     if (
       transientHistoryBridgeRef.current.length > 0 &&
@@ -1732,8 +1714,8 @@ export function useThreadStream({
       )
     : [];
 
-  // Merge history, live stream, and optimistic messages for display
-  // History messages may overlap with thread.messages; thread.messages take precedence
+  // 合并历史、实时流和乐观消息以供展示。
+  // 历史消息可能与 thread.messages 重叠；以后者为准。
   const mergedThread = {
     ...thread,
     stop: stopThread,
@@ -1758,6 +1740,7 @@ type ThreadHistoryOptions = {
   pendingSupersededRunIds?: ReadonlySet<string>;
 };
 
+/** 分页加载线程持久化历史，并与实时状态叠加。 */
 export function useThreadHistory(
   threadId: string,
   { enabled = true, pendingSupersededRunIds }: ThreadHistoryOptions = {},
@@ -1826,6 +1809,7 @@ export function useThreadHistory(
   };
 }
 
+/** 查询线程列表并隐藏不应显示的侧栏线程。 */
 export function useThreads(
   params: ThreadSearchParams = DEFAULT_THREAD_SEARCH_PARAMS,
 ) {
@@ -1835,8 +1819,10 @@ export function useThreads(
   });
 }
 
+/** 无限滚动线程列表每页获取的记录数。 */
 export const INFINITE_THREADS_PAGE_SIZE = 50;
 
+/** 无限分页线程列表查询缓存键的稳定前缀。 */
 export const INFINITE_THREADS_QUERY_KEY_PREFIX = [
   "threads",
   "searchInfinite",
@@ -1861,6 +1847,7 @@ type InfiniteThreadsPageWithNextParam = AgentThread[] & {
   [INFINITE_THREADS_NEXT_PAGE_PARAM]?: number;
 };
 
+/** 为无限分页结果补充本页使用的搜索参数。 */
 function annotateInfiniteThreadsPage(
   page: AgentThread[],
   nextPageParam: number | undefined,
@@ -1871,6 +1858,7 @@ function annotateInfiniteThreadsPage(
   return page;
 }
 
+/** 获取线程无限列表的一页结果。 */
 export async function fetchInfiniteThreadsPage(
   apiClient: InfiniteThreadsSearchClient,
   params: InfiniteThreadsParams,
@@ -1903,6 +1891,7 @@ export async function fetchInfiniteThreadsPage(
   return annotateInfiniteThreadsPage(threads, nextPageParam);
 }
 
+/** 根据当前页结果计算无限线程查询的下一页参数。 */
 export function getInfiniteThreadsNextPageParam(
   lastPage: AgentThread[],
   allPages: AgentThread[][],
@@ -1922,6 +1911,7 @@ export function getInfiniteThreadsNextPageParam(
   return allPages.reduce((sum, page) => sum + page.length, 0);
 }
 
+/** 对无限线程缓存中的每个页面应用映射函数。 */
 export function mapInfiniteThreadsCache(
   oldData: InfiniteData<AgentThread[]> | undefined,
   mapper: (thread: AgentThread) => AgentThread,
@@ -1935,6 +1925,7 @@ export function mapInfiniteThreadsCache(
   };
 }
 
+/** 从无限线程缓存中筛除不符合条件的线程。 */
 export function filterInfiniteThreadsCache(
   oldData: InfiniteData<AgentThread[]> | undefined,
   predicate: (thread: AgentThread) => boolean,
@@ -1948,6 +1939,7 @@ export function filterInfiniteThreadsCache(
   };
 }
 
+/** 以无限滚动方式查询线程列表。 */
 export function useInfiniteThreads(
   params: InfiniteThreadsParams = {
     sortBy: "updated_at",
@@ -1978,6 +1970,7 @@ export function useInfiniteThreads(
   });
 }
 
+/** 查询指定线程的运行记录。 */
 export function useThreadRuns(
   threadId?: string,
   { enabled = true }: { enabled?: boolean } = {},
@@ -1997,6 +1990,7 @@ export function useThreadRuns(
   });
 }
 
+/** 查询指定线程的元数据。 */
 export function useThreadMetadata(
   threadId?: string | null,
   {
@@ -2027,6 +2021,7 @@ export function useThreadMetadata(
   });
 }
 
+/** 查询指定线程的累计令牌使用量。 */
 export function useThreadTokenUsage(
   threadId?: string | null,
   { enabled = true }: { enabled?: boolean } = {},
@@ -2045,6 +2040,7 @@ export function useThreadTokenUsage(
   });
 }
 
+/** 创建从指定对话轮次分叉线程的变更操作。 */
 export function useBranchThread() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -2074,6 +2070,7 @@ export function useBranchThread() {
   });
 }
 
+/** 查询指定线程中单次运行的详情。 */
 export function useRunDetail(threadId: string, runId: string) {
   const apiClient = getAPIClient();
   return useQuery<Run>({
@@ -2086,6 +2083,7 @@ export function useRunDetail(threadId: string, runId: string) {
   });
 }
 
+/** 删除浏览器中与线程关联的本地数据。 */
 async function deleteLocalThreadData(threadId: string) {
   const response = await fetch(
     `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}`,
@@ -2094,11 +2092,10 @@ async function deleteLocalThreadData(threadId: string) {
     },
   );
 
-  // A 404 means the thread is already gone — the desired end state. The prior
-  // `apiClient.threads.delete` call hits the same gateway handler (nginx
-  // rewrites /api/langgraph/threads/* to /api/threads/*) and removes the
-  // thread_meta row, so this second delete's ownership guard 404s. Treat it as
-  // success to keep the delete idempotent.
+  // 404 表示线程已不存在，正是期望的最终状态。先前的 `apiClient.threads.delete`
+  // 调用命中同一网关处理器（nginx 将 /api/langgraph/threads/* 重写为
+  // /api/threads/*）并删除 thread_meta 行，因此第二次删除会被所有权守卫拒绝为
+  // 404。将其视为成功，以保持删除操作幂等。
   if (!response.ok && response.status !== 404) {
     const error = await response
       .json()
@@ -2107,6 +2104,7 @@ async function deleteLocalThreadData(threadId: string) {
   }
 }
 
+/** 在远端与本地删除单个线程。 */
 async function deleteThreadEverywhere(
   apiClient: ThreadDeleteClient,
   threadId: string,
@@ -2115,6 +2113,7 @@ async function deleteThreadEverywhere(
   await deleteLocalThreadData(threadId);
 }
 
+/** 查找指定父线程关联的所有侧栏线程标识。 */
 export async function findSidecarThreadIdsForParent(
   apiClient: ThreadSidecarSearchClient,
   parentThreadId: string,
@@ -2154,6 +2153,7 @@ export async function findSidecarThreadIdsForParent(
   return threadIds;
 }
 
+/** 删除父线程关联的侧栏线程。 */
 async function deleteSidecarThreadsForParent(
   apiClient: ThreadDeleteClient,
   parentThreadId: string,
@@ -2200,6 +2200,7 @@ async function deleteSidecarThreadsForParent(
   });
 }
 
+/** 创建删除线程及其侧栏子线程的变更操作。 */
 export function useDeleteThread() {
   const queryClient = useQueryClient();
   const apiClient = getAPIClient() as ThreadDeleteClient;
@@ -2256,6 +2257,7 @@ export function useDeleteThread() {
   });
 }
 
+/** 创建重命名线程并同步列表缓存的变更操作。 */
 export function useRenameThread() {
   const queryClient = useQueryClient();
   const apiClient = getAPIClient();

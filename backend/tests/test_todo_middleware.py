@@ -1,4 +1,4 @@
-"""Tests for TodoMiddleware context-loss detection."""
+'未说明'
 
 import asyncio
 from typing import Any
@@ -20,24 +20,30 @@ from deerflow.agents.thread_state import ThreadState
 
 
 def _ai_with_write_todos():
+    '未说明'
     return AIMessage(content="", tool_calls=[{"name": "write_todos", "id": "tc_1", "args": {}}])
 
 
 def _reminder_msg():
+    '未说明'
     return HumanMessage(name="todo_reminder", content="reminder")
 
 
 class _CapturingFakeMessagesListChatModel(FakeMessagesListChatModel):
+    '未说明'
     _seen_messages: list[list[Any]] = PrivateAttr(default_factory=list)
 
     @property
     def seen_messages(self) -> list[list[Any]]:
+        '未说明'
         return self._seen_messages
 
     def bind_tools(self, tools, *, tool_choice=None, **kwargs):
+        '未说明'
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         self._seen_messages.append(list(messages))
         return super()._generate(
             messages,
@@ -48,18 +54,21 @@ class _CapturingFakeMessagesListChatModel(FakeMessagesListChatModel):
 
 
 def _make_runtime():
+    '未说明'
     runtime = MagicMock()
     runtime.context = {"thread_id": "test-thread", "run_id": "test-run"}
     return runtime
 
 
 def _make_runtime_for(thread_id: str, run_id: str):
+    '未说明'
     runtime = _make_runtime()
     runtime.context = {"thread_id": thread_id, "run_id": run_id}
     return runtime
 
 
 def _sample_todos():
+    '未说明'
     return [
         {"status": "completed", "content": "Set up project"},
         {"status": "in_progress", "content": "Write tests"},
@@ -68,11 +77,14 @@ def _sample_todos():
 
 
 class TestTodosInMessages:
+    '未说明'
     def test_true_when_write_todos_present(self):
+        '未说明'
         msgs = [HumanMessage(content="hi"), _ai_with_write_todos()]
         assert _todos_in_messages(msgs) is True
 
     def test_false_when_no_write_todos(self):
+        '未说明'
         msgs = [
             HumanMessage(content="hi"),
             AIMessage(content="hello", tool_calls=[{"name": "bash", "id": "tc_1", "args": {}}]),
@@ -80,32 +92,41 @@ class TestTodosInMessages:
         assert _todos_in_messages(msgs) is False
 
     def test_false_for_empty_list(self):
+        '未说明'
         assert _todos_in_messages([]) is False
 
     def test_false_for_ai_without_tool_calls(self):
+        '未说明'
         msgs = [AIMessage(content="hello")]
         assert _todos_in_messages(msgs) is False
 
 
 class TestReminderInMessages:
+    '未说明'
     def test_true_when_reminder_present(self):
+        '未说明'
         msgs = [HumanMessage(content="hi"), _reminder_msg()]
         assert _reminder_in_messages(msgs) is True
 
     def test_false_when_no_reminder(self):
+        '未说明'
         msgs = [HumanMessage(content="hi"), AIMessage(content="hello")]
         assert _reminder_in_messages(msgs) is False
 
     def test_false_for_empty_list(self):
+        '未说明'
         assert _reminder_in_messages([]) is False
 
     def test_false_for_human_without_name(self):
+        '未说明'
         msgs = [HumanMessage(content="todo_reminder")]
         assert _reminder_in_messages(msgs) is False
 
 
 class TestFormatTodos:
+    '未说明'
     def test_formats_multiple_items(self):
+        '未说明'
         todos = _sample_todos()
         result = _format_todos(todos)
         assert "- [completed] Set up project" in result
@@ -113,9 +134,11 @@ class TestFormatTodos:
         assert "- [pending] Deploy" in result
 
     def test_empty_list(self):
+        '未说明'
         assert _format_todos([]) == ""
 
     def test_missing_fields_use_defaults(self):
+        '未说明'
         todos = [{"content": "No status"}, {"status": "done"}]
         result = _format_todos(todos)
         assert "- [pending] No status" in result
@@ -123,17 +146,21 @@ class TestFormatTodos:
 
 
 class TestBeforeModel:
+    '未说明'
     def test_returns_none_when_no_todos(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {"messages": [HumanMessage(content="hi")], "todos": []}
         assert mw.before_model(state, _make_runtime()) is None
 
     def test_returns_none_when_todos_is_none(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {"messages": [HumanMessage(content="hi")], "todos": None}
         assert mw.before_model(state, _make_runtime()) is None
 
     def test_returns_none_when_write_todos_still_visible(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_with_write_todos()],
@@ -142,6 +169,7 @@ class TestBeforeModel:
         assert mw.before_model(state, _make_runtime()) is None
 
     def test_returns_none_when_reminder_already_present(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [HumanMessage(content="hi"), _reminder_msg()],
@@ -150,6 +178,7 @@ class TestBeforeModel:
         assert mw.before_model(state, _make_runtime()) is None
 
     def test_injects_reminder_when_todos_exist_but_truncated(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [HumanMessage(content="hi"), AIMessage(content="sure")],
@@ -163,6 +192,7 @@ class TestBeforeModel:
         assert msgs[0].name == "todo_reminder"
 
     def test_reminder_contains_formatted_todos(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [HumanMessage(content="hi")],
@@ -177,7 +207,9 @@ class TestBeforeModel:
 
 
 class TestAbeforeModel:
+    '未说明'
     def test_delegates_to_sync(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [HumanMessage(content="hi")],
@@ -189,6 +221,7 @@ class TestAbeforeModel:
 
 
 def _todo_completion_reminders(messages):
+    '未说明'
     reminders = []
     for message in messages:
         if isinstance(message, HumanMessage) and message.name == "todo_completion_reminder":
@@ -197,10 +230,12 @@ def _todo_completion_reminders(messages):
 
 
 def _ai_no_tool_calls():
+    '未说明'
     return AIMessage(content="I'm done!")
 
 
 def _ai_with_invalid_tool_calls():
+    '未说明'
     return AIMessage(
         content="",
         tool_calls=[],
@@ -217,6 +252,7 @@ def _ai_with_invalid_tool_calls():
 
 
 def _ai_with_raw_provider_tool_calls():
+    '未说明'
     return AIMessage(
         content="",
         tool_calls=[],
@@ -234,6 +270,7 @@ def _ai_with_raw_provider_tool_calls():
 
 
 def _ai_with_legacy_function_call():
+    '未说明'
     return AIMessage(
         content="",
         additional_kwargs={"function_call": {"name": "write_file", "arguments": '{"path":"report.md"}'}},
@@ -241,10 +278,12 @@ def _ai_with_legacy_function_call():
 
 
 def _ai_with_tool_finish_reason():
+    '未说明'
     return AIMessage(content="", response_metadata={"finish_reason": "tool_calls"})
 
 
 def _incomplete_todos():
+    '未说明'
     return [
         {"status": "completed", "content": "Step 1"},
         {"status": "in_progress", "content": "Step 2"},
@@ -253,6 +292,7 @@ def _incomplete_todos():
 
 
 def _all_completed_todos():
+    '未说明'
     return [
         {"status": "completed", "content": "Step 1"},
         {"status": "completed", "content": "Step 2"},
@@ -260,22 +300,29 @@ def _all_completed_todos():
 
 
 class TestToolCallIntentOrError:
+    '未说明'
     def test_false_for_plain_final_answer(self):
+        '未说明'
         assert _has_tool_call_intent_or_error(_ai_no_tool_calls()) is False
 
     def test_true_for_structured_tool_calls(self):
+        '未说明'
         assert _has_tool_call_intent_or_error(_ai_with_write_todos()) is True
 
     def test_true_for_invalid_tool_calls(self):
+        '未说明'
         assert _has_tool_call_intent_or_error(_ai_with_invalid_tool_calls()) is True
 
     def test_true_for_raw_provider_tool_calls(self):
+        '未说明'
         assert _has_tool_call_intent_or_error(_ai_with_raw_provider_tool_calls()) is True
 
     def test_true_for_legacy_function_call(self):
+        '未说明'
         assert _has_tool_call_intent_or_error(_ai_with_legacy_function_call()) is True
 
     def test_true_for_tool_finish_reason(self):
+        '未说明'
         assert _has_tool_call_intent_or_error(_ai_with_tool_finish_reason()) is True
 
     def test_langchain_ai_message_tool_fields_are_explicitly_handled(self):
@@ -285,12 +332,15 @@ class TestToolCallIntentOrError:
         # reminder guard explicitly decides whether each new field means "not a
         # clean final answer"; the helper has a matching comment pointing back
         # to this sentinel.
+        '未说明'
         tool_related_fields = {name for name in AIMessage.model_fields if "tool" in name.lower() or ("function" in name.lower() and "call" in name.lower())}
         assert tool_related_fields <= {"tool_calls", "invalid_tool_calls"}
 
 
 class TestAfterModel:
+    '未说明'
     def test_returns_none_when_agent_still_using_tools(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_with_write_todos()],
@@ -299,6 +349,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_returns_none_when_no_todos(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_no_tool_calls()],
@@ -307,6 +358,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_returns_none_when_todos_is_none(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_no_tool_calls()],
@@ -315,6 +367,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_returns_none_when_all_completed(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_no_tool_calls()],
@@ -323,6 +376,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_returns_none_when_no_messages(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [],
@@ -331,6 +385,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_queues_reminder_and_jumps_to_model_when_incomplete(self):
+        '未说明'
         mw = TodoMiddleware()
         runtime = _make_runtime()
         state = {
@@ -359,6 +414,7 @@ class TestAfterModel:
         handler.assert_called_once_with("patched-request")
 
     def test_reminder_lists_only_incomplete_items(self):
+        '未说明'
         mw = TodoMiddleware()
         runtime = _make_runtime()
         state = {
@@ -379,6 +435,7 @@ class TestAfterModel:
         assert "Step 3" in content
 
     def test_allows_exit_after_max_reminders(self):
+        '未说明'
         mw = TodoMiddleware()
         runtime = _make_runtime()
         state = {
@@ -392,6 +449,7 @@ class TestAfterModel:
         assert mw.after_model(state, runtime) is None
 
     def test_still_sends_reminder_before_cap(self):
+        '未说明'
         mw = TodoMiddleware()
         runtime = _make_runtime()
         state = {
@@ -406,6 +464,7 @@ class TestAfterModel:
         assert result["jump_to"] == "model"
 
     def test_does_not_trigger_for_invalid_tool_calls(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_with_invalid_tool_calls()],
@@ -414,6 +473,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_does_not_trigger_for_raw_provider_tool_calls(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_with_raw_provider_tool_calls()],
@@ -422,6 +482,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_does_not_trigger_for_legacy_function_call(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_with_legacy_function_call()],
@@ -430,6 +491,7 @@ class TestAfterModel:
         assert mw.after_model(state, _make_runtime()) is None
 
     def test_does_not_trigger_for_tool_finish_reason(self):
+        '未说明'
         mw = TodoMiddleware()
         state = {
             "messages": [_ai_with_tool_finish_reason()],
@@ -439,7 +501,9 @@ class TestAfterModel:
 
 
 class TestAafterModel:
+    '未说明'
     def test_delegates_to_sync(self):
+        '未说明'
         mw = TodoMiddleware()
         runtime = _make_runtime()
         state = {
@@ -453,7 +517,9 @@ class TestAafterModel:
 
 
 class TestWrapModelCall:
+    '未说明'
     def test_no_pending_reminder_passthrough(self):
+        '未说明'
         mw = TodoMiddleware()
         request = MagicMock()
         request.runtime = _make_runtime()
@@ -465,6 +531,7 @@ class TestWrapModelCall:
         handler.assert_called_once_with(request)
 
     def test_pending_reminder_is_injected_once(self):
+        '未说明'
         mw = TodoMiddleware()
         runtime = _make_runtime()
         state = {
@@ -492,7 +559,9 @@ class TestWrapModelCall:
 
 
 class TestTodoMiddlewareAgentGraphIntegration:
+    '未说明'
     def test_reuses_thread_state_todos_schema_in_real_agent_graph(self):
+        '未说明'
         mw = TodoMiddleware()
         model = _CapturingFakeMessagesListChatModel(
             responses=[
@@ -529,6 +598,7 @@ class TestTodoMiddlewareAgentGraphIntegration:
         assert result["todos"] == [{"content": "Step 1", "status": "pending"}]
 
     def test_completion_reminder_is_transient_in_real_agent_graph(self):
+        '未说明'
         mw = TodoMiddleware()
         model = _CapturingFakeMessagesListChatModel(
             responses=[
@@ -580,7 +650,9 @@ class TestTodoMiddlewareAgentGraphIntegration:
 
 
 class TestRunScopedReminderCleanup:
+    '未说明'
     def test_before_agent_clears_stale_count_without_pending_reminder(self):
+        '未说明'
         mw = TodoMiddleware()
         stale_runtime = _make_runtime()
         stale_runtime.context = {"thread_id": "test-thread", "run_id": "stale-run"}
@@ -604,6 +676,7 @@ class TestRunScopedReminderCleanup:
         assert mw._completion_reminder_count_for_runtime(other_thread_runtime) == 1
 
     def test_size_guard_prunes_oldest_count_only_reminder_state(self):
+        '未说明'
         mw = TodoMiddleware()
         mw._MAX_COMPLETION_REMINDER_KEYS = 2
         first_runtime = _make_runtime_for("thread-a", "run-a")
@@ -627,6 +700,7 @@ class TestRunScopedReminderCleanup:
         assert ("thread-a", "run-a") not in mw._completion_reminder_touch_order
 
     def test_size_guard_prunes_pending_and_count_state_together(self):
+        '未说明'
         mw = TodoMiddleware()
         mw._MAX_COMPLETION_REMINDER_KEYS = 1
         stale_runtime = _make_runtime_for("thread-a", "run-a")
@@ -642,7 +716,9 @@ class TestRunScopedReminderCleanup:
 
 
 class TestAwrapModelCall:
+    '未说明'
     def test_async_pending_reminder_is_injected(self):
+        '未说明'
         mw = TodoMiddleware()
         runtime = _make_runtime()
         state = {

@@ -17,6 +17,7 @@ import { writeTextToClipboard } from "@/core/clipboard";
 import { useI18n } from "@/core/i18n/hooks";
 import { cn } from "@/lib/utils";
 
+/** 汇总并展示内容引用来源，保持来源链接与原文上下文可追溯。 */
 export function CitationSourcesPanel({
   className,
   sources,

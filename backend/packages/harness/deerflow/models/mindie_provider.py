@@ -1,3 +1,4 @@
+'定义 mindie_provider 模块提供的职责与可复用接口'
 import ast
 import html
 import json
@@ -12,13 +13,7 @@ from langchain_openai import ChatOpenAI
 
 
 def _fix_messages(messages: list) -> list:
-    """Sanitize incoming messages for MindIE compatibility.
-
-    MindIE's chat template may fail to parse LangChain's native tool_calls
-    or ToolMessage roles, resulting in 0-token generation errors. This function
-    flattens multi-modal list contents into strings and converts tool-related
-    messages into raw text with XML tags expected by the underlying model.
-    """
+    "执行 _fix_messages 的明确职责，并返回与调用约定一致的结果。\n\nSanitize incoming messages for MindIE compatibility.\n\n    MindIE's chat template may fail to parse LangChain's native tool_calls\n    or ToolMessage roles, resulting in 0-token generation errors. This function\n    flattens multi-modal list contents into strings and converts tool-related\n    messages into raw text with XML tags expected by the underlying model.\n    "
     fixed = []
     for msg in messages:
         # Flatten content if it's a list of blocks
@@ -59,15 +54,7 @@ def _fix_messages(messages: list) -> list:
 
 
 def _parse_xml_tool_call_to_dict(content: str) -> tuple[str, list[dict]]:
-    """Parse XML-style tool calls from model output into LangChain dicts.
-
-    Args:
-        content: The raw text output from the model.
-
-    Returns:
-        A tuple containing the cleaned text (with XML blocks removed) and
-        a list of tool call dictionaries formatted for LangChain.
-    """
+    '执行 _parse_xml_tool_call_to_dict 的明确职责，并返回与调用约定一致的结果。\n\nParse XML-style tool calls from model output into LangChain dicts.\n\n    Args:\n        content: The raw text output from the model.\n\n    Returns:\n        A tuple containing the cleaned text (with XML blocks removed) and\n        a list of tool call dictionaries formatted for LangChain.\n    '
     if not isinstance(content, str) or "<tool_call>" not in content:
         return content, []
 
@@ -121,7 +108,7 @@ def _parse_xml_tool_call_to_dict(content: str) -> tuple[str, list[dict]]:
 
 
 def _iter_tool_call_blocks(content: str) -> Iterator[tuple[int, int, str]]:
-    """Iterate `<tool_call>...</tool_call>` blocks and tolerate nesting."""
+    '执行 _iter_tool_call_blocks 的明确职责，并返回与调用约定一致的结果。\n\nIterate `<tool_call>...</tool_call>` blocks and tolerate nesting.'
     token_pattern = re.compile(r"</?tool_call>")
     depth = 0
     block_start = -1
@@ -147,7 +134,7 @@ def _iter_tool_call_blocks(content: str) -> Iterator[tuple[int, int, str]]:
 
 
 def _decode_escaped_newlines_outside_fences(content: str) -> str:
-    """Decode literal `\\n` outside fenced code blocks."""
+    '执行 _decode_escaped_newlines_outside_fences 的明确职责，并返回与调用约定一致的结果。\n\nDecode literal `\\n` outside fenced code blocks.'
     if "\\n" not in content:
         return content
 
@@ -160,18 +147,10 @@ def _decode_escaped_newlines_outside_fences(content: str) -> str:
 
 
 class MindIEChatModel(ChatOpenAI):
-    """Chat model adapter for MindIE engine.
-
-    Addresses compatibility issues including:
-    - Flattening multimodal list contents to strings.
-    - Intercepting and parsing hardcoded XML tool calls into LangChain standard.
-    - Handling stream=True dropping choices when tools are present by falling back
-      to non-streaming generation and yielding simulated chunks.
-    - Fixing over-escaped newline characters from gateway responses.
-    """
+    '封装 MindIEChatModel 的状态、协作关系与公开操作。\n\nChat model adapter for MindIE engine.\n\n    Addresses compatibility issues including:\n    - Flattening multimodal list contents to strings.\n    - Intercepting and parsing hardcoded XML tool calls into LangChain standard.\n    - Handling stream=True dropping choices when tools are present by falling back\n      to non-streaming generation and yielding simulated chunks.\n    - Fixing over-escaped newline characters from gateway responses.\n    '
 
     def __init__(self, **kwargs):
-        """Normalize timeout kwargs without creating long-lived clients."""
+        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nNormalize timeout kwargs without creating long-lived clients.'
         connect_timeout = kwargs.pop("connect_timeout", 30.0)
         read_timeout = kwargs.pop("read_timeout", 900.0)
         write_timeout = kwargs.pop("write_timeout", 60.0)
@@ -189,7 +168,7 @@ class MindIEChatModel(ChatOpenAI):
         super().__init__(**kwargs)
 
     def _patch_result_with_tools(self, result: ChatResult) -> ChatResult:
-        """Apply post-generation fixes to the model result."""
+        '执行 _patch_result_with_tools 的明确职责，并返回与调用约定一致的结果。\n\nApply post-generation fixes to the model result.'
         for gen in result.generations:
             msg = gen.message
 
@@ -208,15 +187,18 @@ class MindIEChatModel(ChatOpenAI):
         return result
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '执行 _generate 的明确职责，并返回与调用约定一致的结果'
         result = super()._generate(_fix_messages(messages), stop=stop, run_manager=run_manager, **kwargs)
         return self._patch_result_with_tools(result)
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        '执行 _agenerate 的明确职责，并返回与调用约定一致的结果'
         result = await super()._agenerate(_fix_messages(messages), stop=stop, run_manager=run_manager, **kwargs)
         return self._patch_result_with_tools(result)
 
     async def _astream(self, messages, stop=None, run_manager=None, **kwargs):
         # Route standard queries to native streaming for lower TTFB
+        '执行 _astream 的明确职责，并返回与调用约定一致的结果'
         if not kwargs.get("tools"):
             async for chunk in super()._astream(_fix_messages(messages), stop=stop, run_manager=run_manager, **kwargs):
                 if isinstance(chunk.message.content, str):

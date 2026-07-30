@@ -1,4 +1,4 @@
-"""Tests for the IM channel system (MessageBus, ChannelStore, ChannelManager)."""
+'定义 test_channels 模块提供的职责与可复用接口。\n\nTests for the IM channel system (MessageBus, ChannelStore, ChannelManager).'
 
 from __future__ import annotations
 
@@ -28,6 +28,7 @@ from deerflow.utils.messages import ORIGINAL_USER_CONTENT_KEY
 
 
 def test_known_channel_command_detection_only_matches_control_commands():
+    '验证 known、channel、command、detection、only、matches、control、commands 场景下的预期行为、边界条件与结果'
     from app.channels.commands import is_known_channel_command
 
     assert is_known_channel_command("/new")
@@ -38,6 +39,7 @@ def test_known_channel_command_detection_only_matches_control_commands():
 
 
 def _make_channel_skill(tmp_path: Path, name: str, *, enabled: bool = True) -> Skill:
+    '执行 _make_channel_skill 的明确职责，并返回与调用约定一致的结果'
     skill_dir = tmp_path / name
     skill_dir.mkdir(parents=True, exist_ok=True)
     skill_file = skill_dir / "SKILL.md"
@@ -55,6 +57,7 @@ def _make_channel_skill(tmp_path: Path, name: str, *, enabled: bool = True) -> S
 
 
 def _make_channel_skill_storage(skills: list[Skill]):
+    '执行 _make_channel_skill_storage 的明确职责，并返回与调用约定一致的结果'
     return SimpleNamespace(
         load_skills=lambda *, enabled_only: [skill for skill in skills if skill.enabled] if enabled_only else skills,
         get_container_root=lambda: "/mnt/skills",
@@ -62,7 +65,7 @@ def _make_channel_skill_storage(skills: list[Skill]):
 
 
 def _run(coro):
-    """Run an async coroutine synchronously."""
+    '执行 _run 的明确职责，并返回与调用约定一致的结果。\n\nRun an async coroutine synchronously.'
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(coro)
@@ -71,7 +74,7 @@ def _run(coro):
 
 
 async def _wait_for(condition, *, timeout=5.0, interval=0.05):
-    """Poll *condition* until it returns True, or raise after *timeout* seconds."""
+    '执行 _wait_for 的明确职责，并返回与调用约定一致的结果。\n\nPoll *condition* until it returns True, or raise after *timeout* seconds.'
     import time
 
     deadline = time.monotonic() + timeout
@@ -88,10 +91,13 @@ async def _wait_for(condition, *, timeout=5.0, interval=0.05):
 
 
 class TestMessageBus:
+    '组织 TestMessageBus 场景的行为与边界验证'
     def test_publish_and_get_inbound(self):
+        '验证 publish、and、get、inbound 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             msg = InboundMessage(
                 channel_name="test",
                 chat_id="chat1",
@@ -107,9 +113,11 @@ class TestMessageBus:
         _run(go())
 
     def test_inbound_queue_is_fifo(self):
+        '验证 inbound、queue、is、fifo 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             for i in range(3):
                 await bus.publish_inbound(InboundMessage(channel_name="test", chat_id="c", user_id="u", text=f"msg{i}"))
             for i in range(3):
@@ -119,13 +127,16 @@ class TestMessageBus:
         _run(go())
 
     def test_outbound_callback(self):
+        '验证 outbound、callback 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         received = []
 
         async def callback(msg):
+            '执行 callback 的明确职责，并返回与调用约定一致的结果'
             received.append(msg)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus.subscribe_outbound(callback)
             out = OutboundMessage(channel_name="test", chat_id="c1", thread_id="t1", text="reply")
             await bus.publish_outbound(out)
@@ -135,13 +146,16 @@ class TestMessageBus:
         _run(go())
 
     def test_unsubscribe_outbound(self):
+        '验证 unsubscribe、outbound 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         received = []
 
         async def callback(msg):
+            '执行 callback 的明确职责，并返回与调用约定一致的结果'
             received.append(msg)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus.subscribe_outbound(callback)
             bus.unsubscribe_outbound(callback)
             out = OutboundMessage(channel_name="test", chat_id="c1", thread_id="t1", text="reply")
@@ -151,17 +165,21 @@ class TestMessageBus:
         _run(go())
 
     def test_unsubscribe_outbound_removes_fresh_bound_method_reference(self):
+        '验证 unsubscribe、outbound、removes、fresh、bound、method、reference 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         received = []
 
         class Handler:
+            '封装 Handler 的状态、协作关系与公开操作'
             async def callback(self, msg):
+                '执行 callback 的明确职责，并返回与调用约定一致的结果'
                 received.append((self, msg))
 
         handler = Handler()
         other_handler = Handler()
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus.subscribe_outbound(handler.callback)
             bus.subscribe_outbound(other_handler.callback)
             bus.unsubscribe_outbound(handler.callback)
@@ -172,17 +190,21 @@ class TestMessageBus:
         _run(go())
 
     def test_outbound_error_does_not_crash(self):
+        '验证 outbound、error、does、not、crash 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
 
         async def bad_callback(msg):
+            '执行 bad_callback 的明确职责，并返回与调用约定一致的结果'
             raise ValueError("boom")
 
         received = []
 
         async def good_callback(msg):
+            '执行 good_callback 的明确职责，并返回与调用约定一致的结果'
             received.append(msg)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus.subscribe_outbound(bad_callback)
             bus.subscribe_outbound(good_callback)
             out = OutboundMessage(channel_name="test", chat_id="c1", thread_id="t1", text="reply")
@@ -192,6 +214,7 @@ class TestMessageBus:
         _run(go())
 
     def test_inbound_message_defaults(self):
+        '验证 inbound、message、defaults 场景下的预期行为、边界条件与结果'
         msg = InboundMessage(channel_name="test", chat_id="c", user_id="u", text="hi")
         assert msg.msg_type == InboundMessageType.CHAT
         assert msg.thread_ts is None
@@ -200,6 +223,7 @@ class TestMessageBus:
         assert msg.created_at > 0
 
     def test_outbound_message_defaults(self):
+        '验证 outbound、message、defaults 场景下的预期行为、边界条件与结果'
         msg = OutboundMessage(channel_name="test", chat_id="c", thread_id="t", text="hi")
         assert msg.artifacts == []
         assert msg.is_final is True
@@ -213,32 +237,40 @@ class TestMessageBus:
 
 
 class TestChannelStore:
+    '组织 TestChannelStore 场景的行为与边界验证'
     @pytest.fixture
     def store(self, tmp_path):
+        '执行 store 的明确职责，并返回与调用约定一致的结果'
         return ChannelStore(path=tmp_path / "store.json")
 
     def test_set_and_get_thread_id(self, store):
+        '验证 set、and、get、thread、id 场景下的预期行为、边界条件与结果'
         store.set_thread_id("slack", "ch1", "thread-abc", user_id="u1")
         assert store.get_thread_id("slack", "ch1") == "thread-abc"
 
     def test_get_nonexistent_returns_none(self, store):
+        '验证 get、nonexistent、returns、none 场景下的预期行为、边界条件与结果'
         assert store.get_thread_id("slack", "nonexistent") is None
 
     def test_remove(self, store):
+        '验证 remove 场景下的预期行为、边界条件与结果'
         store.set_thread_id("slack", "ch1", "t1")
         assert store.remove("slack", "ch1") is True
         assert store.get_thread_id("slack", "ch1") is None
 
     def test_remove_nonexistent_returns_false(self, store):
+        '验证 remove、nonexistent、returns、false 场景下的预期行为、边界条件与结果'
         assert store.remove("slack", "nope") is False
 
     def test_list_entries_all(self, store):
+        '验证 list、entries、all 场景下的预期行为、边界条件与结果'
         store.set_thread_id("slack", "ch1", "t1")
         store.set_thread_id("feishu", "ch2", "t2")
         entries = store.list_entries()
         assert len(entries) == 2
 
     def test_list_entries_filtered(self, store):
+        '验证 list、entries、filtered 场景下的预期行为、边界条件与结果'
         store.set_thread_id("slack", "ch1", "t1")
         store.set_thread_id("feishu", "ch2", "t2")
         entries = store.list_entries(channel_name="slack")
@@ -246,6 +278,7 @@ class TestChannelStore:
         assert entries[0]["channel_name"] == "slack"
 
     def test_persistence(self, tmp_path):
+        '验证 persistence 场景下的预期行为、边界条件与结果'
         path = tmp_path / "store.json"
         store1 = ChannelStore(path=path)
         store1.set_thread_id("slack", "ch1", "t1")
@@ -254,6 +287,7 @@ class TestChannelStore:
         assert store2.get_thread_id("slack", "ch1") == "t1"
 
     def test_update_preserves_created_at(self, store):
+        '验证 update、preserves、created、at 场景下的预期行为、边界条件与结果'
         store.set_thread_id("slack", "ch1", "t1")
         entries = store.list_entries()
         created_at = entries[0]["created_at"]
@@ -265,6 +299,7 @@ class TestChannelStore:
         assert entries[0]["updated_at"] >= created_at
 
     def test_corrupt_file_handled(self, tmp_path):
+        '验证 corrupt、file、handled 场景下的预期行为、边界条件与结果'
         path = tmp_path / "store.json"
         path.write_text("not json", encoding="utf-8")
         store = ChannelStore(path=path)
@@ -277,27 +312,33 @@ class TestChannelStore:
 
 
 class DummyChannel(Channel):
-    """Concrete test implementation of Channel."""
+    '封装 DummyChannel 的状态、协作关系与公开操作。\n\nConcrete test implementation of Channel.'
 
     def __init__(self, bus, config=None):
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__(name="dummy", bus=bus, config=config or {})
         self.sent_messages: list[OutboundMessage] = []
         self._running = False
 
     async def start(self):
+        '执行 start 的明确职责，并返回与调用约定一致的结果'
         self._running = True
         self.bus.subscribe_outbound(self._on_outbound)
 
     async def stop(self):
+        '执行 stop 的明确职责，并返回与调用约定一致的结果'
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
 
     async def send(self, msg: OutboundMessage):
+        '执行 send 的明确职责，并返回与调用约定一致的结果'
         self.sent_messages.append(msg)
 
 
 class TestChannelBase:
+    '组织 TestChannelBase 场景的行为与边界验证'
     def test_make_inbound(self):
+        '验证 make、inbound 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         ch = DummyChannel(bus)
         msg = ch._make_inbound(
@@ -312,10 +353,12 @@ class TestChannelBase:
         assert msg.msg_type == InboundMessageType.COMMAND
 
     def test_on_outbound_routes_to_channel(self):
+        '验证 on、outbound、routes、to、channel 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         ch = DummyChannel(bus)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             await ch.start()
             msg = OutboundMessage(channel_name="dummy", chat_id="c1", thread_id="t1", text="hi")
             await bus.publish_outbound(msg)
@@ -324,10 +367,12 @@ class TestChannelBase:
         _run(go())
 
     def test_on_outbound_ignores_other_channels(self):
+        '验证 on、outbound、ignores、other、channels 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         ch = DummyChannel(bus)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             await ch.start()
             msg = OutboundMessage(channel_name="other", chat_id="c1", thread_id="t1", text="hi")
             await bus.publish_outbound(msg)
@@ -336,6 +381,7 @@ class TestChannelBase:
         _run(go())
 
     def test_send_with_retry_retries_until_success(self, monkeypatch):
+        '验证 send、with、retry、retries、until、success 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         ch = DummyChannel(bus)
         attempts = 0
@@ -343,6 +389,7 @@ class TestChannelBase:
         monkeypatch.setattr("app.channels.base.asyncio.sleep", sleep)
 
         async def flaky_send():
+            '执行 flaky_send 的明确职责，并返回与调用约定一致的结果'
             nonlocal attempts
             attempts += 1
             if attempts < 3:
@@ -356,6 +403,7 @@ class TestChannelBase:
         assert [call.args[0] for call in sleep.await_args_list] == [1, 2]
 
     def test_log_future_error_handles_cancelled_future(self, caplog):
+        '验证 log、future、error、handles、cancelled、future 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         ch = DummyChannel(bus)
         fut = Future()
@@ -367,6 +415,7 @@ class TestChannelBase:
         assert "prepare_inbound" not in caplog.text
 
     def test_log_future_error_surfaces_future_exception(self, caplog):
+        '验证 log、future、error、surfaces、future、exception 场景下的预期行为、边界条件与结果'
         bus = MessageBus()
         ch = DummyChannel(bus)
         fut = Future()
@@ -378,6 +427,7 @@ class TestChannelBase:
         assert "prepare_inbound failed for msg_id=m1: boom" in caplog.text
 
     def test_channel_capabilities_match_channel_defaults(self):
+        '验证 channel、capabilities、match、channel、defaults 场景下的预期行为、边界条件与结果'
         from app.channels.dingtalk import DingTalkChannel
         from app.channels.discord import DiscordChannel
         from app.channels.feishu import FeishuChannel
@@ -409,19 +459,23 @@ class TestChannelBase:
 
 
 class TestExtractResponseText:
+    '组织 TestExtractResponseText 场景的行为与边界验证'
     def test_string_content(self):
+        '验证 string、content 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         result = {"messages": [{"type": "ai", "content": "hello"}]}
         assert _extract_response_text(result) == "hello"
 
     def test_list_content_blocks(self):
+        '验证 list、content、blocks 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         result = {"messages": [{"type": "ai", "content": [{"type": "text", "text": "hello"}, {"type": "text", "text": " world"}]}]}
         assert _extract_response_text(result) == "hello world"
 
     def test_picks_last_ai_message(self):
+        '验证 picks、last、ai、message 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         result = {
@@ -434,23 +488,27 @@ class TestExtractResponseText:
         assert _extract_response_text(result) == "second"
 
     def test_empty_messages(self):
+        '验证 empty、messages 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         assert _extract_response_text({"messages": []}) == ""
 
     def test_no_ai_messages(self):
+        '验证 no、ai、messages 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         result = {"messages": [{"type": "human", "content": "hi"}]}
         assert _extract_response_text(result) == ""
 
     def test_list_result(self):
+        '验证 list、result 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         result = [{"type": "ai", "content": "from list"}]
         assert _extract_response_text(result) == "from list"
 
     def test_skips_empty_ai_content(self):
+        '验证 skips、empty、ai、content 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         result = {
@@ -462,6 +520,7 @@ class TestExtractResponseText:
         assert _extract_response_text(result) == "actual response"
 
     def test_clarification_tool_message(self):
+        '验证 clarification、tool、message 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_response_text
 
         result = {
@@ -474,7 +533,7 @@ class TestExtractResponseText:
         assert _extract_response_text(result) == "您想了解哪方面？"
 
     def test_clarification_over_empty_ai(self):
-        """When AI content is empty but ask_clarification tool message exists, use the tool message."""
+        '验证 clarification、over、empty、ai 场景下的预期行为、边界条件与结果。\n\nWhen AI content is empty but ask_clarification tool message exists, use the tool message.'
         from app.channels.manager import _extract_response_text
 
         result = {
@@ -486,7 +545,7 @@ class TestExtractResponseText:
         assert _extract_response_text(result) == "Could you clarify?"
 
     def test_does_not_leak_previous_turn_text(self):
-        """When current turn AI has no text (only tool calls), do not return previous turn's text."""
+        "验证 does、not、leak、previous、turn、text 场景下的预期行为、边界条件与结果。\n\nWhen current turn AI has no text (only tool calls), do not return previous turn's text."
         from app.channels.manager import _extract_response_text
 
         result = {
@@ -506,7 +565,7 @@ class TestExtractResponseText:
         assert _extract_response_text(result) == ""
 
     def test_ignores_hidden_human_control_messages(self):
-        """Hidden control messages should not terminate current-turn response extraction."""
+        '验证 ignores、hidden、human、control、messages 场景下的预期行为、边界条件与结果。\n\nHidden control messages should not terminate current-turn response extraction.'
         from app.channels.manager import _extract_response_text
 
         result = {
@@ -526,7 +585,9 @@ class TestExtractResponseText:
 
 
 class TestClarificationDetection:
+    '组织 TestClarificationDetection 场景的行为与边界验证'
     def test_final_clarification_tool_message_is_pending(self):
+        '验证 final、clarification、tool、message、is、pending 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _has_current_turn_clarification
 
         result = {
@@ -539,6 +600,7 @@ class TestClarificationDetection:
         assert _has_current_turn_clarification(result) is True
 
     def test_clarification_followed_by_regular_ai_is_not_pending(self):
+        '验证 clarification、followed、by、regular、ai、is、not、pending 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _has_current_turn_clarification
 
         result = {
@@ -552,6 +614,7 @@ class TestClarificationDetection:
         assert _has_current_turn_clarification(result) is False
 
     def test_previous_turn_clarification_does_not_mark_current_turn(self):
+        '验证 previous、turn、clarification、does、not、mark、current、turn 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _has_current_turn_clarification
 
         result = {
@@ -572,7 +635,7 @@ class TestClarificationDetection:
 
 
 def _make_mock_langgraph_client(thread_id="test-thread-123", run_result=None):
-    """Create a mock langgraph_sdk async client."""
+    '执行 _make_mock_langgraph_client 的明确职责，并返回与调用约定一致的结果。\n\nCreate a mock langgraph_sdk async client.'
     mock_client = MagicMock()
 
     # threads.create() returns a Thread-like dict
@@ -596,6 +659,7 @@ def _make_mock_langgraph_client(thread_id="test-thread-123", run_result=None):
 
 
 async def _make_channel_connection_repo(tmp_path: Path):
+    '执行 _make_channel_connection_repo 的明确职责，并返回与调用约定一致的结果'
     from deerflow.persistence.channel_connections import ChannelConnectionRepository, ChannelCredentialCipher
     from deerflow.persistence.engine import get_session_factory, init_engine
 
@@ -607,11 +671,14 @@ async def _make_channel_connection_repo(tmp_path: Path):
 
 
 def _make_stream_part(event: str, data):
+    '执行 _make_stream_part 的明确职责，并返回与调用约定一致的结果'
     return SimpleNamespace(event=event, data=data)
 
 
 def _make_async_iterator(items):
+    '执行 _make_async_iterator 的明确职责，并返回与调用约定一致的结果'
     async def iterator():
+        '执行 iterator 的明确职责，并返回与调用约定一致的结果'
         for item in items:
             yield item
 
@@ -619,7 +686,9 @@ def _make_async_iterator(items):
 
 
 class TestChannelManager:
+    '组织 TestChannelManager 场景的行为与边界验证'
     def test_get_client_includes_csrf_header_and_cookie(self):
+        '验证 get、client、includes、csrf、header、and、cookie 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         bus = MessageBus()
@@ -647,9 +716,11 @@ class TestChannelManager:
         # each create a thread and the second store overwrites the first,
         # orphaning a Gateway thread and splitting the conversation. The create
         # path must be serialized so only one thread is created and reused.
+        '验证 concurrent、inbound、for、same、chat、reuses、single、thread 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -659,6 +730,7 @@ class TestChannelManager:
             release_create = asyncio.Event()
 
             async def blocking_create(*, metadata=None, headers=None):
+                '执行 blocking_create 的明确职责，并返回与调用约定一致的结果'
                 thread_id = f"thread-{len(created_ids) + 1}"
                 created_ids.append(thread_id)
                 first_create_started.set()
@@ -692,26 +764,35 @@ class TestChannelManager:
         _run(go())
 
     def test_fetch_gateway_includes_internal_auth_headers(self, monkeypatch):
+        '验证 fetch、gateway、includes、internal、auth、headers 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         class MockResponse:
+            '封装 MockResponse 的状态、协作关系与公开操作'
             def raise_for_status(self):
+                '执行 raise_for_status 的明确职责，并返回与调用约定一致的结果'
                 return None
 
             def json(self):
+                '执行 json 的明确职责，并返回与调用约定一致的结果'
                 return {"models": [{"name": "default"}]}
 
         class MockAsyncClient:
+            '封装 MockAsyncClient 的状态、协作关系与公开操作'
             def __init__(self, *args, **kwargs):
+                '实现 __init__ 协议方法，保持对象交互语义一致'
                 return None
 
             async def __aenter__(self):
+                '实现 __aenter__ 协议方法，保持对象交互语义一致'
                 return self
 
             async def __aexit__(self, exc_type, exc, tb):
+                '实现 __aexit__ 协议方法，保持对象交互语义一致'
                 return None
 
             async def get(self, url, **kwargs):
+                '读取并返回，并遵守 get 所表达的接口约束'
                 calls.append({"url": url, **kwargs})
                 return MockResponse()
 
@@ -719,6 +800,7 @@ class TestChannelManager:
         monkeypatch.setattr("app.channels.manager.httpx.AsyncClient", MockAsyncClient)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, gateway_url="http://gateway:8001")
@@ -733,27 +815,36 @@ class TestChannelManager:
         _run(go())
 
     def test_fetch_gateway_uses_bound_owner_headers(self, monkeypatch):
+        '验证 fetch、gateway、uses、bound、owner、headers 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
         from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME
 
         class MockResponse:
+            '封装 MockResponse 的状态、协作关系与公开操作'
             def raise_for_status(self):
+                '执行 raise_for_status 的明确职责，并返回与调用约定一致的结果'
                 return None
 
             def json(self):
+                '执行 json 的明确职责，并返回与调用约定一致的结果'
                 return {"facts": [{"text": "owner fact"}]}
 
         class MockAsyncClient:
+            '封装 MockAsyncClient 的状态、协作关系与公开操作'
             def __init__(self, *args, **kwargs):
+                '实现 __init__ 协议方法，保持对象交互语义一致'
                 return None
 
             async def __aenter__(self):
+                '实现 __aenter__ 协议方法，保持对象交互语义一致'
                 return self
 
             async def __aexit__(self, exc_type, exc, tb):
+                '实现 __aexit__ 协议方法，保持对象交互语义一致'
                 return None
 
             async def get(self, url, **kwargs):
+                '读取并返回，并遵守 get 所表达的接口约束'
                 calls.append({"url": url, **kwargs})
                 return MockResponse()
 
@@ -761,6 +852,7 @@ class TestChannelManager:
         monkeypatch.setattr("app.channels.manager.httpx.AsyncClient", MockAsyncClient)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, gateway_url="http://gateway:8001")
@@ -782,9 +874,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_calls_channel_receive_file_for_inbound_files(self, monkeypatch):
+        '验证 handle、chat、calls、channel、receive、file、for、inbound、files 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -792,6 +886,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -842,6 +937,7 @@ class TestChannelManager:
         _run(go())
 
     def test_ingest_inbound_files_uses_explicit_owner_bucket(self, tmp_path, monkeypatch):
+        '验证 ingest、inbound、files、uses、explicit、owner、bucket 场景下的预期行为、边界条件与结果'
         from app.channels.manager import INBOUND_FILE_READERS, _ingest_inbound_files
         from deerflow.config.paths import Paths
 
@@ -849,12 +945,14 @@ class TestChannelManager:
         monkeypatch.setattr("deerflow.uploads.manager.get_paths", lambda: paths)
 
         async def read_file(file_info, client):
+            '执行 read_file 的明确职责，并返回与调用约定一致的结果'
             del file_info, client
             return b"owner data"
 
         INBOUND_FILE_READERS["owner-test"] = read_file
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             try:
                 created = await _ingest_inbound_files(
                     "thread-owner",
@@ -884,13 +982,7 @@ class TestChannelManager:
         _run(go())
 
     def test_channel_storage_user_id_falls_back_to_platform_user(self, monkeypatch):
-        """Unbound auth-enabled channels stage files under the same bucket the run uses.
-
-        ``_resolve_run_params`` runs an unbound msg under ``safe(msg.user_id)``, so
-        ``_channel_storage_user_id`` must resolve to the same value instead of
-        ``None`` (which would fall back to ``"default"`` in the dispatcher task and
-        cross buckets — the agent would read uploads the channel never wrote there).
-        """
+        '验证 channel、storage、user、id、falls、back、to、platform、user 场景下的预期行为、边界条件与结果。\n\nUnbound auth-enabled channels stage files under the same bucket the run uses.\n\n        ``_resolve_run_params`` runs an unbound msg under ``safe(msg.user_id)``, so\n        ``_channel_storage_user_id`` must resolve to the same value instead of\n        ``None`` (which would fall back to ``"default"`` in the dispatcher task and\n        cross buckets — the agent would read uploads the channel never wrote there).\n        '
         from app.channels.manager import _channel_storage_user_id, _safe_user_id_for_run
 
         # Auth enabled (no auth-disabled owner), unbound (no owner_user_id).
@@ -906,9 +998,11 @@ class TestChannelManager:
         assert _channel_storage_user_id(anonymous) is None
 
     def test_handle_chat_creates_thread(self):
+        '验证 handle、chat、creates、thread 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -916,6 +1010,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -970,9 +1065,11 @@ class TestChannelManager:
         _run(go())
 
     def test_dispatch_loop_dedupes_stable_provider_message_id(self, tmp_path):
+        '验证 dispatch、loop、dedupes、stable、provider、message、id 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=tmp_path / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -980,6 +1077,7 @@ class TestChannelManager:
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg: OutboundMessage) -> None:
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -987,6 +1085,7 @@ class TestChannelManager:
 
             def _slack_inbound(message_id: str) -> InboundMessage:
                 # Distinct objects per publish, like a real provider redelivery.
+                '执行 _slack_inbound 的明确职责，并返回与调用约定一致的结果'
                 return InboundMessage(
                     channel_name="slack",
                     chat_id="C123",
@@ -1018,7 +1117,7 @@ class TestChannelManager:
         _run(go())
 
     def test_inbound_dedupe_key_fails_closed_without_workspace(self):
-        """Without a workspace identifier, skip dedupe instead of collapsing workspaces (willem #3)."""
+        '验证 inbound、dedupe、key、fails、closed、without、workspace 场景下的预期行为、边界条件与结果。\n\nWithout a workspace identifier, skip dedupe instead of collapsing workspaces (willem #3).'
         from app.channels.manager import ChannelManager
 
         with_workspace = InboundMessage(
@@ -1040,23 +1139,14 @@ class TestChannelManager:
         assert ChannelManager._inbound_dedupe_key(without_workspace) is None
 
     def test_github_redelivery_is_deduped_like_other_channels(self, tmp_path):
-        """A redelivered GitHub webhook must dispatch the agent only once.
-
-        PR #3584 added inbound dedupe for the IM channels; the GitHub channel
-        added in PR #3754 never stamped the ``message_id`` / workspace the
-        dedupe keys on, so GitHub's native "Redeliver" button or a
-        retry-on-timeout re-ran the agent with real side effects (e.g. a
-        duplicate PR comment). The dispatcher now stamps the X-GitHub-Delivery
-        GUID (scoped per agent) plus the repo, so the same manager dedupe
-        absorbs the replay — while a second agent bound to the same delivery,
-        and a genuinely new delivery, still fire.
-        """
+        '验证 github、redelivery、is、deduped、like、other、channels 场景下的预期行为、边界条件与结果。\n\nA redelivered GitHub webhook must dispatch the agent only once.\n\n        PR #3584 added inbound dedupe for the IM channels; the GitHub channel\n        added in PR #3754 never stamped the ``message_id`` / workspace the\n        dedupe keys on, so GitHub\'s native "Redeliver" button or a\n        retry-on-timeout re-ran the agent with real side effects (e.g. a\n        duplicate PR comment). The dispatcher now stamps the X-GitHub-Delivery\n        GUID (scoped per agent) plus the repo, so the same manager dedupe\n        absorbs the replay — while a second agent bound to the same delivery,\n        and a genuinely new delivery, still fire.\n        '
         from app.channels.manager import ChannelManager
 
         manager = ChannelManager(bus=MessageBus(), store=ChannelStore(path=tmp_path / "store.json"))
 
         def _gh(delivery: str, agent: str = "reviewer") -> InboundMessage:
             # Shaped exactly as app.gateway.github.dispatcher.fanout_event emits.
+            '执行 _gh 的明确职责，并返回与调用约定一致的结果'
             return InboundMessage(
                 channel_name="github",
                 chat_id="zhfeng/llm-gateway",
@@ -1079,10 +1169,11 @@ class TestChannelManager:
         assert manager._is_duplicate_inbound(_gh("d1", agent="coder")) is False
 
     def test_dispatch_loop_releases_dedupe_key_when_handling_fails(self, tmp_path):
-        """A transient handling failure must not black-hole a provider redelivery (ShenAC #1)."""
+        '验证 dispatch、loop、releases、dedupe、key、when、handling、fails 场景下的预期行为、边界条件与结果。\n\nA transient handling failure must not black-hole a provider redelivery (ShenAC #1).'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=tmp_path / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -1090,6 +1181,7 @@ class TestChannelManager:
             attempts = {"n": 0}
 
             async def flaky_wait(*args, **kwargs):
+                '执行 flaky_wait 的明确职责，并返回与调用约定一致的结果'
                 attempts["n"] += 1
                 if attempts["n"] == 1:
                     raise RuntimeError("transient gateway 503")
@@ -1101,6 +1193,7 @@ class TestChannelManager:
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg: OutboundMessage) -> None:
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1129,16 +1222,18 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_outbound_preserves_inbound_metadata(self):
-        """DingTalk (and similar) need inbound metadata on outbound sends (e.g. sender_staff_id)."""
+        '验证 handle、chat、outbound、preserves、inbound、metadata 场景下的预期行为、边界条件与结果。\n\nDingTalk (and similar) need inbound metadata on outbound sends (e.g. sender_staff_id).'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg: OutboundMessage) -> None:
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1168,15 +1263,18 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_marks_clarification_outbound_metadata(self):
+        '验证 handle、chat、marks、clarification、outbound、metadata 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg: OutboundMessage) -> None:
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1210,15 +1308,18 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_does_not_mark_regular_outbound_as_clarification(self):
+        '验证 handle、chat、does、not、mark、regular、outbound、as、clarification 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg: OutboundMessage) -> None:
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1236,16 +1337,18 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_outbound_drops_large_metadata_keys(self):
-        """Large metadata keys like raw_message should be stripped from outbound messages."""
+        '验证 handle、chat、outbound、drops、large、metadata、keys 场景下的预期行为、边界条件与结果。\n\nLarge metadata keys like raw_message should be stripped from outbound messages.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg: OutboundMessage) -> None:
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1280,9 +1383,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_uses_channel_session_overrides(self):
+        '验证 handle、chat、uses、channel、session、overrides 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(
@@ -1303,6 +1408,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1330,12 +1436,13 @@ class TestChannelManager:
         _run(go())
 
     def test_clarification_follow_up_preserves_history(self, monkeypatch):
-        """Conversation should continue after ask_clarification instead of resetting history."""
+        '验证 clarification、follow、up、preserves、history 场景下的预期行为、边界条件与结果。\n\nConversation should continue after ask_clarification instead of resetting history.'
         from app.channels.manager import ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -1343,6 +1450,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1350,6 +1458,7 @@ class TestChannelManager:
             history_by_checkpoint: dict[tuple[str, str], list[str]] = {}
 
             async def _runs_wait(thread_id, assistant_id, *, input, config, context, multitask_strategy=None):
+                '执行 _runs_wait 的明确职责，并返回与调用约定一致的结果'
                 del assistant_id, context  # unused in this test, kept for signature parity
 
                 checkpoint_ns = config.get("configurable", {}).get("checkpoint_ns")
@@ -1453,9 +1562,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_uses_user_session_overrides(self):
+        '验证 handle、chat、uses、user、session、overrides 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(
@@ -1487,6 +1598,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1513,9 +1625,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_chat_rejects_invalid_custom_agent_name(self):
+        '验证 handle、chat、rejects、invalid、custom、agent、name 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(
@@ -1531,6 +1645,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1551,11 +1666,13 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_feishu_chat_streams_multiple_outbound_updates(self, monkeypatch):
+        '验证 handle、feishu、chat、streams、multiple、outbound、updates 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -1563,6 +1680,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1619,14 +1737,13 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_streaming_chat_accepts_runtime_messages_event(self, monkeypatch):
-        """The embedded runtime emits SSE event name "messages" (LangGraph
-        Platform semantics) for the requested "messages-tuple" stream mode —
-        the manager must accumulate text from those events too."""
+        '验证 handle、streaming、chat、accepts、runtime、messages、event 场景下的预期行为、边界条件与结果。\n\nThe embedded runtime emits SSE event name "messages" (LangGraph\n        Platform semantics) for the requested "messages-tuple" stream mode —\n        the manager must accumulate text from those events too.'
         from app.channels.manager import ChannelManager
 
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -1634,6 +1751,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1689,17 +1807,20 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_feishu_streaming_marks_only_final_clarification_outbound(self, monkeypatch):
+        '验证 handle、feishu、streaming、marks、only、final、clarification、outbound 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg: OutboundMessage) -> None:
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1750,12 +1871,13 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_feishu_stream_error_still_sends_final(self, monkeypatch):
-        """When the stream raises mid-way, a final outbound with is_final=True must still be published."""
+        '验证 handle、feishu、stream、error、still、sends、final 场景下的预期行为、边界条件与结果。\n\nWhen the stream raises mid-way, a final outbound with is_final=True must still be published.'
         from app.channels.manager import ChannelManager
 
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -1763,11 +1885,13 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
 
             async def _failing_stream():
+                '执行 _failing_stream 的明确职责，并返回与调用约定一致的结果'
                 yield _make_stream_part(
                     "messages-tuple",
                     [
@@ -1802,6 +1926,7 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_feishu_stream_conflict_sends_busy_message(self, monkeypatch):
+        '验证 handle、feishu、stream、conflict、sends、busy、message 场景下的预期行为、边界条件与结果'
         import httpx
         from langgraph_sdk.errors import ConflictError
 
@@ -1810,6 +1935,7 @@ class TestChannelManager:
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -1817,11 +1943,13 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
 
             async def _conflict_stream():
+                '执行 _conflict_stream 的明确职责，并返回与调用约定一致的结果'
                 request = httpx.Request("POST", "http://127.0.0.1:2024/runs")
                 response = httpx.Response(409, request=request)
                 raise ConflictError(
@@ -1856,11 +1984,13 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_feishu_same_thread_messages_queue_instead_of_busy(self, monkeypatch):
+        '验证 handle、feishu、same、thread、messages、queue、instead、of、busy 场景下的预期行为、边界条件与结果'
         from app.channels.manager import THREAD_BUSY_MESSAGE, ChannelManager
 
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -1868,6 +1998,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -1877,6 +2008,7 @@ class TestChannelManager:
             second_started = asyncio.Event()
 
             async def _stream(thread_id, assistant_id, *, input, **kwargs):  # noqa: ARG001
+                '执行 _stream 的明确职责，并返回与调用约定一致的结果'
                 prompt = input["messages"][0]["content"]
                 if prompt == "first":
                     first_started.set()
@@ -1952,9 +2084,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_feishu_queue_waiter_cleanup_on_cancelled_progress_publish(self):
+        '验证 handle、feishu、queue、waiter、cleanup、on、cancelled、progress、publish 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2002,11 +2136,13 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_feishu_different_threads_can_stream_concurrently(self, monkeypatch):
+        '验证 handle、feishu、different、threads、can、stream、concurrently 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2016,10 +2152,12 @@ class TestChannelManager:
             release_streams = asyncio.Event()
 
             async def create_thread(**kwargs):
+                '创建并返回，并遵守 create_thread 所表达的接口约束'
                 topic_id = kwargs["metadata"]["channel_source"]["topic_id"]
                 return {"thread_id": f"thread-{topic_id}"}
 
             async def _stream(thread_id, assistant_id, *, input, **kwargs):  # noqa: ARG001
+                '执行 _stream 的明确职责，并返回与调用约定一致的结果'
                 if thread_id == "thread-topic-a":
                     first_started.set()
                 elif thread_id == "thread-topic-b":
@@ -2044,6 +2182,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2082,9 +2221,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_help(self):
+        '验证 handle、command、help 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2092,6 +2233,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2115,9 +2257,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_blank_text_is_reported_without_running_agent(self):
+        '验证 handle、command、blank、text、is、reported、without、running、agent 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2128,6 +2272,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2150,9 +2295,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_rejects_multi_slash_control_command(self):
+        '验证 handle、command、rejects、multi、slash、control、command 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2163,6 +2310,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2185,9 +2333,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_requires_control_command_at_start(self):
+        '验证 handle、command、requires、control、command、at、start 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2198,6 +2348,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2221,9 +2372,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_outbound_thread_id_uses_topic_thread(self):
+        '验证 handle、command、outbound、thread、id、uses、topic、thread 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2233,6 +2386,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2256,9 +2410,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_slash_skill_routes_to_chat(self, tmp_path):
+        '验证 handle、command、slash、skill、routes、to、chat 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2270,6 +2426,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2294,9 +2451,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_slash_skill_with_attachment_preserves_original_content(self, monkeypatch, tmp_path):
+        '验证 handle、command、slash、skill、with、attachment、preserves、original、content 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def fake_ingest(thread_id, msg, *, user_id=None):
+            '执行 fake_ingest 的明确职责，并返回与调用约定一致的结果'
             del user_id
             return [
                 {
@@ -2310,6 +2469,7 @@ class TestChannelManager:
         monkeypatch.setattr("app.channels.manager._ingest_inbound_files", fake_ingest)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2321,6 +2481,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2349,9 +2510,11 @@ class TestChannelManager:
         _run(go())
 
     def test_streaming_slash_skill_with_attachment_preserves_original_content(self, monkeypatch, tmp_path):
+        '验证 streaming、slash、skill、with、attachment、preserves、original、content 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def fake_ingest(thread_id, msg, *, user_id=None):
+            '执行 fake_ingest 的明确职责，并返回与调用约定一致的结果'
             del user_id
             return [
                 {
@@ -2365,6 +2528,7 @@ class TestChannelManager:
         monkeypatch.setattr("app.channels.manager._ingest_inbound_files", fake_ingest)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2386,6 +2550,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2413,9 +2578,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_slash_skill_requires_command_at_start(self, tmp_path):
+        '验证 handle、command、slash、skill、requires、command、at、start 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2427,6 +2594,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2449,11 +2617,13 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_slash_skill_respects_custom_agent_skill_whitelist(self, monkeypatch, tmp_path):
+        '验证 handle、command、slash、skill、respects、custom、agent、skill、whitelist 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.setattr("app.channels.manager.load_agent_config", lambda name, *, user_id=None: SimpleNamespace(skills=["frontend-design"]))
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(
@@ -2469,6 +2639,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2491,19 +2662,13 @@ class TestChannelManager:
         _run(go())
 
     def test_slash_skill_whitelist_loads_agent_config_for_the_resolved_owner(self, monkeypatch):
-        """The per-user custom agent whitelist must be read from the same owner
-        bucket the run uses. ``_resolve_run_params`` resolves that owner into
-        ``run_context["user_id"]`` (per ``_channel_storage_user_id``, the single
-        source of truth for run identity and storage), but the whitelist
-        pre-check dropped it, so ``load_agent_config`` fell back to the dispatch
-        loop's unset contextvar (``"default"``) — reading, or failing to find,
-        the wrong user's agent config.
-        """
+        '验证 slash、skill、whitelist、loads、agent、config、for、the、resolved、owner 场景下的预期行为、边界条件与结果。\n\nThe per-user custom agent whitelist must be read from the same owner\n        bucket the run uses. ``_resolve_run_params`` resolves that owner into\n        ``run_context["user_id"]`` (per ``_channel_storage_user_id``, the single\n        source of truth for run identity and storage), but the whitelist\n        pre-check dropped it, so ``load_agent_config`` fell back to the dispatch\n        loop\'s unset contextvar (``"default"``) — reading, or failing to find,\n        the wrong user\'s agent config.\n        '
         from app.channels.manager import ChannelManager
 
         captured: dict[str, object] = {}
 
         def spy_load_agent_config(name, *, user_id=None):
+            '执行 spy_load_agent_config 的明确职责，并返回与调用约定一致的结果'
             captured["name"] = name
             captured["user_id"] = user_id
             return SimpleNamespace(skills=["data-analysis"])
@@ -2532,9 +2697,11 @@ class TestChannelManager:
         assert captured["user_id"] == expected_owner
 
     def test_handle_command_slash_skill_reports_disabled_skill(self, tmp_path):
+        '验证 handle、command、slash、skill、reports、disabled、skill 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2546,6 +2713,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2568,9 +2736,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_uninstalled_slash_skill_stays_unknown_command(self, tmp_path):
+        '验证 handle、command、uninstalled、slash、skill、stays、unknown、command 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2582,6 +2752,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2604,14 +2775,17 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_slash_skill_resolution_error_is_reported(self, monkeypatch):
+        '验证 handle、command、slash、skill、resolution、error、is、reported 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager, SlashSkillCommandResolutionError
 
         def fail_resolution(text, available_skills=None, storage=None):
+            '执行 fail_resolution 的明确职责，并返回与调用约定一致的结果'
             raise SlashSkillCommandResolutionError("Failed to resolve slash skill command. Please check the skill configuration.")
 
         monkeypatch.setattr("app.channels.manager._resolve_slash_skill_command", fail_resolution)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2624,6 +2798,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2648,9 +2823,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_new(self):
+        '验证 handle、command、new 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2663,6 +2840,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2690,10 +2868,11 @@ class TestChannelManager:
         _run(go())
 
     def test_each_topic_creates_new_thread(self):
-        """Messages with distinct topic_ids should each create a new DeerFlow thread."""
+        '验证 each、topic、creates、new、thread 场景下的预期行为、边界条件与结果。\n\nMessages with distinct topic_ids should each create a new DeerFlow thread.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2702,6 +2881,7 @@ class TestChannelManager:
             thread_ids = iter(["thread-1", "thread-2"])
 
             async def create_thread(**kwargs):
+                '创建并返回，并遵守 create_thread 所表达的接口约束'
                 return {"thread_id": next(thread_ids)}
 
             mock_client = _make_mock_langgraph_client()
@@ -2711,6 +2891,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -2742,12 +2923,13 @@ class TestChannelManager:
         _run(go())
 
     def test_same_topic_reuses_thread(self, monkeypatch):
-        """Messages with the same topic_id should reuse the same DeerFlow thread."""
+        '验证 same、topic、reuses、thread 场景下的预期行为、边界条件与结果。\n\nMessages with the same topic_id should reuse the same DeerFlow thread.'
         from app.channels.manager import ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2758,6 +2940,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -2799,10 +2982,11 @@ class TestChannelManager:
         _run(go())
 
     def test_none_topic_reuses_thread(self):
-        """Messages with topic_id=None should reuse the same thread (e.g. a private/direct chat)."""
+        '验证 none、topic、reuses、thread 场景下的预期行为、边界条件与结果。\n\nMessages with topic_id=None should reuse the same thread (e.g. a private/direct chat).'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2813,6 +2997,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -2843,10 +3028,11 @@ class TestChannelManager:
         _run(go())
 
     def test_different_topics_get_different_threads(self):
-        """Messages with different topic_ids should create separate threads."""
+        '验证 different、topics、get、different、threads 场景下的预期行为、边界条件与结果。\n\nMessages with different topic_ids should create separate threads.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2854,6 +3040,7 @@ class TestChannelManager:
             thread_ids = iter(["thread-A", "thread-B"])
 
             async def create_thread(**kwargs):
+                '创建并返回，并遵守 create_thread 所表达的接口约束'
                 return {"thread_id": next(thread_ids)}
 
             mock_client = _make_mock_langgraph_client()
@@ -2887,10 +3074,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_bootstrap_with_text(self):
-        """/bootstrap <text> should route to chat with is_bootstrap=True in run_context."""
+        '验证 handle、command、bootstrap、with、text 场景下的预期行为、边界条件与结果。\n\n/bootstrap <text> should route to chat with is_bootstrap=True in run_context.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2898,6 +3086,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2937,10 +3126,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_bootstrap_without_text(self):
-        """/bootstrap with no text should use a default message."""
+        '验证 handle、command、bootstrap、without、text 场景下的预期行为、边界条件与结果。\n\n/bootstrap with no text should use a default message.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2948,6 +3138,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -2978,12 +3169,13 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_bootstrap_feishu_uses_streaming(self, monkeypatch):
-        """/bootstrap from feishu should go through the streaming path."""
+        '验证 handle、command、bootstrap、feishu、uses、streaming 场景下的预期行为、边界条件与结果。\n\n/bootstrap from feishu should go through the streaming path.'
         from app.channels.manager import ChannelManager
 
         monkeypatch.setattr("app.channels.manager.STREAM_UPDATE_MIN_INTERVAL_SECONDS", 0.0)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -2991,6 +3183,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -3043,10 +3236,11 @@ class TestChannelManager:
         _run(go())
 
     def test_handle_command_bootstrap_creates_thread_if_needed(self):
-        """/bootstrap should create a new thread when none exists."""
+        '验证 handle、command、bootstrap、creates、thread、if、needed 场景下的预期行为、边界条件与结果。\n\n/bootstrap should create a new thread when none exists.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -3054,6 +3248,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -3081,10 +3276,11 @@ class TestChannelManager:
         _run(go())
 
     def test_help_includes_bootstrap(self):
-        """/help output should mention /bootstrap."""
+        '验证 help、includes、bootstrap 场景下的预期行为、边界条件与结果。\n\n/help output should mention /bootstrap.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -3092,6 +3288,7 @@ class TestChannelManager:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -3114,11 +3311,10 @@ class TestChannelManager:
 
 
 class TestResolveRunParamsUserId:
-    """Regression for PR #3294: channel identity must reach ``run_context``
-    while staying safe for user-scoped filesystem buckets.
-    """
+    '组织 TestResolveRunParamsUserId 场景的行为与边界验证。\n\nRegression for PR #3294: channel identity must reach ``run_context``\n    while staying safe for user-scoped filesystem buckets.\n    '
 
     def _manager(self):
+        '执行 _manager 的明确职责，并返回与调用约定一致的结果'
         from app.channels.manager import ChannelManager
 
         bus = MessageBus()
@@ -3126,6 +3322,7 @@ class TestResolveRunParamsUserId:
         return ChannelManager(bus=bus, store=store)
 
     def test_safe_user_id_is_passed_through(self, monkeypatch):
+        '验证 safe、user、id、is、passed、through 场景下的预期行为、边界条件与结果'
         manager = self._manager()
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
         msg = InboundMessage(channel_name="telegram", chat_id="c", user_id="123456", text="hi")
@@ -3136,15 +3333,7 @@ class TestResolveRunParamsUserId:
         assert run_context["channel_user_id"] == "123456"
 
     def test_resolve_run_params_plumbs_channel_name_into_run_context(self):
-        """``channel_name`` must land on ``run_context`` so in-graph code can
-        gate tool exposure on it.
-
-        Concretely: the lead-agent factory withholds the ``update_agent``
-        tool from runs whose ``run_context["channel_name"]`` is webhook-shaped
-        (currently ``"github"``). If this plumbing regresses, the factory
-        loses the only signal it has to make that decision and webhook
-        runs silently regain a privilege-escalation path.
-        """
+        '验证 resolve、run、params、plumbs、channel、name、into、run、context 场景下的预期行为、边界条件与结果。\n\n``channel_name`` must land on ``run_context`` so in-graph code can\n        gate tool exposure on it.\n\n        Concretely: the lead-agent factory withholds the ``update_agent``\n        tool from runs whose ``run_context["channel_name"]`` is webhook-shaped\n        (currently ``"github"``). If this plumbing regresses, the factory\n        loses the only signal it has to make that decision and webhook\n        runs silently regain a privilege-escalation path.\n        '
         manager = self._manager()
 
         gh_msg = InboundMessage(channel_name="github", chat_id="acme/widget", user_id="alice", text="hi")
@@ -3164,12 +3353,7 @@ class TestResolveRunParamsUserId:
         ],
     )
     def test_run_identity_matches_storage_bucket(self, kwargs, monkeypatch):
-        """The run user_id and the file/artifact storage bucket share one resolver.
-
-        Pins #2 and #3 to a single source of truth so they cannot drift: whatever
-        _resolve_run_params puts in run_context["user_id"] is exactly what
-        _channel_storage_user_id scopes uploads/artifacts to.
-        """
+        '验证 run、identity、matches、storage、bucket 场景下的预期行为、边界条件与结果。\n\nThe run user_id and the file/artifact storage bucket share one resolver.\n\n        Pins #2 and #3 to a single source of truth so they cannot drift: whatever\n        _resolve_run_params puts in run_context["user_id"] is exactly what\n        _channel_storage_user_id scopes uploads/artifacts to.\n        '
         from app.channels.manager import _channel_storage_user_id
 
         manager = self._manager()
@@ -3181,6 +3365,7 @@ class TestResolveRunParamsUserId:
         assert run_context["user_id"] == _channel_storage_user_id(msg)
 
     def test_connection_owner_user_id_takes_precedence_over_platform_user_id(self, monkeypatch):
+        '验证 connection、owner、user、id、takes、precedence、over、platform、user、id 场景下的预期行为、边界条件与结果'
         manager = self._manager()
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
         msg = InboundMessage(
@@ -3198,9 +3383,7 @@ class TestResolveRunParamsUserId:
         assert run_context["channel_user_id"] == "U-platform"
 
     def test_github_channel_gets_raised_recursion_limit(self):
-        """Autonomous GitHub coding runs (clone → edit → test → push → PR) need
-        more super-steps than an interactive chat turn. The default
-        ``recursion_limit`` of 100 is raised for the github channel only."""
+        '验证 github、channel、gets、raised、recursion、limit 场景下的预期行为、边界条件与结果。\n\nAutonomous GitHub coding runs (clone → edit → test → push → PR) need\n        more super-steps than an interactive chat turn. The default\n        ``recursion_limit`` of 100 is raised for the github channel only.'
         manager = self._manager()
 
         gh_msg = InboundMessage(channel_name="github", chat_id="zhfeng/llm-gateway", user_id="zhfeng", text="hi")
@@ -3213,8 +3396,7 @@ class TestResolveRunParamsUserId:
         assert slack_config["recursion_limit"] == 100
 
     def test_github_channel_recursion_limit_respects_higher_override(self):
-        """An explicit higher recursion_limit in channel/user config must not be
-        lowered by the github bump (it uses ``max``)."""
+        '验证 github、channel、recursion、limit、respects、higher、override 场景下的预期行为、边界条件与结果。\n\nAn explicit higher recursion_limit in channel/user config must not be\n        lowered by the github bump (it uses ``max``).'
         manager = self._manager()
         manager._default_session["config"] = {"recursion_limit": 400}
 
@@ -3223,15 +3405,7 @@ class TestResolveRunParamsUserId:
         assert gh_config["recursion_limit"] == 400
 
     def test_github_channel_per_agent_recursion_limit_override(self):
-        """An agent's ``github.recursion_limit`` overrides the channel default.
-
-        Some autonomous workloads (large refactors, multi-file migrations)
-        need more headroom than 250; others (review-only agents) need less.
-        The per-agent value flows via ``msg.metadata["github"]["recursion_limit"]``
-        — the dispatcher reads it from ``GitHubAgentConfig`` at fanout time.
-        The per-agent value is honored verbatim, including values below the
-        channel default and below 100.
-        """
+        '验证 github、channel、per、agent、recursion、limit、override 场景下的预期行为、边界条件与结果。\n\nAn agent\'s ``github.recursion_limit`` overrides the channel default.\n\n        Some autonomous workloads (large refactors, multi-file migrations)\n        need more headroom than 250; others (review-only agents) need less.\n        The per-agent value flows via ``msg.metadata["github"]["recursion_limit"]``\n        — the dispatcher reads it from ``GitHubAgentConfig`` at fanout time.\n        The per-agent value is honored verbatim, including values below the\n        channel default and below 100.\n        '
         manager = self._manager()
 
         # Higher than the channel default — agent gets the bigger ceiling.
@@ -3257,14 +3431,7 @@ class TestResolveRunParamsUserId:
         assert gh_config_low["recursion_limit"] == 120
 
     def test_github_channel_per_agent_recursion_limit_honors_value_below_100(self):
-        """Regression pin for willem-bd's finding #4 on PR #3754.
-
-        Previously the channel-policy step did ``max(existing, limit)``
-        which clamped any per-agent recursion_limit below 100 up to 100,
-        silently breaking a safety-conscious ``github.recursion_limit: 50``
-        on a review-only agent. The per-agent value is now honored
-        verbatim for any positive integer, including values below 100.
-        """
+        "验证 github、channel、per、agent、recursion、limit、honors、value、below、100 场景下的预期行为、边界条件与结果。\n\nRegression pin for willem-bd's finding #4 on PR #3754.\n\n        Previously the channel-policy step did ``max(existing, limit)``\n        which clamped any per-agent recursion_limit below 100 up to 100,\n        silently breaking a safety-conscious ``github.recursion_limit: 50``\n        on a review-only agent. The per-agent value is now honored\n        verbatim for any positive integer, including values below 100.\n        "
         manager = self._manager()
 
         # 50: well below the 100 floor that the old max() would have applied,
@@ -3294,7 +3461,7 @@ class TestResolveRunParamsUserId:
             assert gh_config["recursion_limit"] == value, f"override {value!r} must be honored verbatim"
 
     def test_github_channel_recursion_limit_ignores_invalid_override(self):
-        """Non-int / non-positive recursion_limit values fall back to the channel default."""
+        '验证 github、channel、recursion、limit、ignores、invalid、override 场景下的预期行为、边界条件与结果。\n\nNon-int / non-positive recursion_limit values fall back to the channel default.'
         manager = self._manager()
 
         for bad in (None, 0, -1, "many", 3.5):
@@ -3309,6 +3476,7 @@ class TestResolveRunParamsUserId:
             assert gh_config["recursion_limit"] == 250, f"bad value {bad!r} should fall back to 250"
 
     def test_auth_disabled_user_id_is_used_for_unbound_channel_messages(self, monkeypatch):
+        '验证 auth、disabled、user、id、is、used、for、unbound、channel、messages 场景下的预期行为、边界条件与结果'
         from app.gateway.auth_disabled import AUTH_DISABLED_USER_ID
         from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME
 
@@ -3328,6 +3496,7 @@ class TestResolveRunParamsUserId:
         assert headers[INTERNAL_OWNER_USER_ID_HEADER_NAME] == AUTH_DISABLED_USER_ID
 
     def test_auth_disabled_user_id_overrides_bound_owner_for_local_visibility(self, monkeypatch):
+        '验证 auth、disabled、user、id、overrides、bound、owner、for、local、visibility 场景下的预期行为、边界条件与结果'
         from app.gateway.auth_disabled import AUTH_DISABLED_USER_ID
 
         manager = self._manager()
@@ -3346,6 +3515,7 @@ class TestResolveRunParamsUserId:
         assert run_context["channel_user_id"] == "U-platform"
 
     def test_unbound_channel_messages_keep_platform_user_id_when_auth_is_enabled(self, monkeypatch):
+        '验证 unbound、channel、messages、keep、platform、user、id、when、auth、is、enabled 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _owner_headers
 
         manager = self._manager()
@@ -3359,6 +3529,7 @@ class TestResolveRunParamsUserId:
         assert _owner_headers(msg) is None
 
     def test_unsafe_user_id_is_normalized_but_raw_preserved(self, monkeypatch):
+        '验证 unsafe、user、id、is、normalized、but、raw、preserved 场景下的预期行为、边界条件与结果'
         from deerflow.config.paths import make_safe_user_id
 
         manager = self._manager()
@@ -3373,6 +3544,7 @@ class TestResolveRunParamsUserId:
         assert run_context["channel_user_id"] == raw
 
     def test_unsafe_user_id_migrates_unique_legacy_bucket(self, tmp_path, monkeypatch):
+        '验证 unsafe、user、id、migrates、unique、legacy、bucket 场景下的预期行为、边界条件与结果'
         from deerflow.config.paths import Paths, make_safe_user_id
 
         paths = Paths(tmp_path)
@@ -3396,6 +3568,7 @@ class TestResolveRunParamsUserId:
 
     @pytest.mark.parametrize("raw_user_id", ["", None])
     def test_empty_or_none_user_id_is_not_injected(self, raw_user_id, monkeypatch):
+        '验证 empty、or、none、user、id、is、not、injected 场景下的预期行为、边界条件与结果'
         manager = self._manager()
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
         msg = InboundMessage(channel_name="feishu", chat_id="c", user_id=raw_user_id, text="hi")
@@ -3407,32 +3580,17 @@ class TestResolveRunParamsUserId:
 
 
 class TestGithubFireAndForget:
-    """Regression for the ``httpx.ReadTimeout`` on long autonomous GitHub runs.
-
-    The GitHub channel's outbound ``send`` is log-only by design — the agent
-    posts to the issue/PR via the ``gh`` CLI from inside the sandbox. Keeping
-    ``client.runs.wait`` on the manager side kept an HTTP stream open for the
-    entire run lifetime, so any run that legitimately exceeded the SDK default
-    300s read deadline (a routine clone → edit → test → push → PR cycle) blew
-    up with ``httpx.ReadTimeout`` and the outer except branch then released the
-    dedupe key and emitted a false "internal error" outbound.
-
-    The fix is policy-driven: ``ChannelRunPolicy.fire_and_forget=True`` swaps
-    the dispatch call to ``runs.create`` (short POST, returns once the run is
-    ``pending``) and skips the response-extraction + outbound-publish block.
-    """
+    '组织 TestGithubFireAndForget 场景的行为与边界验证。\n\nRegression for the ``httpx.ReadTimeout`` on long autonomous GitHub runs.\n\n    The GitHub channel\'s outbound ``send`` is log-only by design — the agent\n    posts to the issue/PR via the ``gh`` CLI from inside the sandbox. Keeping\n    ``client.runs.wait`` on the manager side kept an HTTP stream open for the\n    entire run lifetime, so any run that legitimately exceeded the SDK default\n    300s read deadline (a routine clone → edit → test → push → PR cycle) blew\n    up with ``httpx.ReadTimeout`` and the outer except branch then released the\n    dedupe key and emitted a false "internal error" outbound.\n\n    The fix is policy-driven: ``ChannelRunPolicy.fire_and_forget=True`` swaps\n    the dispatch call to ``runs.create`` (short POST, returns once the run is\n    ``pending``) and skips the response-extraction + outbound-publish block.\n    '
 
     def test_channel_run_policy_default_is_not_fire_and_forget(self):
-        """Adding ``fire_and_forget`` must not silently re-route any existing
-        channel onto the new path — the default has to stay False so Slack,
-        Telegram, Discord, etc. keep using ``runs.wait`` exactly as before."""
+        '验证 channel、run、policy、default、is、not、fire、and、forget 场景下的预期行为、边界条件与结果。\n\nAdding ``fire_and_forget`` must not silently re-route any existing\n        channel onto the new path — the default has to stay False so Slack,\n        Telegram, Discord, etc. keep using ``runs.wait`` exactly as before.'
         from app.channels.run_policy import ChannelRunPolicy
 
         assert ChannelRunPolicy().fire_and_forget is False
         assert ChannelRunPolicy().serialize_thread_runs is False
 
     def test_feishu_channel_policy_opts_into_serialized_thread_runs(self):
-        """Feishu's queue-same-thread behavior should be policy-driven."""
+        "验证 feishu、channel、policy、opts、into、serialized、thread、runs 场景下的预期行为、边界条件与结果。\n\nFeishu's queue-same-thread behavior should be policy-driven."
         import app.channels.feishu_run_policy  # noqa: F401
         from app.channels.run_policy import CHANNEL_RUN_POLICY
 
@@ -3441,8 +3599,7 @@ class TestGithubFireAndForget:
         assert feishu_policy.serialize_thread_runs is True
 
     def test_github_channel_policy_opts_into_fire_and_forget(self):
-        """The GitHub channel must register ``fire_and_forget=True``. This is
-        the only signal the manager has to skip ``runs.wait`` for github."""
+        '验证 github、channel、policy、opts、into、fire、and、forget 场景下的预期行为、边界条件与结果。\n\nThe GitHub channel must register ``fire_and_forget=True``. This is\n        the only signal the manager has to skip ``runs.wait`` for github.'
         # Importing the github subpackage registers the policy as a side
         # effect (``register_policy()`` runs at module import time).
         import app.gateway.github.run_policy  # noqa: F401
@@ -3453,13 +3610,12 @@ class TestGithubFireAndForget:
         assert github_policy.fire_and_forget is True
 
     def test_handle_chat_for_github_calls_runs_create_not_wait(self):
-        """The hot path: a github inbound dispatches via ``runs.create``, not
-        ``runs.wait``. ``runs.create`` returns once the run is ``pending`` so
-        the manager doesn't have to hold an HTTP stream open for ~6 minutes."""
+        "验证 handle、chat、for、github、calls、runs、create、not、wait 场景下的预期行为、边界条件与结果。\n\nThe hot path: a github inbound dispatches via ``runs.create``, not\n        ``runs.wait``. ``runs.create`` returns once the run is ``pending`` so\n        the manager doesn't have to hold an HTTP stream open for ~6 minutes."
         import app.gateway.github.run_policy  # noqa: F401 — register policy
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             # GitHub deliveries skip the bound-identity gate (authenticity is
@@ -3501,16 +3657,12 @@ class TestGithubFireAndForget:
         _run(go())
 
     def test_handle_chat_for_github_does_not_publish_outbound(self):
-        """Fire-and-forget channels publish nothing on success. The GitHub
-        agent posts to the issue/PR itself via the ``gh`` CLI; if the manager
-        ALSO published an outbound, the channel's log-only ``send`` would
-        write a final-state message into ``gateway.log`` for every run and
-        muddy the operator-facing logs. The streaming-path counterpart of
-        this guarantee already holds — this pins the non-streaming side."""
+        "验证 handle、chat、for、github、does、not、publish、outbound 场景下的预期行为、边界条件与结果。\n\nFire-and-forget channels publish nothing on success. The GitHub\n        agent posts to the issue/PR itself via the ``gh`` CLI; if the manager\n        ALSO published an outbound, the channel's log-only ``send`` would\n        write a final-state message into ``gateway.log`` for every run and\n        muddy the operator-facing logs. The streaming-path counterpart of\n        this guarantee already holds — this pins the non-streaming side."
         import app.gateway.github.run_policy  # noqa: F401 — register policy
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -3518,6 +3670,7 @@ class TestGithubFireAndForget:
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -3552,13 +3705,7 @@ class TestGithubFireAndForget:
         _run(go())
 
     def test_handle_chat_for_github_busy_thread_still_emits_busy_message(self):
-        """A ``ConflictError`` from ``runs.create`` (the runtime rejected the
-        run because a previous one on the same thread is still active) must
-        still trip the ``THREAD_BUSY_MESSAGE`` outbound path. The GitHub
-        channel's ``send`` is log-only, so in practice the operator sees the
-        busy message in ``gateway.log`` rather than on the PR — but the manager
-        must treat this exactly like the ``runs.wait`` case so any future
-        non-github fire-and-forget channel inherits the behavior unchanged."""
+        "验证 handle、chat、for、github、busy、thread、still、emits、busy、message 场景下的预期行为、边界条件与结果。\n\nA ``ConflictError`` from ``runs.create`` (the runtime rejected the\n        run because a previous one on the same thread is still active) must\n        still trip the ``THREAD_BUSY_MESSAGE`` outbound path. The GitHub\n        channel's ``send`` is log-only, so in practice the operator sees the\n        busy message in ``gateway.log`` rather than on the PR — but the manager\n        must treat this exactly like the ``runs.wait`` case so any future\n        non-github fire-and-forget channel inherits the behavior unchanged."
         import httpx
         from langgraph_sdk.errors import ConflictError
 
@@ -3566,6 +3713,7 @@ class TestGithubFireAndForget:
         from app.channels.manager import THREAD_BUSY_MESSAGE, ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -3573,6 +3721,7 @@ class TestGithubFireAndForget:
             outbound_received: list[OutboundMessage] = []
 
             async def capture_outbound(msg):
+                '执行 capture_outbound 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture_outbound)
@@ -3613,14 +3762,11 @@ class TestGithubFireAndForget:
         _run(go())
 
     def test_handle_chat_for_non_fire_and_forget_channel_still_uses_runs_wait(self):
-        """Regression guard for the non-github channels (Slack, DingTalk,
-        WeCom, etc.) — they still need the manager to ferry the final
-        assistant message back, so the ``runs.wait`` dispatch path must stay
-        intact when ``fire_and_forget`` is False or the channel has no policy
-        entry at all."""
+        '验证 handle、chat、for、non、fire、and、forget、channel、still、uses、runs、wait 场景下的预期行为、边界条件与结果。\n\nRegression guard for the non-github channels (Slack, DingTalk,\n        WeCom, etc.) — they still need the manager to ferry the final\n        assistant message back, so the ``runs.wait`` dispatch path must stay\n        intact when ``fire_and_forget`` is False or the channel has no policy\n        entry at all.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -3646,12 +3792,15 @@ class TestGithubFireAndForget:
 
 
 class _BoundIdentityRepo:
+    '封装 _BoundIdentityRepo 的状态、协作关系与公开操作'
     def __init__(self, connections: list[dict[str, str | None]] | None = None) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self.connections = list(connections or [])
         self.lookups: list[dict[str, str | None]] = []
         self.thread_sets: list[dict[str, str | None]] = []
 
     async def find_connection_by_external_identity(self, *, provider: str, external_account_id: str, workspace_id: str | None = None):
+        '查找并返回，并遵守 find_connection_by_external_identity 所表达的接口约束'
         self.lookups.append(
             {
                 "provider": provider,
@@ -3665,6 +3814,7 @@ class _BoundIdentityRepo:
         return None
 
     async def get_thread_id(self, connection_id: str, chat_id: str, topic_id: str | None = None):
+        '读取并返回，并遵守 get_thread_id 所表达的接口约束'
         return None
 
     async def set_thread_id(
@@ -3677,6 +3827,7 @@ class _BoundIdentityRepo:
         external_topic_id: str | None,
         thread_id: str,
     ) -> None:
+        '执行 set_thread_id 的明确职责，并返回与调用约定一致的结果'
         self.thread_sets.append(
             {
                 "connection_id": connection_id,
@@ -3690,12 +3841,15 @@ class _BoundIdentityRepo:
 
 
 class TestChannelManagerBoundIdentityPolicy:
+    '组织 TestChannelManagerBoundIdentityPolicy 场景的行为与边界验证'
     def test_unbound_auth_enabled_chat_is_rejected_before_thread_or_run_creation(self, monkeypatch):
+        '验证 unbound、auth、enabled、chat、is、rejected、before、thread、or、run、creation 场景下的预期行为、边界条件与结果'
         from app.channels.manager import BOUND_IDENTITY_REQUIRED_MESSAGE, ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, require_bound_identity=True)
@@ -3704,6 +3858,7 @@ class TestChannelManagerBoundIdentityPolicy:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -3728,11 +3883,13 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_bound_identity_repo_unavailable_uses_transient_failure_message(self, monkeypatch):
+        '验证 bound、identity、repo、unavailable、uses、transient、failure、message 场景下的预期行为、边界条件与结果'
         from app.channels.manager import BOUND_IDENTITY_UNAVAILABLE_MESSAGE, ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, require_bound_identity=True)
@@ -3741,6 +3898,7 @@ class TestChannelManagerBoundIdentityPolicy:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -3766,17 +3924,20 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_unbound_auth_enabled_chat_is_rejected_before_semaphore(self, monkeypatch):
+        '验证 unbound、auth、enabled、chat、is、rejected、before、semaphore 场景下的预期行为、边界条件与结果'
         from app.channels.manager import BOUND_IDENTITY_REQUIRED_MESSAGE, ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, require_bound_identity=True)
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -3807,11 +3968,13 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_bound_auth_enabled_chat_is_allowed_when_bound_identity_is_required(self, monkeypatch):
+        '验证 bound、auth、enabled、chat、is、allowed、when、bound、identity、is、required 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             repo = _BoundIdentityRepo(
@@ -3850,11 +4013,13 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_bound_auth_enabled_message_checks_bound_identity_once_on_hot_path(self, monkeypatch):
+        '验证 bound、auth、enabled、message、checks、bound、identity、once、on、hot、path 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             repo = _BoundIdentityRepo(
@@ -3900,11 +4065,13 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_auth_enabled_chat_rejects_unverified_bound_identity(self, monkeypatch):
+        '验证 auth、enabled、chat、rejects、unverified、bound、identity 场景下的预期行为、边界条件与结果'
         from app.channels.manager import BOUND_IDENTITY_REQUIRED_MESSAGE, ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             repo = _BoundIdentityRepo(
@@ -3924,6 +4091,7 @@ class TestChannelManagerBoundIdentityPolicy:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -3948,12 +4116,14 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_auth_disabled_chat_keeps_default_user_when_bound_identity_is_required(self, monkeypatch):
+        '验证 auth、disabled、chat、keeps、default、user、when、bound、identity、is、required 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
         from app.gateway.auth_disabled import AUTH_DISABLED_USER_ID
 
         monkeypatch.setenv("DEER_FLOW_AUTH_DISABLED", "1")
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, require_bound_identity=True)
@@ -3978,11 +4148,13 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_legacy_open_bot_mode_allows_unbound_auth_enabled_chat(self, monkeypatch):
+        '验证 legacy、open、bot、mode、allows、unbound、auth、enabled、chat 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, require_bound_identity=False)
@@ -4007,11 +4179,13 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_unbound_auth_enabled_new_command_is_rejected_before_thread_creation(self, monkeypatch):
+        '验证 unbound、auth、enabled、new、command、is、rejected、before、thread、creation 场景下的预期行为、边界条件与结果'
         from app.channels.manager import BOUND_IDENTITY_REQUIRED_MESSAGE, ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store, require_bound_identity=True)
@@ -4020,6 +4194,7 @@ class TestChannelManagerBoundIdentityPolicy:
             outbound_received = []
 
             async def capture(msg):
+                '执行 capture 的明确职责，并返回与调用约定一致的结果'
                 outbound_received.append(msg)
 
             bus.subscribe_outbound(capture)
@@ -4044,11 +4219,13 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_bound_auth_enabled_new_command_creates_thread(self, monkeypatch):
+        '验证 bound、auth、enabled、new、command、creates、thread 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             repo = _BoundIdentityRepo(
@@ -4084,14 +4261,7 @@ class TestChannelManagerBoundIdentityPolicy:
         _run(go())
 
     def test_webhook_channel_run_policy_opts_out_of_bound_identity_gate(self, monkeypatch):
-        """A channel whose ChannelRunPolicy declares ``requires_bound_identity=False``
-        is exempt from the per-sender bound-identity gate, even when
-        ``require_bound_identity=True`` is on for interactive IM channels in the
-        same deployment. This is what lets GitHub webhook deliveries reach the
-        agent: they are HMAC-authenticated at the route, and the sender→DeerFlow
-        binding lives in the agent's config.yaml ownership, not in the
-        channel-connections table.
-        """
+        "验证 webhook、channel、run、policy、opts、out、of、bound、identity、gate 场景下的预期行为、边界条件与结果。\n\nA channel whose ChannelRunPolicy declares ``requires_bound_identity=False``\n        is exempt from the per-sender bound-identity gate, even when\n        ``require_bound_identity=True`` is on for interactive IM channels in the\n        same deployment. This is what lets GitHub webhook deliveries reach the\n        agent: they are HMAC-authenticated at the route, and the sender→DeerFlow\n        binding lives in the agent's config.yaml ownership, not in the\n        channel-connections table.\n        "
         from app.channels.manager import ChannelManager
         from app.channels.run_policy import CHANNEL_RUN_POLICY, ChannelRunPolicy
 
@@ -4107,6 +4277,7 @@ class TestChannelManagerBoundIdentityPolicy:
         try:
 
             async def go():
+                '执行 go 的明确职责，并返回与调用约定一致的结果'
                 bus = MessageBus()
                 store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
                 manager = ChannelManager(bus=bus, store=store, require_bound_identity=True)
@@ -4140,7 +4311,9 @@ class TestChannelManagerBoundIdentityPolicy:
 
 
 class TestChannelManagerConnectionRouting:
+    '组织 TestChannelManagerConnectionRouting 场景的行为与边界验证'
     def test_connection_scoped_conversations_do_not_share_threads(self, tmp_path, monkeypatch):
+        '验证 connection、scoped、conversations、do、not、share、threads 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
         from app.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME
         from deerflow.persistence.engine import close_engine
@@ -4148,6 +4321,7 @@ class TestChannelManagerConnectionRouting:
         monkeypatch.delenv("DEER_FLOW_AUTH_DISABLED", raising=False)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             repo = await _make_channel_connection_repo(tmp_path)
             alice = await repo.upsert_connection(
                 owner_user_id="alice",
@@ -4232,7 +4406,9 @@ class TestChannelManagerConnectionRouting:
 
 
 class TestExtractArtifacts:
+    '组织 TestExtractArtifacts 场景的行为与边界验证'
     def test_extracts_from_present_files_tool_call(self):
+        '验证 extracts、from、present、files、tool、call 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_artifacts
 
         result = {
@@ -4251,6 +4427,7 @@ class TestExtractArtifacts:
         assert _extract_artifacts(result) == ["/mnt/user-data/outputs/report.md"]
 
     def test_empty_when_no_present_files(self):
+        '验证 empty、when、no、present、files 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_artifacts
 
         result = {
@@ -4262,13 +4439,14 @@ class TestExtractArtifacts:
         assert _extract_artifacts(result) == []
 
     def test_empty_for_list_result_no_tool_calls(self):
+        '验证 empty、for、list、result、no、tool、calls 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_artifacts
 
         result = [{"type": "ai", "content": "hello"}]
         assert _extract_artifacts(result) == []
 
     def test_only_extracts_after_last_human_message(self):
-        """Artifacts from previous turns (before the last human message) should be ignored."""
+        '验证 only、extracts、after、last、human、message 场景下的预期行为、边界条件与结果。\n\nArtifacts from previous turns (before the last human message) should be ignored.'
         from app.channels.manager import _extract_artifacts
 
         result = {
@@ -4297,6 +4475,7 @@ class TestExtractArtifacts:
         assert _extract_artifacts(result) == ["/mnt/user-data/outputs/chart.png"]
 
     def test_multiple_files_in_single_call(self):
+        '验证 multiple、files、in、single、call 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _extract_artifacts
 
         result = {
@@ -4314,7 +4493,7 @@ class TestExtractArtifacts:
         assert _extract_artifacts(result) == ["/mnt/user-data/outputs/a.txt", "/mnt/user-data/outputs/b.csv"]
 
     def test_ignores_hidden_human_control_messages(self):
-        """Hidden control messages should not hide current-turn present_files artifacts."""
+        '验证 ignores、hidden、human、control、messages 场景下的预期行为、边界条件与结果。\n\nHidden control messages should not hide current-turn present_files artifacts.'
         from app.channels.manager import _extract_artifacts
 
         result = {
@@ -4340,13 +4519,16 @@ class TestExtractArtifacts:
 
 
 class TestFormatArtifactText:
+    '组织 TestFormatArtifactText 场景的行为与边界验证'
     def test_single_artifact(self):
+        '验证 single、artifact 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _format_artifact_text
 
         text = _format_artifact_text(["/mnt/user-data/outputs/report.md"])
         assert text == "Created File: 📎 report.md"
 
     def test_multiple_artifacts(self):
+        '验证 multiple、artifacts 场景下的预期行为、边界条件与结果'
         from app.channels.manager import _format_artifact_text
 
         text = _format_artifact_text(
@@ -4356,7 +4538,9 @@ class TestFormatArtifactText:
 
 
 class TestHandleChatWithArtifacts:
+    '组织 TestHandleChatWithArtifacts 场景的行为与边界验证'
     def test_bound_owner_artifacts_resolve_from_owner_outputs_bucket(self, tmp_path, monkeypatch):
+        '验证 bound、owner、artifacts、resolve、from、owner、outputs、bucket 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
         from deerflow.config.paths import Paths
 
@@ -4367,6 +4551,7 @@ class TestHandleChatWithArtifacts:
         (outputs_dir / "report.md").write_text("owner report", encoding="utf-8")
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=tmp_path / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -4411,9 +4596,11 @@ class TestHandleChatWithArtifacts:
         _run(go())
 
     def test_artifacts_appended_to_text(self):
+        '验证 artifacts、appended、to、text 场景下的预期行为、边界条件与结果'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -4457,10 +4644,11 @@ class TestHandleChatWithArtifacts:
         _run(go())
 
     def test_artifacts_only_no_text(self):
-        """When agent produces artifacts but no text, the artifacts should be the response."""
+        '验证 artifacts、only、no、text 场景下的预期行为、边界条件与结果。\n\nWhen agent produces artifacts but no text, the artifacts should be the response.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -4505,10 +4693,11 @@ class TestHandleChatWithArtifacts:
         _run(go())
 
     def test_hidden_human_control_message_does_not_trigger_no_response_fallback(self):
-        """Plan-mode hidden control messages should not mask the final AI response."""
+        '验证 hidden、human、control、message、does、not、trigger、no、response、fallback 场景下的预期行为、边界条件与结果。\n\nPlan-mode hidden control messages should not mask the final AI response.'
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -4549,10 +4738,11 @@ class TestHandleChatWithArtifacts:
         _run(go())
 
     def test_only_last_turn_artifacts_returned(self):
-        """Only artifacts from the current turn's present_files calls should be included."""
+        "验证 only、last、turn、artifacts、returned 场景下的预期行为、边界条件与结果。\n\nOnly artifacts from the current turn's present_files calls should be included."
         from app.channels.manager import ChannelManager
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
             manager = ChannelManager(bus=bus, store=store)
@@ -4632,10 +4822,13 @@ class TestHandleChatWithArtifacts:
 
 
 class TestFeishuChannel:
+    '组织 TestFeishuChannel 场景的行为与边界验证'
     def test_prepare_inbound_publishes_without_waiting_for_running_card(self):
+        '验证 prepare、inbound、publishes、without、waiting、for、running、card 场景下的预期行为、边界条件与结果'
         from app.channels.feishu import FeishuChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             bus.publish_inbound = AsyncMock()
             channel = FeishuChannel(bus, config={})
@@ -4644,6 +4837,7 @@ class TestFeishuChannel:
             release_reply = asyncio.Event()
 
             async def slow_reply(message_id: str, text: str) -> str:
+                '执行 slow_reply 的明确职责，并返回与调用约定一致的结果'
                 reply_started.set()
                 await release_reply.wait()
                 return "om-running-card"
@@ -4675,9 +4869,11 @@ class TestFeishuChannel:
         _run(go())
 
     def test_prepare_inbound_topic_reply_includes_source_preview(self):
+        '验证 prepare、inbound、topic、reply、includes、source、preview 场景下的预期行为、边界条件与结果'
         from app.channels.feishu import SOURCE_PREVIEW_METADATA_KEY, FeishuChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             bus.publish_inbound = AsyncMock()
             channel = FeishuChannel(bus, config={})
@@ -4686,6 +4882,7 @@ class TestFeishuChannel:
             release_reply = asyncio.Event()
 
             async def slow_reply(message_id: str, text: str) -> str:
+                '执行 slow_reply 的明确职责，并返回与调用约定一致的结果'
                 reply_started.set()
                 await release_reply.wait()
                 return "om-running-card"
@@ -4717,9 +4914,11 @@ class TestFeishuChannel:
         _run(go())
 
     def test_prepare_inbound_and_send_share_running_card_task(self):
+        '验证 prepare、inbound、and、send、share、running、card、task 场景下的预期行为、边界条件与结果'
         from app.channels.feishu import FeishuChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             bus.publish_inbound = AsyncMock()
             store = ChannelStore(path=Path(tempfile.mkdtemp()) / "store.json")
@@ -4730,6 +4929,7 @@ class TestFeishuChannel:
             release_reply = asyncio.Event()
 
             async def slow_reply(message_id: str, text: str) -> str:
+                '执行 slow_reply 的明确职责，并返回与调用约定一致的结果'
                 reply_started.set()
                 await release_reply.wait()
                 return "om-running-card"
@@ -4785,6 +4985,7 @@ class TestFeishuChannel:
         _run(go())
 
     def test_streaming_reuses_single_running_card(self):
+        '验证 streaming、reuses、single、running、card 场景下的预期行为、边界条件与结果'
         from lark_oapi.api.im.v1 import (
             CreateMessageReactionRequest,
             CreateMessageReactionRequestBody,
@@ -4798,6 +4999,7 @@ class TestFeishuChannel:
         from app.channels.feishu import FeishuChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             channel = FeishuChannel(bus, config={})
 
@@ -4856,6 +5058,7 @@ class TestFeishuChannel:
         _run(go())
 
     def test_streaming_updates_preserve_source_preview(self):
+        '验证 streaming、updates、preserve、source、preview 场景下的预期行为、边界条件与结果'
         from lark_oapi.api.im.v1 import (
             CreateMessageReactionRequest,
             CreateMessageReactionRequestBody,
@@ -4869,6 +5072,7 @@ class TestFeishuChannel:
         from app.channels.feishu import SOURCE_PREVIEW_METADATA_KEY, FeishuChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             channel = FeishuChannel(bus, config={})
 
@@ -4925,10 +5129,13 @@ class TestFeishuChannel:
 
 
 class TestWeComChannel:
+    '组织 TestWeComChannel 场景的行为与边界验证'
     def test_publish_ws_inbound_starts_stream_and_publishes_message(self, monkeypatch):
+        '验证 publish、ws、inbound、starts、stream、and、publishes、message 场景下的预期行为、边界条件与结果'
         from app.channels.wecom import WeComChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             bus.publish_inbound = AsyncMock()
             channel = WeComChannel(bus, config={})
@@ -4970,9 +5177,11 @@ class TestWeComChannel:
         _run(go())
 
     def test_publish_ws_inbound_uses_configured_working_message(self, monkeypatch):
+        '验证 publish、ws、inbound、uses、configured、working、message 场景下的预期行为、边界条件与结果'
         from app.channels.wecom import WeComChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             bus.publish_inbound = AsyncMock()
             channel = WeComChannel(bus, config={"working_message": "Please wait..."})
@@ -4999,9 +5208,11 @@ class TestWeComChannel:
         _run(go())
 
     def test_publish_ws_inbound_treats_slash_prefixed_paths_as_chat(self, monkeypatch):
+        '验证 publish、ws、inbound、treats、slash、prefixed、paths、as、chat 场景下的预期行为、边界条件与结果'
         from app.channels.wecom import WeComChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             bus.publish_inbound = AsyncMock()
             channel = WeComChannel(bus, config={})
@@ -5029,9 +5240,11 @@ class TestWeComChannel:
         _run(go())
 
     def test_on_outbound_sends_attachment_before_clearing_context(self, tmp_path):
+        '验证 on、outbound、sends、attachment、before、clearing、context 场景下的预期行为、边界条件与结果'
         from app.channels.wecom import WeComChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             channel = WeComChannel(bus, config={})
 
@@ -5082,9 +5295,11 @@ class TestWeComChannel:
         _run(go())
 
     def test_send_falls_back_to_send_message_without_thread_context(self):
+        '验证 send、falls、back、to、send、message、without、thread、context 场景下的预期行为、边界条件与结果'
         from app.channels.wecom import WeComChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             channel = WeComChannel(bus, config={})
             channel._ws_client = SimpleNamespace(send_message=AsyncMock())
@@ -5107,6 +5322,7 @@ class TestWeComChannel:
         _run(go())
 
     def test_on_ws_task_done_logs_error_on_exception(self, caplog):
+        '验证 on、ws、task、done、logs、error、on、exception 场景下的预期行为、边界条件与结果'
         import logging
 
         from app.channels.wecom import WeComChannel
@@ -5122,6 +5338,7 @@ class TestWeComChannel:
         assert any("WeCom WebSocket connection task failed" in r.message and r.levelno == logging.ERROR for r in caplog.records)
 
     def test_on_ws_task_done_silent_when_cancelled(self, caplog):
+        '验证 on、ws、task、done、silent、when、cancelled 场景下的预期行为、边界条件与结果'
         import logging
 
         from app.channels.wecom import WeComChannel
@@ -5137,6 +5354,7 @@ class TestWeComChannel:
         assert caplog.records == []
 
     def test_on_ws_task_done_silent_when_no_exception(self, caplog):
+        '验证 on、ws、task、done、silent、when、no、exception 场景下的预期行为、边界条件与结果'
         import logging
 
         from app.channels.wecom import WeComChannel
@@ -5152,6 +5370,7 @@ class TestWeComChannel:
         assert caplog.records == []
 
     def test_on_ws_error_logs_error(self, caplog):
+        '验证 on、ws、error、logs、error 场景下的预期行为、边界条件与结果'
         import logging
 
         from app.channels.wecom import WeComChannel
@@ -5164,6 +5383,7 @@ class TestWeComChannel:
         assert any("WeCom WebSocket error" in r.message and r.levelno == logging.ERROR for r in caplog.records)
 
     def test_on_ws_disconnected_logs_warning(self, caplog):
+        '验证 on、ws、disconnected、logs、warning 场景下的预期行为、边界条件与结果'
         import logging
 
         from app.channels.wecom import WeComChannel
@@ -5176,6 +5396,7 @@ class TestWeComChannel:
         assert any("WeCom WebSocket disconnected" in r.message and r.levelno == logging.WARNING for r in caplog.records)
 
     def test_on_ws_disconnected_logs_reason_when_present(self, caplog):
+        '验证 on、ws、disconnected、logs、reason、when、present 场景下的预期行为、边界条件与结果'
         import logging
 
         from app.channels.wecom import WeComChannel
@@ -5188,15 +5409,18 @@ class TestWeComChannel:
         assert any("connection reset" in r.message and r.levelno == logging.WARNING for r in caplog.records)
 
     def test_start_subscribes_connection_lifecycle_events(self, monkeypatch):
+        '验证 start、subscribes、connection、lifecycle、events 场景下的预期行为、边界条件与结果'
         from app.channels.wecom import WeComChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             channel = WeComChannel(bus, config={"bot_id": "corp123", "bot_secret": "secret"})
 
             ws_client = MagicMock()
 
             async def fake_connect():
+                '执行 fake_connect 的明确职责，并返回与调用约定一致的结果'
                 return None
 
             ws_client.connect = fake_connect
@@ -5223,10 +5447,13 @@ class TestWeComChannel:
 
 
 class TestChannelService:
+    '组织 TestChannelService 场景的行为与边界验证'
     def test_get_status_no_channels(self):
+        '验证 get、status、no、channels 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(channels_config={})
             await service.start()
 
@@ -5241,14 +5468,11 @@ class TestChannelService:
         _run(go())
 
     def test_is_channel_enabled_reflects_live_config(self):
-        """``is_channel_enabled`` is the runtime kill-switch read by the GitHub
-        webhook router. Verify it tracks the live ``_config`` dict, including
-        updates from ``configure_channel`` (which the UI uses to flip the
-        enabled flag without rewriting ``config.yaml``).
-        """
+        '验证 is、channel、enabled、reflects、live、config 场景下的预期行为、边界条件与结果。\n\n``is_channel_enabled`` is the runtime kill-switch read by the GitHub\n        webhook router. Verify it tracks the live ``_config`` dict, including\n        updates from ``configure_channel`` (which the UI uses to flip the\n        enabled flag without rewriting ``config.yaml``).\n        '
         from app.channels.service import ChannelService
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "github": {"enabled": True, "default_mention_login": "bot"},
@@ -5276,9 +5500,11 @@ class TestChannelService:
         _run(go())
 
     def test_disabled_channels_are_skipped(self):
+        '验证 disabled、channels、are、skipped 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "feishu": {"enabled": False, "app_id": "x", "app_secret": "y"},
@@ -5291,9 +5517,11 @@ class TestChannelService:
         _run(go())
 
     def test_concurrent_ensure_channel_ready_starts_channel_once(self):
+        '验证 concurrent、ensure、channel、ready、starts、channel、once 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "telegram": {"enabled": True, "bot_token": "tg-token"},
@@ -5304,6 +5532,7 @@ class TestChannelService:
             start_calls = []
 
             async def fake_start_channel(name, config):
+                '执行 fake_start_channel 的明确职责，并返回与调用约定一致的结果'
                 start_calls.append(name)
                 await asyncio.sleep(0.01)
                 service._channels[name] = SimpleNamespace(is_running=True, stop=AsyncMock())
@@ -5323,6 +5552,7 @@ class TestChannelService:
         _run(go())
 
     def test_session_config_is_forwarded_to_manager(self):
+        '验证 session、config、is、forwarded、to、manager 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         service = ChannelService(
@@ -5347,6 +5577,7 @@ class TestChannelService:
         assert service.manager._channel_sessions["telegram"]["users"]["vip"]["assistant_id"] == "vip_agent"
 
     def test_service_urls_fall_back_to_env(self, monkeypatch):
+        '验证 service、urls、fall、back、to、env 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         monkeypatch.setenv("DEER_FLOW_CHANNELS_LANGGRAPH_URL", "http://gateway:8001/api")
@@ -5358,6 +5589,7 @@ class TestChannelService:
         assert service.manager._gateway_url == "http://gateway:8001"
 
     def test_config_service_urls_override_env(self, monkeypatch):
+        '验证 config、service、urls、override、env 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         monkeypatch.setenv("DEER_FLOW_CHANNELS_LANGGRAPH_URL", "http://gateway:8001/api")
@@ -5374,6 +5606,7 @@ class TestChannelService:
         assert service.manager._gateway_url == "http://custom-gateway:8001"
 
     def test_from_app_config_uses_explicit_config(self):
+        '验证 from、app、config、uses、explicit、config 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         app_config = SimpleNamespace(
@@ -5394,6 +5627,7 @@ class TestChannelService:
         monkeypatch,
         tmp_path,
     ):
+        '验证 from、app、config、does、not、create、runtime、channels、from、channel、connections 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
         from deerflow.config import paths as paths_module
         from deerflow.config.channel_connections_config import ChannelConnectionsConfig
@@ -5421,6 +5655,7 @@ class TestChannelService:
         monkeypatch,
         tmp_path,
     ):
+        '验证 from、app、config、preserves、existing、runtime、channels、with、channel、connections、enabled 场景下的预期行为、边界条件与结果'
         from app.channels.runtime_config_store import ChannelRuntimeConfigStore
         from app.channels.service import ChannelService
         from deerflow.config import paths as paths_module
@@ -5462,6 +5697,7 @@ class TestChannelService:
         assert service._config["discord"]["bot_token"] == "discord-bot-token"
 
     def test_from_app_config_loads_persisted_runtime_channel_config(self, monkeypatch, tmp_path):
+        '验证 from、app、config、loads、persisted、runtime、channel、config 场景下的预期行为、边界条件与结果'
         from app.channels.runtime_config_store import ChannelRuntimeConfigStore
         from app.channels.service import ChannelService
         from deerflow.config import paths as paths_module
@@ -5496,6 +5732,7 @@ class TestChannelService:
         }
 
     def test_from_app_config_runtime_disconnect_suppresses_file_channel_config(self, monkeypatch, tmp_path):
+        '验证 from、app、config、runtime、disconnect、suppresses、file、channel、config 场景下的预期行为、边界条件与结果'
         from app.channels.runtime_config_store import ChannelRuntimeConfigStore
         from app.channels.service import ChannelService
         from deerflow.config import paths as paths_module
@@ -5533,22 +5770,28 @@ class TestChannelService:
         assert "feishu" not in service._config
 
     def test_start_retries_configured_channel_until_ready(self, monkeypatch):
+        '验证 start、retries、configured、channel、until、ready 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         class FlakyReadyChannel(Channel):
+            '封装 FlakyReadyChannel 的状态、协作关系与公开操作'
             starts = 0
 
             def __init__(self, bus, config):
+                '实现 __init__ 协议方法，保持对象交互语义一致'
                 super().__init__(name="slack", bus=bus, config=config)
 
             async def start(self):
+                '执行 start 的明确职责，并返回与调用约定一致的结果'
                 type(self).starts += 1
                 self._running = type(self).starts >= 2
 
             async def stop(self):
+                '执行 stop 的明确职责，并返回与调用约定一致的结果'
                 self._running = False
 
             async def send(self, msg):
+                '执行 send 的明确职责，并返回与调用约定一致的结果'
                 return None
 
         monkeypatch.setattr(
@@ -5557,6 +5800,7 @@ class TestChannelService:
         )
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "slack": {
@@ -5578,6 +5822,7 @@ class TestChannelService:
         _run(go())
 
     def test_connection_repo_is_forwarded_to_manager(self):
+        '验证 connection、repo、is、forwarded、to、manager 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         repo = object()
@@ -5586,6 +5831,7 @@ class TestChannelService:
         assert service.manager._connection_repo is repo
 
     def test_require_bound_identity_is_forwarded_to_manager(self):
+        '验证 require、bound、identity、is、forwarded、to、manager 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         service = ChannelService(channels_config={}, require_bound_identity=True)
@@ -5593,9 +5839,11 @@ class TestChannelService:
         assert service.manager._require_bound_identity is True
 
     def test_remove_channel_stops_running_channel_and_forgets_config(self):
+        '验证 remove、channel、stops、running、channel、and、forgets、config 场景下的预期行为、边界条件与结果'
         from app.channels.service import ChannelService
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "slack": {
@@ -5618,12 +5866,13 @@ class TestChannelService:
         _run(go())
 
     def test_disabled_channel_with_string_creds_emits_warning(self, caplog):
-        """Warning is emitted when a channel has string credentials but enabled=false."""
+        '验证 disabled、channel、with、string、creds、emits、warning 场景下的预期行为、边界条件与结果。\n\nWarning is emitted when a channel has string credentials but enabled=false.'
         import logging
 
         from app.channels.service import ChannelService
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "wecom": {"enabled": False, "bot_id": "corp123", "bot_secret": "secret"},
@@ -5638,13 +5887,14 @@ class TestChannelService:
         assert all("wecom" not in r.message for r in caplog.records)
 
     def test_disabled_channel_with_int_creds_emits_warning(self, caplog):
-        """Warning is emitted even when YAML-parsed integer credentials are present."""
+        '验证 disabled、channel、with、int、creds、emits、warning 场景下的预期行为、边界条件与结果。\n\nWarning is emitted even when YAML-parsed integer credentials are present.'
         import logging
 
         from app.channels.service import ChannelService
 
         async def go():
             # Simulate YAML parsing a numeric token/ID as an int
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "telegram": {"enabled": False, "bot_token": 123456789},
@@ -5659,12 +5909,13 @@ class TestChannelService:
         assert all("telegram" not in r.message for r in caplog.records)
 
     def test_disabled_channel_without_creds_emits_info(self, caplog):
-        """Only an info log (no warning) is emitted when a channel is disabled with no credentials."""
+        '验证 disabled、channel、without、creds、emits、info 场景下的预期行为、边界条件与结果。\n\nOnly an info log (no warning) is emitted when a channel is disabled with no credentials.'
         import logging
 
         from app.channels.service import ChannelService
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             service = ChannelService(
                 channels_config={
                     "telegram": {"enabled": False},
@@ -5681,7 +5932,7 @@ class TestChannelService:
     # -- restart_channel config reload tests (issue #3497) --
 
     def test_restart_channel_reloads_config_from_disk(self, monkeypatch):
-        """restart_channel reads the latest config via get_app_config()."""
+        '验证 restart、channel、reloads、config、from、disk 场景下的预期行为、边界条件与结果。\n\nrestart_channel reads the latest config via get_app_config().'
         from app.channels.service import ChannelService
 
         initial_config = {"feishu": {"enabled": True, "app_id": "old_id", "app_secret": "old_secret"}}
@@ -5690,6 +5941,7 @@ class TestChannelService:
         service = ChannelService(channels_config=initial_config)
 
         def mock_get_app_config():
+            '执行 mock_get_app_config 的明确职责，并返回与调用约定一致的结果'
             return SimpleNamespace(model_extra={"channels": updated_config})
 
         monkeypatch.setattr("deerflow.config.app_config.get_app_config", mock_get_app_config)
@@ -5697,12 +5949,14 @@ class TestChannelService:
         started_configs = {}
 
         async def mock_start_channel(name, config):
+            '执行 mock_start_channel 的明确职责，并返回与调用约定一致的结果'
             started_configs[name] = config
             return True
 
         service._start_channel = mock_start_channel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             await service.restart_channel("feishu")
 
         _run(go())
@@ -5712,16 +5966,11 @@ class TestChannelService:
         assert service._config["feishu"]["app_id"] == "new_id"
 
     def test_configure_channel_keeps_explicit_config_over_stale_file_entry(self, monkeypatch):
-        """UI-entered runtime credentials must not be clobbered by a config.yaml reload.
-
-        configure_channel() receives the authoritative config (e.g. from the
-        browser Connect/Modify dialog, never written to config.yaml), so its
-        restart must skip the file reload that restart_channel() performs for
-        operator-triggered restarts.
-        """
+        '验证 configure、channel、keeps、explicit、config、over、stale、file、entry 场景下的预期行为、边界条件与结果。\n\nUI-entered runtime credentials must not be clobbered by a config.yaml reload.\n\n        configure_channel() receives the authoritative config (e.g. from the\n        browser Connect/Modify dialog, never written to config.yaml), so its\n        restart must skip the file reload that restart_channel() performs for\n        operator-triggered restarts.\n        '
         from app.channels.service import ChannelService
 
         def fail_get_app_config():
+            '执行 fail_get_app_config 的明确职责，并返回与调用约定一致的结果'
             raise AssertionError("configure_channel must not reload file config")
 
         monkeypatch.setattr("deerflow.config.app_config.get_app_config", fail_get_app_config)
@@ -5732,12 +5981,14 @@ class TestChannelService:
         started_configs = {}
 
         async def mock_start_channel(name, config):
+            '执行 mock_start_channel 的明确职责，并返回与调用约定一致的结果'
             started_configs[name] = config
             return True
 
         service._start_channel = mock_start_channel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             await service.configure_channel("feishu", {"enabled": True, "app_id": "ui_id", "app_secret": "ui_secret"})
 
         _run(go())
@@ -5747,8 +5998,7 @@ class TestChannelService:
         assert service._config["feishu"]["app_id"] == "ui_id"
 
     def test_restart_channel_reload_applies_runtime_store_overlay(self, monkeypatch, tmp_path):
-        """An operator-triggered restart keeps UI runtime-store credentials for
-        channels that have no config.yaml entry."""
+        '验证 restart、channel、reload、applies、runtime、store、overlay 场景下的预期行为、边界条件与结果。\n\nAn operator-triggered restart keeps UI runtime-store credentials for\n        channels that have no config.yaml entry.'
         from app.channels.runtime_config_store import ChannelRuntimeConfigStore
         from app.channels.service import ChannelService
         from deerflow.config import paths as paths_module
@@ -5762,6 +6012,7 @@ class TestChannelService:
         )
 
         def mock_get_app_config():
+            '执行 mock_get_app_config 的明确职责，并返回与调用约定一致的结果'
             return SimpleNamespace(
                 model_extra={"channels": {}},
                 channel_connections=ChannelConnectionsConfig.model_validate({"enabled": True, "telegram": {"enabled": True, "bot_username": "deerflow_bot"}}),
@@ -5774,12 +6025,14 @@ class TestChannelService:
         started_configs = {}
 
         async def mock_start_channel(name, config):
+            '执行 mock_start_channel 的明确职责，并返回与调用约定一致的结果'
             started_configs[name] = config
             return True
 
         service._start_channel = mock_start_channel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             await service.restart_channel("telegram")
 
         _run(go())
@@ -5787,13 +6040,14 @@ class TestChannelService:
         assert started_configs["telegram"]["bot_token"] == "store-token"
 
     def test_restart_channel_falls_back_to_cached_config_on_error(self, monkeypatch):
-        """When get_app_config() fails, restart_channel uses cached config."""
+        '验证 restart、channel、falls、back、to、cached、config、on、error 场景下的预期行为、边界条件与结果。\n\nWhen get_app_config() fails, restart_channel uses cached config.'
         from app.channels.service import ChannelService
 
         cached_config = {"feishu": {"enabled": True, "app_id": "cached_id", "app_secret": "cached_secret"}}
         service = ChannelService(channels_config=cached_config)
 
         def _raise():
+            '执行 _raise 的明确职责，并返回与调用约定一致的结果'
             raise RuntimeError("config missing")
 
         monkeypatch.setattr("deerflow.config.app_config.get_app_config", _raise)
@@ -5801,12 +6055,14 @@ class TestChannelService:
         started_configs = {}
 
         async def mock_start_channel(name, config):
+            '执行 mock_start_channel 的明确职责，并返回与调用约定一致的结果'
             started_configs[name] = config
             return True
 
         service._start_channel = mock_start_channel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             await service.restart_channel("feishu")
 
         _run(go())
@@ -5814,19 +6070,20 @@ class TestChannelService:
         assert started_configs["feishu"]["app_id"] == "cached_id"
 
     def test_restart_channel_returns_false_for_unknown_channel(self):
-        """restart_channel returns False when the channel has no config."""
+        '验证 restart、channel、returns、false、for、unknown、channel 场景下的预期行为、边界条件与结果。\n\nrestart_channel returns False when the channel has no config.'
         from app.channels.service import ChannelService
 
         service = ChannelService(channels_config={})
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             result = await service.restart_channel("nonexistent")
             assert result is False
 
         _run(go())
 
     def test_restart_channel_stops_existing_channel_before_restart(self):
-        """restart_channel stops the running channel instance before restarting."""
+        '验证 restart、channel、stops、existing、channel、before、restart 场景下的预期行为、边界条件与结果。\n\nrestart_channel stops the running channel instance before restarting.'
         from app.channels.service import ChannelService
 
         service = ChannelService(channels_config={"feishu": {"enabled": True, "app_id": "x", "app_secret": "y"}})
@@ -5834,9 +6091,11 @@ class TestChannelService:
         stopped = []
 
         class FakeChannel:
+            '封装 FakeChannel 的状态、协作关系与公开操作'
             is_running = True
 
             async def stop(self):
+                '执行 stop 的明确职责，并返回与调用约定一致的结果'
                 stopped.append(True)
 
         service._channels["feishu"] = FakeChannel()
@@ -5844,12 +6103,14 @@ class TestChannelService:
         started_configs = {}
 
         async def mock_start_channel(name, config):
+            '执行 mock_start_channel 的明确职责，并返回与调用约定一致的结果'
             started_configs[name] = config
             return True
 
         service._start_channel = mock_start_channel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             await service.restart_channel("feishu", reload_config=False)
 
         _run(go())
@@ -5858,7 +6119,7 @@ class TestChannelService:
         assert "feishu" in started_configs
 
     def test_restart_channel_skips_disabled_channel(self, monkeypatch):
-        """restart_channel stops the channel and returns True when config has enabled: false."""
+        '验证 restart、channel、skips、disabled、channel 场景下的预期行为、边界条件与结果。\n\nrestart_channel stops the channel and returns True when config has enabled: false.'
         from app.channels.service import ChannelService
 
         service = ChannelService(channels_config={"feishu": {"enabled": True, "app_id": "x", "app_secret": "y"}})
@@ -5866,9 +6127,11 @@ class TestChannelService:
         stopped = []
 
         class FakeChannel:
+            '封装 FakeChannel 的状态、协作关系与公开操作'
             is_running = True
 
             async def stop(self):
+                '执行 stop 的明确职责，并返回与调用约定一致的结果'
                 stopped.append(True)
 
         service._channels["feishu"] = FakeChannel()
@@ -5877,6 +6140,7 @@ class TestChannelService:
         disabled_config = {"feishu": {"enabled": False, "app_id": "x", "app_secret": "y"}}
 
         def mock_get_app_config():
+            '执行 mock_get_app_config 的明确职责，并返回与调用约定一致的结果'
             return SimpleNamespace(model_extra={"channels": disabled_config})
 
         monkeypatch.setattr("deerflow.config.app_config.get_app_config", mock_get_app_config)
@@ -5884,12 +6148,14 @@ class TestChannelService:
         started = []
 
         async def mock_start_channel(name, config):
+            '执行 mock_start_channel 的明确职责，并返回与调用约定一致的结果'
             started.append(name)
             return True
 
         service._start_channel = mock_start_channel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             result = await service.restart_channel("feishu")
             assert result is True  # successfully stopped (no restart needed)
 
@@ -5905,10 +6171,13 @@ class TestChannelService:
 
 
 class TestSlackSendRetry:
+    '组织 TestSlackSendRetry 场景的行为与边界验证'
     def test_retries_on_failure_then_succeeds(self):
+        '验证 retries、on、failure、then、succeeds 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = SlackChannel(bus=bus, config={"bot_token": "xoxb-test", "app_token": "xapp-test"})
 
@@ -5916,6 +6185,7 @@ class TestSlackSendRetry:
             call_count = 0
 
             def post_message(**kwargs):
+                '执行 post_message 的明确职责，并返回与调用约定一致的结果'
                 nonlocal call_count
                 call_count += 1
                 if call_count < 3:
@@ -5933,12 +6203,15 @@ class TestSlackSendRetry:
 
 
 class TestSlackAllowedUsers:
+    '组织 TestSlackAllowedUsers 场景的行为与边界验证'
     @staticmethod
     def _submit_coro(coro, loop):
+        '执行 _submit_coro 的明确职责，并返回与调用约定一致的结果'
         coro.close()
         return MagicMock()
 
     def test_numeric_allowed_users_match_string_event_user_id(self):
+        '验证 numeric、allowed、users、match、string、event、user、id 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -5974,6 +6247,7 @@ class TestSlackAllowedUsers:
         assert inbound.text == "hello from slack"
 
     def test_string_allowed_users_match_event_user_id(self):
+        '验证 string、allowed、users、match、event、user、id 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6009,6 +6283,7 @@ class TestSlackAllowedUsers:
         assert inbound.text == "hello from slack"
 
     def test_connect_code_bypasses_allowed_users_filter(self):
+        '验证 connect、code、bypasses、allowed、users、filter 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6044,6 +6319,7 @@ class TestSlackAllowedUsers:
         channel._send_running_reply.assert_not_called()
 
     def test_app_mention_strips_leading_bot_mention_before_command_detection(self):
+        '验证 app、mention、strips、leading、bot、mention、before、command、detection 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6073,6 +6349,7 @@ class TestSlackAllowedUsers:
         assert inbound.msg_type == InboundMessageType.COMMAND
 
     def test_app_mention_strips_labelled_leading_bot_mention(self):
+        '验证 app、mention、strips、labelled、leading、bot、mention 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6102,6 +6379,7 @@ class TestSlackAllowedUsers:
         assert inbound.msg_type == InboundMessageType.COMMAND
 
     def test_app_mention_strips_leading_bot_mention_before_slash_skill(self):
+        '验证 app、mention、strips、leading、bot、mention、before、slash、skill 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6131,6 +6409,7 @@ class TestSlackAllowedUsers:
         assert inbound.msg_type == InboundMessageType.CHAT
 
     def test_app_mention_preserves_following_user_mention(self):
+        '验证 app、mention、preserves、following、user、mention 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6160,6 +6439,7 @@ class TestSlackAllowedUsers:
         assert inbound.msg_type == InboundMessageType.CHAT
 
     def test_app_mention_preserves_leading_non_bot_mention_when_bot_id_known(self):
+        '验证 app、mention、preserves、leading、non、bot、mention、when、bot、id、known 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6189,6 +6469,7 @@ class TestSlackAllowedUsers:
         assert inbound.msg_type == InboundMessageType.CHAT
 
     def test_app_mention_preserves_leading_non_bot_mention_when_bot_id_unknown(self):
+        '验证 app、mention、preserves、leading、non、bot、mention、when、bot、id、unknown 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6218,6 +6499,7 @@ class TestSlackAllowedUsers:
         assert inbound.msg_type == InboundMessageType.CHAT
 
     def test_socket_event_resolves_bot_user_id_before_app_mention_command_detection(self):
+        '验证 socket、event、resolves、bot、user、id、before、app、mention、command、detection 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6257,6 +6539,7 @@ class TestSlackAllowedUsers:
         assert inbound.msg_type == InboundMessageType.COMMAND
 
     def test_scalar_allowed_users_warns_and_matches_stringified_event_user_id(self, caplog):
+        '验证 scalar、allowed、users、warns、and、matches、stringified、event、user、id 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         bus = MessageBus()
@@ -6290,9 +6573,11 @@ class TestSlackAllowedUsers:
         assert inbound.user_id == "123456"
 
     def test_raises_after_all_retries_exhausted(self):
+        '验证 raises、after、all、retries、exhausted 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = SlackChannel(bus=bus, config={"bot_token": "xoxb-test", "app_token": "xapp-test"})
 
@@ -6309,9 +6594,11 @@ class TestSlackAllowedUsers:
         _run(go())
 
     def test_raises_runtime_error_when_no_attempts_configured(self):
+        '验证 raises、runtime、error、when、no、attempts、configured 场景下的预期行为、边界条件与结果'
         from app.channels.slack import SlackChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = SlackChannel(bus=bus, config={"bot_token": "xoxb-test", "app_token": "xapp-test"})
             ch._web_client = MagicMock()
@@ -6329,7 +6616,9 @@ class TestSlackAllowedUsers:
 
 
 class TestTelegramSendRetry:
+    '组织 TestTelegramSendRetry 场景的行为与边界验证'
     def test_start_registers_known_channel_commands(self, monkeypatch):
+        '验证 start、registers、known、channel、commands 场景下的预期行为、边界条件与结果'
         import sys
         from types import ModuleType
 
@@ -6337,36 +6626,48 @@ class TestTelegramSendRetry:
         from app.channels.telegram import TelegramChannel
 
         class FakeFilter:
+            '封装 FakeFilter 的状态、协作关系与公开操作'
             def __init__(self, expr: str):
+                '实现 __init__ 协议方法，保持对象交互语义一致'
                 self.expr = expr
 
             def __and__(self, other):
+                '实现 __and__ 协议方法，保持对象交互语义一致'
                 return FakeFilter(f"{self.expr}&{other.expr}")
 
             def __invert__(self):
+                '实现 __invert__ 协议方法，保持对象交互语义一致'
                 return FakeFilter(f"~{self.expr}")
 
         class FakeApplication:
+            '封装 FakeApplication 的状态、协作关系与公开操作'
             def __init__(self):
+                '实现 __init__ 协议方法，保持对象交互语义一致'
                 self.handlers = []
 
             def add_handler(self, handler):
+                '执行 add_handler 的明确职责，并返回与调用约定一致的结果'
                 self.handlers.append(handler)
 
         fake_app = FakeApplication()
 
         class FakeApplicationBuilder:
+            '封装 FakeApplicationBuilder 的状态、协作关系与公开操作'
             def token(self, token):
+                '执行 token 的明确职责，并返回与调用约定一致的结果'
                 assert token == "test-token"
                 return self
 
             def build(self):
+                '构建并返回，并遵守 build 所表达的接口约束'
                 return fake_app
 
         def fake_command_handler(command, callback):
+            '执行 fake_command_handler 的明确职责，并返回与调用约定一致的结果'
             return SimpleNamespace(kind="command", command=command, callback=callback)
 
         def fake_message_handler(filter_expr, callback):
+            '执行 fake_message_handler 的明确职责，并返回与调用约定一致的结果'
             return SimpleNamespace(kind="message", filter_expr=filter_expr, callback=callback)
 
         telegram_mod = ModuleType("telegram")
@@ -6380,19 +6681,24 @@ class TestTelegramSendRetry:
         monkeypatch.setitem(sys.modules, "telegram.ext", telegram_ext_mod)
 
         class FakeThread:
+            '封装 FakeThread 的状态、协作关系与公开操作'
             def __init__(self, *, target, daemon):
+                '实现 __init__ 协议方法，保持对象交互语义一致'
                 self.target = target
                 self.daemon = daemon
 
             def start(self):
+                '执行 start 的明确职责，并返回与调用约定一致的结果'
                 return None
 
             def join(self, timeout=None):
+                '执行 join 的明确职责，并返回与调用约定一致的结果'
                 return None
 
         monkeypatch.setattr("app.channels.telegram.threading.Thread", FakeThread)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
 
@@ -6410,9 +6716,11 @@ class TestTelegramSendRetry:
         _run(go())
 
     def test_retries_on_failure_then_succeeds(self):
+        '验证 retries、on、failure、then、succeeds 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
 
@@ -6421,6 +6729,7 @@ class TestTelegramSendRetry:
             call_count = 0
 
             async def send_message(**kwargs):
+                '执行 send_message 的明确职责，并返回与调用约定一致的结果'
                 nonlocal call_count
                 call_count += 1
                 if call_count < 3:
@@ -6440,9 +6749,11 @@ class TestTelegramSendRetry:
         _run(go())
 
     def test_raises_after_all_retries_exhausted(self):
+        '验证 raises、after、all、retries、exhausted 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
 
@@ -6461,9 +6772,11 @@ class TestTelegramSendRetry:
         _run(go())
 
     def test_raises_runtime_error_when_no_attempts_configured(self):
+        '验证 raises、runtime、error、when、no、attempts、configured 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._application = MagicMock()
@@ -6476,10 +6789,13 @@ class TestTelegramSendRetry:
 
 
 class TestFeishuSendRetry:
+    '组织 TestFeishuSendRetry 场景的行为与边界验证'
     def test_raises_runtime_error_when_no_attempts_configured(self):
+        '验证 raises、runtime、error、when、no、attempts、configured 场景下的预期行为、边界条件与结果'
         from app.channels.feishu import FeishuChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = FeishuChannel(bus=bus, config={"app_id": "id", "app_secret": "secret"})
             ch._api_client = MagicMock()
@@ -6497,7 +6813,7 @@ class TestFeishuSendRetry:
 
 
 def _make_telegram_update(chat_type: str, message_id: int, *, reply_to_message_id: int | None = None, text: str = "hello"):
-    """Build a minimal mock telegram Update for testing _on_text / _cmd_generic."""
+    '执行 _make_telegram_update 的明确职责，并返回与调用约定一致的结果。\n\nBuild a minimal mock telegram Update for testing _on_text / _cmd_generic.'
     update = MagicMock()
     update.effective_chat.type = chat_type
     update.effective_chat.id = 100
@@ -6514,12 +6830,14 @@ def _make_telegram_update(chat_type: str, message_id: int, *, reply_to_message_i
 
 
 class TestTelegramPrivateChatThread:
-    """Verify that private chats use topic_id=None (single thread per chat)."""
+    '组织 TestTelegramPrivateChatThread 场景的行为与边界验证。\n\nVerify that private chats use topic_id=None (single thread per chat).'
 
     def test_private_chat_no_reply_uses_none_topic(self):
+        '验证 private、chat、no、reply、uses、none、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6533,9 +6851,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_private_chat_slash_skill_text_routes_as_chat(self):
+        '验证 private、chat、slash、skill、text、routes、as、chat 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6551,9 +6871,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_slash_skill_addressed_to_telegram_bot_strips_username(self):
+        '验证 slash、skill、addressed、to、telegram、bot、strips、username 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6574,9 +6896,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_private_chat_with_reply_still_uses_none_topic(self):
+        '验证 private、chat、with、reply、still、uses、none、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6590,9 +6914,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_group_chat_no_reply_uses_msg_id_as_topic(self):
+        '验证 group、chat、no、reply、uses、msg、id、as、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6606,9 +6932,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_group_chat_reply_uses_reply_msg_id_as_topic(self):
+        '验证 group、chat、reply、uses、reply、msg、id、as、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6622,9 +6950,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_supergroup_chat_uses_msg_id_as_topic(self):
+        '验证 supergroup、chat、uses、msg、id、as、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6638,9 +6968,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_cmd_generic_private_chat_uses_none_topic(self):
+        '验证 cmd、generic、private、chat、uses、none、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6655,9 +6987,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_cmd_generic_group_chat_uses_msg_id_as_topic(self):
+        '验证 cmd、generic、group、chat、uses、msg、id、as、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6672,9 +7006,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_cmd_generic_group_chat_reply_uses_reply_msg_id_as_topic(self):
+        '验证 cmd、generic、group、chat、reply、uses、reply、msg、id、as、topic 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6689,9 +7025,11 @@ class TestTelegramPrivateChatThread:
         _run(go())
 
     def test_cmd_generic_strips_addressed_telegram_bot_username(self):
+        '验证 cmd、generic、strips、addressed、telegram、bot、username 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
             ch._main_loop = asyncio.get_event_loop()
@@ -6709,12 +7047,14 @@ class TestTelegramPrivateChatThread:
 
 
 class TestTelegramProcessingOrder:
-    """Ensure 'working on it...' is sent before inbound is published."""
+    "组织 TestTelegramProcessingOrder 场景的行为与边界验证。\n\nEnsure 'working on it...' is sent before inbound is published."
 
     def test_running_reply_sent_before_publish(self):
+        '验证 running、reply、sent、before、publish 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
 
@@ -6723,9 +7063,11 @@ class TestTelegramProcessingOrder:
             order = []
 
             async def mock_send_running_reply(chat_id, msg_id):
+                '执行 mock_send_running_reply 的明确职责，并返回与调用约定一致的结果'
                 order.append("running_reply")
 
             async def mock_publish_inbound(inbound):
+                '执行 mock_publish_inbound 的明确职责，并返回与调用约定一致的结果'
                 order.append("publish_inbound")
 
             ch._send_running_reply = mock_send_running_reply
@@ -6744,9 +7086,10 @@ class TestTelegramProcessingOrder:
 
 
 class TestSlackMarkdownConversion:
-    """Verify that the SlackChannel.send() path applies mrkdwn conversion."""
+    '组织 TestSlackMarkdownConversion 场景的行为与边界验证。\n\nVerify that the SlackChannel.send() path applies mrkdwn conversion.'
 
     def test_bold_converted(self):
+        '验证 bold、converted 场景下的预期行为、边界条件与结果'
         from app.channels.slack import _slack_md_converter
 
         result = _slack_md_converter.convert("this is **bold** text")
@@ -6754,12 +7097,14 @@ class TestSlackMarkdownConversion:
         assert "**" not in result
 
     def test_link_converted(self):
+        '验证 link、converted 场景下的预期行为、边界条件与结果'
         from app.channels.slack import _slack_md_converter
 
         result = _slack_md_converter.convert("[click](https://example.com)")
         assert "<https://example.com|click>" in result
 
     def test_heading_converted(self):
+        '验证 heading、converted 场景下的预期行为、边界条件与结果'
         from app.channels.slack import _slack_md_converter
 
         result = _slack_md_converter.convert("# Title")
@@ -6773,8 +7118,10 @@ class TestSlackMarkdownConversion:
 
 
 class TestTelegramStreaming:
+    '组织 TestTelegramStreaming 场景的行为与边界验证'
     @staticmethod
     def _make_channel_with_bot():
+        '执行 _make_channel_with_bot 的明确职责，并返回与调用约定一致的结果'
         from app.channels.telegram import TelegramChannel
 
         bus = MessageBus()
@@ -6787,6 +7134,7 @@ class TestTelegramStreaming:
         bot.next_message_id = 100
 
         async def send_message(**kwargs):
+            '执行 send_message 的明确职责，并返回与调用约定一致的结果'
             bot.sent.append(kwargs)
             result = MagicMock()
             result.message_id = bot.next_message_id
@@ -6794,6 +7142,7 @@ class TestTelegramStreaming:
             return result
 
         async def edit_message_text(**kwargs):
+            '执行 edit_message_text 的明确职责，并返回与调用约定一致的结果'
             bot.edited.append(kwargs)
             result = MagicMock()
             result.message_id = kwargs["message_id"]
@@ -6806,7 +7155,9 @@ class TestTelegramStreaming:
         return ch, bot
 
     def test_stream_updates_edit_placeholder_in_place(self, monkeypatch):
+        '验证 stream、updates、edit、placeholder、in、place 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -6829,7 +7180,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_stream_updates_throttled_within_interval(self, monkeypatch):
+        '验证 stream、updates、throttled、within、interval 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -6848,10 +7201,10 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_stream_updates_in_group_chat_use_wider_throttle(self, monkeypatch):
-        """Telegram groups (negative chat_id) are capped at 20 messages/minute,
-        so group-chat stream edits throttle at 3s instead of 1s."""
+        '验证 stream、updates、in、group、chat、use、wider、throttle 场景下的预期行为、边界条件与结果。\n\nTelegram groups (negative chat_id) are capped at 20 messages/minute,\n        so group-chat stream edits throttle at 3s instead of 1s.'
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -6870,7 +7223,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_stream_update_without_placeholder_sends_new_message(self):
+        '验证 stream、update、without、placeholder、sends、new、message 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             await ch.send(OutboundMessage(channel_name="telegram", chat_id="12345", thread_id="t1", text="Hi", is_final=False, thread_ts="42"))
@@ -6884,7 +7239,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_stream_edit_fallback_message_threads_under_user_message(self, monkeypatch):
+        '验证 stream、edit、fallback、message、threads、under、user、message 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -6893,6 +7250,7 @@ class TestTelegramStreaming:
             await ch._send_running_reply("12345", 42)
 
             async def edit_gone(**kwargs):
+                '执行 edit_gone 的明确职责，并返回与调用约定一致的结果'
                 raise Exception("Bad Request: message to edit not found")
 
             bot.edit_message_text = edit_gone
@@ -6906,9 +7264,11 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_stream_message_registry_is_bounded(self):
+        '验证 stream、message、registry、is、bounded 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import MAX_TRACKED_STREAM_MESSAGES
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, _bot = self._make_channel_with_bot()
 
             for i in range(MAX_TRACKED_STREAM_MESSAGES + 1):
@@ -6921,7 +7281,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_stream_update_truncates_long_text(self, monkeypatch):
+        '验证 stream、update、truncates、long、text 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -6938,7 +7300,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_stream_update_retry_after_is_dropped(self, monkeypatch):
+        '验证 stream、update、retry、after、is、dropped 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -6947,6 +7311,7 @@ class TestTelegramStreaming:
             await ch._send_running_reply("12345", 42)
 
             async def edit_rate_limited(**kwargs):
+                '执行 edit_rate_limited 的明确职责，并返回与调用约定一致的结果'
                 exc = Exception("Flood control exceeded")
                 exc.retry_after = 5
                 raise exc
@@ -6959,6 +7324,7 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_telegram_reports_streaming_support(self):
+        '验证 telegram、reports、streaming、support 场景下的预期行为、边界条件与结果'
         from app.channels.manager import CHANNEL_CAPABILITIES
         from app.channels.telegram import TelegramChannel
 
@@ -6968,9 +7334,11 @@ class TestTelegramStreaming:
         assert CHANNEL_CAPABILITIES["telegram"]["supports_streaming"] is True
 
     def test_running_reply_registers_stream_placeholder(self):
+        '验证 running、reply、registers、stream、placeholder 场景下的预期行为、边界条件与结果'
         from app.channels.telegram import TelegramChannel
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             bus = MessageBus()
             ch = TelegramChannel(bus=bus, config={"bot_token": "test-token"})
 
@@ -6997,7 +7365,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_message_edits_stream_message_and_clears_state(self, monkeypatch):
+        '验证 final、message、edits、stream、message、and、clears、state 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -7017,7 +7387,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_message_splits_long_text(self, monkeypatch):
+        '验证 final、message、splits、long、text 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -7039,7 +7411,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_message_not_modified_error_is_ignored(self, monkeypatch):
+        '验证 final、message、not、modified、error、is、ignored 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -7049,6 +7423,7 @@ class TestTelegramStreaming:
             await ch.send(OutboundMessage(channel_name="telegram", chat_id="12345", thread_id="t1", text="done", is_final=False, thread_ts="42"))
 
             async def edit_not_modified(**kwargs):
+                '执行 edit_not_modified 的明确职责，并返回与调用约定一致的结果'
                 raise Exception("Bad Request: message is not modified")
 
             bot.edit_message_text = edit_not_modified
@@ -7062,7 +7437,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_edit_raising_not_modified_is_swallowed(self, monkeypatch):
+        '验证 final、edit、raising、not、modified、is、swallowed 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -7072,6 +7449,7 @@ class TestTelegramStreaming:
             placeholder_id = ch._stream_messages["12345:42"]["message_id"]
 
             async def edit_not_modified(**kwargs):
+                '执行 edit_not_modified 的明确职责，并返回与调用约定一致的结果'
                 raise Exception("Bad Request: message is not modified")
 
             bot.edit_message_text = edit_not_modified
@@ -7086,7 +7464,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_without_stream_state_sends_plain_message(self):
+        '验证 final、without、stream、state、sends、plain、message 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             await ch.send(OutboundMessage(channel_name="telegram", chat_id="12345", thread_id="t1", text="direct", is_final=True, thread_ts=None))
@@ -7098,7 +7478,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_edit_retries_once_after_rate_limit(self, monkeypatch):
+        '验证 final、edit、retries、once、after、rate、limit 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -7107,6 +7489,7 @@ class TestTelegramStreaming:
             sleeps = []
 
             async def fake_sleep(delay):
+                '执行 fake_sleep 的明确职责，并返回与调用约定一致的结果'
                 sleeps.append(delay)
 
             monkeypatch.setattr("app.channels.telegram.asyncio.sleep", fake_sleep)
@@ -7118,6 +7501,7 @@ class TestTelegramStreaming:
             calls = {"n": 0}
 
             async def edit_flaky(**kwargs):
+                '执行 edit_flaky 的明确职责，并返回与调用约定一致的结果'
                 calls["n"] += 1
                 if calls["n"] == 1:
                     exc = Exception("Flood control exceeded")
@@ -7137,7 +7521,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_edit_double_rate_limit_falls_back_to_new_message(self, monkeypatch):
+        '验证 final、edit、double、rate、limit、falls、back、to、new、message 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -7146,6 +7532,7 @@ class TestTelegramStreaming:
             sleeps = []
 
             async def fake_sleep(delay):
+                '执行 fake_sleep 的明确职责，并返回与调用约定一致的结果'
                 sleeps.append(delay)
 
             monkeypatch.setattr("app.channels.telegram.asyncio.sleep", fake_sleep)
@@ -7153,6 +7540,7 @@ class TestTelegramStreaming:
             await ch._send_running_reply("12345", 42)
 
             async def edit_rate_limited(**kwargs):
+                '执行 edit_rate_limited 的明确职责，并返回与调用约定一致的结果'
                 exc = Exception("Flood control exceeded")
                 exc.retry_after = 2
                 raise exc
@@ -7168,7 +7556,9 @@ class TestTelegramStreaming:
         _run(go())
 
     def test_final_overflow_chunk_send_is_retried(self, monkeypatch):
+        '验证 final、overflow、chunk、send、is、retried 场景下的预期行为、边界条件与结果'
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             ch, bot = self._make_channel_with_bot()
 
             clock = {"now": 1000.0}
@@ -7177,6 +7567,7 @@ class TestTelegramStreaming:
             sleeps = []
 
             async def fake_sleep(delay):
+                '执行 fake_sleep 的明确职责，并返回与调用约定一致的结果'
                 sleeps.append(delay)
 
             monkeypatch.setattr("app.channels.telegram.asyncio.sleep", fake_sleep)
@@ -7187,6 +7578,7 @@ class TestTelegramStreaming:
             failures = {"left": 1}
 
             async def send_flaky(**kwargs):
+                '执行 send_flaky 的明确职责，并返回与调用约定一致的结果'
                 if failures["left"] > 0:
                     failures["left"] -= 1
                     raise ConnectionError("transient")
@@ -7204,46 +7596,59 @@ class TestTelegramStreaming:
 
 
 class TestHandleGoalCommand:
-    """Covers the IM-channel ``/goal`` handler (get/set/clear via the Gateway)."""
+    '组织 TestHandleGoalCommand 场景的行为与边界验证。\n\nCovers the IM-channel ``/goal`` handler (get/set/clear via the Gateway).'
 
     @staticmethod
     def _install_mock_httpx(monkeypatch, calls, *, goal_payload=None, fail_method=None):
+        '执行 _install_mock_httpx 的明确职责，并返回与调用约定一致的结果'
         class MockResponse:
+            '封装 MockResponse 的状态、协作关系与公开操作'
             def raise_for_status(self):
+                '执行 raise_for_status 的明确职责，并返回与调用约定一致的结果'
                 return None
 
             def json(self):
+                '执行 json 的明确职责，并返回与调用约定一致的结果'
                 return {"goal": goal_payload}
 
         class MockAsyncClient:
+            '封装 MockAsyncClient 的状态、协作关系与公开操作'
             def __init__(self, *args, **kwargs):
+                '实现 __init__ 协议方法，保持对象交互语义一致'
                 return None
 
             async def __aenter__(self):
+                '实现 __aenter__ 协议方法，保持对象交互语义一致'
                 return self
 
             async def __aexit__(self, exc_type, exc, tb):
+                '实现 __aexit__ 协议方法，保持对象交互语义一致'
                 return None
 
             async def _record(self, method, url, **kwargs):
+                '执行 _record 的明确职责，并返回与调用约定一致的结果'
                 calls.append({"method": method, "url": url, **kwargs})
                 if fail_method == method:
                     raise RuntimeError("gateway down")
                 return MockResponse()
 
             async def get(self, url, **kwargs):
+                '读取并返回，并遵守 get 所表达的接口约束'
                 return await self._record("get", url, **kwargs)
 
             async def put(self, url, **kwargs):
+                '执行 put 的明确职责，并返回与调用约定一致的结果'
                 return await self._record("put", url, **kwargs)
 
             async def delete(self, url, **kwargs):
+                '删除目标资源并返回操作结果，并遵守 delete 所表达的接口约束'
                 return await self._record("delete", url, **kwargs)
 
         monkeypatch.setattr("app.channels.manager.httpx.AsyncClient", MockAsyncClient)
 
     @staticmethod
     def _make_manager(monkeypatch, *, thread_id):
+        '执行 _make_manager 的明确职责，并返回与调用约定一致的结果'
         from app.channels.manager import ChannelManager
 
         bus = MessageBus()
@@ -7251,6 +7656,7 @@ class TestHandleGoalCommand:
         manager = ChannelManager(bus=bus, store=store, gateway_url="http://gateway:8001")
 
         async def _lookup(msg):
+            '执行 _lookup 的明确职责，并返回与调用约定一致的结果'
             return thread_id
 
         monkeypatch.setattr(manager, "_lookup_thread_id", _lookup)
@@ -7258,6 +7664,7 @@ class TestHandleGoalCommand:
 
     @staticmethod
     def _msg(text):
+        '执行 _msg 的明确职责，并返回与调用约定一致的结果'
         return InboundMessage(
             channel_name="slack",
             chat_id="C1",
@@ -7267,10 +7674,12 @@ class TestHandleGoalCommand:
         )
 
     def test_status_without_thread_reports_no_active_goal(self, monkeypatch):
+        '验证 status、without、thread、reports、no、active、goal 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id=None)
             reply = await manager._handle_goal_command(self._msg("/goal"), "")
             assert reply == "No active goal."
@@ -7279,10 +7688,12 @@ class TestHandleGoalCommand:
         _run(go())
 
     def test_status_with_active_goal_reports_objective(self, monkeypatch):
+        '验证 status、with、active、goal、reports、objective 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls, goal_payload={"objective": "ship it"})
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id="t-1")
             reply = await manager._handle_goal_command(self._msg("/goal"), "")
             assert reply == "Goal: ship it"
@@ -7292,10 +7703,12 @@ class TestHandleGoalCommand:
         _run(go())
 
     def test_status_with_no_goal_reports_none(self, monkeypatch):
+        '验证 status、with、no、goal、reports、none 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls, goal_payload=None)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id="t-1")
             reply = await manager._handle_goal_command(self._msg("/goal"), "")
             assert reply == "No active goal."
@@ -7303,10 +7716,12 @@ class TestHandleGoalCommand:
         _run(go())
 
     def test_clear_with_thread_calls_delete(self, monkeypatch):
+        '验证 clear、with、thread、calls、delete 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id="t-1")
             reply = await manager._handle_goal_command(self._msg("/goal clear"), "clear")
             assert reply == "Goal cleared."
@@ -7315,10 +7730,12 @@ class TestHandleGoalCommand:
         _run(go())
 
     def test_clear_without_thread_is_noop(self, monkeypatch):
+        '验证 clear、without、thread、is、noop 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls)
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id=None)
             reply = await manager._handle_goal_command(self._msg("/goal reset"), "reset")
             assert reply == "Goal cleared."
@@ -7327,14 +7744,17 @@ class TestHandleGoalCommand:
         _run(go())
 
     def test_set_with_existing_thread_puts_objective(self, monkeypatch):
+        '验证 set、with、existing、thread、puts、objective 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls, goal_payload={"objective": "finish the work"})
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id="t-1")
             chats = []
 
             async def _handle_chat(msg, **kwargs):
+                '执行 _handle_chat 的明确职责，并返回与调用约定一致的结果'
                 chats.append((msg, kwargs))
 
             monkeypatch.setattr(manager, "_handle_chat", _handle_chat)
@@ -7350,17 +7770,21 @@ class TestHandleGoalCommand:
         _run(go())
 
     def test_set_without_thread_creates_one(self, monkeypatch):
+        '验证 set、without、thread、creates、one 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls, goal_payload={"objective": "do X"})
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id=None)
             chats = []
 
             async def _create(client, msg):
+                '执行 _create 的明确职责，并返回与调用约定一致的结果'
                 return "new-thread"
 
             async def _handle_chat(msg, **kwargs):
+                '执行 _handle_chat 的明确职责，并返回与调用约定一致的结果'
                 chats.append((msg, kwargs))
 
             monkeypatch.setattr(manager, "_create_thread", _create)
@@ -7377,10 +7801,12 @@ class TestHandleGoalCommand:
         _run(go())
 
     def test_set_failure_returns_error_message(self, monkeypatch):
+        '验证 set、failure、returns、error、message 场景下的预期行为、边界条件与结果'
         calls = []
         self._install_mock_httpx(monkeypatch, calls, fail_method="put")
 
         async def go():
+            '执行 go 的明确职责，并返回与调用约定一致的结果'
             manager = self._make_manager(monkeypatch, thread_id="t-1")
             reply = await manager._handle_goal_command(self._msg("/goal do X"), "do X")
             assert reply == "Failed to set goal."
@@ -7397,6 +7823,7 @@ class TestHandleGoalCommand:
 
 
 def _get_merge_stream_text():
+    '执行 _get_merge_stream_text 的明确职责，并返回与调用约定一致的结果'
     from app.channels.manager import _merge_stream_text
 
     return _merge_stream_text
@@ -7409,39 +7836,42 @@ def test_merge_stream_text_cjk_reduplication():
 
 
 def test_merge_stream_text_repeated_token_append():
-    """Identical repeated tokens ('go','go') -> 'gogo', not 'go'."""
+    "验证 merge、stream、text、repeated、token、append 场景下的预期行为、边界条件与结果。\n\nIdentical repeated tokens ('go','go') -> 'gogo', not 'go'."
     _merge = _get_merge_stream_text()
     assert _merge("go", "go") == "gogo"
 
 
 def test_merge_stream_text_suffix_tail_not_dropped():
-    """Delta equal to buffer suffix ('l' after 'hel') -> 'hell', not 'hel'."""
+    "验证 merge、stream、text、suffix、tail、not、dropped 场景下的预期行为、边界条件与结果。\n\nDelta equal to buffer suffix ('l' after 'hel') -> 'hell', not 'hel'."
     _merge = _get_merge_stream_text()
     assert _merge("hel", "l") == "hell"
 
 
 def test_merge_stream_text_cumulative_strictly_longer_replaces():
-    """A strictly longer cumulative snapshot that starts with existing replaces it."""
+    '验证 merge、stream、text、cumulative、strictly、longer、replaces 场景下的预期行为、边界条件与结果。\n\nA strictly longer cumulative snapshot that starts with existing replaces it.'
     _merge = _get_merge_stream_text()
     assert _merge("Hel", "Hel lo world") == "Hel lo world"
 
 
 def test_merge_stream_text_empty_chunk_noop():
+    '验证 merge、stream、text、empty、chunk、noop 场景下的预期行为、边界条件与结果'
     _merge = _get_merge_stream_text()
     assert _merge("Hello", "") == "Hello"
 
 
 def test_merge_stream_text_empty_existing_returns_chunk():
+    '验证 merge、stream、text、empty、existing、returns、chunk 场景下的预期行为、边界条件与结果'
     _merge = _get_merge_stream_text()
     assert _merge("", "Hello") == "Hello"
 
 
 def test_merge_stream_text_newline_split():
-    """'\\n\\n' split across two '\\n' deltas accumulates to two newlines."""
+    "验证 merge、stream、text、newline、split 场景下的预期行为、边界条件与结果。\n\n'\\n\\n' split across two '\\n' deltas accumulates to two newlines."
     _merge = _get_merge_stream_text()
     assert _merge("\n", "\n") == "\n\n"
 
 
 def test_merge_stream_text_normal_append():
+    '验证 merge、stream、text、normal、append 场景下的预期行为、边界条件与结果'
     _merge = _get_merge_stream_text()
     assert _merge("Hello ", "world") == "Hello world"

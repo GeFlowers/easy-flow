@@ -5,15 +5,19 @@ import type { Translations } from "@/core/i18n/locales/types";
 import { getUsageMetadata, type TokenUsage } from "./usage";
 import { hasContent } from "./utils";
 
+/** 令牌用量的行内展示模式。 */
 export type TokenUsageInlineMode = "off" | "per_turn" | "step_debug";
 
+/** 令牌用量视图的持久化偏好。 */
 export interface TokenUsagePreferences {
   headerTotal: boolean;
   inlineMode: TokenUsageInlineMode;
 }
 
+/** 面向界面的令牌用量预设，映射为具体展示偏好。 */
 export type TokenUsageViewPreset = "off" | "summary" | "per_turn" | "debug";
 
+/** 令牌调试视图中归属于单条 AI 消息的一步。 */
 export interface TokenDebugStep {
   id: string;
   messageId: string;
@@ -65,11 +69,12 @@ interface TokenUsageAttribution {
   actions?: TokenUsageAttributionAction[];
 }
 
-// Precise write_todos labels come from the backend attribution payload.
-// The frontend fallback intentionally stays generic so we do not duplicate
+// 精确的 write_todos 标签来自后端的归因载荷。
+// 前端回退逻辑有意保持通用，避免复制
 // backend/packages/harness/deerflow/agents/middlewares/token_usage_middleware.py
-//::_build_todo_actions and risk the two diffing algorithms drifting apart.
+//::_build_todo_actions，从而使两套差异比较算法逐渐产生偏差。
 
+/** 将详细令牌用量偏好归并为对应的界面预设。 */
 export function getTokenUsageViewPreset(
   preferences: TokenUsagePreferences,
 ): TokenUsageViewPreset {
@@ -85,6 +90,7 @@ export function getTokenUsageViewPreset(
   return "per_turn";
 }
 
+/** 将界面预设展开为详细的令牌用量偏好。 */
 export function tokenUsagePreferencesFromPreset(
   preset: TokenUsageViewPreset,
 ): TokenUsagePreferences {
@@ -101,6 +107,7 @@ export function tokenUsagePreferencesFromPreset(
   }
 }
 
+/** 按后端归因或工具调用回退信息构建令牌调试步骤。 */
 export function buildTokenDebugSteps(
   messages: Message[],
   t: Translations,
@@ -187,6 +194,7 @@ export function buildTokenDebugSteps(
   return steps;
 }
 
+/** 获取 getTokenUsageAttribution 所需的结果或配置。 */
 function getTokenUsageAttribution(
   message: Message,
 ): TokenUsageAttribution | null {
@@ -209,6 +217,7 @@ function getTokenUsageAttribution(
   return normalized;
 }
 
+/** 构建 buildActionLabelsFromAttribution 所需的结果。 */
 function buildActionLabelsFromAttribution(
   attribution: TokenUsageAttribution,
   t: Translations,
@@ -218,6 +227,7 @@ function buildActionLabelsFromAttribution(
     .filter((label): label is string => !!label);
 }
 
+/** 实现 describeAttributionAction 的受限辅助逻辑。 */
 function describeAttributionAction(
   action: TokenUsageAttributionAction,
   t: Translations,
@@ -263,6 +273,7 @@ function describeAttributionAction(
   }
 }
 
+/** 实现 describeToolCall 的受限辅助逻辑。 */
 function describeToolCall(
   toolCall: {
     name: string;
@@ -304,6 +315,7 @@ function describeToolCall(
   return t.toolCalls.useTool(toolCall.name);
 }
 
+/** 将输入规范化为 normalizeTokenUsageAttribution 所需的形式。 */
 function normalizeTokenUsageAttribution(
   value: unknown,
 ): TokenUsageAttribution | null {
@@ -318,8 +330,7 @@ function normalizeTokenUsageAttribution(
   }
 
   return {
-    // Versioning is additive for now: the frontend should ignore unknown
-    // fields and fall back when required fields become incompatible.
+    // 当前版本策略仅做增量扩展：前端应忽略未知字段，并在必填字段不兼容时回退。
     version: typeof record.version === "number" ? record.version : undefined,
     kind: isTokenUsageAttributionKind(record.kind) ? record.kind : undefined,
     shared_attribution:
@@ -342,6 +353,7 @@ function normalizeTokenUsageAttribution(
   };
 }
 
+/** 将输入规范化为 normalizeTokenUsageAttributionAction 所需的形式。 */
 function normalizeTokenUsageAttributionAction(
   value: unknown,
 ): TokenUsageAttributionAction | null {
@@ -410,6 +422,7 @@ function normalizeTokenUsageAttributionAction(
   }
 }
 
+/** 实现 asRecord 的受限辅助逻辑。 */
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -418,6 +431,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
+/** 解析并提取 readString 所需的数据。 */
 function readString(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -427,6 +441,7 @@ function readString(value: unknown): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
+/** 判断 isTokenUsageAttributionKind 所表达的条件是否成立。 */
 function isTokenUsageAttributionKind(
   value: unknown,
 ): value is NonNullable<TokenUsageAttribution["kind"]> {

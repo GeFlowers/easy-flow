@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 from langchain_core.messages import AIMessage, AIMessageChunk, HumanMessage
@@ -6,6 +7,7 @@ from deerflow.models.vllm_provider import VllmChatModel
 
 
 def _make_model() -> VllmChatModel:
+    '未说明'
     return VllmChatModel(
         model="Qwen/QwQ-32B",
         api_key="dummy",
@@ -14,6 +16,7 @@ def _make_model() -> VllmChatModel:
 
 
 def test_vllm_provider_restores_reasoning_in_request_payload():
+    '未说明'
     model = _make_model()
     payload = model._get_request_payload(
         [
@@ -33,6 +36,7 @@ def test_vllm_provider_restores_reasoning_in_request_payload():
 
 
 def test_vllm_provider_normalizes_legacy_thinking_kwarg_to_enable_thinking():
+    '未说明'
     model = VllmChatModel(
         model="qwen3",
         api_key="dummy",
@@ -46,6 +50,7 @@ def test_vllm_provider_normalizes_legacy_thinking_kwarg_to_enable_thinking():
 
 
 def test_vllm_provider_preserves_explicit_enable_thinking_kwarg():
+    '未说明'
     model = VllmChatModel(
         model="qwen3",
         api_key="dummy",
@@ -62,6 +67,7 @@ def test_vllm_provider_preserves_explicit_enable_thinking_kwarg():
 
 
 def test_vllm_provider_preserves_reasoning_in_chat_result():
+    '未说明'
     model = _make_model()
     result = model._create_chat_result(
         {
@@ -86,6 +92,7 @@ def test_vllm_provider_preserves_reasoning_in_chat_result():
 
 
 def test_vllm_provider_preserves_reasoning_in_streaming_chunks():
+    '未说明'
     model = _make_model()
     chunk = model._convert_chunk_to_generation_chunk(
         {
@@ -112,6 +119,7 @@ def test_vllm_provider_preserves_reasoning_in_streaming_chunks():
 
 
 def test_vllm_provider_preserves_empty_reasoning_values_in_streaming_chunks():
+    '未说明'
     model = _make_model()
     chunk = model._convert_chunk_to_generation_chunk(
         {

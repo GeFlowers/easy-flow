@@ -1,10 +1,4 @@
-"""Live integration tests for create_deerflow_agent.
-
-Verifies the factory produces a working LangGraph agent that can actually
-process messages end-to-end with a real LLM.
-
-Tests marked ``requires_llm`` are skipped in CI or when OPENAI_API_KEY is unset.
-"""
+'定义 test_create_deerflow_agent_live 模块提供的职责与可复用接口。\n\nLive integration tests for create_deerflow_agent.\n\nVerifies the factory produces a working LangGraph agent that can actually\nprocess messages end-to-end with a real LLM.\n\nTests marked ``requires_llm`` are skipped in CI or when OPENAI_API_KEY is unset.\n'
 
 import os
 import uuid
@@ -19,7 +13,7 @@ requires_llm = pytest.mark.skipif(
 
 
 def _make_model():
-    """Create a real chat model from environment variables."""
+    '执行 _make_model 的明确职责，并返回与调用约定一致的结果。\n\nCreate a real chat model from environment variables.'
     from langchain_openai import ChatOpenAI
 
     return ChatOpenAI(
@@ -32,11 +26,11 @@ def _make_model():
 
 
 # ---------------------------------------------------------------------------
-# 1. Minimal creation — model only, no features
+# 1. 最少的创建 — 仅模型，无特征
 # ---------------------------------------------------------------------------
 @requires_llm
 def test_minimal_agent_responds():
-    """create_deerflow_agent(model) produces a graph that returns a response."""
+    '验证 minimal、agent、responds 场景下的预期行为、边界条件与结果。\n\ncreate_deerflow_agent(model) produces a graph that returns a response.'
     from deerflow.agents.factory import create_deerflow_agent
 
     model = _make_model()
@@ -55,16 +49,16 @@ def test_minimal_agent_responds():
 
 
 # ---------------------------------------------------------------------------
-# 2. With custom tool — verifies tool injection and execution
+# 2. 使用自定义工具 — 验证工具注入和执行
 # ---------------------------------------------------------------------------
 @requires_llm
 def test_agent_with_custom_tool():
-    """Agent can invoke a user-provided tool and return the result."""
+    '验证 agent、with、custom、tool 场景下的预期行为、边界条件与结果。\n\nAgent can invoke a user-provided tool and return the result.'
     from deerflow.agents.factory import create_deerflow_agent
 
     @tool
     def add(a: int, b: int) -> int:
-        """Add two numbers."""
+        '执行 add 的明确职责，并返回与调用约定一致的结果。\n\nAdd two numbers.'
         return a + b
 
     model = _make_model()
@@ -76,18 +70,18 @@ def test_agent_with_custom_tool():
     )
 
     messages = result.get("messages", [])
-    # Should have: user msg, AI tool_call, tool result, AI final
+    # 应包含：用户消息、AI tool_call、工具结果、AI 最终结果
     assert len(messages) >= 3
     last_content = messages[-1].content
     assert "10" in last_content
 
 
 # ---------------------------------------------------------------------------
-# 3. RuntimeFeatures mode — middleware chain runs without errors
+# 3. RuntimeFeatures模式——中间件链运行无错误
 # ---------------------------------------------------------------------------
 @requires_llm
 def test_features_mode_middleware_chain():
-    """RuntimeFeatures assembles a working middleware chain that executes."""
+    '验证 features、mode、middleware、chain 场景下的预期行为、边界条件与结果。\n\nRuntimeFeatures assembles a working middleware chain that executes.'
     from deerflow.agents.factory import create_deerflow_agent
     from deerflow.agents.features import RuntimeFeatures
 

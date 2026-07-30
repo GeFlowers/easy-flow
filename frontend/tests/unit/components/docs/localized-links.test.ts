@@ -7,6 +7,11 @@ import { localizeDocsHref } from "@/components/docs/localized-links";
 
 const CONTENT_ROOT = join(process.cwd(), "src/content");
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 findMdxFiles 的约定。
+
+ */
+
 function findMdxFiles(directory: string): string[] {
   return readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
     const path = join(directory, entry.name);
@@ -47,6 +52,9 @@ describe("localizeDocsHref", () => {
 });
 
 describe("documentation Cards imports", () => {
+  /**
+   * 覆盖“does not bypass the locale-aware MDX Cards component”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("does not bypass the locale-aware MDX Cards component", () => {
     const violations = findMdxFiles(CONTENT_ROOT)
       .filter((path) => {

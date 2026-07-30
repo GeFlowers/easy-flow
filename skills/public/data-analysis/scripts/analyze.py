@@ -1,9 +1,4 @@
-"""
-Data Analysis Script using DuckDB.
-
-Analyzes Excel (.xlsx/.xls) and CSV files using DuckDB's in-process SQL engine.
-Supports schema inspection, SQL queries, statistical summaries, and result export.
-"""
+"""以 DuckDB 加载 CSV 与 Excel 文件，提供缓存、结构检查、查询、导出和统计摘要。"""
 
 import argparse
 import hashlib
@@ -30,13 +25,13 @@ try:
 except ImportError:
     subprocess.run([sys.executable, "-m", "pip", "install", "openpyxl", "-q"], check=True)
 
-# Cache directory for persistent DuckDB databases
+# 持久化 DuckDB 数据库的缓存目录。
 CACHE_DIR = os.path.join(tempfile.gettempdir(), ".data-analysis-cache")
 TABLE_MAP_SUFFIX = ".table_map.json"
 
 
 def compute_files_hash(files: list[str]) -> str:
-    """Compute a combined SHA256 hash of all input files for cache key."""
+    """计算输入文件内容和路径的组合 SHA256，作为持久化缓存键。"""
     hasher = hashlib.sha256()
     for file_path in sorted(files):
         try:
@@ -50,25 +45,25 @@ def compute_files_hash(files: list[str]) -> str:
 
 
 def get_cache_db_path(files_hash: str) -> str:
-    """Get the path to the cached DuckDB database file."""
+    """根据缓存键返回 DuckDB 数据库文件路径，不创建或打开文件。"""
     os.makedirs(CACHE_DIR, exist_ok=True)
     return os.path.join(CACHE_DIR, f"{files_hash}.duckdb")
 
 
 def get_table_map_path(files_hash: str) -> str:
-    """Get the path to the cached table map JSON file."""
+    """根据缓存键返回原始表名映射 JSON 的路径。"""
     return os.path.join(CACHE_DIR, f"{files_hash}{TABLE_MAP_SUFFIX}")
 
 
 def save_table_map(files_hash: str, table_map: dict[str, str]) -> None:
-    """Save table map to a JSON file alongside the cached DB."""
+    """将原始名称到安全 SQL 表名的映射保存到缓存数据库旁。"""
     path = get_table_map_path(files_hash)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(table_map, f, ensure_ascii=False)
 
 
 def load_table_map(files_hash: str) -> dict[str, str] | None:
-    """Load table map from cache. Returns None if not found."""
+    """读取缓存表名映射；缓存不存在时返回 ``None``。"""
     path = get_table_map_path(files_hash)
     if not os.path.exists(path):
         return None
@@ -80,7 +75,7 @@ def load_table_map(files_hash: str) -> dict[str, str] | None:
 
 
 def sanitize_table_name(name: str) -> str:
-    """Sanitize a sheet/file name into a valid SQL table name."""
+    """将工作表或文件名转成合法 SQL 表名，避免特殊字符和首字符非法。"""
     sanitized = re.sub(r"[^\w]", "_", name)
     if sanitized and sanitized[0].isdigit():
         sanitized = f"t_{sanitized}"
@@ -88,11 +83,7 @@ def sanitize_table_name(name: str) -> str:
 
 
 def load_files(con: duckdb.DuckDBPyConnection, files: list[str]) -> dict[str, str]:
-    """
-    Load Excel/CSV files into DuckDB tables.
-
-    Returns a mapping of original_name -> sanitized_table_name.
-    """
+    """将 Excel 或 CSV 文件加载为 DuckDB 表，并返回原名到安全表名的映射。"""
     con.execute("INSTALL spatial; LOAD spatial;")
     table_map: dict[str, str] = {}
 
@@ -116,7 +107,7 @@ def load_files(con: duckdb.DuckDBPyConnection, files: list[str]) -> dict[str, st
 def _load_excel(
     con: duckdb.DuckDBPyConnection, file_path: str, table_map: dict[str, str]
 ) -> None:
-    """Load all sheets from an Excel file into DuckDB tables."""
+    """将 Excel 的所有工作表载入 DuckDB，重名表会加后缀防止覆盖。"""
     import openpyxl
 
     wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
@@ -158,7 +149,7 @@ def _load_excel(
 def _load_csv(
     con: duckdb.DuckDBPyConnection, file_path: str, table_map: dict[str, str]
 ) -> None:
-    """Load a CSV file into a DuckDB table."""
+    """使用 DuckDB 自动识别 CSV 格式并载入单表，处理表名冲突。"""
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     table_name = sanitize_table_name(base_name)
 
@@ -186,7 +177,7 @@ def _load_csv(
 
 
 def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) -> str:
-    """Inspect the schema of all loaded tables."""
+    """输出表的行数、字段类型、非空计数和有限样本，辅助数据探索。"""
     output_parts = []
 
     for original_name, table_name in table_map.items():
@@ -244,7 +235,7 @@ def action_query(
     table_map: dict[str, str],
     output_file: str | None = None,
 ) -> str:
-    """Execute a SQL query and return/export results."""
+    """执行用户 SQL，并按需要格式化或导出结果；查询前替换原始表名映射。"""
     # Replace original sheet/file names with sanitized table names in SQL
     modified_sql = sql
     for original_name, table_name in sorted(
@@ -280,7 +271,7 @@ def action_query(
 
 
 def _format_table(columns: list[str], rows: list[tuple]) -> str:
-    """Format query results as a readable table."""
+    """将查询列和行转换为限宽的终端可读表格。"""
     if not rows:
         msg = "Query returned 0 rows."
         print(msg)
@@ -315,7 +306,7 @@ def _format_table(columns: list[str], rows: list[tuple]) -> str:
 
 
 def _export_results(columns: list[str], rows: list[tuple], output_file: str) -> str:
-    """Export query results to a file (CSV, JSON, or Markdown)."""
+    """将结果导出为 CSV、JSON 或 Markdown；不支持的格式会报错。"""
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     ext = os.path.splitext(output_file)[1].lower()
 
@@ -368,7 +359,7 @@ def action_summary(
     table_name: str,
     table_map: dict[str, str],
 ) -> str:
-    """Generate statistical summary for a table."""
+    """按字段类型汇总行数、空值、数值统计和高频类别。"""
     # Resolve table name
     resolved = table_map.get(table_name, table_name)
 
@@ -478,6 +469,7 @@ def action_summary(
 
 
 def main():
+    """解析命令行参数，复用或创建缓存数据库，并执行选定的数据分析操作。"""
     parser = argparse.ArgumentParser(description="Analyze Excel/CSV files using DuckDB")
     parser.add_argument(
         "--files",

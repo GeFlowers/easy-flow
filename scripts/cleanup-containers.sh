@@ -1,24 +1,24 @@
 #!/usr/bin/env bash
 #
-# cleanup-containers.sh - Clean up DeerFlow sandbox containers
+# cleanup-containers.sh - 清理 DeerFlow 沙箱容器
 #
-# This script cleans up both Docker and Apple Container runtime containers
-# to ensure compatibility across different container runtimes.
+# 同时处理 Docker 与 Apple Container 运行时；命令不存在时跳过，以兼容不同平台，
+# 且仅按传入前缀筛选，避免误停无关容器。
 #
 
 set -e
 
 PREFIX="${1:-deer-flow-sandbox}"
 
-# Colors for output
+# 终端输出颜色；不影响命令的退出状态。
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+NC='\033[0m' # 关闭颜色
 
 echo "Cleaning up sandbox containers with prefix: ${PREFIX}"
 
-# Function to clean up Docker containers
+# 仅停止名称匹配前缀的 Docker 容器；Docker CLI 不可用时安全跳过。
 cleanup_docker() {
     if command -v docker &> /dev/null; then
         echo -n "Checking Docker containers... "
@@ -39,16 +39,16 @@ cleanup_docker() {
     fi
 }
 
-# Function to clean up Apple Container containers
+# 仅停止名称匹配前缀的 Apple Container 容器；该运行时不存在时安全跳过。
 cleanup_apple_container() {
     if command -v container &> /dev/null; then
         echo -n "Checking Apple Container containers... "
 
-        # List all containers and filter by name
+        # 使用 JSON 列表，避免依赖面向人类的表格输出格式。
         CONTAINER_LIST=$(container list --format json 2>/dev/null || echo "[]")
 
         if [ "$CONTAINER_LIST" != "[]" ] && [ -n "$CONTAINER_LIST" ]; then
-            # Extract container IDs that match our prefix
+            # 从配置 ID 中提取匹配前缀的容器，保持与 Docker 的筛选边界一致。
             CONTAINER_IDS=$(echo "$CONTAINER_LIST" | python3 -c "
 import json
 import sys
@@ -88,7 +88,7 @@ except:
     fi
 }
 
-# Clean up both runtimes
+# 依次覆盖两种运行时；其中一种失败不应阻断另一种清理。
 cleanup_docker
 cleanup_apple_container
 

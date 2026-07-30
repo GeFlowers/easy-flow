@@ -1,4 +1,4 @@
-"""Step: browser-connectable IM channel enablement."""
+'未说明'
 
 from __future__ import annotations
 
@@ -20,10 +20,12 @@ CHANNEL_CONNECTION_OPTIONS: tuple[tuple[str, str, str], ...] = (
 
 @dataclass
 class ChannelConnectionsStepResult:
+    '未说明'
     enabled_providers: list[str]
 
 
 def run_channels_step(step_label: str = "Step 4/5") -> ChannelConnectionsStepResult:
+    """执行运行对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     print_header(f"{step_label} · IM Channels (optional)")
     print_info("Choose which IM channels should appear in the DeerFlow sidebar and Settings.")
     print_info("Credentials can be entered later from the browser with Connect or Modify.")

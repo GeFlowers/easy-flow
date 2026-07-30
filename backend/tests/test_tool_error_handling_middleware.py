@@ -1,3 +1,4 @@
+'未说明'
 import posixpath
 import sys
 from types import ModuleType, SimpleNamespace
@@ -22,6 +23,7 @@ from deerflow.subagents.status_contract import SUBAGENT_ERROR_KEY, SUBAGENT_STAT
 
 
 def _request(name: str = "web_search", tool_call_id: str | None = "tc-1"):
+    '未说明'
     tool_call = {"name": name}
     if tool_call_id is not None:
         tool_call["id"] = tool_call_id
@@ -29,6 +31,7 @@ def _request(name: str = "web_search", tool_call_id: str | None = "tc-1"):
 
 
 def _module(name: str, **attrs):
+    '未说明'
     module = ModuleType(name)
     for key, value in attrs.items():
         setattr(module, key, value)
@@ -36,6 +39,7 @@ def _module(name: str, **attrs):
 
 
 def _make_app_config(*, supports_vision: bool = False) -> AppConfig:
+    '未说明'
     return AppConfig(
         models=[
             ModelConfig(
@@ -54,13 +58,18 @@ def _make_app_config(*, supports_vision: bool = False) -> AppConfig:
 
 
 def _stub_runtime_middleware_imports(monkeypatch: pytest.MonkeyPatch) -> None:
+    '未说明'
     class FakeMiddleware:
+        '未说明'
         def __init__(self, *args, **kwargs):
+            '未说明'
             self.args = args
             self.kwargs = kwargs
 
     class FakeLLMErrorHandlingMiddleware:
+        '未说明'
         def __init__(self, *, app_config):
+            '未说明'
             self.app_config = app_config
 
     monkeypatch.setitem(
@@ -94,15 +103,20 @@ def _stub_runtime_middleware_imports(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def test_build_subagent_runtime_middlewares_threads_app_config_to_llm_middleware(monkeypatch: pytest.MonkeyPatch):
+    '未说明'
     captured: dict[str, object] = {}
 
     class FakeMiddleware:
+        '未说明'
         def __init__(self, *args, **kwargs):
+            '未说明'
             self.args = args
             self.kwargs = kwargs
 
     class FakeLLMErrorHandlingMiddleware:
+        '未说明'
         def __init__(self, *, app_config):
+            '未说明'
             captured["app_config"] = app_config
 
     app_config = _make_app_config()
@@ -178,6 +192,7 @@ def test_tool_progress_middleware_is_outer_relative_to_error_handling(monkeypatc
     # ToolProgressMiddleware must have a lower index than ToolErrorHandlingMiddleware
     # so that the framework's "first in list = outermost" rule makes it outer.
     # Only then can it read deerflow_tool_meta stamped by ToolErrorHandlingMiddleware.
+    '未说明'
     from deerflow.agents.middlewares.tool_progress_middleware import ToolProgressMiddleware
     from deerflow.config.tool_progress_config import ToolProgressConfig
 
@@ -207,13 +222,7 @@ def test_tool_progress_middleware_is_outer_relative_to_error_handling(monkeypatc
 
 
 def test_middleware_ordering_guard_raises_when_progress_is_inner(monkeypatch: pytest.MonkeyPatch):
-    """_build_runtime_middlewares must raise RuntimeError when ToolProgressMiddleware ends up
-    at a higher index than ToolErrorHandlingMiddleware.
-
-    We trigger the wrong-order condition by patching SandboxAuditMiddleware to be an actual
-    ToolErrorHandlingMiddleware instance, which appears BEFORE ToolProgressMiddleware in the
-    list. The guard's isinstance() check finds it first, making error_idx < progress_idx.
-    """
+    '未说明'
     from deerflow.agents.middlewares.tool_error_handling_middleware import (
         ToolErrorHandlingMiddleware,
         build_lead_runtime_middlewares,
@@ -241,6 +250,7 @@ def test_middleware_ordering_guard_raises_when_progress_is_inner(monkeypatch: py
 
 
 def test_lead_runtime_middlewares_thread_app_config_to_tool_error_handling(monkeypatch: pytest.MonkeyPatch):
+    '未说明'
     monkeypatch.setitem(
         sys.modules,
         "deerflow.agents.middlewares.input_sanitization_middleware",
@@ -256,13 +266,7 @@ def test_lead_runtime_middlewares_thread_app_config_to_tool_error_handling(monke
 
 
 def test_build_lead_runtime_middlewares_orders_thread_data_before_uploads():
-    """ThreadDataMiddleware must run before UploadsMiddleware so the uploads
-    directory is guaranteed to exist when UploadsMiddleware scans it under
-    lazy_init=False. This is the narrow functional concern the chain order
-    protects; a regression here would silently drop historical files on the
-    first run of a thread when the directory has not been pre-created by the
-    upload endpoint.
-    """
+    '未说明'
     from deerflow.agents.middlewares.thread_data_middleware import ThreadDataMiddleware
     from deerflow.agents.middlewares.uploads_middleware import UploadsMiddleware
 
@@ -278,14 +282,7 @@ def test_build_lead_runtime_middlewares_orders_thread_data_before_uploads():
 
 
 def test_build_lead_runtime_middlewares_chain_order_matches_agents_md():
-    """Pin the AGENTS.md middleware numbering for the shared runtime base.
-
-    The existing tests stub most middlewares as a single ``FakeMiddleware``,
-    which cannot detect a reorder. This test uses the real classes so an
-    index swap between any pair (e.g. Uploads vs ThreadData, Sandbox vs
-    DanglingToolCall) is caught. If a future refactor legitimately reorders
-    these, update backend/AGENTS.md "Middleware Chain" in the same change.
-    """
+    '未说明'
     from deerflow.agents.middlewares.dangling_tool_call_middleware import DanglingToolCallMiddleware
     from deerflow.agents.middlewares.input_sanitization_middleware import InputSanitizationMiddleware
     from deerflow.agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware
@@ -300,6 +297,7 @@ def test_build_lead_runtime_middlewares_chain_order_matches_agents_md():
     middlewares = build_lead_runtime_middlewares(app_config=app_config)
 
     def idx_of(cls, *, label: str) -> int:
+        '未说明'
         matches = [i for i, m in enumerate(middlewares) if isinstance(m, cls)]
         assert matches, f"{label} missing from chain"
         assert len(matches) == 1, f"expected exactly one {label}, got indices {matches}"
@@ -325,6 +323,7 @@ def test_build_lead_runtime_middlewares_chain_order_matches_agents_md():
 
 
 def test_wrap_tool_call_passthrough_on_success():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request()
     expected = ToolMessage(content="ok", tool_call_id="tc-1", name="web_search")
@@ -335,6 +334,7 @@ def test_wrap_tool_call_passthrough_on_success():
 
 
 def test_read_file_skill_read_stamps_compact_skill_metadata():
+    '未说明'
     app_config = _make_app_config()
     app_config.skills.container_path = "/mnt/skills"
     app_config.summarization.skill_file_read_tool_names = ["read_file"]
@@ -358,6 +358,7 @@ def test_read_file_skill_read_stamps_compact_skill_metadata():
 
 
 def test_skill_read_config_is_cached_on_middleware_instance():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     default_names = getattr(summarization_config, "DEFAULT_SKILL_FILE_READ_TOOL_NAMES", None)
 
@@ -367,6 +368,7 @@ def test_skill_read_config_is_cached_on_middleware_instance():
 
 
 def test_skill_metadata_respects_custom_skills_root():
+    '未说明'
     app_config = _make_app_config()
     app_config.skills.container_path = "/custom/skills"
     app_config.summarization.skill_file_read_tool_names = ["read_file"]
@@ -383,6 +385,7 @@ def test_skill_metadata_respects_custom_skills_root():
 
 
 def test_skill_metadata_disabled_when_read_tool_names_empty():
+    '未说明'
     app_config = _make_app_config()
     app_config.summarization.skill_file_read_tool_names = []
     middleware = ToolErrorHandlingMiddleware(app_config=app_config)
@@ -398,10 +401,12 @@ def test_skill_metadata_disabled_when_read_tool_names_empty():
 
 
 def test_wrap_tool_call_returns_error_tool_message_on_exception():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="web_search", tool_call_id="tc-42")
 
     def _boom(_req):
+        '未说明'
         raise RuntimeError("network down")
 
     result = middleware.wrap_tool_call(req, _boom)
@@ -415,10 +420,12 @@ def test_wrap_tool_call_returns_error_tool_message_on_exception():
 
 
 def test_wrap_tool_call_stamps_tool_meta_on_exception():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="web_search", tool_call_id="tc-42")
 
     def _boom(_req):
+        '未说明'
         raise ConnectionError("connection refused")
 
     result = middleware.wrap_tool_call(req, _boom)
@@ -432,10 +439,12 @@ def test_wrap_tool_call_stamps_tool_meta_on_exception():
 
 
 def test_task_exception_wrapper_uses_subagent_result_formatter():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="task", tool_call_id="tc-task")
 
     def _boom(_req):
+        '未说明'
         raise RuntimeError("network down")
 
     result = middleware.wrap_tool_call(req, _boom)
@@ -450,10 +459,12 @@ def test_task_exception_wrapper_uses_subagent_result_formatter():
 
 
 def test_wrap_tool_call_uses_fallback_tool_call_id_when_missing():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="mcp_tool", tool_call_id=None)
 
     def _boom(_req):
+        '未说明'
         raise ValueError("bad request")
 
     result = middleware.wrap_tool_call(req, _boom)
@@ -465,10 +476,12 @@ def test_wrap_tool_call_uses_fallback_tool_call_id_when_missing():
 
 
 def test_wrap_tool_call_reraises_graph_interrupt():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="ask_clarification", tool_call_id="tc-int")
 
     def _interrupt(_req):
+        '未说明'
         raise GraphInterrupt(())
 
     with pytest.raises(GraphInterrupt):
@@ -477,10 +490,12 @@ def test_wrap_tool_call_reraises_graph_interrupt():
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_returns_error_tool_message_on_exception():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="mcp_tool", tool_call_id="tc-async")
 
     async def _boom(_req):
+        '未说明'
         raise TimeoutError("request timed out")
 
     result = await middleware.awrap_tool_call(req, _boom)
@@ -494,10 +509,12 @@ async def test_awrap_tool_call_returns_error_tool_message_on_exception():
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_reraises_graph_interrupt():
+    '未说明'
     middleware = ToolErrorHandlingMiddleware()
     req = _request(name="ask_clarification", tool_call_id="tc-int-async")
 
     async def _interrupt(_req):
+        '未说明'
         raise GraphInterrupt(())
 
     with pytest.raises(GraphInterrupt):
@@ -505,6 +522,7 @@ async def test_awrap_tool_call_reraises_graph_interrupt():
 
 
 def test_subagent_runtime_middlewares_include_view_image_for_vision_model(monkeypatch):
+    '未说明'
     app_config = _make_app_config(supports_vision=True)
     _stub_runtime_middleware_imports(monkeypatch)
 
@@ -514,6 +532,7 @@ def test_subagent_runtime_middlewares_include_view_image_for_vision_model(monkey
 
 
 def test_subagent_runtime_middlewares_include_view_image_for_default_vision_model(monkeypatch):
+    '未说明'
     app_config = _make_app_config(supports_vision=True)
     _stub_runtime_middleware_imports(monkeypatch)
 
@@ -523,6 +542,7 @@ def test_subagent_runtime_middlewares_include_view_image_for_default_vision_mode
 
 
 def test_subagent_runtime_middlewares_skip_view_image_for_text_model(monkeypatch):
+    '未说明'
     app_config = _make_app_config(supports_vision=False)
     _stub_runtime_middleware_imports(monkeypatch)
 
@@ -532,7 +552,7 @@ def test_subagent_runtime_middlewares_skip_view_image_for_text_model(monkeypatch
 
 
 def test_subagent_runtime_middlewares_attach_deferred_filter_when_setup_has_names(monkeypatch):
-    """A subagent built with deferred MCP tools gets DeferredToolFilterMiddleware, positioned before SafetyFinishReasonMiddleware (mirrors the lead ordering)."""
+    '未说明'
     from langchain_core.tools import tool as as_tool
 
     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
@@ -545,7 +565,7 @@ def test_subagent_runtime_middlewares_attach_deferred_filter_when_setup_has_name
 
     @as_tool
     def mcp_thing(x: str) -> str:
-        "deferred mcp tool"
+        '未说明'
         return x
 
     setup = build_deferred_tool_setup([tag_mcp_tool(mcp_thing)], enabled=True)
@@ -561,6 +581,7 @@ def test_subagent_runtime_middlewares_attach_deferred_filter_when_setup_has_name
 
 
 def test_subagent_runtime_middlewares_place_mcp_routing_before_deferred_filter(monkeypatch):
+    '未说明'
     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
     from deerflow.agents.middlewares.mcp_routing_middleware import McpRoutingMiddleware
     from deerflow.tools.builtins.tool_search import DeferredToolSetup
@@ -578,7 +599,7 @@ def test_subagent_runtime_middlewares_place_mcp_routing_before_deferred_filter(m
 
 
 def test_subagent_runtime_middlewares_skip_deferred_filter_without_names(monkeypatch):
-    """No deferred setup (disabled / no MCP tool) -> no DeferredToolFilterMiddleware."""
+    '未说明'
     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
     from deerflow.tools.builtins.tool_search import DeferredToolSetup
 
@@ -591,10 +612,7 @@ def test_subagent_runtime_middlewares_skip_deferred_filter_without_names(monkeyp
 
 
 def test_subagent_runtime_middlewares_attach_loop_detection_when_enabled(monkeypatch):
-    """Subagents must inherit the lead's LoopDetectionMiddleware so a degenerate
-    tool loop is broken instead of burning tokens until ``max_turns`` (#3875).
-    ``loop_detection.enabled`` defaults to True, so the default subagent chain
-    carries the guard. Phase 1 of #3875."""
+    '未说明'
     from deerflow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
 
     app_config = _make_app_config()
@@ -607,8 +625,7 @@ def test_subagent_runtime_middlewares_attach_loop_detection_when_enabled(monkeyp
 
 
 def test_subagent_runtime_middlewares_omit_loop_detection_when_disabled(monkeypatch):
-    """``loop_detection.enabled=False`` must drop the guard from the subagent
-    chain, mirroring the lead's gate (``lead_agent/agent.py``)."""
+    '未说明'
     from deerflow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
     from deerflow.config.loop_detection_config import LoopDetectionConfig
 
@@ -621,12 +638,7 @@ def test_subagent_runtime_middlewares_omit_loop_detection_when_disabled(monkeypa
 
 
 def test_subagent_runtime_middlewares_place_loop_detection_before_safety_finish(monkeypatch):
-    """LoopDetectionMiddleware must be registered before SafetyFinishReasonMiddleware
-    (earlier in the middleware list). LangChain dispatches after_model hooks in
-    reverse registration order, so SafetyFinishReasonMiddleware (registered
-    later) executes first — the placement its docstring requires and the lead
-    chain (``lead_agent/agent.py``) uses. The assertion pins registration order,
-    not execution order."""
+    '未说明'
     from deerflow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
     from deerflow.agents.middlewares.safety_finish_reason_middleware import SafetyFinishReasonMiddleware
 
@@ -641,16 +653,7 @@ def test_subagent_runtime_middlewares_place_loop_detection_before_safety_finish(
 
 
 def test_subagent_runtime_middlewares_attach_durable_context_before_summarization(monkeypatch):
-    """Subagents must project ``summary_text`` back into model requests after
-    compaction, just like the lead agent does.
-
-    Without ``DurableContextMiddleware``, a message-count keep policy can
-    retain only an assistant tool-call plus its tool results. The summary is
-    stored in ``ThreadState.summary_text`` but never reaches the next request,
-    so strict providers reject the assistant-first history. The durable
-    context layer must use the same skill settings as the lead chain and run
-    before summarization.
-    """
+    '未说明'
     from deerflow.agents.middlewares import summarization_middleware as sm
     from deerflow.agents.middlewares.durable_context_middleware import DurableContextMiddleware
 
@@ -658,6 +661,7 @@ def test_subagent_runtime_middlewares_attach_durable_context_before_summarizatio
     captured: dict[str, object] = {}
 
     def fake_create_summarization_middleware(*, app_config=None, keep=None, skip_memory_flush=False):
+        '未说明'
         captured["app_config"] = app_config
         captured["keep"] = keep
         captured["skip_memory_flush"] = skip_memory_flush
@@ -690,13 +694,7 @@ def test_subagent_runtime_middlewares_attach_durable_context_before_summarizatio
 
 
 def test_subagent_compaction_injects_summary_before_assistant_tool_tail(monkeypatch):
-    """A three-tool turn with ``keep=4`` must remain provider-valid.
-
-    This reproduces the production failure shape: compaction preserves an
-    assistant tool-call plus three tool results while removing the original
-    system/user messages. The subagent chain must inject the generated summary
-    as durable human context before that tail reaches the model.
-    """
+    '未说明'
     from langchain.agents import create_agent
     from langchain_core.language_models import BaseChatModel
     from langchain_core.messages import AIMessage, HumanMessage, SystemMessage, ToolMessage
@@ -709,17 +707,21 @@ def test_subagent_compaction_injects_summary_before_assistant_tool_tail(monkeypa
     from deerflow.config.summarization_config import ContextSize, SummarizationConfig
 
     class _StaticModel(BaseChatModel):
+        '未说明'
         text: str
         require_durable_summary: bool = False
 
         @property
         def _llm_type(self) -> str:
+            '未说明'
             return "static"
 
         def bind_tools(self, tools, **kwargs):
+            '未说明'
             return self
 
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            '未说明'
             if self.require_durable_summary:
                 first_ai = next(i for i, message in enumerate(messages) if isinstance(message, AIMessage))
                 durable = [(i, message) for i, message in enumerate(messages) if isinstance(message, HumanMessage) and message.additional_kwargs.get("durable_context_data")]
@@ -778,22 +780,7 @@ def test_subagent_compaction_injects_summary_before_assistant_tool_tail(monkeypa
 
 
 def test_subagent_chain_coalesces_durable_authority_system_message(monkeypatch):
-    """The durable-context authority SystemMessage must not survive as a second one.
-
-    Subagents carry their system prompt as a leading ``SystemMessage`` in
-    ``messages`` (``create_agent(system_prompt=None)``), and
-    ``DurableContextMiddleware`` inserts ``SystemMessage(authority_contract)``
-    directly after it whenever durable data (summary / delegations / skills) is
-    present. That leaves two adjacent system messages — the exact non-leading /
-    duplicate-system shape strict OpenAI-compatible providers reject and the
-    same #4039 failure class the durable fix set out to avoid.
-
-    ``build_subagent_runtime_middlewares`` must therefore pair durable context
-    with ``SystemMessageCoalescingMiddleware`` (#4040). This drives the real
-    builder output through a strict model and asserts the outgoing request keeps
-    exactly one leading ``SystemMessage``. Remove the coalescer from the builder
-    and the model sees ``[System(base), System(authority), ...]`` and this fails.
-    """
+    '未说明'
     from langchain.agents import create_agent
     from langchain_core.language_models import BaseChatModel
     from langchain_core.messages import AIMessage, SystemMessage, ToolMessage
@@ -806,14 +793,18 @@ def test_subagent_chain_coalesces_durable_authority_system_message(monkeypatch):
     seen: dict[str, list[int]] = {}
 
     class _StrictModel(BaseChatModel):
+        '未说明'
         @property
         def _llm_type(self) -> str:
+            '未说明'
             return "strict"
 
         def bind_tools(self, tools, **kwargs):
+            '未说明'
             return self
 
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            '未说明'
             seen["system_indices"] = [i for i, message in enumerate(messages) if isinstance(message, SystemMessage)]
             return ChatResult(generations=[ChatGeneration(message=AIMessage(content="ok"))])
 
@@ -844,9 +835,7 @@ def test_subagent_chain_coalesces_durable_authority_system_message(monkeypatch):
 
 
 def test_subagent_runtime_middlewares_omit_summarization_when_factory_returns_none(monkeypatch):
-    """When ``summarization.enabled`` is False the shared factory returns None and
-    the subagent chain must NOT carry a summarization middleware — the default
-    state, since SummarizationConfig.enabled defaults to False."""
+    '未说明'
     from deerflow.agents.middlewares.summarization_middleware import DeerFlowSummarizationMiddleware
 
     app_config = _make_app_config()  # summarization.enabled defaults to False
@@ -858,19 +847,7 @@ def test_subagent_runtime_middlewares_omit_summarization_when_factory_returns_no
 
 
 def test_lead_runtime_chain_finds_historical_uploads_under_lazy_init_false(tmp_path, monkeypatch):
-    """Integration anchor for the ThreadData → Uploads ordering.
-
-    Under lazy_init=False, ThreadDataMiddleware eagerly creates the thread
-    directories in before_agent. UploadsMiddleware then scans the uploads
-    directory. Running both middlewares via the real build_lead_runtime_middlewares
-    chain (TD before UM) must surface pre-existing historical files in the
-    injected <uploaded_files> context.
-
-    This complements the static order contract
-    (test_build_lead_runtime_middlewares_orders_thread_data_before_uploads):
-    that test pins the chain position; this test pins the observable behavior
-    at that position.
-    """
+    '未说明'
     from langchain_core.messages import HumanMessage
     from langgraph.runtime import Runtime
 
@@ -912,18 +889,7 @@ def test_lead_runtime_chain_finds_historical_uploads_under_lazy_init_false(tmp_p
 
 
 def test_subagent_summarization_fires_mid_run_and_produces_usable_result(monkeypatch):
-    """Integration coverage for #3875 Phase 3 review gap: drive the REAL
-    ``DeerFlowSummarizationMiddleware`` (the exact instance the subagent chain
-    gets via ``create_summarization_middleware(skip_memory_flush=True)``) through
-    a ``create_agent`` run, and assert that (a) compaction actually fires mid-run
-    (messages channel contracts via ``RemoveMessage``) and (b) the run still
-    completes with a usable final answer — not just wiring.
-
-    The builder-wiring test above proves the middleware lands on the chain; this
-    proves the live middleware triggers and the run survives it. We bypass the
-    full ``build_subagent_runtime_middlewares`` chain (whose sandbox/thread-data
-    stubs aren't AgentMiddleware-compatible for a live run) and use the factory
-    directly — the same instance the builder appends."""
+    '未说明'
     from langchain.agents import create_agent
     from langchain_core.language_models import BaseChatModel
     from langchain_core.messages import AIMessage, HumanMessage, RemoveMessage
@@ -941,16 +907,20 @@ def test_subagent_summarization_fires_mid_run_and_produces_usable_result(monkeyp
     # single turn but the input already exceeds the trigger threshold, forcing
     # before_model compaction on the first (and only) model call.
     class _StaticModel(BaseChatModel):
+        '未说明'
         text: str = "final answer after compaction"
 
         @property
         def _llm_type(self) -> str:
+            '未说明'
             return "static"
 
         def bind_tools(self, tools, **kwargs):
+            '未说明'
             return self
 
         def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+            '未说明'
             return ChatResult(generations=[ChatGeneration(message=AIMessage(content=self.text))])
 
     static_model = _StaticModel()

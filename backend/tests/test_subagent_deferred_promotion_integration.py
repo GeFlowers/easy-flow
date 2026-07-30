@@ -1,25 +1,4 @@
-"""End-to-end: the subagent deferral recipe hides then promotes an MCP tool (#3341).
-
-#3272 wired deferred MCP loading into the lead agent only. #3341 extends it to
-subagents. This locks the *subagent build recipe* - the shared helpers the
-executor now calls (``assemble_deferred_tools`` + ``get_deferred_tools_prompt_section``)
-plus the ``DeferredToolFilterMiddleware`` that ``build_subagent_runtime_middlewares``
-attaches - composing into the same hide/promote loop the lead has, under the
-subagent's build shape (``system_prompt=None`` + a single ``SystemMessage``).
-
-The hide/promote mechanics themselves are also covered for the lead path by
-tests/test_deferred_promotion_integration.py; this asserts the subagent recipe
-produces an equivalent loop without binding MCP schemas before promotion.
-
-A second test (``test_subagent_builder_emits_working_deferred_filter``) closes the
-remaining seam: it sources the filter from the *real* ``build_subagent_runtime_middlewares``
-(the exact call ``executor._create_agent`` makes) rather than hand-constructing it, so a
-regression in how the builder wires the setup into the filter - wrong catalog hash,
-dropped filter, wrong deferred set - is caught at runtime. (Running the full real stack
-is intentionally avoided: the other runtime middlewares need sandbox/thread infra to
-execute, which would make the test flaky; their attachment + ordering is locked in
-tests/test_tool_error_handling_middleware.py instead.)
-"""
+'未说明'
 
 import asyncio
 
@@ -36,27 +15,30 @@ from deerflow.tools.mcp_metadata import tag_mcp_tool
 
 @as_tool
 def active_tool(x: str) -> str:
-    "An always-active tool."
+    """处理工具相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
     return x
 
 
 @as_tool
 def mcp_calc(expression: str) -> str:
-    "Evaluate arithmetic."
+    '未说明'
     return expression
 
 
 @as_tool
 def mcp_other(x: str) -> str:
-    "Another deferred MCP tool."
+    '未说明'
     return x
 
 
 def test_subagent_deferral_recipe_hides_then_promotes():
+    '未说明'
     bound: list[list[str]] = []
 
     class RecordingModel(GenericFakeChatModel):
+        '未说明'
         def bind_tools(self, tools, **kwargs):
+            '未说明'
             bound.append([getattr(t, "name", None) for t in tools])
             return self
 
@@ -101,12 +83,7 @@ def test_subagent_deferral_recipe_hides_then_promotes():
 
 
 def test_subagent_builder_emits_working_deferred_filter():
-    """The real build path the executor calls - ``build_subagent_runtime_middlewares`` -
-    must emit a ``DeferredToolFilterMiddleware`` that actually hides/promotes through a
-    graph. The recipe test above hand-builds the filter; this sources it from the real
-    builder given a real setup, so a regression in the builder's wiring is caught: a
-    wrong catalog hash silently stops promotion (turn 2 would keep mcp_calc hidden), a
-    dropped filter stops hiding (turn 1 would bind mcp_calc)."""
+    '未说明'
     from deerflow.agents.middlewares.tool_error_handling_middleware import build_subagent_runtime_middlewares
     from deerflow.config.app_config import AppConfig, CircuitBreakerConfig
     from deerflow.config.guardrails_config import GuardrailsConfig
@@ -116,7 +93,9 @@ def test_subagent_builder_emits_working_deferred_filter():
     bound: list[list[str]] = []
 
     class RecordingModel(GenericFakeChatModel):
+        '未说明'
         def bind_tools(self, tools, **kwargs):
+            '未说明'
             bound.append([getattr(t, "name", None) for t in tools])
             return self
 

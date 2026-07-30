@@ -1,10 +1,10 @@
-"""Configuration for automatic thread title generation."""
+"""提供配置、title、配置相关功能。"""
 
 from pydantic import BaseModel, Field
 
 
 class TitleConfig(BaseModel):
-    """Configuration for automatic thread title generation."""
+    """\u6267\u884c TitleConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=True,
@@ -32,35 +32,28 @@ class TitleConfig(BaseModel):
     )
 
 
-# Global configuration instance
+# 中文说明：此处用于执行相关处理。
 _title_config: TitleConfig = TitleConfig()
 
 
 def get_title_config() -> TitleConfig:
-    """Get the current title configuration."""
+    """\u6267\u884c get_title_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return _title_config
 
 
 def set_title_config(config: TitleConfig) -> None:
-    """Set the title configuration."""
+    """\u6267\u884c set_title_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _title_config
     _title_config = config
 
 
 def load_title_config_from_dict(config_dict: dict) -> None:
-    """Load title configuration from a dictionary."""
+    """\u6267\u884c load_title_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _title_config
     _title_config = TitleConfig(**config_dict)
 
 
 def reset_title_config() -> None:
-    """Restore the title configuration to its pristine ``TitleConfig()`` default.
-
-    Public API so that tests do not have to reach into the private
-    ``_title_config`` module attribute. ``AppConfig.from_file()`` calls
-    :func:`load_title_config_from_dict`, which permanently mutates the
-    singleton; tests that need a clean slate between cases should call
-    this between tests.
-    """
+    """\u6267\u884c reset_title_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _title_config
     _title_config = TitleConfig()

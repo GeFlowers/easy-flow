@@ -1,8 +1,10 @@
+'未说明'
 from deerflow.config.app_config import AppConfig
 from deerflow.persistence.models import ScheduledTaskRow, ScheduledTaskRunRow
 
 
 def test_app_config_exposes_scheduler_section():
+    '未说明'
     config = AppConfig.model_validate(
         {
             "models": [],
@@ -15,5 +17,6 @@ def test_app_config_exposes_scheduler_section():
 
 
 def test_scheduled_task_models_registered():
+    '未说明'
     assert ScheduledTaskRow.__tablename__ == "scheduled_tasks"
     assert ScheduledTaskRunRow.__tablename__ == "scheduled_task_runs"

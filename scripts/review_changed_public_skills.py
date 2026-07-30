@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run deterministic skill review for changed public skills."""
+"""本脚本负责审查 变更 公开。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -22,11 +22,13 @@ EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 @dataclass(frozen=True)
 class ChangedPath:
+    '未说明'
     status: str
     path: PurePosixPath
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    '未说明'
     args = parse_args(argv)
     repo_root = args.repo_root.resolve()
     diff_args = build_diff_args(args)
@@ -82,6 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
+    '未说明'
     parser = argparse.ArgumentParser(description=("Review public skill packages whose SKILL.md changed in a PR or push diff."))
     parser.add_argument(
         "--base-ref",
@@ -123,6 +126,7 @@ def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
 
 
 def build_diff_args(args: argparse.Namespace) -> list[str]:
+    """执行构建对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if args.base_ref and args.head_ref:
         return ["--name-status", "-z", f"{args.base_ref}...{args.head_ref}"]
 
@@ -134,12 +138,14 @@ def build_diff_args(args: argparse.Namespace) -> list[str]:
 
 
 def build_force_push_fallback_diff_args(args: argparse.Namespace) -> list[str] | None:
+    """执行构建对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not args.before or not args.after or is_zero_sha(str(args.before)):
         return None
     return ["--name-status", "-z", EMPTY_TREE_SHA, str(args.after)]
 
 
 def parse_name_status(output: bytes) -> list[ChangedPath]:
+    '未说明'
     parts = [part for part in output.split(b"\0") if part]
     changes: list[ChangedPath] = []
     index = 0
@@ -161,6 +167,7 @@ def parse_name_status(output: bytes) -> list[ChangedPath]:
 
 
 def select_skill_packages(changes: Sequence[ChangedPath], repo_root: Path) -> list[Path]:
+    """执行技能对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     package_statuses: dict[PurePosixPath, list[str]] = {}
     resolutions: list[tuple[ChangedPath, PurePosixPath]] = []
 
@@ -200,30 +207,26 @@ def select_skill_packages(changes: Sequence[ChangedPath], repo_root: Path) -> li
 
 
 def is_fully_removed_package(package_rel: PurePosixPath, statuses: Sequence[str], repo_root: Path) -> bool:
-    """Whether every changed file that resolved to ``package_rel`` was a deletion and the
-    package directory itself no longer exists on disk.
-
-    This identifies a whole public skill package being intentionally deleted (all of its
-    files removed, not just SKILL.md), as distinct from a package left in a broken/partial
-    state (e.g. SKILL.md deleted while other package files remain on disk) — the latter
-    must still be reviewed and flagged.
-    """
+    '未说明'
     if not all(status.startswith("D") for status in statuses):
         return False
     return not (repo_root / package_rel).is_dir()
 
 
 def is_public_skill_md(path: PurePosixPath) -> bool:
+    """执行公开 技能对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     parts = path.parts
     return len(parts) >= 4 and parts[0] == "skills" and parts[1] == "public" and parts[-1] == "SKILL.md" and not _is_eval_fixture_skill_md(path)
 
 
 def is_public_skill_package_path(path: PurePosixPath) -> bool:
+    """执行公开 技能 路径对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     parts = path.parts
     return len(parts) >= 3 and parts[0] == "skills" and parts[1] == "public"
 
 
 def find_public_skill_package(path: PurePosixPath, repo_root: Path) -> PurePosixPath | None:
+    """执行公开 技能对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not is_public_skill_package_path(path):
         return None
 
@@ -240,12 +243,14 @@ def find_public_skill_package(path: PurePosixPath, repo_root: Path) -> PurePosix
 
 
 def _is_eval_fixture_skill_md(path: PurePosixPath) -> bool:
+    '未说明'
     from deerflow.skills.package_paths import is_eval_fixture_skill_md
 
     return is_eval_fixture_skill_md(path)
 
 
 def run_review(package: Path, repo_root: Path, python_executable: str) -> int:
+    """执行运行 审查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     package_rel = package.relative_to(repo_root).as_posix()
     command = [
         python_executable,
@@ -286,6 +291,7 @@ def run_review(package: Path, repo_root: Path, python_executable: str) -> int:
 
 
 def review_env(repo_root: Path) -> dict[str, str]:
+    """执行审查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     env = os.environ.copy()
     harness_path = repo_root / "backend" / "packages" / "harness"
     existing_pythonpath = env.get("PYTHONPATH")
@@ -294,6 +300,7 @@ def review_env(repo_root: Path) -> dict[str, str]:
 
 
 def is_zero_sha(value: str) -> bool:
+    '未说明'
     return len(value) in {40, 64} and set(value) == {"0"}
 
 

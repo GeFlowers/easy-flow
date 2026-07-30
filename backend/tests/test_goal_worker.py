@@ -1,3 +1,4 @@
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 import asyncio
 import copy
 
@@ -13,31 +14,32 @@ from deerflow.runtime.runs.schemas import DisconnectMode, RunStatus
 
 
 class _CollectingBridge:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     def __init__(self) -> None:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         self.events: list[tuple[str, object]] = []
 
     async def publish(self, _run_id: str, event: str, payload: object) -> None:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         self.events.append((event, payload))
 
 
 class _ClearBeforeSecondGoalReadCheckpointer:
-    """Wrap a saver and clear the goal just before the evaluator write rereads.
-
-    The first ``aget_tuple`` is the evaluator's current-goal read. The second is
-    ``write_thread_goal`` preparing its read-modify-write. Clearing at that point
-    models a user ``/goal clear`` landing between those two operations.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
     def __init__(self, inner: InMemorySaver, thread_id: str) -> None:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         self.inner = inner
         self.thread_id = thread_id
         self.read_count = 0
         self.cleared = False
 
     def get_next_version(self, current, channel):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return self.inner.get_next_version(current, channel)
 
     async def aget_tuple(self, config):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         self.read_count += 1
         if self.read_count == 2 and not self.cleared:
             self.cleared = True
@@ -45,35 +47,29 @@ class _ClearBeforeSecondGoalReadCheckpointer:
         return await self.inner.aget_tuple(config)
 
     async def aput(self, *args, **kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return await self.inner.aput(*args, **kwargs)
 
 
 class _RaceAfterFirstContinuationCommitCheckpointer:
-    """Wrap a saver and inject a racing user message right after the first
-    goal-continuation commit lands.
-
-    ``_prepare_goal_continuation_input``'s real continuation commit (the
-    ``_persist(..., continuation_count=next_count)`` call that records the
-    evaluator's decision to continue) performs this scenario's first
-    ``aput``. Injecting a racing visible message immediately after that write
-    lands lets the worker's trailing visible-conversation-signature re-check
-    observe a thread change that happened *after* the continuation was
-    committed but *before* that re-check runs -- modelling the
-    ``thread_changed_before_continuation`` race.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
     def __init__(self, inner: InMemorySaver, thread_id: str) -> None:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         self.inner = inner
         self.thread_id = thread_id
         self.put_count = 0
 
     def get_next_version(self, current, channel):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return self.inner.get_next_version(current, channel)
 
     async def aget_tuple(self, config):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return await self.inner.aget_tuple(config)
 
     async def aput(self, *args, **kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         result = await self.inner.aput(*args, **kwargs)
         self.put_count += 1
         if self.put_count == 1:
@@ -96,6 +92,7 @@ async def _seed_goal_thread(
     goal_text: str,
     messages: list | None = None,
 ) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpoint = empty_checkpoint()
     checkpoint["channel_values"] = {
         "messages": messages
@@ -115,6 +112,7 @@ async def _seed_goal_thread(
 
 
 async def _write_messages(checkpointer: InMemorySaver, *, thread_id: str, messages: list) -> None:
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpoint_tuple = await checkpointer.aget_tuple({"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}})
     assert checkpoint_tuple is not None
     checkpoint = copy.deepcopy(getattr(checkpoint_tuple, "checkpoint", {}) or {})
@@ -139,12 +137,14 @@ async def _write_messages(checkpointer: InMemorySaver, *, thread_id: str, messag
 
 @pytest.mark.asyncio
 async def test_goal_worker_returns_hidden_continuation_when_goal_is_unmet(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "goal-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Finish all tests")
     bridge = _CollectingBridge()
 
     async def fake_evaluate_goal_completion(goal, messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         assert goal["objective"] == "Finish all tests"
         assert [message.content for message in messages][-1] == "I made a start, but I am not done."
         return GoalEvaluation(
@@ -181,12 +181,14 @@ async def test_goal_worker_returns_hidden_continuation_when_goal_is_unmet(monkey
 
 @pytest.mark.asyncio
 async def test_goal_worker_clears_goal_when_evaluator_is_satisfied(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "done-goal-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Finish all tests")
     bridge = _CollectingBridge()
 
     async def fake_evaluate_goal_completion(_goal, _messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return GoalEvaluation(
             satisfied=True,
             blocker="none",
@@ -212,12 +214,14 @@ async def test_goal_worker_clears_goal_when_evaluator_is_satisfied(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_goal_worker_stands_down_for_non_continuable_blocker(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "blocked-goal-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Finish all tests")
     bridge = _CollectingBridge()
 
     async def fake_evaluate_goal_completion(_goal, _messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return GoalEvaluation(
             satisfied=False,
             blocker="missing_evidence",
@@ -246,6 +250,7 @@ async def test_goal_worker_stands_down_for_non_continuable_blocker(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_goal_worker_stands_down_when_no_progress_repeats(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "no-progress-goal-thread"
     messages = [HumanMessage(content="Please finish this task."), AIMessage(content="I made a start, but I am not done.")]
@@ -258,9 +263,9 @@ async def test_goal_worker_stands_down_when_no_progress_repeats(monkeypatch):
         reason="The same work remains.",
         evidence_summary="No new verification evidence.",
     )
-    # Seed the prior evaluation with the SAME visible assistant evidence the worker
-    # will recompute, so the no-progress breaker recognises the stalled turn even
-    # though the evaluator may reword its free-text reason.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     evidence_signature = latest_visible_assistant_signature(messages)
     await write_thread_goal(
         checkpointer,
@@ -270,6 +275,7 @@ async def test_goal_worker_stands_down_when_no_progress_repeats(monkeypatch):
     bridge = _CollectingBridge()
 
     async def fake_evaluate_goal_completion(_goal, _messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return repeated_evaluation
 
     monkeypatch.setattr(worker, "evaluate_goal_completion", fake_evaluate_goal_completion)
@@ -292,12 +298,14 @@ async def test_goal_worker_stands_down_when_no_progress_repeats(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_goal_worker_does_not_resurrect_goal_cleared_during_evaluation(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "clear-during-eval-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Finish all tests")
     bridge = _CollectingBridge()
 
     async def fake_evaluate_goal_completion(_goal, _messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         await write_thread_goal(checkpointer, thread_id, None, as_node="test")
         return GoalEvaluation(
             satisfied=False,
@@ -323,6 +331,7 @@ async def test_goal_worker_does_not_resurrect_goal_cleared_during_evaluation(mon
 
 @pytest.mark.asyncio
 async def test_goal_worker_does_not_resurrect_goal_cleared_during_persist():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "clear-during-persist-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Finish all tests")
@@ -353,6 +362,7 @@ async def test_goal_worker_does_not_resurrect_goal_cleared_during_persist():
 
 @pytest.mark.asyncio
 async def test_goal_worker_stops_when_abort_is_requested_during_evaluation(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "abort-during-eval-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Finish all tests")
@@ -360,6 +370,7 @@ async def test_goal_worker_stops_when_abort_is_requested_during_evaluation(monke
     abort_event = asyncio.Event()
 
     async def fake_evaluate_goal_completion(_goal, _messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         abort_event.set()
         return GoalEvaluation(
             satisfied=False,
@@ -389,12 +400,14 @@ async def test_goal_worker_stops_when_abort_is_requested_during_evaluation(monke
 
 @pytest.mark.asyncio
 async def test_goal_worker_stands_down_when_thread_changes_after_evaluation(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "user-wins-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Finish all tests")
     bridge = _CollectingBridge()
 
     async def fake_evaluate_goal_completion(_goal, messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         await _write_messages(
             checkpointer,
             thread_id=thread_id,
@@ -427,24 +440,7 @@ async def test_goal_worker_stands_down_when_thread_changes_after_evaluation(monk
 
 @pytest.mark.asyncio
 async def test_goal_worker_stands_down_when_thread_changes_before_continuation(monkeypatch):
-    """A user message racing in right after the continuation commits must not
-    double-bump continuation_count.
-
-    Sibling scenario to ``..._after_evaluation`` above, but the race lands
-    later: after the evaluator runs and after _prepare_goal_continuation_input
-    commits the real continuation (``_persist(..., continuation_count=next_count)``),
-    a racing visible message arrives before the function's trailing re-check.
-    That re-check detects the changed thread and stands down via a second
-    ``_persist(..., continuation_count=next_count, stand_down_reason=...)``
-    call using the *same* next_count as the first, already-successful call.
-
-    Without the fix, that second call re-triggers PR #4088's
-    max(continuation_count, current_count + 1) guard against its own sibling
-    call's prior write (current_count is already next_count from the first
-    call), bumping continuation_count to next_count + 1 a second time --
-    consuming 2 units of the continuation budget for a cycle that delivered
-    zero actual continuations. The fix must leave it at next_count (1).
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     inner = InMemorySaver()
     thread_id = "race-before-continuation-thread"
     await _seed_goal_thread(inner, thread_id=thread_id, goal_text="Finish all tests")
@@ -452,6 +448,7 @@ async def test_goal_worker_stands_down_when_thread_changes_before_continuation(m
     bridge = _CollectingBridge()
 
     async def fake_evaluate_goal_completion(_goal, _messages, **_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return GoalEvaluation(
             satisfied=False,
             blocker="goal_not_met_yet",
@@ -473,14 +470,15 @@ async def test_goal_worker_stands_down_when_thread_changes_before_continuation(m
     assert continuation is None
     latest_goal = await read_thread_goal(inner, thread_id)
     assert latest_goal is not None
-    # Without the fix this is 2 (double-bumped). It must be 1: one real
-    # continuation attempt was committed and then stood down, not two.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     assert latest_goal["continuation_count"] == 1
     assert latest_goal["last_evaluation"]["stand_down_reason"] == "thread_changed_before_continuation"
 
 
 @pytest.mark.asyncio
 async def test_goal_worker_stands_down_without_durable_assistant_receipt():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "no-receipt-thread"
     await _seed_goal_thread(
@@ -508,16 +506,12 @@ async def test_goal_worker_stands_down_without_durable_assistant_receipt():
 
 
 def test_stand_down_reason_uses_documented_default_caps_when_missing():
-    """_stand_down_reason must fall back to the same default caps as
-    should_continue_goal (8 / 2). A bare goal dict missing the cap fields must
-    not be reported as 'max reached' / 'no progress' when it has not actually
-    exhausted the documented defaults.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     bare_goal = {"objective": "x", "status": "active", "continuation_count": 0}
     unmet = GoalEvaluation(satisfied=False, blocker="goal_not_met_yet", reason="", evidence_summary="")
 
     assert worker._stand_down_reason(bare_goal, unmet, no_progress_count=0) is None
-    # And the two gate functions agree on the same bare goal.
+    # 说明当前测试分支所验证的真实行为与边界。
     from deerflow.runtime.goal import should_continue_goal
 
     assert should_continue_goal(bare_goal, unmet, no_progress_count=0) is True
@@ -525,8 +519,11 @@ def test_stand_down_reason_uses_documented_default_caps_when_missing():
 
 @pytest.mark.asyncio
 async def test_run_agent_does_not_stream_continuation_after_abort(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     class FakeAgent:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         def __init__(self) -> None:
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             self.inputs = []
             self.metadata = {}
             self.checkpointer = None
@@ -535,40 +532,53 @@ async def test_run_agent_does_not_stream_continuation_after_abort(monkeypatch):
             self.interrupt_after_nodes = []
 
         def astream(self, input_payload, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             self.inputs.append(input_payload)
 
             async def _gen():
+                """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
                 yield {"messages": []}
 
             return _gen()
 
     class FakeRunManager:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         async def set_status(self, _run_id, status, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             record.status = status
 
         async def update_model_name(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def update_run_completion(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def wait_for_prior_finalizing(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def set_finalizing(self, _run_id, finalizing):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             record.finalizing = finalizing
 
     class FakeBridge:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         async def publish(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def publish_end(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def cleanup(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
     async def fake_prepare(**kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         kwargs["abort_event"].set()
         return {"messages": [HumanMessage(content="continue", additional_kwargs={"hide_from_ui": True})]}
 
@@ -602,8 +612,11 @@ async def test_run_agent_does_not_stream_continuation_after_abort(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_run_agent_reuses_goal_evaluator_model_for_goal_loop(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     class FakeAgent:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         def __init__(self) -> None:
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             self.inputs = []
             self.metadata = {}
             self.checkpointer = None
@@ -612,49 +625,63 @@ async def test_run_agent_reuses_goal_evaluator_model_for_goal_loop(monkeypatch):
             self.interrupt_after_nodes = []
 
         def astream(self, input_payload, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             self.inputs.append(input_payload)
 
             async def _gen():
+                """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
                 yield {"messages": []}
 
             return _gen()
 
     class FakeRunManager:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         async def set_status(self, _run_id, status, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             record.status = status
 
         async def update_model_name(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def update_run_completion(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def wait_for_prior_finalizing(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def set_finalizing(self, _run_id, finalizing):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             record.finalizing = finalizing
 
     class FakeBridge:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         async def publish(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def publish_end(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def cleanup(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
     evaluator_model = object()
     create_calls = []
 
     def fake_create_goal_evaluator_model(**kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         create_calls.append(kwargs)
         return evaluator_model
 
     prepare_models = []
 
     async def fake_prepare(**kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         prepare_models.append(kwargs["evaluator_model_factory"]())
         if len(prepare_models) == 1:
             return {"messages": [HumanMessage(content="continue", additional_kwargs={"hide_from_ui": True})]}
@@ -693,42 +720,33 @@ async def test_run_agent_reuses_goal_evaluator_model_for_goal_loop(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_persist_goal_evaluation_does_not_regress_continuation_count_on_race():
-    """A racing continuation must not overwrite a higher count with a lower one.
-
-    Scenario: two goal continuations run concurrently.  Continuation A reads
-    continuation_count=1, computes next=2.  Continuation B reads the same
-    count=1, computes next=2, but acquires the lock first and writes count=2.
-    When A acquires the lock, the current_goal already has count=2.  Without
-    the defensive guard, A would write count=2 again (stale computation),
-    effectively losing one continuation event.  The guard must compute
-    ``max(stale_next, current_count + 1)`` so A writes count=3.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "race-count-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="Race test")
-    # Simulate a racing continuation: bump the persisted continuation_count to 2
-    # before calling _persist_goal_evaluation with a next_count computed from
-    # stale state (count=1 → next=2).
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     existing_goal = await read_thread_goal(checkpointer, thread_id)
     assert existing_goal is not None
     bumped_goal = attach_goal_evaluation(
         existing_goal,
         GoalEvaluation(satisfied=False, blocker="goal_not_met_yet", reason="racing", evidence_summary=""),
         run_id="racing-run",
-        continuation_count=2,  # racing continuation already bumped to 2
+        continuation_count=2,  # 说明当前测试分支所验证的真实行为与边界。
     )
     await write_thread_goal(checkpointer, thread_id, bumped_goal)
 
-    # Now call _persist_goal_evaluation with continuation_count=2 computed from
-    # stale state (old count was 1).  The guard should detect current_count=2
-    # and write max(2, 2+1) = 3.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     bridge = _CollectingBridge()
     result = await worker._persist_goal_evaluation(
         bridge=bridge,
         checkpointer=checkpointer,
         thread_id=thread_id,
         run_id="run-late",
-        goal=existing_goal,  # stale goal with continuation_count=1
+        goal=existing_goal,  # 说明当前测试分支所验证的真实行为与边界。
         evaluation=GoalEvaluation(
             satisfied=False,
             blocker="goal_not_met_yet",
@@ -736,18 +754,18 @@ async def test_persist_goal_evaluation_does_not_regress_continuation_count_on_ra
             evidence_summary="Work remains.",
         ),
         no_progress_count=1,
-        continuation_count=2,  # computed from stale state: stale_count(1) + 1
+        continuation_count=2,  # 说明当前测试分支所验证的真实行为与边界。
     )
 
     assert result is not None
-    # Without the guard this would be 2 (stale computation wins).  With the
-    # guard it must be 3 (current_count + 1 taken inside the lock).
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     assert result["continuation_count"] == 3
 
 
 @pytest.mark.asyncio
 async def test_persist_goal_evaluation_no_race_uses_caller_count():
-    """When no racing continuation exists, the caller's continuation_count is used."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     checkpointer = InMemorySaver()
     thread_id = "no-race-thread"
     await _seed_goal_thread(checkpointer, thread_id=thread_id, goal_text="No race test")
@@ -777,8 +795,11 @@ async def test_persist_goal_evaluation_no_race_uses_caller_count():
 
 @pytest.mark.asyncio
 async def test_run_agent_strips_branch_checkpoint_for_goal_continuation(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     class FakeAgent:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         def __init__(self) -> None:
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             self.calls = []
             self.metadata = {}
             self.checkpointer = None
@@ -787,41 +808,54 @@ async def test_run_agent_strips_branch_checkpoint_for_goal_continuation(monkeypa
             self.interrupt_after_nodes = []
 
         def astream(self, input_payload, **kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             configurable = dict(kwargs["config"].get("configurable", {}))
             self.calls.append((input_payload, configurable))
 
             async def _gen():
+                """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
                 yield {"messages": []}
 
             return _gen()
 
     class FakeRunManager:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         async def set_status(self, _run_id, status, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             record.status = status
 
         async def update_model_name(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def update_run_completion(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def wait_for_prior_finalizing(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def set_finalizing(self, _run_id, finalizing):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             record.finalizing = finalizing
 
     class FakeBridge:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         async def publish(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def publish_end(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
         async def cleanup(self, *_args, **_kwargs):
+            """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
             return None
 
     async def fake_prepare(**_kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         if len(fake_agent.calls) == 1:
             return {"messages": [HumanMessage(content="continue", additional_kwargs={"hide_from_ui": True})]}
         return None

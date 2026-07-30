@@ -1,4 +1,4 @@
-"""Gateway router for IM channel management."""
+"""IM 渠道管理的网关路由模块。"""
 
 from __future__ import annotations
 
@@ -17,18 +17,20 @@ _ADMIN_REQUIRED_DETAIL = "Admin privileges required to manage channel runtime wo
 
 
 class ChannelStatusResponse(BaseModel):
+    """渠道服务状态的 API 响应模型。"""
     service_running: bool
     channels: dict[str, dict]
 
 
 class ChannelRestartResponse(BaseModel):
+    """渠道重启结果的 API 响应模型。"""
     success: bool
     message: str
 
 
 @router.get("/", response_model=ChannelStatusResponse)
 async def get_channels_status() -> ChannelStatusResponse:
-    """Get the status of all IM channels."""
+    """获取所有 IM 渠道的运行状态。"""
     from app.channels.service import get_channel_service
 
     service = get_channel_service()
@@ -40,7 +42,7 @@ async def get_channels_status() -> ChannelStatusResponse:
 
 @router.post("/{name}/restart", response_model=ChannelRestartResponse)
 async def restart_channel(name: str, request: Request) -> ChannelRestartResponse:
-    """Restart a specific IM channel."""
+    """重启指定的 IM 渠道，需要管理员权限。"""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
 
     from app.channels.service import get_channel_service

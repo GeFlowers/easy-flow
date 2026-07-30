@@ -1,3 +1,4 @@
+'未说明'
 from pathlib import Path
 
 import pytest
@@ -6,6 +7,7 @@ from deerflow.skills.installer import resolve_skill_dir_from_archive
 
 
 def _write_skill(skill_dir: Path) -> None:
+    '未说明'
     skill_dir.mkdir(parents=True, exist_ok=True)
     (skill_dir / "SKILL.md").write_text(
         """---
@@ -20,6 +22,7 @@ description: Demo skill
 
 
 def test_resolve_skill_dir_ignores_macosx_wrapper(tmp_path: Path) -> None:
+    '未说明'
     _write_skill(tmp_path / "demo-skill")
     (tmp_path / "__MACOSX").mkdir()
 
@@ -27,6 +30,7 @@ def test_resolve_skill_dir_ignores_macosx_wrapper(tmp_path: Path) -> None:
 
 
 def test_resolve_skill_dir_ignores_hidden_top_level_entries(tmp_path: Path) -> None:
+    '未说明'
     _write_skill(tmp_path / "demo-skill")
     (tmp_path / ".DS_Store").write_text("metadata", encoding="utf-8")
 
@@ -34,6 +38,7 @@ def test_resolve_skill_dir_ignores_hidden_top_level_entries(tmp_path: Path) -> N
 
 
 def test_resolve_skill_dir_rejects_archive_with_only_metadata(tmp_path: Path) -> None:
+    '未说明'
     (tmp_path / "__MACOSX").mkdir()
     (tmp_path / ".DS_Store").write_text("metadata", encoding="utf-8")
 

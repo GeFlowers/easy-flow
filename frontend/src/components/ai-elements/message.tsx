@@ -21,10 +21,12 @@ import { createContext, memo, useContext, useEffect, useState } from "react";
 
 import { ClipboardSafeStreamdown } from "./streamdown";
 
+/** MessageProps 的公开类型定义。 */
 export type MessageProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
 };
 
+/** Message 组件：提供对应的界面结构与交互语义。 */
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
     className={cn(
@@ -36,8 +38,10 @@ export const Message = ({ className, from, ...props }: MessageProps) => (
   />
 );
 
+/** MessageContentProps 的公开类型定义。 */
 export type MessageContentProps = HTMLAttributes<HTMLDivElement>;
 
+/** MessageContent 组件：提供对应的界面结构与交互语义。 */
 export const MessageContent = ({
   children,
   className,
@@ -57,8 +61,10 @@ export const MessageContent = ({
   </div>
 );
 
+/** MessageActionsProps 的公开类型定义。 */
 export type MessageActionsProps = ComponentProps<"div">;
 
+/** MessageActions 组件：提供对应的界面结构与交互语义。 */
 export const MessageActions = ({
   className,
   children,
@@ -69,11 +75,13 @@ export const MessageActions = ({
   </div>
 );
 
+/** MessageActionProps 的公开类型定义。 */
 export type MessageActionProps = ComponentProps<typeof Button> & {
   tooltip?: string;
   label?: string;
 };
 
+/** MessageAction 组件：提供对应的界面结构与交互语义。 */
 export const MessageAction = ({
   tooltip,
   children,
@@ -118,6 +126,7 @@ const MessageBranchContext = createContext<MessageBranchContextType | null>(
   null,
 );
 
+/** useMessageBranch Hook：封装本模块所需的状态或上下文访问。 */
 const useMessageBranch = () => {
   const context = useContext(MessageBranchContext);
 
@@ -130,11 +139,13 @@ const useMessageBranch = () => {
   return context;
 };
 
+/** MessageBranchProps 的公开类型定义。 */
 export type MessageBranchProps = HTMLAttributes<HTMLDivElement> & {
   defaultBranch?: number;
   onBranchChange?: (branchIndex: number) => void;
 };
 
+/** MessageBranch 组件：提供对应的界面结构与交互语义。 */
 export const MessageBranch = ({
   defaultBranch = 0,
   onBranchChange,
@@ -180,8 +191,10 @@ export const MessageBranch = ({
   );
 };
 
+/** MessageBranchContentProps 的公开类型定义。 */
 export type MessageBranchContentProps = HTMLAttributes<HTMLDivElement>;
 
+/** MessageBranchContent 组件：提供对应的界面结构与交互语义。 */
 export const MessageBranchContent = ({
   children,
   ...props
@@ -189,7 +202,7 @@ export const MessageBranchContent = ({
   const { currentBranch, setBranches, branches } = useMessageBranch();
   const childrenArray = Array.isArray(children) ? children : [children];
 
-  // Use useEffect to update branches when they change
+  // 分支集合变化时同步当前分支，避免受控索引指向已不存在的分支。
   useEffect(() => {
     if (branches.length !== childrenArray.length) {
       setBranches(childrenArray);
@@ -210,10 +223,12 @@ export const MessageBranchContent = ({
   ));
 };
 
+/** MessageBranchSelectorProps 的公开类型定义。 */
 export type MessageBranchSelectorProps = HTMLAttributes<HTMLDivElement> & {
   from: UIMessage["role"];
 };
 
+/** MessageBranchSelector 组件：提供对应的界面结构与交互语义。 */
 export const MessageBranchSelector = ({
   className,
   from,
@@ -221,7 +236,7 @@ export const MessageBranchSelector = ({
 }: MessageBranchSelectorProps) => {
   const { totalBranches } = useMessageBranch();
 
-  // Don't render if there's only one branch
+  // 只有一个分支时不渲染分支切换控件。
   if (totalBranches <= 1) {
     return null;
   }
@@ -235,8 +250,10 @@ export const MessageBranchSelector = ({
   );
 };
 
+/** MessageBranchPreviousProps 的公开类型定义。 */
 export type MessageBranchPreviousProps = ComponentProps<typeof Button>;
 
+/** MessageBranchPrevious 组件：提供对应的界面结构与交互语义。 */
 export const MessageBranchPrevious = ({
   children,
   ...props
@@ -258,8 +275,10 @@ export const MessageBranchPrevious = ({
   );
 };
 
+/** MessageBranchNextProps 的公开类型定义。 */
 export type MessageBranchNextProps = ComponentProps<typeof Button>;
 
+/** MessageBranchNext 组件：提供对应的界面结构与交互语义。 */
 export const MessageBranchNext = ({
   children,
   className,
@@ -282,8 +301,10 @@ export const MessageBranchNext = ({
   );
 };
 
+/** MessageBranchPageProps 的公开类型定义。 */
 export type MessageBranchPageProps = HTMLAttributes<HTMLSpanElement>;
 
+/** MessageBranchPage 组件：提供对应的界面结构与交互语义。 */
 export const MessageBranchPage = ({
   className,
   ...props
@@ -303,10 +324,12 @@ export const MessageBranchPage = ({
   );
 };
 
+/** MessageResponseProps 的公开类型定义。 */
 export type MessageResponseProps = ComponentProps<
   typeof ClipboardSafeStreamdown
 >;
 
+/** MessageResponse 组件：提供对应的界面结构与交互语义。 */
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <ClipboardSafeStreamdown
@@ -322,12 +345,14 @@ export const MessageResponse = memo(
 
 MessageResponse.displayName = "MessageResponse";
 
+/** MessageAttachmentProps 的公开类型定义。 */
 export type MessageAttachmentProps = HTMLAttributes<HTMLDivElement> & {
   data: FileUIPart;
   className?: string;
   onRemove?: () => void;
 };
 
+/** MessageAttachment 组件：提供对应的界面结构与交互语义。 */
 export function MessageAttachment({
   data,
   className,
@@ -406,8 +431,10 @@ export function MessageAttachment({
   );
 }
 
+/** MessageAttachmentsProps 的公开类型定义。 */
 export type MessageAttachmentsProps = ComponentProps<"div">;
 
+/** MessageAttachments 组件：提供对应的界面结构与交互语义。 */
 export function MessageAttachments({
   children,
   className,
@@ -430,8 +457,10 @@ export function MessageAttachments({
   );
 }
 
+/** MessageToolbarProps 的公开类型定义。 */
 export type MessageToolbarProps = ComponentProps<"div">;
 
+/** MessageToolbar 组件：提供对应的界面结构与交互语义。 */
 export const MessageToolbar = ({
   className,
   children,

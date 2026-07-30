@@ -7,6 +7,9 @@ import {
 } from "./utils/mock-api";
 
 test.describe("Branch from turn", () => {
+  /**
+   * 覆盖“creates a new chat branch from a completed assistant turn”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("creates a new chat branch from a completed assistant turn", async ({
     page,
   }) => {

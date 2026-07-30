@@ -1,15 +1,4 @@
-"""Regression test: tool args schemas must not emit Pydantic serialization warnings.
-
-DeerFlow tools annotate their runtime parameter as ``Runtime``
-(``deerflow.tools.types.Runtime`` = ``ToolRuntime[dict[str, Any], ThreadState]``)
-so the LangChain tool framework injects the runtime automatically.
-When the inner ``Runtime.context`` field is left as the unbound ``ContextT``
-TypeVar (default ``None``), Pydantic's ``model_dump()`` on the auto-generated
-args schema emits a ``PydanticSerializationUnexpectedValue`` warning on every
-tool call because the actual context DeerFlow installs is a dict. Using the
-``Runtime`` alias (which binds the context to ``dict[str, Any]``) keeps
-Pydantic's serialization expectations aligned with reality.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -36,6 +25,7 @@ from deerflow.tools.skill_manage_tool import skill_manage_tool
 
 
 def _make_runtime(context: dict) -> ToolRuntime:
+    '未说明'
     return ToolRuntime(
         state={"sandbox": {"sandbox_id": "local"}, "thread_data": {}},
         context=context,
@@ -70,12 +60,7 @@ _TOOL_CASES = [
     ids=[case[0].name for case in _TOOL_CASES],
 )
 def test_tool_args_schema_does_not_emit_pydantic_context_warning(tool_obj, extra_args) -> None:
-    """``model_dump()`` of the auto-generated args_schema must not warn about ``context``.
-
-    The model_dump path is hit by LangChain's ``BaseTool._parse_input`` on every tool
-    invocation (see langchain_core/tools/base.py:712), so any warning here would fire
-    once per tool call and pollute production logs.
-    """
+    '未说明'
     schema = tool_obj.args_schema
     assert schema is not None, f"{tool_obj.name} has no args_schema"
 
@@ -92,7 +77,7 @@ def test_tool_args_schema_does_not_emit_pydantic_context_warning(tool_obj, extra
 
 
 def test_write_file_append_is_discoverable_in_tool_schema() -> None:
-    """``append`` must be visible and described in the model-facing tool schema."""
+    '未说明'
     assert "append" in write_file_tool.description
 
     append_field = write_file_tool.tool_call_schema.model_fields["append"]
@@ -103,6 +88,6 @@ def test_write_file_append_is_discoverable_in_tool_schema() -> None:
 
 @pytest.mark.parametrize("tool_obj", [case[0] for case in _TOOL_CASES], ids=[case[0].name for case in _TOOL_CASES])
 def test_model_facing_tool_parameters_have_descriptions(tool_obj) -> None:
-    """Every model-facing tool parameter should explain when and how to use it."""
+    '未说明'
     missing_descriptions = [field_name for field_name, field in tool_obj.tool_call_schema.model_fields.items() if not field.description]
     assert missing_descriptions == [], f"{tool_obj.name} has model-facing parameters without descriptions: {missing_descriptions}. Add an Args: section to the tool's docstring and ensure @tool(parse_docstring=True) is set."

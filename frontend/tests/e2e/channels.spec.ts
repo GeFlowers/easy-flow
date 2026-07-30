@@ -30,6 +30,11 @@ type MockChannelProvider = {
   credential_values?: Record<string, string>;
 };
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 defaultProviders 的约定。
+
+ */
+
 function defaultProviders(): MockChannelProvider[] {
   return channelProviders.map(([provider, displayName, authMode]) => ({
     provider,
@@ -49,6 +54,11 @@ function defaultProviders(): MockChannelProvider[] {
     ],
   }));
 }
+
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 mockChannelsAPI 的约定。
+
+ */
 
 function mockChannelsAPI(
   page: Page,
@@ -92,6 +102,9 @@ function mockChannelsAPI(
 }
 
 test.describe("IM channels", () => {
+  /**
+   * 覆盖“sidebar and settings expose channel connections”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("sidebar and settings expose channel connections", async ({ page }) => {
     mockLangGraphAPI(page);
     mockChannelsAPI(page);
@@ -128,6 +141,11 @@ test.describe("IM channels", () => {
     const dialog = page.getByRole("dialog", { name: "Settings" });
     await expect(dialog.getByRole("button", { name: "Modify" })).toHaveCount(7);
   });
+
+  /**
+   * 覆盖“only enabled providers are shown and runtime setup stays editable”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("only enabled providers are shown and runtime setup stays editable", async ({
     page,
@@ -260,6 +278,11 @@ test.describe("IM channels", () => {
     });
   });
 
+  /**
+   * 覆盖“configured provider connects directly with a binding-code instruction”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("configured provider connects directly with a binding-code instruction", async ({
     page,
   }) => {
@@ -303,6 +326,11 @@ test.describe("IM channels", () => {
     ).toBeVisible();
     expect(slackConnectCalls).toBe(1);
   });
+
+  /**
+   * 覆盖“runtime setup continues into the connect flow when a binding is still required”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("runtime setup continues into the connect flow when a binding is still required", async ({
     page,
@@ -401,6 +429,11 @@ test.describe("IM channels", () => {
     ).toBeVisible();
     expect(slackConnectCalls).toBe(1);
   });
+
+  /**
+   * 覆盖“runtime setup dialog prefills editable credential values”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("runtime setup dialog prefills editable credential values", async ({
     page,

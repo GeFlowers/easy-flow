@@ -44,6 +44,7 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
+/** useSidebar Hook：封装本模块所需的状态或上下文访问。 */
 function useSidebar() {
   const context = React.useContext(SidebarContext);
   if (!context) {
@@ -53,6 +54,7 @@ function useSidebar() {
   return context;
 }
 
+/** SidebarProvider 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -69,8 +71,7 @@ function SidebarProvider({
   const isMobile = useIsMobile();
   const [openMobile, setOpenMobile] = React.useState(false);
 
-  // This is the internal state of the sidebar.
-  // We use openProp and setOpenProp for control from outside the component.
+  // 这是侧边栏的内部状态；通过 openProp 与 setOpenProp 支持外部受控使用。
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
   const setOpen = React.useCallback(
@@ -82,18 +83,18 @@ function SidebarProvider({
         _setOpen(openState);
       }
 
-      // This sets the cookie to keep the sidebar state.
+      // 写入 Cookie 以持久化侧边栏状态。
       document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`;
     },
     [setOpenProp, open],
   );
 
-  // Helper to toggle the sidebar.
+  // 用于切换侧边栏的辅助函数。
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen, setOpenMobile]);
 
-  // Adds a keyboard shortcut to toggle the sidebar.
+  // 注册键盘快捷键以切换侧边栏，同时避免在输入框中误触发。
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
@@ -109,8 +110,7 @@ function SidebarProvider({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [toggleSidebar]);
 
-  // We add a state so that we can do data-state="expanded" or "collapsed".
-  // This makes it easier to style the sidebar with Tailwind classes.
+  // 通过状态输出 expanded 或 collapsed 的 data-state，供 Tailwind 类选择对应样式。
   const state = open ? "expanded" : "collapsed";
 
   const contextValue = React.useMemo<SidebarContextProps>(
@@ -151,6 +151,7 @@ function SidebarProvider({
   );
 }
 
+/** Sidebar 内部组件：组织对应的界面结构与交互语义。 */
 function Sidebar({
   side = "left",
   variant = "sidebar",
@@ -214,7 +215,7 @@ function Sidebar({
       data-side={side}
       data-slot="sidebar"
     >
-      {/* This is what handles the sidebar gap on desktop */}
+      {/* 在桌面端保留侧边栏占位间距。 */}
       <div
         data-slot="sidebar-gap"
         className={cn(
@@ -233,7 +234,7 @@ function Sidebar({
           side === "left"
             ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
             : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-          // Adjust the padding for floating and inset variants.
+          // 为浮动与内嵌变体调整内边距。
           variant === "floating" || variant === "inset"
             ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)+(--spacing(4))+2px)]"
             : "group-data-[collapsible=icon]:w-(--sidebar-width-icon) group-data-[side=left]:border-r group-data-[side=right]:border-l",
@@ -253,6 +254,7 @@ function Sidebar({
   );
 }
 
+/** SidebarTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarTrigger({
   className,
   onClick,
@@ -279,6 +281,7 @@ function SidebarTrigger({
   );
 }
 
+/** SidebarRail 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   const { toggleSidebar } = useSidebar();
 
@@ -304,6 +307,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   );
 }
 
+/** SidebarInset 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   return (
     <main
@@ -318,6 +322,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   );
 }
 
+/** SidebarInput 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarInput({
   className,
   ...props
@@ -332,6 +337,7 @@ function SidebarInput({
   );
 }
 
+/** SidebarHeader 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -343,6 +349,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** SidebarFooter 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -354,6 +361,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** SidebarSeparator 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarSeparator({
   className,
   ...props
@@ -368,6 +376,7 @@ function SidebarSeparator({
   );
 }
 
+/** SidebarContent 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -382,6 +391,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** SidebarGroup 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -393,6 +403,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** SidebarGroupLabel 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarGroupLabel({
   className,
   asChild = false,
@@ -414,6 +425,7 @@ function SidebarGroupLabel({
   );
 }
 
+/** SidebarGroupAction 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarGroupAction({
   className,
   asChild = false,
@@ -427,7 +439,7 @@ function SidebarGroupAction({
       data-sidebar="group-action"
       className={cn(
         "text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground absolute top-3.5 right-3 flex aspect-square w-5 items-center justify-center rounded-md p-0 outline-hidden transition-transform focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
+        // 扩大移动端按钮的可点击区域。
         "after:absolute after:-inset-2 md:after:hidden",
         "group-data-[collapsible=icon]:hidden",
         className,
@@ -437,6 +449,7 @@ function SidebarGroupAction({
   );
 }
 
+/** SidebarGroupContent 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarGroupContent({
   className,
   ...props
@@ -451,6 +464,7 @@ function SidebarGroupContent({
   );
 }
 
+/** SidebarMenu 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -462,6 +476,7 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   );
 }
 
+/** SidebarMenuItem 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li
@@ -495,6 +510,7 @@ const sidebarMenuButtonVariants = cva(
   },
 );
 
+/** SidebarMenuButton 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuButton({
   asChild = false,
   isActive = false,
@@ -545,6 +561,7 @@ function SidebarMenuButton({
   );
 }
 
+/** SidebarMenuAction 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuAction({
   className,
   asChild = false,
@@ -562,7 +579,7 @@ function SidebarMenuAction({
       data-sidebar="menu-action"
       className={cn(
         "text-sidebar-foreground ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground peer-hover/menu-button:text-sidebar-accent-foreground absolute top-1.5 right-1 flex aspect-square w-5 items-center justify-center rounded-md p-0 outline-hidden transition-transform focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
+        // 扩大移动端按钮的可点击区域。
         "after:absolute after:-inset-2 md:after:hidden",
         "peer-data-[size=sm]/menu-button:top-1",
         "peer-data-[size=default]/menu-button:top-1.5",
@@ -577,6 +594,7 @@ function SidebarMenuAction({
   );
 }
 
+/** SidebarMenuBadge 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuBadge({
   className,
   ...props
@@ -599,6 +617,7 @@ function SidebarMenuBadge({
   );
 }
 
+/** SidebarMenuSkeleton 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
@@ -606,7 +625,7 @@ function SidebarMenuSkeleton({
 }: React.ComponentProps<"div"> & {
   showIcon?: boolean;
 }) {
-  // Random width between 50 to 90%.
+  // 在 50% 到 90% 之间随机生成宽度。
   const width = React.useMemo(() => {
     return `${Math.floor(Math.random() * 40) + 50}%`;
   }, []);
@@ -637,6 +656,7 @@ function SidebarMenuSkeleton({
   );
 }
 
+/** SidebarMenuSub 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -652,6 +672,7 @@ function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
   );
 }
 
+/** SidebarMenuSubItem 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuSubItem({
   className,
   ...props
@@ -666,6 +687,7 @@ function SidebarMenuSubItem({
   );
 }
 
+/** SidebarMenuSubButton 内部组件：组织对应的界面结构与交互语义。 */
 function SidebarMenuSubButton({
   asChild = false,
   size = "md",

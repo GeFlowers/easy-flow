@@ -1,10 +1,4 @@
-"""Comprehensive tests for ToolOutputBudgetMiddleware.
-
-Covers: pass-through, disk externalization, fallback truncation, UTF-8
-boundaries, Command results, model-request history patching, config
-variations, exempt tools, per-tool overrides, edge cases, and both
-sync/async code paths.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -41,13 +35,7 @@ from deerflow.config.tool_output_config import ToolOutputConfig
 
 
 def _lines_then_long_line(total: int, newline_ratio: float = 0.6) -> str:
-    """Content that is line-oriented for the first *newline_ratio*, then one unbroken line.
-
-    Mirrors real bash/web_fetch output that logs progress lines and then dumps a
-    single-line artifact (minified JSON, base64 blob). The last newline lands in
-    the second half of the content, which is what exercises line snapping around
-    the tail offset.
-    """
+    '未说明'
     head_len = int(total * newline_ratio)
     lines = "".join(f"[info] step {i} ok\n" for i in range(head_len // 18 + 1))[:head_len]
     lines = lines[:-1] + "\n" if not lines.endswith("\n") else lines
@@ -55,6 +43,7 @@ def _lines_then_long_line(total: int, newline_ratio: float = 0.6) -> str:
 
 
 def _make_request(tool_name: str = "remote_executor", tool_call_id: str = "tc-1", outputs_path: str | None = None) -> SimpleNamespace:
+    '未说明'
     thread_data = {"outputs_path": outputs_path} if outputs_path else None
     state = {"thread_data": thread_data} if thread_data else {}
     runtime = SimpleNamespace(state=state)
@@ -65,6 +54,7 @@ def _make_request(tool_name: str = "remote_executor", tool_call_id: str = "tc-1"
 
 
 def _tm(content: str = "ok", name: str = "tool", tool_call_id: str = "tc-1") -> ToolMessage:
+    '未说明'
     return ToolMessage(content=content, name=name, tool_call_id=tool_call_id)
 
 
@@ -74,70 +64,91 @@ def _tm(content: str = "ok", name: str = "tool", tool_call_id: str = "tc-1") -> 
 
 
 class TestMessageText:
+    '未说明'
     def test_string_content(self):
+        '未说明'
         assert _message_text("hello") == "hello"
 
     def test_none_content(self):
+        '未说明'
         assert _message_text(None) is None
 
     def test_list_of_strings(self):
+        '未说明'
         assert _message_text(["a", "b"]) == "a\nb"
 
     def test_list_of_text_dicts(self):
+        '未说明'
         assert _message_text([{"text": "x"}, {"text": "y"}]) == "x\ny"
 
     def test_list_with_image_returns_none(self):
+        '未说明'
         assert _message_text([{"type": "image", "data": "..."}]) is None
 
     def test_empty_list(self):
+        '未说明'
         assert _message_text([]) is None
 
     def test_non_string_non_list(self):
+        '未说明'
         assert _message_text(42) is None
 
 
 class TestSnapToLineBoundary:
+    '未说明'
     def test_snaps_to_newline(self):
+        '未说明'
         text = "line1\nline2\nline3"
         pos = 14  # inside "line3"
         result = _snap_to_line_boundary(text, pos)
         assert text[result - 1] == "\n"
 
     def test_no_snap_when_no_newline_in_range(self):
+        '未说明'
         text = "abcdefghij"
         assert _snap_to_line_boundary(text, 8) == 8
 
     def test_zero_pos(self):
+        '未说明'
         assert _snap_to_line_boundary("abc", 0) == 0
 
     def test_pos_beyond_length(self):
+        '未说明'
         assert _snap_to_line_boundary("abc", 10) == 10
 
 
 class TestSnapStartToLineBoundary:
+    '未说明'
     def test_snaps_forward_to_newline(self):
+        '未说明'
         text = "line1\nline2\nline3"
         result = _snap_start_to_line_boundary(text, 2)  # inside "line1"
         assert text[result - 1] == "\n"
         assert result >= 2
 
     def test_never_moves_backwards(self):
+        '未说明'
         text = "aaaa\n" + "b" * 20
         for pos in range(1, len(text)):
             assert _snap_start_to_line_boundary(text, pos) >= pos
 
     def test_no_snap_when_no_newline_in_range(self):
+        '未说明'
         assert _snap_start_to_line_boundary("abcdefghij", 2) == 2
 
     def test_zero_pos(self):
+        '未说明'
         assert _snap_start_to_line_boundary("a\nbc", 0) == 0
 
     def test_pos_beyond_length(self):
+        '未说明'
         assert _snap_start_to_line_boundary("abc", 10) == 10
 
 
 class TestExternalize:
+    '未说明'
     def test_writes_file_and_returns_virtual_path(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             path = _externalize(
                 "full content here",
@@ -164,6 +175,7 @@ class TestExternalize:
         # path was silently created by ``mkdir -p`` when the test process
         # ran as root inside the CI container, which made this test fail
         # in CI independently of the externalization logic under test.
+        '未说明'
         path = _externalize(
             "data",
             tool_name="test",
@@ -174,6 +186,7 @@ class TestExternalize:
         assert path is None
 
     def test_txt_extension_for_unknown_tool(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             path = _externalize(
                 "data",
@@ -187,26 +200,34 @@ class TestExternalize:
 
 
 class TestSanitizeToolName:
+    '未说明'
     def test_strips_path_separators(self):
+        '未说明'
         assert _sanitize_tool_name("../../etc/passwd") == "passwd"
 
     def test_strips_backslashes(self):
+        '未说明'
         result = _sanitize_tool_name("..\\..\\windows\\system32")
         assert ".." not in result
         assert "/" not in result
 
     def test_normal_name_unchanged(self):
+        '未说明'
         assert _sanitize_tool_name("bash") == "bash"
 
     def test_empty_becomes_unknown(self):
+        '未说明'
         assert _sanitize_tool_name("") == "unknown"
 
     def test_dots_only_becomes_unknown(self):
+        '未说明'
         assert _sanitize_tool_name("..") == "unknown"
 
 
 class TestExternalizePathTraversal:
+    '未说明'
     def test_traversal_tool_name_is_sanitized(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             path = _externalize(
                 "data",
@@ -220,6 +241,7 @@ class TestExternalizePathTraversal:
             assert "../" not in path
 
     def test_absolute_storage_subdir_rejected(self):
+        '未说明'
         path = _externalize(
             "data",
             tool_name="tool",
@@ -230,6 +252,7 @@ class TestExternalizePathTraversal:
         assert path is None
 
     def test_traversal_storage_subdir_rejected(self):
+        '未说明'
         path = _externalize(
             "data",
             tool_name="tool",
@@ -241,29 +264,36 @@ class TestExternalizePathTraversal:
 
 
 class TestNeedsBudget:
+    '未说明'
     def test_small_output_does_not_need_budget(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=1000)
         msg = _tm("small", name="tool")
         assert _needs_budget(msg, config) is False
 
     def test_large_output_needs_budget(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=50)
         msg = _tm("x" * 100, name="tool")
         assert _needs_budget(msg, config) is True
 
     def test_exempt_tool_does_not_need_budget(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10)
         msg = _tm("x" * 100, name="read_file")
         assert _needs_budget(msg, config) is False
 
     def test_multimodal_does_not_need_budget(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10)
         msg = ToolMessage(content=[{"type": "image", "data": "x" * 100}], name="tool", tool_call_id="tc-1")
         assert _needs_budget(msg, config) is False
 
 
 class TestBuildPreview:
+    '未说明'
     def test_contains_head_and_tail_and_reference(self):
+        '未说明'
         content = "HEAD_" + "x" * 5000 + "_TAIL"
         preview = _build_preview(
             content,
@@ -279,6 +309,7 @@ class TestBuildPreview:
         assert "start_line and end_line" in preview
 
     def test_reports_total_chars(self):
+        '未说明'
         content = "a" * 10000
         preview = _build_preview(
             content,
@@ -291,14 +322,18 @@ class TestBuildPreview:
 
 
 class TestBuildFallback:
+    '未说明'
     def test_short_content_unchanged(self):
+        '未说明'
         assert _build_fallback("short", tool_name="t", max_chars=100, head_chars=50, tail_chars=50) == "short"
 
     def test_zero_max_disables(self):
+        '未说明'
         content = "a" * 1000
         assert _build_fallback(content, tool_name="t", max_chars=0, head_chars=50, tail_chars=50) == content
 
     def test_truncates_long_content(self):
+        '未说明'
         content = "H" * 5000 + "M" * 20000 + "T" * 5000
         result = _build_fallback(content, tool_name="bash", max_chars=12000, head_chars=6000, tail_chars=3000)
         assert len(result) < len(content)
@@ -306,37 +341,28 @@ class TestBuildFallback:
         assert "Persistent storage unavailable" in result
 
     def test_preserves_head_and_tail(self):
+        '未说明'
         content = "HEADSTART" + "x" * 50000 + "TAILEND"
         result = _build_fallback(content, tool_name="t", max_chars=20000, head_chars=10000, tail_chars=5000)
         assert result.startswith("HEADSTART")
         assert "TAILEND" in result
 
     def test_result_never_exceeds_max_chars(self):
-        """The marker itself has non-zero length; total must still respect max_chars."""
+        '未说明'
         for max_chars in [200, 500, 1000, 5000, 20000]:
             content = "x" * 50000
             result = _build_fallback(content, tool_name="long_tool_name", max_chars=max_chars, head_chars=max_chars // 2, tail_chars=max_chars // 4)
             assert len(result) <= max_chars, f"max_chars={max_chars}: got {len(result)}"
 
     def test_result_never_exceeds_max_chars_with_newlines(self):
-        """Same guarantee as above, on content that actually exercises line snapping.
-
-        ``test_result_never_exceeds_max_chars`` passes newline-free content, so the
-        tail offset is never snapped. Real bash/web_fetch output has newlines.
-        """
+        '未说明'
         for total in [50_000, 200_000, 1_000_000]:
             content = _lines_then_long_line(total)
             result = _build_fallback(content, tool_name="bash", max_chars=30_000, head_chars=8_000, tail_chars=3_000)
             assert len(result) <= 30_000, f"total={total}: got {len(result)}"
 
     def test_fallback_forward_snaps_tail_onto_line_boundary(self):
-        """The tail must begin *after* the newline, never before it.
-
-        The bound test above never moves the tail offset: its content has no
-        newline inside the snap window, so it would pass even with the snap
-        removed. Placing a newline in the window pins the direction instead —
-        a backward snap leaves the tail starting mid-line.
-        """
+        '未说明'
         total, newline_pos = 100_000, 98_000  # window is [97_000, 98_500)
         content = "A" * newline_pos + "\n" + "B" * (total - newline_pos - 1)
         result = _build_fallback(content, tool_name="bash", max_chars=30_000, head_chars=8_000, tail_chars=3_000)
@@ -345,6 +371,7 @@ class TestBuildFallback:
         assert tail.startswith("B"), f"tail begins mid-line: {tail[:20]!r}"
 
     def test_very_small_max_chars_does_not_crash(self):
+        '未说明'
         content = "x" * 1000
         result = _build_fallback(content, tool_name="t", max_chars=50, head_chars=20, tail_chars=10)
         assert len(result) <= 50
@@ -356,13 +383,16 @@ class TestBuildFallback:
 
 
 class TestWrapToolCallPassThrough:
+    '未说明'
     def test_small_output_passes_through(self):
+        '未说明'
         mw = ToolOutputBudgetMiddleware(config=ToolOutputConfig(externalize_min_chars=1000))
         msg = _tm("small output", name="bash")
         result = mw.wrap_tool_call(_make_request(), lambda _: msg)
         assert result is msg
 
     def test_disabled_middleware_passes_through(self):
+        '未说明'
         mw = ToolOutputBudgetMiddleware(config=ToolOutputConfig(enabled=False, externalize_min_chars=10, fallback_max_chars=20))
         msg = _tm("x" * 50000, name="bash")
         result = mw.wrap_tool_call(_make_request(), lambda _: msg)
@@ -370,7 +400,9 @@ class TestWrapToolCallPassThrough:
 
 
 class TestWrapToolCallExternalize:
+    '未说明'
     def test_oversized_output_externalized_to_disk(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(externalize_min_chars=100, preview_head_chars=50, preview_tail_chars=30)
             mw = ToolOutputBudgetMiddleware(config=config)
@@ -395,6 +427,7 @@ class TestWrapToolCallExternalize:
                 assert f.read() == content
 
     def test_preview_contains_head_and_tail(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(externalize_min_chars=50, preview_head_chars=20, preview_tail_chars=10)
             mw = ToolOutputBudgetMiddleware(config=config)
@@ -409,7 +442,9 @@ class TestWrapToolCallExternalize:
 
 
 class TestWrapToolCallFallback:
+    '未说明'
     def test_fallback_when_no_outputs_path(self):
+        '未说明'
         config = ToolOutputConfig(
             externalize_min_chars=50,
             fallback_max_chars=200,
@@ -430,6 +465,7 @@ class TestWrapToolCallFallback:
         assert len(result.content) < len(content)
 
     def test_fallback_when_disk_write_fails(self):
+        '未说明'
         config = ToolOutputConfig(
             externalize_min_chars=50,
             fallback_max_chars=200,
@@ -448,7 +484,9 @@ class TestWrapToolCallFallback:
 
 
 class TestWrapToolCallExemption:
+    '未说明'
     def test_read_file_exempt(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=50)
         mw = ToolOutputBudgetMiddleware(config=config)
         content = "x" * 100
@@ -459,6 +497,7 @@ class TestWrapToolCallExemption:
         assert result is msg
 
     def test_read_file_tool_exempt(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=50)
         mw = ToolOutputBudgetMiddleware(config=config)
         content = "x" * 100
@@ -469,6 +508,7 @@ class TestWrapToolCallExemption:
         assert result is msg
 
     def test_custom_exempt_tool(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=50, exempt_tools=["my_tool"])
         mw = ToolOutputBudgetMiddleware(config=config)
         content = "x" * 100
@@ -480,7 +520,9 @@ class TestWrapToolCallExemption:
 
 
 class TestWrapToolCallPerToolOverride:
+    '未说明'
     def test_per_tool_threshold(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(
                 externalize_min_chars=50000,  # global: high
@@ -497,6 +539,7 @@ class TestWrapToolCallPerToolOverride:
             assert "Full sensitive_tool output saved to" in result.content
 
     def test_per_tool_zero_disables_externalization(self):
+        '未说明'
         config = ToolOutputConfig(
             externalize_min_chars=50,
             tool_overrides={"bash": 0},
@@ -518,7 +561,9 @@ class TestWrapToolCallPerToolOverride:
 
 
 class TestWrapToolCallCommand:
+    '未说明'
     def test_command_messages_are_patched(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(externalize_min_chars=50, preview_head_chars=20, preview_tail_chars=10)
             mw = ToolOutputBudgetMiddleware(config=config)
@@ -536,6 +581,7 @@ class TestWrapToolCallCommand:
             assert "Full present_files output saved to" in new_msg.content
 
     def test_command_without_messages_unchanged(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10)
         mw = ToolOutputBudgetMiddleware(config=config)
         command = Command(update={"key": "value"})
@@ -544,7 +590,9 @@ class TestWrapToolCallCommand:
 
 
 class TestWrapToolCallEdgeCases:
+    '未说明'
     def test_none_content_passes_through(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=20)
         mw = ToolOutputBudgetMiddleware(config=config)
         msg = ToolMessage(content=None, name="tool", tool_call_id="tc-1")
@@ -554,6 +602,7 @@ class TestWrapToolCallEdgeCases:
         assert result is msg
 
     def test_empty_string_passes_through(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=20)
         mw = ToolOutputBudgetMiddleware(config=config)
         msg = _tm("", name="tool")
@@ -563,6 +612,7 @@ class TestWrapToolCallEdgeCases:
         assert result is msg
 
     def test_multimodal_content_skipped(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=20)
         mw = ToolOutputBudgetMiddleware(config=config)
         content = [{"type": "image", "data": "x" * 100}]
@@ -573,6 +623,7 @@ class TestWrapToolCallEdgeCases:
         assert result is msg
 
     def test_exactly_at_threshold_passes_through(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=100, fallback_max_chars=100)
         mw = ToolOutputBudgetMiddleware(config=config)
         msg = _tm("x" * 100, name="tool")
@@ -582,6 +633,7 @@ class TestWrapToolCallEdgeCases:
         assert result is msg
 
     def test_one_char_over_threshold_triggers(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(externalize_min_chars=100)
             mw = ToolOutputBudgetMiddleware(config=config)
@@ -593,6 +645,7 @@ class TestWrapToolCallEdgeCases:
             assert result is not msg
 
     def test_chinese_content_preserved(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(externalize_min_chars=50, preview_head_chars=20, preview_tail_chars=10)
             mw = ToolOutputBudgetMiddleware(config=config)
@@ -610,6 +663,7 @@ class TestWrapToolCallEdgeCases:
                 assert f.read() == content
 
     def test_no_runtime_state_uses_fallback(self):
+        '未说明'
         config = ToolOutputConfig(
             externalize_min_chars=50,
             fallback_max_chars=500,
@@ -637,9 +691,10 @@ class TestWrapToolCallEdgeCases:
 
 
 class TestMCPContentAndArtifact:
-    """MCP tools return content as list of content blocks, not plain strings."""
+    '未说明'
 
     def test_text_content_blocks_are_budgeted(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(externalize_min_chars=50, preview_head_chars=20, preview_tail_chars=10)
             mw = ToolOutputBudgetMiddleware(config=config)
@@ -655,6 +710,7 @@ class TestMCPContentAndArtifact:
             assert result.tool_call_id == "tc-mcp"
 
     def test_multiple_text_blocks_joined_and_budgeted(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=50, fallback_max_chars=500, fallback_head_chars=100, fallback_tail_chars=50)
         mw = ToolOutputBudgetMiddleware(config=config)
         content = [{"type": "text", "text": "a" * 300}, {"type": "text", "text": "b" * 300}]
@@ -667,6 +723,7 @@ class TestMCPContentAndArtifact:
         assert "omitted" in result.content
 
     def test_image_content_blocks_are_skipped(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=20)
         mw = ToolOutputBudgetMiddleware(config=config)
         content = [{"type": "image", "data": "base64data" * 100}]
@@ -678,6 +735,7 @@ class TestMCPContentAndArtifact:
         assert result is msg
 
     def test_mixed_text_and_image_blocks_are_skipped(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10)
         mw = ToolOutputBudgetMiddleware(config=config)
         content = [{"type": "text", "text": "x" * 100}, {"type": "image", "data": "base64"}]
@@ -689,6 +747,7 @@ class TestMCPContentAndArtifact:
         assert result is msg
 
     def test_small_text_blocks_pass_through(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=1000)
         mw = ToolOutputBudgetMiddleware(config=config)
         content = [{"type": "text", "text": "small result"}]
@@ -706,8 +765,10 @@ class TestMCPContentAndArtifact:
 
 
 class TestAsyncPaths:
+    '未说明'
     @pytest.mark.anyio
     async def test_async_tool_call_externalized(self):
+        '未说明'
         with tempfile.TemporaryDirectory() as tmpdir:
             config = ToolOutputConfig(externalize_min_chars=50, preview_head_chars=20, preview_tail_chars=10)
             mw = ToolOutputBudgetMiddleware(config=config)
@@ -716,6 +777,7 @@ class TestAsyncPaths:
             req = _make_request(tool_name="async_tool", outputs_path=tmpdir)
 
             async def handler(_):
+                '未说明'
                 return msg
 
             result = await mw.awrap_tool_call(req, handler)
@@ -726,6 +788,7 @@ class TestAsyncPaths:
 
     @pytest.mark.anyio
     async def test_async_model_call_patches_history(self):
+        '未说明'
         config = ToolOutputConfig(fallback_max_chars=500, fallback_head_chars=100, fallback_tail_chars=50)
         mw = ToolOutputBudgetMiddleware(config=config)
         oversized = _tm("h" * 1000, name="tool", tool_call_id="tc-h")
@@ -733,6 +796,7 @@ class TestAsyncPaths:
         captured: dict[str, ModelRequest] = {}
 
         async def handler(req):
+            '未说明'
             captured["request"] = req
             return []
 
@@ -751,7 +815,9 @@ class TestAsyncPaths:
 
 
 class TestWrapModelCall:
+    '未说明'
     def test_oversized_historical_messages_truncated(self):
+        '未说明'
         config = ToolOutputConfig(fallback_max_chars=500, fallback_head_chars=100, fallback_tail_chars=50)
         mw = ToolOutputBudgetMiddleware(config=config)
         oversized = _tm("q" * 1000, name="tool", tool_call_id="tc-q")
@@ -759,6 +825,7 @@ class TestWrapModelCall:
         captured: dict[str, ModelRequest] = {}
 
         def handler(req):
+            '未说明'
             captured["request"] = req
             return []
 
@@ -772,6 +839,7 @@ class TestWrapModelCall:
         assert len(msg.content) < len(oversized.content) + 150
 
     def test_small_historical_messages_unchanged(self):
+        '未说明'
         config = ToolOutputConfig(fallback_max_chars=1000)
         mw = ToolOutputBudgetMiddleware(config=config)
         small = _tm("small", name="tool")
@@ -779,6 +847,7 @@ class TestWrapModelCall:
         captured: dict[str, ModelRequest] = {}
 
         def handler(req):
+            '未说明'
             captured["request"] = req
             return []
 
@@ -787,6 +856,7 @@ class TestWrapModelCall:
         assert captured["request"] is request
 
     def test_exempt_tools_in_history_unchanged(self):
+        '未说明'
         config = ToolOutputConfig(fallback_max_chars=50)
         mw = ToolOutputBudgetMiddleware(config=config)
         read_msg = _tm("x" * 200, name="read_file", tool_call_id="tc-r")
@@ -794,6 +864,7 @@ class TestWrapModelCall:
         captured: dict[str, ModelRequest] = {}
 
         def handler(req):
+            '未说明'
             captured["request"] = req
             return []
 
@@ -802,6 +873,7 @@ class TestWrapModelCall:
         assert captured["request"] is request
 
     def test_non_tool_messages_preserved(self):
+        '未说明'
         config = ToolOutputConfig(fallback_max_chars=500, fallback_head_chars=100, fallback_tail_chars=50)
         mw = ToolOutputBudgetMiddleware(config=config)
         human = HumanMessage(content="x" * 200)
@@ -811,6 +883,7 @@ class TestWrapModelCall:
         captured: dict[str, ModelRequest] = {}
 
         def handler(req):
+            '未说明'
             captured["request"] = req
             return []
 
@@ -829,7 +902,9 @@ class TestWrapModelCall:
 
 
 class TestFromAppConfig:
+    '未说明'
     def test_from_app_config_with_tool_output(self):
+        '未说明'
         config = AppConfig(
             sandbox=SandboxConfig(use="test"),
             tool_output={"externalize_min_chars": 5000, "preview_head_chars": 500},
@@ -839,18 +914,22 @@ class TestFromAppConfig:
         assert mw._config.preview_head_chars == 500
 
     def test_from_app_config_defaults(self):
+        '未说明'
         config = AppConfig(sandbox=SandboxConfig(use="test"))
         mw = ToolOutputBudgetMiddleware.from_app_config(config)
         assert mw._config.externalize_min_chars == 12000
 
 
 class TestPatchModelMessages:
+    '未说明'
     def test_returns_none_when_no_changes(self):
+        '未说明'
         config = ToolOutputConfig(fallback_max_chars=1000)
         messages = [_tm("short", name="tool")]
         assert _patch_model_messages(messages, config) is None
 
     def test_patches_oversized_messages(self):
+        '未说明'
         config = ToolOutputConfig(fallback_max_chars=500, fallback_head_chars=100, fallback_tail_chars=50)
         messages = [_tm("x" * 1000, name="tool")]
         result = _patch_model_messages(messages, config)
@@ -867,28 +946,33 @@ class TestPatchModelMessages:
 
 
 class TestPreScanHelpers:
+    '未说明'
     def test_effective_trigger_uses_global_externalize(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=12000, fallback_max_chars=30000)
         # smallest of the two thresholds wins
         assert _effective_trigger("any_tool", config) == 12000
 
     def test_effective_trigger_respects_per_tool_override(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=50000, fallback_max_chars=0, tool_overrides={"sensitive": 100})
         assert _effective_trigger("sensitive", config) == 100
         # other tools fall back to the (high) global
         assert _effective_trigger("other", config) == 50000
 
     def test_effective_trigger_per_tool_zero_falls_to_fallback(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=50, tool_overrides={"bash": 0}, fallback_max_chars=200)
         # externalize disabled for bash → only fallback can trigger
         assert _effective_trigger("bash", config) == 200
 
     def test_effective_trigger_returns_negative_when_fully_disabled(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=0, fallback_max_chars=0)
         assert _effective_trigger("any", config) == -1
 
     def test_pre_scan_does_not_short_circuit_per_tool_override(self):
-        """Regression: pre-scan must honor per-tool overrides, not just global threshold."""
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=50000, fallback_max_chars=0, tool_overrides={"sensitive": 100})
         msg = _tm("x" * 500, name="sensitive")
         # 500 < global 50000 but > per-tool 100 → must still be flagged
@@ -896,12 +980,13 @@ class TestPreScanHelpers:
         assert _needs_budget(msg, config) is True
 
     def test_exempt_tool_never_over_budget(self):
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=10, fallback_max_chars=20, exempt_tools=["read_file"])
         msg = _tm("x" * 1000, name="read_file")
         assert _tool_message_over_budget(msg, config) is False
 
     def test_model_call_pre_scan_skips_when_nothing_oversized(self):
-        """_patch_model_messages returns None (no list rebuild) when all messages are small."""
+        '未说明'
         config = ToolOutputConfig(externalize_min_chars=12000, fallback_max_chars=30000)
         messages = [_tm("small", name="tool"), HumanMessage(content="hi"), _tm("also small", name="bash")]
         assert _patch_model_messages(messages, config) is None
@@ -913,7 +998,9 @@ class TestPreScanHelpers:
 
 
 class TestMiddlewareChainIntegration:
+    '未说明'
     def test_budget_middleware_is_first_in_chain(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_error_handling_middleware import build_subagent_runtime_middlewares
 
         app_config = AppConfig(sandbox=SandboxConfig(use="test"))
@@ -927,6 +1014,7 @@ class TestMiddlewareChainIntegration:
         assert isinstance(middlewares[1], ToolOutputBudgetMiddleware)
 
     def test_budget_middleware_in_lead_chain(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_error_handling_middleware import build_lead_runtime_middlewares
 
         app_config = AppConfig(sandbox=SandboxConfig(use="test"))
@@ -944,7 +1032,9 @@ class TestMiddlewareChainIntegration:
 
 
 class TestConfigVersion:
+    '未说明'
     def test_config_version_bumped(self):
+        '未说明'
         import yaml
 
         example_path = os.path.join(os.path.dirname(__file__), "..", "..", "config.example.yaml")
@@ -954,6 +1044,7 @@ class TestConfigVersion:
             assert data.get("config_version", 0) >= 11
 
     def test_config_example_has_tool_output_section(self):
+        '未说明'
         import yaml
 
         example_path = os.path.join(os.path.dirname(__file__), "..", "..", "config.example.yaml")
@@ -973,9 +1064,10 @@ class TestConfigVersion:
 
 
 class _FakeSandbox:
-    """In-memory stand-in for a Sandbox. Records calls and supports failure injection."""
+    '未说明'
 
     def __init__(self, *, write_ok: bool = True, check_result: str = "OK") -> None:
+        '未说明'
         self.commands: list[str] = []
         self.writes: list[tuple[str, str]] = []
         self._write_ok = write_ok
@@ -987,6 +1079,7 @@ class _FakeSandbox:
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> str:
+        '未说明'
         del env, timeout
         self.commands.append(command)
         if command.startswith("test -s"):
@@ -994,24 +1087,29 @@ class _FakeSandbox:
         return ""
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
+        """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         if not self._write_ok:
             raise RuntimeError("simulated write failure")
         self.writes.append((path, content))
 
 
 class _FakeProvider:
-    """Minimal SandboxProvider stand-in for monkeypatching get_sandbox_provider."""
+    '未说明'
 
     def __init__(self, *, uses_thread_data_mounts: bool, sandbox: _FakeSandbox | None = None) -> None:
+        '未说明'
         self.uses_thread_data_mounts = uses_thread_data_mounts
         self._sandbox = sandbox
 
     def get(self, sandbox_id: str):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return self._sandbox
 
 
 class TestExternalizeToSandbox:
+    '未说明'
     def test_writes_and_returns_virtual_path(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import (
             _externalize_to_sandbox,
         )
@@ -1033,6 +1131,7 @@ class TestExternalizeToSandbox:
         assert sb.writes[0][1] == "x" * 100
 
     def test_returns_none_when_write_raises(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import (
             _externalize_to_sandbox,
         )
@@ -1047,6 +1146,7 @@ class TestExternalizeToSandbox:
         assert result is None
 
     def test_returns_none_when_validation_fails(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import (
             _externalize_to_sandbox,
         )
@@ -1061,6 +1161,7 @@ class TestExternalizeToSandbox:
         assert result is None
 
     def test_rejects_unsafe_storage_subdir(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import (
             _externalize_to_sandbox,
         )
@@ -1091,6 +1192,7 @@ class TestExternalizeToSandbox:
         assert sb.writes == []
 
     def test_default_extension_for_unknown_tool(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import (
             _externalize_to_sandbox,
         )
@@ -1106,9 +1208,10 @@ class TestExternalizeToSandbox:
 
 
 class TestBudgetContentSandboxDispatch:
-    """_budget_content must branch on uses_thread_data_mounts (issue #3416)."""
+    '未说明'
 
     def test_mounted_sandbox_uses_host_disk(self, monkeypatch, tmp_path):
+        '未说明'
         from deerflow.agents.middlewares import tool_output_budget_middleware as mod
 
         sb = _FakeSandbox()
@@ -1137,6 +1240,7 @@ class TestBudgetContentSandboxDispatch:
         assert len(list(storage_dir.iterdir())) == 1
 
     def test_non_mounted_sandbox_writes_to_sandbox(self, monkeypatch, tmp_path):
+        '未说明'
         from deerflow.agents.middlewares import tool_output_budget_middleware as mod
 
         sb = _FakeSandbox()
@@ -1162,6 +1266,7 @@ class TestBudgetContentSandboxDispatch:
         assert not (tmp_path / ".tool-results").exists()
 
     def test_non_mounted_without_sandbox_falls_back(self, monkeypatch):
+        '未说明'
         from deerflow.agents.middlewares import tool_output_budget_middleware as mod
 
         monkeypatch.setattr(
@@ -1188,25 +1293,30 @@ class TestBudgetContentSandboxDispatch:
 
 
 class TestResolveSandbox:
+    '未说明'
     def test_returns_none_when_no_state(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import _resolve_sandbox
 
         req = SimpleNamespace(runtime=None)
         assert _resolve_sandbox(req) is None
 
     def test_returns_none_when_state_has_no_sandbox(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import _resolve_sandbox
 
         req = SimpleNamespace(runtime=SimpleNamespace(state={}))
         assert _resolve_sandbox(req) is None
 
     def test_returns_none_when_sandbox_id_missing(self):
+        '未说明'
         from deerflow.agents.middlewares.tool_output_budget_middleware import _resolve_sandbox
 
         req = SimpleNamespace(runtime=SimpleNamespace(state={"sandbox": {}}))
         assert _resolve_sandbox(req) is None
 
     def test_returns_sandbox_from_provider(self, monkeypatch):
+        '未说明'
         from deerflow.agents.middlewares import tool_output_budget_middleware as mod
 
         sb = _FakeSandbox()
@@ -1219,10 +1329,13 @@ class TestResolveSandbox:
         assert mod._resolve_sandbox(req) is sb
 
     def test_returns_none_on_provider_exception(self, monkeypatch):
+        '未说明'
         from deerflow.agents.middlewares import tool_output_budget_middleware as mod
 
         class _Boom:
+            '未说明'
             def get(self, sandbox_id):
+                """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
                 raise RuntimeError("boom")
 
         monkeypatch.setattr(mod, "get_sandbox_provider", lambda: _Boom())
@@ -1231,9 +1344,10 @@ class TestResolveSandbox:
 
 
 class TestWrapToolCallSandboxIntegration:
-    """End-to-end via wrap_tool_call for the non-mounted path (issue #3416)."""
+    '未说明'
 
     def test_oversized_output_lands_in_sandbox_not_host(self, monkeypatch, tmp_path):
+        '未说明'
         from deerflow.agents.middlewares import tool_output_budget_middleware as mod
 
         sb = _FakeSandbox()
@@ -1269,19 +1383,16 @@ class TestWrapToolCallSandboxIntegration:
 
 
 class TestBudgetContentNoSandboxNoProviderCall:
-    """Without a sandbox, _budget_content must NOT call get_sandbox_provider.
-
-    This is the legacy host-disk path (and the CI-without-config.yaml path):
-    touching the provider would raise and force inline fallback, regressing
-    issue #3416's fix and breaking environments that never opt into sandbox.
-    """
+    '未说明'
 
     def test_no_provider_call_when_sandbox_absent(self, monkeypatch, tmp_path):
+        '未说明'
         from deerflow.agents.middlewares import tool_output_budget_middleware as mod
 
         called = {"n": 0}
 
         def boom():
+            '未说明'
             called["n"] += 1
             raise RuntimeError("provider must not be called on the legacy path")
 

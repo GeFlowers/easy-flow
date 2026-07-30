@@ -1,10 +1,4 @@
-"""Tests for deerflow.models.patched_openai.PatchedChatOpenAI.
-
-These tests verify that _restore_tool_call_signatures correctly re-injects
-``thought_signature`` onto tool-call objects stored in
-``additional_kwargs["tool_calls"]``, covering id-based matching, positional
-fallback, camelCase keys, and several edge-cases.
-"""
+"""本模块覆盖适配 OpenAI的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -43,6 +37,7 @@ PAYLOAD_TC_2 = {
 
 
 def _ai_msg_with_raw_tool_calls(raw_tool_calls: list[dict]) -> AIMessage:
+    """准备可控测试资源与状态，供后续断言读取。"""
     return AIMessage(content="", additional_kwargs={"tool_calls": raw_tool_calls})
 
 
@@ -52,7 +47,7 @@ def _ai_msg_with_raw_tool_calls(raw_tool_calls: list[dict]) -> AIMessage:
 
 
 def test_tool_call_signature_restored_by_id():
-    """thought_signature is copied to the payload tool-call matched by id."""
+    """验证工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     payload_msg = {"role": "assistant", "content": None, "tool_calls": [PAYLOAD_TC_1.copy()]}
     orig = _ai_msg_with_raw_tool_calls([RAW_TC_SIGNED])
 
@@ -62,7 +57,7 @@ def test_tool_call_signature_restored_by_id():
 
 
 def test_tool_call_signature_for_parallel_calls():
-    """For parallel function calls, only the first has a signature (per Gemini spec)."""
+    """验证工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     payload_msg = {
         "role": "assistant",
         "content": None,
@@ -77,7 +72,7 @@ def test_tool_call_signature_for_parallel_calls():
 
 
 def test_tool_call_signature_camel_case():
-    """thoughtSignature (camelCase) from some gateways is also handled."""
+    """验证工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     raw_camel = {
         "id": "call_1",
         "type": "function",
@@ -93,7 +88,7 @@ def test_tool_call_signature_camel_case():
 
 
 def test_tool_call_signature_positional_fallback():
-    """When ids don't match, falls back to positional matching."""
+    """验证工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     raw_no_id = {
         "type": "function",
         "function": {"name": "web_fetch", "arguments": "{}"},
@@ -118,7 +113,7 @@ def test_tool_call_signature_positional_fallback():
 
 
 def test_tool_call_no_raw_tool_calls_is_noop():
-    """No change when additional_kwargs has no tool_calls."""
+    """验证工具 工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     payload_msg = {"role": "assistant", "content": None, "tool_calls": [PAYLOAD_TC_1.copy()]}
     orig = AIMessage(content="", additional_kwargs={})
 
@@ -128,7 +123,7 @@ def test_tool_call_no_raw_tool_calls_is_noop():
 
 
 def test_tool_call_no_payload_tool_calls_is_noop():
-    """No change when payload has no tool_calls."""
+    """验证工具 载荷 工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     payload_msg = {"role": "assistant", "content": "just text"}
     orig = _ai_msg_with_raw_tool_calls([RAW_TC_SIGNED])
 
@@ -138,7 +133,7 @@ def test_tool_call_no_payload_tool_calls_is_noop():
 
 
 def test_tool_call_unsigned_raw_entries_is_noop():
-    """No signature added when raw tool-calls have no thought_signature."""
+    """验证工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     payload_msg = {"role": "assistant", "content": None, "tool_calls": [PAYLOAD_TC_2.copy()]}
     orig = _ai_msg_with_raw_tool_calls([RAW_TC_UNSIGNED])
 
@@ -148,7 +143,7 @@ def test_tool_call_unsigned_raw_entries_is_noop():
 
 
 def test_tool_call_multiple_sequential_signatures():
-    """Sequential tool calls each carry their own signature."""
+    """验证工具在预期条件及边界场景下的可观察行为，防止相关回归。"""
     raw_tc_a = {
         "id": "call_a",
         "type": "function",

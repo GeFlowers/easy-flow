@@ -5,6 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 
+/** ItemGroup 内部组件：组织对应的界面结构与交互语义。 */
 function ItemGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -16,6 +17,7 @@ function ItemGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** ItemSeparator 内部组件：组织对应的界面结构与交互语义。 */
 function ItemSeparator({
   className,
   ...props
@@ -51,6 +53,7 @@ const itemVariants = cva(
   },
 );
 
+/** Item 内部组件：组织对应的界面结构与交互语义。 */
 function Item({
   className,
   variant = "default",
@@ -88,6 +91,7 @@ const itemMediaVariants = cva(
   },
 );
 
+/** ItemMedia 内部组件：组织对应的界面结构与交互语义。 */
 function ItemMedia({
   className,
   variant = "default",
@@ -103,6 +107,7 @@ function ItemMedia({
   );
 }
 
+/** ItemContent 内部组件：组织对应的界面结构与交互语义。 */
 function ItemContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -116,6 +121,7 @@ function ItemContent({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** ItemTitle 内部组件：组织对应的界面结构与交互语义。 */
 function ItemTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -129,6 +135,7 @@ function ItemTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** ItemDescription 内部组件：组织对应的界面结构与交互语义。 */
 function ItemDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <p
@@ -143,6 +150,7 @@ function ItemDescription({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
+/** ItemActions 内部组件：组织对应的界面结构与交互语义。 */
 function ItemActions({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -153,6 +161,7 @@ function ItemActions({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** ItemHeader 内部组件：组织对应的界面结构与交互语义。 */
 function ItemHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -166,6 +175,7 @@ function ItemHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** ItemFooter 内部组件：组织对应的界面结构与交互语义。 */
 function ItemFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

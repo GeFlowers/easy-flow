@@ -7,6 +7,11 @@ import {
 } from "@/core/channels/provider-state";
 import type { ChannelProvider } from "@/core/channels/types";
 
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeProvider 的约定。
+
+ */
+
 function makeProvider(overrides: Partial<ChannelProvider>): ChannelProvider {
   return {
     provider: "slack",
@@ -29,9 +34,17 @@ function makeProvider(overrides: Partial<ChannelProvider>): ChannelProvider {
 }
 
 describe("providerCanConnect", () => {
+  /**
+   * 覆盖“allows connecting a configured, not yet connected provider”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("allows connecting a configured, not yet connected provider", () => {
     expect(providerCanConnect(makeProvider({}))).toBe(true);
   });
+
+  /**
+   * 覆盖“rejects an already connected provider”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("rejects an already connected provider", () => {
     expect(
@@ -39,11 +52,21 @@ describe("providerCanConnect", () => {
     ).toBe(false);
   });
 
+  /**
+   * 覆盖“rejects a non-connectable provider”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("rejects a non-connectable provider", () => {
     expect(providerCanConnect(makeProvider({ connectable: false }))).toBe(
       false,
     );
   });
+
+  /**
+   * 覆盖“falls back to enabled+configured when connectable is missing”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("falls back to enabled+configured when connectable is missing", () => {
     expect(providerCanConnect(makeProvider({ connectable: undefined }))).toBe(
@@ -58,6 +81,9 @@ describe("providerCanConnect", () => {
 });
 
 describe("providerNeedsRuntimeConfig", () => {
+  /**
+   * 覆盖“requires setup only when enabled and unconfigured with fields”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("requires setup only when enabled and unconfigured with fields", () => {
     expect(
       providerNeedsRuntimeConfig(makeProvider({ configured: false })),
@@ -77,6 +103,9 @@ describe("providerNeedsRuntimeConfig", () => {
 });
 
 describe("providerCanEditRuntimeConfig", () => {
+  /**
+   * 覆盖“is editable whenever enabled with credential fields”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("is editable whenever enabled with credential fields", () => {
     expect(providerCanEditRuntimeConfig(makeProvider({}))).toBe(true);
     expect(providerCanEditRuntimeConfig(makeProvider({ enabled: false }))).toBe(

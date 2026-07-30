@@ -28,6 +28,11 @@ const requestPayload = {
   ],
 };
 
+/**
+ * 覆盖“extractHumanInputRequest reads a valid tool artifact payload”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("extractHumanInputRequest reads a valid tool artifact payload", () => {
   const message = {
     type: "tool",
@@ -40,6 +45,11 @@ test("extractHumanInputRequest reads a valid tool artifact payload", () => {
 
   expect(extractHumanInputRequest(message)).toEqual(requestPayload);
 });
+
+/**
+ * 覆盖“extractHumanInputRequest rejects malformed artifacts”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("extractHumanInputRequest rejects malformed artifacts", () => {
   const message = {
@@ -56,6 +66,11 @@ test("extractHumanInputRequest rejects malformed artifacts", () => {
 
   expect(extractHumanInputRequest(message)).toBeNull();
 });
+
+/**
+ * 覆盖“extractHumanInputResponse reads valid human message metadata”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("extractHumanInputResponse reads valid human message metadata", () => {
   const response = {
@@ -78,6 +93,11 @@ test("extractHumanInputResponse reads valid human message metadata", () => {
 
   expect(extractHumanInputResponse(message)).toEqual(response);
 });
+
+/**
+ * 覆盖“derives answered card state from hidden human input responses”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("derives answered card state from hidden human input responses", () => {
   const response = {
@@ -114,6 +134,11 @@ test("derives answered card state from hidden human input responses", () => {
   expect(state.latestOpenRequestId).toBeNull();
 });
 
+/**
+ * 覆盖“detects whether a thread has an open human input request”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("detects whether a thread has an open human input request", () => {
   const requestMessage = {
     type: "tool",
@@ -145,6 +170,11 @@ test("detects whether a thread has an open human input request", () => {
     false,
   );
 });
+
+/**
+ * 覆盖“detects new thread errors that should unlock pending human input cards”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("detects new thread errors that should unlock pending human input cards", () => {
   const previousError = new Error("old failure");
@@ -179,6 +209,11 @@ test("detects new thread errors that should unlock pending human input cards", (
     }),
   ).toBe(false);
 });
+
+/**
+ * 覆盖“creates option and text responses for a request”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("creates option and text responses for a request", () => {
   const request = extractHumanInputRequest({

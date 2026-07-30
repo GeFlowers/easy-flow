@@ -5,8 +5,10 @@ import {
   isHiddenFromUIMessage,
 } from "@/core/messages/utils";
 
+/** 可被侧栏引用的消息角色。 */
 export type SidecarContextRole = "user" | "assistant";
 
+/** 来自主会话单条消息或其选中文本的侧栏引用。 */
 export type ReferencedMessageSidecarContext = {
   type: "referenced_message";
   label: string;
@@ -15,14 +17,17 @@ export type ReferencedMessageSidecarContext = {
   content: string;
 };
 
+/** 当前仅支持的侧栏上下文联合类型，为后续上下文来源预留扩展点。 */
 export type SidecarContext = ReferencedMessageSidecarContext;
 
+/** 侧栏提示词中作为只读背景附带的主会话消息。 */
 export type ParentConversationContextMessage = {
   messageId?: string;
   role: SidecarContextRole;
   content: string;
 };
 
+/** 将单个侧栏上下文统一转换为数组，保留调用方提供的顺序和内容。 */
 export function normalizeSidecarContexts(
   contextOrContexts: SidecarContext | SidecarContext[],
 ): SidecarContext[] {
@@ -31,6 +36,7 @@ export function normalizeSidecarContexts(
     : [contextOrContexts];
 }
 
+/** 解析消息可作为侧栏上下文时对应的角色。 */
 function roleOfMessage(message: Message): SidecarContextRole | null {
   if (message.type === "human") {
     return "user";
@@ -41,10 +47,12 @@ function roleOfMessage(message: Message): SidecarContextRole | null {
   return null;
 }
 
+/** 返回侧栏提示词中使用的上下文角色标签。 */
 function labelOfRole(role: SidecarContextRole) {
   return role === "user" ? "User" : "Assistant";
 }
 
+/** 在保留首尾语义的前提下截断过长上下文。 */
 function truncateContextText(content: string, maxChars: number) {
   if (content.length <= maxChars) {
     return content;
@@ -52,6 +60,7 @@ function truncateContextText(content: string, maxChars: number) {
   return `${content.slice(0, maxChars).trimEnd()}\n[truncated]`;
 }
 
+/** 从父会话构建可供侧栏任务引用的上下文片段。 */
 export function buildParentConversationContext(
   messages: Message[],
   {
@@ -109,6 +118,7 @@ export function buildParentConversationContext(
   return selectedMessages;
 }
 
+/** 将单条消息转换为侧栏可引用的上下文。 */
 export function buildMessageSidecarContext(
   message: Message,
   displayIndex?: number,
@@ -141,6 +151,7 @@ export function buildMessageSidecarContext(
   };
 }
 
+/** 转义写入标记属性的上下文值。 */
 function escapeXmlAttribute(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -149,6 +160,7 @@ function escapeXmlAttribute(value: string) {
     .replace(/>/g, "&gt;");
 }
 
+/** 将已选侧栏引用序列化为供模型使用的提示词。 */
 export function buildSidecarContextPrompt(
   contextOrContexts: SidecarContext | SidecarContext[] = [],
   {

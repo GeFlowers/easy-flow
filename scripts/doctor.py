@@ -1,13 +1,5 @@
 #!/usr/bin/env python3
-"""DeerFlow Health Check (make doctor).
-
-Checks system requirements, configuration, LLM provider, and optional
-components, then prints an actionable report.
-
-Exit codes:
-  0 — all required checks passed (warnings allowed)
-  1 — one or more required checks failed
-"""
+"""本脚本负责诊断。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -27,41 +19,50 @@ Status = Literal["ok", "warn", "fail", "skip"]
 
 
 def _supports_color() -> bool:
+    '未说明'
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
 def _c(text: str, code: str) -> str:
+    '未说明'
     if _supports_color():
         return f"\033[{code}m{text}\033[0m"
     return text
 
 
 def green(t: str) -> str:
+    '未说明'
     return _c(t, "32")
 
 
 def red(t: str) -> str:
+    '未说明'
     return _c(t, "31")
 
 
 def yellow(t: str) -> str:
+    '未说明'
     return _c(t, "33")
 
 
 def cyan(t: str) -> str:
+    '未说明'
     return _c(t, "36")
 
 
 def bold(t: str) -> str:
+    '未说明'
     return _c(t, "1")
 
 
 def _icon(status: Status) -> str:
+    '未说明'
     icons = {"ok": green("✓"), "warn": yellow("!"), "fail": red("✗"), "skip": "—"}
     return icons[status]
 
 
 def _run(cmd: list[str]) -> str | None:
+    '未说明'
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return (r.stdout or r.stderr).strip()
@@ -70,11 +71,13 @@ def _run(cmd: list[str]) -> str | None:
 
 
 def _parse_major(version_text: str) -> int | None:
+    '未说明'
     v = version_text.lstrip("v").split(".", 1)[0]
     return int(v) if v.isdigit() else None
 
 
 def _load_yaml_file(path: Path) -> dict:
+    '未说明'
     import yaml
 
     with open(path, encoding="utf-8") as f:
@@ -85,12 +88,14 @@ def _load_yaml_file(path: Path) -> dict:
 
 
 def _load_app_config(config_path: Path) -> object:
+    '未说明'
     from deerflow.config.app_config import AppConfig
 
     return AppConfig.from_file(str(config_path))
 
 
 def _split_use_path(use: str) -> tuple[str, str] | None:
+    '未说明'
     if ":" not in use:
         return None
     module_name, attr_name = use.split(":", 1)
@@ -105,6 +110,7 @@ def _split_use_path(use: str) -> tuple[str, str] | None:
 
 
 class CheckResult:
+    '未说明'
     def __init__(
         self,
         label: str,
@@ -112,12 +118,14 @@ class CheckResult:
         detail: str = "",
         fix: str | None = None,
     ) -> None:
+        '未说明'
         self.label = label
         self.status = status
         self.detail = detail
         self.fix = fix
 
     def print(self) -> None:
+        '未说明'
         icon = _icon(self.status)
         detail_str = f"  ({self.detail})" if self.detail else ""
         print(f"  {icon} {self.label}{detail_str}")
@@ -132,6 +140,7 @@ class CheckResult:
 
 
 def check_python() -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     v = sys.version_info
     version_str = f"{v.major}.{v.minor}.{v.micro}"
     if v >= (3, 12):
@@ -145,6 +154,7 @@ def check_python() -> CheckResult:
 
 
 def check_node() -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     node = shutil.which("node")
     if not node:
         return CheckResult(
@@ -165,6 +175,7 @@ def check_node() -> CheckResult:
 
 
 def check_pnpm() -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     candidates = [["pnpm"], ["pnpm.cmd"]]
     if shutil.which("corepack"):
         candidates.append(["corepack", "pnpm"])
@@ -180,6 +191,7 @@ def check_pnpm() -> CheckResult:
 
 
 def check_uv() -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not shutil.which("uv"):
         return CheckResult(
             "uv",
@@ -193,6 +205,7 @@ def check_uv() -> CheckResult:
 
 
 def check_nginx() -> CheckResult:
+    """执行检查 Nginx对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if shutil.which("nginx"):
         out = _run(["nginx", "-v"]) or ""
         version = out.split("/", 1)[-1] if "/" in out else out
@@ -205,6 +218,7 @@ def check_nginx() -> CheckResult:
 
 
 def check_config_exists(config_path: Path) -> CheckResult:
+    """执行检查 配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if config_path.exists():
         return CheckResult("config.yaml found", "ok")
     return CheckResult(
@@ -215,6 +229,7 @@ def check_config_exists(config_path: Path) -> CheckResult:
 
 
 def check_config_version(config_path: Path, project_root: Path) -> CheckResult:
+    """执行检查 配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return CheckResult("config.yaml version", "skip")
 
@@ -251,6 +266,7 @@ def check_config_version(config_path: Path, project_root: Path) -> CheckResult:
 
 
 def check_models_configured(config_path: Path) -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return CheckResult("models configured", "skip")
     try:
@@ -269,6 +285,7 @@ def check_models_configured(config_path: Path) -> CheckResult:
 
 
 def check_config_loadable(config_path: Path) -> CheckResult:
+    """执行检查 配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return CheckResult("config.yaml loadable", "skip")
 
@@ -285,7 +302,7 @@ def check_config_loadable(config_path: Path) -> CheckResult:
 
 
 def check_llm_api_key(config_path: Path) -> list[CheckResult]:
-    """Check that each model's env var is set in the environment."""
+    """执行检查 接口对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return []
 
@@ -304,6 +321,7 @@ def check_llm_api_key(config_path: Path) -> list[CheckResult]:
         for model in data.get("models", []):
             # Collect all values that look like $ENV_VAR references
             def _collect_env_refs(obj: object) -> list[str]:
+                '未说明'
                 refs: list[str] = []
                 if isinstance(obj, str) and obj.startswith("$"):
                     refs.append(obj[1:])
@@ -336,7 +354,7 @@ def check_llm_api_key(config_path: Path) -> list[CheckResult]:
 
 
 def check_llm_package(config_path: Path) -> list[CheckResult]:
-    """Check that the LangChain provider package is installed."""
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return []
 
@@ -377,6 +395,7 @@ def check_llm_package(config_path: Path) -> list[CheckResult]:
 
 
 def check_llm_auth(config_path: Path) -> list[CheckResult]:
+    """执行检查 认证对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return []
 
@@ -431,11 +450,12 @@ def check_llm_auth(config_path: Path) -> list[CheckResult]:
 
 
 def check_web_search(config_path: Path) -> CheckResult:
+    """执行检查 搜索对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return check_web_tool(config_path, tool_name="web_search", label="web search configured")
 
 
 def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckResult:
-    """Warn (not fail) if a web capability is not configured."""
+    """执行检查 工具对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return CheckResult(label, "skip")
 
@@ -494,6 +514,7 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
         }
 
         def _configured_key_detail(tool: dict, default_var: str, key_field: str = "api_key") -> tuple[Status, str] | None:
+            '未说明'
             configured_key = tool.get(key_field)
             if isinstance(configured_key, str) and configured_key.strip():
                 key = configured_key.strip()
@@ -511,6 +532,7 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
             return ("ok", f"{default_var} set") if val and val.strip() else None
 
         def _browserless_self_hosted(tool: dict) -> bool:
+            '未说明'
             base_url = str(tool.get("base_url") or "http://localhost:3032").lower()
             return "browserless.io" not in base_url
 
@@ -573,18 +595,22 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
 
 
 def check_web_fetch(config_path: Path) -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return check_web_tool(config_path, tool_name="web_fetch", label="web fetch configured")
 
 
 def check_web_capture(config_path: Path) -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return check_web_tool(config_path, tool_name="web_capture", label="web capture configured")
 
 
 def check_image_search(config_path: Path) -> CheckResult:
+    """执行检查 图像 搜索对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return check_web_tool(config_path, tool_name="image_search", label="image search configured")
 
 
 def check_frontend_env(project_root: Path) -> CheckResult:
+    """执行检查对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     env_path = project_root / "frontend" / ".env"
     if env_path.exists():
         return CheckResult("frontend/.env found", "ok")
@@ -596,6 +622,7 @@ def check_frontend_env(project_root: Path) -> CheckResult:
 
 
 def check_sandbox(config_path: Path) -> list[CheckResult]:
+    """执行检查 沙箱对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not config_path.exists():
         return [CheckResult("sandbox configured", "skip")]
 
@@ -667,6 +694,7 @@ def check_sandbox(config_path: Path) -> list[CheckResult]:
 
 
 def check_env_file(project_root: Path) -> CheckResult:
+    """执行检查 文件对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     env_path = project_root / ".env"
     if env_path.exists():
         return CheckResult(".env found", "ok")
@@ -683,6 +711,7 @@ def check_env_file(project_root: Path) -> CheckResult:
 
 
 def main() -> int:
+    '未说明'
     project_root = Path(__file__).resolve().parents[1]
     config_path = project_root / "config.yaml"
 

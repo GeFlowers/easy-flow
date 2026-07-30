@@ -1,20 +1,4 @@
-"""Concurrency regression tests for the skill storage singleton lifecycle.
-
-These guard the unsynchronized check-then-create in ``get_or_new_skill_storage``
-and ``get_or_new_user_skill_storage``, and the unlocked ``reset_skill_storage``:
-before the lock was added, concurrent cold-start callers could each construct a
-separate ``SkillStorage`` and overwrite the global, and a ``reset_skill_storage``
-racing a get could hand a caller ``None``.
-
-This mirrors ``test_sandbox_provider_lifecycle.py`` — the sibling singleton that
-``skills/storage/__init__.py`` documents itself as patterned after — adapted to
-the fact that ``SkillStorage`` has no teardown hook, so the fix constructs the
-singleton *inside* the lock (like ``get_memory_storage``) and never builds an
-orphan to clean up.
-
-Each test resets the process-global singleton on entry and in a ``finally`` so
-tests never leak storage into one another.
-"""
+'未说明'
 
 import threading
 import time
@@ -26,57 +10,71 @@ from deerflow.skills.storage import SkillStorage
 
 
 class SlowSkillStorage(SkillStorage):
-    """Storage whose constructor is slow, to widen the check-then-create gap."""
+    '未说明'
 
     instances_created = 0
     instances_lock = threading.Lock()
 
     def __init__(self, **kwargs) -> None:
+        '未说明'
         super().__init__(container_path=kwargs.get("container_path", "/mnt/skills"))
         time.sleep(0.05)
         with self.instances_lock:
             type(self).instances_created += 1
 
     def get_skills_root_path(self) -> Path:
+        """处理获取 路径相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return Path("/tmp/skills")
 
     def _iter_skill_files(self):
+        '未说明'
         return []
 
     def read_custom_skill(self, name: str) -> str:
+        """处理读取 技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return ""
 
     def write_custom_skill(self, name: str, relative_path: str, content: str) -> None:
+        """处理写入 技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         pass
 
     async def ainstall_skill_from_archive(self, archive_path) -> dict:
+        """处理技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return {}
 
     def delete_custom_skill(self, name: str, *, history_meta: dict | None = None) -> None:
+        """处理技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         pass
 
     def custom_skill_exists(self, name: str) -> bool:
+        """处理技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return False
 
     def public_skill_exists(self, name: str) -> bool:
+        """处理公开 技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return False
 
     def append_history(self, name: str, record: dict) -> None:
+        '未说明'
         pass
 
     def read_history(self, name: str) -> list[dict]:
+        """处理读取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return []
 
 
 class _SkillsConfig:
+    '未说明'
     use = "SlowSkillStorage"
     container_path = "/mnt/skills"
 
     def get_skills_path(self) -> Path:
+        """处理获取 路径相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return Path("/tmp/skills")
 
 
 class _AppConfig:
+    '未说明'
     skills = _SkillsConfig()
 
 
@@ -87,17 +85,13 @@ _APP_CONFIG = _AppConfig()
 
 
 def _patch_storage_resolution(monkeypatch, cls=SlowSkillStorage) -> None:
+    '未说明'
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: _APP_CONFIG)
     monkeypatch.setattr("deerflow.reflection.resolve_class", lambda *args, **kwargs: cls)
 
 
 def test_get_or_new_skill_storage_constructs_one_singleton_under_concurrent_access(monkeypatch):
-    """Eight threads racing on a cold start must construct exactly one instance.
-
-    The fix builds the singleton inside the lock, so unlike the sandbox provider
-    (which builds outside the lock and tears orphans down) no second instance is
-    ever constructed — every caller observes the one that was built.
-    """
+    '未说明'
     skill_storage.reset_skill_storage()
     SlowSkillStorage.instances_created = 0
     _patch_storage_resolution(monkeypatch)
@@ -110,6 +104,7 @@ def test_get_or_new_skill_storage_constructs_one_singleton_under_concurrent_acce
     barrier = threading.Barrier(n_threads)
 
     def get_storage() -> None:
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         barrier.wait()
         storage = skill_storage.get_or_new_skill_storage()
         with storages_lock:
@@ -131,13 +126,7 @@ def test_get_or_new_skill_storage_constructs_one_singleton_under_concurrent_acce
 
 
 def test_reset_racing_get_of_live_singleton_never_returns_none(monkeypatch):
-    """A reset racing concurrent gets of a live singleton must never hand back
-    ``None``: every returned value is a real storage instance.
-
-    The singleton is populated before the barrier so the resetter nulls a live
-    instance while the getters read it — the interleaving that the unlocked
-    check-then-return path could turn into a ``None`` return.
-    """
+    '未说明'
     skill_storage.reset_skill_storage()
     SlowSkillStorage.instances_created = 0
     _patch_storage_resolution(monkeypatch)
@@ -150,12 +139,14 @@ def test_reset_racing_get_of_live_singleton_never_returns_none(monkeypatch):
     barrier = threading.Barrier(5)
 
     def getter() -> None:
+        '未说明'
         barrier.wait()
         storage = skill_storage.get_or_new_skill_storage()
         with results_lock:
             results.append(storage)
 
     def resetter() -> None:
+        '未说明'
         barrier.wait()
         skill_storage.reset_skill_storage()
 
@@ -179,16 +170,13 @@ def test_reset_racing_get_of_live_singleton_never_returns_none(monkeypatch):
 
 
 class SlowUserSkillStorage(SkillStorage):
-    """Storage whose constructor is slow, to widen the check-then-create gap.
-
-    Signature mirrors ``UserScopedSkillStorage.__init__(user_id, **kwargs)``
-    so the module-level factory can call it as ``cls(user_id, **kwargs)``.
-    """
+    '未说明'
 
     instances_created = 0
     instances_lock = threading.Lock()
 
     def __init__(self, user_id: str = "default", **kwargs) -> None:
+        '未说明'
         super().__init__(container_path=kwargs.get("container_path", "/mnt/skills"))
         self._user_id = user_id
         time.sleep(0.05)
@@ -196,37 +184,48 @@ class SlowUserSkillStorage(SkillStorage):
             type(self).instances_created += 1
 
     def get_skills_root_path(self) -> Path:
+        """处理获取 路径相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return Path("/tmp/skills")
 
     def _iter_skill_files(self):
+        '未说明'
         return []
 
     def read_custom_skill(self, name: str) -> str:
+        """处理读取 技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return ""
 
     def write_custom_skill(self, name: str, relative_path: str, content: str) -> None:
+        """处理写入 技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         pass
 
     async def ainstall_skill_from_archive(self, archive_path) -> dict:
+        """处理技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return {}
 
     def delete_custom_skill(self, name: str, *, history_meta: dict | None = None) -> None:
+        """处理技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         pass
 
     def custom_skill_exists(self, name: str) -> bool:
+        """处理技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return False
 
     def public_skill_exists(self, name: str) -> bool:
+        """处理公开 技能相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return False
 
     def append_history(self, name: str, record: dict) -> None:
+        '未说明'
         pass
 
     def read_history(self, name: str) -> list[dict]:
+        """处理读取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return []
 
 
 def _patch_user_storage_resolution(monkeypatch, cls=SlowUserSkillStorage) -> None:
+    '未说明'
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: _APP_CONFIG)
     monkeypatch.setattr("deerflow.config.paths.get_paths", lambda: Paths(base_dir=Path("/tmp")))
     monkeypatch.setattr("deerflow.config.paths._paths", None)
@@ -236,9 +235,7 @@ def _patch_user_storage_resolution(monkeypatch, cls=SlowUserSkillStorage) -> Non
 
 
 def test_get_or_new_user_skill_storage_constructs_one_per_user_under_concurrent_access(monkeypatch):
-    """Eight threads racing on a cold start for the same user_id must construct
-    exactly one instance per user. Different user_ids get different instances.
-    """
+    '未说明'
     skill_storage.reset_skill_storage()
     SlowUserSkillStorage.instances_created = 0
     _patch_user_storage_resolution(monkeypatch)
@@ -249,6 +246,7 @@ def test_get_or_new_user_skill_storage_constructs_one_per_user_under_concurrent_
     barrier = threading.Barrier(n_threads)
 
     def get_storage() -> None:
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         barrier.wait()
         storage = skill_storage.get_or_new_user_skill_storage("alice")
         with storages_lock:
@@ -268,7 +266,7 @@ def test_get_or_new_user_skill_storage_constructs_one_per_user_under_concurrent_
 
 
 def test_different_users_get_different_storages(monkeypatch):
-    """Concurrent calls for different user_ids must produce distinct instances."""
+    '未说明'
     skill_storage.reset_skill_storage()
     SlowUserSkillStorage.instances_created = 0
     _patch_user_storage_resolution(monkeypatch)
@@ -285,7 +283,7 @@ def test_different_users_get_different_storages(monkeypatch):
 
 
 def test_reset_user_skill_storage_only_clears_target_user(monkeypatch):
-    """Resetting alice's storage must not invalidate bob's."""
+    '未说明'
     skill_storage.reset_skill_storage()
     SlowUserSkillStorage.instances_created = 0
     _patch_user_storage_resolution(monkeypatch)
@@ -305,14 +303,7 @@ def test_reset_user_skill_storage_only_clears_target_user(monkeypatch):
 
 
 def test_reset_user_skill_storage_normalises_cache_key(monkeypatch):
-    """reset_user_skill_storage must normalise the user_id so that the cache
-    key matches the one used by get_or_new_user_skill_storage.
-
-    Without normalisation, an IM-style user ID like ``feishu:ou_xxx`` would
-    fail to clear its stale cache entry because ``get_or_new`` stores by
-    ``make_safe_user_id(user_id)`` but ``reset`` would try to pop by the raw
-    ID — a silent cache-invalidation failure.
-    """
+    '未说明'
     from deerflow.config.paths import make_safe_user_id
 
     skill_storage.reset_skill_storage()

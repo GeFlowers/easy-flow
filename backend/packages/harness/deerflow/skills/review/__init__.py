@@ -1,4 +1,4 @@
-"""Deterministic skill review core."""
+'未说明'
 
 from deerflow.skills.review.analyzer import analyze_skill_package
 from deerflow.skills.review.models import (

@@ -1,4 +1,4 @@
-"""Tests for channel file attachment support (ResolvedAttachment, resolution, send_file)."""
+"""本模块覆盖相关测试，固定公开行为、失败处理与状态边界。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ from app.channels.message_bus import InboundMessage, MessageBus, OutboundMessage
 
 
 def _run(coro):
-    """Run an async coroutine synchronously."""
+    """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
     loop = asyncio.new_event_loop()
     try:
         return loop.run_until_complete(coro)
@@ -21,12 +21,14 @@ def _run(coro):
 
 
 # ---------------------------------------------------------------------------
-# ResolvedAttachment tests
+# 已解决的附件测试
 # ---------------------------------------------------------------------------
 
 
 class TestResolvedAttachment:
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
     def test_basic_construction(self, tmp_path):
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过3项断言固定返回、状态或副作用边界。"""
         f = tmp_path / "test.pdf"
         f.write_bytes(b"PDF content")
 
@@ -43,6 +45,7 @@ class TestResolvedAttachment:
         assert att.size == 11
 
     def test_image_detection(self, tmp_path):
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         f = tmp_path / "photo.png"
         f.write_bytes(b"\x89PNG")
 
@@ -58,12 +61,14 @@ class TestResolvedAttachment:
 
 
 # ---------------------------------------------------------------------------
-# OutboundMessage.attachments field tests
+# 此处说明该测试段的前置条件、调用限制及预期边界。
 # ---------------------------------------------------------------------------
 
 
 class TestOutboundMessageAttachments:
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
     def test_default_empty_attachments(self):
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         msg = OutboundMessage(
             channel_name="test",
             chat_id="c1",
@@ -73,6 +78,7 @@ class TestOutboundMessageAttachments:
         assert msg.attachments == []
 
     def test_attachments_populated(self, tmp_path):
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         f = tmp_path / "file.txt"
         f.write_text("content")
 
@@ -96,16 +102,17 @@ class TestOutboundMessageAttachments:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_attachments tests
+# 此处说明该测试段的前置条件、调用限制及预期边界。
 # ---------------------------------------------------------------------------
 
 
 class TestResolveAttachments:
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
     def test_resolves_existing_file(self, tmp_path):
-        """Successfully resolves a virtual path to an existing file."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过5项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
-        # Create the directory structure: threads/{thread_id}/user-data/outputs/
+        # 此处说明该测试段的前置条件、调用限制及预期边界。
         thread_id = "test-thread-123"
         outputs_dir = tmp_path / "threads" / thread_id / "user-data" / "outputs"
         outputs_dir.mkdir(parents=True)
@@ -126,7 +133,7 @@ class TestResolveAttachments:
         assert result[0].size == len(b"%PDF-1.4 fake content")
 
     def test_resolves_image_file(self, tmp_path):
-        """Images are detected by MIME type."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过3项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
         thread_id = "test-thread"
@@ -147,7 +154,7 @@ class TestResolveAttachments:
         assert result[0].mime_type == "image/png"
 
     def test_skips_missing_file(self, tmp_path):
-        """Missing files are skipped with a warning."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
         outputs_dir = tmp_path / "outputs"
@@ -163,7 +170,7 @@ class TestResolveAttachments:
         assert result == []
 
     def test_skips_invalid_path(self):
-        """Invalid paths (ValueError from resolve) are skipped."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
         mock_paths = MagicMock()
@@ -175,7 +182,7 @@ class TestResolveAttachments:
         assert result == []
 
     def test_rejects_uploads_path(self):
-        """Paths under /mnt/user-data/uploads/ are rejected (security)."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
         mock_paths = MagicMock()
@@ -187,7 +194,7 @@ class TestResolveAttachments:
         mock_paths.resolve_virtual_path.assert_not_called()
 
     def test_rejects_workspace_path(self):
-        """Paths under /mnt/user-data/workspace/ are rejected (security)."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
         mock_paths = MagicMock()
@@ -199,13 +206,13 @@ class TestResolveAttachments:
         mock_paths.resolve_virtual_path.assert_not_called()
 
     def test_rejects_path_traversal_escape(self, tmp_path):
-        """Paths that escape the outputs directory after resolution are rejected."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
         thread_id = "t1"
         outputs_dir = tmp_path / "threads" / thread_id / "user-data" / "outputs"
         outputs_dir.mkdir(parents=True)
-        # Simulate a resolved path that escapes outside the outputs directory
+        # 模拟转义到输出目录之外的已解析路径
         escaped_file = tmp_path / "threads" / thread_id / "user-data" / "uploads" / "stolen.txt"
         escaped_file.parent.mkdir(parents=True, exist_ok=True)
         escaped_file.write_text("sensitive")
@@ -220,7 +227,7 @@ class TestResolveAttachments:
         assert result == []
 
     def test_multiple_artifacts_partial_resolution(self, tmp_path):
-        """Mixed valid/invalid artifacts: only valid ones are returned."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
         thread_id = "t1"
@@ -233,6 +240,7 @@ class TestResolveAttachments:
         mock_paths.sandbox_outputs_dir.return_value = outputs_dir
 
         def resolve_side_effect(tid, vpath, *, user_id=None):
+            """模拟本用例所需的外部交互，为调用方提供受控返回、异常或调用记录。"""
             if "data.csv" in vpath:
                 return good_file
             return tmp_path / "missing.txt"
@@ -250,12 +258,14 @@ class TestResolveAttachments:
 
 
 # ---------------------------------------------------------------------------
-# Inbound file ingestion tests
+# 入站文件摄取测试
 # ---------------------------------------------------------------------------
 
 
 class TestInboundFileIngestion:
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
     def test_rejects_preexisting_symlink_destination(self, tmp_path):
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过3项断言固定返回、状态或副作用边界。"""
         from app.channels import manager
 
         uploads_dir = tmp_path / "uploads"
@@ -272,6 +282,7 @@ class TestInboundFileIngestion:
         )
 
         async def fake_reader(file_info, client):
+            """模拟本用例所需的外部交互，为调用方提供受控返回、异常或调用记录。"""
             return b"attacker data"
 
         with (
@@ -285,6 +296,7 @@ class TestInboundFileIngestion:
         assert (uploads_dir / "victim.txt").is_symlink()
 
     def test_rejects_dangling_symlink_destination(self, tmp_path):
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过3项断言固定返回、状态或副作用边界。"""
         from app.channels import manager
 
         uploads_dir = tmp_path / "uploads"
@@ -301,6 +313,7 @@ class TestInboundFileIngestion:
         )
 
         async def fake_reader(file_info, client):
+            """模拟本用例所需的外部交互，为调用方提供受控返回、异常或调用记录。"""
             return b"attacker data"
 
         with (
@@ -314,6 +327,7 @@ class TestInboundFileIngestion:
         assert (uploads_dir / "victim.txt").is_symlink()
 
     def test_hardlinked_existing_file_is_not_overwritten(self, tmp_path):
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过4项断言固定返回、状态或副作用边界。"""
         from app.channels import manager
 
         uploads_dir = tmp_path / "uploads"
@@ -331,6 +345,7 @@ class TestInboundFileIngestion:
         )
 
         async def fake_reader(file_info, client):
+            """模拟本用例所需的外部交互，为调用方提供受控返回、异常或调用记录。"""
             return b"new attachment data"
 
         with (
@@ -353,44 +368,54 @@ class TestInboundFileIngestion:
 
 
 # ---------------------------------------------------------------------------
-# Channel base class _on_outbound with attachments
+# 此处说明该测试段的前置条件、调用限制及预期边界。
 # ---------------------------------------------------------------------------
 
 
 class _DummyChannel(Channel):
-    """Concrete channel for testing the base class behavior."""
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
 
     def __init__(self, bus):
+        """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
         super().__init__(name="dummy", bus=bus, config={})
         self.sent_messages: list[OutboundMessage] = []
         self.sent_files: list[tuple[OutboundMessage, ResolvedAttachment]] = []
 
     async def start(self):
+        """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
         pass
 
     async def stop(self):
+        """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
         pass
 
     async def send(self, msg: OutboundMessage) -> None:
+        """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
         self.sent_messages.append(msg)
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
+        """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
         self.sent_files.append((msg, attachment))
         return True
 
 
 class TestBaseChannelOnOutbound:
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
     def test_default_receive_file_returns_original_message(self):
-        """The base Channel.receive_file returns the original message unchanged."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过3项断言固定返回、状态或副作用边界。"""
 
         class MinimalChannel(Channel):
+            """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
             async def start(self):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 pass
 
             async def stop(self):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 pass
 
             async def send(self, msg):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 pass
 
         from app.channels.message_bus import InboundMessage
@@ -406,7 +431,7 @@ class TestBaseChannelOnOutbound:
         assert result.files == [{"file_key": "k1"}]
 
     def test_send_file_called_for_each_attachment(self, tmp_path):
-        """_on_outbound sends text first, then uploads each attachment."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过4项断言固定返回、状态或副作用边界。"""
         bus = MessageBus()
         ch = _DummyChannel(bus)
 
@@ -434,7 +459,7 @@ class TestBaseChannelOnOutbound:
         assert ch.sent_files[1][1].filename == "b.png"
 
     def test_no_attachments_no_send_file(self):
-        """When there are no attachments, send_file is not called."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         bus = MessageBus()
         ch = _DummyChannel(bus)
 
@@ -451,22 +476,23 @@ class TestBaseChannelOnOutbound:
         assert len(ch.sent_files) == 0
 
     def test_send_file_failure_does_not_block_others(self, tmp_path):
-        """If one attachment upload fails, remaining attachments still get sent."""
+        """验证当前场景的异步、异常调用：使用受控输入与依赖替身，通过2项断言固定返回、状态或副作用边界。"""
         bus = MessageBus()
         ch = _DummyChannel(bus)
 
-        # Override send_file to fail on first call, succeed on second
+        # 此处说明该测试段的前置条件、调用限制及预期边界。
         call_count = 0
         original_send_file = ch.send_file
 
         async def flaky_send_file(msg, att):
+            """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
             nonlocal call_count
             call_count += 1
             if call_count == 1:
                 raise RuntimeError("upload failed")
             return await original_send_file(msg, att)
 
-        ch.send_file = flaky_send_file  # type: ignore
+        ch.send_file = flaky_send_file  # 此处说明该测试段的前置条件、调用限制及预期边界。
 
         f1 = tmp_path / "fail.txt"
         f1.write_text("x")
@@ -486,19 +512,20 @@ class TestBaseChannelOnOutbound:
 
         _run(ch._on_outbound(msg))
 
-        # First upload failed, second succeeded
+        # 第一次上传失败，第二次成功
         assert len(ch.sent_files) == 1
         assert ch.sent_files[0][1].filename == "ok.txt"
 
     def test_send_raises_skips_file_uploads(self, tmp_path):
-        """When send() raises, file uploads are skipped entirely."""
+        """验证当前场景的异常调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         bus = MessageBus()
         ch = _DummyChannel(bus)
 
         async def failing_send(msg):
+            """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
             raise RuntimeError("network error")
 
-        ch.send = failing_send  # type: ignore
+        ch.send = failing_send  # 此处说明该测试段的前置条件、调用限制及预期边界。
 
         f = tmp_path / "a.pdf"
         f.write_bytes(b"%PDF")
@@ -513,20 +540,24 @@ class TestBaseChannelOnOutbound:
 
         _run(ch._on_outbound(msg))
 
-        # send() raised, so send_file should never be called
+        # 此处说明该测试段的前置条件、调用限制及预期边界。
         assert len(ch.sent_files) == 0
 
     def test_default_send_file_returns_false(self):
-        """The base Channel.send_file returns False by default."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
 
         class MinimalChannel(Channel):
+            """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
             async def start(self):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 pass
 
             async def stop(self):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 pass
 
             async def send(self, msg):
+                """准备隔离的测试前置条件，避免真实外部依赖影响后续断言。"""
                 pass
 
         bus = MessageBus()
@@ -539,23 +570,24 @@ class TestBaseChannelOnOutbound:
 
 
 # ---------------------------------------------------------------------------
-# ChannelManager artifact resolution integration
+# 此处说明该测试段的前置条件、调用限制及预期边界。
 # ---------------------------------------------------------------------------
 
 
 class TestManagerArtifactResolution:
+    """此测试组归集同一组件的用例，分别约束正常流程与关键边界条件。"""
     def test_handle_chat_populates_attachments(self):
-        """Verify _resolve_attachments is importable and works with the manager module."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过1项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _resolve_attachments
 
-        # Basic smoke test: empty artifacts returns empty list
+        # 基本冒烟测试：空工件返回空列表
         mock_paths = MagicMock()
         with patch("deerflow.config.paths.get_paths", return_value=mock_paths):
             result = _resolve_attachments("t1", [])
         assert result == []
 
     def test_format_artifact_text_for_unresolved(self):
-        """_format_artifact_text produces expected output."""
+        """验证当前场景的同步调用：使用受控输入与依赖替身，通过3项断言固定返回、状态或副作用边界。"""
         from app.channels.manager import _format_artifact_text
 
         assert "report.pdf" in _format_artifact_text(["/mnt/user-data/outputs/report.pdf"])

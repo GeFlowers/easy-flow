@@ -1,10 +1,4 @@
-"""Unit tests for tool output truncation functions.
-
-These functions truncate long tool outputs to prevent context window overflow.
-- _truncate_bash_output: middle-truncation (head + tail), for bash tool
-- _truncate_read_file_output: head-truncation, for read_file tool
-- _truncate_ls_output: head-truncation, for ls tool
-"""
+'未说明'
 
 from deerflow.sandbox.tools import _truncate_bash_output, _truncate_ls_output, _truncate_read_file_output
 
@@ -14,44 +8,53 @@ from deerflow.sandbox.tools import _truncate_bash_output, _truncate_ls_output, _
 
 
 class TestTruncateBashOutput:
+    '未说明'
     def test_short_output_returned_unchanged(self):
+        '未说明'
         output = "hello world"
         assert _truncate_bash_output(output, 20000) == output
 
     def test_output_equal_to_limit_returned_unchanged(self):
+        '未说明'
         output = "A" * 20000
         assert _truncate_bash_output(output, 20000) == output
 
     def test_long_output_is_truncated(self):
+        '未说明'
         output = "A" * 30000
         result = _truncate_bash_output(output, 20000)
         assert len(result) < len(output)
 
     def test_result_never_exceeds_max_chars(self):
+        '未说明'
         output = "A" * 30000
         max_chars = 20000
         result = _truncate_bash_output(output, max_chars)
         assert len(result) <= max_chars
 
     def test_head_is_preserved(self):
+        '未说明'
         head = "HEAD_CONTENT"
         output = head + "M" * 30000
         result = _truncate_bash_output(output, 20000)
         assert result.startswith(head)
 
     def test_tail_is_preserved(self):
+        '未说明'
         tail = "TAIL_CONTENT"
         output = "M" * 30000 + tail
         result = _truncate_bash_output(output, 20000)
         assert result.endswith(tail)
 
     def test_middle_truncation_marker_present(self):
+        '未说明'
         output = "A" * 30000
         result = _truncate_bash_output(output, 20000)
         assert "[middle truncated:" in result
         assert "chars skipped" in result
 
     def test_skipped_chars_count_is_correct(self):
+        '未说明'
         output = "A" * 25000
         result = _truncate_bash_output(output, 20000)
         # Extract the reported skipped count and verify it equals len(output) - kept.
@@ -70,22 +73,26 @@ class TestTruncateBashOutput:
         assert result.startswith(output[: head_and_tail // 2])
 
     def test_max_chars_zero_disables_truncation(self):
+        '未说明'
         output = "A" * 100000
         assert _truncate_bash_output(output, 0) == output
 
     def test_50_50_split(self):
         # head and tail should each be roughly max_chars // 2
+        '未说明'
         output = "H" * 20000 + "M" * 10000 + "T" * 20000
         result = _truncate_bash_output(output, 20000)
         assert result[:100] == "H" * 100
         assert result[-100:] == "T" * 100
 
     def test_small_max_chars_does_not_crash(self):
+        '未说明'
         output = "A" * 1000
         result = _truncate_bash_output(output, 10)
         assert len(result) <= 10
 
     def test_result_never_exceeds_max_chars_various_sizes(self):
+        '未说明'
         output = "X" * 50000
         for max_chars in [100, 1000, 5000, 20000, 49999]:
             result = _truncate_bash_output(output, max_chars)
@@ -98,64 +105,77 @@ class TestTruncateBashOutput:
 
 
 class TestTruncateReadFileOutput:
+    '未说明'
     def test_short_output_returned_unchanged(self):
+        '未说明'
         output = "def foo():\n    pass\n"
         assert _truncate_read_file_output(output, 50000) == output
 
     def test_output_equal_to_limit_returned_unchanged(self):
+        '未说明'
         output = "X" * 50000
         assert _truncate_read_file_output(output, 50000) == output
 
     def test_long_output_is_truncated(self):
+        '未说明'
         output = "X" * 60000
         result = _truncate_read_file_output(output, 50000)
         assert len(result) < len(output)
 
     def test_result_never_exceeds_max_chars(self):
+        '未说明'
         output = "X" * 60000
         max_chars = 50000
         result = _truncate_read_file_output(output, max_chars)
         assert len(result) <= max_chars
 
     def test_head_is_preserved(self):
+        '未说明'
         head = "import os\nimport sys\n"
         output = head + "X" * 60000
         result = _truncate_read_file_output(output, 50000)
         assert result.startswith(head)
 
     def test_truncation_marker_present(self):
+        '未说明'
         output = "X" * 60000
         result = _truncate_read_file_output(output, 50000)
         assert "[truncated:" in result
         assert "showing first" in result
 
     def test_total_chars_reported_correctly(self):
+        '未说明'
         output = "X" * 60000
         result = _truncate_read_file_output(output, 50000)
         assert "of 60000 chars" in result
 
     def test_start_line_hint_present(self):
+        '未说明'
         output = "X" * 60000
         result = _truncate_read_file_output(output, 50000)
         assert "start_line" in result
         assert "end_line" in result
 
     def test_max_chars_zero_disables_truncation(self):
+        '未说明'
         output = "X" * 100000
         assert _truncate_read_file_output(output, 0) == output
 
     def test_tail_is_not_preserved(self):
         # head-truncation: tail should be cut off
+        '未说明'
         output = "H" * 50000 + "TAIL_SHOULD_NOT_APPEAR"
         result = _truncate_read_file_output(output, 50000)
         assert "TAIL_SHOULD_NOT_APPEAR" not in result
 
     def test_small_max_chars_does_not_crash(self):
+        '未说明'
         output = "X" * 1000
         result = _truncate_read_file_output(output, 10)
         assert len(result) <= 10
 
     def test_result_never_exceeds_max_chars_various_sizes(self):
+        '未说明'
         output = "X" * 50000
         for max_chars in [100, 1000, 5000, 20000, 49999]:
             result = _truncate_read_file_output(output, max_chars)
@@ -168,62 +188,75 @@ class TestTruncateReadFileOutput:
 
 
 class TestTruncateLsOutput:
+    '未说明'
     def test_short_output_returned_unchanged(self):
+        '未说明'
         output = "dir1\ndir2\nfile1.txt"
         assert _truncate_ls_output(output, 20000) == output
 
     def test_output_equal_to_limit_returned_unchanged(self):
+        '未说明'
         output = "X" * 20000
         assert _truncate_ls_output(output, 20000) == output
 
     def test_long_output_is_truncated(self):
+        '未说明'
         output = "\n".join(f"file_{i}.txt" for i in range(5000))
         result = _truncate_ls_output(output, 20000)
         assert len(result) < len(output)
 
     def test_result_never_exceeds_max_chars(self):
+        '未说明'
         output = "\n".join(f"subdir/file_{i}.txt" for i in range(5000))
         max_chars = 20000
         result = _truncate_ls_output(output, max_chars)
         assert len(result) <= max_chars
 
     def test_head_is_preserved(self):
+        '未说明'
         head = "first_dir\nsecond_dir\n"
         output = head + "\n".join(f"file_{i}" for i in range(5000))
         result = _truncate_ls_output(output, 20000)
         assert result.startswith(head)
 
     def test_truncation_marker_present(self):
+        '未说明'
         output = "\n".join(f"file_{i}.txt" for i in range(5000))
         result = _truncate_ls_output(output, 20000)
         assert "[truncated:" in result
         assert "showing first" in result
 
     def test_total_chars_reported_correctly(self):
+        '未说明'
         output = "X" * 30000
         result = _truncate_ls_output(output, 20000)
         assert "of 30000 chars" in result
 
     def test_hint_suggests_specific_path(self):
+        '未说明'
         output = "X" * 30000
         result = _truncate_ls_output(output, 20000)
         assert "Use a more specific path" in result
 
     def test_max_chars_zero_disables_truncation(self):
+        '未说明'
         output = "\n".join(f"file_{i}.txt" for i in range(10000))
         assert _truncate_ls_output(output, 0) == output
 
     def test_tail_is_not_preserved(self):
+        '未说明'
         output = "H" * 20000 + "TAIL_SHOULD_NOT_APPEAR"
         result = _truncate_ls_output(output, 20000)
         assert "TAIL_SHOULD_NOT_APPEAR" not in result
 
     def test_small_max_chars_does_not_crash(self):
+        '未说明'
         output = "\n".join(f"file_{i}.txt" for i in range(100))
         result = _truncate_ls_output(output, 10)
         assert len(result) <= 10
 
     def test_result_never_exceeds_max_chars_various_sizes(self):
+        '未说明'
         output = "\n".join(f"file_{i}.txt" for i in range(5000))
         for max_chars in [100, 1000, 5000, 20000, len(output) - 1]:
             result = _truncate_ls_output(output, max_chars)

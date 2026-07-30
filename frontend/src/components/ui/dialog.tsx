@@ -6,30 +6,35 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+/** Dialog 内部组件：组织对应的界面结构与交互语义。 */
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
+/** DialogTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function DialogTrigger({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
+/** DialogPortal 内部组件：组织对应的界面结构与交互语义。 */
 function DialogPortal({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
+/** DialogClose 内部组件：组织对应的界面结构与交互语义。 */
 function DialogClose({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Close>) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
+/** DialogOverlay 内部组件：组织对应的界面结构与交互语义。 */
 function DialogOverlay({
   className,
   ...props
@@ -46,6 +51,7 @@ function DialogOverlay({
   );
 }
 
+/** DialogContent 内部组件：组织对应的界面结构与交互语义。 */
 function DialogContent({
   className,
   children,
@@ -80,6 +86,7 @@ function DialogContent({
   );
 }
 
+/** DialogHeader 内部组件：组织对应的界面结构与交互语义。 */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -90,6 +97,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** DialogFooter 内部组件：组织对应的界面结构与交互语义。 */
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -103,6 +111,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** DialogTitle 内部组件：组织对应的界面结构与交互语义。 */
 function DialogTitle({
   className,
   ...props
@@ -116,6 +125,7 @@ function DialogTitle({
   );
 }
 
+/** DialogDescription 内部组件：组织对应的界面结构与交互语义。 */
 function DialogDescription({
   className,
   ...props

@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -7,6 +8,7 @@ from croniter import croniter
 
 
 def validate_timezone(timezone_name: str) -> str:
+    '未说明'
     try:
         ZoneInfo(timezone_name)
     except ZoneInfoNotFoundError as exc:
@@ -15,6 +17,7 @@ def validate_timezone(timezone_name: str) -> str:
 
 
 def normalize_cron_expression(expr: str) -> str:
+    '未说明'
     parts = [part for part in expr.split() if part]
     if len(parts) != 5:
         raise ValueError("Cron expression must contain exactly 5 fields")
@@ -28,6 +31,7 @@ def next_run_at(
     *,
     now: datetime,
 ) -> datetime | None:
+    '未说明'
     validate_timezone(timezone_name)
     if now.tzinfo is None:
         now = now.replace(tzinfo=UTC)

@@ -5,6 +5,7 @@ import { BotIcon } from "lucide-react";
 import { type Agent } from "@/core/agents";
 import { cn } from "@/lib/utils";
 
+/** 渲染指定代理的欢迎信息，在新对话开始前明确其名称与可选说明。 */
 export function AgentWelcome({
   className,
   agent,

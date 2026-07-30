@@ -1,3 +1,5 @@
+"""提供仅限任务所有者访问的计划任务 CRUD、手动触发和运行历史路由。"""
+
 from __future__ import annotations
 
 import uuid
@@ -28,6 +30,7 @@ router = APIRouter(prefix="/api", tags=["scheduled-tasks"])
 
 
 def _ensure_task_mutable(task: dict[str, Any]) -> None:
+    """拒绝修改运行中的任务，防止调度执行与用户写入产生竞态。"""
     if task.get("status") == "running":
         raise HTTPException(
             status_code=409,
@@ -36,6 +39,7 @@ def _ensure_task_mutable(task: dict[str, Any]) -> None:
 
 
 class ScheduledTaskCreateRequest(BaseModel):
+    """定义创建计划任务时的上下文模式、提示词和调度信息。"""
     thread_id: str | None = None
     context_mode: str = "fresh_thread_per_run"
     title: str = Field(min_length=1)
@@ -46,6 +50,7 @@ class ScheduledTaskCreateRequest(BaseModel):
 
 
 class ScheduledTaskUpdateRequest(BaseModel):
+    """定义计划任务可选更新字段；不含运行中状态的直接修改入口。"""
     context_mode: str | None = None
     thread_id: str | None = None
     title: str | None = Field(default=None, min_length=1)
@@ -57,6 +62,7 @@ class ScheduledTaskUpdateRequest(BaseModel):
 @router.get("/scheduled-tasks")
 @require_permission("threads", "read")
 async def list_scheduled_tasks(request: Request):
+    """列出当前认证用户拥有的计划任务；匿名请求返回空列表。"""
     repo = get_scheduled_task_repo(request)
     user = await get_optional_user_from_request(request)
     if user is None:
@@ -67,6 +73,7 @@ async def list_scheduled_tasks(request: Request):
 @router.post("/scheduled-tasks")
 @require_permission("threads", "write")
 async def create_scheduled_task(request: Request, body: ScheduledTaskCreateRequest):
+    """校验所有权、时区与计划后，为当前用户创建可执行的计划任务。"""
     config = get_config()
     repo = get_scheduled_task_repo(request)
     thread_store = get_thread_store(request)
@@ -126,6 +133,7 @@ async def create_scheduled_task(request: Request, body: ScheduledTaskCreateReque
 @router.get("/scheduled-tasks/{task_id}")
 @require_permission("threads", "read")
 async def get_scheduled_task(task_id: str, request: Request):
+    """返回当前用户拥有的计划任务，不泄露其他用户的任务是否存在。"""
     repo = get_scheduled_task_repo(request)
     user = await get_optional_user_from_request(request)
     if user is None:
@@ -139,6 +147,7 @@ async def get_scheduled_task(task_id: str, request: Request):
 @router.patch("/scheduled-tasks/{task_id}")
 @require_permission("threads", "write")
 async def update_scheduled_task(task_id: str, request: Request, body: ScheduledTaskUpdateRequest):
+    """更新非运行中任务，并在重新排期后重新启用可再次执行的终态任务。"""
     config = get_config()
     repo = get_scheduled_task_repo(request)
     user = await get_optional_user_from_request(request)
@@ -200,10 +209,9 @@ async def update_scheduled_task(task_id: str, request: Request, body: ScheduledT
             )
         updates["schedule_spec"] = schedule_spec
         updates["next_run_at"] = next_run_at
-        # A terminal task (completed/failed/cancelled) whose schedule was just
-        # pushed into the future must be re-armed: claim_due_tasks only admits
-        # "enabled" rows, so leaving the terminal status would return 200 with
-        # a next_run_at that silently never fires.
+        # 刚被推迟到未来的 completed/failed/cancelled 终态任务必须重新启用：
+        # claim_due_tasks 仅接纳 "enabled" 记录，否则虽返回 200 并具有 next_run_at，
+        # 任务却会静默地永不执行。
         if next_run_at is not None and existing["status"] in {"completed", "failed", "cancelled"}:
             updates["status"] = "enabled"
 
@@ -218,6 +226,7 @@ async def update_scheduled_task(task_id: str, request: Request, body: ScheduledT
 @router.post("/scheduled-tasks/{task_id}/pause")
 @require_permission("threads", "write")
 async def pause_scheduled_task(task_id: str, request: Request):
+    """暂停当前用户的非运行中计划任务，运行中任务以 409 拒绝抢占式修改。"""
     repo = get_scheduled_task_repo(request)
     user = await get_optional_user_from_request(request)
     if user is None:
@@ -235,6 +244,7 @@ async def pause_scheduled_task(task_id: str, request: Request):
 @router.post("/scheduled-tasks/{task_id}/resume")
 @require_permission("threads", "write")
 async def resume_scheduled_task(task_id: str, request: Request):
+    """恢复当前用户的非运行中计划任务，使调度器再次可认领它。"""
     repo = get_scheduled_task_repo(request)
     user = await get_optional_user_from_request(request)
     if user is None:
@@ -252,6 +262,7 @@ async def resume_scheduled_task(task_id: str, request: Request):
 @router.post("/scheduled-tasks/{task_id}/trigger")
 @require_permission("threads", "write")
 async def trigger_scheduled_task(task_id: str, request: Request):
+    """手动分派任务，并将调度冲突和分派失败分别转换为 409 与 502。"""
     repo = get_scheduled_task_repo(request)
     service = get_scheduled_task_service(request)
     user = await get_optional_user_from_request(request)
@@ -271,6 +282,7 @@ async def trigger_scheduled_task(task_id: str, request: Request):
 @router.delete("/scheduled-tasks/{task_id}")
 @require_permission("threads", "write")
 async def delete_scheduled_task(task_id: str, request: Request):
+    """删除当前用户拥有的计划任务；未找到或越权时不暴露任务信息。"""
     repo = get_scheduled_task_repo(request)
     user = await get_optional_user_from_request(request)
     if user is None:
@@ -289,6 +301,7 @@ async def list_scheduled_task_runs(
     limit: int = Query(default=50, ge=1, le=200),
     offset: int = Query(default=0, ge=0),
 ):
+    """分页列出当前用户拥有的计划任务的执行记录及失败、跳过等状态。"""
     task_repo = get_scheduled_task_repo(request)
     run_repo = get_scheduled_task_run_repo(request)
     user = await get_optional_user_from_request(request)
@@ -303,6 +316,7 @@ async def list_scheduled_task_runs(
 @router.get("/threads/{thread_id}/scheduled-tasks")
 @require_permission("threads", "read", owner_check=True)
 async def list_thread_scheduled_tasks(thread_id: str, request: Request):
+    """列出当前用户在指定线程上的计划任务，且由线程所有权装饰器先行限制访问。"""
     repo = get_scheduled_task_repo(request)
     user = await get_optional_user_from_request(request)
     if user is None:

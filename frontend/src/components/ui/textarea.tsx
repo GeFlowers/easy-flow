@@ -2,6 +2,7 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
+/** Textarea 内部组件：组织对应的界面结构与交互语义。 */
 function Textarea({ className, ...props }: React.ComponentProps<"textarea">) {
   return (
     <textarea

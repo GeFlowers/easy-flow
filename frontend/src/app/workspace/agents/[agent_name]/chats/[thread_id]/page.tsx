@@ -52,6 +52,7 @@ import { textOfMessage } from "@/core/threads/utils";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
+/** 管理绑定自定义代理的流式会话及其专属上下文。 */
 export default function AgentChatPage() {
   const { t } = useI18n();
   const router = useRouter();
@@ -64,9 +65,7 @@ export default function AgentChatPage() {
 
   const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
     useThreadChat();
-  // `isNewThread` gates history/token-usage fetches until the backend creates
-  // the thread. `isWelcomeMode` controls only the centered welcome layout, so
-  // it can flip immediately on submit without triggering eager history loads.
+  // isNewThread 在后端创建前阻止历史与用量请求；isWelcomeMode 仅控制欢迎布局，可在提交时立即切换而不触发过早加载。
   const [isWelcomeMode, setIsWelcomeMode] = useState(isNewThread);
   const [settings, setSettings] = useThreadSettings(threadId);
   const [localSettings, setLocalSettings] = useLocalSettings();
@@ -105,7 +104,7 @@ export default function AgentChatPage() {
       setIsWelcomeMode(false);
     },
     onStart: (createdThreadId) => {
-      // ! Important: Never use next.js router for navigation in this case, otherwise it will cause the thread to re-mount and lose all states. Use native history API instead.
+      // 使用原生 History API 保留流式状态，避免 Next.js 路由导致会话组件重挂载。
       history.replaceState(
         null,
         "",
@@ -160,6 +159,7 @@ export default function AgentChatPage() {
     threadMetadata.isLoading,
   ]);
 
+  /** 以当前代理名称作为运行上下文发送用户消息。 */
   const handleSubmit = useCallback(
     (message: PromptInputMessage, options?: InputBoxSubmitOptions) => {
       const sendPromise = sendMessage(
@@ -176,6 +176,7 @@ export default function AgentChatPage() {
     [sendMessage, threadId, agent_name],
   );
 
+  /** 将结构化人机输入答案作为隐藏消息提交给当前代理。 */
   const handleSubmitHumanInput = useCallback(
     async (request: HumanInputRequest, response: HumanInputResponse) => {
       let sent = false;
@@ -201,9 +202,11 @@ export default function AgentChatPage() {
     [agent_name, sendMessage, threadId],
   );
 
+  /** 停止当前代理会话的流式执行。 */
   const handleStop = useCallback(async () => {
     await thread.stop();
   }, [thread]);
+  /** 重新生成当前代理会话中的指定消息。 */
   const handleRegenerate = useCallback(
     (messageId: string, supersededMessageIds: string[]) =>
       regenerateMessage(threadId, messageId, supersededMessageIds),
@@ -245,7 +248,7 @@ export default function AgentChatPage() {
               )}
             >
               <SidebarTrigger className="md:hidden" />
-              {/* Agent badge */}
+              {/* 显示当前自定义代理标识。 */}
               <div className="flex min-w-0 shrink-0 items-center gap-1.5 rounded-md border px-2 py-1">
                 <BotIcon className="text-primary h-3.5 w-3.5" />
                 <span className="hidden max-w-24 truncate text-xs font-medium sm:inline sm:max-w-none">

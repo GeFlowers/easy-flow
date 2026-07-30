@@ -1,3 +1,4 @@
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 import asyncio
 import contextvars
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -12,25 +13,27 @@ from deerflow.tools.sync import make_sync_tool_wrapper
 
 
 class MockArgs(BaseModel):
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     x: int = Field(..., description="test param")
 
 
 def test_mcp_tool_sync_wrapper_generation():
-    """Test that get_mcp_tools correctly adds a sync func to async-only tools."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def mock_coro(x: int):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return f"result: {x}"
 
     mock_tool = StructuredTool(
         name="test_tool",
         description="test description",
         args_schema=MockArgs,
-        func=None,  # Sync func is missing
+        func=None,  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         coroutine=mock_coro,
     )
 
     mock_client_instance = MagicMock()
-    # Use AsyncMock for get_tools as it's awaited (Fix for Comment 5)
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     mock_client_instance.get_tools = AsyncMock(return_value=[mock_tool])
 
     with (
@@ -39,24 +42,25 @@ def test_mcp_tool_sync_wrapper_generation():
         patch("deerflow.mcp.tools.build_servers_config", return_value={"test-server": {}}),
         patch("deerflow.mcp.tools.get_initial_oauth_headers", new_callable=AsyncMock, return_value={}),
     ):
-        # Run the async function manually with asyncio.run
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         tools = asyncio.run(get_mcp_tools())
 
         assert len(tools) == 1
         patched_tool = tools[0]
 
-        # Verify func is now populated
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert patched_tool.func is not None
 
-        # Verify it works (sync call)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         result = patched_tool.func(x=42)
         assert result == "result: 42"
 
 
 def test_mcp_tool_loading_skips_failed_server():
-    """A broken MCP server should not drop tools from healthy servers."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def mock_coro(x: int):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return f"result: {x}"
 
     good_tool = StructuredTool(
@@ -68,6 +72,7 @@ def test_mcp_tool_loading_skips_failed_server():
     )
 
     async def get_tools_for_server(*, server_name: str | None = None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if server_name == "good-server":
             return [good_tool]
         if server_name == "bad-server":
@@ -94,33 +99,37 @@ def test_mcp_tool_loading_skips_failed_server():
 
 
 def test_mcp_tool_sync_wrapper_in_running_loop():
-    """Test the shared sync wrapper from production code."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def mock_coro(x: int):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         await asyncio.sleep(0.01)
         return f"async_result: {x}"
 
     sync_func = make_sync_tool_wrapper(mock_coro, "test_tool")
 
     async def run_in_loop():
-        # This call should succeed due to ThreadPoolExecutor in the real helper
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return sync_func(x=100)
 
-    # We run the async function that calls the sync func
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     result = asyncio.run(run_in_loop())
     assert result == "async_result: 100"
 
 
 def test_sync_wrapper_preserves_contextvars_in_running_loop():
-    """The executor branch preserves LangGraph-style contextvars."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     current_value: contextvars.ContextVar[str | None] = contextvars.ContextVar("current_value", default=None)
 
     async def mock_coro() -> str | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return current_value.get()
 
     sync_func = make_sync_tool_wrapper(mock_coro, "test_tool")
 
     async def run_in_loop() -> str | None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         token = current_value.set("from-parent-context")
         try:
             return sync_func()
@@ -131,10 +140,11 @@ def test_sync_wrapper_preserves_contextvars_in_running_loop():
 
 
 def test_sync_wrapper_preserves_runnable_config_injection():
-    """LangChain can still inject RunnableConfig after an async tool is wrapped."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     captured: dict[str, object] = {}
 
     async def mock_coro(x: int, config: RunnableConfig = None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["thread_id"] = ((config or {}).get("configurable") or {}).get("thread_id")
         return f"result: {x}"
 
@@ -153,9 +163,10 @@ def test_sync_wrapper_preserves_runnable_config_injection():
 
 
 def test_sync_wrapper_preserves_regular_config_argument():
-    """Only RunnableConfig-annotated coroutine params get special config injection."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def mock_coro(config: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return config
 
     sync_func = make_sync_tool_wrapper(mock_coro, "test_tool")
@@ -164,9 +175,10 @@ def test_sync_wrapper_preserves_regular_config_argument():
 
 
 def test_mcp_tool_sync_wrapper_exception_logging():
-    """Test the shared sync wrapper's error logging."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def error_coro():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise ValueError("Tool failure")
 
     sync_func = make_sync_tool_wrapper(error_coro, "error_tool")
@@ -175,5 +187,5 @@ def test_mcp_tool_sync_wrapper_exception_logging():
         with pytest.raises(ValueError, match="Tool failure"):
             sync_func()
         mock_log_error.assert_called_once()
-        # Verify the tool name is in the log message
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert mock_log_error.call_args[0][1] == "error_tool"

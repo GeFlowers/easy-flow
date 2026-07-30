@@ -1,15 +1,4 @@
-"""Layer 1 of the record/replay e2e: replay a recorded trace through the **real
-gateway** with a deterministic ``ReplayChatModel`` (no API key, no network) and
-assert the streamed SSE event sequence matches a committed golden.
-
-This catches backend protocol drift: if a change alters the shape/sequence of
-SSE the gateway emits for the recorded scenario, this test goes red. The replay
-model serves the recorded assistant turns by input hash, so the agent graph
-(write_file -> auto-title -> read_file -> final answer) reproduces offline.
-
-Fixtures are produced by ``scripts/record_gateway.py`` +
-``scripts/build_fixture_from_jsonl.py`` (manual, needs a key).
-"""
+"""本模块覆盖回放 基准结果的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -24,10 +13,7 @@ FIXTURE_DIR = Path(__file__).parent / "fixtures" / "replay"
 
 
 def _reset_process_singletons(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Invalidate process-wide caches so the test-only config/home take effect.
-
-    Same set the real-server e2e resets (see test_setup_agent_http_e2e_real_server).
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
     from deerflow.config import app_config as app_config_module
     from deerflow.config import paths as paths_module
     from deerflow.persistence import engine as engine_module
@@ -45,6 +31,7 @@ def _reset_process_singletons(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.no_auto_user
 def test_replay_write_read_file_ultra_matches_golden(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """验证回放 写入 读取 文件 基准结果在预期条件及边界场景下的可观察行为，防止相关回归。"""
     scenario, mode = "write_read_file", "ultra"
     fixture_path = FIXTURE_DIR / f"{scenario}.{mode}.json"
     events_path = FIXTURE_DIR / f"{scenario}.{mode}.events.json"

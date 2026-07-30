@@ -60,18 +60,12 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
       setArtifacts([]);
     }
 
-    // Update artifacts from the current thread
+    // 使用当前线程的产物同步展示状态。
     if (threadArtifacts) {
       setArtifacts(threadArtifacts);
     }
 
-    // DO NOT automatically deselect the artifact when switching threads, because the artifacts auto discovering is not work now.
-    // if (
-    //   selectedArtifact &&
-    //   !thread.values.artifacts?.includes(selectedArtifact)
-    // ) {
-    //   deselect();
-    // }
+    // 切换线程时暂不自动取消选择产物：产物自动发现尚未可靠工作。
 
     if (
       env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" &&

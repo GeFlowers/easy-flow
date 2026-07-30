@@ -1,12 +1,4 @@
-"""Data contracts for DeerFlow SkillScan.
-
-Every ``SecurityFinding`` field has a Phase 1 consumer: the blocking policy
-reads ``severity``; the Gateway rejection response, the agent tool error, and
-the LLM scanner context read the rest. The rule category and owning analyzer
-are encoded in the ``rule_id`` prefix (``package-``, ``secret-``,
-``declaration-``, ``python-``, ``shell-``, ``network-``/``resource-``), not
-duplicated as separate fields.
-"""
+'定义 models 模块提供的职责与可复用接口。\n\nData contracts for DeerFlow SkillScan.\n\nEvery ``SecurityFinding`` field has a Phase 1 consumer: the blocking policy\nreads ``severity``; the Gateway rejection response, the agent tool error, and\nthe LLM scanner context read the rest. The rule category and owning analyzer\nare encoded in the ``rule_id`` prefix (``package-``, ``secret-``,\n``declaration-``, ``python-``, ``shell-``, ``network-``/``resource-``), not\nduplicated as separate fields.\n'
 
 from __future__ import annotations
 
@@ -17,6 +9,7 @@ FindingSeverity = Literal["CRITICAL", "HIGH", "MEDIUM", "LOW"]
 
 
 class SecurityFinding(TypedDict):
+    '封装 SecurityFinding 的状态、协作关系与公开操作'
     rule_id: str
     severity: FindingSeverity
     file: str | None
@@ -27,6 +20,7 @@ class SecurityFinding(TypedDict):
 
 
 class ScanResult(TypedDict):
+    '封装 ScanResult 的状态、协作关系与公开操作'
     findings: list[SecurityFinding]
     blocked: bool
     scanner_errors: list[str]
@@ -34,7 +28,7 @@ class ScanResult(TypedDict):
 
 @dataclass(frozen=True)
 class RuleSpec:
-    """Static definition of one SkillScan rule; ``remediation`` is authored here once and copied into findings."""
+    '封装 RuleSpec 的状态、协作关系与公开操作。\n\nStatic definition of one SkillScan rule; ``remediation`` is authored here once and copied into findings.'
 
     rule_id: str
     severity: FindingSeverity
@@ -43,16 +37,17 @@ class RuleSpec:
 
 
 class StaticScannerError(RuntimeError):
-    """Raised when SkillScan cannot evaluate its input at the package boundary."""
+    '封装 StaticScannerError 的状态、协作关系与公开操作。\n\nRaised when SkillScan cannot evaluate its input at the package boundary.'
 
 
 class StaticScanBlockedError(ValueError):
-    """Raised when deterministic findings block a skill write or install."""
+    '封装 StaticScanBlockedError 的状态、协作关系与公开操作。\n\nRaised when deterministic findings block a skill write or install.'
 
     findings: list[SecurityFinding]
     skill_name: str | None
 
     def __init__(self, findings: list[SecurityFinding], *, skill_name: str | None = None, message: str | None = None) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self.findings = [dict(finding) for finding in findings]  # type: ignore[list-item]
         self.skill_name = skill_name
         subject = f"skill '{skill_name}'" if skill_name else "skill content"

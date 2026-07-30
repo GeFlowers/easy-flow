@@ -1,26 +1,4 @@
-"""Fan out a verified GitHub webhook delivery onto the channel bus.
-
-This module replaces the old "build prompt, create thread, run agent,
-post comment" one-shot dispatcher.  In the new architecture GitHub is a
-first-class :class:`Channel` (see ``app/channels/github.py``):
-
-    POST /api/webhooks/github
-        → verify HMAC (route)
-        → :func:`fanout_event` (this module)
-            • look up bound agents
-            • filter bots
-            • drop redundant review-comment webhook noise, per binding
-            • apply per-binding trigger filter
-            • publish one :class:`InboundMessage` per surviving agent
-        → ChannelManager picks it up off the bus
-            • resolves run params (agent_name comes from message metadata)
-            • creates thread / runs lead_agent with the custom-agent name
-            • publishes outbound message
-        → GitHubChannel.send() posts the reply as a GitHub comment
-
-The webhook handler stays cheap (no langgraph calls) so GitHub's 10-second
-delivery timeout is never at risk.
-"""
+'定义 dispatcher 模块提供的职责与可复用接口。\n\nFan out a verified GitHub webhook delivery onto the channel bus.\n\nThis module replaces the old "build prompt, create thread, run agent,\npost comment" one-shot dispatcher.  In the new architecture GitHub is a\nfirst-class :class:`Channel` (see ``app/channels/github.py``):\n\n    POST /api/webhooks/github\n        → verify HMAC (route)\n        → :func:`fanout_event` (this module)\n            • look up bound agents\n            • filter bots\n            • drop redundant review-comment webhook noise, per binding\n            • apply per-binding trigger filter\n            • publish one :class:`InboundMessage` per surviving agent\n        → ChannelManager picks it up off the bus\n            • resolves run params (agent_name comes from message metadata)\n            • creates thread / runs lead_agent with the custom-agent name\n            • publishes outbound message\n        → GitHubChannel.send() posts the reply as a GitHub comment\n\nThe webhook handler stays cheap (no langgraph calls) so GitHub\'s 10-second\ndelivery timeout is never at risk.\n'
 
 from __future__ import annotations
 
@@ -44,30 +22,7 @@ def _is_self_event(
     agent_name: str,
     github: GitHubAgentConfig,
 ) -> bool:
-    """Return True if this event was triggered by *this agent itself*.
-
-    Checks whether ``sender.login`` (with the ``[bot]`` suffix stripped)
-    matches one of the agent's self-identities. In order of preference:
-
-    1. ``github.bot_login`` — the explicit GitHub App login this agent
-       posts as. Set this when the agent's ``mention_login`` (the handle
-       humans type to invoke it) differs from its actual posting identity.
-    2. Every ``mention_login`` declared across the agent's bindings — the
-       posting identity may match any handle the agent listens for, so we
-       aggregate across all bindings, not just the one for the current
-       ``(repo, event)``.
-    3. The agent's own ``name`` as a final fallback — but ONLY when neither
-       of the above is configured. Otherwise a real GitHub user whose
-       login happens to equal an agent's directory name would be silently
-       dropped here. ``agent.name`` is the same charset as a GitHub login
-       (``^[A-Za-z0-9-]+$``), so collisions like ``reviewer`` or ``coder``
-       are entirely possible.
-
-    This is the per-agent self-loop gate: we skip events triggered by our
-    own bot account (e.g. the coder replying to a PR, which would re-trigger
-    the reviewer) but NOT events from other bots like Copilot or CodeRabbit —
-    those are legitimate signals the agent should see.
-    """
+    "执行 _is_self_event 的明确职责，并返回与调用约定一致的结果。\n\nReturn True if this event was triggered by *this agent itself*.\n\n    Checks whether ``sender.login`` (with the ``[bot]`` suffix stripped)\n    matches one of the agent's self-identities. In order of preference:\n\n    1. ``github.bot_login`` — the explicit GitHub App login this agent\n       posts as. Set this when the agent's ``mention_login`` (the handle\n       humans type to invoke it) differs from its actual posting identity.\n    2. Every ``mention_login`` declared across the agent's bindings — the\n       posting identity may match any handle the agent listens for, so we\n       aggregate across all bindings, not just the one for the current\n       ``(repo, event)``.\n    3. The agent's own ``name`` as a final fallback — but ONLY when neither\n       of the above is configured. Otherwise a real GitHub user whose\n       login happens to equal an agent's directory name would be silently\n       dropped here. ``agent.name`` is the same charset as a GitHub login\n       (``^[A-Za-z0-9-]+$``), so collisions like ``reviewer`` or ``coder``\n       are entirely possible.\n\n    This is the per-agent self-loop gate: we skip events triggered by our\n    own bot account (e.g. the coder replying to a PR, which would re-trigger\n    the reviewer) but NOT events from other bots like Copilot or CodeRabbit —\n    those are legitimate signals the agent should see.\n    "
     sender = payload.get("sender") or {}
     if not isinstance(sender, dict):
         return False
@@ -102,83 +57,7 @@ def _is_self_event(
 
 
 def _is_redundant_review_comment(payload: dict[str, Any]) -> bool:
-    """Return True if this ``pull_request_review_comment`` has the *shape*
-    of fan-out noise from a ``pull_request_review`` submission: a companion
-    inline comment that the review event already covers.
-
-    GitHub fires one ``pull_request_review_comment`` webhook per inline
-    comment attached to a review submission, ON TOP OF the single
-    ``pull_request_review`` event for the review as a whole. A bot
-    reviewer (CodeRabbit routinely posts 20-30 inline comments per review)
-    therefore floods the webhook with 20-30 near-duplicate deliveries.
-
-    Each such companion comment carries ``pull_request_review_id`` (the id
-    of the review it belongs to) and — the discriminator — no
-    ``in_reply_to_id``. ``in_reply_to_id`` is only set when a human (or
-    bot) is replying *within* an existing review-comment thread, which is
-    a genuine new interaction, not fan-out, and must still fire.
-
-    This mirrors the shape GitHub's REST API has always used for
-    review-thread comments (``GET /repos/{owner}/{repo}/pulls/comments``),
-    which the webhook ``comment`` object is drawn from:
-    ``pull_request_review_id`` is present on every review-thread comment;
-    ``in_reply_to_id`` is present only on replies.
-
-    IMPORTANT: a ``True`` result is NOT by itself a "safe to drop" signal —
-    see the per-binding gate in :func:`fanout_event`, which only suppresses
-    a companion comment for a binding that *also* has its own
-    ``pull_request_review`` trigger on the same repo AND whose *resolved*
-    trigger does not itself require a mention (see the ``require_mention``
-    gap note below) — i.e. an unconditional, independent path to the
-    review. A binding that subscribes to ``pull_request_review_comment``
-    alone never receives the parent review event, so unconditionally
-    dropping its companion comments would be a silent, total loss of the
-    review's inline content for it — not noise reduction (PR #4131 review
-    feedback from willem-bd / zhfeng).
-
-    ``require_mention`` gap (PR #4131 review, Medium finding, willem-bd —
-    second round, against the per-binding gate above): a dual-subscribed
-    binding's ``pull_request_review`` trigger is only a *guaranteed*
-    independent path when that trigger does not itself gate on
-    ``require_mention``. If it does, the paired review event can be
-    silently dropped by :func:`app.gateway.github.triggers.event_should_fire`'s
-    own mention check against ``review["body"]`` — the review's
-    *top-level* summary, which this ``pull_request_review_comment``
-    payload never carries (there is no way to see, from a comment
-    delivery, what the sibling review's own summary said). A human
-    ``@mention`` that lives only inside one inline comment — not the
-    review summary — would otherwise be lost twice over: the review event
-    is filtered out (``no_mention``) *and* the one inline comment that
-    actually carries the mention is dropped here as "redundant", via a
-    narrower path than the original bug. The per-binding gate therefore
-    additionally requires ``require_mention`` to be false on the paired
-    trigger before treating it as coverage. This trades a small amount of
-    residual redundancy (an extra companion delivery on occasions when the
-    review's own summary happened to carry the mention too, or
-    ``allow_authors``/self-event would have let the review through anyway)
-    for zero silent loss — the same trade the original fix already made at
-    a coarser grain. It deliberately does not attempt to replay
-    ``allow_authors`` or an ``actions`` whitelist that might also be
-    configured on the paired trigger; those are accepted as out of scope
-    for this narrower fix, same as ``self_event``.
-
-    Residual caveat (PR #4131 review, Concern 3, zhfeng): GitHub documents
-    ``pull_request_review_id`` on the review-comment schema as nullable
-    ("integer or null"), confirming *some* review comments can lack a
-    backing review, but public docs do not state whether the "Add single
-    comment" UI action (as opposed to a multi-comment review) can ever
-    produce a comment with ``pull_request_review_id`` set and
-    ``in_reply_to_id`` absent *without* a companion ``pull_request_review``
-    event also firing. If that combination is possible, a binding with its
-    own ``pull_request_review`` trigger could still lose such a comment
-    under the per-binding gate. Confirmed via a real/documented webhook
-    payload capture before ruling this out; treat it as an open,
-    low-probability risk rather than a settled non-issue. (Distinct from
-    the ``require_mention`` gap above: this caveat questions whether the
-    paired event fires *at all* for a given delivery shape; the
-    ``require_mention`` gap is about a paired event that fires but is then
-    filtered by its own trigger config, which the gate now accounts for.)
-    """
+    '执行 _is_redundant_review_comment 的明确职责，并返回与调用约定一致的结果。\n\nReturn True if this ``pull_request_review_comment`` has the *shape*\n    of fan-out noise from a ``pull_request_review`` submission: a companion\n    inline comment that the review event already covers.\n\n    GitHub fires one ``pull_request_review_comment`` webhook per inline\n    comment attached to a review submission, ON TOP OF the single\n    ``pull_request_review`` event for the review as a whole. A bot\n    reviewer (CodeRabbit routinely posts 20-30 inline comments per review)\n    therefore floods the webhook with 20-30 near-duplicate deliveries.\n\n    Each such companion comment carries ``pull_request_review_id`` (the id\n    of the review it belongs to) and — the discriminator — no\n    ``in_reply_to_id``. ``in_reply_to_id`` is only set when a human (or\n    bot) is replying *within* an existing review-comment thread, which is\n    a genuine new interaction, not fan-out, and must still fire.\n\n    This mirrors the shape GitHub\'s REST API has always used for\n    review-thread comments (``GET /repos/{owner}/{repo}/pulls/comments``),\n    which the webhook ``comment`` object is drawn from:\n    ``pull_request_review_id`` is present on every review-thread comment;\n    ``in_reply_to_id`` is present only on replies.\n\n    IMPORTANT: a ``True`` result is NOT by itself a "safe to drop" signal —\n    see the per-binding gate in :func:`fanout_event`, which only suppresses\n    a companion comment for a binding that *also* has its own\n    ``pull_request_review`` trigger on the same repo AND whose *resolved*\n    trigger does not itself require a mention (see the ``require_mention``\n    gap note below) — i.e. an unconditional, independent path to the\n    review. A binding that subscribes to ``pull_request_review_comment``\n    alone never receives the parent review event, so unconditionally\n    dropping its companion comments would be a silent, total loss of the\n    review\'s inline content for it — not noise reduction (PR #4131 review\n    feedback from willem-bd / zhfeng).\n\n    ``require_mention`` gap (PR #4131 review, Medium finding, willem-bd —\n    second round, against the per-binding gate above): a dual-subscribed\n    binding\'s ``pull_request_review`` trigger is only a *guaranteed*\n    independent path when that trigger does not itself gate on\n    ``require_mention``. If it does, the paired review event can be\n    silently dropped by :func:`app.gateway.github.triggers.event_should_fire`\'s\n    own mention check against ``review["body"]`` — the review\'s\n    *top-level* summary, which this ``pull_request_review_comment``\n    payload never carries (there is no way to see, from a comment\n    delivery, what the sibling review\'s own summary said). A human\n    ``@mention`` that lives only inside one inline comment — not the\n    review summary — would otherwise be lost twice over: the review event\n    is filtered out (``no_mention``) *and* the one inline comment that\n    actually carries the mention is dropped here as "redundant", via a\n    narrower path than the original bug. The per-binding gate therefore\n    additionally requires ``require_mention`` to be false on the paired\n    trigger before treating it as coverage. This trades a small amount of\n    residual redundancy (an extra companion delivery on occasions when the\n    review\'s own summary happened to carry the mention too, or\n    ``allow_authors``/self-event would have let the review through anyway)\n    for zero silent loss — the same trade the original fix already made at\n    a coarser grain. It deliberately does not attempt to replay\n    ``allow_authors`` or an ``actions`` whitelist that might also be\n    configured on the paired trigger; those are accepted as out of scope\n    for this narrower fix, same as ``self_event``.\n\n    Residual caveat (PR #4131 review, Concern 3, zhfeng): GitHub documents\n    ``pull_request_review_id`` on the review-comment schema as nullable\n    ("integer or null"), confirming *some* review comments can lack a\n    backing review, but public docs do not state whether the "Add single\n    comment" UI action (as opposed to a multi-comment review) can ever\n    produce a comment with ``pull_request_review_id`` set and\n    ``in_reply_to_id`` absent *without* a companion ``pull_request_review``\n    event also firing. If that combination is possible, a binding with its\n    own ``pull_request_review`` trigger could still lose such a comment\n    under the per-binding gate. Confirmed via a real/documented webhook\n    payload capture before ruling this out; treat it as an open,\n    low-probability risk rather than a settled non-issue. (Distinct from\n    the ``require_mention`` gap above: this caveat questions whether the\n    paired event fires *at all* for a given delivery shape; the\n    ``require_mention`` gap is about a paired event that fires but is then\n    filtered by its own trigger config, which the gate now accounts for.)\n    '
     comment = payload.get("comment")
     if not isinstance(comment, dict):
         return False
@@ -193,27 +72,7 @@ async def fanout_event(
     *,
     operator_default_mention_login: str | None = None,
 ) -> dict[str, Any]:
-    """Translate one webhook delivery into N inbound messages.
-
-    Args:
-        bus: The channel ``MessageBus`` to publish inbound messages onto.
-        event: ``X-GitHub-Event`` header value.
-        delivery_id: ``X-GitHub-Delivery`` header value.
-        payload: Parsed webhook payload.
-        operator_default_mention_login: Optional fallback handle pulled
-            from ``channels.github.default_mention_login`` in
-            ``config.yaml``. Used in the ``require_mention`` precedence
-            chain when neither the trigger nor the agent's
-            ``github.bot_login`` declares one. The router resolves this
-            from the live channel config and passes it through so the
-            dispatcher stays decoupled from ``get_app_config()`` and
-            remains testable without a singleton.
-
-    Returns:
-        A summary dict for the route response: ``{"matched_agents": [...],
-        "fired_agents": [...], "skipped": [{"agent": "...", "reason": "..."}]}``.
-        Useful for operator visibility when redelivering events via smee.
-    """
+    '执行 fanout_event 的明确职责，并返回与调用约定一致的结果。\n\nTranslate one webhook delivery into N inbound messages.\n\n    Args:\n        bus: The channel ``MessageBus`` to publish inbound messages onto.\n        event: ``X-GitHub-Event`` header value.\n        delivery_id: ``X-GitHub-Delivery`` header value.\n        payload: Parsed webhook payload.\n        operator_default_mention_login: Optional fallback handle pulled\n            from ``channels.github.default_mention_login`` in\n            ``config.yaml``. Used in the ``require_mention`` precedence\n            chain when neither the trigger nor the agent\'s\n            ``github.bot_login`` declares one. The router resolves this\n            from the live channel config and passes it through so the\n            dispatcher stays decoupled from ``get_app_config()`` and\n            remains testable without a singleton.\n\n    Returns:\n        A summary dict for the route response: ``{"matched_agents": [...],\n        "fired_agents": [...], "skipped": [{"agent": "...", "reason": "..."}]}``.\n        Useful for operator visibility when redelivering events via smee.\n    '
     # 1. Extract (repo, number).
     target = extract_target(event, payload)
     if target is None:

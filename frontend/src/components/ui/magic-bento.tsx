@@ -2,6 +2,7 @@ import { gsap } from "gsap";
 import React, { useRef, useEffect, useCallback, useState } from "react";
 import "./magic-bento.css";
 
+/** BentoCardProps 的公开类型定义。 */
 export interface BentoCardProps {
   color?: string;
   title?: React.ReactNode;
@@ -11,6 +12,7 @@ export interface BentoCardProps {
   disableAnimations?: boolean;
 }
 
+/** BentoProps 的公开类型定义。 */
 export interface BentoProps {
   textAutoHide?: boolean;
   enableStars?: boolean;
@@ -53,6 +55,7 @@ const createParticleElement = (
   return el;
 };
 
+/** calculateSpotlightValues 内部组件：组织对应的界面结构与交互语义。 */
 const calculateSpotlightValues = (radius: number) => ({
   proximity: radius * 0.5,
   fadeDistance: radius * 0.75,
@@ -498,6 +501,7 @@ const BentoCardGrid: React.FC<{
   </div>
 );
 
+/** useMobileDetection Hook：封装本模块所需的状态或上下文访问。 */
 const useMobileDetection = () => {
   const [isMobile, setIsMobile] = useState(false);
 
@@ -649,7 +653,7 @@ const MagicBento: React.FC<BentoProps> = ({
                   const x = e.clientX - rect.left;
                   const y = e.clientY - rect.top;
 
-                  // Calculate the maximum distance from click point to any corner
+                  // 计算点击点到任一角落的最大距离，用于扩散动画半径。
                   const maxDistance = Math.max(
                     Math.hypot(x, y),
                     Math.hypot(x - rect.width, y),

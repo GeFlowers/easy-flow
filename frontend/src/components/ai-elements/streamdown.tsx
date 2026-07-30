@@ -5,18 +5,16 @@ import { Streamdown } from "streamdown";
 
 import { installClipboardFallback } from "@/core/clipboard";
 
+/** ClipboardSafeStreamdownProps 的公开类型定义。 */
 export type ClipboardSafeStreamdownProps = ComponentProps<typeof Streamdown>;
 
-// Only patch browser globals in client context; skip during SSR
+// 仅在客户端修补浏览器全局对象，服务端渲染期间跳过。
 if (typeof document !== "undefined") {
   installClipboardFallback();
 }
 
-// marked (used by Streamdown to split content into blocks) has mutually
-// recursive tokenizers — blockquote/list nesting a couple thousand levels
-// deep overflows the call stack during render and would otherwise take down
-// the whole route. When rendering a message throws, fall back to showing
-// that message as plain pre-formatted text instead.
+// Streamdown 用于按块拆分内容的 marked 分词器存在相互递归；引用或列表嵌套数千层时会在渲染中
+// 造成调用栈溢出，进而影响整个路由。单条消息渲染抛错时，降级为显示该消息的预格式化纯文本。
 class StreamdownFallbackBoundary extends Component<
   { raw: ClipboardSafeStreamdownProps["children"]; children: ReactNode },
   { errored: boolean; prevRaw: ClipboardSafeStreamdownProps["children"] }
@@ -34,7 +32,7 @@ class StreamdownFallbackBoundary extends Component<
       prevRaw: ClipboardSafeStreamdownProps["children"];
     },
   ) {
-    // Retry rendering when the content changes (e.g. the next streaming chunk).
+    // 内容变化（例如收到下一段流式数据）后重试渲染。
     if (props.raw !== state.prevRaw) {
       return { errored: false, prevRaw: props.raw };
     }
@@ -53,6 +51,7 @@ class StreamdownFallbackBoundary extends Component<
   }
 }
 
+/** ClipboardSafeStreamdown 组件：提供对应的界面结构与交互语义。 */
 export function ClipboardSafeStreamdown({
   children,
   ...props

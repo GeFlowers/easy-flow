@@ -1,4 +1,4 @@
-"""Contract tests for ``deerflow.subagents.status_contract``."""
+'未说明'
 
 from __future__ import annotations
 
@@ -27,31 +27,35 @@ _CONTRACT_PATH = _REPO_ROOT / "contracts" / "subagent_status_contract.json"
 
 
 def _load_contract() -> dict:
+    '未说明'
     return json.loads(_CONTRACT_PATH.read_text(encoding="utf-8"))
 
 
 def test_contract_file_exists():
+    '未说明'
     assert _CONTRACT_PATH.is_file(), f"missing shared fixture: {_CONTRACT_PATH}"
 
 
 def test_status_values_match_contract():
-    """Backend status enum stays aligned with the contract document."""
+    '未说明'
     contract = _load_contract()
     assert set(SUBAGENT_STATUS_VALUES) == set(contract["valid_status_values"])
 
 
 def test_stop_reason_values_match_contract():
-    """Backend stop_reason vocabulary stays aligned with the contract document (#3875 Phase 2)."""
+    '未说明'
     contract = _load_contract()
     assert set(SUBAGENT_STOP_REASON_VALUES) == set(contract["valid_stop_reason_values"])
 
 
 def test_make_subagent_additional_kwargs_includes_status():
+    '未说明'
     kwargs = make_subagent_additional_kwargs("completed")
     assert kwargs == {SUBAGENT_STATUS_KEY: "completed"}
 
 
 def test_make_subagent_additional_kwargs_carries_terminal_runtime_metadata():
+    '未说明'
     kwargs = make_subagent_additional_kwargs(
         "completed",
         result="done",
@@ -68,11 +72,13 @@ def test_make_subagent_additional_kwargs_carries_terminal_runtime_metadata():
 
 
 def test_make_subagent_additional_kwargs_includes_error_when_present():
+    '未说明'
     kwargs = make_subagent_additional_kwargs("failed", error="boom")
     assert kwargs == {SUBAGENT_STATUS_KEY: "failed", SUBAGENT_ERROR_KEY: "boom"}
 
 
 def test_make_subagent_additional_kwargs_includes_bounded_result_metadata():
+    '未说明'
     kwargs = make_subagent_additional_kwargs("completed", result="done")
     assert kwargs[SUBAGENT_STATUS_KEY] == "completed"
     assert kwargs[SUBAGENT_RESULT_BRIEF_KEY] == "done"
@@ -81,6 +87,7 @@ def test_make_subagent_additional_kwargs_includes_bounded_result_metadata():
 
 
 def test_make_subagent_additional_kwargs_bounds_large_result_metadata():
+    '未说明'
     huge = "x" * (SUBAGENT_METADATA_TEXT_MAX_CHARS + 5000)
     kwargs = make_subagent_additional_kwargs("completed", result=huge)
     assert len(kwargs[SUBAGENT_RESULT_BRIEF_KEY]) <= SUBAGENT_METADATA_TEXT_MAX_CHARS
@@ -89,10 +96,7 @@ def test_make_subagent_additional_kwargs_bounds_large_result_metadata():
 
 
 def test_make_subagent_additional_kwargs_stamps_stop_reason_when_present():
-    """#3875 Phase 2: a capped run keeps a normal status and carries the cap
-    on the additive ``subagent_stop_reason`` field. A token-capped run produced
-    a final answer, so it is ``completed`` + ``token_capped`` and stays
-    result-bearing (the partial work survives on ``result_brief``)."""
+    '未说明'
     kwargs = make_subagent_additional_kwargs("completed", result="investigated 3 of 5 sources", stop_reason="token_capped")
     assert kwargs[SUBAGENT_STATUS_KEY] == "completed"
     assert kwargs[SUBAGENT_RESULT_BRIEF_KEY] == "investigated 3 of 5 sources"
@@ -103,8 +107,7 @@ def test_make_subagent_additional_kwargs_stamps_stop_reason_when_present():
 
 
 def test_format_subagent_result_message_completed_with_stop_reason_notes_the_cap():
-    """The model-visible text folds a ``(capped: ...)`` note in so the lead can
-    tell a budget-capped completion from a clean one without parsing metadata."""
+    '未说明'
     content, metadata_error = format_subagent_result_message("completed", result="investigated 3 of 5 sources", stop_reason="token_capped")
     assert content.startswith("Task Succeeded (capped: token budget)")
     assert "investigated 3 of 5 sources" in content
@@ -113,14 +116,14 @@ def test_format_subagent_result_message_completed_with_stop_reason_notes_the_cap
 
 
 def test_format_subagent_result_message_failed_with_stop_reason_notes_the_cap():
-    """A turn-capped run with no usable output is ``failed`` + ``turn_capped``;
-    the cap note distinguishes "out of budget" from a broken subagent."""
+    '未说明'
     content, metadata_error = format_subagent_result_message("failed", error="Reached max_turns=10", stop_reason="turn_capped")
     assert content.startswith("Task failed (capped: turn budget)")
     assert metadata_error == "Reached max_turns=10"
 
 
 def test_bound_metadata_text_respects_small_caps():
+    '未说明'
     text = "A" * 100
 
     assert _bound_metadata_text(text, cap=0) == ""
@@ -129,13 +132,14 @@ def test_bound_metadata_text_respects_small_caps():
 
 
 def test_make_subagent_additional_kwargs_omits_blank_error():
-    """Empty / whitespace error must not leak as ``subagent_error: ""``."""
+    '未说明'
     assert make_subagent_additional_kwargs("failed", error="") == {SUBAGENT_STATUS_KEY: "failed"}
     assert make_subagent_additional_kwargs("failed", error="   ") == {SUBAGENT_STATUS_KEY: "failed"}
     assert make_subagent_additional_kwargs("failed", error=None) == {SUBAGENT_STATUS_KEY: "failed"}
 
 
 def test_make_subagent_additional_kwargs_bounds_large_error_metadata():
+    '未说明'
     huge = "boom " * 2000
     kwargs = make_subagent_additional_kwargs("failed", error=huge)
     assert kwargs[SUBAGENT_STATUS_KEY] == "failed"
@@ -144,6 +148,7 @@ def test_make_subagent_additional_kwargs_bounds_large_error_metadata():
 
 
 def test_read_subagent_result_metadata_returns_bounded_payload():
+    '未说明'
     parsed = read_subagent_result_metadata(
         {
             SUBAGENT_STATUS_KEY: "completed",
@@ -160,9 +165,7 @@ def test_read_subagent_result_metadata_returns_bounded_payload():
 
 
 def test_read_subagent_result_metadata_reads_stop_reason_for_capped_run():
-    """A capped run's reader surfaces the additive ``stop_reason`` alongside
-    the normal status/result fields so the delegation ledger and frontend can
-    show "capped" without parsing result text (#3875 Phase 2)."""
+    '未说明'
     parsed = read_subagent_result_metadata(
         {
             SUBAGENT_STATUS_KEY: "completed",
@@ -180,12 +183,7 @@ def test_read_subagent_result_metadata_reads_stop_reason_for_capped_run():
 
 
 def test_read_subagent_result_metadata_normalizes_legacy_max_turns_reached():
-    """Phase 1 (#3949) wrote ``max_turns_reached`` into checkpointed thread
-    history; Phase 2 (#3980) stopped producing it. The reader normalizes the
-    legacy value so old delegations still resolve terminally instead of
-    stranding as ``in_progress`` in the durable ledger — partial ``result_brief``
-    preserved as ``completed + turn_capped`` (Phase 1 was result-bearing), or
-    ``failed + turn_capped`` when no result survived."""
+    '未说明'
     # With a recovered partial -> completed + turn_capped, partial preserved.
     parsed = read_subagent_result_metadata(
         {
@@ -217,11 +215,12 @@ def test_read_subagent_result_metadata_normalizes_legacy_max_turns_reached():
 
 
 def test_read_subagent_result_metadata_rejects_unknown_status():
+    '未说明'
     assert read_subagent_result_metadata({SUBAGENT_STATUS_KEY: "future"}) is None
 
 
 def test_read_subagent_result_metadata_rejects_non_hex_sha256():
-    """A 64-char value that is not a lowercase hex digest must be dropped."""
+    '未说明'
     base = {SUBAGENT_STATUS_KEY: "completed", SUBAGENT_RESULT_BRIEF_KEY: "structured"}
     for bad_hash in ("z" * 64, "A" * 64, "a" * 63, "a" * 65, ("a" * 63) + " "):
         parsed = read_subagent_result_metadata({**base, SUBAGENT_RESULT_SHA256_KEY: bad_hash})
@@ -229,6 +228,7 @@ def test_read_subagent_result_metadata_rejects_non_hex_sha256():
 
 
 def test_make_subagent_additional_kwargs_rejects_unknown_status():
+    '未说明'
     import pytest
 
     with pytest.raises(ValueError, match="invalid subagent status"):
@@ -236,6 +236,7 @@ def test_make_subagent_additional_kwargs_rejects_unknown_status():
 
 
 def test_make_subagent_additional_kwargs_rejects_unknown_stop_reason():
+    '未说明'
     import pytest
 
     with pytest.raises(ValueError, match="invalid subagent stop_reason"):

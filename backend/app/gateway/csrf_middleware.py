@@ -1,8 +1,4 @@
-"""CSRF protection middleware for FastAPI.
-
-Per RFC-001:
-State-changing operations require CSRF protection.
-"""
+"""FastAPI 的双重提交 Cookie CSRF 防护中间件。"""
 
 import os
 import secrets
@@ -23,21 +19,17 @@ CSRF_TOKEN_LENGTH = 64  # bytes
 
 
 def is_secure_request(request: Request) -> bool:
-    """Detect whether the original client request was made over HTTPS."""
+    """根据受信任代理头判断客户端原始请求是否使用 HTTPS。"""
     return _request_scheme(request) == "https"
 
 
 def generate_csrf_token() -> str:
-    """Generate a secure random CSRF token."""
+    """生成密码学安全的随机 CSRF 令牌。"""
     return secrets.token_urlsafe(CSRF_TOKEN_LENGTH)
 
 
 def should_check_csrf(request: Request) -> bool:
-    """Determine if a request needs CSRF validation.
-
-    CSRF is checked for state-changing methods (POST, PUT, DELETE, PATCH).
-    GET, HEAD, OPTIONS, and TRACE are exempt per RFC 7231.
-    """
+    """判断请求是否需要 CSRF 校验，仅校验可能改变服务端持久化状态的方法。"""
     if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
         return False
 
@@ -45,11 +37,10 @@ def should_check_csrf(request: Request) -> bool:
         return False
 
     path = request.url.path.rstrip("/")
-    # Exempt /api/v1/auth/me endpoint
+    # 查询当前身份不改变服务端状态，因此免除校验。
     if path == "/api/v1/auth/me":
         return False
-    # Inbound webhooks authenticate themselves via provider-specific signatures
-    # (e.g. GitHub's X-Hub-Signature-256), not the CSRF double-submit cookie.
+    # 入站 Webhook 由供应方签名认证，不依赖浏览器双重提交 Cookie。
     if request.url.path.startswith("/api/webhooks/"):
         return False
     return True
@@ -66,15 +57,12 @@ _AUTH_EXEMPT_PATHS: frozenset[str] = frozenset(
 
 
 def is_auth_endpoint(request: Request) -> bool:
-    """Check if the request is to an auth endpoint.
-
-    Auth endpoints don't need CSRF validation on first call (no token).
-    """
+    """判断是否为首次建立会话时尚无 CSRF 令牌的身份接口。"""
     return request.url.path.rstrip("/") in _AUTH_EXEMPT_PATHS
 
 
 def _host_with_optional_port(hostname: str, port: int | None, scheme: str) -> str:
-    """Return normalized host[:port], omitting default ports."""
+    """返回规范化的主机及可选端口，并省略协议默认端口。"""
     host = hostname.lower()
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"
@@ -85,7 +73,7 @@ def _host_with_optional_port(hostname: str, port: int | None, scheme: str) -> st
 
 
 def _normalize_origin(origin: str) -> str | None:
-    """Return a normalized scheme://host[:port] origin, or None for invalid input."""
+    """将来源规范化为协议、主机和可选端口；非法输入返回空值。"""
     try:
         parsed = urlsplit(origin.strip())
         port = parsed.port
@@ -96,7 +84,7 @@ def _normalize_origin(origin: str) -> str | None:
     if scheme not in {"http", "https"} or not parsed.hostname:
         return None
 
-    # Browser Origin is only scheme/host/port. Reject URL-shaped or credentialed values.
+    # 浏览器来源仅包含协议、主机和端口，拒绝路径或凭据等 URL 组成部分。
     if parsed.username or parsed.password or parsed.path or parsed.query or parsed.fragment:
         return None
 
@@ -104,7 +92,7 @@ def _normalize_origin(origin: str) -> str | None:
 
 
 def _configured_cors_origins() -> set[str]:
-    """Return explicit configured browser origins that may call auth routes."""
+    """返回配置中允许调用身份接口的显式浏览器来源。"""
     origins = set()
     for raw_origin in os.environ.get("GATEWAY_CORS_ORIGINS", "").split(","):
         origin = raw_origin.strip()
@@ -117,12 +105,12 @@ def _configured_cors_origins() -> set[str]:
 
 
 def get_configured_cors_origins() -> set[str]:
-    """Return normalized explicit browser origins from GATEWAY_CORS_ORIGINS."""
+    """返回由环境变量配置并完成规范化的浏览器来源集合。"""
     return _configured_cors_origins()
 
 
 def _first_header_value(value: str | None) -> str | None:
-    """Return the first value from a comma-separated proxy header."""
+    """从逗号分隔的代理头中取出第一个值。"""
     if not value:
         return None
     first = value.split(",", 1)[0].strip()
@@ -130,7 +118,7 @@ def _first_header_value(value: str | None) -> str | None:
 
 
 def _forwarded_param(request: Request, name: str) -> str | None:
-    """Extract a parameter from the first RFC 7239 Forwarded header entry."""
+    """从第一个 Forwarded 代理头条目提取指定参数。"""
     forwarded = _first_header_value(request.headers.get("forwarded"))
     if not forwarded:
         return None
@@ -143,13 +131,13 @@ def _forwarded_param(request: Request, name: str) -> str | None:
 
 
 def _request_scheme(request: Request) -> str:
-    """Resolve the original request scheme from trusted proxy headers."""
+    """从可信代理头解析客户端原始请求协议。"""
     scheme = _forwarded_param(request, "proto") or _first_header_value(request.headers.get("x-forwarded-proto")) or request.url.scheme
     return scheme.lower()
 
 
 def _request_origin(request: Request) -> str | None:
-    """Build the origin for the URL the browser is targeting."""
+    """构造浏览器当前访问目标的规范化来源。"""
     scheme = _request_scheme(request)
     host = _forwarded_param(request, "host") or _first_header_value(request.headers.get("x-forwarded-host")) or request.headers.get("host") or request.url.netloc
 
@@ -161,13 +149,10 @@ def _request_origin(request: Request) -> str | None:
 
 
 def is_allowed_auth_origin(request: Request) -> bool:
-    """Allow auth POSTs only from the same origin or explicit configured origins.
+    """仅允许同源或显式配置来源发起会话建立请求。
 
-    Login/register/initialize are exempt from the double-submit token because
-    first-time browser clients do not have a CSRF token yet. They still create
-    a session cookie, so browser requests with a hostile Origin header must be
-    rejected to prevent login CSRF / session fixation. Requests without Origin
-    are allowed for non-browser clients such as curl and mobile integrations.
+    首次登录等请求没有令牌却会写入会话 Cookie，必须通过来源限制防止登录 CSRF；
+    缺少来源头的非浏览器客户端仍可访问。
     """
     origin = request.headers.get("origin")
     if not origin:
@@ -182,12 +167,14 @@ def is_allowed_auth_origin(request: Request) -> bool:
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):
-    """Middleware that implements CSRF protection using Double Submit Cookie pattern."""
+    """以双重提交 Cookie 模式保护会改变状态的浏览器请求。"""
 
     def __init__(self, app: ASGIApp) -> None:
+        """初始化中间件并保留 Starlette 下游应用。"""
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+        """校验请求令牌及来源，并在建立会话后下发与会话同寿命的令牌。"""
         _is_auth = is_auth_endpoint(request)
 
         if should_check_csrf(request) and _is_auth and not is_allowed_auth_origin(request):
@@ -214,22 +201,18 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
         response = await call_next(request)
 
-        # For auth endpoints that set up session, also set CSRF cookie
+        # 会话建立接口还需下发与会话配对的 CSRF Cookie。
         if _is_auth and request.method == "POST":
-            # Generate a new CSRF token for the session
+            # 为新会话生成独立令牌，避免复用旧浏览器状态。
             csrf_token = generate_csrf_token()
             is_https = is_secure_request(request)
             response.set_cookie(
                 key=CSRF_COOKIE_NAME,
                 value=csrf_token,
-                httponly=False,  # Must be JS-readable for Double Submit Cookie pattern
+                httponly=False,  # 双重提交模式要求前端脚本可读取并回传该 Cookie。
                 secure=is_https,
                 samesite="strict",
-                # Match the access_token cookie's lifetime (auth.py::_set_session_cookie)
-                # so the double-submit pair never diverges. A session-only csrf_token is
-                # evicted when iOS Safari terminates a home-screen PWA while the persistent
-                # access_token survives — leaving the user "logged in" but unable to make
-                # any state-changing request (403 "CSRF token missing").
+                # 与会话 Cookie 同寿命，避免持久会话尚存而会话级 CSRF Cookie 被浏览器清除。
                 max_age=get_auth_config().token_expiry_days * 24 * 3600 if is_https else None,
             )
 
@@ -237,9 +220,5 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
 
 def get_csrf_token(request: Request) -> str | None:
-    """Get the CSRF token from the current request's cookies.
-
-    This is useful for server-side rendering where you need to embed
-    token in forms or headers.
-    """
+    """从当前请求 Cookie 读取 CSRF 令牌，供服务端渲染嵌入表单或请求头。"""
     return request.cookies.get(CSRF_COOKIE_NAME)

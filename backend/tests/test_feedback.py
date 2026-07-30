@@ -1,7 +1,4 @@
-"""Tests for FeedbackRepository and follow-up association.
-
-Uses temp SQLite DB for ORM tests.
-"""
+'定义 test_feedback 模块提供的职责与可复用接口。\n\nTests for FeedbackRepository and follow-up association.\n\nUses temp SQLite DB for ORM tests.\n'
 
 import pytest
 
@@ -9,6 +6,7 @@ from deerflow.persistence.feedback import FeedbackRepository
 
 
 async def _make_feedback_repo(tmp_path):
+    '执行 _make_feedback_repo 的明确职责，并返回与调用约定一致的结果'
     from deerflow.persistence.engine import get_session_factory, init_engine
 
     url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
@@ -17,6 +15,7 @@ async def _make_feedback_repo(tmp_path):
 
 
 async def _cleanup():
+    '执行 _cleanup 的明确职责，并返回与调用约定一致的结果'
     from deerflow.persistence.engine import close_engine
 
     await close_engine()
@@ -26,8 +25,10 @@ async def _cleanup():
 
 
 class TestFeedbackRepository:
+    '组织 TestFeedbackRepository 场景的行为与边界验证'
     @pytest.mark.anyio
     async def test_create_positive(self, tmp_path):
+        '验证 create、positive 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         record = await repo.create(run_id="r1", thread_id="t1", rating=1)
         assert record["feedback_id"]
@@ -39,6 +40,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_create_negative_with_comment(self, tmp_path):
+        '验证 create、negative、with、comment 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         record = await repo.create(
             run_id="r1",
@@ -52,6 +54,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_create_with_message_id(self, tmp_path):
+        '验证 create、with、message、id 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         record = await repo.create(run_id="r1", thread_id="t1", rating=1, message_id="msg-42")
         assert record["message_id"] == "msg-42"
@@ -59,6 +62,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_create_with_owner(self, tmp_path):
+        '验证 create、with、owner 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         record = await repo.create(run_id="r1", thread_id="t1", rating=1, user_id="user-1")
         assert record["user_id"] == "user-1"
@@ -66,6 +70,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_create_invalid_rating_zero(self, tmp_path):
+        '验证 create、invalid、rating、zero 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         with pytest.raises(ValueError):
             await repo.create(run_id="r1", thread_id="t1", rating=0)
@@ -73,6 +78,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_create_invalid_rating_five(self, tmp_path):
+        '验证 create、invalid、rating、five 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         with pytest.raises(ValueError):
             await repo.create(run_id="r1", thread_id="t1", rating=5)
@@ -80,6 +86,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_get(self, tmp_path):
+        '验证 get 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         created = await repo.create(run_id="r1", thread_id="t1", rating=1)
         fetched = await repo.get(created["feedback_id"])
@@ -90,12 +97,14 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_get_nonexistent(self, tmp_path):
+        '验证 get、nonexistent 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         assert await repo.get("nonexistent") is None
         await _cleanup()
 
     @pytest.mark.anyio
     async def test_list_by_run(self, tmp_path):
+        '验证 list、by、run 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         await repo.create(run_id="r1", thread_id="t1", rating=1, user_id="user-1")
         await repo.create(run_id="r1", thread_id="t1", rating=-1, user_id="user-2")
@@ -107,6 +116,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_list_by_thread(self, tmp_path):
+        '验证 list、by、thread 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         await repo.create(run_id="r1", thread_id="t1", rating=1)
         await repo.create(run_id="r2", thread_id="t1", rating=-1)
@@ -118,6 +128,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_delete(self, tmp_path):
+        '验证 delete 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         created = await repo.create(run_id="r1", thread_id="t1", rating=1)
         deleted = await repo.delete(created["feedback_id"])
@@ -127,6 +138,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_delete_nonexistent(self, tmp_path):
+        '验证 delete、nonexistent 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         deleted = await repo.delete("nonexistent")
         assert deleted is False
@@ -134,6 +146,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_aggregate_by_run(self, tmp_path):
+        '验证 aggregate、by、run 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         await repo.create(run_id="r1", thread_id="t1", rating=1, user_id="user-1")
         await repo.create(run_id="r1", thread_id="t1", rating=1, user_id="user-2")
@@ -147,6 +160,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_aggregate_empty(self, tmp_path):
+        '验证 aggregate、empty 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         stats = await repo.aggregate_by_run("t1", "r1")
         assert stats["total"] == 0
@@ -156,6 +170,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_upsert_creates_new(self, tmp_path):
+        '验证 upsert、creates、new 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         record = await repo.upsert(run_id="r1", thread_id="t1", rating=1, user_id="u1")
         assert record["rating"] == 1
@@ -165,6 +180,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_upsert_updates_existing(self, tmp_path):
+        '验证 upsert、updates、existing 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         first = await repo.upsert(run_id="r1", thread_id="t1", rating=1, user_id="u1")
         second = await repo.upsert(run_id="r1", thread_id="t1", rating=-1, user_id="u1", comment="changed my mind")
@@ -175,6 +191,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_upsert_different_users_separate(self, tmp_path):
+        '验证 upsert、different、users、separate 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         r1 = await repo.upsert(run_id="r1", thread_id="t1", rating=1, user_id="u1")
         r2 = await repo.upsert(run_id="r1", thread_id="t1", rating=-1, user_id="u2")
@@ -185,6 +202,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_upsert_invalid_rating(self, tmp_path):
+        '验证 upsert、invalid、rating 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         with pytest.raises(ValueError):
             await repo.upsert(run_id="r1", thread_id="t1", rating=0, user_id="u1")
@@ -192,6 +210,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_delete_by_run(self, tmp_path):
+        '验证 delete、by、run 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         await repo.upsert(run_id="r1", thread_id="t1", rating=1, user_id="u1")
         deleted = await repo.delete_by_run(thread_id="t1", run_id="r1", user_id="u1")
@@ -202,6 +221,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_delete_by_run_nonexistent(self, tmp_path):
+        '验证 delete、by、run、nonexistent 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         deleted = await repo.delete_by_run(thread_id="t1", run_id="r1", user_id="u1")
         assert deleted is False
@@ -209,6 +229,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_list_by_thread_grouped(self, tmp_path):
+        '验证 list、by、thread、grouped 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         await repo.upsert(run_id="r1", thread_id="t1", rating=1, user_id="u1")
         await repo.upsert(run_id="r2", thread_id="t1", rating=-1, user_id="u1")
@@ -223,6 +244,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_list_by_thread_grouped_empty(self, tmp_path):
+        '验证 list、by、thread、grouped、empty 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         grouped = await repo.list_by_thread_grouped("t1", user_id="u1")
         assert grouped == {}
@@ -230,6 +252,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_list_by_run_ids_is_thread_and_owner_scoped(self, tmp_path):
+        '验证 list、by、run、ids、is、thread、and、owner、scoped 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
         await repo.upsert(run_id="r1", thread_id="t1", rating=1, user_id="u1")
         await repo.upsert(run_id="r2", thread_id="t1", rating=-1, user_id="u1")
@@ -246,6 +269,7 @@ class TestFeedbackRepository:
 
     @pytest.mark.anyio
     async def test_list_by_run_ids_empty_skips_query(self, tmp_path):
+        '验证 list、by、run、ids、empty、skips、query 场景下的预期行为、边界条件与结果'
         repo = await _make_feedback_repo(tmp_path)
 
         assert await repo.list_by_run_ids("t1", set(), user_id="u1") == {}
@@ -256,9 +280,10 @@ class TestFeedbackRepository:
 
 
 class TestFollowUpAssociation:
+    '组织 TestFollowUpAssociation 场景的行为与边界验证'
     @pytest.mark.anyio
     async def test_run_records_follow_up_via_memory_store(self):
-        """MemoryRunStore stores follow_up_to_run_id in kwargs."""
+        '验证 run、records、follow、up、via、memory、store 场景下的预期行为、边界条件与结果。\n\nMemoryRunStore stores follow_up_to_run_id in kwargs.'
         from deerflow.runtime.runs.store.memory import MemoryRunStore
 
         store = MemoryRunStore()
@@ -271,7 +296,7 @@ class TestFollowUpAssociation:
 
     @pytest.mark.anyio
     async def test_human_message_has_follow_up_metadata(self):
-        """human_message event metadata includes follow_up_to_run_id."""
+        '验证 human、message、has、follow、up、metadata 场景下的预期行为、边界条件与结果。\n\nhuman_message event metadata includes follow_up_to_run_id.'
         from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
         event_store = MemoryRunEventStore()
@@ -288,7 +313,7 @@ class TestFollowUpAssociation:
 
     @pytest.mark.anyio
     async def test_follow_up_auto_detection_logic(self):
-        """Simulate the auto-detection: latest successful run becomes follow_up_to."""
+        '验证 follow、up、auto、detection、logic 场景下的预期行为、边界条件与结果。\n\nSimulate the auto-detection: latest successful run becomes follow_up_to.'
         from deerflow.runtime.runs.store.memory import MemoryRunStore
 
         store = MemoryRunStore()

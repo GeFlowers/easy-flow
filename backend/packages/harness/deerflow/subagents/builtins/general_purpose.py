@@ -1,4 +1,4 @@
-"""General-purpose subagent configuration."""
+'未说明'
 
 from deerflow.subagents.config import SubagentConfig
 

@@ -4,11 +4,14 @@ import { cache } from "react";
 
 import { getLangByLocale, type Locale } from "@/core/i18n/locale";
 
+/** 博客内容树当前支持的语言代码。 */
 export const BLOG_LANGS = ["zh", "en"] as const;
 const RECENT_POST_LIMIT = 5;
 
+/** 博客内容树支持的语言代码联合类型。 */
 export type BlogLang = (typeof BLOG_LANGS)[number];
 
+/** 博客文章在页面映射中使用的元数据。 */
 export type BlogMetadata = {
   date?: string;
   description?: string;
@@ -27,6 +30,7 @@ type BlogMdxFile = MdxFile & {
   title?: string;
 };
 
+/** 合并语言变体后对外提供的博客文章。 */
 export type BlogPost = {
   lang: BlogLang;
   languages: BlogLang[];
@@ -42,6 +46,7 @@ type LocalizedBlogPost = {
   title: string;
 };
 
+/** 渲染博客索引页所需的页面映射、文章和标签集合。 */
 export type BlogIndexData = {
   pageMap: PageMapItem[];
   posts: BlogPost[];
@@ -49,24 +54,28 @@ export type BlogIndexData = {
   tags: Array<{ name: string; count: number; posts: BlogPost[] }>;
 };
 
+/** 判断页面映射项是否为包含子项的文件夹。 */
 function isFolder(item: PageMapItem): item is Folder {
   return "children" in item && Array.isArray(item.children);
 }
 
+/** 判断页面映射项是否为博客 MDX 文件。 */
 function isMdxFile(item: PageMapItem): item is BlogMdxFile {
   return "name" in item && "route" in item && !isFolder(item);
 }
 
+/** 将语言目录中的博客路由归一为对外公开的 `/blog` 路由。 */
 function normalizeBlogRoute(route: string): string {
-  // Posts are sourced from locale-specific content trees but exposed
-  // under the single public /blog route.
+  // 文章来自按语言划分的内容树，但统一暴露在公开的 /blog 路由下。
   return route.replace(/^\/(en|zh)\/(?:posts|blog)(?=\/|$)/, "/blog");
 }
 
+/** 根据文章 slug 生成公开博客路由。 */
 export function getBlogRoute(slug: string[]): string {
   return slug.length === 0 ? "/blog" : `/blog/${slug.join("/")}`;
 }
 
+/** 从公开博客路由提取文章 slug 片段。 */
 function getSlugFromRoute(route: string): string[] {
   return route
     .replace(/^\/blog\/?/, "")
@@ -74,10 +83,12 @@ function getSlugFromRoute(route: string): string[] {
     .filter(Boolean);
 }
 
+/** 将 slug 片段拼成用于分组和索引的稳定键。 */
 function getSlugKey(slug: string[]): string {
   return slug.join("/");
 }
 
+/** 从文章前置元数据中筛出有效的字符串标签。 */
 function parseTags(tags: unknown): string[] {
   if (!Array.isArray(tags)) {
     return [];
@@ -88,6 +99,7 @@ function parseTags(tags: unknown): string[] {
   );
 }
 
+/** 将可选日期转换为排序时间戳；无效值按最早时间处理。 */
 function parseDate(value: string | undefined): number {
   if (!value) {
     return 0;
@@ -97,6 +109,7 @@ function parseDate(value: string | undefined): number {
   return Number.isNaN(time) ? 0 : time;
 }
 
+/** 在可用语言中优先选择请求语言，否则按固定回退顺序选择。 */
 function selectPreferredLanguage(
   languages: BlogLang[],
   preferredLang?: BlogLang,
@@ -105,8 +118,7 @@ function selectPreferredLanguage(
     return preferredLang;
   }
 
-  // Keep fallback order stable so merged posts resolve predictably
-  // when the preferred locale is unavailable.
+  // 固定回退顺序，确保首选语言缺失时合并文章仍能稳定解析。
   for (const lang of BLOG_LANGS) {
     if (languages.includes(lang)) {
       return lang;
@@ -116,6 +128,7 @@ function selectPreferredLanguage(
   return null;
 }
 
+/** 递归收集指定语言内容树中的博客文章元数据。 */
 function collectLocalizedBlogPosts(
   items: PageMapItem[],
   lang: BlogLang,
@@ -164,6 +177,7 @@ function collectLocalizedBlogPosts(
   return posts;
 }
 
+/** 按 slug 合并多语言文章，并保留所有语言和标签信息。 */
 function mergePostsBySlug(
   posts: LocalizedBlogPost[],
   preferredLang?: BlogLang,
@@ -209,6 +223,7 @@ function mergePostsBySlug(
     .sort((a, b) => parseDate(b.metadata.date) - parseDate(a.metadata.date));
 }
 
+/** 创建供 Nextra 页面映射使用的文件夹节点。 */
 function createFolder(
   name: string,
   route: string,
@@ -223,6 +238,7 @@ function createFolder(
   } as Folder;
 }
 
+/** 将博客文章转换为页面映射中的 MDX 节点。 */
 function createPostItem(post: BlogPost): MdxFile {
   return {
     ...post.metadata.item,
@@ -231,10 +247,12 @@ function createPostItem(post: BlogPost): MdxFile {
   };
 }
 
+/** 将标签转换为适合 URL 的小写 slug。 */
 export function normalizeTagSlug(tag: string): string {
   return tag.toLowerCase().replace(/\s+/g, "-");
 }
 
+/** 将连字符分隔的标签 slug 格式化为标题式显示文本。 */
 export function formatTagName(tag: string): string {
   return tag
     .split("-")
@@ -243,11 +261,13 @@ export function formatTagName(tag: string): string {
     .join(" ");
 }
 
+/** 将界面区域设置映射为受支持的博客语言。 */
 export function getPreferredBlogLang(locale: Locale): BlogLang | undefined {
   const lang = getLangByLocale(locale);
   return BLOG_LANGS.find((value) => value === lang);
 }
 
+/** 判断文章标签中是否包含指定的规范化标签 slug。 */
 function matchTags(tags: string[], slug: string): boolean {
   for (const tag of tags) {
     if (normalizeTagSlug(tag) === slug) {
@@ -257,6 +277,7 @@ function matchTags(tags: string[], slug: string): boolean {
   return false;
 }
 
+/** 获取并按首选语言合并所有语言内容树中的博客文章。 */
 export const getAllPosts = cache(async function getAllPosts(
   preferredLang?: BlogLang,
 ): Promise<BlogPost[]> {
@@ -274,6 +295,7 @@ export const getAllPosts = cache(async function getAllPosts(
   return mergePostsBySlug(localizedPosts, preferredLang);
 });
 
+/** 生成博客索引所需的文章、近期文章、标签和页面映射数据。 */
 export async function getBlogIndexData(
   preferredLang?: BlogLang,
   filters?: {

@@ -1,5 +1,6 @@
 import type { WorkspaceChangeSummary, WorkspaceFileChange } from "./types";
 
+/** 统一差异中各行对应的渲染样式类别。 */
 export type WorkspaceChangeLineClass =
   | "addition"
   | "context"
@@ -7,21 +8,22 @@ export type WorkspaceChangeLineClass =
   | "hunk"
   | "meta";
 
+/** 计算摘要中发生变更的文件总数。 */
 export function getChangedFileCount(summary: WorkspaceChangeSummary) {
   return summary.created + summary.modified + summary.deleted;
 }
 
+/** 生成工作区变更徽标的显示文本。 */
 export function getWorkspaceChangeBadgeLabel(summary: WorkspaceChangeSummary) {
   const count = getChangedFileCount(summary);
   return `${count} ${count === 1 ? "file" : "files"} changed +${summary.additions} -${summary.deletions}`;
 }
 
+/** 根据统一差异行前缀确定渲染样式类别。 */
 export function getWorkspaceChangeLineClass(
   line: string,
 ): WorkspaceChangeLineClass {
-  // Unified-diff file headers are "+++ " / "--- " with a trailing space. A bare
-  // "+++"/"---" prefix would also match real content lines that begin with those
-  // sequences (e.g. an added line "+++foo"), styling them as meta by mistake.
+  // 统一差异的文件头必须带尾随空格；仅匹配裸前缀会误将以这些字符开头的真实内容行标为元数据。
   if (line.startsWith("+++ ") || line.startsWith("--- ")) {
     return "meta";
   }
@@ -37,6 +39,7 @@ export function getWorkspaceChangeLineClass(
   return "context";
 }
 
+/** 按文件状态和路径生成稳定排序的工作区变更副本。 */
 export function sortWorkspaceChanges(files: WorkspaceFileChange[]) {
   const statusRank = {
     created: 0,

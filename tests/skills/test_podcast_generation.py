@@ -1,3 +1,4 @@
+'未说明'
 import sys
 from pathlib import Path
 
@@ -11,6 +12,7 @@ pod = load("podcast-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
+    '未说明'
     for k in ["VOLCENGINE_TTS_APPID", "VOLCENGINE_TTS_ACCESS_TOKEN", "VOLCENGINE_TTS_CLUSTER",
               "MINIMAX_API_KEY", "PODCAST_GENERATION_PROVIDER", "MINIMAX_API_HOST",
               "MINIMAX_TTS_MODEL", "MINIMAX_TTS_VOICE_MALE", "MINIMAX_TTS_VOICE_FEMALE",
@@ -21,17 +23,20 @@ def clean_env(monkeypatch):
 
 
 def test_resolve_prefers_volcengine(monkeypatch):
+    '未说明'
     monkeypatch.setenv("VOLCENGINE_TTS_APPID", "a")
     monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "t")
     assert pod._resolve_tts_provider() == "volcengine"
 
 
 def test_resolve_falls_back_to_minimax(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert pod._resolve_tts_provider() == "minimax"
 
 
 def test_resolve_override(monkeypatch):
+    '未说明'
     monkeypatch.setenv("VOLCENGINE_TTS_APPID", "a")
     monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "t")
     monkeypatch.setenv("PODCAST_GENERATION_PROVIDER", "minimax")
@@ -39,6 +44,7 @@ def test_resolve_override(monkeypatch):
 
 
 def test_resolve_unknown_raises(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     monkeypatch.setenv("PODCAST_GENERATION_PROVIDER", "openai")
     with pytest.raises(ValueError):
@@ -46,10 +52,12 @@ def test_resolve_unknown_raises(monkeypatch):
 
 
 def test_minimax_tts_decodes_hex(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         captured["url"] = url
         captured["json"] = json
         return FakeResp({"data": {"audio": b"audiobytes".hex(), "status": 2},
@@ -64,10 +72,12 @@ def test_minimax_tts_decodes_hex(monkeypatch):
 
 
 def test_process_line_minimax_voice_mapping(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     seen = {}
 
     def fake_tts(text, voice_id):
+        '未说明'
         seen["voice_id"] = voice_id
         return b"x"
 
@@ -79,9 +89,11 @@ def test_process_line_minimax_voice_mapping(monkeypatch):
 
 
 def test_generate_podcast_minimax_end_to_end(monkeypatch, tmp_path):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"data": {"audio": b"chunk".hex(), "status": 2},
                          "base_resp": {"status_code": 0}})
 
@@ -99,11 +111,13 @@ def test_generate_podcast_minimax_end_to_end(monkeypatch, tmp_path):
 
 
 def test_volcengine_tts_decodes_base64(monkeypatch):
+    '未说明'
     import base64
     monkeypatch.setenv("VOLCENGINE_TTS_APPID", "a")
     monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "t")
 
     def fake_post(url, headers=None, json=None, **kw):
+        '未说明'
         return FakeResp({"code": 3000, "data": base64.b64encode(b"volcbytes").decode()})
 
     monkeypatch.setattr(pod.requests, "post", fake_post)
@@ -112,6 +126,7 @@ def test_volcengine_tts_decodes_base64(monkeypatch):
 
 
 def test_volcengine_without_creds_raises(monkeypatch):
+    '未说明'
     monkeypatch.setenv("PODCAST_GENERATION_PROVIDER", "volcengine")
     script = pod.Script(lines=[pod.ScriptLine("male", "a")])
     with pytest.raises(ValueError):
@@ -119,10 +134,12 @@ def test_volcengine_without_creds_raises(monkeypatch):
 
 
 def test_process_line_minimax_male_and_override(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     seen = []
 
     def fake_tts(text, voice_id):
+        '未说明'
         seen.append(voice_id)
         return b"x"
 
@@ -136,10 +153,11 @@ def test_process_line_minimax_male_and_override(monkeypatch):
 
 
 def _seq_post(responses):
-    """Return a fake requests.post that yields the given responses in order."""
+    '未说明'
     calls = {"n": 0}
 
     def fake_post(*a, **k):
+        '未说明'
         resp = responses[min(calls["n"], len(responses) - 1)]
         calls["n"] += 1
         return resp
@@ -148,6 +166,7 @@ def _seq_post(responses):
 
 
 def test_minimax_retries_on_rate_limit_code(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     fake_post, calls = _seq_post([
         FakeResp({"base_resp": {"status_code": 1002, "status_msg": "rate limit"}}),
@@ -161,6 +180,7 @@ def test_minimax_retries_on_rate_limit_code(monkeypatch):
 
 
 def test_minimax_retries_on_http_429(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     fake_post, calls = _seq_post([
         FakeResp({}, status_code=429),
@@ -173,6 +193,7 @@ def test_minimax_retries_on_http_429(monkeypatch):
 
 
 def test_minimax_no_retry_on_auth_error(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     fake_post, calls = _seq_post([
         FakeResp({"base_resp": {"status_code": 1004, "status_msg": "auth failed"}}),
@@ -185,6 +206,7 @@ def test_minimax_no_retry_on_auth_error(monkeypatch):
 
 
 def test_minimax_gives_up_after_max_retries(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     fake_post, calls = _seq_post([
         FakeResp({"base_resp": {"status_code": 1002, "status_msg": "rate limit"}}),
@@ -196,10 +218,12 @@ def test_minimax_gives_up_after_max_retries(monkeypatch):
 
 
 def test_tts_node_raises_on_partial_failure(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     calls = {"n": 0}
 
     def fake_tts(text, voice_id, **kw):
+        '未说明'
         calls["n"] += 1
         return b"x" if calls["n"] == 1 else None
 
@@ -211,16 +235,20 @@ def test_tts_node_raises_on_partial_failure(monkeypatch):
 
 
 def test_tts_node_defaults_to_one_worker_for_minimax(monkeypatch):
+    '未说明'
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     real_executor = pod.ThreadPoolExecutor
 
     class CapturingExecutor(real_executor):
+        '未说明'
         def __init__(self, *args, **kwargs):
+            '未说明'
             captured["max_workers"] = kwargs.get("max_workers", args[0] if args else None)
             super().__init__(*args, **kwargs)
 
     def fake_tts(text, voice_id):
+        '未说明'
         return b"x"
 
     monkeypatch.setattr(pod, "ThreadPoolExecutor", CapturingExecutor)
@@ -232,17 +260,21 @@ def test_tts_node_defaults_to_one_worker_for_minimax(monkeypatch):
 
 
 def test_tts_node_keeps_four_worker_default_for_volcengine(monkeypatch):
+    '未说明'
     monkeypatch.setenv("VOLCENGINE_TTS_APPID", "a")
     monkeypatch.setenv("VOLCENGINE_TTS_ACCESS_TOKEN", "t")
     captured = {}
     real_executor = pod.ThreadPoolExecutor
 
     class CapturingExecutor(real_executor):
+        '未说明'
         def __init__(self, *args, **kwargs):
+            '未说明'
             captured["max_workers"] = kwargs.get("max_workers", args[0] if args else None)
             super().__init__(*args, **kwargs)
 
     def fake_tts(text, voice_type):
+        '未说明'
         return b"x"
 
     monkeypatch.setattr(pod, "ThreadPoolExecutor", CapturingExecutor)

@@ -1,4 +1,4 @@
-"""Load MCP tools using langchain-mcp-adapters with stdio session pooling."""
+"""使用 langchain-mcp-adapters 加载 MCP 工具，并为 stdio 传输复用会话。"""
 
 from __future__ import annotations
 
@@ -61,12 +61,10 @@ _FILE_SNAPSHOT = dict[Path, tuple[int, int]]
 
 
 def _local_path_from_uri(uri: str, *, base_dir: Path | None = None) -> Path | None:
-    """Return an absolute local filesystem ``Path`` if *uri* points to a local
-    file, otherwise ``None``.
+    """若 *uri* 指向本地文件则返回绝对 ``Path``，否则返回 ``None``。
 
-    Accepts bare paths and ``file://`` URIs. Remote URIs
-    (``http``/``https``/``data``/...) return ``None`` so the caller leaves them
-    untouched. Relative paths are resolved only when *base_dir* is supplied.
+    支持裸路径和 ``file://`` URI。远程 URI（``http``、``https``、``data`` 等）返回
+    ``None``，以便调用方保持原样。仅在提供 *base_dir* 时解析相对路径。
     """
     if not uri:
         return None
@@ -94,19 +92,15 @@ def _local_uri_to_virtual_path(
     user_id: str,
     source_base_dir: Path | None = None,
 ) -> str | None:
-    """Translate a local file reference into its ``/mnt/user-data/...`` virtual path.
+    """将本地文件引用转换为 ``/mnt/user-data/...`` 虚拟路径。
 
-    Stdio MCP servers run with their cwd and temp dir pinned inside the thread's
-    mounted user-data tree (see :func:`_make_session_pool_tool`), so the files
-    they produce already live somewhere the sandbox/artifact API can serve — the
-    only thing missing is the virtual prefix the rest of DeerFlow addresses them
-    by. This performs that purely deterministic host→virtual mapping: no copy, no
-    trusted-root list, and no exposure of files outside the thread's own tree.
+stdio MCP 服务器的工作目录和临时目录固定在线程挂载的用户数据树中（见
+``_make_session_pool_tool``），因此其生成的文件已位于沙箱和制品 API 可服务的位置；
+仅缺少 DeerFlow 其他部分使用的虚拟路径前缀。本方法只执行确定性的主机路径到虚拟路径
+映射：不复制文件、不维护受信任根目录列表，也不暴露线程数据树外的文件。
 
-    Returns ``None`` (so the caller leaves the reference untouched) when the URI
-    is remote, cannot be resolved, points outside this thread's user-data tree,
-    or does not name an existing file. Relative references are resolved against
-    *source_base_dir* (the server's cwd).
+URI 为远程地址、无法解析、位于当前线程用户数据树外或不指向现有文件时返回 ``None``，
+调用方将保持原引用。相对引用相对于 *source_base_dir*（服务器工作目录）解析。
     """
     src = _local_path_from_uri(uri, base_dir=source_base_dir)
     if src is None:
@@ -138,7 +132,7 @@ def _local_uri_to_virtual_path(
 
 
 def _snapshot_workspace_files(root: Path) -> _FILE_SNAPSHOT:
-    """Return a lightweight snapshot of regular files under *root*."""
+    """返回 *root* 下普通文件的轻量级快照。"""
     snapshot: _FILE_SNAPSHOT = {}
     if not root.exists():
         return snapshot
@@ -158,18 +152,17 @@ def _snapshot_workspace_files(root: Path) -> _FILE_SNAPSHOT:
 
 
 def _changed_workspace_files(root: Path, before: _FILE_SNAPSHOT) -> list[Path]:
-    """Return files under *root* that were created or modified since *before*."""
+    """返回 *root* 下相对 *before* 新建或已修改的文件。"""
     after = _snapshot_workspace_files(root)
     return [path for path, signature in after.items() if before.get(path) != signature]
 
 
 def _prepare_stdio_workspace(paths: Paths, *, thread_id: str, user_id: str) -> tuple[Path, Path, _FILE_SNAPSHOT]:
-    """Prepare the thread workspace for a pinned stdio MCP subprocess.
+    """为固定工作目录的 stdio MCP 子进程准备线程工作区。
 
-    Bundles all the synchronous filesystem work (dir creation, temp-dir prep,
-    and the pre-call snapshot) into one helper so the caller can run it off the
-    event loop via :func:`asyncio.to_thread`. Returns the workspace cwd, the
-    pinned temp dir, and the pre-call file snapshot.
+将创建目录、准备临时目录和调用前快照等同步文件系统操作集中到此辅助函数，使调用方可
+通过 ``asyncio.to_thread`` 在线程中执行。返回工作区 cwd、固定的临时目录和调用前文件
+快照。
     """
     paths.ensure_thread_dirs(thread_id, user_id=user_id)
     source_base_dir = paths.sandbox_work_dir(thread_id, user_id=user_id)
@@ -184,11 +177,10 @@ def _prepare_stdio_workspace(paths: Paths, *, thread_id: str, user_id: str) -> t
 
 
 def _result_has_text_content(call_tool_result: Any) -> bool:
-    """Return ``True`` when the MCP result carries any text content.
+    """当 MCP 结果包含任意文本内容时返回 ``True``。
 
-    The after-call snapshot diff only feeds bare-filename correlation in free
-    text. When the result has no text blocks there is nothing to rewrite, so the
-    caller can skip the second recursive walk entirely.
+调用后的快照差异只用于自由文本中的裸文件名关联。结果没有文本块时无需改写，调用方可
+完全跳过第二次递归遍历。
     """
     from mcp.types import EmbeddedResource, TextContent, TextResourceContents
 
@@ -211,12 +203,11 @@ def _rewrite_unique_bare_filenames(
     user_id: str,
     source_base_dir: Path | None = None,
 ) -> str:
-    """Rewrite bare filenames only when this call produced a unique match.
+    """仅在本次调用生成唯一匹配时改写裸文件名。
 
-    A response like ``Saved as page-2026.yml`` is not structurally a path. The
-    only safe way to interpret it is to correlate the filename with files
-    created/modified by this exact tool call, and rewrite only when the basename
-    maps to exactly one file inside this thread's mounted user-data tree.
+``Saved as page-2026.yml`` 这类响应在结构上并不是路径。安全的解释方式只能是将文件名
+与本次工具调用新建或修改的文件关联，并且仅当该文件名在当前线程挂载的用户数据树中
+唯一对应一个文件时才改写。
     """
     candidates: dict[str, list[str]] = {}
     for path in changed_files:
@@ -258,20 +249,18 @@ def _rewrite_local_paths_in_text(
     source_base_dir: Path | None = None,
     changed_files: Iterable[Path] | None = None,
 ) -> str:
-    """Best-effort rewrite of local file references found in free text.
+    """尽力改写自由文本中出现的本地文件引用。
 
-    Some MCP servers (notably Playwright's ``browser_take_screenshot``) report
-    the saved file only as free text — e.g. ``Took the screenshot and saved it
-    as temp/page-2026.png`` — instead of a ``ResourceLink``. Free text is not a
-    reliable protocol, so this is deliberately conservative: every candidate
-    token is handed to :func:`_local_uri_to_virtual_path`, which only rewrites
-    it when it resolves to an existing file inside this thread's user-data tree.
-    Tokens that are not real paths (or point elsewhere) are left exactly as they
-    were, so an over-eager regex match has no harmful effect.
+某些 MCP 服务器（尤其是 Playwright 的 ``browser_take_screenshot``）仅以自由文本报告
+保存的文件，例如 ``Took the screenshot and saved it as temp/page-2026.png``，而非使用
+``ResourceLink``。自由文本不是可靠协议，因此此处刻意保守：每个候选令牌都交给
+``_local_uri_to_virtual_path``，只有能解析为当前线程用户数据树内现有文件时才改写。
+不是真实路径或指向其他位置的令牌会保持原样，即使正则表达式匹配过宽也不会造成影响。
     """
     translated_by_source: dict[str, str | None] = {}
 
     def _replace(match: re.Match[str]) -> str:
+        """将匹配到的路径令牌在可安全解析时替换为虚拟路径。"""
         token = match.group(0)
         # A path can end a sentence ("saved as temp/a.png."); strip trailing
         # punctuation and restore it after the (possibly rewritten) path.
@@ -302,7 +291,7 @@ def _rewrite_local_paths_in_text(
 
 
 def _extract_thread_id(runtime: Runtime | None) -> str:
-    """Extract thread_id from the injected tool runtime or LangGraph config."""
+    """从注入的工具运行时或 LangGraph 配置中提取 thread_id。"""
     if runtime is not None:
         tid = runtime.context.get("thread_id") if runtime.context else None
         if tid is not None:
@@ -327,19 +316,15 @@ def _convert_call_tool_result(
     source_base_dir: Path | None = None,
     changed_files: Iterable[Path] | None = None,
 ) -> Any:
-    """Convert an MCP CallToolResult to the LangChain ``content_and_artifact`` format.
+    """将 MCP ``CallToolResult`` 转换为 LangChain 的 ``content_and_artifact`` 格式。
 
-    Implements the same conversion logic as the adapter without relying on
-    the private ``langchain_mcp_adapters.tools._convert_call_tool_result`` symbol.
+实现与适配器相同的转换逻辑，但不依赖私有符号
+``langchain_mcp_adapters.tools._convert_call_tool_result``。
 
-    When ``thread_id`` and ``user_id`` are provided, local files referenced by
-    ``ResourceLink`` blocks or plain text (e.g. screenshots saved by Playwright
-    MCP) have their references translated from the host path to the
-    ``/mnt/user-data/...`` virtual path so they can be resolved by the sandbox
-    and artifact API. The files themselves are not copied — stdio servers run
-    with their cwd/temp pinned inside the mounted tree, so they already live in
-    a servable location. Remote URIs and files outside the thread's user-data
-    tree are left untouched.
+提供 ``thread_id`` 和 ``user_id`` 时，``ResourceLink`` 块或普通文本中引用的本地文件
+（例如 Playwright MCP 保存的截图）会从主机路径转换为 ``/mnt/user-data/...`` 虚拟路径，
+使沙箱和制品 API 可以解析它们。文件本身不会被复制：stdio 服务器的 cwd 与临时目录已
+固定在挂载树内，文件本就位于可服务的位置。远程 URI 及线程用户数据树外的文件保持不变。
     """
     from langchain_core.messages import ToolMessage
     from langchain_core.messages.content import create_file_block, create_image_block, create_text_block
@@ -361,6 +346,7 @@ def _convert_call_tool_result(
         pass
 
     def _resolve_link_url(uri: str) -> str:
+        """在可解析时将资源链接地址转换为虚拟路径。"""
         if thread_id is None or user_id is None:
             return uri
         rewritten = _local_uri_to_virtual_path(uri, thread_id=thread_id, user_id=user_id, source_base_dir=source_base_dir)
@@ -370,6 +356,7 @@ def _convert_call_tool_result(
         # Servers like Playwright report saved files only as plain text, with no
         # ResourceLink to hook into. Scan the text for local paths and translate
         # them so the produced files are readable through the sandbox/artifact API.
+        """在可解析时改写文本中引用的本地文件路径。"""
         if thread_id is None or user_id is None:
             return text
         return _rewrite_local_paths_in_text(
@@ -429,15 +416,13 @@ def _make_session_pool_tool(
     tool_interceptors: list[Any] | None = None,
     tool_call_timeout: float | None = None,
 ) -> BaseTool:
-    """Wrap an MCP tool so it reuses a persistent session from the pool.
+    """包装 MCP 工具，使其复用会话池中的持久化会话。
 
-    Replaces the per-call session creation with pool-managed sessions scoped
-    by ``(server_name, user_id:thread_id)``.  This ensures stateful MCP servers
-    (e.g. Playwright) keep their state across tool calls within the same thread
-    while staying isolated per user.
+以按 ``(server_name, user_id:thread_id)`` 划分的池化会话替代每次调用都创建会话的方式，
+从而使 Playwright 等有状态 MCP 服务器在同一线程的多次工具调用间保留状态，同时保持用户
+之间隔离。
 
-    The configured ``tool_interceptors`` (OAuth, custom) are preserved and
-    applied on every call before invoking the pooled session.
+保留配置的 ``tool_interceptors``（OAuth 或自定义拦截器），并在每次调用池化会话前应用。
     """
     # Strip the server-name prefix to recover the original MCP tool name.
     original_name = tool.name
@@ -451,6 +436,7 @@ def _make_session_pool_tool(
         runtime: Runtime | None = None,
         **arguments: Any,
     ) -> Any:
+        """通过按用户和线程隔离的持久化会话调用当前 MCP 工具。"""
         thread_id = _extract_thread_id(runtime)
         user_id = resolve_runtime_user_id(runtime)
         # Scope the pooled session by user *and* thread. Filesystem isolation is
@@ -504,6 +490,7 @@ def _make_session_pool_tool(
             async def base_handler(request: MCPToolCallRequest) -> Any:
                 # Preserve interceptor-injected headers for stdio MCP calls by
                 # forwarding them through MCP call meta.
+                """执行最终 MCP 调用，并转发拦截器注入的请求头。"""
                 kwargs = dict(call_kwargs)
                 if request.headers:
                     if isinstance(request.headers, Mapping):
@@ -521,6 +508,7 @@ def _make_session_pool_tool(
                 outer = handler
 
                 async def wrapped(req: Any, _i: Any = interceptor, _h: Any = outer) -> Any:
+                    """将当前拦截器包裹在下一处理器之外。"""
                     return await _i(req, _h)
 
                 handler = wrapped
@@ -567,15 +555,13 @@ def _make_session_pool_tool(
 
 
 async def get_mcp_tools() -> list[BaseTool]:
-    """Get all tools from enabled MCP servers.
+    """获取全部已启用 MCP 服务器提供的工具。
 
-    Tools using stdio transport are wrapped with persistent-session logic so
-    consecutive calls within the same thread reuse the same MCP session.
-    HTTP/SSE tools are returned unwrapped to avoid cross-task TaskGroup
-    cleanup errors.
+使用 stdio 传输的工具会被包装为持久化会话逻辑，使同一线程内连续调用复用同一 MCP
+会话。HTTP/SSE 工具保持未包装状态，以避免跨任务清理 TaskGroup 的错误。
 
-    Returns:
-        List of LangChain tools from all enabled MCP servers.
+返回：
+    全部已启用 MCP 服务器提供的 LangChain 工具列表。
     """
     try:
         from langchain_mcp_adapters.client import MultiServerMCPClient
@@ -644,6 +630,7 @@ async def get_mcp_tools() -> list[BaseTool]:
         )
 
         async def load_server_tools(server_name: str) -> list[BaseTool]:
+            """独立加载指定服务器的工具，失败时不影响其他服务器。"""
             try:
                 return await client.get_tools(server_name=server_name)
             except Exception as e:

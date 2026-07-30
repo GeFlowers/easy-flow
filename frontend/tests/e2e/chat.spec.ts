@@ -7,6 +7,11 @@ test.describe("Chat workspace", () => {
     mockLangGraphAPI(page);
   });
 
+  /**
+   * 覆盖“new chat page loads with input box”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("new chat page loads with input box", async ({ page }) => {
     await page.goto("/workspace/chats/new");
 
@@ -14,6 +19,11 @@ test.describe("Chat workspace", () => {
     await expect(textarea).toBeVisible({ timeout: 15_000 });
     await expect(page.getByRole("button", { name: /load more/i })).toBeHidden();
   });
+
+  /**
+   * 覆盖“can type a message in the input box”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("can type a message in the input box", async ({ page }) => {
     await page.goto("/workspace/chats/new");
@@ -24,6 +34,11 @@ test.describe("Chat workspace", () => {
     await textarea.fill("Hello, DeerFlow!");
     await expect(textarea).toHaveValue("Hello, DeerFlow!");
   });
+
+  /**
+   * 覆盖“polishes draft input before sending”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("polishes draft input before sending", async ({ page }) => {
     let polishRequest: { text?: string; model_name?: string } | undefined;
@@ -102,6 +117,11 @@ test.describe("Chat workspace", () => {
       .toBe("Please summarize the uploaded report clearly.");
   });
 
+  /**
+   * 覆盖“undoes polished draft from the polish button”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("undoes polished draft from the polish button", async ({ page }) => {
     await page.route("**/api/input-polish", (route) =>
       route.fulfill({
@@ -134,9 +154,13 @@ test.describe("Chat workspace", () => {
     await expect(polishButton).toHaveAccessibleName("Polish input");
   });
 
+  /**
+   * 覆盖“cancels an in-flight polish request”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("cancels an in-flight polish request", async ({ page }) => {
-    // Hold the polish response open so the request stays in flight while we
-    // exercise the cancel affordance.
+    // 保持润色响应未完成，使请求在测试取消控件期间始终处于进行中状态。
     let releasePolish!: () => void;
     const polishHeld = new Promise<void>((resolve) => {
       releasePolish = resolve;
@@ -166,8 +190,7 @@ test.describe("Chat workspace", () => {
 
     await page.getByTestId("cancel-polish-input-button").click();
 
-    // Cancelling aborts the request, re-enables the composer, and leaves the
-    // original draft untouched (no rewrite applied).
+    // 取消会中止请求、重新启用输入框，并保持原始草稿不变（不应用改写）。
     await expect(page.getByText("Polishing input...")).toBeHidden();
     await expect(textarea).toBeEnabled();
     await expect(textarea).toHaveValue("summarize report");
@@ -177,6 +200,11 @@ test.describe("Chat workspace", () => {
 
     releasePolish();
   });
+
+  /**
+   * 覆盖“suggests matching skills after a leading slash”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("suggests matching skills after a leading slash", async ({ page }) => {
     let submittedText: string | undefined;
@@ -231,6 +259,11 @@ test.describe("Chat workspace", () => {
       .toBe("/data-analysis summarize this dataset");
   });
 
+  /**
+   * 覆盖“goal command sets a goal and starts an agent run”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("goal command sets a goal and starts an agent run", async ({ page }) => {
     let streamCalls = 0;
     await page.goto("/workspace/chats/new");
@@ -254,6 +287,11 @@ test.describe("Chat workspace", () => {
     await expect.poll(() => streamCalls).toBe(1);
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible();
   });
+
+  /**
+   * 覆盖“goal command keeps the welcome header clear of the goal status”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("goal command keeps the welcome header clear of the goal status", async ({
     page,
@@ -298,6 +336,11 @@ test.describe("Chat workspace", () => {
     expect(overlaps).toBe(false);
   });
 
+  /**
+   * 覆盖“uses arrow keys to navigate skill suggestions before prompt history”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("uses arrow keys to navigate skill suggestions before prompt history", async ({
     page,
   }) => {
@@ -339,6 +382,11 @@ test.describe("Chat workspace", () => {
     ).toBeVisible();
   });
 
+  /**
+   * 覆盖“keeps Shift+Enter as newline while skill suggestions are visible”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("keeps Shift+Enter as newline while skill suggestions are visible", async ({
     page,
   }) => {
@@ -360,6 +408,11 @@ test.describe("Chat workspace", () => {
     ).toBeHidden();
   });
 
+  /**
+   * 覆盖“does not suggest skills for slash text away from the prompt start”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("does not suggest skills for slash text away from the prompt start", async ({
     page,
   }) => {
@@ -374,6 +427,11 @@ test.describe("Chat workspace", () => {
       page.getByRole("option", { name: /data-analysis/i }),
     ).toBeHidden();
   });
+
+  /**
+   * 覆盖“sending a message triggers API call and shows response”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("sending a message triggers API call and shows response", async ({
     page,
@@ -394,11 +452,16 @@ test.describe("Chat workspace", () => {
 
     await expect.poll(() => streamCalled, { timeout: 10_000 }).toBeTruthy();
 
-    // The AI response should appear in the chat
+    // 聊天中应显示 AI 回复。
     await expect(page.getByText("Hello from DeerFlow!")).toBeVisible({
       timeout: 10_000,
     });
   });
+
+  /**
+   * 覆盖“blocks suggestion template placeholders until replaced”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("blocks suggestion template placeholders until replaced", async ({
     page,
@@ -471,6 +534,11 @@ test.describe("Chat workspace", () => {
       );
   });
 
+  /**
+   * 覆盖“slash skill command is submitted as normal chat text”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("slash skill command is submitted as normal chat text", async ({
     page,
   }) => {
@@ -513,6 +581,11 @@ test.describe("Chat workspace", () => {
       timeout: 10_000,
     });
   });
+
+  /**
+   * 覆盖“slash skill command with attachment preserves command text and file metadata”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("slash skill command with attachment preserves command text and file metadata", async ({
     page,
@@ -615,6 +688,11 @@ test.describe("Chat workspace", () => {
     });
   });
 
+  /**
+   * 覆盖“shows gateway upload limits on the attachment entry point”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("shows gateway upload limits on the attachment entry point", async ({
     page,
   }) => {
@@ -627,6 +705,11 @@ test.describe("Chat workspace", () => {
     await expect(page.getByRole("tooltip")).toContainText("50 MiB");
     await expect(page.getByRole("tooltip")).toContainText("100 MiB");
   });
+
+  /**
+   * 覆盖“rejects an oversized attachment before upload”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("rejects an oversized attachment before upload", async ({ page }) => {
     let uploadCalled = false;
@@ -672,6 +755,11 @@ test.describe("Chat workspace", () => {
     });
     expect(uploadCalled).toBe(false);
   });
+
+  /**
+   * 覆盖“keeps valid attachments in order when the total limit is exceeded”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("keeps valid attachments in order when the total limit is exceeded", async ({
     page,
@@ -721,6 +809,11 @@ test.describe("Chat workspace", () => {
       page.locator("[data-sonner-toast]").filter({ hasText: "5 B" }),
     ).toBeVisible();
   });
+
+  /**
+   * 覆盖“keeps attachments visible while upload submit is pending”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("keeps attachments visible while upload submit is pending", async ({
     page,
@@ -783,6 +876,11 @@ test.describe("Chat workspace", () => {
     });
     await expect(promptForm.getByText("report.docx")).toBeHidden();
   });
+
+  /**
+   * 覆盖“does not fetch follow-up suggestions when disabled in config”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("does not fetch follow-up suggestions when disabled in config", async ({
     page,

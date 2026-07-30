@@ -1,3 +1,4 @@
+/** 渲染 GitHub 标志 SVG，并透传原生 SVG 属性供外部布局和无障碍标注使用。 */
 export function GithubIcon(props: React.SVGProps<SVGSVGElement>) {
   return (
     <svg

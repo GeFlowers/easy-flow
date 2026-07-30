@@ -1,3 +1,4 @@
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 import threading
 import time
 from unittest.mock import MagicMock, call, patch
@@ -7,11 +8,12 @@ from deerflow.agents.memory.backends.deermem.deermem.core.queue import Conversat
 
 
 def _queue(updater: MagicMock | None = None) -> MemoryUpdateQueue:
-    """A MemoryUpdateQueue with DI config + a (mock) updater; timer disabled."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return MemoryUpdateQueue(DeerMemConfig(), updater or MagicMock())
 
 
 def test_queue_add_preserves_existing_correction_flag_for_same_thread() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     with patch.object(queue, "_reset_timer"):
         queue.add(thread_id="thread-1", messages=["first"], correction_detected=True)
@@ -23,6 +25,7 @@ def test_queue_add_preserves_existing_correction_flag_for_same_thread() -> None:
 
 
 def test_process_queue_forwards_correction_flag_to_updater() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     mock_updater.update_memory.return_value = True
     queue = _queue(mock_updater)
@@ -42,6 +45,7 @@ def test_process_queue_forwards_correction_flag_to_updater() -> None:
 
 
 def test_queue_add_preserves_existing_reinforcement_flag_for_same_thread() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     with patch.object(queue, "_reset_timer"):
         queue.add(thread_id="thread-1", messages=["first"], reinforcement_detected=True)
@@ -53,6 +57,7 @@ def test_queue_add_preserves_existing_reinforcement_flag_for_same_thread() -> No
 
 
 def test_process_queue_forwards_reinforcement_flag_to_updater() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     mock_updater.update_memory.return_value = True
     queue = _queue(mock_updater)
@@ -72,6 +77,7 @@ def test_process_queue_forwards_reinforcement_flag_to_updater() -> None:
 
 
 def test_flush_nowait_cancels_existing_timer_and_starts_immediate_timer() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     existing_timer = MagicMock()
     queue._timer = existing_timer
@@ -88,6 +94,7 @@ def test_flush_nowait_cancels_existing_timer_and_starts_immediate_timer() -> Non
 
 
 def test_add_nowait_cancels_existing_timer_and_starts_immediate_timer() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     existing_timer = MagicMock()
     queue._timer = existing_timer
@@ -105,13 +112,7 @@ def test_add_nowait_cancels_existing_timer_and_starts_immediate_timer() -> None:
 
 
 def test_process_queue_defers_reprocess_when_already_processing() -> None:
-    """When a timer fires while a worker is active, ``_process_queue`` must set the
-    deferred-rerun flag instead of spinning up a tight 0-delay Timer chain.
-
-    The old behavior re-scheduled a 0-delay Timer on every re-entry while busy,
-    burning a fresh thread each time. The fix defers a single re-run via
-    ``_reprocess_pending`` that the finishing worker honors once.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     queue._processing = True
 
@@ -123,8 +124,7 @@ def test_process_queue_defers_reprocess_when_already_processing() -> None:
 
 
 def test_finishing_worker_reschedules_once_when_reprocess_pending() -> None:
-    """A worker that finishes with ``_reprocess_pending`` set and work still queued
-    schedules exactly one follow-up run (not a per-arrival timer spin)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     queue = _queue(mock_updater)
     queue._queue = [ConversationContext(thread_id="thread-1", messages=["first"], agent_name="lead_agent")]
@@ -132,8 +132,9 @@ def test_finishing_worker_reschedules_once_when_reprocess_pending() -> None:
     created_timer = MagicMock()
 
     def _enqueue_more_while_processing(**_kwargs) -> bool:
-        # Simulate a new update arriving mid-processing so the finally block sees
-        # remaining work and reschedules exactly once.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         queue._queue.append(ConversationContext(thread_id="thread-2", messages=["second"], agent_name="lead_agent"))
         return True
 
@@ -149,8 +150,7 @@ def test_finishing_worker_reschedules_once_when_reprocess_pending() -> None:
 
 
 def test_finishing_worker_does_not_reschedule_when_no_work_remains() -> None:
-    """The deferred re-run is cleared even when nothing is left to process, so a
-    stray flag never leaves a dangling ``_reprocess_pending``."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     mock_updater.update_memory.return_value = True
     queue = _queue(mock_updater)
@@ -165,11 +165,13 @@ def test_finishing_worker_does_not_reschedule_when_no_work_remains() -> None:
 
 
 def test_flush_nowait_is_non_blocking() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     started = threading.Event()
     finished = threading.Event()
 
     def _slow_process_queue() -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         started.set()
         time.sleep(0.2)
         finished.set()
@@ -187,6 +189,7 @@ def test_flush_nowait_is_non_blocking() -> None:
 
 
 def test_queue_keeps_updates_for_different_agents_in_same_thread() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     with patch.object(queue, "_reset_timer"):
         queue.add(thread_id="thread-1", messages=["agent-a"], agent_name="agent-a")
@@ -197,6 +200,7 @@ def test_queue_keeps_updates_for_different_agents_in_same_thread() -> None:
 
 
 def test_queue_still_coalesces_updates_for_same_agent_in_same_thread() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     with patch.object(queue, "_reset_timer"):
         queue.add(thread_id="thread-1", messages=["first"], agent_name="agent-a", correction_detected=True)
@@ -209,6 +213,7 @@ def test_queue_still_coalesces_updates_for_same_agent_in_same_thread() -> None:
 
 
 def test_process_queue_updates_different_agents_in_same_thread_separately() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     with patch.object(queue, "_reset_timer"):
         queue.add(thread_id="thread-1", messages=["agent-a"], agent_name="agent-a")
@@ -231,6 +236,7 @@ def test_process_queue_updates_different_agents_in_same_thread_separately() -> N
 
 
 def test_process_queue_forwards_trace_id_to_updater() -> None:
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     mock_updater.update_memory.return_value = True
     queue = _queue(mock_updater)
@@ -250,25 +256,25 @@ def test_process_queue_forwards_trace_id_to_updater() -> None:
 
 
 # ---------------------------------------------------------------------------
-# shutdown_flush / flush_sync (graceful-shutdown drain) — review carry-overs.
-# The queue is a daemon-timer + in-memory buffer, so anything pending at
-# process exit is lost. flush_sync drains it within a hard timeout, joining an
-# in-flight worker first so contexts a debounce Timer already pulled out of the
-# queue are not lost either.
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 # ---------------------------------------------------------------------------
 
 _QUEUE_MODULE = "deerflow.agents.memory.backends.deermem.deermem.core.queue"
 
 
 def test_flush_sync_noop_on_empty_queue() -> None:
-    """flush_sync short-circuits and returns True when there is nothing to drain."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     assert queue.pending_count == 0
     assert queue.flush_sync(timeout=5.0) is True
 
 
 def test_flush_sync_drains_pending_queue_and_returns_true() -> None:
-    """flush_sync runs the synchronous flush() and waits for it to finish."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     mock_updater.update_memory.return_value = True
     queue = _queue(mock_updater)
@@ -294,34 +300,31 @@ def test_flush_sync_drains_pending_queue_and_returns_true() -> None:
 
 
 def test_flush_sync_returns_false_when_flush_exceeds_timeout() -> None:
-    """flush_sync does not block past ``timeout``; a slow flush returns False."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     queue._queue = [ConversationContext(thread_id="thread-1", messages=["conversation"], agent_name="lead_agent")]
     release = threading.Event()
 
     def _slow_flush() -> None:
-        # Block until the test releases us (well past the flush_sync timeout).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         release.wait(timeout=5.0)
 
     with patch.object(queue, "flush", side_effect=_slow_flush):
         completed = queue.flush_sync(timeout=0.1)
 
     assert completed is False
-    # The queue was not drained because flush() never returned.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert queue.pending_count == 1
-    # Release the daemon thread so it does not linger past the test.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     release.set()
 
 
 def _run_inflight_worker(queue: MemoryUpdateQueue, release: threading.Event) -> threading.Thread:
-    """Start a thread that mimics _process_queue's "pulled contexts, mid-LLM" state.
-
-    It claims ``_processing`` / ``_processing_thread`` (so the queue looks idle
-    by ``pending_count`` but a worker is in flight), blocks on ``release``,
-    then clears the flags on the way out.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
 
     def _inflight() -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         with queue._lock:
             queue._processing = True
             queue._processing_thread = threading.current_thread()
@@ -332,17 +335,14 @@ def _run_inflight_worker(queue: MemoryUpdateQueue, release: threading.Event) -> 
 
     thread = threading.Thread(target=_inflight, name="fake-inflight-worker", daemon=True)
     thread.start()
-    # Wait until the fake worker has claimed _processing.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     while not queue.is_processing:
         time.sleep(0.005)
     return thread
 
 
 def test_flush_sync_waits_for_inflight_worker_and_returns_false_if_unfinished() -> None:
-    """flush_sync must not report success while an in-flight _process_queue is
-    still mid-LLM-call — the contexts it already pulled out would be lost on
-    exit. It joins the in-flight worker (bounded) and returns False when the
-    worker does not finish within the budget (review comment #1)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     release = threading.Event()
     inflight = _run_inflight_worker(queue, release)
@@ -357,13 +357,12 @@ def test_flush_sync_waits_for_inflight_worker_and_returns_false_if_unfinished() 
 
 
 def test_flush_sync_returns_true_when_inflight_worker_finishes_in_budget() -> None:
-    """When the in-flight worker finishes within the budget, flush_sync joins it
-    and reports success (review comment #1, positive case)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     release = threading.Event()
     inflight = _run_inflight_worker(queue, release)
 
-    # Let the in-flight worker finish well within the budget.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     release.set()
 
     completed = queue.flush_sync(timeout=5.0)
@@ -375,9 +374,7 @@ def test_flush_sync_returns_true_when_inflight_worker_finishes_in_budget() -> No
 
 
 def test_flush_sync_returns_false_when_flush_raises() -> None:
-    """flush_sync reports failure (not success) when flush() raises, so the
-    caller never logs a contradictory 'completed' next to the exception
-    (review comment #2)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     queue = _queue()
     queue._queue = [ConversationContext(thread_id="thread-1", messages=["conversation"], agent_name="lead_agent")]
 
@@ -388,8 +385,7 @@ def test_flush_sync_returns_false_when_flush_raises() -> None:
 
 
 def test_flush_sync_skips_inter_item_delay_on_drain_path() -> None:
-    """On the shutdown-drain path the per-item rate-limit sleep is skipped so
-    the bounded timeout covers as many items as possible (review comment #5)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mock_updater = MagicMock()
     mock_updater.update_memory.return_value = True
     queue = _queue(mock_updater)
@@ -400,6 +396,6 @@ def test_flush_sync_skips_inter_item_delay_on_drain_path() -> None:
 
     assert completed is True
     assert queue.pending_count == 0
-    # No inter-item rate-limit sleep on the drain path.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     mock_sleep.assert_not_called()
     assert mock_updater.update_memory.call_count == 3

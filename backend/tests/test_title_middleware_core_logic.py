@@ -1,4 +1,4 @@
-"""Core behavior tests for TitleMiddleware."""
+'未说明'
 
 import asyncio
 from types import SimpleNamespace
@@ -16,10 +16,12 @@ from deerflow.config.title_config import TitleConfig, get_title_config, set_titl
 
 def _clone_title_config(config: TitleConfig) -> TitleConfig:
     # Avoid mutating shared global config objects across tests.
+    '未说明'
     return TitleConfig(**config.model_dump())
 
 
 def _set_test_title_config(**overrides) -> TitleConfig:
+    '未说明'
     config = _clone_title_config(get_title_config())
     for key, value in overrides.items():
         setattr(config, key, value)
@@ -28,14 +30,18 @@ def _set_test_title_config(**overrides) -> TitleConfig:
 
 
 class TestTitleMiddlewareCoreLogic:
+    '未说明'
     def setup_method(self):
         # Title config is a global singleton; snapshot and restore for test isolation.
+        """处理设置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self._original = _clone_title_config(get_title_config())
 
     def teardown_method(self):
+        '未说明'
         set_title_config(self._original)
 
     def test_should_generate_title_for_first_complete_exchange(self):
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -48,6 +54,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state) is True
 
     def test_should_generate_title_with_dynamic_context_reminder(self):
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -64,6 +71,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state) is True
 
     def test_should_not_generate_title_when_disabled_or_already_set(self):
+        '未说明'
         middleware = TitleMiddleware()
 
         _set_test_title_config(enabled=False)
@@ -81,6 +89,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(titled_state) is False
 
     def test_should_not_generate_title_after_second_user_turn(self):
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -95,6 +104,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state) is False
 
     def test_generate_title_uses_async_model_and_respects_max_chars(self, monkeypatch):
+        '未说明'
         _set_test_title_config(max_chars=12, model_name="title-model")
         middleware = TitleMiddleware()
         model = MagicMock()
@@ -119,6 +129,7 @@ class TestTitleMiddlewareCoreLogic:
         }
 
     def test_title_model_config_preserves_parent_tags_and_adds_nostream(self, monkeypatch):
+        '未说明'
         middleware = TitleMiddleware()
         monkeypatch.setattr(
             title_middleware_module,
@@ -132,6 +143,7 @@ class TestTitleMiddlewareCoreLogic:
         assert config["tags"] == ["parent", "middleware:title", TAG_NOSTREAM]
 
     def test_generate_title_uses_explicit_app_config_without_global_config(self, monkeypatch):
+        '未说明'
         title_config = TitleConfig(enabled=True, model_name="title-model", max_chars=20)
         app_config = SimpleNamespace(title=title_config)
         middleware = TitleMiddleware(app_config=app_config)
@@ -139,6 +151,7 @@ class TestTitleMiddlewareCoreLogic:
         model.ainvoke = AsyncMock(return_value=AIMessage(content="显式标题"))
 
         def fail_get_title_config():
+            """处理获取 标题 配置相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             raise AssertionError("ambient get_title_config() must not be used when app_config is explicit")
 
         monkeypatch.setattr(title_middleware_module, "get_title_config", fail_get_title_config)
@@ -161,6 +174,7 @@ class TestTitleMiddlewareCoreLogic:
         )
 
     def test_generate_title_normalizes_structured_message_content(self, monkeypatch):
+        '未说明'
         _set_test_title_config(max_chars=20, model_name="title-model")
         middleware = TitleMiddleware()
         model = MagicMock()
@@ -180,6 +194,7 @@ class TestTitleMiddlewareCoreLogic:
         assert title == "请帮我总结这段代码"
 
     def test_generate_title_fallback_for_long_message(self, monkeypatch):
+        '未说明'
         _set_test_title_config(max_chars=20, model_name="title-model")
         middleware = TitleMiddleware()
         model = MagicMock()
@@ -200,6 +215,7 @@ class TestTitleMiddlewareCoreLogic:
         assert title.startswith("这是一个非常长的问题描述")
 
     def test_aafter_model_delegates_to_async_helper(self, monkeypatch):
+        '未说明'
         _set_test_title_config(model_name="title-model")
         middleware = TitleMiddleware()
 
@@ -211,7 +227,7 @@ class TestTitleMiddlewareCoreLogic:
         assert asyncio.run(middleware.aafter_model({"messages": []}, runtime=MagicMock())) is None
 
     def test_aafter_model_uses_local_fallback_when_no_title_model_is_configured(self, monkeypatch):
-        """Default async path must not block stream completion on a second LLM call."""
+        '未说明'
         _set_test_title_config(max_chars=20, model_name=None)
         middleware = TitleMiddleware()
         create_chat_model = MagicMock()
@@ -229,7 +245,7 @@ class TestTitleMiddlewareCoreLogic:
         create_chat_model.assert_not_called()
 
     def test_async_generate_title_result_uses_local_fallback_without_model_name(self, monkeypatch):
-        """The default async helper path avoids the hidden title-model LLM call."""
+        '未说明'
         _set_test_title_config(max_chars=20, model_name=None)
         middleware = TitleMiddleware()
         create_chat_model = MagicMock()
@@ -247,7 +263,7 @@ class TestTitleMiddlewareCoreLogic:
         create_chat_model.assert_not_called()
 
     def test_async_local_fallback_does_not_format_unused_prompt_template(self, monkeypatch):
-        """Local fallback should not depend on the LLM prompt template."""
+        '未说明'
         _set_test_title_config(max_chars=20, model_name=None, prompt_template="{missing_placeholder}")
         middleware = TitleMiddleware()
         create_chat_model = MagicMock()
@@ -265,7 +281,7 @@ class TestTitleMiddlewareCoreLogic:
         create_chat_model.assert_not_called()
 
     def test_async_title_model_falls_back_when_prompt_template_is_invalid(self, monkeypatch):
-        """Opt-in LLM title generation still degrades locally on template errors."""
+        '未说明'
         _set_test_title_config(max_chars=20, model_name="title-model", prompt_template="{usr_msg}")
         middleware = TitleMiddleware()
         create_chat_model = MagicMock()
@@ -283,6 +299,7 @@ class TestTitleMiddlewareCoreLogic:
         create_chat_model.assert_not_called()
 
     def test_after_model_sync_delegates_to_sync_helper(self, monkeypatch):
+        '未说明'
         middleware = TitleMiddleware()
 
         monkeypatch.setattr(middleware, "_generate_title_result", MagicMock(return_value={"title": "同步标题"}))
@@ -293,7 +310,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware.after_model({"messages": []}, runtime=MagicMock()) is None
 
     def test_sync_generate_title_uses_fallback_without_model(self):
-        """Sync path avoids LLM calls and derives a local fallback title."""
+        '未说明'
         _set_test_title_config(max_chars=20)
         middleware = TitleMiddleware()
 
@@ -307,7 +324,7 @@ class TestTitleMiddlewareCoreLogic:
         assert result == {"title": "请帮我写测试"}
 
     def test_sync_generate_title_respects_fallback_truncation(self):
-        """Sync fallback path still respects max_chars truncation rules."""
+        '未说明'
         _set_test_title_config(max_chars=50)
         middleware = TitleMiddleware()
 
@@ -324,13 +341,7 @@ class TestTitleMiddlewareCoreLogic:
 
     @pytest.mark.parametrize("max_chars", [10, 20, 40, 49, 50, 52, 53, 60, 200])
     def test_fallback_title_never_exceeds_max_chars(self, max_chars):
-        """``max_chars`` bounds the fallback title, not just its body.
-
-        The ellipsis is part of the returned title, so a body of exactly
-        ``min(max_chars, 50)`` characters overshot the configured cap by three.
-        ``model_name: null`` is the shipped default, so this is the path every
-        title takes out of the box -- not an error branch.
-        """
+        '未说明'
         _set_test_title_config(max_chars=max_chars, model_name=None)
         middleware = TitleMiddleware()
 
@@ -341,11 +352,7 @@ class TestTitleMiddlewareCoreLogic:
 
     @pytest.mark.parametrize("max_chars", [10, 20, 50])
     def test_fallback_title_honours_the_same_cap_as_the_model_path(self, max_chars):
-        """Both title paths read ``config.max_chars``; both must respect it.
-
-        ``_parse_title`` slices the model's answer to ``max_chars`` exactly. The
-        local path is the other half of the same contract.
-        """
+        '未说明'
         _set_test_title_config(max_chars=max_chars, model_name=None)
         middleware = TitleMiddleware()
         long_text = "x" * 200
@@ -354,11 +361,7 @@ class TestTitleMiddlewareCoreLogic:
         assert len(middleware._fallback_title(long_text)) <= max_chars
 
     def test_fallback_title_keeps_default_config_output_unchanged(self):
-        """The default ``max_chars=60`` leaves room for the ellipsis already.
-
-        Reserving that room must not shorten titles that were never over the
-        cap, so the shipped configuration keeps emitting a 50-character body.
-        """
+        '未说明'
         _set_test_title_config(max_chars=60, model_name=None)
         middleware = TitleMiddleware()
 
@@ -367,7 +370,7 @@ class TestTitleMiddlewareCoreLogic:
         assert title == "x" * 50 + "..."
 
     def test_parse_title_strips_think_tags(self):
-        """Title model responses with <think>...</think> blocks are stripped before use."""
+        '未说明'
         middleware = TitleMiddleware()
         raw = "<think>用户想要研究贵阳发展情况。我需要使用 deep-research skill。</think>贵阳近5年发展报告研究"
         result = middleware._parse_title(raw)
@@ -375,14 +378,14 @@ class TestTitleMiddlewareCoreLogic:
         assert result == "贵阳近5年发展报告研究"
 
     def test_parse_title_strips_think_tags_only_response(self):
-        """If model only outputs a think block and nothing else, title is empty string."""
+        '未说明'
         middleware = TitleMiddleware()
         raw = "<think>just thinking, no real title</think>"
         result = middleware._parse_title(raw)
         assert result == ""
 
     def test_build_title_prompt_strips_assistant_think_tags(self):
-        """<think> blocks in assistant messages are stripped before being included in the title prompt."""
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -395,6 +398,7 @@ class TestTitleMiddlewareCoreLogic:
         assert "<think>" not in prompt
 
     def test_build_title_prompt_uses_real_user_message_with_dynamic_context_reminder(self):
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -414,7 +418,7 @@ class TestTitleMiddlewareCoreLogic:
         assert "User prefers Python" not in prompt
 
     def test_should_generate_title_partial_exchange_allows_user_only(self):
-        """Interrupted-run path can produce a fallback from a lone human message."""
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {"messages": [HumanMessage(content="只有人类消息，AI 还没回复")]}
@@ -423,7 +427,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state, allow_partial_exchange=True) is True
 
     def test_should_generate_title_partial_exchange_skips_when_titled(self):
-        """Existing title still wins, even on the interrupted-run path."""
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -433,7 +437,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state, allow_partial_exchange=True) is False
 
     def test_should_generate_title_handles_dict_messages(self):
-        """Checkpoint channel_values store messages as dicts; the middleware must accept them."""
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -445,7 +449,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state) is True
 
     def test_sync_generate_title_from_dict_messages(self):
-        """Sync fallback path can derive title text from dict-form messages."""
+        '未说明'
         _set_test_title_config(max_chars=20)
         middleware = TitleMiddleware()
         state = {
@@ -457,7 +461,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._generate_title_result(state) == {"title": "请帮我写测试"}
 
     def test_should_generate_title_handles_none_messages_channel(self):
-        """A checkpoint with ``messages=None`` (partially-initialized state) must not crash."""
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         # ``messages`` key exists but is None — ``state.get("messages", [])`` would
@@ -469,7 +473,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state, allow_partial_exchange=True) is False
 
     def test_build_title_prompt_handles_none_messages_channel(self):
-        """``_build_title_prompt`` must also tolerate a None messages channel."""
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {"messages": None}
@@ -480,7 +484,7 @@ class TestTitleMiddlewareCoreLogic:
         assert "{user_msg}" not in prompt  # the template was formatted, not left raw
 
     def test_should_generate_title_dict_messages_role_normalization(self):
-        """Dict-form messages may use either ``type`` or ``role``; both must map correctly."""
+        '未说明'
         _set_test_title_config(enabled=True)
         middleware = TitleMiddleware()
         state = {
@@ -494,7 +498,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._should_generate_title(state) is True
 
     def test_partial_exchange_with_dict_human_message(self):
-        """Interrupted-run path must accept a lone dict-form first-turn user message."""
+        '未说明'
         _set_test_title_config(enabled=True, max_chars=20)
         middleware = TitleMiddleware()
         state = {"messages": [{"role": "user", "content": "请帮我写测试"}]}
@@ -503,7 +507,7 @@ class TestTitleMiddlewareCoreLogic:
         assert result == {"title": "请帮我写测试"}
 
     def test_partial_exchange_ignores_dict_dynamic_context_reminder(self):
-        """Checkpoint dicts can include hidden memory reminders that should not count as real user turns."""
+        '未说明'
         _set_test_title_config(enabled=True, max_chars=20)
         middleware = TitleMiddleware()
         state = {
@@ -521,7 +525,7 @@ class TestTitleMiddlewareCoreLogic:
         assert middleware._generate_title_result(state, allow_partial_exchange=True) == {"title": "请帮我写测试"}
 
     def test_generate_title_async_strips_think_tags_in_response(self, monkeypatch):
-        """Async title generation strips <think> blocks from the model response."""
+        '未说明'
         _set_test_title_config(max_chars=50, model_name="title-model")
         middleware = TitleMiddleware()
         model = MagicMock()

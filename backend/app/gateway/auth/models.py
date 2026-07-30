@@ -1,4 +1,4 @@
-"""User Pydantic models for authentication."""
+"""认证流程使用的用户 Pydantic 模型。"""
 
 from datetime import UTC, datetime
 from typing import Literal
@@ -8,12 +8,12 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 def _utc_now() -> datetime:
-    """Return current UTC time (timezone-aware)."""
+    """返回带时区信息的当前 UTC 时间。"""
     return datetime.now(UTC)
 
 
 class User(BaseModel):
-    """Internal user representation."""
+    """系统内部使用的用户表示。"""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -23,17 +23,17 @@ class User(BaseModel):
     system_role: Literal["admin", "user"] = Field(default="user")
     created_at: datetime = Field(default_factory=_utc_now)
 
-    # OAuth linkage (optional)
+    # 可选的第三方登录关联信息
     oauth_provider: str | None = Field(None, description="e.g. 'github', 'google'")
     oauth_id: str | None = Field(None, description="User ID from OAuth provider")
 
-    # Auth lifecycle
+    # 认证生命周期状态
     needs_setup: bool = Field(default=False, description="True when a reset account must complete setup")
     token_version: int = Field(default=0, description="Incremented on password change to invalidate old JWTs")
 
 
 class UserResponse(BaseModel):
-    """Response model for user info endpoint."""
+    """用户信息接口的响应模型。"""
 
     id: str
     email: str

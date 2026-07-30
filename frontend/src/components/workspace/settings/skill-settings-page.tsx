@@ -31,6 +31,7 @@ import { env } from "@/env";
 
 import { SettingsSection } from "./settings-section";
 
+/** 管理技能启用状态，并在嵌入式场景中允许调用方关闭所属容器。 */
 export function SkillSettingsPage({ onClose }: { onClose?: () => void } = {}) {
   const { t } = useI18n();
   const { skills, isLoading, error } = useSkills();

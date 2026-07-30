@@ -1,17 +1,8 @@
-"""Memory manager contract + pluggable backend factory.
+"""定义记忆管理器契约，并提供可插拔后端的单例工厂。
 
-This module is the shared, backend-agnostic core of the memory package. It
-defines the :class:`MemoryManager` interface (9 methods) that every backend
-implements, plus a singleton :func:`get_memory_manager` factory that resolves
-the active backend from ``MemoryConfig.manager_class``.
-
-Swap backend = drop a ``backends/<name>/`` folder exposing ``MANAGER_CLASS``
-and set ``manager_class: <name>``. Nothing else in deer-flow changes.
-
-Scope note: this phase is *pluggable only*, not black-box. Agent-side
-conventions (``enabled`` gating at call sites, ``<memory>`` wrapping in
-``_get_memory_context``) stay where they are; they are backend-agnostic and
-do not impede pluggability.
+本模块是记忆包中与后端无关的共享核心，定义所有后端实现的 ``MemoryManager``
+接口，并由 ``get_memory_manager`` 根据 ``MemoryConfig.manager_class`` 解析活动
+后端。新增暴露 ``MANAGER_CLASS`` 的后端子包并配置对应名称即可替换后端。
 """
 
 from __future__ import annotations
@@ -42,33 +33,19 @@ _manager_lock = threading.Lock()
 
 
 class MemoryManager(ABC):
-    """Backend-neutral memory manager contract (9 methods).
+    """定义与后端无关的九项记忆管理器契约。
 
-    Memories are bucketed per ``(agent_name, user_id)``; ``thread_id`` aligns
-    with the deer-flow conversation thread. The contract is deliberately
-    neutral so a third-party memory system can be adapted without deer-flow
-    code changes:
-
-    - :meth:`get_context` returns plain injection text; the *format* is the
-      implementation's own choice and is NOT part of the contract (DeerMem
-      does load + ``format_memory_for_injection``; another backend may do
-      its own search + formatting).
-    - :meth:`add` / :meth:`add_nowait` take raw conversation messages; any
-      filtering / correction-/reinforcement-detection is the implementation's
-      private concern (not on the contract).
-    - No facts-model assumption: a backend need not store "facts" at all.
-
-    Methods marked *stub* are part of the contract but have no caller yet in
-    this phase; DeerMem raises ``NotImplementedError`` for them, a future
-    backend (or a later DeerMem ``core/`` module) may implement them for real.
+    记忆按 ``(agent_name, user_id)`` 分桶，``thread_id`` 与会话线程对齐。
+    ``get_context`` 返回可直接注入的文本，格式由后端决定；写入方法接收原始
+    消息，筛选与纠错、强化识别由后端负责，且后端不必以事实模型存储数据。
+    当前尚无调用方的占位方法仍属于契约，可由后续后端实现。
     """
 
     def __init__(self, backend_config: dict[str, Any] | None = None) -> None:
-        """Receive backend-private config (the factory passes ``backend_config``).
+        """接收工厂传入的后端私有配置。
 
-        Default stores the raw dict; backends that need to parse it (e.g. DeerMem
-        into a ``DeerMemConfig``) override ``__init__``. Backends that ignore
-        private config (e.g. noop) inherit this unchanged.
+        默认实现原样保存字典；需要解析配置的后端可覆写此方法，不使用私有配置
+        的后端可直接继承。
         """
         self._backend_config = backend_config
 
@@ -83,15 +60,11 @@ class MemoryManager(ABC):
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> None:
-        """Queue a conversation for memory update (debounced, asynchronous).
+        """将会话加入异步、防抖的记忆更新队列。
 
-        Args:
-            thread_id: Conversation thread id.
-            messages: Raw conversation messages; the implementation filters
-                to user inputs + final assistant responses itself.
-            agent_name: Per-agent bucket; ``None`` = global memory.
-            user_id: Per-user bucket.
-            trace_id: Request trace id captured for memory-LLM tracing.
+        ``thread_id`` 标识会话线程，``messages`` 为原始消息；实现方自行筛选消息。
+        ``agent_name`` 和 ``user_id`` 分别确定代理与用户分桶，``trace_id`` 用于
+        记忆模型调用追踪。
         """
 
     @abstractmethod
@@ -103,11 +76,7 @@ class MemoryManager(ABC):
         agent_name: str | None = None,
         user_id: str | None = None,
     ) -> None:
-        """Queue a conversation for *immediate* memory update (emergency flush).
-
-        Used right before summarization removes messages from state, so the
-        content is captured instead of lost.
-        """
+        """将会话加入立即执行的记忆更新队列，用于摘要前的紧急刷新。"""
 
     # ── Read ─────────────────────────────────────────────────────────────
     @abstractmethod
@@ -118,13 +87,7 @@ class MemoryManager(ABC):
         agent_name: str | None = None,
         thread_id: str | None = None,
     ) -> str:
-        """Return injection-ready memory text for the given bucket.
-
-        Implementations load their memory and format it however they choose;
-        the returned string is injected verbatim by call sites. Format
-        parameters are the backend's own private config (received via
-        ``backend_config`` at construction), NOT a host config on this method.
-        """
+        """返回指定分桶可直接注入提示词的记忆文本，格式由后端私有配置决定。"""
 
     @abstractmethod
     def search(
@@ -136,10 +99,10 @@ class MemoryManager(ABC):
         agent_name: str | None = None,
         category: str | None = None,
     ) -> list[dict[str, Any]]:
-        """Search the bucket's memory for facts matching ``query``; return up to
-        ``top_k`` ranked by relevance. ``category`` (optional) filters BEFORE the
-        ``top_k`` slice so a category-scoped search is not starved by other
-        categories' higher-ranked facts."""
+        """检索匹配 ``query`` 的记忆并按相关度返回至多 ``top_k`` 条。
+
+        ``category`` 会在截取数量前过滤，避免类别限定检索被其他类别挤占。
+        """
 
     # ── Manage ───────────────────────────────────────────────────────────
     @abstractmethod
@@ -149,7 +112,7 @@ class MemoryManager(ABC):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        """Return the full memory document for the bucket."""
+        """返回指定分桶的完整记忆文档。"""
 
     @abstractmethod
     def delete_memory(
@@ -158,7 +121,7 @@ class MemoryManager(ABC):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> None:
-        """Delete the entire memory document for the bucket. *stub* this phase."""
+        """删除指定分桶的整份记忆文档；当前阶段为占位契约。"""
 
     @abstractmethod
     def clear_memory(
@@ -167,7 +130,7 @@ class MemoryManager(ABC):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        """Clear the bucket's memory; return the cleared (now-empty) document."""
+        """清空指定分桶的记忆，并返回清空后的空文档。"""
 
     @abstractmethod
     def import_memory(
@@ -177,7 +140,7 @@ class MemoryManager(ABC):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        """Import a memory document into the bucket; return the merged result."""
+        """将记忆文档导入指定分桶，并返回合并结果。"""
 
     @abstractmethod
     def export_memory(
@@ -186,47 +149,26 @@ class MemoryManager(ABC):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        """Export the memory document for the bucket. *stub* this phase (no caller yet)."""
+        """导出指定分桶的记忆文档；当前阶段为尚无调用方的占位契约。"""
 
     # ── Lifecycle ───────────────────────────────────────────────────────
     @abstractmethod
     def shutdown_flush(self, timeout: float) -> bool:
-        """Best-effort bounded drain of pending updates on graceful shutdown.
+        """在优雅停机时尽力于 ``timeout`` 内排空待处理更新。
 
-        Runs on the Gateway shutdown path (after IM channels and the scheduler
-        stop, so no new IM/scheduler updates arrive during the drain) to flush
-        updates still sitting in the backend's debounce buffer. Without it, any
-        update enqueued since the last timer fire is lost on restart / rolling
-        deploy / SIGTERM, because the buffer is pure in-memory and the debounce
-        worker is a daemon thread killed on process exit.
-
-        Implementations must honour a *hard* ``timeout``: the drain makes a
-        synchronous LLM call that cannot be interrupted, so the caller (the
-        Gateway lifespan) needs a real upper bound that lines up with the K8s
-        ``terminationGracePeriodSeconds`` (the drain must finish inside the pod
-        grace window, or K8s SIGKILLs it mid-drain and the loss the drain is
-        fixing is silently re-introduced).
-
-        Returns ``True`` if the drain genuinely finished within ``timeout``
-        (buffer empty, no worker still running, no exception); ``False`` on
-        timeout or failure (the caller logs a warning and proceeds to exit --
-        any unfinished tail is dropped, strictly better than no flush). A
-        backend with no pending work (or no buffer at all) returns ``True``
-        immediately, so the host may call this unconditionally when memory is
-        enabled without gating on backend-private queue state.
+        该方法在网关关闭时刷新后端防抖缓冲区，避免最后一次定时触发后的内存队列
+        因重启或终止而丢失。实现必须遵守硬超时，因排空可能包含不可中断的同步
+        模型调用。缓冲区清空且无异常时返回 ``True``，超时或失败返回 ``False``；
+        无待处理工作的后端应立即返回 ``True``。
         """
 
 
 # ── Backend discovery (drop-in) ───────────────────────────────────────────
 def _scan_backends() -> dict[str, type[MemoryManager]]:
-    """Discover pluggable backends under ``backends/<name>/``.
+    """发现 ``backends/<名称>/`` 下可插拔后端并缓存注册表。
 
-    Each subpackage that exposes a ``MANAGER_CLASS`` attribute (a
-    :class:`MemoryManager` subclass) is registered under its folder name.
-    Results are cached for the process. Folder name == backend name ==
-    ``manager_class`` config value (drop-in contract). A backend that fails
-    to import is logged and skipped so a broken optional backend never breaks
-    the factory.
+    暴露 ``MANAGER_CLASS`` 且为 ``MemoryManager`` 子类的子包以目录名注册；可选
+    后端导入失败时仅记录日志并跳过，不能阻断其他可用后端。
     """
     global _backends_cache
     if _backends_cache is not None:
@@ -265,19 +207,10 @@ def _scan_backends() -> dict[str, type[MemoryManager]]:
 
 
 def _resolve_manager_class(manager_class: str) -> type[MemoryManager]:
-    """Resolve a ``manager_class`` config value to a concrete class.
+    """将 ``manager_class`` 配置解析为具体的记忆管理器类。
 
-    Resolution order:
-      1. Registered short name (from :func:`_scan_backends`).
-      2. Dotted import path (``pkg.mod:Cls`` or ``pkg.mod.Cls``).
-
-    A value that resolves to neither is a config error: raise rather than
-    silently fall back to a different storage backend. Memory is persistent
-    state, so silently substituting DeerMem when an explicit ``manager_class``
-    fails to resolve (typo / import error / missing attr) would route writes to
-    the wrong store -- a silent data-integrity footgun. Fail loud (the manager
-    is resolved eagerly at startup so it can be warmed) so the operator fixes
-    ``memory.manager_class`` instead of discovering the mismatch later.
+    先匹配扫描得到的短名称，再支持 ``包.模块:类`` 或 ``包.模块.类`` 导入路径。
+    无法解析时必须报错而不能静默回退，以免持久化写入错误存储。
     """
     registry = _scan_backends()
     if manager_class in registry:
@@ -333,13 +266,10 @@ def _host_default_tracing_callback(
     trace_id: str | None,
     model_name: str | None,
 ) -> None:
-    """deer-flow default for DeerMem's ``tracing_callback`` slot.
+    """为默认记忆后端的 ``tracing_callback`` 槽位提供宿主默认实现。
 
-    Merges Langfuse trace metadata into ``invoke_config`` (no-op when
-    Langfuse is not an enabled tracing provider). Maps DeerMem's ``trace_id``
-    onto ``inject_langfuse_metadata``'s ``deerflow_trace_id`` kwarg -- the
-    name mismatch that previously made memory LLM tracing silently TypeError
-    is bridged here, at the host seam, so the portable package is untouched.
+    将追踪元数据合并入 ``invoke_config``；未启用相关提供方时无操作。此处把
+    ``trace_id`` 映射到 ``deerflow_trace_id``，在宿主边界消除参数名差异。
     """
     from deerflow.tracing import inject_langfuse_metadata
 
@@ -355,13 +285,10 @@ def _host_default_tracing_callback(
 
 
 def _host_default_should_keep_hidden_message(additional_kwargs: Any) -> bool:
-    """deer-flow default for DeerMem's ``should_keep_hidden_message`` slot.
+    """为默认记忆后端的隐藏消息保留槽位提供默认判断。
 
-    Keep a ``hide_from_ui`` message only when it carries a human-input
-    clarification response, so the user's clarification is captured into
-    memory; drop all other hidden messages (framework-internal reminders,
-    view-image payloads, etc.). Restores the pre-abstraction behaviour where
-    ``message_processing`` imported ``read_human_input_response`` directly.
+    仅保留携带人类输入澄清响应的 ``hide_from_ui`` 消息，以便将用户澄清写入记忆；
+    框架内部提醒和查看图像载荷等其他隐藏消息均丢弃。
     """
     from deerflow.agents.human_input import read_human_input_response
 
@@ -369,14 +296,10 @@ def _host_default_should_keep_hidden_message(additional_kwargs: Any) -> bool:
 
 
 def _host_default_llm() -> Any:
-    """deer-flow default for DeerMem's ``host_llm`` slot (zero-config extraction).
+    """为默认记忆后端的 ``host_llm`` 槽位创建零配置的默认聊天模型。
 
-    Builds the host's default chat model (``create_chat_model(name=None)`` ->
-    app default, ``attach_tracing=True`` so memory LLM calls surface in langfuse
-    via the metadata ``tracing_callback`` merges), mirroring pre-abstraction
-    ``model_name: null``. Returns ``None`` if no model is available (no models
-    configured) so DeerMem no-ops extraction with a clear error rather than
-    crashing startup.
+    ``create_chat_model(name=None)`` 选择应用默认模型，保持 ``model_name: null``
+    的既有语义；未配置模型时返回 ``None``，使记忆提取明确停用而非启动失败。
     """
     try:
         from deerflow.models import create_chat_model
@@ -389,12 +312,10 @@ def _host_default_llm() -> Any:
 
 # ── Singleton factory ─────────────────────────────────────────────────────
 def get_memory_manager() -> MemoryManager:
-    """Return the singleton :class:`MemoryManager` for the active config.
+    """返回当前配置对应的 ``MemoryManager`` 单例。
 
-    Reads ``MemoryConfig.manager_class`` and resolves it via
-    :func:`_resolve_manager_class`. The instance is cached; call
-    :func:`reset_memory_manager` to force re-resolution (tests / runtime
-    backend switching).
+    读取 ``MemoryConfig.manager_class`` 并解析，结果缓存为单例；测试或运行时
+    切换后端时可调用 ``reset_memory_manager`` 强制重新解析。
     """
     global _memory_manager
     if _memory_manager is not None:
@@ -473,11 +394,7 @@ def get_memory_manager() -> MemoryManager:
 
 
 def reset_memory_manager() -> None:
-    """Clear the cached singleton manager and the backend registry.
-
-    The next :func:`get_memory_manager` call re-reads the config and re-scans
-    backends. Use this in tests or when switching backends at runtime.
-    """
+    """清除缓存的管理器单例及后端注册表，供下次调用重新读取配置和扫描后端。"""
     global _memory_manager, _backends_cache
     with _manager_lock:
         _memory_manager = None

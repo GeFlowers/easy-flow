@@ -1,4 +1,4 @@
-"""Deterministic skill package analyzer."""
+'定义 analyzer 模块提供的职责与可复用接口。\n\nDeterministic skill package analyzer.'
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from deerflow.skills.skillscan.orchestrator import scan_skill_dir
 
 
 def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "deerflow") -> dict[str, Any]:
-    """Produce review-facts.v1 from a PackageSnapshot."""
+    '执行 analyze_skill_package 的明确职责，并返回与调用约定一致的结果。\n\nProduce review-facts.v1 from a PackageSnapshot.'
     findings: list[dict[str, Any]] = []
     analyzer_errors: list[dict[str, Any]] = []
     files = {str(entry["path"]): entry for entry in snapshot.get("files", [])}
@@ -146,6 +146,7 @@ def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "d
 
 
 def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict[str, Any]]) -> str | None:
+    '执行 _analyze_skill_md 的明确职责，并返回与调用约定一致的结果'
     parts, error = split_skill_markdown(content)
     if error or parts is None:
         findings.append(
@@ -275,6 +276,7 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
 
 
 def _add_agentskills_findings(metadata: dict[str, Any], declared_name: str | None, findings: list[dict[str, Any]]) -> None:
+    '执行 _add_agentskills_findings 的明确职责，并返回与调用约定一致的结果'
     description = metadata.get("description")
     if isinstance(description, str) and len(description.strip()) > 200:
         findings.append(
@@ -303,6 +305,7 @@ def _add_agentskills_findings(metadata: dict[str, Any], declared_name: str | Non
 
 
 def _scan_with_skillscan(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
+    '执行 _scan_with_skillscan 的明确职责，并返回与调用约定一致的结果'
     files = [entry for entry in snapshot.get("files", []) if entry.get("kind") == "text" and not is_eval_fixture_path(str(entry.get("path") or ""))]
     if not files:
         return []
@@ -346,14 +349,17 @@ def _scan_with_skillscan(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _valid_skill_name(name: str) -> bool:
+    '执行 _valid_skill_name 的明确职责，并返回与调用约定一致的结果'
     return bool(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)) and len(name) <= 64
 
 
 def _is_nested_archive(path: str) -> bool:
+    '执行 _is_nested_archive 的明确职责，并返回与调用约定一致的结果'
     lowered = path.lower()
     return lowered.endswith((".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".7z", ".rar", ".whl"))
 
 
 def _is_hidden_sensitive_path(path: str) -> bool:
+    '执行 _is_hidden_sensitive_path 的明确职责，并返回与调用约定一致的结果'
     parts = PurePosixPath(path).parts
     return any(part in {".env", ".npmrc", ".pypirc", ".netrc"} for part in parts)

@@ -6,6 +6,11 @@ type NotificationInstance = {
   close: () => void;
 };
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 loadNotificationHook 的约定。
+
+ */
+
 async function loadNotificationHook({
   browserPermission = "granted",
   hookPermission = "granted",
@@ -84,6 +89,9 @@ afterEach(() => {
 });
 
 describe("useNotification", () => {
+  /**
+   * 覆盖“allows the first notification immediately after the hook is created”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("allows the first notification immediately after the hook is created", async () => {
     const { notifications, useNotification } = await loadNotificationHook();
     const { showNotification } = useNotification();
@@ -94,6 +102,11 @@ describe("useNotification", () => {
     expect(notifications[0]?.title).toBe("Finished");
     expect(notifications[0]?.options?.body).toBe("Conversation finished");
   });
+
+  /**
+   * 覆盖“rate limits only after a notification has been sent”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("rate limits only after a notification has been sent", async () => {
     const { notifications, useNotification } = await loadNotificationHook();
@@ -106,6 +119,11 @@ describe("useNotification", () => {
       "First",
     ]);
   });
+
+  /**
+   * 覆盖“uses the browser's current permission when another hook requested it”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("uses the browser's current permission when another hook requested it", async () => {
     const { notifications, useNotification } = await loadNotificationHook({

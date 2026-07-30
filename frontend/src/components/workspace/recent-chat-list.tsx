@@ -66,6 +66,7 @@ import { isIMEComposing } from "@/lib/ime";
 
 import { ThreadChannelIcon } from "./thread-channel-source";
 
+/** 加载并管理最近线程列表，包含重命名、删除和可分享链接等线程级操作。 */
 export function RecentChatList() {
   const { t } = useI18n();
   const router = useRouter();
@@ -107,7 +108,7 @@ export function RecentChatList() {
   const { mutate: deleteThread } = useDeleteThread();
   const { mutate: renameThread } = useRenameThread();
 
-  // Rename dialog state
+  // 重命名对话框状态独立保存，避免列表刷新时丢失正在编辑的目标线程。
   const [renameDialogOpen, setRenameDialogOpen] = useState(false);
   const [renameThreadId, setRenameThreadId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
@@ -170,12 +171,12 @@ export function RecentChatList() {
 
   const handleShare = useCallback(
     async (thread: AgentThread) => {
-      // Always use Vercel URL for sharing so others can access
+      // 本地环境生成 Vercel 地址，确保接收者可访问分享链接。
       const VERCEL_URL = "https://deer-flow-v2.vercel.app";
       const isLocalhost =
         window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1";
-      // On localhost: use Vercel URL; On production: use current origin
+      // localhost 使用 Vercel 地址；生产环境使用当前来源以保留部署域名。
       const baseUrl = isLocalhost ? VERCEL_URL : window.location.origin;
       const shareUrl = `${baseUrl}${pathOfThread(thread)}`;
       try {
@@ -356,7 +357,7 @@ export function RecentChatList() {
         </SidebarGroupContent>
       </SidebarGroup>
 
-      {/* Rename Dialog */}
+      {/* 重命名对话框 */}
       <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
         <DialogContent className="sm:max-w-[425px]">
           <DialogHeader>

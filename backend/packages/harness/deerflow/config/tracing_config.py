@@ -1,3 +1,4 @@
+"""提供配置、追踪、配置相关功能。"""
 import os
 import threading
 
@@ -7,7 +8,7 @@ _config_lock = threading.Lock()
 
 
 class LangSmithTracingConfig(BaseModel):
-    """Configuration for LangSmith tracing."""
+    """\u6267\u884c LangSmithTracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(...)
     api_key: str | None = Field(...)
@@ -16,15 +17,17 @@ class LangSmithTracingConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
+        """\u6267\u884c is_configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.enabled and bool(self.api_key)
 
     def validate(self) -> None:
+        """\u6267\u884c validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if self.enabled and not self.api_key:
             raise ValueError("LangSmith tracing is enabled but LANGSMITH_API_KEY (or LANGCHAIN_API_KEY) is not set.")
 
 
 class LangfuseTracingConfig(BaseModel):
-    """Configuration for Langfuse tracing."""
+    """\u6267\u884c LangfuseTracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(...)
     public_key: str | None = Field(...)
@@ -33,9 +36,11 @@ class LangfuseTracingConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
+        """\u6267\u884c is_configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.enabled and bool(self.public_key) and bool(self.secret_key)
 
     def validate(self) -> None:
+        """\u6267\u884c validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if not self.enabled:
             return
         missing: list[str] = []
@@ -47,14 +52,14 @@ class LangfuseTracingConfig(BaseModel):
             raise ValueError(f"Langfuse tracing is enabled but required settings are missing: {', '.join(missing)}")
 
 
-# Manual mirror of monocle_apptrace's supported exporters, kept local so a typo
-# fails at startup with a clear message instead of an opaque upstream error.
-# Update this tuple when a monocle_apptrace bump adds or renames an exporter.
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
 _MONOCLE_EXPORTERS = ("file", "console", "okahu", "s3", "blob", "gcs")
 
 
 class MonocleTracingConfig(BaseModel):
-    """Configuration for Monocle telemetry."""
+    """\u6267\u884c MonocleTracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(...)
     exporters: str = Field(...)
@@ -62,16 +67,18 @@ class MonocleTracingConfig(BaseModel):
 
     @property
     def is_enabled(self) -> bool:
-        # Unlike the siblings' is_configured, no credential check here: that is
-        # exporter-dependent and lives in validate(), run at Gateway startup.
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+        """\u6267\u884c is_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.enabled
 
     @property
     def exporter_list(self) -> list[str]:
-        """The configured exporters, parsed once so validation and setup agree."""
+        """\u6267\u884c exporter_list \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return [e.strip() for e in self.exporters.split(",") if e.strip()]
 
     def validate(self) -> None:
+        """\u6267\u884c validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if not self.enabled:
             return
         selected = self.exporter_list
@@ -83,7 +90,7 @@ class MonocleTracingConfig(BaseModel):
 
 
 class TracingConfig(BaseModel):
-    """Tracing configuration for supported providers."""
+    """\u6267\u884c TracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     langsmith: LangSmithTracingConfig = Field(...)
     langfuse: LangfuseTracingConfig = Field(...)
@@ -91,10 +98,12 @@ class TracingConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
+        """\u6267\u884c is_configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return bool(self.enabled_providers)
 
     @property
     def explicitly_enabled_providers(self) -> list[str]:
+        """\u6267\u884c explicitly_enabled_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         enabled: list[str] = []
         if self.langsmith.enabled:
             enabled.append("langsmith")
@@ -104,6 +113,7 @@ class TracingConfig(BaseModel):
 
     @property
     def enabled_providers(self) -> list[str]:
+        """\u6267\u884c enabled_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         enabled: list[str] = []
         if self.langsmith.is_configured:
             enabled.append("langsmith")
@@ -112,6 +122,7 @@ class TracingConfig(BaseModel):
         return enabled
 
     def validate_enabled(self) -> None:
+        """\u6267\u884c validate_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         self.langsmith.validate()
         self.langfuse.validate()
 
@@ -123,7 +134,7 @@ _TRUTHY_VALUES = {"1", "true", "yes", "on"}
 
 
 def _env_flag_preferred(*names: str) -> bool:
-    """Return the boolean value of the first env var that is present and non-empty."""
+    """\u6267\u884c _env_flag_preferred \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     for name in names:
         value = os.environ.get(name)
         if value is not None and value.strip():
@@ -132,7 +143,7 @@ def _env_flag_preferred(*names: str) -> bool:
 
 
 def _first_env_value(*names: str) -> str | None:
-    """Return the first non-empty environment value from candidate names."""
+    """\u6267\u884c _first_env_value \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     for name in names:
         value = os.environ.get(name)
         if value and value.strip():
@@ -141,7 +152,7 @@ def _first_env_value(*names: str) -> str | None:
 
 
 def get_tracing_config() -> TracingConfig:
-    """Get the current tracing configuration from environment variables."""
+    """\u6267\u884c get_tracing_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _tracing_config
     if _tracing_config is not None:
         return _tracing_config
@@ -171,42 +182,32 @@ def get_tracing_config() -> TracingConfig:
 
 
 def get_enabled_tracing_providers() -> list[str]:
-    """Return the configured tracing providers that are enabled and complete."""
+    """\u6267\u884c get_enabled_tracing_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return get_tracing_config().enabled_providers
 
 
 def get_explicitly_enabled_tracing_providers() -> list[str]:
-    """Return tracing providers explicitly enabled by config, even if incomplete."""
+    """\u6267\u884c get_explicitly_enabled_tracing_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return get_tracing_config().explicitly_enabled_providers
 
 
 def validate_enabled_tracing_providers() -> None:
-    """Validate that any explicitly enabled providers are fully configured."""
+    """\u6267\u884c validate_enabled_tracing_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     get_tracing_config().validate_enabled()
 
 
 def is_tracing_enabled() -> bool:
-    """Check if any tracing provider is enabled and fully configured."""
+    """\u6267\u884c is_tracing_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return get_tracing_config().is_configured
 
 
 def is_monocle_tracing_enabled() -> bool:
-    """Whether Monocle OTel observability is enabled (via ``MONOCLE_TRACING``).
-
-    Kept separate from :func:`get_enabled_tracing_providers` because Monocle is a
-    process-global instrumentor activated at startup, not a per-run LangChain
-    callback.
-    """
+    """\u6267\u884c is_monocle_tracing_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return get_tracing_config().monocle.is_enabled
 
 
 def reset_tracing_config() -> None:
-    """Discard the cached :class:`TracingConfig` so the next call rebuilds it.
-
-    Public API so that tests do not have to reach into the private
-    ``_tracing_config`` module attribute. A future internal rename would
-    silently break callers that mutate the attribute directly.
-    """
+    """\u6267\u884c reset_tracing_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _tracing_config
     with _config_lock:
         _tracing_config = None

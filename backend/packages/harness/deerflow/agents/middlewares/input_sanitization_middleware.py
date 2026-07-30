@@ -1,18 +1,4 @@
-"""Input guardrail middleware for prompt-injection defense (issue #3630).
-
-Escapes blocked XML-like tags in the last genuine user message (e.g.
-``<system>`` → ``&lt;system&gt;``) so they render as literal text instead
-of structured-context markers.  This preserves the user's intent ("how do
-I use DeerFlow's <think> tag?") while neutralizing injection attempts —
-the same de-identify-don't-reject strategy as AWS Bedrock's PII ANONYMIZE.
-
-Blocked: system-reserved tags (memory, analysis, etc.) + common injection
-tags (system, instruction, role, etc.). Normal HTML/XML tags (<div>,
-<span>) are NOT escaped.
-
-Clean input is wrapped in plain-text boundary markers as a secondary
-semantic defense (OWASP structured-prompt guidance).
-"""
+'定义 input_sanitization_middleware 模块提供的职责与可复用接口。\n\nInput guardrail middleware for prompt-injection defense (issue #3630).\n\nEscapes blocked XML-like tags in the last genuine user message (e.g.\n``<system>`` → ``&lt;system&gt;``) so they render as literal text instead\nof structured-context markers.  This preserves the user\'s intent ("how do\nI use DeerFlow\'s <think> tag?") while neutralizing injection attempts —\nthe same de-identify-don\'t-reject strategy as AWS Bedrock\'s PII ANONYMIZE.\n\nBlocked: system-reserved tags (memory, analysis, etc.) + common injection\ntags (system, instruction, role, etc.). Normal HTML/XML tags (<div>,\n<span>) are NOT escaped.\n\nClean input is wrapped in plain-text boundary markers as a secondary\nsemantic defense (OWASP structured-prompt guidance).\n'
 
 from __future__ import annotations
 
@@ -126,12 +112,12 @@ _BOUNDARY_TOKEN_RE = re.compile(
 
 
 def _escape_tag_match(match: re.Match) -> str:
-    """Escape < and > in a blocked-tag match so it renders as literal text."""
+    '执行 _escape_tag_match 的明确职责，并返回与调用约定一致的结果。\n\nEscape < and > in a blocked-tag match so it renders as literal text.'
     return match.group(0).replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _neutralize_boundary_tokens(text: str) -> str:
-    """Replace real BEGIN/END USER INPUT markers with look-alike inert forms."""
+    '执行 _neutralize_boundary_tokens 的明确职责，并返回与调用约定一致的结果。\n\nReplace real BEGIN/END USER INPUT markers with look-alike inert forms.'
     return _BOUNDARY_TOKEN_RE.sub(
         lambda m: _NEUTRALIZED_BEGIN if m.group(0) == _USER_INPUT_BEGIN else _NEUTRALIZED_END,
         text,
@@ -139,27 +125,7 @@ def _neutralize_boundary_tokens(text: str) -> str:
 
 
 def neutralize_untrusted_tags(text: str) -> str:
-    """Neutralize framework/injection control tokens in untrusted text.
-
-    Shared primitive for any content that originates outside the trust boundary
-    and is about to enter the model context as *data* — currently the genuine
-    user message (via :func:`_check_user_content`) and remote tool results
-    (web_fetch / web_search and friends, via
-    :class:`ToolResultSanitizationMiddleware`).
-
-    Applies exactly the two structural defenses, and nothing else:
-
-    * blocked framework/injection tags (e.g. ``<system-reminder>``) are
-      HTML-escaped to ``&lt;system-reminder&gt;`` so they lose their structural
-      meaning while staying human-readable;
-    * the plain-text ``--- BEGIN/END USER INPUT ---`` boundary markers are
-      neutralized so untrusted content cannot forge or break out of the
-      user-input boundary.
-
-    It intentionally does **not** wrap the text in boundary markers: that
-    framing is specific to the user message. Empty/whitespace-only text is
-    returned unchanged so callers do not emit marker noise.
-    """
+    '执行 neutralize_untrusted_tags 的明确职责，并返回与调用约定一致的结果。\n\nNeutralize framework/injection control tokens in untrusted text.\n\n    Shared primitive for any content that originates outside the trust boundary\n    and is about to enter the model context as *data* — currently the genuine\n    user message (via :func:`_check_user_content`) and remote tool results\n    (web_fetch / web_search and friends, via\n    :class:`ToolResultSanitizationMiddleware`).\n\n    Applies exactly the two structural defenses, and nothing else:\n\n    * blocked framework/injection tags (e.g. ``<system-reminder>``) are\n      HTML-escaped to ``&lt;system-reminder&gt;`` so they lose their structural\n      meaning while staying human-readable;\n    * the plain-text ``--- BEGIN/END USER INPUT ---`` boundary markers are\n      neutralized so untrusted content cannot forge or break out of the\n      user-input boundary.\n\n    It intentionally does **not** wrap the text in boundary markers: that\n    framing is specific to the user message. Empty/whitespace-only text is\n    returned unchanged so callers do not emit marker noise.\n    '
     if not text.strip():
         return text
     text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
@@ -167,11 +133,7 @@ def neutralize_untrusted_tags(text: str) -> str:
 
 
 def _is_genuine_user_message(message: object) -> bool:
-    """Return True for real user messages, excluding system-injected HumanMessages.
-
-    ``hide_from_ui`` is also used by hidden UI replies from HumanInputCard, so
-    only skip hidden HumanMessages that do not carry a valid user response.
-    """
+    '执行 _is_genuine_user_message 的明确职责，并返回与调用约定一致的结果。\n\nReturn True for real user messages, excluding system-injected HumanMessages.\n\n    ``hide_from_ui`` is also used by hidden UI replies from HumanInputCard, so\n    only skip hidden HumanMessages that do not carry a valid user response.\n    '
     if not isinstance(message, HumanMessage):
         return False
     if message.name == _SUMMARY_MESSAGE_NAME:
@@ -182,14 +144,7 @@ def _is_genuine_user_message(message: object) -> bool:
 
 
 def _check_user_content(text: str) -> str:
-    """Sanitize user content: escape blocked tags, then wrap in boundary markers.
-
-    * Empty/whitespace-only → return unchanged (no marker noise).
-    * Blocked tags → HTML-escape ``<``/``>`` (e.g. ``<system>`` → ``&lt;system&gt;``).
-    * Boundary tokens in user text → neutralized so they cannot forge boundaries.
-    * Already wrapped (strict prefix+suffix) → return text unchanged (idempotent).
-    * Otherwise → wrap in boundary markers.
-    """
+    '执行 _check_user_content 的明确职责，并返回与调用约定一致的结果。\n\nSanitize user content: escape blocked tags, then wrap in boundary markers.\n\n    * Empty/whitespace-only → return unchanged (no marker noise).\n    * Blocked tags → HTML-escape ``<``/``>`` (e.g. ``<system>`` → ``&lt;system&gt;``).\n    * Boundary tokens in user text → neutralized so they cannot forge boundaries.\n    * Already wrapped (strict prefix+suffix) → return text unchanged (idempotent).\n    * Otherwise → wrap in boundary markers.\n    '
     if not text.strip():
         return text
     text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
@@ -212,21 +167,11 @@ def _check_user_content(text: str) -> str:
 
 
 class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
-    """Guardrail middleware that escapes prompt-injection tags in user input.
-
-    Blocked tags are HTML-escaped (not rejected) so the user's intent is
-    preserved while the tags lose their semantic significance. Clean input
-    is wrapped in plain-text boundary markers. Transformation is temporary
-    (wrap_model_call) — never written to state.
-    """
+    "封装 InputSanitizationMiddleware 的状态、协作关系与公开操作。\n\nGuardrail middleware that escapes prompt-injection tags in user input.\n\n    Blocked tags are HTML-escaped (not rejected) so the user's intent is\n    preserved while the tags lose their semantic significance. Clean input\n    is wrapped in plain-text boundary markers. Transformation is temporary\n    (wrap_model_call) — never written to state.\n    "
 
     @staticmethod
     def _extract_text_from_content(content: str | list) -> tuple[str, list | None]:
-        """Extract concatenated text from a plain-string or content-block-list.
-
-        Returns ``(text, extracted_blocks)``. *extracted_blocks* is None when
-        *content* is a string, or the list of text-content-block dicts when a list.
-        """
+        '执行 _extract_text_from_content 的明确职责，并返回与调用约定一致的结果。\n\nExtract concatenated text from a plain-string or content-block-list.\n\n        Returns ``(text, extracted_blocks)``. *extracted_blocks* is None when\n        *content* is a string, or the list of text-content-block dicts when a list.\n        '
         if isinstance(content, str):
             return content, None
         if not isinstance(content, list):
@@ -245,11 +190,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         processed_text: str,
         text_blocks: list[dict],
     ) -> list:
-        """Replace text blocks with a single merged text block, preserving interleaved non-text blocks.
-
-        For ``[text, image, text]`` the image block between the two text blocks
-        is kept in place — only the text blocks are collapsed into one.
-        """
+        '执行 _rebuild_content 的明确职责，并返回与调用约定一致的结果。\n\nReplace text blocks with a single merged text block, preserving interleaved non-text blocks.\n\n        For ``[text, image, text]`` the image block between the two text blocks\n        is kept in place — only the text blocks are collapsed into one.\n        '
         text_block_ids = {id(b) for b in text_blocks}
         first = last = None
         for i, block in enumerate(original_content):
@@ -268,12 +209,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         return result
 
     def _process_request(self, request: ModelRequest) -> ModelRequest:
-        """Return a request with the last genuine user message sanitized.
-
-        Blocked tags are HTML-escaped (not rejected) so the user's intent is
-        preserved while the tags lose their semantic significance. Transformation
-        is temporary — the original request is never mutated.
-        """
+        "执行 _process_request 的明确职责，并返回与调用约定一致的结果。\n\nReturn a request with the last genuine user message sanitized.\n\n        Blocked tags are HTML-escaped (not rejected) so the user's intent is\n        preserved while the tags lose their semantic significance. Transformation\n        is temporary — the original request is never mutated.\n        "
         messages = list(request.messages)
         for i in range(len(messages) - 1, -1, -1):
             msg = messages[i]
@@ -338,10 +274,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         return request
 
     def _try_process(self, request: ModelRequest) -> ModelRequest:
-        """Sanitize request; fail-open on unexpected errors.
-
-        GraphBubbleUp propagates; other exceptions return the original request.
-        """
+        '执行 _try_process 的明确职责，并返回与调用约定一致的结果。\n\nSanitize request; fail-open on unexpected errors.\n\n        GraphBubbleUp propagates; other exceptions return the original request.\n        '
         try:
             return self._process_request(request)
         except GraphBubbleUp:
@@ -359,6 +292,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
+        """清洗同步模型请求中的用户输入后执行后续处理器。"""
         return handler(self._try_process(request))
 
     @override
@@ -367,4 +301,5 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
+        """清洗异步模型请求中的用户输入后等待后续处理器执行。"""
         return await handler(self._try_process(request))

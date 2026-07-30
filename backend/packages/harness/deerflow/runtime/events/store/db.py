@@ -1,8 +1,4 @@
-"""SQLAlchemy-backed RunEventStore implementation.
-
-Persists events to the ``run_events`` table. Trace content is truncated
-at ``max_trace_content`` bytes to avoid bloating the database.
-"""
+'定义 db 模块提供的职责与可复用接口。\n\nSQLAlchemy-backed RunEventStore implementation.\n\nPersists events to the ``run_events`` table. Trace content is truncated\nat ``max_trace_content`` bytes to avoid bloating the database.\n'
 
 from __future__ import annotations
 
@@ -24,7 +20,9 @@ logger = logging.getLogger(__name__)
 
 
 class DbRunEventStore(RunEventStore):
+    '封装 DbRunEventStore 的状态、协作关系与公开操作'
     def __init__(self, session_factory: async_sessionmaker[AsyncSession], *, max_trace_content: int = 10240):
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         self._sf = session_factory
         self._max_trace_content = max_trace_content
         # Per-thread asyncio locks serialize seq assignment for concurrent
@@ -35,7 +33,7 @@ class DbRunEventStore(RunEventStore):
         self._write_locks: dict[str, asyncio.Lock] = {}
 
     def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
-        """Return (creating if needed) the per-thread seq-assignment lock."""
+        '执行 _get_write_lock 的明确职责，并返回与调用约定一致的结果。\n\nReturn (creating if needed) the per-thread seq-assignment lock.'
         lock = self._write_locks.get(thread_id)
         if lock is None:
             lock = asyncio.Lock()
@@ -44,6 +42,7 @@ class DbRunEventStore(RunEventStore):
 
     @staticmethod
     def _row_to_dict(row: RunEventRow) -> dict:
+        '执行 _row_to_dict 的明确职责，并返回与调用约定一致的结果'
         d = row.to_dict()
         d["metadata"] = d.pop("event_metadata", {})
         val = d.get("created_at")
@@ -65,6 +64,7 @@ class DbRunEventStore(RunEventStore):
         return d
 
     def _truncate_trace(self, category: str, content: Any, metadata: dict | None) -> tuple[Any, dict]:
+        '执行 _truncate_trace 的明确职责，并返回与调用约定一致的结果'
         if category == "trace":
             text = content if isinstance(content, str) else json.dumps(content, default=str, ensure_ascii=False)
             encoded = text.encode("utf-8")
@@ -76,6 +76,7 @@ class DbRunEventStore(RunEventStore):
 
     @staticmethod
     def _content_to_db(content: Any, metadata: dict | None) -> tuple[str, dict]:
+        '执行 _content_to_db 的明确职责，并返回与调用约定一致的结果'
         metadata = metadata or {}
         if isinstance(content, str):
             return content, metadata
@@ -88,31 +89,13 @@ class DbRunEventStore(RunEventStore):
 
     @staticmethod
     def _user_id_from_context() -> str | None:
-        """Soft read of user_id from contextvar for write paths.
-
-        Returns ``None`` (no filter / no stamp) if contextvar is unset,
-        which is the expected case for background worker writes. HTTP
-        request writes will have the contextvar set by auth middleware
-        and get their user_id stamped automatically.
-
-        Coerces ``user.id`` to ``str`` at the boundary: ``User.id`` is
-        typed as ``UUID`` by the auth layer, but ``run_events.user_id``
-        is ``VARCHAR(64)`` and aiosqlite cannot bind a raw UUID object
-        to a VARCHAR column ("type 'UUID' is not supported") — the
-        INSERT would silently roll back and the worker would hang.
-        """
+        '执行 _user_id_from_context 的明确职责，并返回与调用约定一致的结果。\n\nSoft read of user_id from contextvar for write paths.\n\n        Returns ``None`` (no filter / no stamp) if contextvar is unset,\n        which is the expected case for background worker writes. HTTP\n        request writes will have the contextvar set by auth middleware\n        and get their user_id stamped automatically.\n\n        Coerces ``user.id`` to ``str`` at the boundary: ``User.id`` is\n        typed as ``UUID`` by the auth layer, but ``run_events.user_id``\n        is ``VARCHAR(64)`` and aiosqlite cannot bind a raw UUID object\n        to a VARCHAR column ("type \'UUID\' is not supported") — the\n        INSERT would silently roll back and the worker would hang.\n        '
         user = get_current_user()
         return str(user.id) if user is not None else None
 
     @staticmethod
     async def _max_seq_for_thread(session: AsyncSession, thread_id: str) -> int | None:
-        """Return the current max seq while serializing writers per thread.
-
-        PostgreSQL rejects ``SELECT max(...) FOR UPDATE`` because aggregate
-        results are not lockable rows. As a release-safe workaround, take a
-        transaction-level advisory lock keyed by thread_id before reading the
-        aggregate. Other dialects keep the existing row-locking statement.
-        """
+        '执行 _max_seq_for_thread 的明确职责，并返回与调用约定一致的结果。\n\nReturn the current max seq while serializing writers per thread.\n\n        PostgreSQL rejects ``SELECT max(...) FOR UPDATE`` because aggregate\n        results are not lockable rows. As a release-safe workaround, take a\n        transaction-level advisory lock keyed by thread_id before reading the\n        aggregate. Other dialects keep the existing row-locking statement.\n        '
         stmt = select(func.max(RunEventRow.seq)).where(RunEventRow.thread_id == thread_id)
         bind = session.get_bind()
         dialect_name = bind.dialect.name if bind is not None else ""
@@ -127,14 +110,7 @@ class DbRunEventStore(RunEventStore):
         return await session.scalar(stmt.with_for_update())
 
     async def put(self, *, thread_id, run_id, event_type, category, content="", metadata=None, created_at=None):  # noqa: D401
-        """Write a single event — low-frequency path only.
-
-        This opens a dedicated transaction with a FOR UPDATE lock to
-        assign a monotonic *seq*.  For high-throughput writes use
-        :meth:`put_batch`, which acquires the lock once for the whole
-        batch.  Currently the only caller is ``worker.run_agent`` for
-        the initial ``human_message`` event (once per run).
-        """
+        '执行 put 的明确职责，并返回与调用约定一致的结果。\n\nWrite a single event — low-frequency path only.\n\n        This opens a dedicated transaction with a FOR UPDATE lock to\n        assign a monotonic *seq*.  For high-throughput writes use\n        :meth:`put_batch`, which acquires the lock once for the whole\n        batch.  Currently the only caller is ``worker.run_agent`` for\n        the initial ``human_message`` event (once per run).\n        '
         content, metadata = self._truncate_trace(category, content, metadata)
         db_content, metadata = self._content_to_db(content, metadata)
         user_id = self._user_id_from_context()
@@ -158,6 +134,7 @@ class DbRunEventStore(RunEventStore):
                 return self._row_to_dict(row)
 
     async def put_batch(self, events):
+        '执行 put_batch 的明确职责，并返回与调用约定一致的结果'
         if not events:
             return []
         thread_ids = {e["thread_id"] for e in events}
@@ -203,6 +180,7 @@ class DbRunEventStore(RunEventStore):
         after_seq=None,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        '收集并返回，并遵守 list_messages 所表达的接口约束'
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.list_messages")
         stmt = select(RunEventRow).where(RunEventRow.thread_id == thread_id, RunEventRow.category == "message")
         if resolved_user_id is not None:
@@ -237,6 +215,7 @@ class DbRunEventStore(RunEventStore):
         after_seq=None,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        '收集并返回，并遵守 list_events 所表达的接口约束'
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.list_events")
         stmt = select(RunEventRow).where(RunEventRow.thread_id == thread_id, RunEventRow.run_id == run_id)
         if resolved_user_id is not None:
@@ -267,6 +246,7 @@ class DbRunEventStore(RunEventStore):
         after_seq=None,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        '收集并返回，并遵守 list_messages_by_run 所表达的接口约束'
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.list_messages_by_run")
         stmt = select(RunEventRow).where(
             RunEventRow.thread_id == thread_id,
@@ -299,6 +279,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        '读取并返回，并遵守 get_last_visible_ai_seq_by_run 所表达的接口约束'
         if not run_ids:
             return {}
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.get_last_visible_ai_seq_by_run")
@@ -328,6 +309,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        '执行 count_messages 的明确职责，并返回与调用约定一致的结果'
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.count_messages")
         stmt = select(func.count()).select_from(RunEventRow).where(RunEventRow.thread_id == thread_id, RunEventRow.category == "message")
         if resolved_user_id is not None:
@@ -341,6 +323,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        '删除目标资源并返回操作结果，并遵守 delete_by_thread 所表达的接口约束'
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.delete_by_thread")
         async with self._sf() as session:
             count_conditions = [RunEventRow.thread_id == thread_id]
@@ -368,6 +351,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        '删除目标资源并返回操作结果，并遵守 delete_by_run 所表达的接口约束'
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.delete_by_run")
         async with self._sf() as session:
             count_conditions = [RunEventRow.thread_id == thread_id, RunEventRow.run_id == run_id]

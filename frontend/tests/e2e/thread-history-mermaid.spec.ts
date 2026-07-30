@@ -16,6 +16,11 @@ flowchart TD
 \`\`\`
 `;
 
+/**
+ * 覆盖“historical run messages preview labelled dotted Mermaid arrows”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("historical run messages preview labelled dotted Mermaid arrows", async ({
   page,
 }) => {

@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 from typing import Any
@@ -15,23 +16,27 @@ from deerflow.runtime.runs.worker import _extract_llm_error_fallback_message
 
 @tool
 def lookup_status() -> str:
-    """Return a deterministic tool result."""
+    '未说明'
     return "tool completed"
 
 
 class _PostToolResponseModel(BaseChatModel):
+    '未说明'
     responses: list[str]
     call_count: int = 0
     observed_messages: list[list[Any]] = []
 
     @property
     def _llm_type(self) -> str:
+        '未说明'
         return "post-tool-response"
 
     def bind_tools(self, tools, **kwargs):
+        '未说明'
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         self.observed_messages.append(list(messages))
         self.call_count += 1
         if self.call_count == 1:
@@ -48,21 +53,26 @@ class _PostToolResponseModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=message)])
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
 class _PerRunRetryBudgetModel(BaseChatModel):
+    '未说明'
     call_count: int = 0
     observed_messages: list[list[Any]] = []
 
     @property
     def _llm_type(self) -> str:
+        '未说明'
         return "per-run-retry-budget"
 
     def bind_tools(self, tools, **kwargs):
+        '未说明'
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         self.observed_messages.append(list(messages))
         self.call_count += 1
         if self.call_count == 1:
@@ -84,10 +94,12 @@ class _PerRunRetryBudgetModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=message)])
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
 def _agent(model: BaseChatModel):
+    '未说明'
     return create_agent(
         model=model,
         tools=[lookup_status],
@@ -96,10 +108,12 @@ def _agent(model: BaseChatModel):
 
 
 def _empty_terminal_messages(messages: list[Any]) -> list[AIMessage]:
+    '未说明'
     return [message for message in messages if isinstance(message, AIMessage) and not message.tool_calls and not message.invalid_tool_calls and not str(message.content).strip()]
 
 
 def test_retries_empty_post_tool_response_once_and_returns_model_answer():
+    '未说明'
     model = _PostToolResponseModel(responses=["", "The tool completed successfully."])
 
     result = _agent(model).invoke(
@@ -117,6 +131,7 @@ def test_retries_empty_post_tool_response_once_and_returns_model_answer():
 
 
 def test_second_empty_post_tool_response_becomes_visible_error_fallback():
+    '未说明'
     model = _PostToolResponseModel(responses=["", ""])
 
     result = _agent(model).invoke(
@@ -135,6 +150,7 @@ def test_second_empty_post_tool_response_becomes_visible_error_fallback():
 
 @pytest.mark.asyncio
 async def test_async_graph_retries_empty_post_tool_response_once():
+    '未说明'
     model = _PostToolResponseModel(responses=["", "Recovered asynchronously."])
 
     result = await _agent(model).ainvoke(
@@ -148,6 +164,7 @@ async def test_async_graph_retries_empty_post_tool_response_once():
 
 
 def test_graph_with_thread_id_only_keeps_recovery_state_across_model_loop():
+    '未说明'
     model = _PostToolResponseModel(responses=["", "Recovered without a run id."])
 
     result = _agent(model).invoke(
@@ -161,6 +178,7 @@ def test_graph_with_thread_id_only_keeps_recovery_state_across_model_loop():
 
 
 def test_recovery_budget_is_once_per_run_even_when_retry_calls_another_tool():
+    '未说明'
     model = _PerRunRetryBudgetModel()
 
     result = _agent(model).invoke(
@@ -177,6 +195,7 @@ def test_recovery_budget_is_once_per_run_even_when_retry_calls_another_tool():
 
 
 def test_empty_response_without_tool_result_is_not_retried():
+    '未说明'
     middleware = TerminalResponseMiddleware()
     message = AIMessage(content="", response_metadata={"finish_reason": "stop"})
     state = {"messages": [HumanMessage(content="Hello"), message]}
@@ -186,6 +205,7 @@ def test_empty_response_without_tool_result_is_not_retried():
 
 
 def test_tool_call_intent_is_not_treated_as_empty_terminal_response():
+    '未说明'
     middleware = TerminalResponseMiddleware()
     message = AIMessage(
         content="",
@@ -207,6 +227,7 @@ def test_tool_call_intent_is_not_treated_as_empty_terminal_response():
     ],
 )
 def test_invalid_or_legacy_tool_call_intent_is_not_treated_as_empty_terminal_response(message):
+    '未说明'
     middleware = TerminalResponseMiddleware()
     state = {"messages": [HumanMessage(content="Hello"), message]}
     runtime = type("RuntimeStub", (), {"context": {"thread_id": "thread-5", "run_id": "run-5"}})()
@@ -215,6 +236,7 @@ def test_invalid_or_legacy_tool_call_intent_is_not_treated_as_empty_terminal_res
 
 
 def test_after_agent_clears_retry_state_for_the_run():
+    '未说明'
     middleware = TerminalResponseMiddleware()
     runtime = type("RuntimeStub", (), {"context": {"thread_id": "thread-6", "run_id": "run-6"}})()
     empty_after_tool = {
@@ -233,6 +255,7 @@ def test_after_agent_clears_retry_state_for_the_run():
 
 
 def test_before_agent_clears_same_run_state_for_resumed_invocation():
+    '未说明'
     middleware = TerminalResponseMiddleware()
     runtime = type("RuntimeStub", (), {"context": {"thread_id": "thread-7", "run_id": "run-7"}})()
     empty_after_tool = {
@@ -251,6 +274,7 @@ def test_before_agent_clears_same_run_state_for_resumed_invocation():
 
 
 def test_tool_history_without_real_user_message_does_not_trigger_recovery():
+    '未说明'
     middleware = TerminalResponseMiddleware()
     runtime = type("RuntimeStub", (), {"context": {"thread_id": "thread-8", "run_id": "run-8"}})()
     state = {
@@ -265,6 +289,7 @@ def test_tool_history_without_real_user_message_does_not_trigger_recovery():
 
 
 def test_abandoned_run_state_is_bounded():
+    '未说明'
     middleware = TerminalResponseMiddleware()
 
     for index in range(1001):

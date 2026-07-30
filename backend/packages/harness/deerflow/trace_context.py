@@ -1,7 +1,7 @@
-"""Request trace context helpers.
+"""管理鹿流请求级追踪上下文。
 
-The value stored here is DeerFlow's request-level correlation id. It is
-separate from Langfuse's own trace id and from DeerFlow run ids.
+此处保存的关联标识独立于第三方追踪标识和鹿流运行标识，用于响应
+响应头、日志及可选追踪元数据之间的关联。
 """
 
 from __future__ import annotations
@@ -20,22 +20,15 @@ _current_trace_id: Final[ContextVar[str | None]] = ContextVar("deerflow_current_
 
 
 def generate_trace_id() -> str:
-    """Return a fresh header-safe trace id."""
+    """生成新的、可安全写入响应头的十六进制追踪标识。"""
     return uuid.uuid4().hex
 
 
 def normalize_trace_id(value: object) -> str | None:
-    """Return a safe trace id string, or ``None`` when *value* is unusable.
+    """校验并规范化追踪标识；不可用值返回空值。
 
-    Only printable ASCII (0x20-0x7E) is accepted. Codepoints above 0x7E are
-    rejected because the trace id round-trips through HTTP response headers,
-    which Starlette encodes as latin-1: codepoints > 0xFF raise
-    ``UnicodeEncodeError`` inside ``MutableHeaders.__setitem__`` (forcing a
-    500 before the response body is even dispatched), and C1 controls
-    (0x80-0x9F) technically encode but are stripped or rejected by hardened
-    intermediaries (nginx / envoy / cloudfront), silently breaking the
-    response. C0 controls (< 0x20) and DEL (0x7F) are rejected for the same
-    header-safety reason plus log-injection defense.
+    仅接受长度受限的可打印基础拉丁字符，拒绝控制字符和其他字符，避免响应头编码
+    失败、代理剥离字段或日志注入。
     """
     if not isinstance(value, str):
         return None
@@ -48,7 +41,7 @@ def normalize_trace_id(value: object) -> str | None:
 
 
 def set_current_trace_id(trace_id: str) -> Token[str | None]:
-    """Bind *trace_id* to the current execution context."""
+    """将合法追踪标识绑定至当前执行上下文，并返回可复位令牌。"""
     normalized = normalize_trace_id(trace_id)
     if normalized is None:
         normalized = generate_trace_id()
@@ -56,18 +49,18 @@ def set_current_trace_id(trace_id: str) -> Token[str | None]:
 
 
 def reset_current_trace_id(token: Token[str | None]) -> None:
-    """Restore the trace context captured by *token*."""
+    """使用令牌恢复绑定前的追踪上下文。"""
     _current_trace_id.reset(token)
 
 
 def get_current_trace_id() -> str | None:
-    """Return the current request trace id, if one is bound."""
+    """返回当前上下文已绑定的请求追踪标识；未绑定时返回空值。"""
     return _current_trace_id.get()
 
 
 @contextmanager
 def request_trace_context(trace_id: str | None = None) -> Iterator[str]:
-    """Bind a request trace id for the duration of a request or entry point."""
+    """在上下文管理器范围内绑定指定或新生成的请求追踪标识。"""
     normalized = normalize_trace_id(trace_id) or generate_trace_id()
     token = _current_trace_id.set(normalized)
     try:
@@ -78,7 +71,7 @@ def request_trace_context(trace_id: str | None = None) -> Iterator[str]:
 
 @contextmanager
 def ensure_trace_context(trace_id: str | None = None) -> Iterator[str]:
-    """Bind *trace_id*, inherit the current trace, or create a fresh one."""
+    """优先绑定给定标识，否则继承当前标识，均无时创建新的标识。"""
     normalized = normalize_trace_id(trace_id) or get_current_trace_id() or generate_trace_id()
     token = _current_trace_id.set(normalized)
     try:

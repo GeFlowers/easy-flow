@@ -17,6 +17,7 @@ const ToggleGroupContext = React.createContext<
   spacing: 0,
 });
 
+/** ToggleGroup 内部组件：组织对应的界面结构与交互语义。 */
 function ToggleGroup({
   className,
   variant,
@@ -48,6 +49,7 @@ function ToggleGroup({
   );
 }
 
+/** ToggleGroupItem 内部组件：组织对应的界面结构与交互语义。 */
 function ToggleGroupItem({
   className,
   children,

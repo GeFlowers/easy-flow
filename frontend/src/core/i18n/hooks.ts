@@ -13,6 +13,7 @@ import {
   type Locale,
 } from "./index";
 
+/** 提供 useI18n 对应的 React Hook。 */
 export function useI18n() {
   const { locale, setLocale } = useI18nContext();
 
@@ -23,7 +24,7 @@ export function useI18n() {
     setLocaleInCookie(newLocale);
   };
 
-  // Initialize locale on mount
+  // 组件挂载时再读取并初始化语言设置，避免服务端渲染阶段访问浏览器状态。
   useEffect(() => {
     const saved = getLocaleFromCookie();
     if (saved) {

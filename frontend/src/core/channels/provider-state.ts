@@ -1,5 +1,6 @@
 import type { ChannelProvider } from "./types";
 
+/** 判断提供商是否满足发起连接的条件。 */
 export function providerCanConnect(provider: ChannelProvider): boolean {
   return (
     (provider.connectable ?? (provider.enabled && provider.configured)) &&
@@ -7,6 +8,7 @@ export function providerCanConnect(provider: ChannelProvider): boolean {
   );
 }
 
+/** 判断提供商是否仍缺少连接所需的运行时配置。 */
 export function providerNeedsRuntimeConfig(provider: ChannelProvider): boolean {
   return (
     provider.enabled &&
@@ -15,6 +17,7 @@ export function providerNeedsRuntimeConfig(provider: ChannelProvider): boolean {
   );
 }
 
+/** 判断提供商是否允许在界面中编辑运行时配置。 */
 export function providerCanEditRuntimeConfig(
   provider: ChannelProvider,
 ): boolean {

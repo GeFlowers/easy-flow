@@ -18,22 +18,28 @@ import {
 import { cn } from "@/lib/utils";
 import type { ComponentProps, ReactNode } from "react";
 
+/** ModelSelectorProps 的公开类型定义。 */
 export type ModelSelectorProps = ComponentProps<typeof Dialog>;
 
+/** ModelSelector 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelector = (props: ModelSelectorProps) => (
   <Dialog {...props} />
 );
 
+/** ModelSelectorTriggerProps 的公开类型定义。 */
 export type ModelSelectorTriggerProps = ComponentProps<typeof DialogTrigger>;
 
+/** ModelSelectorTrigger 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorTrigger = (props: ModelSelectorTriggerProps) => (
   <DialogTrigger {...props} />
 );
 
+/** ModelSelectorContentProps 的公开类型定义。 */
 export type ModelSelectorContentProps = ComponentProps<typeof DialogContent> & {
   title?: ReactNode;
 };
 
+/** ModelSelectorContent 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorContent = ({
   className,
   children,
@@ -48,14 +54,18 @@ export const ModelSelectorContent = ({
   </DialogContent>
 );
 
+/** ModelSelectorDialogProps 的公开类型定义。 */
 export type ModelSelectorDialogProps = ComponentProps<typeof CommandDialog>;
 
+/** ModelSelectorDialog 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorDialog = (props: ModelSelectorDialogProps) => (
   <CommandDialog {...props} />
 );
 
+/** ModelSelectorInputProps 的公开类型定义。 */
 export type ModelSelectorInputProps = ComponentProps<typeof CommandInput>;
 
+/** ModelSelectorInput 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorInput = ({
   className,
   ...props
@@ -63,44 +73,57 @@ export const ModelSelectorInput = ({
   <CommandInput className={cn("h-auto py-3.5", className)} {...props} />
 );
 
+/** ModelSelectorListProps 的公开类型定义。 */
 export type ModelSelectorListProps = ComponentProps<typeof CommandList>;
 
+/** ModelSelectorList 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorList = (props: ModelSelectorListProps) => (
   <CommandList {...props} />
 );
 
+/** ModelSelectorEmptyProps 的公开类型定义。 */
 export type ModelSelectorEmptyProps = ComponentProps<typeof CommandEmpty>;
 
+/** ModelSelectorEmpty 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorEmpty = (props: ModelSelectorEmptyProps) => (
   <CommandEmpty {...props} />
 );
 
+/** ModelSelectorGroupProps 的公开类型定义。 */
 export type ModelSelectorGroupProps = ComponentProps<typeof CommandGroup>;
 
+/** ModelSelectorGroup 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorGroup = (props: ModelSelectorGroupProps) => (
   <CommandGroup {...props} />
 );
 
+/** ModelSelectorItemProps 的公开类型定义。 */
 export type ModelSelectorItemProps = ComponentProps<typeof CommandItem>;
 
+/** ModelSelectorItem 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorItem = (props: ModelSelectorItemProps) => (
   <CommandItem {...props} />
 );
 
+/** ModelSelectorShortcutProps 的公开类型定义。 */
 export type ModelSelectorShortcutProps = ComponentProps<typeof CommandShortcut>;
 
+/** ModelSelectorShortcut 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorShortcut = (props: ModelSelectorShortcutProps) => (
   <CommandShortcut {...props} />
 );
 
+/** ModelSelectorSeparatorProps 的公开类型定义。 */
 export type ModelSelectorSeparatorProps = ComponentProps<
   typeof CommandSeparator
 >;
 
+/** ModelSelectorSeparator 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorSeparator = (props: ModelSelectorSeparatorProps) => (
   <CommandSeparator {...props} />
 );
 
+/** ModelSelectorLogoProps 的公开类型定义。 */
 export type ModelSelectorLogoProps = Omit<
   ComponentProps<"img">,
   "src" | "alt"
@@ -165,6 +188,7 @@ export type ModelSelectorLogoProps = Omit<
     | (string & {});
 };
 
+/** ModelSelectorLogo 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorLogo = ({
   provider,
   className,
@@ -180,8 +204,10 @@ export const ModelSelectorLogo = ({
   />
 );
 
+/** ModelSelectorLogoGroupProps 的公开类型定义。 */
 export type ModelSelectorLogoGroupProps = ComponentProps<"div">;
 
+/** ModelSelectorLogoGroup 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorLogoGroup = ({
   className,
   ...props
@@ -195,8 +221,10 @@ export const ModelSelectorLogoGroup = ({
   />
 );
 
+/** ModelSelectorNameProps 的公开类型定义。 */
 export type ModelSelectorNameProps = ComponentProps<"span">;
 
+/** ModelSelectorName 组件：提供对应的界面结构与交互语义。 */
 export const ModelSelectorName = ({
   className,
   ...props

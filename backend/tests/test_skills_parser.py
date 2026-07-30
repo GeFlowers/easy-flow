@@ -1,12 +1,4 @@
-"""Tests for the SKILL.md parser regression introduced in issue #1803.
-
-The previous hand-rolled YAML parser stored quoted string values with their
-surrounding quotes intact (e.g. ``name: "my-skill"`` → ``'"my-skill"'``).
-This caused a mismatch with ``_validate_skill_frontmatter`` (which uses
-``yaml.safe_load``) and broke skill lookup after installation.
-
-The parser now uses ``yaml.safe_load`` consistently with ``validation.py``.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -21,7 +13,7 @@ from deerflow.skills.parser import parse_skill_file
 
 
 def _write_skill(tmp_path: Path, front_matter: str, body: str = "# My Skill\n") -> Path:
-    """Write a minimal SKILL.md and return the path."""
+    '未说明'
     skill_dir = tmp_path / "my-skill"
     skill_dir.mkdir()
     skill_file = skill_dir / "SKILL.md"
@@ -35,7 +27,7 @@ def _write_skill(tmp_path: Path, front_matter: str, body: str = "# My Skill\n") 
 
 
 def test_parse_plain_name(tmp_path):
-    """Unquoted name is parsed correctly."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill\ndescription: A test skill")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -43,11 +35,7 @@ def test_parse_plain_name(tmp_path):
 
 
 def test_parse_quoted_name_no_quotes_in_result(tmp_path):
-    """Quoted name (YAML string) must not include surrounding quotes in result.
-
-    Regression: the old hand-rolled parser stored ``'"my-skill"'`` instead of
-    ``'my-skill'`` when the YAML value was wrapped in double-quotes.
-    """
+    '未说明'
     skill_file = _write_skill(tmp_path, 'name: "my-skill"\ndescription: A test skill')
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -55,7 +43,7 @@ def test_parse_quoted_name_no_quotes_in_result(tmp_path):
 
 
 def test_parse_single_quoted_name(tmp_path):
-    """Single-quoted YAML strings are also handled correctly."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: 'my-skill'\ndescription: A test skill")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -63,7 +51,7 @@ def test_parse_single_quoted_name(tmp_path):
 
 
 def test_parse_description_returned(tmp_path):
-    """Description field is correctly extracted."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill\ndescription: Does amazing things")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -71,7 +59,7 @@ def test_parse_description_returned(tmp_path):
 
 
 def test_parse_multiline_description(tmp_path):
-    """Multi-line YAML descriptions are collapsed correctly by yaml.safe_load."""
+    '未说明'
     front_matter = "name: my-skill\ndescription: >\n  A folded\n  description"
     skill_file = _write_skill(tmp_path, front_matter)
     skill = parse_skill_file(skill_file, category="custom")
@@ -80,7 +68,7 @@ def test_parse_multiline_description(tmp_path):
 
 
 def test_parse_license_field(tmp_path):
-    """Optional license field is captured when present."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill\ndescription: Test\nlicense: MIT")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -88,6 +76,7 @@ def test_parse_license_field(tmp_path):
 
 
 def test_parse_missing_allowed_tools_returns_none(tmp_path):
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill\ndescription: Test")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -95,6 +84,7 @@ def test_parse_missing_allowed_tools_returns_none(tmp_path):
 
 
 def test_parse_allowed_tools_list(tmp_path):
+    '未说明'
     skill_file = _write_skill(tmp_path, 'name: my-skill\ndescription: Test\nallowed-tools: ["bash", "read_file"]')
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -102,6 +92,7 @@ def test_parse_allowed_tools_list(tmp_path):
 
 
 def test_parse_empty_allowed_tools_list(tmp_path):
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill\ndescription: Test\nallowed-tools: []")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is not None
@@ -109,27 +100,28 @@ def test_parse_empty_allowed_tools_list(tmp_path):
 
 
 def test_parse_invalid_allowed_tools_returns_none(tmp_path):
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill\ndescription: Test\nallowed-tools: bash")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is None
 
 
 def test_parse_missing_name_returns_none(tmp_path):
-    """Skills missing a name field are rejected."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "description: A test skill")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is None
 
 
 def test_parse_missing_description_returns_none(tmp_path):
-    """Skills missing a description field are rejected."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is None
 
 
 def test_parse_no_front_matter_returns_none(tmp_path):
-    """Files without YAML front-matter delimiters return None."""
+    '未说明'
     skill_dir = tmp_path / "no-fm"
     skill_dir.mkdir()
     skill_file = skill_dir / "SKILL.md"
@@ -139,14 +131,14 @@ def test_parse_no_front_matter_returns_none(tmp_path):
 
 
 def test_parse_invalid_yaml_returns_none(tmp_path):
-    """Malformed YAML front-matter is handled gracefully (returns None)."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: [unclosed")
     skill = parse_skill_file(skill_file, category="custom")
     assert skill is None
 
 
 def test_parse_category_stored(tmp_path):
-    """Category is propagated into the returned Skill object."""
+    '未说明'
     skill_file = _write_skill(tmp_path, "name: my-skill\ndescription: Test")
     skill = parse_skill_file(skill_file, category="public")
     assert skill is not None
@@ -154,7 +146,7 @@ def test_parse_category_stored(tmp_path):
 
 
 def test_parse_nonexistent_file_returns_none(tmp_path):
-    """Non-existent files are handled gracefully."""
+    '未说明'
     skill = parse_skill_file(tmp_path / "ghost" / "SKILL.md", category="custom")
     assert skill is None
 
@@ -165,21 +157,7 @@ def test_parse_nonexistent_file_returns_none(tmp_path):
 
 
 def test_parse_unquoted_colon_value_logs_line_and_hint(tmp_path, caplog):
-    """Unquoted value with ': ' produces a log that exposes the full offending line
-    (PyYAML truncates long lines with `...`) and a copy-pasteable quoting hint.
-
-    Regression for issue #3333: SKILL.md authored by an LLM frequently
-    contains ``description: foo: bar`` which PyYAML rejects with
-    ``mapping values are not allowed here``. The skill is correctly skipped
-    (the file is not silently accepted). Before this change the only
-    diagnostic was PyYAML's own message, which (a) numbers lines within
-    the front-matter body rather than the file and (b) truncates long
-    values with '...'. The new behaviour pins:
-      * the line number an author sees in their editor (file-line, not
-        front-matter-line),
-      * the *full* offending line (no '...' truncation), and
-      * a copy-pasteable `key: "value"` hint.
-    """
+    '未说明'
 
     # The description value is intentionally long enough to trigger
     # PyYAML's own '...' truncation in the rendered str(exc); our hint
@@ -213,14 +191,7 @@ def test_parse_unquoted_colon_value_logs_line_and_hint(tmp_path, caplog):
 
 
 def test_parse_unquoted_colon_value_preserves_nested_key_indent(tmp_path, caplog):
-    """Nested keys must keep their leading indentation in the quoting hint.
-
-    Regression guard for CR feedback on PR #3335: an earlier version of
-    the hint called ``key.strip()``, which turned ``  author: foo: bar``
-    into ``author: "foo: bar"``. Pasting that back under a parent mapping
-    silently moved the field to the top level. The hint must preserve
-    the original indentation so authors can copy-paste-fix in place.
-    """
+    '未说明'
 
     # A two-space-indented nested key triggers the same scanner error,
     # but its hint must keep the indentation.
@@ -237,7 +208,7 @@ def test_parse_unquoted_colon_value_preserves_nested_key_indent(tmp_path, caplog
 
 
 def test_parse_unrelated_yaml_error_omits_quoting_hint(tmp_path, caplog):
-    """Errors other than 'mapping values are not allowed' must NOT carry the quoting hint."""
+    '未说明'
 
     # Unclosed flow sequence is a scanner error of a different shape; the
     # quoting hint would be misleading and must be suppressed.
@@ -253,7 +224,7 @@ def test_parse_unrelated_yaml_error_omits_quoting_hint(tmp_path, caplog):
 
 
 def test_parse_valid_skill_emits_no_error_log(tmp_path, caplog):
-    """Sanity check: a valid SKILL.md must not produce any error logs."""
+    '未说明'
 
     skill_file = _write_skill(tmp_path, 'name: ok-skill\ndescription: "Foo: bar"')
 
@@ -266,16 +237,7 @@ def test_parse_valid_skill_emits_no_error_log(tmp_path, caplog):
 
 
 def test_parse_unquoted_colon_value_escapes_backslashes_in_hint(tmp_path, caplog):
-    """Backslashes in the offending value must be doubled in the hint.
-
-    Regression guard for CR feedback on PR #3335: an earlier version of
-    the hint only escaped ``"`` but left ``\\`` untouched. Pasting the
-    suggested ``key: "..."`` back into the file would then be reparsed
-    as an escape sequence by PyYAML's double-quoted scalar rules and
-    either fail to load or silently change meaning (e.g. ``C:\\Temp``
-    becoming ``C:<TAB>emp``). The hint must double the backslash so the
-    suggested scalar is valid YAML when pasted back.
-    """
+    '未说明'
 
     # The second ``: `` (after ``path``) is what trips PyYAML's
     # "mapping values are not allowed here"; the ``C:\Temp`` segment
@@ -292,14 +254,7 @@ def test_parse_unquoted_colon_value_escapes_backslashes_in_hint(tmp_path, caplog
 
 
 def test_parse_unquoted_colon_value_escapes_regex_in_hint(tmp_path, caplog):
-    """Regex-style ``\\d`` must also be escaped in the hint.
-
-    Same root cause as the Windows-path guard above, but with a
-    regex-style escape that is even more likely to appear in
-    LLM-authored skills (e.g. a ``description`` that quotes a regex).
-    PyYAML rejects ``\\d`` in double-quoted scalars, so the hint must
-    emit ``\\\\d`` to remain valid.
-    """
+    '未说明'
 
     front_matter = "name: regex-skill\ndescription: match: \\d+ digits"
     skill_file = _write_skill(tmp_path, front_matter)

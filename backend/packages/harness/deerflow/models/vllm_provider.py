@@ -1,16 +1,4 @@
-"""Custom vLLM provider built on top of LangChain ChatOpenAI.
-
-vLLM 0.19.0 exposes reasoning models through an OpenAI-compatible API, but
-LangChain's default OpenAI adapter drops the non-standard ``reasoning`` field
-from assistant messages and streaming deltas. That breaks interleaved
-thinking/tool-call flows because vLLM expects the assistant's prior reasoning to
-be echoed back on subsequent turns.
-
-This provider preserves ``reasoning`` on:
-- non-streaming responses
-- streaming deltas
-- multi-turn request payloads
-"""
+"定义 vllm_provider 模块提供的职责与可复用接口。\n\nCustom vLLM provider built on top of LangChain ChatOpenAI.\n\nvLLM 0.19.0 exposes reasoning models through an OpenAI-compatible API, but\nLangChain's default OpenAI adapter drops the non-standard ``reasoning`` field\nfrom assistant messages and streaming deltas. That breaks interleaved\nthinking/tool-call flows because vLLM expects the assistant's prior reasoning to\nbe echoed back on subsequent turns.\n\nThis provider preserves ``reasoning`` on:\n- non-streaming responses\n- streaming deltas\n- multi-turn request payloads\n"
 
 from __future__ import annotations
 
@@ -37,14 +25,7 @@ from langchain_openai.chat_models.base import _create_usage_metadata
 
 
 def _normalize_vllm_chat_template_kwargs(payload: dict[str, Any]) -> None:
-    """Map DeerFlow's legacy ``thinking`` toggle to vLLM/Qwen's ``enable_thinking``.
-
-    DeerFlow originally documented ``extra_body.chat_template_kwargs.thinking``
-    for vLLM, but vLLM 0.19.0's Qwen reasoning parser reads
-    ``chat_template_kwargs.enable_thinking``. Normalize the payload just before
-    it is sent so existing configs keep working and flash mode can truly
-    disable reasoning.
-    """
+    "执行 _normalize_vllm_chat_template_kwargs 的明确职责，并返回与调用约定一致的结果。\n\nMap DeerFlow's legacy ``thinking`` toggle to vLLM/Qwen's ``enable_thinking``.\n\n    DeerFlow originally documented ``extra_body.chat_template_kwargs.thinking``\n    for vLLM, but vLLM 0.19.0's Qwen reasoning parser reads\n    ``chat_template_kwargs.enable_thinking``. Normalize the payload just before\n    it is sent so existing configs keep working and flash mode can truly\n    disable reasoning.\n    "
     extra_body = payload.get("extra_body")
     if not isinstance(extra_body, dict):
         return
@@ -63,7 +44,7 @@ def _normalize_vllm_chat_template_kwargs(payload: dict[str, Any]) -> None:
 
 
 def _reasoning_to_text(reasoning: Any) -> str:
-    """Best-effort extraction of readable reasoning text from vLLM payloads."""
+    '执行 _reasoning_to_text 的明确职责，并返回与调用约定一致的结果。\n\nBest-effort extraction of readable reasoning text from vLLM payloads.'
     if isinstance(reasoning, str):
         return reasoning
 
@@ -92,7 +73,7 @@ def _reasoning_to_text(reasoning: Any) -> str:
 
 
 def _convert_delta_to_message_chunk_with_reasoning(_dict: Mapping[str, Any], default_class: type[BaseMessageChunk]) -> BaseMessageChunk:
-    """Convert a streaming delta to a LangChain message chunk while preserving reasoning."""
+    '执行 _convert_delta_to_message_chunk_with_reasoning 的明确职责，并返回与调用约定一致的结果。\n\nConvert a streaming delta to a LangChain message chunk while preserving reasoning.'
     id_ = _dict.get("id")
     role = cast(str, _dict.get("role"))
     content = cast(str, _dict.get("content") or "")
@@ -148,7 +129,7 @@ def _convert_delta_to_message_chunk_with_reasoning(_dict: Mapping[str, Any], def
 
 
 def _restore_reasoning_field(payload_msg: dict[str, Any], orig_msg: AIMessage) -> None:
-    """Re-inject vLLM reasoning onto outgoing assistant messages."""
+    '执行 _restore_reasoning_field 的明确职责，并返回与调用约定一致的结果。\n\nRe-inject vLLM reasoning onto outgoing assistant messages.'
     reasoning = orig_msg.additional_kwargs.get("reasoning")
     if reasoning is None:
         reasoning = orig_msg.additional_kwargs.get("reasoning_content")
@@ -157,12 +138,13 @@ def _restore_reasoning_field(payload_msg: dict[str, Any], orig_msg: AIMessage) -
 
 
 class VllmChatModel(ChatOpenAI):
-    """ChatOpenAI variant that preserves vLLM reasoning fields across turns."""
+    '封装 VllmChatModel 的状态、协作关系与公开操作。\n\nChatOpenAI variant that preserves vLLM reasoning fields across turns.'
 
     model_config = {"arbitrary_types_allowed": True}
 
     @property
     def _llm_type(self) -> str:
+        '执行 _llm_type 的明确职责，并返回与调用约定一致的结果'
         return "vllm-openai-compatible"
 
     def _get_request_payload(
@@ -172,7 +154,7 @@ class VllmChatModel(ChatOpenAI):
         stop: list[str] | None = None,
         **kwargs: Any,
     ) -> dict[str, Any]:
-        """Restore assistant reasoning in request payloads for interleaved thinking."""
+        '执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果。\n\nRestore assistant reasoning in request payloads for interleaved thinking.'
         original_messages = self._convert_input(input_).to_messages()
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
         _normalize_vllm_chat_template_kwargs(payload)
@@ -191,7 +173,7 @@ class VllmChatModel(ChatOpenAI):
         return payload
 
     def _create_chat_result(self, response: dict | openai.BaseModel, generation_info: dict | None = None) -> ChatResult:
-        """Preserve vLLM reasoning on non-streaming responses."""
+        '执行 _create_chat_result 的明确职责，并返回与调用约定一致的结果。\n\nPreserve vLLM reasoning on non-streaming responses.'
         result = super()._create_chat_result(response, generation_info=generation_info)
         response_dict = response if isinstance(response, dict) else response.model_dump()
 
@@ -217,7 +199,7 @@ class VllmChatModel(ChatOpenAI):
         default_chunk_class: type,
         base_generation_info: dict | None,
     ) -> ChatGenerationChunk | None:
-        """Preserve vLLM reasoning on streaming deltas."""
+        '执行 _convert_chunk_to_generation_chunk 的明确职责，并返回与调用约定一致的结果。\n\nPreserve vLLM reasoning on streaming deltas.'
         if chunk.get("type") == "content.delta":
             return None
 

@@ -39,6 +39,7 @@ interface TokenUsageIndicatorProps {
   className?: string;
 }
 
+/** 以紧凑状态指示器展示线程 token 用量，并在未知额度时避免错误推算。 */
 export function TokenUsageIndicator({
   threadId,
   messages,

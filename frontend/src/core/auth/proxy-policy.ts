@@ -1,18 +1,20 @@
+/** LangGraph 兼容代理的路径、请求头、凭据、超时与 CSRF 策略。 */
 export interface ProxyPolicy {
-  /** Allowed upstream path prefixes */
+  /** 允许转发至上游的路径前缀。 */
   readonly allowedPaths: readonly string[];
-  /** Request headers to strip before forwarding */
+  /** 转发前必须剥离的请求头。 */
   readonly strippedRequestHeaders: ReadonlySet<string>;
-  /** Response headers to strip before returning */
+  /** 返回客户端前必须剥离的响应头。 */
   readonly strippedResponseHeaders: ReadonlySet<string>;
-  /** Credential mode: which cookie to forward */
+  /** 凭据模式：需要转发的 Cookie。 */
   readonly credential: { readonly type: "cookie"; readonly name: string };
-  /** Timeout in ms */
+  /** 超时时间，单位为毫秒。 */
   readonly timeoutMs: number;
-  /** CSRF: required for non-GET/HEAD */
+  /** CSRF：非 GET/HEAD 请求是否必须校验。 */
   readonly csrf: boolean;
 }
 
+/** LangGraph 兼容代理的生产默认安全策略。 */
 export const LANGGRAPH_COMPAT_POLICY: ProxyPolicy = {
   allowedPaths: [
     "threads",

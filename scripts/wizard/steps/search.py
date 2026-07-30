@@ -1,4 +1,4 @@
-"""Step: Web search configuration."""
+"""本脚本负责搜索。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from wizard.ui import ask_choice, ask_secret, print_header, print_info, print_su
 
 @dataclass
 class SearchStepResult:
+    '未说明'
     search_provider: SearchProvider | None  # None = skip
     search_api_key: str | None
     fetch_provider: WebProvider | None  # None = skip
@@ -17,6 +18,7 @@ class SearchStepResult:
 
 
 def run_search_step(step_label: str = "Step 3/3") -> SearchStepResult:
+    """执行运行 搜索对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     print_header(f"{step_label} · Web Search & Fetch (optional)")
     provided_keys: dict[str, str] = {}
 

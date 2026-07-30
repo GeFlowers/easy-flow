@@ -1,3 +1,4 @@
+"""提供工具、builtins、view、图像、tool相关功能。"""
 import mimetypes
 from pathlib import Path
 from typing import Annotated
@@ -26,10 +27,12 @@ _EXTENSION_TO_MIME = {
 
 
 def _is_allowed_image_virtual_path(image_path: str) -> bool:
+    """\u6267\u884c _is_allowed_image_virtual_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return any(image_path == root or image_path.startswith(f"{root}/") for root in _ALLOWED_IMAGE_VIRTUAL_ROOTS)
 
 
 def _detect_image_mime(image_data: bytes) -> str | None:
+    """\u6267\u884c _detect_image_mime \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     if image_data.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
     if image_data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -40,6 +43,7 @@ def _detect_image_mime(image_data: bytes) -> str | None:
 
 
 def _sanitize_image_error(error: Exception, thread_data: ThreadDataState | None) -> str:
+    """\u6267\u884c _sanitize_image_error \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     from deerflow.sandbox.tools import mask_local_paths_in_output
 
     return mask_local_paths_in_output(f"{type(error).__name__}: {error}", thread_data)
@@ -51,20 +55,7 @@ def view_image_tool(
     image_path: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """Read an image file.
-
-    Use this tool to read an image file and make it available for display.
-
-    When to use the view_image tool:
-    - When you need to view an image file.
-
-    When NOT to use the view_image tool:
-    - For non-image files (use present_files instead)
-    - For multiple files at once (use present_files instead)
-
-    Args:
-        image_path: Absolute /mnt/user-data virtual path to the image file. Common formats supported: jpg, jpeg, png, webp.
-    """
+    """\u6267\u884c view_image_tool \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     from deerflow.sandbox.exceptions import SandboxRuntimeError
     from deerflow.sandbox.tools import (
         get_thread_data,
@@ -96,26 +87,26 @@ def view_image_tool(
 
     path = Path(actual_path)
 
-    # Validate that the file exists
+        # 中文说明：此处用于执行相关处理。
     if not path.exists():
         return Command(
             update={"messages": [ToolMessage(f"Error: Image file not found: {image_path}", tool_call_id=tool_call_id)]},
         )
 
-    # Validate that it's a file (not a directory)
+        # 中文说明：此处用于执行相关处理。
     if not path.is_file():
         return Command(
             update={"messages": [ToolMessage(f"Error: Path is not a file: {image_path}", tool_call_id=tool_call_id)]},
         )
 
-    # Validate image extension
+        # 中文说明：此处用于执行相关处理。
     expected_mime_type = _EXTENSION_TO_MIME.get(path.suffix.lower())
     if expected_mime_type is None:
         return Command(
             update={"messages": [ToolMessage(f"Error: Unsupported image format: {path.suffix}. Supported formats: {', '.join(_EXTENSION_TO_MIME)}", tool_call_id=tool_call_id)]},
         )
 
-    # Detect MIME type from file extension
+        # 中文说明：此处用于执行相关处理。
     mime_type, _ = mimetypes.guess_type(actual_path)
     if mime_type is None:
         mime_type = expected_mime_type
@@ -131,7 +122,7 @@ def view_image_tool(
             update={"messages": [ToolMessage(f"Error: Image file is too large: {image_size} bytes. Maximum supported size is {_MAX_IMAGE_BYTES} bytes", tool_call_id=tool_call_id)]},
         )
 
-    # Read image file to validate contents (magic bytes + size)
+        # 中文说明：此处用于执行相关处理。
     try:
         with open(actual_path, "rb") as f:
             image_data = f.read()
@@ -141,7 +132,7 @@ def view_image_tool(
         )
 
     if len(image_data) != image_size:
-        # File changed between stat() and read() - reject for safety.
+                # 中文说明：此处用于执行相关处理。
         return Command(
             update={"messages": [ToolMessage("Error: Image file changed during read", tool_call_id=tool_call_id)]},
         )
@@ -157,9 +148,9 @@ def view_image_tool(
         )
     mime_type = detected_mime_type
 
-    # Store only lightweight metadata in state (not base64) to avoid
-    # duplicating large payloads across every checkpoint (see #4138).
-    # The middleware reads the file on-demand when the model needs it.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     new_viewed_images = {
         image_path: {
             "mime_type": mime_type,

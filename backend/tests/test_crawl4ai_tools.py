@@ -1,4 +1,4 @@
-"""Tests for Crawl4AI community tools."""
+"""\u672c\u6a21\u5757\u8986\u76d6\u76f8\u5173\u6d4b\u8bd5\uff0c\u56fa\u5b9a\u516c\u5f00\u884c\u4e3a\u3001\u5931\u8d25\u5904\u7406\u4e0e\u72b6\u6001\u8fb9\u754c\u3002"""
 
 import ipaddress
 import json
@@ -10,17 +10,19 @@ from deerflow.community.crawl4ai.crawl4ai_client import Crawl4AiClient
 
 
 class AsyncMock(MagicMock):
-    """Mock that supports async call."""
+    """\u6b64\u6d4b\u8bd5\u7ec4\u5f52\u96c6\u540c\u4e00\u7ec4\u4ef6\u7684\u7528\u4f8b\uff0c\u5206\u522b\u7ea6\u675f\u6b63\u5e38\u6d41\u7a0b\u4e0e\u5173\u952e\u8fb9\u754c\u6761\u4ef6\u3002"""
 
     async def __call__(self, *args, **kwargs):
+        """\u51c6\u5907\u9694\u79bb\u7684\u6d4b\u8bd5\u524d\u7f6e\u6761\u4ef6\uff0c\u907f\u514d\u771f\u5b9e\u5916\u90e8\u4f9d\u8d56\u5f71\u54cd\u540e\u7eed\u65ad\u8a00\u3002"""
         return super().__call__(*args, **kwargs)
 
 
 @pytest.mark.asyncio
 class TestCrawl4AiClient:
-    """Tests for the Crawl4AiClient class."""
+    """\u6b64\u6d4b\u8bd5\u7ec4\u5f52\u96c6\u540c\u4e00\u7ec4\u4ef6\u7684\u7528\u4f8b\uff0c\u5206\u522b\u7ea6\u675f\u6b63\u5e38\u6d41\u7a0b\u4e0e\u5173\u952e\u8fb9\u754c\u6761\u4ef6\u3002"""
 
     async def test_fetch_markdown_success(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc74\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -40,10 +42,12 @@ class TestCrawl4AiClient:
             assert call.kwargs["json"]["f"] == "fit"
 
     async def test_fetch_markdown_strips_trailing_slash_in_base_url(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         client = Crawl4AiClient(base_url="http://crawl4ai:11235/")
         assert client.base_url == "http://crawl4ai:11235"
 
     async def test_fetch_markdown_http_error(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -58,6 +62,7 @@ class TestCrawl4AiClient:
             assert "Error: Crawl4AI HTTP 502" in result
 
     async def test_fetch_markdown_success_false(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -72,6 +77,7 @@ class TestCrawl4AiClient:
             assert result.startswith("Error:")
 
     async def test_fetch_markdown_empty(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -86,6 +92,7 @@ class TestCrawl4AiClient:
             assert result == "Error: Crawl4AI returned empty markdown"
 
     async def test_fetch_markdown_timeout(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -98,6 +105,7 @@ class TestCrawl4AiClient:
             assert "timed out" in result.lower() or "timeout" in result.lower()
 
     async def test_fetch_markdown_with_token(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -114,6 +122,7 @@ class TestCrawl4AiClient:
             assert headers["Authorization"] == "Bearer secret"
 
     async def test_fetch_markdown_no_token_header_when_unset(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -130,6 +139,7 @@ class TestCrawl4AiClient:
             assert "Authorization" not in headers
 
     async def test_fetch_markdown_request_error(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -142,6 +152,7 @@ class TestCrawl4AiClient:
             assert result.startswith("Error: Crawl4AI request failed")
 
     async def test_fetch_markdown_non_json_200(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         with patch("deerflow.community.crawl4ai.crawl4ai_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -161,10 +172,11 @@ class TestCrawl4AiClient:
 
 @pytest.mark.asyncio
 class TestCrawl4AiTools:
-    """Tests for the Crawl4AI tool functions."""
+    """\u6b64\u6d4b\u8bd5\u7ec4\u5f52\u96c6\u540c\u4e00\u7ec4\u4ef6\u7684\u7528\u4f8b\uff0c\u5206\u522b\u7ea6\u675f\u6b63\u5e38\u6d41\u7a0b\u4e0e\u5173\u952e\u8fb9\u754c\u6761\u4ef6\u3002"""
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_success(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -179,6 +191,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_truncates_to_4096(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -192,6 +205,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_error_passthrough(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -205,6 +219,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_exception(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -218,6 +233,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_rejects_metadata_ip(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         with patch("deerflow.community.crawl4ai.tools._get_tool_config", return_value=None):
@@ -228,6 +244,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_rejects_dns_resolving_to_private(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         with patch("deerflow.community.crawl4ai.tools._get_tool_config", return_value=None):
@@ -242,6 +259,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_allows_private_when_opted_in(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -256,7 +274,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_reads_config_once(self, mock_build):
-        """Config is read exactly once per invocation (no split read on hot-reload)."""
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc70\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -270,6 +288,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_passes_configured_filter(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -284,6 +303,7 @@ class TestCrawl4AiTools:
 
     @patch("deerflow.community.crawl4ai.tools._build_client")
     async def test_web_fetch_tool_invalid_filter_falls_back_to_fit(self, mock_build):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         mock_client = MagicMock()
@@ -296,6 +316,7 @@ class TestCrawl4AiTools:
         assert mock_client.fetch_markdown.call_args.kwargs.get("filter_mode") == "fit"
 
     async def test_build_client_reads_config(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         client = tools._build_client({"base_url": "http://host.docker.internal:11235", "timeout": 45})
@@ -303,6 +324,7 @@ class TestCrawl4AiTools:
         assert client.timeout_s == 45.0
 
     async def test_build_client_defaults_when_unconfigured(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc73\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         client = tools._build_client(None)
@@ -311,12 +333,14 @@ class TestCrawl4AiTools:
         assert client.token == ""
 
     async def test_build_client_reads_token(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         client = tools._build_client({"token": "secret-token"})
         assert client.token == "secret-token"
 
     async def test_coerce_timeout_handles_bool_and_bad_values(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc76\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         assert tools._coerce_timeout(True, 30) == 30.0
@@ -327,6 +351,7 @@ class TestCrawl4AiTools:
         assert tools._coerce_timeout(12.5, 30) == 12.5
 
     async def test_coerce_filter_validates_and_normalizes(self):
+        """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u5f02\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc74\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
         from deerflow.community.crawl4ai import tools
 
         assert tools._coerce_filter("raw") == "raw"

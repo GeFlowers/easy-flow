@@ -1,16 +1,19 @@
 import type { Message } from "@langchain/langgraph-sdk";
 
+/** 人工输入请求支持的交互方式。 */
 export type HumanInputMode =
   | "free_text"
   | "single_choice"
   | "choice_with_other";
 
+/** 人工输入选择项的稳定标识、展示标签和提交值。 */
 export type HumanInputOption = {
   id: string;
   label: string;
   value: string;
 };
 
+/** 后端通过工具消息 artifact.human_input 传递的人工输入请求协议。 */
 export type HumanInputRequest = {
   version: 1;
   kind: "human_input_request";
@@ -25,6 +28,7 @@ export type HumanInputRequest = {
   options?: HumanInputOption[];
 };
 
+/** 用户对人工输入请求提交的选项或自由文本响应协议。 */
 export type HumanInputResponse =
   | {
       version: 1;
@@ -44,11 +48,13 @@ export type HumanInputResponse =
       value: string;
     };
 
+/** 由消息历史推导出的人工输入状态，用于判断已答请求与最新待答请求。 */
 export type HumanInputThreadState = {
   answeredResponses: Map<string, HumanInputResponse>;
   latestOpenRequestId: string | null;
 };
 
+/** 当新的线程错误出现且仍有待答请求时，判断是否应清除待答人工输入状态。 */
 export function shouldClearPendingHumanInputOnThreadError({
   currentError,
   pendingRequestCount,
@@ -65,14 +71,17 @@ export function shouldClearPendingHumanInputOnThreadError({
   );
 }
 
+/** 判断 isRecord 所表达的条件是否成立。 */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** 判断 isNonEmptyString 所表达的条件是否成立。 */
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+/** 判断 isHumanInputMode 所表达的条件是否成立。 */
 function isHumanInputMode(value: unknown): value is HumanInputMode {
   return (
     value === "free_text" ||
@@ -81,10 +90,12 @@ function isHumanInputMode(value: unknown): value is HumanInputMode {
   );
 }
 
+/** 解析并提取 readOptionalString 所需的数据。 */
 function readOptionalString(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
+/** 解析并提取 parseOptions 所需的数据。 */
 function parseOptions(value: unknown): HumanInputOption[] | undefined {
   if (value === undefined) {
     return undefined;
@@ -113,6 +124,7 @@ function parseOptions(value: unknown): HumanInputOption[] | undefined {
   return options;
 }
 
+/** 校验未知载荷并解析为人工输入请求；不符合协议时返回 null。 */
 export function parseHumanInputRequest(
   value: unknown,
 ): HumanInputRequest | null {
@@ -172,6 +184,7 @@ export function parseHumanInputRequest(
   };
 }
 
+/** 校验未知载荷并解析为人工输入响应；不符合协议时返回 null。 */
 export function parseHumanInputResponse(
   value: unknown,
 ): HumanInputResponse | null {
@@ -217,6 +230,7 @@ export function parseHumanInputResponse(
   return null;
 }
 
+/** 从工具消息的 artifact.human_input 中提取人工输入请求。 */
 export function extractHumanInputRequest(
   message: Message,
 ): HumanInputRequest | null {
@@ -230,6 +244,7 @@ export function extractHumanInputRequest(
   return parseHumanInputRequest(artifact.human_input);
 }
 
+/** 从隐藏的人类消息 additional_kwargs 中提取人工输入响应。 */
 export function extractHumanInputResponse(
   message: Message,
 ): HumanInputResponse | null {
@@ -243,6 +258,7 @@ export function extractHumanInputResponse(
   return parseHumanInputResponse(additionalKwargs.human_input_response);
 }
 
+/** 根据可见性规则和全部消息推导已答响应及最新待答请求。 */
 export function deriveHumanInputThreadState(
   messages: Message[],
   isVisibleMessage: (message: Message) => boolean = (message) =>
@@ -279,6 +295,7 @@ export function deriveHumanInputThreadState(
   return { answeredResponses, latestOpenRequestId };
 }
 
+/** 判断消息历史中是否仍存在未回答的人工输入请求。 */
 export function hasOpenHumanInputRequest(
   messages: Message[],
   isVisibleMessage?: (message: Message) => boolean,
@@ -289,6 +306,7 @@ export function hasOpenHumanInputRequest(
   );
 }
 
+/** 根据选定选项构建与请求关联的人工输入响应。 */
 export function createHumanInputOptionResponse(
   request: HumanInputRequest,
   option: HumanInputOption,
@@ -304,6 +322,7 @@ export function createHumanInputOptionResponse(
   };
 }
 
+/** 根据自由文本构建与请求关联的人工输入响应。 */
 export function createHumanInputTextResponse(
   request: HumanInputRequest,
   value: string,
@@ -318,6 +337,7 @@ export function createHumanInputTextResponse(
   };
 }
 
+/** 构建用于普通人类消息内容的人工输入响应文本。 */
 export function buildHumanInputResponseText(
   request: HumanInputRequest,
   response: HumanInputResponse,

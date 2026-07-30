@@ -321,6 +321,7 @@ function ChannelProviderItem({
   );
 }
 
+/** 配置外部通道连接，并按提供方能力限制可执行操作。 */
 export function ChannelsSettingsPage() {
   const { t } = useI18n();
   const {

@@ -1,10 +1,4 @@
-"""Live integration tests for DeerFlowClient with real API.
-
-These tests require a working config.yaml with valid API credentials.
-They are skipped in CI and must be run explicitly:
-
-    PYTHONPATH=. uv run pytest tests/test_client_live.py -v -s
-"""
+'定义 test_client_live 模块提供的职责与可复用接口。\n\nLive integration tests for DeerFlowClient with real API.\n\nThese tests require a working config.yaml with valid API credentials.\nThey are skipped in CI and must be run explicitly:\n\n    PYTHONPATH=. uv run pytest tests/test_client_live.py -v -s\n'
 
 import json
 import os
@@ -33,13 +27,13 @@ if _skip_reason:
 
 @pytest.fixture(scope="module")
 def client():
-    """Create a real DeerFlowClient (no mocks)."""
+    '执行 client 的明确职责，并返回与调用约定一致的结果。\n\nCreate a real DeerFlowClient (no mocks).'
     return DeerFlowClient(thinking_enabled=False)
 
 
 @pytest.fixture
 def thread_tmp(tmp_path):
-    """Provide a unique thread_id + tmp directory for file operations."""
+    '执行 thread_tmp 的明确职责，并返回与调用约定一致的结果。\n\nProvide a unique thread_id + tmp directory for file operations.'
     import uuid
 
     tid = f"live-test-{uuid.uuid4().hex[:8]}"
@@ -52,15 +46,16 @@ def thread_tmp(tmp_path):
 
 
 class TestLiveBasicChat:
+    '组织 TestLiveBasicChat 场景的行为与边界验证'
     def test_chat_returns_nonempty_string(self, client):
-        """chat() returns a non-empty response from the real model."""
+        '验证 chat、returns、nonempty、string 场景下的预期行为、边界条件与结果。\n\nchat() returns a non-empty response from the real model.'
         response = client.chat("Reply with exactly: HELLO")
         assert isinstance(response, str)
         assert len(response) > 0
         print(f"  chat response: {response}")
 
     def test_chat_follows_instruction(self, client):
-        """Model can follow a simple instruction."""
+        '验证 chat、follows、instruction 场景下的预期行为、边界条件与结果。\n\nModel can follow a simple instruction.'
         response = client.chat("What is 7 * 8? Reply with just the number.")
         assert "56" in response
         print(f"  math response: {response}")
@@ -72,8 +67,9 @@ class TestLiveBasicChat:
 
 
 class TestLiveStreaming:
+    '组织 TestLiveStreaming 场景的行为与边界验证'
     def test_stream_yields_messages_tuple_and_end(self, client):
-        """stream() produces at least one messages-tuple event and ends with end."""
+        '验证 stream、yields、messages、tuple、and、end 场景下的预期行为、边界条件与结果。\n\nstream() produces at least one messages-tuple event and ends with end.'
         events = list(client.stream("Say hi in one word."))
 
         types = [e.type for e in events]
@@ -86,7 +82,7 @@ class TestLiveStreaming:
             print(f"  [{e.type}] {e.data}")
 
     def test_stream_ai_content_nonempty(self, client):
-        """Streamed messages-tuple AI events contain non-empty content."""
+        '验证 stream、ai、content、nonempty 场景下的预期行为、边界条件与结果。\n\nStreamed messages-tuple AI events contain non-empty content.'
         ai_messages = [e for e in client.stream("What color is the sky? One word.") if e.type == "messages-tuple" and e.data.get("type") == "ai" and e.data.get("content")]
         assert len(ai_messages) >= 1
         for m in ai_messages:
@@ -99,8 +95,9 @@ class TestLiveStreaming:
 
 
 class TestLiveToolUse:
+    '组织 TestLiveToolUse 场景的行为与边界验证'
     def test_agent_uses_bash_tool(self, client):
-        """Agent uses bash tool when asked to run a command."""
+        '验证 agent、uses、bash、tool 场景下的预期行为、边界条件与结果。\n\nAgent uses bash tool when asked to run a command.'
         if not is_host_bash_allowed():
             pytest.skip("Host bash is disabled for LocalSandboxProvider in the active config")
 
@@ -125,7 +122,7 @@ class TestLiveToolUse:
         assert "LIVE_TEST_OK" in tr_events[0].data["content"]
 
     def test_agent_uses_ls_tool(self, client):
-        """Agent uses ls tool to list a directory."""
+        '验证 agent、uses、ls、tool 场景下的预期行为、边界条件与结果。\n\nAgent uses ls tool to list a directory.'
         events = list(client.stream("Use the ls tool to list the contents of /mnt/user-data/workspace. Just report what you see."))
 
         types = [e.type for e in events]
@@ -142,8 +139,9 @@ class TestLiveToolUse:
 
 
 class TestLiveMultiToolChain:
+    '组织 TestLiveMultiToolChain 场景的行为与边界验证'
     def test_write_then_read(self, client):
-        """Agent writes a file, then reads it back."""
+        '验证 write、then、read 场景下的预期行为、边界条件与结果。\n\nAgent writes a file, then reads it back.'
         events = list(client.stream("Step 1: Use write_file to write 'integration_test_content' to /mnt/user-data/outputs/live_test.txt. Step 2: Use read_file to read that file back. Step 3: Tell me the content you read."))
 
         types = [e.type for e in events]
@@ -170,8 +168,9 @@ class TestLiveMultiToolChain:
 
 
 class TestLiveFileUpload:
+    '组织 TestLiveFileUpload 场景的行为与边界验证'
     def test_upload_list_delete(self, client, thread_tmp):
-        """Upload → list → delete → verify deletion."""
+        '验证 upload、list、delete 场景下的预期行为、边界条件与结果。\n\nUpload → list → delete → verify deletion.'
         thread_id, tmp_path = thread_tmp
 
         # Create test files
@@ -212,6 +211,7 @@ class TestLiveFileUpload:
         assert empty["files"] == []
 
     def test_upload_nonexistent_file_raises(self, client):
+        '验证 upload、nonexistent、file、raises 场景下的预期行为、边界条件与结果'
         with pytest.raises(FileNotFoundError):
             client.upload_files("t-fail", ["/nonexistent/path/file.txt"])
 
@@ -222,8 +222,9 @@ class TestLiveFileUpload:
 
 
 class TestLiveConfigQueries:
+    '组织 TestLiveConfigQueries 场景的行为与边界验证'
     def test_list_models_returns_configured_model(self, client):
-        """list_models() returns at least one configured model with Gateway-aligned fields."""
+        '验证 list、models、returns、configured、model 场景下的预期行为、边界条件与结果。\n\nlist_models() returns at least one configured model with Gateway-aligned fields.'
         result = client.list_models()
         assert "models" in result
         assert len(result["models"]) >= 1
@@ -235,7 +236,7 @@ class TestLiveConfigQueries:
         print(f"  models: {names}")
 
     def test_get_model_found(self, client):
-        """get_model() returns details for the first configured model."""
+        '验证 get、model、found 场景下的预期行为、边界条件与结果。\n\nget_model() returns details for the first configured model.'
         result = client.list_models()
         first_model_name = result["models"][0]["name"]
         model = client.get_model(first_model_name)
@@ -246,10 +247,11 @@ class TestLiveConfigQueries:
         print(f"  model detail: {model}")
 
     def test_get_model_not_found(self, client):
+        '验证 get、model、not、found 场景下的预期行为、边界条件与结果'
         assert client.get_model("nonexistent-model-xyz") is None
 
     def test_list_skills(self, client):
-        """list_skills() runs without error."""
+        '验证 list、skills 场景下的预期行为、边界条件与结果。\n\nlist_skills() runs without error.'
         result = client.list_skills()
         assert "skills" in result
         assert isinstance(result["skills"], list)
@@ -264,8 +266,9 @@ class TestLiveConfigQueries:
 
 
 class TestLiveArtifact:
+    '组织 TestLiveArtifact 场景的行为与边界验证'
     def test_get_artifact_after_write(self, client):
-        """Agent writes a file → client reads it back via get_artifact()."""
+        '验证 get、artifact、after、write 场景下的预期行为、边界条件与结果。\n\nAgent writes a file → client reads it back via get_artifact().'
         import uuid
 
         thread_id = f"live-artifact-{uuid.uuid4().hex[:8]}"
@@ -291,6 +294,7 @@ class TestLiveArtifact:
         print(f"  artifact: {data}, mime: {mime}")
 
     def test_get_artifact_not_found(self, client):
+        '验证 get、artifact、not、found 场景下的预期行为、边界条件与结果'
         with pytest.raises(FileNotFoundError):
             client.get_artifact("nonexistent-thread", "mnt/user-data/outputs/nope.txt")
 
@@ -301,8 +305,9 @@ class TestLiveArtifact:
 
 
 class TestLiveOverrides:
+    '组织 TestLiveOverrides 场景的行为与边界验证'
     def test_thinking_disabled_still_works(self, client):
-        """Explicit thinking_enabled=False override produces a response."""
+        '验证 thinking、disabled、still、works 场景下的预期行为、边界条件与结果。\n\nExplicit thinking_enabled=False override produces a response.'
         response = client.chat(
             "Say OK.",
             thinking_enabled=False,
@@ -317,14 +322,18 @@ class TestLiveOverrides:
 
 
 class TestLiveErrorResilience:
+    '组织 TestLiveErrorResilience 场景的行为与边界验证'
     def test_delete_nonexistent_upload(self, client):
+        '验证 delete、nonexistent、upload 场景下的预期行为、边界条件与结果'
         with pytest.raises(FileNotFoundError):
             client.delete_upload("nonexistent-thread", "ghost.txt")
 
     def test_bad_artifact_path(self, client):
+        '验证 bad、artifact、path 场景下的预期行为、边界条件与结果'
         with pytest.raises(ValueError):
             client.get_artifact("t", "invalid/path")
 
     def test_path_traversal_blocked(self, client):
+        '验证 path、traversal、blocked 场景下的预期行为、边界条件与结果'
         with pytest.raises(PathTraversalError):
             client.delete_upload("t", "../../etc/passwd")

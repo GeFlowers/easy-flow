@@ -55,16 +55,13 @@ import { textOfMessage } from "@/core/threads/utils";
 import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
+/** 管理普通会话的流式消息、历史恢复、分支与输入交互。 */
 export default function ChatPage() {
   const { t } = useI18n();
   const router = useRouter();
   const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
     useThreadChat();
-  // `isNewThread` tracks whether the backend has the thread yet — gates the
-  // SDK's history fetch (see issue #2746).  `isWelcomeMode` is the visual
-  // welcome layout (centered input, hero, quick actions); we flip it to false
-  // the moment the user submits so the UI animates immediately, even though
-  // `isNewThread` stays true until the backend actually creates the thread.
+  // isNewThread 表示后端是否已创建会话，用于阻止 SDK 过早拉取历史；isWelcomeMode 仅控制欢迎布局，提交时立即切换以保证动画及时响应。
   const [isWelcomeMode, setIsWelcomeMode] = useState(isNewThread);
   const [settings, setSettings] = useThreadSettings(threadId);
   const [localSettings, setLocalSettings] = useLocalSettings();
@@ -86,10 +83,7 @@ export default function ChatPage() {
     mountedRef.current = true;
   }, []);
 
-  // Keep welcome layout in sync when navigating between threads (sidebar
-  // clicks, "new chat" button).  Submitting in /chats/new flips the layout
-  // via onSend below — `isNewThread` stays true until onStart, so this effect
-  // is harmless during the submit transition.
+  // 在侧栏切换或新建会话时同步欢迎布局；提交后的视觉切换由 onSend 负责，真正创建仍等待 onStart。
   useEffect(() => {
     setIsWelcomeMode(isNewThread);
   }, [isNewThread]);
@@ -110,14 +104,12 @@ export default function ChatPage() {
     displayThreadId: threadId,
     context: settings.context,
     isMock,
-    // onSend only animates the UI; do NOT flip `isNewThread` here — the
-    // LangGraph SDK eagerly fetches /history the moment it receives a
-    // thread id and assumes the thread exists on the backend (issue #2746).
+    // onSend 只更新视觉状态；不能提前清除 isNewThread，否则 SDK 会假定后端已有会话并过早请求历史。
     onSend: () => {
       setIsWelcomeMode(false);
     },
     onStart: (createdThreadId) => {
-      // ! Important: Never use next.js router for navigation in this case, otherwise it will cause the thread to re-mount and lose all states. Use native history API instead.
+      // 会话创建后使用原生 History API 更新地址，避免 Next.js 重挂载页面并丢失正在流式更新的状态。
       history.replaceState(null, "", `/workspace/chats/${createdThreadId}`);
       setThreadId(createdThreadId);
       setIsNewThread(false);
@@ -167,6 +159,7 @@ export default function ChatPage() {
     threadMetadata.isLoading,
   ]);
 
+  /** 发送普通用户消息；含文件时返回 Promise 供上传调用方等待完成。 */
   const handleSubmit = useCallback(
     (message: PromptInputMessage, options?: InputBoxSubmitOptions) => {
       const sendPromise = sendMessage(threadId, message, undefined, options);
@@ -177,6 +170,7 @@ export default function ChatPage() {
     },
     [sendMessage, threadId],
   );
+  /** 将人机输入答案作为隐藏消息发送，并携带结构化响应元数据。 */
   const handleSubmitHumanInput = useCallback(
     async (request: HumanInputRequest, response: HumanInputResponse) => {
       let sent = false;
@@ -201,14 +195,17 @@ export default function ChatPage() {
     },
     [sendMessage, threadId],
   );
+  /** 停止当前正在进行的流式会话。 */
   const handleStop = useCallback(async () => {
     await thread.stop();
   }, [thread]);
+  /** 重新生成指定消息，并标记被替代的后续消息。 */
   const handleRegenerate = useCallback(
     (messageId: string, supersededMessageIds: string[]) =>
       regenerateMessage(threadId, messageId, supersededMessageIds),
     [regenerateMessage, threadId],
   );
+  /** 从指定消息创建会话分支，并在成功后导航至新会话。 */
   const handleBranchTurn = useCallback(
     async (messageId: string, messageIds: string[]) => {
       if (

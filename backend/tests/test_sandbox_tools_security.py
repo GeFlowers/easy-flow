@@ -1,3 +1,4 @@
+'未说明'
 import threading
 from pathlib import Path
 from types import SimpleNamespace
@@ -40,28 +41,20 @@ _THREAD_DATA = {
 
 
 def test_replace_virtual_path_maps_virtual_root_and_subpaths() -> None:
+    '未说明'
     assert Path(replace_virtual_path("/mnt/user-data/workspace/a.txt", _THREAD_DATA)).as_posix() == "/tmp/deer-flow/threads/t1/user-data/workspace/a.txt"
     assert Path(replace_virtual_path("/mnt/user-data", _THREAD_DATA)).as_posix() == "/tmp/deer-flow/threads/t1/user-data"
 
 
 def test_replace_virtual_path_preserves_trailing_slash() -> None:
-    """Trailing slash must survive virtual-to-actual path replacement.
-
-    Regression: '/mnt/user-data/workspace/' was previously returned without
-    the trailing slash, causing string concatenations like
-    output_dir + 'file.txt' to produce a missing-separator path.
-    """
+    '未说明'
     result = replace_virtual_path("/mnt/user-data/workspace/", _THREAD_DATA)
     assert result.endswith("/"), f"Expected trailing slash, got: {result!r}"
     assert result == "/tmp/deer-flow/threads/t1/user-data/workspace/"
 
 
 def test_replace_virtual_path_preserves_trailing_slash_windows_style() -> None:
-    """Trailing slash must be preserved as backslash when actual_base is Windows-style.
-
-    If actual_base uses backslash separators, appending '/' would produce a
-    mixed-separator path.  The separator must match the style of actual_base.
-    """
+    '未说明'
     win_thread_data = {
         "workspace_path": r"C:\deer-flow\threads\t1\user-data\workspace",
         "uploads_path": r"C:\deer-flow\threads\t1\user-data\uploads",
@@ -73,7 +66,7 @@ def test_replace_virtual_path_preserves_trailing_slash_windows_style() -> None:
 
 
 def test_replace_virtual_path_preserves_windows_style_for_nested_subdir_trailing_slash() -> None:
-    """Nested Windows-style subdirectories must keep backslashes throughout."""
+    '未说明'
     win_thread_data = {
         "workspace_path": r"C:\deer-flow\threads\t1\user-data\workspace",
         "uploads_path": r"C:\deer-flow\threads\t1\user-data\uploads",
@@ -85,7 +78,7 @@ def test_replace_virtual_path_preserves_windows_style_for_nested_subdir_trailing
 
 
 def test_replace_virtual_paths_in_command_preserves_trailing_slash() -> None:
-    """Trailing slash on a virtual path inside a command must be preserved."""
+    '未说明'
     cmd = """python -c "output_dir = '/mnt/user-data/workspace/'; print(output_dir + 'some_file.txt')\""""
     result = replace_virtual_paths_in_command(cmd, _THREAD_DATA)
     assert "/tmp/deer-flow/threads/t1/user-data/workspace/" in result, f"Trailing slash lost in: {result!r}"
@@ -95,6 +88,7 @@ def test_replace_virtual_paths_in_command_preserves_trailing_slash() -> None:
 
 
 def test_mask_local_paths_in_output_hides_host_paths() -> None:
+    '未说明'
     output = "Created: /tmp/deer-flow/threads/t1/user-data/workspace/result.txt"
     masked = mask_local_paths_in_output(output, _THREAD_DATA)
 
@@ -103,7 +97,7 @@ def test_mask_local_paths_in_output_hides_host_paths() -> None:
 
 
 def test_mask_local_paths_in_output_hides_skills_host_paths() -> None:
-    """Skills host paths in bash output should be masked to virtual paths."""
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -117,15 +111,7 @@ def test_mask_local_paths_in_output_hides_skills_host_paths() -> None:
 
 @pytest.mark.parametrize("suffix", ["-extra/data.txt", "2/x", ".bak", "foo", "_backup/y"])
 def test_mask_local_paths_does_not_match_inside_longer_sibling(suffix: str) -> None:
-    """A host base must not match inside a sibling that merely shares its prefix.
-
-    The trailing group needs a separator to consume anything, so without a
-    segment-boundary lookahead the regex matches the bare base and
-    ``replace_match`` takes its ``matched_path == base`` branch -- rewriting
-    ``.../skills-extra/data.txt`` to ``/mnt/skills-extra/data.txt``, a container
-    path forward resolution refuses to map back. Reverse-direction mirror of
-    ``LocalSandbox._reverse_output_patterns`` (#4035).
-    """
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -139,13 +125,7 @@ def test_mask_local_paths_does_not_match_inside_longer_sibling(suffix: str) -> N
 
 @pytest.mark.parametrize("suffix", ["-backup/hello.py", "2/hello.py", ".old", "_tmp/x"])
 def test_mask_local_paths_does_not_match_inside_longer_acp_sibling(suffix: str) -> None:
-    """Same bug, second source: the ACP workspace has no enclosing virtual root.
-
-    ``_compiled_mask_patterns`` builds every source's matcher, so the ACP
-    workspace carried the same defect as skills -- and unlike user-data (see
-    below) nothing maps its parent, so ``/mnt/acp-workspace-backup/hello.py``
-    is unresolvable in both directions.
-    """
+    '未说明'
     acp_host = "/home/user/.deer-flow/acp-workspace"
     with patch("deerflow.sandbox.tools._get_acp_workspace_host_path", return_value=acp_host):
         output = f"copied {acp_host}{suffix}"
@@ -157,17 +137,7 @@ def test_mask_local_paths_does_not_match_inside_longer_acp_sibling(suffix: str) 
 
 @pytest.mark.parametrize("suffix", ["2/report.txt", ".bak/report.txt", "-old"])
 def test_mask_local_paths_user_data_sibling_is_carried_by_the_virtual_root(suffix: str) -> None:
-    """User-data siblings are benign -- and must stay that way.
-
-    ``_thread_virtual_to_actual_mappings`` also maps the virtual root
-    ``/mnt/user-data`` to the three dirs' common parent, so a sibling of
-    ``outputs`` is still *inside* a mount and has a real virtual path. Whichever
-    pattern wins -- the bare ``outputs`` base (pre-#4053) or the root (post-) --
-    the string is the same, so the boundary changes nothing here.
-
-    Green on ``main`` too: this is not a bug anchor, it guards the boundary from
-    being narrowed into one that would stop translating a mapped path.
-    """
+    '未说明'
     masked = mask_local_paths_in_output(f"wrote /tmp/deer-flow/threads/t1/user-data/outputs{suffix}", _THREAD_DATA)
 
     assert masked == f"wrote /mnt/user-data/outputs{suffix}"
@@ -189,14 +159,7 @@ def test_mask_local_paths_user_data_sibling_is_carried_by_the_virtual_root(suffi
     ],
 )
 def test_mask_local_paths_still_matches_base_before_non_slash_boundaries(boundary: str, expected: str) -> None:
-    """The lookahead must not narrow away boundaries that translate today.
-
-    This runs over arbitrary command output, where a base can legitimately be
-    followed by a comma (prose), a colon (PATH-style concatenation) or a
-    backslash (Windows separator). Borrowing the shell-oriented class from
-    ``_command_pattern`` -- ``(?=/|$|[\\s"';&|<>()])`` -- admits none of the
-    three, so the lookahead would fail and the raw host path would be emitted.
-    """
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -209,11 +172,7 @@ def test_mask_local_paths_still_matches_base_before_non_slash_boundaries(boundar
 
 @pytest.mark.parametrize("prefix", ["", "cwd: ", "see "])
 def test_mask_local_paths_translates_a_bare_base_at_end_of_output(prefix: str) -> None:
-    """``$`` is load-bearing: output ending exactly at a host base still masks.
-
-    Without it the lookahead fails and the raw host path is handed to the model
-    -- the leak this function exists to prevent.
-    """
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -225,8 +184,7 @@ def test_mask_local_paths_translates_a_bare_base_at_end_of_output(prefix: str) -
 
 
 def test_mask_local_paths_compiled_patterns_are_cached() -> None:
-    """The compiled patterns for a given source set are built once and reused
-    (mask runs once per glob/grep match, so this avoids per-match recompiles)."""
+    '未说明'
     sources = (("/tmp/deer-flow/threads/t1/user-data/workspace", "/mnt/user-data/workspace"),)
     first = _compiled_mask_patterns(sources)
     second = _compiled_mask_patterns(sources)
@@ -234,7 +192,7 @@ def test_mask_local_paths_compiled_patterns_are_cached() -> None:
 
 
 def test_mask_local_paths_stable_across_repeated_and_batched_calls() -> None:
-    """Masking is identical whether applied once or repeatedly (per-match path)."""
+    '未说明'
     output = "a /tmp/deer-flow/threads/t1/user-data/workspace/x.txt and /tmp/deer-flow/threads/t1/user-data/outputs/y.log"
     once = mask_local_paths_in_output(output, _THREAD_DATA)
     twice = mask_local_paths_in_output(once, _THREAD_DATA)
@@ -248,7 +206,7 @@ def test_mask_local_paths_stable_across_repeated_and_batched_calls() -> None:
 
 
 def test_mask_local_paths_no_thread_data_still_masks_skills() -> None:
-    """With thread_data=None, skills host paths are still masked (user-data skipped)."""
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -262,22 +220,26 @@ def test_mask_local_paths_no_thread_data_still_masks_skills() -> None:
 
 
 def test_reject_path_traversal_blocks_dotdot() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         _reject_path_traversal("/mnt/user-data/workspace/../../etc/passwd")
 
 
 def test_reject_path_traversal_blocks_dotdot_at_start() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         _reject_path_traversal("../etc/passwd")
 
 
 def test_reject_path_traversal_blocks_backslash_dotdot() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         _reject_path_traversal("/mnt/user-data/workspace\\..\\..\\etc\\passwd")
 
 
 def test_reject_path_traversal_allows_normal_paths() -> None:
     # Should not raise
+    '未说明'
     _reject_path_traversal("/mnt/user-data/workspace/file.txt")
     _reject_path_traversal("/mnt/skills/public/bootstrap/SKILL.md")
     _reject_path_traversal("/mnt/user-data/workspace/sub/dir/file.py")
@@ -287,16 +249,19 @@ def test_reject_path_traversal_allows_normal_paths() -> None:
 
 
 def test_validate_local_tool_path_rejects_non_virtual_path() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="Only paths under"):
         validate_local_tool_path("/Users/someone/config.yaml", _THREAD_DATA)
 
 
 def test_validate_local_tool_path_rejects_non_virtual_path_mentions_configured_mounts() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="configured mount paths"):
         validate_local_tool_path("/Users/someone/config.yaml", _THREAD_DATA)
 
 
 def test_validate_local_tool_path_prioritizes_user_data_before_custom_mounts() -> None:
+    '未说明'
     from deerflow.config.sandbox_config import VolumeMountConfig
 
     mounts = [
@@ -311,13 +276,14 @@ def test_validate_local_tool_path_prioritizes_user_data_before_custom_mounts() -
 
 
 def test_validate_local_tool_path_rejects_bare_virtual_root() -> None:
-    """The bare /mnt/user-data root without trailing slash is not a valid sub-path."""
+    '未说明'
     with pytest.raises(PermissionError, match="Only paths under"):
         validate_local_tool_path(VIRTUAL_PATH_PREFIX, _THREAD_DATA)
 
 
 def test_validate_local_tool_path_allows_user_data_paths() -> None:
     # Should not raise — user-data paths are always allowed
+    '未说明'
     validate_local_tool_path(f"{VIRTUAL_PATH_PREFIX}/workspace/file.txt", _THREAD_DATA)
     validate_local_tool_path(f"{VIRTUAL_PATH_PREFIX}/uploads/doc.pdf", _THREAD_DATA)
     validate_local_tool_path(f"{VIRTUAL_PATH_PREFIX}/outputs/result.csv", _THREAD_DATA)
@@ -325,24 +291,25 @@ def test_validate_local_tool_path_allows_user_data_paths() -> None:
 
 def test_validate_local_tool_path_allows_user_data_write() -> None:
     # read_only=False (default) should still work for user-data paths
+    '未说明'
     validate_local_tool_path(f"{VIRTUAL_PATH_PREFIX}/workspace/file.txt", _THREAD_DATA, read_only=False)
 
 
 def test_validate_local_tool_path_rejects_traversal_in_user_data() -> None:
-    """Path traversal via .. in user-data paths must be rejected."""
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         validate_local_tool_path(f"{VIRTUAL_PATH_PREFIX}/workspace/../../etc/passwd", _THREAD_DATA)
 
 
 def test_validate_local_tool_path_rejects_traversal_in_skills() -> None:
-    """Path traversal via .. in skills paths must be rejected."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"):
         with pytest.raises(PermissionError, match="path traversal"):
             validate_local_tool_path("/mnt/skills/../../etc/passwd", _THREAD_DATA, read_only=True)
 
 
 def test_validate_local_tool_path_rejects_none_thread_data() -> None:
-    """Missing thread_data should raise SandboxRuntimeError."""
+    '未说明'
     from deerflow.sandbox.exceptions import SandboxRuntimeError
 
     with pytest.raises(SandboxRuntimeError):
@@ -353,7 +320,7 @@ def test_validate_local_tool_path_rejects_none_thread_data() -> None:
 
 
 def test_resolve_skills_path_resolves_correctly() -> None:
-    """Skills virtual path should resolve to host path."""
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -363,7 +330,7 @@ def test_resolve_skills_path_resolves_correctly() -> None:
 
 
 def test_resolve_skills_path_resolves_root() -> None:
-    """Skills container root should resolve to host skills directory."""
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -373,7 +340,7 @@ def test_resolve_skills_path_resolves_root() -> None:
 
 
 def test_resolve_skills_path_raises_when_not_configured() -> None:
-    """Should raise FileNotFoundError when skills directory is not available."""
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value=None),
@@ -386,7 +353,7 @@ def test_resolve_skills_path_raises_when_not_configured() -> None:
 
 
 def test_resolve_and_validate_user_data_path_resolves_correctly(tmp_path: Path) -> None:
-    """Resolved path should land inside the correct thread directory."""
+    '未说明'
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     thread_data = {
@@ -399,7 +366,7 @@ def test_resolve_and_validate_user_data_path_resolves_correctly(tmp_path: Path) 
 
 
 def test_resolve_and_validate_user_data_path_blocks_traversal(tmp_path: Path) -> None:
-    """Even after resolution, path must stay within allowed roots."""
+    '未说明'
     workspace = tmp_path / "workspace"
     workspace.mkdir()
     thread_data = {
@@ -416,14 +383,7 @@ def test_resolve_and_validate_user_data_path_blocks_traversal(tmp_path: Path) ->
 
 
 def test_replace_virtual_paths_in_command_does_not_replace_skills_paths() -> None:
-    """Skills virtual paths in commands should NOT be resolved by replace_virtual_paths_in_command.
-
-    Skills and ACP workspace paths are resolved by the sandbox's
-    PathMapping at execution time, not by pre-resolving in
-    replace_virtual_paths_in_command, because the sandbox's user_id
-    (from acquire time) may differ from the contextvar user_id used by
-    _resolve_skills_path / _resolve_acp_workspace_path.
-    """
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/deer-flow/skills"),
@@ -436,7 +396,7 @@ def test_replace_virtual_paths_in_command_does_not_replace_skills_paths() -> Non
 
 
 def test_replace_virtual_paths_in_command_replaces_user_data_only() -> None:
-    """Only user-data paths should be replaced; skills and ACP paths stay virtual."""
+    '未说明'
     with (
         patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"),
         patch("deerflow.sandbox.tools._get_skills_host_path", return_value="/home/user/skills"),
@@ -461,19 +421,7 @@ def test_replace_virtual_paths_in_command_replaces_user_data_only() -> None:
     ],
 )
 def test_replace_virtual_paths_in_command_does_not_rewrite_prefix_siblings(sibling: str) -> None:
-    """A path that merely starts with the virtual root is not a virtual path.
-
-    The matcher's trailing group needs a ``/`` to consume anything, so when the
-    character after ``/mnt/user-data`` is ``-``, ``.``, ``_``, a digit or a
-    letter, the group matches empty and the bare root still matches. The
-    substitution then rewrites it to the thread's host directory, and the rest of
-    the sibling name rides along — handing the command a real host path outside
-    the mount contract (``.../user-data-backup``), which the agent then reads or
-    writes.
-
-    Same defect as #4035 (reverse patterns) and #4053 (masking patterns),
-    mirrored into the virtual→host command direction.
-    """
+    '未说明'
     result = replace_virtual_paths_in_command(f"cat {sibling}", _THREAD_DATA)
 
     assert result == f"cat {sibling}"
@@ -494,7 +442,7 @@ def test_replace_virtual_paths_in_command_does_not_rewrite_prefix_siblings(sibli
     ],
 )
 def test_replace_virtual_paths_in_command_still_translates_genuine_paths(command: str, expected: str) -> None:
-    """The narrowing must not stop translating paths that translate today."""
+    '未说明'
     assert replace_virtual_paths_in_command(command, _THREAD_DATA) == expected
 
 
@@ -502,12 +450,13 @@ def test_replace_virtual_paths_in_command_still_translates_genuine_paths(command
 
 
 def test_validate_local_bash_command_paths_blocks_host_paths() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe absolute paths"):
         validate_local_bash_command_paths("cat /etc/passwd", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_allows_https_urls() -> None:
-    """URLs like https://github.com/... must not be flagged as unsafe absolute paths."""
+    '未说明'
     validate_local_bash_command_paths(
         "cd /mnt/user-data/workspace && git clone https://github.com/CherryHQ/cherry-studio.git",
         _THREAD_DATA,
@@ -515,7 +464,7 @@ def test_validate_local_bash_command_paths_allows_https_urls() -> None:
 
 
 def test_validate_local_bash_command_paths_allows_http_urls() -> None:
-    """HTTP URLs must not be flagged as unsafe absolute paths."""
+    '未说明'
     validate_local_bash_command_paths(
         "curl http://example.com/file.tar.gz -o /mnt/user-data/workspace/file.tar.gz",
         _THREAD_DATA,
@@ -523,6 +472,7 @@ def test_validate_local_bash_command_paths_allows_http_urls() -> None:
 
 
 def test_validate_local_bash_command_paths_allows_virtual_and_system_paths() -> None:
+    '未说明'
     validate_local_bash_command_paths(
         "/bin/echo ok > /mnt/user-data/workspace/out.txt && cat /dev/null",
         _THREAD_DATA,
@@ -530,7 +480,7 @@ def test_validate_local_bash_command_paths_allows_virtual_and_system_paths() -> 
 
 
 def test_validate_local_bash_command_paths_blocks_traversal_in_user_data() -> None:
-    """Bash commands with traversal in user-data paths should be blocked."""
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         validate_local_bash_command_paths(
             "cat /mnt/user-data/workspace/../../etc/passwd",
@@ -539,7 +489,7 @@ def test_validate_local_bash_command_paths_blocks_traversal_in_user_data() -> No
 
 
 def test_validate_local_bash_command_paths_blocks_traversal_in_skills() -> None:
-    """Bash commands with traversal in skills paths should be blocked."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"):
         with pytest.raises(PermissionError, match="path traversal"):
             validate_local_bash_command_paths(
@@ -558,26 +508,31 @@ def test_validate_local_bash_command_paths_blocks_traversal_in_skills() -> None:
     ],
 )
 def test_validate_local_bash_command_paths_blocks_relative_dotdot_segments(command: str) -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         validate_local_bash_command_paths(command, _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_blocks_cd_root_escape() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe working directory"):
         validate_local_bash_command_paths("cd / && cat etc/passwd", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_blocks_cd_parent_escape() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         validate_local_bash_command_paths("cd .. && cat etc/passwd", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_blocks_cd_env_var_escape() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe working directory"):
         validate_local_bash_command_paths("cd $HOME && cat .ssh/id_rsa", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_blocks_multiline_cd_escape() -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe working directory"):
         validate_local_bash_command_paths("echo ok\ncd $HOME && cat .ssh/id_rsa", _THREAD_DATA)
 
@@ -593,6 +548,7 @@ def test_validate_local_bash_command_paths_blocks_multiline_cd_escape() -> None:
     ],
 )
 def test_validate_local_bash_command_paths_blocks_complex_cd_escapes(command: str) -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe working directory"):
         validate_local_bash_command_paths(command, _THREAD_DATA)
 
@@ -606,6 +562,7 @@ def test_validate_local_bash_command_paths_blocks_complex_cd_escapes(command: st
     ],
 )
 def test_validate_local_bash_command_paths_blocks_bare_root_path(command: str) -> None:
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe absolute paths"):
         validate_local_bash_command_paths(command, _THREAD_DATA)
 
@@ -618,10 +575,12 @@ def test_validate_local_bash_command_paths_blocks_bare_root_path(command: str) -
     ],
 )
 def test_validate_local_bash_command_paths_allows_cd_words_as_arguments(command: str) -> None:
+    '未说明'
     validate_local_bash_command_paths(command, _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_allows_workspace_relative_paths() -> None:
+    '未说明'
     validate_local_bash_command_paths(
         "mkdir -p reports && python script.py data/input.csv > reports/out.txt",
         _THREAD_DATA,
@@ -629,6 +588,7 @@ def test_validate_local_bash_command_paths_allows_workspace_relative_paths() -> 
 
 
 def test_validate_local_bash_command_paths_allows_cd_virtual_workspace_with_relative_paths() -> None:
+    '未说明'
     validate_local_bash_command_paths(
         "cd /mnt/user-data/workspace && cat data/input.csv > reports/out.txt",
         _THREAD_DATA,
@@ -636,6 +596,7 @@ def test_validate_local_bash_command_paths_allows_cd_virtual_workspace_with_rela
 
 
 def test_validate_local_bash_command_paths_allows_http_url_dotdot_segments() -> None:
+    '未说明'
     validate_local_bash_command_paths(
         "curl https://example.com/packages/../archive.tar.gz -o /mnt/user-data/workspace/archive.tar.gz",
         _THREAD_DATA,
@@ -658,13 +619,12 @@ def test_validate_local_bash_command_paths_allows_http_url_dotdot_segments() -> 
     ],
 )
 def test_validate_local_bash_command_paths_allows_non_path_string_literals(command: str) -> None:
+    '未说明'
     validate_local_bash_command_paths(command, _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_still_blocks_ascii_host_path_in_code() -> None:
-    """The literal exemption is shape-based (non-ASCII / identifier-template
-    braces); a plain ASCII host path stays blocked even when written inside a
-    code string, so the guard keeps nudging the model toward virtual paths."""
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe absolute paths"):
         validate_local_bash_command_paths("python3 -c \"open('/etc/passwd').read()\"", _THREAD_DATA)
 
@@ -687,14 +647,13 @@ def test_validate_local_bash_command_paths_still_blocks_ascii_host_path_in_code(
     ],
 )
 def test_validate_local_bash_command_paths_blocks_brace_expansion_host_paths(command: str) -> None:
-    """Regression for the brace-expansion bypass: a `{...}` block that is not a
-    single identifier placeholder (commas, dots, leading separators) must keep
-    the host path blocked rather than be exempted as a literal."""
+    '未说明'
     with pytest.raises(PermissionError, match="Unsafe absolute paths"):
         validate_local_bash_command_paths(command, _THREAD_DATA)
 
 
 def test_bash_tool_rejects_host_bash_when_local_sandbox_default(monkeypatch) -> None:
+    '未说明'
     runtime = SimpleNamespace(
         state={"sandbox": {"sandbox_id": "local"}, "thread_data": _THREAD_DATA.copy()},
         context={"thread_id": "thread-1"},
@@ -716,6 +675,7 @@ def test_bash_tool_rejects_host_bash_when_local_sandbox_default(monkeypatch) -> 
 
 
 def test_bash_tool_blocks_relative_traversal_before_host_execution(monkeypatch) -> None:
+    '未说明'
     runtime = SimpleNamespace(
         state={"sandbox": {"sandbox_id": "local"}, "thread_data": _THREAD_DATA.copy()},
         context={"thread_id": "thread-1"},
@@ -741,6 +701,7 @@ def test_bash_tool_blocks_relative_traversal_before_host_execution(monkeypatch) 
 
 
 def test_is_skills_path_recognises_default_prefix() -> None:
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"):
         assert _is_skills_path("/mnt/skills") is True
         assert _is_skills_path("/mnt/skills/public/bootstrap/SKILL.md") is True
@@ -749,7 +710,7 @@ def test_is_skills_path_recognises_default_prefix() -> None:
 
 
 def test_validate_local_tool_path_allows_skills_read_only() -> None:
-    """read_file / ls should be able to access /mnt/skills paths."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"):
         # Should not raise
         validate_local_tool_path(
@@ -760,7 +721,7 @@ def test_validate_local_tool_path_allows_skills_read_only() -> None:
 
 
 def test_validate_local_tool_path_blocks_skills_write() -> None:
-    """write_file / str_replace must NOT write to skills paths."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"):
         with pytest.raises(PermissionError, match="Write access to skills path is not allowed"):
             validate_local_tool_path(
@@ -771,7 +732,7 @@ def test_validate_local_tool_path_blocks_skills_write() -> None:
 
 
 def test_validate_local_bash_command_paths_allows_skills_path() -> None:
-    """bash commands referencing /mnt/skills should be allowed."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"):
         validate_local_bash_command_paths(
             "cat /mnt/skills/public/bootstrap/SKILL.md",
@@ -780,7 +741,7 @@ def test_validate_local_bash_command_paths_allows_skills_path() -> None:
 
 
 def test_validate_local_bash_command_paths_allows_urls() -> None:
-    """URLs in bash commands should not be mistaken for absolute paths (issue #1385)."""
+    '未说明'
     # HTTPS URLs
     validate_local_bash_command_paths(
         "curl -X POST https://example.com/api/v1/risk/check",
@@ -809,19 +770,19 @@ def test_validate_local_bash_command_paths_allows_urls() -> None:
 
 
 def test_validate_local_bash_command_paths_blocks_file_urls() -> None:
-    """file:// URLs should be treated as unsafe and blocked."""
+    '未说明'
     with pytest.raises(PermissionError):
         validate_local_bash_command_paths("curl file:///etc/passwd", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_blocks_file_urls_case_insensitive() -> None:
-    """file:// URL detection should be case-insensitive."""
+    '未说明'
     with pytest.raises(PermissionError):
         validate_local_bash_command_paths("curl FILE:///etc/shadow", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_blocks_file_urls_mixed_with_valid() -> None:
-    """file:// URLs should be blocked even when mixed with valid paths."""
+    '未说明'
     with pytest.raises(PermissionError):
         validate_local_bash_command_paths(
             "curl file:///etc/passwd -o /mnt/user-data/workspace/out.txt",
@@ -830,14 +791,14 @@ def test_validate_local_bash_command_paths_blocks_file_urls_mixed_with_valid() -
 
 
 def test_validate_local_bash_command_paths_still_blocks_other_paths() -> None:
-    """Paths outside virtual and system prefixes must still be blocked."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills"):
         with pytest.raises(PermissionError, match="Unsafe absolute paths"):
             validate_local_bash_command_paths("cat /etc/shadow", _THREAD_DATA)
 
 
 def test_validate_local_tool_path_skills_custom_container_path() -> None:
-    """Skills with a custom container_path in config should also work."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/custom/skills"):
         # Should not raise
         validate_local_tool_path(
@@ -859,6 +820,7 @@ def test_validate_local_tool_path_skills_custom_container_path() -> None:
 
 
 def test_is_acp_workspace_path_recognises_prefix() -> None:
+    '未说明'
     assert _is_acp_workspace_path("/mnt/acp-workspace") is True
     assert _is_acp_workspace_path("/mnt/acp-workspace/hello.py") is True
     assert _is_acp_workspace_path("/mnt/acp-workspace-extra/foo") is False
@@ -866,7 +828,7 @@ def test_is_acp_workspace_path_recognises_prefix() -> None:
 
 
 def test_validate_local_tool_path_allows_acp_workspace_read_only() -> None:
-    """read_file / ls should be able to access /mnt/acp-workspace paths."""
+    '未说明'
     validate_local_tool_path(
         "/mnt/acp-workspace/hello_world.py",
         _THREAD_DATA,
@@ -875,7 +837,7 @@ def test_validate_local_tool_path_allows_acp_workspace_read_only() -> None:
 
 
 def test_validate_local_tool_path_blocks_acp_workspace_write() -> None:
-    """write_file / str_replace must NOT write to ACP workspace paths."""
+    '未说明'
     with pytest.raises(PermissionError, match="Write access to ACP workspace is not allowed"):
         validate_local_tool_path(
             "/mnt/acp-workspace/hello_world.py",
@@ -885,7 +847,7 @@ def test_validate_local_tool_path_blocks_acp_workspace_write() -> None:
 
 
 def test_validate_local_bash_command_paths_allows_acp_workspace() -> None:
-    """bash commands referencing /mnt/acp-workspace should be allowed."""
+    '未说明'
     validate_local_bash_command_paths(
         "cp /mnt/acp-workspace/hello_world.py /mnt/user-data/outputs/hello_world.py",
         _THREAD_DATA,
@@ -893,7 +855,7 @@ def test_validate_local_bash_command_paths_allows_acp_workspace() -> None:
 
 
 def test_validate_local_bash_command_paths_blocks_traversal_in_acp_workspace() -> None:
-    """Bash commands with traversal in ACP workspace paths should be blocked."""
+    '未说明'
     with pytest.raises(PermissionError, match="path traversal"):
         validate_local_bash_command_paths(
             "cat /mnt/acp-workspace/../../etc/passwd",
@@ -902,7 +864,7 @@ def test_validate_local_bash_command_paths_blocks_traversal_in_acp_workspace() -
 
 
 def test_resolve_acp_workspace_path_resolves_correctly(tmp_path: Path) -> None:
-    """ACP workspace virtual path should resolve to host path."""
+    '未说明'
     acp_dir = tmp_path / "acp-workspace"
     acp_dir.mkdir()
     with patch("deerflow.sandbox.tools._get_acp_workspace_host_path", return_value=str(acp_dir)):
@@ -911,7 +873,7 @@ def test_resolve_acp_workspace_path_resolves_correctly(tmp_path: Path) -> None:
 
 
 def test_resolve_acp_workspace_path_resolves_root(tmp_path: Path) -> None:
-    """ACP workspace root should resolve to host directory."""
+    '未说明'
     acp_dir = tmp_path / "acp-workspace"
     acp_dir.mkdir()
     with patch("deerflow.sandbox.tools._get_acp_workspace_host_path", return_value=str(acp_dir)):
@@ -920,14 +882,14 @@ def test_resolve_acp_workspace_path_resolves_root(tmp_path: Path) -> None:
 
 
 def test_resolve_acp_workspace_path_raises_when_not_available() -> None:
-    """Should raise FileNotFoundError when ACP workspace does not exist."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_acp_workspace_host_path", return_value=None):
         with pytest.raises(FileNotFoundError, match="ACP workspace directory not available"):
             _resolve_acp_workspace_path("/mnt/acp-workspace/hello.py")
 
 
 def test_resolve_acp_workspace_path_blocks_traversal(tmp_path: Path) -> None:
-    """Path traversal in ACP workspace paths must be rejected."""
+    '未说明'
     acp_dir = tmp_path / "acp-workspace"
     acp_dir.mkdir()
     with patch("deerflow.sandbox.tools._get_acp_workspace_host_path", return_value=str(acp_dir)):
@@ -936,12 +898,7 @@ def test_resolve_acp_workspace_path_blocks_traversal(tmp_path: Path) -> None:
 
 
 def test_replace_virtual_paths_in_command_does_not_replace_acp_workspace() -> None:
-    """ACP workspace virtual paths should NOT be resolved by replace_virtual_paths_in_command.
-
-    Like skills paths, ACP workspace paths are resolved by the sandbox's
-    PathMapping at execution time, not pre-resolved, to ensure user_id
-    consistency with the sandbox mapping.
-    """
+    '未说明'
     acp_host = "/home/user/.deer-flow/acp-workspace"
     with patch("deerflow.sandbox.tools._get_acp_workspace_host_path", return_value=acp_host):
         cmd = "cp /mnt/acp-workspace/hello.py /mnt/user-data/outputs/hello.py"
@@ -955,7 +912,7 @@ def test_replace_virtual_paths_in_command_does_not_replace_acp_workspace() -> No
 
 
 def test_mask_local_paths_in_output_hides_acp_workspace_host_paths() -> None:
-    """ACP workspace host paths in bash output should be masked to virtual paths."""
+    '未说明'
     acp_host = "/home/user/.deer-flow/acp-workspace"
     with patch("deerflow.sandbox.tools._get_acp_workspace_host_path", return_value=acp_host):
         output = f"Copied: {acp_host}/hello.py"
@@ -969,7 +926,7 @@ def test_mask_local_paths_in_output_hides_acp_workspace_host_paths() -> None:
 
 
 def test_apply_cwd_prefix_prepends_workspace() -> None:
-    """Command is prefixed with cd <workspace> && when workspace_path is set."""
+    '未说明'
     result = _apply_cwd_prefix("ls -la", _THREAD_DATA)
     assert result.startswith("cd ")
     assert "ls -la" in result
@@ -977,24 +934,24 @@ def test_apply_cwd_prefix_prepends_workspace() -> None:
 
 
 def test_apply_cwd_prefix_no_thread_data() -> None:
-    """Command is returned unchanged when thread_data is None."""
+    '未说明'
     assert _apply_cwd_prefix("ls -la", None) == "ls -la"
 
 
 def test_apply_cwd_prefix_missing_workspace_path() -> None:
-    """Command is returned unchanged when workspace_path is absent from thread_data."""
+    '未说明'
     assert _apply_cwd_prefix("ls -la", {}) == "ls -la"
 
 
 def test_apply_cwd_prefix_quotes_path_with_spaces() -> None:
-    """Workspace path containing spaces is properly shell-quoted."""
+    '未说明'
     thread_data = {**_THREAD_DATA, "workspace_path": "/tmp/my workspace/t1"}
     result = _apply_cwd_prefix("echo hello", thread_data)
     assert result == "cd '/tmp/my workspace/t1' && echo hello"
 
 
 def test_validate_local_bash_command_paths_allows_mcp_filesystem_paths() -> None:
-    """Bash commands referencing MCP filesystem server paths should be allowed."""
+    '未说明'
     from deerflow.config.extensions_config import ExtensionsConfig, McpServerConfig
 
     mock_config = ExtensionsConfig(
@@ -1034,7 +991,7 @@ def test_validate_local_bash_command_paths_allows_mcp_filesystem_paths() -> None
 
 
 def _mock_custom_mounts():
-    """Create mock VolumeMountConfig objects for testing."""
+    '未说明'
     from deerflow.config.sandbox_config import VolumeMountConfig
 
     return [
@@ -1044,6 +1001,7 @@ def _mock_custom_mounts():
 
 
 def test_is_custom_mount_path_recognises_configured_mounts() -> None:
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         assert _is_custom_mount_path("/mnt/code-read") is True
         assert _is_custom_mount_path("/mnt/code-read/src/main.py") is True
@@ -1054,6 +1012,7 @@ def test_is_custom_mount_path_recognises_configured_mounts() -> None:
 
 
 def test_get_custom_mount_for_path_returns_longest_prefix() -> None:
+    '未说明'
     from deerflow.config.sandbox_config import VolumeMountConfig
 
     mounts = [
@@ -1067,55 +1026,55 @@ def test_get_custom_mount_for_path_returns_longest_prefix() -> None:
 
 
 def test_validate_local_tool_path_allows_custom_mount_read() -> None:
-    """read_file / ls should be able to access custom mount paths."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         validate_local_tool_path("/mnt/code-read/src/main.py", _THREAD_DATA, read_only=True)
         validate_local_tool_path("/mnt/data/file.txt", _THREAD_DATA, read_only=True)
 
 
 def test_validate_local_tool_path_blocks_read_only_mount_write() -> None:
-    """write_file / str_replace must NOT write to read-only custom mounts."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         with pytest.raises(PermissionError, match="Write access to read-only mount is not allowed"):
             validate_local_tool_path("/mnt/code-read/src/main.py", _THREAD_DATA, read_only=False)
 
 
 def test_validate_local_tool_path_allows_writable_mount_write() -> None:
-    """write_file / str_replace should succeed on writable custom mounts."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         validate_local_tool_path("/mnt/data/file.txt", _THREAD_DATA, read_only=False)
 
 
 def test_validate_local_tool_path_blocks_traversal_in_custom_mount() -> None:
-    """Path traversal via .. in custom mount paths must be rejected."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         with pytest.raises(PermissionError, match="path traversal"):
             validate_local_tool_path("/mnt/code-read/../../etc/passwd", _THREAD_DATA, read_only=True)
 
 
 def test_validate_local_bash_command_paths_allows_custom_mount() -> None:
-    """bash commands referencing custom mount paths should be allowed."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         validate_local_bash_command_paths("cat /mnt/code-read/src/main.py", _THREAD_DATA)
         validate_local_bash_command_paths("ls /mnt/data", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_blocks_traversal_in_custom_mount() -> None:
-    """Bash commands with traversal in custom mount paths should be blocked."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         with pytest.raises(PermissionError, match="path traversal"):
             validate_local_bash_command_paths("cat /mnt/code-read/../../etc/passwd", _THREAD_DATA)
 
 
 def test_validate_local_bash_command_paths_still_blocks_non_mount_paths() -> None:
-    """Paths not matching any custom mount should still be blocked."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         with pytest.raises(PermissionError, match="Unsafe absolute paths"):
             validate_local_bash_command_paths("cat /etc/shadow", _THREAD_DATA)
 
 
 def test_get_custom_mounts_caching(monkeypatch, tmp_path) -> None:
-    """_get_custom_mounts should cache after first successful load."""
+    '未说明'
     # Clear any existing cache
     if hasattr(_get_custom_mounts, "_cached"):
         monkeypatch.delattr(_get_custom_mounts, "_cached")
@@ -1148,7 +1107,7 @@ def test_get_custom_mounts_caching(monkeypatch, tmp_path) -> None:
 
 
 def test_get_custom_mounts_filters_nonexistent_host_path(monkeypatch, tmp_path) -> None:
-    """_get_custom_mounts should only return mounts whose host_path exists."""
+    '未说明'
     if hasattr(_get_custom_mounts, "_cached"):
         monkeypatch.delattr(_get_custom_mounts, "_cached")
 
@@ -1174,21 +1133,25 @@ def test_get_custom_mounts_filters_nonexistent_host_path(monkeypatch, tmp_path) 
 
 
 def test_get_custom_mount_for_path_boundary_no_false_prefix_match() -> None:
-    """_get_custom_mount_for_path must not match /mnt/code-read-extra for /mnt/code-read."""
+    '未说明'
     with patch("deerflow.sandbox.tools._get_custom_mounts", return_value=_mock_custom_mounts()):
         mount = _get_custom_mount_for_path("/mnt/code-read-extra/foo")
         assert mount is None
 
 
 def test_str_replace_parallel_updates_should_preserve_both_edits(monkeypatch) -> None:
+    '未说明'
     class SharedSandbox:
+        '未说明'
         def __init__(self) -> None:
+            '未说明'
             self.content = "alpha\nbeta\n"
             self._active_reads = 0
             self._state_lock = threading.Lock()
             self._overlap_detected = threading.Event()
 
         def read_file(self, path: str) -> str:
+            """处理读取 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             with self._state_lock:
                 self._active_reads += 1
                 snapshot = self.content
@@ -1203,6 +1166,7 @@ def test_str_replace_parallel_updates_should_preserve_both_edits(monkeypatch) ->
             return snapshot
 
         def write_file(self, path: str, content: str, append: bool = False) -> None:
+            """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             self.content = content
 
     sandbox = SharedSandbox()
@@ -1217,6 +1181,7 @@ def test_str_replace_parallel_updates_should_preserve_both_edits(monkeypatch) ->
     monkeypatch.setattr("deerflow.sandbox.tools.is_local_sandbox", lambda runtime: False)
 
     def worker(runtime: SimpleNamespace, old_str: str, new_str: str) -> None:
+        """处理工作进程相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         try:
             result = str_replace_tool.func(
                 runtime=runtime,
@@ -1245,13 +1210,17 @@ def test_str_replace_parallel_updates_should_preserve_both_edits(monkeypatch) ->
 
 
 def test_str_replace_parallel_updates_in_isolated_sandboxes_should_not_share_path_lock(monkeypatch) -> None:
+    '未说明'
     class IsolatedSandbox:
+        '未说明'
         def __init__(self, sandbox_id: str, shared_state: dict[str, object]) -> None:
+            '未说明'
             self.id = sandbox_id
             self.content = "alpha\nbeta\n"
             self._shared_state = shared_state
 
         def read_file(self, path: str) -> str:
+            """处理读取 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             state_lock = self._shared_state["state_lock"]
             with state_lock:
                 active_reads = self._shared_state["active_reads"]
@@ -1271,6 +1240,7 @@ def test_str_replace_parallel_updates_in_isolated_sandboxes_should_not_share_pat
             return snapshot
 
         def write_file(self, path: str, content: str, append: bool = False) -> None:
+            """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             self.content = content
 
     shared_state: dict[str, object] = {
@@ -1296,6 +1266,7 @@ def test_str_replace_parallel_updates_in_isolated_sandboxes_should_not_share_pat
     monkeypatch.setattr("deerflow.sandbox.tools.is_local_sandbox", lambda runtime: False)
 
     def worker(runtime: SimpleNamespace, old_str: str, new_str: str) -> None:
+        """处理工作进程相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         try:
             result = str_replace_tool.func(
                 runtime=runtime,
@@ -1325,8 +1296,11 @@ def test_str_replace_parallel_updates_in_isolated_sandboxes_should_not_share_pat
 
 
 def test_str_replace_and_append_on_same_path_should_preserve_both_updates(monkeypatch) -> None:
+    '未说明'
     class SharedSandbox:
+        '未说明'
         def __init__(self) -> None:
+            '未说明'
             self.id = "sandbox-1"
             self.content = "alpha\n"
             self.state_lock = threading.Lock()
@@ -1334,6 +1308,7 @@ def test_str_replace_and_append_on_same_path_should_preserve_both_updates(monkey
             self.append_finished = threading.Event()
 
         def read_file(self, path: str) -> str:
+            """处理读取 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             with self.state_lock:
                 snapshot = self.content
             self.str_replace_has_snapshot.set()
@@ -1341,6 +1316,7 @@ def test_str_replace_and_append_on_same_path_should_preserve_both_updates(monkey
             return snapshot
 
         def write_file(self, path: str, content: str, append: bool = False) -> None:
+            """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             with self.state_lock:
                 if append:
                     self.content += content
@@ -1360,6 +1336,7 @@ def test_str_replace_and_append_on_same_path_should_preserve_both_updates(monkey
     monkeypatch.setattr("deerflow.sandbox.tools.is_local_sandbox", lambda runtime: False)
 
     def replace_worker() -> None:
+        """处理替换 工作进程相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         try:
             result = str_replace_tool.func(
                 runtime=runtimes[0],
@@ -1373,6 +1350,7 @@ def test_str_replace_and_append_on_same_path_should_preserve_both_updates(monkey
             failures.append(exc)
 
     def append_worker() -> None:
+        """处理工作进程相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         try:
             sandbox.str_replace_has_snapshot.wait(0.05)
             result = write_file_tool.func(
@@ -1399,10 +1377,13 @@ def test_str_replace_and_append_on_same_path_should_preserve_both_updates(monkey
 
 
 def test_write_file_tool_bounds_large_oserror_and_masks_local_paths(monkeypatch) -> None:
+    '未说明'
     class FailingSandbox:
+        '未说明'
         id = "sandbox-write-large-oserror"
 
         def write_file(self, path: str, content: str, append: bool = False) -> None:
+            """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             host_path = f"{_THREAD_DATA['workspace_path']}/nested/output.txt"
             raise OSError(f"write failed at {host_path}\n{'A' * 12000}\nremote tail marker")
 
@@ -1435,10 +1416,13 @@ def test_write_file_tool_bounds_large_oserror_and_masks_local_paths(monkeypatch)
 
 
 def test_write_file_tool_preserves_short_oserror_without_truncation(monkeypatch) -> None:
+    '未说明'
     class FailingSandbox:
+        '未说明'
         id = "sandbox-write-short-oserror"
 
         def write_file(self, path: str, content: str, append: bool = False) -> None:
+            """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             raise OSError("disk quota exceeded")
 
     runtime = SimpleNamespace(state={}, context={"thread_id": "thread-1"}, config={})
@@ -1460,10 +1444,13 @@ def test_write_file_tool_preserves_short_oserror_without_truncation(monkeypatch)
 
 
 def test_write_file_tool_bounds_large_sandbox_error(monkeypatch) -> None:
+    '未说明'
     class FailingSandbox:
+        '未说明'
         id = "sandbox-write-large-sandbox-error"
 
         def write_file(self, path: str, content: str, append: bool = False) -> None:
+            """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             raise SandboxError(f"remote write rejected {'B' * 12000} final detail")
 
     runtime = SimpleNamespace(state={}, context={"thread_id": "thread-1"}, config={})
@@ -1512,10 +1499,13 @@ def test_write_file_tool_formats_all_other_failure_branches(
     raised_error: Exception,
     expected_fragment: str,
 ) -> None:
+    '未说明'
     class FailingSandbox:
+        '未说明'
         id = "sandbox-write-other-failure"
 
         def write_file(self, path: str, content: str, append: bool = False) -> None:
+            """处理写入 文件相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             raise raised_error
 
     runtime = SimpleNamespace(state={}, context={"thread_id": "thread-1"}, config={})
@@ -1538,12 +1528,10 @@ def test_write_file_tool_formats_all_other_failure_branches(
 
 
 def test_write_file_tool_handles_sandbox_init_failure(monkeypatch) -> None:
-    """Regression for #3133 review: SandboxError raised during sandbox
-    initialization (before the local `requested_path` assignment) must still
-    surface as a bounded tool error rather than an UnboundLocalError.
-    """
+    '未说明'
 
     def raise_sandbox_error(runtime):
+        """处理沙箱 错误相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise SandboxError("sandbox missing")
 
     runtime = SimpleNamespace(state={}, context={"thread_id": "thread-1"}, config={})
@@ -1563,16 +1551,13 @@ def test_write_file_tool_handles_sandbox_init_failure(monkeypatch) -> None:
 
 
 def test_file_operation_lock_memory_cleanup() -> None:
-    """Verify that released locks are eventually cleaned up by WeakValueDictionary.
-
-    This ensures that the sandbox component doesn't leak memory over time when
-    operating on many unique file paths.
-    """
+    '未说明'
     import gc
 
     from deerflow.sandbox.file_operation_lock import _FILE_OPERATION_LOCKS, get_file_operation_lock
 
     class MockSandbox:
+        '未说明'
         id = "test_cleanup_sandbox"
 
     test_path = "/tmp/deer-flow/memory_leak_test_file.txt"
@@ -1583,6 +1568,7 @@ def test_file_operation_lock_memory_cleanup() -> None:
 
     def _use_lock_and_release() -> None:
         # Create and acquire the lock within this scope
+        '未说明'
         lock = get_file_operation_lock(MockSandbox(), test_path)
         with lock:
             pass

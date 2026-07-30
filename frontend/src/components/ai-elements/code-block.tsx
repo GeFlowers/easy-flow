@@ -50,6 +50,7 @@ const lineNumberTransformer: ShikiTransformer = {
   },
 };
 
+/** 使用 Shiki 将源码转换为带主题样式的 HTML 高亮结果。 */
 export async function highlightCode(
   code: string,
   language: BundledLanguage,
@@ -73,6 +74,7 @@ export async function highlightCode(
   ]);
 }
 
+/** CodeBlock 组件：提供对应的界面结构与交互语义。 */
 export const CodeBlock = ({
   code,
   language,
@@ -111,12 +113,12 @@ export const CodeBlock = ({
         <div className="relative size-full">
           <div
             className="[&>pre]:bg-background! [&>pre]:text-foreground! size-full overflow-auto dark:hidden [&_code]:font-mono [&_code]:text-sm [&>pre]:m-0 [&>pre]:text-sm [&>pre]:whitespace-pre-wrap"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: 需要直接注入经过高亮处理的 HTML。
             dangerouslySetInnerHTML={{ __html: html }}
           />
           <div
             className="[&>pre]:bg-background! [&>pre]:text-foreground! hidden size-full overflow-auto dark:block [&_code]:font-mono [&_code]:text-sm [&>pre]:m-0 [&>pre]:text-sm [&>pre]:whitespace-pre-wrap"
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: "this is needed."
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: 需要直接注入经过高亮处理的 HTML。
             dangerouslySetInnerHTML={{ __html: darkHtml }}
           />
           {children && (
@@ -130,12 +132,14 @@ export const CodeBlock = ({
   );
 };
 
+/** CodeBlockCopyButtonProps 的公开类型定义。 */
 export type CodeBlockCopyButtonProps = ComponentProps<typeof Button> & {
   onCopy?: () => void;
   onError?: (error: Error) => void;
   timeout?: number;
 };
 
+/** CodeBlockCopyButton 组件：提供对应的界面结构与交互语义。 */
 export const CodeBlockCopyButton = ({
   onCopy,
   onError,

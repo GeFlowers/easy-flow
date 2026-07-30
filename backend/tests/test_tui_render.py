@@ -1,5 +1,4 @@
-"""Smoke tests for the pure Rich renderers — they must render without error
-and include the expected text."""
+'未说明'
 
 from rich.console import Console
 
@@ -18,6 +17,7 @@ from deerflow.tui.view_state import (
 
 
 def _render_to_text(renderable) -> str:
+    '未说明'
     console = Console(width=100, no_color=True)
     with console.capture() as capture:
         console.print(renderable)
@@ -25,11 +25,13 @@ def _render_to_text(renderable) -> str:
 
 
 def test_render_empty_transcript_shows_hint():
+    '未说明'
     out = _render_to_text(render_transcript(initial_state()))
     assert "Type a message" in out
 
 
 def test_render_transcript_includes_all_row_kinds():
+    '未说明'
     state = initial_state()
     state = reduce(state, UserSubmitted("hello there"))
     state = reduce(state, AssistantDelta(id="m1", text="hi back"))
@@ -46,6 +48,7 @@ def test_render_transcript_includes_all_row_kinds():
 
 
 def test_finalized_assistant_renders_markdown():
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="**bold** text\n\n## A Heading\n\n- item one"))
     out = _render_to_text(render_transcript(state))
@@ -58,6 +61,7 @@ def test_finalized_assistant_renders_markdown():
 
 
 def test_actively_streaming_assistant_stays_plain():
+    '未说明'
     state = initial_state()
     state = reduce(state, RunStarted())
     state = reduce(state, AssistantDelta(id="m1", text="**partial heading ##"))
@@ -71,6 +75,7 @@ def test_prior_message_stays_markdown_when_a_followup_run_starts():
     # to raw text. Between RunStarted and the new answer's first delta (and during
     # the client's re-emit of prior messages), the previous answer is the last
     # assistant row — it must still render as Markdown.
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="**bold answer**"))
     state = reduce(state, RunEnded())
@@ -84,6 +89,7 @@ def test_prior_message_stays_markdown_when_a_followup_run_starts():
 
 
 def test_only_the_actively_streaming_message_is_plain():
+    '未说明'
     state = initial_state()
     state = reduce(state, AssistantDelta(id="m1", text="**done**"))
     state = reduce(state, RunEnded())
@@ -97,6 +103,7 @@ def test_only_the_actively_streaming_message_is_plain():
 
 
 def test_render_status_ready_and_working():
+    '未说明'
     ready = _render_to_text(render_status(initial_state(), model="gpt", thread_label="new"))
     assert "ready" in ready
 
@@ -106,12 +113,14 @@ def test_render_status_ready_and_working():
 
 
 def test_render_status_shows_token_usage():
+    '未说明'
     state = reduce(initial_state(), RunEnded(usage={"total_tokens": 42}))
     out = _render_to_text(render_status(state, model="gpt", thread_label="t1"))
     assert "42 tok" in out
 
 
 def test_render_header_includes_model_and_cwd():
+    '未说明'
     out = _render_to_text(render_header(model="claude", thread_label="new", cwd="/tmp/proj", skills=3))
     assert "DeerFlow" in out
     assert "claude" in out

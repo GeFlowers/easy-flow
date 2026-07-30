@@ -1,20 +1,4 @@
-"""Regression test for GitHub issue #3682.
-
-End-to-end shape:
-
-1. Hand-build a SQLite DB that mirrors a real pre-#3658 deployment -- the
-   ``runs`` table is missing the ``token_usage_by_model`` column, mirroring
-   what every existing user's DB looked like after the upgrade that triggered
-   the issue.
-2. Run ``init_engine`` (the entry point used by the FastAPI Gateway
-   lifespan), which now routes through ``bootstrap_schema``.
-3. Confirm a real ``SELECT`` against the column succeeds, demonstrating the
-   500 from the original issue is gone.
-
-The pre-fix codepath would have raised
-``sqlalchemy.exc.OperationalError: no such column: runs.token_usage_by_model``
-on step 3.
-"""
+"""本模块覆盖持久化 回归的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -34,11 +18,7 @@ pytestmark = pytest.mark.asyncio
 
 
 def _seed_pre_3658_database(db_path: Path) -> None:
-    """Build a DB that looks like a pre-PR-#3658 deployment.
-
-    Uses the synchronous ``sqlite3`` driver so the seed is independent of the
-    async engine under test.
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     # Easiest way to get the legacy shape exactly right: create_all then
@@ -54,6 +34,7 @@ def _seed_pre_3658_database(db_path: Path) -> None:
 
 
 async def test_legacy_database_recovers_token_usage_column(tmp_path: Path) -> None:
+    """验证令牌在预期条件及边界场景下的可观察行为，防止相关回归。"""
     db_path = tmp_path / "legacy.db"
     _seed_pre_3658_database(db_path)
 
@@ -92,11 +73,7 @@ async def test_legacy_database_recovers_token_usage_column(tmp_path: Path) -> No
 
 
 async def test_legacy_database_with_manual_alter_still_bootstraps(tmp_path: Path) -> None:
-    """User-side workaround scenario: someone already applied the manual
-    ``ALTER TABLE runs ADD COLUMN token_usage_by_model JSON`` from the issue
-    write-up. The hybrid bootstrap must just stamp head, not double-add the
-    column, and not error.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     db_path = tmp_path / "manual_altered.db"
     db_path.parent.mkdir(parents=True, exist_ok=True)
 

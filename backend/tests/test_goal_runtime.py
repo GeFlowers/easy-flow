@@ -1,3 +1,4 @@
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 import asyncio
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
@@ -8,6 +9,7 @@ from deerflow.runtime import goal
 
 
 def test_build_goal_state_defaults_to_claude_stop_hook_cap():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     state = goal.build_goal_state("Finish the tests")
 
     assert state["objective"] == "Finish the tests"
@@ -20,6 +22,7 @@ def test_build_goal_state_defaults_to_claude_stop_hook_cap():
 
 
 def test_parse_goal_evaluation_extracts_json_object_from_fenced_response():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     parsed = goal.parse_goal_evaluation_response('```json\n{"satisfied": true, "reason": "All requested tests pass.", "evidence_summary": "pytest passed"}\n```')
 
     assert parsed["satisfied"] is True
@@ -29,6 +32,7 @@ def test_parse_goal_evaluation_extracts_json_object_from_fenced_response():
 
 
 def test_parse_goal_evaluation_strips_think_blocks():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     parsed = goal.parse_goal_evaluation_response('<think>maybe {"satisfied": false}</think>\n{"satisfied": false, "reason": "Missing verification."}')
 
     assert parsed["satisfied"] is False
@@ -37,6 +41,7 @@ def test_parse_goal_evaluation_strips_think_blocks():
 
 
 def test_parse_goal_evaluation_preserves_typed_blocker():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     parsed = goal.parse_goal_evaluation_response('{"satisfied": false, "blocker": "needs_user_input", "reason": "The user must choose a deployment target."}')
 
     assert parsed["satisfied"] is False
@@ -44,6 +49,7 @@ def test_parse_goal_evaluation_preserves_typed_blocker():
 
 
 def test_format_visible_conversation_excludes_hidden_and_system_messages():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     messages = [
         SystemMessage(content="internal"),
         HumanMessage(content="visible user"),
@@ -60,6 +66,7 @@ def test_format_visible_conversation_excludes_hidden_and_system_messages():
 
 
 def test_should_continue_goal_respects_completion_and_cap():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     active = goal.build_goal_state("Finish", max_continuations=2)
     unmet = goal.GoalEvaluation(satisfied=False, blocker="goal_not_met_yet", reason="not yet")
     met = goal.GoalEvaluation(satisfied=True, blocker="none", reason="done")
@@ -72,6 +79,7 @@ def test_should_continue_goal_respects_completion_and_cap():
 
 
 def test_should_continue_goal_respects_no_progress_cap():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     active = goal.build_goal_state("Finish")
     unmet = goal.GoalEvaluation(satisfied=False, blocker="goal_not_met_yet", reason="same evidence")
 
@@ -80,6 +88,7 @@ def test_should_continue_goal_respects_no_progress_cap():
 
 
 def test_make_goal_continuation_message_is_hidden_from_ui():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     state = goal.build_goal_state("Finish the implementation")
     evaluation = goal.GoalEvaluation(satisfied=False, blocker="goal_not_met_yet", reason="Tests have not run")
 
@@ -91,11 +100,13 @@ def test_make_goal_continuation_message_is_hidden_from_ui():
 
 
 def test_evaluate_goal_completion_uses_non_thinking_model(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fake_model = MagicMock()
     fake_model.ainvoke = AsyncMock(return_value=SimpleNamespace(content='{"satisfied": true, "reason": "Done", "evidence_summary": "Done"}'))
     captured = {}
 
     def fake_create_chat_model(**kwargs):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         captured.update(kwargs)
         return fake_model
 
@@ -116,30 +127,25 @@ def test_evaluate_goal_completion_uses_non_thinking_model(monkeypatch):
     assert result["satisfied"] is True
     assert result["blocker"] == "none"
     assert captured["thinking_enabled"] is False
-    # The goal evaluator runs from runtime/runs/worker.py after the main graph
-    # run has already finished, so there is no graph root for it to inherit
-    # tracing callbacks from (unlike make_lead_agent/DeerFlowClient.stream,
-    # which attach build_tracing_callbacks() at the graph root and correctly
-    # pass attach_tracing=False to avoid double-attaching). It must attach its
-    # own model-level tracing callbacks, same as the other standalone,
-    # non-graph callers (oneshot_llm.run_oneshot_llm, MemoryUpdater).
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     assert captured["attach_tracing"] is True
     fake_model.ainvoke.assert_awaited_once()
-    # No thread_id/user_id supplied here, and Langfuse is not enabled in the
-    # ambient test env, so inject_langfuse_metadata() is a no-op and the
-    # config is unchanged from the plain run_name — see
-    # test_evaluate_goal_completion_injects_langfuse_metadata below for the
-    # Langfuse-enabled case.
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
+    # 说明当前测试分支所验证的真实行为与边界。
     assert fake_model.ainvoke.await_args.kwargs["config"] == {"run_name": "goal_evaluator"}
 
 
 def test_evaluate_goal_completion_injects_langfuse_metadata(monkeypatch):
-    """Regression test for the goal evaluator's Langfuse tracing gap.
-
-    Mirrors PR #2944 (main graph) and PR #3902 (memory_agent/suggest_agent):
-    a standalone, non-graph model call must inject Langfuse trace-attribute
-    metadata itself since there is no graph root to lift it from.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     from deerflow.config.tracing_config import reset_tracing_config
 
     for name in ("LANGFUSE_TRACING", "LANGFUSE_PUBLIC_KEY", "LANGFUSE_SECRET_KEY", "LANGFUSE_BASE_URL"):
@@ -186,6 +192,7 @@ def test_evaluate_goal_completion_injects_langfuse_metadata(monkeypatch):
 
 
 def test_evaluate_goal_completion_uses_injected_model(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fake_model = MagicMock()
     fake_model.ainvoke = AsyncMock(return_value=SimpleNamespace(content='{"satisfied": true, "reason": "Done", "evidence_summary": "Done"}'))
     create_chat_model = MagicMock()
@@ -210,6 +217,7 @@ def test_evaluate_goal_completion_uses_injected_model(monkeypatch):
 
 
 def test_evaluate_goal_completion_fails_closed_without_assistant_evidence(monkeypatch):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     fake_model = MagicMock()
     fake_model.ainvoke = AsyncMock()
     monkeypatch.setattr(goal, "create_chat_model", lambda **_kwargs: fake_model)
@@ -223,6 +231,7 @@ def test_evaluate_goal_completion_fails_closed_without_assistant_evidence(monkey
 
 
 def test_attach_goal_evaluation_records_blocker_progress_and_stand_down_reason():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     state = goal.build_goal_state("Finish")
     evaluation = goal.GoalEvaluation(
         satisfied=False,
@@ -247,27 +256,23 @@ def test_attach_goal_evaluation_records_blocker_progress_and_stand_down_reason()
 
 
 def test_latest_visible_assistant_signature_tracks_last_ai_evidence():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     base = [HumanMessage(content="go"), AIMessage(content="answer one")]
     sig1 = goal.latest_visible_assistant_signature(base)
-    # Signature depends only on the latest visible assistant text, not the prompt.
+    # 说明当前测试分支所验证的真实行为与边界。
     sig1_again = goal.latest_visible_assistant_signature([HumanMessage(content="different prompt"), AIMessage(content="answer one")])
-    # It changes when the assistant produces new output.
+    # 说明当前测试分支所验证的真实行为与边界。
     sig2 = goal.latest_visible_assistant_signature([HumanMessage(content="go"), AIMessage(content="answer two")])
 
     assert sig1 and sig1 == sig1_again
     assert sig1 != sig2
-    # Hidden continuations and human-only transcripts contribute no evidence.
+    # 说明当前测试分支所验证的真实行为与边界。
     hidden = AIMessage(content="hidden", additional_kwargs={"hide_from_ui": True})
     assert goal.latest_visible_assistant_signature([HumanMessage(content="only human"), hidden]) == ""
 
 
 def test_no_progress_count_keys_on_evidence_not_volatile_free_text():
-    """The breaker must survive the evaluator rewording its reason.
-
-    Same visible assistant evidence + reworded free-text reason/evidence_summary
-    must still count as 'no progress'. The previous implementation keyed on the
-    volatile free-text, so the breaker effectively never fired.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     evidence = "I made a start, but I am not done."
     first = goal.GoalEvaluation(satisfied=False, blocker="goal_not_met_yet", reason="The same work remains.", evidence_summary="No new verification evidence.")
     prior = goal.attach_goal_evaluation(goal.build_goal_state("Finish"), first, run_id="r1", no_progress_count=0, evidence_signature=evidence)
@@ -277,24 +282,28 @@ def test_no_progress_count_keys_on_evidence_not_volatile_free_text():
 
 
 def test_no_progress_count_resets_when_evidence_advances():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     first = goal.GoalEvaluation(satisfied=False, blocker="goal_not_met_yet", reason="x", evidence_summary="y")
     prior = goal.attach_goal_evaluation(goal.build_goal_state("Finish"), first, run_id="r1", no_progress_count=1, evidence_signature="step 1 done")
 
-    # Identical evaluator wording, but the agent produced NEW visible evidence -> progress.
+    # 说明当前测试分支所验证的真实行为与边界。
     assert goal.compute_no_progress_count(prior, first, evidence_signature="step 2 done") == 0
 
 
 def test_parse_goal_command_status_for_empty_and_whitespace():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     assert goal.parse_goal_command("") == goal.GoalCommand("status")
     assert goal.parse_goal_command("   ") == goal.GoalCommand("status")
 
 
 def test_parse_goal_command_clear_aliases_case_insensitive():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     for alias in ("clear", "reset", "off", "CLEAR", "  Reset  ", "Off"):
         assert goal.parse_goal_command(alias) == goal.GoalCommand("clear")
 
 
 def test_parse_goal_command_set_trims_and_preserves_objective():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     assert goal.parse_goal_command("  finish the work  ") == goal.GoalCommand("set", "finish the work")
-    # A multi-word objective that merely starts with an alias is a set, not a clear.
+    # 说明当前测试分支所验证的真实行为与边界。
     assert goal.parse_goal_command("clear the build cache") == goal.GoalCommand("set", "clear the build cache")

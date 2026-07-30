@@ -1,27 +1,4 @@
-"""Build the GitHub webhook → agent registry.
-
-Walks every user's custom-agent directory under ``{base_dir}/users/`` plus
-the legacy shared layout at ``{base_dir}/agents/`` and indexes every agent
-that declares a ``github:`` block by the ``(repo, event)`` pairs it
-declares an interest in.
-
-The dispatcher calls :func:`build_github_agent_registry` once per webhook
-delivery. We avoid re-parsing every ``config.yaml`` on each call via a
-small mtime-keyed cache: the directory listing + ``stat()`` per config
-file is cheap (~µs), while ``yaml.safe_load`` is the dominant cost
-(~hundreds of µs per file). The cache key is the sorted tuple of
-``(user_id, agent_name, config.yaml mtime)`` triples; any mtime change,
-addition, or deletion invalidates the cache transparently. Operators
-who hand-edit ``config.yaml`` see the change on the next webhook.
-
-Cache invalidation caveat: mtime granularity on macOS HFS+ / APFS is
-~1 µs but on some filesystems (FAT, network shares with caching) it's
-1 s. Two edits inside the same coarse-tick would look identical. For
-the dispatch path that's fine — webhooks are rare relative to operator
-edits, and the next non-coincident write reconciles. If we ever land
-operator tooling that batches sub-second edits, we can extend the
-signature with file size or a content hash.
-"""
+"定义 registry 模块提供的职责与可复用接口。\n\nBuild the GitHub webhook → agent registry.\n\nWalks every user's custom-agent directory under ``{base_dir}/users/`` plus\nthe legacy shared layout at ``{base_dir}/agents/`` and indexes every agent\nthat declares a ``github:`` block by the ``(repo, event)`` pairs it\ndeclares an interest in.\n\nThe dispatcher calls :func:`build_github_agent_registry` once per webhook\ndelivery. We avoid re-parsing every ``config.yaml`` on each call via a\nsmall mtime-keyed cache: the directory listing + ``stat()`` per config\nfile is cheap (~µs), while ``yaml.safe_load`` is the dominant cost\n(~hundreds of µs per file). The cache key is the sorted tuple of\n``(user_id, agent_name, config.yaml mtime)`` triples; any mtime change,\naddition, or deletion invalidates the cache transparently. Operators\nwho hand-edit ``config.yaml`` see the change on the next webhook.\n\nCache invalidation caveat: mtime granularity on macOS HFS+ / APFS is\n~1 µs but on some filesystems (FAT, network shares with caching) it's\n1 s. Two edits inside the same coarse-tick would look identical. For\nthe dispatch path that's fine — webhooks are rare relative to operator\nedits, and the next non-coincident write reconciles. If we ever land\noperator tooling that batches sub-second edits, we can extend the\nsignature with file size or a content hash.\n"
 
 from __future__ import annotations
 
@@ -44,23 +21,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class GitHubAgentMatch:
-    """One ``(user, agent, _resolved_trigger)`` row in the ``(repo, event)`` index.
-
-    The trigger is the binding override merged with per-event field defaults
-    (see :func:`app.gateway.github.triggers._resolved_trigger`), so the
-    dispatcher does not have to re-resolve it at fan-out time. Pre-resolving
-    here also folds the per-binding lookup out of the hot path: the registry
-    already chose the right binding for this ``(repo, event)``, so the
-    dispatcher's old "find the binding whose ``.repo`` matches" loop —
-    which silently dropped events when an agent had multiple bindings on
-    one repo (PR feedback R3) — disappears entirely. Single-binding-per-repo
-    is enforced upstream by :class:`GitHubAgentConfig`'s validator, so
-    each ``(repo, event)`` resolves to exactly one trigger per agent.
-
-    The ``github:`` block is read off ``agent.github`` (always non-None
-    here — the rebuild filters agents without one before constructing a
-    match), so we don't carry a separate ``github`` field.
-    """
+    '封装 GitHubAgentMatch 的状态、协作关系与公开操作。\n\nOne ``(user, agent, _resolved_trigger)`` row in the ``(repo, event)`` index.\n\n    The trigger is the binding override merged with per-event field defaults\n    (see :func:`app.gateway.github.triggers._resolved_trigger`), so the\n    dispatcher does not have to re-resolve it at fan-out time. Pre-resolving\n    here also folds the per-binding lookup out of the hot path: the registry\n    already chose the right binding for this ``(repo, event)``, so the\n    dispatcher\'s old "find the binding whose ``.repo`` matches" loop —\n    which silently dropped events when an agent had multiple bindings on\n    one repo (PR feedback R3) — disappears entirely. Single-binding-per-repo\n    is enforced upstream by :class:`GitHubAgentConfig`\'s validator, so\n    each ``(repo, event)`` resolves to exactly one trigger per agent.\n\n    The ``github:`` block is read off ``agent.github`` (always non-None\n    here — the rebuild filters agents without one before constructing a\n    match), so we don\'t carry a separate ``github`` field.\n    '
 
     user_id: str
     agent: AgentConfig
@@ -80,12 +41,7 @@ _cache_lock = threading.Lock()
 
 
 def _discover_user_ids() -> list[str]:
-    """Return all user-id directories under ``base_dir/users/``.
-
-    Falls back to ``[DEFAULT_USER_ID]`` so the no-auth dev setup (which
-    keeps everything in ``users/default/``) is always covered even before
-    the directory has been created on disk.
-    """
+    '执行 _discover_user_ids 的明确职责，并返回与调用约定一致的结果。\n\nReturn all user-id directories under ``base_dir/users/``.\n\n    Falls back to ``[DEFAULT_USER_ID]`` so the no-auth dev setup (which\n    keeps everything in ``users/default/``) is always covered even before\n    the directory has been created on disk.\n    '
     paths = get_paths()
     users_dir: Path = paths.base_dir / "users"
     if not users_dir.exists():
@@ -101,20 +57,7 @@ def _discover_user_ids() -> list[str]:
 
 
 def _gather_agent_signature() -> tuple[_Signature, list[tuple[str, str]]]:
-    """Return (signature, [(user_id, agent_name)]) for every agent on disk.
-
-    The signature lets us skip the YAML parse on warm hits; the
-    discovered list lets the rebuilder process exactly the agents that
-    the signature covers. Doing iterdir + stat is cheap (~µs each); the
-    full cost we avoid is the ``yaml.safe_load`` per config.
-
-    Includes the legacy shared layout at ``{base_dir}/agents/`` under the
-    :data:`DEFAULT_USER_ID` bucket so unmigrated installations still
-    receive webhook fan-out. Per-user entries shadow legacy entries with
-    the same name (matching :func:`list_custom_agents`' precedence), so
-    once an install runs ``migrate_user_isolation.py`` the legacy entry
-    is silently superseded rather than producing duplicate rows.
-    """
+    "执行 _gather_agent_signature 的明确职责，并返回与调用约定一致的结果。\n\nReturn (signature, [(user_id, agent_name)]) for every agent on disk.\n\n    The signature lets us skip the YAML parse on warm hits; the\n    discovered list lets the rebuilder process exactly the agents that\n    the signature covers. Doing iterdir + stat is cheap (~µs each); the\n    full cost we avoid is the ``yaml.safe_load`` per config.\n\n    Includes the legacy shared layout at ``{base_dir}/agents/`` under the\n    :data:`DEFAULT_USER_ID` bucket so unmigrated installations still\n    receive webhook fan-out. Per-user entries shadow legacy entries with\n    the same name (matching :func:`list_custom_agents`' precedence), so\n    once an install runs ``migrate_user_isolation.py`` the legacy entry\n    is silently superseded rather than producing duplicate rows.\n    "
     paths = get_paths()
     sig: list[tuple[str, str, float]] = []
     discovered: list[tuple[str, str]] = []
@@ -166,17 +109,7 @@ def _gather_agent_signature() -> tuple[_Signature, list[tuple[str, str]]]:
 
 
 def _rebuild(discovered: list[tuple[str, str]]) -> _Registry:
-    """Parse every agent's config.yaml and build the (repo, event) index.
-
-    Each ``(repo, event)`` slot stores :class:`GitHubAgentMatch` rows — the
-    user_id + AgentConfig + the trigger already resolved (binding override
-    merged with per-event field defaults). The dispatcher then only needs
-    to apply the trigger; it never re-walks ``bindings`` to find the right
-    one. Single-binding-per-repo is enforced by
-    :class:`GitHubAgentConfig`'s validator, so a duplicate-repo config
-    fails to load here (logged as a skip) instead of producing duplicate
-    rows in this index.
-    """
+    "执行 _rebuild 的明确职责，并返回与调用约定一致的结果。\n\nParse every agent's config.yaml and build the (repo, event) index.\n\n    Each ``(repo, event)`` slot stores :class:`GitHubAgentMatch` rows — the\n    user_id + AgentConfig + the trigger already resolved (binding override\n    merged with per-event field defaults). The dispatcher then only needs\n    to apply the trigger; it never re-walks ``bindings`` to find the right\n    one. Single-binding-per-repo is enforced by\n    :class:`GitHubAgentConfig`'s validator, so a duplicate-repo config\n    fails to load here (logged as a skip) instead of producing duplicate\n    rows in this index.\n    "
     index: _Registry = {}
     for user_id, agent_name in discovered:
         try:
@@ -200,22 +133,7 @@ def _rebuild(discovered: list[tuple[str, str]]) -> _Registry:
 
 
 def build_github_agent_registry() -> _Registry:
-    """Return ``{(repo, event): [GitHubAgentMatch, ...]}`` across all users.
-
-    Each agent appears in the index once per ``(repo, declared_event)`` pair,
-    with the per-event trigger pre-resolved by merging the binding override
-    with :data:`app.gateway.github.triggers.DEFAULT_TRIGGERS`. Events are
-    opt-in per binding: an agent only registers for the events it explicitly
-    lists under ``github.bindings[].triggers``. An agent that declares an
-    empty ``triggers:`` map (or omits it) registers for nothing and the
-    dispatcher will never fan a webhook out to it.
-
-    Warm path (no agents added/removed/edited since the last call) costs
-    only the iterdir + stat pass — no YAML parsing. Cold path parses
-    every config.yaml and refreshes the cache. The result is shared
-    across callers (returned by reference) since :class:`GitHubAgentMatch`
-    is frozen and the registry is intended as read-only.
-    """
+    '构建并返回，并遵守 build_github_agent_registry 所表达的接口约束。\n\nReturn ``{(repo, event): [GitHubAgentMatch, ...]}`` across all users.\n\n    Each agent appears in the index once per ``(repo, declared_event)`` pair,\n    with the per-event trigger pre-resolved by merging the binding override\n    with :data:`app.gateway.github.triggers.DEFAULT_TRIGGERS`. Events are\n    opt-in per binding: an agent only registers for the events it explicitly\n    lists under ``github.bindings[].triggers``. An agent that declares an\n    empty ``triggers:`` map (or omits it) registers for nothing and the\n    dispatcher will never fan a webhook out to it.\n\n    Warm path (no agents added/removed/edited since the last call) costs\n    only the iterdir + stat pass — no YAML parsing. Cold path parses\n    every config.yaml and refreshes the cache. The result is shared\n    across callers (returned by reference) since :class:`GitHubAgentMatch`\n    is frozen and the registry is intended as read-only.\n    '
     global _cache
     with _cache_lock:
         signature, discovered = _gather_agent_signature()
@@ -227,7 +145,7 @@ def build_github_agent_registry() -> _Registry:
 
 
 def _invalidate_cache() -> None:
-    """Drop the cached registry. Test-only helper."""
+    '执行 _invalidate_cache 的明确职责，并返回与调用约定一致的结果。\n\nDrop the cached registry. Test-only helper.'
     global _cache
     with _cache_lock:
         _cache = None
@@ -238,10 +156,5 @@ def lookup_agents(
     repo: str,
     event: str,
 ) -> list[GitHubAgentMatch]:
-    """Convenience: return the list of agent matches for ``(repo, event)``.
-
-    Each match carries the user, AgentConfig (with ``.github`` attached),
-    and the pre-resolved trigger config for this specific event, so the
-    caller does not need to walk the agent's ``bindings`` again.
-    """
+    "执行 lookup_agents 的明确职责，并返回与调用约定一致的结果。\n\nConvenience: return the list of agent matches for ``(repo, event)``.\n\n    Each match carries the user, AgentConfig (with ``.github`` attached),\n    and the pre-resolved trigger config for this specific event, so the\n    caller does not need to walk the agent's ``bindings`` again.\n    "
     return registry.get((repo, event), [])

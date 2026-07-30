@@ -1,3 +1,4 @@
+'定义 test_detect_thread_boundaries 模块提供的职责与可复用接口'
 from __future__ import annotations
 
 import json
@@ -8,11 +9,13 @@ from support.detectors import thread_boundaries as detector
 
 
 def _write_python(path: Path, source: str) -> Path:
+    '执行 _write_python 的明确职责，并返回与调用约定一致的结果'
     path.write_text(textwrap.dedent(source).strip() + "\n", encoding="utf-8")
     return path
 
 
 def test_scan_file_detects_async_thread_and_tool_boundaries(tmp_path):
+    '验证 scan、file、detects、async、thread、and、tool、boundaries 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -66,6 +69,7 @@ def test_scan_file_detects_async_thread_and_tool_boundaries(tmp_path):
 
 
 def test_scan_file_ignores_unqualified_threads_and_generic_method_names(tmp_path):
+    '验证 scan、file、ignores、unqualified、threads、and、generic、method、names 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -97,6 +101,7 @@ def test_scan_file_ignores_unqualified_threads_and_generic_method_names(tmp_path
 
 
 def test_scan_file_uses_import_evidence_for_thread_and_executor_aliases(tmp_path):
+    '验证 scan、file、uses、import、evidence、for、thread、and、executor、aliases 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -121,6 +126,7 @@ def test_scan_file_uses_import_evidence_for_thread_and_executor_aliases(tmp_path
 
 
 def test_scan_paths_ignores_virtualenv_like_directories(tmp_path):
+    '验证 scan、paths、ignores、virtualenv、like、directories 场景下的预期行为、边界条件与结果'
     scanned_file = _write_python(
         tmp_path / "app.py",
         """
@@ -148,6 +154,7 @@ def test_scan_paths_ignores_virtualenv_like_directories(tmp_path):
 
 
 def test_json_output_and_min_severity_filter(tmp_path, capsys):
+    '验证 json、output、and、min、severity、filter 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "sample.py",
         """
@@ -168,6 +175,7 @@ def test_json_output_and_min_severity_filter(tmp_path, capsys):
 
 
 def test_parse_errors_are_reported_as_findings(tmp_path):
+    '验证 parse、errors、are、reported、as、findings 场景下的预期行为、边界条件与结果'
     source_file = _write_python(
         tmp_path / "broken.py",
         """

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { DEFAULT_LOCALE, normalizeLocale, type Locale } from "./locale";
 import { translations } from "./translations";
 
+/** 实现 detectLocaleServer 的受限辅助逻辑。 */
 export async function detectLocaleServer(): Promise<Locale> {
   const cookieStore = await cookies();
   let locale = cookieStore.get("locale")?.value;
@@ -10,13 +11,14 @@ export async function detectLocaleServer(): Promise<Locale> {
     try {
       locale = decodeURIComponent(locale);
     } catch {
-      // Keep raw cookie value when decoding fails.
+      // 解码失败时保留原始 Cookie 值。
     }
   }
 
   return normalizeLocale(locale);
 }
 
+/** 实现 setLocale 的受限辅助逻辑。 */
 export async function setLocale(locale: string | Locale): Promise<Locale> {
   const normalizedLocale = normalizeLocale(locale);
   const cookieStore = await cookies();
@@ -29,6 +31,7 @@ export async function setLocale(locale: string | Locale): Promise<Locale> {
   return normalizedLocale;
 }
 
+/** 获取 getI18n 所需的结果或配置。 */
 export async function getI18n(localeOverride?: string | Locale) {
   const locale = localeOverride
     ? normalizeLocale(localeOverride)

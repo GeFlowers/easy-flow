@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "motion/react";
 
 import { cn } from "@/lib/utils";
 
+/** 以翻转动画平滑呈现离散数值变化，避免状态更新造成视觉跳变。 */
 export function FlipDisplay({
   uniqueKey,
   children,

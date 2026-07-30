@@ -1,4 +1,4 @@
-"""Tests for StreamBridge implementations."""
+'未说明'
 
 import asyncio
 import os
@@ -19,13 +19,16 @@ from deerflow.runtime.stream_bridge.redis import RedisStreamBridge
 
 
 def _stream_id_gt(left: str, right: str) -> bool:
+    '未说明'
     left_ms, left_seq = left.split("-", 1)
     right_ms, right_seq = right.split("-", 1)
     return (int(left_ms), int(left_seq)) > (int(right_ms), int(right_seq))
 
 
 class _FakeRedis:
+    '未说明'
     def __init__(self) -> None:
+        '未说明'
         self.streams = defaultdict(list)
         self.conditions = defaultdict(asyncio.Condition)
         self.counters = defaultdict(int)
@@ -34,6 +37,7 @@ class _FakeRedis:
         self.closed = False
 
     async def xadd(self, name, fields, maxlen=None, approximate=True):
+        '未说明'
         self.counters[name] += 1
         event_id = f"{self.counters[name]}-0"
         async with self.conditions[name]:
@@ -44,6 +48,7 @@ class _FakeRedis:
         return event_id
 
     async def xread(self, streams, count=None, block=None):
+        '未说明'
         [(name, last_id)] = list(streams.items())
         timeout = None if block is None else block / 1000
         while True:
@@ -59,48 +64,61 @@ class _FakeRedis:
                     return []
 
     async def xrevrange(self, name, max="+", min="-", count=None):
+        '未说明'
         entries = list(reversed(self.streams.get(name, [])))
         return entries[:count] if count is not None else entries
 
     async def delete(self, name):
+        '未说明'
         self.deleted.append(name)
         self.streams.pop(name, None)
         return 1
 
     async def exists(self, name):
+        '未说明'
         return 1 if name in self.streams else 0
 
     async def expire(self, name, seconds):
+        '未说明'
         self.expirations.append((name, seconds))
         return True
 
     def pipeline(self, *, transaction=True):
+        '未说明'
         return _FakeRedisPipeline(self)
 
     async def aclose(self):
+        '未说明'
         self.closed = True
 
 
 class _FakeRedisPipeline:
+    '未说明'
     def __init__(self, redis: _FakeRedis) -> None:
+        '未说明'
         self.redis = redis
         self.ops = []
 
     async def __aenter__(self):
+        '未说明'
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        '未说明'
         return None
 
     def xadd(self, name, fields, maxlen=None, approximate=True):
+        '未说明'
         self.ops.append(("xadd", name, fields, maxlen, approximate))
         return self
 
     def expire(self, name, seconds):
+        '未说明'
         self.ops.append(("expire", name, seconds))
         return self
 
     async def execute(self):
+        '未说明'
         results = []
         for op in self.ops:
             if op[0] == "xadd":
@@ -119,12 +137,13 @@ class _FakeRedisPipeline:
 
 @pytest.fixture
 def bridge() -> MemoryStreamBridge:
+    '未说明'
     return MemoryStreamBridge(queue_maxsize=256)
 
 
 @pytest.mark.anyio
 async def test_publish_subscribe(bridge: MemoryStreamBridge):
-    """Three events followed by end should be received in order."""
+    '未说明'
     run_id = "run-1"
 
     await bridge.publish(run_id, "metadata", {"run_id": run_id})
@@ -147,13 +166,14 @@ async def test_publish_subscribe(bridge: MemoryStreamBridge):
 
 @pytest.mark.anyio
 async def test_heartbeat(bridge: MemoryStreamBridge):
-    """When no events arrive within the heartbeat interval, yield a heartbeat."""
+    '未说明'
     run_id = "run-heartbeat"
     bridge._get_or_create_stream(run_id)  # ensure stream exists
 
     received = []
 
     async def consumer():
+        '未说明'
         async for entry in bridge.subscribe(run_id, heartbeat_interval=0.1):
             received.append(entry)
             if entry is HEARTBEAT_SENTINEL:
@@ -166,7 +186,7 @@ async def test_heartbeat(bridge: MemoryStreamBridge):
 
 @pytest.mark.anyio
 async def test_cleanup(bridge: MemoryStreamBridge):
-    """After cleanup, the run's stream/event log is removed."""
+    '未说明'
     run_id = "run-cleanup"
     await bridge.publish(run_id, "test", {})
     assert run_id in bridge._streams
@@ -178,12 +198,7 @@ async def test_cleanup(bridge: MemoryStreamBridge):
 
 @pytest.mark.anyio
 async def test_stream_exists_reports_cleanup(bridge: MemoryStreamBridge):
-    """Callers can detect when the in-process event log has been cleaned up.
-
-    Before cleanup a completed run's retained history still exists; after
-    cleanup ``stream_exists`` reports False so a reconnecting subscriber does
-    not hang waiting on a stream whose data is already gone.
-    """
+    '未说明'
     run_id = "run-post-cleanup"
     await bridge.publish(run_id, "event-1", {"n": 1})
     await bridge.publish_end(run_id)
@@ -195,7 +210,7 @@ async def test_stream_exists_reports_cleanup(bridge: MemoryStreamBridge):
 
 @pytest.mark.anyio
 async def test_history_is_bounded():
-    """Retained history should be bounded by queue_maxsize."""
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=1)
     run_id = "run-bp"
 
@@ -216,7 +231,7 @@ async def test_history_is_bounded():
 
 @pytest.mark.anyio
 async def test_multiple_runs(bridge: MemoryStreamBridge):
-    """Two different run_ids should not interfere with each other."""
+    '未说明'
     await bridge.publish("run-a", "event-a", {"a": 1})
     await bridge.publish("run-b", "event-b", {"b": 2})
     await bridge.publish_end("run-a")
@@ -245,7 +260,7 @@ async def test_multiple_runs(bridge: MemoryStreamBridge):
 
 @pytest.mark.anyio
 async def test_event_id_format(bridge: MemoryStreamBridge):
-    """Event IDs should use timestamp-sequence format."""
+    '未说明'
     run_id = "run-id-format"
     await bridge.publish(run_id, "test", {"key": "value"})
     await bridge.publish_end(run_id)
@@ -262,7 +277,7 @@ async def test_event_id_format(bridge: MemoryStreamBridge):
 
 @pytest.mark.anyio
 async def test_subscribe_replays_after_last_event_id(bridge: MemoryStreamBridge):
-    """Reconnect should replay buffered events after the provided Last-Event-ID."""
+    '未说明'
     run_id = "run-replay"
     await bridge.publish(run_id, "metadata", {"run_id": run_id})
     await bridge.publish(run_id, "values", {"step": 1})
@@ -291,7 +306,7 @@ async def test_subscribe_replays_after_last_event_id(bridge: MemoryStreamBridge)
 
 @pytest.mark.anyio
 async def test_slow_subscriber_does_not_skip_after_buffer_trim():
-    """A slow subscriber should continue from the correct absolute offset."""
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=2)
     run_id = "run-slow-subscriber"
     await bridge.publish(run_id, "e1", {"step": 1})
@@ -341,7 +356,7 @@ async def test_slow_subscriber_does_not_skip_after_buffer_trim():
 
 @pytest.mark.anyio
 async def test_publish_end_terminates_even_when_history_is_full():
-    """publish_end() should terminate subscribers without mutating retained history."""
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=2)
     run_id = "run-end-history-full"
 
@@ -365,7 +380,7 @@ async def test_publish_end_terminates_even_when_history_is_full():
 
 @pytest.mark.anyio
 async def test_publish_end_without_history_yields_end_immediately():
-    """Subscribers should still receive END when a run completes without events."""
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=2)
     run_id = "run-end-empty"
     await bridge.publish_end(run_id)
@@ -382,7 +397,7 @@ async def test_publish_end_without_history_yields_end_immediately():
 
 @pytest.mark.anyio
 async def test_publish_end_preserves_history_when_space_available():
-    """When history has spare capacity, publish_end should preserve prior events."""
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=10)
     run_id = "run-no-evict"
 
@@ -405,20 +420,18 @@ async def test_publish_end_preserves_history_when_space_available():
 
 @pytest.mark.anyio
 async def test_concurrent_tasks_end_sentinel():
-    """Multiple concurrent producer/consumer pairs should all terminate properly.
-
-    Simulates the production scenario where multiple runs share a single
-    bridge instance — each must receive its own END sentinel.
-    """
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=4)
     num_runs = 4
 
     async def producer(run_id: str):
+        '未说明'
         for i in range(10):  # More events than queue capacity
             await bridge.publish(run_id, f"event-{i}", {"i": i})
         await bridge.publish_end(run_id)
 
     async def consumer(run_id: str) -> list:
+        '未说明'
         events = []
         async for entry in bridge.subscribe(run_id, heartbeat_interval=0.1):
             events.append(entry)
@@ -430,6 +443,7 @@ async def test_concurrent_tasks_end_sentinel():
     results: dict[str, list] = {}
 
     async def consume_into(run_id: str) -> None:
+        '未说明'
         results[run_id] = await consumer(run_id)
 
     with anyio.fail_after(10):
@@ -452,12 +466,13 @@ async def test_concurrent_tasks_end_sentinel():
 
 @pytest.fixture
 def redis_bridge() -> RedisStreamBridge:
+    '未说明'
     return RedisStreamBridge(redis_url="redis://fake", queue_maxsize=2, client=_FakeRedis())
 
 
 @pytest.mark.anyio
 async def test_redis_publish_subscribe(redis_bridge: RedisStreamBridge):
-    """Redis bridge should deliver events in order and terminate on end."""
+    '未说明'
     run_id = "redis-run-1"
 
     await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
@@ -477,7 +492,7 @@ async def test_redis_publish_subscribe(redis_bridge: RedisStreamBridge):
 
 @pytest.mark.anyio
 async def test_redis_replays_after_last_event_id(redis_bridge: RedisStreamBridge):
-    """Redis XREAD should resume after Last-Event-ID."""
+    '未说明'
     run_id = "redis-run-replay"
 
     await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
@@ -502,13 +517,14 @@ async def test_redis_replays_after_last_event_id(redis_bridge: RedisStreamBridge
 
 @pytest.mark.anyio
 async def test_redis_invalid_last_event_id_tails_live_events(redis_bridge: RedisStreamBridge):
-    """Malformed reconnect ids should not replay retained Redis events."""
+    '未说明'
     run_id = "redis-run-invalid-last-event-id"
 
     await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
     received = []
 
     async def publish_later() -> None:
+        '未说明'
         await anyio.sleep(0.05)
         await redis_bridge.publish(run_id, "values", {"step": 1})
         await redis_bridge.publish_end(run_id)
@@ -529,11 +545,12 @@ async def test_redis_invalid_last_event_id_tails_live_events(redis_bridge: Redis
 
 @pytest.mark.anyio
 async def test_redis_invalid_last_event_id_tails_empty_stream(redis_bridge: RedisStreamBridge):
-    """Malformed reconnect ids should still wait for the first Redis event."""
+    '未说明'
     run_id = "redis-run-invalid-empty"
     received = []
 
     async def publish_later() -> None:
+        '未说明'
         await anyio.sleep(0.05)
         await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
         await redis_bridge.publish_end(run_id)
@@ -554,7 +571,7 @@ async def test_redis_invalid_last_event_id_tails_empty_stream(redis_bridge: Redi
 
 @pytest.mark.anyio
 async def test_redis_invalid_last_event_id_on_terminal_run_replays_end(redis_bridge: RedisStreamBridge):
-    """Malformed reconnect ids on terminal streams should drain END instead of hanging."""
+    '未说明'
     run_id = "redis-run-invalid-terminal"
 
     await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
@@ -572,7 +589,7 @@ async def test_redis_invalid_last_event_id_on_terminal_run_replays_end(redis_bri
 
 @pytest.mark.anyio
 async def test_redis_heartbeat(redis_bridge: RedisStreamBridge):
-    """Redis bridge should yield heartbeats when XREAD times out on an existing stream."""
+    '未说明'
     run_id = "redis-run-heartbeat"
     await redis_bridge.publish(run_id, "init", {})
 
@@ -589,7 +606,7 @@ async def test_redis_heartbeat(redis_bridge: RedisStreamBridge):
 
 @pytest.mark.anyio
 async def test_redis_publish_end_preserves_data_history_capacity(redis_bridge: RedisStreamBridge):
-    """The internal end marker should not evict the configured data history."""
+    '未说明'
     run_id = "redis-run-end-capacity"
 
     await redis_bridge.publish(run_id, "event-1", {"n": 1})
@@ -608,6 +625,7 @@ async def test_redis_publish_end_preserves_data_history_capacity(redis_bridge: R
 
 @pytest.mark.anyio
 async def test_redis_cleanup_deletes_stream(redis_bridge: RedisStreamBridge):
+    '未说明'
     fake = redis_bridge._redis
     run_id = "redis-run-cleanup"
 
@@ -619,7 +637,7 @@ async def test_redis_cleanup_deletes_stream(redis_bridge: RedisStreamBridge):
 
 @pytest.mark.anyio
 async def test_redis_publish_refreshes_stream_ttl():
-    """Redis stream TTL should be rolling on publish and publish_end."""
+    '未说明'
     fake = _FakeRedis()
     bridge = RedisStreamBridge(
         redis_url="redis://fake",
@@ -639,7 +657,7 @@ async def test_redis_publish_refreshes_stream_ttl():
 
 @pytest.mark.anyio
 async def test_redis_stream_ttl_can_be_disabled():
-    """A zero TTL disables the Redis leak safety net for installations that need it."""
+    '未说明'
     fake = _FakeRedis()
     bridge = RedisStreamBridge(
         redis_url="redis://fake",
@@ -656,11 +674,12 @@ async def test_redis_stream_ttl_can_be_disabled():
 
 @pytest.mark.anyio
 async def test_redis_subscribe_waits_for_first_publish(redis_bridge: RedisStreamBridge):
-    """A subscriber that starts before the first XADD must not receive END."""
+    '未说明'
     run_id = "redis-run-first-publish"
     received = []
 
     async def publish_later() -> None:
+        '未说明'
         await anyio.sleep(0.05)
         await redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
         await redis_bridge.publish_end(run_id)
@@ -681,7 +700,7 @@ async def test_redis_subscribe_waits_for_first_publish(redis_bridge: RedisStream
 
 @pytest.mark.anyio
 async def test_redis_stream_exists_reports_cleanup(redis_bridge: RedisStreamBridge):
-    """Callers can detect when retained Redis stream data has been cleaned up."""
+    '未说明'
     run_id = "redis-run-post-cleanup"
     await redis_bridge.publish(run_id, "event-1", {"n": 1})
     await redis_bridge.publish_end(run_id)
@@ -693,7 +712,7 @@ async def test_redis_stream_exists_reports_cleanup(redis_bridge: RedisStreamBrid
 
 @pytest.mark.anyio
 async def test_redis_transient_error_retries():
-    """Transient RedisError during XREAD should be retried, not propagated."""
+    '未说明'
     from redis.exceptions import RedisError
 
     fake = _FakeRedis()
@@ -701,6 +720,7 @@ async def test_redis_transient_error_retries():
     original_xread = fake.xread
 
     async def flaky_xread(streams, count=None, block=None):
+        '未说明'
         nonlocal call_count
         call_count += 1
         if call_count <= 2:
@@ -728,12 +748,13 @@ async def test_redis_transient_error_retries():
 
 @pytest.mark.anyio
 async def test_redis_transient_error_gives_up_after_max_retries():
-    """After exceeding max consecutive errors, RedisError should propagate."""
+    '未说明'
     from redis.exceptions import RedisError
 
     fake = _FakeRedis()
 
     async def always_fail_xread(streams, count=None, block=None):
+        '未说明'
         raise RedisError("Persistent connection error")
 
     fake.xread = always_fail_xread
@@ -751,7 +772,7 @@ async def test_redis_transient_error_gives_up_after_max_retries():
 
 @pytest.mark.anyio
 async def test_make_stream_bridge_defaults():
-    """make_stream_bridge() with no config yields a MemoryStreamBridge."""
+    '未说明'
     async with make_stream_bridge() as bridge:
         assert isinstance(bridge, MemoryStreamBridge)
 
@@ -762,7 +783,7 @@ async def test_make_stream_bridge_defaults():
 
 
 def _linear_resolve(stream, last_event_id):
-    """The original linear-scan resolver, kept as a parity reference."""
+    '未说明'
     if last_event_id is None:
         return stream.start_offset
     for index, entry in enumerate(stream.events):
@@ -782,13 +803,13 @@ def _linear_resolve(stream, last_event_id):
     ],
 )
 def test_parse_event_seq(event_id, expected):
+    '未说明'
     assert MemoryStreamBridge._parse_event_seq(event_id) == expected
 
 
 @pytest.mark.anyio
 async def test_resolve_start_offset_matches_linear_scan():
-    """The seq-indexed resolver must return exactly what the linear scan returned,
-    across retained, evicted, foreign (same seq / wrong ts), malformed, and None ids."""
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=4)
     run_id = "run-parity"
     ids = []
@@ -809,7 +830,7 @@ async def test_resolve_start_offset_matches_linear_scan():
 
 @pytest.mark.anyio
 async def test_subscribe_with_unknown_last_event_id_replays_from_earliest():
-    """A foreign/garbage Last-Event-ID falls back to replaying retained events."""
+    '未说明'
     bridge = MemoryStreamBridge(queue_maxsize=10)
     run_id = "run-unknown-id"
     await bridge.publish(run_id, "first", {})
@@ -828,7 +849,7 @@ async def test_subscribe_with_unknown_last_event_id_replays_from_earliest():
 
 @pytest.mark.anyio
 async def test_make_stream_bridge_uses_docker_redis_env(monkeypatch):
-    """Docker can enable Redis bridge without editing config.yaml."""
+    '未说明'
     set_stream_bridge_config(None)
     monkeypatch.setenv("DEER_FLOW_STREAM_BRIDGE_REDIS_URL", "redis://redis:6379/0")
     try:
@@ -841,12 +862,13 @@ async def test_make_stream_bridge_uses_docker_redis_env(monkeypatch):
 
 @pytest.mark.anyio
 async def test_make_stream_bridge_passes_redis_options(monkeypatch):
-    """Redis options from config should be forwarded to Redis bridge setup."""
+    '未说明'
     import deerflow.runtime.stream_bridge.redis as redis_module
 
     captured: dict = {}
 
     def fake_from_url(url, **kwargs):
+        '未说明'
         captured["url"] = url
         captured.update(kwargs)
         return _FakeRedis()
@@ -886,6 +908,7 @@ REDIS_TEST_URL = os.environ.get("DEER_FLOW_TEST_REDIS_URL", "redis://localhost:6
 
 
 def _redis_available() -> bool:
+    '未说明'
     try:
         import redis  # sync client, used only for the connectivity probe
     except ImportError:
@@ -906,6 +929,7 @@ requires_redis = pytest.mark.skipif(not _redis_available(), reason=f"Redis not r
 
 @pytest.fixture
 async def real_redis_bridge():
+    '未说明'
     from redis.asyncio import Redis
 
     client = Redis.from_url(REDIS_TEST_URL, decode_responses=True)
@@ -923,6 +947,7 @@ async def real_redis_bridge():
 @requires_redis
 @pytest.mark.anyio
 async def test_redis_integration_publish_subscribe_and_id_format(real_redis_bridge):
+    '未说明'
     run_id = "integ-basic"
     await real_redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
     await real_redis_bridge.publish(run_id, "values", {"step": 1})
@@ -945,6 +970,7 @@ async def test_redis_integration_publish_subscribe_and_id_format(real_redis_brid
 @requires_redis
 @pytest.mark.anyio
 async def test_redis_integration_replays_after_last_event_id(real_redis_bridge):
+    '未说明'
     run_id = "integ-replay"
     await real_redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
     await real_redis_bridge.publish(run_id, "values", {"step": 1})
@@ -970,12 +996,13 @@ async def test_redis_integration_replays_after_last_event_id(real_redis_bridge):
 @requires_redis
 @pytest.mark.anyio
 async def test_redis_integration_invalid_last_event_id_tails_live_events(real_redis_bridge):
-    """A malformed Last-Event-ID should wait at the live tail."""
+    '未说明'
     run_id = "integ-bad-leid"
     await real_redis_bridge.publish(run_id, "metadata", {"run_id": run_id})
     received = []
 
     async def publish_later() -> None:
+        '未说明'
         await anyio.sleep(0.05)
         await real_redis_bridge.publish(run_id, "values", {"step": 1})
         await real_redis_bridge.publish_end(run_id)
@@ -998,7 +1025,7 @@ async def test_redis_integration_invalid_last_event_id_tails_live_events(real_re
 @requires_redis
 @pytest.mark.anyio
 async def test_redis_integration_maxlen_trims_history(real_redis_bridge):
-    """queue_maxsize should bound the retained stream via XADD MAXLEN (exact)."""
+    '未说明'
     run_id = "integ-maxlen"
     # Fixture sets queue_maxsize=2; publish more data events than that.
     for i in range(6):
@@ -1013,7 +1040,7 @@ async def test_redis_integration_maxlen_trims_history(real_redis_bridge):
 @requires_redis
 @pytest.mark.anyio
 async def test_redis_integration_stream_ttl_reclaims_key():
-    """Redis should reclaim retained stream data when cleanup never runs."""
+    '未说明'
     from redis.asyncio import Redis
 
     client = Redis.from_url(REDIS_TEST_URL, decode_responses=True)

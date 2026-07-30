@@ -30,6 +30,9 @@ const CONTRACT: ContractFile = JSON.parse(
 ) as ContractFile;
 
 describe("parseSubtaskResult", () => {
+  /**
+   * 覆盖“uses legacy task result text when structured metadata is absent”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("uses legacy task result text when structured metadata is absent", () => {
     expect(
       parseSubtaskResult(
@@ -76,6 +79,11 @@ describe("parseSubtaskResult", () => {
     });
   });
 
+  /**
+   * 覆盖“keeps unknown content-only task results in progress”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("keeps unknown content-only task results in progress", () => {
     const parsed = parseSubtaskResult("partial streaming chunk");
 
@@ -86,6 +94,9 @@ describe("parseSubtaskResult", () => {
 });
 
 describe("hasSubtaskToolResult", () => {
+  /**
+   * 覆盖“matches a task tool call to its ToolMessage”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("matches a task tool call to its ToolMessage", () => {
     const messages = [
       { type: "ai" },
@@ -94,6 +105,11 @@ describe("hasSubtaskToolResult", () => {
 
     expect(hasSubtaskToolResult("call_task_1", messages)).toBe(true);
   });
+
+  /**
+   * 覆盖“returns false when a task tool call has no ToolMessage”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("returns false when a task tool call has no ToolMessage", () => {
     const messages = [
@@ -106,6 +122,9 @@ describe("hasSubtaskToolResult", () => {
 });
 
 describe("derivePendingSubtaskStatus", () => {
+  /**
+   * 覆盖“keeps a task in progress while its own assistant turn is loading”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("keeps a task in progress while its own assistant turn is loading", () => {
     const messages = [{ type: "ai" }] as Message[];
 
@@ -114,6 +133,11 @@ describe("derivePendingSubtaskStatus", () => {
     );
   });
 
+  /**
+   * 覆盖“does not revive an earlier unfinished task during a later turn”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("does not revive an earlier unfinished task during a later turn", () => {
     const messages = [{ type: "ai" }] as Message[];
 
@@ -121,6 +145,11 @@ describe("derivePendingSubtaskStatus", () => {
       "failed",
     );
   });
+
+  /**
+   * 覆盖“leaves result parsing to the ToolMessage path when a result exists”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("leaves result parsing to the ToolMessage path when a result exists", () => {
     const messages = [
@@ -135,19 +164,26 @@ describe("derivePendingSubtaskStatus", () => {
 });
 
 /**
- * Structured-status path (bytedance/deer-flow#3146).
+ * 结构化状态路径（bytedance/deer-flow#3146）。
  *
- * The backend stamps `ToolMessage.additional_kwargs.subagent_status`
- * directly. The frontend should prefer that over reverse-engineering it
- * from the content string.
+ * 后端直接写入 `ToolMessage.additional_kwargs.subagent_status`。前端应优先使用它，
+ * 而非从内容字符串逆向推断。
  */
 describe("parseSubtaskResult — structured additional_kwargs (preferred path)", () => {
+  /**
+   * 覆盖“uses additional_kwargs.subagent_status when present”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("uses additional_kwargs.subagent_status when present", () => {
     const parsed = parseSubtaskResult("Task Succeeded. Result: foo", {
       [SUBAGENT_STATUS_KEY]: "completed",
     });
     expect(parsed.status).toBe("completed");
   });
+
+  /**
+   * 覆盖“restores terminal model and token usage metadata”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("restores terminal model and token usage metadata", () => {
     expect(
@@ -171,6 +207,11 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     });
   });
 
+  /**
+   * 覆盖“collapses cancelled / timed_out / polling_timed_out to failed for the card UI”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("collapses cancelled / timed_out / polling_timed_out to failed for the card UI", () => {
     for (const backendStatus of [
       "cancelled",
@@ -184,14 +225,18 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     }
   });
 
+  /**
+   * 覆盖“renders legacy max_turns_reached (checkpointed under #3949) as a terminal failed pill, not spinning in_progress”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("renders legacy max_turns_reached (checkpointed under #3949) as a terminal failed pill, not spinning in_progress", () => {
-    // Phase 1 wrote `subagent_status: "max_turns_reached"` into ToolMessage
-    // additional_kwargs, which is checkpointed in thread history. Phase 2 (#3980)
-    // stopped producing it, but old turns still carry it. Without the deprecated
-    // alias, readStructuredStatus returns null while hasStructuredSubagentMetadata
-    // stays true (sibling keys present) -> parseSubtaskResult returns
-    // { status: "in_progress" } and the card spins forever. The alias keeps it
-    // terminal, matching how Phase 1 itself rendered the value.
+    // 第一阶段将 `subagent_status: "max_turns_reached"` 写入 ToolMessage
+    // additional_kwargs，它会被检入线程历史。第二阶段（#3980）不再生成它，但旧回合
+    // 仍携带该值。没有已废弃别名时，hasStructuredSubagentMetadata 保持 true（存在同级键）
+    // 而 readStructuredStatus 返回 null -> parseSubtaskResult 返回
+    // { status: "in_progress" }，卡片将永远旋转。该别名使其保持终态，与第一阶段对该值的
+    // 渲染方式一致。
     const parsed = parseSubtaskResult("ignored content", {
       [SUBAGENT_STATUS_KEY]: "max_turns_reached",
       [SUBAGENT_ERROR_KEY]: "Reached max_turns=150",
@@ -199,16 +244,19 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     });
     expect(parsed.status).toBe("failed");
     expect(parsed.error).toBe("Reached max_turns=150");
-    // result only attaches for the completed pill; legacy data renders as failed.
+    // result 仅附加到 completed 状态标记；旧数据渲染为 failed。
     expect(parsed.result).toBeUndefined();
   });
 
+  /**
+   * 覆盖“surfaces stop_reason on a capped run while keeping a normal pill status”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("surfaces stop_reason on a capped run while keeping a normal pill status", () => {
-    // bytedance/deer-flow#3875 Phase 2: a token-capped run produced a final
-    // answer, so it is `completed` with the cap on the additive
-    // `subagent_stop_reason` field. The card stays green; stopReason carries
-    // the cap detail for a future badge, and the recovered partial result
-    // lives on subagent_result_brief.
+    // bytedance/deer-flow#3875 第二阶段：受 token 上限限制的任务产生了最终回答，
+    // 因此它是 `completed`，上限信息位于附加的 `subagent_stop_reason` 字段。卡片保持
+    // 绿色；stopReason 为未来标记携带上限详情，恢复的部分结果则位于 subagent_result_brief。
     const parsed = parseSubtaskResult("ignored content", {
       [SUBAGENT_STATUS_KEY]: "completed",
       [SUBAGENT_RESULT_BRIEF_KEY]: "investigated 3 of 5 sources",
@@ -219,9 +267,14 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.stopReason).toBe("token_capped");
   });
 
+  /**
+   * 覆盖“surfaces stop_reason on a turn-capped run that produced no usable result”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("surfaces stop_reason on a turn-capped run that produced no usable result", () => {
-    // No usable partial -> the backend stamps `failed` + turn_capped. The card
-    // goes red; stopReason still carries the cap so a future badge can say so.
+    // 没有可用部分结果 -> 后端写入 `failed` + turn_capped。卡片变红；stopReason 仍携带
+    // 上限，以便未来标记能展示它。
     const parsed = parseSubtaskResult("ignored content", {
       [SUBAGENT_STATUS_KEY]: "failed",
       [SUBAGENT_ERROR_KEY]: "Reached max_turns=150",
@@ -232,9 +285,13 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.stopReason).toBe("turn_capped");
   });
 
+  /**
+   * 覆盖“ignores an unknown subagent_stop_reason value”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("ignores an unknown subagent_stop_reason value", () => {
-    // An unrecognized stop_reason is dropped so a stale frontend never renders
-    // a bogus cap badge.
+    // 丢弃无法识别的 stop_reason，确保旧版前端绝不渲染虚假的上限标记。
     const parsed = parseSubtaskResult("ignored content", {
       [SUBAGENT_STATUS_KEY]: "completed",
       [SUBAGENT_STOP_REASON_KEY]: "future_cap_kind",
@@ -242,6 +299,11 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.status).toBe("completed");
     expect(parsed.stopReason).toBeUndefined();
   });
+
+  /**
+   * 覆盖“uses subagent_error when supplied”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("uses subagent_error when supplied", () => {
     const parsed = parseSubtaskResult("ignored content", {
@@ -252,6 +314,11 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.error).toBe("boom from backend");
   });
 
+  /**
+   * 覆盖“ignores empty / non-string subagent_error”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("ignores empty / non-string subagent_error", () => {
     const parsed = parseSubtaskResult("ignored content", {
       [SUBAGENT_STATUS_KEY]: "failed",
@@ -261,6 +328,11 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.error).toBeUndefined();
   });
 
+  /**
+   * 覆盖“ignores terminal-looking content when partial structured metadata is present”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("ignores terminal-looking content when partial structured metadata is present", () => {
     const parsed = parseSubtaskResult("Task Succeeded. Result: foo", {
       [SUBAGENT_RESULT_BRIEF_KEY]: "structured result without status",
@@ -269,12 +341,22 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.result).toBeUndefined();
   });
 
+  /**
+   * 覆盖“ignores terminal-looking content when the structured status is unknown”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("ignores terminal-looking content when the structured status is unknown", () => {
     const parsed = parseSubtaskResult("Task Succeeded. Result: foo", {
       [SUBAGENT_STATUS_KEY]: "renamed_in_v3",
     });
     expect(parsed.status).toBe("in_progress");
   });
+
+  /**
+   * 覆盖“structured status overrides misleading content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("structured status overrides misleading content", () => {
     const parsed = parseSubtaskResult("Task Succeeded. Result: this is a lie", {
@@ -285,6 +367,11 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.error).toBeUndefined();
   });
 
+  /**
+   * 覆盖“does not back-fill result from content when structured result metadata is missing”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("does not back-fill result from content when structured result metadata is missing", () => {
     const parsed = parseSubtaskResult("Task Succeeded. Result: text-only", {
       [SUBAGENT_STATUS_KEY]: "completed",
@@ -292,6 +379,11 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.status).toBe("completed");
     expect(parsed.result).toBeUndefined();
   });
+
+  /**
+   * 覆盖“uses bounded structured result metadata when present for completed task”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("uses bounded structured result metadata when present for completed task", () => {
     const parsed = parseSubtaskResult("Task Succeeded. Result: text body", {
@@ -302,6 +394,11 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.status).toBe("completed");
     expect(parsed.result).toBe("structured");
   });
+
+  /**
+   * 覆盖“does not back-fill error from content when structured error metadata is missing”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("does not back-fill error from content when structured error metadata is missing", () => {
     const parsed = parseSubtaskResult(
@@ -314,9 +411,13 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
     expect(parsed.error).toBeUndefined();
   });
 
+  /**
+   * 覆盖“leaves `error` undefined when structured says failed with no error and unrecognised text”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("leaves `error` undefined when structured says failed with no error and unrecognised text", () => {
-    // Don't dump arbitrary content into the error field — better to render
-    // an empty `failed` pill than to surface noise.
+    // 不要将任意内容塞入错误字段——宁可渲染空的 `failed` 状态标记，也不要展示噪音。
     const parsed = parseSubtaskResult("partial streaming chunk", {
       [SUBAGENT_STATUS_KEY]: "failed",
     });
@@ -326,9 +427,8 @@ describe("parseSubtaskResult — structured additional_kwargs (preferred path)",
 });
 
 /**
- * Cross-language contract test for the structured subagent status field.
- * The backend and frontend share the enum values, but task result text is
- * no longer part of the wire contract.
+ * 结构化子代理状态字段的跨语言契约测试。后端和前端共享枚举值，但任务结果文本
+ * 不再属于连线契约的一部分。
  */
 describe("parseSubtaskResult — shared contract fixture", () => {
   const expectedCardStatus = (backendStatus: string): string => {

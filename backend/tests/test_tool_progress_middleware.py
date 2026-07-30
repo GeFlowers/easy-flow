@@ -1,4 +1,4 @@
-"""Tests for ToolProgressMiddleware state machine (RFC #3177)."""
+'未说明'
 
 from __future__ import annotations
 
@@ -22,12 +22,14 @@ from deerflow.agents.middlewares.tool_result_meta import TOOL_META_KEY
 
 
 def _make_runtime(thread_id: str = "t1", run_id: str = "r1") -> MagicMock:
+    '未说明'
     rt = MagicMock()
     rt.context = {"thread_id": thread_id, "run_id": run_id}
     return rt
 
 
 def _make_tool_request(tool_name: str = "web_search", *, runtime: MagicMock | None = None) -> SimpleNamespace:
+    '未说明'
     rt = runtime or _make_runtime()
     return SimpleNamespace(
         tool_call={"name": tool_name, "id": f"tc-{tool_name}"},
@@ -43,6 +45,7 @@ def _meta_kwargs(
     recommended_next_action: str = "continue",
     source: str = "content_analysis",
 ) -> dict[str, object]:
+    '未说明'
     return {
         TOOL_META_KEY: {
             "status": status,
@@ -60,6 +63,7 @@ def _make_tool_message(
     tool_name: str = "web_search",
     meta_kwargs: dict[str, object] | None = None,
 ) -> ToolMessage:
+    '未说明'
     return ToolMessage(
         content=content,
         tool_call_id=f"tc-{tool_name}",
@@ -76,10 +80,7 @@ def _make_non_recoverable_error_message(
     error_type: str = "rate_limited",
     recommended_next_action: str = "summarize",
 ) -> ToolMessage:
-    """Non-recoverable stagnation error (recoverable_by_model=False, non-stop).
-    Unlike auth/config, these go through the stagnation counter, but should
-    still reach BLOCKED because the model cannot fix them by retrying.
-    """
+    '未说明'
     return ToolMessage(
         content=content,
         tool_call_id=f"tc-{tool_name}",
@@ -102,6 +103,7 @@ def _make_error_message(
     recoverable_by_model: bool = True,
     recommended_next_action: str = "rewrite_query",
 ) -> ToolMessage:
+    '未说明'
     return ToolMessage(
         content=content,
         tool_call_id=f"tc-{tool_name}",
@@ -117,11 +119,13 @@ def _make_error_message(
 
 
 def _make_model_request(messages: list, runtime: MagicMock) -> MagicMock:
+    '未说明'
     req = MagicMock()
     req.messages = list(messages)
     req.runtime = runtime
 
     def _override(**kw) -> MagicMock:
+        '未说明'
         updated = MagicMock()
         updated.messages = kw.get("messages", req.messages)
         updated.runtime = runtime
@@ -133,6 +137,7 @@ def _make_model_request(messages: list, runtime: MagicMock) -> MagicMock:
 
 
 def _make_mw(**kwargs) -> ToolProgressMiddleware:
+    '未说明'
     defaults = {
         "stagnation_threshold": 3,
         "warn_escalation_count": 2,
@@ -149,6 +154,7 @@ def _make_mw(**kwargs) -> ToolProgressMiddleware:
 
 
 def test_word_set_extracts_words_ge_3():
+    '未说明'
     ws = word_set("go quick brown fox")
     assert "go" not in ws
     assert "quick" in ws
@@ -157,6 +163,7 @@ def test_word_set_extracts_words_ge_3():
 
 
 def test_is_near_duplicate_above_threshold():
+    '未说明'
     ws1 = frozenset("quick brown fox jumps over lazy dog".split())
     ws2 = frozenset("quick brown fox jumps over lazy dog".split())
     assert is_near_duplicate(ws2, [ws1], threshold=0.8, min_words=5)
@@ -167,6 +174,7 @@ def test_is_near_duplicate_near_threshold():
     # intersection=7, union=9  →  Jaccard = 7/9 ≈ 0.778 < 0.8 → NOT duplicate.
     # ws3 shares all 8 original words and adds 1 new word.
     # intersection=8, union=9  →  Jaccard = 8/9 ≈ 0.889 >= 0.8 → IS duplicate.
+    '未说明'
     base = frozenset("alpha bravo charlie delta echo foxtrot golf hotel".split())
     nearly_below = frozenset("alpha bravo charlie delta echo foxtrot golf india".split())  # 7/9 ≈ 0.778
     nearly_above = frozenset("alpha bravo charlie delta echo foxtrot golf hotel india".split())  # 8/9 ≈ 0.889
@@ -175,12 +183,14 @@ def test_is_near_duplicate_near_threshold():
 
 
 def test_is_near_duplicate_below_threshold():
+    '未说明'
     ws1 = frozenset("apple banana cherry delta echo".split())
     ws2 = frozenset("xray yankee zulu alpha bravo".split())
     assert not is_near_duplicate(ws2, [ws1], threshold=0.8, min_words=5)
 
 
 def test_is_near_duplicate_too_short_skips_check():
+    '未说明'
     ws1 = frozenset("apple".split())
     ws2 = frozenset("apple".split())
     # min_words=5 but len==1, so not a duplicate
@@ -192,12 +202,14 @@ def test_is_near_duplicate_too_short_skips_check():
 
 
 def test_normal_call_no_hint_phase_active():
+    '未说明'
     mw = _make_mw()
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
     msg = _make_tool_message("A" * 300)
 
     def handler(_r):
+        '未说明'
         return msg
 
     result = mw.wrap_tool_call(req, handler)
@@ -212,12 +224,14 @@ def test_normal_call_no_hint_phase_active():
 
 
 def test_repeated_no_results_reaches_warned():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
     error_msg = _make_error_message()
 
     def handler(_r):
+        '未说明'
         return error_msg
 
     # stagnation_threshold=2, so the second problem call tips into warned
@@ -239,6 +253,7 @@ def test_repeated_no_results_reaches_warned():
 
 
 def test_warned_to_blocked_after_escalation():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=2)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -247,6 +262,7 @@ def test_warned_to_blocked_after_escalation():
     error_msg = _make_non_recoverable_error_message()
 
     def handler(_r):
+        '未说明'
         return error_msg
 
     for _ in range(4):
@@ -262,6 +278,7 @@ def test_warned_to_blocked_after_escalation():
 
 
 def test_blocked_tool_is_intercepted_without_calling_handler():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -270,6 +287,7 @@ def test_blocked_tool_is_intercepted_without_calling_handler():
     call_count = [0]
 
     def handler(r):
+        '未说明'
         call_count[0] += 1
         return error_msg
 
@@ -295,12 +313,14 @@ def test_blocked_tool_is_intercepted_without_calling_handler():
 def test_recoverable_errors_stay_warned_indefinitely():
     # stagnation_threshold=2, warn_escalation_count=1 → would block at call 3 for
     # non-recoverable errors, but recoverable errors must stay in WARNED forever.
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
     error_msg = _make_error_message()  # recoverable_by_model=True
 
     def handler(_r):
+        '未说明'
         return error_msg
 
     # 10 calls — well past the threshold+escalation
@@ -315,12 +335,14 @@ def test_recoverable_errors_stay_warned_indefinitely():
 def test_recoverable_error_re_injects_hint_past_escalation():
     # After crossing threshold+escalation for a recoverable error, each additional
     # problem call should still queue a hint.
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1, inject_assessment=True)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
     error_msg = _make_error_message()
 
     def handler(_r):
+        '未说明'
         return error_msg
 
     # Reach warned (call 2) and past escalation (call 3+)
@@ -340,6 +362,7 @@ def test_recoverable_error_re_injects_hint_past_escalation():
 
 
 def test_auth_error_immediately_blocked():
+    '未说明'
     mw = _make_mw(stagnation_threshold=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -350,6 +373,7 @@ def test_auth_error_immediately_blocked():
     )
 
     def handler(_r):
+        '未说明'
         return auth_msg
 
     mw.wrap_tool_call(req, handler)
@@ -367,6 +391,7 @@ def test_auth_error_immediately_blocked():
 
 
 def test_valid_result_after_problems_resets_to_active():
+    '未说明'
     mw = _make_mw(stagnation_threshold=3, warn_escalation_count=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -374,9 +399,11 @@ def test_valid_result_after_problems_resets_to_active():
     good_msg = _make_tool_message("A" * 300)
 
     def handler_error(_r):
+        """处理错误相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return error_msg
 
     def handler_good(_r):
+        '未说明'
         return good_msg
 
     mw.wrap_tool_call(req, handler_error)
@@ -399,6 +426,7 @@ def test_valid_result_after_problems_resets_to_active():
 
 
 def test_two_tools_have_independent_states():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1)
     rt = _make_runtime()
     req_search = _make_tool_request("web_search", runtime=rt)
@@ -424,6 +452,7 @@ def test_two_tools_have_independent_states():
 
 
 def test_jaccard_near_duplicate_counts_as_problem():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5, jaccard_threshold=0.8, min_words=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -446,6 +475,7 @@ def test_jaccard_near_duplicate_counts_as_problem():
 
 
 def test_jaccard_different_content_not_a_problem():
+    '未说明'
     mw = _make_mw(stagnation_threshold=3, warn_escalation_count=5, jaccard_threshold=0.8, min_words=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -468,12 +498,7 @@ def test_jaccard_different_content_not_a_problem():
 
 
 def test_jaccard_skipped_when_content_below_production_min_words():
-    """Production default min_words=10 must skip Jaccard for content with 6-9 unique words.
-
-    _make_mw() uses min_words=5 to make most tests easier to set up.  This test
-    uses the production default (min_words=10) to verify that short but repeated
-    content does NOT count as a near-duplicate stagnation problem.
-    """
+    '未说明'
     mw = ToolProgressMiddleware(
         stagnation_threshold=3,
         warn_escalation_count=2,
@@ -501,12 +526,14 @@ def test_jaccard_skipped_when_content_below_production_min_words():
 
 
 def test_exempt_tools_not_tracked():
+    '未说明'
     mw = _make_mw(stagnation_threshold=1, warn_escalation_count=1)
     rt = _make_runtime()
     req = _make_tool_request("ask_clarification", runtime=rt)
     error_msg = _make_error_message(tool_name="ask_clarification")
 
     def handler(_r):
+        '未说明'
         return error_msg
 
     for _ in range(5):
@@ -520,6 +547,7 @@ def test_exempt_tools_not_tracked():
 
 
 def test_before_agent_clears_stale_pending():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt_run1 = _make_runtime(thread_id="t1", run_id="old-run")
     rt_run2 = _make_runtime(thread_id="t1", run_id="new-run")
@@ -545,6 +573,7 @@ def test_before_agent_clears_stale_pending():
 
 @pytest.mark.anyio
 async def test_abefore_agent_clears_stale_pending():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt_run1 = _make_runtime(thread_id="t1", run_id="old-run")
     rt_run2 = _make_runtime(thread_id="t1", run_id="new-run")
@@ -566,6 +595,7 @@ async def test_abefore_agent_clears_stale_pending():
 def test_before_agent_preserves_current_run_hints():
     # _clear_stale_pending deletes keys where thread_id matches but run_id differs.
     # Hints for the *current* run must not be evicted.
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt = _make_runtime(thread_id="t1", run_id="current-run")
     # _queue_assessment guards against phantom entries by checking _phase_states; seed the
@@ -581,15 +611,7 @@ def test_before_agent_preserves_current_run_hints():
 
 
 def test_before_agent_resets_blocked_states_for_new_run():
-    """BLOCKED and WARNED tool states must both be cleared at the start of a new run.
-
-    A tool BLOCKED in run R1 must not silently remain blocked in R2.
-    A tool WARNED in R1 must not carry its consecutive_problems count into R2
-    (the model has not seen the warning context, so it would be hard-blocked
-    without ever receiving a hint in the current session).
-    recent_word_sets must also be cleared so stale Jaccard windows don't cause
-    false near-duplicate detections on the first success call of the new run.
-    """
+    '未说明'
     mw = _make_mw(stagnation_threshold=1, warn_escalation_count=1)
     rt_run1 = _make_runtime(thread_id="t1", run_id="run-1")
     rt_run2 = _make_runtime(thread_id="t1", run_id="run-2")
@@ -625,12 +647,7 @@ def test_before_agent_resets_blocked_states_for_new_run():
 
 
 def test_before_agent_resets_warned_states_for_new_run():
-    """WARNED tool state must also be cleared by before_agent.
-
-    A tool with phase='warned' and accumulated consecutive_problems at end of run R1
-    must not carry that count into R2; the model has no warning context and would
-    be hard-blocked after just a few calls without receiving a hint.
-    """
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt_run1 = _make_runtime(thread_id="t1", run_id="run-1")
     rt_run2 = _make_runtime(thread_id="t1", run_id="run-2")
@@ -654,14 +671,7 @@ def test_before_agent_resets_warned_states_for_new_run():
 
 
 def test_before_agent_resets_active_state_consecutive_problems_and_word_sets():
-    """ACTIVE tools with sub-threshold problems must also be cleaned at run boundaries.
-
-    An ACTIVE tool (phase never left 'active') can exit a run with non-zero
-    consecutive_problems and non-empty recent_word_sets.  If _reset_run_states only
-    touched BLOCKED/WARNED tools, the counter from R1 would bleed into R2: a single
-    problem on R2's first call could then trip WARNED against stale R1 context that
-    the model has never seen.
-    """
+    '未说明'
     # stagnation_threshold=3 so two errors keep the tool ACTIVE.
     mw = _make_mw(stagnation_threshold=3, warn_escalation_count=5)
     rt_run1 = _make_runtime(thread_id="t1", run_id="run-1")
@@ -703,6 +713,7 @@ def test_get_block_reason_does_not_create_phantom_entries():
     # _get_block_reason is called on every wrap_tool_call before the handler.
     # It must not insert an empty entry for new threads (which could prematurely
     # evict another thread's WARNED state via LRU).
+    '未说明'
     mw = _make_mw(max_tracked_threads=2, stagnation_threshold=2)
     rt_a = _make_runtime(thread_id="thread-a")
     rt_b = _make_runtime(thread_id="thread-b")
@@ -740,6 +751,7 @@ def test_get_block_reason_does_not_create_phantom_entries():
 
 
 def test_lru_eviction_of_oldest_thread():
+    '未说明'
     mw = _make_mw(max_tracked_threads=2)
     error_msg = _make_error_message()
 
@@ -756,11 +768,7 @@ def test_lru_eviction_of_oldest_thread():
 
 
 def test_pending_evicted_with_phase_states_on_lru_overflow():
-    """M1 regression: _pending keys for evicted threads must be cleaned up.
-
-    When _phase_states evicts a thread via LRU, any pending hint entries
-    for that thread must also be removed so _pending cannot grow unboundedly.
-    """
+    '未说明'
     mw = _make_mw(max_tracked_threads=2, stagnation_threshold=2)
     error_msg = _make_error_message()
 
@@ -795,6 +803,7 @@ def test_pending_evicted_with_phase_states_on_lru_overflow():
 
 
 def test_hint_injected_into_model_call():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -808,6 +817,7 @@ def test_hint_injected_into_model_call():
     captured_messages = []
 
     def model_handler(r):
+        """处理模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         captured_messages.extend(r.messages)
         return MagicMock()
 
@@ -819,6 +829,7 @@ def test_hint_injected_into_model_call():
 
 
 def test_partial_success_hint_is_specific_not_generic():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -834,6 +845,7 @@ def test_partial_success_hint_is_specific_not_generic():
     )
 
     def handler(_r):
+        '未说明'
         return partial_msg
 
     mw.wrap_tool_call(req, handler)
@@ -846,13 +858,7 @@ def test_partial_success_hint_is_specific_not_generic():
 
 
 def test_jaccard_near_dup_hint_is_specific_and_actionable():
-    """Near-duplicate success hint must be specific (not generic fallback) and include action guidance.
-
-    Before the fix, status='success'/error_type=None fell through to the generic fallback
-    '[PROGRESS HINT] The tool is not producing new information.' with no action suffix
-    (recommended_next_action='continue' was absent from action_map).  The fix adds a
-    'success' key to the base dict and a 'continue' key to the action_map.
-    """
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5, jaccard_threshold=0.8, min_words=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -866,6 +872,7 @@ def test_jaccard_near_dup_hint_is_specific_and_actionable():
     dup_msg = _make_tool_message(words)
 
     def handler(_r):
+        '未说明'
         return dup_msg
 
     mw.wrap_tool_call(req, handler)
@@ -881,6 +888,7 @@ def test_jaccard_near_dup_hint_is_specific_and_actionable():
 
 
 def test_no_hint_when_inject_assessment_disabled():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5, inject_assessment=False)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -894,12 +902,7 @@ def test_no_hint_when_inject_assessment_disabled():
 
 
 def test_augment_request_deduplicates_identical_hints():
-    """L2: _augment_request must deduplicate identical hint strings via dict.fromkeys.
-
-    If the same hint text appears multiple times in the queue (e.g. two successive
-    no_results errors produce identical hint strings), only one copy should be
-    injected into the model message.
-    """
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5, inject_assessment=True)
     rt = _make_runtime()
 
@@ -914,6 +917,7 @@ def test_augment_request_deduplicates_identical_hints():
     captured: list = []
 
     def model_handler(r):
+        """处理模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         captured.extend(r.messages)
         return MagicMock()
 
@@ -930,12 +934,7 @@ def test_augment_request_deduplicates_identical_hints():
 
 
 def test_assess_and_transition_blocked_state_immediate_stop_is_idempotent():
-    """L1: _assess_and_transition must handle an already-blocked state without error.
-
-    The docstring states the immediate-block branch re-applies idempotently.
-    This test verifies that re-entering with a blocked state + stop-action meta
-    stays blocked and does not corrupt the block_reason.
-    """
+    '未说明'
     from deerflow.agents.middlewares.tool_progress_middleware import ToolPhaseState
 
     mw = _make_mw()
@@ -962,12 +961,7 @@ def test_assess_and_transition_blocked_state_immediate_stop_is_idempotent():
 
 
 def test_assess_and_transition_blocked_state_non_stop_increments_count():
-    """L1: A blocked state receiving a non-stop problem increments counter, stays blocked.
-
-    Simulates a concurrent race where two threads both process results for the
-    same tool: the second thread's _assess_and_transition receives a stale
-    'blocked' snapshot.  The result must remain blocked.
-    """
+    '未说明'
     from deerflow.agents.middlewares.tool_progress_middleware import ToolPhaseState
 
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1)
@@ -995,13 +989,7 @@ def test_assess_and_transition_blocked_state_non_stop_increments_count():
 
 
 def test_assess_and_transition_blocked_recoverable_does_not_regress_to_warned():
-    """L1: A blocked state with recoverable errors must not silently regress to warned.
-
-    Before the fix, _assess_and_transition had no guard for already-blocked states.
-    A recoverable error arriving on a blocked state (concurrent race) would take
-    the `warned` branch because recoverable_by_model=True, demoting the phase from
-    blocked back to warned. This test locks the fixed behavior.
-    """
+    '未说明'
     from deerflow.agents.middlewares.tool_progress_middleware import ToolPhaseState
 
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1)
@@ -1033,12 +1021,14 @@ def test_assess_and_transition_blocked_recoverable_does_not_regress_to_warned():
 
 
 def test_no_runtime_passthrough():
+    '未说明'
     mw = _make_mw()
     req = SimpleNamespace(tool_call={"name": "web_search", "id": "tc-1"})
     # No runtime attribute
     msg = _make_tool_message()
 
     def handler(_r):
+        '未说明'
         return msg
 
     result = mw.wrap_tool_call(req, handler)
@@ -1050,12 +1040,14 @@ def test_no_runtime_passthrough():
 
 
 def test_command_result_passthrough():
+    '未说明'
     mw = _make_mw()
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
     cmd = Command(goto="some_node")
 
     def handler(_r):
+        '未说明'
         return cmd
 
     result = mw.wrap_tool_call(req, handler)
@@ -1067,6 +1059,7 @@ def test_command_result_passthrough():
 
 
 def test_from_config():
+    '未说明'
     from deerflow.config.tool_progress_config import ToolProgressConfig
 
     cfg = ToolProgressConfig(
@@ -1084,12 +1077,7 @@ def test_from_config():
 
 
 def test_from_config_empty_exempt_tools_clears_exemptions():
-    """Empty exempt_tools in config must produce an empty set, not the default fallback.
-
-    H1 regression: `exempt_tools or {default}` would silently ignore an empty set
-    because set() is falsy in Python. The fix uses `is not None` so an explicit
-    empty set from config actually disables all exemptions.
-    """
+    '未说明'
     from deerflow.config.tool_progress_config import ToolProgressConfig
 
     cfg = ToolProgressConfig(enabled=True, exempt_tools=set())
@@ -1098,7 +1086,7 @@ def test_from_config_empty_exempt_tools_clears_exemptions():
 
 
 def test_exempt_tools_none_uses_defaults():
-    """None exempt_tools in __init__ must use the built-in default set."""
+    '未说明'
     mw = ToolProgressMiddleware(exempt_tools=None)
     assert "ask_clarification" in mw._exempt_tools
     assert "write_todos" in mw._exempt_tools
@@ -1106,7 +1094,7 @@ def test_exempt_tools_none_uses_defaults():
 
 
 def test_from_config_default_exempt_tools_round_trip():
-    """Default exempt_tools from config must match the __init__ default."""
+    '未说明'
     from deerflow.config.tool_progress_config import ToolProgressConfig
 
     cfg = ToolProgressConfig(enabled=True)
@@ -1119,7 +1107,7 @@ def test_from_config_default_exempt_tools_round_trip():
 
 
 def test_wrap_tool_call_malformed_meta_passthrough():
-    """Malformed deerflow_tool_meta dict must not crash the middleware."""
+    '未说明'
     mw = _make_mw()
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1132,6 +1120,7 @@ def test_wrap_tool_call_malformed_meta_passthrough():
     )
 
     def handler(_r):
+        '未说明'
         return bad_msg
 
     result = mw.wrap_tool_call(req, handler)
@@ -1141,9 +1130,7 @@ def test_wrap_tool_call_malformed_meta_passthrough():
 
 
 def test_missing_meta_on_non_exempt_tool_emits_warning(caplog):
-    """When deerflow_tool_meta is completely absent for a non-exempt tool,
-    the middleware must emit a warning pointing to the likely ordering misconfiguration.
-    """
+    '未说明'
     import logging
 
     mw = _make_mw()
@@ -1169,6 +1156,7 @@ def test_missing_meta_on_non_exempt_tool_emits_warning(caplog):
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_normal_passthrough():
+    '未说明'
     mw = _make_mw()
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1182,6 +1170,7 @@ async def test_awrap_tool_call_normal_passthrough():
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_blocked_intercepted_without_calling_handler():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1190,6 +1179,7 @@ async def test_awrap_tool_call_blocked_intercepted_without_calling_handler():
     call_count = [0]
 
     async def handler(r):
+        '未说明'
         call_count[0] += 1
         return error_msg
 
@@ -1209,6 +1199,7 @@ async def test_awrap_tool_call_blocked_intercepted_without_calling_handler():
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_auth_error_immediately_blocked():
+    '未说明'
     mw = _make_mw(stagnation_threshold=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1227,6 +1218,7 @@ async def test_awrap_tool_call_auth_error_immediately_blocked():
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_no_runtime_passthrough():
+    '未说明'
     mw = _make_mw()
     req = SimpleNamespace(tool_call={"name": "web_search", "id": "tc-1"})
     msg = _make_tool_message()
@@ -1239,6 +1231,7 @@ async def test_awrap_tool_call_no_runtime_passthrough():
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_command_result_passthrough():
+    '未说明'
     mw = _make_mw()
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1251,7 +1244,7 @@ async def test_awrap_tool_call_command_result_passthrough():
 
 @pytest.mark.anyio
 async def test_awrap_tool_call_malformed_meta_passthrough():
-    """Malformed deerflow_tool_meta dict must not crash the middleware."""
+    '未说明'
     mw = _make_mw()
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1272,6 +1265,7 @@ async def test_awrap_tool_call_malformed_meta_passthrough():
 
 @pytest.mark.anyio
 async def test_awrap_model_call_drains_and_injects_hints():
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1285,6 +1279,7 @@ async def test_awrap_model_call_drains_and_injects_hints():
     captured: list = []
 
     async def model_handler(r):
+        """处理模型相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         captured.extend(r.messages)
         return MagicMock()
 
@@ -1301,6 +1296,7 @@ _MW_LOGGER = "deerflow.agents.middlewares.tool_progress_middleware"
 
 
 def test_log_active_to_warned_emits_info(caplog):
+    '未说明'
     mw = _make_mw(stagnation_threshold=2)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1316,6 +1312,7 @@ def test_log_active_to_warned_emits_info(caplog):
 
 
 def test_log_immediate_block_emits_warning(caplog):
+    '未说明'
     mw = _make_mw(stagnation_threshold=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1334,6 +1331,7 @@ def test_log_immediate_block_emits_warning(caplog):
 
 
 def test_log_escalation_block_emits_warning(caplog):
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=2)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1348,6 +1346,7 @@ def test_log_escalation_block_emits_warning(caplog):
 
 
 def test_log_blocked_call_intercepted_emits_info(caplog):
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=1)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1364,6 +1363,7 @@ def test_log_blocked_call_intercepted_emits_info(caplog):
 
 
 def test_log_warned_to_active_reset_emits_info(caplog):
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1383,6 +1383,7 @@ def test_log_warned_to_active_reset_emits_info(caplog):
 
 
 def test_log_hint_injection_emits_debug(caplog):
+    '未说明'
     mw = _make_mw(stagnation_threshold=2, warn_escalation_count=5)
     rt = _make_runtime()
     req = _make_tool_request(runtime=rt)
@@ -1405,17 +1406,7 @@ def test_log_hint_injection_emits_debug(caplog):
 
 
 def test_tool_progress_and_loop_detection_coexist_without_interfering():
-    """ToolProgressMiddleware and LoopDetectionMiddleware operate on separate signals
-    and must not interfere when both are active simultaneously.
-
-    ToolProgressMiddleware (position 8): result-quality guard, fires after tool execution,
-    tracks per-(thread, tool) stagnation, BLOCKs specific tools.
-    LoopDetectionMiddleware (position 19): call-pattern guard, fires after model response,
-    tracks repeated tool_call signatures, hard-stops the whole turn.
-
-    Both can inject HumanMessage hints in the same model call; neither reads or writes
-    the other's internal state.
-    """
+    '未说明'
     from langchain_core.messages import AIMessage
 
     from deerflow.agents.middlewares.loop_detection_middleware import LoopDetectionMiddleware
@@ -1464,6 +1455,7 @@ def test_tool_progress_and_loop_detection_coexist_without_interfering():
     captured: list = []
 
     def capture_handler(r):
+        '未说明'
         captured.extend(r.messages)
         return MagicMock()
 

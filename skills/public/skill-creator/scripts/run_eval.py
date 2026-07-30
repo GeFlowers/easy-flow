@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
-"""Run trigger evaluation for a skill description.
+"""执行技能描述的触发评估。
 
-Tests whether a skill's description causes Claude to trigger (read the skill)
-for a set of queries. Outputs results as JSON.
+针对一组查询临时注册技能命令，调用命令行模型检测是否触发，并输出逐查询的重复运行结果和汇总数据。
 """
 
 import argparse
@@ -20,11 +19,7 @@ from scripts.utils import parse_skill_md
 
 
 def find_project_root() -> Path:
-    """Find the project root by walking up from cwd looking for .claude/.
-
-    Mimics how Claude Code discovers its project root, so the command file
-    we create ends up where claude -p will look for it.
-    """
+    """从当前目录向上查找项目配置目录，以确定临时命令文件能被命令行模型发现的项目根目录。"""
     current = Path.cwd()
     for parent in [current, *current.parents]:
         if (parent / ".claude").is_dir():
@@ -40,14 +35,7 @@ def run_single_query(
     project_root: str,
     model: str | None = None,
 ) -> bool:
-    """Run a single query and return whether the skill was triggered.
-
-    Creates a command file in .claude/commands/ so it appears in Claude's
-    available_skills list, then runs `claude -p` with the raw query.
-    Uses --include-partial-messages to detect triggering early from
-    stream events (content_block_start) rather than waiting for the
-    full assistant message, which only arrives after tool execution.
-    """
+    """执行一次查询并返回是否触发：创建临时命令，解析流式工具事件提前识别调用，最后清理临时文件和进程。"""
     unique_id = uuid.uuid4().hex[:8]
     clean_name = f"{skill_name}-skill-{unique_id}"
     project_commands_dir = Path(project_root) / ".claude" / "commands"
@@ -192,7 +180,7 @@ def run_eval(
     trigger_threshold: float = 0.5,
     model: str | None = None,
 ) -> dict:
-    """Run the full eval set and return results."""
+    """并行执行完整评估集的重复查询，按触发阈值判定正反例是否通过，并返回逐项和汇总结果。"""
     results = []
 
     with ProcessPoolExecutor(max_workers=num_workers) as executor:
@@ -257,6 +245,7 @@ def run_eval(
 
 
 def main():
+    """解析评估配置，读取技能描述，运行触发评估，并将结构化结果输出到标准输出。"""
     parser = argparse.ArgumentParser(description="Run trigger evaluation for a skill description")
     parser.add_argument("--eval-set", required=True, help="Path to eval set JSON file")
     parser.add_argument("--skill-path", required=True, help="Path to skill directory")

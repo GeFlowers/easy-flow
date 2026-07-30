@@ -1,10 +1,4 @@
-"""Regression tests for ToolMessage content normalization in serialization.
-
-Ensures that structured content (list-of-blocks) is properly extracted to
-plain text, preventing raw Python repr strings from reaching the UI.
-
-See: https://github.com/bytedance/deer-flow/issues/1149
-"""
+'未说明'
 
 from langchain_core.messages import ToolMessage
 
@@ -16,16 +10,17 @@ from deerflow.client import DeerFlowClient
 
 
 class TestSerializeToolMessageContent:
-    """DeerFlowClient._serialize_message should normalize ToolMessage content."""
+    '未说明'
 
     def test_string_content(self):
+        '未说明'
         msg = ToolMessage(content="ok", tool_call_id="tc1", name="search")
         result = DeerFlowClient._serialize_message(msg)
         assert result["content"] == "ok"
         assert result["type"] == "tool"
 
     def test_list_of_blocks_content(self):
-        """List-of-blocks should be extracted, not repr'd."""
+        '未说明'
         msg = ToolMessage(
             content=[{"type": "text", "text": "hello world"}],
             tool_call_id="tc1",
@@ -38,7 +33,7 @@ class TestSerializeToolMessageContent:
         assert "{" not in result["content"]
 
     def test_multiple_text_blocks(self):
-        """Multiple full text blocks should be joined with newlines."""
+        '未说明'
         msg = ToolMessage(
             content=[
                 {"type": "text", "text": "line 1"},
@@ -51,7 +46,7 @@ class TestSerializeToolMessageContent:
         assert result["content"] == "line 1\nline 2"
 
     def test_string_chunks_are_joined_without_newlines(self):
-        """Chunked string payloads should not get artificial separators."""
+        '未说明'
         msg = ToolMessage(
             content=['{"a"', ': "b"}'],
             tool_call_id="tc1",
@@ -61,7 +56,7 @@ class TestSerializeToolMessageContent:
         assert result["content"] == '{"a": "b"}'
 
     def test_mixed_string_chunks_and_blocks(self):
-        """String chunks stay contiguous, but text blocks remain separated."""
+        '未说明'
         msg = ToolMessage(
             content=["prefix", "-continued", {"type": "text", "text": "block text"}],
             tool_call_id="tc1",
@@ -71,7 +66,7 @@ class TestSerializeToolMessageContent:
         assert result["content"] == "prefix-continued\nblock text"
 
     def test_mixed_blocks_with_non_text(self):
-        """Non-text blocks (e.g. image) should be skipped gracefully."""
+        '未说明'
         msg = ToolMessage(
             content=[
                 {"type": "text", "text": "found results"},
@@ -84,12 +79,13 @@ class TestSerializeToolMessageContent:
         assert result["content"] == "found results"
 
     def test_empty_list_content(self):
+        '未说明'
         msg = ToolMessage(content=[], tool_call_id="tc1", name="search")
         result = DeerFlowClient._serialize_message(msg)
         assert result["content"] == ""
 
     def test_plain_string_in_list(self):
-        """Bare strings inside a list should be kept."""
+        '未说明'
         msg = ToolMessage(
             content=["plain text block"],
             tool_call_id="tc1",
@@ -99,7 +95,7 @@ class TestSerializeToolMessageContent:
         assert result["content"] == "plain text block"
 
     def test_unknown_content_type_falls_back(self):
-        """Unexpected types should not crash — return str()."""
+        '未说明'
         msg = ToolMessage(content=42, tool_call_id="tc1", name="calc")
         result = DeerFlowClient._serialize_message(msg)
         # int → not str, not list → falls to str()
@@ -112,16 +108,20 @@ class TestSerializeToolMessageContent:
 
 
 class TestExtractText:
-    """DeerFlowClient._extract_text should handle all content shapes."""
+    '未说明'
 
     def test_string_passthrough(self):
+        '未说明'
         assert DeerFlowClient._extract_text("hello") == "hello"
 
     def test_list_text_blocks(self):
+        '未说明'
         assert DeerFlowClient._extract_text([{"type": "text", "text": "hi"}]) == "hi"
 
     def test_empty_list(self):
+        '未说明'
         assert DeerFlowClient._extract_text([]) == ""
 
     def test_fallback_non_iterable(self):
+        '未说明'
         assert DeerFlowClient._extract_text(123) == "123"

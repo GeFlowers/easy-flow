@@ -1,3 +1,4 @@
+"""组装、筛选并返回当前代理可用的工具集合。"""
 import logging
 
 from langchain.tools import BaseTool
@@ -20,12 +21,12 @@ BUILTIN_TOOLS = [
 
 SUBAGENT_TOOLS = [
     task_tool,
-    # task_status_tool is no longer exposed to LLM (backend handles polling internally)
+        # 中文说明：此处用于执行相关处理。
 ]
 
 
 def _is_host_bash_tool(tool: object) -> bool:
-    """Return True if the tool config represents a host-bash execution surface."""
+    """判断工具配置是否表示宿主机 Bash 执行入口。"""
     group = getattr(tool, "group", None)
     use = getattr(tool, "use", None)
     if group == "bash":
@@ -36,7 +37,7 @@ def _is_host_bash_tool(tool: object) -> bool:
 
 
 def _ensure_sync_invocable_tool(tool: BaseTool) -> BaseTool:
-    """Attach a sync wrapper to async-only tools used by sync agent callers."""
+    """为同步代理调用方的纯异步工具附加同步包装器。"""
     if getattr(tool, "func", None) is None and getattr(tool, "coroutine", None) is not None:
         tool.func = make_sync_tool_wrapper(tool.coroutine, tool.name)
     return tool
@@ -50,33 +51,20 @@ def get_available_tools(
     *,
     app_config: AppConfig | None = None,
 ) -> list[BaseTool]:
-    """Get all available tools from config.
-
-    Note: MCP tools should be initialized at application startup using
-    `initialize_mcp_tools()` from deerflow.mcp module.
-
-    Args:
-        groups: Optional list of tool groups to filter by.
-        include_mcp: Whether to include tools from MCP servers (default: True).
-        model_name: Optional model name to determine if vision tools should be included.
-        subagent_enabled: Whether to include subagent tools (task, task_status).
-
-    Returns:
-        List of available tools.
-    """
+    """依据配置、运行时策略和模型能力返回可用工具列表。"""
     config = app_config or get_app_config()
     tool_configs = [tool for tool in config.tools if groups is None or tool.group in groups]
 
-    # Do not expose host bash by default when LocalSandboxProvider is active.
+        # 中文说明：此处用于执行相关处理。
     if not is_host_bash_allowed(config):
         tool_configs = [tool for tool in tool_configs if not _is_host_bash_tool(tool)]
 
     loaded_tools_raw = [(cfg, resolve_variable(cfg.use, BaseTool)) for cfg in tool_configs]
 
-    # Warn when the config ``name`` field and the tool object's ``.name``
-    # attribute diverge — this mismatch is the root cause of issue #1803 where
-    # the LLM receives one name in its tool schema but the runtime router
-    # recognises a different name, producing "not a valid tool" errors.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     for cfg, loaded in loaded_tools_raw:
         if cfg.name != loaded.name:
             logger.warning(
@@ -88,7 +76,7 @@ def get_available_tools(
 
     loaded_tools = [_ensure_sync_invocable_tool(t) for _, t in loaded_tools_raw]
 
-    # Conditionally add tools based on config
+        # 中文说明：此处用于执行相关处理。
     builtin_tools = BUILTIN_TOOLS.copy()
     skill_evolution_config = getattr(config, "skill_evolution", None)
     if getattr(skill_evolution_config, "enabled", False):
@@ -96,26 +84,26 @@ def get_available_tools(
 
         builtin_tools.append(skill_manage_tool)
 
-    # Add subagent tools only if enabled via runtime parameter
+        # 中文说明：此处用于执行相关处理。
     if subagent_enabled:
         builtin_tools.extend(SUBAGENT_TOOLS)
         logger.info("Including subagent tools (task)")
 
-    # If no model_name specified, use the first model (default)
+        # 中文说明：此处用于执行相关处理。
     if model_name is None and config.models:
         model_name = config.models[0].name
 
-    # Add view_image_tool only if the model supports vision
+        # 中文说明：此处用于执行相关处理。
     model_config = config.get_model_config(model_name) if model_name else None
     if model_config is not None and model_config.supports_vision:
         builtin_tools.append(view_image_tool)
         logger.info(f"Including view_image_tool for model '{model_name}' (supports_vision=True)")
 
-    # Get cached MCP tools if enabled
-    # NOTE: We use ExtensionsConfig.from_file() instead of config.extensions
-    # to always read the latest configuration from disk. This ensures that changes
-    # made through the Gateway API (which runs in a separate process) are immediately
-    # reflected when loading MCP tools.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     mcp_tools = []
     if include_mcp:
         try:
@@ -128,11 +116,11 @@ def get_available_tools(
                 if mcp_tools:
                     logger.info(f"Using {len(mcp_tools)} cached MCP tool(s)")
 
-                    # Tag MCP-sourced tools so deferred-tool assembly (done at
-                    # the agent construction site, AFTER tool-policy filtering)
-                    # can identify them. No ContextVar / registry is built here;
-                    # the deferred catalog + tool_search tool are assembled per
-                    # agent from the policy-filtered tool list.
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
+                                        # 中文说明：此处用于执行相关处理。
                     for t in mcp_tools:
                         tag_mcp_tool(t)
         except ImportError:
@@ -140,7 +128,7 @@ def get_available_tools(
         except Exception as e:
             logger.error(f"Failed to get cached MCP tools: {e}")
 
-    # Add invoke_acp_agent tool if any ACP agents are configured
+        # 中文说明：此处用于执行相关处理。
     acp_tools: list[BaseTool] = []
     try:
         from deerflow.tools.builtins.invoke_acp_agent_tool import build_invoke_acp_agent_tool
@@ -159,9 +147,9 @@ def get_available_tools(
 
     logger.info(f"Total tools loaded: {len(loaded_tools)}, built-in tools: {len(builtin_tools)}, MCP tools: {len(mcp_tools)}, ACP tools: {len(acp_tools)}")
 
-    # Deduplicate by tool name — config-loaded tools take priority, followed by
-    # built-ins, MCP tools, and ACP tools.  Duplicate names cause the LLM to
-    # receive ambiguous or concatenated function schemas (issue #1803).
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     all_tools = [_ensure_sync_invocable_tool(t) for t in loaded_tools + builtin_tools + mcp_tools + acp_tools]
     seen_names: set[str] = set()
     unique_tools: list[BaseTool] = []

@@ -6,28 +6,33 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+/** Sheet 内部组件：组织对应的界面结构与交互语义。 */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
 
+/** SheetTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function SheetTrigger({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
 }
 
+/** SheetClose 内部组件：组织对应的界面结构与交互语义。 */
 function SheetClose({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
+/** SheetPortal 内部组件：组织对应的界面结构与交互语义。 */
 function SheetPortal({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
 }
 
+/** SheetOverlay 内部组件：组织对应的界面结构与交互语义。 */
 function SheetOverlay({
   className,
   ...props
@@ -44,6 +49,7 @@ function SheetOverlay({
   );
 }
 
+/** SheetContent 内部组件：组织对应的界面结构与交互语义。 */
 function SheetContent({
   className,
   children,
@@ -81,6 +87,7 @@ function SheetContent({
   );
 }
 
+/** SheetHeader 内部组件：组织对应的界面结构与交互语义。 */
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -91,6 +98,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** SheetFooter 内部组件：组织对应的界面结构与交互语义。 */
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -101,6 +109,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
+/** SheetTitle 内部组件：组织对应的界面结构与交互语义。 */
 function SheetTitle({
   className,
   ...props
@@ -114,6 +123,7 @@ function SheetTitle({
   );
 }
 
+/** SheetDescription 内部组件：组织对应的界面结构与交互语义。 */
 function SheetDescription({
   className,
   ...props

@@ -4,9 +4,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { usePromptInputController } from "@/components/ai-elements/prompt-input";
 import { useI18n } from "@/core/i18n/hooks";
 
-/**
- * Hook to determine if the chat is in a specific mode based on URL parameters, and to set an initial prompt input value accordingly.
- */
+/** 根据路由模式选择初始草稿，确保模式切换不会遗留上一页面的提示内容。 */
 export function useSpecificChatMode() {
   const { t } = useI18n();
   const { thread_id: threadIdFromPath } = useParams<{ thread_id: string }>();

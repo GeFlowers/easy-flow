@@ -1,12 +1,4 @@
-"""Tests for deerflow.models.openai_codex_provider.CodexChatModel.
-
-Covers:
-- LangChain serialization: is_lc_serializable, to_json kwargs, no token leakage
-- _parse_response: text content, tool calls, reasoning_content
-- _convert_messages: SystemMessage, HumanMessage, AIMessage, ToolMessage
-- _parse_sse_data_line: valid data, [DONE], non-JSON, non-data lines
-- _parse_tool_call_arguments: valid JSON, invalid JSON, non-dict JSON
-"""
+"""\u672c\u6a21\u5757\u8986\u76d6\u76f8\u5173\u6d4b\u8bd5\uff0c\u56fa\u5b9a\u516c\u5f00\u884c\u4e3a\u3001\u5931\u8d25\u5904\u7406\u4e0e\u72b6\u6001\u8fb9\u754c\u3002"""
 
 from __future__ import annotations
 
@@ -19,6 +11,7 @@ from deerflow.models.credential_loader import CodexCliCredential
 
 
 def _make_model(**kwargs):
+    """\u51c6\u5907\u9694\u79bb\u7684\u6d4b\u8bd5\u524d\u7f6e\u6761\u4ef6\uff0c\u907f\u514d\u771f\u5b9e\u5916\u90e8\u4f9d\u8d56\u5f71\u54cd\u540e\u7eed\u65ad\u8a00\u3002"""
     from deerflow.models.openai_codex_provider import CodexChatModel
 
     cred = CodexCliCredential(access_token="tok-test", account_id="acc-test")
@@ -27,17 +20,19 @@ def _make_model(**kwargs):
 
 
 # ---------------------------------------------------------------------------
-# Serialization protocol
+# 序列化协议
 # ---------------------------------------------------------------------------
 
 
 def test_is_lc_serializable_returns_true():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     from deerflow.models.openai_codex_provider import CodexChatModel
 
     assert CodexChatModel.is_lc_serializable() is True
 
 
 def test_to_json_produces_constructor_type():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     result = model.to_json()
     assert result["type"] == "constructor"
@@ -45,6 +40,7 @@ def test_to_json_produces_constructor_type():
 
 
 def test_to_json_contains_model_and_reasoning_effort():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     result = model.to_json()
     assert result["kwargs"]["model"] == "gpt-5.4"
@@ -52,7 +48,7 @@ def test_to_json_contains_model_and_reasoning_effort():
 
 
 def test_to_json_does_not_leak_access_token():
-    """_access_token is not a Pydantic field and must not appear in serialized kwargs."""
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc73\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     result = model.to_json()
     kwargs_str = json.dumps(result["kwargs"])
@@ -62,11 +58,12 @@ def test_to_json_does_not_leak_access_token():
 
 
 # ---------------------------------------------------------------------------
-# _parse_response
+# \u6b64\u5904\u8bf4\u660e\u8be5\u6d4b\u8bd5\u6bb5\u7684\u524d\u7f6e\u6761\u4ef6\u3001\u8c03\u7528\u9650\u5236\u53ca\u9884\u671f\u8fb9\u754c\u3002
 # ---------------------------------------------------------------------------
 
 
 def test_parse_response_text_content():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     response = {
         "output": [
@@ -83,6 +80,7 @@ def test_parse_response_text_content():
 
 
 def test_parse_response_populates_usage_metadata():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc76\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     response = {
         "output": [
@@ -113,6 +111,7 @@ def test_parse_response_populates_usage_metadata():
 
 
 def test_parse_response_reasoning_content():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     response = {
         "output": [
@@ -134,6 +133,7 @@ def test_parse_response_reasoning_content():
 
 
 def test_parse_response_tool_call():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc74\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     response = {
         "output": [
@@ -155,6 +155,7 @@ def test_parse_response_tool_call():
 
 
 def test_parse_response_invalid_tool_call_arguments():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc73\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     response = {
         "output": [
@@ -175,17 +176,19 @@ def test_parse_response_invalid_tool_call_arguments():
 
 
 # ---------------------------------------------------------------------------
-# _convert_messages
+# \u6b64\u5904\u8bf4\u660e\u8be5\u6d4b\u8bd5\u6bb5\u7684\u524d\u7f6e\u6761\u4ef6\u3001\u8c03\u7528\u9650\u5236\u53ca\u9884\u671f\u8fb9\u754c\u3002
 # ---------------------------------------------------------------------------
 
 
 def test_convert_messages_human():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     _, items = model._convert_messages([HumanMessage(content="Hello")])
     assert items == [{"role": "user", "content": "Hello"}]
 
 
 def test_convert_messages_system_becomes_instructions():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     instructions, items = model._convert_messages([SystemMessage(content="You are helpful.")])
     assert "You are helpful." in instructions
@@ -193,6 +196,7 @@ def test_convert_messages_system_becomes_instructions():
 
 
 def test_convert_messages_ai_with_tool_calls():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     ai = AIMessage(
         content="",
@@ -203,6 +207,7 @@ def test_convert_messages_ai_with_tool_calls():
 
 
 def test_convert_messages_tool_message():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc73\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     tool_msg = ToolMessage(content="result data", tool_call_id="tc1")
     _, items = model._convert_messages([tool_msg])
@@ -212,11 +217,12 @@ def test_convert_messages_tool_message():
 
 
 # ---------------------------------------------------------------------------
-# _parse_sse_data_line
+# \u6b64\u5904\u8bf4\u660e\u8be5\u6d4b\u8bd5\u6bb5\u7684\u524d\u7f6e\u6761\u4ef6\u3001\u8c03\u7528\u9650\u5236\u53ca\u9884\u671f\u8fb9\u754c\u3002
 # ---------------------------------------------------------------------------
 
 
 def test_parse_sse_data_line_valid():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     from deerflow.models.openai_codex_provider import CodexChatModel
 
     data = {"type": "response.completed", "response": {}}
@@ -225,29 +231,33 @@ def test_parse_sse_data_line_valid():
 
 
 def test_parse_sse_data_line_done_returns_none():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     from deerflow.models.openai_codex_provider import CodexChatModel
 
     assert CodexChatModel._parse_sse_data_line("data: [DONE]") is None
 
 
 def test_parse_sse_data_line_non_data_returns_none():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     from deerflow.models.openai_codex_provider import CodexChatModel
 
     assert CodexChatModel._parse_sse_data_line("event: ping") is None
 
 
 def test_parse_sse_data_line_invalid_json_returns_none():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc71\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     from deerflow.models.openai_codex_provider import CodexChatModel
 
     assert CodexChatModel._parse_sse_data_line("data: {bad json}") is None
 
 
 # ---------------------------------------------------------------------------
-# _parse_tool_call_arguments
+# \u6b64\u5904\u8bf4\u660e\u8be5\u6d4b\u8bd5\u6bb5\u7684\u524d\u7f6e\u6761\u4ef6\u3001\u8c03\u7528\u9650\u5236\u53ca\u9884\u671f\u8fb9\u754c\u3002
 # ---------------------------------------------------------------------------
 
 
 def test_parse_tool_call_arguments_valid_string():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     parsed, err = model._parse_tool_call_arguments({"arguments": '{"key": "val"}', "name": "t", "call_id": "c"})
     assert parsed == {"key": "val"}
@@ -255,6 +265,7 @@ def test_parse_tool_call_arguments_valid_string():
 
 
 def test_parse_tool_call_arguments_already_dict():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     parsed, err = model._parse_tool_call_arguments({"arguments": {"key": "val"}, "name": "t", "call_id": "c"})
     assert parsed == {"key": "val"}
@@ -262,6 +273,7 @@ def test_parse_tool_call_arguments_already_dict():
 
 
 def test_parse_tool_call_arguments_invalid_json():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc73\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     parsed, err = model._parse_tool_call_arguments({"arguments": "not-json", "name": "t", "call_id": "c"})
     assert parsed is None
@@ -270,6 +282,7 @@ def test_parse_tool_call_arguments_invalid_json():
 
 
 def test_parse_tool_call_arguments_non_dict_json():
+    """\u9a8c\u8bc1\u5f53\u524d\u573a\u666f\u7684\u540c\u6b65\u8c03\u7528\uff1a\u4f7f\u7528\u53d7\u63a7\u8f93\u5165\u4e0e\u4f9d\u8d56\u66ff\u8eab\uff0c\u901a\u8fc72\u9879\u65ad\u8a00\u56fa\u5b9a\u8fd4\u56de\u3001\u72b6\u6001\u6216\u526f\u4f5c\u7528\u8fb9\u754c\u3002"""
     model = _make_model()
     parsed, err = model._parse_tool_call_arguments({"arguments": '["list", "not", "dict"]', "name": "t", "call_id": "c"})
     assert parsed is None

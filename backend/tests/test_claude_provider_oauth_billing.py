@@ -1,4 +1,4 @@
-"""Tests for ClaudeChatModel._apply_oauth_billing."""
+'定义 test_claude_provider_oauth_billing 模块提供的职责与可复用接口。\n\nTests for ClaudeChatModel._apply_oauth_billing.'
 
 import asyncio
 import json
@@ -10,7 +10,7 @@ from deerflow.models.claude_provider import OAUTH_BILLING_HEADER, ClaudeChatMode
 
 
 def _make_model() -> ClaudeChatModel:
-    """Return a minimal ClaudeChatModel instance in OAuth mode without network calls."""
+    '执行 _make_model 的明确职责，并返回与调用约定一致的结果。\n\nReturn a minimal ClaudeChatModel instance in OAuth mode without network calls.'
     import unittest.mock as mock
 
     with mock.patch.object(ClaudeChatModel, "model_post_init"):
@@ -22,10 +22,12 @@ def _make_model() -> ClaudeChatModel:
 
 @pytest.fixture()
 def model() -> ClaudeChatModel:
+    '执行 model 的明确职责，并返回与调用约定一致的结果'
     return _make_model()
 
 
 def _billing_block() -> dict:
+    '执行 _billing_block 的明确职责，并返回与调用约定一致的结果'
     return {"type": "text", "text": OAUTH_BILLING_HEADER}
 
 
@@ -35,12 +37,14 @@ def _billing_block() -> dict:
 
 
 def test_billing_injected_first_when_no_system(model):
+    '验证 billing、injected、first、when、no、system 场景下的预期行为、边界条件与结果'
     payload: dict = {}
     model._apply_oauth_billing(payload)
     assert payload["system"][0] == _billing_block()
 
 
 def test_billing_injected_first_into_list(model):
+    '验证 billing、injected、first、into、list 场景下的预期行为、边界条件与结果'
     payload = {"system": [{"type": "text", "text": "You are a helpful assistant."}]}
     model._apply_oauth_billing(payload)
     assert payload["system"][0] == _billing_block()
@@ -48,6 +52,7 @@ def test_billing_injected_first_into_list(model):
 
 
 def test_billing_injected_first_into_string_system(model):
+    '验证 billing、injected、first、into、string、system 场景下的预期行为、边界条件与结果'
     payload = {"system": "You are helpful."}
     model._apply_oauth_billing(payload)
     assert payload["system"][0] == _billing_block()
@@ -55,6 +60,7 @@ def test_billing_injected_first_into_string_system(model):
 
 
 def test_billing_not_duplicated_on_second_call(model):
+    '验证 billing、not、duplicated、on、second、call 场景下的预期行为、边界条件与结果'
     payload = {"system": [{"type": "text", "text": "prompt"}]}
     model._apply_oauth_billing(payload)
     model._apply_oauth_billing(payload)
@@ -63,7 +69,7 @@ def test_billing_not_duplicated_on_second_call(model):
 
 
 def test_billing_moved_to_first_if_not_already_first(model):
-    """Billing block already present but not first — must be normalized to index 0."""
+    '验证 billing、moved、to、first、if、not、already、first 场景下的预期行为、边界条件与结果。\n\nBilling block already present but not first — must be normalized to index 0.'
     payload = {
         "system": [
             {"type": "text", "text": "other block"},
@@ -76,7 +82,7 @@ def test_billing_moved_to_first_if_not_already_first(model):
 
 
 def test_billing_string_with_header_collapsed_to_single_block(model):
-    """If system is a string that already contains the billing header, collapse to one block."""
+    '验证 billing、string、with、header、collapsed、to、single、block 场景下的预期行为、边界条件与结果。\n\nIf system is a string that already contains the billing header, collapse to one block.'
     payload = {"system": OAUTH_BILLING_HEADER}
     model._apply_oauth_billing(payload)
     assert payload["system"] == [_billing_block()]
@@ -88,6 +94,7 @@ def test_billing_string_with_header_collapsed_to_single_block(model):
 
 
 def test_metadata_user_id_added_when_missing(model):
+    '验证 metadata、user、id、added、when、missing 场景下的预期行为、边界条件与结果'
     payload: dict = {}
     model._apply_oauth_billing(payload)
     assert "metadata" in payload
@@ -98,13 +105,14 @@ def test_metadata_user_id_added_when_missing(model):
 
 
 def test_metadata_user_id_not_overwritten_if_present(model):
+    '验证 metadata、user、id、not、overwritten、if、present 场景下的预期行为、边界条件与结果'
     payload = {"metadata": {"user_id": "existing-value"}}
     model._apply_oauth_billing(payload)
     assert payload["metadata"]["user_id"] == "existing-value"
 
 
 def test_metadata_non_dict_replaced_with_dict(model):
-    """Non-dict metadata (e.g. None or a string) should be replaced, not crash."""
+    '验证 metadata、non、dict、replaced、with、dict 场景下的预期行为、边界条件与结果。\n\nNon-dict metadata (e.g. None or a string) should be replaced, not crash.'
     for bad_value in (None, "string-metadata", 42):
         payload = {"metadata": bad_value}
         model._apply_oauth_billing(payload)
@@ -113,6 +121,7 @@ def test_metadata_non_dict_replaced_with_dict(model):
 
 
 def test_sync_create_strips_cache_control_from_oauth_payload(model):
+    '验证 sync、create、strips、cache、control、from、oauth、payload 场景下的预期行为、边界条件与结果'
     payload = {
         "system": [{"type": "text", "text": "sys", "cache_control": {"type": "ephemeral"}}],
         "messages": [
@@ -134,6 +143,7 @@ def test_sync_create_strips_cache_control_from_oauth_payload(model):
 
 
 def test_async_create_strips_cache_control_from_oauth_payload(model):
+    '验证 async、create、strips、cache、control、from、oauth、payload 场景下的预期行为、边界条件与结果'
     payload = {
         "system": [{"type": "text", "text": "sys", "cache_control": {"type": "ephemeral"}}],
         "messages": [

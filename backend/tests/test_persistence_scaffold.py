@@ -1,12 +1,4 @@
-"""Tests for the persistence layer scaffolding.
-
-Tests:
-1. DatabaseConfig property derivation (paths, URLs)
-2. MemoryRunStore CRUD + user_id filtering
-3. Base.to_dict() via inspect mixin
-4. Engine init/close lifecycle (memory + SQLite)
-5. Postgres missing-dep error message
-"""
+"""本模块覆盖持久化的行为、边界与回归场景，确保既有契约稳定。"""
 
 import sys
 from datetime import UTC, datetime
@@ -21,12 +13,15 @@ from deerflow.runtime.runs.store.memory import MemoryRunStore
 
 
 class TestDatabaseConfig:
+    """集中覆盖当前测试分支与回归边界。"""
     def test_defaults(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         c = DatabaseConfig()
         assert c.backend == "memory"
         assert c.pool_size == 5
 
     def test_sqlite_paths_unified(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         c = DatabaseConfig(backend="sqlite", sqlite_dir="./mydata")
         assert c.sqlite_path.endswith("deerflow.db")
         assert "mydata" in c.sqlite_path
@@ -35,12 +30,14 @@ class TestDatabaseConfig:
         assert c.app_sqlite_path == c.sqlite_path
 
     def test_app_sqlalchemy_url_sqlite(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         c = DatabaseConfig(backend="sqlite", sqlite_dir="./data")
         url = c.app_sqlalchemy_url
         assert url.startswith("sqlite+aiosqlite:///")
         assert "deerflow.db" in url
 
     def test_app_sqlalchemy_url_postgres(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         c = DatabaseConfig(
             backend="postgres",
             postgres_url="postgresql://u:p@h:5432/db",
@@ -50,6 +47,7 @@ class TestDatabaseConfig:
         assert "u:p@h:5432/db" in url
 
     def test_app_sqlalchemy_url_postgres_already_asyncpg(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         c = DatabaseConfig(
             backend="postgres",
             postgres_url="postgresql+asyncpg://u:p@h:5432/db",
@@ -58,6 +56,7 @@ class TestDatabaseConfig:
         assert url.count("asyncpg") == 1
 
     def test_memory_has_no_url(self):
+        """验证内存在预期条件及边界场景下的可观察行为，防止相关回归。"""
         c = DatabaseConfig(backend="memory")
         with pytest.raises(ValueError, match="No SQLAlchemy URL"):
             _ = c.app_sqlalchemy_url
@@ -67,12 +66,15 @@ class TestDatabaseConfig:
 
 
 class TestMemoryRunStore:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.fixture
     def store(self):
+        """为存储准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
         return MemoryRunStore()
 
     @pytest.mark.anyio
     async def test_put_and_get(self, store):
+        """验证获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1", status="pending")
         row = await store.get("r1")
         assert row is not None
@@ -81,16 +83,19 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_get_missing_returns_none(self, store):
+        """验证获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
         assert await store.get("nope") is None
 
     @pytest.mark.anyio
     async def test_update_status(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         await store.put("r1", thread_id="t1")
         await store.update_status("r1", "running")
         assert (await store.get("r1"))["status"] == "running"
 
     @pytest.mark.anyio
     async def test_update_status_with_error(self, store):
+        """验证错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1")
         await store.update_status("r1", "error", error="boom")
         row = await store.get("r1")
@@ -99,6 +104,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_list_by_thread(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1")
         await store.put("r2", thread_id="t1")
         await store.put("r3", thread_id="t2")
@@ -108,6 +114,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_list_by_thread_owner_filter(self, store):
+        """验证会话 所有者在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1", user_id="alice")
         await store.put("r2", thread_id="t1", user_id="bob")
         rows = await store.list_by_thread("t1", user_id="alice")
@@ -116,6 +123,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_owner_none_returns_all(self, store):
+        """验证所有者在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1", user_id="alice")
         await store.put("r2", thread_id="t1", user_id="bob")
         rows = await store.list_by_thread("t1", user_id=None)
@@ -123,21 +131,25 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_delete(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         await store.put("r1", thread_id="t1")
         await store.delete("r1")
         assert await store.get("r1") is None
 
     @pytest.mark.anyio
     async def test_delete_nonexistent_is_noop(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         await store.delete("nope")  # should not raise
 
     @pytest.mark.anyio
     async def test_list_by_thread_unknown_thread_is_empty(self, store):
+        """验证会话 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1")
         assert await store.list_by_thread("missing") == []
 
     @pytest.mark.anyio
     async def test_list_by_thread_newest_first(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1", created_at="2024-01-01T00:00:00+00:00")
         await store.put("r2", thread_id="t1", created_at="2024-01-03T00:00:00+00:00")
         await store.put("r3", thread_id="t1", created_at="2024-01-02T00:00:00+00:00")
@@ -146,6 +158,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_list_by_thread_respects_limit(self, store):
+        """验证会话 限制在预期条件及边界场景下的可观察行为，防止相关回归。"""
         for i in range(5):
             await store.put(f"r{i}", thread_id="t1", created_at=f"2024-01-0{i + 1}T00:00:00+00:00")
         rows = await store.list_by_thread("t1", limit=2)
@@ -153,6 +166,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_delete_keeps_thread_index_consistent(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1")
         await store.put("r2", thread_id="t1")
         await store.delete("r1")
@@ -165,6 +179,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_scopes_to_thread(self, store):
+        """验证会话 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1")
         await store.update_run_completion("r1", status="success", model_name="m-a", total_tokens=100)
         await store.put("r2", thread_id="t1")
@@ -180,6 +195,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_excludes_active_unless_requested(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1")
         await store.update_run_completion("r1", status="success", total_tokens=10)
         await store.put("r2", thread_id="t1")
@@ -190,6 +206,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_unknown_thread_is_zero(self, store):
+        """验证会话 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put("r1", thread_id="t1")
         await store.update_run_completion("r1", status="success", total_tokens=10)
         agg = await store.aggregate_tokens_by_thread("missing")
@@ -199,6 +216,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_aggregate_tokens_by_thread_matches_full_scan_reference(self, store):
+        """验证会话 扫描在预期条件及边界场景下的可观察行为，防止相关回归。"""
         plan = [
             ("r0", "t1", "success", "m-a", 10),
             ("r1", "t1", "error", "m-b", 20),
@@ -211,6 +229,7 @@ class TestMemoryRunStore:
             await store.update_run_completion(run_id, status=status, model_name=model, total_tokens=tokens)
 
         def _reference(thread_id, include_active):
+            """准备可控测试资源与状态，供后续断言读取。"""
             statuses = ("success", "error", "running") if include_active else ("success", "error")
             completed = [r for r in store._runs.values() if r["thread_id"] == thread_id and r.get("status") in statuses]
             return len(completed), sum(r.get("total_tokens", 0) for r in completed)
@@ -223,6 +242,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_list_pending(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         await store.put("r1", thread_id="t1", status="pending")
         await store.put("r2", thread_id="t1", status="running")
         await store.put("r3", thread_id="t2", status="pending")
@@ -232,6 +252,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_list_pending_respects_before(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         past = "2020-01-01T00:00:00+00:00"
         future = "2099-01-01T00:00:00+00:00"
         await store.put("r1", thread_id="t1", status="pending", created_at=past)
@@ -242,6 +263,7 @@ class TestMemoryRunStore:
 
     @pytest.mark.anyio
     async def test_list_pending_fifo_order(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         await store.put("r2", thread_id="t1", status="pending", created_at="2024-01-02T00:00:00+00:00")
         await store.put("r1", thread_id="t1", status="pending", created_at="2024-01-01T00:00:00+00:00")
         pending = await store.list_pending()
@@ -252,9 +274,10 @@ class TestMemoryRunStore:
 
 
 class TestBaseToDictMixin:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_to_dict_and_exclude(self, tmp_path):
-        """Create a temp SQLite DB with a minimal model, verify to_dict."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from sqlalchemy import String
         from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
         from sqlalchemy.orm import Mapped, mapped_column
@@ -262,6 +285,7 @@ class TestBaseToDictMixin:
         from deerflow.persistence.base import Base
 
         class _Tmp(Base):
+            """集中覆盖当前测试分支与回归边界。"""
             __tablename__ = "_tmp_test"
             id: Mapped[str] = mapped_column(String(64), primary_key=True)
             name: Mapped[str] = mapped_column(String(128))
@@ -287,8 +311,10 @@ class TestBaseToDictMixin:
 
 
 class TestEngineLifecycle:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_memory_is_noop(self):
+        """验证内存在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
 
         await init_engine("memory")
@@ -297,6 +323,7 @@ class TestEngineLifecycle:
 
     @pytest.mark.anyio
     async def test_sqlite_creates_engine(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
 
         url = f"sqlite+aiosqlite:///{tmp_path / 'test.db'}"
@@ -310,7 +337,7 @@ class TestEngineLifecycle:
 
     @pytest.mark.anyio
     async def test_postgres_without_asyncpg_gives_actionable_error(self):
-        """If asyncpg is not installed, error message tells user what to do."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.persistence.engine import init_engine
 
         with (

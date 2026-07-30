@@ -1,3 +1,4 @@
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 from __future__ import annotations
 
 import fnmatch
@@ -78,6 +79,7 @@ _UTF16_BOMS = (BOM_UTF16_LE, BOM_UTF16_BE)
 
 
 def is_sensitive_workspace_path(path: str) -> bool:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     normalized = path.lower()
     parts = [part.lower() for part in Path(path).parts]
     basename = parts[-1] if parts else normalized
@@ -97,6 +99,7 @@ def scan_workspace_roots(
     text_paths: set[str] | None = None,
     text_cache_dir: Path | None = None,
 ) -> WorkspaceSnapshot:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     resolved_limits = limits or WorkspaceChangeLimits()
     cache_dir = Path(text_cache_dir) if text_cache_dir is not None else None
     if cache_dir is not None:
@@ -152,6 +155,7 @@ def _snapshot_file(
     text_paths: set[str] | None,
     text_cache_dir: Path | None,
 ) -> FileSnapshot | None:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     try:
         stat = host_file.stat()
         size = stat.st_size
@@ -223,6 +227,7 @@ def _snapshot_file(
 
 
 def _cache_text_file(text: str, virtual_path: str, cache_dir: Path) -> Path:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     cache_name = hashlib.sha256(virtual_path.encode("utf-8")).hexdigest()
     target = cache_dir / cache_name
     target.write_text(text, encoding="utf-8")
@@ -230,11 +235,13 @@ def _cache_text_file(text: str, virtual_path: str, cache_dir: Path) -> Path:
 
 
 def _read_sample(path: Path) -> bytes:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     with path.open("rb") as file:
         return file.read(SAMPLE_BYTES)
 
 
 def _sha256_file(path: Path) -> str:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     digest = hashlib.sha256()
     with path.open("rb") as file:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
@@ -243,6 +250,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def _decode_text_bytes(data: bytes) -> str | None:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     for encoding in ("utf-8-sig", "utf-8"):
         try:
             return data.decode(encoding)
@@ -259,6 +267,7 @@ def _decode_text_bytes(data: bytes) -> str | None:
 
 
 def _sample_decodes_as_text(sample: bytes, encoding: str) -> bool:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     try:
         decoder = getincrementaldecoder(encoding)()
         decoder.decode(sample, final=False)
@@ -268,6 +277,7 @@ def _sample_decodes_as_text(sample: bytes, encoding: str) -> bool:
 
 
 def _looks_binary(sample: bytes) -> bool:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if sample.startswith(_UTF16_BOMS) and _sample_decodes_as_text(sample, "utf-16"):
         return False
     if b"\x00" in sample:

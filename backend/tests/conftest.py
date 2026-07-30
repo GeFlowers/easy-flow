@@ -1,8 +1,4 @@
-"""Test configuration for the backend test suite.
-
-Sets up sys.path and pre-mocks modules that would cause circular import
-issues when unit-testing lightweight config/registry code in isolation.
-"""
+'定义 conftest 模块提供的职责与可复用接口。\n\nTest configuration for the backend test suite.\n\nSets up sys.path and pre-mocks modules that would cause circular import\nissues when unit-testing lightweight config/registry code in isolation.\n'
 
 from __future__ import annotations
 
@@ -42,12 +38,7 @@ sys.modules["deerflow.subagents.executor"] = _executor_mock
 
 @pytest.fixture()
 def provisioner_module():
-    """Load docker/provisioner/app.py as an importable test module.
-
-    Shared by test_provisioner_kubeconfig and test_provisioner_pvc_volumes so
-    that any change to the provisioner entry-point path or module name only
-    needs to be updated in one place.
-    """
+    '执行 provisioner_module 的明确职责，并返回与调用约定一致的结果。\n\nLoad docker/provisioner/app.py as an importable test module.\n\n    Shared by test_provisioner_kubeconfig and test_provisioner_pvc_volumes so\n    that any change to the provisioner entry-point path or module name only\n    needs to be updated in one place.\n    '
     repo_root = Path(__file__).resolve().parents[2]
     module_path = repo_root / "docker" / "provisioner" / "app.py"
     spec = importlib.util.spec_from_file_location("provisioner_app_test", module_path)
@@ -80,7 +71,7 @@ def provisioner_module():
 
 @pytest.fixture(autouse=True)
 def _reset_skill_storage_singleton():
-    """Reset the SkillStorage singleton between tests to prevent cross-test contamination."""
+    '执行 _reset_skill_storage_singleton 的明确职责，并返回与调用约定一致的结果。\n\nReset the SkillStorage singleton between tests to prevent cross-test contamination.'
     try:
         from deerflow.skills.storage import reset_skill_storage
     except ImportError:
@@ -95,17 +86,7 @@ def _reset_skill_storage_singleton():
 
 @pytest.fixture(autouse=True)
 def _restore_title_config_singleton():
-    """Reset ``_title_config`` to its pristine default after every test.
-
-    ``AppConfig.from_file()`` writes the on-disk ``title`` block into the
-    module-level singleton (``config/app_config.py`` calls
-    ``load_title_config_from_dict``). Any test that loads the real
-    ``config.yaml`` therefore leaves the singleton in a state that
-    ``test_title_middleware_core_logic.py`` does not expect; that suite
-    relies on the pristine ``TitleConfig()`` default (``enabled=True``).
-    We restore the default after every test so test files stay
-    independent regardless of order.
-    """
+    '执行 _restore_title_config_singleton 的明确职责，并返回与调用约定一致的结果。\n\nReset ``_title_config`` to its pristine default after every test.\n\n    ``AppConfig.from_file()`` writes the on-disk ``title`` block into the\n    module-level singleton (``config/app_config.py`` calls\n    ``load_title_config_from_dict``). Any test that loads the real\n    ``config.yaml`` therefore leaves the singleton in a state that\n    ``test_title_middleware_core_logic.py`` does not expect; that suite\n    relies on the pristine ``TitleConfig()`` default (``enabled=True``).\n    We restore the default after every test so test files stay\n    independent regardless of order.\n    '
     try:
         from deerflow.config.title_config import reset_title_config
     except ImportError:
@@ -120,12 +101,7 @@ def _restore_title_config_singleton():
 
 @pytest.fixture(autouse=True)
 def _auto_user_context(request):
-    """Inject a default ``test-user-autouse`` into the contextvar.
-
-    Opt-out via ``@pytest.mark.no_auto_user``. Uses lazy import so that
-    tests which don't touch the persistence layer never pay the cost
-    of importing runtime.user_context.
-    """
+    "执行 _auto_user_context 的明确职责，并返回与调用约定一致的结果。\n\nInject a default ``test-user-autouse`` into the contextvar.\n\n    Opt-out via ``@pytest.mark.no_auto_user``. Uses lazy import so that\n    tests which don't touch the persistence layer never pay the cost\n    of importing runtime.user_context.\n    "
     if request.node.get_closest_marker("no_auto_user"):
         yield
         return

@@ -10,12 +10,14 @@ import { cn } from "@/lib/utils";
 
 import { MobileNav } from "./mobile-nav";
 
+/** HeaderProps 的公开类型定义。 */
 export type HeaderProps = {
   className?: string;
   homeURL?: string;
   locale?: Locale;
 };
 
+/** Header 组件：提供对应的界面结构与交互语义。 */
 export async function Header({ className, homeURL, locale }: HeaderProps) {
   const isExternalHome = !homeURL;
   const { locale: resolvedLocale, t } = await getI18n(locale);
@@ -88,6 +90,7 @@ export async function Header({ className, homeURL, locale }: HeaderProps) {
   );
 }
 
+/** StarCounter 内部组件：组织对应的界面结构与交互语义。 */
 async function StarCounter() {
   let stars = 10000; // Default value
 

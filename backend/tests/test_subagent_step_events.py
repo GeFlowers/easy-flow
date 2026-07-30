@@ -1,11 +1,4 @@
-"""Tests for the pure subagent step-payload builder (issue #3779).
-
-``build_subagent_step`` turns a captured subagent message dict (the
-``model_dump()`` of an AIMessage or ToolMessage) into the compact,
-serializable step payload that is both streamed (``task_running``) and
-persisted (``subagent.step`` run events). It is a pure function so it can
-be unit-tested without the executor/graph.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -23,6 +16,7 @@ from deerflow.subagents.step_events import (
 
 
 def test_ai_message_becomes_ai_step_with_tool_calls():
+    '未说明'
     message = {
         "type": "ai",
         "id": "ai-1",
@@ -44,6 +38,7 @@ def test_ai_message_becomes_ai_step_with_tool_calls():
 
 
 def test_tool_message_becomes_tool_step_with_output():
+    '未说明'
     message = {
         "type": "tool",
         "id": "tool-1",
@@ -62,6 +57,7 @@ def test_tool_message_becomes_tool_step_with_output():
 
 
 def test_long_tool_output_is_truncated_and_flagged():
+    '未说明'
     big = "x" * (SUBAGENT_STEP_MAX_CHARS + 500)
     message = {"type": "tool", "name": "read_file", "content": big}
 
@@ -72,6 +68,7 @@ def test_long_tool_output_is_truncated_and_flagged():
 
 
 def test_list_content_blocks_are_flattened_to_text():
+    '未说明'
     message = {
         "type": "ai",
         "content": [
@@ -89,6 +86,7 @@ def test_list_content_blocks_are_flattened_to_text():
 
 
 def test_ai_text_is_also_truncated():
+    '未说明'
     big = "y" * (SUBAGENT_STEP_MAX_CHARS + 10)
     message = {"type": "ai", "content": big, "tool_calls": []}
 
@@ -99,11 +97,13 @@ def test_ai_text_is_also_truncated():
 
 
 def test_truncate_step_text_helper():
+    '未说明'
     assert truncate_step_text("abc", 10) == ("abc", False)
     assert truncate_step_text("abcdef", 3) == ("abc", True)
 
 
 def test_capture_ai_message_appends_dict():
+    '未说明'
     captured: list[dict] = []
     seen: set[str] = set()
 
@@ -117,6 +117,7 @@ def test_capture_ai_message_appends_dict():
 def test_capture_tool_message_is_now_captured():
     # Regression for #3779: tool outputs (ToolMessage) used to be dropped,
     # so "what each step produced" never reached the UI/store.
+    '未说明'
     captured: list[dict] = []
     seen: set[str] = set()
 
@@ -132,6 +133,7 @@ def test_capture_tool_message_is_now_captured():
 
 
 def test_capture_dedupes_by_id():
+    '未说明'
     captured: list[dict] = []
     seen: set[str] = set()
     msg = AIMessage(content="hi", id="ai-1")
@@ -142,6 +144,7 @@ def test_capture_dedupes_by_id():
 
 
 def test_capture_ignores_human_message():
+    '未说明'
     captured: list[dict] = []
     seen: set[str] = set()
 
@@ -154,6 +157,7 @@ def test_capture_ignores_human_message():
 def test_none_content_flattens_to_empty_string():
     # A tool-call-only AI turn can carry content=None; it must render as "" (not
     # the literal "None"), matching the shared message_content_to_text guard.
+    '未说明'
     message = {"type": "ai", "content": None, "tool_calls": []}
 
     step = build_subagent_step(message, task_id="t", message_index=1)
@@ -165,6 +169,7 @@ def test_ai_step_caps_large_tool_call_args():
     # Regression for #3779: build_subagent_step capped `text` but copied
     # `tool_calls[].args` verbatim, so a write_file/bash call carrying a big
     # payload produced an unbounded persisted row. Args must now be capped too.
+    '未说明'
     big_payload = "F" * (SUBAGENT_STEP_MAX_CHARS + 4096)
     message = {
         "type": "ai",
@@ -185,6 +190,7 @@ def test_ai_step_caps_large_tool_call_args():
 
 
 def test_ai_step_keeps_small_tool_call_args_structured():
+    '未说明'
     message = {
         "type": "ai",
         "content": "searching",
@@ -202,6 +208,7 @@ def test_capture_new_step_messages_captures_full_multi_tool_tail():
     # Regression for #3779: a single super-step can append several ToolMessages
     # (one per tool call in a multi-tool turn). Capturing only messages[-1]
     # dropped all but the last; the tail walk must capture every new message.
+    '未说明'
     captured: list[dict] = []
     seen: set[str] = set()
 
@@ -231,6 +238,7 @@ def test_capture_new_step_messages_captures_full_multi_tool_tail():
 def test_capture_new_step_messages_is_noop_on_values_reyield():
     # stream_mode="values" re-yields the same trailing message with unchanged
     # length; re-processing must not duplicate captures.
+    '未说明'
     captured: list[dict] = []
     seen: set[str] = set()
     messages = [AIMessage(content="hi", id="ai-1")]
@@ -256,6 +264,7 @@ def test_capture_new_step_messages_handles_history_contraction():
     # NOT a synthetic summary AIMessage. So the contraction chunk is the
     # already-seen tail, deduped by id; the real regression coverage is that
     # POST-compaction growth is still captured.
+    '未说明'
     captured: list[dict] = []
     seen: set[str] = set()
 
@@ -290,6 +299,7 @@ def test_capture_new_step_messages_handles_history_contraction():
 
 
 def test_run_event_for_task_started():
+    '未说明'
     record = subagent_run_event({"type": "task_started", "task_id": "call_1", "description": "research X"})
 
     assert record["event_type"] == "subagent.start"
@@ -299,6 +309,7 @@ def test_run_event_for_task_started():
 
 
 def test_run_event_for_task_running_carries_step_payload():
+    '未说明'
     chunk = {
         "type": "task_running",
         "task_id": "call_1",
@@ -315,6 +326,7 @@ def test_run_event_for_task_running_carries_step_payload():
 
 
 def test_run_event_for_terminal_status():
+    '未说明'
     record = subagent_run_event(
         {
             "type": "task_completed",
@@ -337,6 +349,7 @@ def test_run_event_for_terminal_status():
 
 
 def test_run_event_terminal_result_is_truncated():
+    '未说明'
     big = "z" * (SUBAGENT_STEP_MAX_CHARS + 100)
     record = subagent_run_event({"type": "task_completed", "task_id": "c1", "result": big})
 
@@ -345,6 +358,7 @@ def test_run_event_terminal_result_is_truncated():
 
 
 def test_run_event_ignores_non_task_chunks():
+    '未说明'
     assert subagent_run_event({"type": "something_else"}) is None
     assert subagent_run_event({"no_type": True}) is None
     assert subagent_run_event("not-a-dict") is None

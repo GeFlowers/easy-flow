@@ -1,9 +1,4 @@
-"""Pure Rich renderers for the transcript, status line and header.
-
-These take a :class:`ViewState` (plus light session info) and return Rich
-renderables. No Textual import, so they can be unit-tested by rendering to a
-Rich ``Console`` and inspecting the text.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -22,6 +17,7 @@ _TOOL_STATUS_STYLE = {"running": THEME.warning, "ok": THEME.accent, "error": THE
 
 
 def render_transcript(state: ViewState) -> RenderableType:
+    '未说明'
     if not state.rows:
         return Text(_EMPTY_HINT, style=f"italic {THEME.dim}")
 
@@ -37,6 +33,7 @@ def render_transcript(state: ViewState) -> RenderableType:
 
 
 def render_row(row: Row, *, as_markdown: bool = True) -> RenderableType:
+    '未说明'
     if isinstance(row, UserRow):
         text = Text()
         text.append(f"{SYMBOLS['user']} ", style=f"bold {THEME.user}")
@@ -63,7 +60,7 @@ def render_row(row: Row, *, as_markdown: bool = True) -> RenderableType:
 
 
 def _assistant_markdown(text: str) -> RenderableType:
-    """A ``●`` speaker marker aligned to the top of the Markdown-rendered body."""
+    '未说明'
     grid = Table.grid(padding=(0, 1, 0, 0))
     grid.add_column(width=1, vertical="top")  # marker
     grid.add_column(ratio=1)  # markdown body
@@ -75,6 +72,7 @@ def _assistant_markdown(text: str) -> RenderableType:
 
 
 def _render_tool(row: ToolRow) -> RenderableType:
+    '未说明'
     head = Text()
     head.append(f"  {SYMBOLS['tool']} ", style=THEME.tool)
     head.append(row.title, style=f"bold {THEME.tool}")
@@ -88,6 +86,7 @@ def _render_tool(row: ToolRow) -> RenderableType:
 
 
 def render_status(state: ViewState, *, model: str, thread_label: str, spinner: str = "", elapsed: str = "") -> Text:
+    '未说明'
     text = Text(no_wrap=True, overflow="ellipsis")
     if state.streaming:
         text.append(f"{spinner} working", style=f"bold {THEME.warning}")
@@ -114,7 +113,7 @@ def render_status(state: ViewState, *, model: str, thread_label: str, spinner: s
 
 
 def render_palette(items, index: int, limit: int = 8) -> RenderableType:
-    """Render the slash-command picker: a windowed list with one highlighted row."""
+    '未说明'
     if not items:
         return Text("")
     index = max(0, min(index, len(items) - 1))
@@ -138,6 +137,7 @@ def render_palette(items, index: int, limit: int = 8) -> RenderableType:
 
 
 def render_header(*, model: str, thread_label: str, cwd: str, skills: int = 0) -> Text:
+    '未说明'
     text = Text(no_wrap=True, overflow="ellipsis")
     text.append(" DeerFlow ", style=f"bold {THEME.bg} on {THEME.primary}")
     text.append("  ")

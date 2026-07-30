@@ -1,4 +1,4 @@
-"""Unit tests for the Serper community web search tool."""
+'未说明'
 
 import json
 from unittest.mock import MagicMock, patch
@@ -9,7 +9,7 @@ import pytest
 
 @pytest.fixture(autouse=True)
 def reset_api_key_warned():
-    """Reset the module-level warning flag before each test."""
+    """为重置 接口准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     import deerflow.community.serper.tools as serper_mod
 
     serper_mod._api_key_warned = set()
@@ -19,6 +19,7 @@ def reset_api_key_warned():
 
 @pytest.fixture
 def mock_config_with_key():
+    """为模拟 配置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     with patch("deerflow.community.serper.tools.get_app_config") as mock:
         tool_config = MagicMock()
         tool_config.model_extra = {"api_key": "test-serper-key", "max_results": 5}
@@ -28,6 +29,7 @@ def mock_config_with_key():
 
 @pytest.fixture
 def mock_config_no_key():
+    """为模拟 配置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     with patch("deerflow.community.serper.tools.get_app_config") as mock:
         tool_config = MagicMock()
         tool_config.model_extra = {}
@@ -36,6 +38,7 @@ def mock_config_no_key():
 
 
 def _make_serper_response(organic: list) -> MagicMock:
+    '未说明'
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"organic": organic}
     mock_resp.raise_for_status = MagicMock()
@@ -43,6 +46,7 @@ def _make_serper_response(organic: list) -> MagicMock:
 
 
 def _make_serper_images_response(images: list) -> MagicMock:
+    '未说明'
     mock_resp = MagicMock()
     mock_resp.json.return_value = {"images": images}
     mock_resp.raise_for_status = MagicMock()
@@ -50,7 +54,9 @@ def _make_serper_images_response(images: list) -> MagicMock:
 
 
 class TestGetApiKey:
+    '未说明'
     def test_returns_config_key_when_present(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "from-config"}
@@ -61,6 +67,7 @@ class TestGetApiKey:
             assert _get_api_key("web_search") == "from-config"
 
     def test_falls_back_to_env_when_config_key_empty(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": ""}
@@ -71,6 +78,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") == "env-key"
 
     def test_falls_back_to_env_when_config_key_whitespace(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "   "}
@@ -81,6 +89,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") == "env-key"
 
     def test_falls_back_to_env_when_config_key_null(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": None}
@@ -91,6 +100,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") == "env-key"
 
     def test_falls_back_to_env_when_no_config(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {"SERPER_API_KEY": "env-only"}):
@@ -99,6 +109,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") == "env-only"
 
     def test_returns_none_when_no_key_anywhere(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {}, clear=True):
@@ -110,6 +121,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") is None
 
     def test_returns_none_when_env_key_whitespace(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {"SERPER_API_KEY": "   "}):
@@ -118,6 +130,7 @@ class TestGetApiKey:
                 assert _get_api_key("web_search") is None
 
     def test_reads_config_for_requested_tool_name(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "image-key"}
@@ -130,59 +143,72 @@ class TestGetApiKey:
 
 
 class TestCoerceMaxResults:
+    '未说明'
     def test_returns_value_when_valid_positive_int(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results(3) == 3
 
     def test_returns_value_for_numeric_string(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results("7") == 7
 
     def test_caps_value_at_default_maximum(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results(999) == 10
 
     def test_respects_custom_maximum(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results(999, max_allowed=3) == 3
 
     def test_returns_default_for_non_numeric_string(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results("oops") == 5
 
     def test_returns_default_for_none(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results(None) == 5
 
     def test_returns_default_for_non_coercible_object(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results(object()) == 5
 
     def test_returns_default_for_zero(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results(0) == 5
 
     def test_returns_default_for_negative(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results(-3) == 5
 
     def test_respects_custom_default(self):
+        '未说明'
         from deerflow.community.serper.tools import _coerce_max_results
 
         assert _coerce_max_results("bad", default=2) == 2
 
 
 class TestMissingKeyError:
+    '未说明'
     def test_warns_once_per_tool_name(self, caplog):
+        '未说明'
         import logging
 
         import deerflow.community.serper.tools as serper_mod
@@ -196,6 +222,7 @@ class TestMissingKeyError:
         assert "web_search" in warnings[0].getMessage()
 
     def test_warns_separately_for_each_tool(self, caplog):
+        '未说明'
         import logging
 
         import deerflow.community.serper.tools as serper_mod
@@ -209,6 +236,7 @@ class TestMissingKeyError:
         assert any("image_search" in m for m in warned_tools)
 
     def test_returns_structured_error_json(self):
+        '未说明'
         import deerflow.community.serper.tools as serper_mod
 
         parsed = json.loads(serper_mod._missing_key_error("hello", "web_search"))
@@ -217,122 +245,145 @@ class TestMissingKeyError:
 
 
 class TestSafePublicUrl:
+    '未说明'
     def test_https_public_hostname_passes(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("https://example.com/i.jpg") == "https://example.com/i.jpg"
 
     def test_public_ip_literal_passes(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("https://8.8.8.8/i.jpg") == "https://8.8.8.8/i.jpg"
 
     def test_localhost_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("http://localhost/x.jpg") == ""
 
     def test_localhost_subdomain_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("http://foo.localhost/x.jpg") == ""
 
     def test_trailing_dot_localhost_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # FQDN root label: localhost. still resolves to loopback.
         assert _safe_public_url("http://localhost./x.jpg") == ""
 
     def test_trailing_dot_loopback_ip_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("http://127.0.0.1./x.jpg") == ""
 
     def test_trailing_dot_private_ip_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("http://10.0.0.1./x.jpg") == ""
 
     def test_trailing_dot_public_host_passes(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # A trailing dot on a public host is harmless and must not be rejected.
         assert _safe_public_url("https://example.com./i.jpg") == "https://example.com./i.jpg"
 
     def test_private_ip_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("http://10.0.0.1/x.jpg") == ""
 
     def test_ipv4_mapped_ipv6_loopback_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("http://[::ffff:127.0.0.1]/x.jpg") == ""
 
     def test_non_http_scheme_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("file:///etc/passwd") == ""
 
     def test_non_string_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url(None) == ""
 
     def test_decimal_encoded_loopback_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # 2130706433 == 127.0.0.1
         assert _safe_public_url("http://2130706433/x.jpg") == ""
 
     def test_hex_encoded_loopback_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # 0x7f000001 == 127.0.0.1
         assert _safe_public_url("http://0x7f000001/x.jpg") == ""
 
     def test_octal_encoded_loopback_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # 0177.0.0.1 == 127.0.0.1
         assert _safe_public_url("http://0177.0.0.1/x.jpg") == ""
 
     def test_decimal_encoded_private_ip_is_filtered(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # 167772161 == 10.0.0.1
         assert _safe_public_url("http://167772161/x.jpg") == ""
 
     def test_decimal_encoded_public_ip_passes(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # 134744072 == 8.8.8.8
         assert _safe_public_url("http://134744072/i.jpg") == "http://134744072/i.jpg"
 
     def test_domain_with_hex_chars_is_not_treated_as_ip(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         assert _safe_public_url("https://cafe.com/i.jpg") == "https://cafe.com/i.jpg"
 
     def test_out_of_range_octet_is_not_treated_as_ip(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # 999.1.1.1 is not a valid IPv4 literal; treat as a hostname, not blocked.
         assert _safe_public_url("https://999.1.1.1/i.jpg") == "https://999.1.1.1/i.jpg"
 
     def test_too_many_octets_is_not_treated_as_ip(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # More than 4 dotted parts cannot be an IPv4 literal; treat as hostname.
         assert _safe_public_url("https://1.2.3.4.5/i.jpg") == "https://1.2.3.4.5/i.jpg"
 
     def test_empty_octet_is_not_treated_as_ip(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # Empty dotted part (e.g. trailing/leading dot) cannot decode to an IP.
         assert _safe_public_url("https://1.2..3/i.jpg") == "https://1.2..3/i.jpg"
 
     def test_trailing_octet_out_of_range_is_not_treated_as_ip(self):
+        '未说明'
         from deerflow.community.serper.tools import _safe_public_url
 
         # Leading octets are valid but the trailing block exceeds its range.
@@ -340,7 +391,9 @@ class TestSafePublicUrl:
 
 
 class TestWebSearchTool:
+    '未说明'
     def test_basic_search_returns_normalized_results(self, mock_config_with_key):
+        '未说明'
         organic = [
             {"title": "Result 1", "link": "https://example.com/1", "snippet": "Snippet 1"},
             {"title": "Result 2", "link": "https://example.com/2", "snippet": "Snippet 2"},
@@ -362,6 +415,7 @@ class TestWebSearchTool:
         assert parsed["results"][0]["content"] == "Snippet 1"
 
     def test_respects_max_results_from_config(self, mock_config_with_key):
+        '未说明'
         mock_config_with_key.return_value.get_tool_config.return_value.model_extra = {
             "api_key": "test-key",
             "max_results": 3,
@@ -381,6 +435,7 @@ class TestWebSearchTool:
         assert len(parsed["results"]) == 3
 
     def test_invalid_config_max_results_falls_back_to_default(self, mock_config_with_key):
+        '未说明'
         mock_config_with_key.return_value.get_tool_config.return_value.model_extra = {
             "api_key": "test-key",
             "max_results": "oops",
@@ -401,6 +456,7 @@ class TestWebSearchTool:
         assert mock_post.call_args.kwargs["json"]["num"] == 5
 
     def test_config_max_results_is_capped(self, mock_config_with_key):
+        '未说明'
         mock_config_with_key.return_value.get_tool_config.return_value.model_extra = {
             "api_key": "test-key",
             "max_results": 999,
@@ -422,7 +478,7 @@ class TestWebSearchTool:
         assert mock_post.call_args.kwargs["json"]["num"] == 10
 
     def test_max_results_parameter_accepted(self, mock_config_no_key):
-        """Tool accepts max_results as a call parameter when config does not override it."""
+        '未说明'
         organic = [{"title": f"R{i}", "link": f"https://x.com/{i}", "snippet": f"S{i}"} for i in range(10)]
         mock_resp = _make_serper_response(organic)
 
@@ -438,7 +494,7 @@ class TestWebSearchTool:
         assert parsed["total_results"] == 2
 
     def test_config_max_results_overrides_parameter(self):
-        """Config max_results overrides the parameter passed at call time, matching ddg_search behaviour."""
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "test-key", "max_results": 3}
@@ -458,7 +514,7 @@ class TestWebSearchTool:
         assert parsed["total_results"] == 3
 
     def test_empty_organic_returns_error_json(self, mock_config_with_key):
-        """Empty organic list returns structured error, matching ddg_search convention."""
+        '未说明'
         mock_resp = _make_serper_response([])
 
         with patch("deerflow.community.serper.tools.httpx.Client") as mock_client_cls:
@@ -474,6 +530,7 @@ class TestWebSearchTool:
         assert parsed["query"] == "no results"
 
     def test_missing_api_key_returns_error_json(self, mock_config_no_key):
+        '未说明'
         with patch.dict("os.environ", {}, clear=True):
             import os
 
@@ -488,6 +545,7 @@ class TestWebSearchTool:
         assert "SERPER_API_KEY" in parsed["error"]
 
     def test_missing_api_key_logs_warning_once(self, mock_config_no_key, caplog):
+        '未说明'
         import logging
 
         with patch.dict("os.environ", {}, clear=True):
@@ -505,6 +563,7 @@ class TestWebSearchTool:
         assert len(warnings) == 1
 
     def test_http_error_returns_structured_error(self, mock_config_with_key):
+        '未说明'
         mock_error_response = MagicMock()
         mock_error_response.status_code = 403
         mock_error_response.text = "Forbidden"
@@ -521,6 +580,7 @@ class TestWebSearchTool:
         assert "403" in parsed["error"]
 
     def test_network_exception_returns_error_json(self, mock_config_with_key):
+        '未说明'
         with patch("deerflow.community.serper.tools.httpx.Client") as mock_client_cls:
             mock_client_cls.return_value.__enter__.return_value.post.side_effect = Exception("timeout")
 
@@ -532,6 +592,7 @@ class TestWebSearchTool:
         assert "error" in parsed
 
     def test_http_status_error_from_response_returns_structured_error(self, mock_config_with_key):
+        '未说明'
         mock_error_response = MagicMock()
         mock_error_response.status_code = 403
         mock_error_response.text = "Forbidden"
@@ -549,6 +610,7 @@ class TestWebSearchTool:
         assert "403" in parsed["error"]
 
     def test_sends_correct_headers_and_payload(self, mock_config_with_key):
+        '未说明'
         organic = [{"title": "T", "link": "https://x.com", "snippet": "S"}]
         mock_resp = _make_serper_response(organic)
 
@@ -569,6 +631,7 @@ class TestWebSearchTool:
         assert payload["num"] == 5
 
     def test_uses_env_key_when_config_absent(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {"SERPER_API_KEY": "env-only-key"}):
@@ -587,7 +650,7 @@ class TestWebSearchTool:
                 assert headers["X-API-KEY"] == "env-only-key"
 
     def test_partial_fields_in_organic_result(self, mock_config_with_key):
-        """Missing title/link/snippet should default to empty string."""
+        '未说明'
         organic = [{}]
         mock_resp = _make_serper_response(organic)
 
@@ -602,6 +665,7 @@ class TestWebSearchTool:
         assert parsed["results"][0] == {"title": "", "url": "", "content": ""}
 
     def test_malformed_json_response_returns_error(self, mock_config_with_key):
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.side_effect = json.JSONDecodeError(" Expecting value", "doc", 0)
 
@@ -616,7 +680,7 @@ class TestWebSearchTool:
         assert "error" in parsed
 
     def test_non_dict_json_response_returns_error(self, mock_config_with_key):
-        """A valid but non-dict payload (e.g. a list) must not crash the tool."""
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.return_value = ["unexpected", "list"]
         mock_resp.raise_for_status = MagicMock()
@@ -633,6 +697,7 @@ class TestWebSearchTool:
         assert parsed["query"] == "test"
 
     def test_non_list_organic_returns_error(self, mock_config_with_key):
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"organic": {"unexpected": "dict"}}
         mock_resp.raise_for_status = MagicMock()
@@ -648,7 +713,7 @@ class TestWebSearchTool:
         assert parsed["error"] == "Serper returned an unexpected response format"
 
     def test_null_organic_field_is_treated_as_no_results(self, mock_config_with_key):
-        """A null-typed field (some APIs use it for "no results") is not a format error."""
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"organic": None}
         mock_resp.raise_for_status = MagicMock()
@@ -664,6 +729,7 @@ class TestWebSearchTool:
         assert parsed["error"] == "No results found"
 
     def test_non_dict_organic_items_are_ignored(self, mock_config_with_key):
+        '未说明'
         mock_resp = _make_serper_response(["bad", {"title": "T", "link": "https://x.com", "snippet": "S"}])
 
         with patch("deerflow.community.serper.tools.httpx.Client") as mock_client_cls:
@@ -678,6 +744,7 @@ class TestWebSearchTool:
         assert parsed["results"][0]["title"] == "T"
 
     def test_timeout_returns_error(self, mock_config_with_key):
+        '未说明'
         with patch("deerflow.community.serper.tools.httpx.Client") as mock_client_cls:
             mock_client_cls.return_value.__enter__.return_value.post.side_effect = httpx.TimeoutException("Read timed out")
 
@@ -690,6 +757,7 @@ class TestWebSearchTool:
         assert "timed out" in parsed["error"].lower()
 
     def test_long_query_is_truncated(self, mock_config_with_key):
+        '未说明'
         organic = [{"title": "T", "link": "https://x.com", "snippet": "S"}]
         mock_resp = _make_serper_response(organic)
 
@@ -706,6 +774,7 @@ class TestWebSearchTool:
         assert payload["q"] == "a" * 500
 
     def test_query_is_stripped(self, mock_config_with_key):
+        '未说明'
         organic = [{"title": "T", "link": "https://x.com", "snippet": "S"}]
         mock_resp = _make_serper_response(organic)
 
@@ -722,7 +791,9 @@ class TestWebSearchTool:
 
 
 class TestImageSearchTool:
+    '未说明'
     def test_basic_search_returns_normalized_results(self, mock_config_with_key):
+        '未说明'
         images = [
             {
                 "title": "Cat 1",
@@ -753,6 +824,7 @@ class TestImageSearchTool:
         assert parsed["usage_hint"] == "Use the 'image_url' values as reference images in image generation. Download them first if needed."
 
     def test_sends_correct_headers_and_payload_to_images_endpoint(self, mock_config_with_key):
+        '未说明'
         images = [{"title": "T", "imageUrl": "https://x.com/i.jpg", "thumbnailUrl": "https://x.com/t.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -775,6 +847,7 @@ class TestImageSearchTool:
         assert payload["num"] == 5
 
     def test_image_url_falls_back_to_thumbnail(self, mock_config_with_key):
+        '未说明'
         images = [{"title": "Only thumb", "thumbnailUrl": "https://x.com/thumb.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -790,6 +863,7 @@ class TestImageSearchTool:
         assert parsed["results"][0]["thumbnail_url"] == "https://x.com/thumb.jpg"
 
     def test_thumbnail_url_falls_back_to_image(self, mock_config_with_key):
+        '未说明'
         images = [{"title": "Only image", "imageUrl": "https://x.com/full.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -805,7 +879,7 @@ class TestImageSearchTool:
         assert parsed["results"][0]["thumbnail_url"] == "https://x.com/full.jpg"
 
     def test_filtered_image_url_does_not_collapse_onto_thumbnail(self, mock_config_with_key):
-        """A present-but-unsafe imageUrl must not be replaced by the safe thumbnail."""
+        '未说明'
         images = [{"title": "T", "imageUrl": "http://10.0.0.1/full.jpg", "thumbnailUrl": "https://example.com/t.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -822,7 +896,7 @@ class TestImageSearchTool:
         assert parsed["results"][0]["thumbnail_url"] == "https://example.com/t.jpg"
 
     def test_filtered_thumbnail_does_not_collapse_onto_image(self, mock_config_with_key):
-        """A present-but-unsafe thumbnailUrl must not be replaced by the safe image."""
+        '未说明'
         images = [{"title": "T", "imageUrl": "https://example.com/full.jpg", "thumbnailUrl": "http://127.0.0.1/t.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -838,6 +912,7 @@ class TestImageSearchTool:
         assert parsed["results"][0]["thumbnail_url"] == ""
 
     def test_respects_max_results_from_config(self, mock_config_with_key):
+        '未说明'
         mock_config_with_key.return_value.get_tool_config.return_value.model_extra = {
             "api_key": "test-key",
             "max_results": 3,
@@ -857,6 +932,7 @@ class TestImageSearchTool:
         assert len(parsed["results"]) == 3
 
     def test_config_max_results_is_capped(self, mock_config_with_key):
+        '未说明'
         mock_config_with_key.return_value.get_tool_config.return_value.model_extra = {
             "api_key": "test-key",
             "max_results": 999,
@@ -878,6 +954,7 @@ class TestImageSearchTool:
         assert mock_post.call_args.kwargs["json"]["num"] == 10
 
     def test_empty_images_returns_error_json(self, mock_config_with_key):
+        '未说明'
         mock_resp = _make_serper_images_response([])
 
         with patch("deerflow.community.serper.tools.httpx.Client") as mock_client_cls:
@@ -893,6 +970,7 @@ class TestImageSearchTool:
         assert parsed["query"] == "no results"
 
     def test_missing_api_key_returns_error_json(self, mock_config_no_key):
+        '未说明'
         with patch.dict("os.environ", {}, clear=True):
             import os
 
@@ -907,6 +985,7 @@ class TestImageSearchTool:
         assert "SERPER_API_KEY" in parsed["error"]
 
     def test_http_error_returns_structured_error(self, mock_config_with_key):
+        '未说明'
         mock_error_response = MagicMock()
         mock_error_response.status_code = 403
         mock_error_response.text = "Forbidden"
@@ -923,6 +1002,7 @@ class TestImageSearchTool:
         assert "403" in parsed["error"]
 
     def test_network_exception_returns_error_json(self, mock_config_with_key):
+        '未说明'
         with patch("deerflow.community.serper.tools.httpx.Client") as mock_client_cls:
             mock_client_cls.return_value.__enter__.return_value.post.side_effect = Exception("timeout")
 
@@ -934,6 +1014,7 @@ class TestImageSearchTool:
         assert "error" in parsed
 
     def test_uses_env_key_when_config_absent(self):
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             mock.return_value.get_tool_config.return_value = None
             with patch.dict("os.environ", {"SERPER_API_KEY": "env-only-key"}):
@@ -952,7 +1033,7 @@ class TestImageSearchTool:
                 assert headers["X-API-KEY"] == "env-only-key"
 
     def test_max_results_parameter_accepted(self, mock_config_no_key):
-        """Tool accepts max_results as a call parameter when config does not override it."""
+        '未说明'
         images = [{"title": f"I{i}", "imageUrl": f"https://x.com/{i}.jpg"} for i in range(10)]
         mock_resp = _make_serper_images_response(images)
 
@@ -968,7 +1049,7 @@ class TestImageSearchTool:
         assert parsed["total_results"] == 2
 
     def test_config_max_results_overrides_parameter(self):
-        """Config max_results overrides the parameter passed at call time."""
+        '未说明'
         with patch("deerflow.community.serper.tools.get_app_config") as mock:
             tool_config = MagicMock()
             tool_config.model_extra = {"api_key": "test-key", "max_results": 3}
@@ -988,6 +1069,7 @@ class TestImageSearchTool:
         assert parsed["total_results"] == 3
 
     def test_missing_api_key_logs_warning_once(self, mock_config_no_key, caplog):
+        '未说明'
         import logging
 
         with patch.dict("os.environ", {}, clear=True):
@@ -1005,6 +1087,7 @@ class TestImageSearchTool:
         assert len(warnings) == 1
 
     def test_malformed_json_response_returns_error(self, mock_config_with_key):
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.side_effect = json.JSONDecodeError(" Expecting value", "doc", 0)
 
@@ -1019,7 +1102,7 @@ class TestImageSearchTool:
         assert "error" in parsed
 
     def test_non_dict_json_response_returns_error(self, mock_config_with_key):
-        """A valid but non-dict payload (e.g. a list) must not crash the tool."""
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.return_value = ["unexpected", "list"]
         mock_resp.raise_for_status = MagicMock()
@@ -1036,6 +1119,7 @@ class TestImageSearchTool:
         assert parsed["query"] == "test"
 
     def test_non_list_images_returns_error(self, mock_config_with_key):
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"images": {"unexpected": "dict"}}
         mock_resp.raise_for_status = MagicMock()
@@ -1051,7 +1135,7 @@ class TestImageSearchTool:
         assert parsed["error"] == "Serper returned an unexpected response format"
 
     def test_null_images_field_is_treated_as_no_results(self, mock_config_with_key):
-        """A null-typed images field is "no images", not a malformed payload."""
+        '未说明'
         mock_resp = MagicMock()
         mock_resp.json.return_value = {"images": None}
         mock_resp.raise_for_status = MagicMock()
@@ -1067,6 +1151,7 @@ class TestImageSearchTool:
         assert parsed["error"] == "No images found"
 
     def test_non_dict_image_items_are_ignored(self, mock_config_with_key):
+        '未说明'
         images = ["bad", {"title": "T", "imageUrl": "https://x.com/i.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -1082,6 +1167,7 @@ class TestImageSearchTool:
         assert parsed["results"][0]["image_url"] == "https://x.com/i.jpg"
 
     def test_timeout_returns_error(self, mock_config_with_key):
+        '未说明'
         with patch("deerflow.community.serper.tools.httpx.Client") as mock_client_cls:
             mock_client_cls.return_value.__enter__.return_value.post.side_effect = httpx.TimeoutException("Read timed out")
 
@@ -1094,6 +1180,7 @@ class TestImageSearchTool:
         assert "timed out" in parsed["error"].lower()
 
     def test_long_query_is_truncated(self, mock_config_with_key):
+        '未说明'
         images = [{"title": "T", "imageUrl": "https://x.com/i.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -1110,6 +1197,7 @@ class TestImageSearchTool:
         assert payload["q"] == "a" * 500
 
     def test_query_is_stripped(self, mock_config_with_key):
+        '未说明'
         images = [{"title": "T", "imageUrl": "https://x.com/i.jpg"}]
         mock_resp = _make_serper_images_response(images)
 
@@ -1125,7 +1213,7 @@ class TestImageSearchTool:
         assert payload["q"] == "cat photo"
 
     def test_partial_fields_in_image_result_returns_error(self, mock_config_with_key):
-        """Missing image URLs should not be reported as usable results."""
+        '未说明'
         images = [{}]
         mock_resp = _make_serper_images_response(images)
 
@@ -1141,6 +1229,7 @@ class TestImageSearchTool:
         assert parsed["query"] == "test"
 
     def test_unsafe_image_urls_are_filtered(self, mock_config_with_key):
+        '未说明'
         images = [
             {"title": "Local", "imageUrl": "file:///etc/passwd", "thumbnailUrl": "http://127.0.0.1/thumb.jpg"},
             {"title": "Data", "imageUrl": "data:image/png;base64,abc", "thumbnailUrl": "http://10.0.0.1/thumb.jpg"},
@@ -1162,6 +1251,7 @@ class TestImageSearchTool:
         assert parsed["results"][0]["thumbnail_url"] == "http://example.com/t.jpg"
 
     def test_all_unsafe_image_urls_return_error(self, mock_config_with_key):
+        '未说明'
         images = [
             {"title": "Local", "imageUrl": "file:///etc/passwd", "thumbnailUrl": "http://127.0.0.1/thumb.jpg"},
             {"title": "Private", "imageUrl": "http://10.0.0.1/image.jpg", "thumbnailUrl": "data:image/png;base64,abc"},
@@ -1180,6 +1270,7 @@ class TestImageSearchTool:
         assert parsed["query"] == "test"
 
     def test_unsafe_image_urls_do_not_consume_result_limit(self, mock_config_with_key):
+        '未说明'
         mock_config_with_key.return_value.get_tool_config.return_value.model_extra = {
             "api_key": "test-key",
             "max_results": 1,
@@ -1203,6 +1294,7 @@ class TestImageSearchTool:
 
 
 def test_package_exports_image_search_tool():
+    '未说明'
     from deerflow.community.serper import image_search_tool
     from deerflow.community.serper.tools import image_search_tool as direct_image_search_tool
 

@@ -1,8 +1,7 @@
-"""OIDC state management via signed HttpOnly cookies.
+"""通过签名 HttpOnly Cookie 管理 OIDC 状态。
 
-Stores OIDC state, nonce, and PKCE verifier in a short-lived signed cookie
-instead of server-side storage. This keeps the implementation stateless and
-compatible with multi-worker deployments without Redis.
+将 OIDC state、nonce 和 PKCE 校验器存入短生命周期签名 Cookie，而非服务器端
+存储，从而保持无状态并兼容不依赖 Redis 的多工作进程部署。
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ OIDC_CODE_VERIFIER_BYTES = 32
 
 
 class OIDCStatePayload(BaseModel):
-    """Payload stored inside the signed OIDC state cookie."""
+    """存放在已签名 OIDC 状态 Cookie 中的负载。"""
 
     provider: str = Field(description="OIDC provider ID (must match the state cookie)")  # noqa: E501
     state: str = Field(description="Cryptographically random state value — compared in constant time with the query param")  # noqa: E501
@@ -36,13 +35,13 @@ class OIDCStatePayload(BaseModel):
 
 
 def _sign_state_payload(payload: OIDCStatePayload) -> str:
-    """Sign the state payload with the JWT secret to prevent tampering."""
+    """使用 JWT 密钥签名状态负载，防止 Cookie 内容遭篡改。"""
     secret = get_auth_config().jwt_secret
     return jwt.encode(payload.model_dump(), secret, algorithm="HS256")
 
 
 def _verify_state_signed(signed: str, max_age: int = OIDC_STATE_MAX_AGE) -> OIDCStatePayload | None:
-    """Verify a signed state payload and return it, or None if invalid/expired."""
+    """验证已签名状态负载；无效或过期时返回 ``None``。"""
     secret = get_auth_config().jwt_secret
     try:
         decoded = jwt.decode(signed, secret, algorithms=["HS256"])
@@ -55,40 +54,41 @@ def _verify_state_signed(signed: str, max_age: int = OIDC_STATE_MAX_AGE) -> OIDC
 
 
 def generate_oidc_state() -> str:
-    """Generate a cryptographically random state string."""
+    """生成密码学安全的随机 state 字符串。"""
     return secrets.token_urlsafe(OIDC_STATE_BYTES)
 
 
 def generate_nonce() -> str:
-    """Generate a cryptographically random nonce for ID token validation."""
+    """生成供 ID 令牌校验使用的密码学安全随机 nonce。"""
     return secrets.token_urlsafe(OIDC_NONCE_BYTES)
 
 
 def generate_code_verifier() -> str:
-    """Generate a PKCE code verifier (plain random string)."""
+    """生成 PKCE code verifier 随机字符串。"""
     return secrets.token_urlsafe(OIDC_CODE_VERIFIER_BYTES)
 
 
 def compute_code_challenge(verifier: str) -> str:
-    """Compute the S256 PKCE code challenge from a verifier."""
+    """根据校验器计算 S256 PKCE code challenge。"""
     import hashlib
 
     return _base64url_encode(hashlib.sha256(verifier.encode("ascii")).digest())
 
 
 def _base64url_encode(data: bytes) -> str:
-    """Base64url-encode without padding, as required by RFC 7636 and OIDC."""
+    """按 RFC 7636 与 OIDC 要求进行无填充 Base64url 编码。"""
     import base64
 
     return base64.urlsafe_b64encode(data).rstrip(b"=").decode("ascii")
 
 
 def _cookie_name(provider: str) -> str:
+    """根据提供者标识生成其专属 OIDC 状态 Cookie 名称。"""
     return f"{OIDC_STATE_COOKIE_PREFIX}{provider}"
 
 
 def set_state_cookie(response: Response, request: Request, payload: OIDCStatePayload) -> None:
-    """Set the signed OIDC state cookie on the response."""
+    """在响应中设置已签名的 OIDC 状态 Cookie。"""
     signed = _sign_state_payload(payload)
     is_https = is_secure_request(request)
     response.set_cookie(
@@ -103,7 +103,7 @@ def set_state_cookie(response: Response, request: Request, payload: OIDCStatePay
 
 
 def get_state_cookie(request: Request, provider: str) -> OIDCStatePayload | None:
-    """Read and verify the signed OIDC state cookie for the given provider."""
+    """读取并验证指定提供者的已签名 OIDC 状态 Cookie。"""
     signed = request.cookies.get(_cookie_name(provider))
     if not signed:
         return None
@@ -111,7 +111,7 @@ def get_state_cookie(request: Request, provider: str) -> OIDCStatePayload | None
 
 
 def delete_state_cookie(response: Response, request: Request, provider: str) -> None:
-    """Delete the OIDC state cookie."""
+    """删除 OIDC 状态 Cookie。"""
     is_https = is_secure_request(request)
     response.delete_cookie(
         key=_cookie_name(provider),

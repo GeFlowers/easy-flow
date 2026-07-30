@@ -1,13 +1,4 @@
-"""Skill catalog — deferred skill discovery at runtime.
-
-Mirrors ``DeferredToolCatalog`` from ``tool_search.py``: an immutable, searchable
-catalog that lets the LLM discover skill metadata on demand rather than having
-every skill's full description baked into the system prompt.
-
-The agent sees skill names in ``<skill_index>`` but cannot read their metadata
-until it calls ``describe_skill``.  This keeps the system prompt compact and
-prefix-cache friendly while still giving the model autonomous skill discovery.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -24,11 +15,7 @@ MAX_RESULTS = 5
 
 
 def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
-    """Compile ``pattern`` case-insensitively, falling back to literal match.
-
-    Search queries come from the model, so an invalid regex (e.g. an unbalanced
-    paren) must degrade to a literal substring match rather than raise.
-    """
+    '未说明'
     try:
         return re.compile(pattern, re.IGNORECASE)
     except re.error:
@@ -40,27 +27,17 @@ def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
 # the frozen __setattr__). Do NOT add slots=True or hash/names break at runtime.
 @dataclass(frozen=True)
 class SkillCatalog:
-    """Immutable catalog of skills.  Pure search, no mutation.
-
-    Query forms (mirror ``DeferredToolCatalog.search``):
-
-    - ``"select:data-analysis,deep-research"`` — exact match by name.
-    - ``"+podcast gen"`` — require *podcast* in the name, rank by *gen*.
-    - ``"chart visualization"`` — regex match on name + description.
-    """
+    '未说明'
 
     skills: tuple[Skill, ...]
 
     @cached_property
     def names(self) -> frozenset[str]:
-        """All skill names in insertion order."""
+        '未说明'
         return frozenset(s.name for s in self.skills)
 
     def search(self, query: str) -> list[Skill]:
-        """Match *query* against skill names and descriptions.
-
-        Returns at most ``MAX_RESULTS`` skills, ranked by relevance.
-        """
+        '未说明'
         query = query.strip()
         if not query:
             return []
@@ -98,5 +75,5 @@ class SkillCatalog:
 
 
 def _catalog_regex_score(pattern: re.Pattern[str], s: Skill) -> int:
-    """Count regex hits across name + description for ranking."""
+    '未说明'
     return len(pattern.findall(f"{s.name} {s.description or ''}"))

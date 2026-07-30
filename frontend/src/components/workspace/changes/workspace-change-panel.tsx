@@ -35,6 +35,7 @@ import type {
 } from "@/core/workspace-changes/types";
 import { cn } from "@/lib/utils";
 
+/** 展开线程工作区变更摘要，并在需要时加载文件差异详情。 */
 export function WorkspaceChangePanel({
   threadId,
   runId,

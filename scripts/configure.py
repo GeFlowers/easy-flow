@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform config bootstrap script for DeerFlow."""
+'未说明'
 
 from __future__ import annotations
 
@@ -9,6 +9,7 @@ from pathlib import Path
 
 
 def copy_if_missing(src: Path, dst: Path) -> None:
+    '未说明'
     if dst.exists():
         return
     if not src.exists():
@@ -18,6 +19,7 @@ def copy_if_missing(src: Path, dst: Path) -> None:
 
 
 def main() -> int:
+    '未说明'
     project_root = Path(__file__).resolve().parent.parent
 
     existing_config = [

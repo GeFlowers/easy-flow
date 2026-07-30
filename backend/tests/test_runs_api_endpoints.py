@@ -1,4 +1,4 @@
-"""Tests for GET /api/runs/{run_id}/messages and GET /api/runs/{run_id}/feedback endpoints."""
+"""本模块覆盖接口的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from app.gateway.routers import runs
 
 
 def _make_app(run_store=None, event_store=None, feedback_repo=None):
-    """Build a test FastAPI app with stub auth and mocked state."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     app = make_authed_test_app()
     app.include_router(runs.router)
 
@@ -31,20 +31,21 @@ def _make_app(run_store=None, event_store=None, feedback_repo=None):
 
 
 def _make_run_store(run_record: dict | None):
-    """Return an AsyncMock run store whose get() returns run_record."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     store = MagicMock()
     store.get = AsyncMock(return_value=run_record)
     return store
 
 
 def _make_event_store(rows: list[dict]):
-    """Return an AsyncMock event store whose list_messages_by_run() returns rows."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     store = MagicMock()
     store.list_messages_by_run = AsyncMock(return_value=rows)
     return store
 
 
 def _make_message(seq: int) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     return {"seq": seq, "event_type": "on_chat_model_stream", "category": "message", "content": f"msg-{seq}"}
 
 
@@ -54,7 +55,7 @@ def _make_message(seq: int) -> dict:
 
 
 def test_run_messages_returns_envelope():
-    """GET /api/runs/{run_id}/messages returns {data: [...], has_more: bool}."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     rows = [_make_message(i) for i in range(1, 4)]
     run_record = {"run_id": "run-1", "thread_id": "thread-1"}
     app = _make_app(
@@ -72,7 +73,7 @@ def test_run_messages_returns_envelope():
 
 
 def test_run_messages_404_when_run_not_found():
-    """Returns 404 when the run store returns None."""
+    """验证运行 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     app = _make_app(
         run_store=_make_run_store(None),
         event_store=_make_event_store([]),
@@ -84,7 +85,7 @@ def test_run_messages_404_when_run_not_found():
 
 
 def test_run_messages_has_more_true_when_extra_row_returned():
-    """has_more=True when event store returns limit+1 rows."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     # Default limit is 50; provide 51 rows
     rows = [_make_message(i) for i in range(1, 52)]  # 51 rows
     run_record = {"run_id": "run-2", "thread_id": "thread-2"}
@@ -102,7 +103,7 @@ def test_run_messages_has_more_true_when_extra_row_returned():
 
 
 def test_run_messages_default_page_keeps_newest_messages_when_extra_row_returned():
-    """Default latest-page trimming drops the older sentinel row, not the newest message."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     rows = [_make_message(i) for i in range(16, 67)]
     run_record = {"run_id": "run-2", "thread_id": "thread-2"}
     app = _make_app(
@@ -114,7 +115,7 @@ def test_run_messages_default_page_keeps_newest_messages_when_extra_row_returned
 
 
 def test_run_messages_before_seq_page_keeps_newest_side_when_extra_row_returned():
-    """Backward pagination trims the older sentinel so adjacent pages do not miss the boundary message."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     rows = [_make_message(i) for i in range(1, 18)]
     run_record = {"run_id": "run-2", "thread_id": "thread-2"}
     app = _make_app(
@@ -130,7 +131,7 @@ def test_run_messages_before_seq_page_keeps_newest_side_when_extra_row_returned(
 
 
 def test_run_messages_after_seq_page_keeps_oldest_side_when_extra_row_returned():
-    """Forward pagination still trims the newer sentinel row."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     rows = [_make_message(i) for i in range(11, 62)]
     run_record = {"run_id": "run-2", "thread_id": "thread-2"}
     app = _make_app(
@@ -146,7 +147,7 @@ def test_run_messages_after_seq_page_keeps_oldest_side_when_extra_row_returned()
 
 
 def test_run_messages_passes_after_seq_to_event_store():
-    """after_seq query param is forwarded to event_store.list_messages_by_run."""
+    """验证运行 事件 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     rows = [_make_message(10)]
     run_record = {"run_id": "run-3", "thread_id": "thread-3"}
     event_store = _make_event_store(rows)
@@ -167,7 +168,7 @@ def test_run_messages_passes_after_seq_to_event_store():
 
 
 def test_run_messages_respects_custom_limit():
-    """Custom limit is respected and capped at 200."""
+    """验证运行 限制在预期条件及边界场景下的可观察行为，防止相关回归。"""
     rows = [_make_message(i) for i in range(1, 6)]
     run_record = {"run_id": "run-4", "thread_id": "thread-4"}
     event_store = _make_event_store(rows)
@@ -188,7 +189,7 @@ def test_run_messages_respects_custom_limit():
 
 
 def test_run_messages_passes_before_seq_to_event_store():
-    """before_seq query param is forwarded to event_store.list_messages_by_run."""
+    """验证运行 事件 存储在预期条件及边界场景下的可观察行为，防止相关回归。"""
     rows = [_make_message(3)]
     run_record = {"run_id": "run-5", "thread_id": "thread-5"}
     event_store = _make_event_store(rows)
@@ -209,7 +210,7 @@ def test_run_messages_passes_before_seq_to_event_store():
 
 
 def test_run_messages_empty_data():
-    """Returns empty data list when no messages exist."""
+    """验证运行 数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_record = {"run_id": "run-6", "thread_id": "thread-6"}
     app = _make_app(
         run_store=_make_run_store(run_record),
@@ -224,13 +225,14 @@ def test_run_messages_empty_data():
 
 
 def _make_feedback_repo(rows: list[dict]):
-    """Return an AsyncMock feedback repo whose list_by_run() returns rows."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     repo = MagicMock()
     repo.list_by_run = AsyncMock(return_value=rows)
     return repo
 
 
 def _make_feedback(run_id: str, idx: int) -> dict:
+    """准备可控测试资源与状态，供后续断言读取。"""
     return {"id": f"fb-{idx}", "run_id": run_id, "thread_id": "thread-x", "value": "up"}
 
 
@@ -240,8 +242,9 @@ def _make_feedback(run_id: str, idx: int) -> dict:
 
 
 class TestRunFeedback:
+    """集中覆盖当前测试分支与回归边界。"""
     def test_returns_list_of_feedback_dicts(self):
-        """GET /api/runs/{run_id}/feedback returns a list of feedback dicts."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         run_record = {"run_id": "run-fb-1", "thread_id": "thread-fb-1"}
         rows = [_make_feedback("run-fb-1", i) for i in range(3)]
         app = _make_app(
@@ -256,7 +259,7 @@ class TestRunFeedback:
         assert len(body) == 3
 
     def test_404_when_run_not_found(self):
-        """Returns 404 when run store returns None."""
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         app = _make_app(
             run_store=_make_run_store(None),
             feedback_repo=_make_feedback_repo([]),
@@ -267,7 +270,7 @@ class TestRunFeedback:
         assert "missing-run" in response.json()["detail"]
 
     def test_empty_list_when_no_feedback(self):
-        """Returns empty list when no feedback exists for the run."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         run_record = {"run_id": "run-fb-2", "thread_id": "thread-fb-2"}
         app = _make_app(
             run_store=_make_run_store(run_record),
@@ -279,7 +282,7 @@ class TestRunFeedback:
         assert response.json() == []
 
     def test_503_when_feedback_repo_not_configured(self):
-        """Returns 503 when feedback_repo is None (no DB configured)."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         run_record = {"run_id": "run-fb-3", "thread_id": "thread-fb-3"}
         app = _make_app(
             run_store=_make_run_store(run_record),

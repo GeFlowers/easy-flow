@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Create a redacted DeerFlow support bundle for community troubleshooting."""
+"""本脚本负责支持 诊断包。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -53,6 +53,7 @@ ATTENTION_SIGNAL_NAMES = {
 
 
 def _redact_yaml_secret_match(match: re.Match[str]) -> str:
+    '未说明'
     prefix = match.group(1)
     value = match.group(2)
     if "authorization" in prefix.lower() and value.lstrip().lower().startswith("bearer "):
@@ -61,7 +62,7 @@ def _redact_yaml_secret_match(match: re.Match[str]) -> str:
 
 
 def redact_text(text: str) -> str:
-    """Redact common secret patterns from free-form text."""
+    '未说明'
     text = POSIX_HOME_RE.sub(r"\1/<user>", text)
     text = WINDOWS_HOME_RE.sub(r"\1<user>", text)
     text = URL_USERINFO_RE.sub(r"\1<redacted>@", text)
@@ -74,7 +75,7 @@ def redact_text(text: str) -> str:
 
 
 def _redact_secret_flag_list(items: list[Any]) -> list[Any]:
-    """Mask the value that follows a secret-like CLI flag (e.g. ['--api-key', 'X'])."""
+    '未说明'
     redacted: list[Any] = []
     mask_next = False
     for item in items:
@@ -91,7 +92,7 @@ def _redact_secret_flag_list(items: list[Any]) -> list[Any]:
 
 
 def _redact_env_value(value: Any) -> Any:
-    """Mask env values by default; keep only ``$VAR`` / ``${VAR}`` references visible."""
+    '未说明'
     if isinstance(value, str) and VAR_REFERENCE_RE.fullmatch(value.strip()):
         return value
     if isinstance(value, (dict, list, tuple)):
@@ -100,7 +101,7 @@ def _redact_env_value(value: Any) -> Any:
 
 
 def redact_data(value: Any) -> Any:
-    """Recursively redact secret-like mapping keys while preserving structure."""
+    """执行数据对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if isinstance(value, dict):
         redacted: dict[Any, Any] = {}
         for key, item in value.items():
@@ -123,6 +124,7 @@ def redact_data(value: Any) -> Any:
 
 
 def _read_yaml(path: Path) -> Any:
+    '未说明'
     if not path.exists():
         return {"present": False}
     if yaml is None:
@@ -134,6 +136,7 @@ def _read_yaml(path: Path) -> Any:
 
 
 def _read_json(path: Path) -> Any:
+    '未说明'
     if not path.exists():
         return {"present": False}
     try:
@@ -143,6 +146,7 @@ def _read_json(path: Path) -> Any:
 
 
 def _run_command(args: list[str], cwd: Path, timeout_s: int = 10) -> dict[str, Any]:
+    '未说明'
     try:
         result = subprocess.run(
             args,
@@ -167,12 +171,13 @@ def _run_command(args: list[str], cwd: Path, timeout_s: int = 10) -> dict[str, A
 
 
 def _version_command(name: str, args: list[str], cwd: Path) -> dict[str, Any]:
+    '未说明'
     result = _run_command(args, cwd=cwd, timeout_s=5)
     return {"name": name, **result}
 
 
 def collect_environment(project_root: Path) -> dict[str, Any]:
-    """Collect non-secret environment and toolchain metadata."""
+    '未说明'
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "platform": {
@@ -192,15 +197,17 @@ def collect_environment(project_root: Path) -> dict[str, Any]:
 
 
 def collect_config_summary(config_path: Path) -> Any:
+    """执行配置 摘要对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return redact_data(_read_yaml(config_path))
 
 
 def collect_extensions_summary(extensions_config_path: Path) -> Any:
+    """执行摘要对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     return redact_data(_read_json(extensions_config_path))
 
 
 def collect_git_summary(project_root: Path) -> dict[str, Any]:
-    """Collect best-effort git metadata without requiring a git checkout."""
+    """执行摘要对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     commands = {
         "branch": ["git", "rev-parse", "--abbrev-ref", "HEAD"],
         "head": ["git", "rev-parse", "HEAD"],
@@ -212,11 +219,13 @@ def collect_git_summary(project_root: Path) -> dict[str, Any]:
 
 
 def _validate_thread_id(thread_id: str) -> None:
+    '未说明'
     if not thread_id or thread_id in {".", ".."} or ".." in thread_id or not SAFE_THREAD_ID_RE.fullmatch(thread_id):
         raise ValueError(f"Invalid thread_id: {thread_id!r}")
 
 
 def _candidate_thread_data_dirs(project_root: Path, thread_id: str) -> list[Path]:
+    '未说明'
     _validate_thread_id(thread_id)
     candidates = [
         project_root / ".deer-flow" / "threads" / thread_id / "user-data",
@@ -229,6 +238,7 @@ def _candidate_thread_data_dirs(project_root: Path, thread_id: str) -> list[Path
 
 
 def _display_path(path: Path, project_root: Path) -> str:
+    '未说明'
     try:
         return path.resolve().relative_to(project_root.resolve()).as_posix()
     except (OSError, ValueError):
@@ -236,6 +246,7 @@ def _display_path(path: Path, project_root: Path) -> str:
 
 
 def _file_manifest(root: Path, *, max_files: int = 500) -> list[dict[str, Any]]:
+    '未说明'
     if not root.exists():
         return []
     entries: list[dict[str, Any]] = []
@@ -264,7 +275,7 @@ def _file_manifest(root: Path, *, max_files: int = 500) -> list[dict[str, Any]]:
 
 
 def collect_thread_summary(project_root: Path, thread_id: str) -> dict[str, Any]:
-    """Collect a thread file manifest without reading user file contents."""
+    """执行会话 摘要对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     for data_dir in _candidate_thread_data_dirs(project_root, thread_id):
         if data_dir.exists():
             return {
@@ -283,12 +294,14 @@ def collect_thread_summary(project_root: Path, thread_id: str) -> dict[str, Any]
 
 
 def collect_doctor_output(project_root: Path) -> dict[str, Any]:
+    """执行诊断对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     backend_dir = project_root / "backend"
     cwd = backend_dir if backend_dir.exists() else project_root
     return _run_command([sys.executable, str(project_root / "scripts" / "doctor.py")], cwd=cwd, timeout_s=60)
 
 
 def _command_output(command: dict[str, Any] | None) -> str | None:
+    '未说明'
     if not command:
         return None
     for key in ("stdout", "stderr", "error"):
@@ -299,6 +312,7 @@ def _command_output(command: dict[str, Any] | None) -> str | None:
 
 
 def _environment_versions(environment: dict[str, Any]) -> dict[str, str | None]:
+    '未说明'
     platform_info = environment.get("platform", {})
     python_version = platform_info.get("python") if isinstance(platform_info, dict) else None
     versions: dict[str, str | None] = {"python": python_version if isinstance(python_version, str) else None}
@@ -309,6 +323,7 @@ def _environment_versions(environment: dict[str, Any]) -> dict[str, str | None]:
 
 
 def _parse_major_version(version_text: str | None) -> int | None:
+    '未说明'
     if not version_text:
         return None
     match = re.search(r"v?(\d+)(?:\.\d+)?", version_text)
@@ -316,11 +331,13 @@ def _parse_major_version(version_text: str | None) -> int | None:
 
 
 def _git_stdout(git_summary: dict[str, Any], key: str) -> str | None:
+    '未说明'
     value = git_summary.get(key)
     return _command_output(value) if isinstance(value, dict) else None
 
 
 def _doctor_counts(doctor: dict[str, Any] | None) -> tuple[int | None, int | None]:
+    '未说明'
     if not doctor:
         return (None, None)
     output = "\n".join(value for value in (_command_output(doctor), doctor.get("stdout"), doctor.get("stderr")) if isinstance(value, str))
@@ -331,6 +348,7 @@ def _doctor_counts(doctor: dict[str, Any] | None) -> tuple[int | None, int | Non
 
 
 def _enabled_mapping_keys(value: Any) -> list[str]:
+    '未说明'
     if not isinstance(value, dict):
         return []
     keys: list[str] = []
@@ -342,6 +360,7 @@ def _enabled_mapping_keys(value: Any) -> list[str]:
 
 
 def _config_summary(config_summary: Any) -> dict[str, Any]:
+    '未说明'
     if not isinstance(config_summary, dict):
         return {"present": True, "shape": type(config_summary).__name__}
     present = config_summary.get("present", True)
@@ -361,6 +380,7 @@ def _config_summary(config_summary: Any) -> dict[str, Any]:
 
 
 def _extensions_summary(extensions_summary: Any) -> dict[str, Any]:
+    '未说明'
     if not isinstance(extensions_summary, dict):
         return {"present": True, "shape": type(extensions_summary).__name__}
     present = extensions_summary.get("present", True)
@@ -375,12 +395,14 @@ def _extensions_summary(extensions_summary: Any) -> dict[str, Any]:
 
 
 def _dirty_worktree(status_short: str | None) -> bool:
+    '未说明'
     if not status_short:
         return False
     return any(line and not line.startswith("##") for line in status_short.splitlines())
 
 
 def _status_from_signals(signals: dict[str, bool]) -> str:
+    '未说明'
     if signals["config_missing"] or signals["config_error"] or signals["models_missing"] or signals["extensions_config_error"]:
         return "needs_user_setup"
     if signals["node_missing"] or signals["node_version_too_old"] or signals["nginx_missing"]:
@@ -393,10 +415,12 @@ def _status_from_signals(signals: dict[str, bool]) -> str:
 
 
 def _active_signal_names(signals: dict[str, bool]) -> list[str]:
+    '未说明'
     return [name for name, enabled in signals.items() if enabled and name in ATTENTION_SIGNAL_NAMES]
 
 
 def _maintainer_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
+    '未说明'
     steps: list[str] = []
     if status == "needs_user_setup":
         steps.append("Ask the reporter to complete local setup with `make setup`, then rerun `make doctor` and `make support-bundle`.")
@@ -418,6 +442,7 @@ def _maintainer_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
 
 
 def _reporter_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
+    '未说明'
     steps: list[str] = []
     if status == "needs_user_setup":
         steps.append("Run `make setup`, then rerun `make doctor` and `make support-bundle` before filing the issue if the problem changes.")
@@ -435,6 +460,7 @@ def _reporter_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
 
 
 def _evidence_files(*, include_doctor: bool, include_thread_summary: bool) -> list[dict[str, str]]:
+    '未说明'
     files = [
         ("README.md", "Human-readable entrypoint for the support bundle."),
         ("issue-summary.md", "Markdown summary intended to be pasted into a GitHub issue."),
@@ -463,7 +489,7 @@ def build_triage_report(
     doctor: dict[str, Any] | None,
     thread_summary: dict[str, Any] | None,
 ) -> dict[str, Any]:
-    """Build the stable machine-readable summary that maintainers and AI read first."""
+    """执行构建对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     versions = _environment_versions(environment)
     config = _config_summary(config_summary)
     extensions = _extensions_summary(extensions_summary)
@@ -521,11 +547,12 @@ def build_triage_report(
 
 
 def _markdown_list(items: list[str]) -> str:
+    '未说明'
     return "\n".join(f"- {item}" for item in items) if items else "- None"
 
 
 def render_issue_summary(triage: dict[str, Any]) -> str:
-    """Render Markdown that users can paste into the GitHub issue body."""
+    """执行渲染 摘要对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     git = triage["git"]
     doctor = triage["doctor"]
     versions = triage["versions"]
@@ -557,6 +584,7 @@ def render_issue_summary(triage: dict[str, Any]) -> str:
 
 
 def _os_label(platform_info: dict[str, Any]) -> str:
+    '未说明'
     system = platform_info.get("system")
     if system == "Darwin":
         return "macOS"
@@ -568,11 +596,13 @@ def _os_label(platform_info: dict[str, Any]) -> str:
 
 
 def _platform_details(platform_info: dict[str, Any]) -> str:
+    '未说明'
     details = [platform_info.get("machine"), platform_info.get("system"), platform_info.get("release")]
     return ", ".join(str(item) for item in details if item) or "_No response_"
 
 
 def _draft_affected_areas(triage: dict[str, Any]) -> list[str]:
+    '未说明'
     signals = triage["signals"]
     areas: list[str] = []
     if signals["config_missing"] or signals["config_error"] or signals["models_missing"] or signals["node_missing"] or signals["node_version_too_old"] or signals["nginx_missing"]:
@@ -585,6 +615,7 @@ def _draft_affected_areas(triage: dict[str, Any]) -> list[str]:
 
 
 def _doctor_excerpt(doctor: dict[str, Any] | None, *, max_lines: int = 80, max_chars: int = 12000) -> str:
+    '未说明'
     output = _command_output(doctor) if doctor else None
     if not output:
         return "<REQUIRED: paste key log lines. Do not invent if unknown.>"
@@ -604,7 +635,7 @@ def _doctor_excerpt(doctor: dict[str, Any] | None, *, max_lines: int = 80, max_c
 
 
 def render_ai_issue_draft(triage: dict[str, Any], issue_summary: str, doctor: dict[str, Any] | None) -> str:
-    """Render a GitHub issue body scaffold for AI-assisted reporters."""
+    """执行渲染对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     versions = triage["versions"]
     git = triage["git"]
     platform_info = triage["platform"]
@@ -705,7 +736,7 @@ def render_ai_issue_draft(triage: dict[str, Any], issue_summary: str, doctor: di
 
 
 def render_bundle_readme(triage: dict[str, Any]) -> str:
-    """Render the support bundle README."""
+    """执行渲染 诊断包对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     lines = [
         "# DeerFlow Support Bundle",
         "",
@@ -747,23 +778,28 @@ def render_bundle_readme(triage: dict[str, Any]) -> str:
 
 
 def _default_out_path(project_root: Path) -> Path:
+    '未说明'
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     return project_root / ".deer-flow" / "support-bundles" / f"deer-flow-support-bundle-{timestamp}.zip"
 
 
 def _write_json(zf: zipfile.ZipFile, name: str, data: Any) -> None:
+    '未说明'
     zf.writestr(f"{name}.json", json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
 def _write_text(zf: zipfile.ZipFile, name: str, text: str) -> None:
+    '未说明'
     zf.writestr(name, text)
 
 
 def _issue_summary_sidecar_path(out_path: Path) -> Path:
+    '未说明'
     return out_path.with_name(f"{out_path.stem}-issue-summary.md")
 
 
 def _issue_draft_sidecar_path(out_path: Path) -> Path:
+    '未说明'
     return out_path.with_name(f"{out_path.stem}-issue-draft.md")
 
 
@@ -776,7 +812,7 @@ def create_support_bundle(
     thread_id: str | None = None,
     include_doctor: bool = False,
 ) -> Path:
-    """Create a redacted support bundle and return the zip path."""
+    """执行创建 支持 诊断包对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     project_root = project_root.resolve()
     config_path = (config_path or project_root / "config.yaml").resolve()
     extensions_config_path = (extensions_config_path or project_root / "extensions_config.json").resolve()
@@ -840,6 +876,7 @@ def create_support_bundle(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    '未说明'
     parser = argparse.ArgumentParser(description=__doc__)
     repo_root = Path(__file__).resolve().parents[1]
     parser.add_argument("--project-root", type=Path, default=repo_root, help="DeerFlow project root")
@@ -852,6 +889,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
+    '未说明'
     args = parse_args(argv)
     try:
         bundle_path = create_support_bundle(

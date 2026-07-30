@@ -1,3 +1,5 @@
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
 from __future__ import annotations
 
 import logging
@@ -15,12 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 def _create_langsmith_tracer(config) -> Any:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     from langchain_core.tracers.langchain import LangChainTracer
 
     return LangChainTracer(project_name=config.project)
 
 
 def _create_langfuse_handler(config) -> Any:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     from langfuse import Langfuse
     from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 
@@ -35,7 +39,7 @@ def _create_langfuse_handler(config) -> Any:
 
 
 def build_tracing_callbacks() -> list[Any]:
-    """Build callbacks for all explicitly enabled tracing providers."""
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     validate_enabled_tracing_providers()
     # Monocle is not a callback provider; this per-run path is just where an
     # embedded process that skipped Gateway-lifespan setup can be told about it.

@@ -1,7 +1,7 @@
 import { formatTokenCount, type TokenUsage } from "@/core/messages/usage";
 import type { Model } from "@/core/models/types";
 
-/** Return the user-facing label for a configured subagent model. */
+/** 返回已配置子代理模型面向用户的展示标签。 */
 export function resolveSubtaskModelLabel(
   modelName: string | undefined,
   models: Model[],
@@ -14,6 +14,7 @@ export function resolveSubtaskModelLabel(
   );
 }
 
+/** 格式化子任务令牌用量以供卡片展示。 */
 export function formatSubtaskTokenUsage(
   usage: TokenUsage | undefined,
 ): string | undefined {

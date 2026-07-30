@@ -1,34 +1,26 @@
-"""Persistent MCP session pool for stateful tool calls.
+"""为有状态工具调用维护持久化 MCP 会话池。
 
-When MCP tools are loaded via langchain-mcp-adapters with ``session=None``,
-each tool call creates a new MCP session. For stateful servers like Playwright,
-this means browser state (opened pages, filled forms) is lost between calls.
+通过 langchain-mcp-adapters 以 ``session=None`` 加载 MCP 工具时，每次工具调用
+都会创建新的 MCP 会话。对于 Playwright 等有状态服务器，这会导致已打开的页面、已
+填写的表单等浏览器状态在调用间丢失。
 
-This module provides a session pool that maintains persistent MCP sessions,
-scoped by ``(server_name, scope_key)`` — typically scope_key is the thread_id —
-so that consecutive tool calls share the same session and server-side state.
-Sessions are evicted in LRU order when the pool reaches capacity.
+本模块按 ``(server_name, scope_key)`` 维护持久化 MCP 会话；``scope_key`` 通常为
+``thread_id``，因此同一作用域内连续的工具调用可共享会话及服务端状态。池达到容量
+上限时，按 LRU 顺序逐出会话。
 
-Lifecycle model (owner task)
-----------------------------
-An MCP ``ClientSession`` is implemented on top of an ``anyio`` task group, and
-anyio enforces that a cancel scope must be exited from the *same task* that
-entered it. Calling ``cm.__aexit__`` from any task other than the one that ran
-``cm.__aenter__`` raises::
+生命周期模型（所有者任务）
+--------------------------
+MCP ``ClientSession`` 建立在 ``anyio`` 任务组之上。anyio 要求取消作用域必须由进入
+它的*同一任务*退出；若由执行 ``cm.__aenter__`` 之外的任务调用 ``cm.__aexit__``，将
+抛出错误。
 
-    RuntimeError: Attempted to exit cancel scope in a different task than it
-    was entered in
+同步工具路径（``make_sync_tool_wrapper``）会通过新的 ``asyncio.run`` 事件循环执行
+每次调用，因此某次调用中进入的会话若在另一次调用中退出，会因任务不同而崩溃
+（GitHub issue #3379）。
 
-The sync-tool path (``make_sync_tool_wrapper``) drives each call through a fresh
-``asyncio.run`` event loop, so a session entered while answering one call would
-otherwise be exited while answering another — from a different task — and crash
-(GitHub issue #3379).
-
-To make this impossible, every pooled session is owned by a dedicated
-``_run_session`` task. That task enters the context manager, hands the live
-session back to the caller, and then *waits* on a close event. All shutdown
-paths only ever **signal** that event; the owner task performs ``__aexit__``
-itself, guaranteeing enter and exit always happen in the same task.
+为避免该问题，每个池化会话均由专用的 ``_run_session`` 任务持有。该任务进入上下文
+管理器，将活动会话交给调用方后等待关闭事件。所有关闭路径只会**发出**该事件；由
+所有者任务自行执行 ``__aexit__``，确保进入和退出始终发生在同一任务中。
 """
 
 from __future__ import annotations
@@ -45,13 +37,14 @@ logger = logging.getLogger(__name__)
 
 
 class MCPSessionPool:
-    """Manages persistent MCP sessions scoped by ``(server_name, scope_key)``."""
+    """按 ``(server_name, scope_key)`` 管理持久化 MCP 会话。"""
 
     MAX_SESSIONS = 256
     SESSION_CLOSE_TIMEOUT = 5.0  # seconds to wait when closing a session on a foreign loop
 
     def __init__(self) -> None:
         # Each entry: (session, owning_loop, owner_task, close_event).
+        """初始化会话条目、进行中的创建记录及线程同步锁。"""
         self._entries: OrderedDict[
             tuple[str, str],
             tuple[
@@ -87,12 +80,11 @@ class MCPSessionPool:
         ready: asyncio.Future[ClientSession],
         close_evt: asyncio.Event,
     ) -> None:
-        """Own a single MCP session for its entire lifetime.
+        """在整个生命周期内由当前任务独占一个 MCP 会话。
 
-        Enters the session context manager, initializes it, publishes the live
-        session via ``ready``, then blocks until ``close_evt`` is set. The
-        context manager is *always* exited from this task, satisfying anyio's
-        cancel-scope same-task requirement.
+        此方法进入并初始化会话上下文管理器，通过 ``ready`` 发布活动会话，随后等待
+        ``close_evt`` 被设置。上下文管理器始终由当前任务退出，以满足 anyio 对取消
+        作用域“同一任务退出”的要求。
         """
         from langchain_mcp_adapters.sessions import create_session
 
@@ -129,19 +121,18 @@ class MCPSessionPool:
         scope_key: str,
         connection: dict[str, Any],
     ) -> ClientSession:
-        """Get or create a persistent MCP session.
+        """获取或创建持久化 MCP 会话。
 
-        If an existing session was created in a different (or closed) event
-        loop, it is evicted and replaced with a fresh one owned by a task on
-        the current loop.
+        若已有会话创建于不同或已关闭的事件循环，将其逐出，并在当前事件循环上由新任务
+        创建替代会话。
 
-        Args:
-            server_name: MCP server name.
-            scope_key: Isolation key (typically thread_id).
-            connection: Connection configuration for ``create_session``.
+        参数：
+            server_name：MCP 服务器名称。
+            scope_key：隔离键，通常为 thread_id。
+            connection：传给 ``create_session`` 的连接配置。
 
-        Returns:
-            An initialized ``ClientSession``.
+        返回：
+            已完成初始化的 ``ClientSession``。
         """
         key = (server_name, scope_key)
         current_loop = asyncio.get_running_loop()
@@ -268,10 +259,10 @@ class MCPSessionPool:
 
     @staticmethod
     def _signal_close(loop: asyncio.AbstractEventLoop, close_evt: asyncio.Event) -> None:
-        """Ask an owner task to shut down without waiting.
+        """请求所有者任务关闭，但不等待其完成。
 
-        ``asyncio.Event.set`` is not thread-safe, so it is scheduled on the
-        owning loop. A closed loop means the owner task is already gone.
+        ``asyncio.Event.set`` 不是线程安全操作，因此需调度到所有者事件循环。事件循环
+        已关闭则表示所有者任务已经结束。
         """
         if loop.is_closed():
             return
@@ -287,12 +278,11 @@ class MCPSessionPool:
         task: asyncio.Task[Any],
         cancel: bool = False,
     ) -> None:
-        """Signal an owner task and wait for it to finish (runs on its loop).
+        """向所有者任务发送关闭信号，并在其事件循环上等待结束。
 
-        ``cancel=True`` is used for in-flight creations: the owner task may be
-        blocked inside ``initialize()`` where ``close_evt`` cannot wake it, so it
-        must be cancelled. Its ``finally`` block still runs ``__aexit__`` in its
-        own task, satisfying anyio's same-task cancel-scope requirement.
+        ``cancel=True`` 用于尚在创建中的会话：所有者任务可能阻塞在 ``initialize()``
+        中，无法被 ``close_evt`` 唤醒，因而必须取消。其 ``finally`` 块仍会在自身任务
+        中执行 ``__aexit__``，满足 anyio 对取消作用域“同一任务退出”的要求。
         """
         close_evt.set()
         if cancel:
@@ -309,7 +299,7 @@ class MCPSessionPool:
         close_evt: asyncio.Event,
         cancel: bool = False,
     ) -> None:
-        """Shut down one entry, routing the close to its owning loop."""
+        """将单个条目的关闭操作路由到其所属事件循环执行。"""
         if loop.is_closed():
             return
         current_loop = asyncio.get_running_loop()
@@ -340,7 +330,7 @@ class MCPSessionPool:
                     pass
 
     async def close_scope(self, scope_key: str) -> None:
-        """Close all sessions for a given scope (e.g. thread_id)."""
+        """关闭指定作用域（例如 thread_id）的全部会话。"""
         with self._lock:
             keys = [k for k in self._entries if k[1] == scope_key]
             entries = [(self._entries.pop(k)) for k in keys]
@@ -352,7 +342,7 @@ class MCPSessionPool:
             await self._shutdown_entry(loop, task, close_evt, cancel=True)
 
     async def close_server(self, server_name: str) -> None:
-        """Close all sessions for a given server."""
+        """关闭指定服务器的全部会话。"""
         with self._lock:
             keys = [k for k in self._entries if k[0] == server_name]
             entries = [(self._entries.pop(k)) for k in keys]
@@ -364,7 +354,7 @@ class MCPSessionPool:
             await self._shutdown_entry(loop, task, close_evt, cancel=True)
 
     async def close_all(self) -> None:
-        """Close every managed session."""
+        """关闭当前管理的全部会话。"""
         with self._lock:
             entries = list(self._entries.values())
             self._entries.clear()
@@ -376,23 +366,19 @@ class MCPSessionPool:
             await self._shutdown_entry(loop, task, close_evt, cancel=True)
 
     def close_all_sync(self) -> None:
-        """Close all sessions on their owning event loops (synchronous).
+        """同步地在各会话所属事件循环上关闭全部会话。
 
-        Each session is closed by its owner task on the loop it was created in,
-        avoiding cross-loop and cross-task errors. Safe to call from any thread
-        without an active event loop.
+每个会话均由其所有者任务在创建它的事件循环中关闭，从而避免跨事件循环和跨任务错误。
+此方法可从没有活动事件循环的任意线程安全调用。
 
-        Closing semantics differ by where the owning loop runs:
+关闭语义取决于所有者事件循环的运行位置：
 
-        * Owning loop is idle, or running on another thread — this call blocks
-          until teardown completes (or ``SESSION_CLOSE_TIMEOUT`` elapses).
-        * Owning loop is the one currently running on *this* thread — we cannot
-          block on it without deadlocking, so teardown is only *signalled* here
-          and completes asynchronously once control returns to that loop. The
-          caller must therefore keep that loop running afterwards; if it stops
-          the loop immediately, the owner task's ``__aexit__`` may not run. When
-          a deterministic close is required from inside a running loop, ``await
-          close_all()`` instead.
+* 所有者事件循环空闲或运行在其他线程时，本调用会阻塞至清理完成，或达到
+  ``SESSION_CLOSE_TIMEOUT``。
+* 所有者事件循环正在*当前*线程运行时，不能等待，否则会死锁；此处仅发送关闭信号，
+  待控制权返回该事件循环后异步完成。因此调用者必须继续运行该循环；若立即停止循环，
+  所有者任务的 ``__aexit__`` 可能不会执行。若需在运行中的事件循环内确定性关闭，请改用
+  ``await close_all()``。
         """
         with self._lock:
             entries = list(self._entries.values())
@@ -440,7 +426,7 @@ _pool_lock = threading.Lock()
 
 
 def get_session_pool() -> MCPSessionPool:
-    """Return the global session-pool singleton."""
+    """返回全局会话池单例。"""
     global _pool
     # Build and return under the lock so racing cold-start callers construct
     # exactly one pool and reset_session_pool() can't null the global between
@@ -454,7 +440,7 @@ def get_session_pool() -> MCPSessionPool:
 
 
 def reset_session_pool() -> None:
-    """Reset the singleton (used in tests and the MCP cache reset path)."""
+    """重置全局会话池单例，供测试和 MCP 缓存重置路径使用。"""
     global _pool
     with _pool_lock:
         _pool = None

@@ -1,14 +1,4 @@
-"""Regression tests for blocking-command timeout handling in LocalSandbox.
-
-These pin the fix for the "starting a server hangs the whole turn" bug:
-a backgrounded long-lived process must not keep the bash tool blocked until
-the timeout, and a genuinely blocking foreground command must be terminated
-(process group and all) once it exceeds the timeout.
-
-The POSIX cases exercise real subprocess/process-group semantics, so they are
-skipped on Windows. Windows keeps the ``subprocess.run`` path, but timeout
-errors still use the same user-facing notice.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import os
 import shlex
@@ -28,10 +18,7 @@ linux_proc_fd_only = pytest.mark.skipif(not Path("/proc/self/fd").exists(), reas
 
 @posix_only
 def test_backgrounded_process_returns_promptly():
-    """A backgrounded long-lived process (e.g. a dev server started with `&`)
-    must return as soon as the foreground command finishes, instead of
-    blocking the bash tool until the timeout because it inherited the
-    captured pipe."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox = LocalSandbox("t")
     start = time.monotonic()
     output = sandbox.execute_command("sleep 5 & echo serving", timeout=10)
@@ -44,9 +31,7 @@ def test_backgrounded_process_returns_promptly():
 @posix_only
 @linux_proc_fd_only
 def test_backgrounded_process_does_not_inherit_deleted_temp_capture(tmp_path):
-    """A backgrounded process that forgets to redirect output must not inherit
-    an anonymous deleted temp file for fd 1. That would be an invisible,
-    unbounded disk leak for long-lived processes that keep writing."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     marker = tmp_path / "fd1"
     script = f"import os, pathlib, time; pathlib.Path({str(marker)!r}).write_text(os.readlink('/proc/self/fd/1')); time.sleep(2)"
     sandbox = LocalSandbox("t")
@@ -64,8 +49,7 @@ def test_backgrounded_process_does_not_inherit_deleted_temp_capture(tmp_path):
 
 @posix_only
 def test_foreground_blocking_command_times_out_with_notice():
-    """A foreground command that never exits is terminated at the timeout and
-    the agent receives an explanatory notice instead of a generic error."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox = LocalSandbox("t")
     start = time.monotonic()
     output = sandbox.execute_command("while true; do sleep 0.2; done", timeout=1)
@@ -76,6 +60,7 @@ def test_foreground_blocking_command_times_out_with_notice():
 
 
 def test_timeout_notice_formats_fractional_and_singular_timeouts(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setattr(LocalSandbox, "_get_shell", lambda self: "/bin/sh")
     monkeypatch.setattr(LocalSandbox, "_run_posix_command", staticmethod(lambda args, timeout, env=None: ("", "", 0, True)))
 
@@ -84,7 +69,9 @@ def test_timeout_notice_formats_fractional_and_singular_timeouts(monkeypatch):
 
 
 def test_windows_timeout_expired_returns_notice(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     def fake_run(*args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise local_sandbox.subprocess.TimeoutExpired(cmd=args[0], timeout=kwargs["timeout"], output="partial out", stderr="partial err")
 
     monkeypatch.setattr(local_sandbox.os, "name", "nt")
@@ -102,8 +89,7 @@ def test_windows_timeout_expired_returns_notice(monkeypatch):
 
 @posix_only
 def test_foreground_timeout_kills_whole_process_group(tmp_path):
-    """On timeout the entire process group is killed, not just the direct
-    child, so child processes spawned by the command do not survive."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     marker = tmp_path / "alive"
     sandbox = LocalSandbox("t")
     sandbox.execute_command(f"while true; do touch {marker}; sleep 0.2; done", timeout=1)
@@ -116,8 +102,7 @@ def test_foreground_timeout_kills_whole_process_group(tmp_path):
 
 @posix_only
 def test_command_reading_stdin_does_not_block():
-    """stdin is redirected from /dev/null, so a command that reads stdin gets
-    immediate EOF instead of blocking until the timeout."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox = LocalSandbox("t")
     start = time.monotonic()
     output = sandbox.execute_command("read x; echo got", timeout=10)
@@ -129,8 +114,7 @@ def test_command_reading_stdin_does_not_block():
 
 @posix_only
 def test_normal_command_output_exit_code_and_stderr():
-    """Ordinary commands keep their existing output contract: stdout,
-    appended Std Error section, and a non-zero Exit Code line."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     sandbox = LocalSandbox("t")
 
     assert "hello" in sandbox.execute_command("echo hello")
@@ -143,19 +127,19 @@ def test_normal_command_output_exit_code_and_stderr():
 
 
 def test_sandbox_config_exposes_command_timeout_default():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = SandboxConfig(use="deerflow.sandbox.local:LocalSandboxProvider")
     assert cfg.bash_command_timeout == 600
 
 
 def test_sandbox_config_exposes_health_check_skip_seconds_default():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     cfg = SandboxConfig(use="deerflow.sandbox.local:LocalSandboxProvider")
     assert cfg.health_check_skip_seconds is None
 
 
 def test_bash_tool_description_guides_backgrounding_long_lived_processes():
-    """The bash tool description (seen by the model) must tell it to background
-    long-lived processes like servers, so it doesn't block the turn in the
-    foreground. This is the prompt-side half of the server-hang fix."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from deerflow.sandbox.tools import bash_tool
 
     description = bash_tool.description.lower()

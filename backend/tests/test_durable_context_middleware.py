@@ -1,3 +1,4 @@
+'定义 test_durable_context_middleware 模块提供的职责与可复用接口'
 from types import SimpleNamespace
 from typing import Annotated
 
@@ -24,6 +25,7 @@ from deerflow.subagents.status_contract import make_subagent_additional_kwargs
 
 
 def _make_app_config() -> AppConfig:
+    '执行 _make_app_config 的明确职责，并返回与调用约定一致的结果'
     return AppConfig(
         models=[
             ModelConfig(
@@ -41,6 +43,7 @@ def _make_app_config() -> AppConfig:
 
 
 def _msgs_with_completed_task():
+    '执行 _msgs_with_completed_task 的明确职责，并返回与调用约定一致的结果'
     return [
         HumanMessage(content="research auth"),
         AIMessage(
@@ -64,6 +67,7 @@ def _msgs_with_completed_task():
 
 
 def _msgs_with_completed_tasks(count: int):
+    '执行 _msgs_with_completed_tasks 的明确职责，并返回与调用约定一致的结果'
     messages = []
     for i in range(count):
         tool_call_id = f"call_{i}"
@@ -96,7 +100,9 @@ def _msgs_with_completed_tasks(count: int):
 
 
 class TestBeforeModelCapture:
+    '组织 TestBeforeModelCapture 场景的行为与边界验证'
     def test_returns_ledger_update_for_completed_task(self):
+        '验证 returns、ledger、update、for、completed、task 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
 
         out = middleware.before_model({"messages": _msgs_with_completed_task()}, None)
@@ -106,6 +112,7 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["status"] == "completed"
 
     def test_after_model_captures_in_progress_task_dispatch(self):
+        '验证 after、model、captures、in、progress、task、dispatch 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         messages = [
             AIMessage(
@@ -128,6 +135,7 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["status"] == "in_progress"
 
     def test_captured_delegations_include_runtime_run_id(self):
+        '验证 captured、delegations、include、runtime、run、id 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-42"})
         messages = [
@@ -151,6 +159,7 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["run_id"] == "run-42"
 
     def test_runtime_run_id_capture_starts_at_current_run_message(self):
+        '验证 runtime、run、id、capture、starts、at、current、run、message 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-new"})
         messages = [
@@ -187,6 +196,7 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["run_id"] == "run-new"
 
     def test_missing_current_run_marker_does_not_retag_old_run_delegations(self):
+        '验证 missing、current、run、marker、does、not、retag、old、run、delegations 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-new"})
         messages = [
@@ -217,6 +227,7 @@ class TestBeforeModelCapture:
         assert middleware.before_model({"messages": messages, "delegations": existing}, runtime) is None
 
     def test_resume_run_captures_new_delegation_after_pre_existing_boundary(self):
+        '验证 resume、run、captures、new、delegation、after、pre、existing、boundary 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-new", CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY: {"old-ai"}})
         messages = [
@@ -264,6 +275,7 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["run_id"] == "run-new"
 
     def test_run_id_without_human_boundary_does_not_retag_existing_delegations(self):
+        '验证 run、id、without、human、boundary、does、not、retag、existing、delegations 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-new"})
         messages = [
@@ -293,6 +305,7 @@ class TestBeforeModelCapture:
         assert middleware.before_model({"messages": messages, "delegations": existing}, runtime) is None
 
     def test_resume_without_human_boundary_uses_pre_existing_message_ids(self):
+        '验证 resume、without、human、boundary、uses、pre、existing、message、ids 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-new", CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY: {"old-ai"}})
         messages = [
@@ -340,6 +353,7 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["run_id"] == "run-new"
 
     def test_resume_boundary_does_not_retag_pre_existing_task_missing_from_ledger(self):
+        '验证 resume、boundary、does、not、retag、pre、existing、task、missing、from、ledger 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-new", CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY: {"old-ai"}})
         messages = [
@@ -377,6 +391,7 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["run_id"] == "run-new"
 
     def test_resume_boundary_does_not_treat_legacy_human_without_run_id_as_current(self):
+        '验证 resume、boundary、does、not、treat、legacy、human、without、run、id、as、current 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         runtime = SimpleNamespace(context={"run_id": "run-new", CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY: {"old-human", "old-ai"}})
         messages = [
@@ -414,11 +429,13 @@ class TestBeforeModelCapture:
         assert out["delegations"][0]["run_id"] == "run-new"
 
     def test_returns_none_when_no_delegations(self):
+        '验证 returns、none、when、no、delegations 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
 
         assert middleware.before_model({"messages": [HumanMessage(content="hi")]}, None) is None
 
     def test_repeated_capture_does_not_reemit_unchanged_delegation(self):
+        '验证 repeated、capture、does、not、reemit、unchanged、delegation 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         first = middleware.before_model({"messages": _msgs_with_completed_task()}, None)
         assert first is not None
@@ -440,6 +457,7 @@ class TestBeforeModelCapture:
         assert out is None
 
     def test_repeated_capture_after_cap_does_not_reemit_evicted_old_delegation(self):
+        '验证 repeated、capture、after、cap、does、not、reemit、evicted、old、delegation 场景下的预期行为、边界条件与结果'
         cap = getattr(thread_state_module, "_DELEGATION_LEDGER_MAX_ENTRIES", None)
         assert isinstance(cap, int)
         middleware = DurableContextMiddleware()
@@ -461,6 +479,7 @@ class TestBeforeModelCapture:
         assert out is None
 
     def test_durable_context_uses_structured_task_metadata_when_content_disagrees(self):
+        '验证 durable、context、uses、structured、task、metadata、when、content、disagrees 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         state = {
             "messages": [
@@ -498,7 +517,9 @@ class TestBeforeModelCapture:
 
 
 class TestMiddlewareRegistration:
+    '组织 TestMiddlewareRegistration 场景的行为与边界验证'
     def test_registered_before_summarization(self, monkeypatch):
+        '验证 registered、before、summarization 场景下的预期行为、边界条件与结果'
         app_config = _make_app_config()
         summary_sentinel = object()
 
@@ -518,13 +539,15 @@ class TestMiddlewareRegistration:
 
 
 class RecordingFakeModel(FakeToolCallingModel):
-    """Scripted model that records the messages sent to each model call."""
+    '封装 RecordingFakeModel 的状态、协作关系与公开操作。\n\nScripted model that records the messages sent to each model call.'
 
     def __init__(self, **kwargs):
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__(**kwargs)
         object.__setattr__(self, "received", [])
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '执行 _generate 的明确职责，并返回与调用约定一致的结果'
         self.received.append(list(messages))
         return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
@@ -536,13 +559,7 @@ def fake_task(
     subagent_type: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """Fake task tool.
-
-    Args:
-        description: short task label.
-        prompt: full task instructions.
-        subagent_type: which subagent type to use.
-    """
+    '执行 fake_task 的明确职责，并返回与调用约定一致的结果。\n\nFake task tool.\n\n    Args:\n        description: short task label.\n        prompt: full task instructions.\n        subagent_type: which subagent type to use.\n    '
     return Command(
         update={
             "messages": [
@@ -559,16 +576,14 @@ def fake_task(
 
 @tool("read_file", parse_docstring=True)
 def fake_read_file(path: str) -> str:
-    """Read a file.
-
-    Args:
-        path: absolute path to read.
-    """
+    '执行 fake_read_file 的明确职责，并返回与调用约定一致的结果。\n\nRead a file.\n\n    Args:\n        path: absolute path to read.\n    '
     return "---\nname: data-analysis\ndescription: Analyze data with pandas and charts.\n---\n# Data Analysis\nALWAYS_USE_PANDAS_SENTINEL\n"
 
 
 class TestGraphIntegration:
+    '组织 TestGraphIntegration 场景的行为与边界验证'
     def test_subagent_limit_counts_only_prior_delegations_in_real_middleware_chain(self):
+        '验证 subagent、limit、counts、only、prior、delegations、in、real、middleware、chain 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(
             responses=[
                 AIMessage(
@@ -620,6 +635,7 @@ class TestGraphIntegration:
         assert [message.tool_call_id for message in executed_task_results] == ["new-call-1"]
 
     def test_delegation_captured_and_injected(self):
+        '验证 delegation、captured、and、injected 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(
             responses=[
                 AIMessage(
@@ -656,6 +672,7 @@ class TestGraphIntegration:
         assert "research auth" in injected[0].content
 
     def test_delegations_survives_summarization_and_stays_injected(self):
+        '验证 delegations、survives、summarization、and、stays、injected 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(
             responses=[
                 AIMessage(
@@ -713,7 +730,9 @@ class TestGraphIntegration:
 
 
 class TestSkillContextCapture:
+    '组织 TestSkillContextCapture 场景的行为与边界验证'
     def test_before_model_captures_skill_reference(self):
+        '验证 before、model、captures、skill、reference 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware()
         msgs = [
             HumanMessage(content="use analysis"),
@@ -742,6 +761,7 @@ class TestSkillContextCapture:
         assert "BODY_SENTINEL" not in repr(entry)
 
     def test_custom_skills_root_and_tool_names(self):
+        '验证 custom、skills、root、and、tool、names 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware(skills_container_path="/custom/skills", skill_file_read_tool_names=["open"])
         msgs = [
             AIMessage(content="", tool_calls=[{"name": "open", "args": {"path": "/custom/skills/public/x/SKILL.md"}, "id": "r1", "type": "tool_call"}]),
@@ -764,12 +784,15 @@ class TestSkillContextCapture:
         assert out is not None and out["skill_context"][0]["name"] == "x"
 
     def test_slash_only_skills_root_is_preserved(self):
+        '验证 slash、only、skills、root、is、preserved 场景下的预期行为、边界条件与结果'
         assert DurableContextMiddleware(skills_container_path="/")._skills_root == "/"
         assert DurableContextMiddleware(skills_container_path="////")._skills_root == "/"
 
 
 class TestSkillContextInjection:
+    '组织 TestSkillContextInjection 场景的行为与边界验证'
     def test_skill_reference_injected_not_body(self):
+        '验证 skill、reference、injected、not、body 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(
             responses=[
                 AIMessage(content="", tool_calls=[{"name": "read_file", "args": {"path": "/mnt/skills/public/data-analysis/SKILL.md"}, "id": "r1", "type": "tool_call"}]),
@@ -795,6 +818,7 @@ class TestSkillContextInjection:
         assert "ALWAYS_USE_PANDAS_SENTINEL" not in injected[0].content
 
     def test_skill_reference_survives_summarization_and_stays_injected(self):
+        '验证 skill、reference、survives、summarization、and、stays、injected 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(
             responses=[
                 AIMessage(content="", tool_calls=[{"name": "read_file", "args": {"path": "/mnt/skills/public/data-analysis/SKILL.md"}, "id": "r1", "type": "tool_call"}]),
@@ -832,7 +856,9 @@ class TestSkillContextInjection:
 
 
 class TestDurableContextInjection:
+    '组织 TestDurableContextInjection 场景的行为与边界验证'
     def test_injects_summary_and_ledger_together(self):
+        '验证 injects、summary、and、ledger、together 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(responses=[AIMessage(content="ok")])
         agent = create_agent(
             model=model,
@@ -870,6 +896,7 @@ class TestDurableContextInjection:
         assert "research auth" not in authority[0].content
 
     def test_untrusted_context_values_stay_out_of_system_message(self):
+        '验证 untrusted、context、values、stay、out、of、system、message 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(responses=[AIMessage(content="ok")])
         agent = create_agent(
             model=model,
@@ -916,7 +943,9 @@ class TestDurableContextInjection:
 
 
 class TestSummaryRecordWindowSplit:
+    '组织 TestSummaryRecordWindowSplit 场景的行为与边界验证'
     def test_summary_in_channel_not_messages_then_injected(self):
+        '验证 summary、in、channel、not、messages、then、injected 场景下的预期行为、边界条件与结果'
         model = RecordingFakeModel(responses=[AIMessage(content="turn-a"), AIMessage(content="turn-b")])
         summary_model = FakeToolCallingModel(responses=[AIMessage(content="COMPRESSED")])
         agent = create_agent(
@@ -946,6 +975,7 @@ class TestSummaryRecordWindowSplit:
         assert durable, "summary not injected into model request after compaction"
 
     def test_empty_skill_read_tool_names_disables_skill_capture(self):
+        '验证 empty、skill、read、tool、names、disables、skill、capture 场景下的预期行为、边界条件与结果'
         middleware = DurableContextMiddleware(skill_file_read_tool_names=[])
         msgs = [
             HumanMessage(content="use analysis"),

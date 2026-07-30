@@ -1,4 +1,4 @@
-"""Report finalization and localized Markdown rendering."""
+'定义 renderer 模块提供的职责与可复用接口。\n\nReport finalization and localized Markdown rendering.'
 
 from __future__ import annotations
 
@@ -41,6 +41,7 @@ _ASSURANCE_LABELS = {
 
 
 def readiness_from_facts(facts: dict[str, Any], *, scope: list[str] | None = None) -> Readiness:
+    '执行 readiness_from_facts 的明确职责，并返回与调用约定一致的结果'
     summary = facts.get("summary", {})
     if int(summary.get("blockers") or 0) > 0:
         return "blocked"
@@ -58,7 +59,7 @@ def build_static_report(
     reviewer_model: str = "deterministic-review-core",
     completed_at: str | None = None,
 ) -> dict[str, Any]:
-    """Create a valid review-report.v1 with deterministic facts only."""
+    '构建并返回，并遵守 build_static_report 所表达的接口约束。\n\nCreate a valid review-report.v1 with deterministic facts only.'
     scope = scope or ["all"]
     readiness = readiness_from_facts(facts, scope=scope)
     issues = [
@@ -114,6 +115,7 @@ def build_static_report(
 
 
 def render_report_markdown(report: dict[str, Any], facts: dict[str, Any] | None = None, *, locale: Locale = "en") -> str:
+    '执行 render_report_markdown 的明确职责，并返回与调用约定一致的结果'
     labels = _READINESS_LABELS[locale]
     assurance_labels = _ASSURANCE_LABELS[locale]
     zh = locale == "zh"
@@ -169,6 +171,7 @@ def render_report_markdown(report: dict[str, Any], facts: dict[str, Any] | None 
 
 
 def _semantic_severity(severity: Any) -> str:
+    '执行 _semantic_severity 的明确职责，并返回与调用约定一致的结果'
     if severity == "blocker":
         return "blocker"
     if severity == "error":
@@ -177,6 +180,7 @@ def _semantic_severity(severity: Any) -> str:
 
 
 def _dimensions_from_facts(facts: dict[str, Any]) -> list[dict[str, Any]]:
+    '执行 _dimensions_from_facts 的明确职责，并返回与调用约定一致的结果'
     summary = facts.get("summary", {})
     status = "blocker" if summary.get("blockers") else "concern" if summary.get("errors") or summary.get("warnings") else "pass"
     return [
@@ -194,6 +198,7 @@ def _dimensions_from_facts(facts: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def _recommended_actions(facts: dict[str, Any], readiness: str) -> list[str]:
+    '执行 _recommended_actions 的明确职责，并返回与调用约定一致的结果'
     if readiness == "publish_candidate":
         return []
     actions: list[str] = []

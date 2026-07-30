@@ -1,4 +1,4 @@
-"""Thread metadata persistence — ORM, abstract store, and concrete implementations."""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -27,11 +27,7 @@ def make_thread_store(
     session_factory: async_sessionmaker[AsyncSession] | None,
     store: BaseStore | None = None,
 ) -> ThreadMetaStore:
-    """Create the appropriate ThreadMetaStore based on available backends.
-
-    Returns a SQL-backed repository when a session factory is available,
-    otherwise falls back to the in-memory LangGraph Store implementation.
-    """
+    """执行当前持久化组件提供的操作。"""
     if session_factory is not None:
         return ThreadMetaRepository(session_factory)
     if store is None:

@@ -1,12 +1,4 @@
-"""Tests for the authorization provider protocol, adapter, and configuration.
-
-Phase 0 covers scaffolding only (no behavior change at ``enabled: false``).
-These tests verify:
-- Protocol conformance and ``@runtime_checkable`` isinstance checks.
-- Principal / AuthzRequest / AuthzDecision dataclass construction.
-- GuardrailAuthorizationAdapter request mapping and decision conversion.
-- AuthorizationConfig defaults, singleton load/reset, and AppConfig wiring.
-"""
+"""覆盖本模块的可回归测试，固定关键输入、失败分支与资源生命周期，避免后续改动破坏既有契约。"""
 
 from __future__ import annotations
 
@@ -32,105 +24,117 @@ from deerflow.config.authorization_config import (
 from deerflow.config.sandbox_config import SandboxConfig
 from deerflow.guardrails.provider import GuardrailDecision, GuardrailProvider, GuardrailRequest
 
-# --- Test providers ---
+# --- 测试提供商 ---
 
 
 class _AllowAllProvider:
-    """Provider that allows everything."""
+    """归集“该项全部提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     name = "allow-all"
 
     def authorize(self, request: AuthzRequest) -> AuthzDecision:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return AuthzDecision(allow=True, reasons=[AuthzReason(code="test.allowed", message="allow-all")])
 
     async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return self.authorize(request)
 
     def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+        """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return list(candidates)
 
 
 class _DenyAllProvider:
-    """Provider that denies everything."""
+    """归集“拒绝全部提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     name = "deny-all"
 
     def authorize(self, request: AuthzRequest) -> AuthzDecision:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return AuthzDecision(allow=False, reasons=[AuthzReason(code="test.denied", message="deny-all")], policy_id="test.deny.v1")
 
     async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return self.authorize(request)
 
     def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+        """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return []
 
 
 class _FilterByDenylistProvider:
-    """Provider whose filter_resources removes a denylist, regardless of authorize()."""
+    """归集“过滤该项该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     name = "denylist-filter"
 
     def __init__(self, *, denied: list[str] | None = None):
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         self._denied = set(denied) if denied else set()
 
     def authorize(self, request: AuthzRequest) -> AuthzDecision:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         if request.target in self._denied:
             return AuthzDecision(allow=False, reasons=[AuthzReason(code="test.denied", message=f"'{request.target}' is denied")])
         return AuthzDecision(allow=True, reasons=[AuthzReason(code="test.allowed")])
 
     async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return self.authorize(request)
 
     def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+        """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return [c for c in candidates if c not in self._denied]
 
 
-# --- Protocol conformance ---
+# --- 协议一致性 ---
 
 
 class TestProtocolConformance:
-    """Verify the @runtime_checkable Protocol recognizes concrete providers."""
+    """归集“协议该项”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     def test_allow_all_is_authorization_provider(self):
+        """验证“该项全部该项授权提供方”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         assert isinstance(_AllowAllProvider(), AuthorizationProvider)
 
     def test_deny_all_is_authorization_provider(self):
+        """验证“拒绝全部该项授权提供方”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         assert isinstance(_DenyAllProvider(), AuthorizationProvider)
 
     def test_plain_object_without_methods_is_not_provider(self):
+        """验证“该项对象不使用该项该项该项提供方”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         class _NotAProvider:
+            """归集“该项该项”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             pass
 
         assert not isinstance(_NotAProvider(), AuthorizationProvider)
 
     def test_provider_without_filter_resources_is_not_provider(self):
-        """filter_resources is a required Protocol method.
-
-        A provider that only implements name/authorize/aauthorize but omits
-        filter_resources must NOT pass isinstance — otherwise it would be
-        silently accepted as an AuthorizationProvider and Layer 1 would
-        get None (fail-open) when calling filter_resources.
-        """
+        """验证“提供方不使用过滤资源该项该项提供方”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
 
         class _NoFilterMethod:
+            """归集“该项过滤该项”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "no-filter"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return AuthzDecision(allow=True)
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return self.authorize(request)
 
         assert not isinstance(_NoFilterMethod(), AuthorizationProvider)
 
 
-# --- Dataclass construction ---
+# --- 数据类构造 ---
 
 
 class TestDataclasses:
-    """Verify Principal / AuthzRequest / AuthzDecision construction."""
+    """归集“该项”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     def test_principal_defaults(self):
+        """验证“主体该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         p = Principal()
         assert p.user_id is None
         assert p.role is None
@@ -141,6 +145,7 @@ class TestDataclasses:
         assert p.attributes == {}
 
     def test_principal_with_fields(self):
+        """验证“主体使用字段”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         p = Principal(user_id="u1", role="admin", oauth_provider="github", oauth_id="gh-123", is_internal=True)
         assert p.user_id == "u1"
         assert p.role == "admin"
@@ -149,6 +154,7 @@ class TestDataclasses:
         assert p.is_internal is True
 
     def test_authz_request(self):
+        """验证“该项请求”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         p = Principal(user_id="u1", role="user")
         req = AuthzRequest(principal=p, resource="tool", action="call", target="bash")
         assert req.principal.user_id == "u1"
@@ -158,11 +164,13 @@ class TestDataclasses:
         assert req.context == {}
 
     def test_authz_request_with_context(self):
+        """验证“该项请求使用上下文”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         p = Principal(user_id="u1")
         req = AuthzRequest(principal=p, resource="tool", action="call", target="write_file", context={"thread_id": "t1"})
         assert req.context["thread_id"] == "t1"
 
     def test_authz_decision_defaults(self):
+        """验证“该项决策该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         d = AuthzDecision(allow=True)
         assert d.allow is True
         assert d.reasons == []
@@ -170,6 +178,7 @@ class TestDataclasses:
         assert d.metadata == {}
 
     def test_authz_decision_with_reasons(self):
+        """验证“该项决策使用该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         d = AuthzDecision(allow=False, reasons=[AuthzReason(code="denied", message="no access")], policy_id="p1")
         assert d.allow is False
         assert len(d.reasons) == 1
@@ -178,29 +187,32 @@ class TestDataclasses:
         assert d.policy_id == "p1"
 
 
-# --- filter_resources ---
+# --- 过滤资源 ---
 
 
 class TestFilterResources:
-    """Verify the Layer 1 batch filter."""
+    """归集“过滤资源”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     def test_allow_all_returns_all(self):
+        """验证“该项全部返回全部”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         provider = _AllowAllProvider()
         result = provider.filter_resources(Principal(role="user"), "tool", ["bash", "web_search", "read_file"])
         assert result == ["bash", "web_search", "read_file"]
 
     def test_deny_all_returns_empty(self):
+        """验证“拒绝全部返回空值”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         provider = _DenyAllProvider()
         result = provider.filter_resources(Principal(role="user"), "tool", ["bash", "web_search"])
         assert result == []
 
     def test_denylist_filter_removes_denied(self):
+        """验证“该项过滤该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         provider = _FilterByDenylistProvider(denied=["bash", "write_file"])
         result = provider.filter_resources(Principal(role="user"), "tool", ["bash", "web_search", "write_file", "read_file"])
         assert result == ["web_search", "read_file"]
 
 
-# --- GuardrailAuthorizationAdapter ---
+# 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
 
 
 def _make_guardrail_request(
@@ -214,6 +226,7 @@ def _make_guardrail_request(
     agent_id: str | None = None,
     timestamp: str = "",
 ) -> GuardrailRequest:
+    """为“构造该项请求”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     return GuardrailRequest(
         tool_name=tool_name,
         tool_input=tool_input or {},
@@ -227,19 +240,20 @@ def _make_guardrail_request(
 
 
 class TestGuardrailAuthorizationAdapter:
-    """Verify the adapter maps between Guardrail and Authz request/decision types."""
+    """归集“该项授权适配器”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     def test_adapter_name(self):
+        """验证“适配器名称”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         adapter = GuardrailAuthorizationAdapter(_AllowAllProvider())
         assert adapter.name == "authorization"
 
     def test_adapter_is_guardrail_provider(self):
-        """The adapter must satisfy the GuardrailProvider Protocol so existing
-        GuardrailMiddleware can enforce authz decisions without a new middleware."""
+        """验证“适配器该项该项提供方”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         adapter = GuardrailAuthorizationAdapter(_AllowAllProvider())
         assert isinstance(adapter, GuardrailProvider)
 
     def test_evaluate_allow(self):
+        """验证“评估该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         adapter = GuardrailAuthorizationAdapter(_AllowAllProvider())
         gr_req = _make_guardrail_request(tool_name="web_search")
         decision = adapter.evaluate(gr_req)
@@ -248,6 +262,7 @@ class TestGuardrailAuthorizationAdapter:
         assert decision.reasons[0].code == "test.allowed"
 
     def test_evaluate_deny(self):
+        """验证“评估拒绝”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         adapter = GuardrailAuthorizationAdapter(_DenyAllProvider())
         gr_req = _make_guardrail_request(tool_name="bash")
         decision = adapter.evaluate(gr_req)
@@ -255,20 +270,24 @@ class TestGuardrailAuthorizationAdapter:
         assert decision.policy_id == "test.deny.v1"
 
     def test_evaluate_maps_principal_identity(self):
-        """Verify user_role and user_id flow into the AuthzRequest principal."""
+        """验证“评估该项主体身份”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         captured: list[AuthzRequest] = []
 
         class _CapturingProvider:
+            """归集“该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "capturing"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 captured.append(request)
                 return AuthzDecision(allow=True, reasons=[AuthzReason(code="ok")])
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return self.authorize(request)
 
             def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+                """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return list(candidates)
 
         adapter = GuardrailAuthorizationAdapter(_CapturingProvider())
@@ -284,49 +303,51 @@ class TestGuardrailAuthorizationAdapter:
         assert authz_req.target == "write_file"
 
     def test_evaluate_does_not_populate_is_internal_in_phase0(self):
-        """is_internal is not populated by the adapter in Phase 0.
-
-        The correct signal (auth_source == AUTH_SOURCE_INTERNAL) lives on
-        request.state, not on GuardrailRequest. The adapter does not set
-        is_internal, so Principal retains its dataclass default (False).
-        Phase 1 will thread the signal into run context.
-        """
+        """验证“评估该项该项该项该项内部该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         captured: list[AuthzRequest] = []
 
         class _CapturingProvider:
+            """归集“该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "capturing"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 captured.append(request)
                 return AuthzDecision(allow=True)
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return self.authorize(request)
 
             def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+                """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return list(candidates)
 
         adapter = GuardrailAuthorizationAdapter(_CapturingProvider())
         adapter.evaluate(_make_guardrail_request(user_role="user"))
 
-        # is_internal retains its dataclass default — adapter does not set it
+        # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
         assert captured[0].principal.is_internal is False
 
     def test_evaluate_maps_context_fields(self):
-        """Verify thread_id, tool_input, and is_subagent flow into AuthzRequest.context."""
+        """验证“评估该项上下文字段”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         captured: list[AuthzRequest] = []
 
         class _CapturingProvider:
+            """归集“该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "capturing"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 captured.append(request)
                 return AuthzDecision(allow=True)
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return self.authorize(request)
 
             def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+                """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return list(candidates)
 
         adapter = GuardrailAuthorizationAdapter(_CapturingProvider())
@@ -348,20 +369,24 @@ class TestGuardrailAuthorizationAdapter:
         assert ctx["timestamp"] == "2026-07-13T00:00:00Z"
 
     def test_custom_resource_type_and_action(self):
-        """The adapter can be configured for non-tool resource types."""
+        """验证“该项该项类型该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         captured: list[AuthzRequest] = []
 
         class _CapturingProvider:
+            """归集“该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "capturing"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 captured.append(request)
                 return AuthzDecision(allow=True)
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return self.authorize(request)
 
             def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+                """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return list(candidates)
 
         adapter = GuardrailAuthorizationAdapter(_CapturingProvider(), resource_type="model", action="use")
@@ -371,22 +396,27 @@ class TestGuardrailAuthorizationAdapter:
         assert captured[0].action == "use"
 
     def test_aevaluate_allow(self):
+        """验证“该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         adapter = GuardrailAuthorizationAdapter(_AllowAllProvider())
         gr_req = _make_guardrail_request(tool_name="web_search")
         decision = asyncio.run(adapter.aevaluate(gr_req))
         assert decision.allow is True
 
     def test_aevaluate_deny(self):
+        """验证“该项拒绝”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         adapter = GuardrailAuthorizationAdapter(_DenyAllProvider())
         gr_req = _make_guardrail_request(tool_name="bash")
         decision = asyncio.run(adapter.aevaluate(gr_req))
         assert decision.allow is False
 
     def test_decision_conversion_preserves_metadata(self):
+        """验证“决策该项保留元数据”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         class _MetadataProvider:
+            """归集“元数据提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "metadata"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return AuthzDecision(
                     allow=True,
                     reasons=[AuthzReason(code="ok", message="allowed by policy X")],
@@ -395,9 +425,11 @@ class TestGuardrailAuthorizationAdapter:
                 )
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return self.authorize(request)
 
             def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+                """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return list(candidates)
 
         adapter = GuardrailAuthorizationAdapter(_MetadataProvider())
@@ -409,24 +441,22 @@ class TestGuardrailAuthorizationAdapter:
         assert decision.reasons[0].message == "allowed by policy X"
 
     def test_evaluate_propagates_provider_exception(self):
-        """Provider exceptions propagate to the caller (sync).
-
-        The adapter intentionally does not catch provider exceptions.
-        GuardrailMiddleware's wrap_tool_call applies fail_closed semantics
-        (deny on error when fail_closed=True). Catching here would duplicate
-        that logic and risk divergent behavior between layers.
-        """
+        """验证“评估该项提供方异常”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
 
         class _ExplodingProvider:
+            """归集“该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "exploding"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 raise RuntimeError("provider crashed")
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 raise RuntimeError("provider crashed")
 
             def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+                """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return list(candidates)
 
         adapter = GuardrailAuthorizationAdapter(_ExplodingProvider())
@@ -434,22 +464,22 @@ class TestGuardrailAuthorizationAdapter:
             adapter.evaluate(_make_guardrail_request())
 
     def test_aevaluate_propagates_provider_exception(self):
-        """Provider exceptions propagate to the caller (async).
-
-        Same rationale as the sync variant: GuardrailMiddleware's
-        awrap_tool_call handles fail_closed.
-        """
+        """验证“该项该项提供方异常”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
 
         class _ExplodingProvider:
+            """归集“该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
             name = "exploding"
 
             def authorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 raise RuntimeError("provider crashed")
 
             async def aauthorize(self, request: AuthzRequest) -> AuthzDecision:
+                """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 raise RuntimeError("provider crashed")
 
             def filter_resources(self, principal: Principal, resource_type: str, candidates: list[str]) -> list[str]:
+                """为“过滤资源”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
                 return list(candidates)
 
         adapter = GuardrailAuthorizationAdapter(_ExplodingProvider())
@@ -457,16 +487,18 @@ class TestGuardrailAuthorizationAdapter:
             asyncio.run(adapter.aevaluate(_make_guardrail_request()))
 
 
-# --- Configuration ---
+# --- 配置 ---
 
 
 class TestAuthorizationConfig:
-    """Verify config defaults, singleton behavior, and AppConfig wiring."""
+    """归集“授权配置”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     def teardown_method(self):
+        """为“该项该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         reset_authorization_config()
 
     def test_defaults(self):
+        """验证“该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         config = AuthorizationConfig()
         assert config.enabled is False
         assert config.fail_closed is True
@@ -474,11 +506,13 @@ class TestAuthorizationConfig:
         assert config.provider is None
 
     def test_get_returns_defaults_when_not_loaded(self):
+        """验证“获取返回该项当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         reset_authorization_config()
         config = get_authorization_config()
         assert config.enabled is False
 
     def test_load_from_dict(self):
+        """验证“加载该项字典”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         config = load_authorization_config_from_dict(
             {
                 "enabled": True,
@@ -496,18 +530,20 @@ class TestAuthorizationConfig:
         assert config.provider.config == {"roles": {"admin": {}}}
 
     def test_singleton_persistence(self):
+        """验证“单例持久化”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         load_authorization_config_from_dict({"enabled": True})
         config2 = get_authorization_config()
         assert config2.enabled is True
 
     def test_reset_clears_singleton(self):
+        """验证“重置清除单例”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         load_authorization_config_from_dict({"enabled": True})
         reset_authorization_config()
         config = get_authorization_config()
         assert config.enabled is False
 
     def test_app_config_has_authorization_field(self):
-        """Verify AuthorizationConfig is wired into AppConfig with correct defaults."""
+        """验证“应用配置该项授权该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         app_config = AppConfig(sandbox=SandboxConfig(use="test"))
         assert hasattr(app_config, "authorization")
         assert app_config.authorization.enabled is False
@@ -515,13 +551,7 @@ class TestAuthorizationConfig:
         assert app_config.authorization.default_role == "user"
 
     def test_app_config_load_propagates_to_singleton(self):
-        """Verify _apply_singleton_configs populates the authorization singleton.
-
-        model_validate alone does NOT call _apply_singleton_configs (that runs
-        only in from_file). We call it directly to verify the wiring line
-        ``load_authorization_config_from_dict(config.authorization.model_dump())``
-        actually populates the singleton — deleting that line should fail this test.
-        """
+        """验证“应用配置加载该项该项单例”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         reset_authorization_config()
         validated = AppConfig.model_validate(
             {
@@ -532,7 +562,7 @@ class TestAuthorizationConfig:
                 },
             }
         )
-        # Drive the singleton wiring the same way from_file does.
+        # 此处的测试设置用于精确固定该分支的调用结果、失败传播与资源状态。
         AppConfig._apply_singleton_configs(validated, acp_agents={})
 
         singleton = get_authorization_config()

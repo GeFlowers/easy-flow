@@ -3,18 +3,26 @@ import { expect, test } from "@playwright/test";
 import { mockLangGraphAPI } from "./utils/mock-api";
 
 test.describe("Sidebar navigation", () => {
+  /**
+   * 覆盖“sidebar contains Chats and Agents nav links”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("sidebar contains Chats and Agents nav links", async ({ page }) => {
     mockLangGraphAPI(page);
 
     await page.goto("/workspace/chats/new");
 
-    // Sidebar uses data-sidebar="menu-button" with asChild rendering on <Link>
+    // 侧边栏使用 data-sidebar="menu-button"，并通过 asChild 渲染到 <Link> 上。
     const sidebar = page.locator("[data-sidebar='sidebar']");
     await expect(sidebar.locator("a[href='/workspace/chats']")).toBeVisible({
       timeout: 15_000,
     });
     await expect(sidebar.locator("a[href='/workspace/agents']")).toBeVisible();
   });
+
+  /**
+   * 覆盖“Agents link navigates to agents page”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("Agents link navigates to agents page", async ({ page }) => {
     mockLangGraphAPI(page);
@@ -29,6 +37,11 @@ test.describe("Sidebar navigation", () => {
     await page.waitForURL("**/workspace/agents");
     await expect(page).toHaveURL(/\/workspace\/agents/);
   });
+
+  /**
+   * 覆盖“Agents button is disabled with a hover tooltip when agents_api is off”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("Agents button is disabled with a hover tooltip when agents_api is off", async ({
     page,
@@ -45,26 +58,24 @@ test.describe("Sidebar navigation", () => {
     await page.goto("/workspace/chats/new");
 
     const sidebar = page.locator("[data-sidebar='sidebar']");
-    // Chats remains a real link; Agents is no longer a navigable link.
+    // Chats 仍是真实链接；Agents 不再是可导航链接。
     await expect(sidebar.locator("a[href='/workspace/chats']")).toBeVisible({
       timeout: 15_000,
     });
     await expect(sidebar.locator("a[href='/workspace/agents']")).toHaveCount(0);
 
-    // The disabled Agents button is rendered and announces its disabled state.
+    // 渲染禁用的 Agents 按钮，并声明其禁用状态。
     const agentsButton = sidebar.getByRole("button", { name: "Agents" });
     await expect(agentsButton).toHaveAttribute("aria-disabled", "true");
 
-    // The button itself has pointer-events suppressed; force the hover so the
-    // event reaches the wrapping tooltip-trigger span that surfaces the tooltip.
+    // 按钮自身禁用了 pointer-events；强制悬停，以便事件到达显示工具提示的外层 tooltip-trigger span。
     await agentsButton.hover({ force: true });
     await expect(page.getByText("Feature not enabled").first()).toBeVisible({
       timeout: 5_000,
     });
 
-    // Keyboard/screen-reader users get the reason too: the disabled entry
-    // stays in the tab order (focusable) and is wired to a visually-hidden
-    // description rather than relying on the hover-only tooltip.
+    // 键盘/屏幕阅读器用户同样能获知原因：禁用项仍位于 Tab 顺序中（可聚焦），并关联一个
+    // 视觉隐藏的说明，而非仅依赖悬停工具提示。
     const describedById = await agentsButton.getAttribute("aria-describedby");
     expect(describedById).toBeTruthy();
     await expect(page.locator(`#${describedById}`)).toHaveText(
@@ -73,6 +84,11 @@ test.describe("Sidebar navigation", () => {
     await agentsButton.focus();
     await expect(agentsButton).toBeFocused();
   });
+
+  /**
+   * 覆盖“mobile welcome layout stays within viewport and opens sidebar”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("mobile welcome layout stays within viewport and opens sidebar", async ({
     page,

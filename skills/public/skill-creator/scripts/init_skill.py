@@ -1,14 +1,7 @@
 #!/usr/bin/env python3
-"""
-Skill Initializer - Creates a new skill from template
+"""按内置模板初始化标准技能目录及资源示例。
 
-Usage:
-    init_skill.py <skill-name> --path <path>
-
-Examples:
-    init_skill.py my-new-skill --path skills/public
-    init_skill.py my-api-helper --path skills/private
-    init_skill.py custom-skill --path /custom/location
+创建技能说明文件，以及脚本、参考资料和资源目录中的示例文件，供后续按需要编辑或删除。
 """
 
 import sys
@@ -187,21 +180,12 @@ Note: This is a text placeholder. Actual assets can be any file type.
 
 
 def title_case_skill_name(skill_name):
-    """Convert hyphenated skill name to Title Case for display."""
+    """将连字符分隔的技能名转换为标题式显示文本。"""
     return ' '.join(word.capitalize() for word in skill_name.split('-'))
 
 
 def init_skill(skill_name, path):
-    """
-    Initialize a new skill directory with template SKILL.md.
-
-    Args:
-        skill_name: Name of the skill
-        path: Path where the skill directory should be created
-
-    Returns:
-        Path to created skill directory, or None if error
-    """
+    """在目标路径创建技能目录、说明模板和三类资源示例；创建失败时输出原因并返回空值。"""
     # Determine skill directory path
     skill_dir = Path(path).resolve() / skill_name
 
@@ -271,6 +255,7 @@ def init_skill(skill_name, path):
 
 
 def main():
+    """校验命令行参数，初始化指定技能目录，并以退出状态表示创建是否成功。"""
     if len(sys.argv) < 4 or sys.argv[2] != '--path':
         print("Usage: init_skill.py <skill-name> --path <path>")
         print("\nSkill name requirements:")

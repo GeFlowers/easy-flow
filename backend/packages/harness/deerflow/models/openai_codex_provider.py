@@ -1,15 +1,4 @@
-"""Custom OpenAI Codex provider using ChatGPT Codex Responses API.
-
-Uses Codex CLI OAuth tokens with chatgpt.com/backend-api/codex/responses endpoint.
-This is the same endpoint that the Codex CLI uses internally.
-
-Supports:
-- Auto-load credentials from ~/.codex/auth.json
-- Responses API format (not Chat Completions)
-- Tool calling
-- Streaming (required by the endpoint)
-- Retry with exponential backoff
-"""
+'定义 openai_codex_provider 模块提供的职责与可复用接口。\n\nCustom OpenAI Codex provider using ChatGPT Codex Responses API.\n\nUses Codex CLI OAuth tokens with chatgpt.com/backend-api/codex/responses endpoint.\nThis is the same endpoint that the Codex CLI uses internally.\n\nSupports:\n- Auto-load credentials from ~/.codex/auth.json\n- Responses API format (not Chat Completions)\n- Tool calling\n- Streaming (required by the endpoint)\n- Retry with exponential backoff\n'
 
 import json
 import logging
@@ -30,12 +19,7 @@ CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex"
 
 
 def _build_usage_metadata(oai_usage: dict) -> dict:
-    """Convert Codex/Responses API usage dict to LangChain usage_metadata format.
-
-    Maps OpenAI Responses API token usage fields to the dict structure that
-    LangChain AIMessage.usage_metadata expects. This avoids depending on
-    langchain_openai private helpers like ``_create_usage_metadata_responses``.
-    """
+    '执行 _build_usage_metadata 的明确职责，并返回与调用约定一致的结果。\n\nConvert Codex/Responses API usage dict to LangChain usage_metadata format.\n\n    Maps OpenAI Responses API token usage fields to the dict structure that\n    LangChain AIMessage.usage_metadata expects. This avoids depending on\n    langchain_openai private helpers like ``_create_usage_metadata_responses``.\n    '
     input_tokens = oai_usage.get("input_tokens", 0)
     output_tokens = oai_usage.get("output_tokens", 0)
     total_tokens = oai_usage.get("total_tokens", input_tokens + output_tokens)
@@ -59,14 +43,7 @@ MAX_RETRIES = 3
 
 
 class CodexChatModel(BaseChatModel):
-    """LangChain chat model using ChatGPT Codex Responses API.
-
-    Config example:
-        - name: gpt-5.4
-          use: deerflow.models.openai_codex_provider:CodexChatModel
-          model: gpt-5.4
-          reasoning_effort: medium
-    """
+    '封装 CodexChatModel 的状态、协作关系与公开操作。\n\nLangChain chat model using ChatGPT Codex Responses API.\n\n    Config example:\n        - name: gpt-5.4\n          use: deerflow.models.openai_codex_provider:CodexChatModel\n          model: gpt-5.4\n          reasoning_effort: medium\n    '
 
     model: str = "gpt-5.4"
     reasoning_effort: str = "medium"
@@ -78,18 +55,21 @@ class CodexChatModel(BaseChatModel):
 
     @classmethod
     def is_lc_serializable(cls) -> bool:
+        '判断条件是否成立并返回布尔结果，并遵守 is_lc_serializable 所表达的接口约束'
         return True
 
     @property
     def _llm_type(self) -> str:
+        '执行 _llm_type 的明确职责，并返回与调用约定一致的结果'
         return "codex-responses"
 
     def _validate_retry_config(self) -> None:
+        '执行 _validate_retry_config 的明确职责，并返回与调用约定一致的结果'
         if self.retry_max_attempts < 1:
             raise ValueError("retry_max_attempts must be >= 1")
 
     def model_post_init(self, __context: Any) -> None:
-        """Auto-load Codex CLI credentials."""
+        '执行 model_post_init 的明确职责，并返回与调用约定一致的结果。\n\nAuto-load Codex CLI credentials.'
         self._validate_retry_config()
 
         cred = self._load_codex_auth()
@@ -103,12 +83,12 @@ class CodexChatModel(BaseChatModel):
         super().model_post_init(__context)
 
     def _load_codex_auth(self) -> CodexCliCredential | None:
-        """Load access_token and account_id from Codex CLI auth."""
+        '执行 _load_codex_auth 的明确职责，并返回与调用约定一致的结果。\n\nLoad access_token and account_id from Codex CLI auth.'
         return load_codex_cli_credential()
 
     @classmethod
     def _normalize_content(cls, content: Any) -> str:
-        """Flatten LangChain content blocks into plain text for Codex."""
+        '执行 _normalize_content 的明确职责，并返回与调用约定一致的结果。\n\nFlatten LangChain content blocks into plain text for Codex.'
         if isinstance(content, str):
             return content
 
@@ -135,10 +115,7 @@ class CodexChatModel(BaseChatModel):
             return str(content)
 
     def _convert_messages(self, messages: list[BaseMessage]) -> tuple[str, list[dict]]:
-        """Convert LangChain messages to Responses API format.
-
-        Returns (instructions, input_items).
-        """
+        '执行 _convert_messages 的明确职责，并返回与调用约定一致的结果。\n\nConvert LangChain messages to Responses API format.\n\n        Returns (instructions, input_items).\n        '
         instructions_parts: list[str] = []
         input_items = []
 
@@ -178,7 +155,7 @@ class CodexChatModel(BaseChatModel):
         return instructions, input_items
 
     def _convert_tools(self, tools: list[dict]) -> list[dict]:
-        """Convert LangChain tool format to Responses API format."""
+        '执行 _convert_tools 的明确职责，并返回与调用约定一致的结果。\n\nConvert LangChain tool format to Responses API format.'
         responses_tools = []
         for tool in tools:
             if tool.get("type") == "function" and "function" in tool:
@@ -203,7 +180,7 @@ class CodexChatModel(BaseChatModel):
         return responses_tools
 
     def _call_codex_api(self, messages: list[BaseMessage], tools: list[dict] | None = None) -> dict:
-        """Call the Codex Responses API and return the completed response."""
+        '执行 _call_codex_api 的明确职责，并返回与调用约定一致的结果。\n\nCall the Codex Responses API and return the completed response.'
         instructions, input_items = self._convert_messages(messages)
 
         payload = {
@@ -246,7 +223,7 @@ class CodexChatModel(BaseChatModel):
         raise last_error
 
     def _stream_response(self, headers: dict, payload: dict) -> dict:
-        """Stream SSE from Codex API and collect the final response."""
+        '执行 _stream_response 的明确职责，并返回与调用约定一致的结果。\n\nStream SSE from Codex API and collect the final response.'
         completed_response = None
         streamed_output_items: dict[int, dict[str, Any]] = {}
 
@@ -294,7 +271,7 @@ class CodexChatModel(BaseChatModel):
 
     @staticmethod
     def _parse_sse_data_line(line: str) -> dict[str, Any] | None:
-        """Parse a data line from the SSE stream, skipping terminal markers."""
+        '执行 _parse_sse_data_line 的明确职责，并返回与调用约定一致的结果。\n\nParse a data line from the SSE stream, skipping terminal markers.'
         if not line.startswith("data:"):
             return None
 
@@ -311,7 +288,7 @@ class CodexChatModel(BaseChatModel):
         return data if isinstance(data, dict) else None
 
     def _parse_tool_call_arguments(self, output_item: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-        """Parse function-call arguments, surfacing malformed payloads safely."""
+        '执行 _parse_tool_call_arguments 的明确职责，并返回与调用约定一致的结果。\n\nParse function-call arguments, surfacing malformed payloads safely.'
         raw_arguments = output_item.get("arguments", "{}")
         if isinstance(raw_arguments, dict):
             return raw_arguments, None
@@ -340,7 +317,7 @@ class CodexChatModel(BaseChatModel):
         return parsed_arguments, None
 
     def _parse_response(self, response: dict) -> ChatResult:
-        """Parse Codex Responses API response into LangChain ChatResult."""
+        '执行 _parse_response 的明确职责，并返回与调用约定一致的结果。\n\nParse Codex Responses API response into LangChain ChatResult.'
         content = ""
         tool_calls = []
         invalid_tool_calls = []
@@ -410,13 +387,13 @@ class CodexChatModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        """Generate a response using Codex Responses API."""
+        '执行 _generate 的明确职责，并返回与调用约定一致的结果。\n\nGenerate a response using Codex Responses API.'
         tools = kwargs.get("tools", None)
         response = self._call_codex_api(messages, tools=tools)
         return self._parse_response(response)
 
     def bind_tools(self, tools: list, **kwargs: Any) -> Any:
-        """Bind tools for function calling."""
+        '执行 bind_tools 的明确职责，并返回与调用约定一致的结果。\n\nBind tools for function calling.'
         from langchain_core.runnables import RunnableBinding
         from langchain_core.tools import BaseTool
         from langchain_core.utils.function_calling import convert_to_openai_function

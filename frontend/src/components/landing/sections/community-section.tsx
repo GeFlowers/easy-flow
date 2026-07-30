@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 
 import { Section } from "../section";
 
+/** CommunitySection 组件：提供对应的界面结构与交互语义。 */
 export function CommunitySection() {
   return (
     <Section

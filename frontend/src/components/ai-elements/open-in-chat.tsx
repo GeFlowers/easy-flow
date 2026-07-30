@@ -185,6 +185,7 @@ const providers = {
 
 const OpenInContext = createContext<{ query: string } | undefined>(undefined);
 
+/** useOpenInContext Hook：封装本模块所需的状态或上下文访问。 */
 const useOpenInContext = () => {
   const context = useContext(OpenInContext);
   if (!context) {
@@ -193,18 +194,22 @@ const useOpenInContext = () => {
   return context;
 };
 
+/** OpenInProps 的公开类型定义。 */
 export type OpenInProps = ComponentProps<typeof DropdownMenu> & {
   query: string;
 };
 
+/** OpenIn 组件：提供对应的界面结构与交互语义。 */
 export const OpenIn = ({ query, ...props }: OpenInProps) => (
   <OpenInContext.Provider value={{ query }}>
     <DropdownMenu {...props} />
   </OpenInContext.Provider>
 );
 
+/** OpenInContentProps 的公开类型定义。 */
 export type OpenInContentProps = ComponentProps<typeof DropdownMenuContent>;
 
+/** OpenInContent 组件：提供对应的界面结构与交互语义。 */
 export const OpenInContent = ({ className, ...props }: OpenInContentProps) => (
   <DropdownMenuContent
     align="start"
@@ -213,26 +218,34 @@ export const OpenInContent = ({ className, ...props }: OpenInContentProps) => (
   />
 );
 
+/** OpenInItemProps 的公开类型定义。 */
 export type OpenInItemProps = ComponentProps<typeof DropdownMenuItem>;
 
+/** OpenInItem 组件：提供对应的界面结构与交互语义。 */
 export const OpenInItem = (props: OpenInItemProps) => (
   <DropdownMenuItem {...props} />
 );
 
+/** OpenInLabelProps 的公开类型定义。 */
 export type OpenInLabelProps = ComponentProps<typeof DropdownMenuLabel>;
 
+/** OpenInLabel 组件：提供对应的界面结构与交互语义。 */
 export const OpenInLabel = (props: OpenInLabelProps) => (
   <DropdownMenuLabel {...props} />
 );
 
+/** OpenInSeparatorProps 的公开类型定义。 */
 export type OpenInSeparatorProps = ComponentProps<typeof DropdownMenuSeparator>;
 
+/** OpenInSeparator 组件：提供对应的界面结构与交互语义。 */
 export const OpenInSeparator = (props: OpenInSeparatorProps) => (
   <DropdownMenuSeparator {...props} />
 );
 
+/** OpenInTriggerProps 的公开类型定义。 */
 export type OpenInTriggerProps = ComponentProps<typeof DropdownMenuTrigger>;
 
+/** OpenInTrigger 组件：提供对应的界面结构与交互语义。 */
 export const OpenInTrigger = ({ children, ...props }: OpenInTriggerProps) => (
   <DropdownMenuTrigger {...props} asChild>
     {children ?? (
@@ -244,8 +257,10 @@ export const OpenInTrigger = ({ children, ...props }: OpenInTriggerProps) => (
   </DropdownMenuTrigger>
 );
 
+/** OpenInChatGPTProps 的公开类型定义。 */
 export type OpenInChatGPTProps = ComponentProps<typeof DropdownMenuItem>;
 
+/** OpenInChatGPT 组件：提供对应的界面结构与交互语义。 */
 export const OpenInChatGPT = (props: OpenInChatGPTProps) => {
   const { query } = useOpenInContext();
   return (
@@ -264,8 +279,10 @@ export const OpenInChatGPT = (props: OpenInChatGPTProps) => {
   );
 };
 
+/** OpenInClaudeProps 的公开类型定义。 */
 export type OpenInClaudeProps = ComponentProps<typeof DropdownMenuItem>;
 
+/** OpenInClaude 组件：提供对应的界面结构与交互语义。 */
 export const OpenInClaude = (props: OpenInClaudeProps) => {
   const { query } = useOpenInContext();
   return (
@@ -284,8 +301,10 @@ export const OpenInClaude = (props: OpenInClaudeProps) => {
   );
 };
 
+/** OpenInT3Props 的公开类型定义。 */
 export type OpenInT3Props = ComponentProps<typeof DropdownMenuItem>;
 
+/** OpenInT3 组件：提供对应的界面结构与交互语义。 */
 export const OpenInT3 = (props: OpenInT3Props) => {
   const { query } = useOpenInContext();
   return (
@@ -304,8 +323,10 @@ export const OpenInT3 = (props: OpenInT3Props) => {
   );
 };
 
+/** OpenInSciraProps 的公开类型定义。 */
 export type OpenInSciraProps = ComponentProps<typeof DropdownMenuItem>;
 
+/** OpenInScira 组件：提供对应的界面结构与交互语义。 */
 export const OpenInScira = (props: OpenInSciraProps) => {
   const { query } = useOpenInContext();
   return (
@@ -324,8 +345,10 @@ export const OpenInScira = (props: OpenInSciraProps) => {
   );
 };
 
+/** OpenInv0Props 的公开类型定义。 */
 export type OpenInv0Props = ComponentProps<typeof DropdownMenuItem>;
 
+/** OpenInv0 组件：提供对应的界面结构与交互语义。 */
 export const OpenInv0 = (props: OpenInv0Props) => {
   const { query } = useOpenInContext();
   return (
@@ -344,8 +367,10 @@ export const OpenInv0 = (props: OpenInv0Props) => {
   );
 };
 
+/** OpenInCursorProps 的公开类型定义。 */
 export type OpenInCursorProps = ComponentProps<typeof DropdownMenuItem>;
 
+/** OpenInCursor 组件：提供对应的界面结构与交互语义。 */
 export const OpenInCursor = (props: OpenInCursorProps) => {
   const { query } = useOpenInContext();
   return (

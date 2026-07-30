@@ -38,10 +38,9 @@ interface AgentCardProps {
 }
 
 /**
- * Reveals the full text in a tooltip ONLY when its trigger is actually clipped.
- * Clipping is measured on pointer enter against the trigger's own box, covering
- * both single-line `truncate` (width) and multi-line `line-clamp` (height), so
- * untruncated content never pops a redundant tooltip.
+ * 仅当触发元素确实被截断时才显示完整文本提示。指针进入时依据元素自身尺寸
+ * 检测单行 `truncate` 的宽度截断和多行 `line-clamp` 的高度截断，避免未截断
+ * 内容出现多余提示。
  */
 function TruncatedTooltip({
   text,
@@ -75,9 +74,8 @@ function TruncatedTooltip({
 }
 
 /**
- * Long, user-controlled labels (agent model, skills, tool groups) that must
- * never break the card layout: width is capped to the parent and the text is
- * truncated with an ellipsis, with the full value revealed on hover.
+ * 约束代理模型、技能和工具组等用户可控长标签，避免破坏卡片布局；文本在父级
+ * 宽度内以省略号截断，并在悬停时显示完整值。
  */
 function TruncatedBadge({
   label,
@@ -100,6 +98,7 @@ function TruncatedBadge({
   );
 }
 
+/** 展示单个自定义代理，并提供发起对话和删除前确认等受控操作。 */
 export function AgentCard({ agent }: AgentCardProps) {
   const { t } = useI18n();
   const router = useRouter();
@@ -196,7 +195,7 @@ export function AgentCard({ agent }: AgentCardProps) {
         </CardFooter>
       </Card>
 
-      {/* Delete Confirm */}
+      {/* 删除确认对话框 */}
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader>

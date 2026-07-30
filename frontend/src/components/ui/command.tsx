@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+/** Command 内部组件：组织对应的界面结构与交互语义。 */
 function Command({
   className,
   ...props
@@ -28,6 +29,7 @@ function Command({
   );
 }
 
+/** CommandDialog 内部组件：组织对应的界面结构与交互语义。 */
 function CommandDialog({
   title = "Command Palette",
   description = "Search for a command to run...",
@@ -57,6 +59,7 @@ function CommandDialog({
   );
 }
 
+/** CommandInput 内部组件：组织对应的界面结构与交互语义。 */
 function CommandInput({
   className,
   ...props
@@ -79,6 +82,7 @@ function CommandInput({
   );
 }
 
+/** CommandList 内部组件：组织对应的界面结构与交互语义。 */
 function CommandList({
   className,
   ...props
@@ -95,6 +99,7 @@ function CommandList({
   );
 }
 
+/** CommandEmpty 内部组件：组织对应的界面结构与交互语义。 */
 function CommandEmpty({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Empty>) {
@@ -107,6 +112,7 @@ function CommandEmpty({
   );
 }
 
+/** CommandGroup 内部组件：组织对应的界面结构与交互语义。 */
 function CommandGroup({
   className,
   ...props
@@ -123,6 +129,7 @@ function CommandGroup({
   );
 }
 
+/** CommandSeparator 内部组件：组织对应的界面结构与交互语义。 */
 function CommandSeparator({
   className,
   ...props
@@ -136,6 +143,7 @@ function CommandSeparator({
   );
 }
 
+/** CommandItem 内部组件：组织对应的界面结构与交互语义。 */
 function CommandItem({
   className,
   ...props
@@ -152,6 +160,7 @@ function CommandItem({
   );
 }
 
+/** CommandShortcut 内部组件：组织对应的界面结构与交互语义。 */
 function CommandShortcut({
   className,
   ...props

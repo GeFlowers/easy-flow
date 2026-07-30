@@ -21,6 +21,7 @@ function SkeletonBar({
   );
 }
 
+/** 在历史消息尚未加载时渲染结构稳定的骨架，降低布局位移。 */
 export function MessageListSkeleton() {
   let index = 0;
   return (

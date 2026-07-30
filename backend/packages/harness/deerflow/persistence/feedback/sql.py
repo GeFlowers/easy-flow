@@ -1,7 +1,4 @@
-"""SQLAlchemy-backed feedback storage.
-
-Each method acquires its own short-lived session.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -17,11 +14,14 @@ from deerflow.utils.time import coerce_iso
 
 
 class FeedbackRepository:
+    """定义负责持久化读写及事务边界管理的仓储组件。"""
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self._sf = session_factory
 
     @staticmethod
     def _row_to_dict(row: FeedbackRow) -> dict:
+        """将持久化记录转换为对外使用的字典表示。"""
         d = row.to_dict()
         val = d.get("created_at")
         if isinstance(val, datetime):
@@ -39,7 +39,7 @@ class FeedbackRepository:
         message_id: str | None = None,
         comment: str | None = None,
     ) -> dict:
-        """Create a feedback record. rating must be +1 or -1."""
+        """创建记录并在成功后提交相应的持久化事务。"""
         if rating not in (1, -1):
             raise ValueError(f"rating must be +1 or -1, got {rating}")
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.create")
@@ -65,6 +65,7 @@ class FeedbackRepository:
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.get")
         async with self._sf() as session:
             row = await session.get(FeedbackRow, feedback_id)
@@ -82,6 +83,7 @@ class FeedbackRepository:
         limit: int = 100,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.list_by_run")
         stmt = select(FeedbackRow).where(FeedbackRow.thread_id == thread_id, FeedbackRow.run_id == run_id)
         if resolved_user_id is not None:
@@ -98,6 +100,7 @@ class FeedbackRepository:
         limit: int = 100,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.list_by_thread")
         stmt = select(FeedbackRow).where(FeedbackRow.thread_id == thread_id)
         if resolved_user_id is not None:
@@ -113,6 +116,7 @@ class FeedbackRepository:
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> bool:
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.delete")
         async with self._sf() as session:
             row = await session.get(FeedbackRow, feedback_id)
@@ -133,7 +137,7 @@ class FeedbackRepository:
         user_id: str | None | _AutoSentinel = AUTO,
         comment: str | None = None,
     ) -> dict:
-        """Create or update feedback for (thread_id, run_id, user_id). rating must be +1 or -1."""
+        """执行当前持久化组件提供的操作。"""
         if rating not in (1, -1):
             raise ValueError(f"rating must be +1 or -1, got {rating}")
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.upsert")
@@ -171,7 +175,7 @@ class FeedbackRepository:
         run_id: str,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> bool:
-        """Delete the current user's feedback for a run. Returns True if a record was deleted."""
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.delete_by_run")
         async with self._sf() as session:
             stmt = select(FeedbackRow).where(
@@ -193,7 +197,7 @@ class FeedbackRepository:
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict[str, dict]:
-        """Return feedback grouped by run_id for a thread: {run_id: feedback_dict}."""
+        """查询并返回满足给定条件的持久化记录集合。"""
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.list_by_thread_grouped")
         stmt = select(FeedbackRow).where(FeedbackRow.thread_id == thread_id)
         if resolved_user_id is not None:
@@ -209,7 +213,7 @@ class FeedbackRepository:
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict[str, dict]:
-        """Return feedback for only the selected runs in one thread."""
+        """查询并返回满足给定条件的持久化记录集合。"""
         if not run_ids:
             return {}
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.list_by_run_ids")
@@ -224,7 +228,7 @@ class FeedbackRepository:
             return {row.run_id: self._row_to_dict(row) for row in result.scalars()}
 
     async def aggregate_by_run(self, thread_id: str, run_id: str) -> dict:
-        """Aggregate feedback stats for a run using database-side counting."""
+        """执行当前持久化组件提供的操作。"""
         stmt = select(
             func.count().label("total"),
             func.coalesce(func.sum(case((FeedbackRow.rating == 1, 1), else_=0)), 0).label("positive"),

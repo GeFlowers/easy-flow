@@ -6,24 +6,28 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+/** Select 内部组件：组织对应的界面结构与交互语义。 */
 function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
 
+/** SelectGroup 内部组件：组织对应的界面结构与交互语义。 */
 function SelectGroup({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Group>) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />;
 }
 
+/** SelectValue 内部组件：组织对应的界面结构与交互语义。 */
 function SelectValue({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Value>) {
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
+/** SelectTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function SelectTrigger({
   className,
   size = "default",
@@ -50,6 +54,7 @@ function SelectTrigger({
   );
 }
 
+/** SelectContent 内部组件：组织对应的界面结构与交互语义。 */
 function SelectContent({
   className,
   children,
@@ -87,6 +92,7 @@ function SelectContent({
   );
 }
 
+/** SelectLabel 内部组件：组织对应的界面结构与交互语义。 */
 function SelectLabel({
   className,
   ...props
@@ -100,6 +106,7 @@ function SelectLabel({
   );
 }
 
+/** SelectItem 内部组件：组织对应的界面结构与交互语义。 */
 function SelectItem({
   className,
   children,
@@ -127,6 +134,7 @@ function SelectItem({
   );
 }
 
+/** SelectSeparator 内部组件：组织对应的界面结构与交互语义。 */
 function SelectSeparator({
   className,
   ...props
@@ -140,6 +148,7 @@ function SelectSeparator({
   );
 }
 
+/** SelectScrollUpButton 内部组件：组织对应的界面结构与交互语义。 */
 function SelectScrollUpButton({
   className,
   ...props
@@ -158,6 +167,7 @@ function SelectScrollUpButton({
   );
 }
 
+/** SelectScrollDownButton 内部组件：组织对应的界面结构与交互语义。 */
 function SelectScrollDownButton({
   className,
   ...props

@@ -1,14 +1,14 @@
 #!/bin/bash
 
-# Vercel Deployment Script (via claimable deploy endpoint)
-# Usage: ./deploy.sh [project-path]
-# Returns: JSON with previewUrl, claimUrl, deploymentId, projectId
+# Vercel 部署脚本（经由可认领部署端点）
+# 用法：./deploy.sh [project-path]
+# 返回：包含 previewUrl、claimUrl、deploymentId、projectId 的 JSON
 
 set -e
 
 DEPLOY_ENDPOINT="https://claude-skills-deploy.vercel.com/api/deploy"
 
-# Detect framework from package.json
+# 根据 package.json 识别框架；按特异性排序以避免通用依赖抢先匹配。
 detect_framework() {
     local pkg_json="$1"
 
@@ -19,12 +19,12 @@ detect_framework() {
 
     local content=$(cat "$pkg_json")
 
-    # Helper to check if a package exists in dependencies or devDependencies
+    # 检查依赖或开发依赖中是否出现指定包名。
     has_dep() {
         echo "$content" | grep -q "\"$1\""
     }
 
-    # Order matters - check more specific frameworks first
+    # 匹配顺序有语义：先检查更具体的框架。
 
     # Blitz
     if has_dep "blitz"; then echo "blitzjs"; return; fi
@@ -151,18 +151,19 @@ detect_framework() {
     # Parcel
     if has_dep "parcel"; then echo "parcel"; return; fi
 
-    # No framework detected
+    # 没有识别出框架时显式返回 null，交由部署端采用默认处理。
     echo "null"
 }
 
-# Parse arguments
+# 解析输入路径；默认将当前目录作为部署根。
 INPUT_PATH="${1:-.}"
 
-# Create temp directory for packaging
+# 创建临时打包目录；cleanup 只删除本脚本创建的目录。
 TEMP_DIR=$(mktemp -d)
 TARBALL="$TEMP_DIR/project.tgz"
 CLEANUP_TEMP=true
 
+# 退出时回收临时目录；输入本就是 tarball 时不删除调用方文件。
 cleanup() {
     if [ "$CLEANUP_TEMP" = true ]; then
         rm -rf "$TEMP_DIR"
@@ -172,7 +173,7 @@ trap cleanup EXIT
 
 echo "Preparing deployment..." >&2
 
-# Check if input is a .tgz file or a directory
+# 识别输入是现有 .tgz 还是目录，只有目录才打包并可识别框架。
 FRAMEWORK="null"
 
 if [ -f "$INPUT_PATH" ] && [[ "$INPUT_PATH" == *.tgz ]]; then

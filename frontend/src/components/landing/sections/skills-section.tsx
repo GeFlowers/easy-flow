@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 import ProgressiveSkillsAnimation from "../progressive-skills-animation";
 import { Section } from "../section";
 
+/** SkillsSection 组件：提供对应的界面结构与交互语义。 */
 export function SkillsSection({ className }: { className?: string }) {
   return (
     <Section

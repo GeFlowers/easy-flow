@@ -1,3 +1,4 @@
+"""提供按用户和线程隔离路径映射的本地沙箱提供者。"""
 import logging
 import threading
 from collections import OrderedDict
@@ -33,47 +34,20 @@ DEFAULT_MAX_CACHED_THREAD_SANDBOXES = 256
 
 
 class LocalSandboxProvider(SandboxProvider):
-    """Local-filesystem sandbox provider with per-thread path scoping.
+    """提供按用户和线程隔离路径映射的本地文件系统沙箱。
 
-    Earlier revisions of this provider returned a single process-wide
-    ``LocalSandbox`` keyed by the literal id ``"local"``. That singleton could
-    not honour the documented ``/mnt/user-data/...`` contract at the public
-    ``Sandbox`` API boundary because the corresponding host directory is
-    per-thread (``{base_dir}/users/{user_id}/threads/{thread_id}/user-data/``).
-
-    The provider now produces a fresh ``LocalSandbox`` per ``thread_id`` whose
-    ``path_mappings`` include thread-scoped entries for
-    ``/mnt/user-data/{workspace,uploads,outputs}`` and ``/mnt/acp-workspace``,
-    mirroring how :class:`AioSandboxProvider` bind-mounts those paths into its
-    docker container. The legacy ``acquire()`` / ``acquire(None)`` call still
-    returns a generic singleton with id ``"local"`` for callers (and tests)
-    that do not have a thread context.
-
-    Thread-safety: ``acquire``, ``get`` and ``reset`` may be invoked from
-    multiple threads (Gateway tool dispatch, subagent worker pools, the
-    background memory updater, …) so all cache state changes are serialised
-    through a provider-wide :class:`threading.Lock`. This matches the pattern
-    used by :class:`AioSandboxProvider`.
-
-    Memory bound: ``_thread_sandboxes`` is an LRU cache capped at
-    ``max_cached_threads`` (default :data:`DEFAULT_MAX_CACHED_THREAD_SANDBOXES`).
-    When the cap is exceeded the least-recently-used entry is evicted on the
-    next ``acquire``; the evicted thread's next ``acquire`` rebuilds a fresh
-    sandbox (losing only its ``_agent_written_paths`` reverse-resolve hint,
-    which gracefully degrades read_file output).
+    有线程上下文时，为每个线程创建独立的 ``LocalSandbox``，把
+    用户数据目录、智能体工作区和用户自定义技能映射到该用户、
+    该线程的宿主目录；没有线程上下文的旧调用仍使用标识为 ``"local"`` 的通用实例。
+    缓存操作由提供者级锁保护，并以 LRU 策略限制保留的线程沙箱数量。淘汰后仅会
+    丢失智能体已写文件的反向路径解析提示，下一次获取会重建沙箱。
     """
 
     uses_thread_data_mounts = True
     needs_upload_permission_adjustment = False
 
     def __init__(self, max_cached_threads: int = DEFAULT_MAX_CACHED_THREAD_SANDBOXES):
-        """Initialize the local sandbox provider with static path mappings.
-
-        Args:
-            max_cached_threads: Upper bound on per-thread sandboxes retained in
-                the LRU cache. When exceeded, the least-recently-used entry is
-                evicted on the next ``acquire``.
-        """
+        """使用静态路径映射初始化提供者，并设置线程沙箱 LRU 缓存上限。"""
         self._path_mappings = self._setup_path_mappings()
         self._generic_sandbox: LocalSandbox | None = None
         self._thread_sandboxes: OrderedDict[tuple[str, str], LocalSandbox] = OrderedDict()
@@ -82,17 +56,10 @@ class LocalSandboxProvider(SandboxProvider):
 
     def _setup_path_mappings(self) -> list[PathMapping]:
         """
-        Setup static path mappings shared by every sandbox this provider yields.
+        建立所有沙箱共享的静态路径映射。
 
-        Static mappings cover the **public** skills directory and any custom
-        mounts from ``config.yaml`` — both are process-wide and identical for
-        every thread.  Per-thread ``/mnt/user-data/...``, ``/mnt/acp-workspace``
-        and ``/mnt/skills/custom`` mappings are appended inside
-        :meth:`_build_thread_path_mappings` because they depend on
-        ``thread_id`` and the effective ``user_id``.
-
-        Returns:
-            List of static path mappings
+        静态映射包含公共技能目录和配置中的自定义挂载；依赖线程或有效用户的
+        用户数据目录、智能体工作区与自定义技能映射则在获取沙箱时追加。
         """
         mappings: list[PathMapping] = []
 
@@ -208,20 +175,24 @@ class LocalSandboxProvider(SandboxProvider):
 
     @staticmethod
     def _effective_acquire_user_id(user_id: str | None) -> str:
+        """返回显式用户标识；未提供时解析当前运行时的有效用户标识。"""
         from deerflow.runtime.user_context import get_effective_user_id
 
         return user_id or get_effective_user_id()
 
     @staticmethod
     def _thread_key(thread_id: str, user_id: str) -> tuple[str, str]:
+        """构造用于线程沙箱缓存的用户与线程复合键。"""
         return (user_id, thread_id)
 
     @staticmethod
     def _sandbox_id_for_thread(thread_id: str, user_id: str) -> str:
+        """构造包含用户和线程范围的本地沙箱标识。"""
         return f"local:{user_id}:{thread_id}"
 
     @staticmethod
     def _key_from_sandbox_id(sandbox_id: str) -> tuple[str, str] | None:
+        """从本地线程沙箱标识解析用户与线程复合键。"""
         if not sandbox_id.startswith("local:"):
             return None
         value = sandbox_id[len("local:") :]
@@ -232,13 +203,10 @@ class LocalSandboxProvider(SandboxProvider):
 
     @staticmethod
     def _build_thread_path_mappings(thread_id: str, *, user_id: str | None = None) -> list[PathMapping]:
-        """Build per-thread path mappings for /mnt/user-data, /mnt/acp-workspace,
-        and /mnt/skills/custom.
+        """建立线程级 ``/mnt/user-data``、工作区和用户技能路径映射。
 
-        Uses the explicitly resolved user id when provided, falling back to
-        :func:`get_effective_user_id` for legacy callers.  Custom skills are
-        mounted per-user (read-only) because agent writes custom skills via
-        ``skill_manage_tool`` on the host filesystem, not inside the sandbox.
+        优先使用已解析的用户标识；未提供时兼容旧调用并从运行时取得。自定义技能以
+        用户范围只读挂载，因为智能体通过宿主端的技能管理工具修改它们。
         """
         from deerflow.config import get_app_config
         from deerflow.config.paths import get_paths
@@ -325,17 +293,10 @@ class LocalSandboxProvider(SandboxProvider):
         return mappings
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        """Return a sandbox id scoped to *thread_id* (or the generic singleton).
+        """获取线程范围内的沙箱标识；没有线程时返回通用单例标识。
 
-        - ``thread_id=None`` keeps the legacy singleton with id ``"local"`` for
-          callers that have no thread context (e.g. legacy tests, scripts).
-        - ``thread_id="abc"`` yields a per-thread ``LocalSandbox`` with id
-          ``"local:abc"`` whose ``path_mappings`` resolve ``/mnt/user-data/...``
-          to that thread's host directories.
-
-        Thread-safe under concurrent invocation: the cache check + insert is
-        guarded by ``self._lock`` so two callers racing on the same
-        ``thread_id`` always observe the same LocalSandbox instance.
+        缓存读取和插入受锁保护，相同用户和线程的并发调用始终得到同一实例；创建路径
+        映射涉及文件系统访问时会临时释放锁，并在重新持锁后再次检查缓存。
         """
         global _singleton
 
@@ -375,10 +336,7 @@ class LocalSandboxProvider(SandboxProvider):
             return cached.id
 
     def _evict_until_within_cap_locked(self) -> None:
-        """LRU-evict cached thread sandboxes once the cap is exceeded.
-
-        Caller MUST hold ``self._lock``.
-        """
+        """在缓存超过上限时按 LRU 策略淘汰线程沙箱；调用方必须持有锁。"""
         while len(self._thread_sandboxes) > self._max_cached_threads:
             evicted_key, _ = self._thread_sandboxes.popitem(last=False)
             logger.info(
@@ -389,6 +347,7 @@ class LocalSandboxProvider(SandboxProvider):
             )
 
     def get(self, sandbox_id: str) -> Sandbox | None:
+        """按标识获取通用或线程范围的本地沙箱，并更新线程缓存的使用顺序。"""
         if sandbox_id == "local":
             with self._lock:
                 generic = self._generic_sandbox
@@ -420,16 +379,11 @@ class LocalSandboxProvider(SandboxProvider):
         #
         # Note: This method is intentionally not called by SandboxMiddleware
         # to allow sandbox reuse across multiple turns in a thread.
+        """保留本地沙箱缓存；其资源由 LRU 淘汰、重置或关闭统一回收。"""
         pass
 
     def reset(self) -> None:
-        """Drop all cached LocalSandbox instances.
-
-        ``reset_sandbox_provider()`` calls this to ensure config / mount
-        changes take effect on the next ``acquire()``. We also reset the
-        module-level ``_singleton`` alias so older callers/tests that reach
-        # into it see a fresh state.
-        """
+        """清空所有本地沙箱缓存，使后续获取应用新的配置和挂载。"""
         global _singleton
         with self._lock:
             self._generic_sandbox = None
@@ -440,4 +394,5 @@ class LocalSandboxProvider(SandboxProvider):
         # LocalSandboxProvider has no extra resources beyond the cached
         # ``LocalSandbox`` instances, so shutdown uses the same cleanup path
         # as ``reset``.
+        """关闭提供者；本地实现复用重置逻辑清理缓存。"""
         self.reset()

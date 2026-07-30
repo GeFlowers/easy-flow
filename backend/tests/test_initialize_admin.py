@@ -1,9 +1,4 @@
-"""Tests for the POST /api/v1/auth/initialize endpoint.
-
-Covers: first-boot admin creation, rejection when system already
-initialized, password strength validation,
-and public accessibility (no auth cookie required).
-"""
+"""覆盖初始化管理员接口的首启创建、重复拦截、密码校验与匿名访问边界。"""
 
 import asyncio
 import os
@@ -20,7 +15,7 @@ _TEST_SECRET = "test-secret-key-initialize-admin-min-32"
 
 @pytest.fixture(autouse=True)
 def _setup_auth(tmp_path):
-    """Fresh SQLite engine + auth config per test."""
+    """为每个用例创建独立的轻量数据库引擎、认证配置与干净状态缓存。"""
     from app.gateway import deps
     from app.gateway.routers.auth import _SETUP_STATUS_CACHE, _SETUP_STATUS_INFLIGHT
     from deerflow.persistence.engine import close_engine, init_engine
@@ -44,19 +39,19 @@ def _setup_auth(tmp_path):
 
 @pytest.fixture()
 def client(_setup_auth):
+    """提供不触发生命周期配置加载、但已完成认证依赖初始化的测试客户端。"""
     from app.gateway.app import create_app
     from app.gateway.auth.config import AuthConfig, set_auth_config
 
     set_auth_config(AuthConfig(jwt_secret=_TEST_SECRET))
     app = create_app()
-    # Do NOT use TestClient as a context manager — that would trigger the
-    # full lifespan which requires config.yaml. The auth endpoints work
-    # without the lifespan (persistence engine is set up by _setup_auth).
+    # 不以上下文管理器方式创建客户端：那会启动依赖配置文件的完整生命周期。
+    # 认证端点无需该生命周期，因为前置夹具已经准备好了持久化引擎。
     yield TestClient(app)
 
 
 def _init_payload(**extra):
-    """Build a valid /initialize payload."""
+    """构造可通过初始化接口校验的默认管理员请求，并允许调用方覆盖字段。"""
     return {
         "email": "admin@example.com",
         "password": "Str0ng!Pass99",
@@ -64,11 +59,11 @@ def _init_payload(**extra):
     }
 
 
-# ── Happy path ────────────────────────────────────────────────────────────
+# ── 成功初始化路径 ────────────────────────────────────────────────────────
 
 
 def test_initialize_creates_admin_and_sets_cookie(client):
-    """POST /initialize when no admin exists → 201, session cookie set."""
+    """验证无管理员时初始化返回 201、管理员角色与会话凭据。"""
     resp = client.post("/api/v1/auth/initialize", json=_init_payload())
     assert resp.status_code == 201
     data = resp.json()
@@ -78,18 +73,18 @@ def test_initialize_creates_admin_and_sets_cookie(client):
 
 
 def test_initialize_needs_setup_false(client):
-    """Newly created admin via /initialize has needs_setup=False."""
+    """验证初始化创建的管理员在个人信息接口中已不需要完成设置。"""
     client.post("/api/v1/auth/initialize", json=_init_payload())
     me = client.get("/api/v1/auth/me")
     assert me.status_code == 200
     assert me.json()["needs_setup"] is False
 
 
-# ── Rejection when already initialized ───────────────────────────────────
+# ── 已初始化后的拒绝路径 ──────────────────────────────────────────────────
 
 
 def test_initialize_rejected_when_admin_exists(client):
-    """Second call to /initialize after admin exists → 409 system_already_initialized."""
+    """验证已有管理员后再次初始化返回系统已初始化的 409 错误。"""
     client.post("/api/v1/auth/initialize", json=_init_payload())
     resp2 = client.post(
         "/api/v1/auth/initialize",
@@ -101,17 +96,17 @@ def test_initialize_rejected_when_admin_exists(client):
 
 
 def test_initialize_register_does_not_block_initialization(client):
-    """/register creating a user before /initialize doesn't block admin creation."""
-    # Register a regular user first
+    """验证普通用户存在时仍可初始化首个管理员，因为只统计管理员数量。"""
+    # 先注册普通用户，验证其不会影响管理员初始化资格。
     client.post("/api/v1/auth/register", json={"email": "regular@example.com", "password": "Tr0ub4dor3a"})
-    # /initialize should still succeed (checks admin_count, not total user_count)
+    # 初始化只检查管理员数量，不检查所有用户总数，因此仍应成功。
     resp = client.post("/api/v1/auth/initialize", json=_init_payload())
     assert resp.status_code == 201
     assert resp.json()["system_role"] == "admin"
 
 
 def test_initialize_existing_regular_user_email_reports_email_conflict(client):
-    """With no admin, reusing a regular user's email is an email conflict, not initialized."""
+    """验证无管理员时复用普通用户邮箱返回邮箱冲突，而非已初始化错误。"""
     client.post("/api/v1/auth/register", json={"email": "regular@example.com", "password": "Tr0ub4dor3a"})
 
     resp = client.post(
@@ -125,11 +120,11 @@ def test_initialize_existing_regular_user_email_reports_email_conflict(client):
     assert client.get("/api/v1/auth/setup-status").json()["needs_setup"] is True
 
 
-# ── Endpoint is public (no cookie required) ───────────────────────────────
+# ── 初始化端点的匿名访问边界 ──────────────────────────────────────────────
 
 
 def test_initialize_accessible_without_cookie(client):
-    """No access_token cookie needed for /initialize."""
+    """验证请求不携带访问令牌凭据也能完成首次初始化。"""
     resp = client.post(
         "/api/v1/auth/initialize",
         json=_init_payload(),
@@ -138,11 +133,11 @@ def test_initialize_accessible_without_cookie(client):
     assert resp.status_code == 201
 
 
-# ── Password validation ───────────────────────────────────────────────────
+# ── 密码强度校验 ──────────────────────────────────────────────────────────
 
 
 def test_initialize_rejects_short_password(client):
-    """Password shorter than 8 chars → 422."""
+    """验证短于最小长度的管理员密码被接口以 422 拒绝。"""
     resp = client.post(
         "/api/v1/auth/initialize",
         json={**_init_payload(), "password": "short"},
@@ -151,7 +146,7 @@ def test_initialize_rejects_short_password(client):
 
 
 def test_initialize_rejects_common_password(client):
-    """Common password → 422."""
+    """验证常见弱密码即使长度足够也被接口以 422 拒绝。"""
     resp = client.post(
         "/api/v1/auth/initialize",
         json={**_init_payload(), "password": "password123"},
@@ -159,18 +154,18 @@ def test_initialize_rejects_common_password(client):
     assert resp.status_code == 422
 
 
-# ── setup-status reflects initialization ─────────────────────────────────
+# ── 设置状态与初始化结果一致 ──────────────────────────────────────────────
 
 
 def test_setup_status_before_initialization(client):
-    """setup-status returns needs_setup=True before /initialize is called."""
+    """验证尚未初始化时设置状态接口明确要求完成设置。"""
     resp = client.get("/api/v1/auth/setup-status")
     assert resp.status_code == 200
     assert resp.json()["needs_setup"] is True
 
 
 def test_setup_status_after_initialization(client):
-    """setup-status returns needs_setup=False after /initialize succeeds."""
+    """验证初始化成功后设置状态接口立即报告无需设置。"""
     client.post("/api/v1/auth/initialize", json=_init_payload())
     resp = client.get("/api/v1/auth/setup-status")
     assert resp.status_code == 200
@@ -178,7 +173,7 @@ def test_setup_status_after_initialization(client):
 
 
 def test_setup_status_true_when_only_regular_user_exists(client):
-    """setup-status returns needs_setup=True even when regular users exist (no admin)."""
+    """验证只有普通用户时设置状态仍要求初始化管理员。"""
     client.post("/api/v1/auth/register", json={"email": "regular@example.com", "password": "Tr0ub4dor3a"})
     resp = client.get("/api/v1/auth/setup-status")
     assert resp.status_code == 200
@@ -186,14 +181,14 @@ def test_setup_status_true_when_only_regular_user_exists(client):
 
 
 def test_setup_status_returns_cached_result_on_rapid_calls(client):
-    """Rapid /setup-status calls return the cached result (200) instead of 429."""
+    """验证短时间内重复查询复用缓存并返回相同的成功状态。"""
     client.post("/api/v1/auth/initialize", json=_init_payload())
 
-    # First call succeeds and computes the result.
+    # 首次调用计算并缓存当前设置状态。
     resp1 = client.get("/api/v1/auth/setup-status")
     assert resp1.status_code == 200
 
-    # Immediate second call returns cached result, not 429.
+    # 紧随其后的调用应命中缓存，而不是触发限流。
     resp2 = client.get("/api/v1/auth/setup-status")
     assert resp2.status_code == 200
     assert resp2.json() == resp1.json()
@@ -201,7 +196,7 @@ def test_setup_status_returns_cached_result_on_rapid_calls(client):
 
 
 def test_setup_status_does_not_return_stale_true_after_initialize(client):
-    """A pre-initialize setup-status response should not stay cached as True."""
+    """验证初始化会失效旧的需设置缓存，不会继续返回过期真值。"""
     before = client.get("/api/v1/auth/setup-status")
     assert before.status_code == 200
     assert before.json()["needs_setup"] is True
@@ -216,7 +211,7 @@ def test_setup_status_does_not_return_stale_true_after_initialize(client):
 
 @pytest.mark.asyncio
 async def test_setup_status_single_flight_per_ip(monkeypatch):
-    """Concurrent requests from same IP share one in-flight DB query."""
+    """验证同一来源地址的并发状态查询共用一次进行中的管理员计数。"""
     from starlette.requests import Request
 
     from app.gateway.routers.auth import (
@@ -226,10 +221,14 @@ async def test_setup_status_single_flight_per_ip(monkeypatch):
     )
 
     class _Provider:
+        """模拟可计数管理员并暴露调用次数的认证数据提供者。"""
+
         def __init__(self):
+            """初始化管理员计数调用次数。"""
             self.calls = 0
 
         async def count_admin_users(self):
+            """延迟返回零管理员，以便并发请求重叠并验证单飞控制。"""
             self.calls += 1
             await asyncio.sleep(0.05)
             return 0
@@ -240,6 +239,7 @@ async def test_setup_status_single_flight_per_ip(monkeypatch):
     _SETUP_STATUS_INFLIGHT.clear()
 
     def _request() -> Request:
+        """构造来自同一回环地址的设置状态请求。"""
         return Request(
             {
                 "type": "http",

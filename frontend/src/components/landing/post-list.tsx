@@ -16,6 +16,7 @@ type PostMetaProps = {
   pathname?: string;
 };
 
+/** formatDate 内部组件：组织对应的界面结构与交互语义。 */
 function formatDate(date?: string): string | null {
   if (!date) {
     return null;
@@ -33,6 +34,7 @@ function formatDate(date?: string): string | null {
   }).format(value);
 }
 
+/** PostMeta 组件：提供对应的界面结构与交互语义。 */
 export function PostMeta({
   currentLang,
   date,
@@ -79,6 +81,7 @@ export function PostMeta({
   );
 }
 
+/** PostTags 组件：提供对应的界面结构与交互语义。 */
 export function PostTags({
   tags,
   className,
@@ -114,6 +117,7 @@ export function PostTags({
   );
 }
 
+/** PostList 组件：提供对应的界面结构与交互语义。 */
 export function PostList({ description, posts, title }: PostListProps) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6">

@@ -1,3 +1,4 @@
+"""提供受忽略规则和资源上限约束的文件搜索辅助函数。"""
 import fnmatch
 import os
 import re
@@ -63,23 +64,25 @@ DEFAULT_LINE_SUMMARY_LENGTH = 200
 
 @dataclass(frozen=True)
 class GrepMatch:
+    """表示一次文本搜索命中的路径、行号和行内容。"""
     path: str
     line_number: int
     line: str
 
 
-# ``should_ignore_name`` runs once per directory entry during glob/grep tree
-# walks, so we avoid ~50 ``fnmatch`` calls per name. Most ignore patterns are
-# literal names (O(1) set lookup after normcase); the few glob patterns are
-# pre-translated into a single combined regex. ``os.path.normcase`` keeps the
-# same case behavior ``fnmatch`` applies (case-sensitive on POSIX, folded on
-# Windows).
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
 _EXACT_IGNORE_NAMES = frozenset(os.path.normcase(p) for p in IGNORE_PATTERNS if not any(c in p for c in "*?["))
 _GLOB_IGNORE_PATTERNS = [p for p in IGNORE_PATTERNS if any(c in p for c in "*?[")]
 _GLOB_IGNORE_RE = re.compile("|".join(fnmatch.translate(os.path.normcase(p)) for p in _GLOB_IGNORE_PATTERNS)) if _GLOB_IGNORE_PATTERNS else None
 
 
 def should_ignore_name(name: str) -> bool:
+    """判断名称是否匹配需要跳过的文件或目录规则。"""
     normalized = os.path.normcase(name)
     if normalized in _EXACT_IGNORE_NAMES:
         return True
@@ -87,10 +90,12 @@ def should_ignore_name(name: str) -> bool:
 
 
 def should_ignore_path(path: str) -> bool:
+    """判断路径中是否含有需要跳过的片段。"""
     return any(should_ignore_name(segment) for segment in path.replace("\\", "/").split("/") if segment)
 
 
 def path_matches(pattern: str, rel_path: str) -> bool:
+    """判断相对路径是否匹配通配模式，并兼容前导递归模式。"""
     path = PurePosixPath(rel_path)
     if path.match(pattern):
         return True
@@ -100,6 +105,7 @@ def path_matches(pattern: str, rel_path: str) -> bool:
 
 
 def truncate_line(line: str, max_chars: int = DEFAULT_LINE_SUMMARY_LENGTH) -> str:
+    """去除行尾换行符，并在超长时截断该行。"""
     line = line.rstrip("\n\r")
     if len(line) <= max_chars:
         return line
@@ -107,6 +113,7 @@ def truncate_line(line: str, max_chars: int = DEFAULT_LINE_SUMMARY_LENGTH) -> st
 
 
 def is_binary_file(path: Path, sample_size: int = 8192) -> bool:
+    """通过读取少量字节判断文件是否为二进制文件。"""
     try:
         with path.open("rb") as handle:
             return b"\0" in handle.read(sample_size)
@@ -115,6 +122,7 @@ def is_binary_file(path: Path, sample_size: int = 8192) -> bool:
 
 
 def find_glob_matches(root: Path, pattern: str, *, include_dirs: bool = False, max_results: int = 200) -> tuple[list[str], bool]:
+    """在根目录下递归查找匹配模式的文件，并按需包含目录。"""
     matches: list[str] = []
     truncated = False
     root = root.resolve()
@@ -126,8 +134,8 @@ def find_glob_matches(root: Path, pattern: str, *, include_dirs: bool = False, m
 
     for current_root, dirs, files in os.walk(root):
         dirs[:] = [name for name in dirs if not should_ignore_name(name)]
-        # root is already resolved; os.walk builds current_root by joining under root,
-        # so relative_to() works without an extra stat()/resolve() per directory.
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
         rel_dir = Path(current_root).relative_to(root)
 
         if include_dirs:
@@ -163,6 +171,7 @@ def find_grep_matches(
     max_file_size: int = DEFAULT_MAX_FILE_SIZE_BYTES,
     line_summary_length: int = DEFAULT_LINE_SUMMARY_LENGTH,
 ) -> tuple[list[GrepMatch], bool]:
+    """在根目录的可搜索文本文件中查找匹配行并限制结果规模。"""
     matches: list[GrepMatch] = []
     truncated = False
     root = root.resolve()
@@ -176,7 +185,7 @@ def find_grep_matches(
     flags = 0 if case_sensitive else re.IGNORECASE
     regex = re.compile(regex_source, flags)
 
-    # Skip lines longer than this to prevent ReDoS on minified / no-newline files.
+        # 中文说明：此处用于执行相关处理。
     _max_line_chars = line_summary_length * 10
 
     for current_root, dirs, files in os.walk(root):

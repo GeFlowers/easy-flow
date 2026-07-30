@@ -12,10 +12,12 @@ import type {
   ChannelRuntimeConfigValues,
 } from "./types";
 
+/** 拼接频道 API 的基础地址和指定子路径。 */
 function channelsUrl(path: string): string {
   return `${getBackendBaseURL()}/api/channels${path}`;
 }
 
+/** 获取全部频道提供商及其当前配置状态。 */
 export async function listChannelProviders(): Promise<ChannelProvidersResponse> {
   const response = await fetch(channelsUrl("/providers"));
   if (!response.ok) {
@@ -27,6 +29,7 @@ export async function listChannelProviders(): Promise<ChannelProvidersResponse> 
   return response.json() as Promise<ChannelProvidersResponse>;
 }
 
+/** 获取已建立的频道连接列表。 */
 export async function listChannelConnections(): Promise<ChannelConnection[]> {
   const response = await fetch(channelsUrl("/connections"));
   if (!response.ok) {
@@ -39,6 +42,7 @@ export async function listChannelConnections(): Promise<ChannelConnection[]> {
   return data.connections;
 }
 
+/** 发起指定频道提供商的连接流程。 */
 export async function connectChannelProvider(
   provider: ChannelProviderId,
 ): Promise<ChannelConnectResponse> {
@@ -55,6 +59,7 @@ export async function connectChannelProvider(
   return response.json() as Promise<ChannelConnectResponse>;
 }
 
+/** 保存指定频道提供商的运行时配置。 */
 export async function configureChannelProvider(
   provider: ChannelProviderId,
   values: ChannelRuntimeConfigValues,
@@ -76,6 +81,7 @@ export async function configureChannelProvider(
   return response.json() as Promise<ChannelProvider>;
 }
 
+/** 断开指定频道连接。 */
 export async function disconnectChannelConnection(
   connectionId: string,
 ): Promise<void> {
@@ -91,6 +97,7 @@ export async function disconnectChannelConnection(
   }
 }
 
+/** 断开指定提供商下的全部频道连接。 */
 export async function disconnectChannelProvider(
   provider: ChannelProviderId,
 ): Promise<ChannelProvider> {

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Load the Memory Settings review sample into a local DeerFlow runtime."""
+"""本脚本负责加载 内存。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -11,14 +11,17 @@ from pathlib import Path
 
 
 def default_source(repo_root: Path) -> Path:
+    '未说明'
     return repo_root / "backend" / "docs" / "memory-settings-sample.json"
 
 
 def default_target(repo_root: Path) -> Path:
+    '未说明'
     return repo_root / "backend" / ".deer-flow" / "memory.json"
 
 
 def parse_args(repo_root: Path) -> argparse.Namespace:
+    '未说明'
     parser = argparse.ArgumentParser(
         description="Copy the Memory Settings sample data into the local runtime memory file.",
     )
@@ -43,11 +46,13 @@ def parse_args(repo_root: Path) -> argparse.Namespace:
 
 
 def validate_json_file(path: Path) -> None:
+    """执行校验 JSON 文件对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     with path.open(encoding="utf-8") as handle:
         json.load(handle)
 
 
 def main() -> int:
+    '未说明'
     repo_root = Path(__file__).resolve().parents[1]
     args = parse_args(repo_root)
 

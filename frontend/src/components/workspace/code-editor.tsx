@@ -34,6 +34,7 @@ const customLightTheme = basicLightInit({
   },
 });
 
+/** 提供受控代码编辑器，负责将内容变更与语言、只读等展示约束传递给底层实例。 */
 export function CodeEditor({
   className,
   placeholder,

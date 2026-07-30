@@ -1,21 +1,19 @@
 #!/usr/bin/env bash
-# Check the Helm chart's embedded config_version is not behind config.example.yaml.
+# 检查 Helm chart 内嵌 config_version 不落后于 config.example.yaml。
 #
-# The chart's `config:` block in deploy/helm/deer-flow/values.yaml embeds a
-# config_version that must not lag config.example.yaml. A stale version is
-# silent in-cluster (the image ships no example to compare against, so
-# _check_config_version never warns) but means the chart's config is authored
-# against an older schema - so this fails the build, not a user's install.
-# config_version gates no runtime behavior; it only drives the outdated-warning,
-# so a bare version bump needs no field changes.
+# deploy/helm/deer-flow/values.yaml 的 chart `config:` 块内嵌 config_version，
+# 不得落后于 config.example.yaml。集群内的过期版本不会被发现（镜像不携带用于比较的
+# 示例文件，因此 _check_config_version 不会告警），却表示 chart 配置基于旧 schema；
+# 故在构建阶段失败，而不把问题留给用户安装时。config_version 不控制运行行为，仅驱动
+# 过期告警，所以单独提升版本无需变更字段。
 #
-# Usage:
+# 用法：
 #   scripts/check_config_version.sh
 #
-# Called by .github/workflows/chart.yaml (validate-chart, on PRs + v* tags) and
-# .github/workflows/nightly.yaml (validate-chart) so both stay in sync.
+# 由 .github/workflows/chart.yaml（PR 与 v* tag 的 validate-chart）及
+# .github/workflows/nightly.yaml（validate-chart）调用，以保持二者一致。
 #
-# Exit status is 0 when the chart is current, 1 otherwise.
+# chart 为最新时退出码为 0，否则为 1。
 
 set -uo pipefail
 

@@ -1,3 +1,4 @@
+"""管理沙箱提供者的获取、缓存、重置与关闭生命周期。"""
 import asyncio
 import threading
 from abc import ABC, abstractmethod
@@ -8,90 +9,65 @@ from deerflow.sandbox.sandbox import Sandbox
 
 
 class SandboxProvider(ABC):
-    """Abstract base class for sandbox providers"""
+    """声明创建、查找和释放沙箱的提供者接口。"""
 
     uses_thread_data_mounts: bool = False
     needs_upload_permission_adjustment: bool = True
 
     @abstractmethod
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        """Acquire a sandbox environment and return its ID.
-
-        Returns:
-            The ID of the acquired sandbox environment.
-        """
+        """获取与可选线程和用户范围关联的沙箱标识。"""
         pass
 
     async def acquire_async(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        """Acquire a sandbox without blocking the event loop.
-
-        Most sandbox providers expose a synchronous lifecycle API because local
-        Docker/provisioner operations are blocking. Async runtimes should call
-        this method so those blocking operations run in a worker thread instead
-        of stalling the event loop.
-        """
+        """以异步方式获取沙箱标识，默认在线程中调用同步实现。"""
         return await asyncio.to_thread(self.acquire, thread_id, user_id=user_id)
 
     @abstractmethod
     def get(self, sandbox_id: str) -> Sandbox | None:
-        """Get a sandbox environment by ID.
-
-        Args:
-            sandbox_id: The ID of the sandbox environment to retain.
-        """
+        """按标识返回沙箱；不存在时返回空值。"""
         pass
 
     @abstractmethod
     def release(self, sandbox_id: str) -> None:
-        """Release a sandbox environment.
-
-        Args:
-            sandbox_id: The ID of the sandbox environment to destroy.
-        """
+        """释放由标识指定的沙箱资源。"""
         pass
 
     def reset(self) -> None:
-        """Clear cached state that survives provider instance replacement."""
+        """重置提供者的可复用状态。"""
         pass
 
 
 _default_sandbox_provider: SandboxProvider | None = None
-# Guards every read and write of `_default_sandbox_provider`. The singleton is
-# reachable from more than one OS thread (e.g. the main event loop and the Feishu
-# channel thread, which runs its own loop), so a bare check-then-create can double
-# initialize the provider, and an unsynchronized reset/shutdown racing a get can
-# hand a caller `None` or a torn instance. Every access to the global below takes
-# this lock, including the read+return in `get_sandbox_provider()`.
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
 #
-# The lock guards only the reference swap. Provider callbacks (`__init__`,
-# `reset()`, `shutdown()`) and the dynamic import in `resolve_class()` run
-# *outside* the lock: they are plugin-supplied (`config.sandbox.use` resolves to
-# an arbitrary class) and may be slow or, worse, re-enter these lifecycle
-# functions. Holding a non-reentrant `threading.Lock` across them would
-# self-deadlock such a provider and would block every concurrent `get()` during a
-# slow teardown. Keeping callbacks off the lock avoids both.
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
 _provider_lock = threading.Lock()
 
 
 def get_sandbox_provider(**kwargs) -> SandboxProvider:
-    """Get the sandbox provider singleton.
-
-    Returns a cached singleton instance. Use `reset_sandbox_provider()` to clear
-    the cache, or `shutdown_sandbox_provider()` to properly shutdown and clear.
-
-    Returns:
-        A sandbox provider instance.
-    """
+    """按配置延迟创建并返回进程内共享的沙箱提供者。"""
     global _default_sandbox_provider
-    # Fast path: a single locked read so a concurrent reset/shutdown can't null
-    # the global between the check and the return.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     with _provider_lock:
         if _default_sandbox_provider is not None:
             return _default_sandbox_provider
 
-    # Cold start. Resolve + construct outside the lock: the import and the
-    # provider constructor are plugin code and must not run under a non-reentrant
-    # lock. The construction may race another caller; we reconcile under the lock.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     config = get_app_config()
     cls = resolve_class(config.sandbox.use, SandboxProvider)
     provider = cls(**kwargs)
@@ -100,36 +76,23 @@ def get_sandbox_provider(**kwargs) -> SandboxProvider:
         if _default_sandbox_provider is None:
             _default_sandbox_provider = provider
             return provider
-        # We lost the install race: another thread got there first. `winner` is
-        # read under the same lock, so it is always a live instance, never None.
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
         winner = _default_sandbox_provider
 
-    # Discard the instance we just built (outside the lock). For providers with
-    # side-effectful constructors (e.g. AioSandboxProvider starts an idle-checker
-    # thread), this tears down the orphan so it does not leak — issue #3721.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     if hasattr(provider, "shutdown"):
         provider.shutdown()
     return winner
 
 
 def reset_sandbox_provider() -> None:
-    """Reset the sandbox provider singleton.
-
-    This clears the cached instance without calling shutdown.
-    The next call to `get_sandbox_provider()` will create a new instance.
-    Useful for testing or when switching configurations.
-
-    Providers can override `reset()` to clear any module-level state they keep
-    alive across instances (for example, `LocalSandboxProvider`'s cached
-    `LocalSandbox` singleton). Without it, config/mount changes would not take
-    effect on the next acquire().
-
-    Note: If the provider has active sandboxes, they will be orphaned.
-    Use `shutdown_sandbox_provider()` for proper cleanup.
-    """
+    """清除共享提供者，并重置其内部状态以应用后续配置。"""
     global _default_sandbox_provider
-    # Detach the reference under the lock, then run the provider's `reset()`
-    # callback outside it (see the `_provider_lock` note).
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     with _provider_lock:
         provider = _default_sandbox_provider
         _default_sandbox_provider = None
@@ -138,15 +101,10 @@ def reset_sandbox_provider() -> None:
 
 
 def shutdown_sandbox_provider() -> None:
-    """Shutdown and reset the sandbox provider.
-
-    This properly shuts down the provider (releasing all sandboxes)
-    before clearing the singleton. Call this when the application
-    is shutting down or when you need to completely reset the sandbox system.
-    """
+    """清除共享提供者，并在支持时关闭其持有的资源。"""
     global _default_sandbox_provider
-    # Detach the reference under the lock, then run the (potentially slow)
-    # `shutdown()` callback outside it (see the `_provider_lock` note).
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     with _provider_lock:
         provider = _default_sandbox_provider
         _default_sandbox_provider = None
@@ -155,16 +113,7 @@ def shutdown_sandbox_provider() -> None:
 
 
 def set_sandbox_provider(provider: SandboxProvider) -> None:
-    """Set a custom sandbox provider instance.
-
-    This allows injecting a custom or mock provider for testing purposes.
-
-    Note: any previously installed provider is replaced but not shut down; the
-    caller owns the lifecycle of the instance it is overwriting.
-
-    Args:
-        provider: The SandboxProvider instance to use.
-    """
+    """显式设置进程内共享的沙箱提供者。"""
     global _default_sandbox_provider
     with _provider_lock:
         _default_sandbox_provider = provider

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils";
 
 import { Section } from "../section";
 
+/** CaseStudySection 组件：提供对应的界面结构与交互语义。 */
 export function CaseStudySection({ className }: { className?: string }) {
   const caseStudies = [
     {

@@ -1,9 +1,4 @@
-"""The /events route forwards task_id + after_seq to the store (#3779).
-
-The subtask card pages through one subagent task's persisted steps via these
-query params; this locks the wiring so a rename/typo can't silently drop them
-(which would make reload backfill fetch the whole run again, or nothing).
-"""
+"""本模块覆盖运行的行为、边界与回归场景，确保既有契约稳定。"""
 
 import hashlib
 from types import SimpleNamespace
@@ -19,22 +14,28 @@ from deerflow.runtime.journal import RunJournal
 
 @pytest.mark.anyio
 async def test_list_run_events_forwards_task_id_and_after_seq():
+    """验证运行 任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from app.gateway.routers.thread_runs import list_run_events
 
     calls: dict = {}
 
     class FakeStore:
+        """集中覆盖当前测试分支与回归边界。"""
         async def list_events(self, thread_id, run_id, *, event_types=None, task_id=None, limit=500, after_seq=None):
+            """准备可控测试资源与状态，供后续断言读取。"""
             calls.update(thread_id=thread_id, run_id=run_id, event_types=event_types, task_id=task_id, limit=limit, after_seq=after_seq)
             return [{"seq": 1, "event_type": "subagent.step"}]
 
     class FakeState:
+        """集中覆盖当前测试分支与回归边界。"""
         run_event_store = FakeStore()
 
     class FakeApp:
+        """集中覆盖当前测试分支与回归边界。"""
         state = FakeState()
 
     class FakeRequest:
+        """集中覆盖当前测试分支与回归边界。"""
         app = FakeApp()
         _deerflow_test_bypass_auth = True
 
@@ -56,7 +57,7 @@ async def test_list_run_events_forwards_task_id_and_after_seq():
 
 @pytest.mark.anyio
 async def test_effective_memory_flows_from_injection_to_the_existing_debug_api():
-    """The production run-events route is the field-level consumer for M1."""
+    """验证内存 已有 接口在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from app.gateway.routers.thread_runs import list_run_events
 
     store = MemoryRunEventStore()
@@ -76,12 +77,15 @@ async def test_effective_memory_flows_from_injection_to_the_existing_debug_api()
     await journal.flush()
 
     class FakeState:
+        """集中覆盖当前测试分支与回归边界。"""
         run_event_store = store
 
     class FakeApp:
+        """集中覆盖当前测试分支与回归边界。"""
         state = FakeState()
 
     class FakeRequest:
+        """集中覆盖当前测试分支与回归边界。"""
         app = FakeApp()
         _deerflow_test_bypass_auth = True
 

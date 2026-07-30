@@ -1,9 +1,4 @@
-"""Tests for runtime.user_context — contextvar three-state semantics.
-
-These tests opt out of the autouse contextvar fixture (added in
-commit 6) because they explicitly test the cases where the contextvar
-is set or unset.
-"""
+'未说明'
 
 from types import SimpleNamespace
 
@@ -22,13 +17,13 @@ from deerflow.runtime.user_context import (
 
 @pytest.mark.no_auto_user
 def test_default_is_none():
-    """Before any set, contextvar returns None."""
+    '未说明'
     assert get_current_user() is None
 
 
 @pytest.mark.no_auto_user
 def test_set_and_reset_roundtrip():
-    """set_current_user returns a token that reset restores."""
+    '未说明'
     user = SimpleNamespace(id="user-1")
     token = set_current_user(user)
     try:
@@ -40,7 +35,7 @@ def test_set_and_reset_roundtrip():
 
 @pytest.mark.no_auto_user
 def test_require_current_user_raises_when_unset():
-    """require_current_user raises RuntimeError if contextvar is unset."""
+    '未说明'
     assert get_current_user() is None
     with pytest.raises(RuntimeError, match="without user context"):
         require_current_user()
@@ -48,7 +43,7 @@ def test_require_current_user_raises_when_unset():
 
 @pytest.mark.no_auto_user
 def test_require_current_user_returns_user_when_set():
-    """require_current_user returns the user when contextvar is set."""
+    '未说明'
     user = SimpleNamespace(id="user-2")
     token = set_current_user(user)
     try:
@@ -59,14 +54,14 @@ def test_require_current_user_returns_user_when_set():
 
 @pytest.mark.no_auto_user
 def test_protocol_accepts_duck_typed():
-    """CurrentUser is a runtime_checkable Protocol matching any .id-bearing object."""
+    '未说明'
     user = SimpleNamespace(id="user-3")
     assert isinstance(user, CurrentUser)
 
 
 @pytest.mark.no_auto_user
 def test_protocol_rejects_no_id():
-    """Objects without .id do not satisfy CurrentUser Protocol."""
+    '未说明'
     not_a_user = SimpleNamespace(email="no-id@example.com")
     assert not isinstance(not_a_user, CurrentUser)
 
@@ -77,17 +72,19 @@ def test_protocol_rejects_no_id():
 
 
 def test_default_user_id_is_default():
+    '未说明'
     assert DEFAULT_USER_ID == "default"
 
 
 @pytest.mark.no_auto_user
 def test_effective_user_id_returns_default_when_no_user():
-    """No user in context -> fallback to DEFAULT_USER_ID."""
+    '未说明'
     assert get_effective_user_id() == "default"
 
 
 @pytest.mark.no_auto_user
 def test_effective_user_id_returns_user_id_when_set():
+    '未说明'
     user = SimpleNamespace(id="u-abc-123")
     token = set_current_user(user)
     try:
@@ -98,7 +95,7 @@ def test_effective_user_id_returns_user_id_when_set():
 
 @pytest.mark.no_auto_user
 def test_effective_user_id_coerces_to_str():
-    """User.id might be a UUID object; must come back as str."""
+    '未说明'
     import uuid
 
     uid = uuid.uuid4()

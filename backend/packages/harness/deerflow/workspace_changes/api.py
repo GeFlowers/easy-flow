@@ -1,3 +1,4 @@
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 from __future__ import annotations
 
 from typing import Any
@@ -22,6 +23,7 @@ async def get_workspace_changes_response(
     include_files: bool = True,
     include_diff: bool = True,
 ) -> dict[str, Any]:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     events = await event_store.list_events(
         thread_id,
         run_id,
@@ -48,6 +50,7 @@ async def get_workspace_changes_response(
 
 
 def _empty_response() -> dict[str, Any]:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     return {
         "available": False,
         "version": 1,
@@ -58,6 +61,7 @@ def _empty_response() -> dict[str, Any]:
 
 
 def _extract_workspace_changes_payload(event: dict[str, Any]) -> Any:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     metadata = event.get("metadata") or {}
     if isinstance(metadata, dict) and WORKSPACE_CHANGES_METADATA_KEY in metadata:
         return metadata[WORKSPACE_CHANGES_METADATA_KEY]
@@ -68,6 +72,7 @@ def _extract_workspace_changes_payload(event: dict[str, Any]) -> Any:
 
 
 def _without_diff(file: Any) -> Any:
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if not isinstance(file, dict):
         return file
     sanitized = dict(file)

@@ -1,20 +1,4 @@
-"""Build compact subagent step payloads for streaming + persistence.
-
-Issue #3779: subagent (subtask) execution steps were only visible as the
-latest streamed frame and were never persisted, so users could not review
-what tools a subagent ran or what each step produced after a reload.
-
-This module is the pure data-shaping layer. It converts a captured subagent
-message dict — the ``model_dump()`` of an ``AIMessage`` (an assistant turn:
-text + tool-call requests) or a ``ToolMessage`` (a tool's output) — into the
-small, JSON-serializable ``step`` payload that is:
-
-- streamed live inside the ``task_running`` custom event (``task_tool.py``), and
-- persisted as a ``subagent.step`` run event (``runtime/runs/worker.py``).
-
-Keeping it pure means it is unit-tested without spinning up a graph, and both
-the streaming and persistence call sites share one definition of a "step".
-"""
+"""提供子代理步骤和运行事件的构造功能。"""
 
 from __future__ import annotations
 
@@ -52,16 +36,7 @@ def capture_step_message(
     captured: list[dict[str, Any]],
     seen_ids: set[str],
 ) -> bool:
-    """Append ``message.model_dump()`` to ``captured`` if it is a new step.
-
-    A "step" is an assistant turn (``AIMessage``) or a tool result
-    (``ToolMessage``) — issue #3779 added the latter so tool outputs survive.
-    Other message types (e.g. ``HumanMessage``) are ignored. Dedup is by id
-    when present, falling back to a full-dict compare for id-less messages so
-    ``stream_mode="values"`` re-yielding the same trailing message stays O(1).
-
-    Returns ``True`` when a message was appended.
-    """
+    """处理步骤事件提取与构造，并保持既有状态语义。"""
     if not isinstance(message, (AIMessage, ToolMessage)):
         return False
 
@@ -85,36 +60,7 @@ def capture_new_step_messages(
     seen_ids: set[str],
     processed_count: int,
 ) -> int:
-    """Capture every step message appended since ``processed_count`` (#3779).
-
-    ``stream_mode="values"`` re-yields the full message history on each chunk,
-    and a single LangGraph super-step can append several messages at once — most
-    importantly one ``ToolMessage`` per tool call when the model emits multiple
-    tool calls in one turn. Capturing only ``messages[-1]`` (the previous
-    behaviour) silently dropped all but the last tool output.
-
-    When the history grew, walk every newly-appended message. When it did not
-    grow, re-examine only the trailing message so an id-less in-place replacement
-    (same length, new content) is still captured — ``capture_step_message``'s
-    dedup makes an unchanged re-yield a no-op. Returns the new cursor.
-
-    When the history *contracted* (``total < processed_count``) — which happens
-    when ``DeerFlowSummarizationMiddleware`` rewrites the channel via
-    ``RemoveMessage(id=REMOVE_ALL_MESSAGES)`` (#3875 Phase 3) — reset the cursor
-    to the new tail and let ``capture_step_message``'s id/content dedup prevent
-    re-emitting steps captured before the compaction. Without this reset, every
-    step appended after the compaction point is dropped until ``total`` overtakes
-    the stale cursor.
-
-    INVARIANT: after the reset the no-growth branch only re-examines
-    ``messages[-1]``, so a genuinely new AIMessage/ToolMessage inserted at an
-    index BELOW the reset cursor in a compacted list would be missed. This is
-    not reachable today: the summarization middleware puts the summary into a
-    separate ``summary_text`` state key, and the messages channel after
-    compaction holds only already-seen preserved tail messages — compaction
-    never inserts a NEW capturable message below the cursor. If a future
-    middleware violates this invariant, the reset branch needs a full re-scan.
-    """
+    """处理步骤事件提取与构造，并保持既有状态语义。"""
     total = len(messages)
     if total < processed_count:
         processed_count = total
@@ -128,22 +74,14 @@ def capture_new_step_messages(
 
 
 def truncate_step_text(text: str, max_chars: int) -> tuple[str, bool]:
-    """Return ``(text, truncated)``, clipping to ``max_chars`` when longer."""
+    """处理步骤事件提取与构造，并保持既有状态语义。"""
     if max_chars >= 0 and len(text) > max_chars:
         return text[:max_chars], True
     return text, False
 
 
 def _bounded_tool_call(call: dict[str, Any], max_chars: int) -> dict[str, Any]:
-    """Return ``{name, args}`` for a captured tool call, capping large args (#3779).
-
-    ``build_subagent_step`` caps the ``text`` field, but tool-call ``args`` were
-    copied verbatim, so a ``write_file``/``bash`` call carrying a big payload (full
-    file contents, a heredoc) produced an unbounded persisted ``subagent.step``
-    row and streamed frame. When the JSON-serialized args exceed ``max_chars`` we
-    replace the structured value with a truncated serialized preview and flag it
-    with ``args_truncated`` — small args stay structured for the card to inspect.
-    """
+    """处理步骤事件提取与构造，并保持既有状态语义。"""
     name = call.get("name")
     args = call.get("args")
     serialized = args if isinstance(args, str) else json.dumps(args, default=str, ensure_ascii=False)
@@ -159,14 +97,7 @@ def build_subagent_step(
     message_index: int,
     max_chars: int = SUBAGENT_STEP_MAX_CHARS,
 ) -> dict[str, Any]:
-    """Build the compact step payload from a captured subagent message dict.
-
-    ``kind`` is ``"tool"`` for a ToolMessage (``type == "tool"``) and ``"ai"``
-    otherwise. AI steps carry their ``tool_calls`` (name + args only, with large
-    args capped to ``max_chars`` — see ``_bounded_tool_call``); tool steps carry
-    the originating ``tool_name``. ``text`` is truncated to ``max_chars`` with the
-    ``truncated`` flag set accordingly.
-    """
+    """处理步骤事件提取与构造，并保持既有状态语义。"""
     kind = "tool" if message.get("type") == "tool" else "ai"
     # ``... or ""`` keeps a tool-call-only turn's content=None rendering as ""
     # (message_content_to_text would otherwise str()-ify it to "None").
@@ -189,13 +120,7 @@ def build_subagent_step(
 
 
 def subagent_run_event(chunk: Any) -> dict[str, Any] | None:
-    """Map a ``task_*`` custom stream chunk to ``RunEventStore.put`` kwargs.
-
-    Returns the ``event_type`` / ``category`` / ``content`` / ``metadata`` for a
-    persistable subagent lifecycle event, or ``None`` for any chunk that is not a
-    subagent event (so the worker only persists what it recognizes). ``thread_id``
-    / ``run_id`` are filled in by the caller.
-    """
+    """处理步骤事件提取与构造，并保持既有状态语义。"""
     if not isinstance(chunk, dict):
         return None
 

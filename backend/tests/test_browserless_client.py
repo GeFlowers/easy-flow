@@ -1,4 +1,4 @@
-"""Tests for Browserless community tools."""
+"""覆盖本模块的可回归测试，固定关键输入、失败分支与资源生命周期，避免后续改动破坏既有契约。"""
 
 import ipaddress
 from types import SimpleNamespace
@@ -11,18 +11,19 @@ from deerflow.community.browserless.browserless_client import BrowserlessClient,
 
 
 class AsyncMock(MagicMock):
-    """Mock that supports async call."""
+    """归集“异步模拟”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     async def __call__(self, *args, **kwargs):
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return super().__call__(*args, **kwargs)
 
 
 @pytest.mark.asyncio
 class TestBrowserlessClient:
-    """Tests for the BrowserlessClient class."""
+    """归集“无头浏览器客户端”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     async def test_fetch_html_success(self):
-        """fetch_html returns HTML content on success."""
+        """验证“该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -44,7 +45,7 @@ class TestBrowserlessClient:
             assert "bestAttempt" not in call_kwargs["json"]
 
     async def test_fetch_html_empty_response(self):
-        """fetch_html returns error for empty response."""
+        """验证“该项该项空值响应”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -60,7 +61,7 @@ class TestBrowserlessClient:
             assert result == "Error: Browserless returned empty response"
 
     async def test_fetch_html_http_error(self):
-        """fetch_html returns error for non-200 status."""
+        """验证“该项该项超文本传输协议错误”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -76,7 +77,7 @@ class TestBrowserlessClient:
             assert "Error: Browserless HTTP 500" in result
 
     async def test_fetch_html_timeout(self):
-        """fetch_html returns timeout error."""
+        """验证“该项该项超时”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -89,7 +90,7 @@ class TestBrowserlessClient:
             assert "timed out" in result.lower() or "timeout" in result.lower()
 
     async def test_fetch_html_with_token(self):
-        """fetch_html includes token in payload when set."""
+        """验证“该项该项使用令牌”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -107,7 +108,7 @@ class TestBrowserlessClient:
             assert payload["token"] == "my-token"
 
     async def test_fetch_html_with_wait_for_selector(self):
-        """fetch_html sends waitForSelector when selector is set."""
+        """验证“该项该项使用该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -125,7 +126,7 @@ class TestBrowserlessClient:
             assert payload["waitForSelector"]["selector"] == "article"
 
     async def test_fetch_html_with_reject_params(self):
-        """fetch_html sends reject params when set."""
+        """验证“该项该项使用该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -148,7 +149,7 @@ class TestBrowserlessClient:
             assert payload["rejectRequestPattern"] == [r"\.css$"]
 
     async def test_capture_screenshot_success(self):
-        """capture_screenshot posts to /screenshot and returns image bytes."""
+        """验证“捕获该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -199,7 +200,7 @@ class TestBrowserlessClient:
             assert payload["bestAttempt"] is True
 
     async def test_capture_screenshot_http_error(self):
-        """capture_screenshot returns a bounded error on non-200 responses."""
+        """验证“捕获该项超文本传输协议错误”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -218,7 +219,7 @@ class TestBrowserlessClient:
         assert "Internal browserless error" in result
 
     async def test_capture_screenshot_empty_response(self):
-        """capture_screenshot returns a clear error for empty binary content."""
+        """验证“捕获该项空值响应”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.browserless_client.httpx.AsyncClient") as mock_cls:
             mock_ctx = MagicMock()
             mock_cls.return_value.__aenter__.return_value = mock_ctx
@@ -238,10 +239,10 @@ class TestBrowserlessClient:
 
 @pytest.mark.asyncio
 class TestBrowserlessTools:
-    """Tests for the Browserless tool functions."""
+    """归集“无头浏览器该项”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
 
     async def test_get_browserless_client_uses_env_token_fallback(self):
-        """Browserless tools use BROWSERLESS_TOKEN when config omits token."""
+        """验证“获取无头浏览器客户端使用环境变量令牌该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.tools._get_tool_config") as mock_cfg:
             mock_cfg.return_value = {"base_url": "https://production-sfo.browserless.io"}
             with patch.dict("os.environ", {"BROWSERLESS_TOKEN": "env-token"}, clear=True):
@@ -251,7 +252,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_fetch_tool_success(self, mock_get_client):
-        """web_fetch_tool successfully fetches and extracts content."""
+        """验证“网页该项工具该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_client = MagicMock()
         mock_client.fetch_html = AsyncMock(return_value="<html><body><article><h1>Title</h1><p>Content</p></article></body></html>")
         mock_get_client.return_value = mock_client
@@ -263,7 +264,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_fetch_tool_error(self, mock_get_client):
-        """web_fetch_tool returns error when fetch fails."""
+        """验证“网页该项工具错误”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_client = MagicMock()
         mock_client.fetch_html = AsyncMock(return_value="Error: Browserless returned empty response")
         mock_get_client.return_value = mock_client
@@ -275,7 +276,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_fetch_tool_exception(self, mock_get_client):
-        """web_fetch_tool returns error when client raises exception."""
+        """验证“网页该项工具异常”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_client = MagicMock()
         mock_client.fetch_html = AsyncMock(side_effect=Exception("Unexpected error"))
         mock_get_client.return_value = mock_client
@@ -287,7 +288,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_fetch_tool_rejects_metadata_ip(self, mock_get_client):
-        """web_fetch_tool blocks the cloud-metadata link-local endpoint."""
+        """验证“网页该项工具拒绝元数据网络地址”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.tools._get_tool_config", return_value=None):
             result = await tools.web_fetch_tool.ainvoke("http://169.254.169.254/latest/meta-data/")
 
@@ -296,7 +297,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_fetch_tool_rejects_dns_resolving_to_private(self, mock_get_client):
-        """web_fetch_tool blocks hostnames that resolve to internal IPs."""
+        """验证“网页该项工具拒绝该项该项该项私有”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         with patch("deerflow.community.browserless.tools._get_tool_config", return_value=None):
             with patch(
                 "deerflow.community.browserless.tools._resolve_host_addresses",
@@ -309,7 +310,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_fetch_tool_allows_private_when_opted_in(self, mock_get_client):
-        """web_fetch_tool allows internal targets only when explicitly configured."""
+        """验证“网页该项工具允许私有当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         mock_client = MagicMock()
         mock_client.fetch_html = AsyncMock(return_value="<html><body><article><p>internal</p></article></body></html>")
         mock_get_client.return_value = mock_client
@@ -322,7 +323,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_capture_tool_writes_artifact(self, mock_get_client, tmp_path):
-        """web_capture_tool writes screenshots into thread outputs and presents the artifact."""
+        """验证“网页捕获工具该项制品”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         runtime = SimpleNamespace(state={"thread_data": {"outputs_path": str(outputs_dir)}})
@@ -383,7 +384,7 @@ class TestBrowserlessTools:
         )
 
     async def test_web_capture_tool_rejects_non_http_url(self, tmp_path):
-        """web_capture_tool only accepts explicit http(s) URLs."""
+        """验证“网页捕获工具拒绝该项超文本传输协议网址”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         runtime = SimpleNamespace(state={"thread_data": {"outputs_path": str(outputs_dir)}})
@@ -402,7 +403,7 @@ class TestBrowserlessTools:
         assert list(outputs_dir.iterdir()) == []
 
     async def test_web_capture_tool_rejects_loopback_url(self, tmp_path):
-        """web_capture_tool blocks loopback/localhost targets to prevent SSRF."""
+        """验证“网页捕获工具拒绝回环网址”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         runtime = SimpleNamespace(state={"thread_data": {"outputs_path": str(outputs_dir)}})
@@ -421,7 +422,7 @@ class TestBrowserlessTools:
         assert list(outputs_dir.iterdir()) == []
 
     async def test_web_capture_tool_rejects_metadata_ip(self, tmp_path):
-        """web_capture_tool blocks the cloud-metadata link-local endpoint."""
+        """验证“网页捕获工具拒绝元数据网络地址”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         runtime = SimpleNamespace(state={"thread_data": {"outputs_path": str(outputs_dir)}})
@@ -439,7 +440,7 @@ class TestBrowserlessTools:
         mock_get_client.assert_not_called()
 
     async def test_web_capture_tool_rejects_dns_resolving_to_private(self, tmp_path):
-        """web_capture_tool blocks a public hostname that resolves to an internal IP."""
+        """验证“网页捕获工具拒绝该项该项该项私有”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         runtime = SimpleNamespace(state={"thread_data": {"outputs_path": str(outputs_dir)}})
@@ -461,7 +462,7 @@ class TestBrowserlessTools:
         mock_get_client.assert_not_called()
 
     async def test_web_capture_tool_allows_private_when_opted_in(self, tmp_path):
-        """web_capture_tool honors allow_private_addresses for internal targets."""
+        """验证“网页捕获工具允许私有当该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         runtime = SimpleNamespace(state={"thread_data": {"outputs_path": str(outputs_dir)}})
@@ -490,7 +491,7 @@ class TestBrowserlessTools:
         mock_client.capture_screenshot.assert_called_once()
 
     async def test_web_capture_tool_warns_on_target_error_status(self, tmp_path):
-        """web_capture_tool surfaces a warning when the captured page itself errored."""
+        """验证“网页捕获工具该项该项该项错误该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         runtime = SimpleNamespace(state={"thread_data": {"outputs_path": str(outputs_dir)}})
@@ -523,7 +524,7 @@ class TestBrowserlessTools:
         assert result.update["artifacts"]
 
     async def test_web_capture_tool_dedupes_existing_filename(self, tmp_path):
-        """web_capture_tool appends a suffix instead of overwriting an existing capture."""
+        """验证“网页捕获工具该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         outputs_dir = tmp_path / "outputs"
         outputs_dir.mkdir()
         (outputs_dir / "report.png").write_bytes(b"existing")
@@ -559,7 +560,7 @@ class TestBrowserlessTools:
 
     @patch("deerflow.community.browserless.tools._get_browserless_client")
     async def test_web_capture_tool_missing_outputs_path_returns_error(self, mock_get_client):
-        """web_capture_tool requires ThreadDataMiddleware outputs_path."""
+        """验证“网页捕获工具缺失该项路径返回错误”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
         runtime = SimpleNamespace(state={"thread_data": {}})
 
         with patch("deerflow.community.browserless.tools._get_tool_config", return_value=None):

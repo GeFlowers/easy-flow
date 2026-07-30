@@ -1,19 +1,4 @@
-"""End-to-end demo: SafetyFinishReasonMiddleware on the real DeerFlow lead-agent.
-
-What it proves
---------------
-- The real ``make_lead_agent`` / ``DeerFlowClient`` pipeline is built (full
-  18-middleware chain, sandbox, tools, etc.).
-- A model that returns ``finish_reason='content_filter'`` + ``tool_calls``
-  triggers SafetyFinishReasonMiddleware.
-- LangChain's tool router never invokes ``write_file`` — the truncated
-  arguments do **not** reach the sandbox.
-- A ``safety_termination`` custom event is emitted on the stream and the
-  final AIMessage carries the observability stamp.
-
-Run from backend/ directory:
-    PYTHONPATH=. uv run python scripts/e2e_safety_termination_demo.py
-"""
+"""本脚本负责端到端。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -30,22 +15,21 @@ from langchain_core.outputs import ChatGeneration, ChatResult
 
 
 class _ContentFilteredFakeModel(BaseChatModel):
-    """First call returns finish_reason=content_filter + truncated write_file
-    tool_call. Subsequent calls return a normal stop response so the agent
-    can terminate (the middleware should make a second call unnecessary by
-    clearing tool_calls, but we keep this safety net in case loop-detection
-    or anything else triggers another model invocation)."""
+    '未说明'
 
     call_count: int = 0
 
     @property
     def _llm_type(self) -> str:
+        '未说明'
         return "fake-content-filtered"
 
     def bind_tools(self, tools, **kwargs):
+        '未说明'
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         self.call_count += 1
         if self.call_count == 1:
             msg = AIMessage(
@@ -74,6 +58,7 @@ class _ContentFilteredFakeModel(BaseChatModel):
         return ChatResult(generations=[ChatGeneration(message=msg)])
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
@@ -89,6 +74,7 @@ def main() -> int:
     # so we patch both attribute slots — the source-of-truth patch on
     # ``factory.create_chat_model`` doesn't propagate back into already-
     # imported names.
+    '未说明'
     import deerflow.agents.lead_agent.agent as lead_agent_module
     import deerflow.client as client_module
 
@@ -99,6 +85,7 @@ def main() -> int:
     }
 
     def fake_create_chat_model(*args, **kwargs):
+        '未说明'
         return fake
 
     lead_agent_module.create_chat_model = fake_create_chat_model

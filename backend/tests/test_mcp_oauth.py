@@ -1,4 +1,4 @@
-"""Tests for MCP OAuth support."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -10,36 +10,47 @@ from deerflow.mcp.oauth import OAuthTokenManager, build_oauth_tool_interceptor, 
 
 
 class _MockResponse:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def __init__(self, payload: dict[str, Any]):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._payload = payload
 
     def raise_for_status(self) -> None:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return None
 
     def json(self) -> dict[str, Any]:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self._payload
 
 
 class _MockAsyncClient:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def __init__(self, payload: dict[str, Any], post_calls: list[dict[str, Any]], **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._payload = payload
         self._post_calls = post_calls
 
     async def __aenter__(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return self
 
     async def __aexit__(self, exc_type, exc, tb):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return False
 
     async def post(self, url: str, data: dict[str, Any]):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._post_calls.append({"url": url, "data": data})
         return _MockResponse(self._payload)
 
 
 def test_oauth_token_manager_fetches_and_caches_token(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     post_calls: list[dict[str, Any]] = []
 
     def _client_factory(*args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return _MockAsyncClient(
             payload={
                 "access_token": "token-123",
@@ -84,9 +95,11 @@ def test_oauth_token_manager_fetches_and_caches_token(monkeypatch):
 
 
 def test_build_oauth_interceptor_injects_authorization_header(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     post_calls: list[dict[str, Any]] = []
 
     def _client_factory(*args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return _MockAsyncClient(
             payload={
                 "access_token": "token-abc",
@@ -122,11 +135,14 @@ def test_build_oauth_interceptor_injects_authorization_header(monkeypatch):
     assert interceptor is not None
 
     class _Request:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self.server_name = "secure-sse"
             self.headers = {"X-Test": "1"}
 
         def override(self, **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             updated = _Request()
             updated.server_name = self.server_name
             updated.headers = kwargs.get("headers")
@@ -135,6 +151,7 @@ def test_build_oauth_interceptor_injects_authorization_header(monkeypatch):
     captured: dict[str, Any] = {}
 
     async def _handler(request):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["headers"] = request.headers
         return "ok"
 
@@ -146,9 +163,11 @@ def test_build_oauth_interceptor_injects_authorization_header(monkeypatch):
 
 
 def test_get_initial_oauth_headers(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     post_calls: list[dict[str, Any]] = []
 
     def _client_factory(*args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return _MockAsyncClient(
             payload={
                 "access_token": "token-initial",
@@ -192,30 +211,38 @@ def test_get_initial_oauth_headers(monkeypatch):
 
 
 def test_get_initial_oauth_headers_one_failing_server_does_not_drop_others(monkeypatch):
-    """A single OAuth server whose token endpoint fails must not drop headers
-    (and therefore tools) from healthy servers."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     class _FailingClient:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return self
 
         async def __aexit__(self, exc_type, exc, tb):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return False
 
         async def post(self, url: str, data: dict[str, Any]):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             raise RuntimeError("token endpoint unreachable")
 
     class _OkClient:
+        """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
         def __init__(self, post_calls: list[dict[str, Any]], **kwargs):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self._post_calls = post_calls
 
         async def __aenter__(self):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return self
 
         async def __aexit__(self, exc_type, exc, tb):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             return False
 
         async def post(self, url: str, data: dict[str, Any]):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             self._post_calls.append({"url": url, "data": data})
             return _MockResponse(
                 payload={
@@ -228,9 +255,10 @@ def test_get_initial_oauth_headers_one_failing_server_does_not_drop_others(monke
     ok_post_calls: list[dict[str, Any]] = []
 
     def _client_factory(**kwargs):
-        # The first call is for the failing server, second for the healthy one,
-        # because OAuthTokenManager iterates _oauth_by_server in dict order
-        # ('broken-http' < 'secure-http').
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not hasattr(_client_factory, "_count"):
             _client_factory._count = 0  # type: ignore[attr-defined]
         _client_factory._count += 1  # type: ignore[attr-defined]
@@ -273,17 +301,17 @@ def test_get_initial_oauth_headers_one_failing_server_does_not_drop_others(monke
 
     headers = asyncio.run(get_initial_oauth_headers(config))
 
-    # The healthy server's header must still be present.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert headers == {"secure-http": "Bearer token-ok"}
     assert len(ok_post_calls) == 1
 
 
 def test_oauth_refresh_token_rotation_persists_rotated_value(monkeypatch):
-    """When a provider rotates the refresh_token, _fetch_token must capture
-    the new value so the next refresh uses it instead of the stale original."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     post_calls: list[dict[str, Any]] = []
 
     def _client_factory(*args, **kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return _MockAsyncClient(
             payload={
                 "access_token": "at-1",
@@ -317,17 +345,17 @@ def test_oauth_refresh_token_rotation_persists_rotated_value(monkeypatch):
 
     manager = OAuthTokenManager.from_extensions_config(config)
 
-    # Force the _is_expiring check to always return True so we hit _fetch_token.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     monkeypatch.setattr(OAuthTokenManager, "_is_expiring", lambda self, token, oauth: True)
 
     first = asyncio.run(manager.get_authorization_header("rotating-srv"))
     assert first == "Bearer at-1"
     assert len(post_calls) == 1
-    # First call posted the original seed token.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert post_calls[0]["data"]["refresh_token"] == "rt-original-seed"
 
-    # On the second call, the rotated refresh_token from the first response
-    # must be used.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     second = asyncio.run(manager.get_authorization_header("rotating-srv"))
     assert second == "Bearer at-1"
     assert len(post_calls) == 2

@@ -1,4 +1,4 @@
-"""WeChat channel — connects to iLink via long-polling."""
+'定义 wechat 模块提供的职责与可复用接口。\n\nWeChat channel — connects to iLink via long-polling.'
 
 from __future__ import annotations
 
@@ -31,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class MessageItemType(IntEnum):
+    '封装 MessageItemType 的状态、协作关系与公开操作'
     NONE = 0
     TEXT = 1
     IMAGE = 2
@@ -40,6 +41,7 @@ class MessageItemType(IntEnum):
 
 
 class UploadMediaType(IntEnum):
+    '封装 UploadMediaType 的状态、协作关系与公开操作'
     IMAGE = 1
     VIDEO = 2
     FILE = 3
@@ -47,9 +49,11 @@ class UploadMediaType(IntEnum):
 
 
 def _build_ilink_client_version(version: str) -> str:
+    '执行 _build_ilink_client_version 的明确职责，并返回与调用约定一致的结果'
     parts = [part.strip() for part in version.split(".")]
 
     def _part(index: int) -> int:
+        '执行 _part 的明确职责，并返回与调用约定一致的结果'
         if index >= len(parts):
             return 0
         try:
@@ -64,25 +68,30 @@ def _build_ilink_client_version(version: str) -> str:
 
 
 def _build_wechat_uin() -> str:
+    '执行 _build_wechat_uin 的明确职责，并返回与调用约定一致的结果'
     return base64.b64encode(str(secrets.randbits(32)).encode("utf-8")).decode("utf-8")
 
 
 def _md5_hex(content: bytes) -> str:
+    '执行 _md5_hex 的明确职责，并返回与调用约定一致的结果'
     return hashlib.md5(content).hexdigest()
 
 
 def _encrypted_size_for_aes_128_ecb(plaintext_size: int) -> int:
+    '执行 _encrypted_size_for_aes_128_ecb 的明确职责，并返回与调用约定一致的结果'
     if plaintext_size < 0:
         raise ValueError("plaintext_size must be non-negative")
     return ((plaintext_size // 16) + 1) * 16
 
 
 def _validate_aes_128_key(key: bytes) -> None:
+    '执行 _validate_aes_128_key 的明确职责，并返回与调用约定一致的结果'
     if len(key) != 16:
         raise ValueError("AES-128-ECB requires a 16-byte key")
 
 
 def _encrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
+    '执行 _encrypt_aes_128_ecb 的明确职责，并返回与调用约定一致的结果'
     _validate_aes_128_key(key)
     padder = padding.PKCS7(128).padder()
     padded = padder.update(content) + padder.finalize()
@@ -92,6 +101,7 @@ def _encrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
 
 
 def _decrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
+    '执行 _decrypt_aes_128_ecb 的明确职责，并返回与调用约定一致的结果'
     _validate_aes_128_key(key)
     cipher = Cipher(algorithms.AES(key), modes.ECB())
     decryptor = cipher.decryptor()
@@ -101,6 +111,7 @@ def _decrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
 
 
 def _safe_media_filename(prefix: str, extension: str, message_id: str | None = None, index: int | None = None) -> str:
+    '执行 _safe_media_filename 的明确职责，并返回与调用约定一致的结果'
     safe_ext = extension if extension.startswith(".") else f".{extension}" if extension else ""
     safe_msg = (message_id or "msg").replace("/", "_").replace("\\", "_")
     suffix = f"-{index}" if index is not None else ""
@@ -108,14 +119,17 @@ def _safe_media_filename(prefix: str, extension: str, message_id: str | None = N
 
 
 def _build_cdn_upload_url(cdn_base_url: str, upload_param: str, filekey: str) -> str:
+    '执行 _build_cdn_upload_url 的明确职责，并返回与调用约定一致的结果'
     return f"{cdn_base_url.rstrip('/')}/upload?encrypted_query_param={quote(upload_param, safe='')}&filekey={quote(filekey, safe='')}"
 
 
 def _encode_outbound_media_aes_key(aes_key: bytes) -> str:
+    '执行 _encode_outbound_media_aes_key 的明确职责，并返回与调用约定一致的结果'
     return base64.b64encode(aes_key.hex().encode("utf-8")).decode("utf-8")
 
 
 def _detect_image_extension_and_mime(content: bytes) -> tuple[str, str] | None:
+    '执行 _detect_image_extension_and_mime 的明确职责，并返回与调用约定一致的结果'
     if content.startswith(b"\x89PNG\r\n\x1a\n"):
         return ".png", "image/png"
     if content.startswith(b"\xff\xd8\xff"):
@@ -130,16 +144,7 @@ def _detect_image_extension_and_mime(content: bytes) -> tuple[str, str] | None:
 
 
 class WechatChannel(Channel):
-    """WeChat iLink bot channel using long-polling.
-
-    Configuration keys (in ``config.yaml`` under ``channels.wechat``):
-        - ``bot_token``: iLink bot token used for authenticated API calls.
-        - ``qrcode_login_enabled``: (optional) Allow first-time QR bootstrap when ``bot_token`` is missing.
-        - ``base_url``: (optional) iLink API base URL.
-        - ``allowed_users``: (optional) List of allowed iLink user IDs. Empty = allow all.
-        - ``polling_timeout``: (optional) Long-poll timeout in seconds. Default: 35.
-        - ``state_dir``: (optional) Directory used to persist the long-poll cursor.
-    """
+    '封装 WechatChannel 的状态、协作关系与公开操作。\n\nWeChat iLink bot channel using long-polling.\n\n    Configuration keys (in ``config.yaml`` under ``channels.wechat``):\n        - ``bot_token``: iLink bot token used for authenticated API calls.\n        - ``qrcode_login_enabled``: (optional) Allow first-time QR bootstrap when ``bot_token`` is missing.\n        - ``base_url``: (optional) iLink API base URL.\n        - ``allowed_users``: (optional) List of allowed iLink user IDs. Empty = allow all.\n        - ``polling_timeout``: (optional) Long-poll timeout in seconds. Default: 35.\n        - ``state_dir``: (optional) Directory used to persist the long-poll cursor.\n    '
 
     DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
     DEFAULT_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c"
@@ -219,6 +224,7 @@ class WechatChannel(Channel):
     )
 
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
+        '实现 __init__ 协议方法，保持对象交互语义一致'
         super().__init__(name="wechat", bus=bus, config=config)
         self._main_loop: asyncio.AbstractEventLoop | None = None
         self._poll_task: asyncio.Task | None = None
@@ -262,6 +268,7 @@ class WechatChannel(Channel):
         # State is loaded in start() via asyncio.to_thread instead.
 
     async def start(self) -> None:
+        '执行 start 的明确职责，并返回与调用约定一致的结果'
         if self._running:
             return
 
@@ -286,6 +293,7 @@ class WechatChannel(Channel):
         logger.info("WeChat channel started")
 
     async def stop(self) -> None:
+        '执行 stop 的明确职责，并返回与调用约定一致的结果'
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
 
@@ -304,6 +312,7 @@ class WechatChannel(Channel):
         logger.info("WeChat channel stopped")
 
     async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
+        '执行 send 的明确职责，并返回与调用约定一致的结果'
         text = msg.text.strip()
         if not text:
             return
@@ -334,6 +343,7 @@ class WechatChannel(Channel):
         client_id_prefix: str,
         max_retries: int,
     ) -> None:
+        '执行 _send_text_message 的明确职责，并返回与调用约定一致的结果'
         payload = {
             "msg": {
                 "from_user_id": "",
@@ -353,6 +363,7 @@ class WechatChannel(Channel):
         }
 
         async def send_message() -> None:
+            '执行 send_message 的明确职责，并返回与调用约定一致的结果'
             data = await self._request_json("/ilink/bot/sendmessage", payload)
             self._ensure_success(data, "sendmessage")
 
@@ -363,11 +374,13 @@ class WechatChannel(Channel):
         )
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
+        '执行 send_file 的明确职责，并返回与调用约定一致的结果'
         if attachment.is_image:
             return await self._send_image_attachment(msg, attachment)
         return await self._send_file_attachment(msg, attachment)
 
     async def _send_image_attachment(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
+        '执行 _send_image_attachment 的明确职责，并返回与调用约定一致的结果'
         if self._max_outbound_image_bytes > 0 and attachment.size > self._max_outbound_image_bytes:
             logger.warning("[WeChat] outbound image too large (%d bytes), skipping: %s", attachment.size, attachment.filename)
             return False
@@ -454,6 +467,7 @@ class WechatChannel(Channel):
             return False
 
     async def _send_file_attachment(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
+        '执行 _send_file_attachment 的明确职责，并返回与调用约定一致的结果'
         if not self._is_allowed_file_type(attachment.filename, attachment.mime_type):
             logger.warning("[WeChat] outbound file type blocked, skipping: %s (%s)", attachment.filename, attachment.mime_type)
             return False
@@ -544,6 +558,7 @@ class WechatChannel(Channel):
             return False
 
     async def _poll_loop(self) -> None:
+        '执行 _poll_loop 的明确职责，并返回与调用约定一致的结果'
         while self._running:
             try:
                 if not await self._ensure_authenticated():
@@ -595,6 +610,7 @@ class WechatChannel(Channel):
                 await asyncio.sleep(self._retry_delay)
 
     async def _handle_update(self, raw_message: Any) -> None:
+        '执行 _handle_update 的明确职责，并返回与调用约定一致的结果'
         if not isinstance(raw_message, dict):
             return
         if raw_message.get("message_type") != 1:
@@ -653,6 +669,7 @@ class WechatChannel(Channel):
         await self.bus.publish_inbound(inbound)
 
     async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
+        '执行 _attach_connection_identity 的明确职责，并返回与调用约定一致的结果'
         return await attach_connection_identity(
             inbound,
             repo=self._connection_repo,
@@ -661,6 +678,7 @@ class WechatChannel(Channel):
         )
 
     async def _bind_connection_from_connect_code(self, *, chat_id: str, context_token: str, code: str) -> bool:
+        '执行 _bind_connection_from_connect_code 的明确职责，并返回与调用约定一致的结果'
         if self._connection_repo is None or not code:
             return False
 
@@ -687,6 +705,7 @@ class WechatChannel(Channel):
         return True
 
     async def _send_connection_reply(self, chat_id: str, context_token: str, text: str) -> None:
+        '执行 _send_connection_reply 的明确职责，并返回与调用约定一致的结果'
         if not context_token:
             return
         await self._send_text_message(
@@ -698,6 +717,7 @@ class WechatChannel(Channel):
         )
 
     async def _ensure_authenticated(self) -> bool:
+        '执行 _ensure_authenticated 的明确职责，并返回与调用约定一致的结果'
         async with self._auth_lock:
             if self._bot_token:
                 return True
@@ -717,6 +737,7 @@ class WechatChannel(Channel):
             return bool(auth_state.get("bot_token"))
 
     async def _bind_via_qrcode(self) -> dict[str, Any]:
+        '执行 _bind_via_qrcode 的明确职责，并返回与调用约定一致的结果'
         qrcode_data = await self._request_public_get_json(
             "/ilink/bot/get_bot_qrcode",
             params={"bot_type": self._qrcode_bot_type},
@@ -782,6 +803,7 @@ class WechatChannel(Channel):
         raise TimeoutError("Timed out waiting for WeChat QR confirmation")
 
     async def _request_json(self, path: str, payload: dict[str, Any], *, timeout: float | None = None) -> dict[str, Any]:
+        '执行 _request_json 的明确职责，并返回与调用约定一致的结果'
         client = await self._ensure_client()
         response = await client.post(
             f"{self._base_url}{path}",
@@ -800,6 +822,7 @@ class WechatChannel(Channel):
         *,
         timeout: float | None = None,
     ) -> dict[str, Any]:
+        '执行 _request_public_get_json 的明确职责，并返回与调用约定一致的结果'
         client = await self._ensure_client()
         response = await client.get(
             f"{self._base_url}{path}",
@@ -812,12 +835,14 @@ class WechatChannel(Channel):
         return data if isinstance(data, dict) else {}
 
     async def _ensure_client(self) -> httpx.AsyncClient:
+        '执行 _ensure_client 的明确职责，并返回与调用约定一致的结果'
         if self._client is None:
             timeout = max(self._polling_timeout + 5.0, 10.0)
             self._client = httpx.AsyncClient(timeout=timeout)
         return self._client
 
     def _resolve_context_token(self, msg: OutboundMessage) -> str | None:
+        '执行 _resolve_context_token 的明确职责，并返回与调用约定一致的结果'
         metadata_token = msg.metadata.get("context_token")
         if isinstance(metadata_token, str) and metadata_token.strip():
             return metadata_token.strip()
@@ -826,16 +851,19 @@ class WechatChannel(Channel):
         return self._context_tokens_by_chat.get(msg.chat_id)
 
     def _check_user(self, user_id: str) -> bool:
+        '执行 _check_user 的明确职责，并返回与调用约定一致的结果'
         if not self._allowed_users:
             return True
         return user_id in self._allowed_users
 
     def _current_longpoll_timeout_seconds(self) -> float:
+        '执行 _current_longpoll_timeout_seconds 的明确职责，并返回与调用约定一致的结果'
         if self._respect_server_longpoll_timeout and self._server_longpoll_timeout_seconds is not None:
             return self._server_longpoll_timeout_seconds
         return self._polling_timeout
 
     def _update_longpoll_timeout(self, data: Mapping[str, Any]) -> None:
+        '执行 _update_longpoll_timeout 的明确职责，并返回与调用约定一致的结果'
         if not self._respect_server_longpoll_timeout:
             return
         raw_timeout = data.get("longpolling_timeout_ms")
@@ -850,9 +878,11 @@ class WechatChannel(Channel):
         self._server_longpoll_timeout_seconds = timeout_ms / 1000.0
 
     def _base_info(self) -> dict[str, str]:
+        '执行 _base_info 的明确职责，并返回与调用约定一致的结果'
         return {"channel_version": self._channel_version}
 
     def _common_headers(self) -> dict[str, str]:
+        '执行 _common_headers 的明确职责，并返回与调用约定一致的结果'
         headers = {
             "iLink-App-ClientVersion": _build_ilink_client_version(self._channel_version),
             "X-WECHAT-UIN": _build_wechat_uin(),
@@ -864,12 +894,14 @@ class WechatChannel(Channel):
         return headers
 
     def _public_headers(self) -> dict[str, str]:
+        '执行 _public_headers 的明确职责，并返回与调用约定一致的结果'
         return {
             "Content-Type": "application/json",
             **self._common_headers(),
         }
 
     def _auth_headers(self) -> dict[str, str]:
+        '执行 _auth_headers 的明确职责，并返回与调用约定一致的结果'
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self._bot_token}",
@@ -880,6 +912,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_cdn_full_url(media: Mapping[str, Any] | None) -> str | None:
+        '执行 _extract_cdn_full_url 的明确职责，并返回与调用约定一致的结果'
         if not isinstance(media, Mapping):
             return None
         full_url = media.get("full_url")
@@ -887,6 +920,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_upload_full_url(upload_data: Mapping[str, Any] | None) -> str | None:
+        '执行 _extract_upload_full_url 的明确职责，并返回与调用约定一致的结果'
         if not isinstance(upload_data, Mapping):
             return None
         upload_full_url = upload_data.get("upload_full_url")
@@ -894,6 +928,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_upload_param(upload_data: Mapping[str, Any] | None) -> str | None:
+        '执行 _extract_upload_param 的明确职责，并返回与调用约定一致的结果'
         if not isinstance(upload_data, Mapping):
             return None
         upload_param = upload_data.get("upload_param")
@@ -910,6 +945,7 @@ class WechatChannel(Channel):
         thumb_plaintext: bytes | None = None,
         no_need_thumb: bool = False,
     ) -> dict[str, Any]:
+        '执行 _build_upload_request 的明确职责，并返回与调用约定一致的结果'
         _validate_aes_128_key(aes_key)
         payload: dict[str, Any] = {
             "filekey": filekey,
@@ -933,6 +969,7 @@ class WechatChannel(Channel):
         return payload
 
     async def _download_cdn_bytes(self, url: str, *, timeout: float | None = None) -> bytes:
+        '执行 _download_cdn_bytes 的明确职责，并返回与调用约定一致的结果'
         client = await self._ensure_client()
         response = await client.get(url, timeout=timeout or self.DEFAULT_CDN_TIMEOUT)
         response.raise_for_status()
@@ -947,6 +984,7 @@ class WechatChannel(Channel):
         timeout: float | None = None,
         method: str = "PUT",
     ) -> str | None:
+        '执行 _upload_cdn_bytes 的明确职责，并返回与调用约定一致的结果'
         client = await self._ensure_client()
         request_kwargs = {
             "content": content,
@@ -967,6 +1005,7 @@ class WechatChannel(Channel):
         *,
         ciphertext_size: int,
     ) -> dict[str, Any]:
+        '执行 _build_outbound_image_item 的明确职责，并返回与调用约定一致的结果'
         encoded_aes_key = _encode_outbound_media_aes_key(aes_key)
         media: dict[str, Any] = {
             "aes_key": encoded_aes_key,
@@ -988,6 +1027,7 @@ class WechatChannel(Channel):
         filename: str,
         plaintext: bytes,
     ) -> dict[str, Any]:
+        '执行 _build_outbound_file_item 的明确职责，并返回与调用约定一致的结果'
         media: dict[str, Any] = {
             "aes_key": _encode_outbound_media_aes_key(aes_key),
             "encrypt_type": 1,
@@ -1003,11 +1043,13 @@ class WechatChannel(Channel):
         }
 
     def _download_dir(self) -> Path | None:
+        '执行 _download_dir 的明确职责，并返回与调用约定一致的结果'
         if not self._state_dir:
             return None
         return self._state_dir / self.DEFAULT_IMAGE_DOWNLOAD_DIRNAME
 
     async def _extract_inbound_files(self, raw_message: Mapping[str, Any]) -> list[dict[str, Any]]:
+        '执行 _extract_inbound_files 的明确职责，并返回与调用约定一致的结果'
         files: list[dict[str, Any]] = []
         item_list = raw_message.get("item_list")
         if not isinstance(item_list, list):
@@ -1029,6 +1071,7 @@ class WechatChannel(Channel):
         return files
 
     async def _extract_image_file(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
+        '执行 _extract_image_file 的明确职责，并返回与调用约定一致的结果'
         image_item = item.get("image_item")
         if not isinstance(image_item, Mapping):
             return None
@@ -1077,6 +1120,7 @@ class WechatChannel(Channel):
         }
 
     async def _extract_file_item(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
+        '执行 _extract_file_item 的明确职责，并返回与调用约定一致的结果'
         file_item = item.get("file_item")
         if not isinstance(file_item, Mapping):
             return None
@@ -1127,6 +1171,7 @@ class WechatChannel(Channel):
         }
 
     def _stage_downloaded_file(self, filename: str, content: bytes) -> Path | None:
+        '执行 _stage_downloaded_file 的明确职责，并返回与调用约定一致的结果'
         download_dir = self._download_dir()
         if download_dir is None:
             return None
@@ -1141,11 +1186,13 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _decode_base64_aes_key(value: str) -> bytes | None:
+        '执行 _decode_base64_aes_key 的明确职责，并返回与调用约定一致的结果'
         candidate = value.strip()
         if not candidate:
             return None
 
         def _normalize_decoded(decoded: bytes) -> bytes | None:
+            '执行 _normalize_decoded 的明确职责，并返回与调用约定一致的结果'
             try:
                 _validate_aes_128_key(decoded)
                 return decoded
@@ -1183,6 +1230,7 @@ class WechatChannel(Channel):
 
     @classmethod
     def _parse_aes_key_candidate(cls, value: Any, *, prefer_hex: bool) -> bytes | None:
+        '执行 _parse_aes_key_candidate 的明确职责，并返回与调用约定一致的结果'
         if isinstance(value, bytes):
             try:
                 _validate_aes_128_key(value)
@@ -1218,6 +1266,7 @@ class WechatChannel(Channel):
 
     @classmethod
     def _resolve_media_aes_key(cls, *payloads: Mapping[str, Any]) -> bytes | None:
+        '执行 _resolve_media_aes_key 的明确职责，并返回与调用约定一致的结果'
         for payload in payloads:
             if not isinstance(payload, Mapping):
                 continue
@@ -1243,7 +1292,9 @@ class WechatChannel(Channel):
         item_payload: Mapping[str, Any] | None,
         media: Mapping[str, Any] | None,
     ) -> dict[str, Any]:
+        '执行 _describe_media_key_state 的明确职责，并返回与调用约定一致的结果'
         def _interesting(mapping: Mapping[str, Any] | None) -> dict[str, Any]:
+            '执行 _interesting 的明确职责，并返回与调用约定一致的结果'
             if not isinstance(mapping, Mapping):
                 return {}
             details: dict[str, Any] = {}
@@ -1278,6 +1329,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_ref_message(raw_message: Mapping[str, Any]) -> dict[str, Any] | None:
+        '执行 _extract_ref_message 的明确职责，并返回与调用约定一致的结果'
         item_list = raw_message.get("item_list")
         if not isinstance(item_list, list):
             return None
@@ -1290,6 +1342,7 @@ class WechatChannel(Channel):
         return None
 
     def _is_allowed_file_type(self, filename: str, mime_type: str) -> bool:
+        '执行 _is_allowed_file_type 的明确职责，并返回与调用约定一致的结果'
         suffix = Path(filename).suffix.lower()
         if self._allowed_file_extensions and suffix not in self._allowed_file_extensions:
             return False
@@ -1299,6 +1352,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _normalize_inbound_filename(raw_filename: Any, *, default_prefix: str, message_id: str, index: int) -> str:
+        '执行 _normalize_inbound_filename 的明确职责，并返回与调用约定一致的结果'
         if isinstance(raw_filename, str) and raw_filename.strip():
             candidate = Path(raw_filename.strip()).name
             if candidate:
@@ -1306,6 +1360,7 @@ class WechatChannel(Channel):
         return _safe_media_filename(default_prefix, ".bin", message_id=message_id, index=index)
 
     def _ensure_success(self, data: dict[str, Any], operation: str) -> None:
+        '执行 _ensure_success 的明确职责，并返回与调用约定一致的结果'
         ret = data.get("ret", 0)
         if ret in (0, None):
             return
@@ -1314,6 +1369,7 @@ class WechatChannel(Channel):
         raise RuntimeError(f"iLink {operation} failed: ret={ret} errcode={errcode} errmsg={errmsg}")
 
     def _load_state(self) -> None:
+        '执行 _load_state 的明确职责，并返回与调用约定一致的结果'
         self._load_auth_state()
         if not self._cursor_path or not self._cursor_path.exists():
             return
@@ -1327,6 +1383,7 @@ class WechatChannel(Channel):
             self._get_updates_buf = cursor
 
     def _save_state(self) -> None:
+        '执行 _save_state 的明确职责，并返回与调用约定一致的结果'
         if not self._cursor_path:
             return
         try:
@@ -1336,6 +1393,7 @@ class WechatChannel(Channel):
             logger.warning("[WeChat] failed to persist cursor state to %s", self._cursor_path)
 
     def _load_auth_state(self) -> None:
+        '执行 _load_auth_state 的明确职责，并返回与调用约定一致的结果'
         if not self._auth_path or not self._auth_path.exists():
             return
         try:
@@ -1366,6 +1424,7 @@ class WechatChannel(Channel):
         qrcode: str | None = None,
         qrcode_img_content: str | None = None,
     ) -> dict[str, Any]:
+        '执行 _save_auth_state 的明确职责，并返回与调用约定一致的结果'
         data = dict(self._auth_state)
         data["status"] = status
         data["updated_at"] = int(time.time())
@@ -1418,6 +1477,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_text(raw_message: dict[str, Any]) -> str:
+        '执行 _extract_text 的明确职责，并返回与调用约定一致的结果'
         parts: list[str] = []
         for item in raw_message.get("item_list", []):
             if not isinstance(item, dict) or item.get("type") != int(MessageItemType.TEXT):
@@ -1432,12 +1492,14 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _resolve_state_dir(raw_state_dir: Any) -> Path | None:
+        '执行 _resolve_state_dir 的明确职责，并返回与调用约定一致的结果'
         if not isinstance(raw_state_dir, str) or not raw_state_dir.strip():
             return None
         return Path(raw_state_dir).expanduser()
 
     @staticmethod
     def _coerce_float(value: Any, default: float) -> float:
+        '执行 _coerce_float 的明确职责，并返回与调用约定一致的结果'
         try:
             return float(value)
         except (TypeError, ValueError):
@@ -1445,6 +1507,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _coerce_int(value: Any, default: int) -> int:
+        '执行 _coerce_int 的明确职责，并返回与调用约定一致的结果'
         try:
             return int(value)
         except (TypeError, ValueError):
@@ -1452,6 +1515,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _coerce_str_set(value: Any, default: frozenset[str]) -> set[str]:
+        '执行 _coerce_str_set 的明确职责，并返回与调用约定一致的结果'
         if not isinstance(value, (list, tuple, set, frozenset)):
             return set(default)
         normalized = {str(item).strip().lower() if str(item).strip().startswith(".") else f".{str(item).strip().lower()}" for item in value if str(item).strip()}

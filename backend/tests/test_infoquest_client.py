@@ -1,4 +1,4 @@
-"""Tests for InfoQuest client and tools."""
+"""验证资讯检索客户端及工具的既有行为。"""
 
 import json
 from unittest.mock import MagicMock, patch
@@ -8,16 +8,18 @@ from deerflow.community.infoquest.infoquest_client import InfoQuestClient
 
 
 class TestInfoQuestClient:
+    """覆盖资讯检索客户端及其工具的基础搜索、抓取与结果清洗场景。"""
+
     def test_infoquest_client_initialization(self):
-        """Test InfoQuestClient initialization with different parameters."""
-        # Test with default parameters
+        """验证客户端使用默认值与自定义值时正确保存各项配置。"""
+        # 使用默认参数进行测试
         client = InfoQuestClient()
         assert client.fetch_time == -1
         assert client.fetch_timeout == -1
         assert client.fetch_navigation_timeout == -1
         assert client.search_time_range == -1
 
-        # Test with custom parameters
+        # 使用自定义参数进行测试
         client = InfoQuestClient(fetch_time=10, fetch_timeout=30, fetch_navigation_timeout=60, search_time_range=24)
         assert client.fetch_time == 10
         assert client.fetch_timeout == 30
@@ -26,7 +28,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_fetch_success(self, mock_post):
-        """Test successful fetch operation."""
+        """验证抓取接口成功响应时返回读取到的网页内容。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = json.dumps({"reader_result": "<html><body>Test content</body></html>"})
@@ -44,7 +46,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_fetch_non_200_status(self, mock_post):
-        """Test fetch operation with non-200 status code."""
+        """验证抓取接口返回非 200 状态码时生成包含状态与内容的错误信息。"""
         mock_response = MagicMock()
         mock_response.status_code = 404
         mock_response.text = "Not Found"
@@ -57,7 +59,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_fetch_empty_response(self, mock_post):
-        """Test fetch operation with empty response."""
+        """验证抓取接口返回空响应时给出未找到结果的错误信息。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.text = ""
@@ -70,7 +72,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_web_search_raw_results_success(self, mock_post):
-        """Test successful web_search_raw_results operation."""
+        """验证原始网页搜索接口成功时返回包含搜索结果的数据。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_result": {"results": [{"content": {"results": {"organic": [{"title": "Test Result", "desc": "Test description", "url": "https://example.com"}]}}}], "images_results": []}}
@@ -87,7 +89,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_web_search_success(self, mock_post):
-        """Test successful web_search operation."""
+        """验证网页搜索成功时将原始结果整理为预期结构化字符串。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_result": {"results": [{"content": {"results": {"organic": [{"title": "Test Result", "desc": "Test description", "url": "https://example.com"}]}}}], "images_results": []}}
@@ -96,14 +98,14 @@ class TestInfoQuestClient:
         client = InfoQuestClient()
         result = client.web_search("test query")
 
-        # Check if result is a valid JSON string with expected content
+        # 检查结果是否为包含预期内容的有效结构化数据字符串。
         result_data = json.loads(result)
         assert len(result_data) == 1
         assert result_data[0]["title"] == "Test Result"
         assert result_data[0]["url"] == "https://example.com"
 
     def test_clean_results(self):
-        """Test clean_results method with sample raw results."""
+        """验证结果清洗方法可整理示例原始搜索结果。"""
         raw_results = [
             {
                 "content": {
@@ -125,7 +127,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.tools._get_infoquest_client")
     def test_web_search_tool(self, mock_get_client):
-        """Test web_search_tool function."""
+        """验证网页搜索工具将查询交给客户端并原样返回结果。"""
         mock_client = MagicMock()
         mock_client.web_search.return_value = json.dumps([])
         mock_get_client.return_value = mock_client
@@ -138,7 +140,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.tools._get_infoquest_client")
     def test_web_fetch_tool(self, mock_get_client):
-        """Test web_fetch_tool function."""
+        """验证网页抓取工具将客户端网页结果转换为预期文本。"""
         mock_client = MagicMock()
         mock_client.fetch.return_value = "<html><body>Test content</body></html>"
         mock_get_client.return_value = mock_client
@@ -151,13 +153,13 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.tools.get_app_config")
     def test_get_infoquest_client(self, mock_get_app_config):
-        """Test _get_infoquest_client function with config."""
+        """验证客户端工厂从工具配置读取搜索、抓取和图片搜索参数。"""
         mock_config = MagicMock()
-        # Add image_search config to the side_effect
+        # 将图片搜索配置加入模拟调用序列。
         mock_config.get_tool_config.side_effect = [
-            MagicMock(model_extra={"search_time_range": 24}),  # web_search config
-            MagicMock(model_extra={"fetch_time": 10, "timeout": 30, "navigation_timeout": 60}),  # web_fetch config
-            MagicMock(model_extra={"image_search_time_range": 7, "image_size": "l"}),  # image_search config
+            MagicMock(model_extra={"search_time_range": 24}),  # 网页搜索配置
+            MagicMock(model_extra={"fetch_time": 10, "timeout": 30, "navigation_timeout": 60}),  # 网页抓取配置
+            MagicMock(model_extra={"image_search_time_range": 7, "image_size": "l"}),  # 图片搜索配置
         ]
         mock_get_app_config.return_value = mock_config
 
@@ -172,7 +174,7 @@ class TestInfoQuestClient:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_web_search_api_error(self, mock_post):
-        """Test web_search operation with API error."""
+        """验证网页搜索接口抛出异常时返回错误信息。"""
         mock_post.side_effect = Exception("Connection error")
 
         client = InfoQuestClient()
@@ -181,7 +183,7 @@ class TestInfoQuestClient:
         assert "Error" in result
 
     def test_clean_results_with_image_search(self):
-        """Test clean_results_with_image_search method with sample raw results."""
+        """验证图片搜索结果清洗方法可提取图片地址与标题。"""
         raw_results = [{"content": {"results": {"images_results": [{"original": "https://example.com/image1.jpg", "title": "Test Image 1", "url": "https://example.com/page1"}]}}}]
         cleaned = InfoQuestClient.clean_results_with_image_search(raw_results)
 
@@ -190,14 +192,14 @@ class TestInfoQuestClient:
         assert cleaned[0]["title"] == "Test Image 1"
 
     def test_clean_results_with_image_search_empty(self):
-        """Test clean_results_with_image_search method with empty results."""
+        """验证图片搜索结果为空时清洗方法返回空列表。"""
         raw_results = [{"content": {"results": {"images_results": []}}}]
         cleaned = InfoQuestClient.clean_results_with_image_search(raw_results)
 
         assert len(cleaned) == 0
 
     def test_clean_results_with_image_search_no_images(self):
-        """Test clean_results_with_image_search method with no images_results field."""
+        """验证缺少图片结果字段时清洗方法返回空列表。"""
         raw_results = [{"content": {"results": {"organic": [{"title": "Test Page"}]}}}]
         cleaned = InfoQuestClient.clean_results_with_image_search(raw_results)
 
@@ -205,9 +207,11 @@ class TestInfoQuestClient:
 
 
 class TestImageSearch:
+    """覆盖资讯检索图片搜索接口、参数处理、错误处理及工具调用场景。"""
+
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_image_search_raw_results_success(self, mock_post):
-        """Test successful image_search_raw_results operation."""
+        """验证原始图片搜索接口成功时返回包含搜索结果的数据。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_result": {"results": [{"content": {"results": {"images_results": [{"original": "https://example.com/image1.jpg", "title": "Test Image", "url": "https://example.com/page1"}]}}}]}}
@@ -224,7 +228,7 @@ class TestImageSearch:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_image_search_raw_results_with_parameters(self, mock_post):
-        """Test image_search_raw_results with all parameters."""
+        """验证原始图片搜索接口会提交全部有效参数。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {"search_result": {"results": [{"content": {"results": {"images_results": [{"original": "https://example.com/image1.jpg"}]}}}]}}
@@ -243,14 +247,14 @@ class TestImageSearch:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_image_search_raw_results_invalid_time_range(self, mock_post):
-        """Test image_search_raw_results with invalid time_range parameter."""
+        """验证非法时间范围与图片尺寸不会写入原始图片搜索请求。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
 
         mock_response.json.return_value = {"search_result": {"results": [{"content": {"results": {"images_results": []}}}]}}
         mock_post.return_value = mock_response
 
-        # Create client with invalid time_range (should be ignored)
+        # 创建时间范围无效的客户端（应被忽略）
         client = InfoQuestClient(image_search_time_range=400, image_size="x")
         client.image_search_raw_results(
             query="test",
@@ -265,7 +269,7 @@ class TestImageSearch:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_image_search_success(self, mock_post):
-        """Test successful image_search operation."""
+        """验证图片搜索成功时将原始结果整理为预期结构化字符串。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
 
@@ -275,7 +279,7 @@ class TestImageSearch:
         client = InfoQuestClient()
         result = client.image_search("cat")
 
-        # Check if result is a valid JSON string with expected content
+        # 检查结果是否为包含预期内容的有效结构化数据字符串。
         result_data = json.loads(result)
 
         assert len(result_data) == 1
@@ -286,14 +290,14 @@ class TestImageSearch:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_image_search_with_all_parameters(self, mock_post):
-        """Test image_search with all optional parameters."""
+        """验证图片搜索会提交全部可选参数。"""
         mock_response = MagicMock()
         mock_response.status_code = 200
 
         mock_response.json.return_value = {"search_result": {"results": [{"content": {"results": {"images_results": [{"original": "https://example.com/image1.jpg"}]}}}]}}
         mock_post.return_value = mock_response
 
-        # Create client with image search parameters
+        # 创建带有图片搜索参数的客户端
         client = InfoQuestClient(image_search_time_range=7, image_size="m")
         client.image_search(query="dog", site="flickr.com", output_format="JSON")
 
@@ -306,7 +310,7 @@ class TestImageSearch:
 
     @patch("deerflow.community.infoquest.infoquest_client.requests.post")
     def test_image_search_api_error(self, mock_post):
-        """Test image_search operation with API error."""
+        """验证图片搜索接口抛出异常时返回错误信息。"""
         mock_post.side_effect = Exception("Connection error")
 
         client = InfoQuestClient()
@@ -316,33 +320,33 @@ class TestImageSearch:
 
     @patch("deerflow.community.infoquest.tools._get_infoquest_client")
     def test_image_search_tool(self, mock_get_client):
-        """Test image_search_tool function."""
+        """验证图片搜索工具将查询交给客户端并返回有效结构化结果。"""
         mock_client = MagicMock()
         mock_client.image_search.return_value = json.dumps([{"image_url": "https://example.com/image1.jpg"}])
         mock_get_client.return_value = mock_client
 
         result = tools.image_search_tool.run({"query": "test query"})
 
-        # Check if result is a valid JSON string
+        # 检查结果是否为有效结构化数据字符串。
         result_data = json.loads(result)
         assert len(result_data) == 1
         assert result_data[0]["image_url"] == "https://example.com/image1.jpg"
         mock_get_client.assert_called_once()
         mock_client.image_search.assert_called_once_with("test query")
 
-    # In /Users/bytedance/python/deer-flowv2/deer-flow/backend/tests/test_infoquest_client.py
+    # 此用例验证工具函数向客户端传递的查询参数边界。
 
     @patch("deerflow.community.infoquest.tools._get_infoquest_client")
     def test_image_search_tool_with_parameters(self, mock_get_client):
-        """Test image_search_tool function with all parameters (extra parameters will be ignored)."""
+        """验证图片搜索工具忽略额外参数，仅向客户端传递查询内容。"""
         mock_client = MagicMock()
         mock_client.image_search.return_value = json.dumps([{"image_url": "https://example.com/image1.jpg"}])
         mock_get_client.return_value = mock_client
 
-        # Pass all parameters as a dictionary (extra parameters will be ignored)
+        # 将全部参数作为字典传入（额外参数将被忽略）
         tools.image_search_tool.run({"query": "sunset", "time_range": 30, "site": "unsplash.com", "image_size": "l"})
 
         mock_get_client.assert_called_once()
-        # image_search_tool only passes query to client.image_search
-        # site parameter is empty string by default
+        # 图片搜索工具只会把查询文本传给客户端的图片搜索方法。
+        # 站点参数默认使用空字符串。
         mock_client.image_search.assert_called_once_with("sunset")

@@ -1,10 +1,10 @@
-"""Concurrency-safety tests for JsonlRunEventStore async I/O hardening (#2816).
+"""验证换行记录存储的异步输入输出加固后的并发安全性（编号二八一六）。
 
-Verifies:
-- write-lock serialises concurrent puts within the same thread_id
-- put_batch keeps monotonic seq even under concurrent callers
-- seq recovery from disk on fresh store init
-- DB put_batch rejects mixed-thread batches
+验证内容：
+- 同一线程标识内的并发写入由写锁串行化；
+- 并发调用时批量写入仍保持递增序号；
+- 新建存储实例会从磁盘恢复序号；
+- 数据库存储的批量写入拒绝混合线程批次。
 """
 
 from __future__ import annotations
@@ -18,21 +18,23 @@ import pytest
 from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
 # ---------------------------------------------------------------------------
-# Helpers
+# 辅助函数
 # ---------------------------------------------------------------------------
 
 
 def _make_store(base_dir: Path) -> JsonlRunEventStore:
+    """以指定临时目录创建存储实例，使每个测试的文件生命周期彼此隔离。"""
     return JsonlRunEventStore(base_dir=base_dir)
 
 
 # ---------------------------------------------------------------------------
-# Write-lock: per-thread lock exists and is reused
+# 写锁：每个线程拥有且复用同一把锁
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_get_write_lock_returns_asyncio_lock():
+    """确认首次请求线程写锁时创建的是异步锁实例。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         lock = store._get_write_lock("t1")
@@ -41,6 +43,7 @@ async def test_get_write_lock_returns_asyncio_lock():
 
 @pytest.mark.anyio
 async def test_get_write_lock_same_thread_reuses_lock():
+    """确认同一线程标识复用锁对象，避免并发写入绕过串行化。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         lock_a = store._get_write_lock("t1")
@@ -50,6 +53,7 @@ async def test_get_write_lock_same_thread_reuses_lock():
 
 @pytest.mark.anyio
 async def test_get_write_lock_different_threads_get_different_locks():
+    """确认不同线程标识不共享锁，从而保留跨线程并行写入能力。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         lock_a = store._get_write_lock("t1")
@@ -58,13 +62,13 @@ async def test_get_write_lock_different_threads_get_different_locks():
 
 
 # ---------------------------------------------------------------------------
-# Seq monotonicity under concurrent puts
+# 并发写入时的序号单调性
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_concurrent_puts_produce_unique_monotonic_seqs():
-    """10 concurrent puts on the same thread must yield distinct, monotonic seq values."""
+    """确认同一线程的 10 次并发写入产生互异且递增的序号。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         results = await asyncio.gather(*[store.put(thread_id="t1", run_id=f"r{i}", event_type="trace", category="trace", content=f"msg{i}") for i in range(10)])
@@ -74,7 +78,7 @@ async def test_concurrent_puts_produce_unique_monotonic_seqs():
 
 @pytest.mark.anyio
 async def test_concurrent_puts_different_threads_independent_seqs():
-    """Concurrent puts on different threads keep independent seq counters."""
+    """确认不同线程并发写入时各自维护从 1 开始的独立序号计数器。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         t1_results, t2_results = await asyncio.gather(
@@ -88,12 +92,13 @@ async def test_concurrent_puts_different_threads_independent_seqs():
 
 
 # ---------------------------------------------------------------------------
-# put_batch: delegates to put() and preserves order
+# 批量写入：委托单条写入并保持顺序
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_put_batch_seqs_are_monotonic():
+    """确认单批事件返回的序号有序且无重复，防止批量写入破坏序号契约。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         events = [{"thread_id": "t1", "run_id": "r1", "event_type": "trace", "category": "trace", "content": str(i)} for i in range(5)]
@@ -104,13 +109,13 @@ async def test_put_batch_seqs_are_monotonic():
 
 
 # ---------------------------------------------------------------------------
-# _ensure_seq_loaded: recovers max_seq from disk after fresh store init
+# 序号加载：新建存储实例后从磁盘恢复最大序号
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_ensure_seq_loaded_recovers_from_disk():
-    """A fresh JsonlRunEventStore should pick up the max seq written by a previous instance."""
+    """确认新实例接续旧实例写入的最大序号，避免重启后发生序号碰撞。"""
     with tempfile.TemporaryDirectory() as tmp:
         base = Path(tmp)
         store1 = _make_store(base)
@@ -123,17 +128,18 @@ async def test_ensure_seq_loaded_recovers_from_disk():
 
 
 # ---------------------------------------------------------------------------
-# asyncio.to_thread regression guard
+# 线程卸载回归防线
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_put_offloads_write_via_to_thread():
-    """Regression guard: put() must call asyncio.to_thread for _write_record."""
+    """回归防线：确认单条写入将文件写入交给线程卸载，避免阻塞事件循环。"""
     original = asyncio.to_thread
     calls: list[str] = []
 
     async def spy(*args, **kwargs):
+        """记录被卸载的可调用对象名称后执行原始线程卸载函数。"""
         calls.append(args[0].__name__ if callable(args[0]) else repr(args[0]))
         return await original(*args, **kwargs)
 
@@ -148,22 +154,17 @@ async def test_put_offloads_write_via_to_thread():
 
 
 # ---------------------------------------------------------------------------
-# put_batch atomicity: a failed append must not leave partial records so a
-# caller re-buffering the batch on retry does not produce duplicates.
-# Regression for deer-flow PR #4082 (review feedback from willem-bd).
+# 批量写入原子性：追加失败不能留下局部记录，以免调用方重试整批数据时产生重复。
+# 第 4082 号变更的回归测试（源自审阅反馈）。
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_put_batch_failure_rolls_back_no_partial_records(monkeypatch):
-    """If the disk write inside ``put_batch`` raises after partial output,
-    no records should remain on disk because the seq counter is reserved
-    under the write lock but the seqs were NOT written. A subsequent retry
-    therefore reproduces no duplicates.
+    """验证批量磁盘写入中途失败后重试仍不产生重复且序号保持单调。
 
-    Concretely: the implementation uses a single ``open().write()`` so on
-    failure the file is either empty or has the prior batch's records —
-    never a partial slice of the new batch.
+    该失败替身会先写入半批记录再抛出异常，用于锁定写锁内的序号预留、磁盘
+    恢复和整批重试之间的边界：失败后的重试不能将残留内容错误地重新编号。
     """
     import json
 
@@ -172,7 +173,8 @@ async def test_put_batch_failure_rolls_back_no_partial_records(monkeypatch):
     real_append = jsonl_mod.JsonlRunEventStore._append_records
 
     def failing_append(self, path, records):
-        # Write half the lines, then raise to simulate disk-full mid-batch.
+        """先追加半批换行记录再模拟磁盘写满，制造批量写入中途失败。"""
+        # 先写入半数行，再抛出异常以模拟批处理过程中磁盘写满。
         path.parent.mkdir(parents=True, exist_ok=True)
         mid = len(records) // 2
         partial = "".join(json.dumps(r, default=str, ensure_ascii=False) + "\n" for r in records[:mid])
@@ -194,35 +196,30 @@ async def test_put_batch_failure_rolls_back_no_partial_records(monkeypatch):
             }
             for i in range(4)
         ]
-        # First attempt — fails mid-batch; expect raise; the file may have
-        # partial lines but the in-memory seq counter has been advanced
-        # (because seq reservation happened under the lock).
+        # 首次尝试会中途失败；文件可能有局部行，但因锁内已预留序号，内存计数器已推进。
         with pytest.raises(OSError):
             await store.put_batch(events)
 
-        # Now retry with the real append (no failure): only the unreserved
-        # records will be written — but our implementation appends the whole
-        # batch again, so what we really verify here is that after a failure
-        # the seq counter is monotonic and consistent with the recovered
-        # disk state (no half-batch leftover gets accidentally re-numbered).
+        # 恢复真实追加函数后重试整批数据；此处锁定失败后序号与恢复的磁盘状态一致，
+        # 不会把半批残留内容意外重新编号。
         monkeypatch.setattr(jsonl_mod.JsonlRunEventStore, "_append_records", real_append)
-        # Retry the full batch — the re-buffer pattern from worker.py.
+        # 按运行器的重新缓冲模式重试完整批次。
         records = await store.put_batch(events)
 
-    # The batch succeeded on retry, every event ended up exactly once in the
-    # file (no duplicates), and seqs are still strictly monotonic.
+    # 重试成功后，每个事件恰好写入一次且序号仍严格递增。
     assert len(records) == 4, f"Expected 4 records, got {len(records)}"
     seqs = [r["seq"] for r in records]
     assert seqs == sorted(seqs) and len(set(seqs)) == 4, f"seqs not unique monotonic: {seqs}"
 
 
 # ---------------------------------------------------------------------------
-# Read methods are non-blocking (asyncio.to_thread path exercised)
+# 读取方法不会阻塞（覆盖线程卸载路径）
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_list_messages_reads_written_records():
+    """确认列出消息方法能按写入顺序读回消息记录。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message", content="hello")
@@ -235,6 +232,7 @@ async def test_list_messages_reads_written_records():
 
 @pytest.mark.anyio
 async def test_count_messages_accurate_after_concurrent_writes():
+    """确认并发写入完成后统计消息方法返回精确消息总数。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         await asyncio.gather(*[store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message") for _ in range(7)])
@@ -243,12 +241,13 @@ async def test_count_messages_accurate_after_concurrent_writes():
 
 
 # ---------------------------------------------------------------------------
-# delete_by_thread and delete_by_run use the write lock
+# 按线程删除与按运行删除使用写锁
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_delete_by_thread_clears_seq_counter_and_lock():
+    """确认删除线程会释放其序号计数器和写锁，防止已删除状态滞留内存。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         await store.put(thread_id="t1", run_id="r1", event_type="trace", category="trace")
@@ -259,6 +258,7 @@ async def test_delete_by_thread_clears_seq_counter_and_lock():
 
 @pytest.mark.anyio
 async def test_delete_by_run_removes_run_events():
+    """确认按运行删除仅移除目标运行的事件，查询结果不遗留记录。"""
     with tempfile.TemporaryDirectory() as tmp:
         store = _make_store(Path(tmp))
         await store.put(thread_id="t1", run_id="r1", event_type="trace", category="trace")
@@ -269,13 +269,13 @@ async def test_delete_by_run_removes_run_events():
 
 
 # ---------------------------------------------------------------------------
-# DB put_batch: rejects mixed-thread batches
+# 数据库批量写入：拒绝混合线程批次
 # ---------------------------------------------------------------------------
 
 
 @pytest.mark.anyio
 async def test_db_put_batch_rejects_mixed_thread_ids():
-    """DbRunEventStore.put_batch must raise ValueError for cross-thread batches."""
+    """确认数据库批量写入对跨线程批次抛出数值错误，维护批次原子边界。"""
     from unittest.mock import MagicMock
 
     from deerflow.runtime.events.store.db import DbRunEventStore

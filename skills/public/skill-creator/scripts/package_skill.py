@@ -1,13 +1,7 @@
 #!/usr/bin/env python3
-"""
-Skill Packager - Creates a distributable .skill file of a skill folder
+"""将已验证的技能目录打包为可分发的技能压缩文件。
 
-Usage:
-    python utils/package_skill.py <path/to/skill-folder> [output-directory]
-
-Example:
-    python utils/package_skill.py skills/public/my-skill
-    python utils/package_skill.py skills/public/my-skill ./dist
+打包前执行静态校验，并排除缓存、依赖、系统临时文件和技能根目录的评估数据，保留嵌套资源中的同名目录。
 """
 
 import fnmatch
@@ -16,21 +10,20 @@ import zipfile
 from pathlib import Path
 from scripts.quick_validate import validate_skill
 
-# Patterns to exclude when packaging skills.
+# 打包时排除的构建产物和临时文件模式。
 EXCLUDE_DIRS = {"__pycache__", "node_modules"}
 EXCLUDE_GLOBS = {"*.pyc"}
 EXCLUDE_FILES = {".DS_Store"}
-# Directories excluded only at the skill root (not when nested deeper).
+# 仅在技能根目录排除的文件夹；深层同名目录仍可作为资源保留。
 ROOT_EXCLUDE_DIRS = {"evals"}
 
 
 def should_exclude(rel_path: Path) -> bool:
-    """Check if a path should be excluded from packaging."""
+    """判断相对路径是否属于包外文件，保留嵌套资源中允许的同名目录。"""
     parts = rel_path.parts
     if any(part in EXCLUDE_DIRS for part in parts):
         return True
-    # rel_path is relative to skill_path.parent, so parts[0] is the skill
-    # folder name and parts[1] (if present) is the first subdir.
+    # ``rel_path`` 相对技能父目录，因此 parts[0] 是技能名，parts[1] 才是首层子目录。
     if len(parts) > 1 and parts[1] in ROOT_EXCLUDE_DIRS:
         return True
     name = rel_path.name
@@ -40,16 +33,7 @@ def should_exclude(rel_path: Path) -> bool:
 
 
 def package_skill(skill_path, output_dir=None):
-    """
-    Package a skill folder into a .skill file.
-
-    Args:
-        skill_path: Path to the skill folder
-        output_dir: Optional output directory for the .skill file (defaults to current directory)
-
-    Returns:
-        Path to the created .skill file, or None if error
-    """
+    """校验技能目录后创建压缩包；输出目录未指定时使用当前目录，任一步骤失败则返回空值。"""
     skill_path = Path(skill_path).resolve()
 
     # Validate skill folder exists
@@ -109,6 +93,7 @@ def package_skill(skill_path, output_dir=None):
 
 
 def main():
+    """读取待打包技能路径和可选输出目录，执行打包并以退出状态报告结果。"""
     if len(sys.argv) < 2:
         print("Usage: python utils/package_skill.py <path/to/skill-folder> [output-directory]")
         print("\nExample:")

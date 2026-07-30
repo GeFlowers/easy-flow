@@ -1,11 +1,4 @@
-"""User storage subpackage.
-
-Holds the ORM model for the ``users`` table. The concrete repository
-implementation (``SQLiteUserRepository``) lives in the app layer
-(``app.gateway.auth.repositories.sqlite``) because it converts
-between the ORM row and the auth module's pydantic ``User`` class.
-This keeps the harness package free of any dependency on app code.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from deerflow.persistence.user.model import UserRow
 

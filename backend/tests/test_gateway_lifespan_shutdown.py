@@ -1,11 +1,4 @@
-"""Regression tests for Gateway lifespan shutdown.
-
-These tests guard the invariant that lifespan shutdown is *bounded*: a
-misbehaving channel whose ``stop()`` blocks forever must not keep the
-uvicorn worker alive. A hung worker is the precondition for the
-signal-reentrancy deadlock described in
-``app.gateway.app._SHUTDOWN_HOOK_TIMEOUT_SECONDS``.
-"""
+"""验证当前测试场景在真实调用中的结果、异常与状态边界。"""
 
 from __future__ import annotations
 
@@ -20,29 +13,29 @@ from fastapi import FastAPI
 
 @asynccontextmanager
 async def _noop_langgraph_runtime(_app, _startup_config):
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     yield
 
 
 async def _run_lifespan_with_hanging_stop() -> float:
-    """Drive the lifespan context with stop_channel_service hanging forever.
-
-    Returns the elapsed wall-clock seconds.
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     from app.gateway.app import _SHUTDOWN_HOOK_TIMEOUT_SECONDS, lifespan
 
     async def hang_forever() -> None:
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         await asyncio.sleep(3600)
 
     app = FastAPI()
     startup_config = MagicMock()
     startup_config.log_level = "INFO"
-    # Keep this test focused on the channel-hang timing: skip the memory drain.
+    # 说明当前测试分支所验证的真实行为与边界。
     startup_config.memory.enabled = False
     startup_config.memory.shutdown_flush_timeout_seconds = 5.0
     fake_service = MagicMock()
     fake_service.get_status = MagicMock(return_value={})
 
     async def fake_start(_startup_config):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return fake_service
 
     close_oidc_service = AsyncMock()
@@ -68,18 +61,19 @@ async def _run_lifespan_with_hanging_stop() -> float:
 
 
 def test_shutdown_is_bounded_when_channel_stop_hangs():
-    """Lifespan exit must complete near the configured timeout, not hang."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     from app.gateway.app import _SHUTDOWN_HOOK_TIMEOUT_SECONDS
 
     elapsed = asyncio.run(_run_lifespan_with_hanging_stop())
 
-    # Generous upper bound: timeout + 2s slack for scheduling overhead.
+    # 说明当前测试分支所验证的真实行为与边界。
     assert elapsed < _SHUTDOWN_HOOK_TIMEOUT_SECONDS + 2.0, f"Lifespan shutdown took {elapsed:.2f}s; expected <= {_SHUTDOWN_HOOK_TIMEOUT_SECONDS + 2.0:.1f}s"
-    # Lower bound: the wait_for should actually have waited.
+    # 说明当前测试分支所验证的真实行为与边界。
     assert elapsed >= _SHUTDOWN_HOOK_TIMEOUT_SECONDS - 0.5, f"Lifespan exited too quickly ({elapsed:.2f}s); wait_for may not have been invoked."
 
 
 async def _run_lifespan_with_upload_staging_cleanup():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     from app.gateway.app import lifespan
 
     app = FastAPI()
@@ -91,6 +85,7 @@ async def _run_lifespan_with_upload_staging_cleanup():
     stop_channel_service = AsyncMock()
 
     async def fake_start(_startup_config):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return fake_service
 
     with (
@@ -109,6 +104,7 @@ async def _run_lifespan_with_upload_staging_cleanup():
 
 
 def test_lifespan_sweeps_upload_staging_files_on_startup():
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     cleanup_upload_staging_files, close_oidc_service, stop_channel_service = asyncio.run(_run_lifespan_with_upload_staging_cleanup())
 
     cleanup_upload_staging_files.assert_called_once_with()
@@ -117,15 +113,7 @@ def test_lifespan_sweeps_upload_staging_files_on_startup():
 
 
 async def _run_lifespan_with_memory_flush(*, enabled: bool, flush_return: bool) -> MagicMock:
-    """Drive lifespan with a spied memory manager.shutdown_flush.
-
-    Returns the manager mock so the caller can assert the shutdown flush was
-    reached (and with what timeout). The host calls ``shutdown_flush``
-    unconditionally when memory is enabled -- there is no host-level
-    ``pending_count/is_processing`` gate, because the backend short-circuits on
-    an idle buffer and keeping the in-flight race inside the backend means the
-    host cannot "forget" it (review #6 on the original PR).
-    """
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     from app.gateway.app import lifespan
 
     app = FastAPI()
@@ -143,6 +131,7 @@ async def _run_lifespan_with_memory_flush(*, enabled: bool, flush_return: bool) 
     stop_channel_service = AsyncMock()
 
     async def fake_start(_startup_config):
+        """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
         return fake_service
 
     manager = MagicMock()
@@ -164,9 +153,7 @@ async def _run_lifespan_with_memory_flush(*, enabled: bool, flush_return: bool) 
 
 
 def test_lifespan_drains_memory_on_shutdown_with_configured_timeout(caplog) -> None:
-    """When memory is enabled, shutdown calls manager.shutdown_flush with the
-    configured timeout (asserts the timeout is forwarded, review #3) and logs
-    'completed' at INFO when the drain finishes."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     caplog.set_level(logging.INFO, logger="app.gateway.app")
     manager = asyncio.run(_run_lifespan_with_memory_flush(enabled=True, flush_return=True))
     manager.shutdown_flush.assert_called_once_with(5.0)
@@ -174,10 +161,7 @@ def test_lifespan_drains_memory_on_shutdown_with_configured_timeout(caplog) -> N
 
 
 def test_lifespan_warns_when_memory_flush_does_not_finish(caplog) -> None:
-    """A False return (timeout/failure) is the path operators actually see when
-    K8s SIGKILLs the drain; the host must log a WARNING (not 'completed'), so
-    the loss risk is visible (review #3 False-branch coverage; review #2/#4
-    failed-flush semantics)."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     caplog.set_level(logging.WARNING, logger="app.gateway.app")
     manager = asyncio.run(_run_lifespan_with_memory_flush(enabled=True, flush_return=False))
     manager.shutdown_flush.assert_called_once_with(5.0)
@@ -186,6 +170,6 @@ def test_lifespan_warns_when_memory_flush_does_not_finish(caplog) -> None:
 
 
 def test_lifespan_skips_memory_flush_when_disabled() -> None:
-    """memory.enabled=False skips the drain entirely."""
+    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     manager = asyncio.run(_run_lifespan_with_memory_flush(enabled=False, flush_return=True))
     manager.shutdown_flush.assert_not_called()

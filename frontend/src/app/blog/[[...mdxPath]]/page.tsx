@@ -15,13 +15,16 @@ import { getI18n } from "@/core/i18n/server";
 
 import { useMDXComponents as getMDXComponents } from "../../../mdx-components";
 
+// Nextra 以未绑定方法暴露包装组件；此处仅保存组件引用。
 // eslint-disable-next-line @typescript-eslint/unbound-method
 const Wrapper = getMDXComponents().wrapper;
 
+/** 判断查询参数是否为受支持的博客语言代码。 */
 function isBlogLang(value: string): value is BlogLang {
   return BLOG_LANGS.includes(value as BlogLang);
 }
 
+/** 缓存同一路径的多语言 MDX 查询，并按首选语言选择可用版本。 */
 const loadBlogPage = cache(async function loadBlogPage(
   mdxPath: string[] | undefined,
   preferredLang?: (typeof BLOG_LANGS)[number],
@@ -30,8 +33,7 @@ const loadBlogPage = cache(async function loadBlogPage(
   const matches = await Promise.all(
     BLOG_LANGS.map(async (lang) => {
       try {
-        // Try every localized source for the same public /blog slug,
-        // then pick the best match for the current locale.
+        // 查询同一公开 slug 的全部本地化源，再按当前语言选择最佳匹配。
         const page = await importPage([...slug], lang);
         return { lang, page };
       } catch {
@@ -68,6 +70,7 @@ const loadBlogPage = cache(async function loadBlogPage(
   };
 });
 
+/** 为博客首页、标签页或 MDX 文章生成对应元数据。 */
 export async function generateMetadata(props) {
   const params = await props.params;
   const mdxPath = params.mdxPath ?? [];
@@ -95,6 +98,7 @@ export async function generateMetadata(props) {
   return page.metadata;
 }
 
+/** 根据博客路径、标签及语言偏好渲染文章列表或 MDX 正文。 */
 export default async function Page(props) {
   const params = await props.params;
   const searchParams = await props.searchParams;

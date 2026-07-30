@@ -1,4 +1,4 @@
-"""CLI entry point for deterministic skill review facts."""
+'未说明'
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from deerflow.skills.review.readers import ArchivePackageReader, LocalDirectoryR
 
 
 def main(argv: list[str] | None = None) -> int:
+    '未说明'
     parser = argparse.ArgumentParser(description="Analyze a skill package without executing it.")
     parser.add_argument("target", help="Skill directory or .skill archive to review")
     parser.add_argument("--profile", choices=["deerflow", "agentskills"], default="deerflow")
@@ -47,6 +48,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _print_text(facts: dict[str, Any]) -> None:
+    '未说明'
     subject = facts.get("subject", {})
     summary = facts.get("summary", {})
     completeness = facts.get("completeness", {})
@@ -62,6 +64,7 @@ def _print_text(facts: dict[str, Any]) -> None:
 
 
 def _exit_code(facts: dict[str, Any], fail_on: str, *, fail_on_incomplete: bool = False) -> int:
+    '未说明'
     if fail_on_incomplete and facts.get("completeness", {}).get("not_assessed"):
         return 1
     if fail_on == "never":

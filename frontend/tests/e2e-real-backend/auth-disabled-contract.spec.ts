@@ -7,6 +7,9 @@ const APP =
   `http://localhost:${process.env.E2E_FRONTEND_PORT ?? "3000"}`;
 
 test.describe("auth-disabled contract (real backend)", () => {
+  /**
+   * 覆盖“gateway /auth/me returns the frontend synthetic user without a cookie”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("gateway /auth/me returns the frontend synthetic user without a cookie", async ({
     context,
   }) => {

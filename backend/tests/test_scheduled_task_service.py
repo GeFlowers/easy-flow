@@ -1,3 +1,4 @@
+'未说明'
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -9,30 +10,37 @@ from deerflow.runtime.runs.schemas import DisconnectMode
 
 
 class DummyTaskRepo:
+    '未说明'
     def __init__(self, rows):
+        '未说明'
         self.rows = rows
         self.claimed = False
         self.updated = None
         self.cancelled_stuck_once = None
 
     async def cancel_stuck_once_tasks(self, *, error):
+        '未说明'
         self.cancelled_stuck_once = error
         return 0
 
     async def claim_due_tasks(self, **_kwargs):
+        '未说明'
         if self.claimed:
             return []
         self.claimed = True
         return self.rows
 
     async def update_after_launch(self, *args, **kwargs):
+        '未说明'
         self.updated = (args, kwargs)
 
     async def get(self, task_id: str, *, user_id: str):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         row = next((item for item in self.rows if item["id"] == task_id and item["user_id"] == user_id), None)
         return dict(row) if row is not None else None
 
     async def update(self, task_id: str, *, user_id: str, updates):
+        '未说明'
         row = next((item for item in self.rows if item["id"] == task_id and item["user_id"] == user_id), None)
         if row is None:
             return None
@@ -41,7 +49,9 @@ class DummyTaskRepo:
 
 
 class DummyRunRepo:
+    '未说明'
     def __init__(self, *, active=False, active_count=0):
+        '未说明'
         self.created = None
         self.updated = []
         self.active = active
@@ -49,26 +59,33 @@ class DummyRunRepo:
         self.stale_marked = None
 
     async def count_active_runs(self):
+        '未说明'
         return self.active_count
 
     async def create(self, **kwargs):
+        """处理创建相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.created = kwargs
         return {"id": kwargs["run_record_id"]}
 
     async def update_status(self, run_record_id, **kwargs):
+        '未说明'
         self.updated.append((run_record_id, kwargs))
 
     async def has_active_runs(self, task_id):
+        '未说明'
         return self.active
 
     async def mark_stale_active_runs(self, *, error):
+        '未说明'
         self.stale_marked = error
         return 0
 
 
 @pytest.mark.asyncio
 async def test_service_claims_and_dispatches_due_task():
+    '未说明'
     async def fake_launch(**kwargs):
+        '未说明'
         assert kwargs["owner_user_id"] == "user-1"
         assert kwargs["metadata"]["scheduled_task_id"] == "task-1"
         assert kwargs["metadata"]["scheduled_trigger"] == "scheduled"
@@ -110,7 +127,9 @@ async def test_service_claims_and_dispatches_due_task():
 
 @pytest.mark.asyncio
 async def test_manual_trigger_keeps_paused_cron_task_paused():
+    '未说明'
     async def fake_launch(**kwargs):
+        '未说明'
         return {"run_id": "run-2", "thread_id": kwargs["thread_id"]}
 
     task_repo = DummyTaskRepo(
@@ -150,7 +169,9 @@ async def test_manual_trigger_keeps_paused_cron_task_paused():
 
 @pytest.mark.asyncio
 async def test_fresh_thread_per_run_creates_new_execution_thread():
+    '未说明'
     async def fake_launch(**kwargs):
+        '未说明'
         assert kwargs["thread_id"] != "thread-template"
         return {"run_id": "run-3", "thread_id": kwargs["thread_id"]}
 
@@ -192,7 +213,9 @@ async def test_fresh_thread_per_run_creates_new_execution_thread():
 
 @pytest.mark.asyncio
 async def test_scheduled_overlap_conflict_is_recorded_as_skip():
+    '未说明'
     async def fake_launch(**_kwargs):
+        '未说明'
         raise ConflictError("Thread thread-1 already has an active run")
 
     task_repo = DummyTaskRepo(
@@ -238,7 +261,9 @@ async def test_scheduled_overlap_conflict_is_recorded_as_skip():
 
 @pytest.mark.asyncio
 async def test_manual_overlap_conflict_returns_conflict():
+    '未说明'
     async def fake_launch(**_kwargs):
+        '未说明'
         raise ConflictError("Thread thread-1 already has an active run")
 
     task_repo = DummyTaskRepo(
@@ -280,6 +305,7 @@ async def test_manual_overlap_conflict_returns_conflict():
 
 @pytest.mark.asyncio
 async def test_handle_run_completion_persists_success():
+    '未说明'
     task_repo = DummyTaskRepo(
         [
             {
@@ -327,6 +353,7 @@ async def test_handle_run_completion_persists_success():
 
 
 def _make_service(task_repo, run_repo):
+    '未说明'
     return ScheduledTaskService(
         task_repo=task_repo,
         task_run_repo=run_repo,
@@ -338,6 +365,7 @@ def _make_service(task_repo, run_repo):
 
 
 def _once_task_row(task_id="task-once", status="running"):
+    '未说明'
     return {
         "id": task_id,
         "user_id": "user-1",
@@ -353,6 +381,7 @@ def _once_task_row(task_id="task-once", status="running"):
 
 
 def _completion_record(status, *, task_id="task-once", error=None):
+    '未说明'
     return RunRecord(
         run_id="run-x",
         thread_id="thread-x",
@@ -370,6 +399,7 @@ def _completion_record(status, *, task_id="task-once", error=None):
 
 @pytest.mark.asyncio
 async def test_once_task_completes_only_via_completion_hook():
+    '未说明'
     task_repo = DummyTaskRepo([_once_task_row()])
     run_repo = DummyRunRepo()
     service = _make_service(task_repo, run_repo)
@@ -382,6 +412,7 @@ async def test_once_task_completes_only_via_completion_hook():
 
 @pytest.mark.asyncio
 async def test_once_task_failed_run_marks_task_failed():
+    '未说明'
     task_repo = DummyTaskRepo([_once_task_row()])
     run_repo = DummyRunRepo()
     service = _make_service(task_repo, run_repo)
@@ -396,6 +427,7 @@ async def test_once_task_failed_run_marks_task_failed():
 
 @pytest.mark.asyncio
 async def test_interrupted_run_is_distinct_and_cancels_once_task():
+    '未说明'
     task_repo = DummyTaskRepo([_once_task_row()])
     run_repo = DummyRunRepo()
     service = _make_service(task_repo, run_repo)
@@ -410,6 +442,7 @@ async def test_interrupted_run_is_distinct_and_cancels_once_task():
 
 @pytest.mark.asyncio
 async def test_interrupted_cron_run_keeps_task_enabled():
+    '未说明'
     row = _once_task_row(task_id="task-cron")
     row.update({"schedule_type": "cron", "schedule_spec": {"cron": "0 9 * * *"}, "status": "enabled"})
     task_repo = DummyTaskRepo([row])
@@ -424,9 +457,11 @@ async def test_interrupted_cron_run_keeps_task_enabled():
 
 @pytest.mark.asyncio
 async def test_skip_policy_applies_to_fresh_thread_runs():
+    '未说明'
     launched = []
 
     async def fake_launch(**kwargs):
+        '未说明'
         launched.append(kwargs)
         return {"run_id": "run-9", "thread_id": kwargs["thread_id"]}
 
@@ -455,6 +490,7 @@ async def test_skip_policy_applies_to_fresh_thread_runs():
 
 @pytest.mark.asyncio
 async def test_startup_sweep_reconciles_stale_runs_and_stuck_once_tasks():
+    '未说明'
     task_repo = DummyTaskRepo([])
     run_repo = DummyRunRepo()
     service = _make_service(task_repo, run_repo)
@@ -468,9 +504,11 @@ async def test_startup_sweep_reconciles_stale_runs_and_stuck_once_tasks():
 
 @pytest.mark.asyncio
 async def test_manual_trigger_with_active_run_returns_conflict_without_launching():
+    '未说明'
     launched = []
 
     async def fake_launch(**kwargs):
+        '未说明'
         launched.append(kwargs)
         return {"run_id": "run-x", "thread_id": kwargs["thread_id"]}
 
@@ -498,10 +536,13 @@ async def test_manual_trigger_with_active_run_returns_conflict_without_launching
 
 @pytest.mark.asyncio
 async def test_run_once_claims_only_into_remaining_global_budget():
+    '未说明'
     claim_limits = []
 
     class BudgetTaskRepo(DummyTaskRepo):
+        '未说明'
         async def claim_due_tasks(self, **kwargs):
+            '未说明'
             claim_limits.append(kwargs["limit"])
             return []
 
@@ -520,7 +561,9 @@ async def test_run_once_claims_only_into_remaining_global_budget():
 
 @pytest.mark.asyncio
 async def test_launch_bookkeeping_passes_protect_terminal():
+    '未说明'
     async def fake_launch(**kwargs):
+        '未说明'
         return {"run_id": "run-pt", "thread_id": kwargs["thread_id"]}
 
     task_repo = DummyTaskRepo([_once_task_row(task_id="task-pt", status="enabled")])

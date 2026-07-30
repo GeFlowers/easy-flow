@@ -29,6 +29,7 @@ import { useGlobalShortcuts } from "@/hooks/use-global-shortcuts";
 
 import { SettingsDialog } from "./settings";
 
+/** 提供可键盘访问的命令面板，用于集中执行工作区快捷操作。 */
 export function CommandPalette() {
   const { t } = useI18n();
   const router = useRouter();

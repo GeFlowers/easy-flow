@@ -5,9 +5,11 @@ const MACOS_APP_BUNDLE_CONTENT_TYPES = new Set([
   "application/octet-stream",
 ]);
 
+/** 浏览器无法直接上传苹果系统应用包目录时显示的提示文本。 */
 export const MACOS_APP_BUNDLE_UPLOAD_MESSAGE =
   "macOS .app bundles can't be uploaded directly from the browser. Compress the app as a .zip or upload the .dmg instead.";
 
+/** 判断文件是否可能是苹果系统应用包目录的占位上传项。 */
 export function isLikelyMacOSAppBundle(file: Pick<File, "name" | "type">) {
   return (
     file.name.toLowerCase().endsWith(".app") &&
@@ -15,6 +17,7 @@ export function isLikelyMacOSAppBundle(file: Pick<File, "name" | "type">) {
   );
 }
 
+/** 将待上传文件拆分为可接受与不支持的两组。 */
 export function splitUnsupportedUploadFiles(fileList: File[] | FileList) {
   const incoming = Array.from(fileList);
   const accepted: File[] = [];
@@ -35,27 +38,27 @@ export function splitUnsupportedUploadFiles(fileList: File[] | FileList) {
   };
 }
 
+/** 上传限制违反的分类编码，与网关限制字段对应。 */
 export type UploadLimitViolationCode =
   | "max_file_size"
   | "max_files"
   | "max_total_size";
 
+/** 一类上传限制违反及受影响文件。 */
 export interface UploadLimitViolation {
   code: UploadLimitViolationCode;
   files: File[];
   limit: number;
 }
 
+/** 客户端预校验后允许上传与拒绝上传的文件集合。 */
 export interface UploadLimitValidationResult {
   accepted: File[];
   rejected: File[];
   violations: UploadLimitViolation[];
 }
 
-/**
- * Validate files against the same per-request limits enforced by the gateway.
- * Existing files keep priority and incoming files are accepted in selection order.
- */
+/** 按网关强制执行的单次请求限制校验文件；既有文件优先，待选文件按选择顺序接纳。 */
 export function validateUploadLimits(
   existingFiles: File[],
   incomingFiles: File[] | FileList,
@@ -117,6 +120,7 @@ export function validateUploadLimits(
   };
 }
 
+/** 将字节数格式化为适合上传提示展示的容量文本。 */
 export function formatUploadSize(bytes: number): string {
   if (bytes < 1024) {
     return `${bytes} B`;

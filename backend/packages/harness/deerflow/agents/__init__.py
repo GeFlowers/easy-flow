@@ -1,3 +1,5 @@
+"""提供代理构建、功能配置和状态类型的延迟导出入口。"""
+
 from .features import Next, Prev, RuntimeFeatures
 
 __all__ = [
@@ -12,6 +14,11 @@ __all__ = [
 
 
 def __getattr__(name: str):
+    """按需导入公开符号，避免包导入时初始化完整代理依赖图。
+
+    访问主代理工厂时会预热已启用技能缓存；未知名称遵循模块属性协议抛出
+    ``AttributeError``。
+    """
     if name == "create_deerflow_agent":
         from .factory import create_deerflow_agent
 

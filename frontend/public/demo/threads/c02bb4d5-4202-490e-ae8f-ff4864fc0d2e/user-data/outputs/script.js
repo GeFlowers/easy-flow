@@ -1,22 +1,25 @@
-// Pride and Prejudice - Interactive Features
+// 《傲慢与偏见》交互功能
 
 document.addEventListener("DOMContentLoaded", () => {
-  // Navigation scroll effect
+  // 导航栏滚动效果
   initNavigation();
 
-  // Quotes slider
+  // 引言轮播器
   initQuotesSlider();
 
-  // Scroll reveal animations
+  // 滚动显现动画
   initScrollReveal();
 
-  // Smooth scroll for anchor links
+  // 锚点链接平滑滚动
   initSmoothScroll();
 });
 
 // ============================================
-// NAVIGATION SCROLL EFFECT
+// 导航栏滚动效果
 // ============================================
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initNavigation 的约定。
+ */
 function initNavigation() {
   const nav = document.querySelector(".nav");
   let lastScroll = 0;
@@ -24,7 +27,7 @@ function initNavigation() {
   window.addEventListener("scroll", () => {
     const currentScroll = window.pageYOffset;
 
-    // Add/remove scrolled class
+    // 添加或移除 scrolled 类
     if (currentScroll > 100) {
       nav.classList.add("scrolled");
     } else {
@@ -36,32 +39,45 @@ function initNavigation() {
 }
 
 // ============================================
-// QUOTES SLIDER
+// 引言轮播器
 // ============================================
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initQuotesSlider 的约定。
+ */
 function initQuotesSlider() {
   const quotes = document.querySelectorAll(".quote-card");
   const dots = document.querySelectorAll(".quote-dot");
   let currentIndex = 0;
   let autoSlideInterval;
 
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 showQuote 的约定。
+
+   */
+
   function showQuote(index) {
-    // Remove active class from all quotes and dots
+    // 移除全部引言和圆点的 active 类
     quotes.forEach((quote) => quote.classList.remove("active"));
     dots.forEach((dot) => dot.classList.remove("active"));
 
-    // Add active class to current quote and dot
+    // 为当前引言和圆点添加 active 类
     quotes[index].classList.add("active");
     dots[index].classList.add("active");
 
     currentIndex = index;
   }
 
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 nextQuote 的约定。
+
+   */
+
   function nextQuote() {
     const nextIndex = (currentIndex + 1) % quotes.length;
     showQuote(nextIndex);
   }
 
-  // Dot click handlers
+  // 圆点点击处理器
   dots.forEach((dot, index) => {
     dot.addEventListener("click", () => {
       showQuote(index);
@@ -69,28 +85,39 @@ function initQuotesSlider() {
     });
   });
 
-  // Auto-slide functionality
+  // 自动轮播功能
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 startAutoSlide 的约定。
+   */
   function startAutoSlide() {
     autoSlideInterval = setInterval(nextQuote, 6000);
   }
+
+  /**
+   * 封装测试或脚本中的可复用操作，使调用处能够明确复用 resetAutoSlide 的约定。
+
+   */
 
   function resetAutoSlide() {
     clearInterval(autoSlideInterval);
     startAutoSlide();
   }
 
-  // Start auto-slide
+  // 启动自动轮播
   startAutoSlide();
 
-  // Pause on hover
+  // 悬停时暂停
   const slider = document.querySelector(".quotes-slider");
   slider.addEventListener("mouseenter", () => clearInterval(autoSlideInterval));
   slider.addEventListener("mouseleave", startAutoSlide);
 }
 
 // ============================================
-// SCROLL REVEAL ANIMATIONS
+// 滚动显现动画
 // ============================================
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initScrollReveal 的约定。
+ */
 function initScrollReveal() {
   const revealElements = document.querySelectorAll(
     ".about-content, .character-card, .theme-item, .section-header",
@@ -104,7 +131,7 @@ function initScrollReveal() {
   const revealObserver = new IntersectionObserver((entries) => {
     entries.forEach((entry, index) => {
       if (entry.isIntersecting) {
-        // Add staggered delay for grid items
+        // 为网格项添加错峰延迟
         const delay =
           entry.target.classList.contains("character-card") ||
           entry.target.classList.contains("theme-item")
@@ -132,8 +159,11 @@ function initScrollReveal() {
 }
 
 // ============================================
-// SMOOTH SCROLL FOR ANCHOR LINKS
+// 锚点链接平滑滚动
 // ============================================
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 initSmoothScroll 的约定。
+ */
 function initSmoothScroll() {
   document.querySelectorAll('a[href^="#"]').forEach((anchor) => {
     anchor.addEventListener("click", function (e) {
@@ -155,7 +185,7 @@ function initSmoothScroll() {
 }
 
 // ============================================
-// PARALLAX EFFECT FOR HERO
+// 首屏视差效果
 // ============================================
 window.addEventListener("scroll", () => {
   const scrolled = window.pageYOffset;
@@ -167,7 +197,7 @@ window.addEventListener("scroll", () => {
 });
 
 // ============================================
-// CHARACTER CARD HOVER EFFECT
+// 角色卡片悬停效果
 // ============================================
 document.querySelectorAll(".character-card").forEach((card) => {
   card.addEventListener("mouseenter", function () {

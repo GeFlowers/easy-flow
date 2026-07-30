@@ -1,4 +1,4 @@
-"""Regression tests for docker sandbox mode detection logic."""
+'定义 test_docker_sandbox_mode_detection 模块提供的职责与可复用接口。\n\nRegression tests for docker sandbox mode detection logic.'
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ if BASH_EXECUTABLE is None:
 
 
 def _detect_mode_with_config(config_content: str) -> str:
-    """Write config content into a temp project root and execute detect_sandbox_mode."""
+    '执行 _detect_mode_with_config 的明确职责，并返回与调用约定一致的结果。\n\nWrite config content into a temp project root and execute detect_sandbox_mode.'
     with tempfile.TemporaryDirectory() as tmpdir:
         tmp_root = Path(tmpdir)
         (tmp_root / "config.yaml").write_text(config_content, encoding="utf-8")
@@ -42,7 +42,7 @@ def _detect_mode_with_config(config_content: str) -> str:
 
 
 def test_detect_mode_defaults_to_local_when_config_missing():
-    """No config file should default to local mode."""
+    '验证 detect、mode、defaults、to、local、when、config、missing 场景下的预期行为、边界条件与结果。\n\nNo config file should default to local mode.'
     with tempfile.TemporaryDirectory() as tmpdir:
         command = f"source '{SCRIPT_PATH}' && PROJECT_ROOT='{tmpdir}' && detect_sandbox_mode"
         output = subprocess.check_output(
@@ -55,7 +55,7 @@ def test_detect_mode_defaults_to_local_when_config_missing():
 
 
 def test_detect_mode_local_provider():
-    """Local sandbox provider should map to local mode."""
+    '验证 detect、mode、local、provider 场景下的预期行为、边界条件与结果。\n\nLocal sandbox provider should map to local mode.'
     config = """
 sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
@@ -65,7 +65,7 @@ sandbox:
 
 
 def test_detect_mode_aio_without_provisioner_url():
-    """AIO sandbox without provisioner_url should map to aio mode."""
+    '验证 detect、mode、aio、without、provisioner、url 场景下的预期行为、边界条件与结果。\n\nAIO sandbox without provisioner_url should map to aio mode.'
     config = """
 sandbox:
   use: deerflow.community.aio_sandbox:AioSandboxProvider
@@ -75,7 +75,7 @@ sandbox:
 
 
 def test_detect_mode_provisioner_with_url():
-    """AIO sandbox with provisioner_url should map to provisioner mode."""
+    '验证 detect、mode、provisioner、with、url 场景下的预期行为、边界条件与结果。\n\nAIO sandbox with provisioner_url should map to provisioner mode.'
     config = """
 sandbox:
   use: deerflow.community.aio_sandbox:AioSandboxProvider
@@ -86,7 +86,7 @@ sandbox:
 
 
 def test_detect_mode_ignores_commented_provisioner_url():
-    """Commented provisioner_url should not activate provisioner mode."""
+    '验证 detect、mode、ignores、commented、provisioner、url 场景下的预期行为、边界条件与结果。\n\nCommented provisioner_url should not activate provisioner mode.'
     config = """
 sandbox:
   use: deerflow.community.aio_sandbox:AioSandboxProvider
@@ -97,7 +97,7 @@ sandbox:
 
 
 def test_detect_mode_unknown_provider_falls_back_to_local():
-    """Unknown sandbox provider should default to local mode."""
+    '验证 detect、mode、unknown、provider、falls、back、to、local 场景下的预期行为、边界条件与结果。\n\nUnknown sandbox provider should default to local mode.'
     config = """
 sandbox:
   use: custom.module:UnknownProvider

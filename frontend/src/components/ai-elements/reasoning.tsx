@@ -24,6 +24,7 @@ type ReasoningContextValue = {
 
 const ReasoningContext = createContext<ReasoningContextValue | null>(null);
 
+/** useReasoning Hook：封装相关状态与交互逻辑。 */
 export const useReasoning = () => {
   const context = useContext(ReasoningContext);
   if (!context) {
@@ -32,6 +33,7 @@ export const useReasoning = () => {
   return context;
 };
 
+/** ReasoningProps 的公开类型定义。 */
 export type ReasoningProps = ComponentProps<typeof Collapsible> & {
   isStreaming?: boolean;
   open?: boolean;
@@ -45,6 +47,7 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
 const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
 
+/** Reasoning 组件：提供对应的界面结构与交互语义。 */
 export const Reasoning = memo(
   ({
     className,
@@ -74,10 +77,10 @@ export const Reasoning = memo(
       () => startTimeProp ?? (isStreaming ? Date.now() : null),
     );
 
-    // Track duration when streaming starts and ends
+    // 在流式输出开始与结束时记录持续时间。
     useEffect(() => {
       if (isStreaming) {
-        // Force sync the start time with the Turn start time if provided
+        // 若提供轮次开始时间，则强制与其对齐。
         if (startTimeProp != null && startTime !== startTimeProp) {
           setStartTime(startTimeProp);
         } else if (startTimeProp == null && startTime === null) {
@@ -89,10 +92,10 @@ export const Reasoning = memo(
       }
     }, [isStreaming, startTimeProp, startTime, setDuration]);
 
-    // Auto-open when streaming starts, auto-close when streaming ends (once only)
+    // 流式输出开始时自动展开，结束时仅自动收起一次。
     useEffect(() => {
       if (defaultOpen && !isStreaming && isOpen && !hasAutoClosed) {
-        // Add a small delay before closing to allow user to see the content
+        // 收起前短暂延迟，让用户能看到刚完成的内容。
         const timer = setTimeout(() => {
           setIsOpen(false);
           setHasAutoClosed(true);
@@ -123,6 +126,7 @@ export const Reasoning = memo(
   },
 );
 
+/** ReasoningTriggerProps 的公开类型定义。 */
 export type ReasoningTriggerProps = ComponentProps<
   typeof CollapsibleTrigger
 > & {
@@ -134,6 +138,7 @@ export type ReasoningTriggerProps = ComponentProps<
   hasContent?: boolean;
 };
 
+/** LiveTimer 内部组件：组织对应的界面结构与交互语义。 */
 const LiveTimer = ({ startTime }: { startTime: number }) => {
   const [elapsed, setElapsed] = useState(0);
 
@@ -173,6 +178,7 @@ const defaultGetThinkingMessage = (
   return <span>Thought for {duration} seconds</span>;
 };
 
+/** ReasoningTrigger 组件：提供对应的界面结构与交互语义。 */
 export const ReasoningTrigger = memo(
   ({
     className,
@@ -211,12 +217,14 @@ export const ReasoningTrigger = memo(
   },
 );
 
+/** ReasoningContentProps 的公开类型定义。 */
 export type ReasoningContentProps = ComponentProps<
   typeof CollapsibleContent
 > & {
   children: string;
 };
 
+/** ReasoningContent 组件：提供对应的界面结构与交互语义。 */
 export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent

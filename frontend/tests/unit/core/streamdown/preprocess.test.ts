@@ -9,15 +9,30 @@ import {
   preprocessStreamdownMarkdown,
 } from "@/core/streamdown/preprocess";
 
+/**
+ * 覆盖“capBlockquoteNesting returns normal content unchanged”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("capBlockquoteNesting returns normal content unchanged", () => {
   const input = "# Title\n\n> a quote\n>> nested\n\nsome `code`";
   expect(capBlockquoteNesting(input)).toBe(input);
 });
 
+/**
+ * 覆盖“capBlockquoteNesting keeps nesting at or below the cap untouched”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("capBlockquoteNesting keeps nesting at or below the cap untouched", () => {
   const input = "> ".repeat(100) + "hi";
   expect(capBlockquoteNesting(input)).toBe(input);
 });
+
+/**
+ * 覆盖“capBlockquoteNesting caps pathological nesting and preserves content”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("capBlockquoteNesting caps pathological nesting and preserves content", () => {
   const result = capBlockquoteNesting("> ".repeat(5000) + "hi");
@@ -25,11 +40,21 @@ test("capBlockquoteNesting caps pathological nesting and preserves content", () 
   expect(result.endsWith("hi")).toBe(true);
 });
 
+/**
+ * 覆盖“capBlockquoteNesting handles markers without spaces”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("capBlockquoteNesting handles markers without spaces", () => {
   const result = capBlockquoteNesting(">".repeat(5000) + "hi");
   expect((result.match(/>/g) ?? []).length).toBe(100);
   expect(result.endsWith("hi")).toBe(true);
 });
+
+/**
+ * 覆盖“capBlockquoteNesting leaves fenced code content untouched”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("capBlockquoteNesting leaves fenced code content untouched", () => {
   const literal = ">".repeat(150);
@@ -38,12 +63,22 @@ test("capBlockquoteNesting leaves fenced code content untouched", () => {
   expect(result.split("\n")[2]).toBe(literal);
 });
 
+/**
+ * 覆盖“capBlockquoteNesting leaves indented code blocks untouched”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("capBlockquoteNesting leaves indented code blocks untouched", () => {
   const literal = "    " + ">".repeat(150);
   const input = `${"> ".repeat(3000)}hi\n\n${literal}`;
   const result = capBlockquoteNesting(input);
   expect(result.split("\n")[2]).toBe(literal);
 });
+
+/**
+ * 覆盖“capBlockquoteNesting only rewrites pathological lines”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("capBlockquoteNesting only rewrites pathological lines", () => {
   const normal = "> normal quote";
@@ -55,10 +90,20 @@ test("capBlockquoteNesting only rewrites pathological lines", () => {
   expect(lines[2]).toBe("plain");
 });
 
+/**
+ * 覆盖“capListNesting returns normally indented content unchanged”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("capListNesting returns normally indented content unchanged", () => {
   const input = "- a\n  - b\n    - c\n\n      code continuation";
   expect(capListNesting(input)).toBe(input);
 });
+
+/**
+ * 覆盖“capListNesting caps pathologically deep list indentation”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("capListNesting caps pathologically deep list indentation", () => {
   const deep = "  ".repeat(2000) + "- x";
@@ -68,21 +113,34 @@ test("capListNesting caps pathologically deep list indentation", () => {
   expect(result.endsWith("- x")).toBe(true);
 });
 
+/**
+ * 覆盖“capListNesting leaves fenced code content untouched”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("capListNesting leaves fenced code content untouched", () => {
   const literal = " ".repeat(400) + "deeply indented ascii art";
   const input = `\`\`\`text\n${literal}\n\`\`\``;
   expect(capListNesting(input).split("\n")[1]).toBe(literal);
 });
 
-// Outside a fence, deep indentation is capped regardless of blank-line context:
-// we cannot tell an indented-code line from deeply nested list content (both can
-// follow a blank line), and exempting either reopens the crash — blank-separated
-// deep-indent lists otherwise blow up marked just like contiguous ones.
+// 在围栏代码块之外，无论空行上下文如何，都要限制过深缩进：
+// 无法区分缩进代码行和深层嵌套列表内容（两者都可能出现在空行之后）；
+// 豁免任意一种都会重新引发崩溃，因为由空行分隔的深缩进列表与连续列表一样，
+// 都会使 marked 的处理规模失控。
+/**
+ * 覆盖“capListNesting caps deep indentation even after a blank line”这一可观察行为，防止相关边界在重构后回归。
+ */
 test("capListNesting caps deep indentation even after a blank line", () => {
   const input = `- a\n\n${" ".repeat(500)}- deep`;
   const lines = capListNesting(input).split("\n");
   expect(/^[ \t]*/.exec(lines[2]!)![0].length).toBe(200);
 });
+
+/**
+ * 覆盖“capListNesting only rewrites pathological lines”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("capListNesting only rewrites pathological lines", () => {
   const normal = "    indented paragraph";
@@ -94,6 +152,11 @@ test("capListNesting only rewrites pathological lines", () => {
   expect(lines[2]).toBe("plain");
 });
 
+/**
+ * 覆盖“capMarkdownNesting caps both blockquote and list nesting”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("capMarkdownNesting caps both blockquote and list nesting", () => {
   const input = `${"> ".repeat(3000)}quote\n${" ".repeat(500)}- item`;
   const result = capMarkdownNesting(input);
@@ -102,11 +165,21 @@ test("capMarkdownNesting caps both blockquote and list nesting", () => {
   expect(/^[ \t]*/.exec(lines[1]!)![0].length).toBe(200);
 });
 
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown converts inline math delimiters”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("normalizeStreamdownMathMarkdown converts inline math delimiters", () => {
   expect(
     normalizeStreamdownMathMarkdown("Given \\(x\\), compute \\(x^2\\)."),
   ).toBe("Given $x$, compute $x^2$.");
 });
+
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown converts multiline display math delimiters”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("normalizeStreamdownMathMarkdown converts multiline display math delimiters", () => {
   const input = [
@@ -128,6 +201,11 @@ test("normalizeStreamdownMathMarkdown converts multiline display math delimiters
   ].join("\n");
   expect(normalizeStreamdownMathMarkdown(input)).toBe(expected);
 });
+
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown leaves fenced and indented code untouched”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("normalizeStreamdownMathMarkdown leaves fenced and indented code untouched", () => {
   const input = [
@@ -151,16 +229,31 @@ test("normalizeStreamdownMathMarkdown leaves fenced and indented code untouched"
   expect(normalizeStreamdownMathMarkdown(input)).toBe(expected);
 });
 
+/**
+ * 覆盖“compactDisplayMathBlocks keeps display math as display math”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("compactDisplayMathBlocks keeps display math as display math", () => {
   const input = ["Before", "$$", "x", "=", "y", "$$", "After"].join("\n");
   const expected = ["Before", "$$", "x = y", "$$", "After"].join("\n");
   expect(compactDisplayMathBlocks(input)).toBe(expected);
 });
 
+/**
+ * 覆盖“compactDisplayMathBlocks preserves TeX comments in display math”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("compactDisplayMathBlocks preserves TeX comments in display math", () => {
   const input = ["Before", "$$", "a % step 1", "+ b", "$$", "After"].join("\n");
   expect(compactDisplayMathBlocks(input)).toBe(input);
 });
+
+/**
+ * 覆盖“compactDisplayMathBlocks compacts escaped percent in display math”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("compactDisplayMathBlocks compacts escaped percent in display math", () => {
   const input = ["Before", "$$", "a \\% step 1", "+ b", "$$", "After"].join(
@@ -171,6 +264,11 @@ test("compactDisplayMathBlocks compacts escaped percent in display math", () => 
   );
   expect(compactDisplayMathBlocks(input)).toBe(expected);
 });
+
+/**
+ * 覆盖“compactDisplayMathBlocks leaves fenced code content untouched”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("compactDisplayMathBlocks leaves fenced code content untouched", () => {
   const input = [
@@ -198,6 +296,11 @@ test("compactDisplayMathBlocks leaves fenced code content untouched", () => {
   expect(compactDisplayMathBlocks(input)).toBe(expected);
 });
 
+/**
+ * 覆盖“preprocessStreamdownMarkdown applies only Mermaid fixes (not math)”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("preprocessStreamdownMarkdown applies only Mermaid fixes (not math)", () => {
   const input = [
     "Before \\(x\\)",
@@ -216,13 +319,23 @@ test("preprocessStreamdownMarkdown applies only Mermaid fixes (not math)", () =>
   expect(preprocessStreamdownMarkdown(input)).toBe(expected);
 });
 
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown preserves escaped backslash before parens”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("normalizeStreamdownMathMarkdown preserves escaped backslash before parens", () => {
-  // When the backslash itself is escaped (\\), the following ( is not a math open
+  // 当反斜杠本身被转义（\\）时，其后的 ( 不是数学公式起始符。
   const input = "Use \\\\( to start inline math.";
   expect(normalizeStreamdownMathMarkdown(input)).toBe(
     "Use \\\\( to start inline math.",
   );
 });
+
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown preserves escaped backslash before brackets”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("normalizeStreamdownMathMarkdown preserves escaped backslash before brackets", () => {
   const input = "Escape: \\\\[ is not math.";
@@ -231,16 +344,31 @@ test("normalizeStreamdownMathMarkdown preserves escaped backslash before bracket
   );
 });
 
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown preserves delimiters inside multi-line code spans”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("normalizeStreamdownMathMarkdown preserves delimiters inside multi-line code spans", () => {
-  // A backtick code span opened on line 1 should protect line 2 content
+  // 在第 1 行开始的反引号代码跨度应保护第 2 行内容。
   const input = ["`code span", "with \\(x\\) inside`"].join("\n");
   expect(normalizeStreamdownMathMarkdown(input)).toBe(input);
 });
+
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown preserves delimiters inside multi-backtick code spans”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("normalizeStreamdownMathMarkdown preserves delimiters inside multi-backtick code spans", () => {
   const input = "Use ``\\(literal\\)`` here";
   expect(normalizeStreamdownMathMarkdown(input)).toBe(input);
 });
+
+/**
+ * 覆盖“normalizeStreamdownMathMarkdown requires matching backtick run to close code spans”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("normalizeStreamdownMathMarkdown requires matching backtick run to close code spans", () => {
   const input = "Use ``\\(literal\\)` and still code`` then \\(x\\)";

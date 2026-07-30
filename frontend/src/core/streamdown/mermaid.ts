@@ -6,6 +6,7 @@ const WINDOWS_LINE_ENDING_RE = /\r\n?/g;
 const LABELLED_DOTTED_ARROW_RE =
   /^(\s*)(.+?)\s*--\s*("[^"\n]+"|'[^'\n]+')\s*-\.->\s*(.+?)\s*$/;
 
+/** 规范化流程图代码块内容，修复流式输出常见的空白问题。 */
 function normalizeMermaidCode(code: string): string {
   return code
     .split("\n")
@@ -24,6 +25,7 @@ function normalizeMermaidCode(code: string): string {
     .join("\n");
 }
 
+/** 判断一行是否关闭了指定形式的代码围栏。 */
 function isClosingFence(line: string, fence: string): boolean {
   const trimmedLine = line.trimEnd();
   const indentationLength = trimmedLine.length - trimmedLine.trimStart().length;
@@ -40,6 +42,7 @@ function isClosingFence(line: string, fence: string): boolean {
   );
 }
 
+/** 仅规范化标记文本中流程图围栏的代码内容。 */
 export function normalizeMermaidMarkdown(markdown: string): string {
   const lines = markdown.replace(WINDOWS_LINE_ENDING_RE, "\n").split("\n");
   const normalizedLines: string[] = [];

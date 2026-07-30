@@ -18,6 +18,7 @@ function WelcomeDescription({ children }: { children: string }) {
   );
 }
 
+/** 在空线程中呈现欢迎引导与快捷建议，帮助用户启动首个任务。 */
 export function Welcome({
   className,
   mode,

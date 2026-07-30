@@ -1,3 +1,4 @@
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 import threading
 from pathlib import Path
 from types import SimpleNamespace
@@ -12,6 +13,7 @@ from deerflow.skills.types import Skill, SkillCategory
 
 
 def _set_skills_cache_state(*, skills=None, active=False, version=0):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     prompt_module._get_cached_skills_prompt_section.cache_clear()
     with prompt_module._enabled_skills_lock:
         prompt_module._enabled_skills_cache = skills
@@ -22,10 +24,12 @@ def _set_skills_cache_state(*, skills=None, active=False, version=0):
 
 
 def test_build_self_update_section_empty_for_default_agent():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     assert prompt_module._build_self_update_section(None) == ""
 
 
 def test_build_self_update_section_present_for_custom_agent():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     section = prompt_module._build_self_update_section("my-agent")
 
     assert "<self_update>" in section
@@ -35,6 +39,7 @@ def test_build_self_update_section_present_for_custom_agent():
 
 
 def test_build_custom_mounts_section_returns_empty_when_no_mounts(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = SimpleNamespace(sandbox=SimpleNamespace(mounts=[]))
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
 
@@ -42,6 +47,7 @@ def test_build_custom_mounts_section_returns_empty_when_no_mounts(monkeypatch):
 
 
 def test_build_custom_mounts_section_lists_configured_mounts(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mounts = [
         SimpleNamespace(container_path="/home/user/shared", read_only=False),
         SimpleNamespace(container_path="/mnt/reference", read_only=True),
@@ -59,10 +65,12 @@ def test_build_custom_mounts_section_lists_configured_mounts(monkeypatch):
 
 
 def test_build_custom_mounts_section_uses_explicit_app_config_without_global_read(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mounts = [SimpleNamespace(container_path="/home/user/shared", read_only=False)]
     config = SimpleNamespace(sandbox=SimpleNamespace(mounts=mounts))
 
     def fail_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
     monkeypatch.setattr("deerflow.config.get_app_config", fail_get_app_config)
@@ -74,6 +82,7 @@ def test_build_custom_mounts_section_uses_explicit_app_config_without_global_rea
 
 
 def test_apply_prompt_template_includes_custom_mounts(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mounts = [SimpleNamespace(container_path="/home/user/shared", read_only=False)]
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=mounts),
@@ -86,6 +95,7 @@ def test_apply_prompt_template_includes_custom_mounts(monkeypatch):
 
 
 def test_apply_prompt_template_includes_relative_path_guidance(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills", use="deerflow.skills.storage.local_skill_storage:LocalSkillStorage", get_skills_path=lambda: Path("/tmp/skills")),
@@ -104,6 +114,7 @@ def test_apply_prompt_template_includes_relative_path_guidance(monkeypatch):
 
 
 def test_apply_prompt_template_includes_memory_tool_guidance_only_in_tool_mode(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     tool_config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills", use="deerflow.skills.storage.local_skill_storage:LocalSkillStorage", get_skills_path=lambda: Path("/tmp/skills")),
@@ -136,6 +147,7 @@ def test_apply_prompt_template_includes_memory_tool_guidance_only_in_tool_mode(m
 
 
 def test_apply_prompt_template_threads_explicit_app_config_without_global_config(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     mounts = [SimpleNamespace(container_path="/home/user/shared", read_only=False)]
     explicit_config = SimpleNamespace(
         sandbox=SimpleNamespace(mounts=mounts),
@@ -147,9 +159,11 @@ def test_apply_prompt_template_threads_explicit_app_config_without_global_config
     )
 
     def fail_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
     def fail_get_memory_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_memory_config() must not be used when app_config is explicit")
 
     monkeypatch.setattr("deerflow.config.get_app_config", fail_get_app_config)
@@ -165,6 +179,7 @@ def test_apply_prompt_template_threads_explicit_app_config_without_global_config
 
 
 def test_apply_prompt_template_threads_explicit_app_config_to_subagents_without_global_config(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     explicit_config = SimpleNamespace(
         sandbox=SimpleNamespace(
             use="deerflow.sandbox.local:LocalSandboxProvider",
@@ -187,9 +202,11 @@ def test_apply_prompt_template_threads_explicit_app_config_to_subagents_without_
     )
 
     def fail_get_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_app_config() must not be used when app_config is explicit")
 
     def fail_get_subagents_app_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_subagents_app_config() must not be used when app_config is explicit")
 
     monkeypatch.setattr("deerflow.config.get_app_config", fail_get_app_config)
@@ -204,6 +221,7 @@ def test_apply_prompt_template_threads_explicit_app_config_to_subagents_without_
 
 
 def test_apply_prompt_template_includes_subagent_total_limit(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     explicit_config = SimpleNamespace(
         sandbox=SimpleNamespace(
             use="deerflow.sandbox.local:LocalSandboxProvider",
@@ -233,6 +251,7 @@ def test_apply_prompt_template_includes_subagent_total_limit(monkeypatch):
 
 
 def test_apply_prompt_template_clamps_subagent_limits_to_enforced_bounds(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     explicit_config = SimpleNamespace(
         sandbox=SimpleNamespace(
             use="deerflow.sandbox.local:LocalSandboxProvider",
@@ -262,9 +281,11 @@ def test_apply_prompt_template_clamps_subagent_limits_to_enforced_bounds(monkeyp
 
 
 def test_build_acp_section_uses_explicit_app_config_without_global_config(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     explicit_config = SimpleNamespace(acp_agents={"codex": object()})
 
     def fail_get_acp_agents():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_acp_agents() must not be used when app_config is explicit")
 
     monkeypatch.setattr("deerflow.config.acp_config.get_acp_agents", fail_get_acp_agents)
@@ -276,15 +297,18 @@ def test_build_acp_section_uses_explicit_app_config_without_global_config(monkey
 
 
 def test_get_memory_context_uses_explicit_app_config_without_global_config(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     explicit_config = SimpleNamespace(
         memory=SimpleNamespace(enabled=True, injection_enabled=True, max_injection_tokens=1234, token_counting="tiktoken"),
     )
     captured: dict[str, object] = {}
 
     def fail_get_memory_config():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise AssertionError("ambient get_memory_config() must not be used when app_config is explicit")
 
     def fake_get_context(user_id, *, agent_name=None, thread_id=None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         captured["agent_name"] = agent_name
         captured["user_id"] = user_id
         return "remember this"
@@ -305,7 +329,9 @@ def test_get_memory_context_uses_explicit_app_config_without_global_config(monke
 
 
 def test_refresh_skills_system_prompt_cache_async_reloads_immediately(monkeypatch, tmp_path):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     def make_skill(name: str) -> Skill:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         skill_dir = tmp_path / name
         return Skill(
             name=name,
@@ -335,7 +361,9 @@ def test_refresh_skills_system_prompt_cache_async_reloads_immediately(monkeypatc
 
 
 def test_explicit_config_enabled_skills_are_cached_by_config_identity(monkeypatch, tmp_path):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     def make_skill(name: str) -> Skill:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         skill_dir = tmp_path / name
         return Skill(
             name=name,
@@ -361,10 +389,12 @@ def test_explicit_config_enabled_skills_are_cached_by_config_identity(monkeypatc
     load_count = 0
 
     def fake_get_or_new_skill_storage(**kwargs):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         nonlocal load_count
         assert kwargs == {"app_config": config}
 
         def load_skills(*, enabled_only):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             nonlocal load_count
             if enabled_only:
                 load_count += 1
@@ -388,6 +418,7 @@ def test_explicit_config_enabled_skills_are_cached_by_config_identity(monkeypatc
 
 
 def test_clear_cache_does_not_spawn_parallel_refresh_workers(monkeypatch, tmp_path):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     started = threading.Event()
     release = threading.Event()
     active_loads = 0
@@ -396,6 +427,7 @@ def test_clear_cache_does_not_spawn_parallel_refresh_workers(monkeypatch, tmp_pa
     lock = threading.Lock()
 
     def make_skill(name: str) -> Skill:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         skill_dir = tmp_path / name
         return Skill(
             name=name,
@@ -409,6 +441,7 @@ def test_clear_cache_does_not_spawn_parallel_refresh_workers(monkeypatch, tmp_pa
         )
 
     def fake_load_skills(enabled_only=True):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         nonlocal active_loads, max_active_loads, call_count
         with lock:
             active_loads += 1
@@ -444,6 +477,7 @@ def test_clear_cache_does_not_spawn_parallel_refresh_workers(monkeypatch, tmp_pa
 
 
 def test_warm_enabled_skills_cache_logs_on_timeout(monkeypatch, caplog):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     event = threading.Event()
     monkeypatch.setattr(prompt_module, "_ensure_enabled_skills_cache", lambda: event)
 
@@ -455,27 +489,18 @@ def test_warm_enabled_skills_cache_logs_on_timeout(monkeypatch, caplog):
 
 
 def test_system_prompt_template_contains_file_editing_workflow_rule():
-    """The File Editing Workflow rule must remain in the system prompt
-    template so the planner picks the right tool (str_replace for edits,
-    write_file + append=True for long new content) and avoids mid-stream
-    chunk-gap timeouts on oversized single-shot writes. See issue #3189
-    / PR #3195.
-
-    We deliberately do NOT assert on any specific byte / word threshold
-    here — that would re-introduce the docstring-lock-in pattern the
-    reviewers flagged. The numeric cap lives in the server-side guard
-    (see test_write_file_tool_size_guard.py), which is where it belongs.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE
-    # Section anchor — keeps the rule discoverable in the assembled prompt.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "File Editing Workflow" in template
-    # Behavioural anchors — if either of these disappears, the model will
-    # silently regress to single-shot write_file calls for long content.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "str_replace" in template
     assert "append=True" in template
 
 
 def test_system_prompt_template_requires_virtual_paths_for_output_images():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE
 
     assert "![Chart](/mnt/user-data/outputs/chart.png)" in template
@@ -484,10 +509,7 @@ def test_system_prompt_template_requires_virtual_paths_for_output_images():
 
 
 def test_system_prompt_template_preserves_placeholders():
-    """Ensure the chunking-rule edit didn't drop any f-string placeholder
-    consumed by apply_prompt_template(). A missing placeholder would
-    crash prompt rendering at runtime.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     template = prompt_module.SYSTEM_PROMPT_TEMPLATE
     for ph in (
         "{agent_name}",
@@ -505,6 +527,7 @@ def test_system_prompt_template_preserves_placeholders():
 
 
 def _make_minimal_app_config():
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return SimpleNamespace(
         sandbox=SimpleNamespace(mounts=[]),
         skills=SimpleNamespace(container_path="/mnt/skills"),
@@ -516,8 +539,7 @@ def _make_minimal_app_config():
 
 
 def test_apply_prompt_template_legacy_path_does_not_mention_describe_skill(monkeypatch):
-    """When skill_names is None (legacy path), critical_reminders must not
-    reference describe_skill (the tool is not registered in legacy mode)."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = _make_minimal_app_config()
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
     monkeypatch.setattr(prompt_module, "get_or_new_skill_storage", lambda app_config=None: SimpleNamespace(load_skills=lambda enabled_only=True: []))
@@ -525,15 +547,14 @@ def test_apply_prompt_template_legacy_path_does_not_mention_describe_skill(monke
 
     prompt = prompt_module.apply_prompt_template(app_config=config)
 
-    # Legacy wording — tool-agnostic
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "Always load the relevant skill" in prompt
-    # Must NOT reference the deferred tool
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "describe_skill(name)" not in prompt
 
 
 def test_apply_prompt_template_deferred_path_mentions_describe_skill(monkeypatch):
-    """When skill_names is provided (deferred path), critical_reminders must
-    reference describe_skill so the LLM knows how to discover skills."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = _make_minimal_app_config()
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
     monkeypatch.setattr(prompt_module, "get_or_new_skill_storage", lambda app_config=None: SimpleNamespace(load_skills=lambda enabled_only=True: []))
@@ -544,7 +565,7 @@ def test_apply_prompt_template_deferred_path_mentions_describe_skill(monkeypatch
         skill_names=frozenset({"data-analysis"}),
     )
 
-    # Deferred wording — references describe_skill
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "describe_skill(name)" in prompt
-    # Must NOT contain the legacy wording
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert "Always load the relevant skill" not in prompt

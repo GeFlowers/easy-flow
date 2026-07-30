@@ -1,4 +1,4 @@
-"""Runtime path policy tests for standalone harness usage."""
+"""本模块覆盖相关功能的行为、边界与回归场景，确保既有契约稳定。"""
 
 from pathlib import Path
 
@@ -17,6 +17,7 @@ from deerflow.skills.storage import get_or_new_skill_storage
 
 
 def _clear_path_env(monkeypatch):
+    """准备可控测试资源与状态，供后续断言读取。"""
     for name in (
         "DEER_FLOW_CONFIG_PATH",
         "DEER_FLOW_EXTENSIONS_CONFIG_PATH",
@@ -28,6 +29,7 @@ def _clear_path_env(monkeypatch):
 
 
 def test_default_runtime_paths_resolve_from_current_project(tmp_path: Path, monkeypatch):
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     _clear_path_env(monkeypatch)
     monkeypatch.chdir(tmp_path)
 
@@ -46,6 +48,7 @@ def test_default_runtime_paths_resolve_from_current_project(tmp_path: Path, monk
 
 
 def test_deer_flow_project_root_overrides_current_directory(tmp_path: Path, monkeypatch):
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     _clear_path_env(monkeypatch)
     project_root = tmp_path / "project"
     other_cwd = tmp_path / "other"
@@ -67,6 +70,7 @@ def test_deer_flow_project_root_overrides_current_directory(tmp_path: Path, monk
 
 
 def test_deer_flow_skills_path_overrides_project_default(tmp_path: Path, monkeypatch):
+    """验证路径在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _clear_path_env(monkeypatch)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("DEER_FLOW_SKILLS_PATH", "team-skills")
@@ -76,6 +80,7 @@ def test_deer_flow_skills_path_overrides_project_default(tmp_path: Path, monkeyp
 
 
 def test_deer_flow_project_root_must_exist(tmp_path: Path, monkeypatch):
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     _clear_path_env(monkeypatch)
     missing_root = tmp_path / "missing"
     monkeypatch.setenv("DEER_FLOW_PROJECT_ROOT", str(missing_root))
@@ -85,6 +90,7 @@ def test_deer_flow_project_root_must_exist(tmp_path: Path, monkeypatch):
 
 
 def test_deer_flow_project_root_must_be_directory(tmp_path: Path, monkeypatch):
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     _clear_path_env(monkeypatch)
     project_root_file = tmp_path / "project-root"
     project_root_file.write_text("", encoding="utf-8")
@@ -95,8 +101,7 @@ def test_deer_flow_project_root_must_be_directory(tmp_path: Path, monkeypatch):
 
 
 def test_app_config_falls_back_to_legacy_when_project_root_lacks_config(tmp_path: Path, monkeypatch):
-    """When DEER_FLOW_PROJECT_ROOT is unset and cwd has no config.yaml, the
-    legacy backend/repo-root candidates must be used for monorepo compatibility."""
+    """验证配置 配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _clear_path_env(monkeypatch)
     cwd = tmp_path / "cwd"
     cwd.mkdir()
@@ -124,9 +129,7 @@ def test_app_config_falls_back_to_legacy_when_project_root_lacks_config(tmp_path
 
 
 def test_skills_config_falls_back_to_legacy_when_project_root_lacks_skills(tmp_path: Path, monkeypatch):
-    """When DEER_FLOW_PROJECT_ROOT is unset and cwd has no `skills/`, the legacy
-    repo-root candidate must be used so monorepo runs (cwd=backend/) keep finding
-    `<repo>/skills` instead of `<repo>/backend/skills` (regression test for #2694)."""
+    """验证配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _clear_path_env(monkeypatch)
     cwd = tmp_path / "cwd"
     cwd.mkdir()
@@ -145,8 +148,7 @@ def test_skills_config_falls_back_to_legacy_when_project_root_lacks_skills(tmp_p
 
 
 def test_skills_config_returns_project_default_when_neither_exists(tmp_path: Path, monkeypatch):
-    """When nothing exists, fall back to the project-root default path so callers
-    surface a stable empty location instead of silently picking a stale legacy dir."""
+    """验证配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _clear_path_env(monkeypatch)
     cwd = tmp_path / "cwd"
     cwd.mkdir()
@@ -158,8 +160,7 @@ def test_skills_config_returns_project_default_when_neither_exists(tmp_path: Pat
 
 
 def test_extensions_config_falls_back_to_legacy_when_project_root_lacks_file(tmp_path: Path, monkeypatch):
-    """ExtensionsConfig should hit the legacy backend/repo-root locations when
-    the caller project root has no extensions_config.json/mcp_config.json."""
+    """验证配置 文件在预期条件及边界场景下的可观察行为，防止相关回归。"""
     _clear_path_env(monkeypatch)
     cwd = tmp_path / "cwd"
     cwd.mkdir()

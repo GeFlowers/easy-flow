@@ -1,3 +1,5 @@
+"""提供技能查询、安装和管理员专属自定义技能管理路由。"""
+
 import asyncio
 import json
 import logging
@@ -33,7 +35,7 @@ _ADMIN_REQUIRED_DETAIL = "Admin privileges required to manage skills."
 
 
 class SkillResponse(BaseModel):
-    """Response model for skill information."""
+    '封装 SkillResponse 的状态、协作关系与公开操作。\n\nResponse model for skill information.'
 
     name: str = Field(..., description="Name of the skill")
     description: str = Field(..., description="Description of what the skill does")
@@ -44,26 +46,26 @@ class SkillResponse(BaseModel):
 
 
 class SkillsListResponse(BaseModel):
-    """Response model for listing all skills."""
+    '封装 SkillsListResponse 的状态、协作关系与公开操作。\n\nResponse model for listing all skills.'
 
     skills: list[SkillResponse]
 
 
 class SkillUpdateRequest(BaseModel):
-    """Request model for updating a skill."""
+    '封装 SkillUpdateRequest 的状态、协作关系与公开操作。\n\nRequest model for updating a skill.'
 
     enabled: bool = Field(..., description="Whether to enable or disable the skill")
 
 
 class SkillInstallRequest(BaseModel):
-    """Request model for installing a skill from a .skill file."""
+    '封装 SkillInstallRequest 的状态、协作关系与公开操作。\n\nRequest model for installing a skill from a .skill file.'
 
     thread_id: str = Field(..., description="The thread ID where the .skill file is located")
     path: str = Field(..., description="Virtual path to the .skill file (e.g., mnt/user-data/outputs/my-skill.skill)")
 
 
 class SkillInstallResponse(BaseModel):
-    """Response model for skill installation."""
+    '封装 SkillInstallResponse 的状态、协作关系与公开操作。\n\nResponse model for skill installation.'
 
     success: bool = Field(..., description="Whether the installation was successful")
     skill_name: str = Field(..., description="Name of the installed skill")
@@ -71,23 +73,27 @@ class SkillInstallResponse(BaseModel):
 
 
 class CustomSkillContentResponse(SkillResponse):
+    """表示包含原始 SKILL.md 内容的管理员自定义技能响应。"""
     content: str = Field(..., description="Raw SKILL.md content")
 
 
 class CustomSkillUpdateRequest(BaseModel):
+    """定义管理员替换自定义 SKILL.md 内容的请求。"""
     content: str = Field(..., description="Replacement SKILL.md content")
 
 
 class CustomSkillHistoryResponse(BaseModel):
+    """表示管理员可读取的自定义技能修改历史。"""
     history: list[dict]
 
 
 class SkillRollbackRequest(BaseModel):
+    """定义管理员恢复自定义技能历史版本的请求。"""
     history_index: int = Field(default=-1, description="History entry index to restore from, defaulting to the latest change.")
 
 
 def _skill_to_response(skill: Skill) -> SkillResponse:
-    """Convert a Skill object to a SkillResponse."""
+    '执行 _skill_to_response 的明确职责，并返回与调用约定一致的结果。\n\nConvert a Skill object to a SkillResponse.'
     return SkillResponse(
         name=skill.name,
         description=skill.description,
@@ -99,6 +105,7 @@ def _skill_to_response(skill: Skill) -> SkillResponse:
 
 
 def _static_scan_http_detail(error: StaticScanBlockedError) -> dict:
+    """将静态扫描拦截异常转换为可安全公开的 HTTP 详情。"""
     return {
         "message": str(error),
         "skill_name": error.skill_name,
@@ -107,7 +114,9 @@ def _static_scan_http_detail(error: StaticScanBlockedError) -> dict:
 
 
 async def _scan_static_skill_markdown_or_raise(skill_name: str, content: str, *, app_config: AppConfig) -> list[StaticFinding]:
+    """在临时目录扫描技能 Markdown，命中安全规则时抛出 HTTP 异常。"""
     def _scan_markdown() -> list[StaticFinding]:
+        """在工作线程中落盘临时技能包并执行静态扫描。"""
         with tempfile.TemporaryDirectory() as tmp:
             skill_dir = Path(tmp) / skill_name
             skill_dir.mkdir(parents=True)
@@ -123,11 +132,7 @@ async def _scan_static_skill_markdown_or_raise(skill_name: str, content: str, *,
 
 
 def _get_user_skill_storage(config: AppConfig) -> SkillStorage:
-    """Return a user-scoped skill storage for custom skill operations.
-
-    Uses the effective user_id from the request context (set by auth middleware).
-    For public skill reads, the global singleton storage is still used.
-    """
+    '执行 _get_user_skill_storage 的明确职责，并返回与调用约定一致的结果。\n\nReturn a user-scoped skill storage for custom skill operations.\n\n    Uses the effective user_id from the request context (set by auth middleware).\n    For public skill reads, the global singleton storage is still used.\n    '
     return get_or_new_user_skill_storage(get_effective_user_id(), app_config=config)
 
 
@@ -138,6 +143,7 @@ def _get_user_skill_storage(config: AppConfig) -> SkillStorage:
     description="Retrieve a list of all available skills from both public and custom directories.",
 )
 async def list_skills(config: AppConfig = Depends(get_config)) -> SkillsListResponse:
+    """列出当前用户可见的公共与自定义技能及启用状态。"""
     try:
         # Use user-scoped storage: loads public (global) + custom (user-level + fallback)
         skills = _get_user_skill_storage(config).load_skills(enabled_only=False)
@@ -154,6 +160,7 @@ async def list_skills(config: AppConfig = Depends(get_config)) -> SkillsListResp
     description="Install a skill from a .skill file (ZIP archive) located in the thread's user-data directory.",
 )
 async def install_skill(request: Request, body: SkillInstallRequest, config: AppConfig = Depends(get_config)) -> SkillInstallResponse:
+    """仅允许管理员安装技能包，并在安装前执行安全校验。"""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     try:
         skill_file_path = resolve_thread_virtual_path(body.thread_id, body.path)
@@ -186,13 +193,7 @@ async def install_skill(request: Request, body: SkillInstallRequest, config: App
 
 @router.get("/skills/custom", response_model=SkillsListResponse, summary="List Custom Skills")
 async def list_custom_skills(config: AppConfig = Depends(get_config)) -> SkillsListResponse:
-    """List only user-owned custom skills (SkillCategory.CUSTOM).
-
-    Legacy shared skills (SkillCategory.LEGACY) are NOT included here —
-    they are read-only and appear in the full ``list_skills`` endpoint.
-    The frontend should use ``list_skills`` to display all available
-    skills including legacy ones.
-    """
+    '收集并返回，并遵守 list_custom_skills 所表达的接口约束。\n\nList only user-owned custom skills (SkillCategory.CUSTOM).\n\n    Legacy shared skills (SkillCategory.LEGACY) are NOT included here —\n    they are read-only and appear in the full ``list_skills`` endpoint.\n    The frontend should use ``list_skills`` to display all available\n    skills including legacy ones.\n    '
     try:
         skills = [skill for skill in _get_user_skill_storage(config).load_skills(enabled_only=False) if skill.category == SkillCategory.CUSTOM]
         return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])
@@ -203,11 +204,13 @@ async def list_custom_skills(config: AppConfig = Depends(get_config)) -> SkillsL
 
 @router.get("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Get Custom Skill Content")
 async def get_custom_skill(skill_name: str, request: Request, config: AppConfig = Depends(get_config)) -> CustomSkillContentResponse:
+    """仅允许管理员读取指定自定义技能的原始内容。"""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     return await _read_custom_skill_response(skill_name, config)
 
 
 async def _read_custom_skill_response(skill_name: str, config: AppConfig) -> CustomSkillContentResponse:
+    """读取并封装已校验名称的自定义技能内容响应。"""
     try:
         skill_name = skill_name.replace("\r\n", "").replace("\n", "")
         storage = _get_user_skill_storage(config)
@@ -225,6 +228,7 @@ async def _read_custom_skill_response(skill_name: str, config: AppConfig) -> Cus
 
 @router.put("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Edit Custom Skill")
 async def update_custom_skill(skill_name: str, body: CustomSkillUpdateRequest, request: Request, config: AppConfig = Depends(get_config)) -> CustomSkillContentResponse:
+    """仅允许管理员经扫描后更新自定义技能内容。"""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     try:
         skill_name = skill_name.replace("\r\n", "").replace("\n", "")
@@ -264,6 +268,7 @@ async def update_custom_skill(skill_name: str, body: CustomSkillUpdateRequest, r
 
 @router.delete("/skills/custom/{skill_name}", summary="Delete Custom Skill")
 async def delete_custom_skill(skill_name: str, request: Request, config: AppConfig = Depends(get_config)) -> dict[str, bool]:
+    """仅允许管理员删除指定自定义技能。"""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     try:
         skill_name = skill_name.replace("\r\n", "").replace("\n", "")
@@ -293,6 +298,7 @@ async def delete_custom_skill(skill_name: str, request: Request, config: AppConf
 
 @router.get("/skills/custom/{skill_name}/history", response_model=CustomSkillHistoryResponse, summary="Get Custom Skill History")
 async def get_custom_skill_history(skill_name: str, request: Request, config: AppConfig = Depends(get_config)) -> CustomSkillHistoryResponse:
+    """仅允许管理员读取自定义技能的版本历史。"""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     try:
         skill_name = skill_name.replace("\r\n", "").replace("\n", "")
@@ -309,6 +315,7 @@ async def get_custom_skill_history(skill_name: str, request: Request, config: Ap
 
 @router.post("/skills/custom/{skill_name}/rollback", response_model=CustomSkillContentResponse, summary="Rollback Custom Skill")
 async def rollback_custom_skill(skill_name: str, body: SkillRollbackRequest, request: Request, config: AppConfig = Depends(get_config)) -> CustomSkillContentResponse:
+    """仅允许管理员将自定义技能恢复到指定历史版本。"""
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     try:
         storage = _get_user_skill_storage(config)
@@ -363,6 +370,7 @@ async def rollback_custom_skill(skill_name: str, body: SkillRollbackRequest, req
     description="Retrieve detailed information about a specific skill by its name.",
 )
 async def get_skill(skill_name: str, config: AppConfig = Depends(get_config)) -> SkillResponse:
+    """读取当前用户可见的单个技能元数据。"""
     try:
         skill_name = skill_name.replace("\r\n", "").replace("\n", "")
         skills = _get_user_skill_storage(config).load_skills(enabled_only=False)
@@ -386,6 +394,7 @@ async def get_skill(skill_name: str, config: AppConfig = Depends(get_config)) ->
     description="Update a skill's enabled status by modifying the extensions_config.json file.",
 )
 async def update_skill(skill_name: str, body: SkillUpdateRequest, request: Request, config: AppConfig = Depends(get_config)) -> SkillResponse:
+    """仅允许管理员更新共享技能启用状态并刷新全局代理配置。"""
     # Enabling/disabling a skill writes the shared extensions_config.json and
     # refreshes the system prompt for every tenant, so it is a global mutation
     # (there is no per-user skill state). Guard it as admin-only like the other

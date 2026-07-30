@@ -1,4 +1,4 @@
-"""Tests for UserScopedSkillStorage: per-user isolation, fallback, and path safety."""
+'未说明'
 
 from __future__ import annotations
 
@@ -15,12 +15,13 @@ from deerflow.skills.types import SkillCategory
 
 
 def _skill_content(name: str, description: str = "Demo skill") -> str:
+    '未说明'
     return f"---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n"
 
 
 @pytest.fixture(autouse=True)
 def _reset_storages():
-    """Reset all skill storage caches between tests."""
+    """为重置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     reset_skill_storage()
     yield
     reset_skill_storage()
@@ -28,18 +29,19 @@ def _reset_storages():
 
 @pytest.fixture
 def base_dir(tmp_path: Path) -> Path:
-    """Provide a temp directory as the DeerFlow base_dir."""
+    '未说明'
     return tmp_path
 
 
 @pytest.fixture
 def paths(base_dir: Path) -> Paths:
+    '未说明'
     return Paths(base_dir=base_dir)
 
 
 @pytest.fixture
 def skills_root(base_dir: Path) -> Path:
-    """Create the global skills root directory with public/ and custom/ subdirs."""
+    '未说明'
     root = base_dir / "skills"
     root.mkdir()
     (root / "public").mkdir()
@@ -49,7 +51,7 @@ def skills_root(base_dir: Path) -> Path:
 
 @pytest.fixture
 def config(skills_root):
-    """Minimal app_config-like namespace for storage construction."""
+    """为配置准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     from types import SimpleNamespace
 
     return SimpleNamespace(
@@ -63,7 +65,7 @@ def config(skills_root):
 
 @pytest.fixture
 def user_storage(base_dir: Path, skills_root, config) -> UserScopedSkillStorage:
-    """Create a UserScopedSkillStorage for user 'test-user'."""
+    """为用户准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
         with patch("deerflow.config.paths._paths", None):
             storage = UserScopedSkillStorage("test-user", host_path=str(skills_root), app_config=config)
@@ -71,51 +73,61 @@ def user_storage(base_dir: Path, skills_root, config) -> UserScopedSkillStorage:
 
 
 class TestPathRedirection:
-    """Custom skill paths are redirected to per-user directories."""
+    '未说明'
 
     def test_custom_skill_dir_is_user_scoped(self, user_storage: UserScopedSkillStorage, base_dir: Path):
+        '未说明'
         expected = base_dir / "users" / "test-user" / "skills" / "custom" / "demo-skill"
         assert user_storage.get_custom_skill_dir("demo-skill") == expected
 
     def test_custom_skill_file_is_user_scoped(self, user_storage: UserScopedSkillStorage, base_dir: Path):
+        '未说明'
         expected = base_dir / "users" / "test-user" / "skills" / "custom" / "demo-skill" / "SKILL.md"
         assert user_storage.get_custom_skill_file("demo-skill") == expected
 
     def test_history_file_is_user_scoped(self, user_storage: UserScopedSkillStorage, base_dir: Path):
+        '未说明'
         expected = base_dir / "users" / "test-user" / "skills" / "custom" / ".history" / "demo-skill.jsonl"
         assert user_storage.get_skill_history_file("demo-skill") == expected
 
     def test_public_skill_paths_still_use_global_root(self, user_storage: UserScopedSkillStorage, skills_root: Path):
+        '未说明'
         assert user_storage.get_skills_root_path() == skills_root
 
     def test_user_id_property(self, user_storage: UserScopedSkillStorage):
+        '未说明'
         assert user_storage.user_id == "test-user"
 
 
 class TestWriteAndRead:
-    """Writes go to user dir, reads from user dir when present."""
+    '未说明'
 
     def test_write_creates_file_in_user_dir(self, user_storage: UserScopedSkillStorage, base_dir: Path):
+        '未说明'
         user_storage.write_custom_skill("demo-skill", "SKILL.md", _skill_content("demo-skill"))
         user_file = base_dir / "users" / "test-user" / "skills" / "custom" / "demo-skill" / "SKILL.md"
         assert user_file.exists()
         assert user_file.read_text(encoding="utf-8") == _skill_content("demo-skill")
 
     def test_write_does_not_create_in_global_custom(self, user_storage: UserScopedSkillStorage, skills_root: Path, base_dir: Path):
+        '未说明'
         user_storage.write_custom_skill("demo-skill", "SKILL.md", _skill_content("demo-skill"))
         global_file = skills_root / "custom" / "demo-skill" / "SKILL.md"
         assert not global_file.exists()
 
     def test_read_from_user_dir(self, user_storage: UserScopedSkillStorage, base_dir: Path):
+        '未说明'
         user_storage.write_custom_skill("demo-skill", "SKILL.md", _skill_content("demo-skill"))
         content = user_storage.read_custom_skill("demo-skill")
         assert "demo-skill" in content
 
     def test_read_not_found_raises(self, user_storage: UserScopedSkillStorage):
+        '未说明'
         with pytest.raises(FileNotFoundError):
             user_storage.read_custom_skill("nonexistent")
 
     def test_write_makes_path_sandbox_readable(self, user_storage: UserScopedSkillStorage, base_dir: Path):
+        '未说明'
         user_storage.write_custom_skill("demo-skill", "references/ref.md", "# ref")
         skill_dir = base_dir / "users" / "test-user" / "skills" / "custom" / "demo-skill"
         ref_dir = skill_dir / "references"
@@ -124,9 +136,10 @@ class TestWriteAndRead:
 
 
 class TestSkillLoading:
-    """Public skills from global, custom from user dir + fallback."""
+    '未说明'
 
     def test_public_skills_loaded_from_global(self, user_storage: UserScopedSkillStorage, skills_root: Path):
+        '未说明'
         public_dir = skills_root / "public" / "deep-research"
         public_dir.mkdir(parents=True)
         (public_dir / "SKILL.md").write_text(_skill_content("deep-research"), encoding="utf-8")
@@ -137,6 +150,7 @@ class TestSkillLoading:
         assert public_skills[0].name == "deep-research"
 
     def test_custom_skills_loaded_from_user_dir(self, user_storage: UserScopedSkillStorage, base_dir: Path):
+        '未说明'
         user_storage.write_custom_skill("my-skill", "SKILL.md", _skill_content("my-skill"))
 
         skills = user_storage.load_skills(enabled_only=False)
@@ -146,6 +160,7 @@ class TestSkillLoading:
 
     def test_fallback_to_global_custom_when_user_dir_empty(self, user_storage: UserScopedSkillStorage, skills_root: Path, base_dir: Path):
         # Put skill in global custom (NOT in user dir)
+        '未说明'
         global_dir = skills_root / "custom" / "global-skill"
         global_dir.mkdir(parents=True)
         (global_dir / "SKILL.md").write_text(_skill_content("global-skill"), encoding="utf-8")
@@ -158,6 +173,7 @@ class TestSkillLoading:
 
     def test_no_fallback_when_user_dir_has_content(self, user_storage: UserScopedSkillStorage, skills_root: Path, base_dir: Path):
         # Put skill in global custom
+        '未说明'
         global_dir = skills_root / "custom" / "global-skill"
         global_dir.mkdir(parents=True)
         (global_dir / "SKILL.md").write_text(_skill_content("global-skill"), encoding="utf-8")
@@ -173,6 +189,7 @@ class TestSkillLoading:
 
     def test_mixed_public_and_custom(self, user_storage: UserScopedSkillStorage, skills_root: Path, base_dir: Path):
         # Create public skill
+        '未说明'
         public_dir = skills_root / "public" / "deep-research"
         public_dir.mkdir(parents=True)
         (public_dir / "SKILL.md").write_text(_skill_content("deep-research"), encoding="utf-8")
@@ -187,9 +204,10 @@ class TestSkillLoading:
 
 
 class TestIsolation:
-    """Different users must see different custom skills."""
+    '未说明'
 
     def test_two_users_isolated(self, base_dir: Path, skills_root, config):
+        '未说明'
         with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
             with patch("deerflow.config.paths._paths", None):
                 storage_a = UserScopedSkillStorage("alice", host_path=str(skills_root), app_config=config)
@@ -207,6 +225,7 @@ class TestIsolation:
                 assert skills_b[0].name == "skill-b"
 
     def test_delete_is_isolated(self, base_dir: Path, skills_root, config):
+        '未说明'
         with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
             with patch("deerflow.config.paths._paths", None):
                 storage_a = UserScopedSkillStorage("alice", host_path=str(skills_root), app_config=config)
@@ -226,9 +245,10 @@ class TestIsolation:
 
 
 class TestHistoryIsolation:
-    """History files are per-user."""
+    '未说明'
 
     def test_history_per_user(self, base_dir: Path, skills_root, config):
+        '未说明'
         with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
             with patch("deerflow.config.paths._paths", None):
                 storage_a = UserScopedSkillStorage("alice", host_path=str(skills_root), app_config=config)
@@ -240,6 +260,7 @@ class TestHistoryIsolation:
                 assert history_file_a.exists()
 
     def test_history_does_not_leak_to_global(self, base_dir: Path, skills_root, config):
+        '未说明'
         with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
             with patch("deerflow.config.paths._paths", None):
                 storage = UserScopedSkillStorage("alice", host_path=str(skills_root), app_config=config)
@@ -251,25 +272,29 @@ class TestHistoryIsolation:
 
 
 class TestPathSafety:
-    """UserScopedSkillStorage inherits path-traversal guards from LocalSkillStorage."""
+    '未说明'
 
     def test_rejects_invalid_skill_name(self, user_storage: UserScopedSkillStorage):
+        '未说明'
         with pytest.raises(ValueError, match="hyphen-case"):
             user_storage.get_custom_skill_dir("../../escaped")
 
     def test_rejects_path_traversal_in_write(self, user_storage: UserScopedSkillStorage):
+        '未说明'
         with pytest.raises(ValueError, match="skill directory"):
             user_storage.write_custom_skill("demo-skill", "../../escaped.txt", "x")
 
     def test_rejects_empty_path_in_write(self, user_storage: UserScopedSkillStorage):
+        '未说明'
         with pytest.raises(ValueError, match="empty"):
             user_storage.write_custom_skill("demo-skill", "", "x")
 
 
 class TestFactory:
-    """get_or_new_user_skill_storage factory behavior."""
+    '未说明'
 
     def test_returns_same_instance_for_same_user(self, base_dir: Path, skills_root, config):
+        '未说明'
         with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
             with patch("deerflow.config.paths._paths", None):
                 from deerflow.skills.storage import get_or_new_user_skill_storage
@@ -279,6 +304,7 @@ class TestFactory:
                 assert s1 is s2
 
     def test_returns_different_instance_for_different_user(self, base_dir: Path, skills_root, config):
+        '未说明'
         with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
             with patch("deerflow.config.paths._paths", None):
                 from deerflow.skills.storage import get_or_new_user_skill_storage
@@ -288,6 +314,7 @@ class TestFactory:
                 assert s1 is not s2
 
     def test_reset_clears_specific_user(self, base_dir: Path, skills_root, config):
+        '未说明'
         with patch("deerflow.config.paths.get_paths", return_value=Paths(base_dir=base_dir)):
             with patch("deerflow.config.paths._paths", None):
                 from deerflow.skills.storage import get_or_new_user_skill_storage
@@ -307,15 +334,10 @@ class TestFactory:
 
 
 class TestSkillToggleIsolation:
-    """Per-user enabled/disabled state isolation for same-named custom skills.
-
-    When Alice and Bob each own a custom skill named 'report-gen', disabling
-    Alice's copy must NOT affect Bob's.  The enabled state is stored in
-    per-user ``_skill_states.json`` so same-named skills can be toggled
-    independently across users.
-    """
+    '未说明'
 
     def test_alice_disable_does_not_affect_bob(self, base_dir: Path, skills_root, config):
+        '未说明'
         from types import SimpleNamespace
 
         from deerflow.agents.lead_agent.prompt import clear_skills_system_prompt_cache, get_skills_prompt_section
@@ -377,11 +399,10 @@ class TestSkillToggleIsolation:
 
 
 class TestSkillStateAtomicWrite:
-    """P2-2: ``_write_skill_states`` must be atomic so a crash mid-write
-    cannot silently re-enable every skill the user had disabled.
-    """
+    '未说明'
 
     def test_writes_via_tempfile_then_replace(self, user_storage: UserScopedSkillStorage, base_dir: Path) -> None:
+        '未说明'
         states = {"report-gen": {"enabled": False}}
         user_storage._write_skill_states(states)
 
@@ -395,6 +416,7 @@ class TestSkillStateAtomicWrite:
         assert _json.loads(target.read_text(encoding="utf-8")) == states
 
     def test_failed_write_does_not_truncate_existing_file(self, user_storage: UserScopedSkillStorage) -> None:
+        '未说明'
         import json as _json
 
         # Seed a valid state file.
@@ -417,25 +439,25 @@ class TestSkillStateAtomicWrite:
 
 
 class TestSkillStateFailClosed:
-    """P1-2: ``_is_disabled_skill_path`` must fail CLOSED (return True)
-    when the enabled state cannot be determined, so a corrupt
-    ``_skill_states.json`` or mid-write race never lets the agent read a
-    disabled skill's files.
-    """
+    '未说明'
 
     def test_returns_true_when_state_lookup_raises(self) -> None:
+        '未说明'
         from deerflow.sandbox.tools import _is_disabled_skill_path
 
         def _boom(_skill_name: str) -> bool:
+            '未说明'
             raise OSError("storage unavailable")
 
         with patch("deerflow.skills.storage.user_scoped_skill_storage.UserScopedSkillStorage.get_skill_enabled_state", side_effect=_boom):
             assert _is_disabled_skill_path("/mnt/skills/custom/report-gen/SKILL.md", user_id="default") is True
 
     def test_returns_true_when_public_extensions_config_raises(self) -> None:
+        '未说明'
         from deerflow.sandbox.tools import _is_disabled_skill_path
 
         def _boom() -> bool:
+            '未说明'
             raise OSError("extensions_config.json unreadable")
 
         with patch("deerflow.config.extensions_config.ExtensionsConfig.from_file", side_effect=_boom):
@@ -443,15 +465,10 @@ class TestSkillStateFailClosed:
 
 
 class TestSkillLoadingRespectsGlobalDisable:
-    """P2-1: when the global ``extensions_config.json`` disables a
-    CUSTOM/LEGACY skill, ``load_skills`` must still report it as
-    disabled even if the per-user state has no entry (defaulting to
-    enabled otherwise). Without the AND, an admin's global "off" for a
-    shared skill would be silently flipped to "on" the moment a new
-    user touches the per-user storage.
-    """
+    '未说明'
 
     def test_global_disable_wins_when_per_user_state_missing(self, tmp_path: Path) -> None:
+        '未说明'
         from types import SimpleNamespace
 
         from deerflow.config.paths import Paths
@@ -498,12 +515,10 @@ class TestSkillLoadingRespectsGlobalDisable:
 
 
 class TestEnabledSkillsByConfigCacheBounded:
-    """P2-4: ``_enabled_skills_by_config_cache`` must be bounded so a
-    long-running process cannot leak one entry per distinct
-    (app_config, user_id) pair ever seen.
-    """
+    '未说明'
 
     def test_evicts_least_recently_used_above_maxsize(self, monkeypatch) -> None:
+        '未说明'
         from collections import OrderedDict
 
         from deerflow.agents.lead_agent import prompt as prompt_module
@@ -513,14 +528,19 @@ class TestEnabledSkillsByConfigCacheBounded:
         prompt_module._enabled_skills_by_config_cache = OrderedDict()
 
         class FakeConfig:
+            '未说明'
             def __init__(self, name: str) -> None:
+                '未说明'
                 self.name = name
 
         class FakeStorage:
+            '未说明'
             def __init__(self) -> None:
+                '未说明'
                 self.load_calls = 0
 
             def load_skills(self, *, enabled_only: bool = False):
+                """处理加载相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
                 self.load_calls += 1
                 return []
 
@@ -530,9 +550,11 @@ class TestEnabledSkillsByConfigCacheBounded:
         cfg_to_storage = {id(c): s for c, s in zip(configs, storages)}
 
         def _user_storage(user_id, *, app_config=None):
+            '未说明'
             return cfg_to_storage[id(app_config)]
 
         def _global_storage(*, app_config=None):
+            '未说明'
             return cfg_to_storage[id(app_config)]
 
         # Patch the *already-imported* references inside the prompt

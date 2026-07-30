@@ -2,12 +2,14 @@ import { getBackendBaseURL } from "../config";
 
 import { fetch } from "./fetcher";
 
+/** 线程运行反馈接口返回的持久化数据。 */
 export interface FeedbackData {
   feedback_id: string;
   rating: number;
   comment: string | null;
 }
 
+/** 为指定线程运行新增或更新评分和可选评论。 */
 export async function upsertFeedback(
   threadId: string,
   runId: string,
@@ -28,6 +30,7 @@ export async function upsertFeedback(
   return res.json();
 }
 
+/** 删除指定线程运行的反馈；不存在的反馈视为已删除。 */
 export async function deleteFeedback(
   threadId: string,
   runId: string,

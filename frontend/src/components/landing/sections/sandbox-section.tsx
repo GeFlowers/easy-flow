@@ -8,6 +8,7 @@ import {
 
 import { Section } from "../section";
 
+/** SandboxSection 组件：提供对应的界面结构与交互语义。 */
 export function SandboxSection({ className }: { className?: string }) {
   return (
     <Section
@@ -22,10 +23,10 @@ export function SandboxSection({ className }: { className?: string }) {
       }
     >
       <div className="mt-8 flex w-full max-w-6xl flex-col items-center gap-12 lg:flex-row lg:gap-16">
-        {/* Left: Terminal */}
+        {/* 左侧：终端。 */}
         <div className="w-full flex-1">
           <Terminal className="h-[360px] w-full">
-            {/* Scene 1: Build a Game */}
+            {/* 场景一：构建游戏。 */}
             <TypingAnimation>$ cat requirements.txt</TypingAnimation>
             <AnimatedSpan delay={800} className="text-zinc-400">
               pygame==2.5.0
@@ -58,7 +59,7 @@ export function SandboxSection({ className }: { className?: string }) {
               ✔ 60 FPS stable
             </AnimatedSpan>
 
-            {/* Scene 2: Data Analysis */}
+            {/* 场景二：数据分析。 */}
             <TypingAnimation delay={5400}>
               $ curl -O sales-2024.csv
             </TypingAnimation>
@@ -68,7 +69,7 @@ export function SandboxSection({ className }: { className?: string }) {
           </Terminal>
         </div>
 
-        {/* Right: Description */}
+        {/* 右侧：说明。 */}
         <div className="w-full flex-1 space-y-6">
           <div className="space-y-4">
             <p className="text-sm font-medium tracking-wider text-purple-400 uppercase">
@@ -101,7 +102,7 @@ export function SandboxSection({ className }: { className?: string }) {
             </p>
           </div>
 
-          {/* Feature Tags */}
+          {/* 功能标签。 */}
           <div className="flex flex-wrap gap-3 pt-4">
             <span className="rounded-full border border-zinc-800 bg-zinc-900 px-4 py-2 text-sm text-zinc-300">
               Isolated

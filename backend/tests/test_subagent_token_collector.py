@@ -1,4 +1,4 @@
-"""Tests for SubagentTokenCollector callback handler."""
+'未说明'
 
 from unittest.mock import MagicMock
 from uuid import uuid4
@@ -7,7 +7,7 @@ from deerflow.subagents.token_collector import SubagentTokenCollector
 
 
 def _make_llm_response(content="Hello", usage=None, response_metadata=None):
-    """Create a mock LLM response with a message."""
+    '未说明'
     msg = MagicMock()
     msg.content = content
     msg.usage_metadata = usage
@@ -22,7 +22,7 @@ def _make_llm_response(content="Hello", usage=None, response_metadata=None):
 
 
 def _make_llm_response_from_usages(usages):
-    """Create a mock LLM response with one generation per usage entry."""
+    '未说明'
     generations = []
     for usage in usages:
         msg = MagicMock()
@@ -39,7 +39,9 @@ def _make_llm_response_from_usages(usages):
 
 
 class TestSubagentTokenCollector:
+    '未说明'
     def test_collects_usage_from_response(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150}
         collector.on_llm_end(_make_llm_response("Hi", usage=usage), run_id=uuid4())
@@ -52,6 +54,7 @@ class TestSubagentTokenCollector:
         assert "source_run_id" in records[0]
 
     def test_collects_model_name_from_response_metadata(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150}
         collector.on_llm_end(
@@ -65,6 +68,7 @@ class TestSubagentTokenCollector:
         assert records[0]["model_name"] == "subagent-model"
 
     def test_collects_model_name_from_response_metadata_model_fallback(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 100, "output_tokens": 50, "total_tokens": 150}
         collector.on_llm_end(
@@ -78,6 +82,7 @@ class TestSubagentTokenCollector:
         assert records[0]["model_name"] == "provider-model"
 
     def test_total_tokens_zero_uses_input_plus_output(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 200, "output_tokens": 100, "total_tokens": 0}
         collector.on_llm_end(_make_llm_response("Hi", usage=usage), run_id=uuid4())
@@ -86,6 +91,7 @@ class TestSubagentTokenCollector:
         assert records[0]["total_tokens"] == 300
 
     def test_total_tokens_missing_uses_input_plus_output(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 30, "output_tokens": 20}
         collector.on_llm_end(_make_llm_response("Hi", usage=usage), run_id=uuid4())
@@ -94,6 +100,7 @@ class TestSubagentTokenCollector:
         assert records[0]["total_tokens"] == 50
 
     def test_dedup_same_run_id(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         run_id = uuid4()
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
@@ -103,12 +110,14 @@ class TestSubagentTokenCollector:
         assert len(records) == 1
 
     def test_no_usage_no_record(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         collector.on_llm_end(_make_llm_response("Hi", usage=None), run_id=uuid4())
         records = collector.snapshot_records()
         assert len(records) == 0
 
     def test_zero_usage_no_record(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
         collector.on_llm_end(_make_llm_response("Hi", usage=usage), run_id=uuid4())
@@ -116,6 +125,7 @@ class TestSubagentTokenCollector:
         assert len(records) == 0
 
     def test_skips_empty_generation_and_records_later_usage(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         response = _make_llm_response_from_usages(
             [
@@ -131,6 +141,7 @@ class TestSubagentTokenCollector:
         assert records[0]["total_tokens"] == 30
 
     def test_snapshot_returns_copy(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         collector.on_llm_end(_make_llm_response("Hi", usage=usage), run_id=uuid4())
@@ -143,6 +154,7 @@ class TestSubagentTokenCollector:
         assert len(collector.snapshot_records()) == 1
 
     def test_multiple_calls_accumulate(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         collector.on_llm_end(_make_llm_response("A", usage=usage), run_id=uuid4())
@@ -151,6 +163,7 @@ class TestSubagentTokenCollector:
         assert len(records) == 2
 
     def test_different_run_ids_accumulate_separately(self):
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
         usage1 = {"input_tokens": 10, "output_tokens": 5, "total_tokens": 15}
         usage2 = {"input_tokens": 20, "output_tokens": 10, "total_tokens": 30}
@@ -162,7 +175,7 @@ class TestSubagentTokenCollector:
         assert records[1]["total_tokens"] == 30
 
     def test_message_without_usage_metadata_skipped(self):
-        """A response where message has no usage_metadata attribute must be skipped."""
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
 
         msg = MagicMock(spec=[])  # object without usage_metadata
@@ -176,7 +189,7 @@ class TestSubagentTokenCollector:
         assert len(records) == 0
 
     def test_generation_without_message_skipped(self):
-        """A generation without a message attribute must be skipped."""
+        '未说明'
         collector = SubagentTokenCollector(caller="subagent:test")
 
         gen = MagicMock(spec=[])  # object without message

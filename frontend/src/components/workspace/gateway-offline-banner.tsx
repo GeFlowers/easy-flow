@@ -14,31 +14,28 @@ import {
 } from "./gateway-offline-banner-helpers";
 
 interface GatewayOfflineBannerProps {
-  /**
-   * True when the server-side auth probe at `/api/v1/auth/me` could not
-   * reach the gateway. The banner stays mounted until a client-side probe
-   * confirms the gateway is healthy and `user` becomes populated.
-   */
+  /** 服务端 `/api/v1/auth/me` 探测无法连通网关时为 true；横幅会保留到客户端探测恢复并填充 `user`。 */
   gatewayUnavailable: boolean;
 }
 
+/** 网关暂不可用时轮询认证状态，并在恢复或会话过期时交接给认证系统。 */
+/** 在网关暂不可达时提供恢复中的可见反馈，并在认证恢复后自动撤销轮询。 */
 export function GatewayOfflineBanner({
   gatewayUnavailable,
 }: GatewayOfflineBannerProps) {
   const { t } = useI18n();
   const { user, applyUser, refreshUser, logout } = useAuth();
-  // Guard against piling up probe calls while the gateway is still slow.
+  // 网关仍然缓慢响应时，避免堆积重复的探测请求。
   const inFlightRef = useRef(false);
-  // Count consecutive 401s so we can distinguish "transient warm-up 401"
-  // from "session actually expired" and avoid lying with the banner.
+  // 记录连续 401，以区分“启动预热中的短暂 401”和“会话确已过期”，
+  // 防止横幅给出错误提示。
   const authFailuresRef = useRef(0);
 
   useEffect(() => {
     if (!gatewayUnavailable) return;
-    // Once AuthProvider has a user again the banner has served its
-    // purpose; tear down the polling so we don't keep probing every 10s
-    // for the entire lifetime of the page (gatewayUnavailable is a
-    // server-rendered prop and stays true until a full reload).
+    // AuthProvider 恢复用户后横幅已完成使命，停止轮询，避免在整个页面
+    // 生命周期内每 10 秒继续探测（gatewayUnavailable 是服务端渲染的属性，
+    // 完整刷新前会一直为 true）。
     if (user !== null) return;
 
     const probe = async () => {
@@ -52,9 +49,8 @@ export function GatewayOfflineBanner({
           credentials: "include",
           cache: "no-store",
         });
-        // Reuse the probe's own response body instead of triggering a
-        // second /auth/me request via refreshUser() — halves the recovery
-        // burst against an already-struggling gateway.
+        // 复用当前探测的响应体，不通过 refreshUser() 再发一次 /auth/me；
+        // 这样能将本就负载较高的网关在恢复瞬间承受的请求量减半。
         if (res.ok) {
           try {
             const data = await res.json();
@@ -85,7 +81,7 @@ export function GatewayOfflineBanner({
         return;
       }
       if (action.type === "delegate-refresh") {
-        // Hand off to AuthProvider, which on 401 will /login-redirect.
+        // 交由 AuthProvider 处理；它会在 401 时重定向至 /login。
         authFailuresRef.current = 0;
         await refreshUser();
         return;

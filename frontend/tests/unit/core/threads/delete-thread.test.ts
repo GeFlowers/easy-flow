@@ -3,6 +3,11 @@ import { expect, rs, test } from "@rstest/core";
 import { findSidecarThreadIdsForParent } from "@/core/threads/hooks";
 import type { AgentThread } from "@/core/threads/types";
 
+/**
+ * 构造测试所需的稳定夹具，使调用处能够明确复用 makeThread 的约定。
+
+ */
+
 function makeThread(
   threadId: string,
   metadata: Record<string, unknown> = {},
@@ -16,6 +21,11 @@ function makeThread(
     values: { title: threadId, messages: [] },
   } as unknown as AgentThread;
 }
+
+/**
+ * 覆盖“finds only sidecar threads attached to the deleted parent thread”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("finds only sidecar threads attached to the deleted parent thread", async () => {
   const search = rs.fn().mockResolvedValueOnce([

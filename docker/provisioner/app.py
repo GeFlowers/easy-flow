@@ -1,24 +1,20 @@
-"""DeerFlow Sandbox Provisioner Service.
+"""DeerFlow 沙箱 Provisioner 服务。
 
-Dynamically creates and manages per-sandbox Pods in Kubernetes.
-Each ``sandbox_id`` gets its own Pod + Service.  The backend accesses sandboxes
-through NodePort or Kubernetes service DNS, depending on configuration.
+该服务会在容器编排集群中按 ``sandbox_id`` 动态创建并管理独立的工作负载和
+服务；后端根据配置经由 NodePort 或集群服务 DNS 访问沙箱。
+它优先读取挂载的 kubeconfig（``~/.kube/config``），不可用时改用集群内配置。
 
-The provisioner connects to the host machine's Kubernetes cluster via a
-mounted kubeconfig (``~/.kube/config``) or in-cluster config.  Sandbox Pods
-run in K8s and are accessed by the backend via the configured Service mode.
+接口：
+    POST   /api/sandboxes              — 创建沙箱工作负载与服务
+    DELETE /api/sandboxes/{sandbox_id} — 销毁沙箱工作负载与服务
+    GET    /api/sandboxes/{sandbox_id} — 获取沙箱状态与访问地址
+    GET    /api/sandboxes              — 列出全部沙箱
+    GET    /health                     — 检查 Provisioner 服务健康状态
 
-Endpoints:
-    POST   /api/sandboxes              — Create a sandbox Pod + Service
-    DELETE /api/sandboxes/{sandbox_id} — Destroy a sandbox Pod + Service
-    GET    /api/sandboxes/{sandbox_id} — Get sandbox status & URL
-    GET    /api/sandboxes              — List all sandboxes
-    GET    /health                     — Provisioner health check
-
-Architecture (docker-compose-dev):
+``docker-compose-dev`` 架构：
     ┌────────────┐  HTTP  ┌─────────────┐  K8s API  ┌──────────────┐
-    │ remote     │ ─────▸ │ provisioner │ ────────▸ │  host K8s    │
-    │ _backend   │        │ :8002       │           │  API server  │
+    │ remote     │ ─────▸ │ provisioner │ ────────▸ │  主机集群    │
+    │ _backend   │        │ :8002       │           │  接口服务    │
     └────────────┘        └─────────────┘           └──────┬───────┘
                                                            │ creates
                           ┌─────────────┐           ┌──────▼───────┐
@@ -43,7 +39,7 @@ from kubernetes import config as k8s_config
 from kubernetes.client.rest import ApiException
 from pydantic import BaseModel, Field
 
-# Suppress only the InsecureRequestWarning from urllib3
+# 仅屏蔽 urllib3 的 InsecureRequestWarning。
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 logger = logging.getLogger(__name__)
@@ -52,7 +48,7 @@ logging.basicConfig(
     format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
 )
 
-# ── Configuration (all tuneable via environment variables) ───────────────
+# ── 配置（均可由环境变量调整） ──────────────────────────────────────────
 
 K8S_NAMESPACE = os.environ.get("K8S_NAMESPACE", "deer-flow")
 SANDBOX_IMAGE = os.environ.get(
@@ -79,19 +75,17 @@ SAFE_THREAD_ID_PATTERN = r"^[A-Za-z0-9_\-]+$"
 SAFE_USER_ID_PATTERN = r"^[A-Za-z0-9_\-]+$"
 DEFAULT_USER_ID = "default"
 
-# Path to the kubeconfig *inside* the provisioner container.
-# Typically the host's ~/.kube/config is mounted here.
+# Provisioner 容器内 kubeconfig 的路径；通常将主机的 ``~/.kube/config`` 挂载至此。
 KUBECONFIG_PATH = os.environ.get("KUBECONFIG_PATH", "/root/.kube/config")
 PROVISIONER_API_KEY = os.environ.get("PROVISIONER_API_KEY", "")
 
-# The hostname / IP that the backend uses to reach NodePort services. On Docker
-# Desktop for macOS this is ``host.docker.internal``; on Linux it may be the
-# host's LAN IP. Ignored when SANDBOX_SERVICE_TYPE=ClusterIP.
+# 后端连接 NodePort Service 时使用的主机名或 IP；macOS Docker Desktop 通常为
+# ``host.docker.internal``，Linux 可使用主机局域网 IP；ClusterIP 模式忽略此项。
 NODE_HOST = os.environ.get("NODE_HOST", "host.docker.internal")
 
 
 def join_host_path(base: str, *parts: str) -> str:
-    """Join host filesystem path segments while preserving native style."""
+    """按宿主机路径风格拼接片段，兼容 Windows 盘符、UNC 路径与 POSIX 路径。"""
     if not parts:
         return base
 
@@ -111,16 +105,17 @@ def join_host_path(base: str, *parts: str) -> str:
     return str(result)
 
 
-# ── K8s client setup ────────────────────────────────────────────────────
+# ── Kubernetes 客户端初始化 ─────────────────────────────────────────────
 
 core_v1: k8s_client.CoreV1Api | None = None
 
 
 def _init_k8s_client() -> k8s_client.CoreV1Api:
-    """Load kubeconfig from the mounted host config and return a CoreV1Api.
+    """加载 Kubernetes 配置并返回 ``CoreV1Api``。
 
-    Tries the mounted kubeconfig first, then falls back to in-cluster
-    config (useful if the provisioner itself runs inside K8s).
+    优先使用挂载的 kubeconfig，文件不存在时回退至集群内配置。若设置
+    ``K8S_API_SERVER``，会覆盖 kubeconfig 中的地址以便容器访问宿主集群；本地
+    自签名证书场景会关闭证书校验，配置加载失败会抛出带上下文的 ``RuntimeError``。
     """
     if os.path.exists(KUBECONFIG_PATH):
         if os.path.isdir(KUBECONFIG_PATH):
@@ -137,14 +132,12 @@ def _init_k8s_client() -> k8s_client.CoreV1Api:
         except Exception as exc:
             raise RuntimeError(f"Failed to initialize Kubernetes client. No kubeconfig at {KUBECONFIG_PATH}, and in-cluster config is unavailable: {exc}") from exc
 
-    # When connecting from inside Docker to the host's K8s API, the
-    # kubeconfig may reference ``localhost`` or ``127.0.0.1``.  We
-    # optionally rewrite the server address so it reaches the host.
+    # 容器内 ``localhost`` 指向自身；允许用环境变量改写 kubeconfig 的 API 地址以连接宿主集群。
     k8s_api_server = os.environ.get("K8S_API_SERVER")
     if k8s_api_server:
         configuration = k8s_client.Configuration.get_default_copy()
         configuration.host = k8s_api_server
-        # Self-signed certs are common for local clusters
+        # 本地 Kubernetes 集群常使用自签名证书。
         configuration.verify_ssl = False
         api_client = k8s_client.ApiClient(configuration)
         return k8s_client.CoreV1Api(api_client)
@@ -153,7 +146,7 @@ def _init_k8s_client() -> k8s_client.CoreV1Api:
 
 
 def _wait_for_kubeconfig(timeout: int = 30) -> None:
-    """Wait for kubeconfig file if configured, then continue with fallback support."""
+    """在超时前等待有效 kubeconfig 文件，超时后记录告警并让后续逻辑尝试集群内配置。"""
     deadline = time.time() + timeout
     while time.time() < deadline:
         if os.path.exists(KUBECONFIG_PATH):
@@ -169,7 +162,7 @@ def _wait_for_kubeconfig(timeout: int = 30) -> None:
 
 
 def _ensure_namespace() -> None:
-    """Create the K8s namespace if it does not yet exist."""
+    """确保目标命名空间存在；仅在 API 返回 404 时创建，其他 Kubernetes 错误原样上抛。"""
     try:
         core_v1.read_namespace(K8S_NAMESPACE)
         logger.info(f"Namespace '{K8S_NAMESPACE}' already exists")
@@ -190,11 +183,12 @@ def _ensure_namespace() -> None:
             raise
 
 
-# ── FastAPI lifespan ─────────────────────────────────────────────────────
+# ── FastAPI 生命周期 ────────────────────────────────────────────────────
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
+    """管理 Provisioner 生命周期中的 Kubernetes 客户端初始化。"""
     global core_v1
     _wait_for_kubeconfig()
     core_v1 = _init_k8s_client()
@@ -208,6 +202,7 @@ app = FastAPI(title="DeerFlow Sandbox Provisioner", lifespan=lifespan)
 
 @app.middleware("http")
 async def verify_api_key(request: Request, call_next):
+    """验证 ``/api/`` 请求携带的 Provisioner 接口密钥。"""
     if request.url.path.startswith("/api/"):
         key = request.headers.get("X-API-Key", "")
         if not PROVISIONER_API_KEY or not secrets.compare_digest(key, PROVISIONER_API_KEY):
@@ -216,10 +211,11 @@ async def verify_api_key(request: Request, call_next):
     return await call_next(request)
 
 
-# ── Request / Response models ───────────────────────────────────────────
+# ── 请求与响应模型 ──────────────────────────────────────────────────────
 
 
 class CreateSandboxRequest(BaseModel):
+    """创建沙箱接口的请求模型。"""
     sandbox_id: str
     thread_id: str = Field(pattern=SAFE_THREAD_ID_PATTERN)
     user_id: str = Field(default=DEFAULT_USER_ID, pattern=SAFE_USER_ID_PATTERN)
@@ -227,24 +223,27 @@ class CreateSandboxRequest(BaseModel):
 
 
 class SandboxResponse(BaseModel):
+    """沙箱接口的响应模型。"""
     sandbox_id: str
     sandbox_url: str
     status: str
 
 
-# ── K8s resource helpers ─────────────────────────────────────────────────
+# ── Kubernetes 资源构造辅助函数 ─────────────────────────────────────────
 
 
 def _pod_name(sandbox_id: str) -> str:
+    """生成沙箱 Pod 的 Kubernetes 名称。"""
     return f"sandbox-{sandbox_id}"
 
 
 def _svc_name(sandbox_id: str) -> str:
+    """生成沙箱 Service 的 Kubernetes 名称。"""
     return f"sandbox-{sandbox_id}-svc"
 
 
 def _sandbox_url(sandbox_id: str, node_port: int | None = None) -> str:
-    """Build the sandbox access URL for the configured Service mode."""
+    """按 Service 模式生成后端访问 URL；NodePort 模式必须提供已分配端口。"""
     if SANDBOX_SERVICE_TYPE == "ClusterIP":
         return f"http://{_svc_name(sandbox_id)}.{K8S_NAMESPACE}.svc.cluster.local:{SANDBOX_CONTAINER_PORT}"
     if node_port is None:
@@ -258,20 +257,18 @@ def _build_volumes(
     *,
     include_legacy_skills: bool = False,
 ) -> list[k8s_client.V1Volume]:
-    """Build volume list: PVC when configured, otherwise hostPath.
+    """构造 Pod 卷列表，在 PVC 与安全的宿主机目录布局之间切换。
 
-    Skills are split into public, per-user custom, and legacy (global-custom)
-    volumes so that ``/mnt/skills/{public,custom,legacy}/`` paths resolve
-    correctly inside the sandbox — matching the hostPath layout produced by
-    ``LocalSandboxProvider`` and ``AioSandboxProvider``.
+    非 PVC 模式将公共、用户自定义及可选旧版技能分卷挂载，使
+    ``/mnt/skills/{public,custom,legacy}/`` 与本地沙箱路径契约一致；线程数据
+    按 ``thread_id`` 隔离。PVC 暂不支持三路 ``subPath``，因此保持兼容的单卷挂载。
     """
     volumes: list[k8s_client.V1Volume] = []
 
-    # ── Skills volumes ────────────────────────────────────────────────
+    # ── 技能卷 ───────────────────────────────────────────────────────
 
     if SKILLS_PVC_NAME:
-        # PVC mode: three-way subPath not yet supported; fall back to
-        # single-volume mount for backward compatibility.
+        # PVC 尚不支持三路 subPath，回退为单卷以保持旧部署兼容。
         logger.warning("SKILLS_PVC_NAME is set — three-way skills layout is not supported in PVC mode yet; falling back to single /mnt/skills mount")
         volumes.append(
             k8s_client.V1Volume(
@@ -283,7 +280,7 @@ def _build_volumes(
             )
         )
     else:
-        # hostPath mode: three-way layout
+        # 宿主机路径模式采用三路技能布局。
         public_path = join_host_path(SKILLS_HOST_PATH, "public")
         volumes.append(
             k8s_client.V1Volume(
@@ -324,7 +321,7 @@ def _build_volumes(
                 )
             )
 
-    # ── User-data volume ──────────────────────────────────────────────
+    # ── 用户数据卷 ───────────────────────────────────────────────────
 
     if USERDATA_PVC_NAME:
         userdata_vol = k8s_client.V1Volume(
@@ -352,12 +349,11 @@ def _build_volume_mounts(
     *,
     include_legacy_skills: bool = False,
 ) -> list[k8s_client.V1VolumeMount]:
-    """Build volume mount list, mirroring three-way skills layout.
+    """构造与技能卷对应的容器挂载点，并保留用户和线程隔离边界。
 
-    Skills are mounted to ``/mnt/skills/{public,custom,legacy}/`` so that
-    category-aware ``Skill.get_container_path()`` paths resolve correctly.
-    PVC mode falls back to a single ``/mnt/skills`` mount and can optionally
-    scope that mount with ``SKILLS_PVC_SUBPATH_TEMPLATE``.
+    非 PVC 模式挂载到 ``/mnt/skills/{public,custom,legacy}/``，满足
+    ``Skill.get_container_path()`` 的分类路径契约；PVC 模式使用单个
+    ``/mnt/skills``，并可由 ``SKILLS_PVC_SUBPATH_TEMPLATE`` 进一步限定范围。
     """
     mounts: list[k8s_client.V1VolumeMount] = []
 
@@ -416,7 +412,7 @@ def _build_pod(
     *,
     include_legacy_skills: bool = False,
 ) -> k8s_client.V1Pod:
-    """Construct a Pod manifest for a single sandbox."""
+    """为单个沙箱构造 Pod 清单，包含受限容器、健康探针、资源限额及隔离卷。"""
     return k8s_client.V1Pod(
         metadata=k8s_client.V1ObjectMeta(
             name=_pod_name(sandbox_id),
@@ -495,7 +491,7 @@ def _build_pod(
 
 
 def _build_service(sandbox_id: str) -> k8s_client.V1Service:
-    """Construct a Service manifest for the configured access mode."""
+    """按配置的访问模式构造仅选择对应 ``sandbox-id`` 工作负载的 TCP 服务清单。"""
     return k8s_client.V1Service(
         metadata=k8s_client.V1ObjectMeta(
             name=_svc_name(sandbox_id),
@@ -525,7 +521,7 @@ def _build_service(sandbox_id: str) -> k8s_client.V1Service:
 
 
 def _url_from_service(svc, sandbox_id: str) -> str | None:
-    """Build the backend-facing sandbox URL from an already-fetched Service."""
+    """从已读取的 Service 解析后端可访问 URL；端口尚未分配时返回 ``None``。"""
     if SANDBOX_SERVICE_TYPE == "ClusterIP":
         return _sandbox_url(sandbox_id)
 
@@ -536,7 +532,7 @@ def _url_from_service(svc, sandbox_id: str) -> str | None:
 
 
 def _sandbox_access_url(sandbox_id: str, *, tolerate_read_errors: bool = False) -> str | None:
-    """Read the sandbox Service and return its backend-facing URL when ready."""
+    """读取沙箱 Service 并在可访问时返回 URL；可容忍的短暂读取错误记录后返回空值。"""
     try:
         svc = core_v1.read_namespaced_service(_svc_name(sandbox_id), K8S_NAMESPACE)
     except ApiException as exc:
@@ -556,7 +552,7 @@ def _sandbox_access_url(sandbox_id: str, *, tolerate_read_errors: bool = False) 
 
 
 def _get_pod_phase(sandbox_id: str) -> str:
-    """Return the Pod phase (Pending / Running / Succeeded / Failed / Unknown)."""
+    """返回 Pod 生命周期阶段；资源不存在时返回 ``NotFound``，避免将其误作运行状态。"""
     try:
         pod = core_v1.read_namespaced_pod(_pod_name(sandbox_id), K8S_NAMESPACE)
         return pod.status.phase or "Unknown"
@@ -564,21 +560,22 @@ def _get_pod_phase(sandbox_id: str) -> str:
         return "NotFound"
 
 
-# ── API endpoints ────────────────────────────────────────────────────────
+# ── API 端点 ────────────────────────────────────────────────────────────
 
 
 @app.get("/health")
 async def health():
-    """Provisioner health check."""
+    """返回进程存活状态，供负载均衡器与部署探针检查。"""
     return {"status": "ok"}
 
 
 @app.post("/api/sandboxes", response_model=SandboxResponse)
 def create_sandbox(req: CreateSandboxRequest):
-    """Create a sandbox Pod + Service for *sandbox_id*.
+    """为请求的沙箱创建 Pod 和 Service，并在资源已存在时保持幂等。
 
-    If the sandbox already exists, returns the existing information
-    (idempotent).
+    ``thread_id`` 与 ``user_id`` 已由模型正则约束，用于隔离数据和自定义技能。创建
+    Service 失败会尽力删除刚创建的 Pod；等候访问地址超时或 Kubernetes 操作失败时，
+    向调用方返回明确的 HTTP 500。
     """
     sandbox_id = req.sandbox_id
     thread_id = req.thread_id
@@ -593,7 +590,7 @@ def create_sandbox(req: CreateSandboxRequest):
         include_legacy_skills,
     )
 
-    # ── Fast path: sandbox already exists ────────────────────────────
+    # ── 快速路径：已有沙箱直接返回 ───────────────────────────────────
     existing_url = _sandbox_access_url(sandbox_id, tolerate_read_errors=True)
     if existing_url:
         return SandboxResponse(
@@ -602,7 +599,7 @@ def create_sandbox(req: CreateSandboxRequest):
             status=_get_pod_phase(sandbox_id),
         )
 
-    # ── Create Pod ───────────────────────────────────────────────────
+    # ── 创建 Pod ─────────────────────────────────────────────────────
     try:
         core_v1.create_namespaced_pod(
             K8S_NAMESPACE,
@@ -618,20 +615,20 @@ def create_sandbox(req: CreateSandboxRequest):
         if exc.status != 409:  # 409 = AlreadyExists
             raise HTTPException(status_code=500, detail=f"Pod creation failed: {exc.reason}")
 
-    # ── Create Service ───────────────────────────────────────────────
+    # ── 创建 Service ─────────────────────────────────────────────────
     try:
         core_v1.create_namespaced_service(K8S_NAMESPACE, _build_service(sandbox_id))
         logger.info(f"Created Service {_svc_name(sandbox_id)}")
     except ApiException as exc:
         if exc.status != 409:
-            # Roll back the Pod on failure
+            # Service 创建失败时回滚本次创建的 Pod，避免残留孤儿资源。
             try:
                 core_v1.delete_namespaced_pod(_pod_name(sandbox_id), K8S_NAMESPACE)
             except ApiException:
                 pass
             raise HTTPException(status_code=500, detail=f"Service creation failed: {exc.reason}")
 
-    # ── Wait until the Service has a usable access URL ───────────────
+    # ── 等待 Service 获得可用访问地址 ─────────────────────────────────
     sandbox_url: str | None = None
     for _ in range(20):
         sandbox_url = _sandbox_access_url(sandbox_id, tolerate_read_errors=True)
@@ -651,10 +648,10 @@ def create_sandbox(req: CreateSandboxRequest):
 
 @app.delete("/api/sandboxes/{sandbox_id}")
 def destroy_sandbox(sandbox_id: str):
-    """Destroy a sandbox Pod + Service."""
+    """删除沙箱 Service 与 Pod；404 视为幂等成功，其余部分清理失败会汇总后返回 500。"""
     errors: list[str] = []
 
-    # Delete Service
+    # 先删除 Service，避免新请求继续路由到正在销毁的 Pod。
     try:
         core_v1.delete_namespaced_service(_svc_name(sandbox_id), K8S_NAMESPACE)
         logger.info(f"Deleted Service {_svc_name(sandbox_id)}")
@@ -662,7 +659,7 @@ def destroy_sandbox(sandbox_id: str):
         if exc.status != 404:
             errors.append(f"service: {exc.reason}")
 
-    # Delete Pod
+    # 再删除 Pod；两步均尝试执行以报告完整的清理结果。
     try:
         core_v1.delete_namespaced_pod(_pod_name(sandbox_id), K8S_NAMESPACE)
         logger.info(f"Deleted Pod {_pod_name(sandbox_id)}")
@@ -678,7 +675,7 @@ def destroy_sandbox(sandbox_id: str):
 
 @app.get("/api/sandboxes/{sandbox_id}", response_model=SandboxResponse)
 def get_sandbox(sandbox_id: str):
-    """Return current status and URL for a sandbox."""
+    """返回指定沙箱的当前访问地址和 Pod 状态；Service 不存在或无地址时返回 404。"""
     sandbox_url = _sandbox_access_url(sandbox_id)
     if not sandbox_url:
         raise HTTPException(status_code=404, detail=f"Sandbox '{sandbox_id}' not found")
@@ -692,7 +689,7 @@ def get_sandbox(sandbox_id: str):
 
 @app.get("/api/sandboxes")
 def list_sandboxes():
-    """List every sandbox currently managed in the namespace."""
+    """列出命名空间内带沙箱标签且已具有可访问地址的所有 Service。"""
     try:
         services = core_v1.list_namespaced_service(
             K8S_NAMESPACE,

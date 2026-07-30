@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 import textwrap
@@ -8,6 +9,7 @@ from support.detectors import blocking_io_static as static
 
 
 def _write_python(path: Path, source: str) -> Path:
+    '未说明'
     path.write_text(textwrap.dedent(source).strip() + "\n", encoding="utf-8")
     return path
 
@@ -27,6 +29,7 @@ _CLEANUP_BRANCH_SOURCE = """
 
 
 def test_parse_changed_lines_records_added_lines_only() -> None:
+    '未说明'
     diff = textwrap.dedent(
         """\
         diff --git a/backend/app/x.py b/backend/app/x.py
@@ -43,6 +46,7 @@ def test_parse_changed_lines_records_added_lines_only() -> None:
 
 
 def test_parse_changed_lines_handles_context_diffs() -> None:
+    '未说明'
     diff = textwrap.dedent(
         """\
         diff --git a/backend/app/x.py b/backend/app/x.py
@@ -63,6 +67,7 @@ def test_parse_changed_lines_handles_context_diffs() -> None:
 
 
 def test_parse_changed_lines_ignores_deleted_files() -> None:
+    '未说明'
     diff = textwrap.dedent(
         """\
         diff --git a/x.py b/x.py
@@ -75,6 +80,7 @@ def test_parse_changed_lines_ignores_deleted_files() -> None:
 
 
 def test_select_findings_keeps_only_touched_candidates(tmp_path: Path) -> None:
+    '未说明'
     src = _write_python(tmp_path / "agents.py", _CLEANUP_BRANCH_SOURCE)
     findings = [f.to_dict() for f in static.scan_file(src, repo_root=tmp_path)]
     rmtree = next(f for f in findings if f["blocking_call"]["symbol"] == "shutil.rmtree")
@@ -88,6 +94,7 @@ def test_select_findings_keeps_only_touched_candidates(tmp_path: Path) -> None:
 
 
 def test_find_changed_blocking_io_surfaces_only_changed_candidate(tmp_path: Path, monkeypatch) -> None:
+    '未说明'
     src = _write_python(tmp_path / "agents.py", _CLEANUP_BRANCH_SOURCE)
     all_findings = [f.to_dict() for f in static.scan_file(src, repo_root=tmp_path)]
     rmtree_line = next(f["location"]["line"] for f in all_findings if f["blocking_call"]["symbol"] == "shutil.rmtree")
@@ -130,12 +137,7 @@ _SYNC_HELPER_HEAD = """
 
 
 def test_new_async_caller_exposing_old_sync_helper_is_reported(tmp_path: Path, monkeypatch) -> None:
-    """The blocking line is NOT in the diff — only the new async caller is.
-
-    The finding sits on the untouched `read_text` line, so changed-line
-    selection alone would return empty; the new-vs-base comparison must
-    surface it.
-    """
+    '未说明'
     src = _write_python(tmp_path / "mod.py", _SYNC_HELPER_HEAD)
     head_findings = [f.to_dict() for f in static.scan_file(src, repo_root=tmp_path)]
     read_text_line = next(f["location"]["line"] for f in head_findings if f["blocking_call"]["symbol"] == "path.read_text")
@@ -156,6 +158,7 @@ def test_new_async_caller_exposing_old_sync_helper_is_reported(tmp_path: Path, m
 
 
 def test_select_findings_new_vs_base_matches_by_stable_key(tmp_path: Path) -> None:
+    '未说明'
     head = _write_python(tmp_path / "mod.py", _SYNC_HELPER_HEAD)
     head_findings = [f.to_dict() for f in static.scan_file(head, repo_root=tmp_path)]
 
@@ -170,6 +173,7 @@ def test_select_findings_new_vs_base_matches_by_stable_key(tmp_path: Path) -> No
 
 
 def test_format_report_empty_warns_about_cross_file_blind_spot() -> None:
+    '未说明'
     report = changed.format_report([], base="origin/main")
     assert "No blocking-IO candidates" in report
     assert "defined in another file" in report

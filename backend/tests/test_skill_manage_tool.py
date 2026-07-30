@@ -1,3 +1,4 @@
+'未说明'
 import importlib
 from pathlib import Path
 from types import SimpleNamespace
@@ -11,16 +12,19 @@ skill_manage_module = importlib.import_module("deerflow.tools.skill_manage_tool"
 
 
 def _skill_content(name: str, description: str = "Demo skill") -> str:
+    '未说明'
     return f"---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n"
 
 
 async def _async_result(decision: str, reason: str):
+    '未说明'
     from deerflow.skills.security_scanner import ScanResult
 
     return ScanResult(decision=decision, reason=reason)
 
 
 def _make_config(skills_root: Path):
+    '未说明'
     return SimpleNamespace(
         skills=SimpleNamespace(
             get_skills_path=lambda: skills_root,
@@ -32,6 +36,7 @@ def _make_config(skills_root: Path):
 
 
 def _make_runtime(*, thread_id: str = "thread-1", user_id: str = "default"):
+    '未说明'
     return SimpleNamespace(
         context={"thread_id": thread_id, "user_id": user_id},
         config={"configurable": {"thread_id": thread_id, "user_id": user_id}},
@@ -39,6 +44,7 @@ def _make_runtime(*, thread_id: str = "thread-1", user_id: str = "default"):
 
 
 def test_skill_manage_create_and_patch(monkeypatch, tmp_path):
+    '未说明'
     skills_root = tmp_path / "skills"
     config = _make_config(skills_root)
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
@@ -52,6 +58,7 @@ def test_skill_manage_create_and_patch(monkeypatch, tmp_path):
     refresh_calls = []
 
     async def _refresh(user_id: str):
+        '未说明'
         refresh_calls.append(("refresh", user_id))
 
     monkeypatch.setattr(skill_manage_module, "refresh_user_skills_system_prompt_cache_async", _refresh)
@@ -87,6 +94,7 @@ def test_skill_manage_create_and_patch(monkeypatch, tmp_path):
 
 
 def test_skill_manage_patch_replaces_single_occurrence_by_default(monkeypatch, tmp_path):
+    '未说明'
     skills_root = tmp_path / "skills"
     config = _make_config(skills_root)
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
@@ -97,6 +105,7 @@ def test_skill_manage_patch_replaces_single_occurrence_by_default(monkeypatch, t
     monkeypatch.setattr("deerflow.config.paths._paths", None)
 
     async def _refresh(user_id: str):
+        '未说明'
         return None
 
     monkeypatch.setattr(skill_manage_module, "refresh_user_skills_system_prompt_cache_async", _refresh)
@@ -125,6 +134,7 @@ def test_skill_manage_patch_replaces_single_occurrence_by_default(monkeypatch, t
 
 
 def test_skill_manage_rejects_public_skill_patch(monkeypatch, tmp_path):
+    '未说明'
     skills_root = tmp_path / "skills"
     public_dir = skills_root / "public" / "deep-research"
     public_dir.mkdir(parents=True, exist_ok=True)
@@ -152,6 +162,7 @@ def test_skill_manage_rejects_public_skill_patch(monkeypatch, tmp_path):
 
 
 def test_skill_manage_sync_wrapper_supported(monkeypatch, tmp_path):
+    '未说明'
     skills_root = tmp_path / "skills"
     config = _make_config(skills_root)
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
@@ -163,6 +174,7 @@ def test_skill_manage_sync_wrapper_supported(monkeypatch, tmp_path):
     refresh_calls = []
 
     async def _refresh(user_id: str):
+        '未说明'
         refresh_calls.append(("refresh", user_id))
 
     monkeypatch.setattr(skill_manage_module, "refresh_user_skills_system_prompt_cache_async", _refresh)
@@ -181,6 +193,7 @@ def test_skill_manage_sync_wrapper_supported(monkeypatch, tmp_path):
 
 
 def test_skill_manage_rejects_support_path_traversal(monkeypatch, tmp_path):
+    '未说明'
     skills_root = tmp_path / "skills"
     config = _make_config(skills_root)
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
@@ -191,6 +204,7 @@ def test_skill_manage_rejects_support_path_traversal(monkeypatch, tmp_path):
     monkeypatch.setattr("deerflow.config.paths._paths", None)
 
     async def _refresh(user_id: str):
+        '未说明'
         return None
 
     monkeypatch.setattr(skill_manage_module, "refresh_user_skills_system_prompt_cache_async", _refresh)
@@ -211,6 +225,7 @@ def test_skill_manage_rejects_support_path_traversal(monkeypatch, tmp_path):
 
 
 def test_skill_manage_static_critical_blocks_create_before_llm(monkeypatch, tmp_path):
+    '未说明'
     skills_root = tmp_path / "skills"
     config = _make_config(skills_root)
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
@@ -223,9 +238,11 @@ def test_skill_manage_static_critical_blocks_create_before_llm(monkeypatch, tmp_
     llm_calls = []
 
     async def _refresh(user_id: str):
+        '未说明'
         refresh_calls.append(("refresh", user_id))
 
     async def _scan(*args, **kwargs):
+        '未说明'
         llm_calls.append({"args": args, "kwargs": kwargs})
         return await _async_result("allow", "ok")
 
@@ -252,6 +269,7 @@ def test_skill_manage_static_critical_blocks_create_before_llm(monkeypatch, tmp_
 
 
 def test_skill_manage_static_scan_failure_blocks_create_before_llm(monkeypatch, tmp_path):
+    '未说明'
     skills_root = tmp_path / "skills"
     config = _make_config(skills_root)
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
@@ -264,13 +282,16 @@ def test_skill_manage_static_scan_failure_blocks_create_before_llm(monkeypatch, 
     llm_calls = []
 
     async def _refresh(user_id: str):
+        '未说明'
         refresh_calls.append(("refresh", user_id))
 
     async def _scan(*args, **kwargs):
+        '未说明'
         llm_calls.append({"args": args, "kwargs": kwargs})
         return await _async_result("allow", "ok")
 
     def _broken_static_scan(skill_dir, *, skill_name=None, app_config=None):
+        '未说明'
         raise StaticScannerError("native scanner unavailable")
 
     monkeypatch.setattr(skill_manage_module, "refresh_user_skills_system_prompt_cache_async", _refresh)
@@ -294,7 +315,7 @@ def test_skill_manage_static_scan_failure_blocks_create_before_llm(monkeypatch, 
 
 
 def test_skill_manage_per_user_isolation(monkeypatch, tmp_path):
-    """Two different users must get separate custom skill directories."""
+    '未说明'
     skills_root = tmp_path / "skills"
     config = _make_config(skills_root)
     monkeypatch.setattr("deerflow.config.get_app_config", lambda: config)
@@ -305,6 +326,7 @@ def test_skill_manage_per_user_isolation(monkeypatch, tmp_path):
     monkeypatch.setattr("deerflow.config.paths._paths", None)
 
     async def _refresh(user_id: str):
+        '未说明'
         return None
 
     monkeypatch.setattr(skill_manage_module, "refresh_user_skills_system_prompt_cache_async", _refresh)

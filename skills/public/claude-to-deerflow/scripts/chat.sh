@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
-# chat.sh — Send a message to DeerFlow and collect the streaming response.
+# chat.sh — 向 DeerFlow 发送消息并收集流式响应。
 #
-# Usage:
+# 用法：
 #   bash chat.sh "Your question here"
 #   bash chat.sh "Your question" <thread_id>          # continue conversation
 #   bash chat.sh "Your question" "" pro                # specify mode
 #   DEERFLOW_URL=http://host:2026 bash chat.sh "hi"   # custom endpoint
 #
-# Environment variables:
-#   DEERFLOW_URL          — Unified proxy base URL (default: http://localhost:2026)
-#   DEERFLOW_GATEWAY_URL  — Gateway API base URL (default: $DEERFLOW_URL)
-#   DEERFLOW_LANGGRAPH_URL — LangGraph API base URL (default: $DEERFLOW_URL/api/langgraph)
+# 环境变量：
+#   DEERFLOW_URL          — 统一代理基地址（默认：http://localhost:2026）
+#   DEERFLOW_GATEWAY_URL  — Gateway API 基地址（默认：$DEERFLOW_URL）
+#   DEERFLOW_LANGGRAPH_URL — LangGraph API 基地址（默认：$DEERFLOW_URL/api/langgraph）
 #
-# Modes: flash, standard, pro (default), ultra
+# 模式：flash、standard、pro（默认）、ultra
 
 set -euo pipefail
 
@@ -23,7 +23,7 @@ MESSAGE="${1:?Usage: chat.sh <message> [thread_id] [mode]}"
 THREAD_ID="${2:-}"
 MODE="${3:-pro}"
 
-# --- Health check ---
+# --- 健康检查：请求前快速失败，避免创建无效会话 ---
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${GATEWAY_URL}/health" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" -ge 400 ]; then
   echo "ERROR: DeerFlow is not reachable at ${GATEWAY_URL} (HTTP ${HTTP_CODE})" >&2
@@ -31,7 +31,7 @@ if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" -ge 400 ]; then
   exit 1
 fi
 
-# --- Create or reuse thread ---
+# --- 创建或复用 thread ---
 if [ -z "$THREAD_ID" ]; then
   THREAD_RESP=$(curl -s -X POST "${LANGGRAPH_URL}/threads" \
     -H "Content-Type: application/json" \
@@ -44,7 +44,7 @@ if [ -z "$THREAD_ID" ]; then
   echo "Thread: ${THREAD_ID}" >&2
 fi
 
-# --- Build context based on mode ---
+# --- 按模式构建上下文 ---
 case "$MODE" in
   flash)
     CONTEXT='{"thinking_enabled":false,"is_plan_mode":false,"subagent_enabled":false,"thread_id":"'"$THREAD_ID"'"}'
@@ -64,10 +64,10 @@ case "$MODE" in
     ;;
 esac
 
-# --- Escape message for JSON ---
+# --- 为 JSON 转义消息，避免用户输入破坏请求体 ---
 ESCAPED_MSG=$(python3 -c "import json,sys; print(json.dumps(sys.argv[1]))" "$MESSAGE")
 
-# --- Build request body ---
+# --- 构建请求体 ---
 BODY=$(cat <<ENDJSON
 {
   "assistant_id": "lead_agent",
@@ -89,8 +89,8 @@ BODY=$(cat <<ENDJSON
 ENDJSON
 )
 
-# --- Stream the run and extract final response ---
-# We collect the full SSE output, then parse the last values event to get the AI response.
+# --- 流式执行并提取最终响应 ---
+# 收集完整 SSE 输出，再解析最后一个 values 事件以取得 AI 响应。
 TMPFILE=$(mktemp)
 trap "rm -f '$TMPFILE'" EXIT
 
@@ -98,7 +98,7 @@ curl -s -N -X POST "${LANGGRAPH_URL}/threads/${THREAD_ID}/runs/stream" \
   -H "Content-Type: application/json" \
   -d "$BODY" > "$TMPFILE"
 
-# Parse the SSE output: extract the last "event: values" data block and get the final AI message
+# 解析 SSE 输出：提取最后一个 "event: values" 数据块并取得最终 AI 消息。
 python3 - "$TMPFILE" "$GATEWAY_URL" "$THREAD_ID" << 'PYEOF'
 import json
 import sys

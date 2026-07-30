@@ -15,38 +15,55 @@ const MOCK_AGENTS = [
 ];
 
 test.describe("Agent chat", () => {
+  /**
+   * 覆盖“agent gallery page loads and shows agents”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("agent gallery page loads and shows agents", async ({ page }) => {
     mockLangGraphAPI(page, { agents: MOCK_AGENTS });
 
     await page.goto("/workspace/agents");
 
-    // The agent card should appear with the agent name
+    // 应显示包含 Agent 名称的卡片。
     await expect(page.getByText("test-agent")).toBeVisible({
       timeout: 15_000,
     });
   });
+
+  /**
+   * 覆盖“agent chat page loads with input box”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("agent chat page loads with input box", async ({ page }) => {
     mockLangGraphAPI(page, { agents: MOCK_AGENTS });
 
     await page.goto("/workspace/agents/test-agent/chats/new");
 
-    // The prompt input textarea should be visible
+    // 提示词输入文本区域应可见。
     const textarea = page.getByPlaceholder(/how can i assist you/i);
     await expect(textarea).toBeVisible({ timeout: 15_000 });
   });
+
+  /**
+   * 覆盖“agent chat page shows agent badge”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("agent chat page shows agent badge", async ({ page }) => {
     mockLangGraphAPI(page, { agents: MOCK_AGENTS });
 
     await page.goto("/workspace/agents/test-agent/chats/new");
 
-    // The agent badge should display in the header (scoped to header to avoid
-    // matching the welcome area which also shows the agent name)
+    // Agent 徽章应显示在页头中（限定在页头范围内，避免匹配同样显示 Agent 名称的欢迎区域）。
     await expect(
       page.locator("header span", { hasText: "test-agent" }),
     ).toBeVisible({ timeout: 15_000 });
   });
+
+  /**
+   * 覆盖“agent chat can regenerate its latest response”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("agent chat can regenerate its latest response", async ({ page }) => {
     const humanMessage = {

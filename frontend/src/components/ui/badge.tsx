@@ -25,6 +25,7 @@ const badgeVariants = cva(
   },
 );
 
+/** Badge 内部组件：组织对应的界面结构与交互语义。 */
 function Badge({
   className,
   variant,

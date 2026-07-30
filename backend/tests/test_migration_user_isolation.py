@@ -1,4 +1,4 @@
-"""Tests for per-user data migration."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import json
 from pathlib import Path
@@ -10,16 +10,20 @@ from deerflow.config.paths import Paths
 
 @pytest.fixture
 def base_dir(tmp_path: Path) -> Path:
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     return tmp_path
 
 
 @pytest.fixture
 def paths(base_dir: Path) -> Paths:
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     return Paths(base_dir)
 
 
 class TestMigrateThreadDirs:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_moves_thread_to_user_dir(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy = base_dir / "threads" / "t1" / "user-data" / "workspace"
         legacy.mkdir(parents=True)
         (legacy / "file.txt").write_text("hello")
@@ -34,6 +38,7 @@ class TestMigrateThreadDirs:
         assert not (base_dir / "threads" / "t1").exists()
 
     def test_unowned_thread_goes_to_default(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy = base_dir / "threads" / "t2" / "user-data" / "workspace"
         legacy.mkdir(parents=True)
 
@@ -45,6 +50,7 @@ class TestMigrateThreadDirs:
         assert expected.exists()
 
     def test_idempotent_skip_already_migrated(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         new_dir = base_dir / "users" / "alice" / "threads" / "t1" / "user-data" / "workspace"
         new_dir.mkdir(parents=True)
 
@@ -54,6 +60,7 @@ class TestMigrateThreadDirs:
         assert new_dir.exists()
 
     def test_conflict_preserved(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy = base_dir / "threads" / "t1" / "user-data" / "workspace"
         legacy.mkdir(parents=True)
         (legacy / "old.txt").write_text("old")
@@ -71,6 +78,7 @@ class TestMigrateThreadDirs:
         assert conflicts.exists()
 
     def test_cleans_up_empty_legacy_dir(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy = base_dir / "threads" / "t1" / "user-data"
         legacy.mkdir(parents=True)
 
@@ -81,6 +89,7 @@ class TestMigrateThreadDirs:
         assert not (base_dir / "threads").exists()
 
     def test_dry_run_does_not_move(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy = base_dir / "threads" / "t1" / "user-data"
         legacy.mkdir(parents=True)
 
@@ -89,12 +98,14 @@ class TestMigrateThreadDirs:
         report = migrate_thread_dirs(paths, thread_owner_map={"t1": "alice"}, dry_run=True)
 
         assert len(report) == 1
-        assert (base_dir / "threads" / "t1").exists()  # not moved
+        assert (base_dir / "threads" / "t1").exists()  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert not (base_dir / "users" / "alice" / "threads" / "t1").exists()
 
 
 class TestMigrateMemory:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def test_moves_global_memory(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy_mem = base_dir / "memory.json"
         legacy_mem.write_text(json.dumps({"version": "1.0", "facts": []}))
 
@@ -107,6 +118,7 @@ class TestMigrateMemory:
         assert not legacy_mem.exists()
 
     def test_skips_if_destination_exists(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy_mem = base_dir / "memory.json"
         legacy_mem.write_text(json.dumps({"version": "old"}))
 
@@ -122,14 +134,17 @@ class TestMigrateMemory:
         assert (base_dir / "memory.legacy.json").exists()
 
     def test_no_legacy_memory_is_noop(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from scripts.migrate_user_isolation import migrate_memory
 
-        migrate_memory(paths, user_id="default")  # should not raise
+        migrate_memory(paths, user_id="default")  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 class TestMigrateAgents:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     @staticmethod
     def _seed_legacy_agent(paths: Paths, name: str, *, soul: str = "soul", description: str = "d") -> Path:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         legacy_dir = paths.agents_dir / name
         legacy_dir.mkdir(parents=True, exist_ok=True)
         (legacy_dir / "config.yaml").write_text(f"name: {name}\ndescription: {description}\n", encoding="utf-8")
@@ -137,6 +152,7 @@ class TestMigrateAgents:
         return legacy_dir
 
     def test_moves_legacy_into_user_layout(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         self._seed_legacy_agent(paths, "agent-a", soul="soul-a")
         self._seed_legacy_agent(paths, "agent-b", soul="soul-b")
 
@@ -154,10 +170,11 @@ class TestMigrateAgents:
             assert dest.exists(), f"{name} should have moved into the per-user layout"
             assert (dest / "SOUL.md").read_text() == soul
 
-        # Legacy agents/ root is cleaned up once empty.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert not paths.agents_dir.exists()
 
     def test_dry_run_does_not_move(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy_dir = self._seed_legacy_agent(paths, "agent-a")
 
         from scripts.migrate_user_isolation import migrate_agents
@@ -169,6 +186,7 @@ class TestMigrateAgents:
         assert not paths.user_agent_dir("default", "agent-a").exists()
 
     def test_existing_destination_is_treated_as_conflict(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         self._seed_legacy_agent(paths, "agent-a", soul="legacy soul")
         dest = paths.user_agent_dir("default", "agent-a")
         dest.mkdir(parents=True)
@@ -179,13 +197,14 @@ class TestMigrateAgents:
         report = migrate_agents(paths, user_id="default")
 
         assert report[0]["action"].startswith("conflict -> ")
-        # Per-user destination must be left untouched.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert (dest / "SOUL.md").read_text() == "preexisting"
-        # Legacy copy lands under migration-conflicts/agents/.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         conflicts_dir = paths.base_dir / "migration-conflicts" / "agents" / "agent-a"
         assert (conflicts_dir / "SOUL.md").read_text() == "legacy soul"
 
     def test_no_legacy_dir_is_noop(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from scripts.migrate_user_isolation import migrate_agents
 
         report = migrate_agents(paths, user_id="default")
@@ -193,14 +212,17 @@ class TestMigrateAgents:
 
 
 class TestMigrateSkills:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     @staticmethod
     def _seed_legacy_skill(base_dir: Path, name: str, *, content: str = "skill doc") -> Path:
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         skill_dir = base_dir / "skills" / "custom" / name
         skill_dir.mkdir(parents=True, exist_ok=True)
         (skill_dir / "SKILL.md").write_text(content, encoding="utf-8")
         return skill_dir
 
     def test_moves_legacy_into_user_layout(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         self._seed_legacy_skill(base_dir, "my-skill", content="legacy skill")
         (base_dir / "skills" / "public" / "bootstrap").mkdir(parents=True)
 
@@ -215,12 +237,13 @@ class TestMigrateSkills:
         dest = paths.user_custom_skills_dir("default") / "my-skill" / "SKILL.md"
         assert dest.exists()
         assert dest.read_text() == "legacy skill"
-        # Legacy custom dir cleaned up
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert not (base_dir / "skills" / "custom").exists()
-        # But skills/ parent survives (public/ still in use)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert (base_dir / "skills" / "public").exists()
 
     def test_dry_run_does_not_move(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         legacy_dir = self._seed_legacy_skill(base_dir, "my-skill")
 
         from scripts.migrate_user_isolation import migrate_skills
@@ -232,6 +255,7 @@ class TestMigrateSkills:
         assert not (paths.user_custom_skills_dir("default") / "my-skill").exists()
 
     def test_existing_destination_is_conflict(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         self._seed_legacy_skill(base_dir, "my-skill", content="legacy")
         dest = paths.user_custom_skills_dir("default") / "my-skill"
         dest.mkdir(parents=True)
@@ -247,12 +271,14 @@ class TestMigrateSkills:
         assert (conflicts_dir / "SKILL.md").read_text() == "legacy"
 
     def test_no_legacy_dir_is_noop(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from scripts.migrate_user_isolation import migrate_skills
 
         report = migrate_skills(paths, user_id="default")
         assert report == []
 
     def test_migrates_history_dir(self, base_dir: Path, paths: Paths):
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         history_dir = base_dir / "skills" / "custom" / ".history"
         history_dir.mkdir(parents=True)
         (history_dir / "log.json").write_text("[]", encoding="utf-8")
@@ -266,8 +292,8 @@ class TestMigrateSkills:
         assert not history_dir.exists()
 
     def test_skills_parent_dir_not_deleted_even_if_custom_empty(self, base_dir: Path, paths: Paths):
-        """skills/ parent must NOT be deleted — public/ may still be in use."""
-        # Create only custom dir (empty), public dir with content
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         (base_dir / "skills" / "custom").mkdir(parents=True)
         (base_dir / "skills" / "public" / "bootstrap").mkdir(parents=True)
 
@@ -275,7 +301,7 @@ class TestMigrateSkills:
 
         migrate_skills(paths, user_id="default")
 
-        # custom/ cleaned up (was empty), but skills/ survives
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert not (base_dir / "skills" / "custom").exists()
         assert (base_dir / "skills").exists()
         assert (base_dir / "skills" / "public").exists()

@@ -17,6 +17,11 @@ import {
   stripUploadedFilesTag,
 } from "@/core/messages/utils";
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 aiMessage 的约定。
+
+ */
+
 function aiMessage(content: string): Message {
   return {
     id: "ai-1",
@@ -24,6 +29,11 @@ function aiMessage(content: string): Message {
     content,
   } as Message;
 }
+
+/**
+ * 覆盖“aggregates token usage messages once per assistant turn”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("aggregates token usage messages once per assistant turn", () => {
   const messages = [
@@ -105,6 +115,11 @@ describe("branchable assistant groups", () => {
     { id: "ai-final", type: "ai", content: "Final answer" },
   ] as Message[];
 
+  /**
+   * 覆盖“keeps historical turns branchable and selects only the final AI group in the current completed turn”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("keeps historical turns branchable and selects only the final AI group in the current completed turn", () => {
     const groups = getMessageGroups(messages);
 
@@ -114,6 +129,11 @@ describe("branchable assistant groups", () => {
     ]);
   });
 
+  /**
+   * 覆盖“does not expose the current turn while it is still loading”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("does not expose the current turn while it is still loading", () => {
     const groups = getMessageGroups(messages);
 
@@ -121,6 +141,11 @@ describe("branchable assistant groups", () => {
       "ai-history",
     ]);
   });
+
+  /**
+   * 覆盖“does not expose a completed turn that ends in processing”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("does not expose a completed turn that ends in processing", () => {
     const groups = getMessageGroups(messages.slice(0, -1));
@@ -131,13 +156,16 @@ describe("branchable assistant groups", () => {
   });
 });
 
+/**
+ * 覆盖“reasoning + content (no tool calls) yields a single assistant bubble, not a duplicate processing group”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("reasoning + content (no tool calls) yields a single assistant bubble, not a duplicate processing group", () => {
-  // Regression for #3868: in thinking/pro/ultra modes the final assistant
-  // message carries both reasoning_content and answer text. It must surface its
-  // reasoning exactly once — inside the assistant bubble's <Reasoning>
-  // collapsible. Routing the same message into a processing group as well makes
-  // the ChainOfThought panel above the bubble paint the identical reasoning a
-  // second time.
+  // #3868 的回归场景：在 thinking/pro/ultra 模式中，最终助手消息同时携带
+  // reasoning_content 和回答文本。其推理必须只展示一次——在助手气泡的
+  // <Reasoning> 可折叠区内。若也将同一消息放入处理组，气泡上方的
+  // ChainOfThought 面板会再次绘制完全相同的推理。
   const messages = [
     { id: "human-1", type: "human", content: "Why is the sky blue?" },
     {
@@ -152,17 +180,19 @@ test("reasoning + content (no tool calls) yields a single assistant bubble, not 
 
   expect(groups.map((group) => group.type)).toEqual(["human", "assistant"]);
 
-  // The reasoning-bearing message lands in exactly one group, so turn-usage
-  // aggregation never double-counts it (see #2770).
+  // 携带推理的消息恰好落入一个分组，因此回合用量聚合绝不会重复计数（见 #2770）。
   const turnUsage = getAssistantTurnUsageMessages(groups);
   expect(turnUsage.at(-1)?.map((message) => message.id)).toEqual(["ai-1"]);
 });
 
+/**
+ * 覆盖“keeps tool-call reasoning in the processing group while the final answer's reasoning rides its own bubble”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps tool-call reasoning in the processing group while the final answer's reasoning rides its own bubble", () => {
-  // Companion to #3868: only the message that also becomes an assistant bubble
-  // (content, no tool calls) is pulled out of the processing group. Reasoning
-  // attached to an intermediate tool-calling step still belongs above, with its
-  // tool steps.
+  // #3868 的配套场景：只有同时成为助手气泡的消息（含内容、无工具调用）会被从
+  // 处理组中取出。附加在中间工具调用步骤上的推理仍应与其工具步骤一起留在上方。
   const messages = [
     { id: "human-1", type: "human", content: "Search and summarize" },
     {
@@ -202,6 +232,9 @@ test("keeps tool-call reasoning in the processing group while the final answer's
 });
 
 describe("inline <think> tag splitting", () => {
+  /**
+   * 覆盖“strips a fully closed <think> block from AI content”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("strips a fully closed <think> block from AI content", () => {
     const message = aiMessage("<think>internal reasoning</think>final answer");
     expect(extractContentFromMessage(message)).toBe("final answer");
@@ -209,6 +242,11 @@ describe("inline <think> tag splitting", () => {
       "internal reasoning",
     );
   });
+
+  /**
+   * 覆盖“strips multiple closed <think> blocks and joins their reasoning”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("strips multiple closed <think> blocks and joins their reasoning", () => {
     const message = aiMessage(
@@ -220,8 +258,13 @@ describe("inline <think> tag splitting", () => {
     );
   });
 
+  /**
+   * 覆盖“during streaming, an unclosed <think> tag does not leak its tail into content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("during streaming, an unclosed <think> tag does not leak its tail into content", () => {
-    // Simulates accumulated content mid-stream, before </think> arrives.
+    // 模拟流式传输中已累积内容、但 </think> 尚未到达的时刻。
     const message = aiMessage(
       "<think>I need to analyze the user's question step by",
     );
@@ -231,6 +274,11 @@ describe("inline <think> tag splitting", () => {
       "I need to analyze the user's question step by",
     );
   });
+
+  /**
+   * 覆盖“preamble before an unclosed <think> stays in content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("preamble before an unclosed <think> stays in content", () => {
     const message = aiMessage(
@@ -244,6 +292,11 @@ describe("inline <think> tag splitting", () => {
     );
   });
 
+  /**
+   * 覆盖“closed <think> followed by a trailing unclosed <think> merges both into reasoning”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("closed <think> followed by a trailing unclosed <think> merges both into reasoning", () => {
     const message = aiMessage(
       "<think>first step</think>partial answer<think>second step still streaming",
@@ -254,17 +307,37 @@ describe("inline <think> tag splitting", () => {
     );
   });
 
+  /**
+   * 覆盖“hasReasoning recognises an unclosed <think> tag mid-stream”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("hasReasoning recognises an unclosed <think> tag mid-stream", () => {
     expect(hasReasoning(aiMessage("<think>thinking in progress"))).toBe(true);
   });
+
+  /**
+   * 覆盖“hasContent excludes an unclosed <think> tail when no preamble exists”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("hasContent excludes an unclosed <think> tail when no preamble exists", () => {
     expect(hasContent(aiMessage("<think>thinking in progress"))).toBe(false);
   });
 
+  /**
+   * 覆盖“hasContent stays true when preamble precedes an unclosed <think>”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("hasContent stays true when preamble precedes an unclosed <think>", () => {
     expect(hasContent(aiMessage("preamble<think>still thinking"))).toBe(true);
   });
+
+  /**
+   * 覆盖“a lone <think> open tag with no body yields no reasoning and no content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("a lone <think> open tag with no body yields no reasoning and no content", () => {
     const message = aiMessage("<think>");
@@ -272,6 +345,11 @@ describe("inline <think> tag splitting", () => {
     expect(extractReasoningContentFromMessage(message)).toBeNull();
     expect(hasReasoning(message)).toBe(false);
   });
+
+  /**
+   * 覆盖“a literal <think> inside markdown inline code is not treated as reasoning”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("a literal <think> inside markdown inline code is not treated as reasoning", () => {
     const message = aiMessage(
@@ -284,11 +362,14 @@ describe("inline <think> tag splitting", () => {
     expect(hasReasoning(message)).toBe(false);
   });
 
+  /**
+   * 覆盖“a backtick-prefixed <think> mid-stream is not split into reasoning”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("a backtick-prefixed <think> mid-stream is not split into reasoning", () => {
-    // Simulates the moment the model has emitted the opening backtick and
-    // `<think>` for a literal documentation reference, before the closing
-    // backtick arrives. The pre-fix behaviour would have permanently
-    // truncated the content here.
+    // 模拟模型已为字面文档引用输出起始反引号和 `<think>`、但结束反引号尚未到达的
+    // 时刻。修复前的行为会在此处永久截断内容。
     const message = aiMessage("Documentation: `<think>");
     expect(extractContentFromMessage(message)).toBe("Documentation: `<think>");
     expect(extractReasoningContentFromMessage(message)).toBeNull();
@@ -296,6 +377,9 @@ describe("inline <think> tag splitting", () => {
 });
 
 describe("human message internal context stripping", () => {
+  /**
+   * 覆盖“strips uploaded file context from copy data”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("strips uploaded file context from copy data", () => {
     const message = {
       id: "human-with-upload",
@@ -307,12 +391,22 @@ describe("human message internal context stripping", () => {
     expect(getMessageCopyData(message)).toBe("Summarize this paper");
   });
 
+  /**
+   * 覆盖“strips slash skill activation context from display content”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("strips slash skill activation context from display content", () => {
     const content =
       "<slash_skill_activation>\n<skill_content># Secret SKILL.md</skill_content>\n</slash_skill_activation>\nreal user task";
 
     expect(stripUploadedFilesTag(content)).toBe("real user task");
   });
+
+  /**
+   * 覆盖“hides leaked slash skill activation messages with no user text”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("hides leaked slash skill activation messages with no user text", () => {
     const messages = [
@@ -337,6 +431,11 @@ describe("human message internal context stripping", () => {
     ).toEqual(["ai-1"]);
   });
 });
+
+/**
+ * 覆盖“hides internal todo reminder messages from message groups”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("hides internal todo reminder messages from message groups", () => {
   const messages = [
@@ -372,6 +471,11 @@ test("hides internal todo reminder messages from message groups", () => {
   ).toEqual(["human-1", "ai-1"]);
 });
 
+/**
+ * 覆盖“hides assistant copy data while that turn is streaming”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("hides assistant copy data while that turn is streaming", () => {
   const messages = [
     {
@@ -384,6 +488,11 @@ test("hides assistant copy data while that turn is streaming", () => {
   expect(getAssistantTurnCopyData(messages)).toBe("Partial answer");
   expect(getAssistantTurnCopyData(messages, { isStreaming: true })).toBeNull();
 });
+
+/**
+ * 覆盖“marks the latest assistant message as streaming”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("marks the latest assistant message as streaming", () => {
   const messages = [
@@ -421,6 +530,11 @@ test("marks the latest assistant message as streaming", () => {
   ).toBe(false);
 });
 
+/**
+ * 覆盖“keeps previous assistant copyable while waiting for a new visible answer”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps previous assistant copyable while waiting for a new visible answer", () => {
   const messages = [
     {
@@ -452,6 +566,11 @@ test("keeps previous assistant copyable while waiting for a new visible answer",
   ).toBe(false);
 });
 
+/**
+ * 覆盖“keeps previous assistant copyable while a hidden send is starting”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps previous assistant copyable while a hidden send is starting", () => {
   const messages = [
     {
@@ -477,6 +596,11 @@ test("keeps previous assistant copyable while a hidden send is starting", () => 
     ),
   ).toBe(false);
 });
+
+/**
+ * 覆盖“keeps previous assistant copyable after a hidden send is appended”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("keeps previous assistant copyable after a hidden send is appended", () => {
   const messages = [
@@ -509,6 +633,11 @@ test("keeps previous assistant copyable after a hidden send is appended", () => 
     ),
   ).toBe(false);
 });
+
+/**
+ * 覆盖“uses stream metadata to identify an assistant before optimistic input”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("uses stream metadata to identify an assistant before optimistic input", () => {
   const messages = [
@@ -564,6 +693,11 @@ test("uses stream metadata to identify an assistant before optimistic input", ()
   expect(assistantGroups.map((group) => group.id)).toEqual(["ai-1", "ai-2"]);
 });
 
+/**
+ * 覆盖“does not mark a completed assistant group streaming from a later processing group”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("does not mark a completed assistant group streaming from a later processing group", () => {
   const messages = [
     {
@@ -605,6 +739,11 @@ test("does not mark a completed assistant group streaming from a later processin
   ).toBe(false);
 });
 
+/**
+ * 覆盖“keeps streaming assistant hidden when a hidden control message follows it”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("keeps streaming assistant hidden when a hidden control message follows it", () => {
   const messages = [
     {
@@ -642,10 +781,9 @@ test("keeps streaming assistant hidden when a hidden control message follows it"
 });
 
 describe("multi-part content with bare-string continuations", () => {
-  // Gemini streams the first content block as a {type:"text"} object carrying
-  // the thinking signature, then emits continuation deltas as plain strings.
-  // LangChain's Python merge_content preserves these as bare-string elements,
-  // so the finalized message content is [{type:"text", ...}, "...rest..."].
+  // Gemini 将首个内容块以携带 thinking signature 的 {type:"text"} 对象流式传输，
+  // 随后将续接增量作为纯字符串发出。LangChain 的 Python merge_content 会将其保留为
+  // 裸字符串元素，因此最终消息内容为 [{type:"text", ...}, "...rest..."]。
   const geminiMessage = {
     id: "ai-1",
     type: "ai",
@@ -660,11 +798,21 @@ describe("multi-part content with bare-string continuations", () => {
     ],
   } as unknown as Message;
 
+  /**
+   * 覆盖“extractContentFromMessage includes the bare-string parts”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("extractContentFromMessage includes the bare-string parts", () => {
     expect(extractContentFromMessage(geminiMessage)).toBe(
       "First block carrying the signature.\nContinuation streamed as a bare string.",
     );
   });
+
+  /**
+   * 覆盖“extractTextFromMessage includes the bare-string parts”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("extractTextFromMessage includes the bare-string parts", () => {
     expect(extractTextFromMessage(geminiMessage)).toBe(
@@ -674,14 +822,18 @@ describe("multi-part content with bare-string continuations", () => {
 });
 
 describe("orphan tool messages", () => {
-  // LangGraph stream-mode "messages-tuple" can emit tool-result events out of order or
-  // replayed from subagent state (e.g. bash subagent under LocalSandboxProvider with
-  // allow_host_bash). When that happens, the tool message arrives after a terminal
-  // assistant/human group, so getMessageGroups' lastOpenGroup() returns null.
+  // LangGraph 流模式 “messages-tuple” 可能乱序发出工具结果事件，或从子代理状态回放
+  // 这些事件（例如 LocalSandboxProvider 下启用 allow_host_bash 的 bash 子代理）。
+  // 此时工具消息到达于终止的 assistant/human 分组之后，因此 getMessageGroups 的
+  // lastOpenGroup() 会返回 null。
   //
-  // The previous behaviour was console.error + drop, which silently hid the tool
-  // result from the UI. The fix falls back to attaching the orphan tool to the most
-  // recent group so the user can still see what the agent did.
+  // 先前行为是 console.error 后丢弃，导致工具结果从 UI 中被静默隐藏。修复后回退为将
+  // 孤立工具附加到最近分组，以便用户仍可看到代理执行了什么。
+
+  /**
+   * 覆盖“attaches orphan tool message to the most recent group instead of dropping it”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("attaches orphan tool message to the most recent group instead of dropping it", () => {
     const messages = [
@@ -700,7 +852,7 @@ describe("orphan tool messages", () => {
         content: "output-1",
       },
       { id: "ai-2", type: "ai", content: "Done." }, // terminal assistant group
-      // Orphan tool: arrives after a terminal group, no preceding processing group
+      // 孤立工具：到达于终止分组之后，前面没有处理分组。
       {
         id: "t-2",
         type: "tool",
@@ -712,22 +864,26 @@ describe("orphan tool messages", () => {
 
     const groups = getMessageGroups(messages);
 
-    // Expect groups: human, assistant:processing (ai-1 + t-1), assistant (ai-2), and
-    // t-2 should be attached to the last group (assistant), not dropped.
+    // 预期分组：human、assistant:processing（ai-1 + t-1）、assistant（ai-2）；
+    // t-2 应附加到最后一个分组（assistant），而不是被丢弃。
     const types = groups.map((g) => g.type);
     expect(types).toEqual(["human", "assistant:processing", "assistant"]);
 
-    // t-2 must be retrievable from one of the groups — must NOT be silently dropped
+    // 必须能从某个分组获取 t-2——绝不能被静默丢弃。
     const allMessages = groups.flatMap((g) => g.messages);
     const t2 = allMessages.find((m) => m.id === "t-2");
     expect(t2).toBeDefined();
     expect(t2?.type).toBe("tool");
   });
 
+  /**
+   * 覆盖“replayed tool with same tool_call_id is not lost (duplicate stream events)”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("replayed tool with same tool_call_id is not lost (duplicate stream events)", () => {
-    // LangGraph subagent state restoration can replay tool-result events. The
-    // frontend log shows the same tool_call_id arriving twice. Both occurrences
-    // should be visible in the UI, not just the first.
+    // LangGraph 子代理状态恢复可回放工具结果事件。前端日志显示同一 tool_call_id 到达
+    // 两次。两次出现都应在 UI 中可见，而不只是第一次。
     const messages = [
       { id: "h-1", type: "human", content: "q" },
       {
@@ -743,13 +899,12 @@ describe("orphan tool messages", () => {
         tool_call_id: "call-x",
         content: "first delivery",
       },
-      // Terminal assistant group ends the turn and closes the processing group.
-      // Without this interleave the replayed t-1b would still take the
-      // unchanged happy path; with it, t-1b arrives when lastOpenGroup()
-      // returns null and must take the new fallback branch to be visible.
+      // 终止助手分组结束本回合并关闭处理分组。没有这次交错时，回放的 t-1b 仍会走
+      // 未改变的正常路径；有了它，t-1b 到达时 lastOpenGroup() 返回 null，必须走新的
+      // 回退分支才可见。
       { id: "ai-2", type: "ai", content: "Done." },
-      // Replayed tool-result for the original tool_call — must reach the new
-      // else-if (groups.length > 0) branch instead of being dropped.
+      // 原始 tool_call 的回放工具结果——必须进入新的 else-if (groups.length > 0)
+      // 分支，而不是被丢弃。
       {
         id: "t-1b",
         type: "tool",
@@ -762,9 +917,8 @@ describe("orphan tool messages", () => {
     const groups = getMessageGroups(messages);
     const allMessages = groups.flatMap((g) => g.messages);
 
-    // Strict assertion: the replayed tool message must be reachable from a
-    // group (i.e. attached via the new fallback). Before the fix this was
-    // silently dropped by console.error.
+    // 严格断言：必须能从某个分组获取回放的工具消息（即通过新回退逻辑附加）。修复前，
+    // 它会在 console.error 后被静默丢弃。
     const t1b = allMessages.find((m) => m.id === "t-1b");
     expect(t1b).toBeDefined();
     expect(t1b?.type).toBe("tool");

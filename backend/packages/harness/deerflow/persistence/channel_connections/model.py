@@ -1,4 +1,4 @@
-"""ORM models for user-owned IM channel connections."""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -11,10 +11,12 @@ from deerflow.persistence.base import Base
 
 
 def _utc_now() -> datetime:
+    """执行持久化流程所需的内部辅助操作。"""
     return datetime.now(UTC)
 
 
 class ChannelConnectionRow(Base):
+    """定义与持久化数据表对应的行模型。"""
     __tablename__ = "channel_connections"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -46,11 +48,11 @@ class ChannelConnectionRow(Base):
             name="uq_channel_connection_owner_provider_identity",
         ),
         Index("idx_channel_connections_event_lookup", "provider", "workspace_id", "bot_user_id"),
-        # Enforce the single-active-owner invariant at the database layer: at most
-        # one non-revoked row may exist per external identity. This makes ownership
-        # transfer race-safe (concurrent connects from different owners can no
-        # longer both commit a connected row). Partial unique indexes are
-        # supported by both SQLite (>= 3.8.0) and PostgreSQL.
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
         Index(
             "uq_channel_connection_active_identity",
             "provider",
@@ -64,6 +66,7 @@ class ChannelConnectionRow(Base):
 
 
 class ChannelCredentialRow(Base):
+    """定义与持久化数据表对应的行模型。"""
     __tablename__ = "channel_credentials"
 
     connection_id: Mapped[str] = mapped_column(
@@ -82,6 +85,7 @@ class ChannelCredentialRow(Base):
 
 
 class ChannelOAuthStateRow(Base):
+    """定义与持久化数据表对应的行模型。"""
     __tablename__ = "channel_oauth_states"
 
     state_hash: Mapped[str] = mapped_column(String(128), primary_key=True)
@@ -98,6 +102,7 @@ class ChannelOAuthStateRow(Base):
 
 
 class ChannelConversationRow(Base):
+    """定义与持久化数据表对应的行模型。"""
     __tablename__ = "channel_conversations"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

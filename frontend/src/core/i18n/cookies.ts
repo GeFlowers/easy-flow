@@ -1,12 +1,11 @@
 /**
- * Cookie utilities for locale management
- * Works on both client and server side
+ * 用于管理语言区域的 Cookie 工具，兼容客户端与服务端。
  */
 
 const LOCALE_COOKIE_NAME = "locale";
 
 /**
- * Get locale from cookie (client-side)
+ * 从客户端 Cookie 读取语言区域。
  */
 export function getLocaleFromCookie(): string | null {
   if (typeof document === "undefined") {
@@ -24,21 +23,20 @@ export function getLocaleFromCookie(): string | null {
 }
 
 /**
- * Set locale in cookie (client-side)
+ * 将语言区域写入客户端 Cookie。
  */
 export function setLocaleInCookie(locale: string): void {
   if (typeof document === "undefined") {
     return;
   }
 
-  // Set cookie with 1 year expiration
-  const maxAge = 365 * 24 * 60 * 60; // 1 year in seconds
+  // Cookie 有效期为一年。
+  const maxAge = 365 * 24 * 60 * 60; // 一年对应的秒数。
   document.cookie = `${LOCALE_COOKIE_NAME}=${encodeURIComponent(locale)}; max-age=${maxAge}; path=/; SameSite=Lax`;
 }
 
 /**
- * Get locale from cookie (server-side)
- * Use this in server components or API routes
+ * 从服务端 Cookie 读取语言区域，供服务端组件或 API 路由使用。
  */
 export async function getLocaleFromCookieServer(): Promise<string | null> {
   try {
@@ -46,7 +44,7 @@ export async function getLocaleFromCookieServer(): Promise<string | null> {
     const cookieStore = await cookies();
     return cookieStore.get(LOCALE_COOKIE_NAME)?.value ?? null;
   } catch {
-    // Fallback if cookies() is not available (e.g., in middleware)
+    // cookies() 不可用时（例如中间件中）返回回退值。
     return null;
   }
 }

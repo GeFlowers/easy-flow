@@ -1,4 +1,4 @@
-"""Middleware for injecting image details into conversation before LLM call."""
+'定义 view_image_middleware 模块提供的职责与可复用接口。\n\nMiddleware for injecting image details into conversation before LLM call.'
 
 import asyncio
 import base64
@@ -21,63 +21,30 @@ _MAX_IMAGE_BYTES = 20 * 1024 * 1024
 
 
 class ViewImageMiddlewareState(ThreadState):
-    """Reuse the thread state so reducer-backed keys keep their annotations."""
+    '封装 ViewImageMiddlewareState 的状态、协作关系与公开操作。\n\nReuse the thread state so reducer-backed keys keep their annotations.'
 
 
 class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
-    """Injects image details as a human message before LLM calls when view_image tools have completed.
-
-    This middleware:
-    1. Runs before each LLM call
-    2. Checks if the last assistant message contains view_image tool calls
-    3. Verifies all tool calls in that message have been completed (have corresponding ToolMessages)
-    4. If conditions are met, creates a human message with all viewed image details (including base64 data)
-    5. Adds the message to state so the LLM can see and analyze the images
-
-    This enables the LLM to automatically receive and analyze images that were loaded via view_image tool,
-    without requiring explicit user prompts to describe the images.
-    """
+    '封装 ViewImageMiddleware 的状态、协作关系与公开操作。\n\nInjects image details as a human message before LLM calls when view_image tools have completed.\n\n    This middleware:\n    1. Runs before each LLM call\n    2. Checks if the last assistant message contains view_image tool calls\n    3. Verifies all tool calls in that message have been completed (have corresponding ToolMessages)\n    4. If conditions are met, creates a human message with all viewed image details (including base64 data)\n    5. Adds the message to state so the LLM can see and analyze the images\n\n    This enables the LLM to automatically receive and analyze images that were loaded via view_image tool,\n    without requiring explicit user prompts to describe the images.\n    '
 
     state_schema = ViewImageMiddlewareState
 
     def _get_last_assistant_message(self, messages: list) -> AIMessage | None:
-        """Get the last assistant message from the message list.
-
-        Args:
-            messages: List of messages
-
-        Returns:
-            Last AIMessage or None if not found
-        """
+        '执行 _get_last_assistant_message 的明确职责，并返回与调用约定一致的结果。\n\nGet the last assistant message from the message list.\n\n        Args:\n            messages: List of messages\n\n        Returns:\n            Last AIMessage or None if not found\n        '
         for msg in reversed(messages):
             if isinstance(msg, AIMessage):
                 return msg
         return None
 
     def _has_view_image_tool(self, message: AIMessage) -> bool:
-        """Check if the assistant message contains view_image tool calls.
-
-        Args:
-            message: Assistant message to check
-
-        Returns:
-            True if message contains view_image tool calls
-        """
+        '执行 _has_view_image_tool 的明确职责，并返回与调用约定一致的结果。\n\nCheck if the assistant message contains view_image tool calls.\n\n        Args:\n            message: Assistant message to check\n\n        Returns:\n            True if message contains view_image tool calls\n        '
         if not hasattr(message, "tool_calls") or not message.tool_calls:
             return False
 
         return any(tool_call.get("name") == "view_image" for tool_call in message.tool_calls)
 
     def _all_tools_completed(self, messages: list, assistant_msg: AIMessage) -> bool:
-        """Check if all tool calls in the assistant message have been completed.
-
-        Args:
-            messages: List of all messages
-            assistant_msg: The assistant message containing tool calls
-
-        Returns:
-            True if all tool calls have corresponding ToolMessages
-        """
+        '执行 _all_tools_completed 的明确职责，并返回与调用约定一致的结果。\n\nCheck if all tool calls in the assistant message have been completed.\n\n        Args:\n            messages: List of all messages\n            assistant_msg: The assistant message containing tool calls\n\n        Returns:\n            True if all tool calls have corresponding ToolMessages\n        '
         if not hasattr(assistant_msg, "tool_calls") or not assistant_msg.tool_calls:
             return False
 
@@ -101,15 +68,7 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
 
     @staticmethod
     def _read_image_as_data_url(actual_path: str, mime_type: str, expected_size: int) -> str | None:
-        """Read image file and return a `data:` URL, or None on failure.
-
-        Trust assumption: ``actual_path`` is set by ``view_image_tool``
-        (server-side, validated against the allowed virtual roots at write
-        time) and held in LangGraph-controlled state. Client input cannot
-        reach this field, so the read scope is trusted. We still re-check
-        size at read time to defend against TOCTOU growth and skip files
-        exceeding ``_MAX_IMAGE_BYTES``.
-        """
+        '执行 _read_image_as_data_url 的明确职责，并返回与调用约定一致的结果。\n\nRead image file and return a `data:` URL, or None on failure.\n\n        Trust assumption: ``actual_path`` is set by ``view_image_tool``\n        (server-side, validated against the allowed virtual roots at write\n        time) and held in LangGraph-controlled state. Client input cannot\n        reach this field, so the read scope is trusted. We still re-check\n        size at read time to defend against TOCTOU growth and skip files\n        exceeding ``_MAX_IMAGE_BYTES``.\n        '
         try:
             file_path = Path(actual_path)
             if not file_path.exists() or not file_path.is_file():
@@ -128,20 +87,7 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
             return None
 
     def _create_image_details_message(self, state: ViewImageMiddlewareState) -> list[str | dict]:
-        """Create a formatted message with all viewed image details.
-
-        Reads image files from disk on-demand and encodes them as base64
-        for the model. The base64 data is NOT persisted in state -- only
-        lightweight metadata (path, mime_type, size) is stored in
-        ``viewed_images``, avoiding large duplicate payloads across every
-        checkpoint (see #4138).
-
-        Args:
-            state: Current state containing viewed_images
-
-        Returns:
-            List of content blocks (text and images) for the HumanMessage
-        """
+        '执行 _create_image_details_message 的明确职责，并返回与调用约定一致的结果。\n\nCreate a formatted message with all viewed image details.\n\n        Reads image files from disk on-demand and encodes them as base64\n        for the model. The base64 data is NOT persisted in state -- only\n        lightweight metadata (path, mime_type, size) is stored in\n        ``viewed_images``, avoiding large duplicate payloads across every\n        checkpoint (see #4138).\n\n        Args:\n            state: Current state containing viewed_images\n\n        Returns:\n            List of content blocks (text and images) for the HumanMessage\n        '
         viewed_images = state.get("viewed_images", {})
         if not viewed_images:
             # Return a properly formatted text block, not a plain string array
@@ -174,14 +120,7 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
         return content_blocks
 
     def _should_inject_image_message(self, state: ViewImageMiddlewareState) -> bool:
-        """Determine if we should inject an image details message.
-
-        Args:
-            state: Current state
-
-        Returns:
-            True if we should inject the message
-        """
+        '执行 _should_inject_image_message 的明确职责，并返回与调用约定一致的结果。\n\nDetermine if we should inject an image details message.\n\n        Args:\n            state: Current state\n\n        Returns:\n            True if we should inject the message\n        '
         messages = state.get("messages", [])
         if not messages:
             return False
@@ -212,14 +151,7 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
         return True
 
     def _inject_image_message(self, state: ViewImageMiddlewareState) -> dict | None:
-        """Internal helper to inject image details message.
-
-        Args:
-            state: Current state
-
-        Returns:
-            State update with additional human message, or None if no update needed
-        """
+        '执行 _inject_image_message 的明确职责，并返回与调用约定一致的结果。\n\nInternal helper to inject image details message.\n\n        Args:\n            state: Current state\n\n        Returns:\n            State update with additional human message, or None if no update needed\n        '
         if not self._should_inject_image_message(state):
             return None
 
@@ -238,36 +170,12 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
 
     @override
     def before_model(self, state: ViewImageMiddlewareState, runtime: Runtime) -> dict | None:
-        """Inject image details message before LLM call if view_image tools have completed (sync version).
-
-        This runs before each LLM call, checking if the previous turn included view_image
-        tool calls that have all completed. If so, it injects a human message with the image
-        details so the LLM can see and analyze the images.
-
-        Args:
-            state: Current state
-            runtime: Runtime context (unused but required by interface)
-
-        Returns:
-            State update with additional human message, or None if no update needed
-        """
+        '执行 before_model 的明确职责，并返回与调用约定一致的结果。\n\nInject image details message before LLM call if view_image tools have completed (sync version).\n\n        This runs before each LLM call, checking if the previous turn included view_image\n        tool calls that have all completed. If so, it injects a human message with the image\n        details so the LLM can see and analyze the images.\n\n        Args:\n            state: Current state\n            runtime: Runtime context (unused but required by interface)\n\n        Returns:\n            State update with additional human message, or None if no update needed\n        '
         return self._inject_image_message(state)
 
     @override
     async def abefore_model(self, state: ViewImageMiddlewareState, runtime: Runtime) -> dict | None:
-        """Inject image details message before LLM call if view_image tools have completed (async version).
-
-        This runs before each LLM call, checking if the previous turn included view_image
-        tool calls that have all completed. If so, it injects a human message with the image
-        details so the LLM can see and analyze the images.
-
-        Args:
-            state: Current state
-            runtime: Runtime context (unused but required by interface)
-
-        Returns:
-            State update with additional human message, or None if no update needed
-        """
+        '执行 abefore_model 的明确职责，并返回与调用约定一致的结果。\n\nInject image details message before LLM call if view_image tools have completed (async version).\n\n        This runs before each LLM call, checking if the previous turn included view_image\n        tool calls that have all completed. If so, it injects a human message with the image\n        details so the LLM can see and analyze the images.\n\n        Args:\n            state: Current state\n            runtime: Runtime context (unused but required by interface)\n\n        Returns:\n            State update with additional human message, or None if no update needed\n        '
         if not self._should_inject_image_message(state):
             return None
         # Image reads + base64 encoding can be slow (up to 20MB), so offload

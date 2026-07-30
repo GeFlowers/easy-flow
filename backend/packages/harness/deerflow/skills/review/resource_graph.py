@@ -1,4 +1,4 @@
-"""Deterministic package resource graph checks."""
+'定义 resource_graph 模块提供的职责与可复用接口。\n\nDeterministic package resource graph checks.'
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ _RESOURCE_DIRS = {"references", "scripts", "templates", "assets", "evals"}
 
 
 def build_resource_graph(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    '构建并返回，并遵守 build_resource_graph 所表达的接口约束'
     files = {str(entry["path"]): entry for entry in snapshot.get("files", [])}
     nodes = [{"path": path, "kind": files[path].get("kind", "unknown")} for path in sorted(files)]
     edges: set[tuple[str, str]] = set()
@@ -87,6 +88,7 @@ def build_resource_graph(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list
 
 
 def _extract_references(content: str) -> set[str]:
+    '执行 _extract_references 的明确职责，并返回与调用约定一致的结果'
     refs: set[str] = set()
     for match in _MARKDOWN_LINK_RE.finditer(content):
         refs.add(match.group(1).split("#", 1)[0])
@@ -100,6 +102,7 @@ def _extract_references(content: str) -> set[str]:
 
 
 def _resolve_reference(source_path: str, raw_ref: str) -> str | None:
+    '执行 _resolve_reference 的明确职责，并返回与调用约定一致的结果'
     ref = raw_ref.strip().strip("\"'")
     if not ref or ref.startswith("#") or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", ref):
         return None

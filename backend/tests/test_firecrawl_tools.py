@@ -1,13 +1,15 @@
-"""Unit tests for the Firecrawl community tools."""
+"""验证当前测试文件覆盖的预期行为与边界条件。"""
 
 import json
 from unittest.mock import MagicMock, patch
 
 
 class TestWebSearchTool:
+    """归纳当前测试场景的预期行为。"""
     @patch("deerflow.community.firecrawl.tools.FirecrawlApp")
     @patch("deerflow.community.firecrawl.tools.get_app_config")
     def test_search_uses_web_search_config(self, mock_get_app_config, mock_firecrawl_cls):
+        """验证当前测试场景的预期行为。"""
         search_config = MagicMock()
         search_config.model_extra = {"api_key": "firecrawl-search-key", "max_results": 7}
         mock_get_app_config.return_value.get_tool_config.return_value = search_config
@@ -35,13 +37,16 @@ class TestWebSearchTool:
 
 
 class TestWebFetchTool:
+    """归纳当前测试场景的预期行为。"""
     @patch("deerflow.community.firecrawl.tools.FirecrawlApp")
     @patch("deerflow.community.firecrawl.tools.get_app_config")
     def test_fetch_uses_web_fetch_config(self, mock_get_app_config, mock_firecrawl_cls):
+        """验证当前测试场景的预期行为。"""
         fetch_config = MagicMock()
         fetch_config.model_extra = {"api_key": "firecrawl-fetch-key"}
 
         def get_tool_config(name):
+            """验证当前测试场景的预期行为。"""
             if name == "web_fetch":
                 return fetch_config
             return None

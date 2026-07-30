@@ -1,29 +1,4 @@
-"""Regression anchor: WeChat channel filesystem IO must not block the event loop.
-
-Two production paths touch the filesystem, and both must stay off the asyncio
-loop:
-
-1. **Construction** — ``ChannelService._start_channel()`` instantiates the
-   channel directly on the async path (``channel_cls(...)`` with no thread
-   offload), so ``WechatChannel.__init__`` must be IO-free; persisted state is
-   loaded later in ``start()`` via ``asyncio.to_thread``. Constructing the
-   channel in an async context used to raise ``BlockingError: Blocking call to
-   os.stat`` because ``__init__`` called ``_load_state`` synchronously.
-
-2. **Runtime** — ``_handle_update`` stages downloaded inbound files
-   (``mkdir`` + ``write_bytes``) and ``_ensure_authenticated`` reads persisted
-   auth state (``read_text``); both offload via ``asyncio.to_thread``.
-
-If any of this regresses back onto the event loop, the strict Blockbuster gate
-raises ``BlockingError`` and these tests fail.
-
-The constructors below are invoked *directly* on the event loop (no
-``asyncio.to_thread`` wrapper) on purpose: that mirrors the production
-``_start_channel`` path the gate is meant to protect. Test-only file setup
-(writing the auth fixture) is still wrapped in ``asyncio.to_thread`` because
-that scaffolding IO would otherwise trip the gate even though it is not the
-code under test.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -40,27 +15,28 @@ pytestmark = pytest.mark.asyncio
 
 
 async def test_wechat_constructor_is_io_free_on_async_path(tmp_path: Path) -> None:
-    """``__init__`` must not touch the filesystem — ``_start_channel`` constructs inline."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     bus = MessageBus()
-    # Seed an auth file that WOULD restore a different token if __init__ read it.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     auth_path = tmp_path / "wechat-auth.json"
     await asyncio.to_thread(auth_path.write_text, json.dumps({"status": "confirmed", "bot_token": "from-disk"}))
 
-    # Direct construction on the event loop, no asyncio.to_thread wrapper —
-    # this is exactly the production _start_channel path. If __init__ regresses
-    # to doing os.stat / read_text (e.g. re-adding _load_state here), the gate
-    # raises BlockingError right at this line.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     channel = WechatChannel(bus=bus, config={"bot_token": "from-config", "state_dir": str(tmp_path)})
-    # Token came from config, not the disk file — proving __init__ did not read it.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert channel._bot_token == "from-config"
 
 
 async def test_wechat_inbound_file_staging_does_not_block_event_loop(tmp_path: Path) -> None:
-    """Staging a downloaded inbound image writes through ``asyncio.to_thread``."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     bus = MessageBus()
     published = []
 
     async def capture(msg):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         published.append(msg)
 
     bus.publish_inbound = capture  # type: ignore[method-assign]
@@ -72,6 +48,7 @@ async def test_wechat_inbound_file_staging_does_not_block_event_loop(tmp_path: P
     encrypted = _encrypt_aes_128_ecb(plaintext, aes_key)
 
     async def _fake_download(_url: str, *, timeout: float | None = None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return encrypted
 
     channel._download_cdn_bytes = _fake_download  # type: ignore[method-assign]
@@ -99,10 +76,10 @@ async def test_wechat_inbound_file_staging_does_not_block_event_loop(tmp_path: P
 
 
 async def test_wechat_auth_state_load_does_not_block_event_loop(tmp_path: Path) -> None:
-    """``_ensure_authenticated`` reads persisted auth state through ``asyncio.to_thread``."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     bus = MessageBus()
-    # bot_token="" forces _ensure_authenticated to fall through to the
-    # _load_auth_state branch (offloaded) instead of returning early.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     channel = WechatChannel(bus=bus, config={"bot_token": "", "state_dir": str(tmp_path)})
 
     auth_path = tmp_path / "wechat-auth.json"

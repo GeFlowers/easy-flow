@@ -1,18 +1,4 @@
-"""Docker-backed sandbox container lifecycle and cleanup tests.
-
-This test module requires Docker to be running. It exercises the container
-backend behavior behind sandbox lifecycle management and verifies that test
-containers are created, observed, and explicitly cleaned up correctly.
-
-The coverage here is limited to direct backend/container operations used by
-the reconciliation flow. It does not simulate a process restart by creating
-a new ``AioSandboxProvider`` instance or assert provider startup orphan
-reconciliation end-to-end — that logic is covered by unit tests in
-``test_sandbox_orphan_reconciliation.py``.
-
-Run with: PYTHONPATH=. uv run pytest tests/test_sandbox_orphan_reconciliation_e2e.py -v -s
-Requires: Docker running locally
-"""
+'未说明'
 
 import subprocess
 import time
@@ -21,6 +7,7 @@ import pytest
 
 
 def _docker_available() -> bool:
+    '未说明'
     try:
         result = subprocess.run(["docker", "info"], capture_output=True, timeout=5)
         return result.returncode == 0
@@ -29,6 +16,7 @@ def _docker_available() -> bool:
 
 
 def _container_running(container_name: str) -> bool:
+    '未说明'
     result = subprocess.run(
         ["docker", "inspect", "-f", "{{.State.Running}}", container_name],
         capture_output=True,
@@ -39,6 +27,7 @@ def _container_running(container_name: str) -> bool:
 
 
 def _stop_container(container_name: str) -> None:
+    '未说明'
     subprocess.run(["docker", "stop", container_name], capture_output=True, timeout=15)
 
 
@@ -49,7 +38,7 @@ E2E_PREFIX = "deer-flow-sandbox-e2e-test"
 
 @pytest.fixture(autouse=True)
 def cleanup_test_containers():
-    """Ensure all test containers are cleaned up after the test."""
+    '未说明'
     yield
     # Cleanup: stop any remaining test containers
     result = subprocess.run(
@@ -66,17 +55,10 @@ def cleanup_test_containers():
 
 @pytest.mark.skipif(not _docker_available(), reason="Docker not available")
 class TestOrphanReconciliationE2E:
-    """E2E tests for orphan container reconciliation."""
+    '未说明'
 
     def test_orphan_container_destroyed_on_startup(self):
-        """Core issue scenario: container from a previous process is destroyed on new process init.
-
-        Steps:
-        1. Start a container manually (simulating previous process)
-        2. Create a LocalContainerBackend with matching prefix
-        3. Call list_running() → should find the container
-        4. Simulate _reconcile_orphans() logic → container should be destroyed
-        """
+        '未说明'
         container_name = f"{E2E_PREFIX}-orphan01"
 
         # Step 1: Start a container (simulating previous process lifecycle)
@@ -126,7 +108,7 @@ class TestOrphanReconciliationE2E:
             _stop_container(container_name)
 
     def test_multiple_orphans_all_cleaned(self):
-        """Multiple orphaned containers are all found and can be cleaned up."""
+        '未说明'
         containers = []
         try:
             # Start 3 containers
@@ -173,7 +155,7 @@ class TestOrphanReconciliationE2E:
                 _stop_container(name)
 
     def test_list_running_ignores_unrelated_containers(self):
-        """Containers with different prefixes should not be listed."""
+        '未说明'
         unrelated_name = "unrelated-test-container"
         our_name = f"{E2E_PREFIX}-ours001"
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""CLI wrapper for the static blocking IO detector."""
+"""本脚本负责检测 阻塞 输入输出 静态。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from _detector_cli import run_detector
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    '未说明'
     return run_detector("support.detectors.blocking_io_static", argv)
 
 

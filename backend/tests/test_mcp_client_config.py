@@ -1,4 +1,4 @@
-"""Core behavior tests for MCP client server config building."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import pytest
 
@@ -7,6 +7,7 @@ from deerflow.mcp.client import build_server_params, build_servers_config
 
 
 def test_build_server_params_stdio_success():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig(
         type="stdio",
         command="npx",
@@ -25,6 +26,7 @@ def test_build_server_params_stdio_success():
 
 
 def test_extensions_config_resolves_env_variables_inside_nested_collections(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("MCP_TOKEN", "secret")
     monkeypatch.delenv("MISSING_TOKEN", raising=False)
     raw_config = {
@@ -45,6 +47,7 @@ def test_extensions_config_resolves_env_variables_inside_nested_collections(monk
 
 
 def test_build_server_params_stdio_requires_command():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig(type="stdio", command=None)
 
     with pytest.raises(ValueError, match="requires 'command' field"):
@@ -53,6 +56,7 @@ def test_build_server_params_stdio_requires_command():
 
 @pytest.mark.parametrize("transport", ["sse", "http"])
 def test_build_server_params_http_like_success(transport: str):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig(
         type=transport,
         url="https://example.com/mcp",
@@ -70,6 +74,7 @@ def test_build_server_params_http_like_success(transport: str):
 
 @pytest.mark.parametrize("transport", ["sse", "http"])
 def test_build_server_params_http_like_requires_url(transport: str):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig(type=transport, url=None)
 
     with pytest.raises(ValueError, match="requires 'url' field"):
@@ -77,6 +82,7 @@ def test_build_server_params_http_like_requires_url(transport: str):
 
 
 def test_build_server_params_rejects_unsupported_transport():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig(type="websocket")
 
     with pytest.raises(ValueError, match="unsupported transport type"):
@@ -85,12 +91,7 @@ def test_build_server_params_rejects_unsupported_transport():
 
 @pytest.mark.parametrize("transport", ["sse", "http"])
 def test_mcp_server_config_accepts_transport_alias(transport: str):
-    """The MCP-spec ``transport`` field should be accepted as an alias for ``type``.
-
-    Regression test for https://github.com/bytedance/deer-flow/issues/3238 — a
-    remote MCP server configured with only ``transport: sse`` was previously
-    misidentified as ``stdio`` (the default for ``type``).
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig.model_validate(
         {
             "transport": transport,
@@ -106,7 +107,7 @@ def test_mcp_server_config_accepts_transport_alias(transport: str):
 
 
 def test_mcp_server_config_type_takes_precedence_over_transport():
-    """When both ``type`` and ``transport`` are provided, ``type`` wins."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig.model_validate(
         {
             "type": "http",
@@ -119,6 +120,7 @@ def test_mcp_server_config_type_takes_precedence_over_transport():
 
 
 def test_build_servers_config_returns_empty_when_no_enabled_servers():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     extensions = ExtensionsConfig(
         mcp_servers={
             "disabled-a": McpServerConfig(enabled=False, type="stdio", command="echo"),
@@ -131,6 +133,7 @@ def test_build_servers_config_returns_empty_when_no_enabled_servers():
 
 
 def test_build_servers_config_skips_invalid_server_and_keeps_valid_ones():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     extensions = ExtensionsConfig(
         mcp_servers={
             "valid-stdio": McpServerConfig(enabled=True, type="stdio", command="npx", args=["server"]),
@@ -149,13 +152,7 @@ def test_build_servers_config_skips_invalid_server_and_keeps_valid_ones():
 
 
 def test_build_server_params_excludes_tool_call_timeout():
-    """tool_call_timeout must NOT appear in the connection dict.
-
-    langchain-mcp-adapters passes the connection dict to create_session(),
-    which forwards unknown keys to _create_stdio_session(), causing TypeError.
-    The timeout is read from McpServerConfig at the tool wrapper call-site
-    instead.  Regression for PR #3843 P1 bug.
-    """
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = McpServerConfig(
         type="stdio",
         command="npx",

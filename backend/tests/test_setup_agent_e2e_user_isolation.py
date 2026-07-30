@@ -1,27 +1,4 @@
-"""End-to-end verification for issue #2862 (and the regression of #2782).
-
-Goal: prove — without trusting any single layer's claim — that an authenticated
-user creating a custom agent through the real ``setup_agent`` tool, driven by a
-real LangGraph ``create_agent`` graph, ends up with files under
-``users/<auth_uid>/agents/<name>`` and **not** under ``users/default/agents/...``.
-
-We intentionally exercise the full pipeline:
-
-    HTTP body shape (mimics LangGraph SDK wire format)
-      -> app.gateway.services.start_run config-assembly chain
-      -> deerflow.runtime.runs.worker._build_runtime_context
-      -> langchain.agents.create_agent graph
-      -> ToolNode dispatch
-      -> setup_agent tool
-
-The only thing we mock is the LLM (FakeMessagesListChatModel) — every layer
-that handles ``user_id`` is the real production code path. If the
-``user_id`` propagation is broken anywhere in this chain, these tests will
-fail.
-
-These tests intentionally ``no_auto_user`` so that the ``contextvar``
-fallback would put files into ``default/`` if propagation breaks.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -53,7 +30,7 @@ def _make_request(
     oauth_provider: str | None = None,
     oauth_id: str | None = None,
 ) -> SimpleNamespace:
-    """Build a fake FastAPI Request that carries an authenticated user."""
+    '未说明'
     if user_id_str is None:
         user = None
     else:
@@ -79,7 +56,7 @@ def _assemble_config(
     thread_id: str = "thread-e2e",
     assistant_id: str = "lead_agent",
 ) -> dict:
-    """Replay the **exact** start_run config-assembly sequence."""
+    '未说明'
     config = build_run_config(thread_id, body_config, None, assistant_id=assistant_id)
     merge_run_context_overrides(config, body_context)
     inject_authenticated_user_context(
@@ -95,7 +72,7 @@ def _assemble_config(
 
 
 def _make_paths_mock(tmp_path: Path):
-    """Mirror the production paths.user_agent_dir signature."""
+    '未说明'
     from unittest.mock import MagicMock
 
     paths = MagicMock()
@@ -111,10 +88,10 @@ def _make_paths_mock(tmp_path: Path):
 
 
 class TestConfigAssembly:
-    """Covers L1-L3: validate that user_id reaches runtime_ctx for every wire shape."""
+    '未说明'
 
     def test_typical_wire_format_user_id_in_runtime_ctx(self):
-        """Real frontend: body.config={recursion_limit}, body.context={agent_name,...}."""
+        '未说明'
         config = _assemble_config(
             body_config={"recursion_limit": 1000},
             body_context={"agent_name": "myagent", "is_bootstrap": True, "mode": "flash"},
@@ -125,7 +102,7 @@ class TestConfigAssembly:
         assert runtime_ctx["agent_name"] == "myagent"
 
     def test_body_context_none_still_injects_user_id(self):
-        """If frontend omits body.context entirely, inject must still create it."""
+        '未说明'
         config = _assemble_config(
             body_config={"recursion_limit": 1000},
             body_context=None,
@@ -135,7 +112,7 @@ class TestConfigAssembly:
         assert runtime_ctx["user_id"] == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
     def test_authenticated_user_context_includes_role_and_oauth_identity(self):
-        """Server-authenticated user attributes should reach runtime.context."""
+        '未说明'
         config = _assemble_config(
             body_config={"recursion_limit": 1000},
             body_context=None,
@@ -151,7 +128,7 @@ class TestConfigAssembly:
         assert runtime_ctx["oauth_id"] == "gh_123"
 
     def test_body_context_empty_dict_still_injects_user_id(self):
-        """body.context={} (falsy) path: inject must still produce user_id."""
+        '未说明'
         config = _assemble_config(
             body_config={"recursion_limit": 1000},
             body_context={},
@@ -161,7 +138,7 @@ class TestConfigAssembly:
         assert runtime_ctx["user_id"] == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
     def test_body_config_already_contains_context_field(self):
-        """body.config={'context': {...}} (LG 0.6 alt wire): inject still wins."""
+        '未说明'
         config = _assemble_config(
             body_config={"context": {"agent_name": "myagent"}, "recursion_limit": 1000},
             body_context=None,
@@ -171,13 +148,7 @@ class TestConfigAssembly:
         assert runtime_ctx["user_id"] == "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
 
     def test_body_context_user_id_is_overridden(self):
-        """``body.context`` may carry a legacy/non-web user_id, but server auth wins.
-
-        This covers the whitelisted ``body.context`` merge path only. Full
-        identity spoofing coverage lives in the ``body.config.context`` test
-        below, because that path copies arbitrary context keys before inject
-        overwrites them.
-        """
+        '未说明'
         config = _assemble_config(
             body_config={"recursion_limit": 1000},
             body_context={
@@ -194,16 +165,7 @@ class TestConfigAssembly:
         assert runtime_ctx["oauth_id"] is None
 
     def test_spoofed_context_in_body_config_is_overridden_by_inject(self):
-        """The real spoofing vector is ``body.config.context``: ``build_run_config``
-        copies it wholesale (no whitelist, unlike ``body.context``), so only
-        ``inject_authenticated_user_context``'s unconditional assignment can
-        defeat a client that spoofs ``user_id``/``user_role``/``oauth_*`` there.
-
-        The companion test above covers only ``body.context.user_id``. This
-        test spoofs via ``body.config.context`` so all spoofed values actually
-        reach ``config['context']`` and ``inject``'s overwrite is the only thing
-        standing between them and ``runtime_ctx``.
-        """
+        '未说明'
         config = _assemble_config(
             body_config={
                 "context": {
@@ -226,9 +188,7 @@ class TestConfigAssembly:
         assert runtime_ctx["oauth_id"] == "real-subject"
 
     def test_unauthenticated_request_does_not_inject(self):
-        """If request.state.user is missing (impossible under fail-closed auth, but
-        verify defensively), inject must not write user_id and runtime_ctx must
-        therefore lack it — forcing the tool fallback path to reveal itself."""
+        '未说明'
         config = _assemble_config(
             body_config={"recursion_limit": 1000},
             body_context={"agent_name": "myagent"},
@@ -244,12 +204,7 @@ class TestConfigAssembly:
 
 
 def _build_real_bootstrap_graph(authenticated_user_id: str):
-    """Construct a real LangGraph using create_agent + the real setup_agent tool.
-
-    The LLM is faked (FakeMessagesListChatModel) so we don't need an API key.
-    Everything else — ToolNode dispatch, runtime injection, middleware — is
-    the real production code path.
-    """
+    '未说明'
     from langchain.agents import create_agent
 
     from deerflow.tools.builtins.setup_agent_tool import setup_agent
@@ -287,13 +242,7 @@ def _build_real_bootstrap_graph(authenticated_user_id: str):
 @pytest.mark.no_auto_user
 @pytest.mark.asyncio
 async def test_real_graph_real_setup_agent_writes_to_authenticated_user_dir(tmp_path: Path):
-    """The smoking-gun test for issue #2862.
-
-    Under no_auto_user (contextvar = empty), if user_id propagation through
-    runtime.context is broken, setup_agent will fall back to DEFAULT_USER_ID
-    and write to users/default/agents/... The assertion that this directory
-    DOES NOT exist is what makes this test load-bearing.
-    """
+    '未说明'
     from langgraph.runtime import Runtime
 
     auth_uid = "abcdef01-2345-6789-abcd-ef0123456789"
@@ -342,12 +291,7 @@ async def test_real_graph_real_setup_agent_writes_to_authenticated_user_dir(tmp_
 @pytest.mark.no_auto_user
 @pytest.mark.asyncio
 async def test_inject_failure_falls_back_to_default_proving_test_is_load_bearing(tmp_path: Path):
-    """Negative control: if inject does NOT happen (no user in request), and
-    contextvar is empty (no_auto_user), setup_agent must land in default/.
-
-    This proves the positive test is actually load-bearing — i.e. it would
-    have failed before PR #2784, not passed accidentally.
-    """
+    '未说明'
     from langgraph.runtime import Runtime
 
     config = _assemble_config(
@@ -385,13 +329,7 @@ async def test_inject_failure_falls_back_to_default_proving_test_is_load_bearing
 @pytest.mark.no_auto_user
 @pytest.mark.asyncio
 async def test_subgraph_invocation_preserves_user_id_in_runtime(tmp_path: Path):
-    """When a parent graph invokes a child graph (the pattern used by
-    subagents), parent_runtime.merge() must keep user_id intact.
-
-    We construct a child graph that contains setup_agent and call it from
-    a parent graph's tool. If LangGraph re-creates the Runtime and drops
-    user_id at the sub-graph boundary, this fails.
-    """
+    '未说明'
     from langchain.agents import create_agent
     from langgraph.runtime import Runtime
 
@@ -456,11 +394,7 @@ async def test_subgraph_invocation_preserves_user_id_in_runtime(tmp_path: Path):
 
 
 def test_sync_tool_dispatch_through_thread_pool_uses_runtime_context(tmp_path: Path):
-    """setup_agent is a sync function. When dispatched through ToolNode's
-    ContextThreadPoolExecutor, runtime.context must still carry user_id —
-    not via thread-local copy_context (which only carries contextvars), but
-    because it was passed in as the ToolRuntime constructor argument.
-    """
+    '未说明'
     from langchain.agents import create_agent
     from langgraph.runtime import Runtime
 

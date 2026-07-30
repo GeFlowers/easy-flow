@@ -15,7 +15,7 @@ type TaskRunningEvent = {
   usage?: unknown;
 };
 
-/** Convert an additive task lifecycle event into a task-state update. */
+/** 将增量流式任务生命周期事件转换为可并入子任务状态的局部更新。 */
 export function taskEventToSubtaskUpdate(
   event: unknown,
 ): (Partial<Subtask> & { id: string }) | null {
@@ -56,10 +56,12 @@ export function taskEventToSubtaskUpdate(
   return null;
 }
 
+/** 判断未知事件载荷是否为对象记录。 */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** 规范化事件中的可选模型名称。 */
 function normalizeModelName(value: unknown): string | undefined {
   return typeof value === "string" && value.trim() ? value.trim() : undefined;
 }

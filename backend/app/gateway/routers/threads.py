@@ -1,14 +1,4 @@
-"""Thread CRUD, state, and history endpoints.
-
-Combines the existing thread-local filesystem cleanup with LangGraph
-Platform-compatible thread management backed by the checkpointer.
-
-Channel values returned in state responses are serialized through
-:func:`deerflow.runtime.serialization.serialize_channel_values` to
-ensure LangChain message objects are converted to JSON-safe dicts
-matching the LangGraph Platform wire format expected by the
-``useStream`` React hook.
-"""
+'定义 threads 模块提供的职责与可复用接口。\n\nThread CRUD, state, and history endpoints.\n\nCombines the existing thread-local filesystem cleanup with LangGraph\nPlatform-compatible thread management backed by the checkpointer.\n\nChannel values returned in state responses are serialized through\n:func:`deerflow.runtime.serialization.serialize_channel_values` to\nensure LangChain message objects are converted to JSON-safe dicts\nmatching the LangGraph Platform wire format expected by the\n``useStream`` React hook.\n'
 
 from __future__ import annotations
 
@@ -67,13 +57,14 @@ _BRANCH_HISTORY_SCAN_LIMIT = 200
 
 
 def _strip_reserved_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
-    """Return ``metadata`` with server-controlled keys removed."""
+    '执行 _strip_reserved_metadata 的明确职责，并返回与调用约定一致的结果。\n\nReturn ``metadata`` with server-controlled keys removed.'
     if not metadata:
         return metadata or {}
     return {k: v for k, v in metadata.items() if k not in _SERVER_RESERVED_METADATA_KEYS}
 
 
 def _message_id(message: Any) -> str | None:
+    """读取消息对象或字典中的标识。"""
     if isinstance(message, dict):
         raw = message.get("id")
     else:
@@ -82,6 +73,7 @@ def _message_id(message: Any) -> str | None:
 
 
 def _message_type(message: Any) -> str | None:
+    """读取消息对象或字典中的类型。"""
     if isinstance(message, dict):
         raw = message.get("type")
     else:
@@ -90,6 +82,7 @@ def _message_type(message: Any) -> str | None:
 
 
 def _message_additional_kwargs(message: Any) -> dict[str, Any]:
+    """读取消息附加元数据；缺失时返回空字典。"""
     if isinstance(message, dict):
         raw = message.get("additional_kwargs")
     else:
@@ -98,16 +91,19 @@ def _message_additional_kwargs(message: Any) -> dict[str, Any]:
 
 
 def _is_branch_visible_message(message: Any) -> bool:
+    """判断消息是否可在分支复制时展示。"""
     if _message_additional_kwargs(message).get("hide_from_ui") is True:
         return False
     return _message_type(message) in {"human", "ai"}
 
 
 def _is_branch_assistant_message(message: Any) -> bool:
+    """判断消息是否为助手消息。"""
     return _message_type(message) == "ai"
 
 
 def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
+    """从检查点元组提取消息通道值。"""
     checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
     channel_values = checkpoint.get("channel_values", {}) or {}
     messages = channel_values.get("messages") or []
@@ -115,12 +111,14 @@ def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
 
 
 def _checkpoint_id(checkpoint_tuple: Any) -> str | None:
+    """从检查点配置提取检查点标识。"""
     config = getattr(checkpoint_tuple, "config", {}) or {}
     raw = config.get("configurable", {}).get("checkpoint_id")
     return raw if isinstance(raw, str) and raw else None
 
 
 def _matches_branch_target(messages: list[Any], target_message_ids: set[str]) -> bool:
+    """判断检查点消息是否包含分支目标消息。"""
     if not target_message_ids:
         return False
 
@@ -135,6 +133,7 @@ def _matches_branch_target(messages: list[Any], target_message_ids: set[str]) ->
 
 
 async def _find_branch_checkpoint(checkpointer: Any, thread_id: str, target_message_ids: set[str]) -> Any:
+    """遍历线程检查点，定位包含目标消息的分支基点。"""
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
         async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
@@ -147,16 +146,7 @@ async def _find_branch_checkpoint(checkpointer: Any, thread_id: str, target_mess
 
 
 async def _branch_targets_latest_turn(checkpointer: Any, thread_id: str, target_message_ids: set[str]) -> bool:
-    """Return True when the target turn is the final visible turn in the current state.
-
-    ``alist`` yields newest-first; we take the newest checkpoint that actually holds
-    messages (thread creation writes an empty checkpoint that must be skipped) and
-    reuse ``_matches_branch_target`` to check the target turn is its tail. Used to
-    decide whether cloning the (uncheckpointed) workspace onto a branch is safe: only
-    a branch from the latest turn shares the current workspace timeline. On any lookup
-    failure we fail closed (treat as historical) so a branch from an older turn never
-    inherits a later timeline's workspace files.
-    """
+    "执行 _branch_targets_latest_turn 的明确职责，并返回与调用约定一致的结果。\n\nReturn True when the target turn is the final visible turn in the current state.\n\n    ``alist`` yields newest-first; we take the newest checkpoint that actually holds\n    messages (thread creation writes an empty checkpoint that must be skipped) and\n    reuse ``_matches_branch_target`` to check the target turn is its tail. Used to\n    decide whether cloning the (uncheckpointed) workspace onto a branch is safe: only\n    a branch from the latest turn shares the current workspace timeline. On any lookup\n    failure we fail closed (treat as historical) so a branch from an older turn never\n    inherits a later timeline's workspace files.\n    "
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
         async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
@@ -174,6 +164,7 @@ async def _branch_targets_latest_turn(checkpointer: Any, thread_id: str, target_
 
 
 def _ignore_branch_user_data(directory: str, names: list[str]) -> set[str]:
+    """筛除复制分支用户数据时不应继承的临时或运行文件。"""
     ignored: set[str] = set()
     base = Path(directory)
     for name in names:
@@ -186,6 +177,7 @@ def _ignore_branch_user_data(directory: str, names: list[str]) -> set[str]:
 
 
 def _copy_branch_user_data_sync(paths: Paths, source_thread_id: str, target_thread_id: str, *, user_id: str) -> str:
+    """在工作线程中复制同一用户的分支沙箱数据目录。"""
     source = paths.sandbox_user_data_dir(source_thread_id, user_id=user_id)
     target = paths.sandbox_user_data_dir(target_thread_id, user_id=user_id)
     if not source.exists():
@@ -196,6 +188,7 @@ def _copy_branch_user_data_sync(paths: Paths, source_thread_id: str, target_thre
 
 
 async def _copy_branch_user_data(source_thread_id: str, target_thread_id: str) -> str:
+    """异步调度当前用户的分支数据复制操作。"""
     paths = get_paths()
     user_id = get_effective_user_id()
     try:
@@ -211,6 +204,7 @@ async def _copy_branch_user_data(source_thread_id: str, target_thread_id: str) -
 
 
 def _default_branch_display_name(source_title: Any, *, source_is_branch: bool = False) -> str | None:
+    """根据源线程标题生成默认分支显示名称。"""
     if not isinstance(source_title, str):
         return None
 
@@ -228,14 +222,14 @@ def _default_branch_display_name(source_title: Any, *, source_is_branch: bool = 
 
 
 class ThreadDeleteResponse(BaseModel):
-    """Response model for thread cleanup."""
+    '封装 ThreadDeleteResponse 的状态、协作关系与公开操作。\n\nResponse model for thread cleanup.'
 
     success: bool
     message: str
 
 
 class ThreadResponse(BaseModel):
-    """Response model for a single thread."""
+    '封装 ThreadResponse 的状态、协作关系与公开操作。\n\nResponse model for a single thread.'
 
     thread_id: str = Field(description="Unique thread identifier")
     status: str = Field(default="idle", description="Thread status: idle, busy, interrupted, error")
@@ -247,7 +241,7 @@ class ThreadResponse(BaseModel):
 
 
 class ThreadCreateRequest(BaseModel):
-    """Request body for creating a thread."""
+    '封装 ThreadCreateRequest 的状态、协作关系与公开操作。\n\nRequest body for creating a thread.'
 
     thread_id: str | None = Field(default=None, description="Optional thread ID (auto-generated if omitted)")
     assistant_id: str | None = Field(default=None, description="Associate thread with an assistant")
@@ -257,7 +251,7 @@ class ThreadCreateRequest(BaseModel):
 
 
 class ThreadSearchRequest(BaseModel):
-    """Request body for searching threads."""
+    '封装 ThreadSearchRequest 的状态、协作关系与公开操作。\n\nRequest body for searching threads.'
 
     metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata filter (exact match)")
     limit: int = Field(default=100, ge=1, le=1000, description="Maximum results")
@@ -267,11 +261,7 @@ class ThreadSearchRequest(BaseModel):
     @field_validator("metadata")
     @classmethod
     def _validate_metadata_filters(cls, v: dict[str, Any]) -> dict[str, Any]:
-        """Reject filter entries the SQL backend cannot compile.
-
-        Enforces consistent behaviour across SQL and memory backends.
-        See ``deerflow.persistence.json_compat`` for the shared validators.
-        """
+        '执行 _validate_metadata_filters 的明确职责，并返回与调用约定一致的结果。\n\nReject filter entries the SQL backend cannot compile.\n\n        Enforces consistent behaviour across SQL and memory backends.\n        See ``deerflow.persistence.json_compat`` for the shared validators.\n        '
         if not v:
             return v
         from deerflow.persistence.json_compat import validate_metadata_filter_key, validate_metadata_filter_value
@@ -288,7 +278,7 @@ class ThreadSearchRequest(BaseModel):
 
 
 class ThreadStateResponse(BaseModel):
-    """Response model for thread state."""
+    '封装 ThreadStateResponse 的状态、协作关系与公开操作。\n\nResponse model for thread state.'
 
     values: dict[str, Any] = Field(default_factory=dict, description="Current channel values")
     next: list[str] = Field(default_factory=list, description="Next tasks to execute")
@@ -301,7 +291,7 @@ class ThreadStateResponse(BaseModel):
 
 
 class ThreadPatchRequest(BaseModel):
-    """Request body for patching thread metadata."""
+    '封装 ThreadPatchRequest 的状态、协作关系与公开操作。\n\nRequest body for patching thread metadata.'
 
     metadata: dict[str, Any] = Field(default_factory=dict, description="Metadata to merge")
 
@@ -309,7 +299,7 @@ class ThreadPatchRequest(BaseModel):
 
 
 class ThreadStateUpdateRequest(BaseModel):
-    """Request body for updating thread state (human-in-the-loop resume)."""
+    '封装 ThreadStateUpdateRequest 的状态、协作关系与公开操作。\n\nRequest body for updating thread state (human-in-the-loop resume).'
 
     values: dict[str, Any] | None = Field(default=None, description="Channel values to merge")
     checkpoint_id: str | None = Field(default=None, description="Checkpoint to branch from")
@@ -318,7 +308,7 @@ class ThreadStateUpdateRequest(BaseModel):
 
 
 class ThreadGoalRequest(BaseModel):
-    """Request body for setting a thread-scoped goal."""
+    '封装 ThreadGoalRequest 的状态、协作关系与公开操作。\n\nRequest body for setting a thread-scoped goal.'
 
     objective: str = Field(..., min_length=1, max_length=4000, description="Completion condition for the agent to keep pursuing")
     max_continuations: int = Field(
@@ -330,13 +320,13 @@ class ThreadGoalRequest(BaseModel):
 
 
 class ThreadGoalResponse(BaseModel):
-    """Response model for a thread goal."""
+    '封装 ThreadGoalResponse 的状态、协作关系与公开操作。\n\nResponse model for a thread goal.'
 
     goal: dict[str, Any] | None = Field(default=None, description="Current goal state, or null when no goal is active")
 
 
 class ThreadCompactRequest(BaseModel):
-    """Request body for manually compacting a thread's active context."""
+    "封装 ThreadCompactRequest 的状态、协作关系与公开操作。\n\nRequest body for manually compacting a thread's active context."
 
     force: bool = Field(default=True, description="Run compaction even if automatic summarization thresholds are not met")
     keep: ContextSize | None = Field(default=None, description="Optional retention policy for this compaction only")
@@ -344,7 +334,7 @@ class ThreadCompactRequest(BaseModel):
 
 
 class ThreadCompactResponse(BaseModel):
-    """Response model for manual thread-context compaction."""
+    '封装 ThreadCompactResponse 的状态、协作关系与公开操作。\n\nResponse model for manual thread-context compaction.'
 
     thread_id: str
     compacted: bool
@@ -357,7 +347,7 @@ class ThreadCompactResponse(BaseModel):
 
 
 class HistoryEntry(BaseModel):
-    """Single checkpoint history entry."""
+    '封装 HistoryEntry 的状态、协作关系与公开操作。\n\nSingle checkpoint history entry.'
 
     checkpoint_id: str
     parent_checkpoint_id: str | None = None
@@ -368,14 +358,14 @@ class HistoryEntry(BaseModel):
 
 
 class ThreadHistoryRequest(BaseModel):
-    """Request body for checkpoint history."""
+    '封装 ThreadHistoryRequest 的状态、协作关系与公开操作。\n\nRequest body for checkpoint history.'
 
     limit: int = Field(default=10, ge=1, le=100, description="Maximum entries")
     before: str | None = Field(default=None, description="Cursor for pagination")
 
 
 class ThreadBranchRequest(BaseModel):
-    """Request body for creating a branch from a completed assistant turn."""
+    '封装 ThreadBranchRequest 的状态、协作关系与公开操作。\n\nRequest body for creating a branch from a completed assistant turn.'
 
     message_id: str = Field(..., min_length=1, description="Target assistant message ID to branch from")
     message_ids: list[str] = Field(default_factory=list, description="All assistant message IDs in the target turn")
@@ -383,7 +373,7 @@ class ThreadBranchRequest(BaseModel):
 
 
 class ThreadBranchResponse(BaseModel):
-    """Response model for a thread branch."""
+    '封装 ThreadBranchResponse 的状态、协作关系与公开操作。\n\nResponse model for a thread branch.'
 
     thread_id: str
     parent_thread_id: str
@@ -398,7 +388,7 @@ class ThreadBranchResponse(BaseModel):
 
 
 def _delete_thread_data(thread_id: str, paths: Paths | None = None, *, user_id: str | None = None) -> ThreadDeleteResponse:
-    """Delete local persisted filesystem data for a thread."""
+    '执行 _delete_thread_data 的明确职责，并返回与调用约定一致的结果。\n\nDelete local persisted filesystem data for a thread.'
     path_manager = paths or get_paths()
     try:
         path_manager.delete_thread_dir(thread_id, user_id=user_id)
@@ -417,7 +407,7 @@ def _delete_thread_data(thread_id: str, paths: Paths | None = None, *, user_id: 
 
 
 def _derive_thread_status(checkpoint_tuple) -> str:
-    """Derive thread status from checkpoint metadata."""
+    '执行 _derive_thread_status 的明确职责，并返回与调用约定一致的结果。\n\nDerive thread status from checkpoint metadata.'
     if checkpoint_tuple is None:
         return "idle"
     pending_writes = getattr(checkpoint_tuple, "pending_writes", None) or []
@@ -436,7 +426,7 @@ def _derive_thread_status(checkpoint_tuple) -> str:
 
 
 async def _ensure_thread_for_goal(thread_id: str, request: Request) -> None:
-    """Ensure a thread_meta row and root checkpoint exist for goal commands."""
+    '执行 _ensure_thread_for_goal 的明确职责，并返回与调用约定一致的结果。\n\nEnsure a thread_meta row and root checkpoint exist for goal commands.'
     from app.gateway.deps import get_thread_store
 
     thread_store = get_thread_store(request)
@@ -473,12 +463,7 @@ async def _ensure_thread_for_goal(thread_id: str, request: Request) -> None:
 @router.delete("/{thread_id}", response_model=ThreadDeleteResponse)
 @require_permission("threads", "delete", owner_check=True, require_existing=True)
 async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteResponse:
-    """Delete local persisted filesystem data for a thread.
-
-    Cleans DeerFlow-managed thread directories, removes checkpoint data,
-    and removes the thread_meta row from the configured ThreadMetaStore
-    (sqlite or memory).
-    """
+    '删除目标资源并返回操作结果，并遵守 delete_thread_data 所表达的接口约束。\n\nDelete local persisted filesystem data for a thread.\n\n    Cleans DeerFlow-managed thread directories, removes checkpoint data,\n    and removes the thread_meta row from the configured ThreadMetaStore\n    (sqlite or memory).\n    '
     from app.gateway.deps import get_thread_store
 
     # Clean local filesystem
@@ -510,13 +495,7 @@ async def _resolve_existing_thread(
     thread_owner_user_id: str | None,
     thread_owner_kwargs: dict[str, Any],
 ) -> dict | None:
-    """Return the existing thread_meta record for an idempotent create.
-
-    When the caller carries a trusted internal owner but only a legacy unscoped
-    (``user_id=None``) row exists, claim it for that owner before returning.
-    Both the fast path and the insert-race recovery path resolve through here so
-    a thread's ownership does not diverge based on which path found the record.
-    """
+    "执行 _resolve_existing_thread 的明确职责，并返回与调用约定一致的结果。\n\nReturn the existing thread_meta record for an idempotent create.\n\n    When the caller carries a trusted internal owner but only a legacy unscoped\n    (``user_id=None``) row exists, claim it for that owner before returning.\n    Both the fast path and the insert-race recovery path resolve through here so\n    a thread's ownership does not diverge based on which path found the record.\n    "
     existing_record = await thread_store.get(thread_id, **thread_owner_kwargs)
     if existing_record is None and thread_owner_user_id:
         unscoped_record = await thread_store.get(thread_id, user_id=None)
@@ -528,6 +507,7 @@ async def _resolve_existing_thread(
 
 
 def _existing_thread_response(thread_id: str, record: dict) -> ThreadResponse:
+    """将已存在的线程记录转换为 API 响应。"""
     return ThreadResponse(
         thread_id=thread_id,
         status=record.get("status", "idle"),
@@ -539,12 +519,7 @@ def _existing_thread_response(thread_id: str, record: dict) -> ThreadResponse:
 
 @router.post("", response_model=ThreadResponse)
 async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadResponse:
-    """Create a new thread.
-
-    Writes a thread_meta record (so the thread appears in /threads/search)
-    and an empty checkpoint (so state endpoints work immediately).
-    Idempotent: returns the existing record when ``thread_id`` already exists.
-    """
+    '创建并返回，并遵守 create_thread 所表达的接口约束。\n\nCreate a new thread.\n\n    Writes a thread_meta record (so the thread appears in /threads/search)\n    and an empty checkpoint (so state endpoints work immediately).\n    Idempotent: returns the existing record when ``thread_id`` already exists.\n    '
     from app.gateway.deps import get_thread_store
 
     checkpointer = get_checkpointer(request)
@@ -617,7 +592,7 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
 @router.post("/{thread_id}/branches", response_model=ThreadBranchResponse)
 @require_permission("threads", "write", owner_check=True, require_existing=True)
 async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Request) -> ThreadBranchResponse:
-    """Create a new main-thread branch from a completed assistant turn."""
+    '执行 branch_thread 的明确职责，并返回与调用约定一致的结果。\n\nCreate a new main-thread branch from a completed assistant turn.'
     from app.gateway.deps import get_thread_store
 
     checkpointer = get_checkpointer(request)
@@ -708,11 +683,7 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
 
 @router.post("/search", response_model=list[ThreadResponse])
 async def search_threads(body: ThreadSearchRequest, request: Request) -> list[ThreadResponse]:
-    """Search and list threads.
-
-    Delegates to the configured ThreadMetaStore implementation
-    (SQL-backed for sqlite/postgres, Store-backed for memory mode).
-    """
+    '执行 search_threads 的明确职责，并返回与调用约定一致的结果。\n\nSearch and list threads.\n\n    Delegates to the configured ThreadMetaStore implementation\n    (SQL-backed for sqlite/postgres, Store-backed for memory mode).\n    '
     from app.gateway.deps import get_thread_store
     from deerflow.persistence.thread_meta import InvalidMetadataFilterError
 
@@ -746,7 +717,7 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
 @router.patch("/{thread_id}", response_model=ThreadResponse)
 @require_permission("threads", "write", owner_check=True, require_existing=True)
 async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Request) -> ThreadResponse:
-    """Merge metadata into a thread record."""
+    '执行 patch_thread 的明确职责，并返回与调用约定一致的结果。\n\nMerge metadata into a thread record.'
     from app.gateway.deps import get_thread_store
 
     thread_store = get_thread_store(request)
@@ -775,12 +746,7 @@ async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Reques
 @router.get("/{thread_id}", response_model=ThreadResponse)
 @require_permission("threads", "read", owner_check=True)
 async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
-    """Get thread info.
-
-    Reads metadata from the ThreadMetaStore and derives the accurate
-    execution status from the checkpointer.  Falls back to the checkpointer
-    alone for threads that pre-date ThreadMetaStore adoption (backward compat).
-    """
+    '读取并返回，并遵守 get_thread 所表达的接口约束。\n\nGet thread info.\n\n    Reads metadata from the ThreadMetaStore and derives the accurate\n    execution status from the checkpointer.  Falls back to the checkpointer\n    alone for threads that pre-date ThreadMetaStore adoption (backward compat).\n    '
     from app.gateway.deps import get_thread_store
 
     thread_store = get_thread_store(request)
@@ -832,7 +798,7 @@ async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
 @router.get("/{thread_id}/goal", response_model=ThreadGoalResponse)
 @require_permission("threads", "read", owner_check=True)
 async def get_thread_goal(thread_id: str, request: Request) -> ThreadGoalResponse:
-    """Return the active Claude-style goal for a thread, if any."""
+    '读取并返回，并遵守 get_thread_goal 所表达的接口约束。\n\nReturn the active Claude-style goal for a thread, if any.'
     checkpointer = get_checkpointer(request)
     try:
         goal = await read_thread_goal(checkpointer, thread_id)
@@ -845,11 +811,7 @@ async def get_thread_goal(thread_id: str, request: Request) -> ThreadGoalRespons
 @router.put("/{thread_id}/goal", response_model=ThreadGoalResponse)
 @require_permission("threads", "write", owner_check=True)
 async def set_thread_goal(thread_id: str, body: ThreadGoalRequest, request: Request) -> ThreadGoalResponse:
-    """Set or replace the active goal for a thread.
-
-    ``/chats/new`` pages already hold a generated UUID before the first run, so
-    this endpoint creates the missing thread checkpoint on demand.
-    """
+    '执行 set_thread_goal 的明确职责，并返回与调用约定一致的结果。\n\nSet or replace the active goal for a thread.\n\n    ``/chats/new`` pages already hold a generated UUID before the first run, so\n    this endpoint creates the missing thread checkpoint on demand.\n    '
     checkpointer = get_checkpointer(request)
     await _ensure_thread_for_goal(thread_id, request)
     try:
@@ -867,7 +829,7 @@ async def set_thread_goal(thread_id: str, body: ThreadGoalRequest, request: Requ
 @router.delete("/{thread_id}/goal", response_model=ThreadGoalResponse)
 @require_permission("threads", "write", owner_check=True)
 async def clear_thread_goal(thread_id: str, request: Request) -> ThreadGoalResponse:
-    """Clear the active goal for a thread."""
+    '执行 clear_thread_goal 的明确职责，并返回与调用约定一致的结果。\n\nClear the active goal for a thread.'
     checkpointer = get_checkpointer(request)
     try:
         async with goal_thread_lock(thread_id):
@@ -881,6 +843,7 @@ async def clear_thread_goal(thread_id: str, request: Request) -> ThreadGoalRespo
 
 
 def _thread_compact_response(result: ThreadCompactionResult) -> ThreadCompactResponse:
+    """将线程压缩服务结果转换为路由响应模型。"""
     return ThreadCompactResponse(
         thread_id=result.thread_id,
         compacted=result.compacted,
@@ -896,7 +859,7 @@ def _thread_compact_response(result: ThreadCompactionResult) -> ThreadCompactRes
 @router.post("/{thread_id}/compact", response_model=ThreadCompactResponse)
 @require_permission("threads", "write", owner_check=True, require_existing=True)
 async def compact_thread(thread_id: str, body: ThreadCompactRequest, request: Request) -> ThreadCompactResponse:
-    """Manually summarize old thread context while preserving the visible history."""
+    '执行 compact_thread 的明确职责，并返回与调用约定一致的结果。\n\nManually summarize old thread context while preserving the visible history.'
     run_manager = get_run_manager(request)
     checkpointer = get_checkpointer(request)
     keep = body.keep.to_tuple() if body.keep is not None else None
@@ -930,11 +893,7 @@ async def compact_thread(thread_id: str, body: ThreadCompactRequest, request: Re
 @router.get("/{thread_id}/state", response_model=ThreadStateResponse)
 @require_permission("threads", "read", owner_check=True)
 async def get_thread_state(thread_id: str, request: Request) -> ThreadStateResponse:
-    """Get the latest state snapshot for a thread.
-
-    Channel values are serialized to ensure LangChain message objects
-    are converted to JSON-safe dicts.
-    """
+    '读取并返回，并遵守 get_thread_state 所表达的接口约束。\n\nGet the latest state snapshot for a thread.\n\n    Channel values are serialized to ensure LangChain message objects\n    are converted to JSON-safe dicts.\n    '
     checkpointer = get_checkpointer(request)
 
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
@@ -982,13 +941,7 @@ async def get_thread_state(thread_id: str, request: Request) -> ThreadStateRespo
 @router.post("/{thread_id}/state", response_model=ThreadStateResponse)
 @require_permission("threads", "write", owner_check=True, require_existing=True)
 async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, request: Request) -> ThreadStateResponse:
-    """Update thread state (e.g. for human-in-the-loop resume or title rename).
-
-    Writes a new checkpoint that merges *body.values* into the latest
-    channel values, then syncs any updated ``title`` field through the
-    ThreadMetaStore abstraction so that ``/threads/search`` reflects the
-    change immediately in both sqlite and memory backends.
-    """
+    '更新目标状态并返回最新结果，并遵守 update_thread_state 所表达的接口约束。\n\nUpdate thread state (e.g. for human-in-the-loop resume or title rename).\n\n    Writes a new checkpoint that merges *body.values* into the latest\n    channel values, then syncs any updated ``title`` field through the\n    ThreadMetaStore abstraction so that ``/threads/search`` reflects the\n    change immediately in both sqlite and memory backends.\n    '
     from app.gateway.deps import get_thread_store
 
     checkpointer = get_checkpointer(request)
@@ -1082,11 +1035,13 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
 
 
 def _ai_message_lacks_duration(message: dict[str, Any]) -> bool:
+    """判断助手消息是否尚未写入回合耗时。"""
     additional_kwargs = message.get("additional_kwargs")
     return message.get("type") == "ai" and (not isinstance(additional_kwargs, dict) or "turn_duration" not in additional_kwargs)
 
 
 def _checkpoint_run_durations(metadata: Any) -> dict[str, int]:
+    """从检查点元数据提取运行耗时映射。"""
     raw_durations = metadata.get("run_durations") if isinstance(metadata, dict) else None
     if not isinstance(raw_durations, dict):
         return {}
@@ -1094,6 +1049,7 @@ def _checkpoint_run_durations(metadata: Any) -> dict[str, int]:
 
 
 def _set_message_turn_duration(message: dict[str, Any], run_id: str, run_durations: dict[str, int]) -> None:
+    """在匹配运行的助手消息附加回合耗时。"""
     if message.get("type") != "ai" or run_id not in run_durations:
         return
     additional_kwargs = message.get("additional_kwargs")
@@ -1111,14 +1067,7 @@ async def get_thread_history(
     request: Request,
     background_tasks: BackgroundTasks,
 ) -> list[HistoryEntry]:
-    """Get checkpoint history for a thread.
-
-    Messages are read from the checkpointer's channel values (the
-    authoritative source) and serialized via
-    :func:`~deerflow.runtime.serialization.serialize_channel_values`.
-    Only the latest (first) checkpoint carries the ``messages`` key to
-    avoid duplicating them across every entry.
-    """
+    "读取并返回，并遵守 get_thread_history 所表达的接口约束。\n\nGet checkpoint history for a thread.\n\n    Messages are read from the checkpointer's channel values (the\n    authoritative source) and serialized via\n    :func:`~deerflow.runtime.serialization.serialize_channel_values`.\n    Only the latest (first) checkpoint carries the ``messages`` key to\n    avoid duplicating them across every entry.\n    "
     checkpointer = get_checkpointer(request)
 
     config: dict[str, Any] = {"configurable": {"thread_id": thread_id}}

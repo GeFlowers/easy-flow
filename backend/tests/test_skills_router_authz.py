@@ -1,21 +1,4 @@
-"""Authorization regression tests for the skills router.
-
-Custom skill SKILL.md content is injected into every user's agent system
-prompt. The mutating endpoints that write global shared state (install,
-toggle PUBLIC skills, edit/delete custom skill content, and the endpoints
-that expose raw custom-skill content/history) must be admin-only, matching
-the MCP router which guards the equivalent global extensions_config mutations
-with ``require_admin_user``.
-
-Under per-user skill isolation, ``list_custom_skills`` is open to all
-authenticated users (they see only their own custom skills), but all other
-custom-skill endpoints remain admin-only because they write global state
-(install writes to the shared archive, toggle writes extensions_config.json
-for PUBLIC skills, and edit/delete modify the on-disk skill tree).
-
-These tests pin the access-control boundary: a normal authenticated
-(non-admin) user must receive 403 on every guarded endpoint.
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -32,10 +15,12 @@ from app.gateway.routers import skills as skills_router
 
 
 def _make_user(system_role: str) -> User:
+    '未说明'
     return User(email=f"{system_role}-test@example.com", password_hash="x", system_role=system_role, id=uuid4())
 
 
 def _make_app(*, system_role: str) -> FastAPI:
+    '未说明'
     config = SimpleNamespace(
         skills=SimpleNamespace(get_skills_path=lambda: "/tmp/skills", container_path="/mnt/skills", use="deerflow.skills.storage.local_skill_storage:LocalSkillStorage"),
         skill_evolution=SimpleNamespace(enabled=True, moderation_model_name=None),
@@ -66,12 +51,7 @@ _GUARDED_ENDPOINTS = [
 
 
 def test_non_admin_is_forbidden_on_all_mutating_skills_endpoints():
-    """A normal (non-admin) authenticated user must get 403, never 200/500.
-
-    403 proves the admin guard fired before any business logic ran. If the
-    guard were missing the request would instead reach the handler and return
-    200 or a 4xx/5xx from the storage layer.
-    """
+    '未说明'
     app = _make_app(system_role="user")
     with TestClient(app) as client:
         for method, path, body in _GUARDED_ENDPOINTS:
@@ -80,14 +60,10 @@ def test_non_admin_is_forbidden_on_all_mutating_skills_endpoints():
 
 
 def test_basic_skill_listing_stays_open_to_normal_users(monkeypatch):
-    """The basic list/detail endpoints expose only name/description and are
-    needed by the normal-user UI, so they must NOT be admin-gated.
-
-    Under per-user skill isolation, ``list_custom_skills`` (GET /api/skills/custom)
-    is also open to normal users — they see only their own custom skills.
-    """
+    '未说明'
 
     def _load_skills(*, enabled_only: bool):
+        '未说明'
         from pathlib import Path
 
         from deerflow.skills.types import Skill
@@ -115,9 +91,7 @@ def test_basic_skill_listing_stays_open_to_normal_users(monkeypatch):
 
 
 def test_enable_toggle_allowed_for_admin(monkeypatch, tmp_path):
-    """`PUT /api/skills/{name}` writes the shared extensions_config.json, so it
-    is admin-only. This confirms the guard does not block a legitimate admin.
-    """
+    '未说明'
     from pathlib import Path
 
     from deerflow.skills.types import Skill
@@ -125,6 +99,7 @@ def test_enable_toggle_allowed_for_admin(monkeypatch, tmp_path):
     config_path = tmp_path / "extensions_config.json"
 
     def _load_skills(*, enabled_only: bool):
+        '未说明'
         return [
             Skill(
                 name="demo",
@@ -145,6 +120,7 @@ def test_enable_toggle_allowed_for_admin(monkeypatch, tmp_path):
     monkeypatch.setattr(skills_router.ExtensionsConfig, "resolve_config_path", staticmethod(lambda: config_path))
 
     async def _refresh(_user_id: str):
+        '未说明'
         return None
 
     monkeypatch.setattr(skills_router, "refresh_user_skills_system_prompt_cache_async", _refresh)

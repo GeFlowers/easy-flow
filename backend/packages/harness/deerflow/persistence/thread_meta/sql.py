@@ -1,4 +1,4 @@
-"""SQLAlchemy-backed thread metadata repository."""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -19,11 +19,14 @@ logger = logging.getLogger(__name__)
 
 
 class ThreadMetaRepository(ThreadMetaStore):
+    """定义负责持久化读写及事务边界管理的仓储组件。"""
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self._sf = session_factory
 
     @staticmethod
     def _row_to_dict(row: ThreadMetaRow) -> dict[str, Any]:
+        """将持久化记录转换为对外使用的字典表示。"""
         d = row.to_dict()
         d["metadata"] = d.pop("metadata_json", None) or {}
         for key in ("created_at", "updated_at"):
@@ -45,6 +48,7 @@ class ThreadMetaRepository(ThreadMetaStore):
     ) -> dict:
         # Auto-resolve user_id from contextvar when AUTO; explicit None
         # creates an orphan row (used by migration scripts).
+        """创建记录并在成功后提交相应的持久化事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.create")
         now = datetime.now(UTC)
         row = ThreadMetaRow(
@@ -68,6 +72,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.get")
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)
@@ -79,27 +84,7 @@ class ThreadMetaRepository(ThreadMetaStore):
             return self._row_to_dict(row)
 
     async def check_access(self, thread_id: str, user_id: str, *, require_existing: bool = False) -> bool:
-        """Check if ``user_id`` has access to ``thread_id``.
-
-        Two modes — one row, two distinct semantics depending on what
-        the caller is about to do:
-
-        - ``require_existing=False`` (default, permissive):
-          Returns True for: row missing (untracked legacy thread),
-          ``row.user_id`` is None (shared / pre-auth data),
-          or ``row.user_id == user_id``. Use for **read-style**
-          decorators where treating an untracked thread as accessible
-          preserves backward-compat.
-
-        - ``require_existing=True`` (strict):
-          Returns True **only** when the row exists AND
-          (``row.user_id == user_id`` OR ``row.user_id is None``).
-          Use for **destructive / mutating** decorators (DELETE, PATCH,
-          state-update) so a thread that has *already been deleted*
-          cannot be re-targeted by any caller — closing the
-          delete-idempotence cross-user gap where the row vanishing
-          made every other user appear to "own" it.
-        """
+        """执行当前持久化组件提供的操作。"""
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)
             if row is None:
@@ -117,11 +102,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         offset: int = 0,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict[str, Any]]:
-        """Search threads with optional metadata and status filters.
-
-        Owner filter is enforced by default: caller must be in a user
-        context. Pass ``user_id=None`` to bypass (migration/CLI).
-        """
+        """查询并返回满足给定条件的持久化记录集合。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.search")
         stmt = select(ThreadMetaRow).order_by(ThreadMetaRow.updated_at.desc(), ThreadMetaRow.thread_id.desc())
         if resolved_user_id is not None:
@@ -150,7 +131,7 @@ class ThreadMetaRepository(ThreadMetaStore):
             return [self._row_to_dict(r) for r in result.scalars()]
 
     async def _check_ownership(self, session: AsyncSession, thread_id: str, resolved_user_id: str | None) -> bool:
-        """Return True if the row exists and is owned (or filter bypassed)."""
+        """执行持久化流程所需的内部辅助操作。"""
         if resolved_user_id is None:
             return True  # explicit bypass
         row = await session.get(ThreadMetaRow, thread_id)
@@ -163,7 +144,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """Update the display_name (title) for a thread."""
+        """更新指定持久化记录的状态或字段并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_display_name")
         async with self._sf() as session:
             if not await self._check_ownership(session, thread_id, resolved_user_id):
@@ -178,6 +159,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_status")
         async with self._sf() as session:
             if not await self._check_ownership(session, thread_id, resolved_user_id):
@@ -192,12 +174,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """Merge ``metadata`` into ``metadata_json``.
-
-        Read-modify-write inside a single session/transaction so concurrent
-        callers see consistent state. No-op if the row does not exist or
-        the user_id check fails.
-        """
+        """更新指定持久化记录的状态或字段并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_metadata")
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)
@@ -218,7 +195,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """Move a thread metadata row to ``owner_user_id``."""
+        """更新指定持久化记录的状态或字段并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_owner")
         async with self._sf() as session:
             if not await self._check_ownership(session, thread_id, resolved_user_id):
@@ -232,6 +209,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.delete")
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)

@@ -1,11 +1,4 @@
-"""Tests for memory tool functions (tool-driven memory mode).
-
-The tools are backend-agnostic: they go through ``get_memory_manager()`` (the
-MemoryManager ABC). These tests mock the manager to verify each tool calls the
-right ABC method, returns the expected JSON, and handles errors / duplicates /
-backends that lack fact-CRUD gracefully. Factory mode-gating (tool vs
-middleware) is covered by ``TestModeGating`` at the bottom.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import json
 from types import SimpleNamespace
@@ -20,12 +13,14 @@ from deerflow.agents.memory.tools import (
 
 
 class _NamedTool:
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
     def __init__(self, name: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.name = name
 
 
 class _MockManager:
-    """Configurable MemoryManager stand-in for tool-handler tests."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def __init__(
         self,
@@ -41,6 +36,7 @@ class _MockManager:
         supports_update=True,
         supports_delete=True,
     ):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self._facts = facts if facts is not None else []
         self._search_results = search_results if search_results is not None else []
         self._created_fact = created_fact or {"id": "fact_new", "content": ""}
@@ -54,26 +50,29 @@ class _MockManager:
         self.calls = []
 
     def search(self, query, top_k=5, *, user_id=None, agent_name=None, category=None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.calls.append(("search", query, top_k, user_id, agent_name, category))
         if self._raise_on_search:
             raise self._raise_on_search
-        # Mirror the real backend: filter by category BEFORE returning, so the
-        # tool's category kwarg is honoured server-side (not client-side).
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         results = list(self._search_results)
         if category is not None:
             results = [f for f in results if f.get("category") == category]
         return results
 
     def get_memory(self, *, user_id=None, agent_name=None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.calls.append(("get_memory", user_id, agent_name))
         return {"facts": list(self._facts)}
 
     def create_fact(self, content, category="context", confidence=0.5, *, agent_name=None, user_id=None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.calls.append(("create_fact", content, category, confidence, agent_name, user_id))
         if self._raise_on_create:
             raise self._raise_on_create
-        # Mirrors the real backend: returns (memory_data, fact_id) so the tool uses
-        # the id directly instead of re-deriving it by content matching.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         created = dict(self._created_fact)
         created["content"] = content
         created["category"] = category
@@ -81,21 +80,24 @@ class _MockManager:
         return {"facts": [created] + list(self._facts)}, created.get("id")
 
     def update_fact(self, fact_id, content=None, category=None, confidence=None, *, agent_name=None, user_id=None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.calls.append(("update_fact", fact_id, content, category, confidence, agent_name, user_id))
         if self._raise_on_update:
             raise self._raise_on_update
         return {"facts": []}
 
     def delete_fact(self, fact_id, *, agent_name=None, user_id=None):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.calls.append(("delete_fact", fact_id, agent_name, user_id))
         if self._raise_on_delete:
             raise self._raise_on_delete
         return {"facts": []}
 
-    # Tool uses getattr+callable to probe these; shadow with None to simulate a
-    # backend that does not expose fact CRUD (e.g. noop) -- getattr() returns
-    # None and the tool's callable() check fails gracefully.
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     def _drop_fact_ops(self):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         if not self._supports_create:
             self.create_fact = None
         if not self._supports_update:
@@ -105,6 +107,7 @@ class _MockManager:
 
 
 def _install_manager(monkeypatch, manager):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     manager._drop_fact_ops()
     monkeypatch.setattr("deerflow.agents.memory.tools.get_memory_manager", lambda: manager)
     monkeypatch.setattr("deerflow.agents.memory.tools.resolve_runtime_user_id", lambda runtime: "test-user")
@@ -112,15 +115,15 @@ def _install_manager(monkeypatch, manager):
 
 
 class TestGetMemoryTools:
-    """Tests for get_memory_tools registry."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_returns_four_tools(self):
-        """Should return exactly 4 tools."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         tools = get_memory_tools()
         assert len(tools) == 4
 
     def test_tools_have_unique_names(self):
-        """All tools should have unique names."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         tools = get_memory_tools()
         names = [t.name for t in tools]
         assert len(names) == len(set(names))
@@ -131,10 +134,10 @@ class TestGetMemoryTools:
 
 
 class TestMemorySearchTool:
-    """Tests for memory_search tool handler."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_returns_json_with_results(self, monkeypatch):
-        """Should return JSON with results and count."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         results = [
             {"id": "fact_abc123", "content": "User likes Python", "category": "preference", "confidence": 0.9, "createdAt": "2026-01-01T00:00:00Z"},
         ]
@@ -144,13 +147,13 @@ class TestMemorySearchTool:
         result = json.loads(result_json)
         assert result["count"] == 1
         assert result["results"][0]["id"] == "fact_abc123"
-        # search forwards query + limit + scope to the manager.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert mgr.calls[0][0] == "search"
         assert mgr.calls[0][1] == "Python"
-        assert mgr.calls[0][2] == 10  # limit -> top_k
+        assert mgr.calls[0][2] == 10  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_empty_results(self, monkeypatch):
-        """Should return empty results for no matches."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         _install_manager(monkeypatch, _MockManager(search_results=[]))
 
         result_json = memory_search_tool.func(SimpleNamespace(context={}), "nothing")
@@ -159,7 +162,7 @@ class TestMemorySearchTool:
         assert result["results"] == []
 
     def test_category_filter_forwarded_to_backend(self, monkeypatch):
-        """Category kwarg is forwarded to the backend, which filters before slicing."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         results = [
             {"id": "f1", "content": "likes uv", "category": "preference", "confidence": 0.9},
             {"id": "f2", "content": "uses uv", "category": "context", "confidence": 0.5},
@@ -170,12 +173,12 @@ class TestMemorySearchTool:
         result = json.loads(result_json)
         assert result["count"] == 1
         assert result["results"][0]["id"] == "f1"
-        # category is forwarded to the backend search call (not filtered client-side)
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert mgr.calls[0][0] == "search"
-        assert mgr.calls[0][5] == "preference"  # category kwarg
+        assert mgr.calls[0][5] == "preference"  # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
     def test_runtime_error_returns_error_json(self, monkeypatch):
-        """Should return error JSON when search raises."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         _install_manager(monkeypatch, _MockManager(raise_on_search=RuntimeError("boom")))
 
         result_json = memory_search_tool.func(SimpleNamespace(context={}), "anything")
@@ -184,26 +187,26 @@ class TestMemorySearchTool:
 
 
 class TestMemoryAddTool:
-    """Tests for memory_add tool handler."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_adds_fact_and_returns_json(self, monkeypatch):
-        """Should add a fact and return fact_id + status."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mgr = _install_manager(monkeypatch, _MockManager(facts=[], created_fact={"id": "fact_new123"}))
 
         result_json = memory_add_tool.func(SimpleNamespace(context={}), "User prefers dark mode", category="preference", confidence=0.9)
         result = json.loads(result_json)
         assert result["status"] == "added"
         assert result["fact_id"] == "fact_new123"
-        # dup-checked via get_memory, then created via create_fact.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         assert ("get_memory", "test-user", None) in mgr.calls
         assert any(c[0] == "create_fact" and c[1] == "User prefers dark mode" for c in mgr.calls)
 
     def test_add_returns_fact_id_when_storage_reorders_facts(self, monkeypatch):
-        """fact_id comes directly from create_fact, not derived from the returned list."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         created = {"id": "fact_new123", "content": "User prefers dark mode"}
         older = {"id": "fact_old999", "content": "Older fact"}
-        # Storage may reorder facts; create_fact returns the id directly so the
-        # tool doesn't depend on list position or content matching.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         mgr = _MockManager(facts=[], created_fact=created)
         mgr.create_fact = lambda content, category="context", confidence=0.5, *, agent_name=None, user_id=None: ({"facts": [created, older]}, "fact_new123")
         _install_manager(monkeypatch, mgr)
@@ -213,12 +216,12 @@ class TestMemoryAddTool:
         assert result["fact_id"] == "fact_new123"
 
     def test_add_reports_not_stored_when_cap_evicts_new_fact(self, monkeypatch):
-        """When the cap evicts the new fact (create_fact returns None id), report
-        'not stored' instead of a dangling id + false 'added'."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mgr = _MockManager(facts=[])
         recorded = []
 
         def fake_create(content, category="context", confidence=0.5, *, agent_name=None, user_id=None):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             recorded.append(content)
             return {"facts": []}, None
 
@@ -231,12 +234,13 @@ class TestMemoryAddTool:
         assert recorded == ["low confidence fact"]
 
     def test_uses_runtime_scope(self, monkeypatch):
-        """Should pass agent_name + user_id from runtime to the manager."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         captured = {}
         mgr = _MockManager(facts=[], created_fact={"id": "fact_new", "content": "x"})
         orig_create = mgr.create_fact
 
         def spy(content, category="context", confidence=0.5, *, agent_name=None, user_id=None):
+            """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
             captured["agent_name"] = agent_name
             captured["user_id"] = user_id
             return orig_create(content, category=category, confidence=confidence, agent_name=agent_name, user_id=user_id)
@@ -245,8 +249,8 @@ class TestMemoryAddTool:
         _install_manager(monkeypatch, mgr)
 
         runtime = SimpleNamespace(context={"agent_name": "code-agent"})
-        # resolve_runtime_user_id is monkeypatched to "test-user" by _install_manager;
-        # override here to assert the runtime channel flows through.
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         import deerflow.agents.memory.tools as tools_mod
 
         tools_mod.resolve_runtime_user_id = lambda r: "runtime-user"
@@ -257,7 +261,7 @@ class TestMemoryAddTool:
         assert captured == {"agent_name": "code-agent", "user_id": "runtime-user"}
 
     def test_rejects_existing_duplicate_content(self, monkeypatch):
-        """Should not create a fact whose normalized content already exists."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         existing = [{"id": "fact_existing", "content": "User prefers dark mode"}]
         mgr = _install_manager(monkeypatch, _MockManager(facts=existing))
 
@@ -267,7 +271,7 @@ class TestMemoryAddTool:
         assert not any(c[0] == "create_fact" for c in mgr.calls)
 
     def test_rejects_duplicate_content_outside_top_k(self, monkeypatch):
-        """Dup check reads the full memory (get_memory), not a capped search."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         facts = [{"id": f"fact_{i}", "content": f"variant {i}", "category": "preference", "confidence": 0.9} for i in range(12)]
         facts.append({"id": "fact_exact", "content": "User prefers dark mode", "category": "preference", "confidence": 0.1})
         mgr = _install_manager(monkeypatch, _MockManager(facts=facts))
@@ -278,7 +282,7 @@ class TestMemoryAddTool:
         assert not any(c[0] == "create_fact" for c in mgr.calls)
 
     def test_empty_content_returns_error(self, monkeypatch):
-        """Should return error JSON for empty content without touching the manager."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mgr = _install_manager(monkeypatch, _MockManager())
 
         result_json = memory_add_tool.func(SimpleNamespace(context={}), "   ")
@@ -287,7 +291,7 @@ class TestMemoryAddTool:
         assert not any(c[0] == "create_fact" for c in mgr.calls)
 
     def test_backend_without_create_fact_returns_error(self, monkeypatch):
-        """A backend lacking create_fact (e.g. noop) gets a clear JSON error."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         _install_manager(monkeypatch, _MockManager(facts=[], supports_create=False))
 
         result_json = memory_add_tool.func(SimpleNamespace(context={}), "something")
@@ -297,10 +301,10 @@ class TestMemoryAddTool:
 
 
 class TestMemoryUpdateTool:
-    """Tests for memory_update tool handler."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_updates_fact_and_returns_json(self, monkeypatch):
-        """Should update a fact and return JSON."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mgr = _install_manager(monkeypatch, _MockManager())
 
         result_json = memory_update_tool.func(SimpleNamespace(context={}), "fact_abc", content="updated content")
@@ -310,7 +314,7 @@ class TestMemoryUpdateTool:
         assert any(c[0] == "update_fact" and c[1] == "fact_abc" for c in mgr.calls)
 
     def test_invalid_fact_id_returns_error(self, monkeypatch):
-        """Should return error JSON for invalid fact_id (KeyError)."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         _install_manager(monkeypatch, _MockManager(raise_on_update=KeyError("fact_xxx")))
 
         result_json = memory_update_tool.func(SimpleNamespace(context={}), "fact_xxx", content="nope")
@@ -319,7 +323,7 @@ class TestMemoryUpdateTool:
         assert "fact_xxx" in result["error"]
 
     def test_backend_without_update_fact_returns_error(self, monkeypatch):
-        """A backend lacking update_fact gets a clear JSON error."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         _install_manager(monkeypatch, _MockManager(supports_update=False))
 
         result_json = memory_update_tool.func(SimpleNamespace(context={}), "fact_abc", content="x")
@@ -329,10 +333,10 @@ class TestMemoryUpdateTool:
 
 
 class TestMemoryDeleteTool:
-    """Tests for memory_delete tool handler."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_deletes_fact_and_returns_json(self, monkeypatch):
-        """Should delete a fact and return JSON."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         mgr = _install_manager(monkeypatch, _MockManager())
 
         result_json = memory_delete_tool.func(SimpleNamespace(context={}), "fact_abc")
@@ -342,7 +346,7 @@ class TestMemoryDeleteTool:
         assert any(c[0] == "delete_fact" and c[1] == "fact_abc" for c in mgr.calls)
 
     def test_invalid_fact_id_returns_error(self, monkeypatch):
-        """Should return error JSON for invalid fact_id (KeyError)."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         _install_manager(monkeypatch, _MockManager(raise_on_delete=KeyError("fact_xxx")))
 
         result_json = memory_delete_tool.func(SimpleNamespace(context={}), "fact_xxx")
@@ -351,7 +355,7 @@ class TestMemoryDeleteTool:
         assert "fact_xxx" in result["error"]
 
     def test_backend_without_delete_fact_returns_error(self, monkeypatch):
-        """A backend lacking delete_fact gets a clear JSON error."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         _install_manager(monkeypatch, _MockManager(supports_delete=False))
 
         result_json = memory_delete_tool.func(SimpleNamespace(context={}), "fact_abc")
@@ -361,11 +365,10 @@ class TestMemoryDeleteTool:
 
 
 class TestModeGating:
-    """Integration tests for memory.mode exclusivity."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def test_tool_mode_registers_tools_not_middleware(self, monkeypatch):
-        """When mode=tool, get_memory_tools are added to extra_tools and
-        MemoryMiddleware is NOT in the chain."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.agents.factory import _assemble_from_features
         from deerflow.agents.features import RuntimeFeatures
         from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
@@ -390,7 +393,7 @@ class TestModeGating:
         assert "memory_delete" in tool_names
 
     def test_explicit_memory_config_drives_factory_mode(self, monkeypatch):
-        """Factory mode gating should use the explicit config before ambient globals."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.agents.factory import _assemble_from_features
         from deerflow.agents.features import RuntimeFeatures
         from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
@@ -410,8 +413,7 @@ class TestModeGating:
         assert "memory_add" in tool_names
 
     def test_middleware_mode_appends_middleware_not_tools(self, monkeypatch):
-        """When mode=middleware (default), MemoryMiddleware IS in the chain
-        and memory tools are NOT in extra_tools."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.agents.factory import _assemble_from_features
         from deerflow.agents.features import RuntimeFeatures
         from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
@@ -433,9 +435,7 @@ class TestModeGating:
         assert "memory_search" not in tool_names, "memory_search should not be registered in middleware mode"
 
     def test_memory_disabled_skips_both(self, monkeypatch):
-        """When memory.enabled=False, middleware IS appended but no-ops at
-        runtime (the enabled check is inside after_agent, not the factory).
-        Tools are never registered because mode is middleware (default)."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.agents.factory import _assemble_from_features
         from deerflow.agents.features import RuntimeFeatures
         from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
@@ -450,15 +450,15 @@ class TestModeGating:
         feat = RuntimeFeatures(memory=True)
         chain, extra_tools = _assemble_from_features(feat, name="test-agent")
 
-        # Middleware is appended - it checks enabled internally in after_agent
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         middleware_types = [type(m) for m in chain]
         assert MemoryMiddleware in middleware_types
-        # Tools should NOT be registered in middleware mode regardless of enabled
+        # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
         tool_names = [t.name for t in extra_tools]
         assert "memory_search" not in tool_names
 
     def test_should_use_memory_tools_requires_tool_mode_and_enabled(self):
-        """Tool-mode helper should require both mode=tool and enabled=True."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.config.memory_config import MemoryConfig, should_use_memory_tools
 
         assert should_use_memory_tools(MemoryConfig(enabled=True, mode="tool")) is True
@@ -466,7 +466,7 @@ class TestModeGating:
         assert should_use_memory_tools(MemoryConfig(enabled=True, mode="middleware")) is False
 
     def test_tool_mode_disabled_logs_warning_and_uses_middleware(self, monkeypatch, caplog):
-        """mode=tool with enabled=False should be visible and still disable tools."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.agents.factory import _assemble_from_features
         from deerflow.agents.features import RuntimeFeatures
         from deerflow.agents.middlewares.memory_middleware import MemoryMiddleware
@@ -485,7 +485,7 @@ class TestModeGating:
         assert "memory.mode is 'tool' but memory.enabled is false" in caplog.text
 
     def test_lead_agent_deduplicates_memory_tools_after_appending(self, monkeypatch):
-        """Configured tools should not duplicate tool-mode memory tools."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.agents.lead_agent import agent as lead_agent_module
         from deerflow.config.memory_config import MemoryConfig
 
@@ -518,7 +518,7 @@ class TestModeGating:
         assert "memory_add" in tool_names
 
     def test_lead_agent_preserves_non_memory_duplicate_tool_names(self, monkeypatch):
-        """Memory-tool collision handling should not drop unrelated duplicate tools."""
+        """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
         from deerflow.agents.lead_agent import agent as lead_agent_module
         from deerflow.config.memory_config import MemoryConfig
 

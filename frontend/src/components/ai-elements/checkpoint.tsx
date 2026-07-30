@@ -11,8 +11,10 @@ import { cn } from "@/lib/utils";
 import { BookmarkIcon, type LucideProps } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 
+/** CheckpointProps 的公开类型定义。 */
 export type CheckpointProps = HTMLAttributes<HTMLDivElement>;
 
+/** Checkpoint 组件：提供对应的界面结构与交互语义。 */
 export const Checkpoint = ({
   className,
   children,
@@ -30,8 +32,10 @@ export const Checkpoint = ({
   </div>
 );
 
+/** CheckpointIconProps 的公开类型定义。 */
 export type CheckpointIconProps = LucideProps;
 
+/** CheckpointIcon 组件：提供对应的界面结构与交互语义。 */
 export const CheckpointIcon = ({
   className,
   children,
@@ -41,10 +45,12 @@ export const CheckpointIcon = ({
     <BookmarkIcon className={cn("size-4 shrink-0", className)} {...props} />
   );
 
+/** CheckpointTriggerProps 的公开类型定义。 */
 export type CheckpointTriggerProps = ComponentProps<typeof Button> & {
   tooltip?: string;
 };
 
+/** CheckpointTrigger 组件：提供对应的界面结构与交互语义。 */
 export const CheckpointTrigger = ({
   children,
   className,

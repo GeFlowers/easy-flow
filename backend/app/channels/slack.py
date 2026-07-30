@@ -1,4 +1,4 @@
-"""Slack channel — connects via Socket Mode (no public IP needed)."""
+"""通过 Socket Mode 接入 Slack 通道，无需暴露公网 HTTP 回调地址。"""
 
 from __future__ import annotations
 
@@ -19,6 +19,7 @@ _slack_md_converter = SlackMarkdownConverter()
 
 
 def _normalize_allowed_users(allowed_users: Any) -> set[str]:
+    """将允许用户配置统一为非空 Slack 用户 ID 集合，并兼容单个标量值。"""
     if allowed_users is None:
         return set()
     if isinstance(allowed_users, str):
@@ -35,6 +36,7 @@ def _normalize_allowed_users(allowed_users: Any) -> set[str]:
 
 
 def _strip_leading_slack_bot_mention(text: str, bot_user_id: str | None) -> str:
+    """仅在文本开头提及当前机器人时删除该 Slack 提及标记。"""
     if not bot_user_id:
         return text
     if not text.startswith("<@"):
@@ -49,17 +51,14 @@ def _strip_leading_slack_bot_mention(text: str, bot_user_id: str | None) -> str:
 
 
 class SlackChannel(Channel):
-    """Slack IM channel using Socket Mode (WebSocket, no public IP).
+    """使用 Socket Mode 的 Slack 即时消息通道。
 
-    Configuration keys (in ``config.yaml`` under ``channels.slack``):
-        - ``bot_token``: Slack Bot User OAuth Token (xoxb-...).
-        - ``app_token``: Slack App-Level Token (xapp-...) for Socket Mode.
-        - ``allowed_users``: (optional) List of allowed Slack user IDs, or a
-          single Slack user ID string as shorthand. Empty = allow all. Other
-          scalar values are treated as a single string with a warning.
+    ``bot_token`` 为机器人 OAuth 令牌，``app_token`` 为 Socket Mode 应用令牌；
+    ``allowed_users`` 可为 Slack 用户 ID 列表或单个 ID，空值表示不限制用户。
     """
 
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
+        """初始化 Socket 客户端、用户白名单、机器人身份和按连接缓存的 WebClient。"""
         super().__init__(name="slack", bus=bus, config=config)
         self._socket_client = None
         self._web_client = None
@@ -71,6 +70,7 @@ class SlackChannel(Channel):
         self._bot_user_id = str(configured_bot_user_id).lstrip("@") if configured_bot_user_id else None
 
     async def start(self) -> None:
+        """校验令牌并启动 Slack Socket Mode，在后台线程维持 SDK 连接。"""
         if self._running:
             return
 
@@ -109,11 +109,12 @@ class SlackChannel(Channel):
         self._running = True
         self.bus.subscribe_outbound(self._on_outbound)
 
-        # Start socket mode in background thread
+        # Socket Mode 的阻塞连接在后台执行器中运行。
         asyncio.get_event_loop().run_in_executor(None, self._socket_client.connect)
         logger.info("Slack channel started")
 
     async def stop(self) -> None:
+        """取消总线订阅并关闭 Socket Mode 客户端。"""
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
         if self._socket_client:
@@ -122,6 +123,7 @@ class SlackChannel(Channel):
         logger.info("Slack channel stopped")
 
     async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
+        """在 ``thread_ts`` 指定的 Slack 线程中发送文本，并按策略重试失败请求。"""
         web_client = await self._get_web_client_for_message(msg)
         if not web_client:
             return
@@ -134,8 +136,9 @@ class SlackChannel(Channel):
             kwargs["thread_ts"] = msg.thread_ts
 
         async def post_message() -> None:
+            """在线程池调用 Slack API，成功后为回复线程根消息添加完成标记。"""
             await asyncio.to_thread(web_client.chat_postMessage, **kwargs)
-            # Add a completion reaction to the thread root
+            # 为线程根消息添加完成反应。
             if msg.thread_ts:
                 await asyncio.to_thread(
                     self._add_reaction_with_client,
@@ -152,7 +155,7 @@ class SlackChannel(Channel):
                 log_prefix="[Slack]",
             )
         except Exception:
-            # Add failure reaction on error
+            # 发送失败时为线程根消息添加失败反应。
             if msg.thread_ts:
                 try:
                     await asyncio.to_thread(
@@ -167,6 +170,7 @@ class SlackChannel(Channel):
             raise
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
+        """将附件上传至 Slack 频道，并在存在 ``thread_ts`` 时归入对应回复线程。"""
         web_client = await self._get_web_client_for_message(msg)
         if not web_client:
             return False
@@ -188,9 +192,10 @@ class SlackChannel(Channel):
             logger.exception("[Slack] failed to upload file: %s", attachment.filename)
             return False
 
-    # -- internal ----------------------------------------------------------
+    # 以下为 Slack SDK 事件与连接身份处理的内部辅助方法。
 
     async def _initialize_operator_web_client(self, bot_token: str) -> None:
+        """创建运营机器人 WebClient，并在未配置时通过 ``auth_test`` 获取机器人 ID。"""
         self._web_client = self._web_client_factory(token=bot_token)
         if self._bot_user_id is not None:
             return
@@ -206,13 +211,13 @@ class SlackChannel(Channel):
             logger.warning("[Slack] failed to resolve bot user id; app mention text may include the bot mention", exc_info=True)
 
     async def _get_web_client_for_message(self, msg: OutboundMessage):
+        """返回消息所属连接的 WebClient；令牌不变时复用其会话和限流状态。"""
         if msg.connection_id and self._connection_repo is not None:
             credentials = await self._connection_repo.get_credentials(msg.connection_id)
             access_token = credentials.get("access_token") if credentials else None
             if not access_token:
                 return self._web_client
-            # WebClient keeps its own HTTP session and rate-limit state, so
-            # reuse one per connection until its token changes.
+            # WebClient 自带 HTTP 会话和限流状态，因此同一连接在令牌不变时复用实例。
             cached = self._connection_web_clients.get(msg.connection_id)
             if cached is not None and cached[0] == access_token:
                 return cached[1]
@@ -227,6 +232,7 @@ class SlackChannel(Channel):
 
     @staticmethod
     def _add_reaction_with_client(web_client, channel_id: str, timestamp: str, emoji: str) -> None:
+        """使用指定客户端添加表情反应；重复反应视为正常结果。"""
         try:
             web_client.reactions_add(
                 channel=channel_id,
@@ -238,13 +244,13 @@ class SlackChannel(Channel):
                 logger.warning("[Slack] failed to add reaction %s: %s", emoji, exc)
 
     def _add_reaction(self, channel_id: str, timestamp: str, emoji: str) -> None:
-        """Add an emoji reaction to a message (best-effort, non-blocking)."""
+        """使用运营机器人尽力为消息添加表情反应，不影响主流程。"""
         if not self._web_client:
             return
         self._add_reaction_with_client(self._web_client, channel_id, timestamp, emoji)
 
     def _send_running_reply(self, channel_id: str, thread_ts: str) -> None:
-        """Send a 'Working on it......' reply in the thread (called from SDK thread)."""
+        """从 SDK 线程向回复线程发送处理中提示，作为流式响应的可见起点。"""
         if not self._web_client:
             return
         try:
@@ -258,9 +264,9 @@ class SlackChannel(Channel):
             logger.exception("[Slack] failed to send running reply in channel=%s", channel_id)
 
     def _on_socket_event(self, client, req) -> None:
-        """Called by slack-sdk for each Socket Mode event."""
+        """处理每个 Slack Socket Mode 事件：先确认收包，再分派消息或提及事件。"""
         try:
-            # Acknowledge the event
+            # 立即确认事件，避免 Slack 重投递。
             response = self._SocketModeResponse(envelope_id=req.envelope_id)
             client.send_socket_mode_response(response)
 
@@ -277,7 +283,7 @@ class SlackChannel(Channel):
             event = req.payload.get("event", {})
             etype = event.get("type", "")
 
-            # Handle message events (DM or @mention)
+            # 处理私信与机器人提及消息事件。
             if etype in ("message", "app_mention"):
                 self._handle_message_event(
                     event,
@@ -288,7 +294,8 @@ class SlackChannel(Channel):
             logger.exception("Error processing Slack event")
 
     def _handle_message_event(self, event: dict, *, team_id: str | None = None) -> None:
-        # Ignore bot messages
+        """过滤 Slack 事件、构造线程话题键，并转交主循环发布入站消息。"""
+        # 忽略机器人消息和子类型事件，避免自触发循环。
         if event.get("bot_id") or event.get("subtype"):
             return
 
@@ -313,8 +320,7 @@ class SlackChannel(Channel):
                 )
             return
 
-        # Check allowed users after connect-code handling so browser-initiated
-        # binding can bootstrap a new external identity.
+        # 连接码先于用户白名单处理，使浏览器发起的绑定可建立新的外部身份。
         if self._allowed_users and user_id not in self._allowed_users:
             logger.debug("Ignoring message from non-allowed user: %s", user_id)
             return
@@ -327,9 +333,8 @@ class SlackChannel(Channel):
         else:
             msg_type = InboundMessageType.CHAT
 
-        # topic_id: use thread_ts as the topic identifier.
-        # For threaded messages, thread_ts is the root message ts (shared topic).
-        # For non-threaded messages, thread_ts is the message's own ts (new topic).
+        # ``topic_id`` 使用 ``thread_ts``：线程消息共享根消息时间戳；非线程消息
+        # 使用自身时间戳，因此各自创建独立的 DeerFlow 话题键。
         inbound = self._make_inbound(
             chat_id=channel_id,
             user_id=user_id,
@@ -337,7 +342,7 @@ class SlackChannel(Channel):
             msg_type=msg_type,
             thread_ts=thread_ts,
             metadata={
-                # team_id is already resolved (payload team_id/team, else event team) by the caller.
+                # 调用方已按载荷 team_id/team、再按事件 team 的顺序解析团队 ID。
                 "team_id": team_id,
                 "message_id": event.get("ts"),
                 "client_msg_id": event.get("client_msg_id"),
@@ -346,9 +351,9 @@ class SlackChannel(Channel):
         inbound.topic_id = thread_ts
 
         if self._loop and self._loop.is_running():
-            # Acknowledge with an eyes reaction
+            # 用眼睛反应确认已接收。
             self._add_reaction(channel_id, event.get("ts", thread_ts), "eyes")
-            # Send "running" reply first (fire-and-forget from SDK thread)
+            # 在 SDK 线程先发送处理中提示，不等待其完成。
             self._send_running_reply(channel_id, thread_ts)
             if self._connection_repo is None:
                 asyncio.run_coroutine_threadsafe(self.bus.publish_inbound(inbound), self._loop)
@@ -356,10 +361,12 @@ class SlackChannel(Channel):
                 asyncio.run_coroutine_threadsafe(self._publish_inbound_with_connection(inbound, team_id=team_id), self._loop)
 
     async def _publish_inbound_with_connection(self, inbound, *, team_id: str | None = None) -> None:
+        """附加 Slack 连接身份后，将入站消息发布到异步消息总线。"""
         inbound = await self._attach_connection_identity(inbound, team_id=team_id)
         await self.bus.publish_inbound(inbound)
 
     async def _attach_connection_identity(self, inbound, *, team_id: str | None = None):
+        """以 Slack 团队 ID 作为工作区键，为入站消息解析已绑定的 DeerFlow 身份。"""
         workspace_id = str(team_id or inbound.metadata.get("team_id") or "")
         return await attach_connection_identity(
             inbound,
@@ -369,6 +376,7 @@ class SlackChannel(Channel):
         )
 
     async def _bind_connection_from_connect_code(self, *, event: dict, team_id: str, code: str) -> bool:
+        """消费连接码，将 Slack 用户和团队绑定到拥有该码的 DeerFlow 用户。"""
         if self._connection_repo is None or not code:
             return False
 
@@ -399,6 +407,7 @@ class SlackChannel(Channel):
         return True
 
     async def _post_connection_reply(self, channel_id: str, text: str, thread_ts: str | None = None) -> None:
+        """向连接码来源的 Slack 频道或线程发送绑定结果。"""
         if not self._web_client or not channel_id:
             return
         kwargs: dict[str, Any] = {"channel": channel_id, "text": text}

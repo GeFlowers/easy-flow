@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 
 import { uuid } from "@/core/utils/uuid";
 
+/** 线程删除后广播本地聊天状态重置的浏览器事件名称。 */
 export const THREAD_CHAT_RESET_EVENT = "deer-flow:thread-chat-reset";
 
 type ThreadChatResetDetail = {
@@ -13,6 +14,7 @@ type ThreadChatResetDetail = {
   force?: boolean;
 };
 
+/** 广播线程删除后的聊天状态重置信号。 */
 export function resetThreadChatAfterDelete(detail: ThreadChatResetDetail) {
   if (typeof window === "undefined") {
     return;
@@ -24,12 +26,12 @@ export function resetThreadChatAfterDelete(detail: ThreadChatResetDetail) {
   );
 }
 
+/** 将路由、浏览器路径与本地新建线程状态协调为稳定的聊天线程标识。 */
 export function useThreadChat() {
   const { thread_id: threadIdFromPath } = useParams<{ thread_id: string }>();
   const pathname = usePathname();
-  // Render-time values use the committed browser URL. The sync effect below
-  // intentionally watches the reactive pathname so client navigation still
-  // schedules a reset when window.location is stale during render.
+  // 渲染时以已提交的浏览器 URL 为准；下方同步副作用仍监听响应式路径，
+  // 以便渲染期间 window.location 尚未更新时，客户端导航也能安排重置。
   const actualPathname =
     typeof window === "undefined" ? pathname : window.location.pathname;
   const isNewPath = actualPathname.endsWith("/new");
@@ -68,9 +70,8 @@ export function useThreadChat() {
       return;
     }
     newThreadIdRef.current = null;
-    // Native history updates the canonical pathname but preserves the route
-    // tree, so useParams may still return the stale "new" value. Avoid passing
-    // it to downstream hooks (e.g. useStream), which would cause a 422.
+    // 原生 history 会更新规范路径但保留路由树，useParams 可能仍返回过期的
+    // "new"。不要将其传给下游 Hook（如 useStream），否则会导致 422。
     if (threadIdFromPath === "new") {
       return;
     }
@@ -96,9 +97,8 @@ export function useThreadChat() {
         return;
       }
 
-      // URL replacement is owned by the caller's Next router action; this hook
-      // only resets local chat state so the router state and browser URL stay
-      // in sync.
+      // URL 替换由调用方的 Next 路由操作负责；本 Hook 只重置本地聊天状态，
+      // 从而让路由状态与浏览器 URL 保持一致。
       resetToNewThread();
     };
 

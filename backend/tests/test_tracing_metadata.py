@@ -1,4 +1,4 @@
-"""Tests for deerflow.tracing.metadata.build_langfuse_trace_metadata."""
+'未说明'
 
 from __future__ import annotations
 
@@ -10,6 +10,7 @@ from deerflow.tracing import metadata as tracing_metadata
 
 @pytest.fixture(autouse=True)
 def _clear_tracing_env(monkeypatch):
+    '未说明'
     from deerflow.config.tracing_config import reset_tracing_config
 
     for name in (
@@ -30,6 +31,7 @@ def _clear_tracing_env(monkeypatch):
 
 
 def _enable_langfuse(monkeypatch):
+    '未说明'
     monkeypatch.setenv("LANGFUSE_TRACING", "true")
     monkeypatch.setenv("LANGFUSE_PUBLIC_KEY", "pk-lf-test")
     monkeypatch.setenv("LANGFUSE_SECRET_KEY", "sk-lf-test")
@@ -37,6 +39,7 @@ def _enable_langfuse(monkeypatch):
 
 def test_returns_empty_when_langfuse_disabled(monkeypatch):
     # No env vars set → langfuse not in enabled providers.
+    '未说明'
     result = tracing_metadata.build_langfuse_trace_metadata(
         thread_id="t-1",
         user_id="u-1",
@@ -47,6 +50,7 @@ def test_returns_empty_when_langfuse_disabled(monkeypatch):
 
 
 def test_session_id_maps_to_thread_id(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -58,6 +62,7 @@ def test_session_id_maps_to_thread_id(monkeypatch):
 
 
 def test_user_id_falls_back_to_default(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -69,6 +74,7 @@ def test_user_id_falls_back_to_default(monkeypatch):
 
 
 def test_user_id_explicit_value_wins(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -80,6 +86,7 @@ def test_user_id_explicit_value_wins(monkeypatch):
 
 
 def test_trace_name_uses_assistant_id_when_provided(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -91,6 +98,7 @@ def test_trace_name_uses_assistant_id_when_provided(monkeypatch):
 
 
 def test_trace_name_defaults_to_lead_agent(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -102,6 +110,7 @@ def test_trace_name_defaults_to_lead_agent(monkeypatch):
 
 
 def test_tags_include_env_and_model(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -114,6 +123,7 @@ def test_tags_include_env_and_model(monkeypatch):
 
 
 def test_tags_omitted_when_no_tag_inputs(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -127,6 +137,7 @@ def test_tags_omitted_when_no_tag_inputs(monkeypatch):
 def test_thread_id_none_still_produces_metadata(monkeypatch):
     # Stateless run paths may not have a thread_id — we still want
     # user_id / trace_name to flow through so Users page works.
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     result = tracing_metadata.build_langfuse_trace_metadata(
@@ -139,6 +150,7 @@ def test_thread_id_none_still_produces_metadata(monkeypatch):
 
 
 def test_deerflow_trace_id_comes_from_current_trace_context(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     with request_trace_context("gateway-trace-1"):
@@ -151,6 +163,7 @@ def test_deerflow_trace_id_comes_from_current_trace_context(monkeypatch):
 
 
 def test_deerflow_trace_id_explicit_argument_wins(monkeypatch):
+    '未说明'
     _enable_langfuse(monkeypatch)
 
     with request_trace_context("ambient-trace"):

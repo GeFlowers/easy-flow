@@ -1,11 +1,4 @@
-"""Shared bootstrap for the detector CLI shims in this directory.
-
-The detectors live under `backend/tests/support/detectors/` so they can be
-exercised by the test suite; the shims here only put that package on
-`sys.path` and delegate. Keeping the path computation in one place means a
-layout change breaks loudly in exactly one file instead of silently drifting
-across copies.
-"""
+"""本脚本负责命令行。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -18,7 +11,7 @@ TEST_SUPPORT_PATH = Path(__file__).resolve().parents[1] / "backend" / "tests"
 
 
 def run_detector(module_name: str, argv: Sequence[str] | None = None) -> int:
-    """Import a `support.detectors.*` module and run its `main(argv)`."""
+    """执行运行对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     if not TEST_SUPPORT_PATH.is_dir():
         raise RuntimeError(f"detector support path not found: {TEST_SUPPORT_PATH}; the scripts/ directory has moved relative to backend/tests")
     if str(TEST_SUPPORT_PATH) not in sys.path:

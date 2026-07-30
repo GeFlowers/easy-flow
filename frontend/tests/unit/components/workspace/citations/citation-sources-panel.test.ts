@@ -29,9 +29,17 @@ const sources: CitationSource[] = [
 ];
 
 describe("CitationSourcesPanel", () => {
+  /**
+   * 覆盖“renders nothing when there are no sources”这一可观察行为，防止相关边界在重构后回归。
+   */
   it("renders nothing when there are no sources", () => {
     expect(renderPanel([], "en-US")).toBe("");
   });
+
+  /**
+   * 覆盖“renders a compact source list with occurrence counts”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("renders a compact source list with occurrence counts", () => {
     const html = renderPanel(sources, "en-US");
@@ -45,6 +53,11 @@ describe("CitationSourcesPanel", () => {
     expect(html).toContain('href="https://news.example.org/report"');
   });
 
+  /**
+   * 覆盖“constrains long source lists inside an internal scroll area”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("constrains long source lists inside an internal scroll area", () => {
     const html = renderPanel(sources, "en-US");
 
@@ -52,6 +65,11 @@ describe("CitationSourcesPanel", () => {
     expect(html).toContain("overflow-y-auto");
     expect(html).toContain("overscroll-contain");
   });
+
+  /**
+   * 覆盖“uses localized summary and cite labels”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   it("uses localized summary and cite labels", () => {
     const html = renderPanel(sources, "zh-CN");
@@ -61,6 +79,11 @@ describe("CitationSourcesPanel", () => {
     expect(html).toContain("复制 Paper A 引用");
   });
 
+  /**
+   * 覆盖“renders accessible copied-state labels for copy feedback”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   it("renders accessible copied-state labels for copy feedback", () => {
     const html = renderPanel(sources, "en-US");
 
@@ -68,6 +91,11 @@ describe("CitationSourcesPanel", () => {
     expect(html).toContain('data-copied-label="Copied Paper A reference"');
   });
 });
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 renderPanel 的约定。
+
+ */
 
 function renderPanel(
   panelSources: CitationSource[],

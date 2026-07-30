@@ -1,8 +1,4 @@
-"""Tests for the runtime bridge: StreamEvent -> reducer actions.
-
-The translation layer is pure and is exercised here against real
-``StreamEvent`` objects plus a fake client, with no Textual involved.
-"""
+'未说明'
 
 from deerflow.client import StreamEvent
 from deerflow.tui.runtime import stream_actions, translate
@@ -20,12 +16,14 @@ from deerflow.tui.view_state import (
 
 
 def test_translate_ai_text_delta():
+    '未说明'
     event = StreamEvent(type="messages-tuple", data={"type": "ai", "content": "Hello", "id": "m1"})
     actions = translate(event)
     assert actions == [AssistantDelta(id="m1", text="Hello")]
 
 
 def test_translate_ai_tool_call_emits_tool_started_not_empty_delta():
+    '未说明'
     event = StreamEvent(
         type="messages-tuple",
         data={
@@ -40,6 +38,7 @@ def test_translate_ai_tool_call_emits_tool_started_not_empty_delta():
 
 
 def test_translate_ai_content_blocks_list_extracts_text():
+    '未说明'
     event = StreamEvent(
         type="messages-tuple",
         data={"type": "ai", "content": [{"type": "text", "text": "abc"}, {"type": "text", "text": "def"}], "id": "m9"},
@@ -51,6 +50,7 @@ def test_translate_ai_content_blocks_list_extracts_text():
 def test_translate_tool_call_with_none_id_yields_empty_id():
     # Some providers' first tool-call chunk has id=None; it must coerce to "" (not
     # "None"), so the empty-id guard in the reducer drops the noise chunk.
+    '未说明'
     event = StreamEvent(
         type="messages-tuple",
         data={"type": "ai", "content": "", "id": "m1", "tool_calls": [{"id": None, "name": None, "args": {}}]},
@@ -59,11 +59,13 @@ def test_translate_tool_call_with_none_id_yields_empty_id():
 
 
 def test_translate_tool_result_with_none_id_yields_empty_id():
+    '未说明'
     event = StreamEvent(type="messages-tuple", data={"type": "tool", "content": "x", "name": None, "tool_call_id": None})
     assert translate(event) == [ToolResult(tool_call_id="", content="x", is_error=False, tool_name="")]
 
 
 def test_translate_tool_result_with_error_status():
+    '未说明'
     event = StreamEvent(
         type="messages-tuple",
         data={"type": "tool", "content": "boom", "name": "bash", "tool_call_id": "t1", "status": "error"},
@@ -73,28 +75,34 @@ def test_translate_tool_result_with_error_status():
 
 
 def test_translate_end_event_carries_usage():
+    '未说明'
     usage = {"input_tokens": 3, "output_tokens": 7, "total_tokens": 10}
     actions = translate(StreamEvent(type="end", data={"usage": usage}))
     assert actions == [RunEnded(usage=usage)]
 
 
 def test_translate_values_surfaces_title_only():
+    '未说明'
     assert translate(StreamEvent(type="values", data={"title": "My Thread", "messages": []})) == [ThreadTitle(title="My Thread")]
     assert translate(StreamEvent(type="values", data={"title": None, "messages": []})) == []
     assert translate(StreamEvent(type="custom", data={"anything": 1})) == []
 
 
 class _FakeClient:
+    '未说明'
     def __init__(self, events):
+        '未说明'
         self._events = events
         self.calls = []
 
     def stream(self, message, *, thread_id=None, **kwargs):
+        """处理流相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         self.calls.append((message, thread_id))
         yield from self._events
 
 
 def test_stream_actions_brackets_with_run_started_and_ended():
+    '未说明'
     client = _FakeClient(
         [
             StreamEvent(type="messages-tuple", data={"type": "ai", "content": "Hi", "id": "m1"}),
@@ -108,6 +116,7 @@ def test_stream_actions_brackets_with_run_started_and_ended():
 
 
 def test_stream_actions_reduces_to_expected_transcript():
+    '未说明'
     client = _FakeClient(
         [
             StreamEvent(type="messages-tuple", data={"type": "ai", "content": "Let me look. ", "id": "m1"}),
@@ -134,23 +143,22 @@ def test_stream_actions_reduces_to_expected_transcript():
 
 
 class _BoomClient:
+    '未说明'
     def stream(self, message, *, thread_id=None, **kwargs):
+        """处理流相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         yield StreamEvent(type="messages-tuple", data={"type": "ai", "content": "partial", "id": "m1"})
         raise RuntimeError("model down")
 
 
 def test_stream_actions_surfaces_exception_as_error_then_ends():
+    '未说明'
     actions = list(stream_actions(_BoomClient(), "go"))
     assert any(isinstance(a, AssistantError) and "model down" in a.text for a in actions)
     assert isinstance(actions[-1], RunEnded)
 
 
 def test_stream_actions_two_turns_with_none_ids_produce_separate_rows():
-    """Some providers/paths never stamp per-chunk ids: the raw chunk carries
-    an explicit ``id: None``, which ``_as_str`` coerces to ``""``. Two
-    separate turns from such a provider must not fold into one row -- see
-    ``_apply_assistant_delta_anonymous`` in view_state.py. Drives the real
-    translate()/stream_actions() bridge, not just the reducer directly."""
+    '未说明'
     first_turn = _FakeClient(
         [
             StreamEvent(type="messages-tuple", data={"type": "ai", "content": "First turn answer.", "id": None}),

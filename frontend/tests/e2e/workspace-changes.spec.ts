@@ -6,6 +6,9 @@ const THREAD_ID = "00000000-0000-0000-0000-000000000321";
 const RUN_ID = "run-workspace-changes";
 
 test.describe("Workspace changes", () => {
+  /**
+   * 覆盖“shows changed files badge and opens the diff panel”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("shows changed files badge and opens the diff panel", async ({
     page,
   }) => {
@@ -100,8 +103,7 @@ test.describe("Workspace changes", () => {
     await expect(page.getByText("Edited 2 files")).toBeVisible({
       timeout: 15_000,
     });
-    // The human prompt carries the same run_id, but the badge must only render
-    // under the assistant turn — never under the user's message.
+    // 人工提示词携带相同的 run_id，但徽章只能渲染在助手轮次下，绝不能渲染在用户消息下。
     await expect(page.getByText("Edited 2 files")).toHaveCount(1);
     await expect(page.getByText("outputs/report.md")).toBeVisible();
     await expect(page.getByText("notes.txt")).toBeVisible();

@@ -1,3 +1,4 @@
+'定义 tools 模块提供的职责与可复用接口'
 import asyncio
 import logging
 import os
@@ -36,7 +37,7 @@ _MAX_FILENAME_COLLISION_PROBES = 1000
 
 
 def _get_tool_config(tool_name: str) -> dict | None:
-    """Get tool config extras safely, returning None if not configured."""
+    '执行 _get_tool_config 的明确职责，并返回与调用约定一致的结果。\n\nGet tool config extras safely, returning None if not configured.'
     config = get_app_config().get_tool_config(tool_name)
     if config is None:
         return None
@@ -45,6 +46,7 @@ def _get_tool_config(tool_name: str) -> dict | None:
 
 
 def _get_browserless_client(tool_name: str = "web_fetch") -> BrowserlessClient:
+    '执行 _get_browserless_client 的明确职责，并返回与调用约定一致的结果'
     cfg = _get_tool_config(tool_name)
     base_url = "http://localhost:3032"
     token = os.getenv("BROWSERLESS_TOKEN", "")
@@ -58,6 +60,7 @@ def _get_browserless_client(tool_name: str = "web_fetch") -> BrowserlessClient:
 
 
 def _as_bool(value: object, default: bool) -> bool:
+    '执行 _as_bool 的明确职责，并返回与调用约定一致的结果'
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -70,6 +73,7 @@ def _as_bool(value: object, default: bool) -> bool:
 
 
 def _as_int(value: object, default: int) -> int:
+    '执行 _as_int 的明确职责，并返回与调用约定一致的结果'
     if isinstance(value, int) and not isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -81,6 +85,7 @@ def _as_int(value: object, default: int) -> int:
 
 
 def _as_optional_quality(value: object, output_format: str) -> int | None:
+    '执行 _as_optional_quality 的明确职责，并返回与调用约定一致的结果'
     if output_format not in {"jpeg", "webp"}:
         return None
     quality = _as_int(value, -1)
@@ -88,18 +93,13 @@ def _as_optional_quality(value: object, output_format: str) -> int | None:
 
 
 def _normalize_output_format(value: object) -> str:
+    '执行 _normalize_output_format 的明确职责，并返回与调用约定一致的结果'
     output_format = str(value or "png").strip().lower()
     return output_format if output_format in _OUTPUT_FORMAT_TO_EXTENSION else "png"
 
 
 def _validate_capture_url(url: str, allow_private_addresses: bool = False) -> str | None:
-    """Validate a capture URL for scheme and (unless opted out) SSRF safety.
-
-    Blocks requests that resolve to loopback, private, link-local (incl. the
-    169.254.169.254 cloud-metadata endpoint), reserved, multicast, or
-    unspecified addresses. Operators who intentionally point the tool at an
-    internal Browserless target can opt out via ``allow_private_addresses``.
-    """
+    '执行 _validate_capture_url 的明确职责，并返回与调用约定一致的结果。\n\nValidate a capture URL for scheme and (unless opted out) SSRF safety.\n\n    Blocks requests that resolve to loopback, private, link-local (incl. the\n    169.254.169.254 cloud-metadata endpoint), reserved, multicast, or\n    unspecified addresses. Operators who intentionally point the tool at an\n    internal Browserless target can opt out via ``allow_private_addresses``.\n    '
     return validate_public_http_url(
         url,
         allow_private_addresses=allow_private_addresses,
@@ -109,6 +109,7 @@ def _validate_capture_url(url: str, allow_private_addresses: bool = False) -> st
 
 
 def _default_capture_stem(url: str) -> str:
+    '执行 _default_capture_stem 的明确职责，并返回与调用约定一致的结果'
     parsed = urlparse(url)
     parts = [parsed.netloc, *[part for part in parsed.path.split("/") if part]]
     raw = "-".join(parts) or "web-capture"
@@ -116,6 +117,7 @@ def _default_capture_stem(url: str) -> str:
 
 
 def _safe_capture_filename(filename: str | None, url: str, output_format: str) -> str:
+    '执行 _safe_capture_filename 的明确职责，并返回与调用约定一致的结果'
     extension = _OUTPUT_FORMAT_TO_EXTENSION[output_format]
     if filename:
         raw_name = Path(filename).name
@@ -129,6 +131,7 @@ def _safe_capture_filename(filename: str | None, url: str, output_format: str) -
 
 
 def _thread_outputs_path(runtime: Runtime) -> Path | str:
+    '执行 _thread_outputs_path 的明确职责，并返回与调用约定一致的结果'
     if runtime.state is None:
         return "Error: Thread runtime state is not available"
     thread_data = runtime.state.get("thread_data") or {}
@@ -139,17 +142,12 @@ def _thread_outputs_path(runtime: Runtime) -> Path | str:
 
 
 def _tool_message(content: str, tool_call_id: str) -> Command:
+    '执行 _tool_message 的明确职责，并返回与调用约定一致的结果'
     return Command(update={"messages": [ToolMessage(content, tool_call_id=tool_call_id)]})
 
 
 def _dedupe_output_name(outputs_path: Path, output_name: str) -> str:
-    """Return a non-colliding filename under ``outputs_path``.
-
-    Keeps the original name when free, otherwise appends ``-1``, ``-2``, ...
-    before the extension so an explicit filename never silently overwrites an
-    earlier capture. Falls back to a timestamp suffix if the directory is
-    saturated with the bounded probe range.
-    """
+    '执行 _dedupe_output_name 的明确职责，并返回与调用约定一致的结果。\n\nReturn a non-colliding filename under ``outputs_path``.\n\n    Keeps the original name when free, otherwise appends ``-1``, ``-2``, ...\n    before the extension so an explicit filename never silently overwrites an\n    earlier capture. Falls back to a timestamp suffix if the directory is\n    saturated with the bounded probe range.\n    '
     candidate = outputs_path / output_name
     if not candidate.exists():
         return output_name
@@ -166,7 +164,7 @@ def _dedupe_output_name(outputs_path: Path, output_name: str) -> str:
 
 
 def _write_capture_output(outputs_path: Path, output_name: str, content: bytes) -> str:
-    """Write ``content`` into ``outputs_path`` and return the actual filename used."""
+    '执行 _write_capture_output 的明确职责，并返回与调用约定一致的结果。\n\nWrite ``content`` into ``outputs_path`` and return the actual filename used.'
     outputs_path.mkdir(parents=True, exist_ok=True)
     final_name = _dedupe_output_name(outputs_path, output_name)
     (outputs_path / final_name).write_bytes(content)
@@ -174,13 +172,7 @@ def _write_capture_output(outputs_path: Path, output_name: str, content: bytes) 
 
 
 def _target_status_warning(result: BrowserlessScreenshotResult) -> str:
-    """Return a human-readable warning when the captured page itself errored.
-
-    Browserless returns HTTP 200 for the render request even when the target
-    page responded with a 4xx/5xx (or was an error/anti-bot page), so the raw
-    image alone cannot be trusted as valid visual evidence. The target's real
-    status is surfaced via the X-Response-Code header.
-    """
+    "执行 _target_status_warning 的明确职责，并返回与调用约定一致的结果。\n\nReturn a human-readable warning when the captured page itself errored.\n\n    Browserless returns HTTP 200 for the render request even when the target\n    page responded with a 4xx/5xx (or was an error/anti-bot page), so the raw\n    image alone cannot be trusted as valid visual evidence. The target's real\n    status is surfaced via the X-Response-Code header.\n    "
     code = result.target_status_code.strip()
     if not code or code.startswith(("2", "3")):
         return ""
@@ -191,15 +183,7 @@ def _target_status_warning(result: BrowserlessScreenshotResult) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 async def web_fetch_tool(url: str) -> str:
-    """Fetch the contents of a web page at a given URL using Browserless (headless Chrome).
-    Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
-    This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
-    Do NOT add www. to URLs that do NOT have them.
-    URLs must include the schema: https://example.com is a valid URL while example.com is an invalid URL.
-
-    Args:
-        url: The URL to fetch the contents of.
-    """
+    '执行 web_fetch_tool 的明确职责，并返回与调用约定一致的结果。\n\nFetch the contents of a web page at a given URL using Browserless (headless Chrome).\n    Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.\n    This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.\n    Do NOT add www. to URLs that do NOT have them.\n    URLs must include the schema: https://example.com is a valid URL while example.com is an invalid URL.\n\n    Args:\n        url: The URL to fetch the contents of.\n    '
     try:
         cfg = _get_tool_config("web_fetch") or {}
         allow_private_addresses = _as_bool(cfg.get("allow_private_addresses"), False)
@@ -256,20 +240,7 @@ async def web_capture_tool(
     viewport_width: int | None = None,
     viewport_height: int | None = None,
 ) -> Command:
-    """Capture a rendered webpage screenshot and present it as an artifact.
-
-    Use this tool when you need a visual capture of a public webpage, especially JavaScript-heavy pages, UI states, dashboards, or visual evidence for a report.
-    Only capture exact URLs provided by the user or discovered through other tools. Do not use this for private pages behind login unless the user has explicitly configured Browserless outside DeerFlow.
-    URLs must include the schema: https://example.com is valid while example.com is invalid.
-
-    Args:
-        url: The http(s) URL to capture.
-        filename: Optional output filename. Directories are ignored and the extension is determined by output_format.
-        full_page: Optional override for full-page capture.
-        output_format: Optional image format: png, jpeg, or webp.
-        viewport_width: Optional viewport width in pixels.
-        viewport_height: Optional viewport height in pixels.
-    """
+    '执行 web_capture_tool 的明确职责，并返回与调用约定一致的结果。\n\nCapture a rendered webpage screenshot and present it as an artifact.\n\n    Use this tool when you need a visual capture of a public webpage, especially JavaScript-heavy pages, UI states, dashboards, or visual evidence for a report.\n    Only capture exact URLs provided by the user or discovered through other tools. Do not use this for private pages behind login unless the user has explicitly configured Browserless outside DeerFlow.\n    URLs must include the schema: https://example.com is valid while example.com is invalid.\n\n    Args:\n        url: The http(s) URL to capture.\n        filename: Optional output filename. Directories are ignored and the extension is determined by output_format.\n        full_page: Optional override for full-page capture.\n        output_format: Optional image format: png, jpeg, or webp.\n        viewport_width: Optional viewport width in pixels.\n        viewport_height: Optional viewport height in pixels.\n    '
     try:
         cfg = _get_tool_config("web_capture") or {}
         allow_private_addresses = _as_bool(cfg.get("allow_private_addresses"), False)

@@ -1,8 +1,9 @@
+"""提供配置、skill、evolution、配置相关功能。"""
 from pydantic import BaseModel, Field
 
 
 class SkillEvolutionConfig(BaseModel):
-    """Configuration for agent-managed skill evolution."""
+    """\u6267\u884c SkillEvolutionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=False,

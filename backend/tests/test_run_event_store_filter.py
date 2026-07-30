@@ -1,10 +1,4 @@
-"""Tests for list_events task_id filtering + after_seq cursor pagination (#3779).
-
-These power the subtask card's fetch-on-expand backfill, which must page through
-ONE subagent task's persisted steps without the run-wide 500-event cap dropping
-the tail (or an entire later subtask). The filter has to run in the store (before
-the limit) so pagination stays correct.
-"""
+"""本模块覆盖运行 事件 存储的行为、边界与回归场景，确保既有契约稳定。"""
 
 import pytest
 
@@ -12,7 +6,7 @@ from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
 
 async def _seed_two_tasks(store):
-    """Seed run r1 with task A (start + 3 steps) and task B (start + 2 steps)."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     await store.put(thread_id="t1", run_id="r1", event_type="subagent.start", category="subagent", content={"task_id": "A"}, metadata={"task_id": "A"})
     await store.put(thread_id="t1", run_id="r1", event_type="subagent.start", category="subagent", content={"task_id": "B"}, metadata={"task_id": "B"})
     for i in range(3):
@@ -22,10 +16,12 @@ async def _seed_two_tasks(store):
 
 
 def _task_ids(events):
+    """准备可控测试资源与状态，供后续断言读取。"""
     return [e["metadata"].get("task_id") for e in events]
 
 
 async def _check_task_id_filter(store):
+    """准备可控测试资源与状态，供后续断言读取。"""
     await _seed_two_tasks(store)
     a_events = await store.list_events("t1", "r1", task_id="A")
     assert _task_ids(a_events) == ["A", "A", "A", "A"]  # start + 3 steps
@@ -34,6 +30,7 @@ async def _check_task_id_filter(store):
 
 
 async def _check_task_id_with_event_types(store):
+    """准备可控测试资源与状态，供后续断言读取。"""
     await _seed_two_tasks(store)
     a_steps = await store.list_events("t1", "r1", task_id="A", event_types=["subagent.step"])
     assert [e["event_type"] for e in a_steps] == ["subagent.step"] * 3
@@ -41,6 +38,7 @@ async def _check_task_id_with_event_types(store):
 
 
 async def _check_after_seq_cursor(store):
+    """准备可控测试资源与状态，供后续断言读取。"""
     await _seed_two_tasks(store)
     everything = await store.list_events("t1", "r1")
     cursor = everything[2]["seq"]
@@ -50,7 +48,7 @@ async def _check_after_seq_cursor(store):
 
 
 async def _check_task_id_after_seq_paginate(store):
-    """task_id + after_seq + small limit pages through ONE task with no gaps/dupes."""
+    """准备可控测试资源与状态，供后续断言读取。"""
     await _seed_two_tasks(store)
     collected = []
     after_seq = None
@@ -64,6 +62,7 @@ async def _check_task_id_after_seq_paginate(store):
 
 
 async def _check_no_task_id_returns_all(store):
+    """准备可控测试资源与状态，供后续断言读取。"""
     await _seed_two_tasks(store)
     everything = await store.list_events("t1", "r1")
     assert len(everything) == 7  # 2 starts + 5 steps
@@ -74,26 +73,31 @@ async def _check_no_task_id_returns_all(store):
 
 @pytest.mark.anyio
 async def test_memory_task_id_filter():
+    """验证内存 任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     await _check_task_id_filter(MemoryRunEventStore())
 
 
 @pytest.mark.anyio
 async def test_memory_task_id_with_event_types():
+    """验证内存 任务 事件在预期条件及边界场景下的可观察行为，防止相关回归。"""
     await _check_task_id_with_event_types(MemoryRunEventStore())
 
 
 @pytest.mark.anyio
 async def test_memory_after_seq_cursor():
+    """验证内存在预期条件及边界场景下的可观察行为，防止相关回归。"""
     await _check_after_seq_cursor(MemoryRunEventStore())
 
 
 @pytest.mark.anyio
 async def test_memory_task_id_after_seq_paginate():
+    """验证内存 任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     await _check_task_id_after_seq_paginate(MemoryRunEventStore())
 
 
 @pytest.mark.anyio
 async def test_memory_no_task_id_returns_all():
+    """验证内存 任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     await _check_no_task_id_returns_all(MemoryRunEventStore())
 
 
@@ -102,6 +106,7 @@ async def test_memory_no_task_id_returns_all():
 
 @pytest.mark.anyio
 async def test_db_task_id_filter(tmp_path):
+    """验证任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
     from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -115,6 +120,7 @@ async def test_db_task_id_filter(tmp_path):
 
 @pytest.mark.anyio
 async def test_db_task_id_after_seq_paginate(tmp_path):
+    """验证任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
     from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -128,6 +134,7 @@ async def test_db_task_id_after_seq_paginate(tmp_path):
 
 @pytest.mark.anyio
 async def test_db_no_task_id_returns_all(tmp_path):
+    """验证任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
     from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -144,6 +151,7 @@ async def test_db_no_task_id_returns_all(tmp_path):
 
 @pytest.mark.anyio
 async def test_jsonl_task_id_filter(tmp_path):
+    """验证任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
     await _check_task_id_filter(JsonlRunEventStore(base_dir=str(tmp_path)))
@@ -151,6 +159,7 @@ async def test_jsonl_task_id_filter(tmp_path):
 
 @pytest.mark.anyio
 async def test_jsonl_task_id_after_seq_paginate(tmp_path):
+    """验证任务在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
     await _check_task_id_after_seq_paginate(JsonlRunEventStore(base_dir=str(tmp_path)))

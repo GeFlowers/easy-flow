@@ -17,20 +17,21 @@ import { parseAuthError } from "@/core/auth/types";
 
 type SetupMode = "loading" | "init_admin" | "change_password";
 
+/** 根据当前认证和初始化状态渲染管理员创建或首次密码修改流程。 */
 export default function SetupPage() {
   const router = useRouter();
   const { user, isAuthenticated } = useAuth();
   const { theme, resolvedTheme } = useTheme();
   const [mode, setMode] = useState<SetupMode>("loading");
 
-  // --- Shared state ---
+  // 两种初始化流程共享的表单状态。
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // --- Change-password mode only ---
+  // 仅首次修改密码流程需要当前密码。
   const [currentPassword, setCurrentPassword] = useState("");
 
   useEffect(() => {
@@ -39,14 +40,14 @@ export default function SetupPage() {
     if (isAuthenticated && user?.needs_setup) {
       setMode("change_password");
     } else if (!isAuthenticated) {
-      // Check if the system has no users yet
+      // 未登录时确认系统是否尚未创建管理员。
       void fetchSetupStatus()
         .then((data: { needs_setup?: boolean }) => {
           if (cancelled) return;
           if (data.needs_setup) {
             setMode("init_admin");
           } else {
-            // System already set up and user is not logged in — go to login
+            // 系统已初始化且用户未登录，回到登录页。
             router.replace("/login");
           }
         })
@@ -54,7 +55,7 @@ export default function SetupPage() {
           if (!cancelled) router.replace("/login");
         });
     } else {
-      // Authenticated but needs_setup is false — already set up
+      // 已认证且无需设置，说明初始化已完成。
       router.replace("/workspace");
     }
 
@@ -63,7 +64,7 @@ export default function SetupPage() {
     };
   }, [isAuthenticated, user, router]);
 
-  // ── Init-admin handler ─────────────────────────────────────────────
+  /** 提交首个管理员账号的初始化请求。 */
   const handleInitAdmin = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
@@ -104,7 +105,7 @@ export default function SetupPage() {
     }
   };
 
-  // ── Change-password handler ────────────────────────────────────────
+  /** 提交首次登录后的密码与邮箱更新请求。 */
   const handleChangePassword = async (e: React.SubmitEvent) => {
     e.preventDefault();
     setError("");
@@ -159,7 +160,7 @@ export default function SetupPage() {
     );
   }
 
-  // ── Admin initialization form ──────────────────────────────────────
+  // 管理员首次创建表单。
   if (mode === "init_admin") {
     return (
       <div className="bg-background flex min-h-screen items-center justify-center">
@@ -231,7 +232,7 @@ export default function SetupPage() {
     );
   }
 
-  // ── Change-password form (needs_setup after login) ─────────────────
+  // 已登录但仍需完成初始化时展示密码修改表单。
   return (
     <div className="bg-background flex min-h-screen items-center justify-center">
       <FlickeringGrid

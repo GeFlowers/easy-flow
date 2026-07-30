@@ -8,7 +8,7 @@ function isExternalUrl(href: string | undefined): boolean {
   return !!href && /^https?:\/\//.test(href);
 }
 
-/** Link renderer for artifact markdown: citation: prefix → CitationLink, otherwise underlined text. */
+/** 渲染产物 Markdown 链接：`citation:` 前缀交由 CitationLink，其余显示为带下划线文本。 */
 export function ArtifactLink(props: AnchorHTMLAttributes<HTMLAnchorElement>) {
   if (typeof props.children === "string") {
     const match = /^citation:(.+)$/.exec(props.children);

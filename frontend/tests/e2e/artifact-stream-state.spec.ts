@@ -18,6 +18,11 @@ const THREAD_MESSAGES = [
   },
 ];
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 streamWithoutArtifacts 的约定。
+
+ */
+
 function streamWithoutArtifacts(route: Route) {
   const events = [
     {
@@ -53,6 +58,11 @@ function streamWithoutArtifacts(route: Route) {
       .join(""),
   });
 }
+
+/**
+ * 覆盖“keeps artifact trigger after stream values omit artifacts”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("keeps artifact trigger after stream values omit artifacts", async ({
   page,

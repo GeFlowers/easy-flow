@@ -1,8 +1,4 @@
-"""Regression tests for Windows backslash path normalization.
-
-Ensures that replace_virtual_paths_in_command and LocalSandbox._resolve_paths_in_command
-return forward-slash paths when the host paths use backslashes (Windows).
-"""
+'未说明'
 
 from unittest.mock import patch
 
@@ -18,19 +14,22 @@ _WIN_THREAD_DATA = {
 
 
 class TestReplaceVirtualPathsWindows:
-    """replace_virtual_paths_in_command must normalize backslashes to forward slashes."""
+    '未说明'
 
     def test_user_data_workspace_no_backslash(self) -> None:
+        '未说明'
         cmd = "cat /mnt/user-data/workspace/data.json"
         result = replace_virtual_paths_in_command(cmd, _WIN_THREAD_DATA)
         assert "\\" not in result, f"Backslash in: {result}"
 
     def test_user_data_outputs_no_backslash(self) -> None:
+        '未说明'
         cmd = "ls /mnt/user-data/outputs/report.html"
         result = replace_virtual_paths_in_command(cmd, _WIN_THREAD_DATA)
         assert "\\" not in result, f"Backslash in: {result}"
 
     def test_user_data_subdir_no_backslash(self) -> None:
+        '未说明'
         cmd = "cat /mnt/user-data/workspace/subdir/file.txt"
         result = replace_virtual_paths_in_command(cmd, _WIN_THREAD_DATA)
         assert "\\" not in result, f"Backslash in: {result}"
@@ -38,15 +37,17 @@ class TestReplaceVirtualPathsWindows:
     @patch("deerflow.sandbox.tools._get_skills_host_path", return_value=r"C:\Users\admin\deer-flow\skills")
     @patch("deerflow.sandbox.tools._get_skills_container_path", return_value="/mnt/skills")
     def test_skills_path_no_backslash(self, _mock_container, _mock_host) -> None:
+        '未说明'
         cmd = "python /mnt/skills/custom/skill/scripts/run.py"
         result = replace_virtual_paths_in_command(cmd, _WIN_THREAD_DATA)
         assert "\\" not in result, f"Backslash in: {result}"
 
 
 class TestLocalSandboxResolvePathsInCommandWindows:
-    """LocalSandbox._resolve_paths_in_command must normalize backslashes."""
+    '未说明'
 
     def test_custom_mount_no_backslash(self) -> None:
+        '未说明'
         sandbox = LocalSandbox(
             "test",
             path_mappings=[
@@ -59,6 +60,7 @@ class TestLocalSandboxResolvePathsInCommandWindows:
         assert "C:/Users/admin/models/weights.bin" in result
 
     def test_user_data_no_backslash(self) -> None:
+        '未说明'
         sandbox = LocalSandbox(
             "test",
             path_mappings=[
@@ -71,13 +73,7 @@ class TestLocalSandboxResolvePathsInCommandWindows:
         assert "C:/Users/admin/data/workspace/file.txt" in result
 
     def test_acp_workspace_no_backslash(self) -> None:
-        """PR #3889 moved ACP workspace path resolution from
-        ``replace_virtual_paths_in_command`` to ``LocalSandbox._resolve_paths_in_command``
-        via ``PathMapping``. Verify the Windows backslash normalization still
-        applies to ACP workspace paths through the new routing — the same
-        guarantee ``test_acp_workspace_no_backslash`` (now removed) provided
-        for the legacy inline code path.
-        """
+        '未说明'
         sandbox = LocalSandbox(
             "test",
             path_mappings=[

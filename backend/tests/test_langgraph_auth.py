@@ -1,8 +1,4 @@
-"""Tests for LangGraph Server auth handler (langgraph_auth.py).
-
-Validates that the LangGraph auth layer enforces the same rules as Gateway:
-  cookie → JWT decode → DB lookup → token_version check → owner filter
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import asyncio
 import os
@@ -24,36 +20,41 @@ from app.gateway.auth.models import User
 from app.gateway.auth_disabled import AUTH_DISABLED_USER_ID
 from app.gateway.langgraph_auth import add_owner_filter, authenticate
 
-# ── Helpers ───────────────────────────────────────────────────────────────
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 _JWT_SECRET = "test-secret-key-for-langgraph-auth-testing-min-32"
 
 
 @pytest.fixture(autouse=True)
 def _setup_auth_config():
+    """提供隔离的测试夹具：创建调用用例所需依赖，并保持既定资源回收边界。"""
     set_auth_config(AuthConfig(jwt_secret=_JWT_SECRET))
     yield
     set_auth_config(AuthConfig(jwt_secret=_JWT_SECRET))
 
 
 def _req(cookies=None, method="GET", headers=None):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return SimpleNamespace(cookies=cookies or {}, method=method, headers=headers or {})
 
 
 def _user(user_id=None, token_version=0):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return User(email="test@example.com", password_hash="fakehash", system_role="user", id=user_id or uuid4(), token_version=token_version)
 
 
 def _mock_provider(user=None):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     p = AsyncMock()
     p.get_user = AsyncMock(return_value=user)
     return p
 
 
-# ── @auth.authenticate ───────────────────────────────────────────────────
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 def test_no_cookie_raises_401():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(authenticate(_req()))
     assert exc.value.status_code == 401
@@ -61,6 +62,7 @@ def test_no_cookie_raises_401():
 
 
 def test_auth_disabled_skips_csrf_and_authenticates_e2e_user(monkeypatch):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     monkeypatch.setenv("DEER_FLOW_AUTH_DISABLED", "1")
 
     identity = asyncio.run(authenticate(_req(method="POST")))
@@ -69,6 +71,7 @@ def test_auth_disabled_skips_csrf_and_authenticates_e2e_user(monkeypatch):
 
 
 def test_invalid_jwt_raises_401():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(authenticate(_req({"access_token": "garbage"})))
     assert exc.value.status_code == 401
@@ -76,6 +79,7 @@ def test_invalid_jwt_raises_401():
 
 
 def test_expired_jwt_raises_401():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     token = create_access_token("user-1", expires_delta=timedelta(seconds=-1))
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(authenticate(_req({"access_token": token})))
@@ -83,6 +87,7 @@ def test_expired_jwt_raises_401():
 
 
 def test_user_not_found_raises_401():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     token = create_access_token("ghost")
     with patch("app.gateway.langgraph_auth.get_local_provider", return_value=_mock_provider(None)):
         with pytest.raises(Auth.exceptions.HTTPException) as exc:
@@ -92,6 +97,7 @@ def test_user_not_found_raises_401():
 
 
 def test_token_version_mismatch_raises_401():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     user = _user(token_version=2)
     token = create_access_token(str(user.id), token_version=1)
     with patch("app.gateway.langgraph_auth.get_local_provider", return_value=_mock_provider(user)):
@@ -102,6 +108,7 @@ def test_token_version_mismatch_raises_401():
 
 
 def test_valid_token_returns_user_id():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     user = _user(token_version=0)
     token = create_access_token(str(user.id), token_version=0)
     with patch("app.gateway.langgraph_auth.get_local_provider", return_value=_mock_provider(user)):
@@ -110,6 +117,7 @@ def test_valid_token_returns_user_id():
 
 
 def test_valid_token_matching_version():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     user = _user(token_version=5)
     token = create_access_token(str(user.id), token_version=5)
     with patch("app.gateway.langgraph_auth.get_local_provider", return_value=_mock_provider(user)):
@@ -117,11 +125,11 @@ def test_valid_token_matching_version():
     assert result == str(user.id)
 
 
-# ── @auth.authenticate edge cases ────────────────────────────────────────
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 def test_provider_exception_propagates():
-    """Provider raises → should not be swallowed silently."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     token = create_access_token("user-1")
     p = AsyncMock()
     p.get_user = AsyncMock(side_effect=RuntimeError("DB down"))
@@ -131,7 +139,7 @@ def test_provider_exception_propagates():
 
 
 def test_jwt_missing_ver_defaults_to_zero():
-    """JWT without 'ver' claim → decoded as ver=0, matches user with token_version=0."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import jwt as pyjwt
 
     uid = str(uuid4())
@@ -143,7 +151,7 @@ def test_jwt_missing_ver_defaults_to_zero():
 
 
 def test_jwt_missing_ver_rejected_when_user_version_nonzero():
-    """JWT without 'ver' (defaults 0) vs user with token_version=1 → 401."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import jwt as pyjwt
 
     uid = str(uuid4())
@@ -156,7 +164,7 @@ def test_jwt_missing_ver_rejected_when_user_version_nonzero():
 
 
 def test_wrong_secret_raises_401():
-    """Token signed with different secret → 401."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import jwt as pyjwt
 
     raw = pyjwt.encode({"sub": "user-1", "exp": 9999999999, "ver": 0}, "wrong-secret-that-is-long-enough-32chars!", algorithm="HS256")
@@ -165,29 +173,33 @@ def test_wrong_secret_raises_401():
     assert exc.value.status_code == 401
 
 
-# ── @auth.on (owner filter) ──────────────────────────────────────────────
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 class _FakeUser:
-    """Minimal BaseUser-compatible object without langgraph_api.config dependency."""
+    """测试分组：集中定义同一验证边界的测试替身、输入和断言。"""
 
     def __init__(self, identity: str):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         self.identity = identity
         self.is_authenticated = True
         self.display_name = identity
 
 
 def _make_ctx(user_id):
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     return Auth.types.AuthContext(resource="threads", action="create", user=_FakeUser(user_id), permissions=[])
 
 
 def test_filter_injects_user_id():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     value = {}
     asyncio.run(add_owner_filter(_make_ctx("user-a"), value))
     assert value["metadata"]["user_id"] == "user-a"
 
 
 def test_filter_preserves_existing_metadata():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     value = {"metadata": {"title": "hello"}}
     asyncio.run(add_owner_filter(_make_ctx("user-a"), value))
     assert value["metadata"]["user_id"] == "user-a"
@@ -195,41 +207,45 @@ def test_filter_preserves_existing_metadata():
 
 
 def test_filter_returns_user_id_dict():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     result = asyncio.run(add_owner_filter(_make_ctx("user-x"), {}))
     assert result == {"user_id": "user-x"}
 
 
 def test_filter_read_write_consistency():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     value = {}
     filter_dict = asyncio.run(add_owner_filter(_make_ctx("user-1"), value))
     assert value["metadata"]["user_id"] == filter_dict["user_id"]
 
 
 def test_different_users_different_filters():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     f_a = asyncio.run(add_owner_filter(_make_ctx("a"), {}))
     f_b = asyncio.run(add_owner_filter(_make_ctx("b"), {}))
     assert f_a["user_id"] != f_b["user_id"]
 
 
 def test_filter_overrides_conflicting_user_id():
-    """If value already has a different user_id in metadata, it gets overwritten."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     value = {"metadata": {"user_id": "attacker"}}
     asyncio.run(add_owner_filter(_make_ctx("real-owner"), value))
     assert value["metadata"]["user_id"] == "real-owner"
 
 
 def test_filter_with_empty_metadata():
-    """Explicit empty metadata dict is fine."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     value = {"metadata": {}}
     result = asyncio.run(add_owner_filter(_make_ctx("user-z"), value))
     assert value["metadata"]["user_id"] == "user-z"
     assert result == {"user_id": "user-z"}
 
 
-# ── Gateway parity ───────────────────────────────────────────────────────
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 def test_shared_jwt_secret():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     token = create_access_token("user-1", token_version=3)
     payload = decode_token(token)
     from app.gateway.auth.errors import TokenError
@@ -240,6 +256,7 @@ def test_shared_jwt_secret():
 
 
 def test_langgraph_json_has_auth_path():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     import json
 
     config = json.loads((Path(__file__).parent.parent / "langgraph.json").read_text())
@@ -248,26 +265,27 @@ def test_langgraph_json_has_auth_path():
 
 
 def test_auth_handler_has_both_layers():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     from app.gateway.langgraph_auth import auth
 
     assert auth._authenticate_handler is not None
     assert len(auth._global_handlers) == 1
 
 
-# ── CSRF in LangGraph auth ──────────────────────────────────────────────
+# 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
 
 
 def test_csrf_get_no_check():
-    """GET requests skip CSRF — should proceed to JWT validation."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(authenticate(_req(method="GET")))
-    # Rejected by missing cookie, NOT by CSRF
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert exc.value.status_code == 401
     assert "Not authenticated" in str(exc.value.detail)
 
 
 def test_csrf_post_missing_token():
-    """POST without CSRF token → 403."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(authenticate(_req(method="POST", cookies={"access_token": "some-jwt"})))
     assert exc.value.status_code == 403
@@ -275,7 +293,7 @@ def test_csrf_post_missing_token():
 
 
 def test_csrf_post_mismatched_token():
-    """POST with mismatched CSRF tokens → 403."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(
             authenticate(
@@ -291,7 +309,7 @@ def test_csrf_post_mismatched_token():
 
 
 def test_csrf_post_matching_token_proceeds_to_jwt():
-    """POST with matching CSRF tokens passes CSRF check, then fails on JWT."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(
             authenticate(
@@ -302,20 +320,20 @@ def test_csrf_post_matching_token_proceeds_to_jwt():
                 )
             )
         )
-    # Past CSRF, rejected by JWT decode
+    # 说明：该位置固定测试输入、替身、失败分支或资源生命周期的验证边界。
     assert exc.value.status_code == 401
     assert "Invalid token" in str(exc.value.detail)
 
 
 def test_csrf_put_requires_token():
-    """PUT also requires CSRF."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(authenticate(_req(method="PUT", cookies={"access_token": "jwt"})))
     assert exc.value.status_code == 403
 
 
 def test_csrf_delete_requires_token():
-    """DELETE also requires CSRF."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(Auth.exceptions.HTTPException) as exc:
         asyncio.run(authenticate(_req(method="DELETE", cookies={"access_token": "jwt"})))
     assert exc.value.status_code == 403

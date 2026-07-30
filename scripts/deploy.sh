@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 #
-# deploy.sh - Build, start, or stop DeerFlow production services
+# deploy.sh - 构建、启动或停止 DeerFlow 生产服务
 #
-# Commands:
-#   deploy.sh                    — build + start
-#   deploy.sh build              — build all images (mode-agnostic)
-#   deploy.sh start              — start from pre-built images
-#   deploy.sh down               — stop and remove containers
+# 命令：
+#   deploy.sh                    — 构建并启动
+#   deploy.sh build              — 构建全部镜像（与运行模式无关）
+#   deploy.sh start              — 使用既有镜像启动
+#   deploy.sh down               — 停止并移除容器
 #
-# Sandbox mode (local / aio / provisioner) is auto-detected from config.yaml.
+# 沙箱模式（local / aio / provisioner）从 config.yaml 自动识别。
 #
-# Examples:
+# 示例：
 #   deploy.sh                    # build + start
 #   deploy.sh build              # build all images
 #   deploy.sh start              # start pre-built images
 #   deploy.sh down               # stop and remove containers
 #
-# Must be run from the repo root directory.
+# 脚本会自行切换到仓库根目录，调用位置不影响路径解析。
 
 set -e
 
@@ -50,6 +50,7 @@ else
     COMPOSE_CMD=(docker compose -p deer-flow -f "$DOCKER_DIR/docker-compose.yaml")
 fi
 
+# 只在 UV_EXTRAS 未由调用环境指定时读取 .env，确保显式部署参数优先。
 load_uv_extras_from_dotenv() {
     local line=""
     local value=""
@@ -73,7 +74,7 @@ load_uv_extras_from_dotenv() {
 
 load_uv_extras_from_dotenv
 
-# ── Colors ────────────────────────────────────────────────────────────────────
+# ── 输出颜色 ──────────────────────────────────────────────────────────────────
 
 GREEN='\033[0;32m'
 BLUE='\033[0;34m'
@@ -81,7 +82,7 @@ YELLOW='\033[1;33m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-# ── DEER_FLOW_HOME ────────────────────────────────────────────────────────────
+# ── DEER_FLOW_HOME：运行时持久目录 ─────────────────────────────────────────────
 
 if [ -z "$DEER_FLOW_HOME" ]; then
     export DEER_FLOW_HOME="$REPO_ROOT/backend/.deer-flow"
@@ -89,18 +90,18 @@ fi
 echo -e "${BLUE}DEER_FLOW_HOME=$DEER_FLOW_HOME${NC}"
 mkdir -p "$DEER_FLOW_HOME"
 
-# ── DEER_FLOW_REPO_ROOT (for skills host path in DooD) ───────────────────────
+# ── DEER_FLOW_REPO_ROOT：DooD 中技能宿主路径 ───────────────────────────────────
 
 export DEER_FLOW_REPO_ROOT="$REPO_ROOT"
 
-# ── config.yaml ───────────────────────────────────────────────────────────────
+# ── config.yaml：生产配置来源 ──────────────────────────────────────────────────
 
 if [ -z "$DEER_FLOW_CONFIG_PATH" ]; then
     export DEER_FLOW_CONFIG_PATH="$REPO_ROOT/config.yaml"
 fi
 
 if  [ "$CMD" != "down" ] && [ ! -f "$DEER_FLOW_CONFIG_PATH" ]; then
-    # Try to seed from repo (config.example.yaml is the canonical template)
+    # 使用仓库内权威模板补齐缺失配置，但提示用户先完成密钥配置。
     if [ -f "$REPO_ROOT/config.example.yaml" ]; then
         cp "$REPO_ROOT/config.example.yaml" "$DEER_FLOW_CONFIG_PATH"
         echo -e "${GREEN}✓ Seeded config.example.yaml → $DEER_FLOW_CONFIG_PATH${NC}"
@@ -116,7 +117,7 @@ else
     echo -e "${GREEN}✓ config.yaml: $DEER_FLOW_CONFIG_PATH${NC}"
 fi
 
-# ── extensions_config.json ───────────────────────────────────────────────────
+# ── extensions_config.json：扩展配置来源 ───────────────────────────────────────
 
 if [ -z "$DEER_FLOW_EXTENSIONS_CONFIG_PATH" ]; then
     export DEER_FLOW_EXTENSIONS_CONFIG_PATH="$REPO_ROOT/extensions_config.json"
@@ -127,7 +128,7 @@ if [ ! -f "$DEER_FLOW_EXTENSIONS_CONFIG_PATH" ]; then
         cp "$REPO_ROOT/extensions_config.json" "$DEER_FLOW_EXTENSIONS_CONFIG_PATH"
         echo -e "${GREEN}✓ Seeded extensions_config.json → $DEER_FLOW_EXTENSIONS_CONFIG_PATH${NC}"
     else
-        # Create a minimal empty config so the gateway doesn't fail on startup
+        # 创建最小空配置，避免 Gateway 因缺失可选扩展配置而无法启动。
         echo '{"mcpServers":{},"skills":{}}' > "$DEER_FLOW_EXTENSIONS_CONFIG_PATH"
         echo -e "${YELLOW}⚠ extensions_config.json not found, created empty config at $DEER_FLOW_EXTENSIONS_CONFIG_PATH${NC}"
     fi
@@ -136,9 +137,8 @@ else
 fi
 
 
-# ── BETTER_AUTH_SECRET ───────────────────────────────────────────────────────
-# Required by Next.js in production. Generated once and persisted so auth
-# sessions survive container restarts.
+# ── BETTER_AUTH_SECRET：生产认证密钥 ───────────────────────────────────────────
+# Next.js 生产环境必需；仅生成一次并持久化，以使认证会话跨容器重启保持有效。
 
 _secret_file="$DEER_FLOW_HOME/.better-auth-secret"
 if [ -z "$BETTER_AUTH_SECRET" ]; then
@@ -168,9 +168,8 @@ if [ -z "$BETTER_AUTH_SECRET" ]; then
     fi
 fi
 
-# ── DEER_FLOW_INTERNAL_AUTH_TOKEN ────────────────────────────────────────────
-# Shared by all Gateway workers so channel workers can call internal Gateway
-# APIs even when the request is handled by a different Uvicorn worker.
+# ── DEER_FLOW_INTERNAL_AUTH_TOKEN：Gateway 内部认证令牌 ─────────────────────────
+# 所有 Gateway worker 共享，使渠道 worker 即使落到不同 Uvicorn worker 也能调用内部 API。
 
 _internal_auth_token_file="$DEER_FLOW_HOME/.internal-auth-token"
 if  [ "$CMD" != "down" ] && [ -z "$DEER_FLOW_INTERNAL_AUTH_TOKEN" ]; then
@@ -200,10 +199,9 @@ if  [ "$CMD" != "down" ] && [ -z "$DEER_FLOW_INTERNAL_AUTH_TOKEN" ]; then
     fi
 fi
 
-# ── UV_EXTRAS auto-detection ─────────────────────────────────────────────────
-# The production Dockerfile accepts UV_EXTRAS as a single build-arg token and
-# adds the --extra prefix itself. Convert the detector's uv flag string
-# ("--extra postgres --extra discord") to a comma-joined name token.
+# ── UV_EXTRAS 自动识别 ─────────────────────────────────────────────────────────
+# 生产 Dockerfile 将 UV_EXTRAS 接收为单个 build-arg 并自行添加 --extra 前缀；此处将
+# 探测器输出的 uv 参数串（"--extra postgres --extra discord"）转换为逗号分隔名称。
 
 if [ "$CMD" != "down" ] && [ -z "$UV_EXTRAS" ]; then
     _detect_python=""
@@ -238,8 +236,9 @@ if [ "$CMD" != "down" ] && [ -z "$UV_EXTRAS" ] && [ -n "$_detect_python" ]; then
     fi
 fi
 
-# ── detect_sandbox_mode ───────────────────────────────────────────────────────
+# ── 沙箱模式识别 ───────────────────────────────────────────────────────────────
 
+# 只读取启动服务选择所需字段；无法识别时回退 local，避免意外启用特权容器访问。
 detect_sandbox_mode() {
     local sandbox_use=""
     local provisioner_url=""
@@ -273,11 +272,10 @@ detect_sandbox_mode() {
     fi
 }
 
-# ── down ──────────────────────────────────────────────────────────────────────
+# ── down：仅停止与移除容器 ─────────────────────────────────────────────────────
 
 if [ "$CMD" = "down" ]; then
-    # Set minimal env var defaults so docker compose can parse the file without
-    # warning about unset variables that appear in volume specs.
+    # 为 Compose 提供最小占位默认值，使其可解析 volume 中的变量且不访问真实密钥。
     export DEER_FLOW_HOME="${DEER_FLOW_HOME:-$REPO_ROOT/backend/.deer-flow}"
     export DEER_FLOW_CONFIG_PATH="${DEER_FLOW_CONFIG_PATH:-$DEER_FLOW_HOME/config.yaml}"
     export DEER_FLOW_EXTENSIONS_CONFIG_PATH="${DEER_FLOW_EXTENSIONS_CONFIG_PATH:-$DEER_FLOW_HOME/extensions_config.json}"
@@ -288,8 +286,8 @@ if [ "$CMD" = "down" ]; then
     exit 0
 fi
 
-# ── build ────────────────────────────────────────────────────────────────────
-# Build produces mode-agnostic images. No --gateway or sandbox detection needed.
+# ── build：仅构建镜像 ──────────────────────────────────────────────────────────
+# 构建产物不依赖运行模式，因此无需识别 --gateway 或沙箱配置。
 
 if [ "$CMD" = "build" ]; then
     echo "=========================================="
@@ -309,15 +307,15 @@ if [ "$CMD" = "build" ]; then
     exit 0
 fi
 
-# ── Banner ────────────────────────────────────────────────────────────────────
+# ── 启动信息 ──────────────────────────────────────────────────────────────────
 
 echo "=========================================="
 echo "  DeerFlow Production Deployment"
 echo "=========================================="
 echo ""
 
-# ── Detect runtime configuration ────────────────────────────────────────────
-# Only needed for start / up — determines whether provisioner is launched.
+# ── 运行时配置识别 ────────────────────────────────────────────────────────────
+# 仅在 start / up 时需要，用于决定是否启动 provisioner。
 
 sandbox_mode="$(detect_sandbox_mode)"
 echo -e "${BLUE}Sandbox mode: $sandbox_mode${NC}"
@@ -330,11 +328,10 @@ if [ "$sandbox_mode" = "provisioner" ]; then
     services="$services provisioner"
 fi
 
-# ── DEER_FLOW_DOCKER_SOCKET (aio / pure-DooD mode only) ──────────────────────
-# Only aio mode (AioSandboxProvider without provisioner_url) needs the host
-# Docker socket. It is mounted via the opt-in docker-compose.dood.yaml overlay,
-# appended here, so the default (local) and provisioner modes never expose the
-# host daemon. Mounting the socket = root-equivalent host control; see SECURITY.md.
+# ── DEER_FLOW_DOCKER_SOCKET（仅 aio / 纯 DooD 模式） ───────────────────────────
+# 仅 aio 模式（无 provisioner_url 的 AioSandboxProvider）需要宿主 Docker socket。
+# 此处追加显式 docker-compose.dood.yaml 覆盖层，从而保证默认 local 与 provisioner
+# 模式不会暴露宿主守护进程。挂载 socket 等同于宿主 root 权限，详见 SECURITY.md。
 
 if [ -z "$DEER_FLOW_DOCKER_SOCKET" ]; then
     export DEER_FLOW_DOCKER_SOCKET="/var/run/docker.sock"
@@ -353,7 +350,7 @@ fi
 
 echo ""
 
-# ── Start / Up ───────────────────────────────────────────────────────────────
+# ── Start / Up：按已识别服务集启动 ─────────────────────────────────────────────
 
 if [ "$CMD" = "start" ]; then
     echo "Starting containers (no rebuild)..."
@@ -361,7 +358,7 @@ if [ "$CMD" = "start" ]; then
     # shellcheck disable=SC2086
     "${COMPOSE_CMD[@]}" up -d --remove-orphans $services
 else
-    # Default: build + start
+    # 默认路径：构建并启动。
     echo "Building images and starting containers..."
     echo ""
     # shellcheck disable=SC2086

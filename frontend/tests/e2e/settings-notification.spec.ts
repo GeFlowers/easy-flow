@@ -8,6 +8,11 @@ declare global {
   }
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 installNotificationMock 的约定。
+
+ */
+
 async function installNotificationMock(
   page: Page,
   initialPermission: NotificationPermission = "default",
@@ -46,6 +51,11 @@ async function installNotificationMock(
   }, initialPermission);
 }
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 openNotificationSettings 的约定。
+
+ */
+
 async function openNotificationSettings(page: Page) {
   await page.goto("/workspace/chats/new");
   const sidebar = page.locator("[data-sidebar='sidebar']");
@@ -58,6 +68,9 @@ async function openNotificationSettings(page: Page) {
 }
 
 test.describe("Notification settings", () => {
+  /**
+   * 覆盖“can request permission and send the first test notification immediately”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("can request permission and send the first test notification immediately", async ({
     page,
   }) => {
@@ -86,6 +99,11 @@ test.describe("Notification settings", () => {
         },
       ]);
   });
+
+  /**
+   * 覆盖“sends a completion notification when chat finishes while the page is unfocused”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("sends a completion notification when chat finishes while the page is unfocused", async ({
     page,

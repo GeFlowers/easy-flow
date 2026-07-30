@@ -6,6 +6,11 @@ import {
   buildSidecarContextPrompt,
 } from "@/core/sidecar/context";
 
+/**
+ * 覆盖“builds message sidecar context with a readable label”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("builds message sidecar context with a readable label", () => {
   const context = buildMessageSidecarContext(
     { type: "ai", id: "msg-1", content: "A focused answer." },
@@ -20,6 +25,11 @@ test("builds message sidecar context with a readable label", () => {
     content: "A focused answer.",
   });
 });
+
+/**
+ * 覆盖“builds sidecar context from selected text”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("builds sidecar context from selected text", () => {
   const context = buildMessageSidecarContext(
@@ -41,6 +51,11 @@ test("builds sidecar context from selected text", () => {
   });
 });
 
+/**
+ * 覆盖“renders hidden sidecar context prompt around quoted material”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("renders hidden sidecar context prompt around quoted material", () => {
   const prompt = buildSidecarContextPrompt({
     type: "referenced_message",
@@ -57,6 +72,11 @@ test("renders hidden sidecar context prompt around quoted material", () => {
   expect(prompt).toContain("Message ID: msg-1");
   expect(prompt).toContain("A side conversation panel.");
 });
+
+/**
+ * 覆盖“renders hidden sidecar context prompt around multiple quoted materials”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("renders hidden sidecar context prompt around multiple quoted materials", () => {
   const prompt = buildSidecarContextPrompt([
@@ -81,6 +101,11 @@ test("renders hidden sidecar context prompt around multiple quoted materials", (
   expect(prompt).toContain("First quoted fragment.");
   expect(prompt).toContain("Second quoted fragment.");
 });
+
+/**
+ * 覆盖“builds compact parent conversation context from visible messages”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("builds compact parent conversation context from visible messages", () => {
   const parentContext = buildParentConversationContext([
@@ -115,6 +140,11 @@ test("builds compact parent conversation context from visible messages", () => {
     },
   ]);
 });
+
+/**
+ * 覆盖“renders parent conversation as read-only background in sidecar prompt”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("renders parent conversation as read-only background in sidecar prompt", () => {
   const prompt = buildSidecarContextPrompt(
@@ -151,6 +181,11 @@ test("renders parent conversation as read-only background in sidecar prompt", ()
   expect(prompt).toContain("Use a side conversation.");
   expect(prompt).toContain('referenced_message index="1"');
 });
+
+/**
+ * 覆盖“renders parent conversation for sidecar follow-ups without new references”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("renders parent conversation for sidecar follow-ups without new references", () => {
   const prompt = buildSidecarContextPrompt([], {

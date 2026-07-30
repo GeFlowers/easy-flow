@@ -12,12 +12,12 @@ import {
 import type { Translations } from "./types";
 
 export const enUS: Translations = {
-  // Locale meta
+  // 语言区域元信息
   locale: {
     localName: "English",
   },
 
-  // Common
+  // 通用
   common: {
     home: "Home",
     settings: "Settings",
@@ -55,13 +55,13 @@ export const enUS: Translations = {
     showArtifacts: "Show artifacts of this conversation",
   },
 
-  // Home
+  // 首页
   home: {
     docs: "Docs",
     blog: "Blog",
   },
 
-  // Welcome
+  // 欢迎
   welcome: {
     greeting: "Hello, again!",
     description:
@@ -72,7 +72,7 @@ export const enUS: Translations = {
       "Create your own skill to release the power of DeerFlow. With customized skills,\nDeerFlow can help you search on the web, analyze data, and generate\n artifacts like slides, web pages and do almost anything.",
   },
 
-  // Clipboard
+  // 剪贴板
   clipboard: {
     copyToClipboard: "Copy to clipboard",
     copiedToClipboard: "Copied to clipboard",
@@ -80,7 +80,7 @@ export const enUS: Translations = {
     linkCopied: "Link copied to clipboard",
   },
 
-  // Citations
+  // 引用来源
   citations: {
     sourcesSummary: (count) =>
       `Used ${count} ${count === 1 ? "source" : "sources"}`,
@@ -89,7 +89,7 @@ export const enUS: Translations = {
     copiedReference: (title) => `Copied ${title} reference`,
   },
 
-  // Workspace Changes
+  // 工作区变更
   workspaceChanges: {
     title: "Workspace changes",
     editedTitle: (count) => `Edited ${count} ${count === 1 ? "file" : "files"}`,
@@ -110,7 +110,7 @@ export const enUS: Translations = {
     truncatedSummary: "Some changes were truncated.",
   },
 
-  // Input Box
+  // 输入框
   inputBox: {
     placeholder: "How can I assist you today?",
     createSkillPrompt:
@@ -242,7 +242,7 @@ export const enUS: Translations = {
     pleaseWaitStreaming: "Please wait for the current response to finish.",
   },
 
-  // Sidebar
+  // 侧边栏
   sidebar: {
     newChat: "New chat",
     chats: "Chats",
@@ -254,7 +254,7 @@ export const enUS: Translations = {
     agentsDisabledTooltip: "Feature not enabled",
   },
 
-  // Scheduled tasks
+  // 定时任务
   scheduledTasks: {
     scheduleType: {
       cron: "Recurring",
@@ -388,7 +388,7 @@ export const enUS: Translations = {
     },
   },
 
-  // Agents
+  // 智能体
   agents: {
     title: "Agents",
     description:
@@ -441,13 +441,13 @@ export const enUS: Translations = {
     backToGallery: "Back to Gallery",
   },
 
-  // Breadcrumb
+  // 面包屑导航
   breadcrumb: {
     workspace: "Workspace",
     chats: "Chats",
   },
 
-  // Workspace
+  // 工作区
   workspace: {
     officialWebsite: "DeerFlow's official website",
     githubTooltip: "DeerFlow on GitHub",
@@ -461,7 +461,7 @@ export const enUS: Translations = {
     gatewayUnavailableRetrying: "Retrying in the background…",
   },
 
-  // Conversation
+  // 会话
   conversation: {
     noMessages: "No messages yet",
     startConversation: "Start a conversation to see messages here",
@@ -469,7 +469,7 @@ export const enUS: Translations = {
     branchFailed: "Failed to branch conversation.",
   },
 
-  // Chats
+  // 聊天
   chats: {
     searchChats: "Search chats",
     loadMoreToSearch: "Load more to search older conversations",
@@ -477,7 +477,7 @@ export const enUS: Translations = {
     loadOlderChats: "Load older chats",
   },
 
-  // Sidecar
+  // 侧栏
   sidecar: {
     title: "Side chat",
     open: "Open side chat",
@@ -504,7 +504,7 @@ export const enUS: Translations = {
       "Selection spans multiple messages. Select text within a single reply to quote it.",
   },
 
-  // Channels
+  // 渠道
   channels: {
     title: "Channels",
     connect: "Connect",
@@ -537,7 +537,7 @@ export const enUS: Translations = {
     connectedAs: (name: string) => `Connected as ${name}.`,
   },
 
-  // Page titles (document title)
+  // 页面标题（文档标题）
   pages: {
     appName: "DeerFlow",
     chats: "Chats",
@@ -545,7 +545,7 @@ export const enUS: Translations = {
     untitled: "Untitled",
   },
 
-  // Tool calls
+  // 工具调用
   toolCalls: {
     moreSteps: (count: number) => `${count} more step${count === 1 ? "" : "s"}`,
     lessSteps: "Less steps",
@@ -579,7 +579,7 @@ export const enUS: Translations = {
     answeredValue: (value: string) => `Answered: ${value}`,
   },
 
-  // Subtasks
+  // 子任务
   uploads: {
     uploading: "Uploading...",
     uploadingFiles: "Uploading files, please wait...",
@@ -602,7 +602,7 @@ export const enUS: Translations = {
     failed: "Subtask failed",
   },
 
-  // Token Usage
+  // 令牌用量
   tokenUsage: {
     title: "Token Usage",
     label: "Tokens",
@@ -638,7 +638,7 @@ export const enUS: Translations = {
     removeTodo: (content: string) => `Remove To-do: ${content}`,
   },
 
-  // Shortcuts
+  // 快捷键
   shortcuts: {
     searchActions: "Search actions...",
     noResults: "No results found.",
@@ -650,7 +650,7 @@ export const enUS: Translations = {
     toggleSidebar: "Toggle Sidebar",
   },
 
-  // Settings
+  // 设置
   settings: {
     title: "Settings",
     description: "Adjust how DeerFlow looks and behaves for you.",

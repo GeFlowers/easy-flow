@@ -1,4 +1,4 @@
-"""Tests for MCP routing hint configuration."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from deerflow.config.extensions_config import ExtensionsConfig, McpServerConfig,
 
 
 def test_server_default_routing_applies_to_every_tool():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = ExtensionsConfig.model_validate(
         {
             "mcpServers": {
@@ -33,6 +34,7 @@ def test_server_default_routing_applies_to_every_tool():
 
 
 def test_tool_routing_override_only_replaces_explicit_fields():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     config = ExtensionsConfig.model_validate(
         {
             "mcpServers": {
@@ -64,6 +66,7 @@ def test_tool_routing_override_only_replaces_explicit_fields():
 
 
 def test_invalid_routing_mode_fails_validation():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(ValidationError):
         ExtensionsConfig.model_validate(
             {
@@ -86,6 +89,7 @@ def test_invalid_routing_mode_fails_validation():
     ],
 )
 def test_out_of_range_priority_is_clamped_with_warning(caplog, raw_priority: int, expected: int):
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     caplog.set_level(logging.WARNING)
 
     server = McpServerConfig(routing={"mode": "prefer", "priority": raw_priority})
@@ -95,6 +99,7 @@ def test_out_of_range_priority_is_clamped_with_warning(caplog, raw_priority: int
 
 
 def test_unknown_routing_fields_are_rejected():
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     with pytest.raises(ValidationError):
         ExtensionsConfig.model_validate(
             {

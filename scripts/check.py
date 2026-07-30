@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cross-platform dependency checker for DeerFlow."""
+"""本脚本负责检查。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 def configure_stdio() -> None:
-    """Prefer UTF-8 output so Unicode status markers render on Windows."""
+    '未说明'
     for stream_name in ("stdout", "stderr"):
         stream = getattr(sys, stream_name, None)
         if hasattr(stream, "reconfigure"):
@@ -21,7 +21,7 @@ def configure_stdio() -> None:
 
 
 def run_command(command: list[str]) -> str | None:
-    """Run a command and return trimmed stdout, or None on failure."""
+    """执行运行对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
     try:
         result = subprocess.run(command, capture_output=True, text=True, check=True, shell=False)
     except (OSError, subprocess.CalledProcessError):
@@ -30,7 +30,7 @@ def run_command(command: list[str]) -> str | None:
 
 
 def find_pnpm_command() -> list[str] | None:
-    """Return a pnpm-compatible command that exists on this machine."""
+    '未说明'
     pnpm_path = shutil.which("pnpm")
     if pnpm_path:
         return [str(Path(pnpm_path))]
@@ -48,6 +48,7 @@ def find_pnpm_command() -> list[str] | None:
 
 
 def parse_node_major(version_text: str) -> int | None:
+    '未说明'
     version = version_text.strip()
     if version.startswith("v"):
         version = version[1:]
@@ -58,6 +59,7 @@ def parse_node_major(version_text: str) -> int | None:
 
 
 def main() -> int:
+    '未说明'
     configure_stdio()
     print("==========================================")
     print("  Checking Required Dependencies")

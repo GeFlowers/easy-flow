@@ -1,16 +1,18 @@
+"""提供按沙箱和路径粒度序列化文件操作的锁。"""
 import threading
 import weakref
 
 from deerflow.sandbox.sandbox import Sandbox
 
-# Use WeakValueDictionary to prevent memory leak in long-running processes.
-# Locks are automatically removed when no longer referenced by any thread.
+# 中文说明：此处用于执行相关处理。
+# 中文说明：此处用于执行相关处理。
 _LockKey = tuple[str, str]
 _FILE_OPERATION_LOCKS: weakref.WeakValueDictionary[_LockKey, threading.Lock] = weakref.WeakValueDictionary()
 _FILE_OPERATION_LOCKS_GUARD = threading.Lock()
 
 
 def get_file_operation_lock_key(sandbox: Sandbox, path: str) -> tuple[str, str]:
+    """返回唯一标识给定沙箱文件操作锁的键。"""
     sandbox_id = getattr(sandbox, "id", None)
     if not sandbox_id:
         sandbox_id = f"instance:{id(sandbox)}"
@@ -18,6 +20,7 @@ def get_file_operation_lock_key(sandbox: Sandbox, path: str) -> tuple[str, str]:
 
 
 def get_file_operation_lock(sandbox: Sandbox, path: str) -> threading.Lock:
+    """获取给定沙箱路径的共享互斥锁，并在需要时创建它。"""
     lock_key = get_file_operation_lock_key(sandbox, path)
     with _FILE_OPERATION_LOCKS_GUARD:
         lock = _FILE_OPERATION_LOCKS.get(lock_key)

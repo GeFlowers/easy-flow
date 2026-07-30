@@ -1,4 +1,4 @@
-"""Discord connection routing tests."""
+'定义 test_discord_channel_connections 模块提供的职责与可复用接口。\n\nDiscord connection routing tests.'
 
 from __future__ import annotations
 
@@ -13,6 +13,7 @@ from app.channels.message_bus import InboundMessage, MessageBus
 
 @pytest.fixture
 async def repo(tmp_path):
+    '执行 repo 的明确职责，并返回与调用约定一致的结果'
     from deerflow.persistence.channel_connections import ChannelConnectionRepository, ChannelCredentialCipher
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
 
@@ -28,6 +29,7 @@ async def repo(tmp_path):
 
 @pytest.mark.anyio
 async def test_discord_inbound_attaches_owner_identity_from_user_level_connection(repo):
+    '验证 discord、inbound、attaches、owner、identity、from、user、level、connection 场景下的预期行为、边界条件与结果'
     connection = await repo.upsert_connection(
         owner_user_id="alice",
         provider="discord",
@@ -55,6 +57,7 @@ async def test_discord_inbound_attaches_owner_identity_from_user_level_connectio
 
 @pytest.mark.anyio
 async def test_discord_connect_command_binds_gateway_identity(repo):
+    '验证 discord、connect、command、binds、gateway、identity 场景下的预期行为、边界条件与结果'
     state = "discord-bind-code"
     await repo.create_oauth_state(
         owner_user_id="deerflow-user-1",

@@ -6,6 +6,7 @@ import type { BuildVisitor } from "unist-util-visit";
 const CJK_TEXT_RE =
   /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
 
+/** 创建将非中日韩文字词语拆分为动画元素的转换插件。 */
 export function rehypeSplitWordsIntoSpans() {
   return (tree: Root) => {
     visit(tree, "element", ((node: Element) => {
@@ -47,6 +48,7 @@ export function rehypeSplitWordsIntoSpans() {
   };
 }
 
+/** 按开关返回词语动画转换插件列表。 */
 export function useRehypeSplitWordsIntoSpans(enabled = true) {
   const rehypePlugins = useMemo(
     () => (enabled ? [rehypeSplitWordsIntoSpans] : []),

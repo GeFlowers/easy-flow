@@ -13,6 +13,11 @@ import { fetchSubtaskSteps } from "@/core/tasks/api";
 
 const mockedFetch = rs.mocked(fetcher);
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 jsonResponse 的约定。
+
+ */
+
 function jsonResponse(status: number, body: unknown): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -20,6 +25,11 @@ function jsonResponse(status: number, body: unknown): Response {
     headers: { "Content-Type": "application/json" },
   });
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 stepEvent 的约定。
+
+ */
 
 function stepEvent(seq: number, messageIndex: number, toolName: string) {
   return {
@@ -41,6 +51,9 @@ beforeEach(() => {
 });
 
 describe("fetchSubtaskSteps", () => {
+  /**
+   * 覆盖“scopes the request to the task and only fetches subagent.step”这一可观察行为，防止相关边界在重构后回归。
+   */
   test("scopes the request to the task and only fetches subagent.step", async () => {
     mockedFetch.mockResolvedValueOnce(jsonResponse(200, []));
 
@@ -55,6 +68,11 @@ describe("fetchSubtaskSteps", () => {
     expect(url).toContain("limit=");
     expect(url).not.toContain("after_seq");
   });
+
+  /**
+   * 覆盖“pages forward with after_seq until a short page, accumulating in order”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("pages forward with after_seq until a short page, accumulating in order", async () => {
     mockedFetch
@@ -79,6 +97,11 @@ describe("fetchSubtaskSteps", () => {
     expect(mockedFetch.mock.calls[1]![0] as string).toContain("after_seq=11");
   });
 
+  /**
+   * 覆盖“stops after a single page when it is shorter than the page size”这一可观察行为，防止相关边界在重构后回归。
+
+   */
+
   test("stops after a single page when it is shorter than the page size", async () => {
     mockedFetch.mockResolvedValueOnce(
       jsonResponse(200, [stepEvent(10, 0, "web_search")]),
@@ -89,6 +112,11 @@ describe("fetchSubtaskSteps", () => {
     expect(steps).toHaveLength(1);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
   });
+
+  /**
+   * 覆盖“throws when a page request fails”这一可观察行为，防止相关边界在重构后回归。
+
+   */
 
   test("throws when a page request fails", async () => {
     mockedFetch.mockResolvedValueOnce(jsonResponse(500, { detail: "boom" }));

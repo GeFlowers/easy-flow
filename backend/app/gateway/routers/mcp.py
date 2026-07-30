@@ -1,3 +1,5 @@
+"""提供 MCP 配置读取、更新与敏感字段掩码处理的受控路由。"""
+
 import asyncio
 import json
 import logging
@@ -31,7 +33,7 @@ _SHELL_METACHARS = frozenset(";|&`$<>\n\r")
 
 
 class McpOAuthConfigResponse(BaseModel):
-    """OAuth configuration for an MCP server."""
+    '封装 McpOAuthConfigResponse 的状态、协作关系与公开操作。\n\nOAuth configuration for an MCP server.'
 
     enabled: bool = Field(default=True, description="Whether OAuth token injection is enabled")
     token_url: str = Field(default="", description="OAuth token endpoint URL")
@@ -50,7 +52,7 @@ class McpOAuthConfigResponse(BaseModel):
 
 
 class McpServerConfigResponse(BaseModel):
-    """Response model for MCP server configuration."""
+    '封装 McpServerConfigResponse 的状态、协作关系与公开操作。\n\nResponse model for MCP server configuration.'
 
     enabled: bool = Field(default=True, description="Whether this MCP server is enabled")
     type: str = Field(default="stdio", description="Transport type: 'stdio', 'sse', or 'http'")
@@ -68,7 +70,7 @@ class McpServerConfigResponse(BaseModel):
 
 
 class McpConfigResponse(BaseModel):
-    """Response model for MCP configuration."""
+    '封装 McpConfigResponse 的状态、协作关系与公开操作。\n\nResponse model for MCP configuration.'
 
     mcp_servers: dict[str, McpServerConfigResponse] = Field(
         default_factory=dict,
@@ -77,7 +79,7 @@ class McpConfigResponse(BaseModel):
 
 
 class McpConfigUpdateRequest(BaseModel):
-    """Request model for updating MCP configuration."""
+    '封装 McpConfigUpdateRequest 的状态、协作关系与公开操作。\n\nRequest model for updating MCP configuration.'
 
     mcp_servers: dict[str, McpServerConfigResponse] = Field(
         ...,
@@ -86,7 +88,7 @@ class McpConfigUpdateRequest(BaseModel):
 
 
 class McpCacheResetResponse(BaseModel):
-    """Response model for resetting the MCP tools cache."""
+    '封装 McpCacheResetResponse 的状态、协作关系与公开操作。\n\nResponse model for resetting the MCP tools cache.'
 
     success: bool = Field(description="Whether the MCP tools cache was reset")
     message: str = Field(description="Human-readable reset status")
@@ -100,16 +102,19 @@ _SENSITIVE_EXTRA_KEY_RE = re.compile(
 
 
 def _normalize_config_key(key: str) -> str:
+    """将驼峰或连字符配置键规范化为小写下划线形式。"""
     with_boundaries = re.sub(r"(.)([A-Z][a-z]+)", r"\1_\2", key)
     with_boundaries = re.sub(r"([a-z0-9])([A-Z])", r"\1_\2", with_boundaries)
     return re.sub(r"[^a-z0-9]+", "_", with_boundaries.lower()).strip("_")
 
 
 def _is_sensitive_extra_key(key: str) -> bool:
+    """判断扩展配置键是否可能携带令牌、密钥等敏感值。"""
     return bool(_SENSITIVE_EXTRA_KEY_RE.search(_normalize_config_key(key)))
 
 
 def _mask_sensitive_extra_value(value: Any) -> Any:
+    """递归掩盖敏感扩展配置值，以免 API 读取响应泄露凭据。"""
     if isinstance(value, dict):
         return {key: _MASKED_VALUE if _is_sensitive_extra_key(str(key)) else _mask_sensitive_extra_value(nested) for key, nested in value.items()}
     if isinstance(value, list):
@@ -118,6 +123,7 @@ def _mask_sensitive_extra_value(value: Any) -> Any:
 
 
 def _merge_extra_value_preserving_masked(key: str, incoming_value: Any, existing_value: Any, *, existing_present: bool) -> Any:
+    """合并扩展配置时保留掩码字段原值，避免掩码覆盖已存凭据。"""
     if incoming_value == _MASKED_VALUE and _is_sensitive_extra_key(key):
         if existing_present:
             return existing_value
@@ -145,7 +151,7 @@ def _merge_extra_value_preserving_masked(key: str, incoming_value: Any, existing
 
 
 def _allowed_stdio_commands() -> set[str]:
-    """Return executable names allowed for API-managed stdio MCP servers."""
+    '执行 _allowed_stdio_commands 的明确职责，并返回与调用约定一致的结果。\n\nReturn executable names allowed for API-managed stdio MCP servers.'
     raw = os.environ.get(_MCP_STDIO_COMMAND_ALLOWLIST_ENV)
     base = set(_DEFAULT_MCP_STDIO_COMMAND_ALLOWLIST)
     if raw is None:
@@ -155,7 +161,7 @@ def _allowed_stdio_commands() -> set[str]:
 
 
 def _stdio_command_name(command: str | None, *, server_name: str) -> str:
-    """Normalize and validate a stdio command field from the API boundary."""
+    '执行 _stdio_command_name 的明确职责，并返回与调用约定一致的结果。\n\nNormalize and validate a stdio command field from the API boundary.'
     if command is None or not command.strip():
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -174,12 +180,7 @@ def _stdio_command_name(command: str | None, *, server_name: str) -> str:
 
 
 def _validate_mcp_update_request(request: McpConfigUpdateRequest) -> None:
-    """Validate API-submitted MCP config before it is persisted.
-
-    Local config files can still express arbitrary advanced setups, but the
-    HTTP API is an untrusted boundary. Restricting stdio commands here reduces
-    the blast radius of a compromised authenticated browser session.
-    """
+    '执行 _validate_mcp_update_request 的明确职责，并返回与调用约定一致的结果。\n\nValidate API-submitted MCP config before it is persisted.\n\n    Local config files can still express arbitrary advanced setups, but the\n    HTTP API is an untrusted boundary. Restricting stdio commands here reduces\n    the blast radius of a compromised authenticated browser session.\n    '
     allowed_commands = _allowed_stdio_commands()
     for name, server in request.mcp_servers.items():
         transport_type = (server.type or "stdio").lower()
@@ -196,11 +197,7 @@ def _validate_mcp_update_request(request: McpConfigUpdateRequest) -> None:
 
 
 def _mask_server_config(server: McpServerConfigResponse) -> McpServerConfigResponse:
-    """Return a copy of server config with sensitive fields masked.
-
-    Masks env values, header values, and removes OAuth secrets so they
-    are not exposed through the GET API endpoint.
-    """
+    '执行 _mask_server_config 的明确职责，并返回与调用约定一致的结果。\n\nReturn a copy of server config with sensitive fields masked.\n\n    Masks env values, header values, and removes OAuth secrets so they\n    are not exposed through the GET API endpoint.\n    '
     masked_env = {k: _MASKED_VALUE for k in server.env}
     masked_headers = {k: _MASKED_VALUE for k in server.headers}
     masked_oauth = None
@@ -226,21 +223,7 @@ def _merge_preserving_secrets(
     incoming: McpServerConfigResponse,
     existing: McpServerConfigResponse,
 ) -> McpServerConfigResponse:
-    """Merge incoming config with existing, preserving secrets masked by GET.
-
-    When the frontend toggles ``enabled`` it round-trips the full config:
-    GET (masked) → modify enabled → PUT (masked values sent back).
-    This function ensures masked values (``***``) are replaced with the
-    real secrets from the current on-disk config.
-
-    ``***`` is only accepted for keys that already exist in *existing*.
-    New keys must provide a real value.
-
-    For OAuth secrets, ``None`` means "preserve the existing stored value"
-    so masked GET responses can be safely round-tripped. To explicitly clear
-    a stored secret, clients may send an empty string, which is converted
-    to ``None`` before persisting.
-    """
+    '执行 _merge_preserving_secrets 的明确职责，并返回与调用约定一致的结果。\n\nMerge incoming config with existing, preserving secrets masked by GET.\n\n    When the frontend toggles ``enabled`` it round-trips the full config:\n    GET (masked) → modify enabled → PUT (masked values sent back).\n    This function ensures masked values (``***``) are replaced with the\n    real secrets from the current on-disk config.\n\n    ``***`` is only accepted for keys that already exist in *existing*.\n    New keys must provide a real value.\n\n    For OAuth secrets, ``None`` means "preserve the existing stored value"\n    so masked GET responses can be safely round-tripped. To explicitly clear\n    a stored secret, clients may send an empty string, which is converted\n    to ``None`` before persisting.\n    '
     merged_env = {}
     for k, v in incoming.env.items():
         if v == _MASKED_VALUE:
@@ -309,26 +292,7 @@ def _merge_preserving_secrets(
     description="Retrieve the current Model Context Protocol (MCP) server configurations.",
 )
 async def get_mcp_configuration(request: Request) -> McpConfigResponse:
-    """Get the current MCP configuration.
-
-    Returns:
-        The current MCP configuration with all servers.
-
-    Example:
-        ```json
-        {
-            "mcp_servers": {
-                "github": {
-                    "enabled": true,
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-github"],
-                    "env": {"GITHUB_TOKEN": "***"},
-                    "description": "GitHub MCP server for repository operations"
-                }
-            }
-        }
-        ```
-    """
+    '读取并返回，并遵守 get_mcp_configuration 所表达的接口约束。\n\nGet the current MCP configuration.\n\n    Returns:\n        The current MCP configuration with all servers.\n\n    Example:\n        ```json\n        {\n            "mcp_servers": {\n                "github": {\n                    "enabled": true,\n                    "command": "npx",\n                    "args": ["-y", "@modelcontextprotocol/server-github"],\n                    "env": {"GITHUB_TOKEN": "***"},\n                    "description": "GitHub MCP server for repository operations"\n                }\n            }\n        }\n        ```\n    '
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
 
     config = get_extensions_config()
@@ -338,14 +302,7 @@ async def get_mcp_configuration(request: Request) -> McpConfigResponse:
 
 
 def _apply_mcp_config_update(body: McpConfigUpdateRequest) -> dict:
-    """Worker-thread body for :func:`update_mcp_configuration`.
-
-    Resolving the config path, the existence probe, reading the raw JSON,
-    writing the merged config, and reloading it are all blocking filesystem IO
-    that must stay off the event loop. The merge is pure in-memory work but
-    lives here too so the whole read-modify-write is a single worker hop.
-    Returns the reloaded MCP server configs for the response.
-    """
+    '执行 _apply_mcp_config_update 的明确职责，并返回与调用约定一致的结果。\n\nWorker-thread body for :func:`update_mcp_configuration`.\n\n    Resolving the config path, the existence probe, reading the raw JSON,\n    writing the merged config, and reloading it are all blocking filesystem IO\n    that must stay off the event loop. The merge is pure in-memory work but\n    lives here too so the whole read-modify-write is a single worker hop.\n    Returns the reloaded MCP server configs for the response.\n    '
     # Get the current config path (or determine where to save it)
     config_path = ExtensionsConfig.resolve_config_path()
 
@@ -408,12 +365,7 @@ def _apply_mcp_config_update(body: McpConfigUpdateRequest) -> dict:
     description=("Reset cached MCP tools and pooled sessions process-wide so tools are reloaded on next use. This affects all threads and users in the current Gateway process."),
 )
 async def reset_mcp_tools_cache_endpoint(request: Request) -> McpCacheResetResponse:
-    """Reset cached MCP tools and persistent sessions process-wide.
-
-    The next agent run or tool lookup will reload tools from the configured MCP
-    servers. This affects all threads and users in the current Gateway process,
-    and avoids relying on extensions_config.json mtime changes.
-    """
+    '执行 reset_mcp_tools_cache_endpoint 的明确职责，并返回与调用约定一致的结果。\n\nReset cached MCP tools and persistent sessions process-wide.\n\n    The next agent run or tool lookup will reload tools from the configured MCP\n    servers. This affects all threads and users in the current Gateway process,\n    and avoids relying on extensions_config.json mtime changes.\n    '
     await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     reset_mcp_tools_cache()
     return McpCacheResetResponse(
@@ -429,37 +381,7 @@ async def reset_mcp_tools_cache_endpoint(request: Request) -> McpCacheResetRespo
     description="Update Model Context Protocol (MCP) server configurations and save to file.",
 )
 async def update_mcp_configuration(request: Request, body: McpConfigUpdateRequest) -> McpConfigResponse:
-    """Update the MCP configuration.
-
-    This will:
-    1. Save the new configuration to the mcp_config.json file
-    2. Reload the configuration cache
-    3. Reset MCP tools cache to trigger reinitialization
-
-    Args:
-        request: The new MCP configuration to save.
-
-    Returns:
-        The updated MCP configuration.
-
-    Raises:
-        HTTPException: 500 if the configuration file cannot be written.
-
-    Example Request:
-        ```json
-        {
-            "mcp_servers": {
-                "github": {
-                    "enabled": true,
-                    "command": "npx",
-                    "args": ["-y", "@modelcontextprotocol/server-github"],
-                    "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"},
-                    "description": "GitHub MCP server for repository operations"
-                }
-            }
-        }
-        ```
-    """
+    '更新目标状态并返回最新结果，并遵守 update_mcp_configuration 所表达的接口约束。\n\nUpdate the MCP configuration.\n\n    This will:\n    1. Save the new configuration to the mcp_config.json file\n    2. Reload the configuration cache\n    3. Reset MCP tools cache to trigger reinitialization\n\n    Args:\n        request: The new MCP configuration to save.\n\n    Returns:\n        The updated MCP configuration.\n\n    Raises:\n        HTTPException: 500 if the configuration file cannot be written.\n\n    Example Request:\n        ```json\n        {\n            "mcp_servers": {\n                "github": {\n                    "enabled": true,\n                    "command": "npx",\n                    "args": ["-y", "@modelcontextprotocol/server-github"],\n                    "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"},\n                    "description": "GitHub MCP server for repository operations"\n                }\n            }\n        }\n        ```\n    '
     try:
         await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
         _validate_mcp_update_request(body)

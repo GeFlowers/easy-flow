@@ -6,6 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+/** 封装统一的提示层，并保留触发元素的键盘与读屏访问能力。 */
 export function Tooltip({
   children,
   content,

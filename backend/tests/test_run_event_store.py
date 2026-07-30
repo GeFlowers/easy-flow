@@ -1,8 +1,4 @@
-"""Tests for RunEventStore contract across all backends.
-
-Uses a helper to create the store for each backend type.
-Memory tests run directly; DB and JSONL tests create stores inside each test.
-"""
+"""本模块覆盖运行 事件 存储的行为、边界与回归场景，确保既有契约稳定。"""
 
 import pytest
 
@@ -11,6 +7,7 @@ from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
 @pytest.fixture
 def store():
+    """为存储准备隔离的测试依赖，并由夹具作用域管理其生命周期。"""
     return MemoryRunEventStore()
 
 
@@ -18,8 +15,10 @@ def store():
 
 
 class TestPutAndSeq:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_put_returns_dict_with_seq(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         record = await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message", content="hello")
         assert "seq" in record
         assert record["seq"] == 1
@@ -32,6 +31,7 @@ class TestPutAndSeq:
 
     @pytest.mark.anyio
     async def test_seq_strictly_increasing_same_thread(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         r1 = await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         r2 = await store.put(thread_id="t1", run_id="r1", event_type="ai_message", category="message")
         r3 = await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace")
@@ -41,6 +41,7 @@ class TestPutAndSeq:
 
     @pytest.mark.anyio
     async def test_seq_independent_across_threads(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         r1 = await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         r2 = await store.put(thread_id="t2", run_id="r2", event_type="human_message", category="message")
         assert r1["seq"] == 1
@@ -48,12 +49,14 @@ class TestPutAndSeq:
 
     @pytest.mark.anyio
     async def test_put_respects_provided_created_at(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         ts = "2024-06-01T12:00:00+00:00"
         record = await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message", created_at=ts)
         assert record["created_at"] == ts
 
     @pytest.mark.anyio
     async def test_put_metadata_preserved(self, store):
+        """验证元数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
         meta = {"model": "gpt-4", "tokens": 100}
         record = await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace", metadata=meta)
         assert record["metadata"] == meta
@@ -63,8 +66,10 @@ class TestPutAndSeq:
 
 
 class TestListMessages:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_only_returns_message_category(self, store):
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace")
         await store.put(thread_id="t1", run_id="r1", event_type="run_start", category="lifecycle")
@@ -74,6 +79,7 @@ class TestListMessages:
 
     @pytest.mark.anyio
     async def test_ascending_seq_order(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message", content="first")
         await store.put(thread_id="t1", run_id="r1", event_type="ai_message", category="message", content="second")
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message", content="third")
@@ -83,6 +89,7 @@ class TestListMessages:
 
     @pytest.mark.anyio
     async def test_before_seq_pagination(self, store):
+        """验证分页在预期条件及边界场景下的可观察行为，防止相关回归。"""
         for i in range(10):
             await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message", content=str(i))
         messages = await store.list_messages("t1", before_seq=6, limit=3)
@@ -91,6 +98,7 @@ class TestListMessages:
 
     @pytest.mark.anyio
     async def test_after_seq_pagination(self, store):
+        """验证分页在预期条件及边界场景下的可观察行为，防止相关回归。"""
         for i in range(10):
             await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message", content=str(i))
         messages = await store.list_messages("t1", after_seq=7, limit=3)
@@ -99,6 +107,7 @@ class TestListMessages:
 
     @pytest.mark.anyio
     async def test_limit_restricts_count(self, store):
+        """验证限制在预期条件及边界场景下的可观察行为，防止相关回归。"""
         for _ in range(20):
             await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         messages = await store.list_messages("t1", limit=5)
@@ -106,6 +115,7 @@ class TestListMessages:
 
     @pytest.mark.anyio
     async def test_cross_run_unified_ordering(self, store):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r1", event_type="ai_message", category="message")
         await store.put(thread_id="t1", run_id="r2", event_type="human_message", category="message")
@@ -117,6 +127,7 @@ class TestListMessages:
 
     @pytest.mark.anyio
     async def test_default_returns_latest(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         for _ in range(10):
             await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         messages = await store.list_messages("t1", limit=3)
@@ -128,6 +139,7 @@ class TestListMessages:
         # non-contiguous (1, 3, 5, 7, 9). Seq-window pagination must still be
         # correct over the messages-only projection, including when the cursor
         # lands in a gap or exactly on a message seq (exclusive bound).
+        """验证分页 追踪在预期条件及边界场景下的可观察行为，防止相关回归。"""
         for i in range(10):
             category = "message" if i % 2 == 0 else "trace"
             await store.put(thread_id="t1", run_id="r1", event_type="e", category=category, content=str(i))
@@ -147,8 +159,10 @@ class TestListMessages:
 
 
 class TestListEvents:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_returns_all_categories_for_run(self, store):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace")
         await store.put(thread_id="t1", run_id="r1", event_type="run_start", category="lifecycle")
@@ -157,6 +171,7 @@ class TestListEvents:
 
     @pytest.mark.anyio
     async def test_event_types_filter(self, store):
+        """验证事件在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="llm_start", category="trace")
         await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace")
         await store.put(thread_id="t1", run_id="r1", event_type="tool_start", category="trace")
@@ -166,6 +181,7 @@ class TestListEvents:
 
     @pytest.mark.anyio
     async def test_only_returns_specified_run(self, store):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace")
         await store.put(thread_id="t1", run_id="r2", event_type="llm_end", category="trace")
         events = await store.list_events("t1", "r1")
@@ -177,8 +193,10 @@ class TestListEvents:
 
 
 class TestListMessagesByRun:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_only_messages_for_specified_run(self, store):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace")
         await store.put(thread_id="t1", run_id="r2", event_type="human_message", category="message")
@@ -192,8 +210,10 @@ class TestListMessagesByRun:
 
 
 class TestCountMessages:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_counts_only_message_category(self, store):
+        """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r1", event_type="ai_message", category="message")
         await store.put(thread_id="t1", run_id="r1", event_type="llm_end", category="trace")
@@ -204,8 +224,10 @@ class TestCountMessages:
 
 
 class TestPutBatch:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_batch_assigns_seq(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         events = [
             {"thread_id": "t1", "run_id": "r1", "event_type": "human_message", "category": "message", "content": "a"},
             {"thread_id": "t1", "run_id": "r1", "event_type": "ai_message", "category": "message", "content": "b"},
@@ -217,6 +239,7 @@ class TestPutBatch:
 
     @pytest.mark.anyio
     async def test_batch_seq_strictly_increasing(self, store):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         events = [
             {"thread_id": "t1", "run_id": "r1", "event_type": "human_message", "category": "message"},
             {"thread_id": "t1", "run_id": "r1", "event_type": "ai_message", "category": "message"},
@@ -230,8 +253,10 @@ class TestPutBatch:
 
 
 class TestDelete:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_delete_by_thread(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r1", event_type="ai_message", category="message")
         await store.put(thread_id="t1", run_id="r2", event_type="llm_end", category="trace")
@@ -242,6 +267,7 @@ class TestDelete:
 
     @pytest.mark.anyio
     async def test_delete_by_run(self, store):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r2", event_type="human_message", category="message")
         await store.put(thread_id="t1", run_id="r2", event_type="llm_end", category="trace")
@@ -253,15 +279,18 @@ class TestDelete:
 
     @pytest.mark.anyio
     async def test_delete_nonexistent_thread_returns_zero(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         assert await store.delete_by_thread("nope") == 0
 
     @pytest.mark.anyio
     async def test_delete_nonexistent_run_returns_zero(self, store):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         await store.put(thread_id="t1", run_id="r1", event_type="human_message", category="message")
         assert await store.delete_by_run("t1", "nope") == 0
 
     @pytest.mark.anyio
     async def test_delete_nonexistent_thread_for_run_returns_zero(self, store):
+        """验证会话 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         assert await store.delete_by_run("nope", "r1") == 0
 
 
@@ -269,16 +298,20 @@ class TestDelete:
 
 
 class TestEdgeCases:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_empty_thread_list_messages(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         assert await store.list_messages("empty") == []
 
     @pytest.mark.anyio
     async def test_empty_run_list_events(self, store):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         assert await store.list_events("empty", "r1") == []
 
     @pytest.mark.anyio
     async def test_empty_thread_count_messages(self, store):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         assert await store.count_messages("empty") == 0
 
 
@@ -286,27 +319,33 @@ class TestEdgeCases:
 
 
 class TestDbRunEventStore:
-    """Tests for DbRunEventStore with temp SQLite."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     @pytest.mark.anyio
     async def test_postgres_max_seq_uses_advisory_lock_without_for_update(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from sqlalchemy.dialects import postgresql
 
         from deerflow.runtime.events.store.db import DbRunEventStore
 
         class FakeSession:
+            """集中覆盖当前测试分支与回归边界。"""
             def __init__(self):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 self.dialect = postgresql.dialect()
                 self.execute_calls = []
                 self.scalar_stmt = None
 
             def get_bind(self):
+                """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
                 return self
 
             async def execute(self, stmt, params=None):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 self.execute_calls.append((stmt, params))
 
             async def scalar(self, stmt):
+                """准备可控测试资源与状态，供后续断言读取。"""
                 self.scalar_stmt = stmt
                 return 41
 
@@ -323,6 +362,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_basic_crud(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -345,6 +385,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_trace_content_truncation(self, tmp_path):
+        """验证追踪在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -365,6 +406,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_structured_content_round_trips(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -387,6 +429,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_pagination(self, tmp_path):
+        """验证分页在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -413,6 +456,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_delete(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -434,7 +478,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_put_batch_seq_continuity(self, tmp_path):
-        """Batch write produces continuous seq values with no gaps."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -450,6 +494,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_put_batch_accepts_structured_content(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -481,6 +526,7 @@ class TestDbRunEventStore:
 
     @pytest.mark.anyio
     async def test_dict_content_keeps_legacy_metadata_flag(self, tmp_path):
+        """验证元数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -499,14 +545,10 @@ class TestDbRunEventStore:
 
 
 class TestDbRunEventStoreWriteLock:
-    """Per-thread seq-assignment lock (fixes SQLite UNIQUE(thread_id, seq) races).
-
-    Two in-process coroutines writing to the same thread can interleave between
-    the ``max(seq)`` read and the INSERT, both computing the same next seq and
-    colliding. A per-thread ``asyncio.Lock`` serializes seq assignment.
-    """
+    """集中覆盖当前测试分支与回归边界。"""
 
     def test_get_write_lock_same_thread_returns_same_lock(self):
+        """验证获取 写入 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         import asyncio
         from unittest.mock import MagicMock
 
@@ -520,6 +562,7 @@ class TestDbRunEventStoreWriteLock:
         assert store._get_write_lock("thread-1") is lock
 
     def test_get_write_lock_distinct_threads_get_distinct_locks(self):
+        """验证获取 写入 获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from unittest.mock import MagicMock
 
         from deerflow.runtime.events.store.db import DbRunEventStore
@@ -530,6 +573,7 @@ class TestDbRunEventStoreWriteLock:
 
     @pytest.mark.anyio
     async def test_concurrent_put_batch_same_thread_has_no_seq_collision(self, tmp_path):
+        """验证并发 会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         import asyncio
 
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
@@ -540,6 +584,7 @@ class TestDbRunEventStoreWriteLock:
         s = DbRunEventStore(get_session_factory())
 
         def _batch(run_id: str):
+            """准备可控测试资源与状态，供后续断言读取。"""
             return [{"thread_id": "t1", "run_id": run_id, "event_type": "trace", "category": "trace"} for _ in range(20)]
 
         # Fire two concurrent batches at the same thread; without the per-thread
@@ -555,6 +600,7 @@ class TestDbRunEventStoreWriteLock:
 
     @pytest.mark.anyio
     async def test_delete_by_thread_evicts_orphaned_write_lock(self, tmp_path):
+        """验证会话 写入在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -580,6 +626,7 @@ class TestDbRunEventStoreWriteLock:
 
     @pytest.mark.anyio
     async def test_delete_by_thread_keeps_lock_held_by_inflight_writer(self, tmp_path):
+        """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.persistence.engine import close_engine, get_session_factory, init_engine
         from deerflow.runtime.events.store.db import DbRunEventStore
 
@@ -605,10 +652,11 @@ class TestDbRunEventStoreWriteLock:
 
 
 class TestMakeRunEventStore:
-    """Tests for the make_run_event_store factory function."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     @pytest.mark.anyio
     async def test_memory_backend_default(self):
+        """验证内存在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.runtime.events.store import make_run_event_store
 
         store = make_run_event_store(None)
@@ -616,6 +664,7 @@ class TestMakeRunEventStore:
 
     @pytest.mark.anyio
     async def test_memory_backend_explicit(self):
+        """验证内存在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from unittest.mock import MagicMock
 
         from deerflow.runtime.events.store import make_run_event_store
@@ -627,6 +676,7 @@ class TestMakeRunEventStore:
 
     @pytest.mark.anyio
     async def test_db_backend_with_engine(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from unittest.mock import MagicMock
 
         from deerflow.persistence.engine import close_engine, init_engine
@@ -644,7 +694,7 @@ class TestMakeRunEventStore:
 
     @pytest.mark.anyio
     async def test_db_backend_no_engine_falls_back(self):
-        """db backend without engine falls back to memory."""
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from unittest.mock import MagicMock
 
         from deerflow.persistence.engine import close_engine, init_engine
@@ -660,6 +710,7 @@ class TestMakeRunEventStore:
 
     @pytest.mark.anyio
     async def test_jsonl_backend(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from unittest.mock import MagicMock
 
         from deerflow.runtime.events.store import make_run_event_store
@@ -671,6 +722,7 @@ class TestMakeRunEventStore:
 
     @pytest.mark.anyio
     async def test_unknown_backend_raises(self):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from unittest.mock import MagicMock
 
         from deerflow.runtime.events.store import make_run_event_store
@@ -685,8 +737,10 @@ class TestMakeRunEventStore:
 
 
 class TestJsonlRunEventStore:
+    """集中覆盖当前测试分支与回归边界。"""
     @pytest.mark.anyio
     async def test_basic_crud(self, tmp_path):
+        """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
         from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
         s = JsonlRunEventStore(base_dir=tmp_path / "jsonl")
@@ -697,6 +751,7 @@ class TestJsonlRunEventStore:
 
     @pytest.mark.anyio
     async def test_file_at_correct_path(self, tmp_path):
+        """验证文件 路径在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
         s = JsonlRunEventStore(base_dir=tmp_path / "jsonl")
@@ -705,6 +760,7 @@ class TestJsonlRunEventStore:
 
     @pytest.mark.anyio
     async def test_cross_run_messages(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
         s = JsonlRunEventStore(base_dir=tmp_path / "jsonl")
@@ -716,6 +772,7 @@ class TestJsonlRunEventStore:
 
     @pytest.mark.anyio
     async def test_delete_by_run(self, tmp_path):
+        """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
         from deerflow.runtime.events.store.jsonl import JsonlRunEventStore
 
         s = JsonlRunEventStore(base_dir=tmp_path / "jsonl")

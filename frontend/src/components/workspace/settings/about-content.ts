@@ -1,6 +1,6 @@
 /**
- * About DeerFlow markdown content. Inlined to avoid raw-loader dependency
- * (Turbopack cannot resolve raw-loader for .md imports).
+ * 内联保存 DeerFlow 的介绍 Markdown，避免依赖 raw-loader；
+ * Turbopack 无法解析针对 `.md` 导入的 raw-loader。
  */
 import { APP_VERSION } from "@/version";
 

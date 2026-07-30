@@ -1,4 +1,4 @@
-"""Configuration for deferred tool loading via tool_search."""
+"""提供配置、tool、搜索、配置相关功能。"""
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -7,17 +7,12 @@ AUTO_PROMOTE_TOP_K_MAX = 5
 
 
 def clamp_auto_promote_top_k(value: int) -> int:
-    """Clamp the global MCP routing auto-promote breadth to PR2's range."""
+    """\u6267\u884c clamp_auto_promote_top_k \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return max(AUTO_PROMOTE_TOP_K_MIN, min(AUTO_PROMOTE_TOP_K_MAX, int(value)))
 
 
 class ToolSearchConfig(BaseModel):
-    """Configuration for deferred tool loading via tool_search.
-
-    When enabled, MCP tools are not loaded into the agent's context directly.
-    Instead, they are listed by name in the system prompt and discoverable
-    via the tool_search tool at runtime.
-    """
+    """\u6267\u884c ToolSearchConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
     enabled: bool = Field(
         default=False,
@@ -31,6 +26,7 @@ class ToolSearchConfig(BaseModel):
     @field_validator("auto_promote_top_k")
     @classmethod
     def _clamp_auto_promote_top_k(cls, value: int) -> int:
+        """\u6267\u884c _clamp_auto_promote_top_k \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return clamp_auto_promote_top_k(value)
 
 
@@ -38,7 +34,7 @@ _tool_search_config: ToolSearchConfig | None = None
 
 
 def get_tool_search_config() -> ToolSearchConfig:
-    """Get the tool search config, loading from AppConfig if needed."""
+    """\u6267\u884c get_tool_search_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _tool_search_config
     if _tool_search_config is None:
         _tool_search_config = ToolSearchConfig()
@@ -46,7 +42,7 @@ def get_tool_search_config() -> ToolSearchConfig:
 
 
 def load_tool_search_config_from_dict(data: dict) -> ToolSearchConfig:
-    """Load tool search config from a dict (called during AppConfig loading)."""
+    """\u6267\u884c load_tool_search_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _tool_search_config
     _tool_search_config = ToolSearchConfig.model_validate(data)
     return _tool_search_config

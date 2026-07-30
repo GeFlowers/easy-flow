@@ -12,12 +12,12 @@ import {
 import type { Translations } from "./types";
 
 export const zhCN: Translations = {
-  // Locale meta
+  // 语言区域元信息
   locale: {
     localName: "中文",
   },
 
-  // Common
+  // 通用
   common: {
     home: "首页",
     settings: "设置",
@@ -55,13 +55,13 @@ export const zhCN: Translations = {
     showArtifacts: "查看此对话的文件",
   },
 
-  // Home
+  // 首页
   home: {
     docs: "文档",
     blog: "博客",
   },
 
-  // Welcome
+  // 欢迎
   welcome: {
     greeting: "你好，欢迎回来！",
     description:
@@ -72,7 +72,7 @@ export const zhCN: Translations = {
       "创建你的 Agent Skill 来释放 DeerFlow 的潜力。通过自定义技能，DeerFlow\n可以帮你搜索网络、分析数据，还能为你生成幻灯片、\n网页等作品，几乎可以做任何事情。",
   },
 
-  // Clipboard
+  // 剪贴板
   clipboard: {
     copyToClipboard: "复制到剪贴板",
     copiedToClipboard: "已复制到剪贴板",
@@ -80,7 +80,7 @@ export const zhCN: Translations = {
     linkCopied: "链接已复制到剪贴板",
   },
 
-  // Citations
+  // 引用来源
   citations: {
     sourcesSummary: (count) => `使用了 ${count} 个来源`,
     citeCount: (count) => `${count} 次引用`,
@@ -88,7 +88,7 @@ export const zhCN: Translations = {
     copiedReference: (title) => `已复制 ${title} 引用`,
   },
 
-  // Workspace Changes
+  // 工作区变更
   workspaceChanges: {
     title: "工作区变更",
     editedTitle: (count) => `已编辑 ${count} 个文件`,
@@ -109,7 +109,7 @@ export const zhCN: Translations = {
     truncatedSummary: "部分变更已被截断。",
   },
 
-  // Input Box
+  // 输入框
   inputBox: {
     placeholder: "今天我能为你做些什么？",
     createSkillPrompt:
@@ -229,7 +229,7 @@ export const zhCN: Translations = {
     pleaseWaitStreaming: "请等待当前响应完成。",
   },
 
-  // Sidebar
+  // 侧边栏
   sidebar: {
     newChat: "新对话",
     chats: "对话",
@@ -374,7 +374,7 @@ export const zhCN: Translations = {
     },
   },
 
-  // Agents
+  // 智能体
   agents: {
     title: "智能体",
     description: "创建和管理具有专属 Prompt 与能力的自定义智能体。",
@@ -420,13 +420,13 @@ export const zhCN: Translations = {
     backToGallery: "返回 Gallery",
   },
 
-  // Breadcrumb
+  // 面包屑导航
   breadcrumb: {
     workspace: "工作区",
     chats: "对话",
   },
 
-  // Workspace
+  // 工作区
   workspace: {
     officialWebsite: "访问 DeerFlow 官方网站",
     githubTooltip: "访问 DeerFlow 的 GitHub 仓库",
@@ -440,7 +440,7 @@ export const zhCN: Translations = {
     gatewayUnavailableRetrying: "正在后台重试…",
   },
 
-  // Conversation
+  // 会话
   conversation: {
     noMessages: "还没有消息",
     startConversation: "开始新的对话以查看消息",
@@ -448,7 +448,7 @@ export const zhCN: Translations = {
     branchFailed: "创建分叉对话失败。",
   },
 
-  // Chats
+  // 聊天
   chats: {
     searchChats: "搜索对话",
     loadMoreToSearch: "加载更多以搜索更早的对话",
@@ -456,7 +456,7 @@ export const zhCN: Translations = {
     loadOlderChats: "加载更早的对话",
   },
 
-  // Sidecar
+  // 侧栏
   sidecar: {
     title: "侧边对话",
     open: "打开侧边对话",
@@ -483,7 +483,7 @@ export const zhCN: Translations = {
       "选区跨越了多条消息，请在同一条回复内选择要引用的文本。",
   },
 
-  // Channels
+  // 渠道
   channels: {
     title: "渠道",
     connect: "连接",
@@ -516,7 +516,7 @@ export const zhCN: Translations = {
     connectedAs: (name: string) => `已连接为 ${name}。`,
   },
 
-  // Page titles (document title)
+  // 页面标题（文档标题）
   pages: {
     appName: "DeerFlow",
     chats: "对话",
@@ -524,7 +524,7 @@ export const zhCN: Translations = {
     untitled: "未命名",
   },
 
-  // Tool calls
+  // 工具调用
   toolCalls: {
     moreSteps: (count: number) => `查看其他 ${count} 个步骤`,
     lessSteps: "隐藏步骤",
@@ -579,7 +579,7 @@ export const zhCN: Translations = {
     failed: "子任务失败",
   },
 
-  // Token Usage
+  // 令牌用量
   tokenUsage: {
     title: "Token 用量",
     label: "Tokens",
@@ -614,7 +614,7 @@ export const zhCN: Translations = {
     removeTodo: (content: string) => `移除 To-do：${content}`,
   },
 
-  // Shortcuts
+  // 快捷键
   shortcuts: {
     searchActions: "搜索操作...",
     noResults: "未找到结果。",
@@ -625,7 +625,7 @@ export const zhCN: Translations = {
     toggleSidebar: "切换侧边栏",
   },
 
-  // Settings
+  // 设置
   settings: {
     title: "设置",
     description: "根据你的偏好调整 DeerFlow 的界面和行为。",

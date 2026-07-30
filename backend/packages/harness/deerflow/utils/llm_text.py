@@ -1,4 +1,4 @@
-"""Utilities for normalizing LLM response text before structured parsing."""
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 
 from __future__ import annotations
 
@@ -11,17 +11,7 @@ _OPEN_THINK_RE = re.compile(r"<think\b[^>]*>", re.IGNORECASE)
 
 
 def strip_think_blocks(text: str, *, truncate_unclosed: bool = True) -> str:
-    """Remove inline reasoning ``<think>`` blocks from a model response.
-
-    Complete ``<think>...</think>`` blocks are always removed. A dangling,
-    unclosed ``<think>`` open tag is treated as a model that was truncated
-    mid-thought: when ``truncate_unclosed`` is True (the default, used by JSON
-    parsers like suggestions/goal where trailing garbage must be dropped) the
-    text is cut at that tag. Callers that may legitimately echo a literal
-    ``<think>`` substring in their output (e.g. the input polisher rewriting a
-    draft that mentions the tag) pass ``truncate_unclosed=False`` so the tag is
-    preserved instead of silently discarding the rest of the text.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     text = _THINK_BLOCK_RE.sub("", text)
     if truncate_unclosed:
         open_match = _OPEN_THINK_RE.search(text)
@@ -31,7 +21,7 @@ def strip_think_blocks(text: str, *, truncate_unclosed: bool = True) -> str:
 
 
 def strip_markdown_code_fence(text: str) -> str:
-    """Remove a single wrapping markdown code fence when present."""
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     stripped = text.strip()
     if not stripped.startswith("```"):
         return stripped
@@ -42,7 +32,7 @@ def strip_markdown_code_fence(text: str) -> str:
 
 
 def extract_response_text(content: object) -> str:
-    """Extract textual content from common chat-model response content shapes."""
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if isinstance(content, str):
         return content
     if isinstance(content, list):

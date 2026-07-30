@@ -1,16 +1,4 @@
-"""Intersect a git diff with static blocking-IO findings.
-
-Wraps the static detector (`blocking_io_static`) to answer a narrower question:
-which blocking-IO candidates does THIS change introduce? A candidate qualifies
-when its blocking line is on an added line of the diff, or when the finding is
-new versus the merge base — the latter catches exposure created without
-touching the blocking line itself (a new async caller making an old sync
-helper async-reachable). Used by the `blocking-io-guard` skill as the
-deterministic scope step.
-
-Not directly executable: import as `support.detectors.blocking_io_changed` or
-run via the CLI shim `scripts/scan_changed_blocking_io.py`.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -36,14 +24,7 @@ _HUNK_RE = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)(?:,\d+)? @@")
 
 
 def parse_changed_lines(diff_text: str) -> dict[str, set[int]]:
-    """Map repo-relative path -> set of added line numbers in the new file.
-
-    Accepts any unified diff (with or without `--unified=0`): context lines
-    advance the new-file counter, deletions (`-`) and `\\ No newline` markers
-    do not. Records only added lines (`+`, not the `+++` header), numbered
-    from each hunk's new-file start line; deleted files (`+++ /dev/null`) are
-    skipped.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     changed: dict[str, set[int]] = defaultdict(set)
     current_path: str | None = None
     next_line = 0
@@ -71,7 +52,7 @@ def parse_changed_lines(diff_text: str) -> dict[str, set[int]]:
 
 
 def changed_python_lines(base: str, repo_root: Path = REPO_ROOT) -> dict[str, set[int]]:
-    """Diff `base...HEAD` over scan roots and return added .py lines."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     cmd = [
         "git",
         "-C",
@@ -91,7 +72,7 @@ def select_findings_on_changed_lines(
     findings: Sequence[dict[str, object]],
     changed_lines: dict[str, set[int]],
 ) -> list[dict[str, object]]:
-    """Keep findings whose (path, line) falls on a changed line."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     selected: list[dict[str, object]] = []
     for finding in findings:
         location = finding["location"]  # type: ignore[index]
@@ -103,11 +84,7 @@ def select_findings_on_changed_lines(
 
 
 def base_python_contents(base: str, paths: Sequence[str], repo_root: Path = REPO_ROOT) -> dict[str, str]:
-    """Return each path's content at the merge base of `base` and HEAD.
-
-    Files absent at the merge base (newly added) are omitted, so every head
-    finding in them counts as new.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     merge_base = subprocess.run(
         ["git", "-C", str(repo_root), "merge-base", base, "HEAD"],
         capture_output=True,
@@ -127,7 +104,7 @@ def base_python_contents(base: str, paths: Sequence[str], repo_root: Path = REPO
 
 
 def scan_python_contents(contents: dict[str, str]) -> list[dict[str, object]]:
-    """Run the static detector over in-memory sources (repo-relative path -> code)."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     findings: list[dict[str, object]] = []
     for rel_path in sorted(contents):
         findings.extend(finding.to_dict() for finding in static.scan_source(contents[rel_path], rel_path))
@@ -135,6 +112,7 @@ def scan_python_contents(contents: dict[str, str]) -> list[dict[str, object]]:
 
 
 def _stable_key(finding: dict[str, object]) -> tuple[str, str, str]:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     location = finding["location"]  # type: ignore[index]
     call = finding["blocking_call"]  # type: ignore[index]
     return (location["path"], location["function"], call["symbol"])  # type: ignore[index]
@@ -144,25 +122,13 @@ def select_findings_new_vs_base(
     head_findings: Sequence[dict[str, object]],
     base_findings: Sequence[dict[str, object]],
 ) -> list[dict[str, object]]:
-    """Keep head findings whose stable key (path, function, symbol) is absent at base.
-
-    Line numbers shift between revisions, so matching is by stable key only.
-    A second identical symbol added inside a function that already had a
-    finding collides on the key and is NOT reported here — that case is
-    covered by the changed-line selection instead.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     base_keys = {_stable_key(finding) for finding in base_findings}
     return [finding for finding in head_findings if _stable_key(finding) not in base_keys]
 
 
 def find_changed_blocking_io(base: str, repo_root: Path = REPO_ROOT) -> list[dict[str, object]]:
-    """Return static findings this change introduces or touches.
-
-    Union over the changed files of:
-    - findings whose blocking line is on an added line of the diff;
-    - findings new versus the merge base (a new async caller can expose an
-      untouched sync helper — the blocking line itself is not in the diff).
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     changed_lines = changed_python_lines(base, repo_root)
     if not changed_lines:
         return []
@@ -176,6 +142,7 @@ def find_changed_blocking_io(base: str, repo_root: Path = REPO_ROOT) -> list[dic
 
 
 def format_report(findings: Sequence[dict[str, object]], base: str) -> str:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     if not findings:
         return (
             f"No blocking-IO candidates introduced by this change (base: {base}).\n"
@@ -199,6 +166,7 @@ def format_report(findings: Sequence[dict[str, object]], base: str) -> str:
 
 
 def main(argv: Sequence[str] | None = None) -> int:
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     parser = argparse.ArgumentParser(description="List blocking-IO candidates this change introduces: findings on added lines plus findings new versus the merge base (diff against --base).")
     parser.add_argument("--base", default="origin/main", help="Base ref to diff against (default: origin/main).")
     parser.add_argument("--format", choices=("text", "json"), default="text", help="Output format.")

@@ -3,12 +3,9 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 
 /**
- * RECORD driver (Plan A): drive the real frontend through the write/read-file
- * scenario against the real-model gateway. The gateway captures every model
- * call to DEERFLOW_RECORD_OUT; this just needs to drive the flow and wait until
- * the captures stop arriving (main turns + follow-up suggestions all fired;
- * the default auto-title is local state). It asserts nothing about content —
- * it produces the fixture, it doesn't verify it.
+ * RECORD 驱动器（方案 A）：通过真实模型 Gateway 驱动真实前端完成写入/读取文件场景。Gateway
+ * 会将每次模型调用捕获到 DEERFLOW_RECORD_OUT；这里仅需驱动流程并等待捕获停止到达（主轮次和后续建议
+ * 均已触发；默认自动标题属于本地状态）。它不对内容作断言：只生成 fixture，不验证 fixture。
  */
 const APP = "http://localhost:3000";
 const SCENARIO = "write_read_file";
@@ -19,6 +16,11 @@ const PROMPT =
   "exact contents. Do NOT delegate to a subagent and do NOT use the task tool — do it yourself. " +
   "Do not ask any clarifying questions.";
 
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 countLines 的约定。
+
+ */
+
 function countLines(path: string): number {
   return existsSync(path)
     ? readFileSync(path, "utf-8")
@@ -26,6 +28,11 @@ function countLines(path: string): number {
         .filter((l) => l.trim()).length
     : 0;
 }
+
+/**
+ * 封装测试或脚本中的可复用操作，使调用处能够明确复用 waitForCaptureStable 的约定。
+
+ */
 
 async function waitForCaptureStable(
   path: string,
@@ -44,9 +51,8 @@ async function waitForCaptureStable(
     }
     await new Promise((r) => setTimeout(r, 1000));
   }
-  // Hard failure on timeout: returning the last count here would let a
-  // truncated/partial recording pass silently (captured > 0). A recording must
-  // stabilize, or it is not trustworthy.
+  // 超时必须硬失败：在此返回最后一次计数会让截断/不完整录制静默通过（captured > 0）。
+  // 录制必须稳定，否则不可信。
   throw new Error(
     `[record] captures never stabilized within ${maxMs}ms (last count=${last}); ` +
       `the recording may be truncated — raise maxMs or check the record gateway.`,
@@ -55,16 +61,20 @@ async function waitForCaptureStable(
 
 test.describe.configure({ timeout: 220_000 });
 
+/**
+ * 覆盖“record write/read-file run through the real frontend”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("record write/read-file run through the real frontend", async ({
   page,
   context,
 }) => {
   const out = process.env.DEERFLOW_RECORD_OUT;
   expect(out, "DEERFLOW_RECORD_OUT must be set").toBeTruthy();
-  // The context the frontend derives for ultra mode (core/threads/hooks.ts). The
-  // backend-direct golden test (Layer 1) POSTs this so its prompt — hence the
-  // recorded input hashes — matches the browser run. thinking/reasoning don't
-  // affect the prompt; is_plan_mode + subagent_enabled add the todo/task tools.
+  // 前端为 ultra 模式推导的上下文（core/threads/hooks.ts）。后端直连黄金测试（第 1 层）会 POST
+  // 此对象，使其 prompt（进而录制输入哈希）与浏览器运行一致。thinking/reasoning 不影响 prompt；
+  // is_plan_mode + subagent_enabled 会增加 todo/task 工具。
   const CONTEXT = {
     is_bootstrap: false,
     mode: MODE,
@@ -104,10 +114,8 @@ test("record write/read-file run through the real frontend", async ({
   await textarea.fill(PROMPT);
   await textarea.press("Enter");
 
-  // Suggestions fire only AFTER the run completes (input-box.tsx POSTs
-  // /suggestions). Wait for that response so its model call lands in the capture
-  // before we check for stability — otherwise the stability window can return
-  // first and the recorded fixture would be missing the suggestions turn.
+  // 建议仅在运行完成后触发（input-box.tsx POST /suggestions）。等待该响应，确保其模型调用在检查
+  // 稳定性前进入捕获；否则稳定窗口可能先返回，录制 fixture 会缺少建议轮次。
   await page
     .waitForResponse((r) => r.url().includes("/suggestions"), {
       timeout: 90_000,

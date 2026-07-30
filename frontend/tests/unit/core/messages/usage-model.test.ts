@@ -8,6 +8,11 @@ import {
   tokenUsagePreferencesFromPreset,
 } from "@/core/messages/usage-model";
 
+/**
+ * 覆盖“maps token usage presets to persisted preferences”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("maps token usage presets to persisted preferences", () => {
   expect(tokenUsagePreferencesFromPreset("off")).toEqual({
     headerTotal: false,
@@ -26,6 +31,11 @@ test("maps token usage presets to persisted preferences", () => {
     inlineMode: "step_debug",
   });
 });
+
+/**
+ * 覆盖“derives the active preset from persisted preferences”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("derives the active preset from persisted preferences", () => {
   expect(
@@ -56,6 +66,11 @@ test("derives the active preset from persisted preferences", () => {
     }),
   ).toBe("debug");
 });
+
+/**
+ * 覆盖“uses generic todo labels when backend attribution is absent”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("uses generic todo labels when backend attribution is absent", () => {
   const messages = [
@@ -127,6 +142,11 @@ test("uses generic todo labels when backend attribution is absent", () => {
   ]);
 });
 
+/**
+ * 覆盖“marks multi-action AI steps as shared attribution”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("marks multi-action AI steps as shared attribution", () => {
   const messages = [
     {
@@ -173,6 +193,11 @@ test("marks multi-action AI steps as shared attribution", () => {
   ]);
 });
 
+/**
+ * 覆盖“prefers backend attribution metadata when available”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("prefers backend attribution metadata when available", () => {
   const messages = [
     {
@@ -214,6 +239,11 @@ test("prefers backend attribution metadata when available", () => {
   ]);
 });
 
+/**
+ * 覆盖“falls back safely when attribution payload is malformed”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("falls back safely when attribution payload is malformed", () => {
   const messages = [
     {
@@ -247,6 +277,11 @@ test("falls back safely when attribution payload is malformed", () => {
   ]);
 });
 
+/**
+ * 覆盖“ignores attribution actions that are not objects”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("ignores attribution actions that are not objects", () => {
   const messages = [
     {
@@ -278,6 +313,11 @@ test("ignores attribution actions that are not objects", () => {
   ]);
 });
 
+/**
+ * 覆盖“ignores malformed attribution fields and falls back to message content”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("ignores malformed attribution fields and falls back to message content", () => {
   const messages = [
     {
@@ -307,6 +347,11 @@ test("ignores malformed attribution fields and falls back to message content", (
   ]);
 });
 
+/**
+ * 覆盖“ignores unknown top-level attribution fields”这一可观察行为，防止相关边界在重构后回归。
+
+ */
+
 test("ignores unknown top-level attribution fields", () => {
   const messages = [
     {
@@ -335,6 +380,11 @@ test("ignores unknown top-level attribution fields", () => {
     }),
   ]);
 });
+
+/**
+ * 覆盖“falls back to generic todo labels when backend attribution has no actions”这一可观察行为，防止相关边界在重构后回归。
+
+ */
 
 test("falls back to generic todo labels when backend attribution has no actions", () => {
   const messages = [

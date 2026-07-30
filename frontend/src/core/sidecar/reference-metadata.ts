@@ -1,5 +1,6 @@
 import type { SidecarContext, SidecarContextRole } from "./context";
 
+/** 持久化到消息附加字段中的单条侧栏引用上下文。 */
 export type ReferenceMessageContextMetadata = {
   label: string;
   message_id?: string;
@@ -7,6 +8,7 @@ export type ReferenceMessageContextMetadata = {
   content: string;
 };
 
+/** 写入消息附加字段的侧栏引用元数据，平行数组须与引用集合保持相同顺序。 */
 export type ReferenceMessageMetadata = {
   referenced_message_count: number;
   referenced_message_ids: string[];
@@ -14,17 +16,16 @@ export type ReferenceMessageMetadata = {
   referenced_message_contexts: ReferenceMessageContextMetadata[];
 };
 
+/** 校验值是否为允许写入引用元数据的侧栏上下文角色。 */
 function isSidecarContextRole(value: unknown): value is SidecarContextRole {
   return value === "user" || value === "assistant";
 }
 
+/** 将侧栏上下文编码为可附加到消息的引用元数据。 */
 export function buildReferenceMessageMetadata(
   contexts: SidecarContext[],
 ): ReferenceMessageMetadata {
-  // `referenced_message_count`, `referenced_message_ids`, and
-  // `referenced_message_roles` are kept 1:1 parallel with `contexts` so
-  // consumers can safely zip them. Do not dedupe ids here: two fragments of the
-  // same source message would otherwise leave the arrays non-parallel.
+  // 引用计数、标识与角色和引用集合保持一一对齐，消费者可安全按位置组合；不可在此去重标识，以免同源片段破坏数组对齐。
   return {
     referenced_message_count: contexts.length,
     referenced_message_ids: contexts.map((context) => context.messageId ?? ""),
@@ -38,10 +39,12 @@ export function buildReferenceMessageMetadata(
   };
 }
 
+/** 判断未知值是否为普通对象记录。 */
 function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** 从消息元数据安全读取已持久化的侧栏引用上下文。 */
 export function readReferenceMessageContexts(
   additionalKwargs: unknown,
 ): SidecarContext[] {

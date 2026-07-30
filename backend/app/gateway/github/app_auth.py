@@ -1,22 +1,4 @@
-"""GitHub App authentication helpers.
-
-This module owns the two-stage auth dance GitHub Apps use:
-
-1. **App JWT** — signed with our App's RSA private key, lives 10 minutes
-   tops, identifies the App itself. Used only to mint installation
-   tokens.
-
-2. **Installation access token** — short-lived (1 hour) OAuth-style token
-   scoped to one installation (one customer org / one repo set). Used as
-   ``Authorization: token <…>`` on every REST call that does something
-   useful (post a comment, set a label, etc.).
-
-The cache is in-process and intentionally simple: one dict keyed by
-installation id, with a 55-minute TTL so we refresh well before the
-60-minute GitHub limit. If two webhook deliveries land within a few
-seconds we'll mint two tokens — that's fine and well under any
-rate limit.
-"""
+"定义 app_auth 模块提供的职责与可复用接口。\n\nGitHub App authentication helpers.\n\nThis module owns the two-stage auth dance GitHub Apps use:\n\n1. **App JWT** — signed with our App's RSA private key, lives 10 minutes\n   tops, identifies the App itself. Used only to mint installation\n   tokens.\n\n2. **Installation access token** — short-lived (1 hour) OAuth-style token\n   scoped to one installation (one customer org / one repo set). Used as\n   ``Authorization: token <…>`` on every REST call that does something\n   useful (post a comment, set a label, etc.).\n\nThe cache is in-process and intentionally simple: one dict keyed by\ninstallation id, with a 55-minute TTL so we refresh well before the\n60-minute GitHub limit. If two webhook deliveries land within a few\nseconds we'll mint two tokens — that's fine and well under any\nrate limit.\n"
 
 from __future__ import annotations
 
@@ -46,11 +28,12 @@ _GITHUB_API_BASE = "https://api.github.com"
 
 
 class GitHubAppAuthError(RuntimeError):
-    """Raised when GitHub App credentials are missing or invalid."""
+    '封装 GitHubAppAuthError 的状态、协作关系与公开操作。\n\nRaised when GitHub App credentials are missing or invalid.'
 
 
 @dataclass
 class _CachedToken:
+    '封装 _CachedToken 的状态、协作关系与公开操作'
     token: str
     expires_at: float  # epoch seconds
 
@@ -69,7 +52,7 @@ _install_locks_lock = asyncio.Lock()
 
 
 async def _lock_for(installation_id: int) -> asyncio.Lock:
-    """Return the lock dedicated to ``installation_id``, creating on demand."""
+    '执行 _lock_for 的明确职责，并返回与调用约定一致的结果。\n\nReturn the lock dedicated to ``installation_id``, creating on demand.'
     async with _install_locks_lock:
         lock = _install_locks.get(installation_id)
         if lock is None:
@@ -79,11 +62,7 @@ async def _lock_for(installation_id: int) -> asyncio.Lock:
 
 
 def app_id() -> int:
-    """Return the configured GitHub App id, or raise if unset.
-
-    Read fresh on every call so operators can rotate it without a process
-    restart.
-    """
+    '执行 app_id 的明确职责，并返回与调用约定一致的结果。\n\nReturn the configured GitHub App id, or raise if unset.\n\n    Read fresh on every call so operators can rotate it without a process\n    restart.\n    '
     raw = os.environ.get(_APP_ID_ENV)
     if not raw:
         raise GitHubAppAuthError(f"{_APP_ID_ENV} is not set")
@@ -94,13 +73,7 @@ def app_id() -> int:
 
 
 def load_app_private_key() -> str:
-    """Return the App's RSA private key as a PEM string.
-
-    Reads from ``GITHUB_APP_PRIVATE_KEY`` (inline PEM) if set, else from
-    the path in ``GITHUB_APP_PRIVATE_KEY_PATH``. Inline takes precedence
-    so operators can roll a key by setting an env var instead of moving
-    files around in production.
-    """
+    "加载并返回，并遵守 load_app_private_key 所表达的接口约束。\n\nReturn the App's RSA private key as a PEM string.\n\n    Reads from ``GITHUB_APP_PRIVATE_KEY`` (inline PEM) if set, else from\n    the path in ``GITHUB_APP_PRIVATE_KEY_PATH``. Inline takes precedence\n    so operators can roll a key by setting an env var instead of moving\n    files around in production.\n    "
     inline = os.environ.get(_PRIVATE_KEY_ENV)
     if inline and inline.strip():
         return inline
@@ -115,14 +88,7 @@ def load_app_private_key() -> str:
 
 
 def mint_app_jwt(*, now: float | None = None) -> str:
-    """Sign a short-lived JWT identifying this App to GitHub.
-
-    Args:
-        now: Optional override for ``time.time()`` — tests use this.
-
-    Returns:
-        Signed RS256 JWT suitable for ``Authorization: Bearer <jwt>``.
-    """
+    '执行 mint_app_jwt 的明确职责，并返回与调用约定一致的结果。\n\nSign a short-lived JWT identifying this App to GitHub.\n\n    Args:\n        now: Optional override for ``time.time()`` — tests use this.\n\n    Returns:\n        Signed RS256 JWT suitable for ``Authorization: Bearer <jwt>``.\n    '
     issued_at = int(now if now is not None else time.time())
     payload = {
         # GitHub recommends iat 60s in the past to tolerate clock skew.
@@ -140,7 +106,7 @@ async def _request_new_installation_token(
     *,
     client: httpx.AsyncClient | None = None,
 ) -> _CachedToken:
-    """Hit ``POST /app/installations/{id}/access_tokens`` once."""
+    '执行 _request_new_installation_token 的明确职责，并返回与调用约定一致的结果。\n\nHit ``POST /app/installations/{id}/access_tokens`` once.'
     headers = {
         "Authorization": f"Bearer {mint_app_jwt()}",
         "Accept": "application/vnd.github+json",
@@ -149,6 +115,7 @@ async def _request_new_installation_token(
     url = f"{_GITHUB_API_BASE}/app/installations/{installation_id}/access_tokens"
 
     async def _do(c: httpx.AsyncClient) -> _CachedToken:
+        '执行 _do 的明确职责，并返回与调用约定一致的结果'
         resp = await c.post(url, headers=headers, timeout=15.0)
         if resp.status_code != 201:
             raise GitHubAppAuthError(f"Failed to mint installation token (status={resp.status_code} body={resp.text!r})")
@@ -172,31 +139,7 @@ async def mint_installation_token(
     client: httpx.AsyncClient | None = None,
     force_refresh: bool = False,
 ) -> str:
-    """Return a valid installation access token, minting if necessary.
-
-    Concurrency: a per-installation :class:`asyncio.Lock` serializes mints
-    for the same installation (so two parallel cache-misses don't double-
-    mint), but mints for DIFFERENT installations proceed concurrently —
-    a slow GitHub /access_tokens call for installation A no longer
-    blocks lookups for installation B.
-
-    Cache hits take a lock-free fast path: we check the dict before
-    acquiring any lock, since :class:`asyncio.Lock` itself awaits the
-    event loop and there's no need to serialize a pure read on a value
-    that only this function ever mutates. The lock is re-acquired only
-    when we miss and need to mint, and we re-check the cache inside the
-    lock (double-checked locking) in case another coroutine just minted
-    while we were waiting.
-
-    Args:
-        installation_id: GitHub App installation id (per repo set).
-        client: Optional shared :class:`httpx.AsyncClient` — pass one in
-            if you have a long-lived client.
-        force_refresh: Skip the cache. Use after a 401 from the API.
-
-    Returns:
-        The token string. Caller adds ``Authorization: token <token>``.
-    """
+    "执行 mint_installation_token 的明确职责，并返回与调用约定一致的结果。\n\nReturn a valid installation access token, minting if necessary.\n\n    Concurrency: a per-installation :class:`asyncio.Lock` serializes mints\n    for the same installation (so two parallel cache-misses don't double-\n    mint), but mints for DIFFERENT installations proceed concurrently —\n    a slow GitHub /access_tokens call for installation A no longer\n    blocks lookups for installation B.\n\n    Cache hits take a lock-free fast path: we check the dict before\n    acquiring any lock, since :class:`asyncio.Lock` itself awaits the\n    event loop and there's no need to serialize a pure read on a value\n    that only this function ever mutates. The lock is re-acquired only\n    when we miss and need to mint, and we re-check the cache inside the\n    lock (double-checked locking) in case another coroutine just minted\n    while we were waiting.\n\n    Args:\n        installation_id: GitHub App installation id (per repo set).\n        client: Optional shared :class:`httpx.AsyncClient` — pass one in\n            if you have a long-lived client.\n        force_refresh: Skip the cache. Use after a 401 from the API.\n\n    Returns:\n        The token string. Caller adds ``Authorization: token <token>``.\n    "
     if installation_id <= 0:
         raise GitHubAppAuthError(f"installation_id must be positive, got {installation_id!r}")
 
@@ -224,6 +167,6 @@ async def mint_installation_token(
 
 
 def _clear_token_cache_for_tests() -> None:
-    """Drop every cached token. Tests reach for this between cases."""
+    '执行 _clear_token_cache_for_tests 的明确职责，并返回与调用约定一致的结果。\n\nDrop every cached token. Tests reach for this between cases.'
     _token_cache.clear()
     _install_locks.clear()

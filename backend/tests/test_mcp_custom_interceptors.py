@@ -1,4 +1,4 @@
-"""Tests for custom MCP tool interceptors loaded via extensions_config.json."""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 import asyncio
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -7,10 +7,7 @@ from deerflow.mcp.tools import get_mcp_tools
 
 
 def _make_patches(*, interceptor_paths=None):
-    """Set up mocks for get_mcp_tools() with optional custom interceptors.
-
-    Returns a dict of patch context managers.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     mock_client = MagicMock()
     mock_client.get_tools = AsyncMock(return_value=[])
 
@@ -47,18 +44,20 @@ def _make_patches(*, interceptor_paths=None):
 
 
 def _get_interceptors(mock_cls):
-    """Extract the tool_interceptors list passed to MultiServerMCPClient."""
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     kw = mock_cls.call_args
     return kw.kwargs.get("tool_interceptors") or kw[1].get("tool_interceptors", [])
 
 
 def test_custom_interceptor_loaded_and_appended():
-    """A valid interceptor builder path is resolved, called, and appended to tool_interceptors."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def fake_interceptor(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request)
 
     def fake_builder():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return fake_interceptor
 
     p = _make_patches(interceptor_paths=["my_package.auth:build_interceptor"])
@@ -79,12 +78,14 @@ def test_custom_interceptor_loaded_and_appended():
 
 
 def test_multiple_custom_interceptors():
-    """Multiple interceptor paths are all loaded in order."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def interceptor_a(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request)
 
     async def interceptor_b(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request)
 
     builders = {
@@ -111,7 +112,7 @@ def test_multiple_custom_interceptors():
 
 
 def test_custom_interceptor_builder_returning_none_is_skipped():
-    """If a builder returns None, it is not appended to the interceptor list."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     p = _make_patches(interceptor_paths=["pkg.noop:build_noop"])
 
     with (
@@ -128,7 +129,7 @@ def test_custom_interceptor_builder_returning_none_is_skipped():
 
 
 def test_custom_interceptor_resolve_error_logs_warning_and_continues():
-    """A broken interceptor path logs a warning and does not block tool loading."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     p = _make_patches(interceptor_paths=["broken.path:does_not_exist"])
 
     with (
@@ -148,9 +149,10 @@ def test_custom_interceptor_resolve_error_logs_warning_and_continues():
 
 
 def test_custom_interceptor_builder_exception_logs_warning_and_continues():
-    """If the builder function itself raises, the error is caught and logged."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     def exploding_builder():
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         raise RuntimeError("builder exploded")
 
     p = _make_patches(interceptor_paths=["pkg.bad:exploding_builder"])
@@ -172,7 +174,7 @@ def test_custom_interceptor_builder_exception_logs_warning_and_continues():
 
 
 def test_no_mcp_interceptors_field_is_safe():
-    """When mcpInterceptors is absent from config, no interceptors are added."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     p = _make_patches(interceptor_paths=None)
 
     with (
@@ -188,12 +190,14 @@ def test_no_mcp_interceptors_field_is_safe():
 
 
 def test_custom_interceptor_coexists_with_oauth_interceptor():
-    """Custom interceptors are appended after the OAuth interceptor."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def oauth_fn(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request)
 
     async def custom_fn(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request)
 
     p = _make_patches(interceptor_paths=["pkg.custom:build_custom"])
@@ -215,9 +219,10 @@ def test_custom_interceptor_coexists_with_oauth_interceptor():
 
 
 def test_mcp_interceptors_single_string_is_normalized():
-    """A single string value for mcpInterceptors is normalized to a list."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
 
     async def fake_interceptor(request, handler):
+        """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
         return await handler(request)
 
     p = _make_patches(interceptor_paths="pkg.single:build_it")
@@ -236,7 +241,7 @@ def test_mcp_interceptors_single_string_is_normalized():
 
 
 def test_mcp_interceptors_invalid_type_logs_warning():
-    """A non-list, non-string value for mcpInterceptors logs a warning and is skipped."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     p = _make_patches(interceptor_paths=42)
 
     with (
@@ -255,7 +260,7 @@ def test_mcp_interceptors_invalid_type_logs_warning():
 
 
 def test_custom_interceptor_non_callable_return_logs_warning():
-    """If a builder returns a non-callable value, it is skipped with a warning."""
+    """验证该用例的可观察结果：固定断言、模拟失败分支和资源生命周期边界，防止行为回归。"""
     p = _make_patches(interceptor_paths=["pkg.bad:returns_string"])
 
     with (

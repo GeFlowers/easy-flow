@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
 
 import { useArtifacts } from "./context";
 
+/** 渲染线程产物文件树，并将用户选择同步到产物详情视图。 */
 export function ArtifactFileList({
   className,
   files,

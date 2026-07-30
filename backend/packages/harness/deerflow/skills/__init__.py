@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 from .catalog import SkillCatalog

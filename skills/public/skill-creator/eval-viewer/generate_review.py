@@ -1,15 +1,7 @@
 #!/usr/bin/env python3
-"""Generate and serve a review page for eval results.
+"""生成并提供评估结果评审页面。
 
-Reads the workspace directory, discovers runs (directories with outputs/),
-embeds all output data into a self-contained HTML page, and serves it via
-a tiny HTTP server. Feedback auto-saves to feedback.json in the workspace.
-
-Usage:
-    python generate_review.py <workspace-path> [--port PORT] [--skill-name NAME]
-    python generate_review.py <workspace-path> --previous-feedback /path/to/old/feedback.json
-
-No dependencies beyond the Python stdlib are required.
+脚本扫描工作区内包含输出目录的运行记录，把提示词、输出文件、评分数据及可选基准数据嵌入单个页面；随后以本地服务提供页面，并将页面提交的评审意见自动写入工作区的反馈文件。仅依赖标准库。
 """
 
 import argparse
@@ -50,6 +42,7 @@ MIME_OVERRIDES = {
 
 
 def get_mime_type(path: Path) -> str:
+    """按扩展名优先使用预设媒体类型，否则推断文件的媒体类型并提供二进制兜底值。"""
     ext = path.suffix.lower()
     if ext in MIME_OVERRIDES:
         return MIME_OVERRIDES[ext]
@@ -58,7 +51,7 @@ def get_mime_type(path: Path) -> str:
 
 
 def find_runs(workspace: Path) -> list[dict]:
-    """Recursively find directories that contain an outputs/ subdirectory."""
+    """递归查找工作区中含输出目录的运行目录，并按评估编号和运行标识稳定排序。"""
     runs: list[dict] = []
     _find_runs_recursive(workspace, workspace, runs)
     runs.sort(key=lambda r: (r.get("eval_id", float("inf")), r["id"]))
@@ -66,6 +59,7 @@ def find_runs(workspace: Path) -> list[dict]:
 
 
 def _find_runs_recursive(root: Path, current: Path, runs: list[dict]) -> None:
+    """深度遍历候选目录，在发现输出目录时构建运行记录，并跳过依赖、版本控制和输入目录。"""
     if not current.is_dir():
         return
 
@@ -83,7 +77,7 @@ def _find_runs_recursive(root: Path, current: Path, runs: list[dict]) -> None:
 
 
 def build_run(root: Path, run_dir: Path) -> dict | None:
-    """Build a run dict with prompt, outputs, and grading data."""
+    """从运行目录及其父目录读取提示词、输出文件和评分结果，组装页面使用的运行记录。"""
     prompt = ""
     eval_id = None
 
@@ -147,7 +141,7 @@ def build_run(root: Path, run_dir: Path) -> dict | None:
 
 
 def embed_file(path: Path) -> dict:
-    """Read a file and return an embedded representation."""
+    """读取文件并生成可嵌入页面的表示：文本内联、图像和文档转数据地址，其余二进制提供下载数据。"""
     ext = path.suffix.lower()
     mime = get_mime_type(path)
 
@@ -211,10 +205,7 @@ def embed_file(path: Path) -> dict:
 
 
 def load_previous_iteration(workspace: Path) -> dict[str, dict]:
-    """Load previous iteration's feedback and outputs.
-
-    Returns a map of run_id -> {"feedback": str, "outputs": list[dict]}.
-    """
+    """读取上一轮的反馈和输出，返回以运行标识索引的上下文，保留没有对应运行目录的反馈。"""
     result: dict[str, dict] = {}
 
     # Load feedback
@@ -253,7 +244,7 @@ def generate_html(
     previous: dict[str, dict] | None = None,
     benchmark: dict | None = None,
 ) -> str:
-    """Generate the complete standalone HTML page with embedded data."""
+    """将当前运行、历史反馈与输出及可选基准数据序列化并注入页面模板，生成独立评审页面。"""
     template_path = Path(__file__).parent / "viewer.html"
     template = template_path.read_text()
 
@@ -286,7 +277,7 @@ def generate_html(
 # ---------------------------------------------------------------------------
 
 def _kill_port(port: int) -> None:
-    """Kill any process listening on the given port."""
+    """尝试终止监听指定端口的进程，避免评审服务启动时端口冲突；缺少查询工具时仅输出提示。"""
     try:
         result = subprocess.run(
             ["lsof", "-ti", f":{port}"],
@@ -306,11 +297,7 @@ def _kill_port(port: int) -> None:
         print("Note: lsof not found, cannot check if port is in use", file=sys.stderr)
 
 class ReviewHandler(BaseHTTPRequestHandler):
-    """Serves the review HTML and handles feedback saves.
-
-    Regenerates the HTML on each page load so that refreshing the browser
-    picks up new eval outputs without restarting the server.
-    """
+    """提供评审页面和反馈接口；每次页面请求都会重新扫描工作区，以便刷新后显示新增输出。"""
 
     def __init__(
         self,
@@ -322,6 +309,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         *args,
         **kwargs,
     ):
+        """保存工作区、技能名、反馈路径、历史上下文和基准路径，再交由基类完成请求初始化。"""
         self.workspace = workspace
         self.skill_name = skill_name
         self.feedback_path = feedback_path
@@ -330,6 +318,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
         super().__init__(*args, **kwargs)
 
     def do_GET(self) -> None:
+        """处理页面与反馈读取请求：主页动态生成嵌入数据的页面，反馈接口返回已保存的原始数据。"""
         if self.path == "/" or self.path == "/index.html":
             # Regenerate HTML on each request (re-scans workspace for new outputs)
             runs = find_runs(self.workspace)
@@ -359,6 +348,7 @@ class ReviewHandler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def do_POST(self) -> None:
+        """处理反馈保存请求：校验评审列表结构后写入反馈文件，并以结构化结果回应客户端。"""
         if self.path == "/api/feedback":
             length = int(self.headers.get("Content-Length", 0))
             body = self.rfile.read(length)
@@ -380,11 +370,13 @@ class ReviewHandler(BaseHTTPRequestHandler):
             self.send_error(404)
 
     def log_message(self, format: str, *args: object) -> None:
+        """覆盖基类日志输出，避免每个本地请求干扰终端中的评估信息。"""
         # Suppress request logging to keep terminal clean
         pass
 
 
 def main() -> None:
+    """解析命令行参数，生成静态页面或启动本地评审服务，并处理端口占用后的自动回退。"""
     parser = argparse.ArgumentParser(description="Generate and serve eval review")
     parser.add_argument("workspace", type=Path, help="Path to workspace directory")
     parser.add_argument("--port", "-p", type=int, default=3117, help="Server port (default: 3117)")

@@ -1,3 +1,4 @@
+"""本模块覆盖运行 工作进程的行为、边界与回归场景，确保既有契约稳定。"""
 import asyncio
 import copy
 from contextlib import suppress
@@ -29,13 +30,16 @@ from deerflow.runtime.runs.worker import (
 
 
 class FakeCheckpointer:
+    """集中覆盖当前测试分支与回归边界。"""
     def __init__(self, *, put_result):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.adelete_thread = AsyncMock()
         self.aput = AsyncMock(return_value=put_result)
         self.aput_writes = AsyncMock()
 
 
 def _make_checkpoint(checkpoint_id: str, messages: list[str], version: int):
+    """准备可控测试资源与状态，供后续断言读取。"""
     checkpoint = empty_checkpoint()
     checkpoint["id"] = checkpoint_id
     checkpoint["channel_values"] = {"messages": messages}
@@ -44,6 +48,7 @@ def _make_checkpoint(checkpoint_id: str, messages: list[str], version: int):
 
 
 def test_build_runtime_context_includes_app_config_when_present():
+    """验证构建 上下文 配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     app_config = object()
 
     context = _build_runtime_context("thread-1", "run-1", None, app_config)
@@ -54,6 +59,7 @@ def test_build_runtime_context_includes_app_config_when_present():
 
 
 def test_install_runtime_context_preserves_existing_thread_id_and_threads_app_config():
+    """验证安装 上下文 已有 会话 配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     app_config = object()
     config = {"context": {"thread_id": "caller-thread"}}
 
@@ -72,6 +78,7 @@ def test_install_runtime_context_preserves_existing_thread_id_and_threads_app_co
 
 
 def test_install_runtime_context_overrides_internal_pre_existing_message_ids():
+    """验证安装 上下文 已有 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     config = {"context": {CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY: {"spoofed"}}}
 
     _install_runtime_context(
@@ -88,6 +95,7 @@ def test_install_runtime_context_overrides_internal_pre_existing_message_ids():
 
 @pytest.mark.anyio
 async def test_run_agent_threads_explicit_app_config_into_config_only_factory():
+    """验证运行 配置 配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1")
     bridge = SimpleNamespace(
@@ -99,11 +107,14 @@ async def test_run_agent_threads_explicit_app_config_into_config_only_factory():
     captured: dict[str, object] = {}
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured["astream_context"] = config["context"]
             yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         captured["factory_context"] = config["context"]
         return DummyAgent()
 
@@ -129,6 +140,7 @@ async def test_run_agent_threads_explicit_app_config_into_config_only_factory():
 
 @pytest.mark.anyio
 async def test_run_agent_threads_pre_existing_message_ids_into_runtime_context():
+    """验证运行 已有 消息 上下文在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1")
     bridge = SimpleNamespace(
@@ -139,7 +151,9 @@ async def test_run_agent_threads_pre_existing_message_ids_into_runtime_context()
     captured: dict[str, object] = {}
 
     class DummyCheckpointer:
+        """集中覆盖当前测试分支与回归边界。"""
         async def aget_tuple(self, _config):
+            """准备可控测试资源与状态，供后续断言读取。"""
             return SimpleNamespace(
                 config={"configurable": {"checkpoint_id": "checkpoint-1"}},
                 checkpoint={"channel_values": {"messages": [AIMessage(id="old-ai", content="old")]}},
@@ -148,11 +162,14 @@ async def test_run_agent_threads_pre_existing_message_ids_into_runtime_context()
             )
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured["context"] = config["context"]
             yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return DummyAgent()
 
     await run_agent(
@@ -171,6 +188,7 @@ async def test_run_agent_threads_pre_existing_message_ids_into_runtime_context()
 
 @pytest.mark.anyio
 async def test_run_agent_overrides_spoofed_pre_existing_message_ids_without_snapshot():
+    """验证运行 已有 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1")
     bridge = SimpleNamespace(
@@ -181,11 +199,14 @@ async def test_run_agent_overrides_spoofed_pre_existing_message_ids_without_snap
     captured: dict[str, object] = {}
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured["context"] = config["context"]
             yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return DummyAgent()
 
     await run_agent(
@@ -204,6 +225,7 @@ async def test_run_agent_overrides_spoofed_pre_existing_message_ids_without_snap
 
 @pytest.mark.anyio
 async def test_run_agent_marks_llm_error_fallback_as_error_status():
+    """验证运行 错误 错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1")
     bridge = SimpleNamespace(
@@ -213,7 +235,9 @@ async def test_run_agent_marks_llm_error_fallback_as_error_status():
     )
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             yield {
                 "messages": [
                     AIMessage(
@@ -229,6 +253,7 @@ async def test_run_agent_marks_llm_error_fallback_as_error_status():
             }
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return DummyAgent()
 
     await run_agent(
@@ -250,6 +275,7 @@ async def test_run_agent_marks_llm_error_fallback_as_error_status():
 
 @pytest.mark.anyio
 async def test_run_agent_defaults_root_run_name_from_assistant_id():
+    """验证运行 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1", assistant_id="lead_agent")
     bridge = SimpleNamespace(
@@ -260,11 +286,14 @@ async def test_run_agent_defaults_root_run_name_from_assistant_id():
     captured: dict[str, object] = {}
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured["astream_run_name"] = config["run_name"]
             yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         captured["factory_run_name"] = config["run_name"]
         return DummyAgent()
 
@@ -284,6 +313,7 @@ async def test_run_agent_defaults_root_run_name_from_assistant_id():
 
 @pytest.mark.anyio
 async def test_run_agent_defaults_root_run_name_from_context_agent_name():
+    """验证运行 运行 上下文在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1", assistant_id="lead_agent")
     bridge = SimpleNamespace(
@@ -294,11 +324,14 @@ async def test_run_agent_defaults_root_run_name_from_context_agent_name():
     captured: dict[str, object] = {}
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured["astream_run_name"] = config["run_name"]
             yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         captured["factory_run_name"] = config["run_name"]
         return DummyAgent()
 
@@ -318,6 +351,7 @@ async def test_run_agent_defaults_root_run_name_from_context_agent_name():
 
 @pytest.mark.anyio
 async def test_run_agent_defaults_root_run_name_from_configurable_agent_name():
+    """验证运行 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1", assistant_id="lead_agent")
     bridge = SimpleNamespace(
@@ -328,11 +362,14 @@ async def test_run_agent_defaults_root_run_name_from_configurable_agent_name():
     captured: dict[str, object] = {}
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured["astream_run_name"] = config["run_name"]
             yield {"messages": []}
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         captured["factory_run_name"] = config["run_name"]
         return DummyAgent()
 
@@ -352,6 +389,7 @@ async def test_run_agent_defaults_root_run_name_from_configurable_agent_name():
 
 @pytest.mark.anyio
 async def test_rollback_restores_snapshot_without_deleting_thread():
+    """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = FakeCheckpointer(put_result={"configurable": {"thread_id": "thread-1", "checkpoint_ns": "", "checkpoint_id": "restored-1"}})
 
     await _rollback_to_pre_run_checkpoint(
@@ -403,6 +441,7 @@ async def test_rollback_restores_snapshot_without_deleting_thread():
 
 @pytest.mark.anyio
 async def test_rollback_restored_checkpoint_becomes_latest_with_real_checkpointer():
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     checkpointer = InMemorySaver()
     thread_config = {"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}}
     before_checkpoint = _make_checkpoint("0001", ["before"], 1)
@@ -437,6 +476,7 @@ async def test_rollback_restored_checkpoint_becomes_latest_with_real_checkpointe
 
 @pytest.mark.anyio
 async def test_rollback_deletes_thread_when_no_snapshot_exists():
+    """验证会话在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = FakeCheckpointer(put_result=None)
 
     await _rollback_to_pre_run_checkpoint(
@@ -455,6 +495,7 @@ async def test_rollback_deletes_thread_when_no_snapshot_exists():
 
 @pytest.mark.anyio
 async def test_rollback_raises_when_restore_config_has_no_checkpoint_id():
+    """验证配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = FakeCheckpointer(put_result={"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}})
 
     with pytest.raises(RuntimeError, match="did not return checkpoint_id"):
@@ -479,6 +520,7 @@ async def test_rollback_raises_when_restore_config_has_no_checkpoint_id():
 
 @pytest.mark.anyio
 async def test_rollback_normalizes_none_checkpoint_ns_to_root_namespace():
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     checkpointer = FakeCheckpointer(put_result={"configurable": {"thread_id": "thread-1", "checkpoint_ns": "", "checkpoint_id": "restored-1"}})
 
     await _rollback_to_pre_run_checkpoint(
@@ -506,7 +548,7 @@ async def test_rollback_normalizes_none_checkpoint_ns_to_root_namespace():
 
 @pytest.mark.anyio
 async def test_rollback_raises_on_malformed_pending_write_not_a_tuple():
-    """pending_writes containing a non-3-tuple item should raise RuntimeError."""
+    """验证写入在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = FakeCheckpointer(put_result={"configurable": {"thread_id": "thread-1", "checkpoint_ns": "", "checkpoint_id": "restored-1"}})
 
     with pytest.raises(RuntimeError, match="rollback failed: pending_write is not a 3-tuple"):
@@ -534,7 +576,7 @@ async def test_rollback_raises_on_malformed_pending_write_not_a_tuple():
 
 @pytest.mark.anyio
 async def test_rollback_raises_on_malformed_pending_write_non_string_channel():
-    """pending_writes containing a non-string channel should raise RuntimeError."""
+    """验证写入 通道在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = FakeCheckpointer(put_result={"configurable": {"thread_id": "thread-1", "checkpoint_ns": "", "checkpoint_id": "restored-1"}})
 
     with pytest.raises(RuntimeError, match="rollback failed: pending_write has non-string channel"):
@@ -560,7 +602,7 @@ async def test_rollback_raises_on_malformed_pending_write_non_string_channel():
 
 @pytest.mark.anyio
 async def test_rollback_propagates_aput_writes_failure():
-    """If aput_writes fails, the exception should propagate (not be swallowed)."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     checkpointer = FakeCheckpointer(put_result={"configurable": {"thread_id": "thread-1", "checkpoint_ns": "", "checkpoint_id": "restored-1"}})
     # Simulate aput_writes failure
     checkpointer.aput_writes.side_effect = RuntimeError("Database connection lost")
@@ -588,21 +630,22 @@ async def test_rollback_propagates_aput_writes_failure():
 
 
 def test_agent_factory_supports_app_config_detects_supported_signature():
+    """验证配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     def factory(*, config, app_config=None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return (config, app_config)
 
     assert _agent_factory_supports_app_config(factory) is True
 
 
 def test_build_runtime_context_defaults_to_thread_and_run_id():
+    """验证构建 上下文 会话 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     ctx = _build_runtime_context("thread-1", "run-1", None)
     assert ctx == {"thread_id": "thread-1", "run_id": "run-1"}
 
 
 def test_build_runtime_context_merges_caller_context():
-    """Regression for issue #2677: keys from ``config['context']`` (e.g. ``agent_name``)
-    must be merged into the Runtime's context so that ``ToolRuntime.context`` — which
-    is what ``setup_agent`` reads — can see them."""
+    """验证构建 上下文 上下文在预期条件及边界场景下的可观察行为，防止相关回归。"""
     caller_context = {"agent_name": "my-agent", "is_bootstrap": True, "model_name": "gpt-4"}
 
     ctx = _build_runtime_context("thread-1", "run-1", caller_context)
@@ -615,8 +658,7 @@ def test_build_runtime_context_merges_caller_context():
 
 
 def test_build_runtime_context_caller_cannot_override_thread_id_or_run_id():
-    """A malicious or buggy caller must not be able to overwrite the worker-assigned
-    ``thread_id`` / ``run_id`` by stuffing them into ``config['context']``."""
+    """验证构建 上下文 会话 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     caller_context = {"thread_id": "spoofed", "run_id": "spoofed", "agent_name": "ok"}
 
     ctx = _build_runtime_context("real-thread", "real-run", caller_context)
@@ -627,6 +669,7 @@ def test_build_runtime_context_caller_cannot_override_thread_id_or_run_id():
 
 
 def test_build_runtime_context_ignores_caller_pre_existing_message_ids():
+    """验证构建 上下文 已有 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     caller_context = {CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY: {"spoofed"}}
 
     ctx = _build_runtime_context("thread-1", "run-1", caller_context)
@@ -635,13 +678,17 @@ def test_build_runtime_context_ignores_caller_pre_existing_message_ids():
 
 
 def test_build_runtime_context_ignores_non_dict_caller_context():
+    """验证构建 上下文 上下文在预期条件及边界场景下的可观察行为，防止相关回归。"""
     ctx = _build_runtime_context("thread-1", "run-1", "not-a-dict")
     assert ctx == {"thread_id": "thread-1", "run_id": "run-1"}
 
 
 def test_agent_factory_supports_app_config_returns_false_when_signature_lookup_fails(monkeypatch):
+    """验证配置在预期条件及边界场景下的可观察行为，防止相关回归。"""
     class BrokenCallable:
+        """集中覆盖当前测试分支与回归边界。"""
         def __call__(self, **kwargs):
+            """准备可控测试资源与状态，供后续断言读取。"""
             return kwargs
 
     monkeypatch.setattr("deerflow.runtime.runs.worker.inspect.signature", lambda _obj: (_ for _ in ()).throw(ValueError("boom")))
@@ -655,6 +702,7 @@ def test_agent_factory_supports_app_config_returns_false_when_signature_lookup_f
 
 
 def test_try_extract_from_message_finds_fallback_on_message_object():
+    """验证消息 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     msg = AIMessage(
         content="fallback",
         additional_kwargs={
@@ -667,6 +715,7 @@ def test_try_extract_from_message_finds_fallback_on_message_object():
 
 
 def test_try_extract_from_message_finds_fallback_on_dict():
+    """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     msg = {
         "content": "fallback",
         "additional_kwargs": {
@@ -678,12 +727,13 @@ def test_try_extract_from_message_finds_fallback_on_dict():
 
 
 def test_try_extract_from_message_returns_none_for_normal_message():
+    """验证消息 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     msg = AIMessage(content="hello")
     assert _try_extract_from_message(msg) is None
 
 
 def test_extract_llm_error_fallback_message_large_state_chunk_no_fallback():
-    """Normal-size state dict without fallback markers must not raise and should return None."""
+    """验证错误 消息 状态在预期条件及边界场景下的可观察行为，防止相关回归。"""
     large_state = {
         "messages": [
             AIMessage(content="Hello!"),
@@ -697,6 +747,7 @@ def test_extract_llm_error_fallback_message_large_state_chunk_no_fallback():
 
 
 def test_extract_llm_error_fallback_message_finds_fallback_in_messages_list():
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     state = {
         "messages": [
             AIMessage(content="Hello!"),
@@ -714,6 +765,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_messages_list():
 
 
 def test_extract_llm_error_fallback_message_finds_fallback_in_raw_message():
+    """验证错误 消息 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     msg = AIMessage(
         content="Unavailable.",
         additional_kwargs={
@@ -725,6 +777,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_raw_message():
 
 
 def test_extract_llm_error_fallback_message_finds_fallback_in_tuple():
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     item = (
         "messages",
         AIMessage(
@@ -739,6 +792,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_tuple():
 
 
 def test_extract_llm_error_fallback_message_returns_none_for_empty_values():
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     assert _extract_llm_error_fallback_message({}) is None
     assert _extract_llm_error_fallback_message([]) is None
     assert _extract_llm_error_fallback_message(None) is None
@@ -746,8 +800,7 @@ def test_extract_llm_error_fallback_message_returns_none_for_empty_values():
 
 
 def test_extract_llm_error_fallback_message_finds_fallback_in_updates_mode():
-    """stream_mode='updates' yields dicts keyed by node name (e.g. {'call_model': {...}}).
-    Fallback marker is nested inside the node's state update, not at the top level."""
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     update_chunk = {
         "call_model": {
             "messages": [
@@ -765,7 +818,7 @@ def test_extract_llm_error_fallback_message_finds_fallback_in_updates_mode():
 
 
 def test_extract_llm_error_fallback_message_updates_mode_no_fallback():
-    """Normal updates chunk without any fallback should return None safely."""
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     update_chunk = {
         "__interrupt__": [
             {
@@ -785,7 +838,7 @@ def test_extract_llm_error_fallback_message_updates_mode_no_fallback():
 
 
 def test_try_extract_skips_message_with_pre_existing_id():
-    """Fallback marker on a message whose id is in pre_existing_ids must be ignored."""
+    """验证消息 已有在预期条件及边界场景下的可观察行为，防止相关回归。"""
     msg = AIMessage(
         id="stale-1",
         content="Unavailable.",
@@ -800,7 +853,7 @@ def test_try_extract_skips_message_with_pre_existing_id():
 
 
 def test_try_extract_still_finds_fresh_message_when_others_are_stale():
-    """A non-stale message with a fallback marker must still match."""
+    """验证消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     msg = AIMessage(
         id="fresh-1",
         content="Unavailable.",
@@ -813,6 +866,7 @@ def test_try_extract_still_finds_fresh_message_when_others_are_stale():
 
 
 def test_try_extract_skips_dict_message_with_pre_existing_id():
+    """验证消息 已有在预期条件及边界场景下的可观察行为，防止相关回归。"""
     msg = {
         "id": "stale-2",
         "content": "Unavailable.",
@@ -826,7 +880,7 @@ def test_try_extract_skips_dict_message_with_pre_existing_id():
 
 
 def test_extract_llm_error_fallback_message_skips_stale_history():
-    """A state chunk replaying a stale fallback marker from a prior run must return None."""
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     state = {
         "messages": [
             AIMessage(id="stale-1", content="Hi"),
@@ -844,7 +898,7 @@ def test_extract_llm_error_fallback_message_skips_stale_history():
 
 
 def test_extract_llm_error_fallback_message_returns_fresh_marker_alongside_stale_history():
-    """Stale history is ignored, but a brand-new fallback in the same chunk is reported."""
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     state = {
         "messages": [
             AIMessage(id="stale-1", content="Hi"),
@@ -870,7 +924,7 @@ def test_extract_llm_error_fallback_message_returns_fresh_marker_alongside_stale
 
 
 def test_extract_llm_error_fallback_message_default_filter_is_empty():
-    """Passing no pre_existing_ids must preserve the original (pre-fix) behavior."""
+    """验证错误 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     state = {
         "messages": [
             AIMessage(
@@ -887,6 +941,7 @@ def test_extract_llm_error_fallback_message_default_filter_is_empty():
 
 
 def test_collect_pre_existing_message_ids_pulls_ids_from_snapshot():
+    """验证已有 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     snapshot = {
         "checkpoint": {
             "channel_values": {
@@ -902,6 +957,7 @@ def test_collect_pre_existing_message_ids_pulls_ids_from_snapshot():
 
 
 def test_collect_pre_existing_message_ids_handles_missing_pieces():
+    """验证已有 消息在预期条件及边界场景下的可观察行为，防止相关回归。"""
     assert _collect_pre_existing_message_ids(None) == set()
     assert _collect_pre_existing_message_ids({}) == set()
     assert _collect_pre_existing_message_ids({"checkpoint": None}) == set()
@@ -912,14 +968,7 @@ def test_collect_pre_existing_message_ids_handles_missing_pieces():
 
 @pytest.mark.anyio
 async def test_run_agent_ignores_stale_llm_error_fallback_from_prior_run():
-    """A stale fallback marker checkpointed by an earlier run on the same thread
-    must NOT cause a successful current run to be reported as ``error``.
-
-    This guards against the regression where one IndexError-driven failure (now
-    classified transient and surfaced as a ``deerflow_error_fallback`` AIMessage)
-    persisted in thread history and tripped ``RunStatus.error`` on every
-    subsequent run that re-played the messages channel via ``stream_mode="values"``.
-    """
+    """验证运行 错误 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     record = await run_manager.create("thread-1")
     bridge = SimpleNamespace(
@@ -940,7 +989,9 @@ async def test_run_agent_ignores_stale_llm_error_fallback_from_prior_run():
     )
 
     class StaleHistoryCheckpointer:
+        """集中覆盖当前测试分支与回归边界。"""
         async def aget_tuple(self, config):
+            """准备可控测试资源与状态，供后续断言读取。"""
             checkpoint = empty_checkpoint()
             checkpoint["id"] = "ckpt-stale"
             checkpoint["channel_values"] = {"messages": [stale_fallback]}
@@ -952,9 +1003,11 @@ async def test_run_agent_ignores_stale_llm_error_fallback_from_prior_run():
             )
 
     class DummyAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
             # Replay the prior fallback message (as LangGraph would when using
             # stream_mode="values") and then yield a fresh successful AIMessage.
+            """准备可控测试资源与状态，供后续断言读取。"""
             yield {
                 "messages": [
                     stale_fallback,
@@ -963,6 +1016,7 @@ async def test_run_agent_ignores_stale_llm_error_fallback_from_prior_run():
             }
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         return DummyAgent()
 
     await run_agent(
@@ -982,22 +1036,25 @@ async def test_run_agent_ignores_stale_llm_error_fallback_from_prior_run():
 
 
 class _FakeCheckpointTuple:
-    """Minimal stand-in for ``CheckpointTuple`` used by ``_ensure_interrupted_title``."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self, *, checkpoint: dict, metadata: dict, config: dict | None = None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.checkpoint = checkpoint
         self.metadata = metadata
         self.config = config or {"configurable": {"thread_id": "thread-1", "checkpoint_ns": ""}}
 
 
 class _TitleCheckpointer:
-    """Captures ``aput`` arguments and exposes ``get_next_version`` like DB savers."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     def __init__(self, *, tuple_value: _FakeCheckpointTuple | None, put_result: dict | None = None):
+        """准备可控测试资源与状态，供后续断言读取。"""
         self.aget_tuple = AsyncMock(return_value=tuple_value)
         self.aput = AsyncMock(return_value=put_result or {})
 
     def get_next_version(self, current, _channel):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         if current is None:
             return 1
         if isinstance(current, int):
@@ -1012,7 +1069,7 @@ class _TitleCheckpointer:
 
 @pytest.mark.anyio
 async def test_interrupted_title_finalization_blocks_new_same_thread_run(monkeypatch):
-    """A cancelled run must remain active while its title-only checkpoint is finalizing."""
+    """验证标题 会话 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     monkeypatch.setattr(
@@ -1029,13 +1086,16 @@ async def test_interrupted_title_finalization_blocks_new_same_thread_run(monkeyp
     }
 
     class _BlockingTitleCheckpointer:
+        """集中覆盖当前测试分支与回归边界。"""
         def __init__(self) -> None:
+            """准备可控测试资源与状态，供后续断言读取。"""
             self.latest_checkpoint = copy.deepcopy(initial_checkpoint)
             self.latest_metadata = {"source": "loop", "step": 1}
             self.title_write_started = asyncio.Event()
             self.release_title_write = asyncio.Event()
 
         async def aget_tuple(self, config):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del config
             return _FakeCheckpointTuple(
                 checkpoint=copy.deepcopy(self.latest_checkpoint),
@@ -1050,6 +1110,7 @@ async def test_interrupted_title_finalization_blocks_new_same_thread_run(monkeyp
             )
 
         async def aput(self, config, checkpoint, metadata, new_versions):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del config, new_versions
             self.title_write_started.set()
             await self.release_title_write.wait()
@@ -1064,6 +1125,7 @@ async def test_interrupted_title_finalization_blocks_new_same_thread_run(monkeyp
             }
 
         def get_next_version(self, current, _channel):
+            """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return (current or 0) + 1
 
     run_manager = RunManager()
@@ -1076,6 +1138,7 @@ async def test_interrupted_title_finalization_blocks_new_same_thread_run(monkeyp
     checkpointer = _BlockingTitleCheckpointer()
 
     class _AbortingAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         metadata = {"model_name": "fake-test-model"}
         checkpointer: Any | None = None
         store: Any | None = None
@@ -1083,12 +1146,14 @@ async def test_interrupted_title_finalization_blocks_new_same_thread_run(monkeyp
         interrupt_after_nodes = None
 
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del graph_input, config, stream_mode, subgraphs
             record.abort_event.set()
             if False:
                 yield  # pragma: no cover
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del config
         return _AbortingAgent()
 
@@ -1120,15 +1185,17 @@ async def test_interrupted_title_finalization_blocks_new_same_thread_run(monkeyp
 
 @pytest.mark.anyio
 async def test_finalizing_run_only_blocks_reject_strategy():
-    """A finalizing run must not break interrupt/rollback superseding semantics."""
+    """验证运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
 
     async def _seed_finalizing_run():
+        """准备可控测试资源与状态，供后续断言读取。"""
         run_manager = RunManager()
         record = await run_manager.create("thread-1")
         release_cleanup = asyncio.Event()
         cleanup_cancelled = asyncio.Event()
 
         async def _cleanup_task():
+            """准备可控测试资源与状态，供后续断言读取。"""
             try:
                 await release_cleanup.wait()
             except asyncio.CancelledError:
@@ -1169,7 +1236,7 @@ async def test_finalizing_run_only_blocks_reject_strategy():
 
 @pytest.mark.anyio
 async def test_admitted_pending_replacement_does_not_steal_interrupted_title_recovery(monkeypatch):
-    """The old run must still write the fallback title before releasing a serialized replacement."""
+    """验证标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     monkeypatch.setattr(
@@ -1211,6 +1278,7 @@ async def test_admitted_pending_replacement_does_not_steal_interrupted_title_rec
     original_wait_for_prior_finalizing = run_manager.wait_for_prior_finalizing
 
     async def _wait_for_prior_finalizing(thread_id, run_id, **kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         if run_id == old_record.run_id and old_record.status == RunStatus.interrupted and old_record.finalizing:
             old_title_gate_entered.set()
             await release_old_title_gate.wait()
@@ -1219,6 +1287,7 @@ async def test_admitted_pending_replacement_does_not_steal_interrupted_title_rec
     run_manager.wait_for_prior_finalizing = _wait_for_prior_finalizing  # type: ignore[method-assign]
 
     class _AbortingAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         metadata = {"model_name": "fake-test-model"}
         checkpointer: Any | None = None
         store: Any | None = None
@@ -1226,12 +1295,14 @@ async def test_admitted_pending_replacement_does_not_steal_interrupted_title_rec
         interrupt_after_nodes = None
 
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del graph_input, config, stream_mode, subgraphs
             old_record.abort_event.set()
             if False:
                 yield  # pragma: no cover
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del config
         return _AbortingAgent()
 
@@ -1269,7 +1340,7 @@ async def test_admitted_pending_replacement_does_not_steal_interrupted_title_rec
 
 @pytest.mark.anyio
 async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_replacement(monkeypatch):
-    """A replacement run admitted by multitask interrupt must not lose its newer checkpoint."""
+    """验证标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     monkeypatch.setattr(
@@ -1296,13 +1367,16 @@ async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_rep
     }
 
     class _ReplacementRaceCheckpointer:
+        """集中覆盖当前测试分支与回归边界。"""
         def __init__(self) -> None:
+            """准备可控测试资源与状态，供后续断言读取。"""
             self.latest_checkpoint = copy.deepcopy(old_checkpoint)
             self.latest_metadata = {"source": "loop", "step": 1}
             self.title_write_started = asyncio.Event()
             self.replacement_checkpoint_written = asyncio.Event()
 
         async def aget_tuple(self, config):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del config
             return _FakeCheckpointTuple(
                 checkpoint=copy.deepcopy(self.latest_checkpoint),
@@ -1317,6 +1391,7 @@ async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_rep
             )
 
         async def aput(self, config, checkpoint, metadata, new_versions):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del config, new_versions
             self.title_write_started.set()
             await self.replacement_checkpoint_written.wait()
@@ -1331,6 +1406,7 @@ async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_rep
             }
 
         def get_next_version(self, current, _channel):
+            """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return (current or 0) + 1
 
     run_manager = RunManager()
@@ -1344,6 +1420,7 @@ async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_rep
     old_agent_started = asyncio.Event()
 
     class _BlockingAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         metadata = {"model_name": "fake-test-model"}
         checkpointer: Any | None = None
         store: Any | None = None
@@ -1351,6 +1428,7 @@ async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_rep
         interrupt_after_nodes = None
 
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del graph_input, config, stream_mode, subgraphs
             old_agent_started.set()
             while True:
@@ -1359,6 +1437,7 @@ async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_rep
                 yield  # pragma: no cover
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del config
         return _BlockingAgent()
 
@@ -1400,7 +1479,7 @@ async def test_interrupted_title_does_not_overwrite_checkpoint_from_admitted_rep
 
 @pytest.mark.anyio
 async def test_replacement_run_waits_for_prior_finalizing_run():
-    """Replacement workers must not enter the graph while an older run is finalizing."""
+    """验证运行 运行在预期条件及边界场景下的可观察行为，防止相关回归。"""
     run_manager = RunManager()
     old_record = await run_manager.create("thread-1")
     replacement_record = await run_manager.create("thread-1")
@@ -1414,6 +1493,7 @@ async def test_replacement_run_waits_for_prior_finalizing_run():
     replacement_started = asyncio.Event()
 
     class _ReplacementAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         metadata = {"model_name": "fake-test-model"}
         checkpointer: Any | None = None
         store: Any | None = None
@@ -1421,12 +1501,14 @@ async def test_replacement_run_waits_for_prior_finalizing_run():
         interrupt_after_nodes = None
 
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del graph_input, config, stream_mode, subgraphs
             replacement_started.set()
             if False:
                 yield  # pragma: no cover
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del config
         return _ReplacementAgent()
 
@@ -1460,7 +1542,7 @@ async def test_replacement_run_waits_for_prior_finalizing_run():
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_reloads_latest_checkpoint_before_write():
-    """If the checkpoint advances before the title write, preserve the newer messages."""
+    """验证标题 写入在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.config.title_config import TitleConfig
 
     old_checkpoint = {
@@ -1478,11 +1560,14 @@ async def test_ensure_interrupted_title_reloads_latest_checkpoint_before_write()
     }
 
     class _AdvancingTitleCheckpointer:
+        """集中覆盖当前测试分支与回归边界。"""
         def __init__(self) -> None:
+            """准备可控测试资源与状态，供后续断言读取。"""
             self.read_count = 0
             self.aput = AsyncMock(return_value={})
 
         async def aget_tuple(self, config):
+            """准备可控测试资源与状态，供后续断言读取。"""
             del config
             self.read_count += 1
             checkpoint = old_checkpoint if self.read_count == 1 else new_checkpoint
@@ -1499,6 +1584,7 @@ async def test_ensure_interrupted_title_reloads_latest_checkpoint_before_write()
             )
 
         def get_next_version(self, current, _channel):
+            """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
             return (current or 0) + 1
 
     checkpointer = _AdvancingTitleCheckpointer()
@@ -1514,12 +1600,7 @@ async def test_ensure_interrupted_title_reloads_latest_checkpoint_before_write()
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_bumps_channel_version_and_declares_it_in_new_versions(monkeypatch):
-    """Regression for #3859 review: DB-backed savers (Sqlite/Postgres) strip inline
-    ``channel_values`` from ``put`` and only persist blobs for channels listed in
-    ``new_versions``. The helper must therefore bump ``channel_versions["title"]``
-    and pass ``{"title": next_version}`` so the fallback title actually survives
-    a fresh ``aget_tuple`` after the worker's finally hook.
-    """
+    """验证标题 通道在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     monkeypatch.setattr(
@@ -1566,12 +1647,13 @@ async def test_ensure_interrupted_title_bumps_channel_version_and_declares_it_in
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_writes_graph_input_fallback_without_checkpoint(monkeypatch):
-    """When no checkpoint exists, graph_input should still seed the fallback title write."""
+    """验证标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     captured_state: dict[str, Any] = {}
 
     def _generate(self, state, allow_partial_exchange=False):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del self
         captured_state.update(state)
         assert allow_partial_exchange is True
@@ -1599,10 +1681,7 @@ async def test_ensure_interrupted_title_writes_graph_input_fallback_without_chec
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_bumps_existing_string_version(monkeypatch):
-    """When the checkpointer lacks ``get_next_version`` and the prior title
-    version is a string (some savers use UUID-shaped versions), the helper must
-    still produce a strictly different value rather than overwriting in place.
-    """
+    """验证标题 已有在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     monkeypatch.setattr(
@@ -1619,7 +1698,9 @@ async def test_ensure_interrupted_title_bumps_existing_string_version(monkeypatc
     }
 
     class _NoGetNextVersion:
+        """集中覆盖当前测试分支与回归边界。"""
         def __init__(self):
+            """准备可控测试资源与状态，供后续断言读取。"""
             self.aget_tuple = AsyncMock(
                 return_value=_FakeCheckpointTuple(
                     checkpoint=initial_checkpoint,
@@ -1639,7 +1720,7 @@ async def test_ensure_interrupted_title_bumps_existing_string_version(monkeypatc
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_skips_when_title_already_set():
-    """If the checkpoint already carries a title, no new checkpoint is written."""
+    """验证标题 标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     checkpointer = _TitleCheckpointer(
         tuple_value=_FakeCheckpointTuple(
             checkpoint={
@@ -1659,14 +1740,7 @@ async def test_ensure_interrupted_title_skips_when_title_already_set():
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_round_trip_with_real_sqlite_checkpointer(tmp_path):
-    """Full round-trip against a real ``AsyncSqliteSaver`` on a disk-backed DB.
-
-    Mirrors what Gateway constructs in production via ``make_checkpointer`` when
-    ``database.backend == "sqlite"``, then closes and re-opens the saver to
-    simulate a fresh connection. The fallback title must survive that boundary —
-    this is the scenario the #3874 review flagged as broken before the
-    ``new_versions={"title": ...}`` fix.
-    """
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     from langchain_core.messages import HumanMessage
     from langgraph.checkpoint.base import empty_checkpoint
     from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -1717,32 +1791,30 @@ async def test_ensure_interrupted_title_round_trip_with_real_sqlite_checkpointer
 
 
 class _CheckpointerWithIntVersion:
-    """A checkpointer whose ``get_next_version`` increments integers (default LangGraph behavior)."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     @staticmethod
     def get_next_version(current, _channel):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         return (current or 0) + 1
 
 
 class _CheckpointerWithBrokenGetNextVersion:
-    """A checkpointer whose ``get_next_version`` raises — must fall back, not propagate."""
+    """集中覆盖当前测试分支与回归边界。"""
 
     @staticmethod
     def get_next_version(current, _channel):
+        """处理获取相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         raise RuntimeError("simulated saver bug")
 
 
 def test_bump_channel_version_uses_checkpointer_get_next_version_when_available():
-    """Happy path — saver's ``get_next_version`` result is preferred over our fallback."""
+    """验证通道 获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
     assert _bump_channel_version(_CheckpointerWithIntVersion(), 5) == 6
 
 
 def test_bump_channel_version_falls_back_on_broken_get_next_version():
-    """A raising ``get_next_version`` must not propagate; the defensive path bumps from prior.
-
-    Without this, a saver bug would leave ``new_versions={"title": v}`` no-op
-    on DB savers — the very class of bug the #3874 review flagged.
-    """
+    """验证通道 获取在预期条件及边界场景下的可观察行为，防止相关回归。"""
     bumped = _bump_channel_version(_CheckpointerWithBrokenGetNextVersion(), 7)
     assert bumped == 8
 
@@ -1754,7 +1826,7 @@ def test_bump_channel_version_falls_back_on_broken_get_next_version():
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_handles_none_messages_channel(monkeypatch):
-    """A partially-initialized checkpoint with ``messages=None`` must not crash."""
+    """验证标题 通道在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.config.title_config import TitleConfig
 
     initial_checkpoint = {
@@ -1773,11 +1845,7 @@ async def test_ensure_interrupted_title_handles_none_messages_channel(monkeypatc
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_propagates_aput_error_to_caller(monkeypatch):
-    """Exceptions from ``aput`` propagate — the caller (worker.run_agent finally block) is responsible for swallowing them.
-
-    This test pins the contract: the helper itself does NOT silently eat saver errors,
-    so a structural saver regression remains visible in the logs at the call site.
-    """
+    """验证标题 错误在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     monkeypatch.setattr(
@@ -1802,11 +1870,7 @@ async def test_ensure_interrupted_title_propagates_aput_error_to_caller(monkeypa
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_idempotent_across_repeated_calls(monkeypatch):
-    """Second invocation against the now-titled checkpoint must not re-write.
-
-    Regression anchor for the case where a brittle helper might re-trigger
-    on subsequent finally-hook runs (e.g. retries) and rewrite the title.
-    """
+    """验证标题在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from langgraph.checkpoint.memory import InMemorySaver
 
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
@@ -1843,12 +1907,7 @@ async def test_ensure_interrupted_title_idempotent_across_repeated_calls(monkeyp
 
 @pytest.mark.anyio
 async def test_ensure_interrupted_title_preserves_non_title_channel_versions(monkeypatch):
-    """Bumping ``channel_versions["title"]`` must not modify other channels' versions.
-
-    Regression anchor: an earlier draft built ``new_versions`` from
-    ``dict(channel_versions)`` and would have erroneously declared every
-    channel as "needs new blob" on DB savers.
-    """
+    """验证标题 标题 通道在预期条件及边界场景下的可观察行为，防止相关回归。"""
     from deerflow.agents.middlewares.title_middleware import TitleMiddleware
 
     monkeypatch.setattr(
@@ -1883,15 +1942,11 @@ async def test_ensure_interrupted_title_preserves_non_title_channel_versions(mon
 
 @pytest.mark.anyio
 async def test_worker_finally_block_swallows_helper_exceptions(monkeypatch):
-    """The worker's interrupted-title hook must remain non-fatal — any exception
-    from the helper (DB saver bug, middleware bug, etc.) must not propagate past
-    the run boundary or prevent the subsequent threads_meta sync block from
-    running. This pins the integration of helper + finally try/except, not just
-    the helper itself.
-    """
+    """验证工作进程在预期条件及边界场景下的可观察行为，防止相关回归。"""
     import deerflow.runtime.runs.worker as worker_module
 
     async def _boom(*_args, **_kwargs):
+        """准备可控测试资源与状态，供后续断言读取。"""
         raise RuntimeError("forced helper failure")
 
     monkeypatch.setattr(worker_module, "_ensure_interrupted_title", _boom)
@@ -1907,23 +1962,31 @@ async def test_worker_finally_block_swallows_helper_exceptions(monkeypatch):
     )
 
     class _MinimalCheckpointer:
+        """集中覆盖当前测试分支与回归边界。"""
         async def aget_tuple(self, config):
+            """准备可控测试资源与状态，供后续断言读取。"""
             return None
 
         async def aput(self, *args, **kwargs):
+            """准备可控测试资源与状态，供后续断言读取。"""
             return {}
 
     captured_status: dict[str, Any] = {}
 
     class _ThreadStore:
+        """集中覆盖当前测试分支与回归边界。"""
         async def update_display_name(self, thread_id, title):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured_status["display_name"] = (thread_id, title)
 
         async def update_status(self, thread_id, status):
+            """准备可控测试资源与状态，供后续断言读取。"""
             captured_status["status"] = (thread_id, status)
 
     class _AbortingAgent:
+        """集中覆盖当前测试分支与回归边界。"""
         def __init__(self) -> None:
+            """准备可控测试资源与状态，供后续断言读取。"""
             self.metadata = {"model_name": "fake-test-model"}
             self.checkpointer: Any | None = None
             self.store: Any | None = None
@@ -1932,12 +1995,14 @@ async def test_worker_finally_block_swallows_helper_exceptions(monkeypatch):
 
         async def astream(self, graph_input, config=None, stream_mode=None, subgraphs=False):
             # Abort immediately so the run lands in the interrupted branch.
+            """准备可控测试资源与状态，供后续断言读取。"""
             record.abort_event.set()
             if False:
                 yield  # pragma: no cover — make this an async generator
             return
 
     def factory(*, config):
+        """准备可控测试资源与状态，供后续断言读取。"""
         del config
         return _AbortingAgent()
 

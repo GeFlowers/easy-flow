@@ -1,10 +1,12 @@
+"""定义网关进程监听配置及其惰性环境变量读取逻辑。"""
+
 import os
 
 from pydantic import BaseModel, Field
 
 
 class GatewayConfig(BaseModel):
-    """Configuration for the API Gateway."""
+    """描述网关监听地址、端口及接口文档开关的进程配置。"""
 
     host: str = Field(default="0.0.0.0", description="Host to bind the gateway server")
     port: int = Field(default=8001, description="Port to bind the gateway server")
@@ -15,7 +17,7 @@ _gateway_config: GatewayConfig | None = None
 
 
 def get_gateway_config() -> GatewayConfig:
-    """Get gateway config, loading from environment if available."""
+    """返回进程内缓存的网关配置，首次访问时从环境变量构造。"""
     global _gateway_config
     if _gateway_config is None:
         _gateway_config = GatewayConfig(

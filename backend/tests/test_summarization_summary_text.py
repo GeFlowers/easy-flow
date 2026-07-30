@@ -1,3 +1,4 @@
+'未说明'
 from __future__ import annotations
 
 from types import SimpleNamespace
@@ -12,54 +13,69 @@ from deerflow.agents.middlewares.summarization_middleware import DeerFlowSummari
 
 
 def _char_count(messages) -> int:
+    '未说明'
     return sum(len(str(getattr(message, "content", ""))) for message in messages)
 
 
 def _raising_count(messages) -> int:
+    '未说明'
     raise RuntimeError("token counter unavailable")
 
 
 class _RaisingChatModel(BaseChatModel):
+    '未说明'
     @property
     def _llm_type(self) -> str:
+        '未说明'
         return "raising-summary-test-chat-model"
 
     def bind_tools(self, tools, **kwargs):
+        '未说明'
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         raise RuntimeError("summary model boom")
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
 class _StaticChatModel(BaseChatModel):
+    '未说明'
     text: str = "COMPRESSED_SUMMARY"
 
     @property
     def _llm_type(self) -> str:
+        '未说明'
         return "static-summary-test-chat-model"
 
     def bind_tools(self, tools, **kwargs):
+        '未说明'
         return self
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         return ChatResult(generations=[ChatGeneration(message=AIMessage(content=self.text))])
 
     async def _agenerate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         return self._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
 class _RecordingSummaryModel(_StaticChatModel):
+    '未说明'
     prompts: list[str] = Field(default_factory=list)
 
     def _generate(self, messages, stop=None, run_manager=None, **kwargs):
+        '未说明'
         self.prompts.append("\n".join(str(getattr(message, "content", message)) for message in messages))
         return super()._generate(messages, stop=stop, run_manager=run_manager, **kwargs)
 
 
 def _big_history(n: int = 12) -> list:
+    '未说明'
     messages = []
     for i in range(n):
         messages.append(HumanMessage(content=f"user turn {i} " * 20))
@@ -68,7 +84,9 @@ def _big_history(n: int = 12) -> list:
 
 
 class TestSummaryFailureSafety:
+    '未说明'
     def test_summary_model_failure_does_not_destroy_history(self):
+        '未说明'
         middleware = DeerFlowSummarizationMiddleware(
             model=_RaisingChatModel(),
             trigger=("messages", 4),
@@ -82,7 +100,9 @@ class TestSummaryFailureSafety:
 
 
 class TestSummaryWritesChannel:
+    '未说明'
     def _middleware(self) -> DeerFlowSummarizationMiddleware:
+        '未说明'
         return DeerFlowSummarizationMiddleware(
             model=_StaticChatModel(text="COMPRESSED_SUMMARY"),
             trigger=("messages", 4),
@@ -91,6 +111,7 @@ class TestSummaryWritesChannel:
         )
 
     def test_summary_goes_to_summary_text_not_messages(self):
+        '未说明'
         out = self._middleware()._maybe_summarize({"messages": _big_history()}, None)
 
         assert out is not None
@@ -100,6 +121,7 @@ class TestSummaryWritesChannel:
         assert any(isinstance(message, RemoveMessage) for message in out["messages"])
 
     def test_empty_summary_window_after_rescue_does_not_overwrite_existing_summary(self):
+        '未说明'
         middleware = DeerFlowSummarizationMiddleware(
             model=_StaticChatModel(text="SHOULD_NOT_BE_USED"),
             trigger=("messages", 2),
@@ -124,6 +146,7 @@ class TestSummaryWritesChannel:
         assert out is None
 
     def test_existing_summary_is_included_when_creating_next_summary(self):
+        '未说明'
         model = _RecordingSummaryModel(text="UPDATED_SUMMARY")
         middleware = DeerFlowSummarizationMiddleware(
             model=model,
@@ -146,6 +169,7 @@ class TestSummaryWritesChannel:
         assert "OLD_SUMMARY_SENTINEL" in model.prompts[-1]
 
     def test_summary_text_counts_toward_summarization_trigger(self):
+        '未说明'
         middleware = DeerFlowSummarizationMiddleware(
             model=_StaticChatModel(text="UPDATED_SUMMARY"),
             trigger=("tokens", 80),
@@ -169,6 +193,7 @@ class TestSummaryWritesChannel:
         assert out["summary_text"] == "UPDATED_SUMMARY"
 
     def test_compact_state_force_ignores_trigger_threshold(self):
+        '未说明'
         middleware = DeerFlowSummarizationMiddleware(
             model=_StaticChatModel(text="FORCED_SUMMARY"),
             trigger=("messages", 100),
@@ -184,6 +209,7 @@ class TestSummaryWritesChannel:
         assert len(result.messages_to_summarize) > 0
 
     def test_previous_summary_is_trimmed_with_summary_prompt_input(self):
+        '未说明'
         middleware = DeerFlowSummarizationMiddleware(
             model=_StaticChatModel(text="UPDATED_SUMMARY"),
             trigger=("messages", 4),
@@ -203,6 +229,7 @@ class TestSummaryWritesChannel:
         assert "NEW_MESSAGE_SENTINEL" in prompt
 
     def test_new_message_summary_prompt_trim_uses_token_counter_budget(self):
+        '未说明'
         middleware = DeerFlowSummarizationMiddleware(
             model=_StaticChatModel(text="UPDATED_SUMMARY"),
             trigger=("messages", 4),
@@ -219,6 +246,7 @@ class TestSummaryWritesChannel:
         assert "NEW_MESSAGE_SENTINEL" in new_messages
 
     def test_summary_prompt_fallback_bound_respects_small_budget(self):
+        '未说明'
         middleware = DeerFlowSummarizationMiddleware(
             model=_StaticChatModel(text="UPDATED_SUMMARY"),
             trigger=("messages", 4),

@@ -1,4 +1,4 @@
-"""Tests for thread-global message history pagination."""
+'未说明'
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
 
 def _make_app(event_store: MemoryRunEventStore, *, superseded: set[str] | None = None, records=None, feedback=None):
+    '未说明'
     app = make_authed_test_app()
     app.include_router(thread_runs.router)
     app.state.run_event_store = event_store
@@ -30,6 +31,7 @@ def _make_app(event_store: MemoryRunEventStore, *, superseded: set[str] | None =
 
 
 async def _put_message(store, run_id, message_type, message_id, *, caller="lead_agent"):
+    '未说明'
     return await store.put(
         thread_id="thread-1",
         run_id=run_id,
@@ -41,9 +43,11 @@ async def _put_message(store, run_id, message_type, message_id, *, caller="lead_
 
 
 def test_thread_page_orders_across_runs_and_paginates_without_gaps():
+    '未说明'
     store = MemoryRunEventStore()
 
     async def seed():
+        """处理准备相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         for index in range(1, 7):
             await _put_message(store, f"run-{(index + 1) // 2}", "human" if index % 2 else "ai", f"m-{index}")
 
@@ -63,10 +67,12 @@ def test_thread_page_orders_across_runs_and_paginates_without_gaps():
 
 
 def test_thread_page_scans_past_middleware_chunks_to_fill_visible_page(monkeypatch):
+    '未说明'
     monkeypatch.setattr(thread_runs, "THREAD_MESSAGE_PAGE_SCAN_BATCH", 3)
     store = MemoryRunEventStore()
 
     async def seed():
+        """处理准备相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         await _put_message(store, "run-1", "human", "visible-old")
         for index in range(3):
             await _put_message(store, "run-1", "ai", f"middleware-{index}", caller="middleware:title")
@@ -85,9 +91,11 @@ def test_thread_page_scans_past_middleware_chunks_to_fill_visible_page(monkeypat
 
 
 def test_thread_page_scans_large_middleware_only_region_with_production_batch_size():
+    '未说明'
     store = MemoryRunEventStore()
 
     async def seed():
+        """处理准备相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         await _put_message(store, "run-old", "human", "visible-old")
         for index in range(thread_runs.THREAD_MESSAGE_PAGE_SCAN_BATCH * 2):
             await _put_message(store, "run-middle", "ai", f"middleware-{index}", caller="middleware:title")
@@ -110,9 +118,11 @@ def test_thread_page_scans_large_middleware_only_region_with_production_batch_si
 
 
 def test_thread_page_filters_all_successfully_superseded_runs_before_filling():
+    '未说明'
     store = MemoryRunEventStore()
 
     async def seed():
+        """处理准备相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         await _put_message(store, "run-a", "ai", "answer-a")
         await _put_message(store, "run-b", "ai", "answer-b")
         await _put_message(store, "run-c", "ai", "answer-c")
@@ -129,6 +139,7 @@ def test_thread_page_filters_all_successfully_superseded_runs_before_filling():
 
 
 def test_thread_page_logs_rows_missing_sequence_values(caplog):
+    '未说明'
     store = AsyncMock()
     store.list_messages.return_value = [{"run_id": "run-1", "content": {"type": "human"}}]
     app = _make_app(store)
@@ -144,6 +155,7 @@ def test_thread_page_logs_rows_missing_sequence_values(caplog):
 
 
 def test_thread_page_logs_when_scan_cursor_does_not_advance(caplog):
+    '未说明'
     store = AsyncMock()
     store.list_messages.return_value = [{"run_id": "run-1", "seq": 10, "content": {"type": "human"}}]
     app = _make_app(store)
@@ -160,9 +172,11 @@ def test_thread_page_logs_when_scan_cursor_does_not_advance(caplog):
 
 
 def test_thread_page_feedback_only_attaches_to_global_last_ai_row():
+    '未说明'
     store = MemoryRunEventStore()
 
     async def seed():
+        """处理准备相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         await _put_message(store, "run-1", "ai", "draft")
         await _put_message(store, "run-1", "human", "follow-up")
         await _put_message(store, "run-1", "ai", "final")
@@ -190,6 +204,7 @@ def test_thread_page_feedback_only_attaches_to_global_last_ai_row():
 
 
 def test_thread_page_helpers_forward_explicit_user_without_request_context():
+    '未说明'
     event_store = AsyncMock()
     event_store.list_messages.return_value = []
     event_store.get_last_visible_ai_seq_by_run.return_value = {}
@@ -202,6 +217,7 @@ def test_thread_page_helpers_forward_explicit_user_without_request_context():
     request.app.state.feedback_repo = AsyncMock()
 
     async def exercise_helpers():
+        '未说明'
         await thread_runs._scan_thread_message_page(
             "thread-1",
             limit=10,
@@ -223,6 +239,7 @@ def test_thread_page_helpers_forward_explicit_user_without_request_context():
 
 
 def test_thread_page_scan_rejects_any_row_without_sequence():
+    '未说明'
     event_store = AsyncMock()
     event_store.list_messages.return_value = [
         {"run_id": "run-1", "seq": 1, "content": {"type": "human"}},
@@ -247,6 +264,7 @@ def test_thread_page_scan_rejects_any_row_without_sequence():
 
 
 def test_thread_page_batch_hydrates_duration_for_old_runs():
+    '未说明'
     store = MemoryRunEventStore()
     asyncio.run(_put_message(store, "run-old", "ai", "answer"))
     record = RunRecord(
@@ -266,6 +284,7 @@ def test_thread_page_batch_hydrates_duration_for_old_runs():
 
 
 def test_thread_page_preserves_tool_and_subagent_wrapper_metadata():
+    '未说明'
     store = MemoryRunEventStore()
     asyncio.run(
         store.put(
@@ -294,6 +313,7 @@ def test_thread_page_preserves_tool_and_subagent_wrapper_metadata():
 
 
 def test_thread_page_empty_and_exact_limit_cursor_contract():
+    '未说明'
     empty_store = MemoryRunEventStore()
     with TestClient(_make_app(empty_store)) as client:
         empty = client.get("/api/threads/thread-1/messages/page?limit=2")
@@ -302,6 +322,7 @@ def test_thread_page_empty_and_exact_limit_cursor_contract():
     store = MemoryRunEventStore()
 
     async def seed():
+        """处理准备相关的测试辅助逻辑，保持输入输出可预测且不引入生产副作用。"""
         await _put_message(store, "run-1", "human", "one")
         await _put_message(store, "run-1", "ai", "two")
 
@@ -314,6 +335,7 @@ def test_thread_page_empty_and_exact_limit_cursor_contract():
 
 
 def test_thread_page_rejects_forward_cursor_and_invalid_bounds():
+    '未说明'
     app = _make_app(MemoryRunEventStore())
     with TestClient(app) as client:
         assert client.get("/api/threads/thread-1/messages/page?after_seq=1").status_code == 422

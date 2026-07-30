@@ -1,3 +1,4 @@
+'未说明'
 from unittest.mock import MagicMock
 
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
@@ -7,17 +8,20 @@ from deerflow.config.token_budget_config import TokenBudgetConfig
 
 
 def _make_runtime(thread_id="test-thread", run_id="test-run"):
+    '未说明'
     runtime = MagicMock()
     runtime.context = {"thread_id": thread_id, "run_id": run_id}
     return runtime
 
 
 def _make_request(messages, runtime):
+    '未说明'
     request = MagicMock()
     request.messages = list(messages)
     request.runtime = runtime
 
     def override_fn(messages=None, **kwags):
+        '未说明'
         new_req = MagicMock()
         new_req.messages = messages if messages is not None else request.messages
         new_req.runtime = request.runtime
@@ -28,9 +32,11 @@ def _make_request(messages, runtime):
 
 
 def _capture_handler():
+    '未说明'
     captured: list = []
 
     def handler(req):
+        '未说明'
         captured.append(req)
         return MagicMock()
 
@@ -38,7 +44,7 @@ def _capture_handler():
 
 
 def _make_state_with_usage(total: int, input_tk: int = 0, output_tk: int = 0, tool_calls=None, content=""):
-    """Build a state dict with a single AIMessage containing usage."""
+    '未说明'
     if input_tk == 0 and output_tk == 0:
         input_tk = total
     msg = AIMessage(id="test-msg", content=content, tool_calls=tool_calls or [], usage_metadata={"input_tokens": input_tk, "output_tokens": output_tk, "total_tokens": total})
@@ -46,7 +52,9 @@ def _make_state_with_usage(total: int, input_tk: int = 0, output_tk: int = 0, to
 
 
 class TestTokenBudgetTracking:
+    '未说明'
     def test_no_usage_metadata_returns_none(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=1000, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 
@@ -55,6 +63,7 @@ class TestTokenBudgetTracking:
         assert result is None
 
     def test_below_threshold_returns_none(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, warn_threshold=0.8, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 
@@ -63,6 +72,7 @@ class TestTokenBudgetTracking:
         assert result is None
 
     def test_warning_threshold_injects_warning_and_returns_none(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, warn_threshold=0.8, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 
@@ -81,7 +91,9 @@ class TestTokenBudgetTracking:
 
 
 class TestTokenBudgetWarning:
+    '未说明'
     def test_warn_injected_at_next_model_call(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, warn_threshold=0.8, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
         runtime = _make_runtime()
@@ -106,6 +118,7 @@ class TestTokenBudgetWarning:
         assert "TOKEN BUDGET WARNING" in sent[2].content
 
     def test_warn_only_once_per_run(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, warn_threshold=0.8, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
         runtime = _make_runtime()
@@ -120,7 +133,9 @@ class TestTokenBudgetWarning:
 
 
 class TestTokenBudgetHardStop:
+    '未说明'
     def test_hard_stop_strip_tool_calls(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, hard_stop_threshold=1.0, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 
@@ -140,10 +155,7 @@ class TestTokenBudgetHardStop:
         assert "TOKEN BUDGET EXCEEDED" in msgs[0].content
 
     def test_hard_stop_stamps_token_capped_stop_reason_consumed_once(self):
-        """#3875 Phase 2: a hard-stop stamps ``token_capped`` on a per-run
-        accessor the executor reads post-run. It pops on read so a second read
-        (e.g. a retry over the same executor) does not double-report, and a
-        non-capped run yields ``None``."""
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, hard_stop_threshold=1.0, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 
@@ -160,8 +172,7 @@ class TestTokenBudgetHardStop:
         assert mw.consume_stop_reason("uncapped-run") is None
 
     def test_below_threshold_does_not_stamp_stop_reason(self):
-        """A run that only crosses the warn threshold (not the hard stop) keeps
-        running and must not stamp ``token_capped`` — the run is not capped."""
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, warn_threshold=0.7, hard_stop_threshold=1.0, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 
@@ -174,7 +185,9 @@ class TestTokenBudgetHardStop:
 
 
 class TestIndependentDimensions:
+    '未说明'
     def test_input_tokens_trigger_limit(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100000, max_input_tokens=10000, warn_threshold=0.8, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 
@@ -187,6 +200,7 @@ class TestIndependentDimensions:
         assert "input token" in warnings[0]
 
     def test_output_tokens_trigger_limit(self):
+        '未说明'
         config = TokenBudgetConfig(max_tokens=100_000, max_output_tokens=5_000, hard_stop_threshold=1.0, enabled=True)
         mw = TokenBudgetMiddleware.from_config(config)
 

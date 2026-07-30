@@ -1,4 +1,4 @@
-"""Tests for thread-level token usage aggregation API."""
+'未说明'
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from app.gateway.routers import thread_runs
 
 
 def _make_app(run_store: MagicMock):
+    '未说明'
     app = make_authed_test_app()
     app.include_router(thread_runs.router)
     app.state.run_store = run_store
@@ -18,6 +19,7 @@ def _make_app(run_store: MagicMock):
 
 
 def test_thread_token_usage_returns_stable_shape():
+    '未说明'
     run_store = MagicMock()
     run_store.aggregate_tokens_by_thread = AsyncMock(
         return_value={
@@ -56,6 +58,7 @@ def test_thread_token_usage_returns_stable_shape():
 
 
 def test_thread_token_usage_can_include_active_runs():
+    '未说明'
     run_store = MagicMock()
     run_store.aggregate_tokens_by_thread = AsyncMock(
         return_value={

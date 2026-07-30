@@ -1,8 +1,4 @@
-"""Unit tests for scripts/doctor.py.
-
-Run from repo root:
-    cd backend && uv run pytest tests/test_doctor.py -v
-"""
+'定义 test_doctor 模块提供的职责与可复用接口。\n\nUnit tests for scripts/doctor.py.\n\nRun from repo root:\n    cd backend && uv run pytest tests/test_doctor.py -v\n'
 
 from __future__ import annotations
 
@@ -16,7 +12,9 @@ import doctor
 
 
 class TestCheckPython:
+    '组织 TestCheckPython 场景的行为与边界验证'
     def test_current_python_passes(self):
+        '验证 current、python、passes 场景下的预期行为、边界条件与结果'
         result = doctor.check_python()
         assert sys.version_info >= (3, 12)
         assert result.status == "ok"
@@ -28,12 +26,15 @@ class TestCheckPython:
 
 
 class TestCheckConfigExists:
+    '组织 TestCheckConfigExists 场景的行为与边界验证'
     def test_missing_config(self, tmp_path):
+        '验证 missing、config 场景下的预期行为、边界条件与结果'
         result = doctor.check_config_exists(tmp_path / "config.yaml")
         assert result.status == "fail"
         assert result.fix is not None
 
     def test_present_config(self, tmp_path):
+        '验证 present、config 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\n")
         result = doctor.check_config_exists(cfg)
@@ -46,7 +47,9 @@ class TestCheckConfigExists:
 
 
 class TestCheckConfigVersion:
+    '组织 TestCheckConfigVersion 场景的行为与边界验证'
     def test_up_to_date(self, tmp_path):
+        '验证 up、to、date 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\n")
         example = tmp_path / "config.example.yaml"
@@ -55,6 +58,7 @@ class TestCheckConfigVersion:
         assert result.status == "ok"
 
     def test_outdated(self, tmp_path):
+        '验证 outdated 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 3\n")
         example = tmp_path / "config.example.yaml"
@@ -64,6 +68,7 @@ class TestCheckConfigVersion:
         assert result.fix is not None
 
     def test_missing_config_skipped(self, tmp_path):
+        '验证 missing、config、skipped 场景下的预期行为、边界条件与结果'
         result = doctor.check_config_version(tmp_path / "config.yaml", tmp_path)
         assert result.status == "skip"
 
@@ -74,7 +79,9 @@ class TestCheckConfigVersion:
 
 
 class TestCheckConfigLoadable:
+    '组织 TestCheckConfigLoadable 场景的行为与边界验证'
     def test_loadable_config(self, tmp_path, monkeypatch):
+        '验证 loadable、config 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\n")
         monkeypatch.setattr(doctor, "_load_app_config", lambda _path: object())
@@ -82,10 +89,12 @@ class TestCheckConfigLoadable:
         assert result.status == "ok"
 
     def test_invalid_config(self, tmp_path, monkeypatch):
+        '验证 invalid、config 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\n")
 
         def fail(_path):
+            '执行 fail 的明确职责，并返回与调用约定一致的结果'
             raise ValueError("bad config")
 
         monkeypatch.setattr(doctor, "_load_app_config", fail)
@@ -100,19 +109,23 @@ class TestCheckConfigLoadable:
 
 
 class TestCheckModelsConfigured:
+    '组织 TestCheckModelsConfigured 场景的行为与边界验证'
     def test_no_models(self, tmp_path):
+        '验证 no、models 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nmodels: []\n")
         result = doctor.check_models_configured(cfg)
         assert result.status == "fail"
 
     def test_one_model(self, tmp_path):
+        '验证 one、model 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nmodels:\n  - name: default\n    use: langchain_openai:ChatOpenAI\n    model: gpt-4o\n    api_key: $OPENAI_API_KEY\n")
         result = doctor.check_models_configured(cfg)
         assert result.status == "ok"
 
     def test_missing_config_skipped(self, tmp_path):
+        '验证 missing、config、skipped 场景下的预期行为、边界条件与结果'
         result = doctor.check_models_configured(tmp_path / "config.yaml")
         assert result.status == "skip"
 
@@ -123,7 +136,9 @@ class TestCheckModelsConfigured:
 
 
 class TestCheckLLMApiKey:
+    '组织 TestCheckLLMApiKey 场景的行为与边界验证'
     def test_key_set(self, tmp_path, monkeypatch):
+        '验证 key、set 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nmodels:\n  - name: default\n    use: langchain_openai:ChatOpenAI\n    model: gpt-4o\n    api_key: $OPENAI_API_KEY\n")
         monkeypatch.setenv("OPENAI_API_KEY", "sk-test")
@@ -132,6 +147,7 @@ class TestCheckLLMApiKey:
         assert all(r.status != "fail" for r in results)
 
     def test_key_missing(self, tmp_path, monkeypatch):
+        '验证 key、missing 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nmodels:\n  - name: default\n    use: langchain_openai:ChatOpenAI\n    model: gpt-4o\n    api_key: $OPENAI_API_KEY\n")
         monkeypatch.delenv("OPENAI_API_KEY", raising=False)
@@ -142,6 +158,7 @@ class TestCheckLLMApiKey:
         assert any("OPENAI_API_KEY" in (r.fix or "") for r in failed)
 
     def test_missing_config_returns_empty(self, tmp_path):
+        '验证 missing、config、returns、empty 场景下的预期行为、边界条件与结果'
         results = doctor.check_llm_api_key(tmp_path / "config.yaml")
         assert results == []
 
@@ -152,7 +169,9 @@ class TestCheckLLMApiKey:
 
 
 class TestCheckLLMAuth:
+    '组织 TestCheckLLMAuth 场景的行为与边界验证'
     def test_codex_auth_file_missing_fails(self, tmp_path, monkeypatch):
+        '验证 codex、auth、file、missing、fails 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nmodels:\n  - name: codex\n    use: deerflow.models.openai_codex_provider:CodexChatModel\n    model: gpt-5.4\n")
         monkeypatch.setenv("CODEX_AUTH_PATH", str(tmp_path / "missing-auth.json"))
@@ -160,6 +179,7 @@ class TestCheckLLMAuth:
         assert any(result.status == "fail" and "Codex CLI auth available" in result.label for result in results)
 
     def test_claude_oauth_env_passes(self, tmp_path, monkeypatch):
+        '验证 claude、oauth、env、passes 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nmodels:\n  - name: claude\n    use: deerflow.models.claude_provider:ClaudeChatModel\n    model: claude-sonnet-4-6\n")
         monkeypatch.setenv("CLAUDE_CODE_OAUTH_TOKEN", "token")
@@ -173,7 +193,9 @@ class TestCheckLLMAuth:
 
 
 class TestCheckWebSearch:
+    '组织 TestCheckWebSearch 场景的行为与边界验证'
     def test_ddg_always_ok(self, tmp_path):
+        '验证 ddg、always、ok 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text(
             "config_version: 5\nmodels:\n  - name: default\n    use: langchain_openai:ChatOpenAI\n    model: gpt-4o\n    api_key: $OPENAI_API_KEY\ntools:\n  - name: web_search\n    use: deerflow.community.ddg_search.tools:web_search_tool\n"
@@ -183,6 +205,7 @@ class TestCheckWebSearch:
         assert "DuckDuckGo" in result.detail
 
     def test_tavily_with_key_ok(self, tmp_path, monkeypatch):
+        '验证 tavily、with、key、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("TAVILY_API_KEY", "tvly-test")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.tavily.tools:web_search_tool\n")
@@ -190,6 +213,7 @@ class TestCheckWebSearch:
         assert result.status == "ok"
 
     def test_tavily_without_key_warns(self, tmp_path, monkeypatch):
+        '验证 tavily、without、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("TAVILY_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.tavily.tools:web_search_tool\n")
@@ -199,6 +223,7 @@ class TestCheckWebSearch:
         assert "make setup" in result.fix
 
     def test_brave_with_key_ok(self, tmp_path, monkeypatch):
+        '验证 brave、with、key、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "bsa-test")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.brave.tools:web_search_tool\n")
@@ -206,6 +231,7 @@ class TestCheckWebSearch:
         assert result.status == "ok"
 
     def test_brave_without_key_warns(self, tmp_path, monkeypatch):
+        '验证 brave、without、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.brave.tools:web_search_tool\n")
@@ -215,6 +241,7 @@ class TestCheckWebSearch:
         assert "BRAVE_SEARCH_API_KEY" in result.fix
 
     def test_brave_with_inline_api_key_warns(self, tmp_path, monkeypatch):
+        '验证 brave、with、inline、api、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text('config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.brave.tools:web_search_tool\n    api_key: "inline-key"\n')
@@ -224,6 +251,7 @@ class TestCheckWebSearch:
         assert "BRAVE_SEARCH_API_KEY" in (result.fix or "")
 
     def test_brave_with_api_key_env_ref_ok(self, tmp_path, monkeypatch):
+        '验证 brave、with、api、key、env、ref、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "bsa-test")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.brave.tools:web_search_tool\n    api_key: $BRAVE_SEARCH_API_KEY\n")
@@ -232,6 +260,7 @@ class TestCheckWebSearch:
         assert "BRAVE_SEARCH_API_KEY set from config" in result.detail
 
     def test_serper_with_key_ok(self, tmp_path, monkeypatch):
+        '验证 serper、with、key、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("SERPER_API_KEY", "test-key")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.serper.tools:web_search_tool\n")
@@ -240,6 +269,7 @@ class TestCheckWebSearch:
         assert "serper" in result.detail
 
     def test_serper_without_key_warns(self, tmp_path, monkeypatch):
+        '验证 serper、without、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("SERPER_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.serper.tools:web_search_tool\n")
@@ -248,6 +278,7 @@ class TestCheckWebSearch:
         assert "SERPER_API_KEY" in (result.fix or "")
 
     def test_serper_inline_api_key_warns(self, tmp_path, monkeypatch):
+        '验证 serper、inline、api、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("SERPER_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.serper.tools:web_search_tool\n    api_key: inline-key\n")
@@ -257,6 +288,7 @@ class TestCheckWebSearch:
         assert "SERPER_API_KEY" in (result.fix or "")
 
     def test_serper_config_env_ref_ok(self, tmp_path, monkeypatch):
+        '验证 serper、config、env、ref、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("SERPER_API_KEY", "test-key")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.serper.tools:web_search_tool\n    api_key: $SERPER_API_KEY\n")
@@ -267,6 +299,7 @@ class TestCheckWebSearch:
     def test_serper_unresolved_env_ref_falls_back_to_default_var(self, tmp_path, monkeypatch):
         # The referenced $VAR is unset, but the default SERPER_API_KEY is set,
         # which the tool uses as a runtime fallback; report ok rather than warn.
+        '验证 serper、unresolved、env、ref、falls、back、to、default、var 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("MY_CUSTOM_SERPER_KEY", raising=False)
         monkeypatch.setenv("SERPER_API_KEY", "test-key")
         cfg = tmp_path / "config.yaml"
@@ -277,6 +310,7 @@ class TestCheckWebSearch:
 
     def test_serper_unresolved_env_ref_without_default_warns(self, tmp_path, monkeypatch):
         # Neither the referenced $VAR nor the default SERPER_API_KEY is set.
+        '验证 serper、unresolved、env、ref、without、default、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("MY_CUSTOM_SERPER_KEY", raising=False)
         monkeypatch.delenv("SERPER_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
@@ -286,6 +320,7 @@ class TestCheckWebSearch:
         assert "SERPER_API_KEY" in (result.fix or "")
 
     def test_no_search_tool_warns(self, tmp_path):
+        '验证 no、search、tool、warns 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools: []\n")
         result = doctor.check_web_search(cfg)
@@ -294,10 +329,12 @@ class TestCheckWebSearch:
         assert "make setup" in result.fix
 
     def test_missing_config_skipped(self, tmp_path):
+        '验证 missing、config、skipped 场景下的预期行为、边界条件与结果'
         result = doctor.check_web_search(tmp_path / "config.yaml")
         assert result.status == "skip"
 
     def test_invalid_provider_use_fails(self, tmp_path):
+        '验证 invalid、provider、use、fails 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_search\n    use: deerflow.community.not_real.tools:web_search_tool\n")
         result = doctor.check_web_search(cfg)
@@ -310,7 +347,9 @@ class TestCheckWebSearch:
 
 
 class TestCheckWebFetch:
+    '组织 TestCheckWebFetch 场景的行为与边界验证'
     def test_jina_always_ok(self, tmp_path):
+        '验证 jina、always、ok 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_fetch\n    use: deerflow.community.jina_ai.tools:web_fetch_tool\n")
         result = doctor.check_web_fetch(cfg)
@@ -318,6 +357,7 @@ class TestCheckWebFetch:
         assert "Jina AI" in result.detail
 
     def test_firecrawl_without_key_warns(self, tmp_path, monkeypatch):
+        '验证 firecrawl、without、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("FIRECRAWL_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_fetch\n    use: deerflow.community.firecrawl.tools:web_fetch_tool\n")
@@ -326,6 +366,7 @@ class TestCheckWebFetch:
         assert "FIRECRAWL_API_KEY" in (result.fix or "")
 
     def test_no_fetch_tool_warns(self, tmp_path):
+        '验证 no、fetch、tool、warns 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools: []\n")
         result = doctor.check_web_fetch(cfg)
@@ -333,6 +374,7 @@ class TestCheckWebFetch:
         assert result.fix is not None
 
     def test_invalid_provider_use_fails(self, tmp_path):
+        '验证 invalid、provider、use、fails 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_fetch\n    use: deerflow.community.not_real.tools:web_fetch_tool\n")
         result = doctor.check_web_fetch(cfg)
@@ -345,7 +387,9 @@ class TestCheckWebFetch:
 
 
 class TestCheckWebCapture:
+    '组织 TestCheckWebCapture 场景的行为与边界验证'
     def test_browserless_self_host_without_token_ok(self, tmp_path, monkeypatch):
+        '验证 browserless、self、host、without、token、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("BROWSERLESS_TOKEN", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_capture\n    use: deerflow.community.browserless.tools:web_capture_tool\n    base_url: http://localhost:3032\n")
@@ -356,6 +400,7 @@ class TestCheckWebCapture:
         assert "self-hosted" in result.detail
 
     def test_browserless_token_env_ref_ok(self, tmp_path, monkeypatch):
+        '验证 browserless、token、env、ref、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("BROWSERLESS_TOKEN", "browserless-test")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_capture\n    use: deerflow.community.browserless.tools:web_capture_tool\n    base_url: https://production-sfo.browserless.io\n    token: $BROWSERLESS_TOKEN\n")
@@ -366,6 +411,7 @@ class TestCheckWebCapture:
         assert "BROWSERLESS_TOKEN set from config" in result.detail
 
     def test_browserless_cloud_without_token_warns(self, tmp_path, monkeypatch):
+        '验证 browserless、cloud、without、token、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("BROWSERLESS_TOKEN", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: web_capture\n    use: deerflow.community.browserless.tools:web_capture_tool\n    base_url: https://production-sfo.browserless.io\n")
@@ -382,7 +428,9 @@ class TestCheckWebCapture:
 
 
 class TestCheckImageSearch:
+    '组织 TestCheckImageSearch 场景的行为与边界验证'
     def test_ddg_always_ok(self, tmp_path):
+        '验证 ddg、always、ok 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.image_search.tools:image_search_tool\n")
         result = doctor.check_image_search(cfg)
@@ -390,6 +438,7 @@ class TestCheckImageSearch:
         assert "DuckDuckGo" in result.detail
 
     def test_serper_with_key_ok(self, tmp_path, monkeypatch):
+        '验证 serper、with、key、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("SERPER_API_KEY", "test-key")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.serper.tools:image_search_tool\n")
@@ -398,6 +447,7 @@ class TestCheckImageSearch:
         assert "serper" in result.detail
 
     def test_serper_without_key_warns(self, tmp_path, monkeypatch):
+        '验证 serper、without、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("SERPER_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.serper.tools:image_search_tool\n")
@@ -406,6 +456,7 @@ class TestCheckImageSearch:
         assert "SERPER_API_KEY" in (result.fix or "")
 
     def test_serper_inline_api_key_warns(self, tmp_path, monkeypatch):
+        '验证 serper、inline、api、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("SERPER_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.serper.tools:image_search_tool\n    api_key: inline-key\n")
@@ -415,6 +466,7 @@ class TestCheckImageSearch:
         assert "SERPER_API_KEY" in (result.fix or "")
 
     def test_serper_config_env_ref_without_env_warns(self, tmp_path, monkeypatch):
+        '验证 serper、config、env、ref、without、env、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("SERPER_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.serper.tools:image_search_tool\n    api_key: $SERPER_API_KEY\n")
@@ -423,6 +475,7 @@ class TestCheckImageSearch:
         assert "SERPER_API_KEY" in (result.fix or "")
 
     def test_brave_image_search_with_key_ok(self, tmp_path, monkeypatch):
+        '验证 brave、image、search、with、key、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("BRAVE_SEARCH_API_KEY", "bsa-test")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.brave.tools:image_search_tool\n")
@@ -431,6 +484,7 @@ class TestCheckImageSearch:
         assert "brave" in result.detail
 
     def test_brave_image_search_without_key_warns(self, tmp_path, monkeypatch):
+        '验证 brave、image、search、without、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.brave.tools:image_search_tool\n")
@@ -439,6 +493,7 @@ class TestCheckImageSearch:
         assert "BRAVE_SEARCH_API_KEY" in (result.fix or "")
 
     def test_brave_image_search_inline_api_key_warns(self, tmp_path, monkeypatch):
+        '验证 brave、image、search、inline、api、key、warns 场景下的预期行为、边界条件与结果'
         monkeypatch.delenv("BRAVE_SEARCH_API_KEY", raising=False)
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.brave.tools:image_search_tool\n    api_key: inline-key\n")
@@ -448,6 +503,7 @@ class TestCheckImageSearch:
         assert "BRAVE_SEARCH_API_KEY" in (result.fix or "")
 
     def test_infoquest_with_key_ok(self, tmp_path, monkeypatch):
+        '验证 infoquest、with、key、ok 场景下的预期行为、边界条件与结果'
         monkeypatch.setenv("INFOQUEST_API_KEY", "test-key")
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.infoquest.tools:image_search_tool\n")
@@ -456,6 +512,7 @@ class TestCheckImageSearch:
         assert "infoquest" in result.detail
 
     def test_no_image_search_tool_warns(self, tmp_path):
+        '验证 no、image、search、tool、warns 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools: []\n")
         result = doctor.check_image_search(cfg)
@@ -463,6 +520,7 @@ class TestCheckImageSearch:
         assert result.fix is not None
 
     def test_invalid_provider_use_fails(self, tmp_path):
+        '验证 invalid、provider、use、fails 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\ntools:\n  - name: image_search\n    use: deerflow.community.not_real.tools:image_search_tool\n")
         result = doctor.check_image_search(cfg)
@@ -475,11 +533,14 @@ class TestCheckImageSearch:
 
 
 class TestCheckEnvFile:
+    '组织 TestCheckEnvFile 场景的行为与边界验证'
     def test_missing(self, tmp_path):
+        '验证 missing 场景下的预期行为、边界条件与结果'
         result = doctor.check_env_file(tmp_path)
         assert result.status == "warn"
 
     def test_present(self, tmp_path):
+        '验证 present 场景下的预期行为、边界条件与结果'
         (tmp_path / ".env").write_text("KEY=val\n")
         result = doctor.check_env_file(tmp_path)
         assert result.status == "ok"
@@ -491,11 +552,14 @@ class TestCheckEnvFile:
 
 
 class TestCheckFrontendEnv:
+    '组织 TestCheckFrontendEnv 场景的行为与边界验证'
     def test_missing(self, tmp_path):
+        '验证 missing 场景下的预期行为、边界条件与结果'
         result = doctor.check_frontend_env(tmp_path)
         assert result.status == "warn"
 
     def test_present(self, tmp_path):
+        '验证 present 场景下的预期行为、边界条件与结果'
         frontend_dir = tmp_path / "frontend"
         frontend_dir.mkdir()
         (frontend_dir / ".env").write_text("KEY=val\n")
@@ -509,19 +573,23 @@ class TestCheckFrontendEnv:
 
 
 class TestCheckSandbox:
+    '组织 TestCheckSandbox 场景的行为与边界验证'
     def test_missing_sandbox_fails(self, tmp_path):
+        '验证 missing、sandbox、fails 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\n")
         results = doctor.check_sandbox(cfg)
         assert results[0].status == "fail"
 
     def test_local_sandbox_with_disabled_host_bash_warns(self, tmp_path):
+        '验证 local、sandbox、with、disabled、host、bash、warns 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nsandbox:\n  use: deerflow.sandbox.local:LocalSandboxProvider\n  allow_host_bash: false\ntools:\n  - name: bash\n    use: deerflow.sandbox.tools:bash_tool\n")
         results = doctor.check_sandbox(cfg)
         assert any(result.status == "warn" for result in results)
 
     def test_container_sandbox_without_runtime_warns(self, tmp_path, monkeypatch):
+        '验证 container、sandbox、without、runtime、warns 场景下的预期行为、边界条件与结果'
         cfg = tmp_path / "config.yaml"
         cfg.write_text("config_version: 5\nsandbox:\n  use: deerflow.community.aio_sandbox:AioSandboxProvider\ntools: []\n")
         monkeypatch.setattr(doctor.shutil, "which", lambda _name: None)
@@ -535,8 +603,9 @@ class TestCheckSandbox:
 
 
 class TestMainExitCode:
+    '组织 TestMainExitCode 场景的行为与边界验证'
     def test_returns_int(self, tmp_path, monkeypatch, capsys):
-        """main() should return 0 or 1 without raising."""
+        '验证 returns、int 场景下的预期行为、边界条件与结果。\n\nmain() should return 0 or 1 without raising.'
         repo_root = tmp_path / "repo"
         scripts_dir = repo_root / "scripts"
         scripts_dir.mkdir(parents=True)

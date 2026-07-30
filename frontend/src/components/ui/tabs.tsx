@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
+/** Tabs 内部组件：组织对应的界面结构与交互语义。 */
 function Tabs({
   className,
   orientation = "horizontal",
@@ -40,6 +41,7 @@ const tabsListVariants = cva(
   },
 );
 
+/** TabsList 内部组件：组织对应的界面结构与交互语义。 */
 function TabsList({
   className,
   variant = "default",
@@ -56,6 +58,7 @@ function TabsList({
   );
 }
 
+/** TabsTrigger 内部组件：组织对应的界面结构与交互语义。 */
 function TabsTrigger({
   className,
   ...props
@@ -75,6 +78,7 @@ function TabsTrigger({
   );
 }
 
+/** TabsContent 内部组件：组织对应的界面结构与交互语义。 */
 function TabsContent({
   className,
   ...props

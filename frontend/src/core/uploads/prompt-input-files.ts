@@ -1,10 +1,12 @@
 import type { FileUIPart } from "ai";
 
+/** 为提交阶段保留原始浏览器文件引用的输入组件文件分片。 */
 export type PromptInputFilePart = FileUIPart & {
-  // Transient submit-time handle to the original browser File; not serializable.
+  // 指向原始浏览器文件的临时提交句柄，不可序列化。
   file?: File;
 };
 
+/** 将输入组件的文件分片还原为浏览器文件实例。 */
 export async function promptInputFilePartToFile(
   filePart: PromptInputFilePart,
 ): Promise<File | null> {

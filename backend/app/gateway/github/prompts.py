@@ -1,9 +1,8 @@
-"""Translate GitHub webhook payloads into prompts for the agent.
+"""将 GitHub Webhook 负载转换为智能体提示词。
 
-Each supported event has its own template. The output is a single
-human-readable string fed in as a ``role: user`` message to the agent.
+每个支持的事件都使用独立模板，结果作为用户消息进入智能体。
 
-Design notes:
+设计说明：
 
 * The prompt is descriptive ("a PR was opened on …"), not imperative
   ("review this PR"), so the agent's SOUL.md gets to define behavior.
@@ -27,7 +26,7 @@ from typing import Any
 
 
 def _truncate(text: str | None, limit: int = 4000) -> str:
-    """Trim long fields so a single bad payload doesn't blow the context window."""
+    """截断过长字段，避免单个异常负载耗尽上下文窗口。"""
     if not text:
         return ""
     if len(text) <= limit:
@@ -36,6 +35,7 @@ def _truncate(text: str | None, limit: int = 4000) -> str:
 
 
 def _pull_request_prompt(payload: dict[str, Any]) -> str:
+    """为拉取请求事件生成供智能体处理的提示词。"""
     pr = payload.get("pull_request") or {}
     repo = (payload.get("repository") or {}).get("full_name") or "(unknown repo)"
     number = pr.get("number") or payload.get("number")
@@ -59,7 +59,7 @@ def _pull_request_prompt(payload: dict[str, Any]) -> str:
 
 
 def _render_parent_context(parent: dict[str, Any], kind: str) -> str:
-    """Render the issue/PR the event hangs off as a header block.
+    """将事件所属议题或拉取请求渲染为标题上下文块。
 
     ``kind`` is ``"issue"`` or ``"pull request"`` — used in the heading
     only. The webhook payload's ``issue``/``pull_request`` object already
@@ -74,6 +74,7 @@ def _render_parent_context(parent: dict[str, Any], kind: str) -> str:
 
 
 def _issue_comment_prompt(payload: dict[str, Any]) -> str:
+    """为议题或拉取请求评论事件生成带父级上下文的提示词。"""
     repo = (payload.get("repository") or {}).get("full_name") or "(unknown repo)"
     issue = payload.get("issue") or {}
     number = issue.get("number")
@@ -99,6 +100,7 @@ def _issue_comment_prompt(payload: dict[str, Any]) -> str:
 
 
 def _pr_review_comment_prompt(payload: dict[str, Any]) -> str:
+    """为行内审查评论生成包含代码位置和差异上下文的提示词。"""
     repo = (payload.get("repository") or {}).get("full_name") or "(unknown repo)"
     pr = payload.get("pull_request") or {}
     number = pr.get("number")
@@ -125,6 +127,7 @@ def _pr_review_comment_prompt(payload: dict[str, Any]) -> str:
 
 
 def _pr_review_prompt(payload: dict[str, Any]) -> str:
+    """为拉取请求审查事件生成提示词并保留获取行内评论的指引。"""
     repo = (payload.get("repository") or {}).get("full_name") or "(unknown repo)"
     pr = payload.get("pull_request") or {}
     number = pr.get("number")
@@ -168,6 +171,7 @@ def _pr_review_prompt(payload: dict[str, Any]) -> str:
 
 
 def _issues_prompt(payload: dict[str, Any]) -> str:
+    """为议题事件生成包含标题、作者、链接和正文的提示词。"""
     repo = (payload.get("repository") or {}).get("full_name") or "(unknown repo)"
     issue = payload.get("issue") or {}
     number = issue.get("number")
@@ -191,6 +195,7 @@ def _issues_prompt(payload: dict[str, Any]) -> str:
 
 
 def _ping_prompt(payload: dict[str, Any]) -> str:
+    """为 Webhook 安装探测事件生成无需动作的提示词。"""
     # Ping events arrive when a webhook is first installed. We don't
     # normally fire on them but include a template for completeness.
     zen = payload.get("zen") or "(no zen)"
@@ -209,7 +214,7 @@ _EVENT_BUILDERS: dict[str, Any] = {
 
 
 def build_prompt(event: str, payload: dict[str, Any]) -> str:
-    """Return the prompt string for a webhook delivery.
+    """返回 Webhook 投递对应的提示词。
 
     Unknown events get a generic stub so the dispatcher can still kick
     off a run without crashing — useful when a new event type is

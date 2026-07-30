@@ -9,6 +9,7 @@ type ChannelProviderIconProps = SVGProps<SVGSVGElement> & {
   provider: string;
 };
 
+/** 按通道提供方标识渲染一致的图标，并支持调用方传入尺寸与样式。 */
 export function ChannelProviderIcon({
   provider,
   className,

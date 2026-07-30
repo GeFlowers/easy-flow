@@ -46,6 +46,7 @@ function getModeDescriptionKey(
   }
 }
 
+/** 为代理模式提供悬停说明，兼顾图标化控件的可发现性与读屏标签。 */
 export function ModeHoverGuide({
   mode,
   children,
@@ -53,7 +54,7 @@ export function ModeHoverGuide({
 }: {
   mode: AgentMode;
   children: React.ReactNode;
-  /** When true, tooltip shows "ModeName: Description". When false, only description. */
+  /** 为 true 时提示显示“模式名：说明”；否则仅显示说明，避免在紧凑界面重复模式名。 */
   showTitle?: boolean;
 }) {
   const { t } = useI18n();

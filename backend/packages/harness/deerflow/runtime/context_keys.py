@@ -1,4 +1,4 @@
-"""Private runtime context keys shared across DeerFlow runtime components."""
+"""定义运行期组件共享的私有上下文键。"""
 
 from typing import Final
 

@@ -1,9 +1,4 @@
-"""In-memory ThreadMetaStore backed by LangGraph BaseStore.
-
-Used when database.backend=memory. Delegates to the LangGraph Store's
-``("threads",)`` namespace — the same namespace used by the Gateway
-router for thread records.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -19,7 +14,9 @@ THREADS_NS: tuple[str, ...] = ("threads",)
 
 
 class MemoryThreadMetaStore(ThreadMetaStore):
+    """定义持久化存储的抽象接口或具体实现。"""
     def __init__(self, store: BaseStore) -> None:
+        """初始化当前持久化组件所需的依赖与内部状态。"""
         self._store = store
 
     async def _get_owned_record(
@@ -28,7 +25,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         user_id: str | None | _AutoSentinel,
         method_name: str,
     ) -> dict | None:
-        """Fetch a record and verify ownership. Returns a mutable copy, or None."""
+        """执行持久化流程所需的内部辅助操作。"""
         resolved = resolve_user_id(user_id, method_name=method_name)
         item = await self._store.aget(THREADS_NS, thread_id)
         if item is None:
@@ -47,6 +44,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         display_name: str | None = None,
         metadata: dict | None = None,
     ) -> dict:
+        """创建记录并在成功后提交相应的持久化事务。"""
         resolved_user_id = resolve_user_id(user_id, method_name="MemoryThreadMetaStore.create")
         now = now_iso()
         record: dict[str, Any] = {
@@ -64,6 +62,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         return record
 
     async def get(self, thread_id: str, *, user_id: str | None | _AutoSentinel = AUTO) -> dict | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         return await self._get_owned_record(thread_id, user_id, "MemoryThreadMetaStore.get")
 
     async def search(
@@ -75,6 +74,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         offset: int = 0,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict[str, Any]]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         resolved_user_id = resolve_user_id(user_id, method_name="MemoryThreadMetaStore.search")
         filter_dict: dict[str, Any] = {}
         if metadata:
@@ -93,6 +93,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         return [self._item_to_dict(item) for item in items]
 
     async def check_access(self, thread_id: str, user_id: str, *, require_existing: bool = False) -> bool:
+        """执行当前持久化组件提供的操作。"""
         item = await self._store.aget(THREADS_NS, thread_id)
         if item is None:
             return not require_existing
@@ -102,6 +103,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         return record_user_id == user_id
 
     async def update_display_name(self, thread_id: str, display_name: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         record = await self._get_owned_record(thread_id, user_id, "MemoryThreadMetaStore.update_display_name")
         if record is None:
             return
@@ -110,6 +112,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         await self._store.aput(THREADS_NS, thread_id, record)
 
     async def update_status(self, thread_id: str, status: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         record = await self._get_owned_record(thread_id, user_id, "MemoryThreadMetaStore.update_status")
         if record is None:
             return
@@ -118,6 +121,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         await self._store.aput(THREADS_NS, thread_id, record)
 
     async def update_metadata(self, thread_id: str, metadata: dict, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         record = await self._get_owned_record(thread_id, user_id, "MemoryThreadMetaStore.update_metadata")
         if record is None:
             return
@@ -128,6 +132,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         await self._store.aput(THREADS_NS, thread_id, record)
 
     async def update_owner(self, thread_id: str, owner_user_id: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         record = await self._get_owned_record(thread_id, user_id, "MemoryThreadMetaStore.update_owner")
         if record is None:
             return
@@ -136,6 +141,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
         await self._store.aput(THREADS_NS, thread_id, record)
 
     async def delete(self, thread_id: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         record = await self._get_owned_record(thread_id, user_id, "MemoryThreadMetaStore.delete")
         if record is None:
             return
@@ -143,7 +149,7 @@ class MemoryThreadMetaStore(ThreadMetaStore):
 
     @staticmethod
     def _item_to_dict(item) -> dict[str, Any]:
-        """Convert a Store SearchItem to the dict format expected by callers."""
+        """将持久化记录转换为对外使用的字典表示。"""
         val = item.value
         return {
             "thread_id": item.key,

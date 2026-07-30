@@ -5,14 +5,7 @@ export type GoalContinuationDisplay = {
   max: number;
 };
 
-/**
- * Decide the continuation counter to render for an active goal.
- *
- * Returns `null` until the agent has actually auto-continued at least once
- * (`continuation_count > 0`). Before that, the raw "0/8" reads as a mysterious
- * score, so the counter is hidden; once continuation starts it surfaces as
- * "{count}/{max}" with an explanatory tooltip.
- */
+/** 决定活动目标是否显示续跑计数。代理尚未自动续跑（`continuation_count > 0`）时返回 `null`，避免将含义不明的 “0/8” 展示给用户；开始续跑后显示 `{count}/{max}` 并提供说明提示。 */
 export function getGoalContinuationDisplay(
   goal: Pick<GoalState, "continuation_count" | "max_continuations">,
 ): GoalContinuationDisplay | null {
@@ -24,15 +17,7 @@ export function getGoalContinuationDisplay(
   return { count, max };
 }
 
-/**
- * Stable signature of the *server* goal, used to decide when an optimistic
- * client override should yield back to server state.
- *
- * It changes whenever a new goal is set (`created_at`), the agent auto-continues
- * (`continuation_count`/`updated_at`), or the backend clears/satisfies the goal
- * (`null`). `useActiveGoal` resets its optimistic copy when this key changes, so
- * the streamed continuation counter is never permanently shadowed.
- */
+/** 生成服务端目标的稳定签名，以判断客户端乐观覆盖何时应让位给服务端状态。新设目标（`created_at`）、代理自动续跑（`continuation_count` / `updated_at`）或后端清除、满足目标（`null`）均会改变签名；`useActiveGoal` 据此重置乐观副本，避免流式续跑计数长期被遮蔽。 */
 export function goalReconciliationKey(goal: GoalState | null): string {
   if (!goal) {
     return "none";

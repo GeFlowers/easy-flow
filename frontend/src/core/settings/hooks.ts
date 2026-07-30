@@ -14,6 +14,7 @@ import {
   type LocalSettingsSetter,
 } from "./store";
 
+/** 订阅并更新全局本地设置。 */
 export function useLocalSettings(): [LocalSettings, LocalSettingsSetter] {
   const settings = useSyncExternalStore(
     subscribe,
@@ -28,6 +29,7 @@ export function useLocalSettings(): [LocalSettings, LocalSettingsSetter] {
   return [settings, setSettings];
 }
 
+/** 返回已应用线程模型覆盖的设置及其更新器。 */
 export function useThreadSettings(
   threadId: string,
 ): [LocalSettings, LocalSettingsSetter] {

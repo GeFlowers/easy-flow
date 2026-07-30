@@ -1,28 +1,4 @@
-"""Backend↔frontend contract for structured subagent result metadata.
-
-``task`` tool result text is model-visible display content. Runtime
-consumers read the structured facts carried inside
-``ToolMessage.additional_kwargs``:
-
-- ``subagent_status``: one of ``SUBAGENT_STATUS_VALUES``.
-- ``subagent_stop_reason`` (optional): when a guardrail cap ended the run
-  early, one of ``SUBAGENT_STOP_REASON_VALUES`` (``token_capped`` /
-  ``turn_capped`` / ``loop_capped``). Additive (#3875 Phase 2): a capped run
-  that still produced a final answer stays ``status=completed`` and carries
-  the cap here; a capped run with no usable output is ``status=failed`` +
-  ``stop_reason``. Old frontends ignore the unknown field.
-- ``subagent_error`` (optional): the human-readable error blob the
-  backend recorded.
-- ``subagent_result_brief`` / ``subagent_result_sha256`` (optional):
-  bounded completed-result metadata plus a digest of the full result.
-- ``subagent_model_name`` (optional): effective DeerFlow model identifier used
-  by this delegated run.
-- ``subagent_token_usage`` (optional): final cumulative ``input_tokens`` /
-  ``output_tokens`` / ``total_tokens`` snapshot when the provider reported it.
-
-The shared fixture at ``contracts/subagent_status_contract.json`` pins
-the enum values across Python and TypeScript.
-"""
+"""提供子代理隔离执行、调度校验或终端异步交互功能。"""
 
 from __future__ import annotations
 
@@ -106,6 +82,7 @@ _LEGACY_STATUS_NORMALIZATION: dict[str, SubagentStopReasonValue] = {
 
 
 class StructuredSubagentResult(TypedDict):
+    """封装当前模块相关的数据、状态或协作职责。"""
     status: SubagentStatusValue
     stop_reason: NotRequired[SubagentStopReasonValue]
     result_brief: NotRequired[str]
@@ -114,6 +91,7 @@ class StructuredSubagentResult(TypedDict):
 
 
 def _bound_metadata_text(text: str, cap: int = SUBAGENT_METADATA_TEXT_MAX_CHARS) -> str:
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     cleaned = text.strip()
     if len(cleaned) <= cap:
         return cleaned
@@ -136,19 +114,7 @@ def make_subagent_additional_kwargs(
     model_name: str | None = None,
     token_usage: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Build the ``additional_kwargs`` payload the middleware stamps.
-
-    Drops the error field when blank so the JSON wire format never carries
-    a misleading empty ``subagent_error: ""``. ``stop_reason`` is stamped
-    only when a guardrail cap ended the run (see :data:`SUBAGENT_STOP_REASON_VALUES`).
-
-    Raises:
-        ValueError: when ``status`` is not in :data:`SUBAGENT_STATUS_VALUES`,
-            or ``stop_reason`` is not in :data:`SUBAGENT_STOP_REASON_VALUES`.
-            We do not accept arbitrary strings: a typo would silently leak
-            through to consumers as missing metadata rather than failing
-            loudly at the producer boundary.
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     if status not in SUBAGENT_STATUS_VALUES:
         raise ValueError(f"invalid subagent status {status!r}; expected one of {SUBAGENT_STATUS_VALUES}")
     if stop_reason is not None and stop_reason not in SUBAGENT_STOP_REASON_VALUES:
@@ -172,16 +138,7 @@ def make_subagent_additional_kwargs(
 
 
 def normalize_token_usage(value: Any) -> dict[str, int] | None:
-    """Validate a cumulative token-usage mapping into the contract shape.
-
-    The single shared validator for both metadata surfaces — the terminal
-    ``ToolMessage`` metadata (here) and the persisted ``subagent.step`` /
-    ``subagent.end`` run events (``step_events.py``). Keeping one function
-    prevents the two from drifting (e.g. one later accepting an extra token
-    field the other rejects, silently dropping usage on one path). Requires
-    non-negative ``int`` values for all three keys — ``bool`` is rejected — and
-    returns ``None`` for any non-mapping or malformed input.
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     if not isinstance(value, Mapping):
         return None
     normalized: dict[str, int] = {}
@@ -200,14 +157,7 @@ def format_subagent_result_message(
     error: str | None = None,
     stop_reason: SubagentStopReasonValue | None = None,
 ) -> tuple[str, str | None]:
-    """Return model-visible task content plus normalized metadata error.
-
-    When ``stop_reason`` is set, a short ``(capped: ...)`` note is folded into
-    the text so the lead agent sees — without parsing metadata — that the run
-    was ended by a guardrail cap. A capped run that produced usable work is
-    ``status=completed`` (+ the partial result); a capped run with no usable
-    output is ``status=failed``.
-    """
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     result_text = "" if result is None else str(result)
     error_text = str(error).strip() if isinstance(error, str) else ""
     capped = _STOP_REASON_LABELS.get(stop_reason) if stop_reason is not None else None
@@ -249,6 +199,7 @@ def format_subagent_result_message(
 def read_subagent_result_metadata(
     additional_kwargs: Mapping[str, object] | None,
 ) -> StructuredSubagentResult | None:
+    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
     if not additional_kwargs:
         return None
     raw_status = additional_kwargs.get(SUBAGENT_STATUS_KEY)

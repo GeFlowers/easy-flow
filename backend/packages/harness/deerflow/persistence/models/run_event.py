@@ -1,4 +1,4 @@
-"""ORM model for run events."""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ from deerflow.persistence.base import Base
 
 
 class RunEventRow(Base):
+    """定义与持久化数据表对应的行模型。"""
     __tablename__ = "run_events"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

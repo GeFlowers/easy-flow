@@ -1,3 +1,4 @@
+/** 网关返回的定时任务及其最近一次执行摘要。 */
 export type ScheduledTask = {
   id: string;
   thread_id: string | null;
@@ -24,6 +25,7 @@ export type ScheduledTask = {
   updated_at: string;
 };
 
+/** 网关记录的一次定时任务执行实例。 */
 export type ScheduledTaskRun = {
   id: string;
   task_id: string;

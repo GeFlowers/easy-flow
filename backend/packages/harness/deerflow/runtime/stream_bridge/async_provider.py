@@ -1,15 +1,4 @@
-"""Async stream bridge factory.
-
-Provides an **async context manager** aligned with
-:func:`deerflow.runtime.checkpointer.async_provider.make_checkpointer`.
-
-Usage (e.g. FastAPI lifespan)::
-
-    from deerflow.agents.stream_bridge import make_stream_bridge
-
-    async with make_stream_bridge() as bridge:
-        app.state.stream_bridge = bridge
-"""
+'定义 async_provider 模块提供的职责与可复用接口。\n\nAsync stream bridge factory.\n\nProvides an **async context manager** aligned with\n:func:`deerflow.runtime.checkpointer.async_provider.make_checkpointer`.\n\nUsage (e.g. FastAPI lifespan)::\n\n    from deerflow.agents.stream_bridge import make_stream_bridge\n\n    async with make_stream_bridge() as bridge:\n        app.state.stream_bridge = bridge\n'
 
 from __future__ import annotations
 
@@ -29,6 +18,7 @@ _ENV_REDIS_URL = "DEER_FLOW_STREAM_BRIDGE_REDIS_URL"
 
 
 def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
+    '执行 _resolve_config 的明确职责，并返回与调用约定一致的结果'
     if app_config is None:
         config = get_stream_bridge_config()
     else:
@@ -42,16 +32,13 @@ def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
 
 
 def _resolve_redis_url(config: StreamBridgeConfig) -> str:
+    '执行 _resolve_redis_url 的明确职责，并返回与调用约定一致的结果'
     return config.redis_url or os.getenv(_ENV_REDIS_URL) or os.getenv("REDIS_URL") or "redis://localhost:6379/0"
 
 
 @contextlib.asynccontextmanager
 async def make_stream_bridge(app_config: AppConfig | None = None) -> AsyncIterator[StreamBridge]:
-    """Async context manager that yields a :class:`StreamBridge`.
-
-    Falls back to :class:`MemoryStreamBridge` when no configuration is
-    provided and nothing is set globally.
-    """
+    '构造并返回，并遵守 make_stream_bridge 所表达的接口约束。\n\nAsync context manager that yields a :class:`StreamBridge`.\n\n    Falls back to :class:`MemoryStreamBridge` when no configuration is\n    provided and nothing is set globally.\n    '
     config = _resolve_config(app_config)
 
     if config is None or config.type == "memory":

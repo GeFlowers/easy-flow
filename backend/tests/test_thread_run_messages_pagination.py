@@ -1,4 +1,4 @@
-"""Tests for paginated GET /api/threads/{thread_id}/runs/{run_id}/messages endpoint."""
+'未说明'
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from deerflow.runtime.runs.store.memory import MemoryRunStore
 
 
 def _make_app(event_store=None, run_manager=None, stream_bridge=None):
-    """Build a test FastAPI app with stub auth and mocked state."""
+    '未说明'
     app = make_authed_test_app()
     app.include_router(thread_runs.router)
 
@@ -35,36 +35,44 @@ def _make_app(event_store=None, run_manager=None, stream_bridge=None):
 
 
 class _EndingCrossProcessBridge:
+    '未说明'
     supports_cross_process = True
 
     async def publish(self, run_id, event, data):
+        '未说明'
         return None
 
     async def publish_end(self, run_id):
+        '未说明'
         return None
 
     def subscribe(self, run_id, *, last_event_id=None, heartbeat_interval=15.0):
+        '未说明'
         async def _events():
+            '未说明'
             yield END_SENTINEL
 
         return _events()
 
     async def cleanup(self, run_id, *, delay=0):
+        '未说明'
         return None
 
 
 def _make_event_store(rows: list[dict]):
-    """Return an AsyncMock event store whose list_messages_by_run() returns rows."""
+    '未说明'
     store = MagicMock()
     store.list_messages_by_run = AsyncMock(return_value=rows)
     return store
 
 
 def _make_message(seq: int) -> dict:
+    '未说明'
     return {"seq": seq, "event_type": "ai_message", "category": "message", "content": f"msg-{seq}"}
 
 
 def _make_store_only_run_manager() -> RunManager:
+    '未说明'
     store = MemoryRunStore()
     asyncio.run(
         store.put(
@@ -87,7 +95,7 @@ def _make_store_only_run_manager() -> RunManager:
 
 
 def test_returns_paginated_envelope():
-    """GET /api/threads/{tid}/runs/{rid}/messages returns {data: [...], has_more: bool}."""
+    '未说明'
     rows = [_make_message(i) for i in range(1, 4)]
     app = _make_app(event_store=_make_event_store(rows))
     with TestClient(app) as client:
@@ -101,7 +109,7 @@ def test_returns_paginated_envelope():
 
 
 def test_has_more_true_when_extra_row_returned():
-    """has_more=True when event store returns limit+1 rows."""
+    '未说明'
     # Default limit is 50; provide 51 rows
     rows = [_make_message(i) for i in range(1, 52)]  # 51 rows
     app = _make_app(event_store=_make_event_store(rows))
@@ -115,7 +123,7 @@ def test_has_more_true_when_extra_row_returned():
 
 
 def test_default_page_keeps_newest_messages_when_extra_row_returned():
-    """Default latest-page trimming drops the older sentinel row, not the newest message."""
+    '未说明'
     rows = [_make_message(i) for i in range(16, 67)]
     app = _make_app(event_store=_make_event_store(rows))
     with TestClient(app) as client:
@@ -127,7 +135,7 @@ def test_default_page_keeps_newest_messages_when_extra_row_returned():
 
 
 def test_before_seq_page_keeps_newest_side_when_extra_row_returned():
-    """Backward pagination trims the older sentinel so adjacent pages do not miss the boundary message."""
+    '未说明'
     rows = [_make_message(i) for i in range(1, 18)]
     app = _make_app(event_store=_make_event_store(rows))
     with TestClient(app) as client:
@@ -139,7 +147,7 @@ def test_before_seq_page_keeps_newest_side_when_extra_row_returned():
 
 
 def test_after_seq_page_keeps_oldest_side_when_extra_row_returned():
-    """Forward pagination still trims the newer sentinel row."""
+    '未说明'
     rows = [_make_message(i) for i in range(11, 62)]
     app = _make_app(event_store=_make_event_store(rows))
     with TestClient(app) as client:
@@ -151,7 +159,7 @@ def test_after_seq_page_keeps_oldest_side_when_extra_row_returned():
 
 
 def test_after_seq_forwarded_to_event_store():
-    """after_seq query param is forwarded to event_store.list_messages_by_run."""
+    '未说明'
     rows = [_make_message(10)]
     event_store = _make_event_store(rows)
     app = _make_app(event_store=event_store)
@@ -168,7 +176,7 @@ def test_after_seq_forwarded_to_event_store():
 
 
 def test_before_seq_forwarded_to_event_store():
-    """before_seq query param is forwarded to event_store.list_messages_by_run."""
+    '未说明'
     rows = [_make_message(3)]
     event_store = _make_event_store(rows)
     app = _make_app(event_store=event_store)
@@ -185,7 +193,7 @@ def test_before_seq_forwarded_to_event_store():
 
 
 def test_custom_limit_forwarded_to_event_store():
-    """Custom limit is forwarded as limit+1 to the event store."""
+    '未说明'
     rows = [_make_message(i) for i in range(1, 6)]
     event_store = _make_event_store(rows)
     app = _make_app(event_store=event_store)
@@ -202,7 +210,7 @@ def test_custom_limit_forwarded_to_event_store():
 
 
 def test_empty_data_when_no_messages():
-    """Returns empty data list with has_more=False when no messages exist."""
+    '未说明'
     app = _make_app(event_store=_make_event_store([]))
     with TestClient(app) as client:
         response = client.get("/api/threads/thread-6/runs/run-6/messages")
@@ -213,7 +221,7 @@ def test_empty_data_when_no_messages():
 
 
 def test_get_run_hydrates_store_only_run():
-    """GET /api/threads/{tid}/runs/{rid} should read historical store rows."""
+    '未说明'
     app = _make_app(run_manager=_make_store_only_run_manager())
     with TestClient(app) as client:
         response = client.get("/api/threads/thread-store/runs/store-only-run")
@@ -226,7 +234,7 @@ def test_get_run_hydrates_store_only_run():
 
 
 def test_cancel_store_only_run_returns_409():
-    """Store-only runs are readable but not cancellable by this worker."""
+    '未说明'
     app = _make_app(run_manager=_make_store_only_run_manager())
     with TestClient(app) as client:
         response = client.post("/api/threads/thread-store/runs/store-only-run/cancel")
@@ -236,7 +244,7 @@ def test_cancel_store_only_run_returns_409():
 
 
 def test_join_store_only_run_returns_409():
-    """join endpoint should return 409 for store-only runs (no local stream state)."""
+    '未说明'
     app = _make_app(run_manager=_make_store_only_run_manager())
     with TestClient(app) as client:
         response = client.get("/api/threads/thread-store/runs/store-only-run/join")
@@ -246,7 +254,7 @@ def test_join_store_only_run_returns_409():
 
 
 def test_stream_store_only_run_returns_409():
-    """stream endpoint (action=None) should return 409 for store-only runs."""
+    '未说明'
     app = _make_app(run_manager=_make_store_only_run_manager())
     with TestClient(app) as client:
         response = client.get("/api/threads/thread-store/runs/store-only-run/stream")
@@ -256,7 +264,7 @@ def test_stream_store_only_run_returns_409():
 
 
 def test_join_store_only_run_allowed_with_cross_process_bridge():
-    """Redis-like bridges can stream store-only runs hydrated on another worker."""
+    '未说明'
     app = _make_app(run_manager=_make_store_only_run_manager(), stream_bridge=_EndingCrossProcessBridge())
     with TestClient(app) as client:
         response = client.get("/api/threads/thread-store/runs/store-only-run/join")
@@ -266,7 +274,7 @@ def test_join_store_only_run_allowed_with_cross_process_bridge():
 
 
 def test_list_run_messages_injects_turn_duration():
-    """Verify that list_run_messages injects turn_duration into ALL AI messages for the run."""
+    '未说明'
     from unittest.mock import AsyncMock
 
     from deerflow.runtime import RunRecord
@@ -306,7 +314,7 @@ def test_list_run_messages_injects_turn_duration():
 
 
 def test_list_thread_messages_injects_turn_duration():
-    """Verify that list_thread_messages injects turn_duration into the inner content."""
+    '未说明'
     from unittest.mock import AsyncMock
 
     from deerflow.runtime import RunRecord

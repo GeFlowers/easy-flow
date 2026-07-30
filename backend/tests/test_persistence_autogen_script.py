@@ -1,16 +1,4 @@
-"""Tests for ``scripts/_autogen_revision.py`` (``make migrate-rev``).
-
-The script must work in a clean checkout without any pre-existing data
-directory -- this is the failure mode reported as P2: a bare ``alembic
-revision --autogenerate`` would crash with
-``sqlite3.OperationalError: unable to open database file`` because
-``alembic.ini``'s default URL points at ``./data/deerflow.db`` which doesn't
-exist yet.
-
-The fix: the script builds its own temp DB by running the existing alembic
-chain to head and runs autogenerate against THAT, instead of relying on
-``alembic.ini``'s URL or runtime ``create_all`` bootstrap.
-"""
+"""本模块覆盖持久化 脚本的行为、边界与回归场景，确保既有契约稳定。"""
 
 from __future__ import annotations
 
@@ -26,11 +14,7 @@ from deerflow.persistence.base import Base
 
 @pytest.fixture(scope="module")
 def autogen_module():
-    """Load ``scripts/_autogen_revision.py`` as an importable module.
-
-    The file lives outside the package tree (under ``backend/scripts/``) so we
-    load it directly via ``spec_from_file_location``.
-    """
+    """准备可控测试资源与状态，供后续断言读取。"""
     script_path = Path(__file__).resolve().parents[1] / "scripts/_autogen_revision.py"
     assert script_path.exists(), f"missing autogen script at {script_path}"
     spec = importlib.util.spec_from_file_location("_autogen_revision_under_test", script_path)
@@ -41,11 +25,7 @@ def autogen_module():
 
 
 def test_autogen_builds_temp_db_at_head_without_data_dir(autogen_module, monkeypatch) -> None:
-    """The temp-DB builder must succeed even when ``./data/`` does not exist.
-
-    We chdir to an empty directory to mimic a clean checkout where the
-    alembic.ini default URL would explode.
-    """
+    """验证数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
     import os  # noqa: PLC0415
     import tempfile  # noqa: PLC0415
 
@@ -63,9 +43,7 @@ def test_autogen_builds_temp_db_at_head_without_data_dir(autogen_module, monkeyp
 
 
 def test_autogen_temp_db_is_at_head(autogen_module) -> None:
-    """The temp DB the autogen script builds must be at head, so the
-    autogenerate diff against current models is empty (or only reflects
-    intentional, in-progress model changes)."""
+    """验证给定输入和替身状态下的可观察结果符合本用例断言。"""
     import sqlite3  # noqa: PLC0415
 
     url = autogen_module._build_temp_db_at_head()
@@ -78,13 +56,7 @@ def test_autogen_temp_db_is_at_head(autogen_module) -> None:
 
 
 def test_autogen_temp_db_comes_from_migration_history_not_current_metadata(autogen_module) -> None:
-    """Pending ORM changes must remain visible to autogenerate.
-
-    If the helper accidentally uses runtime ``bootstrap_schema`` /
-    ``Base.metadata.create_all`` again, this probe table would be created in
-    the temp DB and the test would fail. A temp DB built from alembic history
-    only contains objects that committed revisions know how to create.
-    """
+    """验证迁移 元数据在预期条件及边界场景下的可观察行为，防止相关回归。"""
     import sqlite3  # noqa: PLC0415
 
     probe_name = "__autogen_probe_pending_migration__"

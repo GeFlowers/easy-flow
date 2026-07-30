@@ -1,3 +1,4 @@
+"""覆盖本模块的可回归测试，固定关键输入、失败分支与资源生命周期，避免后续改动破坏既有契约。"""
 from __future__ import annotations
 
 import importlib.util
@@ -7,6 +8,7 @@ from typing import Any
 
 
 def _load_module(name: str, relative: str):
+    """为“加载模块”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
     path = Path(__file__).resolve().parents[1] / relative
     spec = importlib.util.spec_from_file_location(name, path)
     assert spec is not None
@@ -22,7 +24,9 @@ summarize = _load_module("summarize_bench", "scripts/benchmark/summarize_bench.p
 
 
 class _FakeProvider:
+    """归集“该项提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
     def __init__(self, sandbox: Any | None = None) -> None:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         self._lock = bench.threading.Lock()
         self._warm_pool: dict[str, tuple[Any, float]] = {}
         self._sandbox = sandbox or _FakeSandbox("ok")
@@ -30,42 +34,54 @@ class _FakeProvider:
         self.shutdown_called = False
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        """为“获取”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return "sandbox-id"
 
     def get(self, sandbox_id: str):
+        """为“获取”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return self._sandbox
 
     def release(self, sandbox_id: str) -> None:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         self.released.append(sandbox_id)
 
     def shutdown(self) -> None:
+        """为“关闭”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         self.shutdown_called = True
 
 
 class _FakeWarmReclaimProvider(_FakeProvider):
+    """归集“该项预热回收提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        """为“获取”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         reclaimed = self._reclaim_warm_pool("sandbox-id")
         assert reclaimed is not None
         return reclaimed
 
     def _reclaim_warm_pool(self, sandbox_id: str) -> str | None:
+        """为“回收预热池”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         return sandbox_id
 
 
 class _FakeSandbox:
+    """归集“该项沙箱”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
     def __init__(self, output: str | Exception) -> None:
+        """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         self.output = output
 
     def execute_command(self, command: str, timeout: float | None = None) -> str:
+        """为“执行命令”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         if isinstance(self.output, Exception):
             raise self.output
         return self.output
 
 
 def test_aio_provider_default_leaves_image_unset(monkeypatch, tmp_path):
+    """验证“异步输入输出提供方默认值该项镜像该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     captured_config: dict[str, Any] = {}
 
     def _factory(config: dict[str, Any]):
+        """为“工厂”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         captured_config.update(config)
         return _FakeProvider(), {"replicas": config["replicas"], "idle_timeout": config["idle_timeout"], "image": config.get("image")}
 
@@ -89,9 +105,11 @@ def test_aio_provider_default_leaves_image_unset(monkeypatch, tmp_path):
 
 
 def test_explicit_aio_provider_image_is_forwarded(monkeypatch, tmp_path):
+    """验证“显式异步输入输出提供方镜像该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     captured_config: dict[str, Any] = {}
 
     def _factory(config: dict[str, Any]):
+        """为“工厂”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         captured_config.update(config)
         return _FakeProvider(), {"replicas": config["replicas"], "idle_timeout": config["idle_timeout"], "image": config.get("image")}
 
@@ -117,6 +135,7 @@ def test_explicit_aio_provider_image_is_forwarded(monkeypatch, tmp_path):
 
 
 def test_failed_turn_releases_acquired_sandbox() -> None:
+    """验证“失败轮次该项该项沙箱”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     provider = _FakeProvider(_FakeSandbox(RuntimeError("boom")))
 
     result = bench._run_one_turn(
@@ -137,6 +156,7 @@ def test_failed_turn_releases_acquired_sandbox() -> None:
 
 
 def test_error_string_output_records_failed_turn() -> None:
+    """验证“错误字符串输出该项失败轮次”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     provider = _FakeProvider(_FakeSandbox("Error: vsock disconnected"))
 
     result = bench._run_one_turn(
@@ -158,6 +178,7 @@ def test_error_string_output_records_failed_turn() -> None:
 
 
 def test_warm_hit_uses_reclaim_instrumentation_not_pre_acquire_sample() -> None:
+    """验证“预热该项使用回收该项该项该项获取该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     provider = _FakeWarmReclaimProvider(_FakeSandbox("ok"))
     bench._install_warm_hit_tracking(provider)
 
@@ -179,6 +200,7 @@ def test_warm_hit_uses_reclaim_instrumentation_not_pre_acquire_sample() -> None:
 
 
 def test_summary_preserves_all_failure_group() -> None:
+    """验证“汇总保留全部失败该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     rows = [
         {
             "provider": "boxlite",
@@ -220,9 +242,11 @@ def test_summary_preserves_all_failure_group() -> None:
 
 
 def test_health_check_skip_seconds_is_forwarded_and_serialized(monkeypatch, tmp_path):
+    """验证“健康检查该项跳过该项该项该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     captured_config: dict[str, Any] = {}
 
     def _factory(config: dict[str, Any]):
+        """为“工厂”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         captured_config.update(config)
         return _FakeProvider(), {
             "replicas": config["replicas"],
@@ -256,14 +280,17 @@ def test_health_check_skip_seconds_is_forwarded_and_serialized(monkeypatch, tmp_
 
 
 def test_boxlite_factory_restores_module_state(monkeypatch):
+    """验证“轻量隔离容器工厂该项模块状态”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     import deerflow.community.boxlite.provider as provider_mod
 
     original_get_app_config = provider_mod.get_app_config
 
     class _FactoryProvider:
+        """归集“工厂提供方”场景的测试与桩对象，明确其成功结果、异常传播和资源回收边界。"""
         _create_box = object()
 
         def __init__(self) -> None:
+            """为“该项”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
             self.created = True
 
     original_create_box = _FactoryProvider._create_box
@@ -277,6 +304,7 @@ def test_boxlite_factory_restores_module_state(monkeypatch):
 
 
 def test_boxlite_shim_workaround_retries_after_fixing_permissions(monkeypatch, tmp_path):
+    """验证“轻量隔离容器该项该项该项该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     boxes_dir = tmp_path / "boxes"
     shim = boxes_dir / "deadbeef" / "bin" / "boxlite-shim"
     shim.parent.mkdir(parents=True)
@@ -286,6 +314,7 @@ def test_boxlite_shim_workaround_retries_after_fixing_permissions(monkeypatch, t
     calls = 0
 
     def _create_box(_sandbox_id: str):
+        """为“创建隔离容器”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         nonlocal calls
         calls += 1
         if calls == 1:
@@ -306,10 +335,12 @@ def test_boxlite_shim_workaround_retries_after_fixing_permissions(monkeypatch, t
 
 
 def test_boxlite_shim_workaround_loud_fails_for_other_versions(monkeypatch, tmp_path):
+    """验证“轻量隔离容器该项该项该项失败该项该项该项”的回归边界，在受控输入和模拟依赖下固定预期结果、失败分支与资源生命周期。"""
     boxes_dir = tmp_path / "boxes"
     monkeypatch.setattr(bench, "_boxlite_version", lambda: "0.9.8")
 
     def _create_box(_sandbox_id: str):
+        """为“创建隔离容器”测试场景提供受控辅助行为，精确限定模拟返回、异常传播或资源状态。"""
         raise RuntimeError("shim not executable")
 
     with __import__("pytest").raises(RuntimeError, match="only supports boxlite 0.9.7"):

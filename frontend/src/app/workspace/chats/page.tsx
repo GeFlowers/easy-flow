@@ -24,6 +24,7 @@ import {
 } from "@/core/threads/utils";
 import { formatTimeAgo } from "@/core/utils/datetime";
 
+/** 展示可搜索的会话列表，并按模式安全地触发分页加载。 */
 export default function ChatsPage() {
   const { t } = useI18n();
   const {
@@ -49,11 +50,7 @@ export default function ChatsPage() {
     });
   }, [threads, search]);
 
-  // Sentinel-based auto load-more for the unfiltered list (issue #3482).
-  // In search mode we deliberately do NOT auto-paginate, otherwise an empty
-  // filtered view would keep the sentinel in the viewport and drain the
-  // entire backend list one page at a time.  Searching falls back to an
-  // explicit button so users can still reach older conversations on demand.
+  // 未搜索时由哨兵自动加载下一页；搜索时改为按钮，避免空结果持续可见而耗尽全部分页。
   const sentinelRef = useRef<HTMLDivElement | null>(null);
   useEffect(() => {
     const element = sentinelRef.current;

@@ -1,15 +1,7 @@
-"""update_agent tool — let a custom agent persist updates to its own SOUL.md / config.
+"""让自定义代理持久化更新自身配置和角色说明的工具。
 
-Bound to the lead agent only when ``runtime.context['agent_name']`` is set
-(i.e. inside an existing custom agent's chat). The default agent does not see
-this tool, and the bootstrap flow continues to use ``setup_agent`` for the
-initial creation handshake.
-
-The tool writes back to ``{base_dir}/users/{user_id}/agents/{agent_name}/{config.yaml,SOUL.md}``
-so an agent created by one user is never visible to (or mutable by) another.
-Writes are staged into temp files first; both files are renamed into place only
-after both temp files are successfully written, so a partial failure cannot leave
-config.yaml updated while SOUL.md still holds stale content.
+该工具仅在现有自定义代理会话中提供。它按用户隔离写入代理目录，并先写入临时文件，
+待全部文件准备完成后再替换目标文件，避免部分失败导致配置与角色说明不一致。
 """
 
 from __future__ import annotations
@@ -45,10 +37,9 @@ _UNTRUSTED_CHANNELS: frozenset[str] = frozenset({"github"})
 
 
 def _stage_temp(path: Path, text: str) -> Path:
-    """Write ``text`` into a sibling temp file and return its path.
+    """将文本写入同级临时文件并返回其路径。
 
-    The caller is responsible for ``Path.replace``-ing the temp into the target
-    once every staged file is ready, or for unlinking it on failure.
+    调用方负责在全部文件准备就绪后替换目标文件，或在失败时删除临时文件。
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = tempfile.NamedTemporaryFile(
@@ -70,7 +61,7 @@ def _stage_temp(path: Path, text: str) -> Path:
 
 
 def _cleanup_temps(temps: list[Path]) -> None:
-    """Best-effort removal of staged temp files."""
+    """尽力删除已暂存的临时文件。"""
     for tmp in temps:
         try:
             tmp.unlink(missing_ok=True)
@@ -79,10 +70,12 @@ def _cleanup_temps(temps: list[Path]) -> None:
 
 
 def _is_nullish_string(value: object) -> bool:
+    """判断值是否为表示空值的字符串。"""
     return isinstance(value, str) and value.strip().lower() in _NULLISH_STRINGS
 
 
 def _normalize_nullish_string(value: object) -> object:
+    """将表示空值的字符串规范化为 ``None``。"""
     return None if _is_nullish_string(value) else value
 
 
@@ -99,7 +92,7 @@ def update_agent(
     tool_groups: OptionalStringList = None,
     model: OptionalText = None,
 ) -> Command:
-    """Persist updates to the current custom agent's SOUL.md and config.yaml.
+    """持久化更新当前自定义代理的角色说明和配置。
 
     Use this when the user asks to refine the agent's identity, description,
     skill whitelist, tool-group whitelist, or default model. Only the fields
@@ -130,6 +123,7 @@ def update_agent(
     channel_name: str | None = runtime.context.get("channel_name") if runtime.context else None
 
     def _err(message: str) -> Command:
+        """构造包含错误信息的工具结果命令。"""
         return Command(update={"messages": [ToolMessage(content=f"Error: {message}", tool_call_id=tool_call_id, status="error")]})
 
     # Defence in depth — the lead-agent factory already withholds this

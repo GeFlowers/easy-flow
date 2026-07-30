@@ -1,16 +1,4 @@
-"""Abstract interface for thread metadata storage.
-
-Implementations:
-- ThreadMetaRepository: SQL-backed (sqlite / postgres via SQLAlchemy)
-- MemoryThreadMetaStore: wraps LangGraph BaseStore (memory mode)
-
-All mutating and querying methods accept a ``user_id`` parameter with
-three-state semantics (see :mod:`deerflow.runtime.user_context`):
-
-- ``AUTO`` (default): resolve from the request-scoped contextvar.
-- Explicit ``str``: use the provided value verbatim.
-- Explicit ``None``: bypass owner filtering (migration/CLI only).
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from __future__ import annotations
 
@@ -21,10 +9,12 @@ from deerflow.runtime.user_context import AUTO, _AutoSentinel
 
 
 class InvalidMetadataFilterError(ValueError):
-    """Raised when all client-supplied metadata filter keys are rejected."""
+    """定义持久化层使用的数据模型、配置或辅助组件。"""
 
 
 class ThreadMetaStore(abc.ABC):
+    """定义持久化存储的抽象接口或具体实现。"""
+
     @abc.abstractmethod
     async def create(
         self,
@@ -35,10 +25,12 @@ class ThreadMetaStore(abc.ABC):
         display_name: str | None = None,
         metadata: dict | None = None,
     ) -> dict:
+        """创建记录并在成功后提交相应的持久化事务。"""
         pass
 
     @abc.abstractmethod
     async def get(self, thread_id: str, *, user_id: str | None | _AutoSentinel = AUTO) -> dict | None:
+        """按给定条件查询并返回对应的持久化记录。"""
         pass
 
     @abc.abstractmethod
@@ -51,40 +43,35 @@ class ThreadMetaStore(abc.ABC):
         offset: int = 0,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict[str, Any]]:
+        """查询并返回满足给定条件的持久化记录集合。"""
         pass
 
     @abc.abstractmethod
     async def update_display_name(self, thread_id: str, display_name: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         pass
 
     @abc.abstractmethod
     async def update_status(self, thread_id: str, status: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """更新指定持久化记录的状态或字段并提交事务。"""
         pass
 
     @abc.abstractmethod
     async def update_metadata(self, thread_id: str, metadata: dict, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
-        """Merge ``metadata`` into the thread's metadata field.
-
-        Existing keys are overwritten by the new values; keys absent from
-        ``metadata`` are preserved. No-op if the thread does not exist
-        or the owner check fails.
-        """
+        """更新指定持久化记录的状态或字段并提交事务。"""
         pass
 
     @abc.abstractmethod
     async def update_owner(self, thread_id: str, owner_user_id: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
-        """Move a thread metadata row to a new owner.
-
-        Intended for trusted internal repair/migration paths. No-op if the
-        row does not exist or the caller fails the owner check.
-        """
+        """更新指定持久化记录的状态或字段并提交事务。"""
         pass
 
     @abc.abstractmethod
     async def check_access(self, thread_id: str, user_id: str, *, require_existing: bool = False) -> bool:
-        """Check if ``user_id`` has access to ``thread_id``."""
+        """执行当前持久化组件提供的操作。"""
         pass
 
     @abc.abstractmethod
     async def delete(self, thread_id: str, *, user_id: str | None | _AutoSentinel = AUTO) -> None:
+        """删除或撤销满足条件的持久化记录并提交事务。"""
         pass

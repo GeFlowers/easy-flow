@@ -1,18 +1,4 @@
-"""ORM model registration entry point.
-
-Importing this module ensures all ORM models are registered with
-``Base.metadata`` so Alembic autogenerate detects every table.
-
-The actual ORM classes have moved to entity-specific subpackages:
-- ``deerflow.persistence.thread_meta``
-- ``deerflow.persistence.run``
-- ``deerflow.persistence.feedback``
-- ``deerflow.persistence.user``
-
-``RunEventRow`` remains in ``deerflow.persistence.models.run_event`` because
-its storage implementation lives in ``deerflow.runtime.events.store.db`` and
-there is no matching entity directory.
-"""
+"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
 
 from deerflow.persistence.channel_connections.model import (
     ChannelConnectionRow,

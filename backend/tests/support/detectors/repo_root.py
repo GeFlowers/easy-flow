@@ -1,11 +1,4 @@
-"""Fail-loud repository-root resolution shared by the detectors.
-
-Depth-indexed resolution (`Path(__file__).resolve().parents[N]`) fails
-silently when a detector file moves to a different directory depth: scan
-roots resolve under the wrong directory, nothing is scanned, and the
-detector reports zero findings with no error. Walking upward to a
-repository marker turns that into an immediate error instead.
-"""
+"""测试模块：覆盖本文件定义的回归边界、模拟失败与资源生命周期。"""
 
 from __future__ import annotations
 
@@ -15,15 +8,7 @@ REPO_ROOT_MARKER = ".git"
 
 
 def resolve_repo_root(start: Path) -> Path:
-    """Return the repository root above `start` (the directory containing `.git`).
-
-    `.git` is checked with `exists()` rather than `is_dir()` so git worktrees
-    (where `.git` is a file) resolve correctly.
-
-    Raises:
-        RuntimeError: when no marker is found above `start`, so a relocated
-            detector fails loudly instead of silently scanning an empty tree.
-    """
+    """测试辅助定义：构造输入或替身，并保持调用方断言依赖的状态、异常和资源边界。"""
     resolved = start.resolve()
     for candidate in (resolved, *resolved.parents):
         if (candidate / REPO_ROOT_MARKER).exists():

@@ -1,18 +1,4 @@
-"""Langfuse trace-attribute metadata builders.
-
-The Langfuse v4 ``langchain.CallbackHandler`` lifts a fixed set of reserved
-keys from ``RunnableConfig.metadata`` onto the root trace:
-
-- ``langfuse_session_id`` → groups traces (LangGraph thread → Langfuse Session)
-- ``langfuse_user_id``    → trace user_id (powers the Users page)
-- ``langfuse_trace_name`` → human-readable trace name
-- ``langfuse_tags``       → trace tags
-
-See ``langfuse/langchain/CallbackHandler.py::_parse_langfuse_trace_attributes``
-and https://langfuse.com/docs/observability/features/sessions for the
-contract. Builders here exist so the gateway/run worker can inject the
-right metadata without leaking Langfuse internals into the call sites.
-"""
+"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
 
 from __future__ import annotations
 
@@ -35,23 +21,7 @@ def build_langfuse_trace_metadata(
     environment: str | None = None,
     deerflow_trace_id: str | None = None,
 ) -> dict[str, Any]:
-    """Return Langfuse trace-attribute metadata for ``RunnableConfig.metadata``.
-
-    Returns ``{}`` when Langfuse is not in the enabled tracing providers so
-    callers can unconditionally merge the result without affecting LangSmith
-    or other tracers.
-
-    Args:
-        thread_id: LangGraph thread id; mapped to ``langfuse_session_id``.
-        user_id: Effective user id; falls back to ``DEFAULT_USER_ID`` when
-            ``None`` so the Langfuse Users page works in no-auth mode.
-        assistant_id: Optional agent identifier; defaults to ``"lead-agent"``.
-        model_name: Model name; emitted as ``model:<name>`` in ``langfuse_tags``.
-        environment: Deployment env (e.g. ``"production"``); emitted as
-            ``env:<value>`` in ``langfuse_tags``.
-        deerflow_trace_id: Optional DeerFlow request trace id; falls back to
-            the current request trace context when omitted.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     if "langfuse" not in get_enabled_tracing_providers():
         return {}
 
@@ -87,16 +57,7 @@ def inject_langfuse_metadata(
     environment: str | None = None,
     deerflow_trace_id: str | None = None,
 ) -> None:
-    """Merge Langfuse trace-attribute metadata into ``config["metadata"]``.
-
-    Shared by the gateway worker (``runtime/runs/worker.py``) and the
-    embedded client (``client.py``) so the two paths cannot drift apart.
-
-    Caller-supplied metadata wins via ``setdefault`` — an upstream value
-    for e.g. ``langfuse_session_id`` set by the frontend stays untouched.
-    The ``config`` dict is mutated in place; the call is a no-op when
-    Langfuse is not in the enabled tracing providers.
-    """
+    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
     langfuse_metadata = build_langfuse_trace_metadata(
         thread_id=thread_id,
         user_id=user_id,

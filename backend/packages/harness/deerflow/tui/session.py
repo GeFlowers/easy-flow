@@ -1,10 +1,4 @@
-"""Embedded session wiring for the TUI.
-
-Owns construction of the ``DeerFlowClient`` (with a persistent checkpointer),
-thread resolution for ``--continue`` / ``--resume`` (by id **or** title), and the
-shared-persistence writer that makes terminal sessions visible in the Web UI (see
-``deerflow.tui.persistence``).
-"""
+'未说明'
 
 from __future__ import annotations
 
@@ -20,12 +14,13 @@ if TYPE_CHECKING:  # avoid importing the heavy client during pure planning
 
 @dataclass
 class Session:
+    '未说明'
     client: DeerFlowClient
     writer: ThreadMetaWriter | None = None
     _loop: _LoopThread | None = None
 
     def resolve_thread(self, plan: LaunchPlan) -> str | None:
-        """Resolve the thread id to run against, honoring --resume / --continue."""
+        '未说明'
         if plan.thread_id:
             return self.resolve_ref(plan.thread_id)
         if plan.continue_recent:
@@ -35,12 +30,7 @@ class Session:
         return None
 
     def resolve_ref(self, ref: str) -> str:
-        """Resolve a thread reference (id or title) to a thread id.
-
-        Matches an existing thread by id first, then by exact title. Falls back to
-        the literal ref (treated as an id) when nothing matches, so an unknown id
-        still continues/creates that namespace.
-        """
+        '未说明'
         try:
             threads = self.client.list_threads(limit=100).get("thread_list", [])
         except Exception:  # noqa: BLE001 - resolution is best-effort
@@ -53,10 +43,11 @@ class Session:
         return ref
 
     def recent_threads(self, limit: int = 20) -> list[dict]:
+        '未说明'
         return self.client.list_threads(limit=limit).get("thread_list", [])
 
     def close(self) -> None:
-        """Stop the background DB loop and dispose the engine (best-effort)."""
+        '未说明'
         loop = self._loop
         if loop is None:
             return
@@ -71,13 +62,7 @@ class Session:
 
 
 def open_session(persistence: bool = True) -> Session:
-    """Build an embedded session backed by the configured checkpointer.
-
-    ``persistence`` controls the shared ``threads_meta`` writer (and its background
-    DB loop/engine). Headless one-shots never use the writer, so they pass
-    ``persistence=False`` to avoid standing up an event loop + connection pool only
-    to discard it.
-    """
+    '未说明'
     from deerflow.client import DeerFlowClient
     from deerflow.runtime.checkpointer.provider import get_checkpointer
 

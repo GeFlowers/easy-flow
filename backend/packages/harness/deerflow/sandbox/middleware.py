@@ -1,3 +1,4 @@
+"""在智能体和工具调用生命周期中管理沙箱的中间件。"""
 import asyncio
 import logging
 from collections.abc import Awaitable, Callable
@@ -19,58 +20,48 @@ logger = logging.getLogger(__name__)
 
 
 class SandboxMiddlewareState(AgentState):
-    """Compatible with the `ThreadState` schema."""
+    """声明沙箱中间件读取和写入的智能体状态字段。"""
 
     sandbox: SandboxStateField
     thread_data: NotRequired[ThreadDataState | None]
 
 
 class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
-    """Create a sandbox environment and assign it to an agent.
-
-    Lifecycle Management:
-    - With lazy_init=True (default): Sandbox is acquired on first tool call
-    - With lazy_init=False: Sandbox is acquired on first agent invocation (before_agent)
-    - Sandbox is reused across multiple turns within the same thread
-    - Sandbox is NOT released after each agent call to avoid wasteful recreation
-    - Cleanup happens at application shutdown via SandboxProvider.shutdown()
-    """
+    """按需获取、传播并在运行结束时释放线程范围内的沙箱。"""
 
     state_schema = SandboxMiddlewareState
 
     def __init__(self, lazy_init: bool = True):
-        """Initialize sandbox middleware.
-
-        Args:
-            lazy_init: If True, defer sandbox acquisition until first tool call.
-                      If False, acquire sandbox eagerly in before_agent().
-                      Default is True for optimal performance.
-        """
+        """初始化中间件，并配置是否延迟获取沙箱。"""
         super().__init__()
         self._lazy_init = lazy_init
 
     def _acquire_sandbox(self, thread_id: str, *, user_id: str) -> str:
+        """同步获取指定线程和用户范围内的沙箱标识。"""
         provider = get_sandbox_provider()
         sandbox_id = provider.acquire(thread_id, user_id=user_id)
         logger.info(f"Acquiring sandbox {sandbox_id}")
         return sandbox_id
 
     async def _acquire_sandbox_async(self, thread_id: str, *, user_id: str) -> str:
+        """异步获取指定线程和用户范围内的沙箱标识。"""
         provider = get_sandbox_provider()
         sandbox_id = await provider.acquire_async(thread_id, user_id=user_id)
         logger.info(f"Acquiring sandbox {sandbox_id}")
         return sandbox_id
 
     async def _release_sandbox_async(self, sandbox_id: str) -> None:
+        """在线程中异步释放指定沙箱，避免阻塞事件循环。"""
         await asyncio.to_thread(get_sandbox_provider().release, sandbox_id)
 
     @override
     def before_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        # Skip acquisition if lazy_init is enabled
+                # 中文说明：此处用于执行相关处理。
+        """在同步智能体运行前按配置预先分配沙箱。"""
         if self._lazy_init:
             return super().before_agent(state, runtime)
 
-        # Eager initialization (original behavior)
+                # 中文说明：此处用于执行相关处理。
         if "sandbox" not in state or state["sandbox"] is None:
             thread_id = (runtime.context or {}).get("thread_id")
             if thread_id is None:
@@ -82,12 +73,13 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @override
     async def abefore_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        # Skip acquisition if lazy_init is enabled
+                # 中文说明：此处用于执行相关处理。
+        """在异步智能体运行前按配置预先分配沙箱。"""
         if self._lazy_init:
             return await super().abefore_agent(state, runtime)
 
-        # Eager initialization (original behavior), but use the async provider
-        # hook so blocking sandbox startup/polling runs outside the event loop.
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
         if "sandbox" not in state or state["sandbox"] is None:
             thread_id = (runtime.context or {}).get("thread_id")
             if thread_id is None:
@@ -99,6 +91,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @override
     def after_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
+        """在同步智能体运行结束后释放状态或上下文中的沙箱。"""
         sandbox = state.get("sandbox")
         if sandbox is not None:
             sandbox_id = sandbox["sandbox_id"]
@@ -112,11 +105,12 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             get_sandbox_provider().release(sandbox_id)
             return None
 
-        # No sandbox to release
+                # 中文说明：此处用于执行相关处理。
         return super().after_agent(state, runtime)
 
     @override
     async def aafter_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
+        """在异步智能体运行结束后释放状态或上下文中的沙箱。"""
         sandbox = state.get("sandbox")
         if sandbox is not None:
             sandbox_id = sandbox["sandbox_id"]
@@ -130,26 +124,27 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             await self._release_sandbox_async(sandbox_id)
             return None
 
-        # No sandbox to release
+                # 中文说明：此处用于执行相关处理。
         return await super().aafter_agent(state, runtime)
 
     # ------------------------------------------------------------------
-    # Tool-call wrappers: persist lazily-acquired sandbox state into the
-    # graph state via Command(update=...).
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     #
-    # Background:
-    #   ``ensure_sandbox_initialized*`` in ``deerflow.sandbox.tools`` mutates
-    #   ``runtime.state["sandbox"]`` directly. That mutation is local to the
-    #   current tool invocation and is NOT picked up by LangGraph's channel
-    #   reducer, so subsequent graph steps (and downstream consumers such as
-    #   ``ToolOutputBudgetMiddleware`` and the sub-agent ``task_tool``)
-    #   cannot observe the sandbox id. Wrapping the tool call lets us detect
-    #   a fresh lazy init by diffing the state snapshot before/after the
-    #   handler and emit a proper state update via ``Command``.
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
     # ------------------------------------------------------------------
 
     @staticmethod
     def _read_sandbox_id_from_state(state: object) -> str | None:
+        """从字典形态的状态中安全提取沙箱标识。"""
         if not isinstance(state, dict):
             return None
         sandbox_state = state.get("sandbox")
@@ -160,14 +155,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @staticmethod
     def _attach_sandbox_update(result: ToolMessage | Command, sandbox_id: str) -> ToolMessage | Command:
-        """Wrap or merge ``result`` so that ``sandbox.sandbox_id`` is persisted.
-
-        - ``ToolMessage`` -> ``Command(update={"sandbox": ..., "messages": [msg]})``
-        - ``Command`` with dict update -> merge ``sandbox`` key, preserve all
-          existing fields (``messages``, ``goto``, ``graph``, ``resume``, ...).
-        - ``Command`` with non-dict / None update -> leave it untouched to
-          avoid silent data loss on unknown update shapes.
-        """
+        """将新获得的沙箱标识合并到工具结果的状态更新中。"""
         sandbox_update = {"sandbox": {"sandbox_id": sandbox_id}}
 
         if isinstance(result, ToolMessage):
@@ -181,7 +169,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @staticmethod
     def _read_sandbox_id_from_request(request: ToolCallRequest) -> str | None:
-        """Read sandbox_id from runtime.state (where ensure_sandbox_initialized writes)."""
+        """从工具调用请求的运行时状态中读取沙箱标识。"""
         runtime = request.runtime
         if runtime is None or runtime.state is None:
             return None
@@ -193,6 +181,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
+        """执行同步工具调用，并把调用期间延迟初始化的沙箱写回结果。"""
         prev_sandbox_id = self._read_sandbox_id_from_request(request)
         result = handler(request)
         if prev_sandbox_id is not None:
@@ -208,6 +197,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
+        """执行异步工具调用，并把调用期间延迟初始化的沙箱写回结果。"""
         prev_sandbox_id = self._read_sandbox_id_from_request(request)
         result = await handler(request)
         if prev_sandbox_id is not None:

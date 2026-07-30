@@ -1,3 +1,5 @@
+"""提供发送前输入润色接口，且不创建运行或持久化消息。"""
+
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -15,28 +17,30 @@ router = APIRouter(prefix="/api", tags=["input-polish"])
 
 
 class InputPolishRequest(BaseModel):
+    """定义输入润色请求中的草稿、语言提示和仅用于追踪的线程标识。"""
     text: str = Field(..., description="Draft text currently shown in the composer")
     locale: str | None = Field(default=None, description="Optional UI locale hint")
     thread_id: str | None = Field(default=None, description="Optional thread id for tracing only")
 
 
 class InputPolishResponse(BaseModel):
+    """返回模型润色后的草稿以及是否与原文不同的标记。"""
     rewritten_text: str = Field(..., description="Polished draft text")
     changed: bool = Field(..., description="Whether the model changed the original draft")
 
 
 def _clean_rewritten_text(text: str) -> str:
-    # The polished draft may legitimately contain a literal "<think>" substring
-    # (e.g. a draft that asks about the tag), so do NOT truncate at a dangling
-    # open tag here — that would silently drop the rest of a valid rewrite and
-    # can produce a spurious 503. Complete <think>...</think> blocks are still
-    # removed.
+    """移除完整思考块和 Markdown 围栏，同时保留合法的未闭合标签文本。"""
+    # 润色草稿可合法包含字面量 "<think>"，例如询问该标签的草稿；因此不能在未闭合
+    # 开始标签处截断，否则会悄然丢失有效改写的后半段并错误返回 503。完整的
+    # <think>...</think> 块仍会被移除。
     candidate = llm_text.strip_think_blocks(text, truncate_unclosed=False)
     candidate = llm_text.strip_markdown_code_fence(candidate)
     return candidate.strip()
 
 
 def _build_system_instruction() -> str:
+    """构造约束润色模型保留用户意图且只输出改写结果的系统指令。"""
     return (
         "You are DeerFlow's pre-send prompt optimizer.\n"
         "Rewrite the user's rough draft into a clearer instruction for an AI agent before it is sent.\n"
@@ -51,6 +55,7 @@ def _build_system_instruction() -> str:
 
 
 def _build_user_content(text: str, locale: str | None) -> str:
+    """将草稿及可选语言提示封装为单次模型调用的用户内容。"""
     locale_hint = locale.strip() if locale else "same language as the draft"
     return f"Locale hint: {locale_hint}\n\nRewrite this draft while preserving its intent:\n<draft>\n{text}\n</draft>"
 
@@ -67,14 +72,14 @@ async def polish_input(
     request: Request,
     config: AppConfig = Depends(get_config),
 ) -> InputPolishResponse:
-    del request  # Required by the auth decorator.
+    """在通过创建运行权限校验后润色草稿，但不启动或写入任何线程运行。"""
+    del request  # 认证装饰器要求保留该参数。
 
     if not config.input_polish.enabled:
         raise HTTPException(status_code=404, detail="Input polishing is disabled")
 
-    # Validate the same normalized view of the input that we send to the model,
-    # so the user-facing length boundary and the model input cannot disagree
-    # (e.g. a padded draft passing the check but arriving with stray whitespace).
+    # 校验与发送给模型完全相同的规范化输入，避免用户可见长度边界与模型输入不一致，
+    # 例如填充空白的草稿通过校验却带着多余空白传给模型。
     text = body.text.strip()
     if not text:
         raise HTTPException(status_code=400, detail="Input text is required")

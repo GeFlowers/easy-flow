@@ -1,4 +1,4 @@
-"""Regression coverage for production deploy.sh UV_EXTRAS propagation."""
+'定义 test_deploy_uv_extras 模块提供的职责与可复用接口。\n\nRegression coverage for production deploy.sh UV_EXTRAS propagation.'
 
 from __future__ import annotations
 
@@ -14,6 +14,7 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 
 
 def _backend_dockerfile_uv_sync_script() -> str:
+    '执行 _backend_dockerfile_uv_sync_script 的明确职责，并返回与调用约定一致的结果'
     dockerfile = (REPO_ROOT / "backend" / "Dockerfile").read_text(encoding="utf-8")
     match = re.search(r"""sh -c (?P<quote>["'])(?P<script>.*?uv sync.*?)(?P=quote)""", dockerfile, re.S)
     assert match is not None
@@ -21,7 +22,7 @@ def _backend_dockerfile_uv_sync_script() -> str:
 
 
 def test_backend_dockerfile_expands_multiple_uv_extras(tmp_path):
-    """Dockerfile build args must become repeated uv --extra flags."""
+    '验证 backend、dockerfile、expands、multiple、uv、extras 场景下的预期行为、边界条件与结果。\n\nDockerfile build args must become repeated uv --extra flags.'
     workdir = tmp_path / "work"
     backend = workdir / "backend"
     backend.mkdir(parents=True)
@@ -59,7 +60,7 @@ def test_backend_dockerfile_expands_multiple_uv_extras(tmp_path):
 
 
 def test_backend_dockerfile_rejects_glob_uv_extra(tmp_path):
-    """Dockerfile extras must reject globs before invoking uv."""
+    '验证 backend、dockerfile、rejects、glob、uv、extra 场景下的预期行为、边界条件与结果。\n\nDockerfile extras must reject globs before invoking uv.'
     workdir = tmp_path / "work"
     backend = workdir / "backend"
     backend.mkdir(parents=True)
@@ -93,7 +94,7 @@ def test_backend_dockerfile_rejects_glob_uv_extra(tmp_path):
 
 
 def test_deploy_build_auto_detects_postgres_extra_when_other_extras_are_enabled(tmp_path):
-    """Production image builds preserve every detected extra as Docker build tokens."""
+    '验证 deploy、build、auto、detects、postgres、extra、when、other、extras、are、enabled 场景下的预期行为、边界条件与结果。\n\nProduction image builds preserve every detected extra as Docker build tokens.'
     worktree = tmp_path / "repo"
     shutil.copytree(REPO_ROOT / "scripts", worktree / "scripts")
     shutil.copytree(REPO_ROOT / "docker", worktree / "docker")
@@ -132,7 +133,7 @@ def test_deploy_build_auto_detects_postgres_extra_when_other_extras_are_enabled(
 
 
 def test_deploy_uses_dotenv_without_sourcing_shell_syntax(tmp_path):
-    """Repo-root .env is Docker Compose dotenv, not a shell script."""
+    '验证 deploy、uses、dotenv、without、sourcing、shell、syntax 场景下的预期行为、边界条件与结果。\n\nRepo-root .env is Docker Compose dotenv, not a shell script.'
     worktree = tmp_path / "repo"
     shutil.copytree(REPO_ROOT / "scripts", worktree / "scripts")
     shutil.copytree(REPO_ROOT / "docker", worktree / "docker")
@@ -182,7 +183,7 @@ def test_deploy_uses_dotenv_without_sourcing_shell_syntax(tmp_path):
 
 
 def test_deploy_build_auto_detects_postgres_extra_with_python_fallback(tmp_path):
-    """Production deploy hosts may have python but no runnable python3."""
+    '验证 deploy、build、auto、detects、postgres、extra、with、python、fallback 场景下的预期行为、边界条件与结果。\n\nProduction deploy hosts may have python but no runnable python3.'
     worktree = tmp_path / "repo"
     shutil.copytree(REPO_ROOT / "scripts", worktree / "scripts")
     shutil.copytree(REPO_ROOT / "docker", worktree / "docker")
