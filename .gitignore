@@ -13,8 +13,12 @@ Thumbs.db
 
 # Python cache
 __pycache__/
-*.pyc
-*.pyo
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
 
 # Virtual environments
 .venv
