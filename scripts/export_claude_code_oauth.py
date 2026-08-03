@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责导出。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""从 macOS 钥匙串导出 Claude Code OAuth 凭证。"""
 
 from __future__ import annotations
 
@@ -91,7 +91,7 @@ def write_credentials_file(output_path: Path, data: dict[str, Any]) -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    '未说明'
+    """解析钥匙串服务、账户及凭证输出路径参数。"""
     parser = argparse.ArgumentParser(
         description="Manually export Claude Code OAuth credentials from macOS Keychain for DeerFlow.",
     )
@@ -129,7 +129,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def main() -> int:
-    '未说明'
+    """从 macOS 钥匙串导出 Claude Code OAuth 凭证。"""
     args = parse_args()
 
     if args.show_target:

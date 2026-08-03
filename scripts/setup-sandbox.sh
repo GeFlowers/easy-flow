@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-pull sandbox container image for DeerFlow
+# 预拉取 DeerFlow 沙箱容器镜像
 
 set -uo pipefail
 
@@ -8,19 +8,18 @@ echo "  Pre-pulling Sandbox Container Image"
 echo "=========================================="
 echo ""
 
-# Try to extract image from config.yaml (handles both commented and uncommented sandbox sections)
+# 尝试从 config.yaml 提取镜像，兼容已启用和被注释的 sandbox 配置节
 IMAGE=""
 CONFIGURED=1
 if [ -f "config.yaml" ]; then
-    # Look for uncommented image: field under the sandbox section
+    # 查找 sandbox 配置节下未被注释的 image 字段
     IMAGE=$(grep -A 20 "^sandbox:" config.yaml 2>/dev/null | grep "^  image:" | awk '{print $2}' | head -1 || true)
 fi
 
 if [ -z "$IMAGE" ]; then
-    # NOTE: not ":latest". The mirror's `:latest` tag is frozen on an old
-    # pre-1.9.3 digest that lacks the /v1/bash/* routes required-secrets
-    # skills need (see #3921/#3922) — pulling it here would defeat the whole
-    # point of this pre-pull helper. Keep this pinned to a version >= 1.9.3.
+    # 注意：不要使用 :latest。镜像站的 :latest 仍指向 1.9.3 之前的旧摘要，
+    # 缺少 required-secrets 技能依赖的 /v1/bash/* 路由（见 #3921/#3922）。
+    # 使用该标签会失去预拉取脚本的意义，因此版本必须固定为 1.9.3 或更高。
     IMAGE="enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:1.11.0"
     CONFIGURED=0
     echo "Using default image: $IMAGE"

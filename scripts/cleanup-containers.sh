@@ -57,7 +57,7 @@ try:
     if isinstance(containers, list):
         for c in containers:
             if isinstance(c, dict):
-                # Apple Container uses 'id' field which contains the container name
+                # Apple Container 的 id 字段中保存容器名称
                 cid = c.get('configuration').get('id', '')
                 if '${PREFIX}' in cid:
                     print(cid)

@@ -71,7 +71,7 @@ print(f'Upgrading config.yaml: version {user_version} -> {example_version}')
 print()
 
 # ── Migrations ───────────────────────────────────────────────────────────
-# Each migration targets a specific version upgrade.
+# 每个迁移函数只负责一个明确的版本升级。
 # 'replacements': list of (old_string, new_string) applied to the raw YAML text.
 #   This handles value changes that a dict merge cannot catch.
 
@@ -85,14 +85,14 @@ MIGRATIONS = {
             ('src.tools.', 'deerflow.tools.'),
         ],
     },
-    # Future migrations go here:
+    # 后续迁移函数在此处按版本顺序调用：
     # 2: {
     #     'description': '...',
     #     'replacements': [('old', 'new')],
     # },
 }
 
-# Apply migrations in order for versions (user_version, example_version]
+# 按版本顺序应用位于 (user_version, example_version] 区间内的迁移
 migrated = []
 for version in range(user_version + 1, example_version + 1):
     migration = MIGRATIONS.get(version)
@@ -104,7 +104,7 @@ for version in range(user_version + 1, example_version + 1):
             raw_text = raw_text.replace(old, new)
             migrated.append(f'{old} -> {new}')
 
-# Re-parse after text migrations
+# 文本迁移完成后重新解析配置
 user = yaml.safe_load(raw_text) or {}
 
 if migrated:
@@ -129,7 +129,7 @@ def merge(target, source, path=''):
 
 merge(user, example)
 
-# Always update config_version
+# 无论是否执行迁移，都将 config_version 更新为示例版本
 user['config_version'] = example_version
 
 # ── Write ─────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责检查。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""检查 DeerFlow 本地开发所需工具及其版本。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 def configure_stdio() -> None:
-    '未说明'
+    """配置标准输入输出使用 UTF-8，并在不支持时安全降级。"""
     for stream_name in ("stdout", "stderr"):
         stream = getattr(sys, stream_name, None)
         if hasattr(stream, "reconfigure"):
@@ -30,7 +30,7 @@ def run_command(command: list[str]) -> str | None:
 
 
 def find_pnpm_command() -> list[str] | None:
-    '未说明'
+    """查找可用的 pnpm 命令，并兼容通过 Corepack 启动的场景。"""
     pnpm_path = shutil.which("pnpm")
     if pnpm_path:
         return [str(Path(pnpm_path))]
@@ -48,7 +48,7 @@ def find_pnpm_command() -> list[str] | None:
 
 
 def parse_node_major(version_text: str) -> int | None:
-    '未说明'
+    """从 Node.js 版本文本中解析主版本号。"""
     version = version_text.strip()
     if version.startswith("v"):
         version = version[1:]
@@ -59,7 +59,7 @@ def parse_node_major(version_text: str) -> int | None:
 
 
 def main() -> int:
-    '未说明'
+    """检查项目所需命令及其版本，并返回对应的进程退出码。"""
     configure_stdio()
     print("==========================================")
     print("  Checking Required Dependencies")

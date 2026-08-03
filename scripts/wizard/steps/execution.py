@@ -1,4 +1,4 @@
-'未说明'
+"""实现配置向导的代码执行环境选择步骤。"""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ CONTAINER_SANDBOX = "deerflow.community.aio_sandbox:AioSandboxProvider"
 
 @dataclass
 class ExecutionStepResult:
-    '未说明'
+    """记录代码执行环境及其沙箱连接配置。"""
     sandbox_use: str
     allow_host_bash: bool
     include_bash_tool: bool

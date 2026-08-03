@@ -1,4 +1,4 @@
-'未说明'
+"""定义配置向导支持的模型、网页和搜索服务提供商。"""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 
 @dataclass
 class LLMProvider:
-    '未说明'
+    """描述大语言模型服务商的连接参数与模型能力。"""
     name: str
     display_name: str
     description: str
@@ -16,19 +16,19 @@ class LLMProvider:
     default_model: str
     env_var: str | None
     package: str | None
-    # Optional: some providers use a different field name for the API key in YAML
+    # 可选：部分服务商在 YAML 中使用不同的 API 密钥字段名
     api_key_field: str = "api_key"
-    # Extra config fields beyond the common ones (merged into YAML)
+    # 通用字段之外需要合并到 YAML 的额外配置
     extra_config: dict = field(default_factory=dict)
-    # Per-model supports_vision overrides for providers whose models differ in
-    # capability (e.g. MiniMax M3 supports vision but M2.7 is text-only). The
-    # provider-level extra_config holds the default (default_model) capability.
+    # 当同一服务商的模型能力不同时，可按模型覆盖 supports_vision。
+    # 例如 MiniMax M3 支持视觉，而 M2.7 仅支持文本；服务商级 extra_config
+    # 保存默认模型的能力配置。
     model_vision_overrides: dict[str, bool] = field(default_factory=dict)
     auth_hint: str | None = None
     base_url_prompt: str | None = None
     model_prompt: str | None = None
-    # For generic OpenAI-compatible gateways the wizard cannot infer whether the
-    # user-supplied model supports thinking/reasoning, so prompt for it explicitly.
+    # 对于通用 OpenAI 兼容网关，向导无法推断用户填写的模型是否支持思考/推理，
+    # 因此需要显式询问。
     ask_thinking_support: bool = False
 
     def extra_config_for(self, model_name: str) -> dict:
@@ -41,7 +41,7 @@ class LLMProvider:
 
 @dataclass
 class WebProvider:
-    '未说明'
+    """描述网页访问服务商的连接参数。"""
     name: str
     display_name: str
     description: str
@@ -53,7 +53,7 @@ class WebProvider:
 
 @dataclass
 class SearchProvider:
-    '未说明'
+    """描述搜索服务商的连接参数与配置字段。"""
     name: str
     display_name: str
     description: str

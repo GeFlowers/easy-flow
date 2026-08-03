@@ -1,4 +1,4 @@
-'未说明'
+"""负责读取环境变量并生成配置向导的输出文件。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ CHANNEL_CONNECTION_PROVIDERS: tuple[str, ...] = (
 
 
 def _project_root() -> Path:
-    '未说明'
+    """返回 DeerFlow 项目根目录。"""
     return Path(__file__).resolve().parents[2]
 
 
@@ -69,12 +69,12 @@ def write_env_file(env_path: Path, pairs: dict[str, str]) -> None:
 # ── config.yaml helpers ───────────────────────────────────────────────────────
 
 def _yaml_dump(data: Any) -> str:
-    '未说明'
+    """将配置对象序列化为保持键顺序的 YAML 文本。"""
     return yaml.safe_dump(data, default_flow_style=False, allow_unicode=True, sort_keys=False)
 
 
 def _default_tools() -> list[dict[str, Any]]:
-    '未说明'
+    """返回默认启用的内置工具配置。"""
     return [
         {"name": "image_search", "use": "deerflow.community.image_search.tools:image_search_tool", "group": "web", "max_results": 5},
         {"name": "ls", "use": "deerflow.sandbox.tools:ls_tool", "group": "file:read"},
@@ -99,7 +99,7 @@ def _build_tools(
     include_bash_tool: bool,
     include_write_tools: bool,
 ) -> list[dict[str, Any]]:
-    '未说明'
+    """根据所选网页与搜索服务商构建工具配置。"""
     tools = deepcopy(base_tools if base_tools is not None else _default_tools())
     tools = [
         tool
@@ -145,15 +145,15 @@ def _build_tools(
 
 
 def _make_model_config_name(model_name: str) -> str:
-    '未说明'
-    # Take only the last path component for namespaced models (e.g. "org/model-name")
+    """将模型名称转换为稳定的配置项名称。"""
+    # 对带命名空间的模型仅保留最后一段，例如 "org/model-name"
     base = model_name.split("/")[-1]
-    # Replace dots with hyphens so "gpt-5.4" → "gpt-5-4"
+    # 将点替换为连字符，例如 "gpt-5.4" → "gpt-5-4"
     return base.replace(".", "-")
 
 
 def _build_channel_connections_config(enabled_providers: list[str]) -> dict[str, Any]:
-    '未说明'
+    """根据启用的消息渠道生成连接配置。"""
     selected = set(enabled_providers)
     unknown = selected.difference(CHANNEL_CONNECTION_PROVIDERS)
     if unknown:
@@ -270,7 +270,7 @@ def write_config_yaml(
     channel_connection_providers: list[str] | None = None,
 ) -> None:
     """执行写入 配置对应的单一步骤；仅作用于调用方传入的范围，并将异常交由调用方处理。"""
-    # Read config_version from config.example.yaml if present
+    # 如果示例配置存在，则读取其中的 config_version
     config_version = 5
     example_path = config_path.parent / "config.example.yaml"
     if example_path.exists():

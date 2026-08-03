@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责诊断。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""诊断 DeerFlow 的运行环境、配置、认证和外部工具。"""
 
 from __future__ import annotations
 
@@ -12,57 +12,57 @@ from pathlib import Path
 from typing import Literal
 
 # ---------------------------------------------------------------------------
-# Helpers
+# 通用辅助函数
 # ---------------------------------------------------------------------------
 
 Status = Literal["ok", "warn", "fail", "skip"]
 
 
 def _supports_color() -> bool:
-    '未说明'
+    """判断当前标准输出是否支持 ANSI 彩色文本。"""
     return hasattr(sys.stdout, "isatty") and sys.stdout.isatty()
 
 
 def _c(text: str, code: str) -> str:
-    '未说明'
+    """在终端支持颜色时为文本添加指定 ANSI 样式。"""
     if _supports_color():
         return f"\033[{code}m{text}\033[0m"
     return text
 
 
 def green(t: str) -> str:
-    '未说明'
+    """将文本渲染为绿色。"""
     return _c(t, "32")
 
 
 def red(t: str) -> str:
-    '未说明'
+    """将文本渲染为红色。"""
     return _c(t, "31")
 
 
 def yellow(t: str) -> str:
-    '未说明'
+    """将文本渲染为黄色。"""
     return _c(t, "33")
 
 
 def cyan(t: str) -> str:
-    '未说明'
+    """将文本渲染为青色。"""
     return _c(t, "36")
 
 
 def bold(t: str) -> str:
-    '未说明'
+    """将文本渲染为粗体。"""
     return _c(t, "1")
 
 
 def _icon(status: Status) -> str:
-    '未说明'
+    """返回与检查状态对应的终端图标。"""
     icons = {"ok": green("✓"), "warn": yellow("!"), "fail": red("✗"), "skip": "—"}
     return icons[status]
 
 
 def _run(cmd: list[str]) -> str | None:
-    '未说明'
+    """执行检查命令并返回去除首尾空白的输出，失败时返回 None。"""
     try:
         r = subprocess.run(cmd, capture_output=True, text=True, check=True)
         return (r.stdout or r.stderr).strip()
@@ -71,13 +71,13 @@ def _run(cmd: list[str]) -> str | None:
 
 
 def _parse_major(version_text: str) -> int | None:
-    '未说明'
+    """从版本文本中解析第一个主版本号。"""
     v = version_text.lstrip("v").split(".", 1)[0]
     return int(v) if v.isdigit() else None
 
 
 def _load_yaml_file(path: Path) -> dict:
-    '未说明'
+    """读取 YAML 文件并确保顶层结果为映射。"""
     import yaml
 
     with open(path, encoding="utf-8") as f:
@@ -88,14 +88,14 @@ def _load_yaml_file(path: Path) -> dict:
 
 
 def _load_app_config(config_path: Path) -> object:
-    '未说明'
+    """通过后端配置加载器读取并校验应用配置。"""
     from deerflow.config.app_config import AppConfig
 
     return AppConfig.from_file(str(config_path))
 
 
 def _split_use_path(use: str) -> tuple[str, str] | None:
-    '未说明'
+    """将模型引用拆分为配置名称与模型名称。"""
     if ":" not in use:
         return None
     module_name, attr_name = use.split(":", 1)
@@ -105,12 +105,12 @@ def _split_use_path(use: str) -> tuple[str, str] | None:
 
 
 # ---------------------------------------------------------------------------
-# Check result container
+# 检查结果容器
 # ---------------------------------------------------------------------------
 
 
 class CheckResult:
-    '未说明'
+    """封装单项环境检查的状态、标题与详细信息。"""
     def __init__(
         self,
         label: str,
@@ -118,14 +118,14 @@ class CheckResult:
         detail: str = "",
         fix: str | None = None,
     ) -> None:
-        '未说明'
+        """初始化检查结果。"""
         self.label = label
         self.status = status
         self.detail = detail
         self.fix = fix
 
     def print(self) -> None:
-        '未说明'
+        """按状态颜色输出检查结果及其详细信息。"""
         icon = _icon(self.status)
         detail_str = f"  ({self.detail})" if self.detail else ""
         print(f"  {icon} {self.label}{detail_str}")
@@ -135,7 +135,7 @@ class CheckResult:
 
 
 # ---------------------------------------------------------------------------
-# Individual checks
+# 各项环境检查
 # ---------------------------------------------------------------------------
 
 
@@ -319,9 +319,9 @@ def check_llm_api_key(config_path: Path) -> list[CheckResult]:
             data = yaml.safe_load(f) or {}
 
         for model in data.get("models", []):
-            # Collect all values that look like $ENV_VAR references
+            # 收集所有形如 $ENV_VAR 的环境变量引用
             def _collect_env_refs(obj: object) -> list[str]:
-                '未说明'
+                """递归收集配置值中引用的环境变量名称。"""
                 refs: list[str] = []
                 if isinstance(obj, str) and obj.startswith("$"):
                     refs.append(obj[1:])
@@ -370,7 +370,7 @@ def check_llm_package(config_path: Path) -> list[CheckResult]:
             use = model.get("use", "")
             if ":" in use:
                 package_path = use.split(":")[0]
-                # e.g. langchain_openai → langchain-openai
+                # 例如：langchain_openai → langchain-openai
                 top_level = package_path.split(".")[0]
                 pip_name = top_level.replace("_", "-")
                 if pip_name in seen_packages:
@@ -514,7 +514,7 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
         }
 
         def _configured_key_detail(tool: dict, default_var: str, key_field: str = "api_key") -> tuple[Status, str] | None:
-            '未说明'
+            """判断工具密钥是否已通过配置或环境变量提供。"""
             configured_key = tool.get(key_field)
             if isinstance(configured_key, str) and configured_key.strip():
                 key = configured_key.strip()
@@ -523,8 +523,7 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
                     val = os.environ.get(env_name)
                     if val and val.strip():
                         return ("ok", f"{env_name} set from config")
-                    # The referenced var is unset; fall through to the default
-                    # env var below, which tools use as a runtime fallback.
+                    # 引用的变量未设置，继续检查下方工具运行时使用的默认环境变量。
                 else:
                     return ("warn", f"literal {key_field} set in config")
 
@@ -532,7 +531,7 @@ def check_web_tool(config_path: Path, *, tool_name: str, label: str) -> CheckRes
             return ("ok", f"{default_var} set") if val and val.strip() else None
 
         def _browserless_self_hosted(tool: dict) -> bool:
-            '未说明'
+            """判断 Browserless 是否配置为自托管服务。"""
             base_url = str(tool.get("base_url") or "http://localhost:3032").lower()
             return "browserless.io" not in base_url
 
@@ -706,16 +705,16 @@ def check_env_file(project_root: Path) -> CheckResult:
 
 
 # ---------------------------------------------------------------------------
-# Main
+# 主程序入口
 # ---------------------------------------------------------------------------
 
 
 def main() -> int:
-    '未说明'
+    """运行全部项目环境诊断并根据错误数量返回退出码。"""
     project_root = Path(__file__).resolve().parents[1]
     config_path = project_root / "config.yaml"
 
-    # Load .env early so key checks work
+    # 提前加载 .env，确保密钥检查能够读取其中的值
     try:
         from dotenv import load_dotenv
 

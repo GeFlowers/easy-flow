@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责检测。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""从环境变量和配置文件解析 uv 可选依赖参数。"""
 
 from __future__ import annotations
 
@@ -8,14 +8,13 @@ import re
 import sys
 from pathlib import Path
 
-# Mirrors uv's accepted shape for extra names — keeps the eventual
-# `uv sync --extra <name>` invocation free of shell metacharacters even when
-# `UV_EXTRAS` comes from `.env` or another semi-trusted source.
+# 与 uv 接受的可选依赖名称格式保持一致，避免来自 .env 或其他半可信来源的
+# UV_EXTRAS 在 `uv sync --extra <name>` 参数中引入 Shell 元字符。
 _EXTRA_NAME_RE = re.compile(r"^[A-Za-z][A-Za-z0-9_-]*$")
 
 
 def _validate_extras(names: list[str]) -> list[str]:
-    '未说明'
+    """校验、规范化并去重 uv 可选依赖组名称。"""
     valid: list[str] = []
     for name in names:
         if _EXTRA_NAME_RE.match(name):
@@ -29,7 +28,7 @@ def _validate_extras(names: list[str]) -> list[str]:
 
 
 def parse_env_extras(value: str) -> list[str]:
-    '未说明'
+    """解析环境变量中以逗号或空白分隔的可选依赖组。"""
     parts = re.split(r"[\s,]+", value.strip())
     return _validate_extras([p for p in parts if p])
 
@@ -53,7 +52,7 @@ _KEY_RE = re.compile(r"^\s+([A-Za-z_][\w-]*)\s*:\s*(\S.*?)\s*$")
 
 
 def _strip_comment(line: str) -> str:
-    '未说明'
+    """移除配置行中位于引号外部的行尾注释。"""
     in_quote: str | None = None
     out: list[str] = []
     for ch in line:
@@ -73,14 +72,14 @@ def _strip_comment(line: str) -> str:
 
 
 def _unquote(value: str) -> str:
-    '未说明'
+    """去除配置值首尾成对的单引号或双引号。"""
     if len(value) >= 2 and value[0] == value[-1] and value[0] in ("'", '"'):
         return value[1:-1]
     return value
 
 
 def section_value(lines: list[str], section: str, key: str) -> str | None:
-    '未说明'
+    """读取简单配置节中的指定键值。"""
     inside = False
     child_indent: int | None = None
     for raw in lines:
@@ -113,7 +112,7 @@ def section_value(lines: list[str], section: str, key: str) -> str | None:
 
 
 def nested_section_value(lines: list[str], section_path: str, key: str) -> str | None:
-    '未说明'
+    """读取嵌套配置节中的指定键值。"""
     parts = section_path.split(".")
     if len(parts) != 2:
         return None
@@ -132,7 +131,7 @@ def nested_section_value(lines: list[str], section_path: str, key: str) -> str |
         stripped = line.lstrip()
         indent = len(line) - len(stripped)
 
-        # Top-level section match
+        # 匹配顶层配置节
         sect_match = _SECTION_RE.match(line)
         if sect_match:
             if indent == 0:
@@ -145,19 +144,19 @@ def nested_section_value(lines: list[str], section_path: str, key: str) -> str |
         if not inside_parent:
             continue
 
-        # Track parent indent from first child
+        # 从第一个子项记录父配置节的内容缩进
         if parent_indent is None and indent > 0:
             parent_indent = indent
 
-        # If indent goes back to 0, we left the parent section
+        # 缩进回到零时表示已离开父配置节
         if indent == 0:
             inside_parent = False
             inside_child = False
             continue
 
-        # Check if we're at the parent's child level (subsection)
+        # 判断当前行是否位于父配置节的直接子级
         if parent_indent is not None and indent == parent_indent:
-            # This could be a subsection or a direct key of parent
+            # 该行可能是子配置节，也可能是父配置节的直接键
             sub_match = _INDENTED_SECTION_RE.match(line)
             if sub_match and sub_match.group(1) == child_section:
                 inside_child = True
@@ -170,7 +169,7 @@ def nested_section_value(lines: list[str], section_path: str, key: str) -> str |
         if not inside_child:
             continue
 
-        # We're inside the subsection — track child indent
+        # 已进入目标子配置节，记录其内容缩进
         if child_indent is None and indent > (parent_indent or 0):
             child_indent = indent
 
@@ -212,7 +211,7 @@ def detect_from_runtime_env() -> list[str]:
 
 
 def merge_extras(*groups: list[str]) -> list[str]:
-    '未说明'
+    """按首次出现顺序合并并去重多组可选依赖。"""
     merged: list[str] = []
     seen: set[str] = set()
     for group in groups:
@@ -225,7 +224,7 @@ def merge_extras(*groups: list[str]) -> list[str]:
 
 
 def resolve_extras() -> list[str]:
-    '未说明'
+    """合并运行时环境变量与配置文件中的 uv 可选依赖。"""
     runtime_env_extras = detect_from_runtime_env()
     env = os.environ.get("UV_EXTRAS", "")
     if env.strip():
@@ -242,7 +241,7 @@ def format_flags(extras: list[str]) -> str:
 
 
 def main() -> int:
-    '未说明'
+    """检测 uv 可选依赖并输出对应的命令行参数。"""
     extras = resolve_extras()
     if extras:
         sys.stdout.write(format_flags(extras))

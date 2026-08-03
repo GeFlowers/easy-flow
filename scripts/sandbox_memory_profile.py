@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责沙箱 内存。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""采集 Kubernetes 沙箱 Pod 与容器进程的资源使用情况。"""
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ DEFAULT_KUBECTL_TIMEOUT = 30
 
 @dataclass(frozen=True)
 class TopPod:
-    '未说明'
+    """记录 Pod 的 CPU 与内存用量。"""
     name: str
     cpu_raw: str
     memory_raw: str
@@ -29,7 +29,7 @@ class TopPod:
 
 @dataclass(frozen=True)
 class ProcessSample:
-    '未说明'
+    """记录容器内单个进程的资源采样数据。"""
     pid: int
     ppid: int | None
     rss_kib: int
@@ -38,13 +38,13 @@ class ProcessSample:
 
 @dataclass(frozen=True)
 class ProcessSampleResult:
-    '未说明'
+    """记录进程采样结果及可能的错误信息。"""
     samples: dict[str, list[ProcessSample]]
     errors: dict[str, str]
 
 
 def parse_cpu_millicores(value: str) -> int | None:
-    '未说明'
+    """将 Kubernetes CPU 用量转换为毫核。"""
     value = value.strip()
     if not value:
         return None
@@ -109,7 +109,7 @@ def run_kubectl(
 
 
 def parse_top_pods(output: str) -> list[TopPod]:
-    '未说明'
+    """解析 kubectl top pods 的表格输出。"""
     pods: list[TopPod] = []
     for raw_line in output.splitlines():
         line = raw_line.strip()
@@ -134,7 +134,7 @@ def parse_top_pods(output: str) -> list[TopPod]:
 
 
 def parse_processes(output: str, *, limit: int) -> list[ProcessSample]:
-    '未说明'
+    """解析容器进程列表并按内存用量截取指定数量。"""
     if limit < 1:
         raise ValueError("process limit must be greater than 0")
 
@@ -166,7 +166,7 @@ def parse_processes(output: str, *, limit: int) -> list[ProcessSample]:
 
 
 def _container_resources(pod: dict[str, Any]) -> dict[str, Any]:
-    '未说明'
+    """汇总 Pod 规范中各容器的资源请求与限制。"""
     resources: dict[str, Any] = {}
     for container in pod.get("spec", {}).get("containers", []):
         name = container.get("name", "")
@@ -224,7 +224,7 @@ def attach_process_samples(
     pods: list[dict[str, Any]],
     process_samples: dict[str, list[ProcessSample]],
 ) -> list[dict[str, Any]]:
-    '未说明'
+    """将容器进程采样结果附加到对应 Pod 数据。"""
     for pod in pods:
         samples = process_samples.get(pod["name"], [])
         pod["processes"] = [
@@ -383,7 +383,7 @@ def collect_process_samples(
     limit: int,
     kubectl_timeout: int = DEFAULT_KUBECTL_TIMEOUT,
 ) -> ProcessSampleResult:
-    '未说明'
+    """并发收集各 Pod 的容器进程资源样本。"""
     samples: dict[str, list[ProcessSample]] = {}
     errors: dict[str, str] = {}
     command = (
@@ -416,7 +416,7 @@ def collect(
     process_limit: int = 10,
     kubectl_timeout: int = DEFAULT_KUBECTL_TIMEOUT,
 ) -> dict[str, Any]:
-    '未说明'
+    """从 Kubernetes 集群收集沙箱 Pod 与进程资源数据。"""
     if process_limit < 1:
         raise ValueError("--process-limit must be greater than 0")
     if kubectl_timeout < 1:
@@ -453,7 +453,7 @@ def collect(
 
 
 def parse_args(argv: list[str]) -> argparse.Namespace:
-    '未说明'
+    """解析命名空间、标签、采样数量与输出格式参数。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--namespace",
@@ -498,7 +498,7 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    '未说明'
+    """生成沙箱内存分析报告并写入文件或标准输出。"""
     args = parse_args(list(sys.argv[1:] if argv is None else argv))
     try:
         report = collect(

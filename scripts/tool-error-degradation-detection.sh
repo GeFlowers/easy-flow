@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Detect whether the current branch has working tool-failure downgrade:
+# 检测当前分支是否正确实现工具失败降级：
 # - Lead agent middleware chain includes error-handling
 # - Subagent middleware chain includes error-handling
 # - Failing tool call does not abort the whole call sequence

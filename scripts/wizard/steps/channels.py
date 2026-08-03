@@ -1,4 +1,4 @@
-'未说明'
+"""实现配置向导的消息渠道连接步骤。"""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ CHANNEL_CONNECTION_OPTIONS: tuple[tuple[str, str, str], ...] = (
 
 @dataclass
 class ChannelConnectionsStepResult:
-    '未说明'
+    """记录消息渠道连接步骤中启用的服务商。"""
     enabled_providers: list[str]
 
 

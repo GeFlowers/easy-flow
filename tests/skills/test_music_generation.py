@@ -1,4 +1,4 @@
-'未说明'
+"""验证音乐生成技能的请求构造、响应处理和输入校验。"""
 import sys
 from pathlib import Path
 
@@ -12,15 +12,15 @@ mus = load("music-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    '未说明'
+    """清理 MiniMax 音乐生成相关环境变量，隔离每个测试。"""
     for k in ["MINIMAX_API_KEY", "MINIMAX_API_HOST", "MINIMAX_MUSIC_MODEL"]:
         monkeypatch.delenv(k, raising=False)
 
 
 def _post_ok(captured):
-    '未说明'
+    """创建记录请求参数并返回成功音频响应的 POST 替身。"""
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """记录请求内容并返回十六进制编码的模拟音频。"""
         captured["url"] = url
         captured["headers"] = headers
         captured["json"] = json
@@ -30,7 +30,7 @@ def _post_ok(captured):
 
 
 def test_with_lyrics_payload_and_writes(monkeypatch, tmp_path):
-    '未说明'
+    """验证含歌词请求的参数构造、音频写入和成功消息。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))
@@ -49,7 +49,7 @@ def test_with_lyrics_payload_and_writes(monkeypatch, tmp_path):
 
 
 def test_instrumental_sets_flag(monkeypatch, tmp_path):
-    '未说明'
+    """验证纯音乐模式仅发送伴奏标记而不发送歌词参数。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))
@@ -62,7 +62,7 @@ def test_instrumental_sets_flag(monkeypatch, tmp_path):
 
 
 def test_no_lyrics_uses_optimizer(monkeypatch, tmp_path):
-    '未说明'
+    """验证缺少歌词时启用歌词优化器。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))
@@ -74,7 +74,7 @@ def test_no_lyrics_uses_optimizer(monkeypatch, tmp_path):
 
 
 def test_model_override(monkeypatch, tmp_path):
-    '未说明'
+    """验证环境变量可以覆盖默认音乐模型。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     monkeypatch.setenv("MINIMAX_MUSIC_MODEL", "music-2.6")
     captured = {}
@@ -86,11 +86,11 @@ def test_model_override(monkeypatch, tmp_path):
 
 
 def test_raises_on_base_resp_error(monkeypatch, tmp_path):
-    '未说明'
+    """验证 MiniMax 业务错误码会转换为包含错误码的异常。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """返回余额不足的模拟业务错误。"""
         return FakeResp({"base_resp": {"status_code": 1008, "status_msg": "no balance"}})
 
     monkeypatch.setattr(mus.requests, "post", fake_post)
@@ -102,7 +102,7 @@ def test_raises_on_base_resp_error(monkeypatch, tmp_path):
 
 
 def test_missing_api_key_returns_message(monkeypatch, tmp_path):
-    '未说明'
+    """验证缺少 API 密钥时返回配置提示。"""
     spec = tmp_path / "s.json"
     spec.write_text('{"prompt":"x"}', encoding="utf-8")
     msg = mus.generate_music(str(spec), str(tmp_path / "o.mp3"))
@@ -110,12 +110,12 @@ def test_missing_api_key_returns_message(monkeypatch, tmp_path):
 
 
 def test_raises_on_missing_audio_data(monkeypatch, tmp_path):
-    '未说明'
+    """验证成功响应缺少音频数据时抛出异常。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
-        return FakeResp({"base_resp": {"status_code": 0}})  # no "data" key
+        """返回不包含 data 字段的模拟成功响应。"""
+        return FakeResp({"base_resp": {"status_code": 0}})
 
     monkeypatch.setattr(mus.requests, "post", fake_post)
     spec = tmp_path / "s.json"
@@ -125,22 +125,22 @@ def test_raises_on_missing_audio_data(monkeypatch, tmp_path):
 
 
 def test_empty_prompt_raises(monkeypatch, tmp_path):
-    '未说明'
+    """验证提示词为空时在调用 API 前抛出参数错误。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):  # pragma: no cover
-        '未说明'
+        """在不应调用 API 的场景中主动使测试失败。"""
         raise AssertionError("must not call the API when prompt is missing")
 
     monkeypatch.setattr(mus.requests, "post", fake_post)
     spec = tmp_path / "s.json"
-    spec.write_text('{"title":"X","lyrics":"[verse]\\nhi"}', encoding="utf-8")  # no prompt
+    spec.write_text('{"title":"X","lyrics":"[verse]\\nhi"}', encoding="utf-8")  # 刻意省略提示词。
     with pytest.raises(ValueError, match="prompt"):
         mus.generate_music(str(spec), str(tmp_path / "o.mp3"))
 
 
 def test_empty_lyrics_falls_back_to_optimizer(monkeypatch, tmp_path):
-    '未说明'
+    """验证空歌词按未提供歌词处理并启用优化器。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
     monkeypatch.setattr(mus.requests, "post", _post_ok(captured))

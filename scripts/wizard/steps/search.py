@@ -1,4 +1,4 @@
-"""本脚本负责搜索。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""实现配置向导的搜索服务选择与认证步骤。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from wizard.ui import ask_choice, ask_secret, print_header, print_info, print_su
 
 @dataclass
 class SearchStepResult:
-    '未说明'
+    """记录搜索服务商选择及其认证信息。"""
     search_provider: SearchProvider | None  # None = skip
     search_api_key: str | None
     fetch_provider: WebProvider | None  # None = skip

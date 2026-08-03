@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责加载 内存。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""将示例记忆数据校验并复制到本地运行目录。"""
 
 from __future__ import annotations
 
@@ -11,17 +11,17 @@ from pathlib import Path
 
 
 def default_source(repo_root: Path) -> Path:
-    '未说明'
+    """返回仓库内默认记忆示例文件路径。"""
     return repo_root / "backend" / "docs" / "memory-settings-sample.json"
 
 
 def default_target(repo_root: Path) -> Path:
-    '未说明'
+    """返回默认的本地记忆数据目标路径。"""
     return repo_root / "backend" / ".deer-flow" / "memory.json"
 
 
 def parse_args(repo_root: Path) -> argparse.Namespace:
-    '未说明'
+    """解析记忆示例源文件与目标文件参数。"""
     parser = argparse.ArgumentParser(
         description="Copy the Memory Settings sample data into the local runtime memory file.",
     )
@@ -52,7 +52,7 @@ def validate_json_file(path: Path) -> None:
 
 
 def main() -> int:
-    '未说明'
+    """校验并复制记忆示例数据到本地目标位置。"""
     repo_root = Path(__file__).resolve().parents[1]
     args = parse_args(repo_root)
 

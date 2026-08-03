@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责支持 诊断包。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""收集并脱敏 DeerFlow 故障诊断信息，生成支持包和问题草稿。"""
 
 from __future__ import annotations
 
@@ -53,7 +53,7 @@ ATTENTION_SIGNAL_NAMES = {
 
 
 def _redact_yaml_secret_match(match: re.Match[str]) -> str:
-    '未说明'
+    """保留 YAML 键和格式并遮蔽匹配到的敏感值。"""
     prefix = match.group(1)
     value = match.group(2)
     if "authorization" in prefix.lower() and value.lstrip().lower().startswith("bearer "):
@@ -62,7 +62,7 @@ def _redact_yaml_secret_match(match: re.Match[str]) -> str:
 
 
 def redact_text(text: str) -> str:
-    '未说明'
+    """遮蔽文本中的密钥、令牌、凭证与敏感命令参数。"""
     text = POSIX_HOME_RE.sub(r"\1/<user>", text)
     text = WINDOWS_HOME_RE.sub(r"\1<user>", text)
     text = URL_USERINFO_RE.sub(r"\1<redacted>@", text)
@@ -75,7 +75,7 @@ def redact_text(text: str) -> str:
 
 
 def _redact_secret_flag_list(items: list[Any]) -> list[Any]:
-    '未说明'
+    """复制命令参数列表并遮蔽敏感选项后的值。"""
     redacted: list[Any] = []
     mask_next = False
     for item in items:
@@ -92,7 +92,7 @@ def _redact_secret_flag_list(items: list[Any]) -> list[Any]:
 
 
 def _redact_env_value(value: Any) -> Any:
-    '未说明'
+    """遮蔽环境变量表达式或环境变量值。"""
     if isinstance(value, str) and VAR_REFERENCE_RE.fullmatch(value.strip()):
         return value
     if isinstance(value, (dict, list, tuple)):
@@ -124,7 +124,7 @@ def redact_data(value: Any) -> Any:
 
 
 def _read_yaml(path: Path) -> Any:
-    '未说明'
+    """读取 YAML 文件，缺失或解析失败时返回结构化错误。"""
     if not path.exists():
         return {"present": False}
     if yaml is None:
@@ -136,7 +136,7 @@ def _read_yaml(path: Path) -> Any:
 
 
 def _read_json(path: Path) -> Any:
-    '未说明'
+    """读取 JSON 文件，缺失或解析失败时返回结构化错误。"""
     if not path.exists():
         return {"present": False}
     try:
@@ -146,7 +146,7 @@ def _read_json(path: Path) -> Any:
 
 
 def _run_command(args: list[str], cwd: Path, timeout_s: int = 10) -> dict[str, Any]:
-    '未说明'
+    """执行诊断命令并返回已脱敏的状态、输出和错误信息。"""
     try:
         result = subprocess.run(
             args,
@@ -171,13 +171,13 @@ def _run_command(args: list[str], cwd: Path, timeout_s: int = 10) -> dict[str, A
 
 
 def _version_command(name: str, args: list[str], cwd: Path) -> dict[str, Any]:
-    '未说明'
+    """采集指定工具的版本命令结果。"""
     result = _run_command(args, cwd=cwd, timeout_s=5)
     return {"name": name, **result}
 
 
 def collect_environment(project_root: Path) -> dict[str, Any]:
-    '未说明'
+    """收集操作系统、运行时和项目工具版本信息。"""
     return {
         "generated_at": datetime.now(UTC).isoformat(),
         "platform": {
@@ -219,13 +219,13 @@ def collect_git_summary(project_root: Path) -> dict[str, Any]:
 
 
 def _validate_thread_id(thread_id: str) -> None:
-    '未说明'
+    """校验线程标识仅包含允许的安全字符。"""
     if not thread_id or thread_id in {".", ".."} or ".." in thread_id or not SAFE_THREAD_ID_RE.fullmatch(thread_id):
         raise ValueError(f"Invalid thread_id: {thread_id!r}")
 
 
 def _candidate_thread_data_dirs(project_root: Path, thread_id: str) -> list[Path]:
-    '未说明'
+    """生成线程数据可能所在的目录列表。"""
     _validate_thread_id(thread_id)
     candidates = [
         project_root / ".deer-flow" / "threads" / thread_id / "user-data",
@@ -238,7 +238,7 @@ def _candidate_thread_data_dirs(project_root: Path, thread_id: str) -> list[Path
 
 
 def _display_path(path: Path, project_root: Path) -> str:
-    '未说明'
+    """优先将路径显示为相对于项目根目录的形式。"""
     try:
         return path.resolve().relative_to(project_root.resolve()).as_posix()
     except (OSError, ValueError):
@@ -246,7 +246,7 @@ def _display_path(path: Path, project_root: Path) -> str:
 
 
 def _file_manifest(root: Path, *, max_files: int = 500) -> list[dict[str, Any]]:
-    '未说明'
+    """生成目录中文件的大小和修改时间清单。"""
     if not root.exists():
         return []
     entries: list[dict[str, Any]] = []
@@ -301,7 +301,7 @@ def collect_doctor_output(project_root: Path) -> dict[str, Any]:
 
 
 def _command_output(command: dict[str, Any] | None) -> str | None:
-    '未说明'
+    """从命令结果中提取可用的标准输出文本。"""
     if not command:
         return None
     for key in ("stdout", "stderr", "error"):
@@ -312,7 +312,7 @@ def _command_output(command: dict[str, Any] | None) -> str | None:
 
 
 def _environment_versions(environment: dict[str, Any]) -> dict[str, str | None]:
-    '未说明'
+    """从环境摘要中提取各工具的版本字符串。"""
     platform_info = environment.get("platform", {})
     python_version = platform_info.get("python") if isinstance(platform_info, dict) else None
     versions: dict[str, str | None] = {"python": python_version if isinstance(python_version, str) else None}
@@ -323,7 +323,7 @@ def _environment_versions(environment: dict[str, Any]) -> dict[str, str | None]:
 
 
 def _parse_major_version(version_text: str | None) -> int | None:
-    '未说明'
+    """从可选版本文本中解析主版本号。"""
     if not version_text:
         return None
     match = re.search(r"v?(\d+)(?:\.\d+)?", version_text)
@@ -331,13 +331,13 @@ def _parse_major_version(version_text: str | None) -> int | None:
 
 
 def _git_stdout(git_summary: dict[str, Any], key: str) -> str | None:
-    '未说明'
+    """提取 Git 摘要中指定命令的标准输出。"""
     value = git_summary.get(key)
     return _command_output(value) if isinstance(value, dict) else None
 
 
 def _doctor_counts(doctor: dict[str, Any] | None) -> tuple[int | None, int | None]:
-    '未说明'
+    """从诊断结果中提取错误和警告数量。"""
     if not doctor:
         return (None, None)
     output = "\n".join(value for value in (_command_output(doctor), doctor.get("stdout"), doctor.get("stderr")) if isinstance(value, str))
@@ -348,7 +348,7 @@ def _doctor_counts(doctor: dict[str, Any] | None) -> tuple[int | None, int | Non
 
 
 def _enabled_mapping_keys(value: Any) -> list[str]:
-    '未说明'
+    """返回映射中值为启用状态的键名列表。"""
     if not isinstance(value, dict):
         return []
     keys: list[str] = []
@@ -360,7 +360,7 @@ def _enabled_mapping_keys(value: Any) -> list[str]:
 
 
 def _config_summary(config_summary: Any) -> dict[str, Any]:
-    '未说明'
+    """将原始应用配置整理为可用于分诊的精简摘要。"""
     if not isinstance(config_summary, dict):
         return {"present": True, "shape": type(config_summary).__name__}
     present = config_summary.get("present", True)
@@ -380,7 +380,7 @@ def _config_summary(config_summary: Any) -> dict[str, Any]:
 
 
 def _extensions_summary(extensions_summary: Any) -> dict[str, Any]:
-    '未说明'
+    """将扩展配置整理为可用于分诊的精简摘要。"""
     if not isinstance(extensions_summary, dict):
         return {"present": True, "shape": type(extensions_summary).__name__}
     present = extensions_summary.get("present", True)
@@ -395,14 +395,14 @@ def _extensions_summary(extensions_summary: Any) -> dict[str, Any]:
 
 
 def _dirty_worktree(status_short: str | None) -> bool:
-    '未说明'
+    """判断 Git 简短状态是否表示工作树存在修改。"""
     if not status_short:
         return False
     return any(line and not line.startswith("##") for line in status_short.splitlines())
 
 
 def _status_from_signals(signals: dict[str, bool]) -> str:
-    '未说明'
+    """根据故障信号计算分诊状态。"""
     if signals["config_missing"] or signals["config_error"] or signals["models_missing"] or signals["extensions_config_error"]:
         return "needs_user_setup"
     if signals["node_missing"] or signals["node_version_too_old"] or signals["nginx_missing"]:
@@ -415,12 +415,12 @@ def _status_from_signals(signals: dict[str, bool]) -> str:
 
 
 def _active_signal_names(signals: dict[str, bool]) -> list[str]:
-    '未说明'
+    """返回所有已触发故障信号的名称。"""
     return [name for name, enabled in signals.items() if enabled and name in ATTENTION_SIGNAL_NAMES]
 
 
 def _maintainer_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
-    '未说明'
+    """根据分诊状态生成维护者后续排查建议。"""
     steps: list[str] = []
     if status == "needs_user_setup":
         steps.append("Ask the reporter to complete local setup with `make setup`, then rerun `make doctor` and `make support-bundle`.")
@@ -442,7 +442,7 @@ def _maintainer_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
 
 
 def _reporter_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
-    '未说明'
+    """根据分诊状态生成问题报告者后续操作建议。"""
     steps: list[str] = []
     if status == "needs_user_setup":
         steps.append("Run `make setup`, then rerun `make doctor` and `make support-bundle` before filing the issue if the problem changes.")
@@ -460,7 +460,7 @@ def _reporter_next_steps(status: str, signals: dict[str, bool]) -> list[str]:
 
 
 def _evidence_files(*, include_doctor: bool, include_thread_summary: bool) -> list[dict[str, str]]:
-    '未说明'
+    """列出支持包中将包含的证据文件及其用途。"""
     files = [
         ("README.md", "Human-readable entrypoint for the support bundle."),
         ("issue-summary.md", "Markdown summary intended to be pasted into a GitHub issue."),
@@ -547,7 +547,7 @@ def build_triage_report(
 
 
 def _markdown_list(items: list[str]) -> str:
-    '未说明'
+    """将字符串列表渲染为 Markdown 项目符号列表。"""
     return "\n".join(f"- {item}" for item in items) if items else "- None"
 
 
@@ -584,7 +584,7 @@ def render_issue_summary(triage: dict[str, Any]) -> str:
 
 
 def _os_label(platform_info: dict[str, Any]) -> str:
-    '未说明'
+    """生成适合问题报告展示的操作系统名称。"""
     system = platform_info.get("system")
     if system == "Darwin":
         return "macOS"
@@ -596,13 +596,13 @@ def _os_label(platform_info: dict[str, Any]) -> str:
 
 
 def _platform_details(platform_info: dict[str, Any]) -> str:
-    '未说明'
+    """生成包含系统版本与架构的平台详情文本。"""
     details = [platform_info.get("machine"), platform_info.get("system"), platform_info.get("release")]
     return ", ".join(str(item) for item in details if item) or "_No response_"
 
 
 def _draft_affected_areas(triage: dict[str, Any]) -> list[str]:
-    '未说明'
+    """根据分诊结果推断问题可能影响的功能区域。"""
     signals = triage["signals"]
     areas: list[str] = []
     if signals["config_missing"] or signals["config_error"] or signals["models_missing"] or signals["node_missing"] or signals["node_version_too_old"] or signals["nginx_missing"]:
@@ -615,7 +615,7 @@ def _draft_affected_areas(triage: dict[str, Any]) -> list[str]:
 
 
 def _doctor_excerpt(doctor: dict[str, Any] | None, *, max_lines: int = 80, max_chars: int = 12000) -> str:
-    '未说明'
+    """截取诊断输出，并限制最大行数和字符数。"""
     output = _command_output(doctor) if doctor else None
     if not output:
         return "<REQUIRED: paste key log lines. Do not invent if unknown.>"
@@ -778,28 +778,28 @@ def render_bundle_readme(triage: dict[str, Any]) -> str:
 
 
 def _default_out_path(project_root: Path) -> Path:
-    '未说明'
+    """生成带 UTC 时间戳的默认支持包输出路径。"""
     timestamp = datetime.now(UTC).strftime("%Y%m%d-%H%M%S")
     return project_root / ".deer-flow" / "support-bundles" / f"deer-flow-support-bundle-{timestamp}.zip"
 
 
 def _write_json(zf: zipfile.ZipFile, name: str, data: Any) -> None:
-    '未说明'
+    """将对象以格式化 JSON 写入 ZIP 归档。"""
     zf.writestr(f"{name}.json", json.dumps(data, indent=2, sort_keys=True) + "\n")
 
 
 def _write_text(zf: zipfile.ZipFile, name: str, text: str) -> None:
-    '未说明'
+    """将 UTF-8 文本写入 ZIP 归档。"""
     zf.writestr(name, text)
 
 
 def _issue_summary_sidecar_path(out_path: Path) -> Path:
-    '未说明'
+    """返回支持包对应的问题摘要旁路文件路径。"""
     return out_path.with_name(f"{out_path.stem}-issue-summary.md")
 
 
 def _issue_draft_sidecar_path(out_path: Path) -> Path:
-    '未说明'
+    """返回支持包对应的 AI 问题草稿旁路文件路径。"""
     return out_path.with_name(f"{out_path.stem}-issue-draft.md")
 
 
@@ -876,7 +876,7 @@ def create_support_bundle(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    '未说明'
+    """解析支持包输出、线程摘要和压缩选项。"""
     parser = argparse.ArgumentParser(description=__doc__)
     repo_root = Path(__file__).resolve().parents[1]
     parser.add_argument("--project-root", type=Path, default=repo_root, help="DeerFlow project root")
@@ -889,7 +889,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> int:
-    '未说明'
+    """创建脱敏支持包及问题摘要，并输出生成文件路径。"""
     args = parse_args(argv)
     try:
         bundle_path = create_support_bundle(

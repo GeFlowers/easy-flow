@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责同步。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""将仓库标签配置同步到 GitHub。"""
 
 from __future__ import annotations
 
@@ -56,7 +56,7 @@ def sync_label(label: dict[str, str], repo: str | None, dry_run: bool) -> bool:
 
 
 def main() -> int:
-    '未说明'
+    """解析参数并将标签配置同步到目标 GitHub 仓库。"""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo", help="Target repository as OWNER/NAME")
     parser.add_argument(

@@ -1,22 +1,22 @@
 #!/usr/bin/env python3
-"""本脚本负责设置 向导。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""启动 DeerFlow 交互式配置向导。"""
 
 from __future__ import annotations
 
 import sys
 from pathlib import Path
 
-# Make the scripts/ directory importable so wizard.* works
+# 将 scripts/ 加入模块搜索路径，以便导入 wizard.*
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
 def _is_interactive() -> bool:
-    '未说明'
+    """判断当前标准输入输出是否均连接到交互式终端。"""
     return sys.stdin.isatty() and sys.stdout.isatty()
 
 
 def main() -> int:
-    '未说明'
+    """启动交互式配置向导，非交互环境下给出替代指引。"""
     try:
         if not _is_interactive():
             print(

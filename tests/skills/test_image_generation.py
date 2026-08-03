@@ -1,4 +1,4 @@
-'未说明'
+"""验证图像生成技能的提供商选择、请求构造和文件输出。"""
 import base64
 import sys
 from pathlib import Path
@@ -13,46 +13,46 @@ img = load("image-generation")
 
 @pytest.fixture(autouse=True)
 def clean_env(monkeypatch):
-    '未说明'
+    """清理图像生成相关环境变量，隔离每个测试。"""
     for k in ["GEMINI_API_KEY", "MINIMAX_API_KEY", "IMAGE_GENERATION_PROVIDER",
               "MINIMAX_API_HOST", "MINIMAX_IMAGE_MODEL"]:
         monkeypatch.delenv(k, raising=False)
 
 
 def test_resolve_prefers_gemini(monkeypatch):
-    '未说明'
+    """验证 Gemini 可用时优先选择默认提供商。"""
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "gemini"
 
 
 def test_resolve_falls_back_to_minimax(monkeypatch):
-    '未说明'
+    """验证 Gemini 不可用时回退到 MiniMax。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", False) == "minimax"
 
 
 def test_resolve_override_wins(monkeypatch):
-    '未说明'
+    """验证显式提供商配置优先于自动选择结果。"""
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "MiniMax")
     assert img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", True) == "minimax"
 
 
 def test_resolve_errors_when_none(monkeypatch):
-    '未说明'
+    """验证没有可用提供商时抛出配置错误。"""
     with pytest.raises(ValueError):
         img._resolve_provider("IMAGE_GENERATION_PROVIDER", "gemini", False)
 
 
 def test_minimax_builds_payload_and_writes(monkeypatch, tmp_path):
-    '未说明'
+    """验证 MiniMax 请求参数、鉴权信息和图像文件写入。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     raw = b"PNGBYTES"
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """记录 MiniMax 请求并返回 Base64 编码的模拟图像。"""
         captured["url"] = url
         captured["headers"] = headers
         captured["json"] = json
@@ -77,12 +77,12 @@ def test_minimax_builds_payload_and_writes(monkeypatch, tmp_path):
 
 
 def test_minimax_reference_image_as_data_url(monkeypatch, tmp_path):
-    '未说明'
+    """验证参考图像被编码为带 MIME 类型的 Data URL。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """记录包含参考图像的请求并返回模拟图像。"""
         captured["json"] = json
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
                          "base_resp": {"status_code": 0}})
@@ -103,11 +103,11 @@ def test_minimax_reference_image_as_data_url(monkeypatch, tmp_path):
 
 
 def test_minimax_raises_on_base_resp_error(monkeypatch, tmp_path):
-    '未说明'
+    """验证 MiniMax 业务错误码会转换为异常。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """返回鉴权失败的模拟业务响应。"""
         return FakeResp({"base_resp": {"status_code": 1004, "status_msg": "auth failed"}})
 
     monkeypatch.setattr(img.requests, "post", fake_post)
@@ -119,12 +119,12 @@ def test_minimax_raises_on_base_resp_error(monkeypatch, tmp_path):
 
 
 def test_minimax_extracts_json_prompt_field(monkeypatch, tmp_path):
-    '未说明'
+    """验证 JSON 提示文件仅提取 prompt 字段发送给 MiniMax。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """记录解析后的提示词请求并返回模拟图像。"""
         captured["json"] = json
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
                          "base_resp": {"status_code": 0}})
@@ -138,18 +138,18 @@ def test_minimax_extracts_json_prompt_field(monkeypatch, tmp_path):
     )
     img.generate_image(str(prompt_file), [], str(tmp_path / "o.jpg"), "16:9")
 
-    # Only the JSON `prompt` field reaches MiniMax — no other fields, no JSON syntax.
+    # 仅将 JSON 中的 prompt 字段发送给 MiniMax，不携带其他字段或 JSON 语法。
     assert captured["json"]["prompt"] == "a red barn at dawn"
     assert captured["json"]["prompt_optimizer"] is True
 
 
 def test_minimax_plaintext_prompt_passes_through(monkeypatch, tmp_path):
-    '未说明'
+    """验证纯文本提示词保持原样发送。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
     captured = {}
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """记录纯文本提示词请求并返回模拟图像。"""
         captured["json"] = json
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"x").decode()]},
                          "base_resp": {"status_code": 0}})
@@ -163,11 +163,11 @@ def test_minimax_plaintext_prompt_passes_through(monkeypatch, tmp_path):
 
 
 def test_minimax_rejects_overlong_prompt_without_calling_api(monkeypatch, tmp_path):
-    '未说明'
+    """验证超长提示词在调用 API 前被拒绝。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):  # pragma: no cover
-        '未说明'
+        """在不应调用 API 的场景中主动使测试失败。"""
         raise AssertionError("must not call the API when the prompt is over the limit")
 
     monkeypatch.setattr(img.requests, "post", fake_post)
@@ -182,11 +182,11 @@ def test_minimax_rejects_overlong_prompt_without_calling_api(monkeypatch, tmp_pa
 
 
 def test_minimax_creates_nested_output_dir(monkeypatch, tmp_path):
-    '未说明'
+    """验证生成图像前自动创建多级输出目录。"""
     monkeypatch.setenv("MINIMAX_API_KEY", "m")
 
     def fake_post(url, headers=None, json=None, **kw):
-        '未说明'
+        """返回用于验证目录创建和文件写入的模拟图像。"""
         return FakeResp({"data": {"image_base64": [base64.b64encode(b"img").decode()]},
                          "base_resp": {"status_code": 0}})
 
@@ -200,7 +200,7 @@ def test_minimax_creates_nested_output_dir(monkeypatch, tmp_path):
 
 
 def test_unknown_provider_raises(monkeypatch, tmp_path):
-    '未说明'
+    """验证配置不受支持的提供商时抛出错误。"""
     monkeypatch.setenv("IMAGE_GENERATION_PROVIDER", "openai")
     monkeypatch.setenv("GEMINI_API_KEY", "g")
     pf = tmp_path / "p.json"
@@ -210,7 +210,7 @@ def test_unknown_provider_raises(monkeypatch, tmp_path):
 
 
 def test_guess_mime_by_extension():
-    '未说明'
+    """验证根据常见扩展名推断 MIME 类型及默认回退值。"""
     assert img._guess_mime("/a/b.png") == "image/png"
     assert img._guess_mime("/a/b.webp") == "image/webp"
     assert img._guess_mime("/a/b.jpg") == "image/jpeg"

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责扫描 变更 阻塞 输入输出。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""扫描 Git 变更文件中可能存在的阻塞 I/O 调用。"""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from _detector_cli import run_detector
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    '未说明'
+    """调用变更文件阻塞 I/O 扫描器并透传命令行参数。"""
     return run_detector("support.detectors.blocking_io_changed", argv)
 
 

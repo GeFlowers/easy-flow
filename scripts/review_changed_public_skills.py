@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""本脚本负责审查 变更 公开。安全边界：仅处理显式指定的输入与路径，不作为常驻生产服务入口。"""
+"""识别发生变更的公共技能包并执行质量评审。"""
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ EMPTY_TREE_SHA = "4b825dc642cb6eb9a060e54bf8d69288fbee4904"
 
 @dataclass(frozen=True)
 class ChangedPath:
-    '未说明'
+    """表示 Git 变更中的状态、当前路径和可选原路径。"""
     status: str
     path: PurePosixPath
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    '未说明'
+    """识别发生变更的公共技能包并逐个执行质量评审。"""
     args = parse_args(argv)
     repo_root = args.repo_root.resolve()
     diff_args = build_diff_args(args)
@@ -84,7 +84,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def parse_args(argv: Sequence[str] | None) -> argparse.Namespace:
-    '未说明'
+    """解析 Git 对比范围、解释器及仓库路径参数。"""
     parser = argparse.ArgumentParser(description=("Review public skill packages whose SKILL.md changed in a PR or push diff."))
     parser.add_argument(
         "--base-ref",
@@ -145,7 +145,7 @@ def build_force_push_fallback_diff_args(args: argparse.Namespace) -> list[str] |
 
 
 def parse_name_status(output: bytes) -> list[ChangedPath]:
-    '未说明'
+    """解析 Git 的 NUL 分隔名称与状态输出。"""
     parts = [part for part in output.split(b"\0") if part]
     changes: list[ChangedPath] = []
     index = 0
@@ -207,7 +207,7 @@ def select_skill_packages(changes: Sequence[ChangedPath], repo_root: Path) -> li
 
 
 def is_fully_removed_package(package_rel: PurePosixPath, statuses: Sequence[str], repo_root: Path) -> bool:
-    '未说明'
+    """判断技能包是否已从工作树中完全删除。"""
     if not all(status.startswith("D") for status in statuses):
         return False
     return not (repo_root / package_rel).is_dir()
@@ -243,7 +243,7 @@ def find_public_skill_package(path: PurePosixPath, repo_root: Path) -> PurePosix
 
 
 def _is_eval_fixture_skill_md(path: PurePosixPath) -> bool:
-    '未说明'
+    """判断路径是否为评测夹具中的技能说明文件。"""
     from deerflow.skills.package_paths import is_eval_fixture_skill_md
 
     return is_eval_fixture_skill_md(path)
@@ -300,7 +300,7 @@ def review_env(repo_root: Path) -> dict[str, str]:
 
 
 def is_zero_sha(value: str) -> bool:
-    '未说明'
+    """判断 Git 提交哈希是否为全零占位值。"""
     return len(value) in {40, 64} and set(value) == {"0"}
 
 

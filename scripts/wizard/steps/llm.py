@@ -1,4 +1,4 @@
-'未说明'
+"""实现配置向导的大语言模型选择与认证步骤。"""
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ from wizard.ui import (
 
 @dataclass
 class LLMStepResult:
-    '未说明'
+    """记录所选模型服务商、模型和认证信息。"""
     provider: LLMProvider
     model_name: str
     api_key: str | None
@@ -35,7 +35,7 @@ def run_llm_step(step_label: str = "Step 1/3") -> LLMStepResult:
 
     print()
 
-    # Model selection (show list, default to provider preference)
+    # 显示模型列表，并默认选择服务商推荐的模型
     if len(provider.models) > 1:
         print_info(f"Available models for {provider.display_name}:")
         default_model_idx = provider.models.index(provider.default_model)

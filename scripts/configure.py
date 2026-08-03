@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-'未说明'
+"""根据示例文件生成 DeerFlow 本地配置文件。"""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from pathlib import Path
 
 
 def copy_if_missing(src: Path, dst: Path) -> None:
-    '未说明'
+    """在目标文件不存在时复制示例文件，否则保留现有配置。"""
     if dst.exists():
         return
     if not src.exists():
@@ -19,7 +19,7 @@ def copy_if_missing(src: Path, dst: Path) -> None:
 
 
 def main() -> int:
-    '未说明'
+    """创建缺失的本地配置文件并返回进程退出码。"""
     project_root = Path(__file__).resolve().parent.parent
 
     existing_config = [
