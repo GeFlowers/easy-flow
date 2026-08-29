@@ -31,7 +31,11 @@ def _get_searxng_client() -> SearxngClient:
 
 @tool("web_search", parse_docstring=True)
 async def web_search_tool(query: str) -> str:
-    '执行 web_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch the web using SearXNG.\n\n    Args:\n        query: The query to search for.\n    '
+    """Search the web using SearXNG.
+
+    Args:
+        query: The query to search for.
+    """
     try:
         cfg = _get_tool_config("web_search")
         max_results = 5

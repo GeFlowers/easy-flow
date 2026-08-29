@@ -888,6 +888,10 @@ DeerFlow has key high-privilege capabilities including **system command executio
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflow, and guidelines.
 
 Regression coverage includes Docker sandbox mode detection and provisioner kubeconfig-path handling tests in `backend/tests/`.
+Tool docstrings used with `@tool(parse_docstring=True)` are runtime API schema,
+not documentation-only text. Keep their Google-style `Args:` sections aligned
+with the function signature; `backend/tests/test_tool_docstring_contract.py`
+validates every such tool without importing the full Gateway.
 Backend blocking-IO diagnostics are available from the repository root with
 `make detect-blocking-io`: it statically scans backend business code for
 blocking IO that may run on the backend event loop, prints a concise summary,

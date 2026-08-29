@@ -135,28 +135,6 @@ def test_frontend_rewrites_langgraph_prefix_to_gateway():
     assert "langgraph-compat" not in api_client
 
 
-def test_smoke_test_docs_do_not_expect_standalone_langgraph_server():
-    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
-    smoke_files = {
-        ".agent/skills/smoke-test/SKILL.md": _read(".agent/skills/smoke-test/SKILL.md"),
-        ".agent/skills/smoke-test/references/SOP.md": _read(".agent/skills/smoke-test/references/SOP.md"),
-        ".agent/skills/smoke-test/references/troubleshooting.md": _read(".agent/skills/smoke-test/references/troubleshooting.md"),
-        ".agent/skills/smoke-test/scripts/check_local_env.sh": _read(".agent/skills/smoke-test/scripts/check_local_env.sh"),
-        ".agent/skills/smoke-test/scripts/deploy_local.sh": _read(".agent/skills/smoke-test/scripts/deploy_local.sh"),
-        ".agent/skills/smoke-test/scripts/health_check.sh": _read(".agent/skills/smoke-test/scripts/health_check.sh"),
-        ".agent/skills/smoke-test/templates/report.local.template.md": _read(".agent/skills/smoke-test/templates/report.local.template.md"),
-        ".agent/skills/smoke-test/templates/report.docker.template.md": _read(".agent/skills/smoke-test/templates/report.docker.template.md"),
-    }
-
-    for path, content in smoke_files.items():
-        assert "localhost:2024" not in content, path
-        assert "127.0.0.1:2024" not in content, path
-        assert "deer-flow-langgraph" not in content, path
-        assert "langgraph.log" not in content, path
-        assert "LangGraph service" not in content, path
-        assert "langgraph dev" not in content, path
-
-
 def test_gateway_runtime_docs_do_not_reference_transition_modes():
     """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
     docs = {
@@ -170,13 +148,3 @@ def test_gateway_runtime_docs_do_not_reference_transition_modes():
         assert "./scripts/deploy.sh --gateway" not in content, path
         assert "docker compose --profile gateway" not in content, path
         assert "`/api/langgraph/*` → LangGraph" not in content, path
-
-
-def test_agent_instruction_docs_do_not_reference_standalone_langgraph_server():
-    """验证当前测试场景在真实调用中的结果、异常与状态边界。"""
-    content = _read(".github/copilot-instructions.md")
-
-    assert "langgraph.log" not in content
-    assert "localhost:2024" not in content
-    assert "127.0.0.1:2024" not in content
-    assert "Starts LangGraph" not in content

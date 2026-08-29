@@ -122,7 +122,12 @@ def web_search_tool(
     query: str,
     max_results: int = 5,
 ) -> str:
-    '执行 web_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch the web for information. Use this tool to find current information, news, articles, and facts from the internet.\n\n    Args:\n        query: Search keywords describing what you want to find. Be specific for better results.\n        max_results: Maximum number of results to return. Default is 5.\n    '
+    """Search the web for information. Use this tool to find current information, news, articles, and facts from the internet.
+
+    Args:
+        query: Search keywords describing what you want to find. Be specific for better results.
+        max_results: Maximum number of results to return. Default is 5.
+    """
     config = get_app_config().get_tool_config("web_search")
     region = DEFAULT_REGION
     safesearch = DEFAULT_SAFESEARCH

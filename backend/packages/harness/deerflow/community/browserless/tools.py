@@ -183,7 +183,15 @@ def _target_status_warning(result: BrowserlessScreenshotResult) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 async def web_fetch_tool(url: str) -> str:
-    '执行 web_fetch_tool 的明确职责，并返回与调用约定一致的结果。\n\nFetch the contents of a web page at a given URL using Browserless (headless Chrome).\n    Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.\n    This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.\n    Do NOT add www. to URLs that do NOT have them.\n    URLs must include the schema: https://example.com is a valid URL while example.com is an invalid URL.\n\n    Args:\n        url: The URL to fetch the contents of.\n    '
+    """Fetch the contents of a web page at a given URL using Browserless (headless Chrome).
+    Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
+    This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
+    Do NOT add www. to URLs that do NOT have them.
+    URLs must include the schema: https://example.com is a valid URL while example.com is an invalid URL.
+
+    Args:
+        url: The URL to fetch the contents of.
+    """
     try:
         cfg = _get_tool_config("web_fetch") or {}
         allow_private_addresses = _as_bool(cfg.get("allow_private_addresses"), False)
@@ -240,7 +248,20 @@ async def web_capture_tool(
     viewport_width: int | None = None,
     viewport_height: int | None = None,
 ) -> Command:
-    '执行 web_capture_tool 的明确职责，并返回与调用约定一致的结果。\n\nCapture a rendered webpage screenshot and present it as an artifact.\n\n    Use this tool when you need a visual capture of a public webpage, especially JavaScript-heavy pages, UI states, dashboards, or visual evidence for a report.\n    Only capture exact URLs provided by the user or discovered through other tools. Do not use this for private pages behind login unless the user has explicitly configured Browserless outside DeerFlow.\n    URLs must include the schema: https://example.com is valid while example.com is invalid.\n\n    Args:\n        url: The http(s) URL to capture.\n        filename: Optional output filename. Directories are ignored and the extension is determined by output_format.\n        full_page: Optional override for full-page capture.\n        output_format: Optional image format: png, jpeg, or webp.\n        viewport_width: Optional viewport width in pixels.\n        viewport_height: Optional viewport height in pixels.\n    '
+    """Capture a rendered webpage screenshot and present it as an artifact.
+
+    Use this tool when you need a visual capture of a public webpage, especially JavaScript-heavy pages, UI states, dashboards, or visual evidence for a report.
+    Only capture exact URLs provided by the user or discovered through other tools. Do not use this for private pages behind login unless the user has explicitly configured Browserless outside DeerFlow.
+    URLs must include the schema: https://example.com is valid while example.com is invalid.
+
+    Args:
+        url: The http(s) URL to capture.
+        filename: Optional output filename. Directories are ignored and the extension is determined by output_format.
+        full_page: Optional override for full-page capture.
+        output_format: Optional image format: png, jpeg, or webp.
+        viewport_width: Optional viewport width in pixels.
+        viewport_height: Optional viewport height in pixels.
+    """
     try:
         cfg = _get_tool_config("web_capture") or {}
         allow_private_addresses = _as_bool(cfg.get("allow_private_addresses"), False)

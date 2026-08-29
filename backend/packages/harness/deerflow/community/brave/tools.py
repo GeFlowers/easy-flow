@@ -209,7 +209,12 @@ def _brave_get(
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int = 5) -> str:
-    '执行 web_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch the web for information using Brave Search.\n\n    Args:\n        query: Search keywords describing what you want to find. Be specific for better results.\n        max_results: Maximum number of search results to return. Default is 5.\n    '
+    """Search the web for information using Brave Search.
+
+    Args:
+        query: Search keywords describing what you want to find. Be specific for better results.
+        max_results: Maximum number of search results to return. Default is 5.
+    """
     config = get_app_config().get_tool_config("web_search")
     if config is not None and "max_results" in (config.model_extra or {}):
         max_results = config.model_extra["max_results"]
@@ -250,7 +255,14 @@ def web_search_tool(query: str, max_results: int = 5) -> str:
 
 @tool("image_search", parse_docstring=True)
 def image_search_tool(query: str, max_results: int = 5) -> str:
-    '执行 image_search_tool 的明确职责，并返回与调用约定一致的结果。\n\nSearch for images online using Brave Image Search. Use this tool BEFORE image generation to find reference images for characters, portraits, objects, scenes, or any content requiring visual accuracy.\n\n    The returned image URLs can be used as reference images in image generation to significantly improve quality.\n\n    Args:\n        query: Search keywords describing the images you want to find. Be specific for better results.\n        max_results: Maximum number of images to return. Default is 5, capped at 200.\n    '
+    """Search for images online using Brave Image Search. Use this tool BEFORE image generation to find reference images for characters, portraits, objects, scenes, or any content requiring visual accuracy.
+
+    The returned image URLs can be used as reference images in image generation to significantly improve quality.
+
+    Args:
+        query: Search keywords describing the images you want to find. Be specific for better results.
+        max_results: Maximum number of images to return. Default is 5, capped at 200.
+    """
     config = get_app_config().get_tool_config("image_search")
     extra = (config.model_extra or {}) if config is not None else {}
     if "max_results" in extra:

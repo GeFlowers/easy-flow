@@ -30,7 +30,6 @@ from deerflow.tools.types import Runtime
 
 logger = logging.getLogger(__name__)
 
-# 中文说明：此处用于执行相关处理。
 _skill_locks: WeakValueDictionary[tuple[str, str], asyncio.Lock] = WeakValueDictionary()
 
 
@@ -253,9 +252,6 @@ async def _skill_manage_impl(
             return f"Removed '{path}' from custom skill '{name}'."
 
         if await _to_thread(skill_storage.public_skill_exists, name):
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
             raise ValueError(f"'{name}' is a read-only skill (built-in or legacy shared). To customise it, create your own version with the same name.")
         raise ValueError(f"Unsupported action '{action}'.")
 
@@ -271,7 +267,17 @@ async def skill_manage_tool(
     replace: str | None = None,
     expected_count: int | None = None,
 ) -> str:
-    """提供自定义技能的创建、编辑、补丁和文件管理入口。"""
+    """Manage custom skills under skills/custom/.
+
+    Args:
+        action: One of create, patch, edit, delete, write_file, remove_file.
+        name: Skill name in hyphen-case.
+        content: New file content for create, edit, or write_file.
+        path: Supporting file path for write_file or remove_file.
+        find: Existing text to replace for patch.
+        replace: Replacement text for patch.
+        expected_count: Optional expected number of replacements for patch.
+    """
     return await _skill_manage_impl(
         runtime=runtime,
         action=action,

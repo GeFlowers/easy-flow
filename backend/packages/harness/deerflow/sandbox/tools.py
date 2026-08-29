@@ -1435,10 +1435,20 @@ def _github_env_from_runtime(runtime: Runtime) -> dict[str, str] | None:
 
 @tool("bash", parse_docstring=True)
 def bash_tool(runtime: Runtime, description: str, command: str) -> str:
-    """在隔离环境中执行命令解释器命令。
+    """Execute a bash command in a Linux environment.
 
-    优先采用线程工作区中的虚拟环境；启动长期运行的服务时必须在后台运行并重定向输出。
-    描述参数用于简短说明目的，命令参数为要执行的命令，文件和目录应使用绝对路径。
+
+    - Use `python` to run Python code.
+    - Prefer a thread-local virtual environment in `/mnt/user-data/workspace/.venv`.
+    - Use `python -m pip` (inside the virtual environment) to install Python packages.
+    - To start a long-lived process such as a web server, ALWAYS run it in the background with its
+      output redirected, e.g. `your-command > /mnt/user-data/workspace/server.log 2>&1 &`, then check
+      the log file or poll the port. A long-lived process run in the foreground blocks the turn until
+      it is killed at the command timeout.
+
+    Args:
+        description: Explain why you are running this command in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
+        command: The bash command to execute. Always use absolute paths for files and directories.
     """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
@@ -1507,7 +1517,12 @@ bash_tool.coroutine = _bash_tool_async
 
 @tool("ls", parse_docstring=True)
 def ls_tool(runtime: Runtime, description: str, path: str) -> str:
-    """以树形格式列出目录中最多两层的内容。"""
+    """List the contents of a directory up to 2 levels deep in tree format.
+
+    Args:
+        description: Explain why you are listing this directory in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
+        path: The **absolute** path to the directory to list.
+    """
     try:
         user_id = resolve_runtime_user_id(runtime)
         # Block access to disabled skill directories
@@ -1578,7 +1593,15 @@ def glob_tool(
     include_dirs: bool = False,
     max_results: int = _DEFAULT_GLOB_MAX_RESULTS,
 ) -> str:
-    """在根目录下查找匹配通配模式的文件或目录，并限制返回数量。"""
+    """Find files or directories that match a glob pattern under a root directory.
+
+    Args:
+        description: Explain why you are searching for these paths in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
+        pattern: The glob pattern to match relative to the root path, for example `**/*.py`.
+        path: The **absolute** root directory to search under.
+        include_dirs: Whether matching directories should also be returned. Default is False.
+        max_results: Maximum number of paths to return. Default is 200.
+    """
     try:
         user_id = resolve_runtime_user_id(runtime)
         # Block access to disabled skill directories
@@ -1653,7 +1676,17 @@ def grep_tool(
     case_sensitive: bool = False,
     max_results: int = _DEFAULT_GREP_MAX_RESULTS,
 ) -> str:
-    """在根目录下的文本文件中搜索匹配行，并支持通配过滤和结果上限。"""
+    """Search for matching lines inside text files under a root directory.
+
+    Args:
+        description: Explain why you are searching file contents in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
+        pattern: The string or regex pattern to search for.
+        path: The **absolute** root directory to search under.
+        glob: Optional glob filter for candidate files, for example `**/*.py`.
+        literal: Whether to treat `pattern` as a plain string. Default is False.
+        case_sensitive: Whether matching is case-sensitive. Default is False.
+        max_results: Maximum number of matching lines to return. Default is 100.
+    """
     try:
         user_id = resolve_runtime_user_id(runtime)
         # Block access to disabled skill directories
@@ -1763,7 +1796,14 @@ def read_file_tool(
     start_line: int | None = None,
     end_line: int | None = None,
 ) -> str:
-    """读取文本文件内容，可选按起止行号读取指定范围。"""
+    """Read the contents of a text file. Use this to examine source code, configuration files, logs, or any text-based file.
+
+    Args:
+        description: Explain why you are reading this file in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
+        path: The **absolute** path to the file to read.
+        start_line: Optional starting line number (1-indexed, inclusive). Use with end_line to read a specific range.
+        end_line: Optional ending line number (1-indexed, inclusive). Use with start_line to read a specific range.
+    """
     try:
         # Block access to disabled skill files
         if _is_disabled_skill_path(path, user_id=resolve_runtime_user_id(runtime)):
@@ -1843,10 +1883,39 @@ def write_file_tool(
     content: str,
     append: bool = False,
 ) -> str:
-    """写入文本文件；默认覆盖，追加模式写入文件末尾。
+    """Write text content to a file. By default this overwrites the target file; set append=True to add content to the end without replacing existing content.
 
-    现有文件必须先读取当前版本，任一次写入都会使此前读取失效。单次非追加写入受 UTF-8
-    内容大小限制，大文档应使用分段追加或字符串替换；环境变量可调整该上限。
+    READ-BEFORE-WRITE (issue #3857): if the target file already exists (including
+    append=True), you must have read its CURRENT version with read_file first.
+    Any write invalidates earlier reads, so re-read between consecutive
+    modifications — a ranged read of the relevant section is enough. Writes
+    that fail this check are rejected with an error.
+
+    SIZE POLICY (issue #3189):
+    A single non-append write_file call must not exceed 80 KB of UTF-8 content.
+    Oversized single-shot writes correlate with LLM streaming chunk-gap
+    timeouts because the tool-call JSON payload — which the model must emit as
+    one continuous stream — grows past the safe window. For larger documents,
+    use ONE of these strategies (write_file rejects oversized payloads with an
+    actionable error):
+
+      1. INCREMENTAL EDIT (preferred for revisions): after the initial write,
+         use `str_replace` to surgically update sections. This is the same
+         pattern Claude Code's Write+Edit and OpenAI Codex's apply_patch use,
+         and keeps each tool call's payload small.
+      2. APPEND-IN-CHUNKS (for new long-form content): split the document into
+         sections, each well under 80 KB. First call uses append=False to
+         create the file; subsequent calls use append=True. The 80 KB cap does
+         NOT apply to append=True calls.
+
+    Operators can override the cap via env var `DEERFLOW_WRITE_FILE_MAX_BYTES`
+    (0 disables the guard entirely). Raising it risks streaming timeouts.
+
+    Args:
+        description: Explain why you are writing to this file in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
+        path: The **absolute** path to the file to write to. ALWAYS PROVIDE THIS PARAMETER SECOND.
+        content: The content to write to the file. ALWAYS PROVIDE THIS PARAMETER THIRD.
+        append: Whether to append content to the end of the file instead of overwriting it. Defaults to False.
     """
     if not append:
         max_bytes = _effective_write_file_max_bytes()
@@ -1915,7 +1984,19 @@ def str_replace_tool(
     new_str: str,
     replace_all: bool = False,
 ) -> str:
-    """使用新字符串替换文件中的旧字符串；写入前必须先读取文件当前版本。"""
+    """Replace a substring in a file with another substring.
+    If `replace_all` is False (default), the substring to replace must appear **exactly once** in the file.
+
+    READ-BEFORE-WRITE (issue #3857): you must have read the file's CURRENT
+    version with read_file first; any write invalidates earlier reads.
+
+    Args:
+        description: Explain why you are replacing the substring in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
+        path: The **absolute** path to the file to replace the substring in. ALWAYS PROVIDE THIS PARAMETER SECOND.
+        old_str: The substring to replace. ALWAYS PROVIDE THIS PARAMETER THIRD.
+        new_str: The new substring. ALWAYS PROVIDE THIS PARAMETER FOURTH.
+        replace_all: Whether to replace all occurrences of the substring. If False, only the first occurrence will be replaced. Default is False.
+    """
     try:
         sandbox = ensure_sandbox_initialized(runtime)
         ensure_thread_directories_exist(runtime)

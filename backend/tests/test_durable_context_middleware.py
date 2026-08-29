@@ -559,7 +559,13 @@ def fake_task(
     subagent_type: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    '执行 fake_task 的明确职责，并返回与调用约定一致的结果。\n\nFake task tool.\n\n    Args:\n        description: short task label.\n        prompt: full task instructions.\n        subagent_type: which subagent type to use.\n    '
+    """Fake task tool.
+
+    Args:
+        description: short task label.
+        prompt: full task instructions.
+        subagent_type: which subagent type to use.
+    """
     return Command(
         update={
             "messages": [
@@ -576,7 +582,11 @@ def fake_task(
 
 @tool("read_file", parse_docstring=True)
 def fake_read_file(path: str) -> str:
-    '执行 fake_read_file 的明确职责，并返回与调用约定一致的结果。\n\nRead a file.\n\n    Args:\n        path: absolute path to read.\n    '
+    """Read a file.
+
+    Args:
+        path: absolute path to read.
+    """
     return "---\nname: data-analysis\ndescription: Analyze data with pandas and charts.\n---\n# Data Analysis\nALWAYS_USE_PANDAS_SENTINEL\n"
 
 

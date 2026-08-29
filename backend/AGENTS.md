@@ -798,6 +798,13 @@ Both can be modified at runtime via Gateway API endpoints or `DeerFlowClient` me
 - For lightweight config/utility modules, prefer pure unit tests with no external dependencies
 - If a module causes circular import issues in tests, add a `sys.modules` mock in `tests/conftest.py` (see existing example for `deerflow.subagents.executor`)
 
+Tool docstrings decorated with `@tool(parse_docstring=True)` are consumed at
+import time to build the model-facing JSON schema. They must retain a valid
+Google-style `Args:` section whose names match the current function signature;
+translating or shortening them as ordinary comments can prevent Gateway startup.
+`tests/test_tool_docstring_contract.py` statically scans every such tool so one
+malformed optional provider does not hide behind an earlier import failure.
+
 ```bash
 # Run all tests
 make test
