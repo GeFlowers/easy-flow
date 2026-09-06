@@ -6,6 +6,12 @@
   ],
   "settings": {
     "js/ts.tsdk.path": "frontend/node_modules/typescript/lib",
+    "typescript.tsdk": "frontend/node_modules/typescript/lib",
+    "python.defaultInterpreterPath": "${workspaceFolder}/backend/.venv/Scripts/python.exe",
+    "python.analysis.extraPaths": [
+      "${workspaceFolder}/backend",
+      "${workspaceFolder}/backend/packages/harness"
+    ],
     "python-envs.pythonProjects": [
       {
         "path": "backend",
