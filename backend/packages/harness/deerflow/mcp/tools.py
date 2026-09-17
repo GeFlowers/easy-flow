@@ -94,13 +94,13 @@ def _local_uri_to_virtual_path(
 ) -> str | None:
     """将本地文件引用转换为 ``/mnt/user-data/...`` 虚拟路径。
 
-stdio MCP 服务器的工作目录和临时目录固定在线程挂载的用户数据树中（见
-``_make_session_pool_tool``），因此其生成的文件已位于沙箱和制品 API 可服务的位置；
-仅缺少 DeerFlow 其他部分使用的虚拟路径前缀。本方法只执行确定性的主机路径到虚拟路径
-映射：不复制文件、不维护受信任根目录列表，也不暴露线程数据树外的文件。
+    stdio MCP 服务器的工作目录和临时目录固定在线程挂载的用户数据树中（见
+    ``_make_session_pool_tool``），因此其生成的文件已位于沙箱和制品 API 可服务的位置；
+    仅缺少 DeerFlow 其他部分使用的虚拟路径前缀。本方法只执行确定性的主机路径到虚拟路径
+    映射：不复制文件、不维护受信任根目录列表，也不暴露线程数据树外的文件。
 
-URI 为远程地址、无法解析、位于当前线程用户数据树外或不指向现有文件时返回 ``None``，
-调用方将保持原引用。相对引用相对于 *source_base_dir*（服务器工作目录）解析。
+    URI 为远程地址、无法解析、位于当前线程用户数据树外或不指向现有文件时返回 ``None``，
+    调用方将保持原引用。相对引用相对于 *source_base_dir*（服务器工作目录）解析。
     """
     src = _local_path_from_uri(uri, base_dir=source_base_dir)
     if src is None:
@@ -160,9 +160,9 @@ def _changed_workspace_files(root: Path, before: _FILE_SNAPSHOT) -> list[Path]:
 def _prepare_stdio_workspace(paths: Paths, *, thread_id: str, user_id: str) -> tuple[Path, Path, _FILE_SNAPSHOT]:
     """为固定工作目录的 stdio MCP 子进程准备线程工作区。
 
-将创建目录、准备临时目录和调用前快照等同步文件系统操作集中到此辅助函数，使调用方可
-通过 ``asyncio.to_thread`` 在线程中执行。返回工作区 cwd、固定的临时目录和调用前文件
-快照。
+    将创建目录、准备临时目录和调用前快照等同步文件系统操作集中到此辅助函数，使调用方可
+    通过 ``asyncio.to_thread`` 在线程中执行。返回工作区 cwd、固定的临时目录和调用前文件
+    快照。
     """
     paths.ensure_thread_dirs(thread_id, user_id=user_id)
     source_base_dir = paths.sandbox_work_dir(thread_id, user_id=user_id)
@@ -179,8 +179,8 @@ def _prepare_stdio_workspace(paths: Paths, *, thread_id: str, user_id: str) -> t
 def _result_has_text_content(call_tool_result: Any) -> bool:
     """当 MCP 结果包含任意文本内容时返回 ``True``。
 
-调用后的快照差异只用于自由文本中的裸文件名关联。结果没有文本块时无需改写，调用方可
-完全跳过第二次递归遍历。
+    调用后的快照差异只用于自由文本中的裸文件名关联。结果没有文本块时无需改写，调用方可
+    完全跳过第二次递归遍历。
     """
     from mcp.types import EmbeddedResource, TextContent, TextResourceContents
 
@@ -205,9 +205,9 @@ def _rewrite_unique_bare_filenames(
 ) -> str:
     """仅在本次调用生成唯一匹配时改写裸文件名。
 
-``Saved as page-2026.yml`` 这类响应在结构上并不是路径。安全的解释方式只能是将文件名
-与本次工具调用新建或修改的文件关联，并且仅当该文件名在当前线程挂载的用户数据树中
-唯一对应一个文件时才改写。
+    ``Saved as page-2026.yml`` 这类响应在结构上并不是路径。安全的解释方式只能是将文件名
+    与本次工具调用新建或修改的文件关联，并且仅当该文件名在当前线程挂载的用户数据树中
+    唯一对应一个文件时才改写。
     """
     candidates: dict[str, list[str]] = {}
     for path in changed_files:
@@ -251,11 +251,11 @@ def _rewrite_local_paths_in_text(
 ) -> str:
     """尽力改写自由文本中出现的本地文件引用。
 
-某些 MCP 服务器（尤其是 Playwright 的 ``browser_take_screenshot``）仅以自由文本报告
-保存的文件，例如 ``Took the screenshot and saved it as temp/page-2026.png``，而非使用
-``ResourceLink``。自由文本不是可靠协议，因此此处刻意保守：每个候选令牌都交给
-``_local_uri_to_virtual_path``，只有能解析为当前线程用户数据树内现有文件时才改写。
-不是真实路径或指向其他位置的令牌会保持原样，即使正则表达式匹配过宽也不会造成影响。
+    某些 MCP 服务器（尤其是 Playwright 的 ``browser_take_screenshot``）仅以自由文本报告
+    保存的文件，例如 ``Took the screenshot and saved it as temp/page-2026.png``，而非使用
+    ``ResourceLink``。自由文本不是可靠协议，因此此处刻意保守：每个候选令牌都交给
+    ``_local_uri_to_virtual_path``，只有能解析为当前线程用户数据树内现有文件时才改写。
+    不是真实路径或指向其他位置的令牌会保持原样，即使正则表达式匹配过宽也不会造成影响。
     """
     translated_by_source: dict[str, str | None] = {}
 
@@ -318,13 +318,13 @@ def _convert_call_tool_result(
 ) -> Any:
     """将 MCP ``CallToolResult`` 转换为 LangChain 的 ``content_and_artifact`` 格式。
 
-实现与适配器相同的转换逻辑，但不依赖私有符号
-``langchain_mcp_adapters.tools._convert_call_tool_result``。
+    实现与适配器相同的转换逻辑，但不依赖私有符号
+    ``langchain_mcp_adapters.tools._convert_call_tool_result``。
 
-提供 ``thread_id`` 和 ``user_id`` 时，``ResourceLink`` 块或普通文本中引用的本地文件
-（例如 Playwright MCP 保存的截图）会从主机路径转换为 ``/mnt/user-data/...`` 虚拟路径，
-使沙箱和制品 API 可以解析它们。文件本身不会被复制：stdio 服务器的 cwd 与临时目录已
-固定在挂载树内，文件本就位于可服务的位置。远程 URI 及线程用户数据树外的文件保持不变。
+    提供 ``thread_id`` 和 ``user_id`` 时，``ResourceLink`` 块或普通文本中引用的本地文件
+    （例如 Playwright MCP 保存的截图）会从主机路径转换为 ``/mnt/user-data/...`` 虚拟路径，
+    使沙箱和制品 API 可以解析它们。文件本身不会被复制：stdio 服务器的 cwd 与临时目录已
+    固定在挂载树内，文件本就位于可服务的位置。远程 URI 及线程用户数据树外的文件保持不变。
     """
     from langchain_core.messages import ToolMessage
     from langchain_core.messages.content import create_file_block, create_image_block, create_text_block
@@ -418,11 +418,11 @@ def _make_session_pool_tool(
 ) -> BaseTool:
     """包装 MCP 工具，使其复用会话池中的持久化会话。
 
-以按 ``(server_name, user_id:thread_id)`` 划分的池化会话替代每次调用都创建会话的方式，
-从而使 Playwright 等有状态 MCP 服务器在同一线程的多次工具调用间保留状态，同时保持用户
-之间隔离。
+    以按 ``(server_name, user_id:thread_id)`` 划分的池化会话替代每次调用都创建会话的方式，
+    从而使 Playwright 等有状态 MCP 服务器在同一线程的多次工具调用间保留状态，同时保持用户
+    之间隔离。
 
-保留配置的 ``tool_interceptors``（OAuth 或自定义拦截器），并在每次调用池化会话前应用。
+    保留配置的 ``tool_interceptors``（OAuth 或自定义拦截器），并在每次调用池化会话前应用。
     """
     # Strip the server-name prefix to recover the original MCP tool name.
     original_name = tool.name
@@ -557,11 +557,11 @@ def _make_session_pool_tool(
 async def get_mcp_tools() -> list[BaseTool]:
     """获取全部已启用 MCP 服务器提供的工具。
 
-使用 stdio 传输的工具会被包装为持久化会话逻辑，使同一线程内连续调用复用同一 MCP
-会话。HTTP/SSE 工具保持未包装状态，以避免跨任务清理 TaskGroup 的错误。
+    使用 stdio 传输的工具会被包装为持久化会话逻辑，使同一线程内连续调用复用同一 MCP
+    会话。HTTP/SSE 工具保持未包装状态，以避免跨任务清理 TaskGroup 的错误。
 
-返回：
-    全部已启用 MCP 服务器提供的 LangChain 工具列表。
+    返回：
+        全部已启用 MCP 服务器提供的 LangChain 工具列表。
     """
     try:
         from langchain_mcp_adapters.client import MultiServerMCPClient

@@ -1,4 +1,16 @@
-"定义 patched_minimax 模块提供的职责与可复用接口。\n\nPatched ChatOpenAI adapter for MiniMax reasoning output.\n\nMiniMax's OpenAI-compatible chat completions API can return structured\n``reasoning_details`` when ``extra_body.reasoning_split=true`` is enabled.\n``langchain_openai.ChatOpenAI`` currently ignores that field, so DeerFlow's\nfrontend never receives reasoning content in the shape it expects.\n\nThis adapter preserves ``reasoning_split`` in the request payload and maps the\nprovider-specific reasoning field into ``additional_kwargs.reasoning_content``,\nwhich DeerFlow already understands.\n"
+"""定义 patched_minimax 模块提供的职责与可复用接口。
+
+Patched ChatOpenAI adapter for MiniMax reasoning output.
+
+MiniMax's OpenAI-compatible chat completions API can return structured
+``reasoning_details`` when ``extra_body.reasoning_split=true`` is enabled.
+``langchain_openai.ChatOpenAI`` currently ignores that field, so DeerFlow's
+frontend never receives reasoning content in the shape it expects.
+
+This adapter preserves ``reasoning_split`` in the request payload and maps the
+provider-specific reasoning field into ``additional_kwargs.reasoning_content``,
+which DeerFlow already understands.
+"""
 
 from __future__ import annotations
 
@@ -23,7 +35,7 @@ def _extract_reasoning_text(
     *,
     strip_parts: bool = True,
 ) -> str | None:
-    '执行 _extract_reasoning_text 的明确职责，并返回与调用约定一致的结果'
+    "执行 _extract_reasoning_text 的明确职责，并返回与调用约定一致的结果"
     if not isinstance(reasoning_details, list):
         return None
 
@@ -41,11 +53,11 @@ def _extract_reasoning_text(
 
 
 def _strip_inline_think_tags(content: str) -> tuple[str, str | None]:
-    '执行 _strip_inline_think_tags 的明确职责，并返回与调用约定一致的结果'
+    "执行 _strip_inline_think_tags 的明确职责，并返回与调用约定一致的结果"
     reasoning_parts: list[str] = []
 
     def _replace(match: re.Match[str]) -> str:
-        '执行 _replace 的明确职责，并返回与调用约定一致的结果'
+        "执行 _replace 的明确职责，并返回与调用约定一致的结果"
         reasoning = match.group(1).strip()
         if reasoning:
             reasoning_parts.append(reasoning)
@@ -57,7 +69,7 @@ def _strip_inline_think_tags(content: str) -> tuple[str, str | None]:
 
 
 def _merge_reasoning(*values: str | None) -> str | None:
-    '执行 _merge_reasoning 的明确职责，并返回与调用约定一致的结果'
+    "执行 _merge_reasoning 的明确职责，并返回与调用约定一致的结果"
     merged: list[str] = []
     for value in values:
         if not value:
@@ -74,7 +86,7 @@ def _with_reasoning_content(
     *,
     preserve_whitespace: bool = False,
 ):
-    '执行 _with_reasoning_content 的明确职责，并返回与调用约定一致的结果'
+    "执行 _with_reasoning_content 的明确职责，并返回与调用约定一致的结果"
     if not reasoning:
         return message
 
@@ -91,7 +103,9 @@ def _with_reasoning_content(
 
 
 class PatchedChatMiniMax(ChatOpenAI):
-    '封装 PatchedChatMiniMax 的状态、协作关系与公开操作。\n\nChatOpenAI adapter that preserves MiniMax reasoning output.'
+    """封装 PatchedChatMiniMax 的状态、协作关系与公开操作。
+
+    ChatOpenAI adapter that preserves MiniMax reasoning output."""
 
     def _get_request_payload(
         self,
@@ -100,7 +114,7 @@ class PatchedChatMiniMax(ChatOpenAI):
         stop: list[str] | None = None,
         **kwargs: Any,
     ) -> dict:
-        '执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果'
+        "执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果"
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
         extra_body = payload.get("extra_body")
         if isinstance(extra_body, dict):
@@ -115,7 +129,17 @@ class PatchedChatMiniMax(ChatOpenAI):
 
     @staticmethod
     def _strip_user_message_names(payload: dict) -> None:
-        '执行 _strip_user_message_names 的明确职责，并返回与调用约定一致的结果。\n\nDrop the per-message ``name`` field from user-role messages.\n\n        DeerFlow middlewares tag user messages with internal provenance names\n        (``user-input``, ``summary``, ``loop_warning``, ...). ``langchain_openai``\n        serializes those into the OpenAI-compatible request, but MiniMax requires\n        every user-role ``name`` to be identical and otherwise rejects the request\n        with ``invalid params, user name must be consistent (2013)``. MiniMax does\n        not use the per-message author name, so strip it.\n        '
+        """执行 _strip_user_message_names 的明确职责，并返回与调用约定一致的结果。
+
+        Drop the per-message ``name`` field from user-role messages.
+
+                DeerFlow middlewares tag user messages with internal provenance names
+                (``user-input``, ``summary``, ``loop_warning``, ...). ``langchain_openai``
+                serializes those into the OpenAI-compatible request, but MiniMax requires
+                every user-role ``name`` to be identical and otherwise rejects the request
+                with ``invalid params, user name must be consistent (2013)``. MiniMax does
+                not use the per-message author name, so strip it.
+        """
         messages = payload.get("messages")
         if not isinstance(messages, list):
             return
@@ -129,7 +153,7 @@ class PatchedChatMiniMax(ChatOpenAI):
         default_chunk_class: type,
         base_generation_info: dict | None,
     ) -> ChatGenerationChunk | None:
-        '执行 _convert_chunk_to_generation_chunk 的明确职责，并返回与调用约定一致的结果'
+        "执行 _convert_chunk_to_generation_chunk 的明确职责，并返回与调用约定一致的结果"
         if chunk.get("type") == "content.delta":
             return None
 
@@ -193,7 +217,7 @@ class PatchedChatMiniMax(ChatOpenAI):
         response: dict | Any,
         generation_info: dict | None = None,
     ) -> ChatResult:
-        '执行 _create_chat_result 的明确职责，并返回与调用约定一致的结果'
+        "执行 _create_chat_result 的明确职责，并返回与调用约定一致的结果"
         result = super()._create_chat_result(response, generation_info)
         response_dict = response if isinstance(response, dict) else response.model_dump()
         choices = response_dict.get("choices", [])

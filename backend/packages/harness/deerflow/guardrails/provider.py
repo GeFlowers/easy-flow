@@ -1,4 +1,6 @@
-'定义 provider 模块提供的职责与可复用接口。\n\nGuardrailProvider protocol and data structures for pre-tool-call authorization.'
+"""定义 provider 模块提供的职责与可复用接口。
+
+GuardrailProvider protocol and data structures for pre-tool-call authorization."""
 
 from __future__ import annotations
 
@@ -8,7 +10,9 @@ from typing import Any, Protocol, runtime_checkable
 
 @dataclass
 class GuardrailRequest:
-    '封装 GuardrailRequest 的状态、协作关系与公开操作。\n\nContext passed to the provider for each tool call.'
+    """封装 GuardrailRequest 的状态、协作关系与公开操作。
+
+    Context passed to the provider for each tool call."""
 
     tool_name: str
     tool_input: dict[str, Any]
@@ -26,7 +30,9 @@ class GuardrailRequest:
 
 @dataclass
 class GuardrailReason:
-    '封装 GuardrailReason 的状态、协作关系与公开操作。\n\nStructured reason for an allow/deny decision (OAP reason object).'
+    """封装 GuardrailReason 的状态、协作关系与公开操作。
+
+    Structured reason for an allow/deny decision (OAP reason object)."""
 
     code: str
     message: str = ""
@@ -34,7 +40,9 @@ class GuardrailReason:
 
 @dataclass
 class GuardrailDecision:
-    "封装 GuardrailDecision 的状态、协作关系与公开操作。\n\nProvider's allow/deny verdict (aligned with OAP Decision object)."
+    """封装 GuardrailDecision 的状态、协作关系与公开操作。
+
+    Provider's allow/deny verdict (aligned with OAP Decision object)."""
 
     allow: bool
     reasons: list[GuardrailReason] = field(default_factory=list)
@@ -44,14 +52,25 @@ class GuardrailDecision:
 
 @runtime_checkable
 class GuardrailProvider(Protocol):
-    '封装 GuardrailProvider 的状态、协作关系与公开操作。\n\nContract for pluggable tool-call authorization.\n\n    Any class with these methods works - no base class required.\n    Providers are loaded by class path via resolve_variable(),\n    the same mechanism DeerFlow uses for models, tools, and sandbox.\n    '
+    """封装 GuardrailProvider 的状态、协作关系与公开操作。
+
+    Contract for pluggable tool-call authorization.
+
+        Any class with these methods works - no base class required.
+        Providers are loaded by class path via resolve_variable(),
+        the same mechanism DeerFlow uses for models, tools, and sandbox.
+    """
 
     name: str
 
     def evaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        '执行 evaluate 的明确职责，并返回与调用约定一致的结果。\n\nEvaluate whether a tool call should proceed.'
+        """执行 evaluate 的明确职责，并返回与调用约定一致的结果。
+
+        Evaluate whether a tool call should proceed."""
         ...
 
     async def aevaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        '执行 aevaluate 的明确职责，并返回与调用约定一致的结果。\n\nAsync variant.'
+        """执行 aevaluate 的明确职责，并返回与调用约定一致的结果。
+
+        Async variant."""
         ...

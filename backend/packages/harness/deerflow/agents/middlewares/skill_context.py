@@ -1,4 +1,6 @@
-'定义 skill_context 模块提供的职责与可复用接口。\n\nDeterministic capture and rendering for loaded skill files.'
+"""定义 skill_context 模块提供的职责与可复用接口。
+
+Deterministic capture and rendering for loaded skill files."""
 
 from __future__ import annotations
 
@@ -21,13 +23,14 @@ logger = logging.getLogger(__name__)
 
 
 class SkillEntryMetadata(TypedDict):
-    '封装 SkillEntryMetadata 的状态、协作关系与公开操作'
+    "封装 SkillEntryMetadata 的状态、协作关系与公开操作"
+
     path: str
     description: str
 
 
 def _tool_call_name(tool_call: dict[str, Any]) -> str:
-    '执行 _tool_call_name 的明确职责，并返回与调用约定一致的结果'
+    "执行 _tool_call_name 的明确职责，并返回与调用约定一致的结果"
     name = tool_call.get("name")
     if isinstance(name, str):
         return name
@@ -38,13 +41,13 @@ def _tool_call_name(tool_call: dict[str, Any]) -> str:
 
 
 def _tool_call_id(tool_call: dict[str, Any]) -> str | None:
-    '执行 _tool_call_id 的明确职责，并返回与调用约定一致的结果'
+    "执行 _tool_call_id 的明确职责，并返回与调用约定一致的结果"
     tool_call_id = tool_call.get("id")
     return str(tool_call_id) if tool_call_id else None
 
 
 def _tool_call_path(tool_call: dict[str, Any]) -> str | None:
-    '执行 _tool_call_path 的明确职责，并返回与调用约定一致的结果'
+    "执行 _tool_call_path 的明确职责，并返回与调用约定一致的结果"
     args = tool_call.get("args")
     if not isinstance(args, dict):
         return None
@@ -56,7 +59,7 @@ def _tool_call_path(tool_call: dict[str, Any]) -> str | None:
 
 
 def _normalize_under_root(path: str, normalized_root: str) -> str | None:
-    '执行 _normalize_under_root 的明确职责，并返回与调用约定一致的结果'
+    "执行 _normalize_under_root 的明确职责，并返回与调用约定一致的结果"
     normalized = posixpath.normpath(path)
     if normalized == normalized_root or normalized.startswith(normalized_root + "/"):
         return normalized
@@ -64,17 +67,21 @@ def _normalize_under_root(path: str, normalized_root: str) -> str | None:
 
 
 def _is_skill_file(path: str) -> bool:
-    '执行 _is_skill_file 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_skill_file 的明确职责，并返回与调用约定一致的结果"
     return posixpath.basename(path) == _SKILL_FILE_NAME
 
 
 def _skill_name_from_path(skill_md_path: str) -> str:
-    '执行 _skill_name_from_path 的明确职责，并返回与调用约定一致的结果。\n\nDerive the skill name from the directory containing SKILL.md.'
+    """执行 _skill_name_from_path 的明确职责，并返回与调用约定一致的结果。
+
+    Derive the skill name from the directory containing SKILL.md."""
     return posixpath.basename(posixpath.dirname(skill_md_path))
 
 
 def _parse_description(content: str) -> str:
-    '执行 _parse_description 的明确职责，并返回与调用约定一致的结果。\n\nExtract frontmatter description from already-read SKILL.md content.'
+    """执行 _parse_description 的明确职责，并返回与调用约定一致的结果。
+
+    Extract frontmatter description from already-read SKILL.md content."""
     match = _FRONT_MATTER_RE.match(content)
     if not match:
         return ""
@@ -91,7 +98,7 @@ def _parse_description(content: str) -> str:
 
 
 def _is_tool_error_text(content: str) -> bool:
-    '执行 _is_tool_error_text 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_tool_error_text 的明确职责，并返回与调用约定一致的结果"
     return content.lstrip().startswith("Error:")
 
 
@@ -101,7 +108,7 @@ def build_skill_entry_metadata_from_read(
     *,
     skills_root: str,
 ) -> SkillEntryMetadata | None:
-    '构建并返回，并遵守 build_skill_entry_metadata_from_read 所表达的接口约束'
+    "构建并返回，并遵守 build_skill_entry_metadata_from_read 所表达的接口约束"
     normalized_root = posixpath.normpath(skills_root.rstrip("/") or "/")
     normalized_path = _normalize_under_root(path, normalized_root)
     if normalized_path is None or not _is_skill_file(normalized_path) or _is_tool_error_text(content):
@@ -113,7 +120,7 @@ def build_skill_entry_metadata_from_read(
 
 
 def read_skill_entry_metadata(additional_kwargs: Mapping[str, object] | None) -> SkillEntryMetadata | None:
-    '执行 read_skill_entry_metadata 的明确职责，并返回与调用约定一致的结果'
+    "执行 read_skill_entry_metadata 的明确职责，并返回与调用约定一致的结果"
     if not additional_kwargs:
         return None
     raw = additional_kwargs.get(SKILL_CONTEXT_ENTRY_KEY)
@@ -130,7 +137,7 @@ def read_skill_entry_metadata(additional_kwargs: Mapping[str, object] | None) ->
 
 
 def _escape_context_text(value: object) -> str:
-    '执行 _escape_context_text 的明确职责，并返回与调用约定一致的结果'
+    "执行 _escape_context_text 的明确职责，并返回与调用约定一致的结果"
     return escape(str(value), quote=False)
 
 
@@ -140,7 +147,9 @@ def extract_skills(
     skills_root: str,
     read_tool_names: Collection[str],
 ) -> list[SkillEntry]:
-    '执行 extract_skills 的明确职责，并返回与调用约定一致的结果。\n\nEnumerate skill-file reads (AI read_file call + paired ToolMessage result).'
+    """执行 extract_skills 的明确职责，并返回与调用约定一致的结果。
+
+    Enumerate skill-file reads (AI read_file call + paired ToolMessage result)."""
     normalized_root = posixpath.normpath(skills_root.rstrip("/") or "/")
     read_names = frozenset(read_tool_names)
 
@@ -193,7 +202,9 @@ def extract_skills(
 
 
 def render_skill_context(entries: list[SkillEntry]) -> str:
-    '执行 render_skill_context 的明确职责，并返回与调用约定一致的结果。\n\nRender active-skill references as a compact reminder, not the body.'
+    """执行 render_skill_context 的明确职责，并返回与调用约定一致的结果。
+
+    Render active-skill references as a compact reminder, not the body."""
     if not entries:
         return ""
 

@@ -12,6 +12,7 @@ from deerflow.persistence.base import Base
 
 class RunEventRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "run_events"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)

@@ -76,9 +76,9 @@ class _Dialect:
     num_cast: str
     int_types: tuple[str, ...]
     int_cast: str
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     int_guard: str | None
     string_type: str
     bool_type: str | None
@@ -126,7 +126,7 @@ def _build_clause(compiler: SQLCompiler, typeof: str, extract: str, value: objec
     if value is None:
         return f"{typeof} = '{dialect.null_type}'"
     if isinstance(value, bool):
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         bool_str = "true" if value else "false"
         if dialect.bool_type is None:
             return f"{typeof} = '{bool_str}'"
@@ -134,7 +134,7 @@ def _build_clause(compiler: SQLCompiler, typeof: str, extract: str, value: objec
     if isinstance(value, int):
         bp = _bind(compiler, value, BigInteger(), **kw)
         if dialect.int_guard:
-                        # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
             return f"(CASE WHEN {_type_check(typeof, dialect.int_types)} AND {extract} ~ {dialect.int_guard} THEN CAST({extract} AS {dialect.int_cast}) END = {bp})"
         return f"({_type_check(typeof, dialect.int_types)} AND CAST({extract} AS {dialect.int_cast}) = {bp})"
     if isinstance(value, float):

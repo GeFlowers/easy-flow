@@ -1,4 +1,6 @@
-'定义 naming 模块提供的职责与可复用接口。\n\nRun naming helpers for LangChain/LangSmith tracing.'
+"""定义 naming 模块提供的职责与可复用接口。
+
+Run naming helpers for LangChain/LangSmith tracing."""
 
 from __future__ import annotations
 

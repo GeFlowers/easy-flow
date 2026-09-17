@@ -1,4 +1,5 @@
-'未说明'
+"未说明"
+
 import logging
 import re
 from pathlib import Path
@@ -14,7 +15,7 @@ _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> str:
-    '未说明'
+    "未说明"
 
     lines = [f"Invalid YAML front-matter in {skill_file}: {exc}"]
 
@@ -40,7 +41,7 @@ def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> st
 
 
 def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None:
-    '未说明'
+    "未说明"
     if raw is None:
         return None
     if not isinstance(raw, list):
@@ -58,7 +59,7 @@ def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None
 
 
 def parse_required_secrets(raw: object, skill_file: Path) -> tuple[SecretRequirement, ...]:
-    '未说明'
+    "未说明"
     if raw is None:
         return ()
     if not isinstance(raw, list):
@@ -87,7 +88,7 @@ def parse_required_secrets(raw: object, skill_file: Path) -> tuple[SecretRequire
 
 
 def parse_secrets_autonomous(raw: object, skill_file: Path) -> bool:
-    '未说明'
+    "未说明"
     if raw is None:
         return True
     if isinstance(raw, bool):
@@ -97,7 +98,7 @@ def parse_secrets_autonomous(raw: object, skill_file: Path) -> bool:
 
 
 def parse_skill_file(skill_file: Path, category: SkillCategory, relative_path: Path | None = None) -> Skill | None:
-    '未说明'
+    "未说明"
     if not skill_file.exists() or skill_file.name != SKILL_MD_FILE:
         return None
 

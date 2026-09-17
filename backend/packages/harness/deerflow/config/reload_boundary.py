@@ -31,10 +31,10 @@ STARTUP_ONLY_FIELDS: dict[str, str] = {
         "and TraceMiddleware captures logging.enhance.enabled once at startup so response X-Trace-Id headers, log trace_id fields, and Langfuse "
         "deerflow_trace_id stay coherent. A freshly reloaded AppConfig does not retrigger any of this."
     ),
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     "channels": ("start_channel_service() is invoked once during startup; the live IM channel clients (Feishu, Slack, Telegram, DingTalk) are not rebuilt when channels.* changes."),
     "channel_connections": (
         "start_channel_service() wires the connection repository and channel workers once at startup, and the channel-connections router caches the merged provider config on app.state; channel_connections.* edits need a restart."

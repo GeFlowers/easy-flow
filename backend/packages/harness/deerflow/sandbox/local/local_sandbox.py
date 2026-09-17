@@ -1,4 +1,5 @@
 """实现带路径映射、访问隔离和命令回收的本地文件系统沙箱。"""
+
 import errno
 import logging
 import ntpath
@@ -80,6 +81,7 @@ class PathMapping:
 
 class ResolvedPath(NamedTuple):
     """表示路径解析结果及其命中的路径映射。"""
+
     path: str
     mapping: PathMapping | None
 

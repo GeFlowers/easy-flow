@@ -1,4 +1,5 @@
-'定义 tools 模块提供的职责与可复用接口'
+"定义 tools 模块提供的职责与可复用接口"
+
 from langchain.tools import tool
 
 from deerflow.config import get_app_config
@@ -10,7 +11,7 @@ readability_extractor = ReadabilityExtractor()
 
 
 def _get_infoquest_client() -> InfoQuestClient:
-    '执行 _get_infoquest_client 的明确职责，并返回与调用约定一致的结果'
+    "执行 _get_infoquest_client 的明确职责，并返回与调用约定一致的结果"
     search_config = get_app_config().get_tool_config("web_search")
     search_time_range = -1
     if search_config is not None and "search_time_range" in search_config.model_extra:

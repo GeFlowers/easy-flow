@@ -1,4 +1,21 @@
-'定义 async_provider 模块提供的职责与可复用接口。\n\nAsync checkpointer factory.\n\nProvides an **async context manager** for long-running async servers that need\nproper resource cleanup.\n\nSupported backends: memory, sqlite, postgres.\n\nUsage (e.g. FastAPI lifespan)::\n\n    from deerflow.runtime.checkpointer.async_provider import make_checkpointer\n\n    async with make_checkpointer() as checkpointer:\n        app.state.checkpointer = checkpointer  # InMemorySaver if not configured\n\nFor sync usage see :mod:`deerflow.runtime.checkpointer.provider`.\n'
+"""定义 async_provider 模块提供的职责与可复用接口。
+
+Async checkpointer factory.
+
+Provides an **async context manager** for long-running async servers that need
+proper resource cleanup.
+
+Supported backends: memory, sqlite, postgres.
+
+Usage (e.g. FastAPI lifespan)::
+
+    from deerflow.runtime.checkpointer.async_provider import make_checkpointer
+
+    async with make_checkpointer() as checkpointer:
+        app.state.checkpointer = checkpointer  # InMemorySaver if not configured
+
+For sync usage see :mod:`deerflow.runtime.checkpointer.provider`.
+"""
 
 from __future__ import annotations
 
@@ -21,21 +38,23 @@ logger = logging.getLogger(__name__)
 
 
 def _prepare_sqlite_checkpointer_path(raw: str) -> str:
-    '执行 _prepare_sqlite_checkpointer_path 的明确职责，并返回与调用约定一致的结果'
+    "执行 _prepare_sqlite_checkpointer_path 的明确职责，并返回与调用约定一致的结果"
     conn_str = resolve_sqlite_conn_str(raw)
     ensure_sqlite_parent_dir(conn_str)
     return conn_str
 
 
 def _prepare_database_sqlite_checkpointer_path(db_config) -> str:
-    '执行 _prepare_database_sqlite_checkpointer_path 的明确职责，并返回与调用约定一致的结果'
+    "执行 _prepare_database_sqlite_checkpointer_path 的明确职责，并返回与调用约定一致的结果"
     conn_str = db_config.checkpointer_sqlite_path
     ensure_sqlite_parent_dir(conn_str)
     return conn_str
 
 
 def _build_postgres_pool(conn_string: str):
-    '执行 _build_postgres_pool 的明确职责，并返回与调用约定一致的结果。\n\nBuild an AsyncConnectionPool with TCP keepalive and connection checking.'
+    """执行 _build_postgres_pool 的明确职责，并返回与调用约定一致的结果。
+
+    Build an AsyncConnectionPool with TCP keepalive and connection checking."""
     from psycopg.rows import dict_row
     from psycopg_pool import AsyncConnectionPool
 
@@ -55,7 +74,9 @@ def _build_postgres_pool(conn_string: str):
 
 
 def _ensure_postgres_imports():
-    '执行 _ensure_postgres_imports 的明确职责，并返回与调用约定一致的结果。\n\nImport and return (AsyncPostgresSaver, AsyncConnectionPool), raising ImportError on failure.'
+    """执行 _ensure_postgres_imports 的明确职责，并返回与调用约定一致的结果。
+
+    Import and return (AsyncPostgresSaver, AsyncConnectionPool), raising ImportError on failure."""
     try:
         from langgraph.checkpoint.postgres.aio import AsyncPostgresSaver
     except ImportError as exc:
@@ -76,7 +97,9 @@ def _ensure_postgres_imports():
 
 @contextlib.asynccontextmanager
 async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
-    '执行 _async_checkpointer 的明确职责，并返回与调用约定一致的结果。\n\nAsync context manager that constructs and tears down a checkpointer.'
+    """执行 _async_checkpointer 的明确职责，并返回与调用约定一致的结果。
+
+    Async context manager that constructs and tears down a checkpointer."""
     if config.type == "memory":
         from langgraph.checkpoint.memory import InMemorySaver
 
@@ -117,7 +140,9 @@ async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
 
 @contextlib.asynccontextmanager
 async def _async_checkpointer_from_database(db_config) -> AsyncIterator[Checkpointer]:
-    '执行 _async_checkpointer_from_database 的明确职责，并返回与调用约定一致的结果。\n\nAsync context manager that constructs a checkpointer from unified DatabaseConfig.'
+    """执行 _async_checkpointer_from_database 的明确职责，并返回与调用约定一致的结果。
+
+    Async context manager that constructs a checkpointer from unified DatabaseConfig."""
     if db_config.backend == "memory":
         from langgraph.checkpoint.memory import InMemorySaver
 
@@ -153,7 +178,21 @@ async def _async_checkpointer_from_database(db_config) -> AsyncIterator[Checkpoi
 
 @contextlib.asynccontextmanager
 async def make_checkpointer(app_config: AppConfig | None = None) -> AsyncIterator[Checkpointer]:
-    "构造并返回，并遵守 make_checkpointer 所表达的接口约束。\n\nAsync context manager that yields a checkpointer for the caller's lifetime.\n    Resources are opened on enter and closed on exit -- no global state::\n\n        async with make_checkpointer(app_config) as checkpointer:\n            app.state.checkpointer = checkpointer\n\n    Yields an ``InMemorySaver`` when no checkpointer is configured in *config.yaml*.\n\n    Priority:\n    1. Legacy ``checkpointer:`` config section (backward compatible)\n    2. Unified ``database:`` config section\n    3. Default InMemorySaver\n    "
+    """构造并返回，并遵守 make_checkpointer 所表达的接口约束。
+
+    Async context manager that yields a checkpointer for the caller's lifetime.
+        Resources are opened on enter and closed on exit -- no global state::
+
+            async with make_checkpointer(app_config) as checkpointer:
+                app.state.checkpointer = checkpointer
+
+        Yields an ``InMemorySaver`` when no checkpointer is configured in *config.yaml*.
+
+        Priority:
+        1. Legacy ``checkpointer:`` config section (backward compatible)
+        2. Unified ``database:`` config section
+        3. Default InMemorySaver
+    """
 
     if app_config is None:
         app_config = get_app_config()

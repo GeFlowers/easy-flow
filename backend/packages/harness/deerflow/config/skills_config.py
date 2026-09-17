@@ -1,4 +1,5 @@
 """提供配置、技能、配置相关功能。"""
+
 import os
 from pathlib import Path
 
@@ -38,7 +39,7 @@ class SkillsConfig(BaseModel):
     def get_skills_path(self) -> Path:
         """\u6267\u884c get_skills_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         if self.path:
-                        # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
             return resolve_path(self.path)
         if env_path := os.getenv("DEER_FLOW_SKILLS_PATH"):
             return resolve_path(env_path)

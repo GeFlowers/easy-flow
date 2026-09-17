@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from deerflow.skills.review.models import normalize_relative_path
 
 
 def compute_package_digest(snapshot: dict[str, Any]) -> str:
-    '未说明'
+    "未说明"
     records: list[bytes] = []
     for file_entry in snapshot.get("files", []):
         path = normalize_relative_path(str(file_entry["path"]))

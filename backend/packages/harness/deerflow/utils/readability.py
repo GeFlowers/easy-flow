@@ -1,4 +1,5 @@
 """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
 import logging
 import re
 import subprocess
@@ -12,6 +13,7 @@ logger = logging.getLogger(__name__)
 
 class Article:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     url: str
 
     def __init__(self, title: str, html_content: str):
@@ -62,6 +64,7 @@ class Article:
 
 class ReadabilityExtractor:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     def extract_article(self, html: str) -> Article:
         """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
         try:

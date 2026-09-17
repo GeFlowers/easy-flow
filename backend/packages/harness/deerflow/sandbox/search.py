@@ -1,4 +1,5 @@
 """提供受忽略规则和资源上限约束的文件搜索辅助函数。"""
+
 import fnmatch
 import os
 import re
@@ -65,6 +66,7 @@ DEFAULT_LINE_SUMMARY_LENGTH = 200
 @dataclass(frozen=True)
 class GrepMatch:
     """表示一次文本搜索命中的路径、行号和行内容。"""
+
     path: str
     line_number: int
     line: str
@@ -134,8 +136,8 @@ def find_glob_matches(root: Path, pattern: str, *, include_dirs: bool = False, m
 
     for current_root, dirs, files in os.walk(root):
         dirs[:] = [name for name in dirs if not should_ignore_name(name)]
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         rel_dir = Path(current_root).relative_to(root)
 
         if include_dirs:
@@ -185,7 +187,7 @@ def find_grep_matches(
     flags = 0 if case_sensitive else re.IGNORECASE
     regex = re.compile(regex_source, flags)
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     _max_line_chars = line_summary_length * 10
 
     for current_root, dirs, files in os.walk(root):

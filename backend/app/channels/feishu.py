@@ -1,4 +1,6 @@
-'定义 feishu 模块提供的职责与可复用接口。\n\nFeishu/Lark channel — connects to Feishu via WebSocket (no public IP needed).'
+"""定义 feishu 模块提供的职责与可复用接口。
+
+Feishu/Lark channel — connects to Feishu via WebSocket (no public IP needed)."""
 
 from __future__ import annotations
 
@@ -33,15 +35,32 @@ SOURCE_PREVIEW_METADATA_KEY = "feishu_source_preview"
 
 
 def _is_feishu_command(text: str) -> bool:
-    '执行 _is_feishu_command 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_feishu_command 的明确职责，并返回与调用约定一致的结果"
     return is_known_channel_command(text)
 
 
 class FeishuChannel(Channel):
-    '封装 FeishuChannel 的状态、协作关系与公开操作。\n\nFeishu/Lark IM channel using the ``lark-oapi`` WebSocket client.\n\n    Configuration keys (in ``config.yaml`` under ``channels.feishu``):\n        - ``app_id``: Feishu app ID.\n        - ``app_secret``: Feishu app secret.\n        - ``verification_token``: (optional) Event verification token.\n\n    The channel uses WebSocket long-connection mode so no public IP is required.\n\n    Message flow:\n        1. User sends a message → bot adds "OK" emoji reaction\n        2. Bot replies with a card: "Working on it......"\n        3. Agent processes the message and returns a result\n        4. Bot updates the card with the result\n        5. Bot adds "DONE" emoji reaction to the original message\n    '
+    """封装 FeishuChannel 的状态、协作关系与公开操作。
+
+    Feishu/Lark IM channel using the ``lark-oapi`` WebSocket client.
+
+        Configuration keys (in ``config.yaml`` under ``channels.feishu``):
+            - ``app_id``: Feishu app ID.
+            - ``app_secret``: Feishu app secret.
+            - ``verification_token``: (optional) Event verification token.
+
+        The channel uses WebSocket long-connection mode so no public IP is required.
+
+        Message flow:
+            1. User sends a message → bot adds "OK" emoji reaction
+            2. Bot replies with a card: "Working on it......"
+            3. Agent processes the message and returns a result
+            4. Bot updates the card with the result
+            5. Bot adds "DONE" emoji reaction to the original message
+    """
 
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__(name="feishu", bus=bus, config=config)
         self._thread: threading.Thread | None = None
         self._main_loop: asyncio.AbstractEventLoop | None = None
@@ -65,14 +84,14 @@ class FeishuChannel(Channel):
 
     @staticmethod
     def _non_empty_str(value: Any) -> str | None:
-        '执行 _non_empty_str 的明确职责，并返回与调用约定一致的结果'
+        "执行 _non_empty_str 的明确职责，并返回与调用约定一致的结果"
         if isinstance(value, str) and value.strip():
             return value.strip()
         return None
 
     @staticmethod
     def _pending_key(chat_id: str, user_id: str) -> tuple[str, str]:
-        '执行 _pending_key 的明确职责，并返回与调用约定一致的结果'
+        "执行 _pending_key 的明确职责，并返回与调用约定一致的结果"
         return (chat_id, user_id)
 
     @staticmethod
@@ -83,14 +102,14 @@ class FeishuChannel(Channel):
         parent_id: str | None,
         thread_id: str | None,
     ) -> bool:
-        '执行 _should_include_source_preview 的明确职责，并返回与调用约定一致的结果'
+        "执行 _should_include_source_preview 的明确职责，并返回与调用约定一致的结果"
         if chat_type == "p2p":
             return False
         return bool(root_id or parent_id or thread_id)
 
     @staticmethod
     def _compact_source_preview(text: str) -> str | None:
-        '执行 _compact_source_preview 的明确职责，并返回与调用约定一致的结果'
+        "执行 _compact_source_preview 的明确职责，并返回与调用约定一致的结果"
         stripped = text.strip()
         if not stripped:
             return None
@@ -105,7 +124,7 @@ class FeishuChannel(Channel):
 
     @classmethod
     def _compose_card_text(cls, text: str, metadata: dict[str, Any] | None = None) -> str:
-        '执行 _compose_card_text 的明确职责，并返回与调用约定一致的结果'
+        "执行 _compose_card_text 的明确职责，并返回与调用约定一致的结果"
         preview = None
         if isinstance(metadata, dict):
             raw_preview = metadata.get(SOURCE_PREVIEW_METADATA_KEY)
@@ -119,18 +138,18 @@ class FeishuChannel(Channel):
 
     @property
     def supports_streaming(self) -> bool:
-        '执行 supports_streaming 的明确职责，并返回与调用约定一致的结果'
+        "执行 supports_streaming 的明确职责，并返回与调用约定一致的结果"
         return True
 
     @property
     def is_running(self) -> bool:
-        '判断条件是否成立并返回布尔结果，并遵守 is_running 所表达的接口约束'
+        "判断条件是否成立并返回布尔结果，并遵守 is_running 所表达的接口约束"
         if not self._running:
             return False
         return self._thread is not None and self._thread.is_alive()
 
     def _build_event_handler(self, lark):
-        '执行 _build_event_handler 的明确职责，并返回与调用约定一致的结果'
+        "执行 _build_event_handler 的明确职责，并返回与调用约定一致的结果"
         return (
             lark.EventDispatcherHandler.builder("", "")
             .register_p2_im_message_receive_v1(self._on_message)
@@ -142,7 +161,7 @@ class FeishuChannel(Channel):
         )
 
     async def start(self) -> None:
-        '执行 start 的明确职责，并返回与调用约定一致的结果'
+        "执行 start 的明确职责，并返回与调用约定一致的结果"
         if self._running:
             return
 
@@ -212,7 +231,20 @@ class FeishuChannel(Channel):
         logger.info("Feishu channel started")
 
     def _run_ws(self, app_id: str, app_secret: str, domain: str) -> None:
-        "执行 _run_ws 的明确职责，并返回与调用约定一致的结果。\n\nConstruct and run the lark WS client in a thread with a fresh event loop.\n\n        The lark-oapi SDK captures a module-level event loop at import time\n        (``lark_oapi.ws.client.loop``).  When uvicorn uses uvloop, that\n        captured loop is the *main* thread's uvloop — which is already\n        running, so ``loop.run_until_complete()`` inside ``Client.start()``\n        raises ``RuntimeError``.\n\n        We work around this by creating a plain asyncio event loop for this\n        thread and patching the SDK's module-level reference before calling\n        ``start()``.\n        "
+        """执行 _run_ws 的明确职责，并返回与调用约定一致的结果。
+
+        Construct and run the lark WS client in a thread with a fresh event loop.
+
+                The lark-oapi SDK captures a module-level event loop at import time
+                (``lark_oapi.ws.client.loop``).  When uvicorn uses uvloop, that
+                captured loop is the *main* thread's uvloop — which is already
+                running, so ``loop.run_until_complete()`` inside ``Client.start()``
+                raises ``RuntimeError``.
+
+                We work around this by creating a plain asyncio event loop for this
+                thread and patching the SDK's module-level reference before calling
+                ``start()``.
+        """
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
@@ -239,11 +271,11 @@ class FeishuChannel(Channel):
             self._running = False
 
     def _on_ignored_message_event(self, event) -> None:
-        '执行 _on_ignored_message_event 的明确职责，并返回与调用约定一致的结果'
+        "执行 _on_ignored_message_event 的明确职责，并返回与调用约定一致的结果"
         logger.debug("[Feishu] ignoring non-content message event: %s", type(event).__name__)
 
     async def stop(self) -> None:
-        '执行 stop 的明确职责，并返回与调用约定一致的结果'
+        "执行 stop 的明确职责，并返回与调用约定一致的结果"
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
         for task in list(self._background_tasks):
@@ -258,7 +290,7 @@ class FeishuChannel(Channel):
         logger.info("Feishu channel stopped")
 
     async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
-        '执行 send 的明确职责，并返回与调用约定一致的结果'
+        "执行 send 的明确职责，并返回与调用约定一致的结果"
         if not self._api_client:
             logger.warning("[Feishu] send called but no api_client available")
             return
@@ -277,7 +309,7 @@ class FeishuChannel(Channel):
         )
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
-        '执行 send_file 的明确职责，并返回与调用约定一致的结果'
+        "执行 send_file 的明确职责，并返回与调用约定一致的结果"
         if not self._api_client:
             return False
 
@@ -313,7 +345,9 @@ class FeishuChannel(Channel):
             return False
 
     async def _upload_image(self, path) -> str:
-        '执行 _upload_image 的明确职责，并返回与调用约定一致的结果。\n\nUpload an image to Feishu and return the image_key.'
+        """执行 _upload_image 的明确职责，并返回与调用约定一致的结果。
+
+        Upload an image to Feishu and return the image_key."""
         with open(str(path), "rb") as f:
             request = self._CreateImageRequest.builder().request_body(self._CreateImageRequestBody.builder().image_type("message").image(f).build()).build()
             response = await asyncio.to_thread(self._api_client.im.v1.image.create, request)
@@ -322,7 +356,9 @@ class FeishuChannel(Channel):
         return response.data.image_key
 
     async def _upload_file(self, path, filename: str) -> str:
-        '执行 _upload_file 的明确职责，并返回与调用约定一致的结果。\n\nUpload a file to Feishu and return the file_key.'
+        """执行 _upload_file 的明确职责，并返回与调用约定一致的结果。
+
+        Upload a file to Feishu and return the file_key."""
         suffix = path.suffix.lower() if hasattr(path, "suffix") else ""
         if suffix in (".xls", ".xlsx", ".csv"):
             file_type = "xls"
@@ -343,7 +379,12 @@ class FeishuChannel(Channel):
         return response.data.file_key
 
     async def receive_file(self, msg: InboundMessage, thread_id: str, *, user_id: str | None = None) -> InboundMessage:
-        '执行 receive_file 的明确职责，并返回与调用约定一致的结果。\n\nDownload a Feishu file into the thread uploads directory.\n\n        Returns the sandbox virtual path when the image is persisted successfully.\n        '
+        """执行 receive_file 的明确职责，并返回与调用约定一致的结果。
+
+        Download a Feishu file into the thread uploads directory.
+
+                Returns the sandbox virtual path when the image is persisted successfully.
+        """
         if not msg.thread_ts:
             logger.warning("[Feishu] received file message without thread_ts, cannot associate with conversation: %s", msg)
             return msg
@@ -371,11 +412,11 @@ class FeishuChannel(Channel):
         *,
         user_id: str | None = None,
     ) -> str:
-        '执行 _receive_single_file 的明确职责，并返回与调用约定一致的结果'
+        "执行 _receive_single_file 的明确职责，并返回与调用约定一致的结果"
         request = self._GetMessageResourceRequest.builder().message_id(message_id).file_key(file_key).type(type).build()
 
         def inner():
-            '执行 inner 的明确职责，并返回与调用约定一致的结果'
+            "执行 inner 的明确职责，并返回与调用约定一致的结果"
             return self._api_client.im.v1.message_resource.get(request)
 
         try:
@@ -429,7 +470,7 @@ class FeishuChannel(Channel):
 
         def down_load():
             # use thread_lock to avoid filename conflicts when writing
-            '执行 down_load 的明确职责，并返回与调用约定一致的结果'
+            "执行 down_load 的明确职责，并返回与调用约定一致的结果"
             with self._thread_lock:
                 resolved_target.write_bytes(content)
 
@@ -461,7 +502,13 @@ class FeishuChannel(Channel):
 
     @staticmethod
     def _build_card_content(text: str) -> str:
-        "执行 _build_card_content 的明确职责，并返回与调用约定一致的结果。\n\nBuild a Feishu interactive card with markdown content.\n\n        Feishu's interactive card format natively renders markdown, including\n        headers, bold/italic, code blocks, lists, and links.\n        "
+        """执行 _build_card_content 的明确职责，并返回与调用约定一致的结果。
+
+        Build a Feishu interactive card with markdown content.
+
+                Feishu's interactive card format natively renders markdown, including
+                headers, bold/italic, code blocks, lists, and links.
+        """
         card = {
             "config": {"wide_screen_mode": True, "update_multi": True},
             "elements": [{"tag": "markdown", "content": text}],
@@ -471,7 +518,9 @@ class FeishuChannel(Channel):
     # -- reaction helpers --------------------------------------------------
 
     async def _add_reaction(self, message_id: str, emoji_type: str = "THUMBSUP") -> None:
-        '执行 _add_reaction 的明确职责，并返回与调用约定一致的结果。\n\nAdd an emoji reaction to a message.'
+        """执行 _add_reaction 的明确职责，并返回与调用约定一致的结果。
+
+        Add an emoji reaction to a message."""
         if not self._api_client or not self._CreateMessageReactionRequest:
             return
         try:
@@ -482,7 +531,9 @@ class FeishuChannel(Channel):
             logger.exception("[Feishu] failed to add reaction '%s' to message %s", emoji_type, message_id)
 
     async def _reply_card(self, message_id: str, text: str) -> str | None:
-        '执行 _reply_card 的明确职责，并返回与调用约定一致的结果。\n\nReply with an interactive card and return the created card message ID.'
+        """执行 _reply_card 的明确职责，并返回与调用约定一致的结果。
+
+        Reply with an interactive card and return the created card message ID."""
         if not self._api_client:
             return None
 
@@ -493,7 +544,9 @@ class FeishuChannel(Channel):
         return getattr(response_data, "message_id", None)
 
     async def _create_card(self, chat_id: str, text: str) -> None:
-        '执行 _create_card 的明确职责，并返回与调用约定一致的结果。\n\nCreate a new card message in the target chat.'
+        """执行 _create_card 的明确职责，并返回与调用约定一致的结果。
+
+        Create a new card message in the target chat."""
         if not self._api_client:
             return
 
@@ -502,7 +555,9 @@ class FeishuChannel(Channel):
         await asyncio.to_thread(self._api_client.im.v1.message.create, request)
 
     async def _update_card(self, message_id: str, text: str) -> None:
-        '执行 _update_card 的明确职责，并返回与调用约定一致的结果。\n\nPatch an existing card message in place.'
+        """执行 _update_card 的明确职责，并返回与调用约定一致的结果。
+
+        Patch an existing card message in place."""
         if not self._api_client or not self._PatchMessageRequest:
             return
 
@@ -511,12 +566,14 @@ class FeishuChannel(Channel):
         await asyncio.to_thread(self._api_client.im.v1.message.patch, request)
 
     def _track_background_task(self, task: asyncio.Task, *, name: str, msg_id: str) -> None:
-        '执行 _track_background_task 的明确职责，并返回与调用约定一致的结果。\n\nKeep a strong reference to fire-and-forget tasks and surface errors.'
+        """执行 _track_background_task 的明确职责，并返回与调用约定一致的结果。
+
+        Keep a strong reference to fire-and-forget tasks and surface errors."""
         self._background_tasks.add(task)
         task.add_done_callback(lambda done_task, task_name=name, mid=msg_id: self._finalize_background_task(done_task, task_name, mid))
 
     def _finalize_background_task(self, task: asyncio.Task, name: str, msg_id: str) -> None:
-        '执行 _finalize_background_task 的明确职责，并返回与调用约定一致的结果'
+        "执行 _finalize_background_task 的明确职责，并返回与调用约定一致的结果"
         self._background_tasks.discard(task)
         self._log_task_error(task, name, msg_id)
 
@@ -527,7 +584,9 @@ class FeishuChannel(Channel):
         *,
         metadata: dict[str, Any] | None = None,
     ) -> str | None:
-        '执行 _create_running_card 的明确职责，并返回与调用约定一致的结果。\n\nCreate the running card and cache its message ID when available.'
+        """执行 _create_running_card 的明确职责，并返回与调用约定一致的结果。
+
+        Create the running card and cache its message ID when available."""
         running_card_id = await self._reply_card(source_message_id, self._compose_card_text(text, metadata))
         if running_card_id:
             self._running_card_ids[source_message_id] = running_card_id
@@ -543,7 +602,9 @@ class FeishuChannel(Channel):
         *,
         metadata: dict[str, Any] | None = None,
     ) -> asyncio.Task | None:
-        '执行 _ensure_running_card_started 的明确职责，并返回与调用约定一致的结果。\n\nStart running-card creation once per source message.'
+        """执行 _ensure_running_card_started 的明确职责，并返回与调用约定一致的结果。
+
+        Start running-card creation once per source message."""
         running_card_id = self._running_card_ids.get(source_message_id)
         if running_card_id:
             return None
@@ -558,7 +619,7 @@ class FeishuChannel(Channel):
         return running_card_task
 
     def _finalize_running_card_task(self, source_message_id: str, task: asyncio.Task) -> None:
-        '执行 _finalize_running_card_task 的明确职责，并返回与调用约定一致的结果'
+        "执行 _finalize_running_card_task 的明确职责，并返回与调用约定一致的结果"
         if self._running_card_tasks.get(source_message_id) is task:
             self._running_card_tasks.pop(source_message_id, None)
         self._log_task_error(task, "create_running_card", source_message_id)
@@ -570,7 +631,9 @@ class FeishuChannel(Channel):
         *,
         metadata: dict[str, Any] | None = None,
     ) -> str | None:
-        '执行 _ensure_running_card 的明确职责，并返回与调用约定一致的结果。\n\nEnsure the in-thread running card exists and track its message ID.'
+        """执行 _ensure_running_card 的明确职责，并返回与调用约定一致的结果。
+
+        Ensure the in-thread running card exists and track its message ID."""
         running_card_id = self._running_card_ids.get(source_message_id)
         if running_card_id:
             return running_card_id
@@ -585,14 +648,18 @@ class FeishuChannel(Channel):
         return await running_card_task
 
     async def _send_running_reply(self, message_id: str, *, metadata: dict[str, Any] | None = None) -> None:
-        '执行 _send_running_reply 的明确职责，并返回与调用约定一致的结果。\n\nReply to a message in-thread with a running card.'
+        """执行 _send_running_reply 的明确职责，并返回与调用约定一致的结果。
+
+        Reply to a message in-thread with a running card."""
         try:
             await self._ensure_running_card(message_id, metadata=metadata)
         except Exception:
             logger.exception("[Feishu] failed to send running reply for message %s", message_id)
 
     async def _send_card_message(self, msg: OutboundMessage) -> None:
-        '执行 _send_card_message 的明确职责，并返回与调用约定一致的结果。\n\nSend or update the Feishu card tied to the current request.'
+        """执行 _send_card_message 的明确职责，并返回与调用约定一致的结果。
+
+        Send or update the Feishu card tied to the current request."""
         source_message_id = msg.thread_ts
         if source_message_id:
             running_card_id = self._running_card_ids.get(source_message_id)
@@ -652,7 +719,7 @@ class FeishuChannel(Channel):
     # -- internal ----------------------------------------------------------
 
     def _remember_thread_mapping(self, msg: OutboundMessage, *topic_ids: str | None) -> None:
-        '执行 _remember_thread_mapping 的明确职责，并返回与调用约定一致的结果'
+        "执行 _remember_thread_mapping 的明确职责，并返回与调用约定一致的结果"
         store = self.config.get("channel_store")
         if store is None or not msg.thread_id:
             return
@@ -687,7 +754,7 @@ class FeishuChannel(Channel):
                 logger.exception("[Feishu] failed to remember thread mapping for topic_id=%s", topic_id)
 
     def _remember_pending_clarification(self, msg: OutboundMessage, card_message_id: str | None) -> None:
-        '执行 _remember_pending_clarification 的明确职责，并返回与调用约定一致的结果'
+        "执行 _remember_pending_clarification 的明确职责，并返回与调用约定一致的结果"
         if not msg.is_final or msg.metadata.get(PENDING_CLARIFICATION_METADATA_KEY) is not True:
             return
 
@@ -719,7 +786,7 @@ class FeishuChannel(Channel):
         )
 
     def _consume_pending_clarification(self, chat_id: str, user_id: str) -> dict[str, Any] | None:
-        '执行 _consume_pending_clarification 的明确职责，并返回与调用约定一致的结果'
+        "执行 _consume_pending_clarification 的明确职责，并返回与调用约定一致的结果"
         key = self._pending_key(chat_id, user_id)
         with self._thread_lock:
             pending_items = self._pending_clarifications.get(key)
@@ -742,7 +809,7 @@ class FeishuChannel(Channel):
             return None
 
     def _ensure_pending_thread_mapping(self, chat_id: str, user_id: str, pending: dict[str, Any]) -> None:
-        '执行 _ensure_pending_thread_mapping 的明确职责，并返回与调用约定一致的结果'
+        "执行 _ensure_pending_thread_mapping 的明确职责，并返回与调用约定一致的结果"
         store = self.config.get("channel_store")
         topic_id = self._non_empty_str(pending.get("topic_id"))
         thread_id = self._non_empty_str(pending.get("thread_id"))
@@ -762,7 +829,7 @@ class FeishuChannel(Channel):
         parent_id: str | None,
         thread_id: str | None,
     ) -> tuple[str, bool]:
-        '执行 _resolve_topic_id 的明确职责，并返回与调用约定一致的结果'
+        "执行 _resolve_topic_id 的明确职责，并返回与调用约定一致的结果"
         store = self.config.get("channel_store")
         candidates = [root_id, parent_id, thread_id]
 
@@ -789,7 +856,7 @@ class FeishuChannel(Channel):
         parent_id: str | None,
         thread_id: str | None,
     ) -> bool:
-        '执行 _is_batchable_file_inbound 的明确职责，并返回与调用约定一致的结果'
+        "执行 _is_batchable_file_inbound 的明确职责，并返回与调用约定一致的结果"
         return msg_type == InboundMessageType.CHAT and text in {"[file]", "[image]"} and len(files) == 1 and not (root_id or parent_id or thread_id)
 
     def _schedule_prepare_inbound(
@@ -799,7 +866,7 @@ class FeishuChannel(Channel):
         *,
         source_message_ids: list[str] | None = None,
     ) -> None:
-        '执行 _schedule_prepare_inbound 的明确职责，并返回与调用约定一致的结果'
+        "执行 _schedule_prepare_inbound 的明确职责，并返回与调用约定一致的结果"
         if self._main_loop and self._main_loop.is_running():
             logger.info("[Feishu] publishing inbound message to bus (type=%s, msg_id=%s)", inbound.msg_type.value, msg_id)
             fut = asyncio.run_coroutine_threadsafe(
@@ -811,7 +878,7 @@ class FeishuChannel(Channel):
             logger.warning("[Feishu] main loop not running, cannot publish inbound message")
 
     def _schedule_batch_flush(self, key: tuple[str, str], source_message_id: str) -> None:
-        '执行 _schedule_batch_flush 的明确职责，并返回与调用约定一致的结果'
+        "执行 _schedule_batch_flush 的明确职责，并返回与调用约定一致的结果"
         if self._main_loop and self._main_loop.is_running():
             fut = asyncio.run_coroutine_threadsafe(self._flush_pending_inbound_batch_after(key, source_message_id), self._main_loop)
             fut.add_done_callback(lambda f, mid=source_message_id: self._log_future_error(f, "flush_inbound_batch", mid))
@@ -819,7 +886,7 @@ class FeishuChannel(Channel):
             logger.warning("[Feishu] main loop not running, cannot flush inbound batch")
 
     def _queue_file_inbound_batch(self, msg_id: str, inbound: InboundMessage) -> bool:
-        '执行 _queue_file_inbound_batch 的明确职责，并返回与调用约定一致的结果'
+        "执行 _queue_file_inbound_batch 的明确职责，并返回与调用约定一致的结果"
         key = self._pending_key(inbound.chat_id, inbound.user_id)
         should_schedule_flush = False
         expired_batch: tuple[str, InboundMessage, list[str]] | None = None
@@ -865,7 +932,7 @@ class FeishuChannel(Channel):
         return True
 
     def _pop_pending_inbound_batch(self, key: tuple[str, str], *, anchor_message_id: str | None = None) -> tuple[str, InboundMessage, list[str]] | None:
-        '执行 _pop_pending_inbound_batch 的明确职责，并返回与调用约定一致的结果'
+        "执行 _pop_pending_inbound_batch 的明确职责，并返回与调用约定一致的结果"
         with self._thread_lock:
             batch = self._pending_inbound_batches.get(key)
             if not batch:
@@ -876,7 +943,7 @@ class FeishuChannel(Channel):
             return batch["anchor_message_id"], batch["inbound"], list(batch["message_ids"])
 
     async def _flush_pending_inbound_batch_after(self, key: tuple[str, str], anchor_message_id: str) -> None:
-        '执行 _flush_pending_inbound_batch_after 的明确职责，并返回与调用约定一致的结果'
+        "执行 _flush_pending_inbound_batch_after 的明确职责，并返回与调用约定一致的结果"
         await asyncio.sleep(FEISHU_INBOUND_BATCH_WINDOW_SECONDS)
         batch = self._pop_pending_inbound_batch(key, anchor_message_id=anchor_message_id)
         if not batch:
@@ -894,7 +961,9 @@ class FeishuChannel(Channel):
 
     @staticmethod
     def _log_task_error(task: asyncio.Task, name: str, msg_id: str) -> None:
-        '执行 _log_task_error 的明确职责，并返回与调用约定一致的结果。\n\nCallback for background asyncio tasks to surface errors.'
+        """执行 _log_task_error 的明确职责，并返回与调用约定一致的结果。
+
+        Callback for background asyncio tasks to surface errors."""
         try:
             exc = task.exception()
             if exc:
@@ -905,7 +974,9 @@ class FeishuChannel(Channel):
             pass
 
     async def _prepare_inbound(self, msg_id: str, inbound, *, source_message_ids: list[str] | None = None) -> None:
-        '执行 _prepare_inbound 的明确职责，并返回与调用约定一致的结果。\n\nKick off Feishu side effects without delaying inbound dispatch.'
+        """执行 _prepare_inbound 的明确职责，并返回与调用约定一致的结果。
+
+        Kick off Feishu side effects without delaying inbound dispatch."""
         inbound = await self._attach_connection_identity(inbound)
         reaction_message_ids = source_message_ids or [msg_id]
         for reaction_message_id in reaction_message_ids:
@@ -915,7 +986,7 @@ class FeishuChannel(Channel):
         await self.bus.publish_inbound(inbound)
 
     async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
-        '执行 _attach_connection_identity 的明确职责，并返回与调用约定一致的结果'
+        "执行 _attach_connection_identity 的明确职责，并返回与调用约定一致的结果"
         return await attach_connection_identity(
             inbound,
             repo=self._connection_repo,
@@ -924,7 +995,7 @@ class FeishuChannel(Channel):
         )
 
     async def _bind_connection_from_connect_code(self, *, message_id: str, chat_id: str, user_id: str, code: str) -> bool:
-        '执行 _bind_connection_from_connect_code 的明确职责，并返回与调用约定一致的结果'
+        "执行 _bind_connection_from_connect_code 的明确职责，并返回与调用约定一致的结果"
         if self._connection_repo is None or not code:
             return False
 
@@ -952,7 +1023,9 @@ class FeishuChannel(Channel):
         return True
 
     def _on_message(self, event) -> None:
-        '执行 _on_message 的明确职责，并返回与调用约定一致的结果。\n\nCalled by lark-oapi when a message is received (runs in lark thread).'
+        """执行 _on_message 的明确职责，并返回与调用约定一致的结果。
+
+        Called by lark-oapi when a message is received (runs in lark thread)."""
         try:
             logger.info("[Feishu] raw event received: type=%s", type(event).__name__)
             message = event.event.message

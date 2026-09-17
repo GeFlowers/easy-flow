@@ -1,4 +1,5 @@
-'定义 e2b_sandbox 模块提供的职责与可复用接口'
+"定义 e2b_sandbox 模块提供的职责与可复用接口"
+
 from __future__ import annotations
 
 import errno
@@ -30,13 +31,26 @@ _E2B_NOT_FOUND_SIGNATURES = (
 
 
 def _is_sandbox_gone_error(exc: BaseException) -> bool:
-    '执行 _is_sandbox_gone_error 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_sandbox_gone_error 的明确职责，并返回与调用约定一致的结果"
     msg = str(exc).lower()
     return any(sig in msg for sig in _E2B_NOT_FOUND_SIGNATURES)
 
 
 class E2BSandbox(Sandbox):
-    '封装 E2BSandbox 的状态、协作关系与公开操作。\n\nDeerFlow Sandbox adapter that delegates to an e2b cloud sandbox.\n\n    Args:\n        id: DeerFlow-side sandbox id (used as cache key in the provider).\n        client: A live ``e2b_code_interpreter.Sandbox`` (sync) instance.\n            The caller owns the connection and is responsible for ``kill()``;\n            this wrapper only calls ``close()`` on its host-side HTTP client\n            during release.\n        home_dir: Directory inside the sandbox that backs the\n            ``VIRTUAL_PATH_PREFIX`` (``/mnt/user-data``) prefix.  Defaults to\n            :data:`DEFAULT_E2B_HOME_DIR`.\n    '
+    """封装 E2BSandbox 的状态、协作关系与公开操作。
+
+    DeerFlow Sandbox adapter that delegates to an e2b cloud sandbox.
+
+        Args:
+            id: DeerFlow-side sandbox id (used as cache key in the provider).
+            client: A live ``e2b_code_interpreter.Sandbox`` (sync) instance.
+                The caller owns the connection and is responsible for ``kill()``;
+                this wrapper only calls ``close()`` on its host-side HTTP client
+                during release.
+            home_dir: Directory inside the sandbox that backs the
+                ``VIRTUAL_PATH_PREFIX`` (``/mnt/user-data``) prefix.  Defaults to
+                :data:`DEFAULT_E2B_HOME_DIR`.
+    """
 
     def __init__(
         self,
@@ -45,7 +59,7 @@ class E2BSandbox(Sandbox):
         *,
         home_dir: str = DEFAULT_E2B_HOME_DIR,
     ) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__(id)
         self._client = client
         self._home_dir = home_dir.rstrip("/") or "/"
@@ -57,21 +71,23 @@ class E2BSandbox(Sandbox):
 
     @property
     def client(self) -> E2BClientSandbox:
-        '执行 client 的明确职责，并返回与调用约定一致的结果'
+        "执行 client 的明确职责，并返回与调用约定一致的结果"
         return self._client
 
     @property
     def home_dir(self) -> str:
-        '执行 home_dir 的明确职责，并返回与调用约定一致的结果'
+        "执行 home_dir 的明确职责，并返回与调用约定一致的结果"
         return self._home_dir
 
     @property
     def sandbox_id(self) -> str:
-        "执行 sandbox_id 的明确职责，并返回与调用约定一致的结果。\n\ne2b-side sandbox id (different from DeerFlow's ``self.id`` cache key)."
+        """执行 sandbox_id 的明确职责，并返回与调用约定一致的结果。
+
+        e2b-side sandbox id (different from DeerFlow's ``self.id`` cache key)."""
         return getattr(self._client, "sandbox_id", self.id)
 
     def close(self) -> None:
-        '执行 close 的明确职责，并返回与调用约定一致的结果'
+        "执行 close 的明确职责，并返回与调用约定一致的结果"
         with self._lock:
             if self._closed:
                 return
@@ -94,7 +110,16 @@ class E2BSandbox(Sandbox):
                 return
 
     def _resolve_path(self, path: str) -> str:
-        '执行 _resolve_path 的明确职责，并返回与调用约定一致的结果。\n\nMap DeerFlow virtual paths into the e2b sandbox filesystem.\n\n        ``VIRTUAL_PATH_PREFIX`` (``/mnt/user-data``) is rewritten under\n        :attr:`home_dir`, mirroring how ``LocalContainerBackend`` bind-mounts\n        the host workspace into the AIO container at ``/mnt/user-data``.\n        Other absolute paths are returned verbatim so the sandbox can reach\n        system directories (``/tmp``, ``/etc``, …) when needed.\n        '
+        """执行 _resolve_path 的明确职责，并返回与调用约定一致的结果。
+
+        Map DeerFlow virtual paths into the e2b sandbox filesystem.
+
+                ``VIRTUAL_PATH_PREFIX`` (``/mnt/user-data``) is rewritten under
+                :attr:`home_dir`, mirroring how ``LocalContainerBackend`` bind-mounts
+                the host workspace into the AIO container at ``/mnt/user-data``.
+                Other absolute paths are returned verbatim so the sandbox can reach
+                system directories (``/tmp``, ``/etc``, …) when needed.
+        """
         if not path:
             raise ValueError("path must be a non-empty string")
         normalised = path.replace("\\", "/")
@@ -112,7 +137,24 @@ class E2BSandbox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> str:
-        '执行 execute_command 的明确职责，并返回与调用约定一致的结果。\n\nExecute a shell command via ``sandbox.commands.run``.\n\n        Returns the combined stdout/stderr.\n        The lock serialises concurrent calls on the same instance\n        because the e2b SDK shares a single HTTP/2 connection per sandbox.\n\n        Args:\n            command: The command to execute.\n            env: Optional per-call environment variables (request-scoped secrets,\n                issue #3861). Validated against the POSIX env-var name rule\n                (shared with the local and AIO sandboxes) and passed through to\n                e2b as ``envs``, which are scoped to this command only and never\n                placed in the command string.\n            timeout: Optional per-call command timeout in seconds. ``None`` keeps\n                the e2b SDK default (60s).\n        '
+        """执行 execute_command 的明确职责，并返回与调用约定一致的结果。
+
+        Execute a shell command via ``sandbox.commands.run``.
+
+                Returns the combined stdout/stderr.
+                The lock serialises concurrent calls on the same instance
+                because the e2b SDK shares a single HTTP/2 connection per sandbox.
+
+                Args:
+                    command: The command to execute.
+                    env: Optional per-call environment variables (request-scoped secrets,
+                        issue #3861). Validated against the POSIX env-var name rule
+                        (shared with the local and AIO sandboxes) and passed through to
+                        e2b as ``envs``, which are scoped to this command only and never
+                        placed in the command string.
+                    timeout: Optional per-call command timeout in seconds. ``None`` keeps
+                        the e2b SDK default (60s).
+        """
         _validate_extra_env(env)
         with self._lock:
             client = self._client
@@ -145,12 +187,28 @@ class E2BSandbox(Sandbox):
 
     @property
     def is_dead(self) -> bool:
-        "判断条件是否成立并返回布尔结果，并遵守 is_dead 所表达的接口约束。\n\nWhether the underlying e2b VM is known to be reaped.\n\n        Updated lazily by ``execute_command`` and the provider's ``ping`` /\n        bootstrap calls — there is no proactive heartbeat. Reading the value\n        does *not* round-trip to the API.\n        "
+        """判断条件是否成立并返回布尔结果，并遵守 is_dead 所表达的接口约束。
+
+        Whether the underlying e2b VM is known to be reaped.
+
+                Updated lazily by ``execute_command`` and the provider's ``ping`` /
+                bootstrap calls — there is no proactive heartbeat. Reading the value
+                does *not* round-trip to the API.
+        """
         with self._lock:
             return self._dead
 
     def ping(self) -> bool:
-        '执行 ping 的明确职责，并返回与调用约定一致的结果。\n\nCheap health check: returns False if the e2b VM has been reaped.\n\n        Run as ``commands.run("true")`` so successful execution implies the\n        full HTTP path (auth + control plane + envd) is alive.  Sets\n        ``_dead = True`` on the same "sandbox not found" signature\n        :func:`_is_sandbox_gone_error` recognises so subsequent calls\n        short-circuit.\n        '
+        """执行 ping 的明确职责，并返回与调用约定一致的结果。
+
+        Cheap health check: returns False if the e2b VM has been reaped.
+
+                Run as ``commands.run("true")`` so successful execution implies the
+                full HTTP path (auth + control plane + envd) is alive.  Sets
+                ``_dead = True`` on the same "sandbox not found" signature
+                :func:`_is_sandbox_gone_error` recognises so subsequent calls
+                short-circuit.
+        """
         with self._lock:
             if self._dead or self._client is None:
                 return False
@@ -167,7 +225,7 @@ class E2BSandbox(Sandbox):
             return True
 
     def read_file(self, path: str) -> str:
-        '执行 read_file 的明确职责，并返回与调用约定一致的结果'
+        "执行 read_file 的明确职责，并返回与调用约定一致的结果"
         resolved = self._resolve_path(path)
         try:
             content = self._client.files.read(resolved)
@@ -179,7 +237,7 @@ class E2BSandbox(Sandbox):
             return f"Error: {e}"
 
     def download_file(self, path: str) -> bytes:
-        '执行 download_file 的明确职责，并返回与调用约定一致的结果'
+        "执行 download_file 的明确职责，并返回与调用约定一致的结果"
         normalised = path.replace("\\", "/")
         for segment in normalised.split("/"):
             if segment == "..":
@@ -275,7 +333,7 @@ class E2BSandbox(Sandbox):
         return b"".join(chunks)
 
     def list_dir(self, path: str, max_depth: int = 2) -> list[str]:
-        '收集并返回，并遵守 list_dir 所表达的接口约束'
+        "收集并返回，并遵守 list_dir 所表达的接口约束"
         resolved = self._resolve_path(path)
         with self._lock:
             client = self._client
@@ -290,7 +348,7 @@ class E2BSandbox(Sandbox):
                 return []
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
-        '执行 write_file 的明确职责，并返回与调用约定一致的结果'
+        "执行 write_file 的明确职责，并返回与调用约定一致的结果"
         resolved = self._resolve_path(path)
         with self._lock:
             client = self._client
@@ -312,7 +370,7 @@ class E2BSandbox(Sandbox):
                 raise
 
     def update_file(self, path: str, content: bytes) -> None:
-        '更新目标状态并返回最新结果，并遵守 update_file 所表达的接口约束'
+        "更新目标状态并返回最新结果，并遵守 update_file 所表达的接口约束"
         resolved = self._resolve_path(path)
         with self._lock:
             client = self._client
@@ -334,7 +392,7 @@ class E2BSandbox(Sandbox):
         include_dirs: bool = False,
         max_results: int = 200,
     ) -> tuple[list[str], bool]:
-        '执行 glob 的明确职责，并返回与调用约定一致的结果'
+        "执行 glob 的明确职责，并返回与调用约定一致的结果"
         resolved = self._resolve_path(path)
         types = "f,d" if include_dirs else "f"
         with self._lock:
@@ -380,7 +438,7 @@ class E2BSandbox(Sandbox):
         case_sensitive: bool = False,
         max_results: int = 100,
     ) -> tuple[list[GrepMatch], bool]:
-        '执行 grep 的明确职责，并返回与调用约定一致的结果'
+        "执行 grep 的明确职责，并返回与调用约定一致的结果"
         regex_source = re.escape(pattern) if literal else pattern
         re.compile(regex_source, 0 if case_sensitive else re.IGNORECASE)
 

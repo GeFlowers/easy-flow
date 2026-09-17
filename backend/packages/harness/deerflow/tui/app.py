@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -34,37 +34,38 @@ _HELP_TEXT = "Commands:  /new  /threads  /goal  /model  /skills  /tools  /mcp  /
 
 
 class SelectScreen(ModalScreen):
-    '未说明'
+    "未说明"
 
     BINDINGS = [Binding("escape", "cancel", "Close")]
 
     def __init__(self, title: str, options: list[tuple[str, str]]) -> None:
-        '未说明'
+        "未说明"
         super().__init__()
         self._title = title
         self._options = options
 
     def compose(self) -> ComposeResult:
-        '未说明'
+        "未说明"
         with Vertical(id="dialog"):
             yield Label(self._title, id="dialog-title")
             yield OptionList(*[Option(label, id=oid) for oid, label in self._options], id="dialog-list")
 
     def on_mount(self) -> None:
-        '未说明'
+        "未说明"
         self.query_one(OptionList).focus()
 
     def on_option_list_option_selected(self, event: OptionList.OptionSelected) -> None:
-        '未说明'
+        "未说明"
         self.dismiss(event.option_id)
 
     def action_cancel(self) -> None:
-        '未说明'
+        "未说明"
         self.dismiss(None)
 
 
 class DeerFlowTUI(App):
-    '未说明'
+    "未说明"
+
     CSS = f"""
     Screen {{
         background: {THEME.bg};
@@ -156,7 +157,7 @@ class DeerFlowTUI(App):
     ]
 
     def __init__(self, session, plan) -> None:
-        '未说明'
+        "未说明"
         super().__init__()
         self.session = session
         self.plan = plan
@@ -179,7 +180,7 @@ class DeerFlowTUI(App):
     # ----- composition --------------------------------------------------- #
 
     def compose(self) -> ComposeResult:
-        '未说明'
+        "未说明"
         yield Static(id="header")
         with VerticalScroll(id="scroll"):
             yield Static(id="transcript")
@@ -188,7 +189,7 @@ class DeerFlowTUI(App):
         yield ComposerInput(placeholder="Message DeerFlow…   ( / for commands )", id="composer")
 
     def on_mount(self) -> None:
-        '未说明'
+        "未说明"
         self._load_session_info()
         self._refresh_all()
         self.set_interval(0.1, self._tick_spinner)
@@ -200,7 +201,7 @@ class DeerFlowTUI(App):
     # ----- session info -------------------------------------------------- #
 
     def _load_session_info(self) -> None:
-        '未说明'
+        "未说明"
         self._conv_thread_id = self.session.resolve_thread(self.plan) if self.plan else None
         client = self.session.client
         try:
@@ -221,7 +222,7 @@ class DeerFlowTUI(App):
     # ----- input --------------------------------------------------------- #
 
     def on_input_submitted(self, event: Input.Submitted) -> None:
-        '未说明'
+        "未说明"
         text = event.value.strip()
         event.input.value = ""
         self._close_palette()
@@ -231,7 +232,7 @@ class DeerFlowTUI(App):
         self._handle_submit(text)
 
     def on_input_changed(self, event: Input.Changed) -> None:
-        '未说明'
+        "未说明"
         value = event.value
         if value.startswith("/") and " " not in value:
             from .command_registry import build_registry, filter_commands
@@ -247,7 +248,7 @@ class DeerFlowTUI(App):
     # ----- slash command palette ----------------------------------------- #
 
     def check_action(self, action: str, parameters):  # noqa: D401 - Textual hook
-        '未说明'
+        "未说明"
         custom = {"nav_up", "nav_down", "palette_complete", "palette_accept", "escape"}
         if action in custom:
             # A modal overlay (e.g. the model/thread picker) is on top — never
@@ -263,27 +264,27 @@ class DeerFlowTUI(App):
         return True
 
     def action_nav_up(self) -> None:
-        '未说明'
+        "未说明"
         if self._palette_open:
             self.action_palette_up()
         else:
             self._history_move(self._history.up(self.query_one("#composer", Input).value))
 
     def action_nav_down(self) -> None:
-        '未说明'
+        "未说明"
         if self._palette_open:
             self.action_palette_down()
         else:
             self._history_move(self._history.down())
 
     def _history_move(self, value: str) -> None:
-        '未说明'
+        "未说明"
         composer = self.query_one("#composer", Input)
         composer.value = value
         composer.cursor_position = len(value)
 
     def _open_palette(self, items: list) -> None:
-        '未说明'
+        "未说明"
         if not items:
             self._close_palette()
             return
@@ -295,7 +296,7 @@ class DeerFlowTUI(App):
         self._render_palette()
 
     def _close_palette(self) -> None:
-        '未说明'
+        "未说明"
         if not self._palette_open and not self._palette_items:
             return
         self._palette_open = False
@@ -304,25 +305,25 @@ class DeerFlowTUI(App):
         self.query_one("#palette", Static).remove_class("open")
 
     def _render_palette(self) -> None:
-        '未说明'
+        "未说明"
         from .render import render_palette
 
         self.query_one("#palette", Static).update(render_palette(self._palette_items, self._palette_index))
 
     def _current_palette_item(self):
-        '未说明'
+        "未说明"
         if 0 <= self._palette_index < len(self._palette_items):
             return self._palette_items[self._palette_index]
         return None
 
     def action_palette_down(self) -> None:
-        '未说明'
+        "未说明"
         if self._palette_items:
             self._palette_index = min(self._palette_index + 1, len(self._palette_items) - 1)
             self._render_palette()
 
     def action_palette_up(self) -> None:
-        '未说明'
+        "未说明"
         if self._palette_items:
             self._palette_index = max(self._palette_index - 1, 0)
             self._render_palette()
@@ -331,12 +332,12 @@ class DeerFlowTUI(App):
         # When the palette is open, Tab completes the highlighted command.
         # When it's closed, Tab is a no-op here (consumed) so focus stays in the
         # composer instead of moving to the scroll region.
-        '未说明'
+        "未说明"
         if self._palette_open:
             self._fill_from_palette()
 
     def action_palette_accept(self) -> None:
-        '未说明'
+        "未说明"
         item = self._current_palette_item()
         if item is None:
             return
@@ -349,7 +350,7 @@ class DeerFlowTUI(App):
         self._handle_submit(f"/{item.name}")
 
     def _fill_from_palette(self) -> None:
-        '未说明'
+        "未说明"
         item = self._current_palette_item()
         if item is None:
             return
@@ -359,7 +360,7 @@ class DeerFlowTUI(App):
         self._close_palette()
 
     def _handle_submit(self, text: str) -> None:
-        '未说明'
+        "未说明"
         from .command_registry import resolve
 
         res = resolve(text, skills=self._skill_names)
@@ -374,7 +375,7 @@ class DeerFlowTUI(App):
         self._send_to_agent(text)
 
     def _handle_builtin(self, name: str, args: str) -> None:
-        '未说明'
+        "未说明"
         if name == "quit":
             self.exit()
         elif name == "help":
@@ -417,7 +418,7 @@ class DeerFlowTUI(App):
     # ----- overlays + info commands -------------------------------------- #
 
     def _open_model_picker(self) -> None:
-        '未说明'
+        "未说明"
         try:
             models = self.session.client.list_models().get("models", [])
         except Exception:  # noqa: BLE001
@@ -428,7 +429,7 @@ class DeerFlowTUI(App):
             return
 
         def on_choice(choice: str | None) -> None:
-            '未说明'
+            "未说明"
             if choice:
                 self._model_override = choice
                 self._model = choice
@@ -438,7 +439,7 @@ class DeerFlowTUI(App):
         self.push_screen(SelectScreen("Select model", options), on_choice)
 
     def _open_thread_switcher(self) -> None:
-        '未说明'
+        "未说明"
         try:
             threads = self.session.recent_threads(limit=20)
         except Exception:  # noqa: BLE001
@@ -455,14 +456,14 @@ class DeerFlowTUI(App):
             return
 
         def on_choice(choice: str | None) -> None:
-            '未说明'
+            "未说明"
             if choice:
                 self._switch_to_thread(choice)
 
         self.push_screen(SelectScreen("Resume thread", options), on_choice)
 
     def _resume_thread(self, ref: str) -> None:
-        '未说明'
+        "未说明"
         ref = ref.strip()
         if not ref:
             self._open_thread_switcher()
@@ -470,14 +471,14 @@ class DeerFlowTUI(App):
         self._switch_to_thread(self.session.resolve_ref(ref))
 
     def _switch_to_thread(self, thread_id: str) -> None:
-        '未说明'
+        "未说明"
         self._conv_thread_id = thread_id
         self.state = initial_state()
         self._dispatch(SystemMessage(f"Resumed thread {thread_id[:8]}."))
         self._refresh_header()
 
     def _handle_goal(self, args: str) -> None:
-        '未说明'
+        "未说明"
         command = parse_goal_command(args)
 
         if command.kind == "status":
@@ -516,12 +517,12 @@ class DeerFlowTUI(App):
         self._dispatch(SystemMessage(f"Goal set: {goal.get('objective') if goal else command.objective}"))
 
     def _show_skills(self) -> None:
-        '未说明'
+        "未说明"
         names = ", ".join(self._skill_names) or "none"
         self._dispatch(SystemMessage(f"Enabled skills ({self._skills}): {names}"))
 
     def _show_mcp(self) -> None:
-        '未说明'
+        "未说明"
         try:
             servers = self.session.client.get_mcp_config().get("mcp_servers", {})
         except Exception:  # noqa: BLE001
@@ -534,7 +535,7 @@ class DeerFlowTUI(App):
         self._dispatch(SystemMessage("MCP servers — " + "  ·  ".join(lines)))
 
     def _show_memory(self) -> None:
-        '未说明'
+        "未说明"
         try:
             data = self.session.client.get_memory()
         except Exception:  # noqa: BLE001
@@ -545,7 +546,7 @@ class DeerFlowTUI(App):
         self._dispatch(SystemMessage(f"Memory: {len(facts)} facts · top of mind: {top}"))
 
     def _show_usage(self) -> None:
-        '未说明'
+        "未说明"
         usage = self.state.usage or {}
         if not usage:
             self._dispatch(SystemMessage("No token usage recorded yet."))
@@ -554,13 +555,13 @@ class DeerFlowTUI(App):
         self._dispatch(SystemMessage(f"Token usage — {parts}"))
 
     def _show_config(self) -> None:
-        '未说明'
+        "未说明"
         import os
 
         self._dispatch(SystemMessage(f"cwd: {os.getcwd()}   model: {self._model or 'default'}"))
 
     def _show_uploads(self) -> None:
-        '未说明'
+        "未说明"
         if not self._conv_thread_id:
             self._dispatch(SystemMessage("Start a thread before listing uploads."))
             return
@@ -578,7 +579,7 @@ class DeerFlowTUI(App):
     # ----- agent run ----------------------------------------------------- #
 
     def _send_to_agent(self, text: str) -> None:
-        '未说明'
+        "未说明"
         if self._streaming:
             self._dispatch(SystemMessage("Still working — wait for the current run to finish.", tone="info"))
             return
@@ -594,7 +595,7 @@ class DeerFlowTUI(App):
         )
 
     def _stream_worker(self, text: str, thread_id: str) -> None:
-        '未说明'
+        "未说明"
         kwargs: dict = {}
         if self._model_override:
             kwargs["model_name"] = self._model_override
@@ -620,7 +621,7 @@ class DeerFlowTUI(App):
             writer.set_title(thread_id, latest_title)
 
     def _on_action(self, action) -> None:
-        '未说明'
+        "未说明"
         self.state = reduce(self.state, action)
         if isinstance(action, RunStarted):
             self._streaming = True
@@ -636,7 +637,7 @@ class DeerFlowTUI(App):
         self._refresh_status()
 
     def _flush_transcript(self) -> None:
-        '未说明'
+        "未说明"
         if self._transcript_dirty:
             self._transcript_dirty = False
             self._refresh_transcript()
@@ -644,21 +645,21 @@ class DeerFlowTUI(App):
     # ----- key actions --------------------------------------------------- #
 
     def action_interrupt(self) -> None:
-        '未说明'
+        "未说明"
         if self._streaming:
             self._interrupt_run()
         else:
             self.exit()
 
     def action_escape(self) -> None:
-        '未说明'
+        "未说明"
         if self._palette_open:
             self._close_palette()
         elif self._streaming:
             self._interrupt_run()
 
     def _interrupt_run(self) -> None:
-        '未说明'
+        "未说明"
         self._cancelled = True
         self.workers.cancel_group(self, "agent")
         self._streaming = False
@@ -666,42 +667,42 @@ class DeerFlowTUI(App):
         self._dispatch(SystemMessage("Interrupted.", tone="info"))
 
     def action_redraw(self) -> None:
-        '未说明'
+        "未说明"
         self.refresh(layout=True)
         self._refresh_all()
 
     def action_clear_composer(self) -> None:
-        '未说明'
+        "未说明"
         self.query_one("#composer", Input).value = ""
 
     # ----- rendering ----------------------------------------------------- #
 
     def _dispatch(self, action) -> None:
-        '未说明'
+        "未说明"
         self.state = reduce(self.state, action)
         self._refresh_transcript()
         self._refresh_status()
 
     def _tick_spinner(self) -> None:
-        '未说明'
+        "未说明"
         if self._streaming:
             self._spinner_idx = (self._spinner_idx + 1) % len(SYMBOLS["spinner"])
             self._refresh_status()
 
     def _thread_label(self) -> str:
-        '未说明'
+        "未说明"
         if not self._conv_thread_id:
             return "new thread"
         return f"thread {self._conv_thread_id[:8]}"
 
     def _refresh_all(self) -> None:
-        '未说明'
+        "未说明"
         self._refresh_header()
         self._refresh_transcript()
         self._refresh_status()
 
     def _refresh_header(self) -> None:
-        '未说明'
+        "未说明"
         import os
 
         self.query_one("#header", Static).update(
@@ -714,18 +715,18 @@ class DeerFlowTUI(App):
         )
 
     def _refresh_transcript(self) -> None:
-        '未说明'
+        "未说明"
         self.query_one("#transcript", Static).update(render_transcript(self.state))
         self.query_one("#scroll", VerticalScroll).scroll_end(animate=False)
 
     def _refresh_status(self) -> None:
-        '未说明'
+        "未说明"
         spinner = SYMBOLS["spinner"][self._spinner_idx] if self._streaming else ""
         self.query_one("#status", Static).update(render_status(self.state, model=self._model, thread_label=self._thread_label(), spinner=spinner))
 
 
 def run_tui(plan) -> int:
-    '未说明'
+    "未说明"
     from .session import open_session
 
     session = open_session()

@@ -1,11 +1,11 @@
-'未说明'
+"未说明"
 
 import stat
 from pathlib import Path
 
 
 def make_skill_path_sandbox_readable(path: Path) -> None:
-    '未说明'
+    "未说明"
     if path.is_symlink():
         return
     mode = stat.S_IMODE(path.stat().st_mode)
@@ -17,14 +17,14 @@ def make_skill_path_sandbox_readable(path: Path) -> None:
 
 
 def make_skill_tree_sandbox_readable(target: Path) -> None:
-    '未说明'
+    "未说明"
     make_skill_path_sandbox_readable(target)
     for path in target.rglob("*"):
         make_skill_path_sandbox_readable(path)
 
 
 def make_skill_written_path_sandbox_readable(skill_root: Path, target: Path) -> None:
-    '未说明'
+    "未说明"
     resolved_root = skill_root.resolve()
     resolved_target = target.resolve()
     resolved_target.relative_to(resolved_root)

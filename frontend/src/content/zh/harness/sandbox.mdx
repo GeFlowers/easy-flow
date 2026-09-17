@@ -113,16 +113,6 @@ sandbox:
   原本读写 `/mnt/user-data/...` 的工具无需任何改动即可正常工作。
 </Callout>
 
-### Provisioner 管理的沙箱（Kubernetes）
-
-每个沙箱在 Kubernetes 集群中获得一个专用 Pod，由 Provisioner 服务管理。这提供最强的隔离性，适合有多个并发用户的生产环境。
-
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  provisioner_url: http://provisioner:8002
-```
-
 ## 路径映射
 
 沙箱使用路径映射来桥接主机文件系统和容器的虚拟文件系统。始终配置两个关键映射：
@@ -153,13 +143,13 @@ sandbox:
   <code>/mnt/user-data</code>。
 </Callout>
 
-当 `LocalSandboxProvider` 运行在生产 Docker（`make up`）中时，它实际运行在
+当 `LocalSandboxProvider` 运行在 Docker 开发环境（`make docker-start`）中时，它实际运行在
 `deer-flow-gateway` 容器里。此时 `host_path` 是从 gateway
 容器的文件系统解析，而不是直接从 Docker 宿主机解析。需要先把宿主机目录 bind
 mount 到 gateway 服务，再在 `config.yaml` 中使用容器内路径：
 
 ```yaml
-# docker/docker-compose.yaml 或 override 文件
+# docker/docker-compose-dev.yaml
 services:
   gateway:
     volumes:

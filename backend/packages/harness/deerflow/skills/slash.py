@@ -1,4 +1,5 @@
-'定义 slash 模块提供的职责与可复用接口'
+"定义 slash 模块提供的职责与可复用接口"
+
 from __future__ import annotations
 
 import re
@@ -21,7 +22,9 @@ _SLASH_SKILL_RE = re.compile(r"^/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s+|$)")
 
 @dataclass(frozen=True, slots=True)
 class SlashSkillReference:
-    '封装 SlashSkillReference 的状态、协作关系与公开操作。\n\nParsed slash-skill command with the skill name and remaining task text.'
+    """封装 SlashSkillReference 的状态、协作关系与公开操作。
+
+    Parsed slash-skill command with the skill name and remaining task text."""
 
     name: str
     remaining_text: str
@@ -29,7 +32,9 @@ class SlashSkillReference:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedSlashSkill:
-    '封装 ResolvedSlashSkill 的状态、协作关系与公开操作。\n\nSlash-skill activation resolved against enabled runtime-visible skills.'
+    """封装 ResolvedSlashSkill 的状态、协作关系与公开操作。
+
+    Slash-skill activation resolved against enabled runtime-visible skills."""
 
     skill: Skill
     remaining_text: str
@@ -37,7 +42,9 @@ class ResolvedSlashSkill:
 
 
 def parse_slash_skill_reference(text: str) -> SlashSkillReference | None:
-    '解析输入并返回结构化结果，并遵守 parse_slash_skill_reference 所表达的接口约束。\n\nParse strict `/skill-name task` syntax, ignoring reserved control commands.'
+    """解析输入并返回结构化结果，并遵守 parse_slash_skill_reference 所表达的接口约束。
+
+    Parse strict `/skill-name task` syntax, ignoring reserved control commands."""
     match = _SLASH_SKILL_RE.match(text)
     if not match:
         return None
@@ -57,7 +64,9 @@ def resolve_slash_skill(
     available_skills: set[str] | None = None,
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
 ) -> ResolvedSlashSkill | None:
-    '执行 resolve_slash_skill 的明确职责，并返回与调用约定一致的结果。\n\nResolve text into an enabled, whitelisted skill activation if possible.'
+    """执行 resolve_slash_skill 的明确职责，并返回与调用约定一致的结果。
+
+    Resolve text into an enabled, whitelisted skill activation if possible."""
     reference = parse_slash_skill_reference(text)
     if reference is None:
         return None

@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 
 @dataclass(frozen=True)
 class SkillMarkdownParts:
-    '未说明'
+    "未说明"
 
     metadata: dict[str, Any]
     frontmatter_text: str
@@ -34,7 +34,7 @@ class SkillMarkdownParts:
 
 
 def split_skill_markdown(content: str) -> tuple[SkillMarkdownParts | None, str | None]:
-    '未说明'
+    "未说明"
     match = _FRONTMATTER_RE.match(content)
     if not match:
         return None, "No YAML frontmatter found"

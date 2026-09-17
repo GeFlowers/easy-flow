@@ -1,4 +1,5 @@
-'定义 searxng_client 模块提供的职责与可复用接口'
+"定义 searxng_client 模块提供的职责与可复用接口"
+
 import logging
 from typing import Any
 
@@ -8,10 +9,12 @@ logger = logging.getLogger(__name__)
 
 
 class SearxngClient:
-    '封装 SearxngClient 的状态、协作关系与公开操作。\n\nClient for SearXNG meta search engine API.'
+    """封装 SearxngClient 的状态、协作关系与公开操作。
+
+    Client for SearXNG meta search engine API."""
 
     def __init__(self, base_url: str) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         self.base_url = base_url.rstrip("/")
 
     async def search(
@@ -20,7 +23,18 @@ class SearxngClient:
         max_results: int = 5,
         categories: list[str] | None = None,
     ) -> list[dict[str, Any]]:
-        '执行 search 的明确职责，并返回与调用约定一致的结果。\n\nSearch the web using SearXNG.\n\n        Args:\n            query: The search query.\n            max_results: Maximum number of results to return.\n            categories: Search categories to use.\n\n        Returns:\n            List of search result dictionaries.\n        '
+        """执行 search 的明确职责，并返回与调用约定一致的结果。
+
+        Search the web using SearXNG.
+
+                Args:
+                    query: The search query.
+                    max_results: Maximum number of results to return.
+                    categories: Search categories to use.
+
+                Returns:
+                    List of search result dictionaries.
+        """
         params: dict[str, Any] = {
             "q": query,
             "format": "json",

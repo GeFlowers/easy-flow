@@ -1,4 +1,13 @@
-'定义 patched_stepfun 模块提供的职责与可复用接口。\n\nPatched ChatOpenAI adapter for StepFun reasoning models.\n\nStepFun returns ``reasoning`` (or ``reasoning_content`` with deepseek-style) in\nboth streaming deltas and non-streaming responses. Standard ``ChatOpenAI``\nignores these non-standard fields, so reasoning content is silently dropped.\nThis adapter captures reasoning from all response paths and replays it on\nhistorical assistant messages for multi-turn tool-call conversations.\n'
+"""定义 patched_stepfun 模块提供的职责与可复用接口。
+
+Patched ChatOpenAI adapter for StepFun reasoning models.
+
+StepFun returns ``reasoning`` (or ``reasoning_content`` with deepseek-style) in
+both streaming deltas and non-streaming responses. Standard ``ChatOpenAI``
+ignores these non-standard fields, so reasoning content is silently dropped.
+This adapter captures reasoning from all response paths and replays it on
+historical assistant messages for multi-turn tool-call conversations.
+"""
 
 from __future__ import annotations
 
@@ -19,7 +28,13 @@ _MISSING = object()
 
 
 def _extract_reasoning(value: Any) -> str | object:
-    '执行 _extract_reasoning 的明确职责，并返回与调用约定一致的结果。\n\nReturn reasoning content from a dict/Pydantic object.\n\n    StepFun may return reasoning via ``reasoning`` (default) or\n    ``reasoning_content`` (deepseek-style). Check both fields.\n    '
+    """执行 _extract_reasoning 的明确职责，并返回与调用约定一致的结果。
+
+    Return reasoning content from a dict/Pydantic object.
+
+        StepFun may return reasoning via ``reasoning`` (default) or
+        ``reasoning_content`` (deepseek-style). Check both fields.
+    """
     if isinstance(value, Mapping):
         # Check reasoning_content first (deepseek-style), then reasoning (default)
         for field in ("reasoning_content", "reasoning"):
@@ -44,7 +59,9 @@ def _extract_reasoning(value: Any) -> str | object:
 
 
 def _with_reasoning_content(message: AIMessage | AIMessageChunk, reasoning: str) -> AIMessage | AIMessageChunk:
-    '执行 _with_reasoning_content 的明确职责，并返回与调用约定一致的结果。\n\nReturn a copy of *message* with reasoning_content stored in additional_kwargs.'
+    """执行 _with_reasoning_content 的明确职责，并返回与调用约定一致的结果。
+
+    Return a copy of *message* with reasoning_content stored in additional_kwargs."""
     additional_kwargs = dict(message.additional_kwargs)
     if additional_kwargs.get("reasoning_content") != reasoning:
         additional_kwargs["reasoning_content"] = reasoning
@@ -52,7 +69,9 @@ def _with_reasoning_content(message: AIMessage | AIMessageChunk, reasoning: str)
 
 
 def _get_typed_choice_message(response: Any, index: int) -> Any:
-    '执行 _get_typed_choice_message 的明确职责，并返回与调用约定一致的结果。\n\nExtract the SDK-typed choice message at *index*, if available.'
+    """执行 _get_typed_choice_message 的明确职责，并返回与调用约定一致的结果。
+
+    Extract the SDK-typed choice message at *index*, if available."""
     choices = getattr(response, "choices", None)
     if choices is None:
         return None
@@ -63,16 +82,23 @@ def _get_typed_choice_message(response: Any, index: int) -> Any:
 
 
 class PatchedChatStepFun(ChatOpenAI):
-    '封装 PatchedChatStepFun 的状态、协作关系与公开操作。\n\nChatOpenAI with full reasoning support for StepFun models.\n\n    Captures ``reasoning`` / ``reasoning_content`` from both streaming and\n    non-streaming responses and replays it on historical assistant messages in\n    multi-turn tool-call conversations.\n    '
+    """封装 PatchedChatStepFun 的状态、协作关系与公开操作。
+
+    ChatOpenAI with full reasoning support for StepFun models.
+
+        Captures ``reasoning`` / ``reasoning_content`` from both streaming and
+        non-streaming responses and replays it on historical assistant messages in
+        multi-turn tool-call conversations.
+    """
 
     @classmethod
     def is_lc_serializable(cls) -> bool:
-        '判断条件是否成立并返回布尔结果，并遵守 is_lc_serializable 所表达的接口约束'
+        "判断条件是否成立并返回布尔结果，并遵守 is_lc_serializable 所表达的接口约束"
         return True
 
     @property
     def lc_secrets(self) -> dict[str, str]:
-        '执行 lc_secrets 的明确职责，并返回与调用约定一致的结果'
+        "执行 lc_secrets 的明确职责，并返回与调用约定一致的结果"
         return {"api_key": "STEPFUN_API_KEY", "openai_api_key": "STEPFUN_API_KEY"}
 
     # --- Request payload replay ---
@@ -84,7 +110,9 @@ class PatchedChatStepFun(ChatOpenAI):
         stop: list[str] | None = None,
         **kwargs: Any,
     ) -> dict:
-        '执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果。\n\nRestore ``reasoning_content`` on historical assistant messages.'
+        """执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果。
+
+        Restore ``reasoning_content`` on historical assistant messages."""
         original_messages = self._convert_input(input_).to_messages()
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
 
@@ -104,7 +132,9 @@ class PatchedChatStepFun(ChatOpenAI):
         default_chunk_class: type,
         base_generation_info: dict | None,
     ) -> ChatGenerationChunk | None:
-        '执行 _convert_chunk_to_generation_chunk 的明确职责，并返回与调用约定一致的结果。\n\nCapture ``reasoning`` / ``reasoning_content`` from streaming deltas.'
+        """执行 _convert_chunk_to_generation_chunk 的明确职责，并返回与调用约定一致的结果。
+
+        Capture ``reasoning`` / ``reasoning_content`` from streaming deltas."""
         generation_chunk = super()._convert_chunk_to_generation_chunk(
             chunk,
             default_chunk_class,
@@ -132,7 +162,9 @@ class PatchedChatStepFun(ChatOpenAI):
         response: dict | Any,
         generation_info: dict | None = None,
     ) -> ChatResult:
-        '执行 _create_chat_result 的明确职责，并返回与调用约定一致的结果。\n\nExtract ``reasoning`` / ``reasoning_content`` from non-streaming responses.'
+        """执行 _create_chat_result 的明确职责，并返回与调用约定一致的结果。
+
+        Extract ``reasoning`` / ``reasoning_content`` from non-streaming responses."""
         result = super()._create_chat_result(response, generation_info)
         response_dict = response if isinstance(response, dict) else response.model_dump()
         choices = response_dict.get("choices", [])

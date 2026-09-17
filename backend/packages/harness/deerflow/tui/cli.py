@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -17,7 +17,8 @@ Mode = Literal["tui", "print", "json", "headless-help"]
 
 @dataclass
 class LaunchPlan:
-    '未说明'
+    "未说明"
+
     mode: Mode
     message: str | None = None
     read_stdin: bool = False
@@ -28,7 +29,7 @@ class LaunchPlan:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    '未说明'
+    "未说明"
     parser = argparse.ArgumentParser(
         prog="deerflow",
         description="DeerFlow terminal workbench — a TUI over the embedded DeerFlow harness.",
@@ -61,7 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _strip_chat(argv: Sequence[str]) -> list[str]:
-    '未说明'
+    "未说明"
     argv = list(argv)
     if argv and argv[0] == "chat":
         return argv[1:]
@@ -69,7 +70,7 @@ def _strip_chat(argv: Sequence[str]) -> list[str]:
 
 
 def _truthy(value: object) -> bool:
-    '未说明'
+    "未说明"
     return isinstance(value, str) and value.strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -80,7 +81,7 @@ def plan_launch(
     stdout_isatty: bool,
     env: dict[str, str],
 ) -> LaunchPlan:
-    '未说明'
+    "未说明"
     args = build_parser().parse_args(_strip_chat(argv))
     positional = " ".join(args.message).strip() or None
     resume = args.resume
@@ -146,14 +147,14 @@ deerflow — DeerFlow terminal workbench
 
 
 def _resolve_message(plan: LaunchPlan) -> str:
-    '未说明'
+    "未说明"
     if plan.read_stdin:
         return sys.stdin.read().strip()
     return plan.message or ""
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    '未说明'
+    "未说明"
     argv = list(sys.argv[1:] if argv is None else argv)
     plan = plan_launch(
         argv,
@@ -181,14 +182,14 @@ def _make_session():
     # Imported lazily so the pure planning path never imports the heavy harness.
     # Headless one-shots never use the threads_meta writer, so skip persistence
     # (no background loop / engine / connection pool just to discard it).
-    '未说明'
+    "未说明"
     from .session import open_session
 
     return open_session(persistence=False)
 
 
 def _run_print(plan: LaunchPlan) -> int:
-    '未说明'
+    "未说明"
     message = _resolve_message(plan)
     if not message:
         print("No message provided.", file=sys.stderr)
@@ -201,7 +202,7 @@ def _run_print(plan: LaunchPlan) -> int:
 
 
 def _run_json(plan: LaunchPlan) -> int:
-    '未说明'
+    "未说明"
     message = _resolve_message(plan)
     if not message:
         print("No message provided.", file=sys.stderr)
@@ -216,7 +217,7 @@ def _run_json(plan: LaunchPlan) -> int:
 
 
 def _run_tui(plan: LaunchPlan) -> int:
-    '未说明'
+    "未说明"
     try:
         # Absolute import (not `from .app`) so the harness import-boundary check,
         # which records relative module names verbatim, doesn't mistake the sibling

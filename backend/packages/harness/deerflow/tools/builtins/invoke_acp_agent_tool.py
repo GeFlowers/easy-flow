@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 class _InvokeACPAgentInput(BaseModel):
     """\u6267\u884c _InvokeACPAgentInput \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+
     agent: str = Field(description="Name of the ACP agent to invoke")
     prompt: str = Field(description="The concise task prompt to send to the agent")
 
@@ -126,7 +127,7 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
         "After the agent completes, its output files are accessible at /mnt/acp-workspace/ (read-only)."
     )
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     _agents = dict(agents)
 
     async def _invoke(agent: str, prompt: str, config: Annotated[RunnableConfig, InjectedToolArg] = None) -> str:

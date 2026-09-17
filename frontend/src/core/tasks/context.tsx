@@ -22,7 +22,9 @@ export interface SubtaskContextValue {
 export const SubtaskContext = createContext<SubtaskContextValue>({
   tasks: {},
   tasksRef: { current: {} },
-  setTasks: () => {},
+  setTasks: () => {
+    /* noop */
+  },
 });
 
 /** 提供子任务状态及其更新能力。 */

@@ -1,4 +1,5 @@
-'定义 tools 模块提供的职责与可复用接口'
+"定义 tools 模块提供的职责与可复用接口"
+
 import logging
 
 from langchain.tools import tool
@@ -17,7 +18,9 @@ VALID_FILTERS = ("fit", "raw", "bm25", "llm")
 
 
 def _get_tool_config(tool_name: str) -> dict | None:
-    "执行 _get_tool_config 的明确职责，并返回与调用约定一致的结果。\n\nReturn the tool's config extras (model_extra) dict, or None if unconfigured."
+    """执行 _get_tool_config 的明确职责，并返回与调用约定一致的结果。
+
+    Return the tool's config extras (model_extra) dict, or None if unconfigured."""
     config = get_app_config().get_tool_config(tool_name)
     if config is None:
         return None
@@ -26,7 +29,14 @@ def _get_tool_config(tool_name: str) -> dict | None:
 
 
 def _coerce_timeout(value: object, default: int) -> float:
-    '执行 _coerce_timeout 的明确职责，并返回与调用约定一致的结果。\n\nCoerce a config timeout into seconds, falling back to ``default`` on bad input.\n\n    Mirrors ``jina_ai._coerce_timeout``: booleans and non-numeric strings fall\n    back to the default so e.g. ``timeout: off`` (YAML ``False``) does not become\n    ``0.0`` and time out every request against a healthy server.\n    '
+    """执行 _coerce_timeout 的明确职责，并返回与调用约定一致的结果。
+
+    Coerce a config timeout into seconds, falling back to ``default`` on bad input.
+
+        Mirrors ``jina_ai._coerce_timeout``: booleans and non-numeric strings fall
+        back to the default so e.g. ``timeout: off`` (YAML ``False``) does not become
+        ``0.0`` and time out every request against a healthy server.
+    """
     if isinstance(value, bool):
         return float(default)
     if isinstance(value, (int, float)):
@@ -40,7 +50,7 @@ def _coerce_timeout(value: object, default: int) -> float:
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
-    '执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果'
+    "执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果"
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -53,7 +63,13 @@ def _coerce_bool(value: object, default: bool) -> bool:
 
 
 def _coerce_filter(value: object) -> str:
-    '执行 _coerce_filter 的明确职责，并返回与调用约定一致的结果。\n\nNormalize and validate the markdown filter, falling back to the default.\n\n    Catches typos / stale values (e.g. ``FIt``, ``fit_content``) at config-read\n    time instead of letting them reach the server as an opaque HTTP 400.\n    '
+    """执行 _coerce_filter 的明确职责，并返回与调用约定一致的结果。
+
+    Normalize and validate the markdown filter, falling back to the default.
+
+        Catches typos / stale values (e.g. ``FIt``, ``fit_content``) at config-read
+        time instead of letting them reach the server as an opaque HTTP 400.
+    """
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in VALID_FILTERS:
@@ -63,7 +79,14 @@ def _coerce_filter(value: object) -> str:
 
 
 def _build_client(cfg: dict | None) -> Crawl4AiClient:
-    '执行 _build_client 的明确职责，并返回与调用约定一致的结果。\n\nBuild a ``Crawl4AiClient`` from an already-read ``web_fetch`` config dict.\n\n    Takes the config as an argument (rather than reading it again) so a single\n    invocation reads ``get_app_config()`` exactly once and cannot split across a\n    concurrent hot-reload.\n    '
+    """执行 _build_client 的明确职责，并返回与调用约定一致的结果。
+
+    Build a ``Crawl4AiClient`` from an already-read ``web_fetch`` config dict.
+
+        Takes the config as an argument (rather than reading it again) so a single
+        invocation reads ``get_app_config()`` exactly once and cannot split across a
+        concurrent hot-reload.
+    """
     base_url = DEFAULT_BASE_URL
     token = ""
     timeout_s: float = float(DEFAULT_TIMEOUT_S)

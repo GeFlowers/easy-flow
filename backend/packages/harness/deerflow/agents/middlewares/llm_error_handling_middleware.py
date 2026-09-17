@@ -1,4 +1,6 @@
-'定义 llm_error_handling_middleware 模块提供的职责与可复用接口。\n\nLLM error handling middleware with retry/backoff and user-facing fallbacks.'
+"""定义 llm_error_handling_middleware 模块提供的职责与可复用接口。
+
+LLM error handling middleware with retry/backoff and user-facing fallbacks."""
 
 from __future__ import annotations
 
@@ -99,7 +101,9 @@ _STREAM_DROP_EXCEPTIONS: frozenset[str] = frozenset(
 
 
 class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
-    '封装 LLMErrorHandlingMiddleware 的状态、协作关系与公开操作。\n\nRetry transient LLM errors and surface graceful assistant messages.'
+    """封装 LLMErrorHandlingMiddleware 的状态、协作关系与公开操作。
+
+    Retry transient LLM errors and surface graceful assistant messages."""
 
     retry_max_attempts: int = 3
     retry_base_delay_ms: int = 1000
@@ -120,7 +124,13 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         self._circuit_probe_in_flight = False
 
     def _max_attempts_for(self, exc: BaseException) -> int:
-        '执行 _max_attempts_for 的明确职责，并返回与调用约定一致的结果。\n\nReturn the effective max attempt count for this exception.\n\n        Falls back to `self.retry_max_attempts` unless the exception class name\n        appears in the per-exception override table.\n        '
+        """执行 _max_attempts_for 的明确职责，并返回与调用约定一致的结果。
+
+        Return the effective max attempt count for this exception.
+
+                Falls back to `self.retry_max_attempts` unless the exception class name
+                appears in the per-exception override table.
+        """
         override = _RETRY_BUDGET_OVERRIDES.get(type(exc).__name__)
         if override is None:
             return self.retry_max_attempts
@@ -128,7 +138,9 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         return min(override, self.retry_max_attempts)
 
     def _check_circuit(self) -> bool:
-        '执行 _check_circuit 的明确职责，并返回与调用约定一致的结果。\n\nReturns True if circuit is OPEN (fast fail), False otherwise.'
+        """执行 _check_circuit 的明确职责，并返回与调用约定一致的结果。
+
+        Returns True if circuit is OPEN (fast fail), False otherwise."""
         with self._circuit_lock:
             now = time.time()
 
@@ -182,7 +194,14 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                     )
 
     def _release_half_open_probe(self) -> None:
-        '执行 _release_half_open_probe 的明确职责，并返回与调用约定一致的结果。\n\nRelease the in-flight half-open probe without recording a failure.\n\n        Used when something other than a classified success/failure consumes the probe (a\n        GraphBubbleUp control-flow signal, or a non-retriable error), so the circuit can admit\n        the next probe instead of fast-failing forever.\n        '
+        """执行 _release_half_open_probe 的明确职责，并返回与调用约定一致的结果。
+
+        Release the in-flight half-open probe without recording a failure.
+
+                Used when something other than a classified success/failure consumes the probe (a
+                GraphBubbleUp control-flow signal, or a non-retriable error), so the circuit can admit
+                the next probe instead of fast-failing forever.
+        """
         with self._circuit_lock:
             if self._circuit_state == "half_open":
                 self._circuit_probe_in_flight = False

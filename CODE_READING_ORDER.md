@@ -2462,7 +2462,6 @@
   - [`scripts/cleanup-containers.sh`](<scripts/cleanup-containers.sh>)
   - [`scripts/config-upgrade.sh`](<scripts/config-upgrade.sh>)
   - [`scripts/configure.py`](<scripts/configure.py>)
-  - [`scripts/deploy.sh`](<scripts/deploy.sh>)
   - [`scripts/detect_blocking_io_static.py`](<scripts/detect_blocking_io_static.py>)
   - [`scripts/detect_thread_boundaries.py`](<scripts/detect_thread_boundaries.py>)
   - [`scripts/detect_uv_extras.py`](<scripts/detect_uv_extras.py>)
@@ -2555,24 +2554,15 @@
   - [`backend/samples/other_agent_demo/deermem_manager.yaml`](<backend/samples/other_agent_demo/deermem_manager.yaml>)
   - [`backend/sitecustomize.py`](<backend/sitecustomize.py>)
 
-### 185. `docker/provisioner`
-
-- 作用：实现远程或 Kubernetes 沙箱的 Provisioner 服务。
-- 阅读重点：关注沙箱创建、资源限制和生命周期接口。
-- 文件：
-  - [`docker/provisioner/app.py`](<docker/provisioner/app.py>)
-  - [`docker/provisioner/Dockerfile`](<docker/provisioner/Dockerfile>)
-
 ### 186. `docker`
 
-- 作用：定义本地、开发和生产容器编排及 Nginx 入口。
+- 作用：定义本地开发容器编排及 Nginx 入口。
 - 阅读重点：沿服务拓扑理解端口、卷和反向代理关系。
 - 文件：
   - [`docker/dev-entrypoint.sh`](<docker/dev-entrypoint.sh>)
   - [`docker/docker-compose-dev.yaml`](<docker/docker-compose-dev.yaml>)
-  - [`docker/docker-compose.cli-auth.yaml`](<docker/docker-compose.cli-auth.yaml>)
-  - [`docker/docker-compose.dood.yaml`](<docker/docker-compose.dood.yaml>)
-  - [`docker/docker-compose.yaml`](<docker/docker-compose.yaml>)
+  - [`docker/nginx/nginx.conf`](<docker/nginx/nginx.conf>)
+  - [`docker/nginx/nginx.local.conf`](<docker/nginx/nginx.local.conf>)
 
 ### 187. `deploy`
 

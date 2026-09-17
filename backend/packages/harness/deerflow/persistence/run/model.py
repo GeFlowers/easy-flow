@@ -12,6 +12,7 @@ from deerflow.persistence.base import Base
 
 class RunRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "runs"
 
     run_id: Mapped[str] = mapped_column(String(64), primary_key=True)

@@ -76,28 +76,28 @@ async def init_engine(
 
         from sqlalchemy import event
 
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         await asyncio.to_thread(os.makedirs, sqlite_dir or ".", exist_ok=True)
         _engine = create_async_engine(url, echo=echo, json_serializer=_json_serializer)
 
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         @event.listens_for(_engine.sync_engine, "connect")
         def _enable_sqlite_wal(dbapi_conn, _record):  # noqa: ARG001 — SQLAlchemy contract
             """执行持久化流程所需的内部辅助操作。"""
@@ -122,24 +122,24 @@ async def init_engine(
 
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     from deerflow.persistence.bootstrap import bootstrap_schema
 
     try:
         await bootstrap_schema(_engine, backend=backend)
     except Exception as exc:
         if backend == "postgres" and "does not exist" in str(exc):
-                        # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
             await _auto_create_postgres_db(url)
-                        # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
             await _engine.dispose()
             _engine = create_async_engine(url, echo=echo, pool_size=pool_size, pool_pre_ping=True, json_serializer=_json_serializer)
             _session_factory = async_sessionmaker(_engine, expire_on_commit=False)

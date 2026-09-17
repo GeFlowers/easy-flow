@@ -22,8 +22,8 @@ _initialization_lock = asyncio.Lock()
 # 中文说明：此处用于执行相关处理。
 # 中文说明：此处用于执行相关处理。
 _ConfigSignature = tuple[float | None, int | None, str | None]
-_config_path: Path | None = None                                    # 中文说明：此处用于执行相关处理。
-_config_signature: _ConfigSignature | None = None                                                     # 中文说明：此处用于执行相关处理。
+_config_path: Path | None = None  # 中文说明：此处用于执行相关处理。
+_config_signature: _ConfigSignature | None = None  # 中文说明：此处用于执行相关处理。
 
 
 def _resolve_config_path() -> Path | None:
@@ -68,20 +68,20 @@ def _current_config_state() -> tuple[Path | None, _ConfigSignature | None]:
 def _is_cache_stale() -> bool:
     """判断已初始化的 MCP 工具缓存是否因配置变化而过期。"""
     if not _cache_initialized:
-        return False                        # 中文说明：此处用于执行相关处理。
+        return False  # 中文说明：此处用于执行相关处理。
 
     current_path, current_signature = _current_config_state()
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     if _config_signature is None or current_signature is None:
         return False
 
@@ -110,7 +110,7 @@ async def initialize_mcp_tools() -> list[BaseTool]:
         logger.info("Initializing MCP tools...")
         _mcp_tools_cache = await get_mcp_tools()
         _cache_initialized = True
-        _config_path, _config_signature = _current_config_state()                                                                     # 中文说明：此处用于执行相关处理。
+        _config_path, _config_signature = _current_config_state()  # 中文说明：此处用于执行相关处理。
         logger.info("MCP tools initialized: %d tool(s) loaded (config path: %s)", len(_mcp_tools_cache), _config_path)
 
         return _mcp_tools_cache
@@ -120,7 +120,7 @@ def get_cached_mcp_tools() -> list[BaseTool]:
     """返回缓存的 MCP 工具，必要时同步完成惰性初始化。"""
     global _cache_initialized
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     if _is_cache_stale():
         logger.info("MCP cache is stale, resetting for re-initialization...")
         reset_mcp_tools_cache()
@@ -128,21 +128,21 @@ def get_cached_mcp_tools() -> list[BaseTool]:
     if not _cache_initialized:
         logger.info("MCP tools not initialized, performing lazy initialization...")
         try:
-                        # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
             loop = asyncio.get_event_loop()
             if loop.is_running():
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
                 import concurrent.futures
 
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(asyncio.run, initialize_mcp_tools())
                     future.result()
             else:
-                                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
                 loop.run_until_complete(initialize_mcp_tools())
         except RuntimeError:
-                        # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
             try:
                 asyncio.run(initialize_mcp_tools())
             except Exception:
@@ -163,18 +163,18 @@ def reset_mcp_tools_cache() -> None:
     _config_path = None
     _config_signature = None
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     #
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     try:
         from deerflow.mcp.session_pool import get_session_pool
 

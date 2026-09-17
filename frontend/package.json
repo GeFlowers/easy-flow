@@ -14,8 +14,6 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "preview": "next build && next start",
     "start": "next start",
-    "test": "rstest",
-    "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -96,9 +94,6 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3.3.1",
-    "@playwright/test": "^1.59.1",
-    "@rsbuild/plugin-react": "^2.1.0",
-    "@rstest/core": "^0.10.6",
     "@tailwindcss/postcss": "^4.0.15",
     "@types/gsap": "^3.0.0",
     "@types/node": "^20.14.10",

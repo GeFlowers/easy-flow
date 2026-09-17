@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ MAX_RESULTS = 5
 
 
 def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
-    '未说明'
+    "未说明"
     try:
         return re.compile(pattern, re.IGNORECASE)
     except re.error:
@@ -27,17 +27,17 @@ def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
 # the frozen __setattr__). Do NOT add slots=True or hash/names break at runtime.
 @dataclass(frozen=True)
 class SkillCatalog:
-    '未说明'
+    "未说明"
 
     skills: tuple[Skill, ...]
 
     @cached_property
     def names(self) -> frozenset[str]:
-        '未说明'
+        "未说明"
         return frozenset(s.name for s in self.skills)
 
     def search(self, query: str) -> list[Skill]:
-        '未说明'
+        "未说明"
         query = query.strip()
         if not query:
             return []
@@ -75,5 +75,5 @@ class SkillCatalog:
 
 
 def _catalog_regex_score(pattern: re.Pattern[str], s: Skill) -> int:
-    '未说明'
+    "未说明"
     return len(pattern.findall(f"{s.name} {s.description or ''}"))

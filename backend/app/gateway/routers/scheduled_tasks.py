@@ -40,6 +40,7 @@ def _ensure_task_mutable(task: dict[str, Any]) -> None:
 
 class ScheduledTaskCreateRequest(BaseModel):
     """定义创建计划任务时的上下文模式、提示词和调度信息。"""
+
     thread_id: str | None = None
     context_mode: str = "fresh_thread_per_run"
     title: str = Field(min_length=1)
@@ -51,6 +52,7 @@ class ScheduledTaskCreateRequest(BaseModel):
 
 class ScheduledTaskUpdateRequest(BaseModel):
     """定义计划任务可选更新字段；不含运行中状态的直接修改入口。"""
+
     context_mode: str | None = None
     thread_id: str | None = None
     title: str | None = Field(default=None, min_length=1)

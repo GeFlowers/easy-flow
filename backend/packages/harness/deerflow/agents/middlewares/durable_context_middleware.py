@@ -1,4 +1,13 @@
-'定义 durable_context_middleware 模块提供的职责与可复用接口。\n\nDurable-context middleware: inject summary, delegation ledger, and skills.\n\nCapture enumerates task delegations and loaded skill files into checkpointed\nstate channels. Injection renders static authority rules as a SystemMessage and\nrenders untrusted channel values (`summary_text`, `delegations`,\n`skill_context`) as one hidden <durable_context_data> HumanMessage, never\nwritten back to state.\n'
+"""定义 durable_context_middleware 模块提供的职责与可复用接口。
+
+Durable-context middleware: inject summary, delegation ledger, and skills.
+
+Capture enumerates task delegations and loaded skill files into checkpointed
+state channels. Injection renders static authority rules as a SystemMessage and
+renders untrusted channel values (`summary_text`, `delegations`,
+`skill_context`) as one hidden <durable_context_data> HumanMessage, never
+written back to state.
+"""
 
 from __future__ import annotations
 
@@ -153,7 +162,15 @@ def _messages_after_pre_existing_boundary(messages: list[AnyMessage], pre_existi
 
 
 def _current_run_messages(messages: list[AnyMessage], run_id: str | None, pre_existing_message_ids: frozenset[str]) -> list[AnyMessage]:
-    '执行 _current_run_messages 的明确职责，并返回与调用约定一致的结果。\n\nReturn the message tail where this invocation may have emitted tasks.\n\n    A resumed run may not append a new HumanMessage marker. In that case the\n    latest HumanMessage can belong to an older run. The worker supplies the\n    message ids that existed before this run so we can capture only newly\n    appended messages instead of re-tagging old task calls.\n    '
+    """执行 _current_run_messages 的明确职责，并返回与调用约定一致的结果。
+
+    Return the message tail where this invocation may have emitted tasks.
+
+        A resumed run may not append a new HumanMessage marker. In that case the
+        latest HumanMessage can belong to an older run. The worker supplies the
+        message ids that existed before this run so we can capture only newly
+        appended messages instead of re-tagging old task calls.
+    """
     if run_id is None:
         return messages
     for index in range(len(messages) - 1, -1, -1):
@@ -172,7 +189,9 @@ def _current_run_messages(messages: list[AnyMessage], run_id: str | None, pre_ex
 
 
 def _with_run_id(delegations: list[dict], run_id: str | None, existing: list[dict]) -> list[dict]:
-    '执行 _with_run_id 的明确职责，并返回与调用约定一致的结果。\n\nTag only new delegation ids with the current run_id.'
+    """执行 _with_run_id 的明确职责，并返回与调用约定一致的结果。
+
+    Tag only new delegation ids with the current run_id."""
     if run_id is None:
         return delegations
     existing_by_id = {entry.get("id"): entry for entry in existing if isinstance(entry, dict)}
@@ -191,7 +210,9 @@ def _with_run_id(delegations: list[dict], run_id: str | None, existing: list[dic
 
 
 class DurableContextMiddleware(AgentMiddleware[AgentState]):
-    '封装 DurableContextMiddleware 的状态、协作关系与公开操作。\n\nCapture delegations + loaded skills; inject durable context ephemerally.'
+    """封装 DurableContextMiddleware 的状态、协作关系与公开操作。
+
+    Capture delegations + loaded skills; inject durable context ephemerally."""
 
     def __init__(
         self,

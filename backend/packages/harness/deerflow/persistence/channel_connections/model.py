@@ -17,6 +17,7 @@ def _utc_now() -> datetime:
 
 class ChannelConnectionRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "channel_connections"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
@@ -48,11 +49,11 @@ class ChannelConnectionRow(Base):
             name="uq_channel_connection_owner_provider_identity",
         ),
         Index("idx_channel_connections_event_lookup", "provider", "workspace_id", "bot_user_id"),
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         Index(
             "uq_channel_connection_active_identity",
             "provider",
@@ -67,6 +68,7 @@ class ChannelConnectionRow(Base):
 
 class ChannelCredentialRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "channel_credentials"
 
     connection_id: Mapped[str] = mapped_column(
@@ -86,6 +88,7 @@ class ChannelCredentialRow(Base):
 
 class ChannelOAuthStateRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "channel_oauth_states"
 
     state_hash: Mapped[str] = mapped_column(String(128), primary_key=True)
@@ -103,6 +106,7 @@ class ChannelOAuthStateRow(Base):
 
 class ChannelConversationRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "channel_conversations"
 
     id: Mapped[str] = mapped_column(String(64), primary_key=True)

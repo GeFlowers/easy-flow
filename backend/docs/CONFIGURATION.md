@@ -376,20 +376,6 @@ reclaim its warm VM on the next acquire; different threads cannot share a VM.
 evicted; active VMs continue and the provider may temporarily exceed the cap if
 all boxes are active.
 
-**Docker Execution with Kubernetes** (runs sandbox code in Kubernetes pods via provisioner service):
-
-This mode runs each sandbox in an isolated Kubernetes Pod on your **host machine's cluster**. Requires Docker Desktop K8s, OrbStack, or similar local K8s setup.
-
-```yaml
-sandbox:
-   use: deerflow.community.aio_sandbox:AioSandboxProvider
-   provisioner_url: http://provisioner:8002
-```
-
-When using Docker development (`make docker-start`), DeerFlow starts the `provisioner` service only if this provisioner mode is configured. In local or plain Docker sandbox modes, `provisioner` is skipped.
-
-See [Provisioner Setup Guide](../../docker/provisioner/README.md) for detailed configuration, prerequisites, and troubleshooting.
-
 **E2B Cloud Sandbox** (runs sandbox code in [E2B](https://e2b.dev) cloud micro-VMs):
 
 ```yaml
@@ -440,10 +426,10 @@ sandbox:
 
 `allow_host_bash` is intentionally `false` by default. DeerFlow's local sandbox is a host-side convenience mode, not a secure shell isolation boundary. If you need `bash`, prefer `AioSandboxProvider`. Only set `allow_host_bash: true` for fully trusted single-user local workflows.
 
-When `LocalSandboxProvider` runs under `make up`, it runs inside the `deer-flow-gateway` container. In that mode, `sandbox.mounts[].host_path` is resolved from the gateway container's filesystem, not from your Docker host. If you need a local-sandbox custom mount in production Docker, bind the host directory into the gateway service first, then use the in-container path in `config.yaml`:
+When `LocalSandboxProvider` runs under `make docker-start`, it runs inside the `deer-flow-gateway` container. In that mode, `sandbox.mounts[].host_path` is resolved from the gateway container's filesystem, not from your Docker host. If you need a custom mount, bind the host directory into the gateway service first, then use the in-container path in `config.yaml`:
 
 ```yaml
-# docker/docker-compose.yaml or an override file
+# docker/docker-compose-dev.yaml
 services:
   gateway:
     volumes:
@@ -508,8 +494,6 @@ sandbox:
   use: deerflow.community.aio_sandbox:AioSandboxProvider
   image: your-registry/your-aio-sandbox:tag
 ```
-
-In provisioner mode, sandbox Pods are created by the provisioner service, so configure the provisioner `SANDBOX_IMAGE` environment variable instead of `sandbox.image`. See the [Provisioner Setup Guide](../../docker/provisioner/README.md#custom-sandbox-image).
 
 If you rebuild the runtime from scratch instead of extending the published image, it must expose the same HTTP API used by `agent-sandbox`. DeerFlow currently depends on:
 
@@ -625,44 +609,12 @@ DeerFlow searches for configuration in this order:
 4. Legacy backend/repository-root locations for monorepo compatibility
 
 ## Security Notes
-### Sandbox Isolation and the Docker Socket (DooD)
+### Sandbox Isolation in Docker Development
 
-DeerFlow executes agent-generated shell/code through a configurable sandbox
-(`sandbox.use` in `config.yaml`). The isolation guarantees differ by mode, and
-one mode requires mounting the host Docker socket. Understand the trade-offs
-before exposing an instance to untrusted input.
-
-| Mode | `config.yaml` | Host Docker socket | Isolation |
-|------|---------------|--------------------|-----------|
-| `local` (default) | `deerflow.sandbox.local:LocalSandboxProvider` | Not mounted | Commands run **inside the gateway container** on its filesystem. Not a strong boundary — `allow_host_bash` is `false` by default and should stay off for untrusted workloads. |
-| `aio` (pure DooD) | `deerflow.community.aio_sandbox:AioSandboxProvider` (no `provisioner_url`) | **Mounted** (opt-in overlay) | Sandbox containers are started via the host Docker daemon. |
-| `provisioner` (Kubernetes) | `AioSandboxProvider` + `provisioner_url` | Not mounted | Sandbox pods are created through the provisioner's K8s API over HTTP. Strongest isolation. |
-
-#### The Docker socket is host root
-
-Mounting `/var/run/docker.sock` into a container grants that container
-**root-equivalent control of the host**: anything able to reach the socket can
-start a new container that bind-mounts the host filesystem and escape. This
-matters for DeerFlow because the gateway executes model-generated commands, so a
-prompt injection or any in-container code-execution primitive could pivot to the
-host through the socket.
-
-To keep this off the default attack surface:
-
-- The host Docker socket is **not** mounted by the default Compose stack. It is
-  added only for `aio` mode through the opt-in `docker/docker-compose.dood.yaml`
-  overlay, which `scripts/deploy.sh` and `scripts/docker.sh` append
-  automatically when `detect_sandbox_mode()` returns `aio`.
-- Prefer **provisioner/Kubernetes mode** for multi-tenant or internet-exposed
-  deployments — it isolates sandboxes without handing the gateway the host
-  daemon.
-- If you must use `aio`/DooD, treat the host as part of the gateway's trust
-  boundary: run it on a dedicated host, and consider a scoped Docker API proxy
-  instead of the raw socket.
-
-> Note: the gateway bind-mounts `$HOME/.claude` and `$HOME/.codex` (read-only)
-> for CLI auto-auth in **all** modes. These hold long-lived CLI credentials;
-> scope or omit them when the gateway runs untrusted workloads.
+This project's retained Compose stack uses
+`deerflow.sandbox.local:LocalSandboxProvider`. Commands run inside the gateway
+container and the host Docker socket is not mounted. This is not a strong
+security boundary; keep `allow_host_bash` disabled for untrusted workloads.
 
 ### CLI Credential Mounts (Claude Code / Codex)
 
@@ -681,7 +633,7 @@ with the least exposure that fits your setup:
 |------|-----|----------|
 | Claude model provider | env `CLAUDE_CODE_OAUTH_TOKEN` / `ANTHROPIC_AUTH_TOKEN` (via `.env`), or `CLAUDE_CODE_CREDENTIALS_PATH` → a single mounted `.credentials.json` | none / one file |
 | Codex model provider | env `CODEX_AUTH_PATH` pointing at a single mounted `auth.json` | one file |
-| ACP agent | the adapter's own auth — many ACP adapters take an env API key (e.g. `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) and need no mount; use the opt-in `docker/docker-compose.cli-auth.yaml` overlay only if your adapter reads the full CLI config dir | none / full dir |
+| ACP agent | the adapter's own auth — many ACP adapters take an env API key (e.g. `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`) | none |
 
 The Gateway credential loader checks environment variables **before** the
 default credential files, so the env-token paths need no bind mount at all. ACP
@@ -689,9 +641,7 @@ adapters authenticate independently of DeerFlow via their own documented env —
 for example the common `claude-code-acp` adapter starts as
 `ANTHROPIC_API_KEY=… claude-code-acp` and honors `CLAUDE_CONFIG_DIR` to redirect
 its config directory, so it needs no `~/.claude` mount at all. Prefer the
-adapter's documented env auth, and reach for the
-`docker-compose.cli-auth.yaml` overlay only as a fallback for an adapter that
-genuinely reads the full CLI config directory.
+adapter's documented environment-variable authentication.
 
 
 ## Best Practices

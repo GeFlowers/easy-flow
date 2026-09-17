@@ -1,4 +1,6 @@
-'定义 storage 模块提供的职责与可复用接口。\n\nMemory storage providers.'
+"""定义 storage 模块提供的职责与可复用接口。
+
+Memory storage providers."""
 
 import abc
 import json
@@ -16,12 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 def utc_now_iso_z() -> str:
-    '执行 utc_now_iso_z 的明确职责，并返回与调用约定一致的结果。\n\nCurrent UTC time as ISO-8601 with ``Z`` suffix (matches prior naive-UTC output).'
+    """执行 utc_now_iso_z 的明确职责，并返回与调用约定一致的结果。
+
+    Current UTC time as ISO-8601 with ``Z`` suffix (matches prior naive-UTC output)."""
     return datetime.now(UTC).isoformat().removesuffix("+00:00") + "Z"
 
 
 def create_empty_memory() -> dict[str, Any]:
-    '创建并返回，并遵守 create_empty_memory 所表达的接口约束。\n\nCreate an empty memory structure.'
+    """创建并返回，并遵守 create_empty_memory 所表达的接口约束。
+
+    Create an empty memory structure."""
     return {
         "version": "1.0",
         "lastUpdated": utc_now_iso_z(),
@@ -40,29 +46,41 @@ def create_empty_memory() -> dict[str, Any]:
 
 
 class MemoryStorage(abc.ABC):
-    '封装 MemoryStorage 的状态、协作关系与公开操作。\n\nAbstract base class for memory storage providers.'
+    """封装 MemoryStorage 的状态、协作关系与公开操作。
+
+    Abstract base class for memory storage providers."""
 
     @abc.abstractmethod
     def load(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '加载并返回，并遵守 load 所表达的接口约束。\n\nLoad memory data for the given agent.'
+        """加载并返回，并遵守 load 所表达的接口约束。
+
+        Load memory data for the given agent."""
         pass
 
     @abc.abstractmethod
     def reload(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '执行 reload 的明确职责，并返回与调用约定一致的结果。\n\nForce reload memory data for the given agent.'
+        """执行 reload 的明确职责，并返回与调用约定一致的结果。
+
+        Force reload memory data for the given agent."""
         pass
 
     @abc.abstractmethod
     def save(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> bool:
-        '持久化输入并返回保存结果，并遵守 save 所表达的接口约束。\n\nSave memory data for the given agent.'
+        """持久化输入并返回保存结果，并遵守 save 所表达的接口约束。
+
+        Save memory data for the given agent."""
         pass
 
 
 class FileMemoryStorage(MemoryStorage):
-    '封装 FileMemoryStorage 的状态、协作关系与公开操作。\n\nFile-based memory storage provider.'
+    """封装 FileMemoryStorage 的状态、协作关系与公开操作。
+
+    File-based memory storage provider."""
 
     def __init__(self, config: DeerMemConfig):
-        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nInitialize the file memory storage with an injected DeerMemConfig.'
+        """实现 __init__ 协议方法，保持对象交互语义一致。
+
+        Initialize the file memory storage with an injected DeerMemConfig."""
         self._config = config
         # Per-user/agent memory cache: keyed by (user_id, agent_name) tuple (None = global)
         # Value: (memory_data, file_mtime)
@@ -71,11 +89,15 @@ class FileMemoryStorage(MemoryStorage):
         self._cache_lock = threading.Lock()
 
     def _get_memory_file_path(self, agent_name: str | None = None, *, user_id: str | None = None) -> Path:
-        "执行 _get_memory_file_path 的明确职责，并返回与调用约定一致的结果。\n\nGet the path to the memory file (DeerMem's own path resolution)."
+        """执行 _get_memory_file_path 的明确职责，并返回与调用约定一致的结果。
+
+        Get the path to the memory file (DeerMem's own path resolution)."""
         return memory_file_path(self._config, agent_name, user_id=user_id)
 
     def _load_memory_from_file(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '执行 _load_memory_from_file 的明确职责，并返回与调用约定一致的结果。\n\nLoad memory data from file.'
+        """执行 _load_memory_from_file 的明确职责，并返回与调用约定一致的结果。
+
+        Load memory data from file."""
         file_path = self._get_memory_file_path(agent_name, user_id=user_id)
 
         if not file_path.exists():
@@ -91,11 +113,13 @@ class FileMemoryStorage(MemoryStorage):
 
     @staticmethod
     def _cache_key(agent_name: str | None = None, *, user_id: str | None = None) -> tuple[str | None, str | None]:
-        '执行 _cache_key 的明确职责，并返回与调用约定一致的结果'
+        "执行 _cache_key 的明确职责，并返回与调用约定一致的结果"
         return (user_id, agent_name)
 
     def load(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '加载并返回，并遵守 load 所表达的接口约束。\n\nLoad memory data (cached with file modification time check).'
+        """加载并返回，并遵守 load 所表达的接口约束。
+
+        Load memory data (cached with file modification time check)."""
         file_path = self._get_memory_file_path(agent_name, user_id=user_id)
         cache_key = self._cache_key(agent_name, user_id=user_id)
 
@@ -117,7 +141,9 @@ class FileMemoryStorage(MemoryStorage):
         return memory_data
 
     def reload(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '执行 reload 的明确职责，并返回与调用约定一致的结果。\n\nReload memory data from file, forcing cache invalidation.'
+        """执行 reload 的明确职责，并返回与调用约定一致的结果。
+
+        Reload memory data from file, forcing cache invalidation."""
         file_path = self._get_memory_file_path(agent_name, user_id=user_id)
         memory_data = self._load_memory_from_file(agent_name, user_id=user_id)
         cache_key = self._cache_key(agent_name, user_id=user_id)
@@ -132,7 +158,9 @@ class FileMemoryStorage(MemoryStorage):
         return memory_data
 
     def save(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> bool:
-        '持久化输入并返回保存结果，并遵守 save 所表达的接口约束。\n\nSave memory data to file and update cache.'
+        """持久化输入并返回保存结果，并遵守 save 所表达的接口约束。
+
+        Save memory data to file and update cache."""
         file_path = self._get_memory_file_path(agent_name, user_id=user_id)
         cache_key = self._cache_key(agent_name, user_id=user_id)
 
@@ -164,7 +192,18 @@ class FileMemoryStorage(MemoryStorage):
 
 
 def create_storage(config: DeerMemConfig) -> MemoryStorage:
-    '创建并返回，并遵守 create_storage 所表达的接口约束。\n\nBuild the configured memory storage instance for ``config``.\n\n    Replaces the old ``get_memory_storage()`` global singleton: the caller\n    (``DeerMem.__init__``) owns the returned instance. Empty ``storage_class``\n    (default) -> ``FileMemoryStorage`` directly (no importlib, portable); a\n    dotted path is resolved and raises ``ValueError`` on failure (fail-fast:\n    memory is persistent state, so an unresolved ``storage_class`` is not\n    silently substituted with ``FileMemoryStorage`` -- mirrors the\n    ``manager_class`` resolution policy).\n    '
+    """创建并返回，并遵守 create_storage 所表达的接口约束。
+
+    Build the configured memory storage instance for ``config``.
+
+        Replaces the old ``get_memory_storage()`` global singleton: the caller
+        (``DeerMem.__init__``) owns the returned instance. Empty ``storage_class``
+        (default) -> ``FileMemoryStorage`` directly (no importlib, portable); a
+        dotted path is resolved and raises ``ValueError`` on failure (fail-fast:
+        memory is persistent state, so an unresolved ``storage_class`` is not
+        silently substituted with ``FileMemoryStorage`` -- mirrors the
+        ``manager_class`` resolution policy).
+    """
     storage_class_path = config.storage_class
     if not storage_class_path:
         return FileMemoryStorage(config)

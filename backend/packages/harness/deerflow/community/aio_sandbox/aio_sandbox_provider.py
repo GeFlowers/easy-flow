@@ -1,4 +1,16 @@
-'定义 aio_sandbox_provider 模块提供的职责与可复用接口。\n\nAIO Sandbox Provider — orchestrates sandbox lifecycle with pluggable backends.\n\nThis provider composes:\n- SandboxBackend: how sandboxes are provisioned (local container vs remote/K8s)\n\nThe provider itself handles:\n- In-process caching for fast repeated access\n- Idle timeout management\n- Graceful shutdown with signal handling\n- Mount computation (thread-specific, skills)\n'
+"""定义 aio_sandbox_provider 模块提供的职责与可复用接口。
+
+AIO Sandbox Provider — orchestrates sandbox lifecycle with pluggable backends.
+
+This provider composes:
+- SandboxBackend: how sandboxes are provisioned (local container vs remote/K8s)
+
+The provider itself handles:
+- In-process caching for fast repeated access
+- Idle timeout management
+- Graceful shutdown with signal handling
+- Mount computation (thread-specific, skills)
+"""
 
 import asyncio
 import atexit
@@ -51,7 +63,7 @@ atexit.register(_THREAD_LOCK_EXECUTOR.shutdown, wait=False, cancel_futures=True)
 
 
 def _lock_file_exclusive(lock_file) -> None:
-    '执行 _lock_file_exclusive 的明确职责，并返回与调用约定一致的结果'
+    "执行 _lock_file_exclusive 的明确职责，并返回与调用约定一致的结果"
     if fcntl is not None:
         fcntl.flock(lock_file, fcntl.LOCK_EX)
         return
@@ -61,7 +73,7 @@ def _lock_file_exclusive(lock_file) -> None:
 
 
 def _unlock_file(lock_file) -> None:
-    '执行 _unlock_file 的明确职责，并返回与调用约定一致的结果'
+    "执行 _unlock_file 的明确职责，并返回与调用约定一致的结果"
     if fcntl is not None:
         fcntl.flock(lock_file, fcntl.LOCK_UN)
         return
@@ -71,12 +83,14 @@ def _unlock_file(lock_file) -> None:
 
 
 def _open_lock_file(lock_path):
-    '执行 _open_lock_file 的明确职责，并返回与调用约定一致的结果'
+    "执行 _open_lock_file 的明确职责，并返回与调用约定一致的结果"
     return open(lock_path, "a", encoding="utf-8")
 
 
 async def _acquire_thread_lock_async(lock: threading.Lock) -> None:
-    '执行 _acquire_thread_lock_async 的明确职责，并返回与调用约定一致的结果。\n\nAcquire a threading.Lock without polling or using the default executor.'
+    """执行 _acquire_thread_lock_async 的明确职责，并返回与调用约定一致的结果。
+
+    Acquire a threading.Lock without polling or using the default executor."""
     loop = asyncio.get_running_loop()
     acquire_future = loop.run_in_executor(_THREAD_LOCK_EXECUTOR, lock.acquire, True)
 
@@ -91,7 +105,9 @@ async def _acquire_thread_lock_async(lock: threading.Lock) -> None:
 
 
 def _release_cancelled_lock_acquire(lock: threading.Lock, task: asyncio.Future[bool]) -> None:
-    '执行 _release_cancelled_lock_acquire 的明确职责，并返回与调用约定一致的结果。\n\nRelease a lock acquired after its awaiting coroutine was cancelled.'
+    """执行 _release_cancelled_lock_acquire 的明确职责，并返回与调用约定一致的结果。
+
+    Release a lock acquired after its awaiting coroutine was cancelled."""
     if task.cancelled():
         return
 
@@ -106,10 +122,33 @@ def _release_cancelled_lock_acquire(lock: threading.Lock, task: asyncio.Future[b
 
 
 class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
-    '封装 AioSandboxProvider 的状态、协作关系与公开操作。\n\nSandbox provider that manages containers running the AIO sandbox.\n\n    Architecture:\n        This provider composes a SandboxBackend (how to provision), enabling:\n        - Local Docker/Apple Container mode (auto-start containers)\n        - Remote/K8s mode (connect to pre-existing sandbox URL)\n\n    Configuration options in config.yaml under sandbox:\n        use: deerflow.community.aio_sandbox:AioSandboxProvider\n        image: <container image>\n        port: 8080                      # Base port for local containers\n        container_prefix: deer-flow-sandbox\n        idle_timeout: 600               # Idle timeout in seconds (0 to disable)\n        replicas: 3                     # Max concurrent sandbox containers (LRU eviction when exceeded)\n        mounts:                         # Volume mounts for local containers\n          - host_path: /path/on/host\n            container_path: /path/in/container\n            read_only: false\n        environment:                    # Environment variables for containers\n          NODE_ENV: production\n          API_KEY: $MY_API_KEY\n    '
+    """封装 AioSandboxProvider 的状态、协作关系与公开操作。
+
+    Sandbox provider that manages containers running the AIO sandbox.
+
+        Architecture:
+            This provider composes a SandboxBackend (how to provision), enabling:
+            - Local Docker/Apple Container mode (auto-start containers)
+            - Remote/K8s mode (connect to pre-existing sandbox URL)
+
+        Configuration options in config.yaml under sandbox:
+            use: deerflow.community.aio_sandbox:AioSandboxProvider
+            image: <container image>
+            port: 8080                      # Base port for local containers
+            container_prefix: deer-flow-sandbox
+            idle_timeout: 600               # Idle timeout in seconds (0 to disable)
+            replicas: 3                     # Max concurrent sandbox containers (LRU eviction when exceeded)
+            mounts:                         # Volume mounts for local containers
+              - host_path: /path/on/host
+                container_path: /path/in/container
+                read_only: false
+            environment:                    # Environment variables for containers
+              NODE_ENV: production
+              API_KEY: $MY_API_KEY
+    """
 
     def __init__(self):
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         self._lock = threading.Lock()
         self._sandboxes: dict[str, AioSandbox] = {}  # sandbox_id -> AioSandbox instance
         self._sandbox_infos: dict[str, SandboxInfo] = {}  # sandbox_id -> SandboxInfo (for destroy)
@@ -141,13 +180,29 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
 
     @property
     def uses_thread_data_mounts(self) -> bool:
-        '执行 uses_thread_data_mounts 的明确职责，并返回与调用约定一致的结果。\n\nWhether thread workspace/uploads/outputs are visible via mounts.\n\n        Local container backends bind-mount the thread data directories, so files\n        written by the gateway are already visible when the sandbox starts.\n        Remote backends may require explicit file sync.\n        '
+        """执行 uses_thread_data_mounts 的明确职责，并返回与调用约定一致的结果。
+
+        Whether thread workspace/uploads/outputs are visible via mounts.
+
+                Local container backends bind-mount the thread data directories, so files
+                written by the gateway are already visible when the sandbox starts.
+                Remote backends may require explicit file sync.
+        """
         return isinstance(self._backend, LocalContainerBackend)
 
     # ── Factory methods ──────────────────────────────────────────────────
 
     def _create_backend(self) -> SandboxBackend:
-        '执行 _create_backend 的明确职责，并返回与调用约定一致的结果。\n\nCreate the appropriate backend based on configuration.\n\n        Selection logic (checked in order):\n        1. ``provisioner_url`` set → RemoteSandboxBackend (provisioner mode)\n              Provisioner dynamically creates Pods + Services in k3s.\n        2. Default → LocalContainerBackend (local mode)\n              Local provider manages container lifecycle directly (start/stop).\n        '
+        """执行 _create_backend 的明确职责，并返回与调用约定一致的结果。
+
+        Create the appropriate backend based on configuration.
+
+                Selection logic (checked in order):
+                1. ``provisioner_url`` set → RemoteSandboxBackend (provisioner mode)
+                      Provisioner dynamically creates Pods + Services in k3s.
+                2. Default → LocalContainerBackend (local mode)
+                      Local provider manages container lifecycle directly (start/stop).
+        """
         provisioner_url = self._config.get("provisioner_url")
         if provisioner_url:
             logger.info(f"Using remote sandbox backend with provisioner at {provisioner_url}")
@@ -166,7 +221,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
     # ── Configuration ────────────────────────────────────────────────────
 
     def _load_config(self) -> dict:
-        '执行 _load_config 的明确职责，并返回与调用约定一致的结果。\n\nLoad sandbox configuration from app config.'
+        """执行 _load_config 的明确职责，并返回与调用约定一致的结果。
+
+        Load sandbox configuration from app config."""
         config = get_app_config()
         sandbox_config = config.sandbox
 
@@ -188,7 +245,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
 
     @staticmethod
     def _resolve_env_vars(env_config: dict[str, str]) -> dict[str, str]:
-        '执行 _resolve_env_vars 的明确职责，并返回与调用约定一致的结果。\n\nResolve environment variable references (values starting with $).'
+        """执行 _resolve_env_vars 的明确职责，并返回与调用约定一致的结果。
+
+        Resolve environment variable references (values starting with $)."""
         resolved = {}
         for key, value in env_config.items():
             if isinstance(value, str) and value.startswith("$"):
@@ -201,7 +260,24 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
     # ── Startup reconciliation ────────────────────────────────────────────
 
     def _reconcile_orphans(self) -> None:
-        '执行 _reconcile_orphans 的明确职责，并返回与调用约定一致的结果。\n\nReconcile orphaned containers left by previous process lifecycles.\n\n        On startup, enumerate all running containers matching our prefix\n        and adopt them all into the warm pool.  The idle checker will reclaim\n        containers that nobody re-acquires within ``idle_timeout``.\n\n        All containers are adopted unconditionally because we cannot\n        distinguish "orphaned" from "actively used by another process"\n        based on age alone — ``idle_timeout`` represents inactivity, not\n        uptime.  Adopting into the warm pool and letting the idle checker\n        decide avoids destroying containers that a concurrent process may\n        still be using.\n\n        This closes the fundamental gap where in-memory state loss (process\n        restart, crash, SIGKILL) leaves Docker containers running forever.\n        '
+        """执行 _reconcile_orphans 的明确职责，并返回与调用约定一致的结果。
+
+        Reconcile orphaned containers left by previous process lifecycles.
+
+                On startup, enumerate all running containers matching our prefix
+                and adopt them all into the warm pool.  The idle checker will reclaim
+                containers that nobody re-acquires within ``idle_timeout``.
+
+                All containers are adopted unconditionally because we cannot
+                distinguish "orphaned" from "actively used by another process"
+                based on age alone — ``idle_timeout`` represents inactivity, not
+                uptime.  Adopting into the warm pool and letting the idle checker
+                decide avoids destroying containers that a concurrent process may
+                still be using.
+
+                This closes the fundamental gap where in-memory state loss (process
+                restart, crash, SIGKILL) leaves Docker containers running forever.
+        """
         try:
             running = self._backend.list_running()
         except Exception as e:
@@ -232,23 +308,31 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
 
     @staticmethod
     def _effective_acquire_user_id(user_id: str | None) -> str:
-        '执行 _effective_acquire_user_id 的明确职责，并返回与调用约定一致的结果'
+        "执行 _effective_acquire_user_id 的明确职责，并返回与调用约定一致的结果"
         return user_id or get_effective_user_id()
 
     @staticmethod
     def _thread_key(thread_id: str, user_id: str) -> tuple[str, str]:
-        '执行 _thread_key 的明确职责，并返回与调用约定一致的结果'
+        "执行 _thread_key 的明确职责，并返回与调用约定一致的结果"
         return (user_id, thread_id)
 
     @staticmethod
     def _deterministic_sandbox_id(thread_id: str, user_id: str) -> str:
-        '执行 _deterministic_sandbox_id 的明确职责，并返回与调用约定一致的结果。\n\nGenerate a deterministic sandbox ID from user/thread scope.\n\n        Includes user_id so a previously-created default-bucket sandbox cannot be\n        reused for an auth/channel run that should mount a user-scoped bucket.\n        '
+        """执行 _deterministic_sandbox_id 的明确职责，并返回与调用约定一致的结果。
+
+        Generate a deterministic sandbox ID from user/thread scope.
+
+                Includes user_id so a previously-created default-bucket sandbox cannot be
+                reused for an auth/channel run that should mount a user-scoped bucket.
+        """
         return hashlib.sha256(f"{user_id}:{thread_id}".encode()).hexdigest()[:8]
 
     # ── Mount helpers ────────────────────────────────────────────────────
 
     def _get_extra_mounts(self, thread_id: str | None, *, user_id: str | None = None) -> list[tuple[str, str, bool]]:
-        '执行 _get_extra_mounts 的明确职责，并返回与调用约定一致的结果。\n\nCollect all extra mounts for a sandbox (thread-specific + skills).'
+        """执行 _get_extra_mounts 的明确职责，并返回与调用约定一致的结果。
+
+        Collect all extra mounts for a sandbox (thread-specific + skills)."""
         mounts: list[tuple[str, str, bool]] = []
 
         if thread_id:
@@ -264,7 +348,14 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
 
     @staticmethod
     def _get_thread_mounts(thread_id: str, *, user_id: str | None = None) -> list[tuple[str, str, bool]]:
-        "执行 _get_thread_mounts 的明确职责，并返回与调用约定一致的结果。\n\nGet volume mounts for a thread's data directories.\n\n        Creates directories if they don't exist (lazy initialization).\n        Mount sources use host_base_dir so that when running inside Docker with a\n        mounted Docker socket (DooD), the host Docker daemon can resolve the paths.\n        "
+        """执行 _get_thread_mounts 的明确职责，并返回与调用约定一致的结果。
+
+        Get volume mounts for a thread's data directories.
+
+                Creates directories if they don't exist (lazy initialization).
+                Mount sources use host_base_dir so that when running inside Docker with a
+                mounted Docker socket (DooD), the host Docker daemon can resolve the paths.
+        """
         paths = get_paths()
         effective_user_id = AioSandboxProvider._effective_acquire_user_id(user_id)
         paths.ensure_thread_dirs(thread_id, user_id=effective_user_id)
@@ -280,7 +371,20 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
 
     @staticmethod
     def _get_skills_mounts(*, user_id: str | None = None) -> list[tuple[str, str, bool]]:
-        '执行 _get_skills_mounts 的明确职责，并返回与调用约定一致的结果。\n\nGet skills directory mount configurations for three-way skills layout.\n\n        Mirrors ``LocalSandboxProvider._build_thread_path_mappings`` for AIO\n        sandboxes: public, per-user custom, and legacy (pre-migration\n        global-custom) skills are mounted to separate container subdirectories so\n        that ``Skill.get_container_path()`` category-aware paths resolve\n        correctly inside the sandbox.\n\n        Mount sources use ``DEER_FLOW_HOST_SKILLS_PATH`` and\n        ``DEER_FLOW_HOST_BASE_DIR`` when running inside Docker (DooD) so the\n        host Docker daemon can resolve the paths.\n        '
+        """执行 _get_skills_mounts 的明确职责，并返回与调用约定一致的结果。
+
+        Get skills directory mount configurations for three-way skills layout.
+
+                Mirrors ``LocalSandboxProvider._build_thread_path_mappings`` for AIO
+                sandboxes: public, per-user custom, and legacy (pre-migration
+                global-custom) skills are mounted to separate container subdirectories so
+                that ``Skill.get_container_path()`` category-aware paths resolve
+                correctly inside the sandbox.
+
+                Mount sources use ``DEER_FLOW_HOST_SKILLS_PATH`` and
+                ``DEER_FLOW_HOST_BASE_DIR`` when running inside Docker (DooD) so the
+                host Docker daemon can resolve the paths.
+        """
         mounts: list[tuple[str, str, bool]] = []
         try:
             config = get_app_config()
@@ -342,11 +446,13 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
     # ── Idle timeout management ──────────────────────────────────────────
 
     def _cleanup_idle_resources(self, idle_timeout: float) -> None:
-        '执行 _cleanup_idle_resources 的明确职责，并返回与调用约定一致的结果。\n\nClean AIO resources idle longer than ``idle_timeout`` seconds.'
+        """执行 _cleanup_idle_resources 的明确职责，并返回与调用约定一致的结果。
+
+        Clean AIO resources idle longer than ``idle_timeout`` seconds."""
         self._cleanup_idle_sandboxes(idle_timeout)
 
     def _cleanup_idle_sandboxes(self, idle_timeout: float) -> None:
-        '执行 _cleanup_idle_sandboxes 的明确职责，并返回与调用约定一致的结果'
+        "执行 _cleanup_idle_sandboxes 的明确职责，并返回与调用约定一致的结果"
         current_time = time.time()
         active_to_destroy = []
 
@@ -384,13 +490,19 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
     # ── Signal handling ──────────────────────────────────────────────────
 
     def _register_signal_handlers(self) -> None:
-        '执行 _register_signal_handlers 的明确职责，并返回与调用约定一致的结果。\n\nRegister signal handlers for graceful shutdown.\n\n        Handles SIGTERM, SIGINT, and SIGHUP (terminal close) to ensure\n        sandbox containers are cleaned up even when the user closes the terminal.\n        '
+        """执行 _register_signal_handlers 的明确职责，并返回与调用约定一致的结果。
+
+        Register signal handlers for graceful shutdown.
+
+                Handles SIGTERM, SIGINT, and SIGHUP (terminal close) to ensure
+                sandbox containers are cleaned up even when the user closes the terminal.
+        """
         self._original_sigterm = signal.getsignal(signal.SIGTERM)
         self._original_sigint = signal.getsignal(signal.SIGINT)
         self._original_sighup = signal.getsignal(signal.SIGHUP) if hasattr(signal, "SIGHUP") else None
 
         def signal_handler(signum, frame):
-            '执行 signal_handler 的明确职责，并返回与调用约定一致的结果'
+            "执行 signal_handler 的明确职责，并返回与调用约定一致的结果"
             self.shutdown()
             if signum == signal.SIGTERM:
                 original = self._original_sigterm
@@ -415,7 +527,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
     # ── Thread locking (in-process) ──────────────────────────────────────
 
     def _get_thread_lock(self, thread_id: str, user_id: str) -> threading.Lock:
-        '执行 _get_thread_lock 的明确职责，并返回与调用约定一致的结果。\n\nGet or create an in-process lock for a specific user/thread scope.'
+        """执行 _get_thread_lock 的明确职责，并返回与调用约定一致的结果。
+
+        Get or create an in-process lock for a specific user/thread scope."""
         key = self._thread_key(thread_id, user_id)
         with self._lock:
             if key not in self._thread_locks:
@@ -423,11 +537,15 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
             return self._thread_locks[key]
 
     def _sandbox_id_for_thread(self, thread_id: str | None, user_id: str | None) -> str:
-        '执行 _sandbox_id_for_thread 的明确职责，并返回与调用约定一致的结果。\n\nReturn deterministic IDs for thread sandboxes and random IDs otherwise.'
+        """执行 _sandbox_id_for_thread 的明确职责，并返回与调用约定一致的结果。
+
+        Return deterministic IDs for thread sandboxes and random IDs otherwise."""
         return self._deterministic_sandbox_id(thread_id, self._effective_acquire_user_id(user_id)) if thread_id else str(uuid.uuid4())[:8]
 
     def _reuse_in_process_sandbox(self, thread_id: str | None, *, user_id: str | None = None, post_lock: bool = False) -> str | None:
-        '执行 _reuse_in_process_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nReuse an active in-process sandbox for a thread if one is still tracked.'
+        """执行 _reuse_in_process_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Reuse an active in-process sandbox for a thread if one is still tracked."""
         if thread_id is None:
             return None
 
@@ -473,7 +591,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         user_id: str | None = None,
         post_lock: bool = False,
     ) -> str | None:
-        '执行 _reclaim_warm_pool_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nPromote a warm-pool sandbox back to active tracking if available.'
+        """执行 _reclaim_warm_pool_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Promote a warm-pool sandbox back to active tracking if available."""
         if thread_id is None:
             return None
 
@@ -510,7 +630,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return sandbox_id
 
     def _recheck_cached_sandbox(self, thread_id: str, sandbox_id: str, *, user_id: str) -> str | None:
-        '执行 _recheck_cached_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nRe-check in-memory caches after acquiring the cross-process file lock.'
+        """执行 _recheck_cached_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Re-check in-memory caches after acquiring the cross-process file lock."""
         return self._reuse_in_process_sandbox(thread_id, user_id=user_id, post_lock=True) or self._reclaim_warm_pool_sandbox(
             thread_id,
             sandbox_id,
@@ -519,7 +641,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         )
 
     def _register_discovered_sandbox(self, thread_id: str, info: SandboxInfo, *, user_id: str) -> str:
-        '执行 _register_discovered_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nTrack a sandbox discovered through the backend.'
+        """执行 _register_discovered_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Track a sandbox discovered through the backend."""
         sandbox = AioSandbox(id=info.sandbox_id, base_url=info.sandbox_url)
         key = self._thread_key(thread_id, user_id)
         with self._lock:
@@ -532,7 +656,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return info.sandbox_id
 
     def _register_created_sandbox(self, thread_id: str | None, sandbox_id: str, info: SandboxInfo, *, user_id: str | None = None) -> str:
-        '执行 _register_created_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nTrack a newly-created sandbox in the active maps.'
+        """执行 _register_created_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Track a newly-created sandbox in the active maps."""
         sandbox = AioSandbox(id=sandbox_id, base_url=info.sandbox_url)
         with self._lock:
             self._sandboxes[sandbox_id] = sandbox
@@ -545,7 +671,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return sandbox_id
 
     def _check_tracked_sandbox_alive(self, sandbox_id: str, info: SandboxInfo) -> bool | None:
-        '执行 _check_tracked_sandbox_alive 的明确职责，并返回与调用约定一致的结果。\n\nReturn whether a tracked sandbox appears alive, or None if unknown.'
+        """执行 _check_tracked_sandbox_alive 的明确职责，并返回与调用约定一致的结果。
+
+        Return whether a tracked sandbox appears alive, or None if unknown."""
         try:
             return self._backend.is_alive(info)
         except Exception as e:
@@ -558,7 +686,15 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         *,
         expected_info: SandboxInfo | None = None,
     ) -> tuple[Sandbox | None, SandboxInfo | None, bool]:
-        '执行 _remove_tracked_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nRemove a sandbox from in-process tracking maps.\n\n        When expected_info is provided, removal only happens if the currently\n        tracked active or warm-pool entry is the exact info object that was\n        checked. This prevents a stale health-check result from deleting a\n        freshly recreated sandbox with the same deterministic id.\n        '
+        """执行 _remove_tracked_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Remove a sandbox from in-process tracking maps.
+
+                When expected_info is provided, removal only happens if the currently
+                tracked active or warm-pool entry is the exact info object that was
+                checked. This prevents a stale health-check result from deleting a
+                freshly recreated sandbox with the same deterministic id.
+        """
         thread_keys_to_remove: list[tuple[str, str]] = []
 
         with self._lock:
@@ -582,7 +718,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return sandbox, info, True
 
     def _drop_unhealthy_sandbox(self, sandbox_id: str, reason: str, *, expected_info: SandboxInfo | None = None) -> None:
-        '执行 _drop_unhealthy_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nRemove and destroy a sandbox after a definitive failed health check.'
+        """执行 _drop_unhealthy_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Remove and destroy a sandbox after a definitive failed health check."""
         sandbox, info, removed = self._remove_tracked_sandbox(sandbox_id, expected_info=expected_info)
         if not removed:
             logger.info(f"Skipped dropping sandbox {sandbox_id}: tracked info changed after health check")
@@ -603,11 +741,15 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         logger.warning(f"Dropped unhealthy sandbox {sandbox_id}: {reason}")
 
     def _active_count_locked(self) -> int:
-        '执行 _active_count_locked 的明确职责，并返回与调用约定一致的结果。\n\nReturn active AIO sandbox count while ``_lock`` is held.'
+        """执行 _active_count_locked 的明确职责，并返回与调用约定一致的结果。
+
+        Return active AIO sandbox count while ``_lock`` is held."""
         return len(self._sandboxes)
 
     def _destroy_warm_entry(self, sandbox_id: str, entry: SandboxInfo, *, reason: str) -> None:
-        '执行 _destroy_warm_entry 的明确职责，并返回与调用约定一致的结果。\n\nDestroy a warm-pool sandbox using AIO-specific backend logging.'
+        """执行 _destroy_warm_entry 的明确职责，并返回与调用约定一致的结果。
+
+        Destroy a warm-pool sandbox using AIO-specific backend logging."""
         try:
             self._backend.destroy(entry)
         except Exception as e:
@@ -629,7 +771,22 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
     # ── Core: acquire / get / release / shutdown ─────────────────────────
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        '执行 acquire 的明确职责，并返回与调用约定一致的结果。\n\nAcquire a sandbox environment and return its ID.\n\n        For the same thread_id, this method will return the same sandbox_id\n        across multiple turns, multiple processes, and (with shared storage)\n        multiple pods.\n\n        Thread-safe with both in-process and cross-process locking.\n\n        Args:\n            thread_id: Optional thread ID for thread-specific configurations.\n\n        Returns:\n            The ID of the acquired sandbox environment.\n        '
+        """执行 acquire 的明确职责，并返回与调用约定一致的结果。
+
+        Acquire a sandbox environment and return its ID.
+
+                For the same thread_id, this method will return the same sandbox_id
+                across multiple turns, multiple processes, and (with shared storage)
+                multiple pods.
+
+                Thread-safe with both in-process and cross-process locking.
+
+                Args:
+                    thread_id: Optional thread ID for thread-specific configurations.
+
+                Returns:
+                    The ID of the acquired sandbox environment.
+        """
         effective_user_id = self._effective_acquire_user_id(user_id)
         if thread_id:
             thread_lock = self._get_thread_lock(thread_id, effective_user_id)
@@ -639,7 +796,14 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
             return self._acquire_internal(thread_id, user_id=effective_user_id)
 
     async def acquire_async(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        '执行 acquire_async 的明确职责，并返回与调用约定一致的结果。\n\nAcquire a sandbox environment without blocking the event loop.\n\n        Mirrors ``acquire()`` while keeping blocking backend operations off the\n        event loop and using async-native readiness polling for newly created\n        sandboxes.\n        '
+        """执行 acquire_async 的明确职责，并返回与调用约定一致的结果。
+
+        Acquire a sandbox environment without blocking the event loop.
+
+                Mirrors ``acquire()`` while keeping blocking backend operations off the
+                event loop and using async-native readiness polling for newly created
+                sandboxes.
+        """
         effective_user_id = self._effective_acquire_user_id(user_id)
         if thread_id:
             thread_lock = self._get_thread_lock(thread_id, effective_user_id)
@@ -652,7 +816,15 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return await self._acquire_internal_async(thread_id, user_id=effective_user_id)
 
     def _acquire_internal(self, thread_id: str | None, *, user_id: str) -> str:
-        '执行 _acquire_internal 的明确职责，并返回与调用约定一致的结果。\n\nInternal sandbox acquisition with two-layer consistency.\n\n        Layer 1: In-process cache (fastest, covers same-process repeated access)\n        Layer 2: Backend discovery (covers containers started by other processes;\n                 sandbox_id is deterministic from thread_id so no shared state file\n                 is needed — any process can derive the same container name)\n        '
+        """执行 _acquire_internal 的明确职责，并返回与调用约定一致的结果。
+
+        Internal sandbox acquisition with two-layer consistency.
+
+                Layer 1: In-process cache (fastest, covers same-process repeated access)
+                Layer 2: Backend discovery (covers containers started by other processes;
+                         sandbox_id is deterministic from thread_id so no shared state file
+                         is needed — any process can derive the same container name)
+        """
         cached_id = self._reuse_in_process_sandbox(thread_id, user_id=user_id)
         if cached_id is not None:
             return cached_id
@@ -675,7 +847,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return self._create_sandbox(thread_id, sandbox_id, user_id=user_id)
 
     async def _acquire_internal_async(self, thread_id: str | None, *, user_id: str) -> str:
-        '执行 _acquire_internal_async 的明确职责，并返回与调用约定一致的结果。\n\nAsync counterpart to ``_acquire_internal``.'
+        """执行 _acquire_internal_async 的明确职责，并返回与调用约定一致的结果。
+
+        Async counterpart to ``_acquire_internal``."""
         cached_id = await asyncio.to_thread(self._reuse_in_process_sandbox, thread_id, user_id=user_id)
         if cached_id is not None:
             return cached_id
@@ -695,7 +869,13 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return await self._create_sandbox_async(thread_id, sandbox_id, user_id=user_id)
 
     def _discover_or_create_with_lock(self, thread_id: str, sandbox_id: str, *, user_id: str | None = None) -> str:
-        '执行 _discover_or_create_with_lock 的明确职责，并返回与调用约定一致的结果。\n\nDiscover an existing sandbox or create a new one under a cross-process file lock.\n\n        The file lock serializes concurrent sandbox creation for the same thread_id\n        across multiple processes, preventing container-name conflicts.\n        '
+        """执行 _discover_or_create_with_lock 的明确职责，并返回与调用约定一致的结果。
+
+        Discover an existing sandbox or create a new one under a cross-process file lock.
+
+                The file lock serializes concurrent sandbox creation for the same thread_id
+                across multiple processes, preventing container-name conflicts.
+        """
         paths = get_paths()
         effective_user_id = self._effective_acquire_user_id(user_id)
         paths.ensure_thread_dirs(thread_id, user_id=effective_user_id)
@@ -723,7 +903,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
                     _unlock_file(lock_file)
 
     async def _discover_or_create_with_lock_async(self, thread_id: str, sandbox_id: str, *, user_id: str | None = None) -> str:
-        '执行 _discover_or_create_with_lock_async 的明确职责，并返回与调用约定一致的结果。\n\nAsync counterpart to ``_discover_or_create_with_lock``.'
+        """执行 _discover_or_create_with_lock_async 的明确职责，并返回与调用约定一致的结果。
+
+        Async counterpart to ``_discover_or_create_with_lock``."""
         paths = get_paths()
         effective_user_id = self._effective_acquire_user_id(user_id)
         await asyncio.to_thread(paths.ensure_thread_dirs, thread_id, user_id=effective_user_id)
@@ -753,7 +935,20 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
             await asyncio.to_thread(lock_file.close)
 
     def _create_sandbox(self, thread_id: str | None, sandbox_id: str, *, user_id: str | None = None) -> str:
-        '执行 _create_sandbox 的明确职责，并返回与调用约定一致的结果。\n\nCreate a new sandbox via the backend.\n\n        Args:\n            thread_id: Optional thread ID.\n            sandbox_id: The sandbox ID to use.\n\n        Returns:\n            The sandbox_id.\n\n        Raises:\n            RuntimeError: If sandbox creation or readiness check fails.\n        '
+        """执行 _create_sandbox 的明确职责，并返回与调用约定一致的结果。
+
+        Create a new sandbox via the backend.
+
+                Args:
+                    thread_id: Optional thread ID.
+                    sandbox_id: The sandbox ID to use.
+
+                Returns:
+                    The sandbox_id.
+
+                Raises:
+                    RuntimeError: If sandbox creation or readiness check fails.
+        """
         effective_user_id = self._effective_acquire_user_id(user_id)
         extra_mounts = self._get_extra_mounts(thread_id, user_id=effective_user_id)
 
@@ -774,7 +969,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return self._register_created_sandbox(thread_id, sandbox_id, info, user_id=effective_user_id)
 
     async def _create_sandbox_async(self, thread_id: str | None, sandbox_id: str, *, user_id: str | None = None) -> str:
-        '执行 _create_sandbox_async 的明确职责，并返回与调用约定一致的结果。\n\nAsync counterpart to ``_create_sandbox``.'
+        """执行 _create_sandbox_async 的明确职责，并返回与调用约定一致的结果。
+
+        Async counterpart to ``_create_sandbox``."""
         effective_user_id = self._effective_acquire_user_id(user_id)
         extra_mounts = await asyncio.to_thread(self._get_extra_mounts, thread_id, user_id=effective_user_id)
 
@@ -795,7 +992,16 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         return self._register_created_sandbox(thread_id, sandbox_id, info, user_id=effective_user_id)
 
     def get(self, sandbox_id: str) -> Sandbox | None:
-        '读取并返回，并遵守 get 所表达的接口约束。\n\nGet a sandbox by ID. Updates last activity timestamp.\n\n        Args:\n            sandbox_id: The ID of the sandbox.\n\n        Returns:\n            The sandbox instance if found, None otherwise.\n        '
+        """读取并返回，并遵守 get 所表达的接口约束。
+
+        Get a sandbox by ID. Updates last activity timestamp.
+
+                Args:
+                    sandbox_id: The ID of the sandbox.
+
+                Returns:
+                    The sandbox instance if found, None otherwise.
+        """
         with self._lock:
             sandbox = self._sandboxes.get(sandbox_id)
             if sandbox is not None:
@@ -803,7 +1009,22 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
             return sandbox
 
     def release(self, sandbox_id: str) -> None:
-        '执行 release 的明确职责，并返回与调用约定一致的结果。\n\nRelease a sandbox from active use into the warm pool.\n\n        The container is kept running so it can be reclaimed quickly by the same\n        thread on its next turn without a cold-start.  The container will only be\n        stopped when the replicas limit forces eviction or during shutdown.\n\n        The host-side HTTP client owned by the cached ``AioSandbox`` instance is\n        closed before the instance is dropped (#2872). The warm-pool entry only\n        stores ``SandboxInfo``, so a fresh ``AioSandbox`` (and a fresh client)\n        is constructed if the container is later reclaimed.\n\n        Args:\n            sandbox_id: The ID of the sandbox to release.\n        '
+        """执行 release 的明确职责，并返回与调用约定一致的结果。
+
+        Release a sandbox from active use into the warm pool.
+
+                The container is kept running so it can be reclaimed quickly by the same
+                thread on its next turn without a cold-start.  The container will only be
+                stopped when the replicas limit forces eviction or during shutdown.
+
+                The host-side HTTP client owned by the cached ``AioSandbox`` instance is
+                closed before the instance is dropped (#2872). The warm-pool entry only
+                stores ``SandboxInfo``, so a fresh ``AioSandbox`` (and a fresh client)
+                is constructed if the container is later reclaimed.
+
+                Args:
+                    sandbox_id: The ID of the sandbox to release.
+        """
         info = None
         sandbox = None
         thread_keys_to_remove: list[tuple[str, str]] = []
@@ -831,7 +1052,20 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
         logger.info(f"Released sandbox {sandbox_id} to warm pool (container still running)")
 
     def destroy(self, sandbox_id: str) -> None:
-        '执行 destroy 的明确职责，并返回与调用约定一致的结果。\n\nDestroy a sandbox: stop the container and free all resources.\n\n        Unlike release(), this actually stops the container.  Use this for\n        explicit cleanup, capacity-driven eviction, or shutdown.\n\n        The host-side HTTP client owned by the cached ``AioSandbox`` instance is\n        closed alongside backend/container destruction so no client/socket\n        resources leak (#2872).\n\n        Args:\n            sandbox_id: The ID of the sandbox to destroy.\n        '
+        """执行 destroy 的明确职责，并返回与调用约定一致的结果。
+
+        Destroy a sandbox: stop the container and free all resources.
+
+                Unlike release(), this actually stops the container.  Use this for
+                explicit cleanup, capacity-driven eviction, or shutdown.
+
+                The host-side HTTP client owned by the cached ``AioSandbox`` instance is
+                closed alongside backend/container destruction so no client/socket
+                resources leak (#2872).
+
+                Args:
+                    sandbox_id: The ID of the sandbox to destroy.
+        """
         sandbox, info, _ = self._remove_tracked_sandbox(sandbox_id)
 
         if sandbox is not None:
@@ -848,7 +1082,9 @@ class AioSandboxProvider(WarmPoolLifecycleMixin[SandboxInfo], SandboxProvider):
             logger.info(f"Destroyed sandbox {sandbox_id}")
 
     def shutdown(self) -> None:
-        '执行 shutdown 的明确职责，并返回与调用约定一致的结果。\n\nShutdown all sandboxes. Thread-safe and idempotent.'
+        """执行 shutdown 的明确职责，并返回与调用约定一致的结果。
+
+        Shutdown all sandboxes. Thread-safe and idempotent."""
         with self._lock:
             if self._shutdown_called:
                 return

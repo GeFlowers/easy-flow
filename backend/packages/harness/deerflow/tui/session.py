@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -14,13 +14,14 @@ if TYPE_CHECKING:  # avoid importing the heavy client during pure planning
 
 @dataclass
 class Session:
-    '未说明'
+    "未说明"
+
     client: DeerFlowClient
     writer: ThreadMetaWriter | None = None
     _loop: _LoopThread | None = None
 
     def resolve_thread(self, plan: LaunchPlan) -> str | None:
-        '未说明'
+        "未说明"
         if plan.thread_id:
             return self.resolve_ref(plan.thread_id)
         if plan.continue_recent:
@@ -30,7 +31,7 @@ class Session:
         return None
 
     def resolve_ref(self, ref: str) -> str:
-        '未说明'
+        "未说明"
         try:
             threads = self.client.list_threads(limit=100).get("thread_list", [])
         except Exception:  # noqa: BLE001 - resolution is best-effort
@@ -43,11 +44,11 @@ class Session:
         return ref
 
     def recent_threads(self, limit: int = 20) -> list[dict]:
-        '未说明'
+        "未说明"
         return self.client.list_threads(limit=limit).get("thread_list", [])
 
     def close(self) -> None:
-        '未说明'
+        "未说明"
         loop = self._loop
         if loop is None:
             return
@@ -62,7 +63,7 @@ class Session:
 
 
 def open_session(persistence: bool = True) -> Session:
-    '未说明'
+    "未说明"
     from deerflow.client import DeerFlowClient
     from deerflow.runtime.checkpointer.provider import get_checkpointer
 

@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from deerflow.skills.review.models import make_finding
 
 
 def analyze_eval_manifests(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    '未说明'
+    "未说明"
     files = {str(entry["path"]): entry for entry in snapshot.get("files", [])}
     eval_files = [path for path in sorted(files) if path.startswith("evals/") and path.endswith(".json")]
     findings: list[dict[str, Any]] = []
@@ -71,7 +71,7 @@ def analyze_eval_manifests(snapshot: dict[str, Any]) -> tuple[dict[str, Any], li
 
 
 def _classify_manifest(payload: Any) -> dict[str, Any]:
-    '未说明'
+    "未说明"
     if isinstance(payload, dict) and isinstance(payload.get("schema_version"), str):
         cases = payload.get("cases")
         if isinstance(cases, list):
@@ -88,7 +88,7 @@ def _classify_manifest(payload: Any) -> dict[str, Any]:
 
 
 def _case_stats(schema: str, cases: list[Any]) -> dict[str, Any]:
-    '未说明'
+    "未说明"
     positive = 0
     negative = 0
     for case in cases:

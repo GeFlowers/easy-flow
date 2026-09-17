@@ -1,4 +1,5 @@
 """实现受根目录约束的本地目录遍历。"""
+
 from pathlib import Path
 
 from deerflow.sandbox.search import should_ignore_name
@@ -48,7 +49,7 @@ def list_dir(path: str, max_depth: int = 2) -> list[str]:
                 post_fix = "/" if item.is_dir() else ""
                 result.append(str(item_resolved) + post_fix)
 
-                                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
                 if item.is_dir() and current_depth < max_depth:
                     _traverse(item, current_depth + 1)
         except PermissionError:

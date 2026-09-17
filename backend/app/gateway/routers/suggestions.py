@@ -19,12 +19,14 @@ router = APIRouter(prefix="/api", tags=["suggestions"])
 
 class SuggestionMessage(BaseModel):
     """表示用于生成建议的一条纯文本用户或助手消息。"""
+
     role: str = Field(..., description="Message role: user|assistant")
     content: str = Field(..., description="Message content as plain text")
 
 
 class SuggestionsRequest(BaseModel):
     """定义后续问题建议生成的消息上下文和数量上限。"""
+
     messages: list[SuggestionMessage] = Field(..., description="Recent conversation messages")
     n: int = Field(default=3, ge=1, le=5, description="Number of suggestions to generate")
     model_name: str | None = Field(default=None, description="Optional model override")
@@ -32,11 +34,13 @@ class SuggestionsRequest(BaseModel):
 
 class SuggestionsResponse(BaseModel):
     """返回清洗后的后续问题建议列表。"""
+
     suggestions: list[str] = Field(default_factory=list, description="Suggested follow-up questions")
 
 
 class SuggestionsConfigResponse(BaseModel):
     """返回全局后续问题建议功能是否启用。"""
+
     enabled: bool = Field(..., description="Whether follow-up suggestions are enabled globally")
 
 

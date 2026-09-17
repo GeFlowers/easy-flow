@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -6,20 +6,21 @@ DEFAULT_LIMIT = 200
 
 
 class InputHistory:
-    '未说明'
+    "未说明"
+
     def __init__(self, entries: list[str] | None = None, limit: int = DEFAULT_LIMIT) -> None:
-        '未说明'
+        "未说明"
         self._limit = max(1, limit)
         self._entries: list[str] = list(entries or [])[-self._limit :]
         self._cursor: int | None = None  # None => not navigating
         self._draft: str = ""
 
     def entries(self) -> list[str]:
-        '未说明'
+        "未说明"
         return list(self._entries)
 
     def add(self, text: str) -> None:
-        '未说明'
+        "未说明"
         self._cursor = None
         self._draft = ""
         if not text.strip():
@@ -31,7 +32,7 @@ class InputHistory:
             self._entries = self._entries[-self._limit :]
 
     def up(self, draft: str = "") -> str:
-        '未说明'
+        "未说明"
         if not self._entries:
             return draft
         if self._cursor is None:
@@ -42,7 +43,7 @@ class InputHistory:
         return self._entries[self._cursor]
 
     def down(self) -> str:
-        '未说明'
+        "未说明"
         if self._cursor is None:
             return self._draft
         if self._cursor < len(self._entries) - 1:
@@ -52,6 +53,6 @@ class InputHistory:
         return self._draft
 
     def reset(self) -> None:
-        '未说明'
+        "未说明"
         self._cursor = None
         self._draft = ""

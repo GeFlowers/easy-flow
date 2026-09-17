@@ -18,12 +18,14 @@ _ADMIN_REQUIRED_DETAIL = "Admin privileges required to manage channel runtime wo
 
 class ChannelStatusResponse(BaseModel):
     """渠道服务状态的 API 响应模型。"""
+
     service_running: bool
     channels: dict[str, dict]
 
 
 class ChannelRestartResponse(BaseModel):
     """渠道重启结果的 API 响应模型。"""
+
     success: bool
     message: str
 

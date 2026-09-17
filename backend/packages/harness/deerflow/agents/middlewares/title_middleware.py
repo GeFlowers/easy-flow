@@ -1,4 +1,6 @@
-'定义 title_middleware 模块提供的职责与可复用接口。\n\nMiddleware for automatic thread title generation.'
+"""定义 title_middleware 模块提供的职责与可复用接口。
+
+Middleware for automatic thread title generation."""
 
 import logging
 import re
@@ -22,24 +24,28 @@ logger = logging.getLogger(__name__)
 
 
 class TitleMiddlewareState(AgentState):
-    '封装 TitleMiddlewareState 的状态、协作关系与公开操作。\n\nCompatible with the `ThreadState` schema.'
+    """封装 TitleMiddlewareState 的状态、协作关系与公开操作。
+
+    Compatible with the `ThreadState` schema."""
 
     title: NotRequired[str | None]
 
 
 class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
-    '封装 TitleMiddleware 的状态、协作关系与公开操作。\n\nAutomatically generate a title for the thread after the first user message.'
+    """封装 TitleMiddleware 的状态、协作关系与公开操作。
+
+    Automatically generate a title for the thread after the first user message."""
 
     state_schema = TitleMiddlewareState
 
     def __init__(self, *, app_config: "AppConfig | None" = None, title_config: "TitleConfig | None" = None):
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__()
         self._app_config = app_config
         self._title_config = title_config
 
     def _get_title_config(self):
-        '执行 _get_title_config 的明确职责，并返回与调用约定一致的结果'
+        "执行 _get_title_config 的明确职责，并返回与调用约定一致的结果"
         if self._title_config is not None:
             return self._title_config
         if self._app_config is not None:
@@ -47,7 +53,7 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return get_title_config()
 
     def _normalize_content(self, content: object) -> str:
-        '执行 _normalize_content 的明确职责，并返回与调用约定一致的结果'
+        "执行 _normalize_content 的明确职责，并返回与调用约定一致的结果"
         if isinstance(content, str):
             return content
 
@@ -68,7 +74,7 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
 
     @staticmethod
     def _message_type(message: object) -> str | None:
-        '执行 _message_type 的明确职责，并返回与调用约定一致的结果'
+        "执行 _message_type 的明确职责，并返回与调用约定一致的结果"
         message_type = getattr(message, "type", None)
         if message_type is None and isinstance(message, dict):
             message_type = message.get("type") or message.get("role")
@@ -80,14 +86,14 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
 
     @staticmethod
     def _message_content(message: object) -> object:
-        '执行 _message_content 的明确职责，并返回与调用约定一致的结果'
+        "执行 _message_content 的明确职责，并返回与调用约定一致的结果"
         if isinstance(message, dict):
             return message.get("content", "")
         return getattr(message, "content", "")
 
     @staticmethod
     def _is_dynamic_context_reminder_message(message: object) -> bool:
-        '执行 _is_dynamic_context_reminder_message 的明确职责，并返回与调用约定一致的结果'
+        "执行 _is_dynamic_context_reminder_message 的明确职责，并返回与调用约定一致的结果"
         if is_dynamic_context_reminder(message):
             return True
         if isinstance(message, dict):
@@ -97,17 +103,19 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
 
     @staticmethod
     def _is_user_message_for_title(message: object) -> bool:
-        '执行 _is_user_message_for_title 的明确职责，并返回与调用约定一致的结果'
+        "执行 _is_user_message_for_title 的明确职责，并返回与调用约定一致的结果"
         return TitleMiddleware._message_type(message) == "human" and not TitleMiddleware._is_dynamic_context_reminder_message(message)
 
     def _get_title_user_message(self, state: TitleMiddlewareState) -> str:
-        '执行 _get_title_user_message 的明确职责，并返回与调用约定一致的结果'
+        "执行 _get_title_user_message 的明确职责，并返回与调用约定一致的结果"
         messages = state.get("messages") or []
         user_msg_content = next((self._message_content(m) for m in messages if self._is_user_message_for_title(m)), "")
         return self._normalize_content(user_msg_content)
 
     def _should_generate_title(self, state: TitleMiddlewareState, *, allow_partial_exchange: bool = False) -> bool:
-        '执行 _should_generate_title 的明确职责，并返回与调用约定一致的结果。\n\nCheck if we should generate a title for this thread.'
+        """执行 _should_generate_title 的明确职责，并返回与调用约定一致的结果。
+
+        Check if we should generate a title for this thread."""
         config = self._get_title_config()
         if not config.enabled:
             return False
@@ -135,7 +143,12 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return len(user_messages) == 1 and (len(assistant_messages) >= 1 or allow_partial_exchange)
 
     def _build_title_prompt(self, state: TitleMiddlewareState) -> tuple[str, str]:
-        '执行 _build_title_prompt 的明确职责，并返回与调用约定一致的结果。\n\nExtract user/assistant messages and build the title prompt.\n\n        Returns (prompt_string, user_msg) so callers can use user_msg as fallback.\n        '
+        """执行 _build_title_prompt 的明确职责，并返回与调用约定一致的结果。
+
+        Extract user/assistant messages and build the title prompt.
+
+                Returns (prompt_string, user_msg) so callers can use user_msg as fallback.
+        """
         config = self._get_title_config()
         messages = state.get("messages") or []
 
@@ -152,11 +165,15 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return prompt, user_msg
 
     def _strip_think_tags(self, text: str) -> str:
-        '执行 _strip_think_tags 的明确职责，并返回与调用约定一致的结果。\n\nRemove <think>...</think> blocks emitted by reasoning models (e.g. minimax, DeepSeek-R1).'
+        """执行 _strip_think_tags 的明确职责，并返回与调用约定一致的结果。
+
+        Remove <think>...</think> blocks emitted by reasoning models (e.g. minimax, DeepSeek-R1)."""
         return re.sub(r"<think>[\s\S]*?</think>", "", text, flags=re.IGNORECASE).strip()
 
     def _parse_title(self, content: object) -> str:
-        '执行 _parse_title 的明确职责，并返回与调用约定一致的结果。\n\nNormalize model output into a clean title string.'
+        """执行 _parse_title 的明确职责，并返回与调用约定一致的结果。
+
+        Normalize model output into a clean title string."""
         config = self._get_title_config()
         title_content = self._normalize_content(content)
         title_content = self._strip_think_tags(title_content)
@@ -164,7 +181,7 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return title[: config.max_chars] if len(title) > config.max_chars else title
 
     def _fallback_title(self, user_msg: str) -> str:
-        '执行 _fallback_title 的明确职责，并返回与调用约定一致的结果'
+        "执行 _fallback_title 的明确职责，并返回与调用约定一致的结果"
         config = self._get_title_config()
         fallback_chars = min(config.max_chars, 50)
         if len(user_msg) > fallback_chars:
@@ -176,7 +193,13 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return user_msg if user_msg else "New Conversation"
 
     def _get_runnable_config(self) -> dict[str, Any]:
-        '执行 _get_runnable_config 的明确职责，并返回与调用约定一致的结果。\n\nInherit the parent RunnableConfig and add middleware tag.\n\n        This ensures RunJournal identifies LLM calls from this middleware\n        as ``middleware:title`` instead of ``lead_agent``.\n        '
+        """执行 _get_runnable_config 的明确职责，并返回与调用约定一致的结果。
+
+        Inherit the parent RunnableConfig and add middleware tag.
+
+                This ensures RunJournal identifies LLM calls from this middleware
+                as ``middleware:title`` instead of ``lead_agent``.
+        """
         try:
             parent = get_config()
         except Exception:
@@ -191,7 +214,9 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return config
 
     def _generate_title_result(self, state: TitleMiddlewareState, *, allow_partial_exchange: bool = False) -> dict | None:
-        '执行 _generate_title_result 的明确职责，并返回与调用约定一致的结果。\n\nGenerate a local fallback title without blocking on an LLM call.'
+        """执行 _generate_title_result 的明确职责，并返回与调用约定一致的结果。
+
+        Generate a local fallback title without blocking on an LLM call."""
         if not self._should_generate_title(state, allow_partial_exchange=allow_partial_exchange):
             return None
 
@@ -199,7 +224,9 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
         return {"title": self._fallback_title(user_msg)}
 
     async def _agenerate_title_result(self, state: TitleMiddlewareState) -> dict | None:
-        '执行 _agenerate_title_result 的明确职责，并返回与调用约定一致的结果。\n\nGenerate a configured LLM title asynchronously and fall back locally.'
+        """执行 _agenerate_title_result 的明确职责，并返回与调用约定一致的结果。
+
+        Generate a configured LLM title asynchronously and fall back locally."""
         if not self._should_generate_title(state):
             return None
 
@@ -230,10 +257,10 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
 
     @override
     def after_model(self, state: TitleMiddlewareState, runtime: Runtime) -> dict | None:
-        '执行 after_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
         return self._generate_title_result(state)
 
     @override
     async def aafter_model(self, state: TitleMiddlewareState, runtime: Runtime) -> dict | None:
-        '执行 aafter_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
         return await self._agenerate_title_result(state)

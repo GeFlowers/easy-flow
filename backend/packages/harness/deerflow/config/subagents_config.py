@@ -128,14 +128,14 @@ class SubagentsAppConfig(BaseModel):
         description="User-defined subagent types keyed by agent name",
     )
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     _token_budget_is_default: bool = True
 
     def __init__(self, **data):
@@ -183,8 +183,8 @@ class SubagentsAppConfig(BaseModel):
         override = self.agents.get(agent_name)
         if override is not None and override.token_budget is not None:
             return override.token_budget
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
         if self._token_budget_is_default:
             return default_subagent_token_budget(summarization_enabled=summarization_enabled)
         return self.token_budget
@@ -201,15 +201,15 @@ def get_subagents_app_config() -> SubagentsAppConfig:
 def load_subagents_config_from_dict(config_dict: dict) -> None:
     """\u6267\u884c load_subagents_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     global _subagents_config
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     tb = config_dict.get("token_budget")
     if tb is not None and tb == default_subagent_token_budget(summarization_enabled=False).model_dump():
         config_dict = {k: v for k, v in config_dict.items() if k != "token_budget"}

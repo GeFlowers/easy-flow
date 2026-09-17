@@ -1,4 +1,6 @@
-'定义 tool_error_handling_middleware 模块提供的职责与可复用接口。\n\nTool error handling middleware and shared runtime middleware builders.'
+"""定义 tool_error_handling_middleware 模块提供的职责与可复用接口。
+
+Tool error handling middleware and shared runtime middleware builders."""
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -39,7 +41,9 @@ _RECOVERY_HINT = "Continue with available context, or choose an alternative tool
 
 
 def _stamp_task_exception_status(message: ToolMessage, *, tool_name: str, error: str) -> ToolMessage:
-    '执行 _stamp_task_exception_status 的明确职责，并返回与调用约定一致的结果。\n\nStamp failed metadata on task exception wrappers produced here.'
+    """执行 _stamp_task_exception_status 的明确职责，并返回与调用约定一致的结果。
+
+    Stamp failed metadata on task exception wrappers produced here."""
     if tool_name != _TASK_TOOL_NAME:
         return message
     content, metadata_error = format_subagent_result_message("failed", error=error)
@@ -53,10 +57,12 @@ def _stamp_task_exception_status(message: ToolMessage, *, tool_name: str, error:
 
 
 class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
-    '封装 ToolErrorHandlingMiddleware 的状态、协作关系与公开操作。\n\nConvert tool exceptions into error ToolMessages so the run can continue.'
+    """封装 ToolErrorHandlingMiddleware 的状态、协作关系与公开操作。
+
+    Convert tool exceptions into error ToolMessages so the run can continue."""
 
     def __init__(self, *, app_config: AppConfig | None = None) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__()
         self._app_config = app_config
         if app_config is None:
@@ -67,7 +73,7 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
             self._skills_root = app_config.skills.container_path
 
     def _build_error_message(self, request: ToolCallRequest, exc: Exception) -> ToolMessage:
-        '执行 _build_error_message 的明确职责，并返回与调用约定一致的结果'
+        "执行 _build_error_message 的明确职责，并返回与调用约定一致的结果"
         tool_name = str(request.tool_call.get("name") or "unknown_tool")
         tool_call_id = str(request.tool_call.get("id") or _MISSING_TOOL_CALL_ID)
         detail = str(exc).strip() or exc.__class__.__name__
@@ -95,7 +101,7 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         *,
         tool_name: str,
     ) -> ToolMessage:
-        '执行 _stamp_skill_read_metadata 的明确职责，并返回与调用约定一致的结果'
+        "执行 _stamp_skill_read_metadata 的明确职责，并返回与调用约定一致的结果"
         if tool_name not in self._skill_read_tool_names:
             return message
         if getattr(message, "status", "success") == "error":
@@ -115,7 +121,9 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         return message
 
     def _maybe_stamp(self, result: ToolMessage | Command, request: ToolCallRequest) -> ToolMessage | Command:
-        '执行 _maybe_stamp 的明确职责，并返回与调用约定一致的结果。\n\nApply producer-bound metadata for tool results that need it.'
+        """执行 _maybe_stamp 的明确职责，并返回与调用约定一致的结果。
+
+        Apply producer-bound metadata for tool results that need it."""
         if not isinstance(result, ToolMessage):
             return result
         tool_name = str(request.tool_call.get("name") or "")
@@ -127,7 +135,7 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        '执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果"
         try:
             result = handler(request)
         except GraphBubbleUp:
@@ -144,7 +152,7 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        '执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果"
         try:
             result = await handler(request)
         except GraphBubbleUp:
@@ -163,7 +171,9 @@ def _build_runtime_middlewares(
     include_dangling_tool_call_patch: bool,
     lazy_init: bool = True,
 ) -> list[AgentMiddleware]:
-    '执行 _build_runtime_middlewares 的明确职责，并返回与调用约定一致的结果。\n\nBuild shared base middlewares for agent execution.'
+    """执行 _build_runtime_middlewares 的明确职责，并返回与调用约定一致的结果。
+
+    Build shared base middlewares for agent execution."""
     from deerflow.agents.middlewares.input_sanitization_middleware import InputSanitizationMiddleware
     from deerflow.agents.middlewares.llm_error_handling_middleware import LLMErrorHandlingMiddleware
     from deerflow.agents.middlewares.thread_data_middleware import ThreadDataMiddleware
@@ -270,7 +280,9 @@ def _build_runtime_middlewares(
 
 
 def build_lead_runtime_middlewares(*, app_config: AppConfig, lazy_init: bool = True) -> list[AgentMiddleware]:
-    '构建并返回，并遵守 build_lead_runtime_middlewares 所表达的接口约束。\n\nMiddlewares shared by lead agent runtime before lead-only middlewares.'
+    """构建并返回，并遵守 build_lead_runtime_middlewares 所表达的接口约束。
+
+    Middlewares shared by lead agent runtime before lead-only middlewares."""
     return _build_runtime_middlewares(
         app_config=app_config,
         include_uploads=True,
@@ -288,7 +300,9 @@ def build_subagent_runtime_middlewares(
     mcp_routing_middleware: AgentMiddleware | None = None,
     agent_name: str | None = None,
 ) -> list[AgentMiddleware]:
-    '构建并返回，并遵守 build_subagent_runtime_middlewares 所表达的接口约束。\n\nMiddlewares shared by subagent runtime before subagent-only middlewares.'
+    """构建并返回，并遵守 build_subagent_runtime_middlewares 所表达的接口约束。
+
+    Middlewares shared by subagent runtime before subagent-only middlewares."""
     if app_config is None:
         from deerflow.config import get_app_config
 

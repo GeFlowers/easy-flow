@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 import asyncio
 import concurrent.futures
@@ -42,24 +42,24 @@ _EXECUTABLE_MAGIC_PREFIXES = (
 
 
 class SkillAlreadyExistsError(ValueError):
-    '未说明'
+    "未说明"
 
 
 class SkillSecurityScanError(ValueError):
-    '未说明'
+    "未说明"
 
     findings: list[StaticFinding]
     skill_name: str | None
 
     def __init__(self, message: str, *, findings: list[StaticFinding] | None = None, skill_name: str | None = None) -> None:
-        '未说明'
+        "未说明"
         super().__init__(message)
         self.findings = [dict(finding) for finding in (findings or [])]
         self.skill_name = skill_name
 
 
 def is_unsafe_zip_member(info: zipfile.ZipInfo) -> bool:
-    '未说明'
+    "未说明"
     name = info.filename
     if not name:
         return False
@@ -77,23 +77,23 @@ def is_unsafe_zip_member(info: zipfile.ZipInfo) -> bool:
 
 
 def is_symlink_member(info: zipfile.ZipInfo) -> bool:
-    '未说明'
+    "未说明"
     mode = info.external_attr >> 16
     return stat.S_ISLNK(mode)
 
 
 def is_executable_binary_prefix(prefix: bytes) -> bool:
-    '未说明'
+    "未说明"
     return prefix.startswith(_EXECUTABLE_MAGIC_PREFIXES)
 
 
 def should_ignore_archive_entry(path: Path) -> bool:
-    '未说明'
+    "未说明"
     return path.name.startswith(".") or path.name == "__MACOSX"
 
 
 def resolve_skill_dir_from_archive(temp_path: Path) -> Path:
-    '未说明'
+    "未说明"
     items = [p for p in temp_path.iterdir() if not should_ignore_archive_entry(p)]
     if not items:
         raise ValueError("Skill archive is empty")
@@ -107,7 +107,7 @@ def safe_extract_skill_archive(
     dest_path: Path,
     max_total_size: int = 512 * 1024 * 1024,
 ) -> None:
-    '未说明'
+    "未说明"
     dest_root = dest_path.resolve()
     total_written = 0
 
@@ -142,19 +142,19 @@ def safe_extract_skill_archive(
 
 
 def _is_script_support_file(rel_path: Path) -> bool:
-    '未说明'
+    "未说明"
     return bool(rel_path.parts) and rel_path.parts[0] == "scripts"
 
 
 def _should_scan_support_file(rel_path: Path) -> bool:
-    '未说明'
+    "未说明"
     if _is_script_support_file(rel_path):
         return True
     return bool(rel_path.parts) and rel_path.parts[0] in _PROMPT_INPUT_DIRS and rel_path.suffix.lower() in _PROMPT_INPUT_SUFFIXES
 
 
 def _has_shebang(path: Path) -> bool:
-    '未说明'
+    "未说明"
     try:
         with path.open("rb") as f:
             return f.read(2) == b"#!"
@@ -163,21 +163,21 @@ def _has_shebang(path: Path) -> bool:
 
 
 def _is_code_file_by_name(rel_path: Path) -> bool:
-    '未说明'
+    "未说明"
     if _is_script_support_file(rel_path):
         return True
     return rel_path.suffix.lower() in _CODE_SUFFIXES
 
 
 async def _is_code_file(path: Path, rel_path: Path) -> bool:
-    '未说明'
+    "未说明"
     if _is_code_file_by_name(rel_path):
         return True
     return not rel_path.suffix and await asyncio.to_thread(_has_shebang, path)
 
 
 def _move_staged_skill_into_reserved_target(staging_target: Path, target: Path) -> None:
-    '未说明'
+    "未说明"
     installed = False
     reserved = False
     try:
@@ -195,12 +195,12 @@ def _move_staged_skill_into_reserved_target(staging_target: Path, target: Path) 
 
 
 def _findings_for_file(findings: list[StaticFinding], rel_path: str) -> list[StaticFinding]:
-    '未说明'
+    "未说明"
     return [finding for finding in findings if finding.get("file") in {rel_path, None}]
 
 
 async def _scan_skill_file_or_raise(skill_dir: Path, path: Path, skill_name: str, *, executable: bool, static_findings: list[StaticFinding] | None = None) -> None:
-    '未说明'
+    "未说明"
     rel_path = path.relative_to(skill_dir).as_posix()
     location = f"{skill_name}/{rel_path}"
     try:
@@ -226,7 +226,7 @@ async def _scan_skill_file_or_raise(skill_dir: Path, path: Path, skill_name: str
 
 
 def scan_archive_preflight_or_raise(archive_path: Path, *, app_config=None) -> None:
-    '未说明'
+    "未说明"
     if not skill_scan_enabled(app_config):
         return
     result = scan_archive_preflight(archive_path)
@@ -240,12 +240,12 @@ def scan_archive_preflight_or_raise(archive_path: Path, *, app_config=None) -> N
 
 
 def format_static_archive_findings(findings: list[StaticFinding]) -> str:
-    '未说明'
+    "未说明"
     return "; ".join(f"{finding['rule_id']} ({finding['severity']}) at {finding.get('file') or '<archive>'}: {finding['message']}" for finding in findings)
 
 
 async def _scan_static_skill_archive_or_raise(skill_dir: Path, skill_name: str, *, app_config=None) -> list[StaticFinding]:
-    '未说明'
+    "未说明"
     try:
         return await asyncio.to_thread(enforce_static_scan, skill_dir, skill_name=skill_name, app_config=app_config)
     except StaticScanBlockedError as e:
@@ -255,12 +255,12 @@ async def _scan_static_skill_archive_or_raise(skill_dir: Path, skill_name: str, 
 
 
 def _collect_scannable_files(skill_dir: Path) -> list[Path]:
-    '未说明'
+    "未说明"
     return [candidate for candidate in sorted(skill_dir.rglob("*")) if candidate.is_file()]
 
 
 async def _scan_skill_archive_contents_or_raise(skill_dir: Path, skill_name: str, *, app_config=None) -> list[StaticFinding]:
-    '未说明'
+    "未说明"
     static_findings = await _scan_static_skill_archive_or_raise(skill_dir, skill_name, app_config=app_config)
 
     skill_md = skill_dir / "SKILL.md"
@@ -293,7 +293,7 @@ async def _scan_skill_archive_contents_or_raise(skill_dir: Path, skill_name: str
 
 
 def _run_async_install(coro):
-    '未说明'
+    "未说明"
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:

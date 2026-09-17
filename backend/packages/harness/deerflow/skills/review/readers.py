@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -36,12 +36,12 @@ _ZIP_READ_CHUNK_BYTES = 1024 * 1024
 
 
 def _sha256(data: bytes) -> str:
-    '未说明'
+    "未说明"
     return hashlib.sha256(data).hexdigest()
 
 
 def _decode_text(data: bytes, path: str) -> str | None:
-    '未说明'
+    "未说明"
     suffix = PurePosixPath(path).suffix.lower()
     if suffix not in _TEXT_EXTENSIONS and b"\0" in data:
         return None
@@ -52,7 +52,7 @@ def _decode_text(data: bytes, path: str) -> str | None:
 
 
 def _truncate_utf8_bytes(content: str, max_bytes: int) -> tuple[str, bytes]:
-    '未说明'
+    "未说明"
     data = content.encode("utf-8")
     truncated = data[:max_bytes]
     text = truncated.decode("utf-8", errors="ignore")
@@ -66,7 +66,7 @@ def _subject(
     name_hint: str | None = None,
     category: str | None = None,
 ) -> dict[str, Any]:
-    '未说明'
+    "未说明"
     return {
         "source": source,
         "category": category,
@@ -76,7 +76,7 @@ def _subject(
 
 
 def _empty_snapshot(subject: dict[str, Any], limits: PackageLimits) -> dict[str, Any]:
-    '执行 _empty_snapshot 的明确职责，并返回与调用约定一致的结果'
+    "执行 _empty_snapshot 的明确职责，并返回与调用约定一致的结果"
     return {
         "schema_version": PACKAGE_SNAPSHOT_SCHEMA_VERSION,
         "subject": subject,
@@ -93,7 +93,7 @@ def build_inline_snapshot(
     name_hint: str | None = None,
     limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
 ) -> dict[str, Any]:
-    '构建并返回，并遵守 build_inline_snapshot 所表达的接口约束'
+    "构建并返回，并遵守 build_inline_snapshot 所表达的接口约束"
     data = content.encode("utf-8")
     snapshot = _empty_snapshot(
         _subject(source="inline", display_ref=name_hint or "inline://SKILL.md", name_hint=name_hint),
@@ -123,7 +123,9 @@ def build_inline_snapshot(
 
 
 class LocalDirectoryReader:
-    '封装 LocalDirectoryReader 的状态、协作关系与公开操作。\n\nRead a local skill directory without following symlink escapes.'
+    """封装 LocalDirectoryReader 的状态、协作关系与公开操作。
+
+    Read a local skill directory without following symlink escapes."""
 
     def __init__(
         self,
@@ -132,7 +134,7 @@ class LocalDirectoryReader:
         subject: dict[str, Any] | None = None,
         limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
     ) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         self.root = Path(root)
         self.limits = limits
         self.subject = subject or _subject(
@@ -142,7 +144,7 @@ class LocalDirectoryReader:
         )
 
     def read(self) -> dict[str, Any]:
-        '执行 read 的明确职责，并返回与调用约定一致的结果'
+        "执行 read 的明确职责，并返回与调用约定一致的结果"
         root = self.root
         snapshot = _empty_snapshot(self.subject, self.limits)
         if not root.exists():
@@ -221,7 +223,7 @@ class LocalDirectoryReader:
         return self._sort_snapshot(snapshot)
 
     def _append_symlink(self, snapshot: dict[str, Any], path: Path, root: Path, file_count: int) -> int:
-        '执行 _append_symlink 的明确职责，并返回与调用约定一致的结果'
+        "执行 _append_symlink 的明确职责，并返回与调用约定一致的结果"
         rel_path = self._relative(path, root, snapshot)
         if rel_path is None:
             return file_count
@@ -247,7 +249,7 @@ class LocalDirectoryReader:
 
     @staticmethod
     def _relative(path: Path, root: Path, snapshot: dict[str, Any]) -> str | None:
-        '执行 _relative 的明确职责，并返回与调用约定一致的结果'
+        "执行 _relative 的明确职责，并返回与调用约定一致的结果"
         try:
             rel = path.relative_to(root).as_posix()
             return normalize_relative_path(rel)
@@ -257,14 +259,16 @@ class LocalDirectoryReader:
 
     @staticmethod
     def _sort_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
-        '执行 _sort_snapshot 的明确职责，并返回与调用约定一致的结果'
+        "执行 _sort_snapshot 的明确职责，并返回与调用约定一致的结果"
         snapshot["files"] = sorted(snapshot["files"], key=lambda item: item["path"])
         snapshot["reader_errors"] = sorted(snapshot["reader_errors"], key=lambda item: (str(item.get("path") or ""), str(item.get("code") or "")))
         return snapshot
 
 
 class ArchivePackageReader:
-    '封装 ArchivePackageReader 的状态、协作关系与公开操作。\n\nInspect a .skill ZIP archive without installing it.'
+    """封装 ArchivePackageReader 的状态、协作关系与公开操作。
+
+    Inspect a .skill ZIP archive without installing it."""
 
     def __init__(
         self,
@@ -272,12 +276,12 @@ class ArchivePackageReader:
         *,
         limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
     ) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         self.archive_path = Path(archive_path)
         self.limits = limits
 
     def read(self) -> dict[str, Any]:
-        '执行 read 的明确职责，并返回与调用约定一致的结果'
+        "执行 read 的明确职责，并返回与调用约定一致的结果"
         snapshot = _empty_snapshot(
             _subject(source="archive", display_ref=str(self.archive_path.name), name_hint=self.archive_path.stem),
             self.limits,
@@ -350,7 +354,7 @@ class ArchivePackageReader:
 
     @staticmethod
     def _normalize_archive_name(filename: str, snapshot: dict[str, Any]) -> str | None:
-        '执行 _normalize_archive_name 的明确职责，并返回与调用约定一致的结果'
+        "执行 _normalize_archive_name 的明确职责，并返回与调用约定一致的结果"
         try:
             return normalize_relative_path(filename)
         except ValueError as exc:
@@ -359,13 +363,13 @@ class ArchivePackageReader:
 
 
 def _zip_member_is_symlink(info: zipfile.ZipInfo) -> bool:
-    '执行 _zip_member_is_symlink 的明确职责，并返回与调用约定一致的结果'
+    "执行 _zip_member_is_symlink 的明确职责，并返回与调用约定一致的结果"
     mode = info.external_attr >> 16
     return stat.S_ISLNK(mode)
 
 
 def _read_zip_member_bounded(zf: zipfile.ZipFile, info: zipfile.ZipInfo, *, max_bytes: int) -> tuple[bytes, int, bool]:
-    '执行 _read_zip_member_bounded 的明确职责，并返回与调用约定一致的结果'
+    "执行 _read_zip_member_bounded 的明确职责，并返回与调用约定一致的结果"
     chunks: list[bytes] = []
     actual_size = 0
     with zf.open(info) as member:
@@ -383,7 +387,9 @@ def _read_zip_member_bounded(zf: zipfile.ZipFile, info: zipfile.ZipInfo, *, max_
 
 
 class InstalledSkillReader(LocalDirectoryReader):
-    '封装 InstalledSkillReader 的状态、协作关系与公开操作。\n\nResolve and read an installed skill by canonical skill:// identity.'
+    """封装 InstalledSkillReader 的状态、协作关系与公开操作。
+
+    Resolve and read an installed skill by canonical skill:// identity."""
 
     @classmethod
     def from_target(
@@ -393,7 +399,7 @@ class InstalledSkillReader(LocalDirectoryReader):
         storage: Any,
         limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
     ) -> InstalledSkillReader:
-        '执行 from_target 的明确职责，并返回与调用约定一致的结果'
+        "执行 from_target 的明确职责，并返回与调用约定一致的结果"
         category, rel_path = parse_skill_uri(target)
         root = _installed_skill_root(storage, category, rel_path)
         return cls(
@@ -409,7 +415,7 @@ class InstalledSkillReader(LocalDirectoryReader):
 
 
 def parse_skill_uri(target: str) -> tuple[str, str]:
-    '解析输入并返回结构化结果，并遵守 parse_skill_uri 所表达的接口约束'
+    "解析输入并返回结构化结果，并遵守 parse_skill_uri 所表达的接口约束"
     if not target.startswith("skill://"):
         raise ValueError("Installed skill targets must use skill://<category>/<relative-path>")
     raw = target[len("skill://") :]
@@ -421,7 +427,7 @@ def parse_skill_uri(target: str) -> tuple[str, str]:
 
 
 def _installed_skill_root(storage: Any, category: str, rel_path: str) -> Path:
-    '执行 _installed_skill_root 的明确职责，并返回与调用约定一致的结果'
+    "执行 _installed_skill_root 的明确职责，并返回与调用约定一致的结果"
     if category == "custom" and hasattr(storage, "get_user_custom_root"):
         return Path(storage.get_user_custom_root()) / rel_path
     if category == "legacy":

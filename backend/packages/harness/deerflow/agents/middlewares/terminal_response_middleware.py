@@ -1,4 +1,6 @@
-'定义 terminal_response_middleware 模块提供的职责与可复用接口。\n\nEnsure tool-using lead-agent turns end with a visible assistant response.'
+"""定义 terminal_response_middleware 模块提供的职责与可复用接口。
+
+Ensure tool-using lead-agent turns end with a visible assistant response."""
 
 from __future__ import annotations
 
@@ -28,7 +30,9 @@ _TOOL_CALL_FINISH_REASONS = {"tool_calls", "function_call"}
 
 
 def _has_visible_content(message: AIMessage) -> bool:
-    '执行 _has_visible_content 的明确职责，并返回与调用约定一致的结果。\n\nReturn whether an AI message contains user-visible text.'
+    """执行 _has_visible_content 的明确职责，并返回与调用约定一致的结果。
+
+    Return whether an AI message contains user-visible text."""
     content = message.content
     if isinstance(content, str):
         return bool(content.strip())
@@ -44,7 +48,9 @@ def _has_visible_content(message: AIMessage) -> bool:
 
 
 def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
-    '执行 _has_tool_call_intent_or_error 的明确职责，并返回与调用约定一致的结果。\n\nKeep tool routing and malformed tool-call handling out of this guard.'
+    """执行 _has_tool_call_intent_or_error 的明确职责，并返回与调用约定一致的结果。
+
+    Keep tool routing and malformed tool-call handling out of this guard."""
     if message.tool_calls or getattr(message, "invalid_tool_calls", None):
         return True
     additional_kwargs = message.additional_kwargs or {}
@@ -55,7 +61,9 @@ def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
 
 
 def _tool_result_in_current_turn(messages: list[Any]) -> bool:
-    '执行 _tool_result_in_current_turn 的明确职责，并返回与调用约定一致的结果。\n\nReturn whether a tool result follows the latest real user message.'
+    """执行 _tool_result_in_current_turn 的明确职责，并返回与调用约定一致的结果。
+
+    Return whether a tool result follows the latest real user message."""
     latest_user_index = -1
     for index, message in enumerate(messages):
         if not isinstance(message, HumanMessage):
@@ -72,10 +80,12 @@ def _tool_result_in_current_turn(messages: list[Any]) -> bool:
 
 
 class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
-    '封装 TerminalResponseMiddleware 的状态、协作关系与公开操作。\n\nRetry one empty post-tool response, then persist a visible error fallback.'
+    """封装 TerminalResponseMiddleware 的状态、协作关系与公开操作。
+
+    Retry one empty post-tool response, then persist a visible error fallback."""
 
     def __init__(self) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__()
         self._lock = threading.Lock()
         self._retry_counts: BoundedDict[tuple[str, str], int] = BoundedDict(1000)
@@ -83,7 +93,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _key(runtime: Runtime) -> tuple[str, str]:
-        '执行 _key 的明确职责，并返回与调用约定一致的结果'
+        "执行 _key 的明确职责，并返回与调用约定一致的结果"
         context = getattr(runtime, "context", None)
         if isinstance(context, dict):
             thread_id = str(context.get("thread_id") or "unknown-thread")
@@ -94,14 +104,14 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         return "unknown-thread", str(id(runtime))
 
     def _clear(self, runtime: Runtime) -> None:
-        '执行 _clear 的明确职责，并返回与调用约定一致的结果'
+        "执行 _clear 的明确职责，并返回与调用约定一致的结果"
         key = self._key(runtime)
         with self._lock:
             self._retry_counts.pop(key, None)
             self._pending_prompts.pop(key, None)
 
     def _clear_other_runs(self, runtime: Runtime) -> None:
-        '执行 _clear_other_runs 的明确职责，并返回与调用约定一致的结果'
+        "执行 _clear_other_runs 的明确职责，并返回与调用约定一致的结果"
         thread_id, run_id = self._key(runtime)
         with self._lock:
             stale = [key for key in self._retry_counts if key[0] == thread_id and key[1] != run_id]
@@ -110,7 +120,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
                 self._pending_prompts.pop(key, None)
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        '执行 _apply 的明确职责，并返回与调用约定一致的结果'
+        "执行 _apply 的明确职责，并返回与调用约定一致的结果"
         messages = list(state.get("messages") or [])
         if not messages or not isinstance(messages[-1], AIMessage):
             return None
@@ -154,7 +164,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         return {"messages": [fallback]}
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
-        '执行 _augment_request 的明确职责，并返回与调用约定一致的结果'
+        "执行 _augment_request 的明确职责，并返回与调用约定一致的结果"
         key = self._key(request.runtime)
         with self._lock:
             pending = key in self._pending_prompts
@@ -170,7 +180,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '执行 before_agent 的明确职责，并返回与调用约定一致的结果'
+        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
         self._clear_other_runs(runtime)
         # A prior invocation can bypass after_agent via Command(goto=END).
         # Reset the same run id here so resume starts with a fresh one-retry
@@ -180,7 +190,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
 
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '执行 abefore_agent 的明确职责，并返回与调用约定一致的结果'
+        "执行 abefore_agent 的明确职责，并返回与调用约定一致的结果"
         self._clear_other_runs(runtime)
         self._clear(runtime)
         return None
@@ -188,13 +198,13 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
     @hook_config(can_jump_to=["model"])
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        '执行 after_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
         return self._apply(state, runtime)
 
     @hook_config(can_jump_to=["model"])
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        '执行 aafter_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
         return self._apply(state, runtime)
 
     @override
@@ -203,7 +213,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        '执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
         return handler(self._augment_request(request))
 
     @override
@@ -212,17 +222,17 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        '执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
         return await handler(self._augment_request(request))
 
     @override
     def after_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '执行 after_agent 的明确职责，并返回与调用约定一致的结果'
+        "执行 after_agent 的明确职责，并返回与调用约定一致的结果"
         self._clear(runtime)
         return None
 
     @override
     async def aafter_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '执行 aafter_agent 的明确职责，并返回与调用约定一致的结果'
+        "执行 aafter_agent 的明确职责，并返回与调用约定一致的结果"
         self._clear(runtime)
         return None

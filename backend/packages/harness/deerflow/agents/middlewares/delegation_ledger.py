@@ -1,4 +1,6 @@
-'定义 delegation_ledger 模块提供的职责与可复用接口。\n\nDeterministic capture and rendering for task delegations.'
+"""定义 delegation_ledger 模块提供的职责与可复用接口。
+
+Deterministic capture and rendering for task delegations."""
 
 from __future__ import annotations
 
@@ -32,7 +34,9 @@ def _utc_now_iso() -> str:
 
 
 def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
-    '执行 _bound_text 的明确职责，并返回与调用约定一致的结果。\n\nDeterministic head/tail truncation. This is not an LLM summary.'
+    """执行 _bound_text 的明确职责，并返回与调用约定一致的结果。
+
+    Deterministic head/tail truncation. This is not an LLM summary."""
     if len(text) <= cap:
         return text
     if cap <= 0:
@@ -102,7 +106,9 @@ def _tool_call_args(tool_call: dict[str, Any]) -> dict[str, Any]:
 
 
 def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
-    '执行 extract_delegations 的明确职责，并返回与调用约定一致的结果。\n\nEnumerate `task` delegations from AI tool calls and paired results.'
+    """执行 extract_delegations 的明确职责，并返回与调用约定一致的结果。
+
+    Enumerate `task` delegations from AI tool calls and paired results."""
     entries_by_id: dict[str, DelegationEntry] = {}
     order: list[str] = []
     now = _utc_now_iso()
@@ -173,7 +179,9 @@ def _render_entry_line(entry: DelegationEntry) -> str:
 
 
 def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int = _LEDGER_RENDER_CHAR_BUDGET) -> str:
-    '执行 render_delegation_ledger 的明确职责，并返回与调用约定一致的结果。\n\nRender the delegation ledger as model-visible system context.'
+    """执行 render_delegation_ledger 的明确职责，并返回与调用约定一致的结果。
+
+    Render the delegation ledger as model-visible system context."""
     if not entries:
         return ""
 

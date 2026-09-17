@@ -1,4 +1,22 @@
-'定义 tools 模块提供的职责与可复用接口。\n\nGroundRoute community web search + fetch tools.\n\nGroundRoute (https://groundroute.ai) is a meta search layer: one API in front of\nsix search engines (Serper, Brave, Exa, Tavily, Firecrawl, Perplexity). It routes\neach query to the cheapest engine that clears a quality bar and caches repeats, so\nhigh-volume research runs keep working when one engine is down and pay no more than\ngoing to a single engine direct. Pricing is gain-share: the caller keeps about half\nof any cache savings.\n\nThis module is self-contained (httpx only, no GroundRoute SDK). The /v1/search\nrequest and response mapping mirrors the GroundRoute MCP server and the verified\nLangflow component:\n  results[] = {url, title, snippet, content, source_engine, published_at}\n\n`web_search` returns a normalized JSON list of {title, url, snippet, source_engine}.\n`web_fetch` reads one URL via GroundRoute mode=page and returns its extracted text.\n'
+"""定义 tools 模块提供的职责与可复用接口。
+
+GroundRoute community web search + fetch tools.
+
+GroundRoute (https://groundroute.ai) is a meta search layer: one API in front of
+six search engines (Serper, Brave, Exa, Tavily, Firecrawl, Perplexity). It routes
+each query to the cheapest engine that clears a quality bar and caches repeats, so
+high-volume research runs keep working when one engine is down and pay no more than
+going to a single engine direct. Pricing is gain-share: the caller keeps about half
+of any cache savings.
+
+This module is self-contained (httpx only, no GroundRoute SDK). The /v1/search
+request and response mapping mirrors the GroundRoute MCP server and the verified
+Langflow component:
+  results[] = {url, title, snippet, content, source_engine, published_at}
+
+`web_search` returns a normalized JSON list of {title, url, snippet, source_engine}.
+`web_fetch` reads one URL via GroundRoute mode=page and returns its extracted text.
+"""
 
 import json
 import logging
@@ -22,7 +40,14 @@ _api_key_warned: set[str] = set()
 
 
 def _get_api_key(tool_name: str) -> str | None:
-    "执行 _get_api_key 的明确职责，并返回与调用约定一致的结果。\n\nResolve the GroundRoute key from a given tool's config block, then the env var.\n\n    `tool_name` is the config section to read (web_search vs web_fetch) so a flow that\n    runs GroundRoute for fetch but a different engine for search still reads the right\n    key. Mirrors serper/exa/firecrawl, which all take the tool name.\n    "
+    """执行 _get_api_key 的明确职责，并返回与调用约定一致的结果。
+
+    Resolve the GroundRoute key from a given tool's config block, then the env var.
+
+        `tool_name` is the config section to read (web_search vs web_fetch) so a flow that
+        runs GroundRoute for fetch but a different engine for search still reads the right
+        key. Mirrors serper/exa/firecrawl, which all take the tool name.
+    """
     config = get_app_config().get_tool_config(tool_name)
     if config is not None:
         api_key = (config.model_extra or {}).get("api_key")
@@ -32,7 +57,7 @@ def _get_api_key(tool_name: str) -> str | None:
 
 
 def _coerce_max_results(value: object, *, default: int = _DEFAULT_MAX_RESULTS) -> int:
-    '执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果'
+    "执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果"
     try:
         coerced = int(value)
     except (TypeError, ValueError):
@@ -42,7 +67,7 @@ def _coerce_max_results(value: object, *, default: int = _DEFAULT_MAX_RESULTS) -
 
 
 def _missing_key_error(tool_name: str, **context: str) -> str:
-    '执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果'
+    "执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果"
     if tool_name not in _api_key_warned:
         _api_key_warned.add(tool_name)
         logger.warning(
@@ -53,7 +78,7 @@ def _missing_key_error(tool_name: str, **context: str) -> str:
 
 
 def _post_search(api_key: str, body: dict) -> dict:
-    '执行 _post_search 的明确职责，并返回与调用约定一致的结果'
+    "执行 _post_search 的明确职责，并返回与调用约定一致的结果"
     with httpx.Client(timeout=_TIMEOUT_S) as client:
         response = client.post(
             _GROUNDROUTE_ENDPOINT,

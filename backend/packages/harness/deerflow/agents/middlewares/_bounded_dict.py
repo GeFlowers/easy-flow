@@ -1,4 +1,12 @@
-'定义 _bounded_dict 模块提供的职责与可复用接口。\n\nA small bounded ``OrderedDict`` shared by guard middlewares.\n\nGuard middlewares (``TokenBudgetMiddleware``, ``LoopDetectionMiddleware``) keep\nper-``run_id`` state that must not grow without bound on abandoned or reused\nruns. This module provides the single shared implementation so both middlewares\ncap identically and a future guard does not reinvent it.\n'
+"""定义 _bounded_dict 模块提供的职责与可复用接口。
+
+A small bounded ``OrderedDict`` shared by guard middlewares.
+
+Guard middlewares (``TokenBudgetMiddleware``, ``LoopDetectionMiddleware``) keep
+per-``run_id`` state that must not grow without bound on abandoned or reused
+runs. This module provides the single shared implementation so both middlewares
+cap identically and a future guard does not reinvent it.
+"""
 
 from __future__ import annotations
 
@@ -7,7 +15,15 @@ from typing import Any
 
 
 class BoundedDict(OrderedDict):
-    '封装 BoundedDict 的状态、协作关系与公开操作。\n\nAn ``OrderedDict`` that evicts the oldest entry once ``maxsize`` is reached.\n\n    Used for per-``run_id`` state (stop-reason flags, pending warnings, usage\n    accumulators) so a long-lived middleware instance on the lead agent cannot\n    leak memory across many runs. Insertion order is preserved, so the\n    least-recently-inserted key is evicted first.\n    '
+    """封装 BoundedDict 的状态、协作关系与公开操作。
+
+    An ``OrderedDict`` that evicts the oldest entry once ``maxsize`` is reached.
+
+        Used for per-``run_id`` state (stop-reason flags, pending warnings, usage
+        accumulators) so a long-lived middleware instance on the lead agent cannot
+        leak memory across many runs. Insertion order is preserved, so the
+        least-recently-inserted key is evicted first.
+    """
 
     def __init__(self, maxsize: int = 1000, *args: Any, **kwds: Any) -> None:
         """使用给定容量和初始字典内容初始化有界字典。"""

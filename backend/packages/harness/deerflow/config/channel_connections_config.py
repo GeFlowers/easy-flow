@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 class SlackChannelConnectionConfig(BaseModel):
     """\u6267\u884c SlackChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+
     enabled: bool = False
 
     @property
@@ -17,6 +18,7 @@ class SlackChannelConnectionConfig(BaseModel):
 
 class TelegramChannelConnectionConfig(BaseModel):
     """\u6267\u884c TelegramChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+
     enabled: bool = False
     bot_username: str = ""
 
@@ -28,6 +30,7 @@ class TelegramChannelConnectionConfig(BaseModel):
 
 class DiscordChannelConnectionConfig(BaseModel):
     """\u6267\u884c DiscordChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+
     enabled: bool = False
 
     @property
@@ -38,6 +41,7 @@ class DiscordChannelConnectionConfig(BaseModel):
 
 class BindingCodeChannelConnectionConfig(BaseModel):
     """\u6267\u884c BindingCodeChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+
     enabled: bool = False
 
     @property

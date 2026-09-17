@@ -1,4 +1,10 @@
-'定义 infoquest_client 模块提供的职责与可复用接口。\n\nUtil that calls InfoQuest Search And Fetch API.\n\nIn order to set this up, follow instructions at:\nhttps://docs.byteplus.com/en/docs/InfoQuest/What_is_Info_Quest\n'
+"""定义 infoquest_client 模块提供的职责与可复用接口。
+
+Util that calls InfoQuest Search And Fetch API.
+
+In order to set this up, follow instructions at:
+https://docs.byteplus.com/en/docs/InfoQuest/What_is_Info_Quest
+"""
 
 import json
 import logging
@@ -11,10 +17,12 @@ logger = logging.getLogger(__name__)
 
 
 class InfoQuestClient:
-    '封装 InfoQuestClient 的状态、协作关系与公开操作。\n\nClient for interacting with the InfoQuest web search and fetch API.'
+    """封装 InfoQuestClient 的状态、协作关系与公开操作。
+
+    Client for interacting with the InfoQuest web search and fetch API."""
 
     def __init__(self, fetch_time: int = -1, fetch_timeout: int = -1, fetch_navigation_timeout: int = -1, search_time_range: int = -1, image_search_time_range: int = -1, image_size: str = "i"):
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         logger.info("\n============================================\n🚀 BytePlus InfoQuest Client Initialization 🚀\n============================================")
 
         self.fetch_time = fetch_time
@@ -40,7 +48,7 @@ class InfoQuestClient:
             logger.debug("\n" + "*" * 70 + "\n")
 
     def fetch(self, url: str, return_format: str = "html") -> str:
-        '执行 fetch 的明确职责，并返回与调用约定一致的结果'
+        "执行 fetch 的明确职责，并返回与调用约定一致的结果"
         if logger.isEnabledFor(logging.DEBUG):
             url_truncated = url[:50] + "..." if len(url) > 50 else url
             logger.debug(
@@ -106,7 +114,9 @@ class InfoQuestClient:
 
     @staticmethod
     def _prepare_headers() -> dict[str, str]:
-        '执行 _prepare_headers 的明确职责，并返回与调用约定一致的结果。\n\nPrepare request headers.'
+        """执行 _prepare_headers 的明确职责，并返回与调用约定一致的结果。
+
+        Prepare request headers."""
         headers = {
             "Content-Type": "application/json",
         }
@@ -121,7 +131,9 @@ class InfoQuestClient:
         return headers
 
     def _prepare_crawl_request_data(self, url: str, return_format: str) -> dict[str, Any]:
-        '执行 _prepare_crawl_request_data 的明确职责，并返回与调用约定一致的结果。\n\nPrepare request data with formatted parameters.'
+        """执行 _prepare_crawl_request_data 的明确职责，并返回与调用约定一致的结果。
+
+        Prepare request data with formatted parameters."""
         # Normalize return_format
         if return_format and return_format.lower() == "html":
             normalized_format = "HTML"
@@ -152,7 +164,9 @@ class InfoQuestClient:
         site: str,
         output_format: str = "JSON",
     ) -> dict:
-        '执行 web_search_raw_results 的明确职责，并返回与调用约定一致的结果。\n\nGet results from the InfoQuest Web-Search API synchronously.'
+        """执行 web_search_raw_results 的明确职责，并返回与调用约定一致的结果。
+
+        Get results from the InfoQuest Web-Search API synchronously."""
         headers = self._prepare_headers()
 
         params = {"format": output_format, "query": query}
@@ -175,7 +189,9 @@ class InfoQuestClient:
 
     @staticmethod
     def clean_results(raw_results: list[dict[str, dict[str, dict[str, Any]]]]) -> list[dict]:
-        '执行 clean_results 的明确职责，并返回与调用约定一致的结果。\n\nClean results from InfoQuest Web-Search API.'
+        """执行 clean_results 的明确职责，并返回与调用约定一致的结果。
+
+        Clean results from InfoQuest Web-Search API."""
         logger.debug("Processing web-search results")
 
         seen_urls = set()
@@ -235,7 +251,7 @@ class InfoQuestClient:
         site: str = "",
         output_format: str = "JSON",
     ) -> str:
-        '执行 web_search 的明确职责，并返回与调用约定一致的结果'
+        "执行 web_search 的明确职责，并返回与调用约定一致的结果"
         if logger.isEnabledFor(logging.DEBUG):
             query_truncated = query[:50] + "..." if len(query) > 50 else query
             logger.debug(
@@ -283,7 +299,9 @@ class InfoQuestClient:
 
     @staticmethod
     def clean_results_with_image_search(raw_results: list[dict[str, dict[str, dict[str, Any]]]]) -> list[dict]:
-        '执行 clean_results_with_image_search 的明确职责，并返回与调用约定一致的结果。\n\nClean results from InfoQuest Web-Search API.'
+        """执行 clean_results_with_image_search 的明确职责，并返回与调用约定一致的结果。
+
+        Clean results from InfoQuest Web-Search API."""
         logger.debug("Processing web-search results")
 
         seen_urls = set()
@@ -317,7 +335,9 @@ class InfoQuestClient:
         site: str = "",
         output_format: str = "JSON",
     ) -> dict:
-        '执行 image_search_raw_results 的明确职责，并返回与调用约定一致的结果。\n\nGet image search results from the InfoQuest Web-Search API synchronously.'
+        """执行 image_search_raw_results 的明确职责，并返回与调用约定一致的结果。
+
+        Get image search results from the InfoQuest Web-Search API synchronously."""
         headers = self._prepare_headers()
 
         params = {"format": output_format, "query": query, "search_type": "Images"}
@@ -355,7 +375,7 @@ class InfoQuestClient:
         site: str = "",
         output_format: str = "JSON",
     ) -> str:
-        '执行 image_search 的明确职责，并返回与调用约定一致的结果'
+        "执行 image_search 的明确职责，并返回与调用约定一致的结果"
         if logger.isEnabledFor(logging.DEBUG):
             query_truncated = query[:50] + "..." if len(query) > 50 else query
             logger.debug(

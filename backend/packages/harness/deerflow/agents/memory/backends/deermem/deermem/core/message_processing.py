@@ -1,4 +1,6 @@
-'定义 message_processing 模块提供的职责与可复用接口。\n\nShared helpers for turning conversations into memory update inputs.'
+"""定义 message_processing 模块提供的职责与可复用接口。
+
+Shared helpers for turning conversations into memory update inputs."""
 
 from __future__ import annotations
 
@@ -39,7 +41,9 @@ _REINFORCEMENT_PATTERNS = (
 
 
 def extract_message_text(message: Any) -> str:
-    '执行 extract_message_text 的明确职责，并返回与调用约定一致的结果。\n\nExtract plain text from message content for filtering and signal detection.'
+    """执行 extract_message_text 的明确职责，并返回与调用约定一致的结果。
+
+    Extract plain text from message content for filtering and signal detection."""
     content = getattr(message, "content", "")
     if isinstance(content, list):
         text_parts: list[str] = []
@@ -55,12 +59,29 @@ def extract_message_text(message: Any) -> str:
 
 
 def _non_empty_str(value: object) -> str | None:
-    '执行 _non_empty_str 的明确职责，并返回与调用约定一致的结果。\n\nReturn ``value`` if it is a non-empty (stripped) string, else None.'
+    """执行 _non_empty_str 的明确职责，并返回与调用约定一致的结果。
+
+    Return ``value`` if it is a non-empty (stripped) string, else None."""
     return value if isinstance(value, str) and value.strip() else None
 
 
 def _is_human_clarification_response(additional_kwargs: Any) -> bool:
-    "执行 _is_human_clarification_response 的明确职责，并返回与调用约定一致的结果。\n\nReturn True iff ``additional_kwargs`` carries a well-formed human\n    clarification response (a user-authored answer worth remembering).\n\n    Host-agnostic structural mirror of deer-flow's ``read_human_input_response``\n    (which the host injects via ``should_keep_hidden_message`` in production):\n    a ``human_input_response`` mapping with version 1 + kind\n    ``human_input_response``, non-empty source/request_id/value, and (for\n    option responses) a non-empty option_id. Malformed/partial payloads return\n    False so they are excluded like other hide_from_ui framework messages.\n    Kept inline (no host import) so the bare ``filter_messages_for_memory``\n    does the right thing standalone and in tests. NOTE: if the\n    human_input_response format changes, keep this in sync with\n    ``read_human_input_response`` (the production path) -- they must agree.\n    "
+    """执行 _is_human_clarification_response 的明确职责，并返回与调用约定一致的结果。
+
+    Return True iff ``additional_kwargs`` carries a well-formed human
+        clarification response (a user-authored answer worth remembering).
+
+        Host-agnostic structural mirror of deer-flow's ``read_human_input_response``
+        (which the host injects via ``should_keep_hidden_message`` in production):
+        a ``human_input_response`` mapping with version 1 + kind
+        ``human_input_response``, non-empty source/request_id/value, and (for
+        option responses) a non-empty option_id. Malformed/partial payloads return
+        False so they are excluded like other hide_from_ui framework messages.
+        Kept inline (no host import) so the bare ``filter_messages_for_memory``
+        does the right thing standalone and in tests. NOTE: if the
+        human_input_response format changes, keep this in sync with
+        ``read_human_input_response`` (the production path) -- they must agree.
+    """
     if not isinstance(additional_kwargs, Mapping):
         return False
     raw = additional_kwargs.get("human_input_response")
@@ -79,7 +100,18 @@ def _is_human_clarification_response(additional_kwargs: Any) -> bool:
 
 
 def filter_messages_for_memory(messages: list[Any], *, should_keep_hidden_message: Any = None) -> list[Any]:
-    "执行 filter_messages_for_memory 的明确职责，并返回与调用约定一致的结果。\n\nKeep only user inputs and final assistant responses for memory updates.\n\n    ``hide_from_ui`` framework messages are skipped, but user-authored\n    clarification answers (a well-formed ``human_input_response``) are kept by\n    default via a host-agnostic structural check (mirrors deer-flow's\n    ``read_human_input_response``). Pass a ``should_keep_hidden_message(\n    additional_kwargs) -> bool`` hook to override the keep decision; the host\n    injects one delegating to the authoritative ``read_human_input_response``\n    in production.\n    "
+    """执行 filter_messages_for_memory 的明确职责，并返回与调用约定一致的结果。
+
+    Keep only user inputs and final assistant responses for memory updates.
+
+        ``hide_from_ui`` framework messages are skipped, but user-authored
+        clarification answers (a well-formed ``human_input_response``) are kept by
+        default via a host-agnostic structural check (mirrors deer-flow's
+        ``read_human_input_response``). Pass a ``should_keep_hidden_message(
+        additional_kwargs) -> bool`` hook to override the keep decision; the host
+        injects one delegating to the authoritative ``read_human_input_response``
+        in production.
+    """
     filtered = []
     skip_next_ai = False
     for msg in messages:
@@ -132,7 +164,9 @@ def filter_messages_for_memory(messages: list[Any], *, should_keep_hidden_messag
 
 
 def detect_correction(messages: list[Any]) -> bool:
-    '执行 detect_correction 的明确职责，并返回与调用约定一致的结果。\n\nDetect explicit user corrections in recent conversation turns.'
+    """执行 detect_correction 的明确职责，并返回与调用约定一致的结果。
+
+    Detect explicit user corrections in recent conversation turns."""
     recent_user_msgs = [msg for msg in messages[-6:] if getattr(msg, "type", None) == "human"]
 
     for msg in recent_user_msgs:
@@ -144,7 +178,9 @@ def detect_correction(messages: list[Any]) -> bool:
 
 
 def detect_reinforcement(messages: list[Any]) -> bool:
-    '执行 detect_reinforcement 的明确职责，并返回与调用约定一致的结果。\n\nDetect explicit positive reinforcement signals in recent conversation turns.'
+    """执行 detect_reinforcement 的明确职责，并返回与调用约定一致的结果。
+
+    Detect explicit positive reinforcement signals in recent conversation turns."""
     recent_user_msgs = [msg for msg in messages[-6:] if getattr(msg, "type", None) == "human"]
 
     for msg in recent_user_msgs:

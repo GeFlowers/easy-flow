@@ -230,7 +230,6 @@ Use the table below as a practical starting point when choosing how to run DeerF
 |---------|-----------|------------|-------|
 | Local evaluation / `make dev` | 4 vCPU, 8 GB RAM, 20 GB free SSD | 8 vCPU, 16 GB RAM | Good for one developer or one light session with hosted model APIs. `2 vCPU / 4 GB` is usually not enough. |
 | Docker development / `make docker-start` | 4 vCPU, 8 GB RAM, 25 GB free SSD | 8 vCPU, 16 GB RAM | Image builds, bind mounts, and sandbox containers need more headroom than pure local dev. |
-| Long-running server / `make up` | 8 vCPU, 16 GB RAM, 40 GB free SSD | 16 vCPU, 32 GB RAM | Preferred for shared use, multi-agent runs, report generation, or heavier sandbox workloads. |
 
 - These numbers cover DeerFlow itself. If you also host a local LLM, size that service separately.
 - Linux plus Docker is the recommended deployment target for a persistent server. macOS and Windows are best treated as development or evaluation environments.
@@ -241,11 +240,12 @@ Use the table below as a practical starting point when choosing how to run DeerF
 **Development** (hot-reload, source mounts):
 
 ```bash
-make docker-init    # Pull sandbox image (only once or when image updates)
-make docker-start   # Start services (auto-detects sandbox mode from config.yaml)
+make docker-init    # Check Docker availability
+make docker-start   # Start PostgreSQL, frontend, gateway, and nginx
 ```
 
-`make docker-start` starts `provisioner` only when `config.yaml` uses provisioner mode (`sandbox.use: deerflow.community.aio_sandbox:AioSandboxProvider` with `provisioner_url`).
+This customized Docker stack uses `LocalSandboxProvider`; it does not mount the
+Docker socket or start an AIO/Kubernetes provisioner.
 
 Docker builds use the upstream `uv` registry by default. If you need faster mirrors in restricted networks, export `UV_INDEX_URL=https://pypi.tuna.tsinghua.edu.cn/simple` and `NPM_REGISTRY=https://registry.npmmirror.com` before running `make docker-init` or `make docker-start`.
 
@@ -253,13 +253,6 @@ Backend processes automatically pick up `config.yaml` changes on the next config
 
 > [!TIP]
 > On Linux, if Docker-based commands fail with `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock`, add your user to the `docker` group and re-login before retrying. See [CONTRIBUTING.md](CONTRIBUTING.md#linux-docker-daemon-permission-denied) for the full fix.
-
-**Production** (builds images locally, mounts runtime config and data):
-
-```bash
-make up     # Build images and start all production services
-make down   # Stop and remove containers
-```
 
 Access: http://localhost:2026
 
@@ -316,33 +309,17 @@ On Windows, run the local development flow from Git Bash. Native `cmd.exe` and P
 
 DeerFlow runs the agent runtime inside the Gateway API. Development mode enables hot-reload; production mode uses a pre-built frontend.
 
-| | **Local Foreground** | **Local Daemon** | **Docker Dev** | **Docker Prod** |
-|---|---|---|---|---|
-| **Dev** | `./scripts/serve.sh --dev`<br/>`make dev` | `./scripts/serve.sh --dev --daemon`<br/>`make dev-daemon` | `./scripts/docker.sh start`<br/>`make docker-start` | — |
-| **Prod** | `./scripts/serve.sh --prod`<br/>`make start` | `./scripts/serve.sh --prod --daemon`<br/>`make start-daemon` | — | `./scripts/deploy.sh`<br/>`make up` |
-
-| Action | Local | Docker Dev | Docker Prod |
+| | **Local Foreground** | **Local Daemon** | **Docker Dev** |
 |---|---|---|---|
-| **Stop** | `./scripts/serve.sh --stop`<br/>`make stop` | `./scripts/docker.sh stop`<br/>`make docker-stop` | `./scripts/deploy.sh down`<br/>`make down` |
-| **Restart** | `./scripts/serve.sh --restart [flags]` | `./scripts/docker.sh restart` | — |
+| **Dev** | `./scripts/serve.sh --dev`<br/>`make dev` | `./scripts/serve.sh --dev --daemon`<br/>`make dev-daemon` | `./scripts/docker.sh start`<br/>`make docker-start` |
+| **Prod** | `./scripts/serve.sh --prod`<br/>`make start` | `./scripts/serve.sh --prod --daemon`<br/>`make start-daemon` | — |
+
+| Action | Local | Docker Dev |
+|---|---|---|
+| **Stop** | `./scripts/serve.sh --stop`<br/>`make stop` | `./scripts/docker.sh stop`<br/>`make docker-stop` |
+| **Restart** | `./scripts/serve.sh --restart [flags]` | `./scripts/docker.sh restart` |
 
 Gateway owns `/api/langgraph/*` and translates those public LangGraph-compatible paths to its native `/api/*` routers behind nginx.
-
-#### Docker Production Deployment
-
-`deploy.sh` supports building and starting separately:
-
-```bash
-# One-step (build + start)
-deploy.sh
-
-# Two-step (build once, start later)
-deploy.sh build              # build all images
-deploy.sh start              # start pre-built images
-
-# Stop
-deploy.sh down
-```
 
 ### Advanced
 #### Sandbox Mode
@@ -350,9 +327,8 @@ deploy.sh down
 DeerFlow supports multiple sandbox execution modes:
 - **Local Execution** (runs sandbox code directly on the host machine)
 - **Docker Execution** (runs sandbox code in isolated Docker containers)
-- **Docker Execution with Kubernetes** (runs sandbox code in Kubernetes pods via provisioner service)
 
-For Docker development, service startup follows `config.yaml` sandbox mode. In Local/Docker modes, `provisioner` is not started.
+The retained Docker development stack supports the configured local sandbox only.
 
 See the [Sandbox Configuration Guide](backend/docs/CONFIGURATION.md#sandbox) to configure your preferred mode.
 
@@ -887,7 +863,6 @@ DeerFlow has key high-privilege capabilities including **system command executio
 
 We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflow, and guidelines.
 
-Regression coverage includes Docker sandbox mode detection and provisioner kubeconfig-path handling tests in `backend/tests/`.
 Tool docstrings used with `@tool(parse_docstring=True)` are runtime API schema,
 not documentation-only text. Keep their Google-style `Args:` sections aligned
 with the function signature; `backend/tests/test_tool_docstring_contract.py`

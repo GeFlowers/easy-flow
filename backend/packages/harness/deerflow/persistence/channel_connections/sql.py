@@ -179,9 +179,9 @@ class ChannelConnectionRepository:
             for _ in range(_UPSERT_MAX_ATTEMPTS):
                 try:
                     row = (await session.execute(stmt)).scalar_one_or_none()
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
                     await _revoke_other_active_owners(session)
                     if row is None:
                         row = ChannelConnectionRow(
@@ -197,10 +197,10 @@ class ChannelConnectionRepository:
                     await session.refresh(row)
                     return self._connection_to_dict(row)
                 except IntegrityError as exc:
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
                     last_error = exc
                     await session.rollback()
             raise last_error  # type: ignore[misc]  # loop runs at least once
@@ -350,12 +350,12 @@ class ChannelConnectionRepository:
         current_time = now or datetime.now(UTC)
         async with self.session_factory() as session:
             await self._serialize_oauth_owner_scope(session, owner_user_id, provider)
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
+            # 中文说明：此处用于执行相关处理。
             await session.execute(
                 delete(ChannelOAuthStateRow).where(
                     ChannelOAuthStateRow.owner_user_id == owner_user_id,
@@ -405,7 +405,7 @@ class ChannelConnectionRepository:
     def _oauth_scope_lock_key(owner_user_id: str, provider: str) -> int:
         """获取并管理数据库架构操作所需的并发互斥锁。"""
         digest = hashlib.sha256(f"{owner_user_id}\x00{provider}".encode()).digest()
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         return int.from_bytes(digest[:8], "big") & 0x7FFFFFFFFFFFFFFF
 
     async def delete_expired_oauth_states(self, *, now: datetime | None = None) -> int:
@@ -463,9 +463,9 @@ class ChannelConnectionRepository:
                 await session.commit()
                 return None
 
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
-                        # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
             result = await session.execute(
                 update(ChannelOAuthStateRow)
                 .where(

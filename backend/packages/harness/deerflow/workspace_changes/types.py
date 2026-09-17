@@ -1,4 +1,5 @@
 """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass, field
@@ -15,6 +16,7 @@ DiffUnavailableReason = Literal["binary", "large", "sensitive", "truncated"]
 @dataclass(frozen=True)
 class WorkspaceChangeLimits:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     max_files: int = 200
     max_scanned_files: int = 2000
     max_file_bytes_for_diff: int = 256 * 1024
@@ -28,6 +30,7 @@ class WorkspaceChangeLimits:
 @dataclass(frozen=True)
 class WorkspaceRoot:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     name: str
     host_path: Path
     virtual_prefix: str
@@ -41,6 +44,7 @@ class WorkspaceRoot:
 @dataclass(frozen=True)
 class FileSnapshot:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     path: str
     root: str
     size: int
@@ -56,6 +60,7 @@ class FileSnapshot:
 @dataclass(frozen=True)
 class WorkspaceSnapshot:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     files: dict[str, FileSnapshot] = field(default_factory=dict)
     truncated: bool = False
     text_cache_dir: str | None = None
@@ -64,6 +69,7 @@ class WorkspaceSnapshot:
 @dataclass(frozen=True)
 class WorkspaceFileChange:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     path: str
     root: str
     status: WorkspaceChangeStatus
@@ -87,6 +93,7 @@ class WorkspaceFileChange:
 @dataclass(frozen=True)
 class WorkspaceChangeSummary:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     created: int = 0
     modified: int = 0
     deleted: int = 0
@@ -102,6 +109,7 @@ class WorkspaceChangeSummary:
 @dataclass(frozen=True)
 class WorkspaceChangeResult:
     """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+
     summary: WorkspaceChangeSummary
     files: list[WorkspaceFileChange]
     limits: WorkspaceChangeLimits = field(default_factory=WorkspaceChangeLimits)

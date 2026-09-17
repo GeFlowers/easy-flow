@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ from deerflow.guardrails.provider import GuardrailDecision, GuardrailReason, Gua
 
 
 class GuardrailAuthorizationAdapter:
-    '未说明guardrail?authorization未说明'
+    "未说明guardrail?authorization未说明"
 
     name = "authorization"
 
@@ -18,13 +18,13 @@ class GuardrailAuthorizationAdapter:
         resource_type: str = "tool",
         action: str = "call",
     ) -> None:
-        '未说明'
+        "未说明"
         self._provider = provider
         self._resource_type = resource_type
         self._action = action
 
     def _to_authz(self, gr: GuardrailRequest) -> AuthzRequest:
-        '未说明to未说明'
+        "未说明to未说明"
         return AuthzRequest(
             principal=Principal(
                 user_id=gr.user_id,
@@ -48,7 +48,7 @@ class GuardrailAuthorizationAdapter:
 
     @staticmethod
     def _to_guardrail(d: AuthzDecision) -> GuardrailDecision:
-        '未说明to?guardrail未说明'
+        "未说明to?guardrail未说明"
         return GuardrailDecision(
             allow=d.allow,
             reasons=[GuardrailReason(code=r.code, message=r.message) for r in d.reasons],
@@ -57,11 +57,11 @@ class GuardrailAuthorizationAdapter:
         )
 
     def evaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        '未说明evaluate未说明'
+        "未说明evaluate未说明"
         decision = self._provider.authorize(self._to_authz(request))
         return self._to_guardrail(decision)
 
     async def aevaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        '未说明aevaluate未说明'
+        "未说明aevaluate未说明"
         decision = await self._provider.aauthorize(self._to_authz(request))
         return self._to_guardrail(decision)

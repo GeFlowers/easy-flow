@@ -22,6 +22,7 @@ def _lease_expired_or_null(lease_col, cutoff: datetime):
 
 class RunRepository(RunStore):
     """定义负责持久化读写及事务边界管理的仓储组件。"""
+
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         """初始化当前持久化组件所需的依赖与内部状态。"""
         self._sf = session_factory

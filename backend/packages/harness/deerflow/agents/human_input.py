@@ -10,6 +10,7 @@ HUMAN_INPUT_RESPONSE_KEY = "human_input_response"
 
 class HumanInputTextResponse(TypedDict):
     """描述用户以自由文本提交的版本一澄清响应载荷。"""
+
     version: Literal[1]
     kind: Literal["human_input_response"]
     source: str
@@ -20,6 +21,7 @@ class HumanInputTextResponse(TypedDict):
 
 class HumanInputOptionResponse(TypedDict):
     """描述用户选择预设选项提交的版本一澄清响应载荷。"""
+
     version: Literal[1]
     kind: Literal["human_input_response"]
     source: str

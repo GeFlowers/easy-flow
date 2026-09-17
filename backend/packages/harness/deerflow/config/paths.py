@@ -1,4 +1,5 @@
 """提供配置、paths相关功能。"""
+
 import hashlib
 import logging
 import os
@@ -252,8 +253,8 @@ class Paths:
         stripped = virtual_path.lstrip("/")
         prefix = VIRTUAL_PATH_PREFIX.lstrip("/")
 
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         if stripped != prefix and not stripped.startswith(prefix + "/"):
             raise ValueError(f"Path must start with /{prefix}")
 

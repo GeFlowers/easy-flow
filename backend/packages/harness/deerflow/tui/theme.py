@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -7,7 +7,8 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class Theme:
-    '未说明'
+    "未说明"
+
     bg: str = "#1a1b26"
     panel: str = "#1f2335"
     border: str = "#2f334d"

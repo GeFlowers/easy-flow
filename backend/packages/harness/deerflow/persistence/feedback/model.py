@@ -12,6 +12,7 @@ from deerflow.persistence.base import Base
 
 class FeedbackRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "feedback"
 
     __table_args__ = (UniqueConstraint("thread_id", "run_id", "user_id", name="uq_feedback_thread_run_user"),)

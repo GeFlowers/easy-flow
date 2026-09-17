@@ -1,4 +1,14 @@
-'定义 orchestrator 模块提供的职责与可复用接口。\n\nNative deterministic scanning for DeerFlow skills.\n\n``scan_archive_preflight()`` and ``scan_skill_dir()`` are synchronous pure\nfunctions of their inputs; async callers must dispatch them off the event\nloop. Policy is one code constant — ``CRITICAL`` blocks, everything else is a\nwarning — applied by ``enforce_static_scan()``, which also honours the\n``skill_scan.enabled`` kill switch. Rule specs live next to the analyzers\nthat match them so a rule is authored, read, and tested in one place.\n'
+"""定义 orchestrator 模块提供的职责与可复用接口。
+
+Native deterministic scanning for DeerFlow skills.
+
+``scan_archive_preflight()`` and ``scan_skill_dir()`` are synchronous pure
+functions of their inputs; async callers must dispatch them off the event
+loop. Policy is one code constant — ``CRITICAL`` blocks, everything else is a
+warning — applied by ``enforce_static_scan()``, which also honours the
+``skill_scan.enabled`` kill switch. Rule specs live next to the analyzers
+that match them so a rule is authored, read, and tested in one place.
+"""
 
 from __future__ import annotations
 
@@ -111,7 +121,7 @@ _DESTRUCTIVE_RM_RE = (
 
 
 def skill_scan_enabled(app_config: Any | None = None) -> bool:
-    '执行 skill_scan_enabled 的明确职责，并返回与调用约定一致的结果'
+    "执行 skill_scan_enabled 的明确职责，并返回与调用约定一致的结果"
     if app_config is None:
         try:
             from deerflow.config import get_app_config
@@ -126,7 +136,7 @@ def skill_scan_enabled(app_config: Any | None = None) -> bool:
 
 
 def format_static_findings(findings: list[SecurityFinding]) -> str:
-    '格式化输入并返回规范化文本，并遵守 format_static_findings 所表达的接口约束'
+    "格式化输入并返回规范化文本，并遵守 format_static_findings 所表达的接口约束"
     parts = []
     for finding in findings:
         location = finding["file"] or "<archive>"
@@ -142,7 +152,7 @@ def enforce_static_scan(
     skill_name: str | None = None,
     app_config: Any | None = None,
 ) -> list[SecurityFinding]:
-    '执行 enforce_static_scan 的明确职责，并返回与调用约定一致的结果'
+    "执行 enforce_static_scan 的明确职责，并返回与调用约定一致的结果"
     if not skill_scan_enabled(app_config):
         return []
 
@@ -163,7 +173,7 @@ def enforce_static_scan(
 
 
 def scan_archive_preflight(archive_path: Path) -> ScanResult:
-    '执行 scan_archive_preflight 的明确职责，并返回与调用约定一致的结果'
+    "执行 scan_archive_preflight 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     scanner_errors: list[str] = []
     total_size = 0
@@ -208,7 +218,7 @@ def scan_archive_preflight(archive_path: Path) -> ScanResult:
 
 
 def scan_skill_dir(skill_dir: Path) -> ScanResult:
-    '执行 scan_skill_dir 的明确职责，并返回与调用约定一致的结果'
+    "执行 scan_skill_dir 的明确职责，并返回与调用约定一致的结果"
     root = Path(skill_dir)
     if not root.is_dir():
         raise StaticScannerError(f"skill_dir is not a directory: {root}")
@@ -238,7 +248,7 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
 
 
 def _scan_archive_member_metadata(info: zipfile.ZipInfo, normalized: str) -> list[SecurityFinding]:
-    '执行 _scan_archive_member_metadata 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_archive_member_metadata 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     if _archive_member_is_absolute(info.filename):
         findings.append(_finding("package-absolute-path", file=normalized, evidence=info.filename))
@@ -253,7 +263,7 @@ def _scan_archive_member_metadata(info: zipfile.ZipInfo, normalized: str) -> lis
 
 
 def _scan_file_package_properties(rel_path: str, file_bytes: bytes, file_size: int) -> list[SecurityFinding]:
-    '执行 _scan_file_package_properties 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_file_package_properties 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     path = PurePosixPath(rel_path)
     if path.name == "SKILL.md" and len(path.parts) > 1 and not is_eval_fixture_skill_md(path):
@@ -272,7 +282,7 @@ def _scan_file_package_properties(rel_path: str, file_bytes: bytes, file_size: i
 
 
 def _scan_text_file(rel_path: str, text: str) -> list[SecurityFinding]:
-    '执行 _scan_text_file 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_text_file 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     findings.extend(_scan_secrets(rel_path, text))
     if PurePosixPath(rel_path).name == "SKILL.md":
@@ -286,7 +296,7 @@ def _scan_text_file(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_secrets(rel_path: str, text: str) -> list[SecurityFinding]:
-    '执行 _scan_secrets 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_secrets 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     private_key = re.search(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----", text)
     if private_key:
@@ -314,7 +324,7 @@ def _scan_secrets(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_declaration(rel_path: str, text: str) -> list[SecurityFinding]:
-    '执行 _scan_declaration 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_declaration 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     prompt_re = re.compile(r"(?i)\b(ignore|disregard)\s+(all\s+)?(previous|prior)\s+instructions\b|\boverride\s+(the\s+)?(system|developer)\s+instructions\b")
     if match := prompt_re.search(text):
@@ -337,7 +347,7 @@ def _scan_declaration(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_python(rel_path: str, text: str) -> list[SecurityFinding]:
-    '执行 _scan_python 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_python 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     try:
         tree = ast.parse(text)
@@ -408,7 +418,7 @@ def _scan_python(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_shell(rel_path: str, text: str) -> list[SecurityFinding]:
-    '执行 _scan_shell 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_shell 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     # Unmistakable reverse-shell signals hard-block; weaker idioms (bash -i,
     # mkfifo) only warn->LLM because they appear in legitimate scripts.
@@ -428,7 +438,7 @@ def _scan_shell(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_network_and_resource(rel_path: str, text: str) -> list[SecurityFinding]:
-    '执行 _scan_network_and_resource 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_network_and_resource 的明确职责，并返回与调用约定一致的结果"
     findings: list[SecurityFinding] = []
     if match := re.search(r"(169\.254\.169\.254|metadata\.google\.internal)", text):
         findings.append(_finding_from_match("network-cloud-metadata", rel_path, text, match))
@@ -445,7 +455,7 @@ def _scan_network_and_resource(rel_path: str, text: str) -> list[SecurityFinding
 
 
 def _finding(rule_id: str, *, file: str | None, evidence: str | None, line: int | None = None, severity: FindingSeverity | None = None) -> SecurityFinding:
-    '执行 _finding 的明确职责，并返回与调用约定一致的结果'
+    "执行 _finding 的明确职责，并返回与调用约定一致的结果"
     spec = RULES[rule_id]
     if evidence is not None and rule_id.startswith("secret-"):
         evidence = _redact_secret_evidence(evidence)
@@ -461,23 +471,23 @@ def _finding(rule_id: str, *, file: str | None, evidence: str | None, line: int 
 
 
 def _finding_from_match(rule_id: str, rel_path: str, text: str, match: re.Match[str]) -> SecurityFinding:
-    '执行 _finding_from_match 的明确职责，并返回与调用约定一致的结果'
+    "执行 _finding_from_match 的明确职责，并返回与调用约定一致的结果"
     return _finding(rule_id, file=rel_path, line=_line_number(text, match.start()), evidence=match.group(0))
 
 
 def _finding_for_text(rule_id: str, rel_path: str, text: str, evidence: str) -> SecurityFinding:
-    '执行 _finding_for_text 的明确职责，并返回与调用约定一致的结果'
+    "执行 _finding_for_text 的明确职责，并返回与调用约定一致的结果"
     index = text.find(evidence)
     return _finding(rule_id, file=rel_path, line=_line_number(text, index if index >= 0 else 0), evidence=evidence)
 
 
 def _finding_for_node(rule_id: str, rel_path: str, node: ast.AST | None, evidence: str) -> SecurityFinding:
-    '执行 _finding_for_node 的明确职责，并返回与调用约定一致的结果'
+    "执行 _finding_for_node 的明确职责，并返回与调用约定一致的结果"
     return _finding(rule_id, file=rel_path, line=getattr(node, "lineno", 1), evidence=evidence)
 
 
 def _nested_archive_finding(rel_path: str, prefix: bytes, read_data, scanner_errors: list[str]) -> SecurityFinding:
-    '执行 _nested_archive_finding 的明确职责，并返回与调用约定一致的结果'
+    "执行 _nested_archive_finding 的明确职责，并返回与调用约定一致的结果"
     name = PurePosixPath(rel_path).name
     if prefix.startswith(b"PK\x03\x04"):
         try:
@@ -491,7 +501,7 @@ def _nested_archive_finding(rel_path: str, prefix: bytes, read_data, scanner_err
 
 
 def _nested_zip_contains_executable(data: bytes) -> bool:
-    '执行 _nested_zip_contains_executable 的明确职责，并返回与调用约定一致的结果'
+    "执行 _nested_zip_contains_executable 的明确职责，并返回与调用约定一致的结果"
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as nested:
             for info in nested.infolist()[:_NESTED_ZIP_PEEK_MEMBER_LIMIT]:
@@ -509,7 +519,7 @@ def _nested_zip_contains_executable(data: bytes) -> bool:
 
 
 def _read_archive_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes | None:
-    '执行 _read_archive_member 的明确职责，并返回与调用约定一致的结果'
+    "执行 _read_archive_member 的明确职责，并返回与调用约定一致的结果"
     if info.file_size > MAX_FILE_BYTES:
         return None
     with zf.open(info) as member:
@@ -520,18 +530,18 @@ def _redact_secret_evidence(value: str) -> str:
     # Drop the value entirely: the rule_id already names the secret category, and
     # any retained prefix (e.g. value[:6]) leaks real token bytes into findings
     # that flow to Gateway responses and LLM context.
-    '执行 _redact_secret_evidence 的明确职责，并返回与调用约定一致的结果'
+    "执行 _redact_secret_evidence 的明确职责，并返回与调用约定一致的结果"
     return "[redacted]"
 
 
 def _scan_result(findings: list[SecurityFinding], scanner_errors: list[str]) -> ScanResult:
-    '执行 _scan_result 的明确职责，并返回与调用约定一致的结果'
+    "执行 _scan_result 的明确职责，并返回与调用约定一致的结果"
     blocked = any(finding["severity"] == _BLOCK_SEVERITY for finding in findings)
     return {"findings": findings, "blocked": blocked, "scanner_errors": scanner_errors}
 
 
 def _dedupe(findings: Iterable[SecurityFinding]) -> list[SecurityFinding]:
-    '执行 _dedupe 的明确职责，并返回与调用约定一致的结果'
+    "执行 _dedupe 的明确职责，并返回与调用约定一致的结果"
     seen: set[tuple[str, str | None, int | None]] = set()
     deduped: list[SecurityFinding] = []
     for finding in findings:
@@ -544,38 +554,38 @@ def _dedupe(findings: Iterable[SecurityFinding]) -> list[SecurityFinding]:
 
 
 def _line_number(text: str, index: int) -> int:
-    '执行 _line_number 的明确职责，并返回与调用约定一致的结果'
+    "执行 _line_number 的明确职责，并返回与调用约定一致的结果"
     return text[: max(index, 0)].count("\n") + 1
 
 
 def _normalize_archive_name(name: str) -> str:
-    '执行 _normalize_archive_name 的明确职责，并返回与调用约定一致的结果'
+    "执行 _normalize_archive_name 的明确职责，并返回与调用约定一致的结果"
     return posixpath.normpath(name.replace("\\", "/")).removeprefix("./")
 
 
 def _archive_member_is_absolute(name: str) -> bool:
-    '执行 _archive_member_is_absolute 的明确职责，并返回与调用约定一致的结果'
+    "执行 _archive_member_is_absolute 的明确职责，并返回与调用约定一致的结果"
     normalized = name.replace("\\", "/")
     return normalized.startswith("/") or PurePosixPath(normalized).is_absolute() or PureWindowsPath(name).is_absolute()
 
 
 def _archive_member_traverses(name: str) -> bool:
-    '执行 _archive_member_traverses 的明确职责，并返回与调用约定一致的结果'
+    "执行 _archive_member_traverses 的明确职责，并返回与调用约定一致的结果"
     return ".." in PurePosixPath(name.replace("\\", "/")).parts
 
 
 def _is_symlink_member(info: zipfile.ZipInfo) -> bool:
-    '执行 _is_symlink_member 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_symlink_member 的明确职责，并返回与调用约定一致的结果"
     return stat.S_ISLNK(info.external_attr >> 16)
 
 
 def _relative_file(path: Path, root: Path) -> str:
-    '执行 _relative_file 的明确职责，并返回与调用约定一致的结果'
+    "执行 _relative_file 的明确职责，并返回与调用约定一致的结果"
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
 def _is_hidden_sensitive_path(rel_path: str) -> bool:
-    '执行 _is_hidden_sensitive_path 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_hidden_sensitive_path 的明确职责，并返回与调用约定一致的结果"
     parts = PurePosixPath(rel_path).parts
     if ".aws" in parts and parts[-1] == "credentials":
         return True
@@ -585,23 +595,23 @@ def _is_hidden_sensitive_path(rel_path: str) -> bool:
 
 
 def _is_nested_archive_name(rel_path: str) -> bool:
-    '执行 _is_nested_archive_name 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_nested_archive_name 的明确职责，并返回与调用约定一致的结果"
     lower = rel_path.lower()
     return any(lower.endswith(suffix) for suffix in _ARCHIVE_SUFFIXES)
 
 
 def _looks_like_archive(file_bytes: bytes) -> bool:
-    '执行 _looks_like_archive 的明确职责，并返回与调用约定一致的结果'
+    "执行 _looks_like_archive 的明确职责，并返回与调用约定一致的结果"
     return file_bytes.startswith(b"PK\x03\x04") or file_bytes.startswith(b"\x1f\x8b") or file_bytes.startswith(b"7z\xbc\xaf\x27\x1c")
 
 
 def _is_executable_binary(prefix: bytes) -> bool:
-    '执行 _is_executable_binary 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_executable_binary 的明确职责，并返回与调用约定一致的结果"
     return prefix.startswith(b"\x7fELF") or prefix.startswith(b"MZ") or prefix.startswith((b"\xfe\xed\xfa", b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe"))
 
 
 def _binary_magic_evidence(prefix: bytes) -> str:
-    '执行 _binary_magic_evidence 的明确职责，并返回与调用约定一致的结果'
+    "执行 _binary_magic_evidence 的明确职责，并返回与调用约定一致的结果"
     if prefix.startswith(b"\x7fELF"):
         return "ELF"
     if prefix.startswith(b"MZ"):
@@ -612,7 +622,7 @@ def _binary_magic_evidence(prefix: bytes) -> str:
 def _decode_text_for_analysis(file_bytes: bytes) -> str | None:
     # Binaries are rejected by the NUL probe and the decode failure below, so
     # every NUL-free, UTF-8-decodable file is analyzed regardless of extension.
-    '执行 _decode_text_for_analysis 的明确职责，并返回与调用约定一致的结果'
+    "执行 _decode_text_for_analysis 的明确职责，并返回与调用约定一致的结果"
     if b"\x00" in file_bytes[:4096]:
         return None
     try:
@@ -622,18 +632,18 @@ def _decode_text_for_analysis(file_bytes: bytes) -> str | None:
 
 
 def _is_python_path(rel_path: str, text: str) -> bool:
-    '执行 _is_python_path 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_python_path 的明确职责，并返回与调用约定一致的结果"
     return PurePosixPath(rel_path).suffix.lower() == ".py" or text.startswith("#!") and "python" in text.splitlines()[0].lower()
 
 
 def _is_shell_path(rel_path: str, text: str) -> bool:
-    '执行 _is_shell_path 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_shell_path 的明确职责，并返回与调用约定一致的结果"
     suffix = PurePosixPath(rel_path).suffix.lower()
     return suffix in {".sh", ".bash"} or text.startswith("#!") and any(shell in text.splitlines()[0].lower() for shell in ("sh", "bash", "zsh"))
 
 
 def _looks_like_placeholder(value: str) -> bool:
-    '执行 _looks_like_placeholder 的明确职责，并返回与调用约定一致的结果'
+    "执行 _looks_like_placeholder 的明确职责，并返回与调用约定一致的结果"
     normalized = value.strip().strip("\"'").lower()
     if normalized in _PLACEHOLDER_VALUES:
         return True
@@ -641,18 +651,18 @@ def _looks_like_placeholder(value: str) -> bool:
 
 
 def _http_host(url: str) -> str | None:
-    '执行 _http_host 的明确职责，并返回与调用约定一致的结果'
+    "执行 _http_host 的明确职责，并返回与调用约定一致的结果"
     match = re.match(r"https?://\[?([^]/:]+)", url)
     return match.group(1) if match else None
 
 
 def _is_outbound_url(value: str) -> bool:
-    '执行 _is_outbound_url 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_outbound_url 的明确职责，并返回与调用约定一致的结果"
     return bool(value.startswith(("http://", "https://")) and (_http_host(value) or "") not in _LOCAL_HTTP_HOSTS)
 
 
 def _collect_python_aliases(tree: ast.AST) -> dict[str, str]:
-    '执行 _collect_python_aliases 的明确职责，并返回与调用约定一致的结果'
+    "执行 _collect_python_aliases 的明确职责，并返回与调用约定一致的结果"
     aliases: dict[str, str] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -665,7 +675,7 @@ def _collect_python_aliases(tree: ast.AST) -> dict[str, str]:
 
 
 def _python_name(node: ast.AST, aliases: dict[str, str]) -> str:
-    '执行 _python_name 的明确职责，并返回与调用约定一致的结果'
+    "执行 _python_name 的明确职责，并返回与调用约定一致的结果"
     if isinstance(node, ast.Name):
         return aliases.get(node.id, node.id)
     if isinstance(node, ast.Attribute):
@@ -675,24 +685,24 @@ def _python_name(node: ast.AST, aliases: dict[str, str]) -> str:
 
 
 def _python_call_name(node: ast.Call, aliases: dict[str, str]) -> str:
-    '执行 _python_call_name 的明确职责，并返回与调用约定一致的结果'
+    "执行 _python_call_name 的明确职责，并返回与调用约定一致的结果"
     return _python_name(node.func, aliases)
 
 
 def _compile_mode_is_exec(node: ast.Call) -> bool:
-    '执行 _compile_mode_is_exec 的明确职责，并返回与调用约定一致的结果'
+    "执行 _compile_mode_is_exec 的明确职责，并返回与调用约定一致的结果"
     if len(node.args) >= 3 and isinstance(node.args[2], ast.Constant):
         return node.args[2].value == "exec"
     return any(keyword.arg == "mode" and isinstance(keyword.value, ast.Constant) and keyword.value.value == "exec" for keyword in node.keywords)
 
 
 def _call_has_shell_true(node: ast.Call) -> bool:
-    '执行 _call_has_shell_true 的明确职责，并返回与调用约定一致的结果'
+    "执行 _call_has_shell_true 的明确职责，并返回与调用约定一致的结果"
     return any(keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True for keyword in node.keywords)
 
 
 def _call_is_network_sink(call_name: str) -> bool:
-    '执行 _call_is_network_sink 的明确职责，并返回与调用约定一致的结果'
+    "执行 _call_is_network_sink 的明确职责，并返回与调用约定一致的结果"
     return call_name in {
         "requests.get",
         "requests.post",
@@ -719,7 +729,7 @@ def _call_is_network_sink(call_name: str) -> bool:
 
 
 def _yaml_load_uses_safe_loader(node: ast.Call) -> bool:
-    '执行 _yaml_load_uses_safe_loader 的明确职责，并返回与调用约定一致的结果'
+    "执行 _yaml_load_uses_safe_loader 的明确职责，并返回与调用约定一致的结果"
     for keyword in node.keywords:
         if keyword.arg in {"Loader", "loader"}:
             name = _python_name(keyword.value, {})

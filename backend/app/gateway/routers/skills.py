@@ -35,7 +35,9 @@ _ADMIN_REQUIRED_DETAIL = "Admin privileges required to manage skills."
 
 
 class SkillResponse(BaseModel):
-    '封装 SkillResponse 的状态、协作关系与公开操作。\n\nResponse model for skill information.'
+    """封装 SkillResponse 的状态、协作关系与公开操作。
+
+    Response model for skill information."""
 
     name: str = Field(..., description="Name of the skill")
     description: str = Field(..., description="Description of what the skill does")
@@ -46,26 +48,34 @@ class SkillResponse(BaseModel):
 
 
 class SkillsListResponse(BaseModel):
-    '封装 SkillsListResponse 的状态、协作关系与公开操作。\n\nResponse model for listing all skills.'
+    """封装 SkillsListResponse 的状态、协作关系与公开操作。
+
+    Response model for listing all skills."""
 
     skills: list[SkillResponse]
 
 
 class SkillUpdateRequest(BaseModel):
-    '封装 SkillUpdateRequest 的状态、协作关系与公开操作。\n\nRequest model for updating a skill.'
+    """封装 SkillUpdateRequest 的状态、协作关系与公开操作。
+
+    Request model for updating a skill."""
 
     enabled: bool = Field(..., description="Whether to enable or disable the skill")
 
 
 class SkillInstallRequest(BaseModel):
-    '封装 SkillInstallRequest 的状态、协作关系与公开操作。\n\nRequest model for installing a skill from a .skill file.'
+    """封装 SkillInstallRequest 的状态、协作关系与公开操作。
+
+    Request model for installing a skill from a .skill file."""
 
     thread_id: str = Field(..., description="The thread ID where the .skill file is located")
     path: str = Field(..., description="Virtual path to the .skill file (e.g., mnt/user-data/outputs/my-skill.skill)")
 
 
 class SkillInstallResponse(BaseModel):
-    '封装 SkillInstallResponse 的状态、协作关系与公开操作。\n\nResponse model for skill installation.'
+    """封装 SkillInstallResponse 的状态、协作关系与公开操作。
+
+    Response model for skill installation."""
 
     success: bool = Field(..., description="Whether the installation was successful")
     skill_name: str = Field(..., description="Name of the installed skill")
@@ -74,26 +84,32 @@ class SkillInstallResponse(BaseModel):
 
 class CustomSkillContentResponse(SkillResponse):
     """表示包含原始 SKILL.md 内容的管理员自定义技能响应。"""
+
     content: str = Field(..., description="Raw SKILL.md content")
 
 
 class CustomSkillUpdateRequest(BaseModel):
     """定义管理员替换自定义 SKILL.md 内容的请求。"""
+
     content: str = Field(..., description="Replacement SKILL.md content")
 
 
 class CustomSkillHistoryResponse(BaseModel):
     """表示管理员可读取的自定义技能修改历史。"""
+
     history: list[dict]
 
 
 class SkillRollbackRequest(BaseModel):
     """定义管理员恢复自定义技能历史版本的请求。"""
+
     history_index: int = Field(default=-1, description="History entry index to restore from, defaulting to the latest change.")
 
 
 def _skill_to_response(skill: Skill) -> SkillResponse:
-    '执行 _skill_to_response 的明确职责，并返回与调用约定一致的结果。\n\nConvert a Skill object to a SkillResponse.'
+    """执行 _skill_to_response 的明确职责，并返回与调用约定一致的结果。
+
+    Convert a Skill object to a SkillResponse."""
     return SkillResponse(
         name=skill.name,
         description=skill.description,
@@ -115,6 +131,7 @@ def _static_scan_http_detail(error: StaticScanBlockedError) -> dict:
 
 async def _scan_static_skill_markdown_or_raise(skill_name: str, content: str, *, app_config: AppConfig) -> list[StaticFinding]:
     """在临时目录扫描技能 Markdown，命中安全规则时抛出 HTTP 异常。"""
+
     def _scan_markdown() -> list[StaticFinding]:
         """在工作线程中落盘临时技能包并执行静态扫描。"""
         with tempfile.TemporaryDirectory() as tmp:
@@ -132,7 +149,13 @@ async def _scan_static_skill_markdown_or_raise(skill_name: str, content: str, *,
 
 
 def _get_user_skill_storage(config: AppConfig) -> SkillStorage:
-    '执行 _get_user_skill_storage 的明确职责，并返回与调用约定一致的结果。\n\nReturn a user-scoped skill storage for custom skill operations.\n\n    Uses the effective user_id from the request context (set by auth middleware).\n    For public skill reads, the global singleton storage is still used.\n    '
+    """执行 _get_user_skill_storage 的明确职责，并返回与调用约定一致的结果。
+
+    Return a user-scoped skill storage for custom skill operations.
+
+        Uses the effective user_id from the request context (set by auth middleware).
+        For public skill reads, the global singleton storage is still used.
+    """
     return get_or_new_user_skill_storage(get_effective_user_id(), app_config=config)
 
 
@@ -193,7 +216,15 @@ async def install_skill(request: Request, body: SkillInstallRequest, config: App
 
 @router.get("/skills/custom", response_model=SkillsListResponse, summary="List Custom Skills")
 async def list_custom_skills(config: AppConfig = Depends(get_config)) -> SkillsListResponse:
-    '收集并返回，并遵守 list_custom_skills 所表达的接口约束。\n\nList only user-owned custom skills (SkillCategory.CUSTOM).\n\n    Legacy shared skills (SkillCategory.LEGACY) are NOT included here —\n    they are read-only and appear in the full ``list_skills`` endpoint.\n    The frontend should use ``list_skills`` to display all available\n    skills including legacy ones.\n    '
+    """收集并返回，并遵守 list_custom_skills 所表达的接口约束。
+
+    List only user-owned custom skills (SkillCategory.CUSTOM).
+
+        Legacy shared skills (SkillCategory.LEGACY) are NOT included here —
+        they are read-only and appear in the full ``list_skills`` endpoint.
+        The frontend should use ``list_skills`` to display all available
+        skills including legacy ones.
+    """
     try:
         skills = [skill for skill in _get_user_skill_storage(config).load_skills(enabled_only=False) if skill.category == SkillCategory.CUSTOM]
         return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])

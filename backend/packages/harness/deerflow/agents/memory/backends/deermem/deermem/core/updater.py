@@ -1,4 +1,6 @@
-'定义 updater 模块提供的职责与可复用接口。\n\nMemory updater for reading, writing, and updating memory data.'
+"""定义 updater 模块提供的职责与可复用接口。
+
+Memory updater for reading, writing, and updating memory data."""
 
 import asyncio
 import atexit
@@ -46,14 +48,24 @@ atexit.register(lambda: _SYNC_MEMORY_UPDATER_EXECUTOR.shutdown(wait=False))
 # delete_memory_fact / update_memory_fact) moved into MemoryUpdater as instance
 # methods (use self._storage). See the class below.
 def _validate_confidence(confidence: float) -> float:
-    '执行 _validate_confidence 的明确职责，并返回与调用约定一致的结果。\n\nValidate persisted fact confidence so stored JSON stays standards-compliant.'
+    """执行 _validate_confidence 的明确职责，并返回与调用约定一致的结果。
+
+    Validate persisted fact confidence so stored JSON stays standards-compliant."""
     if not math.isfinite(confidence) or confidence < 0 or confidence > 1:
         raise ValueError("confidence")
     return confidence
 
 
 def _coerce_source_confidence(fact: dict[str, Any]) -> float:
-    '执行 _coerce_source_confidence 的明确职责，并返回与调用约定一致的结果。\n\nReturn a stored fact\'s confidence as a finite float in [0, 1], defaulting to 0.5.\n\n    dict.get(key, default) returns the stored value (including None) when the key\n    exists, so a fact written with "confidence": null would propagate None into\n    arithmetic and crash max(). This helper guards against null, bool, non-numeric,\n    and non-finite values from corrupted or manually edited memory files.\n    '
+    """执行 _coerce_source_confidence 的明确职责，并返回与调用约定一致的结果。
+
+    Return a stored fact's confidence as a finite float in [0, 1], defaulting to 0.5.
+
+        dict.get(key, default) returns the stored value (including None) when the key
+        exists, so a fact written with "confidence": null would propagate None into
+        arithmetic and crash max(). This helper guards against null, bool, non-numeric,
+        and non-finite values from corrupted or manually edited memory files.
+    """
     raw = fact.get("confidence")
     if raw is None or isinstance(raw, bool):
         return 0.5
@@ -65,14 +77,37 @@ def _coerce_source_confidence(fact: dict[str, Any]) -> float:
 
 
 def _trim_facts_to_max(facts: list[dict[str, Any]], max_facts: int) -> list[dict[str, Any]]:
-    '执行 _trim_facts_to_max 的明确职责，并返回与调用约定一致的结果。\n\nKeep the highest-confidence facts within ``max_facts`` (confidence coerced).\n\n    Confidence is read via :func:`_coerce_source_confidence` so legacy / imported\n    facts with ``null`` or non-numeric confidence never crash the sort -- the\n    pre-#4023 ``key=lambda f: f.get("confidence", 0)`` form compared ``None`` /\n    ``str`` against ``float`` and raised ``TypeError`` once ``len(facts) >\n    max_facts``. Mirrors upstream\'s ``_trim_facts_to_max`` (introduced in #4023)\n    so the vendored copy no longer lags the coercion fix the\n    monolithic->vendored rename silently dropped.\n    '
+    """执行 _trim_facts_to_max 的明确职责，并返回与调用约定一致的结果。
+
+    Keep the highest-confidence facts within ``max_facts`` (confidence coerced).
+
+        Confidence is read via :func:`_coerce_source_confidence` so legacy / imported
+        facts with ``null`` or non-numeric confidence never crash the sort -- the
+        pre-#4023 ``key=lambda f: f.get("confidence", 0)`` form compared ``None`` /
+        ``str`` against ``float`` and raised ``TypeError`` once ``len(facts) >
+        max_facts``. Mirrors upstream's ``_trim_facts_to_max`` (introduced in #4023)
+        so the vendored copy no longer lags the coercion fix the
+        monolithic->vendored rename silently dropped.
+    """
     if len(facts) <= max_facts:
         return facts
     return sorted(facts, key=_coerce_source_confidence, reverse=True)[:max_facts]
 
 
 def _extract_text(content: Any) -> str:
-    '执行 _extract_text 的明确职责，并返回与调用约定一致的结果。\n\nExtract plain text from LLM response content (str or list of content blocks).\n\n    Modern LLMs may return structured content as a list of blocks instead of a\n    plain string, e.g. [{"type": "text", "text": "..."}]. Using str() on such\n    content produces Python repr instead of the actual text, breaking JSON\n    parsing downstream.\n\n    String chunks are concatenated without separators to avoid corrupting\n    chunked JSON/text payloads. Dict-based text blocks are treated as full text\n    blocks and joined with newlines for readability.\n    '
+    """执行 _extract_text 的明确职责，并返回与调用约定一致的结果。
+
+    Extract plain text from LLM response content (str or list of content blocks).
+
+        Modern LLMs may return structured content as a list of blocks instead of a
+        plain string, e.g. [{"type": "text", "text": "..."}]. Using str() on such
+        content produces Python repr instead of the actual text, breaking JSON
+        parsing downstream.
+
+        String chunks are concatenated without separators to avoid corrupting
+        chunked JSON/text payloads. Dict-based text blocks are treated as full text
+        blocks and joined with newlines for readability.
+    """
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -80,7 +115,7 @@ def _extract_text(content: Any) -> str:
         pending_str_parts: list[str] = []
 
         def flush_pending_str_parts() -> None:
-            '执行 flush_pending_str_parts 的明确职责，并返回与调用约定一致的结果'
+            "执行 flush_pending_str_parts 的明确职责，并返回与调用约定一致的结果"
             if pending_str_parts:
                 pieces.append("".join(pending_str_parts))
                 pending_str_parts.clear()
@@ -103,7 +138,9 @@ _REQUIRED_MEMORY_UPDATE_TOP_LEVEL_KEYS = frozenset({"user", "history", "newFacts
 
 
 def _normalize_memory_update_fact(fact: Any) -> dict[str, Any] | None:
-    '执行 _normalize_memory_update_fact 的明确职责，并返回与调用约定一致的结果。\n\nNormalize a single fact entry from a model-produced memory update.'
+    """执行 _normalize_memory_update_fact 的明确职责，并返回与调用约定一致的结果。
+
+    Normalize a single fact entry from a model-produced memory update."""
     if not isinstance(fact, dict):
         return None
 
@@ -160,7 +197,9 @@ def _normalize_memory_update_fact(fact: Any) -> dict[str, Any] | None:
 
 
 def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]:
-    '执行 _normalize_memory_update_data 的明确职责，并返回与调用约定一致的结果。\n\nCoerce parsed memory update data into the shape consumed by _apply_updates.'
+    """执行 _normalize_memory_update_data 的明确职责，并返回与调用约定一致的结果。
+
+    Coerce parsed memory update data into the shape consumed by _apply_updates."""
     user = update_data.get("user")
     history = update_data.get("history")
     new_facts = update_data.get("newFacts")
@@ -282,7 +321,14 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
 
 
 def _parse_memory_update_response(response_content: Any) -> dict[str, Any]:
-    '执行 _parse_memory_update_response 的明确职责，并返回与调用约定一致的结果。\n\nParse the first valid memory-update JSON object from an LLM response.\n\n    Some providers may wrap JSON in thinking traces, prose, or markdown fences\n    even when prompted to return JSON only. This parser accepts safely\n    extractable JSON objects but does not repair truncated or malformed JSON.\n    '
+    """执行 _parse_memory_update_response 的明确职责，并返回与调用约定一致的结果。
+
+    Parse the first valid memory-update JSON object from an LLM response.
+
+        Some providers may wrap JSON in thinking traces, prose, or markdown fences
+        even when prompted to return JSON only. This parser accepts safely
+        extractable JSON objects but does not repair truncated or malformed JSON.
+    """
     response_text = _extract_text(response_content).strip()
     decoder = json.JSONDecoder()
 
@@ -312,7 +358,13 @@ _UPLOAD_SENTENCE_RE = re.compile(
 
 
 def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str, Any]:
-    '执行 _strip_upload_mentions_from_memory 的明确职责，并返回与调用约定一致的结果。\n\nRemove sentences about file uploads from all memory summaries and facts.\n\n    Uploaded files are session-scoped; persisting upload events in long-term\n    memory causes the agent to search for non-existent files in future sessions.\n    '
+    """执行 _strip_upload_mentions_from_memory 的明确职责，并返回与调用约定一致的结果。
+
+    Remove sentences about file uploads from all memory summaries and facts.
+
+        Uploaded files are session-scoped; persisting upload events in long-term
+        memory causes the agent to search for non-existent files in future sessions.
+    """
     # Scrub summaries in user/history sections
     for section in ("user", "history"):
         section_data = memory_data.get(section, {})
@@ -331,7 +383,7 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
 
 
 def _fact_content_key(content: Any) -> str | None:
-    '执行 _fact_content_key 的明确职责，并返回与调用约定一致的结果'
+    "执行 _fact_content_key 的明确职责，并返回与调用约定一致的结果"
     if not isinstance(content, str):
         return None
     stripped = content.strip()
@@ -344,7 +396,12 @@ def _fact_content_key(content: Any) -> str | None:
 
 
 def _parse_fact_datetime(raw: str) -> datetime | None:
-    "执行 _parse_fact_datetime 的明确职责，并返回与调用约定一致的结果。\n\nParse an ISO-8601 datetime string from a fact's createdAt field.\n\n    Returns ``None`` on any parse failure so callers can safely skip malformed facts.\n    "
+    """执行 _parse_fact_datetime 的明确职责，并返回与调用约定一致的结果。
+
+    Parse an ISO-8601 datetime string from a fact's createdAt field.
+
+        Returns ``None`` on any parse failure so callers can safely skip malformed facts.
+    """
     if not raw:
         return None
     try:
@@ -359,7 +416,19 @@ def _parse_fact_datetime(raw: str) -> datetime | None:
 
 
 def _effective_fact_staleness_age(fact: dict[str, Any], config: Any) -> int:
-    '执行 _effective_fact_staleness_age 的明确职责，并返回与调用约定一致的结果。\n\nReturn the effective staleness review age in days for *fact*.\n\n    Returns the stored ``expected_valid_days`` value directly when present and\n    valid.  The ``staleness_max_lifetime_multiplier`` cap is applied once at\n    *write time* (when a fact is first created) so the review window is bounded\n    from the start.  Re-applying it here would prevent lifetime-extension\n    operations from ever moving the review window beyond that initial cap,\n    defeating the purpose of ``staleFactsToExtend``.  Falls back to the global\n    ``staleness_age_days`` for facts that pre-date this feature or where the\n    LLM did not provide an estimate.\n    '
+    """执行 _effective_fact_staleness_age 的明确职责，并返回与调用约定一致的结果。
+
+    Return the effective staleness review age in days for *fact*.
+
+        Returns the stored ``expected_valid_days`` value directly when present and
+        valid.  The ``staleness_max_lifetime_multiplier`` cap is applied once at
+        *write time* (when a fact is first created) so the review window is bounded
+        from the start.  Re-applying it here would prevent lifetime-extension
+        operations from ever moving the review window beyond that initial cap,
+        defeating the purpose of ``staleFactsToExtend``.  Falls back to the global
+        ``staleness_age_days`` for facts that pre-date this feature or where the
+        LLM did not provide an estimate.
+    """
     raw = fact.get("expected_valid_days")
     if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
         return int(raw)
@@ -370,7 +439,17 @@ def _select_stale_candidates(
     current_memory: dict[str, Any],
     config: Any,
 ) -> list[dict[str, Any]]:
-    "执行 _select_stale_candidates 的明确职责，并返回与调用约定一致的结果。\n\nReturn facts that have exceeded their individual review window.\n\n    Each fact's effective review age is determined by\n    ``_effective_fact_staleness_age``: facts with an LLM-assigned\n    ``expected_valid_days`` use that value directly; facts without it fall back\n    to the global ``staleness_age_days``.  Protected categories (default:\n    ``correction``) are excluded because they represent explicit user feedback\n    that should not be auto-pruned by age.\n    "
+    """执行 _select_stale_candidates 的明确职责，并返回与调用约定一致的结果。
+
+    Return facts that have exceeded their individual review window.
+
+        Each fact's effective review age is determined by
+        ``_effective_fact_staleness_age``: facts with an LLM-assigned
+        ``expected_valid_days`` use that value directly; facts without it fall back
+        to the global ``staleness_age_days``.  Protected categories (default:
+        ``correction``) are excluded because they represent explicit user feedback
+        that should not be auto-pruned by age.
+    """
     now = datetime.now(UTC)
     protected = frozenset(config.staleness_protected_categories)
     candidates: list[dict[str, Any]] = []
@@ -393,7 +472,15 @@ def _build_staleness_section(
     stale_candidates: list[dict[str, Any]],
     config: Any,
 ) -> str:
-    '执行 _build_staleness_section 的明确职责，并返回与调用约定一致的结果。\n\nFormat the staleness review prompt section from candidate facts.\n\n    Each fact line includes a ``valid:Nd`` annotation - the effective review\n    window for that fact - so the LLM can calibrate its conservatism: a fact\n    reviewed after 30 days was considered volatile at creation; one reviewed\n    after 365 days was considered stable.\n    '
+    """执行 _build_staleness_section 的明确职责，并返回与调用约定一致的结果。
+
+    Format the staleness review prompt section from candidate facts.
+
+        Each fact line includes a ``valid:Nd`` annotation - the effective review
+        window for that fact - so the LLM can calibrate its conservatism: a fact
+        reviewed after 30 days was considered volatile at creation; one reviewed
+        after 365 days was considered stable.
+    """
     if not stale_candidates:
         return ""
     lines: list[str] = []
@@ -419,7 +506,15 @@ def _select_consolidation_candidates(
     current_memory: dict[str, Any],
     config: Any,
 ) -> dict[str, list[dict[str, Any]]]:
-    '执行 _select_consolidation_candidates 的明确职责，并返回与调用约定一致的结果。\n\nReturn fact categories that exceed the fragmentation threshold.\n\n    Groups facts by category; only categories with at least\n    ``consolidation_min_facts`` entries are returned.  Categories in\n    ``staleness_protected_categories`` are exempt, mirroring the staleness\n    contract so explicit user feedback is never surfaced for merging.\n    '
+    """执行 _select_consolidation_candidates 的明确职责，并返回与调用约定一致的结果。
+
+    Return fact categories that exceed the fragmentation threshold.
+
+        Groups facts by category; only categories with at least
+        ``consolidation_min_facts`` entries are returned.  Categories in
+        ``staleness_protected_categories`` are exempt, mirroring the staleness
+        contract so explicit user feedback is never surfaced for merging.
+    """
     facts = current_memory.get("facts", [])
     if not facts:
         return {}
@@ -440,7 +535,14 @@ def _build_consolidation_section(
     max_groups: int = 3,
     max_sources: int = 8,
 ) -> str:
-    '执行 _build_consolidation_section 的明确职责，并返回与调用约定一致的结果。\n\nFormat consolidation candidate groups into the prompt section.\n\n    Surfaces at most ``max_groups`` categories (largest fragmented groups first)\n    and at most ``max_sources`` facts per group, matching the caps enforced at\n    apply time so the LLM is never shown groups it cannot act on.\n    '
+    """执行 _build_consolidation_section 的明确职责，并返回与调用约定一致的结果。
+
+    Format consolidation candidate groups into the prompt section.
+
+        Surfaces at most ``max_groups`` categories (largest fragmented groups first)
+        and at most ``max_sources`` facts per group, matching the caps enforced at
+        apply time so the LLM is never shown groups it cannot act on.
+    """
     if not candidates:
         return ""
     # Prioritise the most fragmented categories; alphabetical tiebreak for stability.
@@ -459,7 +561,26 @@ def _build_consolidation_section(
 
 
 def _escape_memory_for_prompt(memory: Any) -> Any:
-    '执行 _escape_memory_for_prompt 的明确职责，并返回与调用约定一致的结果。\n\nReturn a copy of ``memory`` with every string leaf HTML-escaped.\n\n    ``MEMORY_UPDATE_PROMPT`` embeds the full memory state as a ``json.dumps``\n    blob inside a ``<current_memory>...</current_memory>`` block. ``json.dumps``\n    escapes ``"`` and ``\\`` but leaves ``<``, ``>`` and ``&`` intact, so a\n    user-influenced field - e.g. a fact ``content`` of\n    ``</current_memory><evil>...`` - would otherwise reach the model verbatim\n    and break out of the block (prompt injection, #4044).\n\n    Escaping each string *value* before serialization (rather than the\n    serialized blob) cannot corrupt the JSON structure, because ``json.dumps``\n    re-quotes the already-safe values. Escaping every leaf - not just known\n    fields - guarantees no current or future user-influenced field can carry a\n    raw ``<``/``>``/``&``; controlled fields such as ids and timestamps contain\n    none of those characters, so escaping them is a harmless no-op. This mirrors\n    the ``html.escape`` treatment already applied to the staleness and\n    consolidation sections (#4028).\n    '
+    """执行 _escape_memory_for_prompt 的明确职责，并返回与调用约定一致的结果。
+
+    Return a copy of ``memory`` with every string leaf HTML-escaped.
+
+        ``MEMORY_UPDATE_PROMPT`` embeds the full memory state as a ``json.dumps``
+        blob inside a ``<current_memory>...</current_memory>`` block. ``json.dumps``
+        escapes ``"`` and ``\\`` but leaves ``<``, ``>`` and ``&`` intact, so a
+        user-influenced field - e.g. a fact ``content`` of
+        ``</current_memory><evil>...`` - would otherwise reach the model verbatim
+        and break out of the block (prompt injection, #4044).
+
+        Escaping each string *value* before serialization (rather than the
+        serialized blob) cannot corrupt the JSON structure, because ``json.dumps``
+        re-quotes the already-safe values. Escaping every leaf - not just known
+        fields - guarantees no current or future user-influenced field can carry a
+        raw ``<``/``>``/``&``; controlled fields such as ids and timestamps contain
+        none of those characters, so escaping them is a harmless no-op. This mirrors
+        the ``html.escape`` treatment already applied to the staleness and
+        consolidation sections (#4028).
+    """
     if isinstance(memory, str):
         return html.escape(memory)
     if isinstance(memory, dict):
@@ -470,10 +591,21 @@ def _escape_memory_for_prompt(memory: Any) -> Any:
 
 
 class MemoryUpdater:
-    '封装 MemoryUpdater 的状态、协作关系与公开操作。\n\nUpdates memory using LLM based on conversation context.'
+    """封装 MemoryUpdater 的状态、协作关系与公开操作。
+
+    Updates memory using LLM based on conversation context."""
 
     def __init__(self, config: DeerMemConfig, storage: MemoryStorage, llm: Any = None):
-        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nInitialize the memory updater with injected config + storage + llm (DI).\n\n        Args:\n            config: DeerMem private configuration.\n            storage: Memory storage instance (owned by DeerMem, injected here).\n            llm: The chat model for memory extraction (owned by DeerMem, injected\n                here). None when no LLM is configured; an update raises in that case.\n        '
+        """实现 __init__ 协议方法，保持对象交互语义一致。
+
+        Initialize the memory updater with injected config + storage + llm (DI).
+
+                Args:
+                    config: DeerMem private configuration.
+                    storage: Memory storage instance (owned by DeerMem, injected here).
+                    llm: The chat model for memory extraction (owned by DeerMem, injected
+                        here). None when no LLM is configured; an update raises in that case.
+        """
         self._config = config
         self._storage = storage
         self._llm = llm
@@ -481,32 +613,58 @@ class MemoryUpdater:
     # ── Data access + fact CRUD (formerly module-level functions; use self._storage) ──
 
     def _save_memory_to_file(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> bool:
-        '执行 _save_memory_to_file 的明确职责，并返回与调用约定一致的结果。\n\nPersist memory data via the injected storage.'
+        """执行 _save_memory_to_file 的明确职责，并返回与调用约定一致的结果。
+
+        Persist memory data via the injected storage."""
         return self._storage.save(memory_data, agent_name, user_id=user_id)
 
     def get_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '读取并返回，并遵守 get_memory_data 所表达的接口约束。\n\nGet the current memory data via the injected storage.'
+        """读取并返回，并遵守 get_memory_data 所表达的接口约束。
+
+        Get the current memory data via the injected storage."""
         return self._storage.load(agent_name, user_id=user_id)
 
     def reload_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '执行 reload_memory_data 的明确职责，并返回与调用约定一致的结果。\n\nReload memory data via the injected storage.'
+        """执行 reload_memory_data 的明确职责，并返回与调用约定一致的结果。
+
+        Reload memory data via the injected storage."""
         return self._storage.reload(agent_name, user_id=user_id)
 
     def import_memory_data(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '执行 import_memory_data 的明确职责，并返回与调用约定一致的结果。\n\nPersist imported memory data via the injected storage.'
+        """执行 import_memory_data 的明确职责，并返回与调用约定一致的结果。
+
+        Persist imported memory data via the injected storage."""
         if not self._storage.save(memory_data, agent_name, user_id=user_id):
             raise OSError("Failed to save imported memory data")
         return self._storage.load(agent_name, user_id=user_id)
 
     def clear_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '执行 clear_memory_data 的明确职责，并返回与调用约定一致的结果。\n\nClear all stored memory data and persist an empty structure.'
+        """执行 clear_memory_data 的明确职责，并返回与调用约定一致的结果。
+
+        Clear all stored memory data and persist an empty structure."""
         cleared_memory = create_empty_memory()
         if not self._save_memory_to_file(cleared_memory, agent_name, user_id=user_id):
             raise OSError("Failed to save cleared memory data")
         return cleared_memory
 
     def create_memory_fact(self, content: str, category: str = "context", confidence: float = 0.5, agent_name: str | None = None, *, user_id: str | None = None) -> tuple[dict[str, Any], str | None]:
-        '创建并返回，并遵守 create_memory_fact 所表达的接口约束。\n\nCreate a new fact, persist it, and return ``(updated_memory, fact_id)``.\n\n        The fact_id is returned directly so callers (e.g. the memory_add tool)\n        don\'t have to re-derive it from the memory data by content matching --\n        which would couple them to the backend\'s content normalization and could\n        misreport a storage cap on backends that normalize differently.\n\n        The new fact is then trimmed by :func:`_trim_facts_to_max` (highest-\n        confidence wins, confidence coerced). If the cap evicts the just-added\n        (lower-confidence) fact, ``fact_id`` is ``None`` so callers report\n        "not stored - cap reached" instead of a dangling id with a false\n        "added" status. This restores both the max_facts cap and the post-trim\n        existence check (upstream\'s ``create_memory_fact_with_created_fact``),\n        which the vendored copy had dropped together to avoid the dangling id.\n        '
+        """创建并返回，并遵守 create_memory_fact 所表达的接口约束。
+
+        Create a new fact, persist it, and return ``(updated_memory, fact_id)``.
+
+                The fact_id is returned directly so callers (e.g. the memory_add tool)
+                don't have to re-derive it from the memory data by content matching --
+                which would couple them to the backend's content normalization and could
+                misreport a storage cap on backends that normalize differently.
+
+                The new fact is then trimmed by :func:`_trim_facts_to_max` (highest-
+                confidence wins, confidence coerced). If the cap evicts the just-added
+                (lower-confidence) fact, ``fact_id`` is ``None`` so callers report
+                "not stored - cap reached" instead of a dangling id with a false
+                "added" status. This restores both the max_facts cap and the post-trim
+                existence check (upstream's ``create_memory_fact_with_created_fact``),
+                which the vendored copy had dropped together to avoid the dangling id.
+        """
         normalized_content = content.strip()
         if not normalized_content:
             raise ValueError("content")
@@ -536,7 +694,9 @@ class MemoryUpdater:
         return updated_memory, (fact_id if stored else None)
 
     def delete_memory_fact(self, fact_id: str, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '删除目标资源并返回操作结果，并遵守 delete_memory_fact 所表达的接口约束。\n\nDelete a fact by its id and persist the updated memory data.'
+        """删除目标资源并返回操作结果，并遵守 delete_memory_fact 所表达的接口约束。
+
+        Delete a fact by its id and persist the updated memory data."""
         memory_data = self.get_memory_data(agent_name, user_id=user_id)
         facts = memory_data.get("facts", [])
         updated_facts = [fact for fact in facts if fact.get("id") != fact_id]
@@ -549,7 +709,9 @@ class MemoryUpdater:
         return updated_memory
 
     def update_memory_fact(self, fact_id: str, content: str | None = None, category: str | None = None, confidence: float | None = None, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '更新目标状态并返回最新结果，并遵守 update_memory_fact 所表达的接口约束。\n\nUpdate an existing fact and persist the updated memory data.'
+        """更新目标状态并返回最新结果，并遵守 update_memory_fact 所表达的接口约束。
+
+        Update an existing fact and persist the updated memory data."""
         memory_data = self.get_memory_data(agent_name, user_id=user_id)
         updated_memory = dict(memory_data)
         updated_facts: list[dict[str, Any]] = []
@@ -582,7 +744,9 @@ class MemoryUpdater:
         correction_detected: bool,
         reinforcement_detected: bool,
     ) -> str:
-        '执行 _build_correction_hint 的明确职责，并返回与调用约定一致的结果。\n\nBuild optional prompt hints for correction and reinforcement signals.'
+        """执行 _build_correction_hint 的明确职责，并返回与调用约定一致的结果。
+
+        Build optional prompt hints for correction and reinforcement signals."""
         correction_hint = ""
         if correction_detected:
             correction_hint = (
@@ -610,7 +774,9 @@ class MemoryUpdater:
         reinforcement_detected: bool,
         user_id: str | None = None,
     ) -> tuple[dict[str, Any], str] | None:
-        '执行 _prepare_update_prompt 的明确职责，并返回与调用约定一致的结果。\n\nLoad memory and build the update prompt for a conversation.'
+        """执行 _prepare_update_prompt 的明确职责，并返回与调用约定一致的结果。
+
+        Load memory and build the update prompt for a conversation."""
         config = self._config
         if not messages:
             return None
@@ -660,7 +826,9 @@ class MemoryUpdater:
         agent_name: str | None,
         user_id: str | None = None,
     ) -> bool:
-        '执行 _finalize_update 的明确职责，并返回与调用约定一致的结果。\n\nParse the model response, apply updates, and persist memory.'
+        """执行 _finalize_update 的明确职责，并返回与调用约定一致的结果。
+
+        Parse the model response, apply updates, and persist memory."""
         update_data = _parse_memory_update_response(response_content)
         # Deep-copy before in-place mutation so a subsequent save() failure
         # cannot corrupt the still-cached original object reference.
@@ -678,7 +846,16 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        '执行 aupdate_memory 的明确职责，并返回与调用约定一致的结果。\n\nUpdate memory asynchronously by delegating to the sync path.\n\n        Uses ``asyncio.to_thread`` to run the *sync* ``model.invoke()`` path\n        in a worker thread so no second event loop is created and the\n        langchain async httpx client pool (shared with the lead agent) is\n        never touched.  This eliminates the cross-loop connection-reuse bug\n        described in issue #2615.\n        '
+        """执行 aupdate_memory 的明确职责，并返回与调用约定一致的结果。
+
+        Update memory asynchronously by delegating to the sync path.
+
+                Uses ``asyncio.to_thread`` to run the *sync* ``model.invoke()`` path
+                in a worker thread so no second event loop is created and the
+                langchain async httpx client pool (shared with the lead agent) is
+                never touched.  This eliminates the cross-loop connection-reuse bug
+                described in issue #2615.
+        """
         return await asyncio.to_thread(
             self._do_update_memory_sync,
             messages=messages,
@@ -700,7 +877,19 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        '执行 _do_update_memory_sync 的明确职责，并返回与调用约定一致的结果。\n\nPure-sync memory update; bind ``trace_id`` into the request-trace\n        ContextVar for the worker thread, then delegate to the impl.\n\n        The update runs on a Timer / executor thread with no request ContextVar\n        inheritance, so log records emitted here would otherwise lose the\n        request trace id (it only reached ``tracing_callback`` before). The\n        host-injected ``trace_context_manager`` hook (``None`` when DeerMem runs\n        standalone, outside the deer-flow factory) binds ``trace_id`` for the\n        duration of the call and restores the prior binding on exit. A ``None``\n        trace_id leaves the ContextVar untouched (no fabricated id).\n        '
+        """执行 _do_update_memory_sync 的明确职责，并返回与调用约定一致的结果。
+
+        Pure-sync memory update; bind ``trace_id`` into the request-trace
+                ContextVar for the worker thread, then delegate to the impl.
+
+                The update runs on a Timer / executor thread with no request ContextVar
+                inheritance, so log records emitted here would otherwise lose the
+                request trace id (it only reached ``tracing_callback`` before). The
+                host-injected ``trace_context_manager`` hook (``None`` when DeerMem runs
+                standalone, outside the deer-flow factory) binds ``trace_id`` for the
+                duration of the call and restores the prior binding on exit. A ``None``
+                trace_id leaves the ContextVar untouched (no fabricated id).
+        """
         cm = self._config.trace_context_manager
         if cm is not None and trace_id is not None:
             with cm(trace_id):
@@ -733,7 +922,16 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        "执行 _do_update_memory_sync_impl 的明确职责，并返回与调用约定一致的结果。\n\nPure-sync memory update using ``model.invoke()``.\n\n        Uses the *sync* LLM call path so no event loop is created.  This\n        guarantees that the langchain provider's globally cached async\n        httpx ``AsyncClient`` / connection pool (the one shared with the\n        lead agent) is never touched — no cross-loop connection reuse is\n        possible.\n        "
+        """执行 _do_update_memory_sync_impl 的明确职责，并返回与调用约定一致的结果。
+
+        Pure-sync memory update using ``model.invoke()``.
+
+                Uses the *sync* LLM call path so no event loop is created.  This
+                guarantees that the langchain provider's globally cached async
+                httpx ``AsyncClient`` / connection pool (the one shared with the
+                lead agent) is never touched — no cross-loop connection reuse is
+                possible.
+        """
         try:
             prepared = self._prepare_update_prompt(
                 messages=messages,
@@ -788,7 +986,30 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        "更新目标状态并返回最新结果，并遵守 update_memory 所表达的接口约束。\n\nSynchronously update memory using the sync LLM path.\n\n        Uses ``model.invoke()`` (sync HTTP) which operates on a completely\n        separate connection pool from the async ``AsyncClient`` shared by\n        the lead agent.  This eliminates the cross-loop connection-reuse\n        bug described in issue #2615.\n\n        When called from within a running event loop (e.g. from a LangGraph\n        node), the blocking sync call is offloaded to a thread pool so the\n        caller's loop is not blocked.\n\n        Args:\n            messages: List of conversation messages.\n            thread_id: Optional thread ID for tracking source.\n            agent_name: If provided, updates per-agent memory. If None, updates global memory.\n            correction_detected: Whether recent turns include an explicit correction signal.\n            reinforcement_detected: Whether recent turns include a positive reinforcement signal.\n            user_id: If provided, scopes memory to a specific user.\n\n        Returns:\n            True if update was successful, False otherwise.\n        "
+        """更新目标状态并返回最新结果，并遵守 update_memory 所表达的接口约束。
+
+        Synchronously update memory using the sync LLM path.
+
+                Uses ``model.invoke()`` (sync HTTP) which operates on a completely
+                separate connection pool from the async ``AsyncClient`` shared by
+                the lead agent.  This eliminates the cross-loop connection-reuse
+                bug described in issue #2615.
+
+                When called from within a running event loop (e.g. from a LangGraph
+                node), the blocking sync call is offloaded to a thread pool so the
+                caller's loop is not blocked.
+
+                Args:
+                    messages: List of conversation messages.
+                    thread_id: Optional thread ID for tracking source.
+                    agent_name: If provided, updates per-agent memory. If None, updates global memory.
+                    correction_detected: Whether recent turns include an explicit correction signal.
+                    reinforcement_detected: Whether recent turns include a positive reinforcement signal.
+                    user_id: If provided, scopes memory to a specific user.
+
+                Returns:
+                    True if update was successful, False otherwise.
+        """
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -827,7 +1048,18 @@ class MemoryUpdater:
         update_data: dict[str, Any],
         thread_id: str | None = None,
     ) -> dict[str, Any]:
-        '执行 _apply_updates 的明确职责，并返回与调用约定一致的结果。\n\nApply LLM-generated updates to memory.\n\n        Args:\n            current_memory: Current memory data.\n            update_data: Updates from LLM.\n            thread_id: Optional thread ID for tracking.\n\n        Returns:\n            Updated memory data.\n        '
+        """执行 _apply_updates 的明确职责，并返回与调用约定一致的结果。
+
+        Apply LLM-generated updates to memory.
+
+                Args:
+                    current_memory: Current memory data.
+                    update_data: Updates from LLM.
+                    thread_id: Optional thread ID for tracking.
+
+                Returns:
+                    Updated memory data.
+        """
         config = self._config
         now = utc_now_iso_z()
 

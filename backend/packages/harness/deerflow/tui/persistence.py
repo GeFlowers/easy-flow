@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -11,45 +11,45 @@ from deerflow.runtime.user_context import DEFAULT_USER_ID
 
 
 class _LoopThread:
-    '未说明'
+    "未说明"
 
     def __init__(self) -> None:
-        '未说明'
+        "未说明"
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run, name="deerflow-tui-db", daemon=True)
         self._thread.start()
 
     def _run(self) -> None:
-        '未说明'
+        "未说明"
         asyncio.set_event_loop(self._loop)
         self._loop.run_forever()
 
     def run(self, coro: Awaitable[Any], *, timeout: float = 15.0) -> Any:
-        '未说明'
+        "未说明"
         future = asyncio.run_coroutine_threadsafe(coro, self._loop)
         return future.result(timeout)
 
     def close(self) -> None:
-        '未说明'
+        "未说明"
         self._loop.call_soon_threadsafe(self._loop.stop)
 
 
 class ThreadMetaWriter:
-    '未说明'
+    "未说明"
 
     def __init__(self, loop: _LoopThread, store: Any) -> None:
-        '未说明'
+        "未说明"
         self._loop = loop
         self._store = store
         self.user_id = DEFAULT_USER_ID
 
     @property
     def enabled(self) -> bool:
-        '未说明'
+        "未说明"
         return self._store is not None
 
     def ensure_created(self, thread_id: str, *, assistant_id: str | None = None, metadata: dict | None = None) -> None:
-        '未说明'
+        "未说明"
         if not self._store or not thread_id:
             return
         try:
@@ -58,7 +58,7 @@ class ThreadMetaWriter:
             pass
 
     async def _ensure_created(self, thread_id: str, assistant_id: str | None, metadata: dict | None) -> None:
-        '未说明'
+        "未说明"
         existing = await self._store.get(thread_id, user_id=self.user_id)
         if existing is None:
             await self._store.create(
@@ -69,7 +69,7 @@ class ThreadMetaWriter:
             )
 
     def set_title(self, thread_id: str, title: str) -> None:
-        '未说明'
+        "未说明"
         if not self._store or not thread_id or not title:
             return
         try:
@@ -79,7 +79,7 @@ class ThreadMetaWriter:
 
 
 def build_persistence() -> tuple[_LoopThread, ThreadMetaWriter]:
-    '未说明'
+    "未说明"
     loop = _LoopThread()
     store = None
     try:

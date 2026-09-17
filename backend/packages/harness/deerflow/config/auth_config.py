@@ -24,7 +24,7 @@ class OIDCProviderConfig(BaseModel):
         description="How the client authenticates at the token endpoint",
     )
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     auto_create_users: bool = Field(
         default=True,
         description="Automatically create a DeerFlow user on first SSO login",
@@ -42,11 +42,11 @@ class OIDCProviderConfig(BaseModel):
         description="Users with these email addresses are automatically granted the admin role on first login",
     )
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     pkce_enabled: bool = Field(default=True, description="Enable PKCE (S256) for the authorization code flow")
     nonce_enabled: bool = Field(default=True, description="Include and validate the nonce claim in ID tokens")
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     authorization_endpoint: str | None = Field(default=None)
     token_endpoint: str | None = Field(default=None)
     userinfo_endpoint: str | None = Field(default=None)

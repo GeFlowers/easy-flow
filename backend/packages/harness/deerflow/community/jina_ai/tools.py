@@ -1,4 +1,5 @@
-'定义 tools 模块提供的职责与可复用接口'
+"定义 tools 模块提供的职责与可复用接口"
+
 import asyncio
 
 from langchain.tools import tool
@@ -11,7 +12,7 @@ readability_extractor = ReadabilityExtractor()
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
-    '执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果'
+    "执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果"
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -24,7 +25,7 @@ def _coerce_bool(value: object, default: bool) -> bool:
 
 
 def _coerce_timeout(value: object, default: int) -> int:
-    '执行 _coerce_timeout 的明确职责，并返回与调用约定一致的结果'
+    "执行 _coerce_timeout 的明确职责，并返回与调用约定一致的结果"
     if isinstance(value, bool):
         return default
     if isinstance(value, int):
@@ -38,7 +39,7 @@ def _coerce_timeout(value: object, default: int) -> int:
 
 
 def _coerce_proxy(value: object) -> str | None:
-    '执行 _coerce_proxy 的明确职责，并返回与调用约定一致的结果'
+    "执行 _coerce_proxy 的明确职责，并返回与调用约定一致的结果"
     if not isinstance(value, str):
         return None
     proxy = value.strip()

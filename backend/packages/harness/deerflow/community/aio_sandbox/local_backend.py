@@ -1,4 +1,10 @@
-'定义 local_backend 模块提供的职责与可复用接口。\n\nLocal container backend for sandbox provisioning.\n\nManages sandbox containers using Docker or Apple Container on the local machine.\nHandles container lifecycle, port allocation, and cross-process container discovery.\n'
+"""定义 local_backend 模块提供的职责与可复用接口。
+
+Local container backend for sandbox provisioning.
+
+Manages sandbox containers using Docker or Apple Container on the local machine.
+Handles container lifecycle, port allocation, and cross-process container discovery.
+"""
 
 from __future__ import annotations
 
@@ -18,7 +24,16 @@ logger = logging.getLogger(__name__)
 
 
 def _parse_docker_timestamp(raw: str) -> float:
-    '执行 _parse_docker_timestamp 的明确职责，并返回与调用约定一致的结果。\n\nParse Docker\'s ISO 8601 timestamp into a Unix epoch float.\n\n    Docker returns timestamps with nanosecond precision and a trailing ``Z``\n    (e.g. ``2026-04-08T01:22:50.123456789Z``).  Python\'s ``fromisoformat``\n    accepts at most microseconds and (pre-3.11) does not accept ``Z``, so the\n    string is normalized before parsing.  Returns ``0.0`` on empty input or\n    parse failure so callers can use ``0.0`` as a sentinel for "unknown age".\n    '
+    """执行 _parse_docker_timestamp 的明确职责，并返回与调用约定一致的结果。
+
+    Parse Docker's ISO 8601 timestamp into a Unix epoch float.
+
+        Docker returns timestamps with nanosecond precision and a trailing ``Z``
+        (e.g. ``2026-04-08T01:22:50.123456789Z``).  Python's ``fromisoformat``
+        accepts at most microseconds and (pre-3.11) does not accept ``Z``, so the
+        string is normalized before parsing.  Returns ``0.0`` on empty input or
+        parse failure so callers can use ``0.0`` as a sentinel for "unknown age".
+    """
     if not raw:
         return 0.0
     try:
@@ -40,7 +55,12 @@ def _parse_docker_timestamp(raw: str) -> float:
 
 
 def _extract_host_port(inspect_entry: dict, container_port: int) -> int | None:
-    '执行 _extract_host_port 的明确职责，并返回与调用约定一致的结果。\n\nExtract the host port mapped to ``container_port/tcp`` from a docker inspect entry.\n\n    Returns None if the container has no port mapping for that port.\n    '
+    """执行 _extract_host_port 的明确职责，并返回与调用约定一致的结果。
+
+    Extract the host port mapped to ``container_port/tcp`` from a docker inspect entry.
+
+        Returns None if the container has no port mapping for that port.
+    """
     try:
         ports = (inspect_entry.get("NetworkSettings") or {}).get("Ports") or {}
         bindings = ports.get(f"{container_port}/tcp") or []
@@ -54,7 +74,15 @@ def _extract_host_port(inspect_entry: dict, container_port: int) -> int | None:
 
 
 def _format_container_mount(runtime: str, host_path: str, container_path: str, read_only: bool) -> list[str]:
-    "执行 _format_container_mount 的明确职责，并返回与调用约定一致的结果。\n\nFormat a bind-mount argument for the selected runtime.\n\n    Docker's ``-v host:container`` syntax is ambiguous for Windows drive-letter\n    paths like ``D:/...`` because ``:`` is both the drive separator and the\n    volume separator. Use ``--mount type=bind,...`` for Docker to avoid that\n    parsing ambiguity. Apple Container keeps using ``-v``.\n    "
+    """执行 _format_container_mount 的明确职责，并返回与调用约定一致的结果。
+
+    Format a bind-mount argument for the selected runtime.
+
+        Docker's ``-v host:container`` syntax is ambiguous for Windows drive-letter
+        paths like ``D:/...`` because ``:`` is both the drive separator and the
+        volume separator. Use ``--mount type=bind,...`` for Docker to avoid that
+        parsing ambiguity. Apple Container keeps using ``-v``.
+    """
     if runtime == "docker":
         mount_spec = f"type=bind,src={host_path},dst={container_path}"
         if read_only:
@@ -68,7 +96,9 @@ def _format_container_mount(runtime: str, host_path: str, container_path: str, r
 
 
 def _redact_container_command_for_log(cmd: list[str]) -> list[str]:
-    '执行 _redact_container_command_for_log 的明确职责，并返回与调用约定一致的结果。\n\nReturn a Docker/Container command with environment values redacted.'
+    """执行 _redact_container_command_for_log 的明确职责，并返回与调用约定一致的结果。
+
+    Return a Docker/Container command with environment values redacted."""
     redacted: list[str] = []
     redact_next_env = False
 
@@ -102,29 +132,40 @@ def _redact_container_command_for_log(cmd: list[str]) -> list[str]:
 
 
 def _format_container_command_for_log(cmd: list[str]) -> str:
-    '执行 _format_container_command_for_log 的明确职责，并返回与调用约定一致的结果'
+    "执行 _format_container_command_for_log 的明确职责，并返回与调用约定一致的结果"
     if os.name == "nt":
         return subprocess.list2cmdline(cmd)
     return shlex.join(cmd)
 
 
 def _normalize_sandbox_host(host: str) -> str:
-    '执行 _normalize_sandbox_host 的明确职责，并返回与调用约定一致的结果'
+    "执行 _normalize_sandbox_host 的明确职责，并返回与调用约定一致的结果"
     return host.strip().lower()
 
 
 def _is_ipv6_loopback_sandbox_host(host: str) -> bool:
-    '执行 _is_ipv6_loopback_sandbox_host 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_ipv6_loopback_sandbox_host 的明确职责，并返回与调用约定一致的结果"
     return _normalize_sandbox_host(host) in {"::1", "[::1]"}
 
 
 def _is_loopback_sandbox_host(host: str) -> bool:
-    '执行 _is_loopback_sandbox_host 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_loopback_sandbox_host 的明确职责，并返回与调用约定一致的结果"
     return _normalize_sandbox_host(host) in {"", "localhost", "127.0.0.1", "::1", "[::1]"}
 
 
 def _resolve_docker_bind_host(sandbox_host: str | None = None, bind_host: str | None = None) -> str:
-    '执行 _resolve_docker_bind_host 的明确职责，并返回与调用约定一致的结果。\n\nChoose the host interface for legacy Docker ``-p`` sandbox publishing.\n\n    Bare-metal/local runs talk to sandboxes through localhost and should not\n    expose the sandbox HTTP API on every host interface.  Docker-outside-of-\n    Docker deployments commonly use ``host.docker.internal`` from another\n    container; keep their legacy broad bind unless operators opt into a\n    narrower bind with ``DEER_FLOW_SANDBOX_BIND_HOST``.  When operators choose\n    an IPv6 loopback sandbox host, bind Docker to IPv6 loopback as well so the\n    advertised sandbox URL and published socket use the same address family.\n    '
+    """执行 _resolve_docker_bind_host 的明确职责，并返回与调用约定一致的结果。
+
+    Choose the host interface for legacy Docker ``-p`` sandbox publishing.
+
+        Bare-metal/local runs talk to sandboxes through localhost and should not
+        expose the sandbox HTTP API on every host interface.  Docker-outside-of-
+        Docker deployments commonly use ``host.docker.internal`` from another
+        container; keep their legacy broad bind unless operators opt into a
+        narrower bind with ``DEER_FLOW_SANDBOX_BIND_HOST``.  When operators choose
+        an IPv6 loopback sandbox host, bind Docker to IPv6 loopback as well so the
+        advertised sandbox URL and published socket use the same address family.
+    """
     explicit_bind = bind_host if bind_host is not None else os.environ.get("DEER_FLOW_SANDBOX_BIND_HOST")
     if explicit_bind is not None:
         explicit_bind = explicit_bind.strip()
@@ -145,7 +186,17 @@ def _resolve_docker_bind_host(sandbox_host: str | None = None, bind_host: str | 
 
 
 def _is_no_such_container_error(stderr: str, container_name: str) -> bool:
-    '执行 _is_no_such_container_error 的明确职责，并返回与调用约定一致的结果。\n\nReturn True only when stderr definitively says the container does not exist.\n\n    Docker reports "No such object" / "No such container". Apple Container\n    reports a generic "not found", so that phrase is only trusted when the\n    message also names the inspected container (or refers to a\n    container/object); transient failures whose text happens to contain\n    "not found" (e.g. "command not found", "context not found") must stay on\n    the raise path instead of being misread as a dead container.\n    '
+    """执行 _is_no_such_container_error 的明确职责，并返回与调用约定一致的结果。
+
+    Return True only when stderr definitively says the container does not exist.
+
+        Docker reports "No such object" / "No such container". Apple Container
+        reports a generic "not found", so that phrase is only trusted when the
+        message also names the inspected container (or refers to a
+        container/object); transient failures whose text happens to contain
+        "not found" (e.g. "command not found", "context not found") must stay on
+        the raise path instead of being misread as a dead container.
+    """
     message = stderr.lower()
     if "no such object" in message or "no such container" in message:
         return True
@@ -155,7 +206,19 @@ def _is_no_such_container_error(stderr: str, container_name: str) -> bool:
 
 
 class LocalContainerBackend(SandboxBackend):
-    '封装 LocalContainerBackend 的状态、协作关系与公开操作。\n\nBackend that manages sandbox containers locally using Docker or Apple Container.\n\n    On macOS, automatically prefers Apple Container if available, otherwise falls back to Docker.\n    On other platforms, uses Docker.\n\n    Features:\n    - Deterministic container naming for cross-process discovery\n    - Port allocation with thread-safe utilities\n    - Container lifecycle management (start/stop with --rm)\n    - Support for volume mounts and environment variables\n    '
+    """封装 LocalContainerBackend 的状态、协作关系与公开操作。
+
+    Backend that manages sandbox containers locally using Docker or Apple Container.
+
+        On macOS, automatically prefers Apple Container if available, otherwise falls back to Docker.
+        On other platforms, uses Docker.
+
+        Features:
+        - Deterministic container naming for cross-process discovery
+        - Port allocation with thread-safe utilities
+        - Container lifecycle management (start/stop with --rm)
+        - Support for volume mounts and environment variables
+    """
 
     def __init__(
         self,
@@ -166,7 +229,17 @@ class LocalContainerBackend(SandboxBackend):
         config_mounts: list,
         environment: dict[str, str],
     ):
-        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nInitialize the local container backend.\n\n        Args:\n            image: Container image to use.\n            base_port: Base port number to start searching for free ports.\n            container_prefix: Prefix for container names (e.g., "deer-flow-sandbox").\n            config_mounts: Volume mount configurations from config (list of VolumeMountConfig).\n            environment: Environment variables to inject into containers.\n        '
+        """实现 __init__ 协议方法，保持对象交互语义一致。
+
+        Initialize the local container backend.
+
+                Args:
+                    image: Container image to use.
+                    base_port: Base port number to start searching for free ports.
+                    container_prefix: Prefix for container names (e.g., "deer-flow-sandbox").
+                    config_mounts: Volume mount configurations from config (list of VolumeMountConfig).
+                    environment: Environment variables to inject into containers.
+        """
         self._image = image
         self._base_port = base_port
         self._container_prefix = container_prefix
@@ -176,11 +249,22 @@ class LocalContainerBackend(SandboxBackend):
 
     @property
     def runtime(self) -> str:
-        '执行任务并返回执行结果，并遵守 runtime 所表达的接口约束。\n\nThe detected container runtime ("docker" or "container").'
+        """执行任务并返回执行结果，并遵守 runtime 所表达的接口约束。
+
+        The detected container runtime ("docker" or "container")."""
         return self._runtime
 
     def _detect_runtime(self) -> str:
-        '执行 _detect_runtime 的明确职责，并返回与调用约定一致的结果。\n\nDetect which container runtime to use.\n\n        On macOS, prefer Apple Container if available, otherwise fall back to Docker.\n        On other platforms, use Docker.\n\n        Returns:\n            "container" for Apple Container, "docker" for Docker.\n        '
+        """执行 _detect_runtime 的明确职责，并返回与调用约定一致的结果。
+
+        Detect which container runtime to use.
+
+                On macOS, prefer Apple Container if available, otherwise fall back to Docker.
+                On other platforms, use Docker.
+
+                Returns:
+                    "container" for Apple Container, "docker" for Docker.
+        """
         import platform
 
         if platform.system() == "Darwin":
@@ -209,7 +293,23 @@ class LocalContainerBackend(SandboxBackend):
         *,
         user_id: str | None = None,
     ) -> SandboxInfo:
-        '创建并返回，并遵守 create 所表达的接口约束。\n\nStart a new container and return its connection info.\n\n        Args:\n            thread_id: Thread ID for which the sandbox is being created. Useful for backends that want to organize sandboxes by thread.\n            sandbox_id: Deterministic sandbox identifier (used in container name).\n            extra_mounts: Additional volume mounts as (host_path, container_path, read_only) tuples.\n            user_id: User bucket already reflected in extra_mounts. Accepted for\n                interface compatibility with remote backends.\n\n        Returns:\n            SandboxInfo with container details.\n\n        Raises:\n            RuntimeError: If the container fails to start.\n        '
+        """创建并返回，并遵守 create 所表达的接口约束。
+
+        Start a new container and return its connection info.
+
+                Args:
+                    thread_id: Thread ID for which the sandbox is being created. Useful for backends that want to organize sandboxes by thread.
+                    sandbox_id: Deterministic sandbox identifier (used in container name).
+                    extra_mounts: Additional volume mounts as (host_path, container_path, read_only) tuples.
+                    user_id: User bucket already reflected in extra_mounts. Accepted for
+                        interface compatibility with remote backends.
+
+                Returns:
+                    SandboxInfo with container details.
+
+                Raises:
+                    RuntimeError: If the container fails to start.
+        """
         del user_id
         container_name = f"{self._container_prefix}-{sandbox_id}"
 
@@ -258,7 +358,9 @@ class LocalContainerBackend(SandboxBackend):
         )
 
     def destroy(self, info: SandboxInfo) -> None:
-        '执行 destroy 的明确职责，并返回与调用约定一致的结果。\n\nStop the container and release its port.'
+        """执行 destroy 的明确职责，并返回与调用约定一致的结果。
+
+        Stop the container and release its port."""
         # Prefer container_id, fall back to container_name (both accepted by docker stop).
         # This ensures containers discovered via list_running() (which only has the name)
         # can also be stopped.
@@ -276,13 +378,31 @@ class LocalContainerBackend(SandboxBackend):
             pass
 
     def is_alive(self, info: SandboxInfo) -> bool:
-        '判断条件是否成立并返回布尔结果，并遵守 is_alive 所表达的接口约束。\n\nCheck if the container is still running (lightweight, no HTTP).'
+        """判断条件是否成立并返回布尔结果，并遵守 is_alive 所表达的接口约束。
+
+        Check if the container is still running (lightweight, no HTTP)."""
         if info.container_name:
             return self._is_container_running(info.container_name)
         return False
 
     def discover(self, sandbox_id: str) -> SandboxInfo | None:
-        '执行 discover 的明确职责，并返回与调用约定一致的结果。\n\nDiscover an existing container by its deterministic name.\n\n        Checks if a container with the expected name is running, retrieves its\n        port, and verifies it responds to health checks.\n\n        Args:\n            sandbox_id: The deterministic sandbox ID (determines container name).\n\n        Returns:\n            SandboxInfo if container found and healthy, None otherwise. A\n            failed runtime check (e.g. transient daemon error) also returns\n            None — discovery must not adopt a container it cannot verify, and\n            falling through to create keeps acquire recoverable instead of\n            hard-failing on a hiccup.\n        '
+        """执行 discover 的明确职责，并返回与调用约定一致的结果。
+
+        Discover an existing container by its deterministic name.
+
+                Checks if a container with the expected name is running, retrieves its
+                port, and verifies it responds to health checks.
+
+                Args:
+                    sandbox_id: The deterministic sandbox ID (determines container name).
+
+                Returns:
+                    SandboxInfo if container found and healthy, None otherwise. A
+                    failed runtime check (e.g. transient daemon error) also returns
+                    None — discovery must not adopt a container it cannot verify, and
+                    falling through to create keeps acquire recoverable instead of
+                    hard-failing on a hiccup.
+        """
         container_name = f"{self._container_prefix}-{sandbox_id}"
 
         try:
@@ -310,7 +430,23 @@ class LocalContainerBackend(SandboxBackend):
         )
 
     def list_running(self) -> list[SandboxInfo]:
-        "收集并返回，并遵守 list_running 所表达的接口约束。\n\nEnumerate all running containers matching the configured prefix.\n\n        Uses a single ``docker ps`` call to list container names, then a\n        single batched ``docker inspect`` call to retrieve creation timestamp\n        and port mapping for all containers at once.  Total subprocess calls:\n        2 (down from 2N+1 in the naive per-container approach).\n\n        Note: Docker's ``--filter name=`` performs *substring* matching,\n        so a secondary ``startswith`` check is applied to ensure only\n        containers with the exact prefix are included.\n\n        Containers without port mappings are still included (with empty\n        sandbox_url) so that startup reconciliation can adopt orphans\n        regardless of their port state.\n        "
+        """收集并返回，并遵守 list_running 所表达的接口约束。
+
+        Enumerate all running containers matching the configured prefix.
+
+                Uses a single ``docker ps`` call to list container names, then a
+                single batched ``docker inspect`` call to retrieve creation timestamp
+                and port mapping for all containers at once.  Total subprocess calls:
+                2 (down from 2N+1 in the naive per-container approach).
+
+                Note: Docker's ``--filter name=`` performs *substring* matching,
+                so a secondary ``startswith`` check is applied to ensure only
+                containers with the exact prefix are included.
+
+                Containers without port mappings are still included (with empty
+                sandbox_url) so that startup reconciliation can adopt orphans
+                regardless of their port state.
+        """
         # Step 1: enumerate container names via docker ps
         try:
             result = subprocess.run(
@@ -373,7 +509,13 @@ class LocalContainerBackend(SandboxBackend):
         return infos
 
     def _batch_inspect(self, container_names: list[str]) -> dict[str, tuple[float, int | None]]:
-        '执行 _batch_inspect 的明确职责，并返回与调用约定一致的结果。\n\nBatch-inspect containers in a single subprocess call.\n\n        Returns a mapping of ``container_name -> (created_at, host_port)``.\n        Missing containers or parse failures are silently dropped from the result.\n        '
+        """执行 _batch_inspect 的明确职责，并返回与调用约定一致的结果。
+
+        Batch-inspect containers in a single subprocess call.
+
+                Returns a mapping of ``container_name -> (created_at, host_port)``.
+                Missing containers or parse failures are silently dropped from the result.
+        """
         if not container_names:
             return {}
         try:
@@ -422,7 +564,21 @@ class LocalContainerBackend(SandboxBackend):
         port: int,
         extra_mounts: list[tuple[str, str, bool]] | None = None,
     ) -> str:
-        '执行 _start_container 的明确职责，并返回与调用约定一致的结果。\n\nStart a new container.\n\n        Args:\n            container_name: Name for the container.\n            port: Host port to map to container port 8080.\n            extra_mounts: Additional volume mounts.\n\n        Returns:\n            The container ID.\n\n        Raises:\n            RuntimeError: If container fails to start.\n        '
+        """执行 _start_container 的明确职责，并返回与调用约定一致的结果。
+
+        Start a new container.
+
+                Args:
+                    container_name: Name for the container.
+                    port: Host port to map to container port 8080.
+                    extra_mounts: Additional volume mounts.
+
+                Returns:
+                    The container ID.
+
+                Raises:
+                    RuntimeError: If container fails to start.
+        """
         cmd = [self._runtime, "run"]
 
         # Docker-specific security options
@@ -487,7 +643,9 @@ class LocalContainerBackend(SandboxBackend):
             raise RuntimeError(f"Failed to start sandbox container: {e.stderr}")
 
     def _stop_container(self, container_id: str) -> None:
-        '执行 _stop_container 的明确职责，并返回与调用约定一致的结果。\n\nStop a container (--rm ensures automatic removal).'
+        """执行 _stop_container 的明确职责，并返回与调用约定一致的结果。
+
+        Stop a container (--rm ensures automatic removal)."""
         try:
             subprocess.run(
                 [self._runtime, "stop", container_id],
@@ -500,7 +658,20 @@ class LocalContainerBackend(SandboxBackend):
             logger.warning(f"Failed to stop container {container_id}: {e.stderr}")
 
     def _is_container_running(self, container_name: str) -> bool:
-        '执行 _is_container_running 的明确职责，并返回与调用约定一致的结果。\n\nCheck if a named container is currently running.\n\n        This enables cross-process container discovery — any process can detect\n        containers started by another process via the deterministic container name.\n\n        Raises:\n            RuntimeError: If the container runtime cannot answer the inspect\n                query. A failed check is intentionally distinct from a\n                definitive "container does not exist" result so callers do not\n                destroy healthy containers during transient Docker/Container\n                daemon failures.\n        '
+        """执行 _is_container_running 的明确职责，并返回与调用约定一致的结果。
+
+        Check if a named container is currently running.
+
+                This enables cross-process container discovery — any process can detect
+                containers started by another process via the deterministic container name.
+
+                Raises:
+                    RuntimeError: If the container runtime cannot answer the inspect
+                        query. A failed check is intentionally distinct from a
+                        definitive "container does not exist" result so callers do not
+                        destroy healthy containers during transient Docker/Container
+                        daemon failures.
+        """
         try:
             result = subprocess.run(
                 [self._runtime, "inspect", "-f", "{{.State.Running}}", container_name],
@@ -518,7 +689,16 @@ class LocalContainerBackend(SandboxBackend):
         raise RuntimeError(f"Failed to inspect container {container_name}: {result.stderr.strip()}")
 
     def _get_container_port(self, container_name: str) -> int | None:
-        '执行 _get_container_port 的明确职责，并返回与调用约定一致的结果。\n\nGet the host port of a running container.\n\n        Args:\n            container_name: The container name to inspect.\n\n        Returns:\n            The host port mapped to container port 8080, or None if not found.\n        '
+        """执行 _get_container_port 的明确职责，并返回与调用约定一致的结果。
+
+        Get the host port of a running container.
+
+                Args:
+                    container_name: The container name to inspect.
+
+                Returns:
+                    The host port mapped to container port 8080, or None if not found.
+        """
         try:
             result = subprocess.run(
                 [self._runtime, "port", container_name, "8080"],

@@ -1,4 +1,8 @@
-'定义 tools 模块提供的职责与可复用接口。\n\n\nWeb Search Tool - Search the web using DuckDuckGo (no API key required).\n'
+"""定义 tools 模块提供的职责与可复用接口。
+
+
+Web Search Tool - Search the web using DuckDuckGo (no API key required).
+"""
 
 import json
 import logging
@@ -24,7 +28,7 @@ WIKIPEDIA_LANGUAGE_ALIASES = {
 
 
 def _normalize_backend(backend: str | list[str] | tuple[str, ...] | None) -> str:
-    '执行 _normalize_backend 的明确职责，并返回与调用约定一致的结果'
+    "执行 _normalize_backend 的明确职责，并返回与调用约定一致的结果"
     if backend is None:
         return DEFAULT_BACKEND
     if isinstance(backend, (list, tuple)):
@@ -33,23 +37,25 @@ def _normalize_backend(backend: str | list[str] | tuple[str, ...] | None) -> str
 
 
 def _normalize_setting(value: str | None, default: str) -> str:
-    '执行 _normalize_setting 的明确职责，并返回与调用约定一致的结果'
+    "执行 _normalize_setting 的明确职责，并返回与调用约定一致的结果"
     return str(value).strip() if value else default
 
 
 def _backend_includes_wikipedia(backend: str | list[str] | tuple[str, ...] | None) -> bool:
-    '执行 _backend_includes_wikipedia 的明确职责，并返回与调用约定一致的结果'
+    "执行 _backend_includes_wikipedia 的明确职责，并返回与调用约定一致的结果"
     backend = _normalize_backend(backend)
     return any(part.strip().lower() in WIKIPEDIA_BACKENDS for part in backend.split(","))
 
 
 def _contains_codepoint(query: str, ranges: tuple[tuple[int, int], ...]) -> bool:
-    '执行 _contains_codepoint 的明确职责，并返回与调用约定一致的结果'
+    "执行 _contains_codepoint 的明确职责，并返回与调用约定一致的结果"
     return any(start <= ord(char) <= end for char in query for start, end in ranges)
 
 
 def _infer_wikipedia_region(query: str) -> str:
-    "执行 _infer_wikipedia_region 的明确职责，并返回与调用约定一致的结果。\n\nPick a valid Wikipedia language region when DDGS' worldwide region is used."
+    """执行 _infer_wikipedia_region 的明确职责，并返回与调用约定一致的结果。
+
+    Pick a valid Wikipedia language region when DDGS' worldwide region is used."""
     if _contains_codepoint(query, ((0x3040, 0x30FF), (0x31F0, 0x31FF))):
         return "jp-ja"
     if _contains_codepoint(query, ((0xAC00, 0xD7AF), (0x1100, 0x11FF), (0x3130, 0x318F))):
@@ -68,7 +74,12 @@ def _infer_wikipedia_region(query: str) -> str:
 
 
 def _resolve_ddgs_region(query: str, region: str | None, backend: str | list[str] | tuple[str, ...] | None) -> str:
-    "执行 _resolve_ddgs_region 的明确职责，并返回与调用约定一致的结果。\n\n\n    DDGS' wikipedia engine treats the second part of region as a Wikipedia\n    subdomain. Its default worldwide region, wt-wt, becomes wt.wikipedia.org.\n    "
+    """执行 _resolve_ddgs_region 的明确职责，并返回与调用约定一致的结果。
+
+
+    DDGS' wikipedia engine treats the second part of region as a Wikipedia
+    subdomain. Its default worldwide region, wt-wt, becomes wt.wikipedia.org.
+    """
     normalized_region = _normalize_setting(region, DEFAULT_REGION).lower()
     if not _backend_includes_wikipedia(backend):
         return normalized_region
@@ -90,7 +101,21 @@ def _search_text(
     safesearch: str | None = DEFAULT_SAFESEARCH,
     backend: str | list[str] | tuple[str, ...] | None = DEFAULT_BACKEND,
 ) -> list[dict]:
-    '执行 _search_text 的明确职责，并返回与调用约定一致的结果。\n\n\n    Execute text search using DuckDuckGo.\n\n    Args:\n        query: Search keywords\n        max_results: Maximum number of results\n        region: Search region\n        safesearch: Safe search level\n        backend: DDGS backend(s), e.g. "auto", "duckduckgo", or "duckduckgo,brave"\n\n    Returns:\n        List of search results\n    '
+    """执行 _search_text 的明确职责，并返回与调用约定一致的结果。
+
+
+    Execute text search using DuckDuckGo.
+
+    Args:
+        query: Search keywords
+        max_results: Maximum number of results
+        region: Search region
+        safesearch: Safe search level
+        backend: DDGS backend(s), e.g. "auto", "duckduckgo", or "duckduckgo,brave"
+
+    Returns:
+        List of search results
+    """
     try:
         from ddgs import DDGS
     except ImportError:

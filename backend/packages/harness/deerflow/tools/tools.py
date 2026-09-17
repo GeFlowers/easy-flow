@@ -1,4 +1,5 @@
 """组装、筛选并返回当前代理可用的工具集合。"""
+
 import logging
 
 from langchain.tools import BaseTool
@@ -21,7 +22,7 @@ BUILTIN_TOOLS = [
 
 SUBAGENT_TOOLS = [
     task_tool,
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
 ]
 
 
@@ -55,16 +56,16 @@ def get_available_tools(
     config = app_config or get_app_config()
     tool_configs = [tool for tool in config.tools if groups is None or tool.group in groups]
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     if not is_host_bash_allowed(config):
         tool_configs = [tool for tool in tool_configs if not _is_host_bash_tool(tool)]
 
     loaded_tools_raw = [(cfg, resolve_variable(cfg.use, BaseTool)) for cfg in tool_configs]
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     for cfg, loaded in loaded_tools_raw:
         if cfg.name != loaded.name:
             logger.warning(
@@ -76,7 +77,7 @@ def get_available_tools(
 
     loaded_tools = [_ensure_sync_invocable_tool(t) for _, t in loaded_tools_raw]
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     builtin_tools = BUILTIN_TOOLS.copy()
     skill_evolution_config = getattr(config, "skill_evolution", None)
     if getattr(skill_evolution_config, "enabled", False):
@@ -116,11 +117,11 @@ def get_available_tools(
                 if mcp_tools:
                     logger.info(f"Using {len(mcp_tools)} cached MCP tool(s)")
 
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
-                                        # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
+                    # 中文说明：此处用于执行相关处理。
                     for t in mcp_tools:
                         tag_mcp_tool(t)
         except ImportError:
@@ -147,9 +148,9 @@ def get_available_tools(
 
     logger.info(f"Total tools loaded: {len(loaded_tools)}, built-in tools: {len(builtin_tools)}, MCP tools: {len(mcp_tools)}, ACP tools: {len(acp_tools)}")
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
     all_tools = [_ensure_sync_invocable_tool(t) for t in loaded_tools + builtin_tools + mcp_tools + acp_tools]
     seen_names: set[str] = set()
     unique_tools: list[BaseTool] = []

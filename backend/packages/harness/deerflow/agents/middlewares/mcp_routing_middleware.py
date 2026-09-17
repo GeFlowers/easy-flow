@@ -1,4 +1,6 @@
-'定义 mcp_routing_middleware 模块提供的职责与可复用接口。\n\nAuto-promote deferred MCP tools from routing metadata before model calls.'
+"""定义 mcp_routing_middleware 模块提供的职责与可复用接口。
+
+Auto-promote deferred MCP tools from routing metadata before model calls."""
 
 from __future__ import annotations
 
@@ -18,7 +20,8 @@ logger = logging.getLogger(__name__)
 
 
 class McpRoutingIndexEntry(TypedDict):
-    '封装 McpRoutingIndexEntry 的状态、协作关系与公开操作'
+    "封装 McpRoutingIndexEntry 的状态、协作关系与公开操作"
+
     priority: int
     keywords: list[str]
 
@@ -27,7 +30,15 @@ McpRoutingIndex = Mapping[str, McpRoutingIndexEntry]
 
 
 class McpRoutingMiddleware(AgentMiddleware[AgentState]):
-    '封装 McpRoutingMiddleware 的状态、协作关系与公开操作。\n\nWrite minimal deferred-tool promotion state from latest user text.\n\n    The middleware intentionally receives only serialized routing data. It does\n    not hold ``BaseTool`` objects, does not execute tools, and does not filter\n    tool calls. ``DeferredToolFilterMiddleware`` remains responsible for hiding\n    unpromoted schemas and blocking unpromoted deferred tool calls.\n    '
+    """封装 McpRoutingMiddleware 的状态、协作关系与公开操作。
+
+    Write minimal deferred-tool promotion state from latest user text.
+
+        The middleware intentionally receives only serialized routing data. It does
+        not hold ``BaseTool`` objects, does not execute tools, and does not filter
+        tool calls. ``DeferredToolFilterMiddleware`` remains responsible for hiding
+        unpromoted schemas and blocking unpromoted deferred tool calls.
+    """
 
     def __init__(
         self,
@@ -35,7 +46,7 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
         catalog_hash: str | None,
         top_k: int,
     ) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__()
         self._catalog_hash = catalog_hash
         self._top_k = clamp_auto_promote_top_k(top_k)
@@ -48,7 +59,7 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
         # tool_search._routing_priority / _routing_keywords. In practice it is a
         # no-op over the builder's output; keep the coercion rules aligned with
         # those two helpers if either side changes.
-        '执行 _normalize_index 的明确职责，并返回与调用约定一致的结果'
+        "执行 _normalize_index 的明确职责，并返回与调用约定一致的结果"
         normalized: dict[str, tuple[int, tuple[str, ...]]] = {}
         for raw_name, raw_entry in routing_index.items():
             name = str(raw_name)
@@ -69,14 +80,14 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _latest_user_message(messages: list[Any]) -> HumanMessage | None:
-        '执行 _latest_user_message 的明确职责，并返回与调用约定一致的结果'
+        "执行 _latest_user_message 的明确职责，并返回与调用约定一致的结果"
         for message in reversed(messages):
             if is_real_user_message(message):
                 return message
         return None
 
     def _matched_names(self, state: Mapping[str, Any] | None) -> list[str]:
-        '执行 _matched_names 的明确职责，并返回与调用约定一致的结果'
+        "执行 _matched_names 的明确职责，并返回与调用约定一致的结果"
         if not self._catalog_hash or not self._routing_index:
             return []
         messages = list((state or {}).get("messages") or [])
@@ -101,7 +112,7 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
         return [name for _, name in matched[: self._top_k]]
 
     def _state_update(self, state: Mapping[str, Any] | None) -> dict[str, Any] | None:
-        '执行 _state_update 的明确职责，并返回与调用约定一致的结果'
+        "执行 _state_update 的明确职责，并返回与调用约定一致的结果"
         names = self._matched_names(state)
         if not names:
             return None
@@ -120,17 +131,19 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def before_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        '执行 before_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 before_model 的明确职责，并返回与调用约定一致的结果"
         return self._state_update(state)
 
     @override
     async def abefore_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        '执行 abefore_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 abefore_model 的明确职责，并返回与调用约定一致的结果"
         return self._state_update(state)
 
 
 def assert_mcp_routing_before_deferred_filter(middlewares: Sequence[AgentMiddleware]) -> None:
-    '执行 assert_mcp_routing_before_deferred_filter 的明确职责，并返回与调用约定一致的结果。\n\nFail fast if auto-promote would run after deferred schema filtering.'
+    """执行 assert_mcp_routing_before_deferred_filter 的明确职责，并返回与调用约定一致的结果。
+
+    Fail fast if auto-promote would run after deferred schema filtering."""
     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
 
     routing_idx = next((idx for idx, middleware in enumerate(middlewares) if isinstance(middleware, McpRoutingMiddleware)), None)

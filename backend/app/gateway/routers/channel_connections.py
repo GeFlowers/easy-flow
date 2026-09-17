@@ -32,6 +32,7 @@ _ADMIN_REQUIRED_DETAIL = "Admin privileges required to manage channel runtime cr
 
 class ChannelCredentialFieldResponse(BaseModel):
     """渠道凭据字段的 API 响应模型。"""
+
     name: str
     label: str
     type: str = "text"
@@ -40,6 +41,7 @@ class ChannelCredentialFieldResponse(BaseModel):
 
 class ChannelProviderResponse(BaseModel):
     """渠道提供商状态的 API 响应模型。"""
+
     provider: str
     display_name: str
     enabled: bool
@@ -54,12 +56,14 @@ class ChannelProviderResponse(BaseModel):
 
 class ChannelProvidersResponse(BaseModel):
     """渠道提供商列表的 API 响应模型。"""
+
     enabled: bool
     providers: list[ChannelProviderResponse]
 
 
 class ChannelConnectionResponse(BaseModel):
     """用户渠道连接记录的 API 响应模型。"""
+
     id: str
     provider: str
     status: str
@@ -73,11 +77,13 @@ class ChannelConnectionResponse(BaseModel):
 
 class ChannelConnectionsResponse(BaseModel):
     """用户渠道连接列表的 API 响应模型。"""
+
     connections: list[ChannelConnectionResponse]
 
 
 class ChannelConnectResponse(BaseModel):
     """发起渠道连接后的 API 响应模型。"""
+
     provider: str
     mode: str
     url: str | None = None
@@ -88,6 +94,7 @@ class ChannelConnectResponse(BaseModel):
 
 class ChannelRuntimeConfigRequest(BaseModel):
     """更新渠道运行时配置的 API 请求模型。"""
+
     values: dict[str, str] = Field(default_factory=dict)
 
 

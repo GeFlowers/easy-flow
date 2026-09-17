@@ -1,4 +1,32 @@
-'定义 dynamic_context_middleware 模块提供的职责与可复用接口。\n\nMiddleware to inject dynamic context (memory, current date) as a system-reminder.\n\nThe system prompt is kept fully static for maximum prefix-cache reuse across users\nand sessions.  The current date is always injected.  Per-user memory is also injected\nwhen ``memory.injection_enabled`` is True in the app config.  Both are delivered once\nper conversation as a dedicated <system-reminder> SystemMessage inserted before the\nfirst user message (frozen-snapshot pattern).\n\nWhen a conversation spans midnight the middleware detects the date change and injects\na lightweight date-update reminder as a separate SystemMessage before the current turn.\nThis correction is persisted so subsequent turns on the new day see a consistent history\nand do not re-inject.\n\nReminder format:\n\n    <system-reminder>\n    <memory>...</memory>\n\n    <current_date>2026-05-08, Friday</current_date>\n    </system-reminder>\n\nDate-update format:\n\n    <system-reminder>\n    <current_date>2026-05-09, Saturday</current_date>\n    </system-reminder>\n'
+"""定义 dynamic_context_middleware 模块提供的职责与可复用接口。
+
+Middleware to inject dynamic context (memory, current date) as a system-reminder.
+
+The system prompt is kept fully static for maximum prefix-cache reuse across users
+and sessions.  The current date is always injected.  Per-user memory is also injected
+when ``memory.injection_enabled`` is True in the app config.  Both are delivered once
+per conversation as a dedicated <system-reminder> SystemMessage inserted before the
+first user message (frozen-snapshot pattern).
+
+When a conversation spans midnight the middleware detects the date change and injects
+a lightweight date-update reminder as a separate SystemMessage before the current turn.
+This correction is persisted so subsequent turns on the new day see a consistent history
+and do not re-inject.
+
+Reminder format:
+
+    <system-reminder>
+    <memory>...</memory>
+
+    <current_date>2026-05-08, Friday</current_date>
+    </system-reminder>
+
+Date-update format:
+
+    <system-reminder>
+    <current_date>2026-05-09, Saturday</current_date>
+    </system-reminder>
+"""
 
 from __future__ import annotations
 
@@ -37,13 +65,17 @@ _SUMMARY_MESSAGE_NAME = "summary"
 
 
 def _extract_date(content: str) -> str | None:
-    '执行 _extract_date 的明确职责，并返回与调用约定一致的结果。\n\nReturn the first <current_date> value found in *content*, or None.'
+    """执行 _extract_date 的明确职责，并返回与调用约定一致的结果。
+
+    Return the first <current_date> value found in *content*, or None."""
     m = _DATE_RE.search(content)
     return m.group(1) if m else None
 
 
 def is_dynamic_context_reminder(message: object) -> bool:
-    '判断条件是否成立并返回布尔结果，并遵守 is_dynamic_context_reminder 所表达的接口约束。\n\nReturn whether *message* is a hidden dynamic-context reminder.'
+    """判断条件是否成立并返回布尔结果，并遵守 is_dynamic_context_reminder 所表达的接口约束。
+
+    Return whether *message* is a hidden dynamic-context reminder."""
     # DEPRECATED: HumanMessage reminders only exist in pre-PR checkpoints.
     # Once all active checkpoints are migrated, the HumanMessage branch can be
     # removed and this function can check SystemMessage exclusively.
@@ -51,7 +83,19 @@ def is_dynamic_context_reminder(message: object) -> bool:
 
 
 def _last_injected_date(messages: list) -> str | None:
-    '执行 _last_injected_date 的明确职责，并返回与调用约定一致的结果。\n\nScan messages in reverse and return the most recently injected date.\n\n    Detection uses the ``dynamic_context_reminder`` additional_kwargs flag rather\n    than content substring matching, so user messages containing ``<system-reminder>``\n    are not mistakenly treated as injected reminders.\n\n    The authoritative date is the ``reminder_date`` value in additional_kwargs of\n    the date SystemMessage. Reminders without it (the separate ``<memory>``\n    HumanMessage, or any future dateless reminder) carry no date and are skipped,\n    so they cannot shadow the real date reminder.\n    '
+    """执行 _last_injected_date 的明确职责，并返回与调用约定一致的结果。
+
+    Scan messages in reverse and return the most recently injected date.
+
+        Detection uses the ``dynamic_context_reminder`` additional_kwargs flag rather
+        than content substring matching, so user messages containing ``<system-reminder>``
+        are not mistakenly treated as injected reminders.
+
+        The authoritative date is the ``reminder_date`` value in additional_kwargs of
+        the date SystemMessage. Reminders without it (the separate ``<memory>``
+        HumanMessage, or any future dateless reminder) carry no date and are skipped,
+        so they cannot shadow the real date reminder.
+    """
     for msg in reversed(messages):
         if not is_dynamic_context_reminder(msg):
             continue
@@ -71,7 +115,9 @@ def _last_injected_date(messages: list) -> str | None:
 
 
 def _is_user_injection_target(message: object) -> bool:
-    '执行 _is_user_injection_target 的明确职责，并返回与调用约定一致的结果。\n\nReturn whether *message* can receive a dynamic-context reminder.'
+    """执行 _is_user_injection_target 的明确职责，并返回与调用约定一致的结果。
+
+    Return whether *message* can receive a dynamic-context reminder."""
     if not isinstance(message, HumanMessage):
         return False
     if is_dynamic_context_reminder(message):
@@ -90,7 +136,24 @@ def _is_user_injection_target(message: object) -> bool:
 
 
 class DynamicContextMiddleware(AgentMiddleware):
-    '封装 DynamicContextMiddleware 的状态、协作关系与公开操作。\n\nInject memory and current date as a SystemMessage <system-reminder>.\n\n    First turn\n    ----------\n    Prepends a full system-reminder (memory + date) to the first HumanMessage and\n    persists it (same message ID).  The first message is then frozen for the whole\n    session — its content never changes again, so the prefix cache can hit on every\n    subsequent turn.\n\n    Midnight crossing\n    -----------------\n    If the conversation spans midnight, the current date differs from the date that\n    was injected earlier.  In that case a lightweight date-update reminder is prepended\n    to the **current** (last) HumanMessage and persisted.  Subsequent turns on the new\n    day see the corrected date in history and skip re-injection.\n    '
+    """封装 DynamicContextMiddleware 的状态、协作关系与公开操作。
+
+    Inject memory and current date as a SystemMessage <system-reminder>.
+
+        First turn
+        ----------
+        Prepends a full system-reminder (memory + date) to the first HumanMessage and
+        persists it (same message ID).  The first message is then frozen for the whole
+        session — its content never changes again, so the prefix cache can hit on every
+        subsequent turn.
+
+        Midnight crossing
+        -----------------
+        If the conversation spans midnight, the current date differs from the date that
+        was injected earlier.  In that case a lightweight date-update reminder is prepended
+        to the **current** (last) HumanMessage and persisted.  Subsequent turns on the new
+        day see the corrected date in history and skip re-injection.
+    """
 
     def __init__(self, agent_name: str | None = None, *, app_config: AppConfig | None = None):
         """使用代理名称与可选应用配置初始化动态上下文中间件。"""
@@ -99,7 +162,15 @@ class DynamicContextMiddleware(AgentMiddleware):
         self._app_config = app_config
 
     def _build_full_reminder(self) -> tuple[str, str | None]:
-        '执行 _build_full_reminder 的明确职责，并返回与调用约定一致的结果。\n\nReturn (date_reminder, memory_block | None).\n\n        Framework-owned data (date) is separated from user-owned data (memory)\n        so the downstream SystemMessage carries only framework authority and\n        memory stays at role:user — preventing untrusted content from gaining\n        system privilege (OWASP LLM01).\n        '
+        """执行 _build_full_reminder 的明确职责，并返回与调用约定一致的结果。
+
+        Return (date_reminder, memory_block | None).
+
+                Framework-owned data (date) is separated from user-owned data (memory)
+                so the downstream SystemMessage carries only framework authority and
+                memory stays at role:user — preventing untrusted content from gaining
+                system privilege (OWASP LLM01).
+        """
         from deerflow.agents.lead_agent.prompt import _get_memory_context
 
         injection_enabled = self._app_config.memory.injection_enabled if self._app_config else True
@@ -137,7 +208,22 @@ class DynamicContextMiddleware(AgentMiddleware):
         *,
         reminder_date: str | None = None,
     ) -> list[SystemMessage | HumanMessage]:
-        '执行 _make_reminder_and_user_messages 的明确职责，并返回与调用约定一致的结果。\n\nReturn messages using the ID-swap technique.\n\n        SystemMessage carries framework-owned data (date, metadata) — takes\n        the original ID so add_messages replaces it in-place.  *reminder_date*\n        is recorded in its additional_kwargs as the authoritative injected date\n        (``_last_injected_date`` reads it instead of parsing content).  Optional\n        HumanMessage carries user-owned memory content with ``{id}__memory``.\n        The actual user message gets ``{id}__user``.\n\n        SystemMessage is used — system context must not masquerade as user\n        input (#3630).  Memory is deliberately kept as HumanMessage so\n        user-influenceable content does not gain system authority (OWASP LLM01)\n        — and it deliberately never carries ``reminder_date``.\n        '
+        """执行 _make_reminder_and_user_messages 的明确职责，并返回与调用约定一致的结果。
+
+        Return messages using the ID-swap technique.
+
+                SystemMessage carries framework-owned data (date, metadata) — takes
+                the original ID so add_messages replaces it in-place.  *reminder_date*
+                is recorded in its additional_kwargs as the authoritative injected date
+                (``_last_injected_date`` reads it instead of parsing content).  Optional
+                HumanMessage carries user-owned memory content with ``{id}__memory``.
+                The actual user message gets ``{id}__user``.
+
+                SystemMessage is used — system context must not masquerade as user
+                input (#3630).  Memory is deliberately kept as HumanMessage so
+                user-influenceable content does not gain system authority (OWASP LLM01)
+                — and it deliberately never carries ``reminder_date``.
+        """
         stable_id = original.id or str(uuid.uuid4())
         messages: list[SystemMessage | HumanMessage] = []
 
@@ -251,7 +337,15 @@ class DynamicContextMiddleware(AgentMiddleware):
 
     @staticmethod
     def _effective_memory_message(state, update: dict | None, runtime: Runtime) -> HumanMessage | None:
-        "执行 _effective_memory_message 的明确职责，并返回与调用约定一致的结果。\n\nFind server-created memory that is effective for this run.\n\n        A first-run block must come from this middleware's update. A reused\n        block must have existed in the checkpoint before the run; the Gateway\n        strips the reminder marker from untrusted input so a caller cannot\n        replace a known checkpoint ID with forged provenance.\n        "
+        """执行 _effective_memory_message 的明确职责，并返回与调用约定一致的结果。
+
+        Find server-created memory that is effective for this run.
+
+                A first-run block must come from this middleware's update. A reused
+                block must have existed in the checkpoint before the run; the Gateway
+                strips the reminder marker from untrusted input so a caller cannot
+                replace a known checkpoint ID with forged provenance.
+        """
         if isinstance(update, dict):
             update_messages = update.get("messages")
             if isinstance(update_messages, list):
@@ -276,7 +370,9 @@ class DynamicContextMiddleware(AgentMiddleware):
         return None
 
     def _record_effective_memory(self, state, update: dict | None, runtime: Runtime) -> None:
-        '执行 _record_effective_memory 的明确职责，并返回与调用约定一致的结果。\n\nAttach the effective hidden memory block to the current run ledger.'
+        """执行 _record_effective_memory 的明确职责，并返回与调用约定一致的结果。
+
+        Attach the effective hidden memory block to the current run ledger."""
         context = getattr(runtime, "context", None)
         journal = context.get("__run_journal") if isinstance(context, dict) else None
         if journal is None:

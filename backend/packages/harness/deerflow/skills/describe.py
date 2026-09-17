@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class SkillSearchSetup:
-    '未说明'
+    "未说明"
 
     describe_skill_tool: BaseTool | None
     skill_names: frozenset[str]
@@ -37,14 +37,14 @@ def build_describe_skill_tool(
     *,
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
 ) -> BaseTool:
-    '未说明'
+    "未说明"
 
     @tool
     def describe_skill(
         name: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
     ) -> Command:
-        '未说明'
+        "未说明"
         matched = catalog.search(name)
         if not matched:
             content = f"No skills matched: {name}"
@@ -72,7 +72,7 @@ def build_skill_search_setup(
     enabled: bool,
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
 ) -> SkillSearchSetup:
-    '未说明'
+    "未说明"
     if not enabled or not skills:
         return SkillSearchSetup(None, frozenset())
 
@@ -90,7 +90,7 @@ def build_skill_search_setup(
 
 
 def _render_skill_metadata(skills: list, container_base_path: str) -> str:
-    '未说明'
+    "未说明"
     blocks: list[str] = []
     for s in skills:
         mutability = "[custom, editable]" if s.category == SkillCategory.CUSTOM else "[built-in]"
@@ -115,7 +115,7 @@ def get_skill_index_prompt_section(
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
     skill_evolution_section: str = "",
 ) -> str:
-    '未说明'
+    "未说明"
     if not skill_names:
         return ""
 

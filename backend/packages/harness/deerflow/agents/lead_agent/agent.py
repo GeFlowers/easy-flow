@@ -102,7 +102,7 @@ def _create_todo_list_middleware(is_plan_mode: bool) -> TodoMiddleware | None:
     if not is_plan_mode:
         return None
 
-# 与 DeerFlow 风格一致的自定义提示词。
+    # 与 DeerFlow 风格一致的自定义提示词。
     system_prompt = """
 <todo_list_system>
 You have access to the `write_todos` tool to help you manage and track complex multi-step objectives.

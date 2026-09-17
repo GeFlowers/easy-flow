@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -46,14 +46,14 @@ DEFAULT_RESULT_LIMIT = 160
 
 
 def truncate(text: str, limit: int) -> str:
-    '未说明'
+    "未说明"
     if len(text) <= limit:
         return text
     return text[:limit].rstrip() + "…"
 
 
 def summarize_tool_title(tool_name: str) -> str:
-    '未说明'
+    "未说明"
     if not tool_name or not tool_name.strip():
         return "Tool"
     if tool_name in _TOOL_TITLES:
@@ -62,7 +62,7 @@ def summarize_tool_title(tool_name: str) -> str:
 
 
 def format_tool_detail(tool_name: str, args: Any, limit: int = DEFAULT_DETAIL_LIMIT) -> str:
-    '未说明'
+    "未说明"
     if not isinstance(args, dict) or not args:
         return ""
 
@@ -81,7 +81,7 @@ def format_tool_detail(tool_name: str, args: Any, limit: int = DEFAULT_DETAIL_LI
 
 
 def format_tool_result(result: Any, limit: int = DEFAULT_RESULT_LIMIT) -> str:
-    '未说明'
+    "未说明"
     if result is None:
         return ""
     if not isinstance(result, str):
@@ -93,12 +93,12 @@ def format_tool_result(result: Any, limit: int = DEFAULT_RESULT_LIMIT) -> str:
 
 
 def _one_line(text: str) -> str:
-    '未说明'
+    "未说明"
     return " ".join(text.split())
 
 
 def _humanize(name: str) -> str:
-    '未说明'
+    "未说明"
     cleaned = name.replace("_", " ").replace("-", " ").strip()
     if not cleaned:
         return name

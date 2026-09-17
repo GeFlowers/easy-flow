@@ -1,4 +1,5 @@
-'定义 tools 模块提供的职责与可复用接口'
+"定义 tools 模块提供的职责与可复用接口"
+
 import json
 
 from exa_py import Exa
@@ -8,7 +9,7 @@ from deerflow.config import get_app_config
 
 
 def _get_exa_client(tool_name: str = "web_search") -> Exa:
-    '执行 _get_exa_client 的明确职责，并返回与调用约定一致的结果'
+    "执行 _get_exa_client 的明确职责，并返回与调用约定一致的结果"
     config = get_app_config().get_tool_config(tool_name)
     api_key = None
     if config is not None and "api_key" in config.model_extra:

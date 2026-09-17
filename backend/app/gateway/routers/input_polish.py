@@ -18,6 +18,7 @@ router = APIRouter(prefix="/api", tags=["input-polish"])
 
 class InputPolishRequest(BaseModel):
     """定义输入润色请求中的草稿、语言提示和仅用于追踪的线程标识。"""
+
     text: str = Field(..., description="Draft text currently shown in the composer")
     locale: str | None = Field(default=None, description="Optional UI locale hint")
     thread_id: str | None = Field(default=None, description="Optional thread id for tracing only")
@@ -25,6 +26,7 @@ class InputPolishRequest(BaseModel):
 
 class InputPolishResponse(BaseModel):
     """返回模型润色后的草稿以及是否与原文不同的标记。"""
+
     rewritten_text: str = Field(..., description="Polished draft text")
     changed: bool = Field(..., description="Whether the model changed the original draft")
 

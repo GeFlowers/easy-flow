@@ -1,4 +1,9 @@
-'定义 validation 模块提供的职责与可复用接口。\n\nSkill frontmatter validation utilities.\n\nPure-logic validation of SKILL.md frontmatter — no FastAPI or HTTP dependencies.\n'
+"""定义 validation 模块提供的职责与可复用接口。
+
+Skill frontmatter validation utilities.
+
+Pure-logic validation of SKILL.md frontmatter — no FastAPI or HTTP dependencies.
+"""
 
 import re
 from pathlib import Path
@@ -9,7 +14,16 @@ from deerflow.skills.types import SKILL_MD_FILE
 
 
 def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]:
-    "执行 _validate_skill_frontmatter 的明确职责，并返回与调用约定一致的结果。\n\nValidate a skill directory's SKILL.md frontmatter.\n\n    Args:\n        skill_dir: Path to the skill directory containing SKILL.md.\n\n    Returns:\n        Tuple of (is_valid, message, skill_name).\n    "
+    """执行 _validate_skill_frontmatter 的明确职责，并返回与调用约定一致的结果。
+
+    Validate a skill directory's SKILL.md frontmatter.
+
+        Args:
+            skill_dir: Path to the skill directory containing SKILL.md.
+
+        Returns:
+            Tuple of (is_valid, message, skill_name).
+    """
     skill_md = skill_dir / SKILL_MD_FILE
     if not skill_md.exists():
         return False, f"{SKILL_MD_FILE} not found", None

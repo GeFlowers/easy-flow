@@ -1,4 +1,6 @@
-'定义 subagent_limit_middleware 模块提供的职责与可复用接口。\n\nMiddleware to enforce subagent tool-call limits.'
+"""定义 subagent_limit_middleware 模块提供的职责与可复用接口。
+
+Middleware to enforce subagent tool-call limits."""
 
 import logging
 from typing import Any, override
@@ -36,17 +38,21 @@ _TOTAL_LIMIT_STOP_MSG = (
 
 
 def _clamp_subagent_limit(value: int) -> int:
-    '执行 _clamp_subagent_limit 的明确职责，并返回与调用约定一致的结果。\n\nClamp subagent limit to valid range [2, 4].'
+    """执行 _clamp_subagent_limit 的明确职责，并返回与调用约定一致的结果。
+
+    Clamp subagent limit to valid range [2, 4]."""
     return clamp_subagent_concurrency(value)
 
 
 def _clamp_total_subagent_limit(value: int) -> int:
-    '执行 _clamp_total_subagent_limit 的明确职责，并返回与调用约定一致的结果。\n\nClamp total subagent limit to a bounded positive range.'
+    """执行 _clamp_total_subagent_limit 的明确职责，并返回与调用约定一致的结果。
+
+    Clamp total subagent limit to a bounded positive range."""
     return clamp_total_subagents_per_run(value)
 
 
 def _append_text(content: Any, text: str) -> Any:
-    '执行 _append_text 的明确职责，并返回与调用约定一致的结果'
+    "执行 _append_text 的明确职责，并返回与调用约定一致的结果"
     if content is None:
         return text
     if isinstance(content, str):
@@ -59,7 +65,7 @@ def _append_text(content: Any, text: str) -> Any:
 
 
 def _delegation_id(entry: object) -> str | None:
-    '执行 _delegation_id 的明确职责，并返回与调用约定一致的结果'
+    "执行 _delegation_id 的明确职责，并返回与调用约定一致的结果"
     if not isinstance(entry, dict):
         return None
     entry_id = entry.get("id")
@@ -67,7 +73,7 @@ def _delegation_id(entry: object) -> str | None:
 
 
 def _delegation_run_id(entry: object) -> str | None:
-    '执行 _delegation_run_id 的明确职责，并返回与调用约定一致的结果'
+    "执行 _delegation_run_id 的明确职责，并返回与调用约定一致的结果"
     if not isinstance(entry, dict):
         return None
     run_id = entry.get("run_id")
@@ -75,7 +81,7 @@ def _delegation_run_id(entry: object) -> str | None:
 
 
 def _runtime_run_id(runtime: Runtime | None) -> str | None:
-    '执行 _runtime_run_id 的明确职责，并返回与调用约定一致的结果'
+    "执行 _runtime_run_id 的明确职责，并返回与调用约定一致的结果"
     context = getattr(runtime, "context", None)
     if not isinstance(context, dict):
         return None
@@ -84,7 +90,7 @@ def _runtime_run_id(runtime: Runtime | None) -> str | None:
 
 
 def _count_prior_delegations(delegations: object, *, run_id: str | None) -> int:
-    '执行 _count_prior_delegations 的明确职责，并返回与调用约定一致的结果'
+    "执行 _count_prior_delegations 的明确职责，并返回与调用约定一致的结果"
     if not isinstance(delegations, list):
         return 0
     ids = set()
@@ -98,16 +104,32 @@ def _count_prior_delegations(delegations: object, *, run_id: str | None) -> int:
 
 
 class SubagentLimitMiddleware(AgentMiddleware[AgentState]):
-    "封装 SubagentLimitMiddleware 的状态、协作关系与公开操作。\n\nTruncates excess 'task' tool calls from a single model response/run.\n\n    When an LLM generates more than max_concurrent parallel task tool calls\n    in one response, this middleware keeps only the first max_concurrent and\n    discards the rest. It also enforces a total per-run cap using entries in\n    the durable delegation ledger tagged with the current run_id, so repeated\n    planning checkpoints in one run cannot keep launching more legal-sized\n    batches indefinitely. This is more reliable than prompt-based limits.\n\n    Args:\n        max_concurrent: Maximum number of concurrent subagent calls allowed.\n            Defaults to MAX_CONCURRENT_SUBAGENTS (3). Clamped to [2, 4].\n        max_total: Maximum number of subagent calls allowed across the run.\n            Defaults to 6. Clamped to [1, 50].\n    "
+    """封装 SubagentLimitMiddleware 的状态、协作关系与公开操作。
+
+    Truncates excess 'task' tool calls from a single model response/run.
+
+        When an LLM generates more than max_concurrent parallel task tool calls
+        in one response, this middleware keeps only the first max_concurrent and
+        discards the rest. It also enforces a total per-run cap using entries in
+        the durable delegation ledger tagged with the current run_id, so repeated
+        planning checkpoints in one run cannot keep launching more legal-sized
+        batches indefinitely. This is more reliable than prompt-based limits.
+
+        Args:
+            max_concurrent: Maximum number of concurrent subagent calls allowed.
+                Defaults to MAX_CONCURRENT_SUBAGENTS (3). Clamped to [2, 4].
+            max_total: Maximum number of subagent calls allowed across the run.
+                Defaults to 6. Clamped to [1, 50].
+    """
 
     def __init__(self, max_concurrent: int = MAX_CONCURRENT_SUBAGENTS, max_total: int = DEFAULT_MAX_TOTAL_SUBAGENTS):
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__()
         self.max_concurrent = _clamp_subagent_limit(max_concurrent)
         self.max_total = _clamp_total_subagent_limit(max_total)
 
     def _truncate_task_calls(self, state: AgentState, runtime: Runtime | None = None) -> dict | None:
-        '执行 _truncate_task_calls 的明确职责，并返回与调用约定一致的结果'
+        "执行 _truncate_task_calls 的明确职责，并返回与调用约定一致的结果"
         messages = state.get("messages", [])
         if not messages:
             return None
@@ -160,10 +182,10 @@ class SubagentLimitMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '执行 after_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
         return self._truncate_task_calls(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '执行 aafter_model 的明确职责，并返回与调用约定一致的结果'
+        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
         return self._truncate_task_calls(state, runtime)

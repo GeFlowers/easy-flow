@@ -81,7 +81,7 @@ CMD ["sh", "-c", "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app 
 
 # ── 阶段 3：运行时 ────────────────────────────────────────────────────────────
 # 不含 build-essential 的干净镜像，可减少约 200 MB 体积和攻击面。
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-bookworm AS runtime
 
 ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8

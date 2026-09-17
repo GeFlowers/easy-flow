@@ -1,4 +1,5 @@
 """提供向用户请求澄清信息的内置工具。"""
+
 from typing import Literal
 
 from langchain.tools import tool

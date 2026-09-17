@@ -1,4 +1,8 @@
-'定义 tools 模块提供的职责与可复用接口。\n\n\nImage Search Tool - Search images using DuckDuckGo for reference in image generation.\n'
+"""定义 tools 模块提供的职责与可复用接口。
+
+
+Image Search Tool - Search images using DuckDuckGo for reference in image generation.
+"""
 
 import json
 import logging
@@ -21,7 +25,25 @@ def _search_images(
     layout: str | None = None,
     license_image: str | None = None,
 ) -> list[dict]:
-    '执行 _search_images 的明确职责，并返回与调用约定一致的结果。\n\n\n    Execute image search using DuckDuckGo.\n\n    Args:\n        query: Search keywords\n        max_results: Maximum number of results\n        region: Search region\n        safesearch: Safe search level\n        size: Image size (Small/Medium/Large/Wallpaper)\n        color: Color filter\n        type_image: Image type (photo/clipart/gif/transparent/line)\n        layout: Layout (Square/Tall/Wide)\n        license_image: License filter\n\n    Returns:\n        List of search results\n    '
+    """执行 _search_images 的明确职责，并返回与调用约定一致的结果。
+
+
+    Execute image search using DuckDuckGo.
+
+    Args:
+        query: Search keywords
+        max_results: Maximum number of results
+        region: Search region
+        safesearch: Safe search level
+        size: Image size (Small/Medium/Large/Wallpaper)
+        color: Color filter
+        type_image: Image type (photo/clipart/gif/transparent/line)
+        layout: Layout (Square/Tall/Wide)
+        license_image: License filter
+
+    Returns:
+        List of search results
+    """
     try:
         from ddgs import DDGS
     except ImportError:

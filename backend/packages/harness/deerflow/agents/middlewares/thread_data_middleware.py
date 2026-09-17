@@ -1,4 +1,5 @@
-'定义 thread_data_middleware 模块提供的职责与可复用接口'
+"定义 thread_data_middleware 模块提供的职责与可复用接口"
+
 import logging
 from datetime import UTC, datetime
 from typing import NotRequired, override
@@ -17,24 +18,57 @@ logger = logging.getLogger(__name__)
 
 
 class ThreadDataMiddlewareState(AgentState):
-    '封装 ThreadDataMiddlewareState 的状态、协作关系与公开操作。\n\nCompatible with the `ThreadState` schema.'
+    """封装 ThreadDataMiddlewareState 的状态、协作关系与公开操作。
+
+    Compatible with the `ThreadState` schema."""
 
     thread_data: NotRequired[ThreadDataState | None]
 
 
 class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
-    '封装 ThreadDataMiddleware 的状态、协作关系与公开操作。\n\nCreate thread data directories for each thread execution.\n\n    Creates the following directory structure:\n    - {base_dir}/threads/{thread_id}/user-data/workspace\n    - {base_dir}/threads/{thread_id}/user-data/uploads\n    - {base_dir}/threads/{thread_id}/user-data/outputs\n\n    Lifecycle Management:\n    - With lazy_init=True (default): Only compute paths, directories created on-demand\n    - With lazy_init=False: Eagerly create directories in before_agent()\n    '
+    """封装 ThreadDataMiddleware 的状态、协作关系与公开操作。
+
+    Create thread data directories for each thread execution.
+
+        Creates the following directory structure:
+        - {base_dir}/threads/{thread_id}/user-data/workspace
+        - {base_dir}/threads/{thread_id}/user-data/uploads
+        - {base_dir}/threads/{thread_id}/user-data/outputs
+
+        Lifecycle Management:
+        - With lazy_init=True (default): Only compute paths, directories created on-demand
+        - With lazy_init=False: Eagerly create directories in before_agent()
+    """
 
     state_schema = ThreadDataMiddlewareState
 
     def __init__(self, base_dir: str | None = None, lazy_init: bool = True):
-        '实现 __init__ 协议方法，保持对象交互语义一致。\n\nInitialize the middleware.\n\n        Args:\n            base_dir: Base directory for thread data. Defaults to Paths resolution.\n            lazy_init: If True, defer directory creation until needed.\n                      If False, create directories eagerly in before_agent().\n                      Default is True for optimal performance.\n        '
+        """实现 __init__ 协议方法，保持对象交互语义一致。
+
+        Initialize the middleware.
+
+                Args:
+                    base_dir: Base directory for thread data. Defaults to Paths resolution.
+                    lazy_init: If True, defer directory creation until needed.
+                              If False, create directories eagerly in before_agent().
+                              Default is True for optimal performance.
+        """
         super().__init__()
         self._paths = Paths(base_dir) if base_dir else get_paths()
         self._lazy_init = lazy_init
 
     def _get_thread_paths(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
-        "执行 _get_thread_paths 的明确职责，并返回与调用约定一致的结果。\n\nGet the paths for a thread's data directories.\n\n        Args:\n            thread_id: The thread ID.\n            user_id: Optional user ID for per-user path isolation.\n\n        Returns:\n            Dictionary with workspace_path, uploads_path, and outputs_path.\n        "
+        """执行 _get_thread_paths 的明确职责，并返回与调用约定一致的结果。
+
+        Get the paths for a thread's data directories.
+
+                Args:
+                    thread_id: The thread ID.
+                    user_id: Optional user ID for per-user path isolation.
+
+                Returns:
+                    Dictionary with workspace_path, uploads_path, and outputs_path.
+        """
         return {
             "workspace_path": str(self._paths.sandbox_work_dir(thread_id, user_id=user_id)),
             "uploads_path": str(self._paths.sandbox_uploads_dir(thread_id, user_id=user_id)),
@@ -42,13 +76,23 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
         }
 
     def _create_thread_directories(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
-        '执行 _create_thread_directories 的明确职责，并返回与调用约定一致的结果。\n\nCreate the thread data directories.\n\n        Args:\n            thread_id: The thread ID.\n            user_id: Optional user ID for per-user path isolation.\n\n        Returns:\n            Dictionary with the created directory paths.\n        '
+        """执行 _create_thread_directories 的明确职责，并返回与调用约定一致的结果。
+
+        Create the thread data directories.
+
+                Args:
+                    thread_id: The thread ID.
+                    user_id: Optional user ID for per-user path isolation.
+
+                Returns:
+                    Dictionary with the created directory paths.
+        """
         self._paths.ensure_thread_dirs(thread_id, user_id=user_id)
         return self._get_thread_paths(thread_id, user_id=user_id)
 
     @override
     def before_agent(self, state: ThreadDataMiddlewareState, runtime: Runtime) -> dict | None:
-        '执行 before_agent 的明确职责，并返回与调用约定一致的结果'
+        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
         context = runtime.context or {}
         thread_id = context.get("thread_id")
         if thread_id is None:

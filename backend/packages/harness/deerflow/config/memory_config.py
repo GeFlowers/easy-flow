@@ -133,23 +133,23 @@ def load_memory_config_from_dict(config_dict: dict) -> None:
         if key in _LEGACY_DEERMEM_FIELDS:
             value = config_dict.pop(key)
             if value is None or value == "":
-                continue                            # 中文说明：此处用于执行相关处理。
+                continue  # 中文说明：此处用于执行相关处理。
             if key == "model_name":
-                                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
                 model_cfg = dict(backend_config.get("model") or {})
                 if "model" not in model_cfg:
                     model_cfg["model"] = value
                     backend_config["model"] = model_cfg
                     migrated.append(f"{key} -> backend_config.model.model")
             elif key == "storage_path" and str(value).endswith(".json"):
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
-                                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
                 logger.warning(
                     "Legacy memory.storage_path=%r looks like a file path; DeerMem now "
                     "treats storage_path as a root DIRECTORY (per-user memory under "
@@ -160,7 +160,7 @@ def load_memory_config_from_dict(config_dict: dict) -> None:
                     value,
                 )
             elif key not in backend_config:
-                                # 中文说明：此处用于执行相关处理。
+                # 中文说明：此处用于执行相关处理。
                 backend_config[key] = value
                 migrated.append(f"{key} -> backend_config.{key}")
         else:

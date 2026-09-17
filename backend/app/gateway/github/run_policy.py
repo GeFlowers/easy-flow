@@ -1,4 +1,17 @@
-'定义 run_policy 模块提供的职责与可复用接口。\n\nPer-run policy hooks for the GitHub channel.\n\nThe generic ``ChannelManager`` looks up a :class:`ChannelRunPolicy`\nkeyed on ``msg.channel_name`` and applies it after ``_resolve_run_params``\nbut before the agent runs. The GitHub channel registers its policy\nentry from :func:`register_policy`, called once from the gateway\nbootstrap.\n\nKeeping the GitHub-specific provider closure here (rather than inline\nin ``ChannelManager``) lets every new webhook channel ship its own\n``run_policy.py`` with the same shape, with no edits to the manager.\n'
+"""定义 run_policy 模块提供的职责与可复用接口。
+
+Per-run policy hooks for the GitHub channel.
+
+The generic ``ChannelManager`` looks up a :class:`ChannelRunPolicy`
+keyed on ``msg.channel_name`` and applies it after ``_resolve_run_params``
+but before the agent runs. The GitHub channel registers its policy
+entry from :func:`register_policy`, called once from the gateway
+bootstrap.
+
+Keeping the GitHub-specific provider closure here (rather than inline
+in ``ChannelManager``) lets every new webhook channel ship its own
+``run_policy.py`` with the same shape, with no edits to the manager.
+"""
 
 from __future__ import annotations
 
@@ -12,7 +25,47 @@ logger = logging.getLogger(__name__)
 
 
 async def inject_github_credentials(msg: InboundMessage, run_context: dict[str, Any]) -> None:
-    '执行 inject_github_credentials 的明确职责，并返回与调用约定一致的结果。\n\nInstall a GitHub App installation token in ``run_context``.\n\n    The GitHub fan-out dispatcher carries each binding\'s\n    ``installation_id`` in ``msg.metadata["github"]``. We mint a\n    short-lived (1h) installation token and put the resulting **string**\n    into ``run_context["github_token"]``.\n\n    Why a string and not a closure:\n        ``run_context`` is passed to ``client.runs.wait(context=…)``\n        on the ``langgraph_sdk`` HTTP client, which JSON-encodes the\n        payload before sending it to Gateway\'s LangGraph-compatible\n        runtime over HTTP — even when that runtime is embedded in the\n        same process. A Python callable does not survive that\n        encoding (``TypeError: Type is not JSON serializable: function``).\n        The harness side (``_github_env_from_runtime`` in\n        ``packages/harness/deerflow/sandbox/tools.py``) already accepts\n        either a ``str`` or a zero-arg sync callable from\n        ``runtime.context["github_token"]``; only the ``str`` shape\n        round-trips through the SDK transport, so that is what we\n        ship.\n\n    Failure modes for autonomous runs that span past the 1h token TTL:\n        The minted token is valid for 1h. Most agent runs complete well\n        inside that window. Truly long coder runs (multi-hour refactors\n        on the higher ``recursion_limit=250`` ceiling) may see a 401 on\n        a late ``git push`` / ``gh pr create``. The fix for that —\n        re-installing a token-refresh hook on the **runtime side** by\n        pushing the ``installation_id`` through ``run_context`` and\n        looking up a process-local provider in the harness — is\n        deliberately deferred: it crosses the harness/app boundary\n        (``tests/test_harness_boundary.py``) and needs a registered\n        token-provider lookup, not a string-vs-closure switch.\n\n    Minting on the bus-consumer side (not in the webhook route) keeps\n    GitHub\'s 10s delivery timeout safe. Mint failures propagate up to\n    :meth:`ChannelManager._apply_channel_policy`, which logs and lets\n    the run proceed without credentials (read-only is better than no\n    response).\n    '
+    """执行 inject_github_credentials 的明确职责，并返回与调用约定一致的结果。
+
+    Install a GitHub App installation token in ``run_context``.
+
+        The GitHub fan-out dispatcher carries each binding's
+        ``installation_id`` in ``msg.metadata["github"]``. We mint a
+        short-lived (1h) installation token and put the resulting **string**
+        into ``run_context["github_token"]``.
+
+        Why a string and not a closure:
+            ``run_context`` is passed to ``client.runs.wait(context=…)``
+            on the ``langgraph_sdk`` HTTP client, which JSON-encodes the
+            payload before sending it to Gateway's LangGraph-compatible
+            runtime over HTTP — even when that runtime is embedded in the
+            same process. A Python callable does not survive that
+            encoding (``TypeError: Type is not JSON serializable: function``).
+            The harness side (``_github_env_from_runtime`` in
+            ``packages/harness/deerflow/sandbox/tools.py``) already accepts
+            either a ``str`` or a zero-arg sync callable from
+            ``runtime.context["github_token"]``; only the ``str`` shape
+            round-trips through the SDK transport, so that is what we
+            ship.
+
+        Failure modes for autonomous runs that span past the 1h token TTL:
+            The minted token is valid for 1h. Most agent runs complete well
+            inside that window. Truly long coder runs (multi-hour refactors
+            on the higher ``recursion_limit=250`` ceiling) may see a 401 on
+            a late ``git push`` / ``gh pr create``. The fix for that —
+            re-installing a token-refresh hook on the **runtime side** by
+            pushing the ``installation_id`` through ``run_context`` and
+            looking up a process-local provider in the harness — is
+            deliberately deferred: it crosses the harness/app boundary
+            (``tests/test_harness_boundary.py``) and needs a registered
+            token-provider lookup, not a string-vs-closure switch.
+
+        Minting on the bus-consumer side (not in the webhook route) keeps
+        GitHub's 10s delivery timeout safe. Mint failures propagate up to
+        :meth:`ChannelManager._apply_channel_policy`, which logs and lets
+        the run proceed without credentials (read-only is better than no
+        response).
+    """
     if msg.channel_name != "github":
         return
     meta = msg.metadata if isinstance(msg.metadata, dict) else {}
@@ -40,7 +93,17 @@ async def inject_github_credentials(msg: InboundMessage, run_context: dict[str, 
 
 
 def register_policy() -> None:
-    "执行 register_policy 的明确职责，并返回与调用约定一致的结果。\n\nRegister the GitHub channel's :class:`ChannelRunPolicy` entry.\n\n    Called once from the gateway bootstrap so the manager finds the\n    policy on first delivery. Also invoked at module-import time below\n    so test code that constructs a :class:`ChannelManager` directly\n    (bypassing the gateway bootstrap) gets the same registration as\n    soon as anything inside ``app.gateway.github`` is imported.\n    Idempotent — registering twice just overwrites the same row.\n    "
+    """执行 register_policy 的明确职责，并返回与调用约定一致的结果。
+
+    Register the GitHub channel's :class:`ChannelRunPolicy` entry.
+
+        Called once from the gateway bootstrap so the manager finds the
+        policy on first delivery. Also invoked at module-import time below
+        so test code that constructs a :class:`ChannelManager` directly
+        (bypassing the gateway bootstrap) gets the same registration as
+        soon as anything inside ``app.gateway.github`` is imported.
+        Idempotent — registering twice just overwrites the same row.
+    """
     from app.channels.run_policy import CHANNEL_RUN_POLICY, ChannelRunPolicy
 
     CHANNEL_RUN_POLICY["github"] = ChannelRunPolicy(

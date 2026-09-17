@@ -1,4 +1,12 @@
-'定义 assistant_payload_replay 模块提供的职责与可复用接口。\n\nHelpers for replaying provider-specific assistant message fields.\n\nSeveral provider adapters need to preserve fields that LangChain stores on the\noriginal ``AIMessage`` but drops when serializing request payloads. This module\nkeeps the assistant-message matching logic shared while letting each provider\ndecide which fields to restore.\n'
+"""定义 assistant_payload_replay 模块提供的职责与可复用接口。
+
+Helpers for replaying provider-specific assistant message fields.
+
+Several provider adapters need to preserve fields that LangChain stores on the
+original ``AIMessage`` but drops when serializing request payloads. This module
+keeps the assistant-message matching logic shared while letting each provider
+decide which fields to restore.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +24,9 @@ def restore_assistant_payloads(
     original_messages: Sequence[BaseMessage],
     restore: AssistantPayloadRestorer,
 ) -> None:
-    '执行 restore_assistant_payloads 的明确职责，并返回与调用约定一致的结果。\n\nRestore provider-specific fields onto serialized assistant payloads.'
+    """执行 restore_assistant_payloads 的明确职责，并返回与调用约定一致的结果。
+
+    Restore provider-specific fields onto serialized assistant payloads."""
     if len(payload_messages) == len(original_messages):
         for payload_msg, orig_msg in zip(payload_messages, original_messages):
             if payload_msg.get("role") == "assistant" and isinstance(orig_msg, AIMessage):
@@ -34,14 +44,18 @@ def restore_assistant_payloads(
 
 
 def restore_additional_kwargs_field(payload_msg: dict[str, Any], orig_msg: AIMessage, field_name: str) -> None:
-    '执行 restore_additional_kwargs_field 的明确职责，并返回与调用约定一致的结果。\n\nCopy a provider-specific ``additional_kwargs`` field onto a payload message.'
+    """执行 restore_additional_kwargs_field 的明确职责，并返回与调用约定一致的结果。
+
+    Copy a provider-specific ``additional_kwargs`` field onto a payload message."""
     value = orig_msg.additional_kwargs.get(field_name)
     if value is not None:
         payload_msg[field_name] = value
 
 
 def restore_reasoning_content(payload_msg: dict[str, Any], orig_msg: AIMessage) -> None:
-    '执行 restore_reasoning_content 的明确职责，并返回与调用约定一致的结果。\n\nCopy provider reasoning content onto a serialized assistant payload.'
+    """执行 restore_reasoning_content 的明确职责，并返回与调用约定一致的结果。
+
+    Copy provider reasoning content onto a serialized assistant payload."""
     restore_additional_kwargs_field(payload_msg, orig_msg, "reasoning_content")
 
 
@@ -51,7 +65,7 @@ def _match_ai_message(
     used_ai_indexes: set[int],
     fallback_ordinal: int,
 ) -> AIMessage | None:
-    '执行 _match_ai_message 的明确职责，并返回与调用约定一致的结果'
+    "执行 _match_ai_message 的明确职责，并返回与调用约定一致的结果"
     payload_key = _assistant_signature(payload_msg)
     if payload_key is not None:
         matches = [index for index, ai_msg in enumerate(ai_messages) if index not in used_ai_indexes and _ai_signature(ai_msg) == payload_key]
@@ -68,7 +82,16 @@ def _match_ai_message(
 
 
 def _next_unused_index_at_or_after(count: int, used_ai_indexes: set[int], start: int) -> int | None:
-    "执行 _next_unused_index_at_or_after 的明确职责，并返回与调用约定一致的结果。\n\nReturn the next unused AI index at or after ``start``.\n\n    Scanning forward from the payload's ordinal preserves the positional bias of\n    the previous behaviour while still recovering when serialization drops or\n    reorders messages so the exact ordinal index is already taken. It does not\n    wrap to earlier indexes because those messages may be represented by payload\n    entries that were already dropped.\n    "
+    """执行 _next_unused_index_at_or_after 的明确职责，并返回与调用约定一致的结果。
+
+    Return the next unused AI index at or after ``start``.
+
+        Scanning forward from the payload's ordinal preserves the positional bias of
+        the previous behaviour while still recovering when serialization drops or
+        reorders messages so the exact ordinal index is already taken. It does not
+        wrap to earlier indexes because those messages may be represented by payload
+        entries that were already dropped.
+    """
     if count == 0 or start >= count:
         return None
     for index in range(start, count):
@@ -78,7 +101,7 @@ def _next_unused_index_at_or_after(count: int, used_ai_indexes: set[int], start:
 
 
 def _assistant_signature(payload_msg: dict[str, Any]) -> tuple[str, str] | None:
-    '执行 _assistant_signature 的明确职责，并返回与调用约定一致的结果'
+    "执行 _assistant_signature 的明确职责，并返回与调用约定一致的结果"
     return _signature(
         payload_msg.get("content"),
         _tool_call_ids(payload_msg.get("tool_calls") or []),
@@ -86,20 +109,20 @@ def _assistant_signature(payload_msg: dict[str, Any]) -> tuple[str, str] | None:
 
 
 def _ai_signature(message: AIMessage) -> tuple[str, str] | None:
-    '执行 _ai_signature 的明确职责，并返回与调用约定一致的结果'
+    "执行 _ai_signature 的明确职责，并返回与调用约定一致的结果"
     tool_calls = message.tool_calls or message.additional_kwargs.get("tool_calls") or []
     return _signature(message.content, _tool_call_ids(tool_calls))
 
 
 def _signature(content: Any, tool_call_ids: tuple[str, ...]) -> tuple[str, str] | None:
-    '执行 _signature 的明确职责，并返回与调用约定一致的结果'
+    "执行 _signature 的明确职责，并返回与调用约定一致的结果"
     if content in (None, "") and not tool_call_ids:
         return None
     return (_stable_repr(content), "|".join(tool_call_ids))
 
 
 def _stable_repr(value: Any) -> str:
-    '执行 _stable_repr 的明确职责，并返回与调用约定一致的结果'
+    "执行 _stable_repr 的明确职责，并返回与调用约定一致的结果"
     try:
         return json.dumps(value, sort_keys=True, ensure_ascii=False)
     except TypeError:
@@ -107,7 +130,7 @@ def _stable_repr(value: Any) -> str:
 
 
 def _tool_call_ids(tool_calls: Sequence[Any]) -> tuple[str, ...]:
-    '执行 _tool_call_ids 的明确职责，并返回与调用约定一致的结果'
+    "执行 _tool_call_ids 的明确职责，并返回与调用约定一致的结果"
     ids: list[str] = []
     for tool_call in tool_calls:
         if isinstance(tool_call, dict):

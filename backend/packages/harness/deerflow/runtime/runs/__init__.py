@@ -1,4 +1,6 @@
-'定义 __init__ 模块提供的职责与可复用接口。\n\nRun lifecycle management for LangGraph Platform API compatibility.'
+"""定义 __init__ 模块提供的职责与可复用接口。
+
+Run lifecycle management for LangGraph Platform API compatibility."""
 
 from .manager import CancelOutcome, ConflictError, RunManager, RunRecord, UnsupportedStrategyError
 from .schemas import DisconnectMode, RunStatus

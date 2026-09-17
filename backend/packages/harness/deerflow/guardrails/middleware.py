@@ -1,4 +1,6 @@
-'定义 middleware 模块提供的职责与可复用接口。\n\nGuardrailMiddleware - evaluates tool calls against a GuardrailProvider before execution.'
+"""定义 middleware 模块提供的职责与可复用接口。
+
+GuardrailMiddleware - evaluates tool calls against a GuardrailProvider before execution."""
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -20,23 +22,31 @@ _REASON_MESSAGE_LIMIT = 500
 
 
 class GuardrailMiddleware(AgentMiddleware[AgentState]):
-    '封装 GuardrailMiddleware 的状态、协作关系与公开操作。\n\nEvaluate tool calls against a GuardrailProvider before execution.\n\n    Denied calls return an error ToolMessage so the agent can adapt.\n    If the provider raises, behavior depends on fail_closed:\n      - True (default): block the call\n      - False: allow it through with a warning\n    '
+    """封装 GuardrailMiddleware 的状态、协作关系与公开操作。
+
+    Evaluate tool calls against a GuardrailProvider before execution.
+
+        Denied calls return an error ToolMessage so the agent can adapt.
+        If the provider raises, behavior depends on fail_closed:
+          - True (default): block the call
+          - False: allow it through with a warning
+    """
 
     def __init__(self, provider: GuardrailProvider, *, fail_closed: bool = True, passport: str | None = None):
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         self.provider = provider
         self.fail_closed = fail_closed
         self.passport = passport
 
     @staticmethod
     def _resolve_context(request: ToolCallRequest) -> dict:
-        '执行 _resolve_context 的明确职责，并返回与调用约定一致的结果'
+        "执行 _resolve_context 的明确职责，并返回与调用约定一致的结果"
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None) if runtime is not None else None
         return context if isinstance(context, dict) else {}
 
     def _build_request(self, request: ToolCallRequest, context: dict) -> GuardrailRequest:
-        '执行 _build_request 的明确职责，并返回与调用约定一致的结果'
+        "执行 _build_request 的明确职责，并返回与调用约定一致的结果"
         return GuardrailRequest(
             tool_name=str(request.tool_call.get("name", "")),
             tool_input=request.tool_call.get("args", {}),
@@ -53,7 +63,7 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         )
 
     def _build_denied_message(self, request: ToolCallRequest, decision: GuardrailDecision) -> ToolMessage:
-        '执行 _build_denied_message 的明确职责，并返回与调用约定一致的结果'
+        "执行 _build_denied_message 的明确职责，并返回与调用约定一致的结果"
         tool_name = str(request.tool_call.get("name", "unknown_tool"))
         tool_call_id = str(request.tool_call.get("id", "missing_id"))
         reason_text = decision.reasons[0].message if decision.reasons else "blocked by guardrail policy"
@@ -74,7 +84,15 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         action: str,
         provider_error: bool,
     ) -> None:
-        '执行 _record_guardrail_event 的明确职责，并返回与调用约定一致的结果。\n\nPersist a security-relevant guardrail decision to RunJournal.\n\n        This follows the optional-Journal pattern used by existing middleware:\n        audit persistence is best-effort and must never change tool execution\n        behavior. Runtimes without ``__run_journal`` (including embedded and\n        subagent execution) skip persistence.\n        '
+        """执行 _record_guardrail_event 的明确职责，并返回与调用约定一致的结果。
+
+        Persist a security-relevant guardrail decision to RunJournal.
+
+                This follows the optional-Journal pattern used by existing middleware:
+                audit persistence is best-effort and must never change tool execution
+                behavior. Runtimes without ``__run_journal`` (including embedded and
+                subagent execution) skip persistence.
+        """
         journal = context.get("__run_journal")
         if journal is None:
             return
@@ -115,7 +133,7 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        '执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果"
         context = self._resolve_context(request)
         gr = self._build_request(request, context)
         try:
@@ -163,7 +181,7 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        '执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果"
         context = self._resolve_context(request)
         gr = self._build_request(request, context)
         try:

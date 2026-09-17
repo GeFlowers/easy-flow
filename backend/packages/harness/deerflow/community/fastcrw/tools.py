@@ -1,4 +1,5 @@
-'定义 tools 模块提供的职责与可复用接口'
+"定义 tools 模块提供的职责与可复用接口"
+
 import json
 import os
 
@@ -16,7 +17,7 @@ DEFAULT_BASE_URL = "https://fastcrw.com/api"
 
 
 def _get_fastcrw_client(tool_name: str = "web_search") -> FirecrawlApp:
-    '执行 _get_fastcrw_client 的明确职责，并返回与调用约定一致的结果'
+    "执行 _get_fastcrw_client 的明确职责，并返回与调用约定一致的结果"
     config = get_app_config().get_tool_config(tool_name)
     api_key = None
     base_url = None
@@ -33,13 +34,13 @@ def _get_fastcrw_client(tool_name: str = "web_search") -> FirecrawlApp:
 
 
 def _get_tool_config_extra(tool_name: str) -> dict:
-    '执行 _get_tool_config_extra 的明确职责，并返回与调用约定一致的结果'
+    "执行 _get_tool_config_extra 的明确职责，并返回与调用约定一致的结果"
     config = get_app_config().get_tool_config(tool_name)
     return dict(config.model_extra or {}) if config is not None else {}
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
-    '执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果'
+    "执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果"
     if isinstance(value, bool):
         return value
     if isinstance(value, str):

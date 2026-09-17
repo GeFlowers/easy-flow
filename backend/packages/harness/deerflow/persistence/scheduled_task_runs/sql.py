@@ -1,4 +1,5 @@
 """提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -16,6 +17,7 @@ ACTIVE_RUN_STATUSES: tuple[str, ...] = ("queued", "running")
 
 class ScheduledTaskRunRepository:
     """定义负责持久化读写及事务边界管理的仓储组件。"""
+
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         """初始化当前持久化组件所需的依赖与内部状态。"""
         self._sf = session_factory

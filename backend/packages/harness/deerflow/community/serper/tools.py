@@ -1,4 +1,11 @@
-'定义 tools 模块提供的职责与可复用接口。\n\n\nWeb and image search tools powered by Serper (Google Search API).\n\nSerper provides real-time Google Search and Google Images results via a JSON\nAPI. An API key is required. Sign up at https://serper.dev to get one.\n'
+"""定义 tools 模块提供的职责与可复用接口。
+
+
+Web and image search tools powered by Serper (Google Search API).
+
+Serper provides real-time Google Search and Google Images results via a JSON
+API. An API key is required. Sign up at https://serper.dev to get one.
+"""
 
 import json
 import logging
@@ -20,7 +27,7 @@ _api_key_warned: set[str] = set()
 
 
 def _get_api_key(tool_name: str) -> str | None:
-    '执行 _get_api_key 的明确职责，并返回与调用约定一致的结果'
+    "执行 _get_api_key 的明确职责，并返回与调用约定一致的结果"
     config = get_app_config().get_tool_config(tool_name)
     if config is not None:
         api_key = config.model_extra.get("api_key")
@@ -33,7 +40,9 @@ def _get_api_key(tool_name: str) -> str | None:
 
 
 def _coerce_max_results(value: object, default: int = 5, max_allowed: int = _SERPER_MAX_RESULTS) -> int:
-    '执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果。\n\nCoerce config/parameter input into a bounded positive result count.'
+    """执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果。
+
+    Coerce config/parameter input into a bounded positive result count."""
     try:
         count = int(value)
     except (TypeError, ValueError):
@@ -44,7 +53,7 @@ def _coerce_max_results(value: object, default: int = 5, max_allowed: int = _SER
 
 
 def _missing_key_error(query: str, tool_name: str) -> str:
-    '执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果'
+    "执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果"
     if tool_name not in _api_key_warned:
         _api_key_warned.add(tool_name)
         logger.warning("Serper API key is not set for '%s'. Set SERPER_API_KEY in your environment or provide api_key in config.yaml. Sign up at https://serper.dev", tool_name)
@@ -55,7 +64,7 @@ def _missing_key_error(query: str, tool_name: str) -> str:
 
 
 def _unexpected_format_error(query: str) -> str:
-    '执行 _unexpected_format_error 的明确职责，并返回与调用约定一致的结果'
+    "执行 _unexpected_format_error 的明确职责，并返回与调用约定一致的结果"
     return json.dumps(
         {"error": "Serper returned an unexpected response format", "query": query},
         ensure_ascii=False,
@@ -63,7 +72,7 @@ def _unexpected_format_error(query: str) -> str:
 
 
 def _response_items(data: dict, field: str, query: str) -> tuple[list[dict] | None, str | None]:
-    '执行 _response_items 的明确职责，并返回与调用约定一致的结果'
+    "执行 _response_items 的明确职责，并返回与调用约定一致的结果"
     items = data.get(field)
     # Treat a missing or null field as "no results" (some APIs return
     # ``{"organic": null}`` to signal that) rather than a malformed payload.
@@ -76,7 +85,9 @@ def _response_items(data: dict, field: str, query: str) -> tuple[list[dict] | No
 
 
 def _clean_query(query: str) -> str:
-    '执行 _clean_query 的明确职责，并返回与调用约定一致的结果。\n\nNormalize a raw query into the value actually sent to Serper.'
+    """执行 _clean_query 的明确职责，并返回与调用约定一致的结果。
+
+    Normalize a raw query into the value actually sent to Serper."""
     query = query.strip()
     if len(query) > 500:
         query = query[:500]
@@ -84,7 +95,16 @@ def _clean_query(query: str) -> str:
 
 
 def _decode_ipv4(host: str) -> IPv4Address | None:
-    '执行 _decode_ipv4 的明确职责，并返回与调用约定一致的结果。\n\nDecode obfuscated IPv4 literals that ``ip_address`` rejects.\n\n    Mirrors the permissive ``inet_aton`` parsing many HTTP clients use, so that\n    integer (``2130706433``), hex (``0x7f000001``) and octal (``0177.0.0.1``)\n    encodings of an address are recognized. Returns an ``IPv4Address`` when the\n    host decodes to one, otherwise ``None`` (e.g. real domains like\n    ``cafe.com`` fail to decode and are left for the caller to treat as a host).\n    '
+    """执行 _decode_ipv4 的明确职责，并返回与调用约定一致的结果。
+
+    Decode obfuscated IPv4 literals that ``ip_address`` rejects.
+
+        Mirrors the permissive ``inet_aton`` parsing many HTTP clients use, so that
+        integer (``2130706433``), hex (``0x7f000001``) and octal (``0177.0.0.1``)
+        encodings of an address are recognized. Returns an ``IPv4Address`` when the
+        host decodes to one, otherwise ``None`` (e.g. real domains like
+        ``cafe.com`` fail to decode and are left for the caller to treat as a host).
+    """
     parts = host.split(".")
     if not 1 <= len(parts) <= 4:
         return None
@@ -119,12 +139,29 @@ def _decode_ipv4(host: str) -> IPv4Address | None:
 
 
 def _is_url_present(value: object) -> bool:
-    '执行 _is_url_present 的明确职责，并返回与调用约定一致的结果。\n\nReturn ``True`` when *value* is a non-empty URL string.\n\n    Used to distinguish a field that was *absent* (eligible for cross-field\n    fallback) from one that was *present but filtered* by the SSRF guard (which\n    must stay empty rather than collapse onto its counterpart).\n    '
+    """执行 _is_url_present 的明确职责，并返回与调用约定一致的结果。
+
+    Return ``True`` when *value* is a non-empty URL string.
+
+        Used to distinguish a field that was *absent* (eligible for cross-field
+        fallback) from one that was *present but filtered* by the SSRF guard (which
+        must stay empty rather than collapse onto its counterpart).
+    """
     return isinstance(value, str) and bool(value.strip())
 
 
 def _safe_public_url(value: object) -> str:
-    '执行 _safe_public_url 的明确职责，并返回与调用约定一致的结果。\n\nReturn ``value`` only if it is a safe, public http(s) URL, else "".\n\n    This is a best-effort SSRF guard that rejects non-http(s) schemes,\n    ``localhost``, and private/non-global IP literals (including obfuscated\n    decimal/hex/octal encodings). It only inspects the URL string and cannot\n    catch public hostnames that resolve to internal IPs (e.g. DNS rebinding);\n    any consumer that actually downloads these URLs must re-validate the\n    resolved IP at fetch time.\n    '
+    """执行 _safe_public_url 的明确职责，并返回与调用约定一致的结果。
+
+    Return ``value`` only if it is a safe, public http(s) URL, else "".
+
+        This is a best-effort SSRF guard that rejects non-http(s) schemes,
+        ``localhost``, and private/non-global IP literals (including obfuscated
+        decimal/hex/octal encodings). It only inspects the URL string and cannot
+        catch public hostnames that resolve to internal IPs (e.g. DNS rebinding);
+        any consumer that actually downloads these URLs must re-validate the
+        resolved IP at fetch time.
+    """
     if not isinstance(value, str):
         return ""
     url = value.strip()
@@ -151,7 +188,16 @@ def _safe_public_url(value: object) -> str:
 
 
 def _serper_post(endpoint: str, api_key: str, query: str, max_results: int) -> tuple[dict | None, str | None]:
-    '执行 _serper_post 的明确职责，并返回与调用约定一致的结果。\n\nSend a POST request to a Serper endpoint.\n\n    ``query`` is expected to already be normalized via :func:`_clean_query`.\n\n    Returns a ``(data, error_json)`` tuple: on success ``data`` is the parsed\n    JSON response and ``error_json`` is ``None``; on failure ``data`` is ``None``\n    and ``error_json`` is a serialized structured error ready to return.\n    '
+    """执行 _serper_post 的明确职责，并返回与调用约定一致的结果。
+
+    Send a POST request to a Serper endpoint.
+
+        ``query`` is expected to already be normalized via :func:`_clean_query`.
+
+        Returns a ``(data, error_json)`` tuple: on success ``data`` is the parsed
+        JSON response and ``error_json`` is ``None``; on failure ``data`` is ``None``
+        and ``error_json`` is a serialized structured error ready to return.
+    """
     headers = {
         "X-API-KEY": api_key,
         "Content-Type": "application/json",

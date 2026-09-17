@@ -1,4 +1,13 @@
-"定义 patched_mimo 模块提供的职责与可复用接口。\n\nPatched ChatOpenAI adapter for Xiaomi MiMo reasoning_content replay.\n\nMiMo's OpenAI-compatible API returns ``reasoning_content`` in thinking mode and\nrequires that value to be replayed on historical assistant messages in\nmulti-turn agent conversations. Standard ``langchain_openai.ChatOpenAI`` drops\nthat provider-specific field, which can cause HTTP 400 errors once tool calls\nenter the conversation history.\n"
+"""定义 patched_mimo 模块提供的职责与可复用接口。
+
+Patched ChatOpenAI adapter for Xiaomi MiMo reasoning_content replay.
+
+MiMo's OpenAI-compatible API returns ``reasoning_content`` in thinking mode and
+requires that value to be replayed on historical assistant messages in
+multi-turn agent conversations. Standard ``langchain_openai.ChatOpenAI`` drops
+that provider-specific field, which can cause HTTP 400 errors once tool calls
+enter the conversation history.
+"""
 
 from __future__ import annotations
 
@@ -16,7 +25,9 @@ _MISSING = object()
 
 
 def _extract_reasoning_content(value: Any) -> str | object:
-    '执行 _extract_reasoning_content 的明确职责，并返回与调用约定一致的结果。\n\nReturn reasoning_content from a dict/Pydantic object, preserving empty strings.'
+    """执行 _extract_reasoning_content 的明确职责，并返回与调用约定一致的结果。
+
+    Return reasoning_content from a dict/Pydantic object, preserving empty strings."""
     if isinstance(value, Mapping):
         if "reasoning_content" in value and value["reasoning_content"] is not None:
             return value["reasoning_content"]
@@ -34,7 +45,7 @@ def _extract_reasoning_content(value: Any) -> str | object:
 
 
 def _with_reasoning_content(message: AIMessage | AIMessageChunk, reasoning: str) -> AIMessage | AIMessageChunk:
-    '执行 _with_reasoning_content 的明确职责，并返回与调用约定一致的结果'
+    "执行 _with_reasoning_content 的明确职责，并返回与调用约定一致的结果"
     additional_kwargs = dict(message.additional_kwargs)
     if additional_kwargs.get("reasoning_content") != reasoning:
         additional_kwargs["reasoning_content"] = reasoning
@@ -42,7 +53,7 @@ def _with_reasoning_content(message: AIMessage | AIMessageChunk, reasoning: str)
 
 
 def _get_typed_choice_message(response: Any, index: int) -> Any:
-    '执行 _get_typed_choice_message 的明确职责，并返回与调用约定一致的结果'
+    "执行 _get_typed_choice_message 的明确职责，并返回与调用约定一致的结果"
     choices = getattr(response, "choices", None)
     if choices is None:
         return None
@@ -53,16 +64,18 @@ def _get_typed_choice_message(response: Any, index: int) -> Any:
 
 
 class PatchedChatMiMo(ChatOpenAI):
-    '封装 PatchedChatMiMo 的状态、协作关系与公开操作。\n\nChatOpenAI with ``reasoning_content`` preservation for MiMo thinking mode.'
+    """封装 PatchedChatMiMo 的状态、协作关系与公开操作。
+
+    ChatOpenAI with ``reasoning_content`` preservation for MiMo thinking mode."""
 
     @classmethod
     def is_lc_serializable(cls) -> bool:
-        '判断条件是否成立并返回布尔结果，并遵守 is_lc_serializable 所表达的接口约束'
+        "判断条件是否成立并返回布尔结果，并遵守 is_lc_serializable 所表达的接口约束"
         return True
 
     @property
     def lc_secrets(self) -> dict[str, str]:
-        '执行 lc_secrets 的明确职责，并返回与调用约定一致的结果'
+        "执行 lc_secrets 的明确职责，并返回与调用约定一致的结果"
         return {"api_key": "MIMO_API_KEY", "openai_api_key": "MIMO_API_KEY"}
 
     def _get_request_payload(
@@ -72,7 +85,7 @@ class PatchedChatMiMo(ChatOpenAI):
         stop: list[str] | None = None,
         **kwargs: Any,
     ) -> dict:
-        '执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果'
+        "执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果"
         original_messages = self._convert_input(input_).to_messages()
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
         restore_assistant_payloads(
@@ -89,7 +102,7 @@ class PatchedChatMiMo(ChatOpenAI):
         default_chunk_class: type,
         base_generation_info: dict | None,
     ) -> ChatGenerationChunk | None:
-        '执行 _convert_chunk_to_generation_chunk 的明确职责，并返回与调用约定一致的结果'
+        "执行 _convert_chunk_to_generation_chunk 的明确职责，并返回与调用约定一致的结果"
         generation_chunk = super()._convert_chunk_to_generation_chunk(
             chunk,
             default_chunk_class,
@@ -115,7 +128,7 @@ class PatchedChatMiMo(ChatOpenAI):
         response: dict | Any,
         generation_info: dict | None = None,
     ) -> ChatResult:
-        '执行 _create_chat_result 的明确职责，并返回与调用约定一致的结果'
+        "执行 _create_chat_result 的明确职责，并返回与调用约定一致的结果"
         result = super()._create_chat_result(response, generation_info)
         response_dict = response if isinstance(response, dict) else response.model_dump()
         choices = response_dict.get("choices", [])

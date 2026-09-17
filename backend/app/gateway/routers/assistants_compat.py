@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api/assistants", tags=["assistants-compat"])
 
 class AssistantResponse(BaseModel):
     """描述兼容层返回给 LangGraph 客户端的助手元数据。"""
+
     assistant_id: str
     graph_id: str
     name: str
@@ -33,6 +34,7 @@ class AssistantResponse(BaseModel):
 
 class AssistantSearchRequest(BaseModel):
     """定义兼容助手检索接口接受的可选筛选与分页参数。"""
+
     graph_id: str | None = None
     name: str | None = None
     metadata: dict[str, Any] | None = None

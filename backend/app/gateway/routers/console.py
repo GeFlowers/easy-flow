@@ -140,6 +140,7 @@ def _as_utc(dt: datetime | None) -> datetime | None:
 
 class _ModelPricing(NamedTuple):
     """每百万 Token 的模型定价配置。"""
+
     input_per_million: float
     output_per_million: float
     currency: str

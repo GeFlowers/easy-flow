@@ -91,6 +91,7 @@ def _raise_static_scan_failure(name: str, error: StaticScannerError) -> NoReturn
 
 async def _scan_static_candidate_or_raise(name: str, updates: dict[str, str], skill_storage: SkillStorage | None = None) -> list[StaticFinding]:
     """在临时技能副本上执行静态扫描，并在失败时阻止写入。"""
+
     def _scan_candidate() -> list[StaticFinding]:
         """构建候选技能目录并返回静态扫描发现项。"""
         with tempfile.TemporaryDirectory() as tmp:

@@ -12,6 +12,7 @@ from deerflow.persistence.base import Base
 
 class UserRow(Base):
     """定义与持久化数据表对应的行模型。"""
+
     __tablename__ = "users"
 
     # UUIDs are stored as 36-char strings for cross-backend portability.

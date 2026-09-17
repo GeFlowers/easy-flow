@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 class ScheduledTaskService:
     """协调定时任务的轮询抢占、重叠处理、运行分派与生命周期收尾。"""
+
     def __init__(
         self,
         *,

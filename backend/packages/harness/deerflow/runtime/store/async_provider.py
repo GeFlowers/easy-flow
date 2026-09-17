@@ -1,4 +1,21 @@
-'定义 async_provider 模块提供的职责与可复用接口。\n\nAsync Store factory — backend mirrors runtime persistence configuration.\n\nThe deprecated ``checkpointer`` section takes precedence when present;\notherwise Store follows the unified ``database`` section in *config.yaml*:\n\n- ``memory``   → :class:`langgraph.store.memory.InMemoryStore`\n- ``sqlite``   → :class:`langgraph.store.sqlite.aio.AsyncSqliteStore`\n- ``postgres`` → :class:`langgraph.store.postgres.aio.AsyncPostgresStore`\n\nUsage (e.g. FastAPI lifespan)::\n\n    from deerflow.runtime.store import make_store\n\n    async with make_store() as store:\n        app.state.store = store\n'
+"""定义 async_provider 模块提供的职责与可复用接口。
+
+Async Store factory — backend mirrors runtime persistence configuration.
+
+The deprecated ``checkpointer`` section takes precedence when present;
+otherwise Store follows the unified ``database`` section in *config.yaml*:
+
+- ``memory``   → :class:`langgraph.store.memory.InMemoryStore`
+- ``sqlite``   → :class:`langgraph.store.sqlite.aio.AsyncSqliteStore`
+- ``postgres`` → :class:`langgraph.store.postgres.aio.AsyncPostgresStore`
+
+Usage (e.g. FastAPI lifespan)::
+
+    from deerflow.runtime.store import make_store
+
+    async with make_store() as store:
+        app.state.store = store
+"""
 
 from __future__ import annotations
 
@@ -28,7 +45,13 @@ logger = logging.getLogger(__name__)
 
 @contextlib.asynccontextmanager
 async def _async_store(config) -> AsyncIterator[BaseStore]:
-    '执行 _async_store 的明确职责，并返回与调用约定一致的结果。\n\nAsync context manager that constructs and tears down a Store.\n\n    The ``config`` argument is a :class:`deerflow.config.checkpointer_config.CheckpointerConfig`\n    instance — the same object used by the checkpointer factory.\n    '
+    """执行 _async_store 的明确职责，并返回与调用约定一致的结果。
+
+    Async context manager that constructs and tears down a Store.
+
+        The ``config`` argument is a :class:`deerflow.config.checkpointer_config.CheckpointerConfig`
+        instance — the same object used by the checkpointer factory.
+    """
     if config.type == "memory":
         from langgraph.store.memory import InMemoryStore
 
@@ -76,7 +99,20 @@ async def _async_store(config) -> AsyncIterator[BaseStore]:
 
 @contextlib.asynccontextmanager
 async def make_store(app_config: AppConfig | None = None) -> AsyncIterator[BaseStore]:
-    '构造并返回，并遵守 make_store 所表达的接口约束。\n\nYield a Store selected from legacy or unified persistence config.\n\n    The legacy ``checkpointer`` section takes precedence when configured;\n    otherwise the unified ``database`` section selects the backend, matching\n    :func:`deerflow.runtime.checkpointer.async_provider.make_checkpointer`::\n\n        async with make_store(app_config) as store:\n            app.state.store = store\n\n    An :class:`~langgraph.store.memory.InMemoryStore` is returned only when the\n    resolved backend is explicitly ``memory``.\n    '
+    """构造并返回，并遵守 make_store 所表达的接口约束。
+
+    Yield a Store selected from legacy or unified persistence config.
+
+        The legacy ``checkpointer`` section takes precedence when configured;
+        otherwise the unified ``database`` section selects the backend, matching
+        :func:`deerflow.runtime.checkpointer.async_provider.make_checkpointer`::
+
+            async with make_store(app_config) as store:
+                app.state.store = store
+
+        An :class:`~langgraph.store.memory.InMemoryStore` is returned only when the
+        resolved backend is explicitly ``memory``.
+    """
     if app_config is None:
         app_config = get_app_config()
 

@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -14,14 +14,16 @@ from .message_format import format_tool_detail, format_tool_result, summarize_to
 
 @dataclass(frozen=True)
 class UserRow:
-    '未说明'
+    "未说明"
+
     text: str
     kind: Literal["user"] = "user"
 
 
 @dataclass(frozen=True)
 class AssistantRow:
-    '未说明'
+    "未说明"
+
     text: str
     id: str | None = None
     error: bool = False
@@ -30,7 +32,8 @@ class AssistantRow:
 
 @dataclass(frozen=True)
 class ToolRow:
-    '未说明'
+    "未说明"
+
     tool_call_id: str
     tool_name: str
     title: str
@@ -42,7 +45,8 @@ class ToolRow:
 
 @dataclass(frozen=True)
 class SystemRow:
-    '未说明'
+    "未说明"
+
     text: str
     tone: Literal["info", "error"] = "info"
     kind: Literal["system"] = "system"
@@ -58,38 +62,44 @@ Row = UserRow | AssistantRow | ToolRow | SystemRow
 
 @dataclass(frozen=True)
 class UserSubmitted:
-    '未说明'
+    "未说明"
+
     text: str
 
 
 @dataclass(frozen=True)
 class RunStarted:
-    '未说明'
+    "未说明"
+
     pass
 
 
 @dataclass(frozen=True)
 class RunEnded:
-    '未说明'
+    "未说明"
+
     usage: dict | None = None
 
 
 @dataclass(frozen=True)
 class AssistantDelta:
-    '未说明'
+    "未说明"
+
     id: str
     text: str
 
 
 @dataclass(frozen=True)
 class AssistantError:
-    '未说明'
+    "未说明"
+
     text: str
 
 
 @dataclass(frozen=True)
 class ToolStarted:
-    '未说明'
+    "未说明"
+
     tool_call_id: str
     tool_name: str
     args: dict = field(default_factory=dict)
@@ -97,7 +107,8 @@ class ToolStarted:
 
 @dataclass(frozen=True)
 class ToolResult:
-    '未说明'
+    "未说明"
+
     tool_call_id: str
     content: str
     is_error: bool = False
@@ -106,20 +117,23 @@ class ToolResult:
 
 @dataclass(frozen=True)
 class SystemMessage:
-    '未说明'
+    "未说明"
+
     text: str
     tone: Literal["info", "error"] = "info"
 
 
 @dataclass(frozen=True)
 class ThreadTitle:
-    '未说明'
+    "未说明"
+
     title: str
 
 
 @dataclass(frozen=True)
 class ClearRows:
-    '未说明'
+    "未说明"
+
     pass
 
 
@@ -133,7 +147,8 @@ Action = UserSubmitted | RunStarted | RunEnded | AssistantDelta | AssistantError
 
 @dataclass(frozen=True)
 class ViewState:
-    '未说明'
+    "未说明"
+
     rows: tuple[Row, ...] = ()
     streaming: bool = False
     usage: dict | None = None
@@ -153,7 +168,7 @@ class ViewState:
 
 
 def initial_state(rows: tuple[Row, ...] = ()) -> ViewState:
-    '未说明'
+    "未说明"
     return ViewState(rows=tuple(rows))
 
 
@@ -163,12 +178,12 @@ def initial_state(rows: tuple[Row, ...] = ()) -> ViewState:
 
 
 def _append(state: ViewState, row: Row) -> ViewState:
-    '未说明'
+    "未说明"
     return replace(state, rows=state.rows + (row,))
 
 
 def reduce(state: ViewState, action: Action) -> ViewState:
-    '未说明'
+    "未说明"
 
     if isinstance(action, UserSubmitted):
         return _append(state, UserRow(text=action.text))
@@ -212,7 +227,7 @@ def reduce(state: ViewState, action: Action) -> ViewState:
 
 
 def _apply_assistant_delta(state: ViewState, action: AssistantDelta) -> ViewState:
-    '未说明'
+    "未说明"
     if not action.id:
         return _apply_assistant_delta_anonymous(state, action)
 
@@ -235,7 +250,7 @@ def _apply_assistant_delta(state: ViewState, action: AssistantDelta) -> ViewStat
 
 
 def _apply_assistant_delta_anonymous(state: ViewState, action: AssistantDelta) -> ViewState:
-    '未说明'
+    "未说明"
     index = state.streaming_anonymous_row_index
     if index is not None and index == len(state.rows) - 1:
         row = state.rows[index]
@@ -253,21 +268,21 @@ def _apply_assistant_delta_anonymous(state: ViewState, action: AssistantDelta) -
 
 
 def _mark_streaming(state: ViewState, message_id: str) -> ViewState:
-    '未说明'
+    "未说明"
     if state.streaming:
         return replace(state, streaming_id=message_id)
     return state
 
 
 def _mark_streaming_anonymous(state: ViewState, index: int) -> ViewState:
-    '未说明'
+    "未说明"
     if state.streaming:
         return replace(state, streaming_id=None, streaming_anonymous_row_index=index)
     return state
 
 
 def _merge_stream_text(existing: str, incoming: str) -> str:
-    '未说明'
+    "未说明"
     if not existing:
         return incoming
     # Cumulative re-delivery: incoming strictly extends existing.
@@ -282,7 +297,7 @@ def _merge_stream_text(existing: str, incoming: str) -> str:
 
 
 def _apply_tool_started(state: ViewState, action: ToolStarted) -> ViewState:
-    '未说明'
+    "未说明"
     if not action.tool_call_id:
         return state
 
@@ -307,7 +322,7 @@ def _apply_tool_started(state: ViewState, action: ToolStarted) -> ViewState:
 
 
 def _apply_tool_result(state: ViewState, action: ToolResult) -> ViewState:
-    '未说明'
+    "未说明"
     if not action.tool_call_id:
         return state
 

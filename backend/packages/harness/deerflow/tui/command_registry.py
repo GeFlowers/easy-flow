@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -8,7 +8,8 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class Command:
-    '未说明'
+    "未说明"
+
     name: str  # without leading slash
     description: str
     category: Literal["builtin", "skill"] = "builtin"
@@ -16,7 +17,8 @@ class Command:
 
 @dataclass(frozen=True)
 class Resolution:
-    '未说明'
+    "未说明"
+
     kind: Literal["builtin", "skill", "unknown", "message"]
     name: str = ""
     args: str = ""
@@ -48,7 +50,7 @@ _BUILTIN_NAMES = frozenset(c.name for c in BUILTIN_COMMANDS)
 
 
 def build_registry(skills: list[dict]) -> list[Command]:
-    '未说明'
+    "未说明"
     commands = list(BUILTIN_COMMANDS)
     for skill in skills:
         if not skill.get("enabled", False):
@@ -61,7 +63,7 @@ def build_registry(skills: list[dict]) -> list[Command]:
 
 
 def filter_commands(commands: list[Command], query: str) -> list[Command]:
-    '未说明'
+    "未说明"
     q = query.strip().lower()
     if not q:
         return commands
@@ -81,7 +83,7 @@ def filter_commands(commands: list[Command], query: str) -> list[Command]:
 
 
 def resolve(text: str, skills: list[str] | None = None) -> Resolution:
-    '未说明'
+    "未说明"
     stripped = text.strip()
     if not stripped.startswith("/"):
         return Resolution(kind="message", text=text)

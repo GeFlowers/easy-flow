@@ -1,4 +1,6 @@
-'定义 context_compaction 模块提供的职责与可复用接口。\n\nManual thread-context compaction helpers.'
+"""定义 context_compaction 模块提供的职责与可复用接口。
+
+Manual thread-context compaction helpers."""
 
 from __future__ import annotations
 
@@ -16,16 +18,22 @@ from deerflow.utils.time import now_iso
 
 
 class ContextCompactionDisabled(RuntimeError):
-    '封装 ContextCompactionDisabled 的状态、协作关系与公开操作。\n\nRaised when manual compaction is requested while summarization is disabled.'
+    """封装 ContextCompactionDisabled 的状态、协作关系与公开操作。
+
+    Raised when manual compaction is requested while summarization is disabled."""
 
 
 class ContextCompactionFailed(RuntimeError):
-    '封装 ContextCompactionFailed 的状态、协作关系与公开操作。\n\nRaised when a compressible thread cannot be summarized.'
+    """封装 ContextCompactionFailed 的状态、协作关系与公开操作。
+
+    Raised when a compressible thread cannot be summarized."""
 
 
 @dataclass(frozen=True)
 class ThreadCompactionResult:
-    '封装 ThreadCompactionResult 的状态、协作关系与公开操作。\n\nResult returned after a manual context-compaction attempt.'
+    """封装 ThreadCompactionResult 的状态、协作关系与公开操作。
+
+    Result returned after a manual context-compaction attempt."""
 
     thread_id: str
     compacted: bool
@@ -42,7 +50,7 @@ def _create_compaction_middleware(
     app_config: AppConfig,
     keep: tuple[str, int | float] | None,
 ) -> DeerFlowSummarizationMiddleware:
-    '执行 _create_compaction_middleware 的明确职责，并返回与调用约定一致的结果'
+    "执行 _create_compaction_middleware 的明确职责，并返回与调用约定一致的结果"
     middleware = create_summarization_middleware(app_config=app_config, keep=keep)
     if middleware is None:
         raise ContextCompactionDisabled("Context compaction is disabled.")
@@ -50,7 +58,7 @@ def _create_compaction_middleware(
 
 
 def _checkpoint_namespace(checkpoint_tuple: Any) -> str:
-    '执行 _checkpoint_namespace 的明确职责，并返回与调用约定一致的结果'
+    "执行 _checkpoint_namespace 的明确职责，并返回与调用约定一致的结果"
     config = getattr(checkpoint_tuple, "config", {}) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     checkpoint_ns = configurable.get("checkpoint_ns", "") if isinstance(configurable, dict) else ""
@@ -67,7 +75,9 @@ async def compact_thread_context(
     agent_name: str | None = None,
     app_config: AppConfig | None = None,
 ) -> ThreadCompactionResult:
-    '执行 compact_thread_context 的明确职责，并返回与调用约定一致的结果。\n\nSummarize old messages in a thread and write a compacted checkpoint.'
+    """执行 compact_thread_context 的明确职责，并返回与调用约定一致的结果。
+
+    Summarize old messages in a thread and write a compacted checkpoint."""
     resolved_app_config = app_config or get_app_config()
     middleware = _create_compaction_middleware(app_config=resolved_app_config, keep=keep)
 

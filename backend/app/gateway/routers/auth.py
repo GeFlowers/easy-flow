@@ -596,7 +596,8 @@ async def list_auth_providers():
 async def oauth_login(
     request: Request,
     provider: str,
-    next: str | None = None,  # noqa: A002（有意遮蔽内置名称，与查询参数名保持一致）
+    # 有意使用内置名称 `next`，以与查询参数名保持一致。
+    next: str | None = None,  # noqa: A002
 ):
     """发起 OIDC 登录流程。
 

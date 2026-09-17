@@ -122,18 +122,6 @@ Get an API key at [e2b.dev/dashboard](https://e2b.dev/dashboard) and either set 
   that read or write under `/mnt/user-data/...` continue to work transparently.
 </Callout>
 
-### Provisioner-managed Sandbox (Kubernetes)
-
-Each sandbox gets a dedicated Pod in a Kubernetes cluster, managed by the provisioner service. This provides the strongest isolation and is recommended for production environments with multiple concurrent users.
-
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  provisioner_url: http://provisioner:8002
-```
-
-The provisioner service is included in `docker/docker-compose-dev.yaml` and manages the Pod and Service lifecycle for each sandbox ID.
-
 ## Path mappings
 
 The sandbox uses path mappings to bridge the host filesystem and the container's virtual filesystem. Two key mappings are always configured:
@@ -163,14 +151,14 @@ sandbox:
   `/mnt/skills`, `/mnt/acp-workspace`, or `/mnt/user-data`.
 </Callout>
 
-When `LocalSandboxProvider` runs under production Docker (`make up`), the
+When `LocalSandboxProvider` runs under Docker development (`make docker-start`), the
 provider runs inside the `deer-flow-gateway` container. In that mode,
 `host_path` is resolved from the gateway container's filesystem, not directly
 from your Docker host. Bind the host directory into the gateway service first,
 then use the in-container path in `config.yaml`:
 
 ```yaml
-# docker/docker-compose.yaml or an override file
+# docker/docker-compose-dev.yaml
 services:
   gateway:
     volumes:

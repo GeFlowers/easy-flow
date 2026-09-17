@@ -83,6 +83,7 @@ _LEGACY_STATUS_NORMALIZATION: dict[str, SubagentStopReasonValue] = {
 
 class StructuredSubagentResult(TypedDict):
     """封装当前模块相关的数据、状态或协作职责。"""
+
     status: SubagentStatusValue
     stop_reason: NotRequired[SubagentStopReasonValue]
     result_brief: NotRequired[str]

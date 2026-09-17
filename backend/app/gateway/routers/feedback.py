@@ -25,6 +25,7 @@ router = APIRouter(prefix="/api/threads", tags=["feedback"])
 
 class FeedbackCreateRequest(BaseModel):
     """定义创建运行反馈时的评分、备注和可选消息范围。"""
+
     rating: int = Field(..., description="Feedback rating: +1 (positive) or -1 (negative)")
     comment: str | None = Field(default=None, description="Optional text feedback")
     message_id: str | None = Field(default=None, description="Optional: scope feedback to a specific message")
@@ -32,12 +33,14 @@ class FeedbackCreateRequest(BaseModel):
 
 class FeedbackUpsertRequest(BaseModel):
     """定义幂等写入运行反馈时允许更新的字段。"""
+
     rating: int = Field(..., description="Feedback rating: +1 (positive) or -1 (negative)")
     comment: str | None = Field(default=None, description="Optional text feedback")
 
 
 class FeedbackResponse(BaseModel):
     """表示持久化反馈记录的 API 响应结构。"""
+
     feedback_id: str
     run_id: str
     thread_id: str
@@ -50,6 +53,7 @@ class FeedbackResponse(BaseModel):
 
 class FeedbackStatsResponse(BaseModel):
     """表示单次运行的反馈总数及正负评分汇总。"""
+
     run_id: str
     total: int = 0
     positive: int = 0
@@ -120,7 +124,9 @@ async def create_feedback(
     body: FeedbackCreateRequest,
     request: Request,
 ) -> dict[str, Any]:
-    '创建并返回，并遵守 create_feedback 所表达的接口约束。\n\nSubmit feedback (thumbs-up/down) for a run.'
+    """创建并返回，并遵守 create_feedback 所表达的接口约束。
+
+    Submit feedback (thumbs-up/down) for a run."""
     if body.rating not in (1, -1):
         raise HTTPException(status_code=400, detail="rating must be +1 or -1")
 

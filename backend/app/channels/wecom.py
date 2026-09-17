@@ -1,4 +1,4 @@
-'未说明channels未说明'
+"未说明channels未说明"
 
 from __future__ import annotations
 
@@ -24,9 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class WeComChannel(Channel):
-    '未说明we?com未说明'
+    "未说明we?com未说明"
+
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
-        '未说明'
+        "未说明"
         super().__init__(name="wecom", bus=bus, config=config)
         self._bot_id: str | None = None
         self._bot_secret: str | None = None
@@ -38,18 +39,18 @@ class WeComChannel(Channel):
 
     @property
     def supports_streaming(self) -> bool:
-        '未说明supports?streaming未说明'
+        "未说明supports?streaming未说明"
         return True
 
     def _clear_ws_context(self, thread_ts: str | None) -> None:
-        '未说明clear?ws?context未说明'
+        "未说明clear?ws?context未说明"
         if not thread_ts:
             return
         self._ws_frames.pop(thread_ts, None)
         self._ws_stream_ids.pop(thread_ts, None)
 
     async def _send_ws_upload_command(self, req_id: str, body: dict[str, Any], cmd: str) -> dict[str, Any]:
-        '未说明ws未说明command未说明'
+        "未说明ws未说明command未说明"
         if not self._ws_client:
             raise RuntimeError("WeCom WebSocket client is not available")
 
@@ -62,7 +63,7 @@ class WeComChannel(Channel):
         return await send_reply_async(req_id, body, cmd)
 
     async def start(self) -> None:
-        '未说明start未说明'
+        "未说明start未说明"
         if self._running:
             return
 
@@ -99,7 +100,7 @@ class WeComChannel(Channel):
         logger.info("WeCom channel started")
 
     def _on_ws_task_done(self, task: asyncio.Task) -> None:
-        '未说明on?ws未说明done未说明'
+        "未说明on?ws未说明done未说明"
         if task.cancelled():
             return
         exc = task.exception()
@@ -111,16 +112,16 @@ class WeComChannel(Channel):
         )
 
     def _on_ws_error(self, error: Any) -> None:
-        '未说明on?ws?error未说明'
+        "未说明on?ws?error未说明"
         logger.error("WeCom WebSocket error: %s", error)
 
     def _on_ws_disconnected(self, *args: Any) -> None:
-        '未说明on?ws?disconnected未说明'
+        "未说明on?ws?disconnected未说明"
         detail = f" ({args[0]})" if args else ""
         logger.warning("WeCom WebSocket disconnected%s; SDK will attempt to reconnect", detail)
 
     async def stop(self) -> None:
-        '未说明stop未说明'
+        "未说明stop未说明"
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
         if self._ws_task:
@@ -140,14 +141,14 @@ class WeComChannel(Channel):
         logger.info("WeCom channel stopped")
 
     async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
-        '未说明'
+        "未说明"
         if self._ws_client:
             await self._send_ws(msg, _max_retries=_max_retries)
             return
         logger.warning("[WeCom] send called but WebSocket client is not available")
 
     async def _on_outbound(self, msg: OutboundMessage) -> None:
-        '未说明on?outbound未说明'
+        "未说明on?outbound未说明"
         if msg.channel_name != self.name:
             return
 
@@ -171,7 +172,7 @@ class WeComChannel(Channel):
             self._clear_ws_context(msg.thread_ts)
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
-        '未说明'
+        "未说明"
         if not msg.is_final:
             return True
         if not self._ws_client:
@@ -212,7 +213,7 @@ class WeComChannel(Channel):
             return False
 
     async def _on_ws_text(self, frame: dict[str, Any]) -> None:
-        '未说明on?ws未说明'
+        "未说明on?ws未说明"
         body = frame.get("body", {}) or {}
         text = ((body.get("text") or {}).get("content") or "").strip()
         quote = (((body.get("quote") or {}).get("text") or {}).get("content") or "").strip()
@@ -221,7 +222,7 @@ class WeComChannel(Channel):
         await self._publish_ws_inbound(frame, text + (f"\nQuote message: {quote}" if quote else ""))
 
     async def _on_ws_mixed(self, frame: dict[str, Any]) -> None:
-        '未说明on?ws?mixed未说明'
+        "未说明on?ws?mixed未说明"
         body = frame.get("body", {}) or {}
         mixed = body.get("mixed") or {}
         items = mixed.get("msg_item") or []
@@ -253,7 +254,7 @@ class WeComChannel(Channel):
         await self._publish_ws_inbound(frame, text, files=files)
 
     async def _on_ws_image(self, frame: dict[str, Any]) -> None:
-        '未说明on?ws?image未说明'
+        "未说明on?ws?image未说明"
         body = frame.get("body", {}) or {}
         image = body.get("image") or {}
         url = image.get("url")
@@ -273,7 +274,7 @@ class WeComChannel(Channel):
         )
 
     async def _on_ws_file(self, frame: dict[str, Any]) -> None:
-        '未说明on?ws未说明'
+        "未说明on?ws未说明"
         body = frame.get("body", {}) or {}
         file_obj = body.get("file") or {}
         url = file_obj.get("url")
@@ -299,7 +300,7 @@ class WeComChannel(Channel):
         *,
         files: list[dict[str, Any]] | None = None,
     ) -> None:
-        '未说明publish?ws?inbound未说明'
+        "未说明publish?ws?inbound未说明"
         if not self._ws_client:
             return
         try:
@@ -353,7 +354,7 @@ class WeComChannel(Channel):
         await self.bus.publish_inbound(inbound)
 
     async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
-        '未说明attach未说明'
+        "未说明attach未说明"
         return await attach_connection_identity(
             inbound,
             repo=self._connection_repo,
@@ -363,7 +364,7 @@ class WeComChannel(Channel):
         )
 
     async def _bind_connection_from_connect_code(self, *, frame: dict[str, Any], user_id: str, code: str) -> bool:
-        '未说明bind未说明from?connect?code未说明'
+        "未说明bind未说明from?connect?code未说明"
         if self._connection_repo is None or not code:
             return False
 
@@ -393,13 +394,13 @@ class WeComChannel(Channel):
         return True
 
     async def _send_connection_reply(self, frame: dict[str, Any], text: str) -> None:
-        '未说明reply未说明'
+        "未说明reply未说明"
         if not self._ws_client:
             return
         await self._ws_client.reply(frame, {"msgtype": "text", "text": {"content": text}})
 
     async def _send_ws(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
-        '未说明ws未说明'
+        "未说明ws未说明"
         if not self._ws_client:
             return
         try:
@@ -439,7 +440,7 @@ class WeComChannel(Channel):
         path: str,
         size: int,
     ) -> str | None:
-        '未说明media?ws未说明'
+        "未说明media?ws未说明"
         if not self._ws_client:
             return None
         try:

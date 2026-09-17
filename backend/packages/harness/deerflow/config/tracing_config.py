@@ -1,4 +1,5 @@
 """提供配置、追踪、配置相关功能。"""
+
 import os
 import threading
 
@@ -67,8 +68,8 @@ class MonocleTracingConfig(BaseModel):
 
     @property
     def is_enabled(self) -> bool:
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
+        # 中文说明：此处用于执行相关处理。
         """\u6267\u884c is_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.enabled
 

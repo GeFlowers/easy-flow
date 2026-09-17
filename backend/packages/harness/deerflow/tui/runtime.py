@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from __future__ import annotations
 
@@ -18,19 +18,21 @@ from .view_state import (
 
 
 class _StreamEventLike(Protocol):
-    '未说明'
+    "未说明"
+
     type: str
     data: dict
 
 
 class _ClientLike(Protocol):
-    '未说明'
+    "未说明"
+
     def stream(self, message: str, *, thread_id: str | None = None, **kwargs: Any) -> Iterator[Any]:
-        '未说明'
+        "未说明"
 
 
 def translate(event: _StreamEventLike) -> list[Action]:
-    '未说明'
+    "未说明"
     if event.type == "messages-tuple":
         return _translate_message(event.data)
     if event.type == "end":
@@ -46,7 +48,7 @@ def translate(event: _StreamEventLike) -> list[Action]:
 
 
 def _translate_message(data: Any) -> list[Action]:
-    '未说明'
+    "未说明"
     if not isinstance(data, dict):
         return []
 
@@ -85,12 +87,12 @@ def _as_str(value: Any) -> str:
     # Provider stream chunks can carry an explicit ``None`` id/name (the key is
     # present, so ``.get(k, "")`` would return None, and ``str(None) == "None"``
     # — a truthy value that would defeat the empty-id guard downstream).
-    '未说明'
+    "未说明"
     return "" if value is None else str(value)
 
 
 def stream_actions(client: _ClientLike, message: str, *, thread_id: str | None = None, **kwargs: Any) -> Iterator[Action]:
-    '未说明'
+    "未说明"
     yield RunStarted()
     try:
         for event in client.stream(message, thread_id=thread_id, **kwargs):
@@ -104,7 +106,7 @@ def stream_actions(client: _ClientLike, message: str, *, thread_id: str | None =
 
 
 def _extract_text(content: Any) -> str:
-    '未说明'
+    "未说明"
     if content is None:
         return ""
     if isinstance(content, str):

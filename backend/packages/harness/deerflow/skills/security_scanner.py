@@ -1,4 +1,6 @@
-'定义 security_scanner 模块提供的职责与可复用接口。\n\nSecurity screening for agent-managed skill writes.'
+"""定义 security_scanner 模块提供的职责与可复用接口。
+
+Security screening for agent-managed skill writes."""
 
 from __future__ import annotations
 
@@ -18,13 +20,14 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class ScanResult:
-    '封装 ScanResult 的状态、协作关系与公开操作'
+    "封装 ScanResult 的状态、协作关系与公开操作"
+
     decision: str
     reason: str
 
 
 def _extract_json_object(raw: str) -> dict | None:
-    '执行 _extract_json_object 的明确职责，并返回与调用约定一致的结果'
+    "执行 _extract_json_object 的明确职责，并返回与调用约定一致的结果"
     raw = raw.strip()
 
     # Strip markdown code fences (```json ... ``` or ``` ... ```)
@@ -71,7 +74,7 @@ def _extract_json_object(raw: str) -> dict | None:
 
 
 def _format_static_findings_context(static_findings: list[dict[str, Any]]) -> str:
-    '执行 _format_static_findings_context 的明确职责，并返回与调用约定一致的结果'
+    "执行 _format_static_findings_context 的明确职责，并返回与调用约定一致的结果"
     if not static_findings:
         return "None."
     lines = []
@@ -91,7 +94,9 @@ async def scan_skill_content(
     app_config: AppConfig | None = None,
     static_findings: list[dict[str, Any]] | None = None,
 ) -> ScanResult:
-    '执行 scan_skill_content 的明确职责，并返回与调用约定一致的结果。\n\nScreen skill content before it is written to disk.'
+    """执行 scan_skill_content 的明确职责，并返回与调用约定一致的结果。
+
+    Screen skill content before it is written to disk."""
     rubric = (
         "You are a security reviewer for AI agent skills. "
         "Classify the content as allow, warn, or block. "

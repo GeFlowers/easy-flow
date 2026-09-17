@@ -1,4 +1,31 @@
-'定义 read_before_write_middleware 模块提供的职责与可复用接口。\n\nDeterministic read-before-write gate for file-modifying tools (issue #3857).\n\nThe lead agent\'s duplicate-output failure mode (the same report section\nappended five times) came from "append-only, never read back" writes. This\nmiddleware enforces a version gate: modifying an existing file requires a\n``read_file`` of the file\'s *current* version earlier in the conversation.\n\nDesign invariants:\n- Tools stay stateless. The read mark (``sha256`` of the full file content)\n  is stamped on the ``read_file`` ToolMessage\'s ``additional_kwargs``, so the\n  gate\'s state lives in ``state["messages"]``.\n- Summarization deleting the read result deletes the mark with it — the gate\n  can never pass while the read content is gone from context.\n- Writes never refresh marks: any successful write changes the file hash and\n  therefore invalidates every earlier read, forcing a re-read between\n  consecutive modifications.\n- Gate check and tool execution are serialized per (scope, path): LangGraph\n  runs the tool calls of one AIMessage concurrently, so without a critical\n  section two same-turn writes could both pass on one stale mark before\n  either mutation lands. The same lock covers ``read_file`` + mark stamping,\n  so a mark always hashes the version the model was actually shown.\n- Fail-open: if the gate itself cannot inspect the file (sandbox hiccup,\n  binary content, or sandboxes like AIO/E2B that report read failures as\n  ``"Error: ..."`` strings instead of raising), it lets the tool run and\n  produce its own error.\n'
+"""定义 read_before_write_middleware 模块提供的职责与可复用接口。
+
+Deterministic read-before-write gate for file-modifying tools (issue #3857).
+
+The lead agent's duplicate-output failure mode (the same report section
+appended five times) came from "append-only, never read back" writes. This
+middleware enforces a version gate: modifying an existing file requires a
+``read_file`` of the file's *current* version earlier in the conversation.
+
+Design invariants:
+- Tools stay stateless. The read mark (``sha256`` of the full file content)
+  is stamped on the ``read_file`` ToolMessage's ``additional_kwargs``, so the
+  gate's state lives in ``state["messages"]``.
+- Summarization deleting the read result deletes the mark with it — the gate
+  can never pass while the read content is gone from context.
+- Writes never refresh marks: any successful write changes the file hash and
+  therefore invalidates every earlier read, forcing a re-read between
+  consecutive modifications.
+- Gate check and tool execution are serialized per (scope, path): LangGraph
+  runs the tool calls of one AIMessage concurrently, so without a critical
+  section two same-turn writes could both pass on one stale mark before
+  either mutation lands. The same lock covers ``read_file`` + mark stamping,
+  so a mark always hashes the version the model was actually shown.
+- Fail-open: if the gate itself cannot inspect the file (sandbox hiccup,
+  binary content, or sandboxes like AIO/E2B that report read failures as
+  ``"Error: ..."`` strings instead of raising), it lets the tool run and
+  produce its own error.
+"""
 
 import asyncio
 import hashlib
@@ -45,7 +72,7 @@ _GATE_LOCKS_GUARD = threading.Lock()
 
 
 def _get_gate_lock(scope: str, norm_path: str) -> threading.Lock:
-    '执行 _get_gate_lock 的明确职责，并返回与调用约定一致的结果'
+    "执行 _get_gate_lock 的明确职责，并返回与调用约定一致的结果"
     key = (scope, norm_path)
     with _GATE_LOCKS_GUARD:
         lock = _GATE_LOCKS.get(key)
@@ -56,20 +83,22 @@ def _get_gate_lock(scope: str, norm_path: str) -> threading.Lock:
 
 
 def _normalize_mark_path(path: str) -> str:
-    '执行 _normalize_mark_path 的明确职责，并返回与调用约定一致的结果'
+    "执行 _normalize_mark_path 的明确职责，并返回与调用约定一致的结果"
     return posixpath.normpath(path)
 
 
 def _content_hash(content: str) -> str:
-    '执行 _content_hash 的明确职责，并返回与调用约定一致的结果'
+    "执行 _content_hash 的明确职责，并返回与调用约定一致的结果"
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 class ReadBeforeWriteMiddleware(AgentMiddleware):
-    '封装 ReadBeforeWriteMiddleware 的状态、协作关系与公开操作。\n\nVersion gate: block writes to existing files not read at their current version.'
+    """封装 ReadBeforeWriteMiddleware 的状态、协作关系与公开操作。
+
+    Version gate: block writes to existing files not read at their current version."""
 
     def __init__(self, content_reader: Callable[[Any, str], str] | None = None) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__()
         self._content_reader = content_reader or read_current_file_content
 
@@ -79,7 +108,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        '执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果"
         name = request.tool_call.get("name")
         if name in _GATED_WRITE_TOOLS:
             path = self._requested_path(request)
@@ -108,7 +137,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        '执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果"
         name = request.tool_call.get("name")
         if name in _GATED_WRITE_TOOLS:
             path = self._requested_path(request)
@@ -143,12 +172,14 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
     # -- locking ---------------------------------------------------------
 
     def _lock_for(self, request: ToolCallRequest, path: str) -> threading.Lock:
-        '执行 _lock_for 的明确职责，并返回与调用约定一致的结果'
+        "执行 _lock_for 的明确职责，并返回与调用约定一致的结果"
         return _get_gate_lock(self._lock_scope(request), _normalize_mark_path(path))
 
     @staticmethod
     def _lock_scope(request: ToolCallRequest) -> str:
-        '执行 _lock_scope 的明确职责，并返回与调用约定一致的结果。\n\nScope locks per thread (or sandbox) so unrelated agents never contend.'
+        """执行 _lock_scope 的明确职责，并返回与调用约定一致的结果。
+
+        Scope locks per thread (or sandbox) so unrelated agents never contend."""
         context = getattr(request.runtime, "context", None)
         if isinstance(context, dict):
             thread_id = context.get("thread_id")
@@ -166,7 +197,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
     # -- gate ----------------------------------------------------------
 
     def _check_write_gate(self, request: ToolCallRequest) -> ToolMessage | None:
-        '执行 _check_write_gate 的明确职责，并返回与调用约定一致的结果'
+        "执行 _check_write_gate 的明确职责，并返回与调用约定一致的结果"
         tool_call = request.tool_call
         path = self._requested_path(request)
         if path is None:
@@ -198,7 +229,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
 
     @staticmethod
     def _requested_path(request: ToolCallRequest) -> str | None:
-        '执行 _requested_path 的明确职责，并返回与调用约定一致的结果'
+        "执行 _requested_path 的明确职责，并返回与调用约定一致的结果"
         args = request.tool_call.get("args") or {}
         if not isinstance(args, dict):
             return None
@@ -207,7 +238,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
 
     @staticmethod
     def _latest_mark_hash(state: Any, norm_path: str) -> str | None:
-        '执行 _latest_mark_hash 的明确职责，并返回与调用约定一致的结果'
+        "执行 _latest_mark_hash 的明确职责，并返回与调用约定一致的结果"
         messages = state.get("messages") if isinstance(state, dict) else getattr(state, "messages", None)
         if not messages:
             return None
@@ -223,7 +254,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
     # -- mark stamping ---------------------------------------------------
 
     def _attach_read_mark(self, request: ToolCallRequest, result: ToolMessage | Command) -> None:
-        '执行 _attach_read_mark 的明确职责，并返回与调用约定一致的结果'
+        "执行 _attach_read_mark 的明确职责，并返回与调用约定一致的结果"
         path = self._requested_path(request)
         if path is None:
             return
@@ -245,7 +276,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
 
     @staticmethod
     def _extract_tool_message(result: ToolMessage | Command) -> ToolMessage | None:
-        '执行 _extract_tool_message 的明确职责，并返回与调用约定一致的结果'
+        "执行 _extract_tool_message 的明确职责，并返回与调用约定一致的结果"
         if isinstance(result, ToolMessage):
             return result
         if isinstance(result, Command) and isinstance(result.update, dict):

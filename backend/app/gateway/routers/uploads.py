@@ -1,4 +1,6 @@
-'定义 uploads 模块提供的职责与可复用接口。\n\nUpload router for handling file uploads.'
+"""定义 uploads 模块提供的职责与可复用接口。
+
+Upload router for handling file uploads."""
 
 import logging
 import os
@@ -49,13 +51,16 @@ DEFAULT_MAX_TOTAL_SIZE = 100 * 1024 * 1024
 @dataclass(slots=True)
 class _UploadTempFile:
     """保存单个上传文件提交前所需的目标路径、临时路径和已打开句柄。"""
+
     file_path: Path
     temp_path: Path
     handle: BinaryIO
 
 
 class UploadedFileInfo(BaseModel):
-    '封装 UploadedFileInfo 的状态、协作关系与公开操作。\n\nUploaded file metadata exposed by upload and list APIs.'
+    """封装 UploadedFileInfo 的状态、协作关系与公开操作。
+
+    Uploaded file metadata exposed by upload and list APIs."""
 
     filename: str
     size: int
@@ -72,7 +77,9 @@ class UploadedFileInfo(BaseModel):
 
 
 class UploadResponse(BaseModel):
-    '封装 UploadResponse 的状态、协作关系与公开操作。\n\nResponse model for file upload.'
+    """封装 UploadResponse 的状态、协作关系与公开操作。
+
+    Response model for file upload."""
 
     success: bool
     files: list[UploadedFileInfo]
@@ -81,14 +88,18 @@ class UploadResponse(BaseModel):
 
 
 class UploadListResponse(BaseModel):
-    '封装 UploadListResponse 的状态、协作关系与公开操作。\n\nResponse model for uploaded file listing.'
+    """封装 UploadListResponse 的状态、协作关系与公开操作。
+
+    Response model for uploaded file listing."""
 
     files: list[UploadedFileInfo]
     count: int
 
 
 class UploadLimits(BaseModel):
-    '封装 UploadLimits 的状态、协作关系与公开操作。\n\nApplication-level upload limits exposed to clients.'
+    """封装 UploadLimits 的状态、协作关系与公开操作。
+
+    Application-level upload limits exposed to clients."""
 
     max_files: int
     max_file_size: int
@@ -96,7 +107,15 @@ class UploadLimits(BaseModel):
 
 
 def _make_file_sandbox_writable(file_path: os.PathLike[str] | str) -> None:
-    '执行 _make_file_sandbox_writable 的明确职责，并返回与调用约定一致的结果。\n\nEnsure uploaded files remain writable when mounted into non-local sandboxes.\n\n    In AIO sandbox mode, the gateway writes the authoritative host-side file\n    first, then the sandbox runtime may rewrite the same mounted path. Granting\n    world-writable access here prevents permission mismatches between the\n    gateway user and the sandbox runtime user.\n    '
+    """执行 _make_file_sandbox_writable 的明确职责，并返回与调用约定一致的结果。
+
+    Ensure uploaded files remain writable when mounted into non-local sandboxes.
+
+        In AIO sandbox mode, the gateway writes the authoritative host-side file
+        first, then the sandbox runtime may rewrite the same mounted path. Granting
+        world-writable access here prevents permission mismatches between the
+        gateway user and the sandbox runtime user.
+    """
     file_stat = os.lstat(file_path)
     if stat.S_ISLNK(file_stat.st_mode):
         logger.warning("Skipping sandbox chmod for symlinked upload path: %s", file_path)
@@ -108,7 +127,16 @@ def _make_file_sandbox_writable(file_path: os.PathLike[str] | str) -> None:
 
 
 def _make_file_sandbox_readable(file_path: os.PathLike[str] | str) -> None:
-    '执行 _make_file_sandbox_readable 的明确职责，并返回与调用约定一致的结果。\n\nEnsure uploaded files are readable by the sandbox process.\n\n    For Docker sandboxes (AIO), the gateway writes files as root with 0o600\n    permissions, then bind-mounts the host directory into the container. The\n    sandbox process inside the container runs as a non-root user and cannot\n    read those files without group/other read bits. This function adds\n    ``S_IRGRP | S_IROTH`` so the sandbox can read the uploaded content.\n    '
+    """执行 _make_file_sandbox_readable 的明确职责，并返回与调用约定一致的结果。
+
+    Ensure uploaded files are readable by the sandbox process.
+
+        For Docker sandboxes (AIO), the gateway writes files as root with 0o600
+        permissions, then bind-mounts the host directory into the container. The
+        sandbox process inside the container runs as a non-root user and cannot
+        read those files without group/other read bits. This function adds
+        ``S_IRGRP | S_IROTH`` so the sandbox can read the uploaded content.
+    """
     file_stat = os.lstat(file_path)
     if stat.S_ISLNK(file_stat.st_mode):
         logger.warning("Skipping sandbox chmod for symlinked upload path: %s", file_path)
@@ -125,7 +153,9 @@ def _uses_thread_data_mounts(sandbox_provider: SandboxProvider) -> bool:
 
 
 def _get_uploads_config_value(app_config: AppConfig, key: str, default: object) -> object:
-    '执行 _get_uploads_config_value 的明确职责，并返回与调用约定一致的结果。\n\nRead a value from the uploads config, supporting dict and attribute access.'
+    """执行 _get_uploads_config_value 的明确职责，并返回与调用约定一致的结果。
+
+    Read a value from the uploads config, supporting dict and attribute access."""
     uploads_cfg = getattr(app_config, "uploads", None)
     if isinstance(uploads_cfg, dict):
         return uploads_cfg.get(key, default)
@@ -258,7 +288,7 @@ async def _write_upload_file_with_limits(
     max_total_size: int,
     total_size: int,
 ) -> tuple[os.PathLike[str] | str, int, int]:
-    '执行 _write_upload_file_with_limits 的明确职责，并返回与调用约定一致的结果'
+    "执行 _write_upload_file_with_limits 的明确职责，并返回与调用约定一致的结果"
     file_size = 0
     upload_temp: _UploadTempFile | None = None
     try:
@@ -283,7 +313,13 @@ async def _write_upload_file_with_limits(
 
 
 def _auto_convert_documents_enabled(app_config: AppConfig) -> bool:
-    '执行 _auto_convert_documents_enabled 的明确职责，并返回与调用约定一致的结果。\n\nReturn whether automatic host-side document conversion is enabled.\n\n    The secure default is disabled unless an operator explicitly opts in via\n    uploads.auto_convert_documents in config.yaml.\n    '
+    """执行 _auto_convert_documents_enabled 的明确职责，并返回与调用约定一致的结果。
+
+    Return whether automatic host-side document conversion is enabled.
+
+        The secure default is disabled unless an operator explicitly opts in via
+        uploads.auto_convert_documents in config.yaml.
+    """
     try:
         raw = _get_uploads_config_value(app_config, "auto_convert_documents", False)
         if isinstance(raw, str):
@@ -301,7 +337,9 @@ async def upload_files(
     files: list[UploadFile] = File(...),
     config: AppConfig = Depends(get_config),
 ) -> UploadResponse:
-    "执行 upload_files 的明确职责，并返回与调用约定一致的结果。\n\nUpload multiple files to a thread's uploads directory."
+    """执行 upload_files 的明确职责，并返回与调用约定一致的结果。
+
+    Upload multiple files to a thread's uploads directory."""
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -435,14 +473,18 @@ async def get_upload_limits(
     request: Request,
     config: AppConfig = Depends(get_config),
 ) -> UploadLimits:
-    '读取并返回，并遵守 get_upload_limits 所表达的接口约束。\n\nReturn upload limits used by the gateway for this thread.'
+    """读取并返回，并遵守 get_upload_limits 所表达的接口约束。
+
+    Return upload limits used by the gateway for this thread."""
     return _get_upload_limits(config)
 
 
 @router.get("/list", response_model=UploadListResponse)
 @require_permission("threads", "read", owner_check=True)
 async def list_uploaded_files(thread_id: str, request: Request) -> UploadListResponse:
-    "收集并返回，并遵守 list_uploaded_files 所表达的接口约束。\n\nList all files in a thread's uploads directory."
+    """收集并返回，并遵守 list_uploaded_files 所表达的接口约束。
+
+    List all files in a thread's uploads directory."""
     try:
         result = await run_file_io(_list_uploaded_files_for_thread, thread_id, get_effective_user_id())
     except ValueError as e:
@@ -454,7 +496,9 @@ async def list_uploaded_files(thread_id: str, request: Request) -> UploadListRes
 @router.delete("/{filename}")
 @require_permission("threads", "delete", owner_check=True, require_existing=True)
 async def delete_uploaded_file(thread_id: str, filename: str, request: Request) -> dict:
-    "删除目标资源并返回操作结果，并遵守 delete_uploaded_file 所表达的接口约束。\n\nDelete a file from a thread's uploads directory."
+    """删除目标资源并返回操作结果，并遵守 delete_uploaded_file 所表达的接口约束。
+
+    Delete a file from a thread's uploads directory."""
     try:
         return await run_file_io(_delete_uploaded_file_for_thread, thread_id, filename, get_effective_user_id())
     except FileNotFoundError:

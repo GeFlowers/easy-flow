@@ -15,6 +15,7 @@ THREADS_NS: tuple[str, ...] = ("threads",)
 
 class MemoryThreadMetaStore(ThreadMetaStore):
     """定义持久化存储的抽象接口或具体实现。"""
+
     def __init__(self, store: BaseStore) -> None:
         """初始化当前持久化组件所需的依赖与内部状态。"""
         self._store = store

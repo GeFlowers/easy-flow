@@ -1,4 +1,21 @@
-'定义 claude_provider 模块提供的职责与可复用接口。\n\nCustom Claude provider with OAuth Bearer auth, prompt caching, and smart thinking.\n\nSupports two authentication modes:\n  1. Standard API key (x-api-key header) — default ChatAnthropic behavior\n  2. Claude Code OAuth token (Authorization: Bearer header)\n     - Detected by sk-ant-oat prefix\n     - Requires anthropic-beta: oauth-2025-04-20,claude-code-20250219\n     - Requires billing header in system prompt for all OAuth requests\n\nAuto-loads credentials from explicit runtime handoff:\n  - $ANTHROPIC_API_KEY environment variable\n  - $CLAUDE_CODE_OAUTH_TOKEN or $ANTHROPIC_AUTH_TOKEN\n  - $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR\n  - $CLAUDE_CODE_CREDENTIALS_PATH\n  - ~/.claude/.credentials.json\n'
+"""定义 claude_provider 模块提供的职责与可复用接口。
+
+Custom Claude provider with OAuth Bearer auth, prompt caching, and smart thinking.
+
+Supports two authentication modes:
+  1. Standard API key (x-api-key header) — default ChatAnthropic behavior
+  2. Claude Code OAuth token (Authorization: Bearer header)
+     - Detected by sk-ant-oat prefix
+     - Requires anthropic-beta: oauth-2025-04-20,claude-code-20250219
+     - Requires billing header in system prompt for all OAuth requests
+
+Auto-loads credentials from explicit runtime handoff:
+  - $ANTHROPIC_API_KEY environment variable
+  - $CLAUDE_CODE_OAUTH_TOKEN or $ANTHROPIC_AUTH_TOKEN
+  - $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
+  - $CLAUDE_CODE_CREDENTIALS_PATH
+  - ~/.claude/.credentials.json
+"""
 
 import hashlib
 import json
@@ -27,7 +44,17 @@ OAUTH_BILLING_HEADER = os.environ.get("ANTHROPIC_BILLING_HEADER", _DEFAULT_BILLI
 
 
 class ClaudeChatModel(ChatAnthropic):
-    '封装 ClaudeChatModel 的状态、协作关系与公开操作。\n\nChatAnthropic with OAuth Bearer auth, prompt caching, and smart thinking.\n\n    Config example:\n        - name: claude-sonnet-4.6\n          use: deerflow.models.claude_provider:ClaudeChatModel\n          model: claude-sonnet-4-6\n          max_tokens: 16384\n          enable_prompt_caching: true\n    '
+    """封装 ClaudeChatModel 的状态、协作关系与公开操作。
+
+    ChatAnthropic with OAuth Bearer auth, prompt caching, and smart thinking.
+
+        Config example:
+            - name: claude-sonnet-4.6
+              use: deerflow.models.claude_provider:ClaudeChatModel
+              model: claude-sonnet-4-6
+              max_tokens: 16384
+              enable_prompt_caching: true
+    """
 
     # Custom fields
     enable_prompt_caching: bool = True
@@ -40,12 +67,14 @@ class ClaudeChatModel(ChatAnthropic):
     model_config = {"arbitrary_types_allowed": True}
 
     def _validate_retry_config(self) -> None:
-        '执行 _validate_retry_config 的明确职责，并返回与调用约定一致的结果'
+        "执行 _validate_retry_config 的明确职责，并返回与调用约定一致的结果"
         if self.retry_max_attempts < 1:
             raise ValueError("retry_max_attempts must be >= 1")
 
     def model_post_init(self, __context: Any) -> None:
-        '执行 model_post_init 的明确职责，并返回与调用约定一致的结果。\n\nAuto-load credentials and configure OAuth if needed.'
+        """执行 model_post_init 的明确职责，并返回与调用约定一致的结果。
+
+        Auto-load credentials and configure OAuth if needed."""
         from pydantic import SecretStr
 
         from deerflow.models.credential_loader import (
@@ -104,7 +133,9 @@ class ClaudeChatModel(ChatAnthropic):
             self._patch_client_oauth(self._async_client)
 
     def _patch_client_oauth(self, client: Any) -> None:
-        '执行 _patch_client_oauth 的明确职责，并返回与调用约定一致的结果。\n\nSwap api_key → auth_token on an Anthropic SDK client for OAuth Bearer auth.'
+        """执行 _patch_client_oauth 的明确职责，并返回与调用约定一致的结果。
+
+        Swap api_key → auth_token on an Anthropic SDK client for OAuth Bearer auth."""
         if hasattr(client, "api_key") and hasattr(client, "auth_token"):
             client.api_key = None
             client.auth_token = self._oauth_access_token
@@ -116,7 +147,9 @@ class ClaudeChatModel(ChatAnthropic):
         stop: list[str] | None = None,
         **kwargs: Any,
     ) -> dict:
-        '执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果。\n\nOverride to inject prompt caching, thinking budget, and OAuth billing.'
+        """执行 _get_request_payload 的明确职责，并返回与调用约定一致的结果。
+
+        Override to inject prompt caching, thinking budget, and OAuth billing."""
         payload = super()._get_request_payload(input_, stop=stop, **kwargs)
 
         if self._is_oauth:
@@ -131,7 +164,13 @@ class ClaudeChatModel(ChatAnthropic):
         return payload
 
     def _apply_oauth_billing(self, payload: dict) -> None:
-        '执行 _apply_oauth_billing 的明确职责，并返回与调用约定一致的结果。\n\nInject the billing header block required for all OAuth requests.\n\n        The billing block is always placed first in the system list, removing any\n        existing occurrence to avoid duplication or out-of-order positioning.\n        '
+        """执行 _apply_oauth_billing 的明确职责，并返回与调用约定一致的结果。
+
+        Inject the billing header block required for all OAuth requests.
+
+                The billing block is always placed first in the system list, removing any
+                existing occurrence to avoid duplication or out-of-order positioning.
+        """
         billing_block = {"type": "text", "text": OAUTH_BILLING_HEADER}
 
         system = payload.get("system")
@@ -164,7 +203,19 @@ class ClaudeChatModel(ChatAnthropic):
             )
 
     def _apply_prompt_caching(self, payload: dict) -> None:
-        '执行 _apply_prompt_caching 的明确职责，并返回与调用约定一致的结果。\n\nApply ephemeral cache_control to system, recent messages, and last tool definition.\n\n        Uses a budget of MAX_CACHE_BREAKPOINTS (4) breakpoints — the hard limit\n        enforced by both the Anthropic API and AWS Bedrock.  Breakpoints are\n        placed on the *last* eligible blocks because later breakpoints cover a\n        larger prefix and yield better cache hit rates.\n\n        The system prompt is expected to be fully static (no per-user memory or\n        current date).  Dynamic context is injected per-turn via\n        DynamicContextMiddleware as a <system-reminder> in the first HumanMessage.\n        '
+        """执行 _apply_prompt_caching 的明确职责，并返回与调用约定一致的结果。
+
+        Apply ephemeral cache_control to system, recent messages, and last tool definition.
+
+                Uses a budget of MAX_CACHE_BREAKPOINTS (4) breakpoints — the hard limit
+                enforced by both the Anthropic API and AWS Bedrock.  Breakpoints are
+                placed on the *last* eligible blocks because later breakpoints cover a
+                larger prefix and yield better cache hit rates.
+
+                The system prompt is expected to be fully static (no per-user memory or
+                current date).  Dynamic context is injected per-turn via
+                DynamicContextMiddleware as a <system-reminder> in the first HumanMessage.
+        """
         MAX_CACHE_BREAKPOINTS = 4
 
         # Collect candidate blocks in document order:
@@ -212,7 +263,9 @@ class ClaudeChatModel(ChatAnthropic):
             block["cache_control"] = {"type": "ephemeral"}
 
     def _apply_thinking_budget(self, payload: dict) -> None:
-        '执行 _apply_thinking_budget 的明确职责，并返回与调用约定一致的结果。\n\nAuto-allocate thinking budget (80% of max_tokens).'
+        """执行 _apply_thinking_budget 的明确职责，并返回与调用约定一致的结果。
+
+        Auto-allocate thinking budget (80% of max_tokens)."""
         thinking = payload.get("thinking")
         if not thinking or not isinstance(thinking, dict):
             return
@@ -226,7 +279,9 @@ class ClaudeChatModel(ChatAnthropic):
 
     @staticmethod
     def _strip_cache_control(payload: dict) -> None:
-        '执行 _strip_cache_control 的明确职责，并返回与调用约定一致的结果。\n\nRemove cache_control markers before OAuth requests reach Anthropic.'
+        """执行 _strip_cache_control 的明确职责，并返回与调用约定一致的结果。
+
+        Remove cache_control markers before OAuth requests reach Anthropic."""
         for section in ("system", "messages"):
             items = payload.get(section)
             if not isinstance(items, list):
@@ -248,19 +303,21 @@ class ClaudeChatModel(ChatAnthropic):
                     tool.pop("cache_control", None)
 
     def _create(self, payload: dict) -> Any:
-        '执行 _create 的明确职责，并返回与调用约定一致的结果'
+        "执行 _create 的明确职责，并返回与调用约定一致的结果"
         if self._is_oauth:
             self._strip_cache_control(payload)
         return super()._create(payload)
 
     async def _acreate(self, payload: dict) -> Any:
-        '执行 _acreate 的明确职责，并返回与调用约定一致的结果'
+        "执行 _acreate 的明确职责，并返回与调用约定一致的结果"
         if self._is_oauth:
             self._strip_cache_control(payload)
         return await super()._acreate(payload)
 
     def _generate(self, messages: list[BaseMessage], stop: list[str] | None = None, **kwargs: Any) -> Any:
-        '执行 _generate 的明确职责，并返回与调用约定一致的结果。\n\nOverride with OAuth patching and retry logic.'
+        """执行 _generate 的明确职责，并返回与调用约定一致的结果。
+
+        Override with OAuth patching and retry logic."""
         if self._is_oauth:
             self._patch_client_oauth(self._client)
 
@@ -285,7 +342,9 @@ class ClaudeChatModel(ChatAnthropic):
         raise last_error
 
     async def _agenerate(self, messages: list[BaseMessage], stop: list[str] | None = None, **kwargs: Any) -> Any:
-        '执行 _agenerate 的明确职责，并返回与调用约定一致的结果。\n\nAsync override with OAuth patching and retry logic.'
+        """执行 _agenerate 的明确职责，并返回与调用约定一致的结果。
+
+        Async override with OAuth patching and retry logic."""
         import asyncio
 
         if self._is_oauth:
@@ -313,7 +372,9 @@ class ClaudeChatModel(ChatAnthropic):
 
     @staticmethod
     def _calc_backoff_ms(attempt: int, error: Exception) -> int:
-        '执行 _calc_backoff_ms 的明确职责，并返回与调用约定一致的结果。\n\nExponential backoff with a fixed 20% buffer.'
+        """执行 _calc_backoff_ms 的明确职责，并返回与调用约定一致的结果。
+
+        Exponential backoff with a fixed 20% buffer."""
         backoff_ms = 2000 * (1 << (attempt - 1))
         jitter_ms = int(backoff_ms * 0.2)
         total_ms = backoff_ms + jitter_ms

@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 class DatabaseConfig(BaseModel):
     """\u6267\u884c DatabaseConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+
     backend: Literal["memory", "sqlite", "postgres"] = Field(
         default="memory",
         description=("Storage backend for both checkpointer and application data. 'memory' for development (no persistence across restarts), 'sqlite' for single-node deployment, 'postgres' for production multi-node deployment."),
@@ -36,7 +37,7 @@ class DatabaseConfig(BaseModel):
         description="Connection pool size for the app ORM engine (postgres only).",
     )
 
-        # 中文说明：此处用于执行相关处理。
+    # 中文说明：此处用于执行相关处理。
 
     @property
     def _resolved_sqlite_dir(self) -> str:
@@ -51,6 +52,7 @@ class DatabaseConfig(BaseModel):
         return os.path.join(self._resolved_sqlite_dir, "deerflow.db")
 
         # 中文说明：此处用于执行相关处理。
+
     @property
     def checkpointer_sqlite_path(self) -> str:
         """\u6267\u884c checkpointer_sqlite_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""

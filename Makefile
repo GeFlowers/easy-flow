@@ -1,6 +1,6 @@
 # DeerFlow - 统一开发环境入口
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop up down clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-redis
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-postgres
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
@@ -36,18 +36,14 @@ help:
 	@echo "  make stop            - Stop all running services"
 	@echo "  make clean           - Clean up processes and temporary files"
 	@echo ""
-	@echo "Docker Production Commands:"
-	@echo "  make up              - Build and start production Docker services (localhost:2026)"
-	@echo "  make down            - Stop and remove production Docker containers"
-	@echo ""
 	@echo "Docker Development Commands:"
-	@echo "  make docker-init     - Pull the sandbox image"
-	@echo "  make docker-start    - Start Docker services (mode-aware from config.yaml, localhost:2026)"
+	@echo "  make docker-init     - Check the Docker environment"
+	@echo "  make docker-start    - Start Docker development services (localhost:2026)"
 	@echo "  make docker-stop     - Stop Docker development services"
 	@echo "  make docker-logs     - View Docker development logs"
 	@echo "  make docker-logs-frontend - View Docker frontend logs"
 	@echo "  make docker-logs-gateway - View Docker gateway logs"
-	@echo "  make docker-logs-redis - View Docker Redis logs"
+	@echo "  make docker-logs-postgres - View Docker PostgreSQL logs"
 
 ## 初始化与诊断：只生成或检查本地配置，不启动服务
 setup:
@@ -137,7 +133,7 @@ clean: stop
 # Docker 开发命令：按 config.yaml 的沙箱模式选择服务和权限边界。
 # ==========================================
 
-# 预拉取 Docker 沙箱镜像；本地沙箱会安全跳过。
+# 检查 Docker 客户端和守护进程是否可用。
 docker-init:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh init
 
@@ -158,17 +154,5 @@ docker-logs-frontend:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh logs --frontend
 docker-logs-gateway:
 	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh logs --gateway
-docker-logs-redis:
-	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh logs --redis
-
-# ==========================================
-# Docker 生产命令：构建或管理生产 Compose 服务。
-# ==========================================
-
-# 构建并启动生产 Compose 服务。
-up:
-	@$(RUN_WITH_GIT_BASH) ./scripts/deploy.sh
-
-# 停止并移除生产 Compose 容器。
-down:
-	@$(RUN_WITH_GIT_BASH) ./scripts/deploy.sh down
+docker-logs-postgres:
+	@$(RUN_WITH_GIT_BASH) ./scripts/docker.sh logs --postgres

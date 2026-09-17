@@ -1,4 +1,4 @@
-'未说明'
+"未说明"
 
 from .bash_agent import BASH_AGENT_CONFIG
 from .general_purpose import GENERAL_PURPOSE_CONFIG

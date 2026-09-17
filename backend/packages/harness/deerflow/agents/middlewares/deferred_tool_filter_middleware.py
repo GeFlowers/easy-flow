@@ -1,4 +1,18 @@
-'定义 deferred_tool_filter_middleware 模块提供的职责与可复用接口。\n\nMiddleware to filter deferred tool schemas from model binding.\n\nWhen tool_search is enabled, MCP tools are still passed to ToolNode for\nexecution, but their schemas must NOT be sent to the LLM via bind_tools until\nthe model has discovered them via tool_search. This middleware removes the\nstill-deferred tools from request.tools before model binding, and blocks tool\ncalls to tools that have not been promoted yet.\n\nThe deferred name set and the catalog hash are injected at construction time\n(no ContextVar). Promotion state is read from graph state (``state["promoted"]``),\nscoped by catalog hash so a stale persisted promotion cannot expose a renamed\nor drifted tool.\n'
+"""定义 deferred_tool_filter_middleware 模块提供的职责与可复用接口。
+
+Middleware to filter deferred tool schemas from model binding.
+
+When tool_search is enabled, MCP tools are still passed to ToolNode for
+execution, but their schemas must NOT be sent to the LLM via bind_tools until
+the model has discovered them via tool_search. This middleware removes the
+still-deferred tools from request.tools before model binding, and blocks tool
+calls to tools that have not been promoted yet.
+
+The deferred name set and the catalog hash are injected at construction time
+(no ContextVar). Promotion state is read from graph state (``state["promoted"]``),
+scoped by catalog hash so a stale persisted promotion cannot expose a renamed
+or drifted tool.
+"""
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -15,7 +29,14 @@ logger = logging.getLogger(__name__)
 
 
 class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
-    '封装 DeferredToolFilterMiddleware 的状态、协作关系与公开操作。\n\nHide deferred tool schemas from the bound model until promoted.\n\n    ToolNode still holds all tools (including deferred) for execution routing,\n    but the LLM only sees active tool schemas plus tools that have already been\n    promoted (recorded in ``state["promoted"]`` under the current catalog hash).\n    '
+    """封装 DeferredToolFilterMiddleware 的状态、协作关系与公开操作。
+
+    Hide deferred tool schemas from the bound model until promoted.
+
+        ToolNode still holds all tools (including deferred) for execution routing,
+        but the LLM only sees active tool schemas plus tools that have already been
+        promoted (recorded in ``state["promoted"]`` under the current catalog hash).
+    """
 
     def __init__(self, deferred_names: frozenset[str], catalog_hash: str | None):
         """使用延迟工具名称集合及其目录版本标识初始化过滤器。"""

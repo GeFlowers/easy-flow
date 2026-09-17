@@ -11,11 +11,13 @@ from deerflow.subagents.status_contract import SUBAGENT_STATUS_VALUES
 
 class SandboxState(TypedDict):
     """描述线程关联沙箱的持久化状态。"""
+
     sandbox_id: NotRequired[str | None]
 
 
 class ThreadDataState(TypedDict):
     """描述线程隔离工作、上传和输出目录的状态。"""
+
     workspace_path: NotRequired[str | None]
     uploads_path: NotRequired[str | None]
     outputs_path: NotRequired[str | None]
@@ -102,6 +104,7 @@ def merge_goal(existing: GoalState | None, new: GoalState | None) -> GoalState |
 
 class PromotedTools(TypedDict):
     """记录按工具目录哈希范围限定的延迟工具提升结果。"""
+
     catalog_hash: str
     names: list[str]
 
@@ -131,6 +134,7 @@ _DELEGATION_LEDGER_MAX_ENTRIES = 50
 
 class DelegationEntry(TypedDict):
     """描述一条子代理委派记录及其可持久化结果摘要。"""
+
     id: str
     run_id: NotRequired[str]
     description: str
@@ -181,6 +185,7 @@ _SKILL_DESCRIPTION_MAX_CHARS = 500
 
 class SkillEntry(TypedDict):
     """描述已读取技能的轻量引用，而非其完整正文。"""
+
     name: str
     path: str
     description: str
@@ -233,6 +238,7 @@ def merge_skill_context(existing: list[SkillEntry] | None, new: list[SkillEntry]
 
 class ThreadState(AgentState):
     """扩展代理状态，保存线程资源、归约通道与持久化上下文。"""
+
     sandbox: SandboxStateField
     thread_data: NotRequired[ThreadDataState | None]
     title: NotRequired[str | None]

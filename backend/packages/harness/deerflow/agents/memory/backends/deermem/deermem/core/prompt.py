@@ -1,4 +1,6 @@
-'定义 prompt 模块提供的职责与可复用接口。\n\nPrompt templates for memory update and injection.'
+"""定义 prompt 模块提供的职责与可复用接口。
+
+Prompt templates for memory update and injection."""
 
 from __future__ import annotations
 
@@ -283,7 +285,24 @@ _tiktoken_encoding_cache_lock = threading.Lock()
 
 
 def _get_tiktoken_encoding(encoding_name: str = "cl100k_base") -> tiktoken.Encoding | None:
-    '执行 _get_tiktoken_encoding 的明确职责，并返回与调用约定一致的结果。\n\nReturn a cached tiktoken encoding, or ``None`` on failure / unavailability.\n\n    On the very first call for a given *encoding_name*, tiktoken may need to\n    download the BPE data from ``openaipublic.blob.core.windows.net``.  In\n    network-restricted environments (e.g. deployments behind the GFW) this\n    download can block for tens of minutes before the OS TCP timeout kicks in.\n    The caller must therefore be prepared for this to block and should run it\n    off the event loop (e.g. via ``asyncio.to_thread``).\n\n    A failed load is remembered (with a timestamp) so subsequent calls fall\n    back immediately to character-based estimation instead of re-triggering the\n    blocking download. The failure expires after ``_TIKTOKEN_RETRY_COOLDOWN_S``\n    so a transient outage can self-heal without a restart. A load already in\n    progress is also remembered so that a timed-out caller does not leave a\n    window where later requests start more blocking ``get_encoding`` calls.\n    '
+    """执行 _get_tiktoken_encoding 的明确职责，并返回与调用约定一致的结果。
+
+    Return a cached tiktoken encoding, or ``None`` on failure / unavailability.
+
+        On the very first call for a given *encoding_name*, tiktoken may need to
+        download the BPE data from ``openaipublic.blob.core.windows.net``.  In
+        network-restricted environments (e.g. deployments behind the GFW) this
+        download can block for tens of minutes before the OS TCP timeout kicks in.
+        The caller must therefore be prepared for this to block and should run it
+        off the event loop (e.g. via ``asyncio.to_thread``).
+
+        A failed load is remembered (with a timestamp) so subsequent calls fall
+        back immediately to character-based estimation instead of re-triggering the
+        blocking download. The failure expires after ``_TIKTOKEN_RETRY_COOLDOWN_S``
+        so a transient outage can self-heal without a restart. A load already in
+        progress is also remembered so that a timed-out caller does not leave a
+        window where later requests start more blocking ``get_encoding`` calls.
+    """
     if not TIKTOKEN_AVAILABLE:
         return None
 
@@ -315,7 +334,17 @@ def _get_tiktoken_encoding(encoding_name: str = "cl100k_base") -> tiktoken.Encod
 
 
 def _char_based_token_estimate(text: str) -> int:
-    '执行 _char_based_token_estimate 的明确职责，并返回与调用约定一致的结果。\n\nNetwork-free token estimate that accounts for CJK density.\n\n    The plain ``len(text) // 4`` heuristic is reasonable for English/code\n    (~4 chars per token) but significantly under-estimates token counts for\n    Chinese, Japanese, and Korean text, where the ratio is closer to 1.5-2\n    characters per token. Counting CJK characters separately (~2 chars per\n    token) avoids over-filling the injection budget for CJK-heavy memory\n    content.\n    '
+    """执行 _char_based_token_estimate 的明确职责，并返回与调用约定一致的结果。
+
+    Network-free token estimate that accounts for CJK density.
+
+        The plain ``len(text) // 4`` heuristic is reasonable for English/code
+        (~4 chars per token) but significantly under-estimates token counts for
+        Chinese, Japanese, and Korean text, where the ratio is closer to 1.5-2
+        characters per token. Counting CJK characters separately (~2 chars per
+        token) avoids over-filling the injection budget for CJK-heavy memory
+        content.
+    """
     cjk = sum(
         1
         for ch in text
@@ -327,7 +356,20 @@ def _char_based_token_estimate(text: str) -> int:
 
 
 def _count_tokens(text: str, encoding_name: str = "cl100k_base", *, use_tiktoken: bool = True) -> int:
-    '执行 _count_tokens 的明确职责，并返回与调用约定一致的结果。\n\nCount tokens in text using tiktoken.\n\n    Args:\n        text: The text to count tokens for.\n        encoding_name: The encoding to use (default: cl100k_base for GPT-4/3.5).\n        use_tiktoken: When ``False``, skip tiktoken entirely and use the\n            network-free character-based estimate. This guarantees no BPE\n            download is attempted (see ``memory.token_counting`` config).\n\n    Returns:\n        The number of tokens in the text.\n    '
+    """执行 _count_tokens 的明确职责，并返回与调用约定一致的结果。
+
+    Count tokens in text using tiktoken.
+
+        Args:
+            text: The text to count tokens for.
+            encoding_name: The encoding to use (default: cl100k_base for GPT-4/3.5).
+            use_tiktoken: When ``False``, skip tiktoken entirely and use the
+                network-free character-based estimate. This guarantees no BPE
+                download is attempted (see ``memory.token_counting`` config).
+
+        Returns:
+            The number of tokens in the text.
+    """
     if not use_tiktoken:
         return _char_based_token_estimate(text)
 
@@ -345,12 +387,27 @@ def _count_tokens(text: str, encoding_name: str = "cl100k_base", *, use_tiktoken
 
 
 def warm_tiktoken_cache() -> bool:
-    '执行 warm_tiktoken_cache 的明确职责，并返回与调用约定一致的结果。\n\nPre-warm the tiktoken encoding cache.\n\n    Call at startup (off the event loop) so the first request never blocks\n    on the BPE download.  Returns ``True`` if the encoding was loaded\n    successfully (or was already cached), ``False`` if tiktoken is\n    unavailable or the download failed.\n    '
+    """执行 warm_tiktoken_cache 的明确职责，并返回与调用约定一致的结果。
+
+    Pre-warm the tiktoken encoding cache.
+
+        Call at startup (off the event loop) so the first request never blocks
+        on the BPE download.  Returns ``True`` if the encoding was loaded
+        successfully (or was already cached), ``False`` if tiktoken is
+        unavailable or the download failed.
+    """
     return _get_tiktoken_encoding("cl100k_base") is not None
 
 
 def _coerce_confidence(value: Any, default: float = 0.0) -> float:
-    '执行 _coerce_confidence 的明确职责，并返回与调用约定一致的结果。\n\nCoerce a confidence-like value to a bounded float in [0, 1].\n\n    Non-finite values (NaN, inf, -inf) are treated as invalid and fall back\n    to the default before clamping, preventing them from dominating ranking.\n    The ``default`` parameter is assumed to be a finite value.\n    '
+    """执行 _coerce_confidence 的明确职责，并返回与调用约定一致的结果。
+
+    Coerce a confidence-like value to a bounded float in [0, 1].
+
+        Non-finite values (NaN, inf, -inf) are treated as invalid and fall back
+        to the default before clamping, preventing them from dominating ranking.
+        The ``default`` parameter is assumed to be a finite value.
+    """
     try:
         confidence = float(value)
     except (TypeError, ValueError):
@@ -361,7 +418,13 @@ def _coerce_confidence(value: Any, default: float = 0.0) -> float:
 
 
 def _format_fact_line(fact: dict[str, Any]) -> str | None:
-    '执行 _format_fact_line 的明确职责，并返回与调用约定一致的结果。\n\nBuild a single formatted fact line, or return ``None`` for invalid facts.\n\n    Extracted as a shared helper so the guaranteed-injection and regular-injection\n    paths produce identical line formatting.\n    '
+    """执行 _format_fact_line 的明确职责，并返回与调用约定一致的结果。
+
+    Build a single formatted fact line, or return ``None`` for invalid facts.
+
+        Extracted as a shared helper so the guaranteed-injection and regular-injection
+        paths produce identical line formatting.
+    """
     content_value = fact.get("content")
     if not isinstance(content_value, str):
         return None
@@ -387,7 +450,20 @@ def _format_fact_line(fact: dict[str, Any]) -> str | None:
 
 
 def _escape_summary(value: Any) -> str:
-    '执行 _escape_summary 的明确职责，并返回与调用约定一致的结果。\n\nEscape a user-editable context summary for the ``<memory>`` block.\n\n    Context summaries (``workContext``/``personalContext``/``topOfMind`` and the\n    history sections) are user-editable via ``/api/memory`` import and render into\n    the same ``<memory>`` block as facts, so an unescaped ``</memory>`` value can\n    close the block and relocate the text after it out of the user-managed trust\n    zone the lead-agent prompt declares. Sibling of ``_format_fact_line``\'s\n    escaping (#4097). ``str(...)`` preserves the prior f-string coercion for the\n    rare non-string summary an import can plant; ``quote=False`` because summaries\n    land in element-text position (never attribute values), so only ``<``, ``>``,\n    ``&`` can break out - leave ``\'`` and ``"`` untouched.\n    '
+    """执行 _escape_summary 的明确职责，并返回与调用约定一致的结果。
+
+    Escape a user-editable context summary for the ``<memory>`` block.
+
+        Context summaries (``workContext``/``personalContext``/``topOfMind`` and the
+        history sections) are user-editable via ``/api/memory`` import and render into
+        the same ``<memory>`` block as facts, so an unescaped ``</memory>`` value can
+        close the block and relocate the text after it out of the user-managed trust
+        zone the lead-agent prompt declares. Sibling of ``_format_fact_line``'s
+        escaping (#4097). ``str(...)`` preserves the prior f-string coercion for the
+        rare non-string summary an import can plant; ``quote=False`` because summaries
+        land in element-text position (never attribute values), so only ``<``, ``>``,
+        ``&`` can break out - leave ``'`` and ``"`` untouched.
+    """
     return html.escape(str(value), quote=False)
 
 
@@ -397,7 +473,31 @@ def _select_fact_lines(
     token_budget: int,
     use_tiktoken: bool,
 ) -> tuple[list[str], int]:
-    '执行 _select_fact_lines 的明确职责，并返回与调用约定一致的结果。\n\nGreedily select formatted fact lines within a *line-only* token budget.\n\n    This function is intentionally **header-agnostic**: it counts only the\n    fact lines themselves (including ``\\n`` separators between lines).  The\n    caller is responsible for reserving tokens for the ``"Facts:\\n"`` header\n    and any inter-section ``"\\n\\n"`` separator *before* calling this\n    function, and passing the remaining capacity as *token_budget*.\n\n    Stops at the first fact that would exceed the budget so the caller\'s\n    pre-sorted order (typically confidence-descending) is preserved strictly:\n    a shorter lower-ranked fact can never slip ahead of a skipped\n    higher-ranked one.\n\n    Args:\n        ranked_facts: Facts pre-sorted by the caller\'s preferred ranking.\n        token_budget: Maximum tokens available for fact lines only.\n        use_tiktoken: Whether to use tiktoken for counting.\n\n    Returns:\n        ``(selected_lines, consumed_tokens)`` — *consumed_tokens* is the\n        exact token cost of the returned lines (including inter-line\n        ``\\n`` separators, but *not* a leading header).\n    '
+    """执行 _select_fact_lines 的明确职责，并返回与调用约定一致的结果。
+
+    Greedily select formatted fact lines within a *line-only* token budget.
+
+        This function is intentionally **header-agnostic**: it counts only the
+        fact lines themselves (including ``\\n`` separators between lines).  The
+        caller is responsible for reserving tokens for the ``"Facts:\\n"`` header
+        and any inter-section ``"\\n\\n"`` separator *before* calling this
+        function, and passing the remaining capacity as *token_budget*.
+
+        Stops at the first fact that would exceed the budget so the caller's
+        pre-sorted order (typically confidence-descending) is preserved strictly:
+        a shorter lower-ranked fact can never slip ahead of a skipped
+        higher-ranked one.
+
+        Args:
+            ranked_facts: Facts pre-sorted by the caller's preferred ranking.
+            token_budget: Maximum tokens available for fact lines only.
+            use_tiktoken: Whether to use tiktoken for counting.
+
+        Returns:
+            ``(selected_lines, consumed_tokens)`` — *consumed_tokens* is the
+            exact token cost of the returned lines (including inter-line
+            ``\\n`` separators, but *not* a leading header).
+    """
     lines: list[str] = []
     consumed = 0
     for fact in ranked_facts:
@@ -420,7 +520,24 @@ def _fallback_format_facts(
     max_tokens: int,
     use_tiktoken: bool,
 ) -> tuple[str, list[str]] | tuple[None, None]:
-    '执行 _fallback_format_facts 的明确职责，并返回与调用约定一致的结果。\n\nConfidence-only ranking used when the primary path raises an exception.\n\n    Returns a tuple ``(section_text, fact_lines)`` where ``section_text`` is the\n    formatted ``"Facts:\\n..."`` section string (without any leading inter-section\n    separator — the caller owns that), and ``fact_lines`` are the individual lines\n    that make up the facts block.  Both elements are ``None`` if no facts survive.\n\n    Returning the lines separately lets the caller track them for the\n    structure-aware safety truncation so fallback facts enjoy the same\n    protected-suffix treatment as facts emitted by the primary path.\n\n    *valid_facts* is the already-filtered fact list built by the primary path so\n    the fallback does not redo validation work.  *preceding_section_cost* is the\n    tokens already consumed by user-context / history sections (used to derive\n    the remaining budget).\n    '
+    """执行 _fallback_format_facts 的明确职责，并返回与调用约定一致的结果。
+
+    Confidence-only ranking used when the primary path raises an exception.
+
+        Returns a tuple ``(section_text, fact_lines)`` where ``section_text`` is the
+        formatted ``"Facts:\\n..."`` section string (without any leading inter-section
+        separator — the caller owns that), and ``fact_lines`` are the individual lines
+        that make up the facts block.  Both elements are ``None`` if no facts survive.
+
+        Returning the lines separately lets the caller track them for the
+        structure-aware safety truncation so fallback facts enjoy the same
+        protected-suffix treatment as facts emitted by the primary path.
+
+        *valid_facts* is the already-filtered fact list built by the primary path so
+        the fallback does not redo validation work.  *preceding_section_cost* is the
+        tokens already consumed by user-context / history sections (used to derive
+        the remaining budget).
+    """
     ranked = sorted(valid_facts, key=lambda f: _coerce_confidence(f.get("confidence"), default=0.0), reverse=True)
 
     header = "Facts:\n"
@@ -443,7 +560,32 @@ def format_memory_for_injection(
     guaranteed_categories: list[str] | None = None,
     guaranteed_token_budget: int = 500,
 ) -> str:
-    '格式化输入并返回规范化文本，并遵守 format_memory_for_injection 所表达的接口约束。\n\nFormat memory data for injection into system prompt.\n\n    Args:\n        memory_data: The memory data dictionary.\n        max_tokens: Maximum tokens to use (counted via tiktoken for accuracy).\n        use_tiktoken: When ``False``, all token counting uses the network-free\n            character-based estimate instead of tiktoken (see\n            ``memory.token_counting`` config). Defaults to ``True``.\n        guaranteed_categories: Fact categories that must always be injected\n            regardless of the regular token budget. These facts draw from a\n            separate *guaranteed_token_budget*. When ``None`` or empty, all\n            facts compete for the same budget (original behaviour).\n        guaranteed_token_budget: Token ceiling for the guaranteed section.\n            In the common case the guaranteed lines *displace* regular lines\n            within *max_tokens* (the total output stays ≤ ``max_tokens``);\n            the budget becomes truly additive only when the guaranteed lines\n            alone would push the assembled output past *max_tokens*, at which\n            point the safety-truncation ceiling is raised to\n            ``max_tokens + guaranteed_actual_usage`` to protect them.\n            Ignored when *guaranteed_categories* is ``None`` or empty.\n\n    Returns:\n        Formatted memory string for system prompt injection.\n    '
+    """格式化输入并返回规范化文本，并遵守 format_memory_for_injection 所表达的接口约束。
+
+    Format memory data for injection into system prompt.
+
+        Args:
+            memory_data: The memory data dictionary.
+            max_tokens: Maximum tokens to use (counted via tiktoken for accuracy).
+            use_tiktoken: When ``False``, all token counting uses the network-free
+                character-based estimate instead of tiktoken (see
+                ``memory.token_counting`` config). Defaults to ``True``.
+            guaranteed_categories: Fact categories that must always be injected
+                regardless of the regular token budget. These facts draw from a
+                separate *guaranteed_token_budget*. When ``None`` or empty, all
+                facts compete for the same budget (original behaviour).
+            guaranteed_token_budget: Token ceiling for the guaranteed section.
+                In the common case the guaranteed lines *displace* regular lines
+                within *max_tokens* (the total output stays ≤ ``max_tokens``);
+                the budget becomes truly additive only when the guaranteed lines
+                alone would push the assembled output past *max_tokens*, at which
+                point the safety-truncation ceiling is raised to
+                ``max_tokens + guaranteed_actual_usage`` to protect them.
+                Ignored when *guaranteed_categories* is ``None`` or empty.
+
+        Returns:
+            Formatted memory string for system prompt injection.
+    """
     if not memory_data:
         return ""
 
@@ -542,13 +684,13 @@ def format_memory_for_injection(
             # ``guaranteed_categories=["context"]``.  Missing-category facts
             # always fall through to the regular path.
             def _confidence_key(fact: dict[str, Any]) -> float:
-                '执行 _confidence_key 的明确职责，并返回与调用约定一致的结果'
+                "执行 _confidence_key 的明确职责，并返回与调用约定一致的结果"
                 return _coerce_confidence(fact.get("confidence"), default=0.0)
 
             if effective_guaranteed:
 
                 def _category_match(fact: dict[str, Any]) -> bool:
-                    '执行 _category_match 的明确职责，并返回与调用约定一致的结果'
+                    "执行 _category_match 的明确职责，并返回与调用约定一致的结果"
                     raw = fact.get("category")
                     if not isinstance(raw, str):
                         return False
@@ -680,7 +822,16 @@ def format_memory_for_injection(
 
 
 def format_conversation_for_update(messages: list[Any]) -> str:
-    '格式化输入并返回规范化文本，并遵守 format_conversation_for_update 所表达的接口约束。\n\nFormat conversation messages for memory update prompt.\n\n    Args:\n        messages: List of conversation messages.\n\n    Returns:\n        Formatted conversation string.\n    '
+    """格式化输入并返回规范化文本，并遵守 format_conversation_for_update 所表达的接口约束。
+
+    Format conversation messages for memory update prompt.
+
+        Args:
+            messages: List of conversation messages.
+
+        Returns:
+            Formatted conversation string.
+    """
     lines = []
     for msg in messages:
         role = getattr(msg, "type", "unknown")

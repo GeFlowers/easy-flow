@@ -146,6 +146,7 @@ def require_permission(
 
     def decorator(func: Callable[P, T]) -> Callable[P, T]:
         """为具体路由处理器创建权限检查包装器。"""
+
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
             """认证调用方、检查权限及资源归属后执行处理器。"""

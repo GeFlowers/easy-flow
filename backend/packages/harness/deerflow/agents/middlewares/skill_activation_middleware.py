@@ -1,4 +1,6 @@
-'定义 skill_activation_middleware 模块提供的职责与可复用接口。\n\nMiddleware for skill activation: explicit slash + in-context secret binding.'
+"""定义 skill_activation_middleware 模块提供的职责与可复用接口。
+
+Middleware for skill activation: explicit slash + in-context secret binding."""
 
 from __future__ import annotations
 
@@ -58,7 +60,8 @@ _SLASH_SKILL_ACTIVATION_TARGET_ID_KEY = "slash_skill_activation_target_id"
 
 @dataclass(frozen=True, slots=True)
 class _Activation:
-    '封装 _Activation 的状态、协作关系与公开操作'
+    "封装 _Activation 的状态、协作关系与公开操作"
+
     skill_name: str
     category: str
     container_file_path: str
@@ -71,23 +74,28 @@ class _Activation:
 
 @dataclass(frozen=True, slots=True)
 class _ActivationResolution:
-    '封装 _ActivationResolution 的状态、协作关系与公开操作'
+    "封装 _ActivationResolution 的状态、协作关系与公开操作"
+
     activation: _Activation | None = None
     failure_message: str | None = None
 
 
 def is_slash_skill_activation_reminder(message: object) -> bool:
-    '判断条件是否成立并返回布尔结果，并遵守 is_slash_skill_activation_reminder 所表达的接口约束。\n\nReturn whether a message is hidden slash-skill activation context.'
+    """判断条件是否成立并返回布尔结果，并遵守 is_slash_skill_activation_reminder 所表达的接口约束。
+
+    Return whether a message is hidden slash-skill activation context."""
     return isinstance(message, HumanMessage) and bool(message.additional_kwargs.get(_SLASH_SKILL_ACTIVATION_KEY))
 
 
 def _is_user_activation_target(message: object) -> bool:
-    '执行 _is_user_activation_target 的明确职责，并返回与调用约定一致的结果'
+    "执行 _is_user_activation_target 的明确职责，并返回与调用约定一致的结果"
     return is_real_user_message(message)
 
 
 class SkillActivationMiddleware(AgentMiddleware):
-    '封装 SkillActivationMiddleware 的状态、协作关系与公开操作。\n\nInject full SKILL.md content when the user explicitly types /skill-name.'
+    """封装 SkillActivationMiddleware 的状态、协作关系与公开操作。
+
+    Inject full SKILL.md content when the user explicitly types /skill-name."""
 
     def __init__(
         self,
@@ -96,14 +104,14 @@ class SkillActivationMiddleware(AgentMiddleware):
         app_config: AppConfig | None = None,
         user_id: str | None = None,
     ) -> None:
-        '实现 __init__ 协议方法，保持对象交互语义一致'
+        "实现 __init__ 协议方法，保持对象交互语义一致"
         super().__init__()
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
 
     def _storage(self) -> SkillStorage:
-        '执行 _storage 的明确职责，并返回与调用约定一致的结果'
+        "执行 _storage 的明确职责，并返回与调用约定一致的结果"
         if self._user_id is not None:
             return get_or_new_user_skill_storage(self._user_id, app_config=self._app_config)
         if self._app_config is not None:
@@ -112,7 +120,7 @@ class SkillActivationMiddleware(AgentMiddleware):
 
     @staticmethod
     def _read_skill_content(skill_file: Path, skills_root: Path, *, storage: SkillStorage | None = None) -> str:
-        '执行 _read_skill_content 的明确职责，并返回与调用约定一致的结果'
+        "执行 _read_skill_content 的明确职责，并返回与调用约定一致的结果"
         if skill_file.name != SKILL_MD_FILE:
             raise ValueError(f"Expected {SKILL_MD_FILE}, got {skill_file.name}")
         # Use the storage's path validation if available — UserScopedSkillStorage
@@ -134,7 +142,7 @@ class SkillActivationMiddleware(AgentMiddleware):
         return resolved_file.read_text(encoding="utf-8")
 
     def _resolve_activation(self, text: str) -> _ActivationResolution | None:
-        '执行 _resolve_activation 的明确职责，并返回与调用约定一致的结果'
+        "执行 _resolve_activation 的明确职责，并返回与调用约定一致的结果"
         reference = parse_slash_skill_reference(text)
         if reference is None:
             return None
@@ -182,7 +190,7 @@ class SkillActivationMiddleware(AgentMiddleware):
 
     @staticmethod
     def _build_activation_reminder(activation: _Activation) -> str:
-        '执行 _build_activation_reminder 的明确职责，并返回与调用约定一致的结果'
+        "执行 _build_activation_reminder 的明确职责，并返回与调用约定一致的结果"
         user_request = activation.remaining_text or ("No additional task text was provided after the slash skill command. Ask the user what they want to do with this skill if the next step is unclear.")
         escaped_user_request = html.escape(user_request, quote=False)
         escaped_skill_content = html.escape(activation.skill_content, quote=False)
@@ -209,7 +217,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _has_existing_activation_for_target(messages: list, target_index: int, target: HumanMessage) -> bool:
-        '执行 _has_existing_activation_for_target 的明确职责，并返回与调用约定一致的结果'
+        "执行 _has_existing_activation_for_target 的明确职责，并返回与调用约定一致的结果"
         if target_index <= 0:
             return False
 
@@ -226,7 +234,15 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _activation_run_key(target: HumanMessage) -> str:
-        '执行 _activation_run_key 的明确职责，并返回与调用约定一致的结果。\n\nStable identity for a user slash message, used to activate once per run.\n\n        Prefers the message id (LangGraph assigns and preserves a stable id once a\n        message is in graph state); falls back to a digest of the genuine user text\n        so an id-less message still dedupes within a run. A new user slash message\n        (new id / new text) yields a new key, so it is not suppressed.\n        '
+        """执行 _activation_run_key 的明确职责，并返回与调用约定一致的结果。
+
+        Stable identity for a user slash message, used to activate once per run.
+
+                Prefers the message id (LangGraph assigns and preserves a stable id once a
+                message is in graph state); falls back to a digest of the genuine user text
+                so an id-less message still dedupes within a run. A new user slash message
+                (new id / new text) yields a new key, so it is not suppressed.
+        """
         if target.id:
             return target.id
         content = get_original_user_content_text(target.content, target.additional_kwargs)
@@ -234,18 +250,30 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _run_context(request: ModelRequest) -> dict | None:
-        '执行 _run_context 的明确职责，并返回与调用约定一致的结果'
+        "执行 _run_context 的明确职责，并返回与调用约定一致的结果"
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         return context if isinstance(context, dict) else None
 
     @staticmethod
     def _already_activated(run_context: dict | None, run_key: str) -> bool:
-        '执行 _already_activated 的明确职责，并返回与调用约定一致的结果。\n\nWhether ``run_key`` was already recorded as activated earlier in this run.\n\n        Sibling to ``_has_existing_activation_for_target``: that helper catches an\n        activation reminder still present in the scanned ``messages`` window; this\n        one catches a prior activation recorded on ``run_context`` whose reminder\n        already fell out of that window (the tool-loop case — see\n        ``_SLASH_SKILL_ACTIVATION_RUN_KEY``). ``run_key`` is computed once by the\n        caller (``_find_activation_target``) and reused as-is at the write site in\n        ``_prepare_model_request``, so the same key is always used to check and to\n        record — this helper only ever checks membership, never computes the key.\n        '
+        """执行 _already_activated 的明确职责，并返回与调用约定一致的结果。
+
+        Whether ``run_key`` was already recorded as activated earlier in this run.
+
+                Sibling to ``_has_existing_activation_for_target``: that helper catches an
+                activation reminder still present in the scanned ``messages`` window; this
+                one catches a prior activation recorded on ``run_context`` whose reminder
+                already fell out of that window (the tool-loop case — see
+                ``_SLASH_SKILL_ACTIVATION_RUN_KEY``). ``run_key`` is computed once by the
+                caller (``_find_activation_target``) and reused as-is at the write site in
+                ``_prepare_model_request``, so the same key is always used to check and to
+                record — this helper only ever checks membership, never computes the key.
+        """
         return isinstance(run_context, dict) and run_context.get(_SLASH_SKILL_ACTIVATION_RUN_KEY) == run_key
 
     def _find_activation_target(self, messages: list, *, run_context: dict | None = None) -> tuple[int, HumanMessage, _ActivationResolution, str] | None:
-        '执行 _find_activation_target 的明确职责，并返回与调用约定一致的结果'
+        "执行 _find_activation_target 的明确职责，并返回与调用约定一致的结果"
         if not messages:
             return None
 
@@ -277,7 +305,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _record_activation(request: ModelRequest, activation: _Activation, *, hook: str) -> None:
-        '执行 _record_activation 的明确职责，并返回与调用约定一致的结果'
+        "执行 _record_activation 的明确职责，并返回与调用约定一致的结果"
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         journal = context.get("__run_journal") if isinstance(context, dict) else None
@@ -300,7 +328,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
             logger.debug("Failed to record slash skill activation audit event", exc_info=True)
 
     def _prepare_model_request(self, request: ModelRequest, *, hook: str) -> tuple[ModelRequest | AIMessage | None, _Activation | None]:
-        '执行 _prepare_model_request 的明确职责，并返回与调用约定一致的结果'
+        "执行 _prepare_model_request 的明确职责，并返回与调用约定一致的结果"
         run_context = self._run_context(request)
         target_and_resolution = self._find_activation_target(list(request.messages), run_context=run_context)
         if target_and_resolution is None:
@@ -339,7 +367,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return request.override(messages=messages), activation
 
     def _handle_model_request(self, request: ModelRequest, *, hook: str) -> ModelRequest | AIMessage:
-        '执行 _handle_model_request 的明确职责，并返回与调用约定一致的结果'
+        "执行 _handle_model_request 的明确职责，并返回与调用约定一致的结果"
         prepared, activation = self._prepare_model_request(request, hook=hook)
         if isinstance(prepared, AIMessage):
             return prepared
@@ -348,7 +376,33 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return effective
 
     def _resolve_secret_bindings(self, request: ModelRequest, activation: _Activation | None, *, hook: str) -> None:
-        "执行 _resolve_secret_bindings 的明确职责，并返回与调用约定一致的结果。\n\nRecompute the per-run secret injection set (binding point A+, #3861/#3914).\n\n        Sources, unioned on every model call:\n\n        - the most recent slash activation of this run (persisted as a source on\n          the run context so the whole tool loop after the activation call keeps\n          the binding — a new slash activation replaces it). The slash source is\n          validated once, at activation (enabled + allowlist checks in\n          ``_resolve_activation``), and deliberately NOT re-validated per call:\n          slash is a run-scoped commitment made by the user, and it dies with\n          the run anyway;\n        - skills the model loaded earlier in the thread (``ThreadState.skill_context``),\n          re-validated against the live registry on each call: enabled,\n          runtime-allowed for this agent, and not opted out via\n          ``secrets-autonomous: false``. Slash activation is exempt from the\n          opt-out — it is the explicit-ceremony path.\n\n        The set is recomputed and REPLACED each call, so a skill evicted from\n        skill_context, or a caller that stops supplying a value, loses its\n        injection on the next call automatically. Injected values always come\n        from the caller's request (``context.secrets``) — never the host\n        environment, which ``env_policy.build_sandbox_env`` scrubs before\n        injection — so a skill can never harvest a host platform credential.\n        Secret *values* are never logged; the audit journal records names only.\n        "
+        """执行 _resolve_secret_bindings 的明确职责，并返回与调用约定一致的结果。
+
+        Recompute the per-run secret injection set (binding point A+, #3861/#3914).
+
+                Sources, unioned on every model call:
+
+                - the most recent slash activation of this run (persisted as a source on
+                  the run context so the whole tool loop after the activation call keeps
+                  the binding — a new slash activation replaces it). The slash source is
+                  validated once, at activation (enabled + allowlist checks in
+                  ``_resolve_activation``), and deliberately NOT re-validated per call:
+                  slash is a run-scoped commitment made by the user, and it dies with
+                  the run anyway;
+                - skills the model loaded earlier in the thread (``ThreadState.skill_context``),
+                  re-validated against the live registry on each call: enabled,
+                  runtime-allowed for this agent, and not opted out via
+                  ``secrets-autonomous: false``. Slash activation is exempt from the
+                  opt-out — it is the explicit-ceremony path.
+
+                The set is recomputed and REPLACED each call, so a skill evicted from
+                skill_context, or a caller that stops supplying a value, loses its
+                injection on the next call automatically. Injected values always come
+                from the caller's request (``context.secrets``) — never the host
+                environment, which ``env_policy.build_sandbox_env`` scrubs before
+                injection — so a skill can never harvest a host platform credential.
+                Secret *values* are never logged; the audit journal records names only.
+        """
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         if not isinstance(context, dict):
@@ -412,7 +466,26 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         self._record_secret_binding(context, audit_state, hook=hook)
 
     def _load_skill_registry_by_path(self) -> dict[str, Skill] | None:
-        "执行 _load_skill_registry_by_path 的明确职责，并返回与调用约定一致的结果。\n\nLoad the live skill registry keyed by normalized container file path.\n\n        Reloaded every call on purpose (not cached): load_skills re-reads the\n        enabled state from extensions_config so an operator disabling a skill\n        revokes its secret binding on the very next model call. A cache keyed on\n        file mtimes would miss enable/disable toggles (which do not touch\n        SKILL.md) and keep injecting after a disable — trading the\n        immediate-revocation security property for speed. The cost is gated: the\n        only caller runs this only when the caller supplied secrets.\n\n        Paths are normalized so a non-canonical ``container_path`` config (e.g. a\n        trailing slash) still matches the canonical path captured in\n        ``skill_context`` (#3938). Returns ``None`` if the registry can't load —\n        both the slash and in-context sources then bind nothing for that call\n        (fail closed). This is a deliberate availability-for-security trade-off:\n        a transient registry read failure mid-run drops the injection for that\n        call rather than trusting stale caller-supplied data.\n        "
+        """执行 _load_skill_registry_by_path 的明确职责，并返回与调用约定一致的结果。
+
+        Load the live skill registry keyed by normalized container file path.
+
+                Reloaded every call on purpose (not cached): load_skills re-reads the
+                enabled state from extensions_config so an operator disabling a skill
+                revokes its secret binding on the very next model call. A cache keyed on
+                file mtimes would miss enable/disable toggles (which do not touch
+                SKILL.md) and keep injecting after a disable — trading the
+                immediate-revocation security property for speed. The cost is gated: the
+                only caller runs this only when the caller supplied secrets.
+
+                Paths are normalized so a non-canonical ``container_path`` config (e.g. a
+                trailing slash) still matches the canonical path captured in
+                ``skill_context`` (#3938). Returns ``None`` if the registry can't load —
+                both the slash and in-context sources then bind nothing for that call
+                (fail closed). This is a deliberate availability-for-security trade-off:
+                a transient registry read failure mid-run drops the injection for that
+                call rather than trusting stale caller-supplied data.
+        """
         try:
             storage = self._storage()
             skills = storage.load_skills(enabled_only=False)
@@ -423,7 +496,24 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return {posixpath.normpath(skill.get_container_file_path(container_root)): skill for skill in skills}
 
     def _resolve_registry_skill(self, registry: dict[str, Skill], path: object, *, require_autonomous: bool) -> Skill | None:
-        "执行 _resolve_registry_skill 的明确职责，并返回与调用约定一致的结果。\n\nResolve a container path to a live registry skill eligible for secret\n        binding, or ``None``.\n\n        Match strictly by normalized container file path — never by name. A\n        by-name fallback would be a confused deputy: DeerFlow lets a custom skill\n        shadow a same-named public/legacy one (load_skills de-dupes by name,\n        custom wins), so a reference to public/foo could bind the custom foo's\n        secrets. A path that does not resolve simply binds nothing (the safe\n        direction), which also fails closed on a caller-forged path (#3938).\n\n        Gates: the skill must be enabled, declare secrets, and be allowlisted for\n        this agent. ``require_autonomous`` additionally enforces the\n        ``secrets-autonomous`` opt-out for the in-context path; the slash path\n        passes ``False`` because explicit activation is the ceremony that opt-out\n        is meant to preserve.\n        "
+        """执行 _resolve_registry_skill 的明确职责，并返回与调用约定一致的结果。
+
+        Resolve a container path to a live registry skill eligible for secret
+                binding, or ``None``.
+
+                Match strictly by normalized container file path — never by name. A
+                by-name fallback would be a confused deputy: DeerFlow lets a custom skill
+                shadow a same-named public/legacy one (load_skills de-dupes by name,
+                custom wins), so a reference to public/foo could bind the custom foo's
+                secrets. A path that does not resolve simply binds nothing (the safe
+                direction), which also fails closed on a caller-forged path (#3938).
+
+                Gates: the skill must be enabled, declare secrets, and be allowlisted for
+                this agent. ``require_autonomous`` additionally enforces the
+                ``secrets-autonomous`` opt-out for the in-context path; the slash path
+                passes ``False`` because explicit activation is the ceremony that opt-out
+                is meant to preserve.
+        """
         if not isinstance(path, str) or not path:
             return None
         skill = registry.get(posixpath.normpath(path))
@@ -436,7 +526,15 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return skill
 
     def _in_context_secret_sources(self, request: ModelRequest, registry: dict[str, Skill]) -> list[tuple[str, tuple[SecretRequirement, ...]]]:
-        "执行 _in_context_secret_sources 的明确职责，并返回与调用约定一致的结果。\n\nMap ``ThreadState.skill_context`` entries to declared-secret sources.\n\n        Entries are references to skills the model actually loaded in this\n        thread. Each is re-validated against the live registry so a skill that\n        was disabled, uninstalled, opted out, or removed from the agent's\n        allowlist after being read stops binding immediately.\n        "
+        """执行 _in_context_secret_sources 的明确职责，并返回与调用约定一致的结果。
+
+        Map ``ThreadState.skill_context`` entries to declared-secret sources.
+
+                Entries are references to skills the model actually loaded in this
+                thread. Each is re-validated against the live registry so a skill that
+                was disabled, uninstalled, opted out, or removed from the agent's
+                allowlist after being read stops binding immediately.
+        """
         state = getattr(request, "state", None) or {}
         try:
             entries = state.get("skill_context") or []
@@ -457,7 +555,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _record_secret_binding(context: dict, audit_state: dict, *, hook: str) -> None:
-        '执行 _record_secret_binding 的明确职责，并返回与调用约定一致的结果'
+        "执行 _record_secret_binding 的明确职责，并返回与调用约定一致的结果"
         journal = context.get("__run_journal")
         if journal is None:
             return
@@ -474,7 +572,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _make_activation_message(target: HumanMessage, activation_content: str) -> HumanMessage:
-        '执行 _make_activation_message 的明确职责，并返回与调用约定一致的结果'
+        "执行 _make_activation_message 的明确职责，并返回与调用约定一致的结果"
         stable_id = target.id or str(uuid.uuid4())
         additional_kwargs = {
             "hide_from_ui": True,
@@ -494,7 +592,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse | AIMessage:
-        '执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
         prepared = self._handle_model_request(request, hook="wrap_model_call")
         if isinstance(prepared, AIMessage):
             return prepared
@@ -506,7 +604,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse | AIMessage:
-        '执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果'
+        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
         prepared = await asyncio.to_thread(self._handle_model_request, request, hook="awrap_model_call")
         if isinstance(prepared, AIMessage):
             return prepared
