@@ -8,7 +8,6 @@ import asyncio
 import errno
 import json
 import logging
-import os
 import shutil
 import tempfile
 from collections.abc import Iterable
@@ -26,6 +25,16 @@ logger = logging.getLogger(__name__)
 # Bound for the best-effort temp-dir cleanup so a stalled filesystem (e.g. NFS)
 # cannot hold back the install outcome propagating out of the finally block.
 _INSTALL_TMP_CLEANUP_TIMEOUT_SECONDS = 5.0
+
+
+def _iter_direct_skill_files(category_path: Path) -> Iterable[Path]:
+    """Yield SKILL.md files from direct child directories only."""
+    for skill_dir in sorted(category_path.iterdir(), key=lambda path: path.name):
+        if skill_dir.name.startswith(".") or not skill_dir.is_dir():
+            continue
+        skill_file = skill_dir / SKILL_MD_FILE
+        if skill_file.is_file():
+            yield skill_file
 
 
 class LocalSkillStorage(SkillStorage):
@@ -88,11 +97,8 @@ class LocalSkillStorage(SkillStorage):
             category_path = self._host_root / category.value
             if not category_path.exists() or not category_path.is_dir():
                 continue
-            for current_root, dir_names, file_names in os.walk(category_path, followlinks=True):
-                dir_names[:] = sorted(name for name in dir_names if not name.startswith("."))
-                if SKILL_MD_FILE not in file_names:
-                    continue
-                yield category, category_path, Path(current_root) / SKILL_MD_FILE
+            for skill_file in _iter_direct_skill_files(category_path):
+                yield category, category_path, skill_file
 
     def read_custom_skill(self, name: str) -> str:
         "执行 read_custom_skill 的明确职责，并返回与调用约定一致的结果"

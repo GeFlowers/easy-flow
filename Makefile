@@ -1,6 +1,6 @@
 # DeerFlow - 统一开发环境入口
 
-.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon nginx stop clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-postgres
+.PHONY: help config config-upgrade check install setup doctor support-bundle detect-thread-boundaries detect-blocking-io dev dev-daemon start start-daemon stop clean docker-init docker-start docker-stop docker-logs docker-logs-frontend docker-logs-gateway docker-logs-postgres
 
 BASH ?= bash
 BACKEND_UV_RUN = cd backend && uv run
@@ -32,7 +32,6 @@ help:
 	@echo "  make dev-daemon      - Start dev services in background (daemon mode)"
 	@echo "  make start           - Start all services in production mode (optimized, no hot-reloading)"
 	@echo "  make start-daemon    - Start prod services in background (daemon mode)"
-	@echo "  make nginx           - Start nginx alone in the foreground (local dev config)"
 	@echo "  make stop            - Stop all running services"
 	@echo "  make clean           - Clean up processes and temporary files"
 	@echo ""
@@ -113,10 +112,6 @@ dev-daemon:
 start-daemon:
 	@$(PYTHON) ./scripts/check.py
 	@$(RUN_WITH_GIT_BASH) ./scripts/serve.sh --prod --daemon
-
-# 仅在前台启动 nginx，使用本地开发配置用于独立代理调试。
-nginx:
-	@$(RUN_WITH_GIT_BASH) ./scripts/nginx.sh
 
 # 仅停止 DeerFlow 所属服务；停止逻辑会保留无关项目进程。
 stop:

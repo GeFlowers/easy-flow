@@ -1,6 +1,6 @@
 # 🦌 DeerFlow - 2.0
 
-English | [中文](./README_zh.md) | [日本語](./README_ja.md) | [Français](./README_fr.md) | [Русский](./README_ru.md)
+English | [中文](./README_zh.md)
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend/pyproject.toml)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
@@ -95,7 +95,7 @@ DeerFlow has newly integrated the intelligent search and crawling toolset indepe
 If you use Claude Code, Codex, Cursor, Windsurf, or another coding agent, you can hand it the setup instructions in one sentence:
 
 ```text
-Help me clone DeerFlow if needed, then bootstrap it for local development by following https://raw.githubusercontent.com/bytedance/deer-flow/main/Install.md
+Help me clone DeerFlow if needed, then bootstrap it for local development by following the setup instructions in `README.md` and `backend/docs/SETUP.md`.
 ```
 
 That prompt is intended for coding agents. It tells the agent to clone the repo if needed, choose Docker when available, and stop with the exact next command plus any missing config the user still needs to provide.
@@ -252,7 +252,7 @@ Docker builds use the upstream `uv` registry by default. If you need faster mirr
 Backend processes automatically pick up `config.yaml` changes on the next config access, so model metadata updates do not require a manual restart during development.
 
 > [!TIP]
-> On Linux, if Docker-based commands fail with `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock`, add your user to the `docker` group and re-login before retrying. See [CONTRIBUTING.md](CONTRIBUTING.md#linux-docker-daemon-permission-denied) for the full fix.
+> On Linux, if Docker-based commands fail with `permission denied while trying to connect to the Docker daemon socket at unix:///var/run/docker.sock`, add your user to the `docker` group and re-login before retrying.
 
 Access: http://localhost:2026
 
@@ -266,7 +266,7 @@ The unified nginx endpoint is same-origin by default and does not emit browser C
 > [!IMPORTANT]
 > The Gateway still owns active run tasks in process, so production defaults to a single Gateway worker (`GATEWAY_WORKERS=1`). The Redis stream bridge (`stream_bridge.type: redis`) shares SSE delivery and `Last-Event-ID` replay across workers, with a rolling retained-buffer TTL (`stream_ttl_seconds`) as a cleanup safety net. Malformed reconnect IDs live-tail new events instead of replaying the retained buffer. It does not make run cancellation, request de-duplication, or IM channel state fully cross-worker by itself; use single-worker Gateway or explicit sticky routing/ownership before raising `GATEWAY_WORKERS`.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for detailed Docker development guide.
+See [backend/docs/SETUP.md](backend/docs/SETUP.md) for the backend setup guide.
 
 #### Option 2: Local Development
 
@@ -277,7 +277,7 @@ On Windows, run the local development flow from Git Bash. Native `cmd.exe` and P
 
 1. **Check prerequisites**:
    ```bash
-   make check  # Verifies Node.js 22+, pnpm, uv, nginx
+   make check  # Verifies Node.js 22+, pnpm, and uv
    ```
 
 2. **Install dependencies**:
@@ -296,14 +296,14 @@ On Windows, run the local development flow from Git Bash. Native `cmd.exe` and P
    python scripts/load_memory_sample.py
    ```
    This copies the sample fixture into the default local runtime memory file so reviewers can immediately test `Settings > Memory`.
-   See [backend/docs/MEMORY_SETTINGS_REVIEW.md](backend/docs/MEMORY_SETTINGS_REVIEW.md) for the shortest review flow.
+   Open `Settings > Memory` to review the loaded sample data.
 
 5. **Start services**:
    ```bash
    make dev
    ```
 
-6. **Access**: http://localhost:2026
+6. **Access**: http://localhost:3000
 
 #### Startup Modes
 
@@ -319,7 +319,7 @@ DeerFlow runs the agent runtime inside the Gateway API. Development mode enables
 | **Stop** | `./scripts/serve.sh --stop`<br/>`make stop` | `./scripts/docker.sh stop`<br/>`make docker-stop` |
 | **Restart** | `./scripts/serve.sh --restart [flags]` | `./scripts/docker.sh restart` |
 
-Gateway owns `/api/langgraph/*` and translates those public LangGraph-compatible paths to its native `/api/*` routers behind nginx.
+Gateway owns `/api/langgraph/*` and translates those public LangGraph-compatible paths to its native `/api/*` routers. In local mode, Next.js rewrites same-origin `/api/*` requests to the Gateway; in Docker mode, nginx performs the same public routing at `http://localhost:2026`.
 
 ### Advanced
 #### Sandbox Mode
@@ -618,6 +618,8 @@ Skills are what make DeerFlow do *almost anything*.
 
 A standard Agent Skill is a structured capability module — a Markdown file that defines a workflow, best practices, and references to supporting resources. DeerFlow ships with built-in skills for research, report generation, slide creation, web pages, image and video generation, and more. But the real power is extensibility: add your own skills, replace the built-in ones, or combine them into compound workflows.
 
+Each skill must be a direct child of `skills/public` or `skills/custom` and contain its own `SKILL.md`. Nested `SKILL.md` files inside a skill package are treated as supporting or evaluation content and are not loaded as separate skills.
+
 Skills are loaded progressively — only when the task needs them, not all at once. This keeps the context window lean and makes DeerFlow work well even with token-sensitive models.
 
 Users can explicitly activate an enabled skill for a single turn by starting the request with `/skill-name`, for example `/data-analysis analyze uploads/foo.csv`. DeerFlow loads that skill's `SKILL.md` as hidden current-turn context while leaving the base prompt limited to skill metadata. Slash activation respects disabled skills, custom-agent skill whitelists, and existing channel commands such as `/new` and `/help`.
@@ -818,8 +820,6 @@ Enable background polling with `config.yaml -> scheduler.enabled`. Manual trigge
 
 `deerflow` is a terminal-native workbench for people who live in the shell. It runs **embedded** over `DeerFlowClient` — no Gateway, frontend, nginx, or Docker required — while honoring the same `config.yaml`, checkpointer, skills, memory, MCP, and sandbox settings as the rest of DeerFlow.
 
-![DeerFlow TUI](docs/tui/tui-preview.svg)
-
 ```bash
 uv pip install 'deerflow-harness[tui]'        # optional 'textual' dependency
 
@@ -836,9 +836,9 @@ See [backend/docs/TUI.md](backend/docs/TUI.md) for the full guide.
 
 ## Documentation
 
-- [Contributing Guide](CONTRIBUTING.md) - Development environment setup and workflow
+- [Development Guide](AGENTS.md) - Development environment setup and workflow
 - [Configuration Guide](backend/docs/CONFIGURATION.md) - Setup and configuration instructions
-- [Architecture Overview](backend/CLAUDE.md) - Technical architecture details
+- [Architecture Overview](backend/AGENTS.md) - Technical architecture details
 - [Backend Architecture](backend/README.md) - Backend architecture and API reference
 
 ## ⚠️ Security Notice
@@ -861,7 +861,7 @@ DeerFlow has key high-privilege capabilities including **system command executio
 
 ## Contributing
 
-We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, workflow, and guidelines.
+We welcome contributions! Please see [AGENTS.md](AGENTS.md) and [backend/AGENTS.md](backend/AGENTS.md) for development setup, workflow, and guidelines.
 
 Tool docstrings used with `@tool(parse_docstring=True)` are runtime API schema,
 not documentation-only text. Keep their Google-style `Args:` sections aligned

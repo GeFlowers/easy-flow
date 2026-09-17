@@ -60,11 +60,10 @@ fi
 
 # 将运行时自有文件排除在 uvicorn 热重载监听之外。每个排除路径必须在 uvicorn 启动前存在，
 # 才会被 watchfiles 识别为目录而非普通 glob；Python 3.12 对绝对 glob 会抛出
-# NotImplementedError 并导致启动崩溃（#3459 / #3454）。因此此处也必须创建 `sandbox`，
-# 而不能只创建 `.deer-flow`。
+# NotImplementedError 并导致启动崩溃（#3459 / #3454）。
 : "${DEER_FLOW_HOME:=/app/backend/.deer-flow}"
 export DEER_FLOW_HOME
-mkdir -p "$DEER_FLOW_HOME" /app/backend/.deer-flow /app/backend/sandbox
+mkdir -p "$DEER_FLOW_HOME" /app/backend/.deer-flow
 
 # ── 同步依赖（带自愈） ────────────────────────────────────────────────────────
 
@@ -89,6 +88,5 @@ PYTHONPATH=. exec uv run uvicorn app.gateway.app:app \
     --reload \
     --reload-include='*.yaml' \
     --reload-include='.env' \
-    --reload-exclude=/app/backend/sandbox \
     --reload-exclude="$DEER_FLOW_HOME" \
     --reload-exclude=/app/backend/.deer-flow

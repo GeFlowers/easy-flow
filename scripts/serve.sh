@@ -74,7 +74,7 @@ done
 
 # ── 停止辅助逻辑 ──────────────────────────────────────────────────────────────
 
-# 所有 deer-flow worktree（主检出与关联 worktree）均使用 8001/3000/2026 开发端口，
+# 所有 deer-flow worktree（主检出与关联 worktree）均使用 8001/3000 开发端口，
 # 因而需要能够回收任一检出的服务；否则本检出的 `make stop`/`make dev` 无法接管同级
 # worktree 占用的端口。DEERFLOW_ROOTS 是允许处理的根目录集合，集合外的进程（如另一个
 # 项目占用 3000）绝不触及。按路径长度从长到短排序，使嵌套的关联 worktree 归属准确。
@@ -111,7 +111,7 @@ _is_deerflow_pid() {
 # 在回收其他 worktree 的端口前显式报告，避免停止（或启动前停止）时静默中断他人进程。
 _report_reclaimed_ports() {
     local port pid files root owner
-    for port in 8001 3000 2026; do
+    for port in 8001 3000; do
         for pid in $(lsof -nP -iTCP:"$port" -sTCP:LISTEN -t 2>/dev/null); do
             _is_deerflow_pid "$pid" || continue
             files=$(lsof -b -w -p "$pid" 2>/dev/null)
@@ -192,57 +192,6 @@ _is_port_listening() {
     return 1
 }
 
-# 校验 nginx PID 属于 DeerFlow 配置，兼容 macOS 对 nginx 进程名的改写。
-_is_repo_nginx_pid() {
-    local pid=$1
-    local command
-    local args
-
-    command=$(ps -p "$pid" -o comm= 2>/dev/null) || return 1
-    # nginx 会改写 master/worker 的 argv[0]；macOS 的 `ps -o comm=` 可能报告该形式而非二进制名。
-    case "$command" in
-        nginx|*/nginx|nginx:*) ;;
-        *) return 1 ;;
-    esac
-
-    args=$(ps -p "$pid" -o args= 2>/dev/null) || return 1
-    local root
-    while IFS= read -r root; do
-        [ -n "$root" ] || continue
-        case "$args" in
-            *"$root"/docker/nginx/nginx.local.conf*|*"$root"/*) return 0 ;;
-        esac
-    done <<< "$DEERFLOW_ROOTS"
-
-    _is_deerflow_pid "$pid"
-}
-
-# 先从 pid 文件、再从进程列表定位本仓库 nginx，避免清理无关 nginx 实例。
-_kill_repo_nginx() {
-    local pid
-    local pids=""
-
-    if [ -f "$REPO_ROOT/logs/nginx.pid" ]; then
-        read -r pid < "$REPO_ROOT/logs/nginx.pid" || true
-        if [ -n "$pid" ] && _is_repo_nginx_pid "$pid"; then
-            pids="$pids $pid"
-        fi
-    fi
-
-    while IFS= read -r pid; do
-        if [ -n "$pid" ] && _is_repo_nginx_pid "$pid"; then
-            case " $pids " in
-                *" $pid "*) ;;
-                *) pids="$pids $pid" ;;
-            esac
-        fi
-    done < <(pgrep -f nginx 2>/dev/null || true)
-
-    if [ -n "$pids" ]; then
-        kill -9 $pids 2>/dev/null || true
-    fi
-}
-
 # 以温和退出优先、强制端口回收兜底的顺序停止本项目服务。
 stop_all() {
     echo "Stopping all services..."
@@ -251,14 +200,10 @@ stop_all() {
     _kill_repo_processes "next dev"
     _kill_repo_processes "next start"
     _kill_repo_processes "next-server"
-    nginx -c "$REPO_ROOT/docker/nginx/nginx.local.conf" -p "$REPO_ROOT" -s quit 2>/dev/null || true
     sleep 1
-    _kill_repo_nginx
-    # 对仍占用服务端口的残留进程强制清理。包含 2026，确保未被名称识别的 nginx
-    # 或其他 deer-flow 进程也会被回收，否则 `make dev` 的 nginx 端口预检会失败。
+    # 对仍占用服务端口的残留进程强制清理。
     _kill_repo_port 8001
     _kill_repo_port 3000
-    _kill_repo_port 2026
     ./scripts/cleanup-containers.sh deer-flow-sandbox 2>/dev/null || true
     echo "✓ All services stopped"
 }
@@ -310,18 +255,14 @@ if [ -z "$DEER_FLOW_HOME" ]; then
     export DEER_FLOW_HOME="$BACKEND_RUNTIME_HOME"
 fi
 
-# 下方会从 uvicorn 热重载监听中排除 `backend/sandbox`。绝对路径仅在目录已存在时才会
-# 被 uvicorn 直接排除；否则会按 glob 处理，而 Python 3.12 的 pathlib 会拒绝绝对 glob，
-# 导致新检出执行 `make dev` 时出现 NotImplementedError（#3459 / #3454）。提前创建目录
-# 可确保所有绝对排除路径均走 is_dir 分支。
-mkdir -p "$DEER_FLOW_HOME" "$BACKEND_RUNTIME_HOME" "$REPO_ROOT/backend/sandbox"
+mkdir -p "$DEER_FLOW_HOME" "$BACKEND_RUNTIME_HOME"
 DEER_FLOW_HOME="$(cd "$DEER_FLOW_HOME" && pwd -P)"
 BACKEND_RUNTIME_HOME="$(cd "$BACKEND_RUNTIME_HOME" && pwd -P)"
 export DEER_FLOW_HOME
 
 # 仅前台开发模式启用 uvicorn 热重载，并排除运行时高频写入目录。
 if $DEV_MODE && ! $DAEMON_MODE; then
-    GATEWAY_EXTRA_FLAGS="--reload --reload-include='*.yaml' --reload-include='.env' --reload-exclude='*.pyc' --reload-exclude='__pycache__' --reload-exclude='$REPO_ROOT/backend/sandbox' --reload-exclude='$DEER_FLOW_HOME' --reload-exclude='$BACKEND_RUNTIME_HOME'"
+    GATEWAY_EXTRA_FLAGS="--reload --reload-include='*.yaml' --reload-include='.env' --reload-exclude='*.pyc' --reload-exclude='__pycache__' --reload-exclude='$DEER_FLOW_HOME' --reload-exclude='$BACKEND_RUNTIME_HOME'"
 else
     GATEWAY_EXTRA_FLAGS=""
 fi
@@ -391,7 +332,6 @@ echo ""
 echo "  Services:"
 echo "    Gateway     → localhost:8001  (REST API + agent runtime)"
 echo "    Frontend    → localhost:3000  (Next.js)"
-echo "    Nginx       → localhost:2026  (reverse proxy)"
 echo ""
 
 # ── 清理处理器 ────────────────────────────────────────────────────────────────
@@ -441,7 +381,6 @@ run_service() {
 # ── 启动服务 ─────────────────────────────────────────────────────────────────
 
 mkdir -p logs
-mkdir -p temp/client_body_temp temp/proxy_temp temp/fastcgi_temp temp/uwsgi_temp temp/scgi_temp
 
 # 1. Gateway API：先启动，供后续代理健康检查使用。
 run_service "Gateway" \
@@ -453,11 +392,6 @@ run_service "Frontend" \
     "cd frontend && $FRONTEND_CMD > ../logs/frontend.log 2>&1" \
     3000 120
 
-# 3. Nginx：最后启动统一入口，避免代理至尚未就绪的上游。
-run_service "Nginx" \
-    "nginx -g 'daemon off;' -c '$REPO_ROOT/docker/nginx/nginx.local.conf' -p '$REPO_ROOT' > logs/nginx.log 2>&1" \
-    2026 10
-
 # ── 就绪信息 ─────────────────────────────────────────────────────────────────
 
 echo ""
@@ -465,13 +399,11 @@ echo "=========================================="
 echo "  ✓ DeerFlow is running!  [$MODE_LABEL]"
 echo "=========================================="
 echo ""
-echo "  🌐 http://localhost:2026"
+echo "  🌐 http://localhost:3000"
 echo ""
-echo "  Routing: Frontend → Nginx → Gateway"
-echo "  API:     /api/langgraph/*  →  Gateway agent runtime"
-echo "           /api/*              →  Gateway REST API (8001)"
+echo "  API proxy: Next.js rewrites /api/* to Gateway (8001)"
 echo ""
-echo "  📋 Logs: logs/{gateway,frontend,nginx}.log"
+echo "  📋 Logs: logs/{gateway,frontend}.log"
 echo ""
 
 if $DAEMON_MODE; then

@@ -47,7 +47,6 @@ ATTENTION_SIGNAL_NAMES = {
     "extensions_config_error",
     "node_missing",
     "node_version_too_old",
-    "nginx_missing",
     "dirty_worktree",
 }
 
@@ -190,7 +189,6 @@ def collect_environment(project_root: Path) -> dict[str, Any]:
             _version_command("node", ["node", "--version"], project_root),
             _version_command("pnpm", ["pnpm", "--version"], project_root),
             _version_command("uv", ["uv", "--version"], project_root),
-            _version_command("nginx", ["nginx", "-v"], project_root),
             _version_command("docker", ["docker", "--version"], project_root),
         ],
     }
@@ -405,7 +403,7 @@ def _status_from_signals(signals: dict[str, bool]) -> str:
     """根据故障信号计算分诊状态。"""
     if signals["config_missing"] or signals["config_error"] or signals["models_missing"] or signals["extensions_config_error"]:
         return "needs_user_setup"
-    if signals["node_missing"] or signals["node_version_too_old"] or signals["nginx_missing"]:
+    if signals["node_missing"] or signals["node_version_too_old"]:
         return "environment_mismatch"
     if not signals["doctor_included"]:
         return "insufficient_evidence"
@@ -506,7 +504,6 @@ def build_triage_report(
         "extensions_config_error": bool(extensions.get("error")),
         "node_missing": versions.get("node") is not None and "not found" in versions["node"].lower(),
         "node_version_too_old": node_major is not None and node_major < 22,
-        "nginx_missing": versions.get("nginx") is not None and "not found" in versions["nginx"].lower(),
         "dirty_worktree": _dirty_worktree(status_short),
         "thread_summary_included": thread_summary is not None,
         "thread_summary_found": bool(thread_summary and thread_summary.get("found")),
@@ -563,7 +560,7 @@ def render_issue_summary(triage: dict[str, Any]) -> str:
         f"- Active signals: {', '.join(triage['active_signals']) or 'none'}",
         f"- Doctor: included={doctor['included']}, ok={doctor['ok']}, errors={doctor['errors']}, warnings={doctor['warnings']}",
         f"- Git: branch={git['branch'] or 'unknown'}, head={git['head'] or 'unknown'}, dirty_worktree={git['dirty_worktree']}",
-        f"- Versions: python={versions.get('python') or 'unknown'}, node={versions.get('node') or 'unknown'}, pnpm={versions.get('pnpm') or 'unknown'}, uv={versions.get('uv') or 'unknown'}, nginx={versions.get('nginx') or 'unknown'}",
+        f"- Versions: python={versions.get('python') or 'unknown'}, node={versions.get('node') or 'unknown'}, pnpm={versions.get('pnpm') or 'unknown'}, uv={versions.get('uv') or 'unknown'}",
         "",
         "### Reporter next steps",
         _markdown_list(triage["reporter_next_steps"]),
@@ -605,7 +602,7 @@ def _draft_affected_areas(triage: dict[str, Any]) -> list[str]:
     """根据分诊结果推断问题可能影响的功能区域。"""
     signals = triage["signals"]
     areas: list[str] = []
-    if signals["config_missing"] or signals["config_error"] or signals["models_missing"] or signals["node_missing"] or signals["node_version_too_old"] or signals["nginx_missing"]:
+    if signals["config_missing"] or signals["config_error"] or signals["models_missing"] or signals["node_missing"] or signals["node_version_too_old"]:
         areas.append("Config / setup (make, config.yaml, env)")
     if signals["extensions_config_error"]:
         areas.extend(["MCP", "Skills"])

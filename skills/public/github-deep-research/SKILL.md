@@ -74,7 +74,7 @@ python /path/to/skill/scripts/github_api.py <owner> <repo> tree
 
 ## Report Structure
 
-Follow template in `assets/report_template.md`:
+Follow template in `templates/report_template.md`:
 
 1. **Metadata Block** - Date, confidence level, subject
 2. **Executive Summary** - 2-3 sentence overview with key metrics

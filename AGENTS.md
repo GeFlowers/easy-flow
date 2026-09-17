@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents (Claude Code, Codex, and others) when working with code in this repository. It is the source of truth; the sibling `CLAUDE.md` imports it via `@AGENTS.md`.
+This file provides guidance to AI coding agents (Claude Code, Codex, and others) when working with code in this repository. It is the source of truth for the repository.
 
 It is the **monorepo orientation layer**: it maps the whole repo and points to the
 module guides that own the depth. For anything inside a module, read that module's
@@ -22,19 +22,21 @@ DingTalk) bridge into the same agent through the Gateway.
 
 ## Service Topology
 
-A single `make dev` / Docker stack runs four cooperating services:
+The local `make dev` / `make start` flow runs Gateway and Frontend directly. The Docker stack also runs nginx as the unified public entry.
 
 | Service         | Port   | Role                                                                 |
 | --------------- | ------ | ------------------------------------------------------------------- |
-| **Nginx**       | `2026` | Unified reverse-proxy entry point — open this in the browser        |
+| **Nginx**       | `2026` | Docker-only unified reverse-proxy entry point — open this in the browser for Docker runs |
 | **Gateway API** | `8001` | FastAPI REST API + embedded LangGraph-compatible agent runtime      |
 | **Frontend**    | `3000` | Next.js web interface                                               |
 | **Provisioner** | `8002` | Optional — only when sandbox is configured for provisioner/K8s mode |
 
-Nginx is the single public entry: it serves the frontend and proxies `/api/langgraph/*`
+In local mode, open the Frontend at `http://localhost:3000`; Next.js rewrites same-origin
+`/api/*` requests to the Gateway at `localhost:8001`. In Docker mode, nginx is the public
+entry at `http://localhost:2026`: it serves the frontend and proxies `/api/langgraph/*`
 to the Gateway's LangGraph runtime, rewriting it to Gateway's native `/api/*` routes; all
-other `/api/*` go straight to the Gateway REST routers. See
-[backend/AGENTS.md](backend/AGENTS.md) for the runtime and router detail.
+other `/api/*` go straight to the Gateway REST routers. See [backend/AGENTS.md](backend/AGENTS.md)
+for the runtime and router detail.
 
 ## Repository Map
 
@@ -51,7 +53,7 @@ deer-flow/
 ├── docker/                         # docker-compose files, nginx config, provisioner
 ├── skills/                         # Agent skills: public/ (committed), custom/ (gitignored)
 ├── contracts/                      # Cross-component JSON contracts (e.g. subagent status, skill review)
-├── scripts/                        # Root orchestration scripts invoked by the Makefile (check, configure, doctor, support_bundle, serve, nginx, docker, deploy, setup_wizard)
+├── scripts/                        # Root orchestration scripts invoked by the Makefile (check, configure, doctor, support_bundle, serve, docker, deploy, setup_wizard)
 ├── tests/                          # Root-level tests (currently tests/skills/ — public skill tests)
 └── docs/                           # Cross-cutting docs, plans, and design notes
 ```
@@ -85,8 +87,8 @@ make support-bundle  # Generate redacted troubleshooting summary, AI issue draft
 make config      # Generate local config files from the examples
 make check       # Check that required tools are installed
 make install     # Install all dependencies (frontend + backend + pre-commit hooks)
-make dev         # Start all services with hot-reload (Gateway + Frontend + Nginx)
-make start       # Start all services in production mode (local, optimized)
+make dev         # Start local services with hot-reload (Gateway + Frontend; browser at localhost:3000)
+make start       # Start local services in production mode (Gateway + Frontend; browser at localhost:3000)
 make stop        # Stop all running services
 make up / down   # Build/stop the production Docker stack (browser at localhost:2026)
 make docker-start / docker-stop / docker-logs   # Docker development environment
@@ -116,12 +118,9 @@ Rule of thumb: **root `make` = the full application**; **`backend/Makefile` and 
 
 - Backend work → **[backend/AGENTS.md](backend/AGENTS.md)**
 - Frontend work → **[frontend/AGENTS.md](frontend/AGENTS.md)**
-- Setup & install → **[Install.md](Install.md)**, **[CONTRIBUTING.md](CONTRIBUTING.md)**
+- Setup & install → **[README.md](README.md)**, **[backend/docs/SETUP.md](backend/docs/SETUP.md)**
 - Project overview & usage → **[README.md](README.md)** (translations: `README_zh.md`,
-  `README_ja.md`, `README_fr.md`, `README_ru.md`)
-- Security policy → **[SECURITY.md](SECURITY.md)**
-- Changes → **[CHANGELOG.md](CHANGELOG.md)**
-- Cutting a release → **[RELEASING.md](RELEASING.md)**
+  which is the only maintained translation)
 
 ## Cross-Cutting Conventions
 

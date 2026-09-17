@@ -41,7 +41,7 @@ from pathlib import Path
 
 from deerflow.constants import DEFAULT_SKILLS_CONTAINER_PATH
 from deerflow.skills.permissions import make_skill_written_path_sandbox_readable
-from deerflow.skills.storage.local_skill_storage import LocalSkillStorage
+from deerflow.skills.storage.local_skill_storage import LocalSkillStorage, _iter_direct_skill_files
 from deerflow.skills.storage.skill_storage import SKILL_MD_FILE
 from deerflow.skills.types import SkillCategory
 
@@ -290,22 +290,16 @@ class UserScopedSkillStorage(LocalSkillStorage):
         "执行 _iter_skill_files 的明确职责，并返回与调用约定一致的结果"
         public_path = self._host_root / SkillCategory.PUBLIC.value
         if public_path.exists() and public_path.is_dir():
-            for current_root, dir_names, file_names in os.walk(public_path, followlinks=True):
-                dir_names[:] = sorted(name for name in dir_names if not name.startswith("."))
-                if SKILL_MD_FILE not in file_names:
-                    continue
-                yield SkillCategory.PUBLIC, public_path, Path(current_root) / SKILL_MD_FILE
+            for skill_file in _iter_direct_skill_files(public_path):
+                yield SkillCategory.PUBLIC, public_path, skill_file
 
         # 2. Custom skills: prefer user-level directory
         user_custom_exists = False
         user_custom_path = self._user_custom_root
         if user_custom_path.exists() and user_custom_path.is_dir():
-            for current_root, dir_names, file_names in os.walk(user_custom_path, followlinks=True):
-                dir_names[:] = sorted(name for name in dir_names if not name.startswith(".") and name != ".history")
-                if SKILL_MD_FILE not in file_names:
-                    continue
+            for skill_file in _iter_direct_skill_files(user_custom_path):
                 user_custom_exists = True
-                yield SkillCategory.CUSTOM, user_custom_path, Path(current_root) / SKILL_MD_FILE
+                yield SkillCategory.CUSTOM, user_custom_path, skill_file
 
         # 3. Fallback: if user has no custom skills, load from global custom
         #    as LEGACY (read-only) so legacy skills are visible but not
@@ -315,11 +309,8 @@ class UserScopedSkillStorage(LocalSkillStorage):
         if not user_custom_exists:
             global_custom_path = self._global_custom_root
             if global_custom_path.exists() and global_custom_path.is_dir():
-                for current_root, dir_names, file_names in os.walk(global_custom_path, followlinks=True):
-                    dir_names[:] = sorted(name for name in dir_names if not name.startswith(".") and name != ".history")
-                    if SKILL_MD_FILE not in file_names:
-                        continue
-                    yield SkillCategory.LEGACY, global_custom_path, Path(current_root) / SKILL_MD_FILE
+                for skill_file in _iter_direct_skill_files(global_custom_path):
+                    yield SkillCategory.LEGACY, global_custom_path, skill_file
 
     # ------------------------------------------------------------------
     # Install — redirect custom_dir to user directory

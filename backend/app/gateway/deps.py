@@ -179,7 +179,7 @@ def get_config() -> AppConfig:
     standardised ``"startup-only:"`` prefix on the matching
     ``Field(description=...)`` in :class:`AppConfig` — IDE hover on those
     fields will surface the boundary inline. See
-    ``backend/CLAUDE.md`` "Config Hot-Reload Boundary" for the operator
+     ``backend/AGENTS.md`` "Config Hot-Reload Boundary" for the operator
     summary.
 
     Any failure to materialise the config (missing file, permission denied,
@@ -205,7 +205,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
     connections, file handles, or singleton providers — so they bind to this
     snapshot and survive across `config.yaml` edits. Request-time consumers
     must still go through :func:`get_config` for any field that should be
-    hot-reloadable. See ``backend/CLAUDE.md`` "Config Hot-Reload Boundary".
+     hot-reloadable. See ``backend/AGENTS.md`` "Config Hot-Reload Boundary".
 
     The matching ``run_events_config`` is frozen onto ``app.state`` so
     :func:`get_run_context` pairs a freshly-loaded ``AppConfig`` with the

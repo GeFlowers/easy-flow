@@ -41,7 +41,7 @@ services:
     ports:
       - "2026:2026"
     volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf.template:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf.template:ro
     command:
       - sh
       - -c

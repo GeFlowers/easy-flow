@@ -6,7 +6,7 @@ function getBaseOrigin() {
     return window.location.origin;
   }
   // 服务端渲染期间没有浏览器位置对象，使用稳定回退值。
-  return "http://localhost:2026";
+  return "http://localhost:3000";
 }
 
 /** 解析配置的后端基础地址；未配置时保留相对请求路径。 */
@@ -42,6 +42,6 @@ export function getLangGraphBaseURL(isMock?: boolean) {
       return `${window.location.origin}/api/langgraph`;
     }
     // 服务端渲染时使用稳定的默认地址。
-    return "http://localhost:2026/api/langgraph";
+    return "http://localhost:3000/api/langgraph";
   }
 }

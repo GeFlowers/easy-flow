@@ -1,6 +1,6 @@
 # AGENTS.md
 
-This file provides guidance to AI coding agents (Claude Code, Codex, and others) when working with code in this repository. It is the source of truth; the sibling `CLAUDE.md` imports it via `@AGENTS.md`.
+This file provides guidance to AI coding agents (Claude Code, Codex, and others) when working with code in this repository. It is the source of truth for backend development.
 
 ## Project Overview
 
@@ -9,10 +9,10 @@ DeerFlow is a LangGraph-based AI super agent system with a full-stack architectu
 **Architecture**:
 - **Gateway API** (port 8001): REST API plus embedded LangGraph-compatible agent runtime
 - **Frontend** (port 3000): Next.js web interface
-- **Nginx** (port 2026): Unified reverse proxy entry point
+- **Nginx** (port 2026): Docker-only unified reverse proxy entry point
 
 **Runtime**:
-- `make dev`, Docker dev, and production all run the agent runtime in Gateway via `RunManager` + `run_agent()` + `StreamBridge` (`packages/harness/deerflow/runtime/`). Nginx exposes that runtime at `/api/langgraph/*` and rewrites it to Gateway's native `/api/*` routers.
+- `make dev`, Docker dev, and production all run the agent runtime in Gateway via `RunManager` + `run_agent()` + `StreamBridge` (`packages/harness/deerflow/runtime/`). Local frontend runs use Next.js rewrites for same-origin `/api/*` requests; Docker uses nginx to expose `/api/langgraph/*` and rewrite it to Gateway's native `/api/*` routers.
 - Scheduled-task executions must reuse that same Gateway run lifecycle. The scheduler may decide *when* work runs, but it must dispatch through the existing run path rather than introducing a parallel execution stack.
 
 **Project Structure**:
@@ -71,7 +71,7 @@ deer-flow/
 
 When making code changes, you MUST update the relevant documentation:
 - Update `README.md` for user-facing changes (features, setup, usage instructions)
-- Update `AGENTS.md` for development changes (architecture, commands, workflows, internal systems). `CLAUDE.md` imports it via `@AGENTS.md`, so editing `AGENTS.md` updates both.
+- Update this `AGENTS.md` for development changes (architecture, commands, workflows, and internal systems).
 - Keep documentation synchronized with the codebase at all times
 - Ensure accuracy and timeliness of all documentation
 
@@ -81,7 +81,7 @@ When making code changes, you MUST update the relevant documentation:
 ```bash
 make check      # Check system requirements
 make install    # Install all dependencies (frontend + backend)
-make dev        # Start all services (Gateway + Frontend + Nginx), with config.yaml preflight
+make dev        # Start local services (Gateway + Frontend), with config.yaml preflight
 make start      # Start production services locally
 make stop       # Stop all services
 ```
@@ -115,11 +115,8 @@ informational and is not run from CI in this round.
 
 For a diff-scoped view of the same findings, `scripts/scan_changed_blocking_io.py`
 (repo root) reports findings on the added lines of `git diff <base>...HEAD`
-plus findings new versus the merge base (so a new async caller exposing an
-untouched sync helper in the same file is still reported) — used by the
-`blocking-io-guard` skill (`.agent/skills/blocking-io-guard/`) as the
-deterministic scope step before routing each candidate to a fix and/or a
-`tests/blocking_io/` runtime anchor.
+plus findings new versus the merge base. It is an informational review aid and
+is not required for normal Gateway operation.
 
 Blocking-IO runtime gate (`tests/blocking_io/`):
 - Wraps every item under `tests/blocking_io/` with a strict Blockbuster
@@ -150,7 +147,7 @@ Blocking-IO runtime gate (`tests/blocking_io/`):
 Boundary check (harness → app import firewall):
 - `tests/test_harness_boundary.py` — ensures `packages/harness/deerflow/` never imports from `app.*`
 
-CI runs these regression tests for every pull request via [.github/workflows/backend-unit-tests.yml](../.github/workflows/backend-unit-tests.yml).
+These regression tests should be run locally with the backend test command before changes are committed.
 
 ## Architecture
 
@@ -441,7 +438,7 @@ Additional providers also live here (`boxlite`, `brave`, `browserless`, `crawl4a
 
 - **Location**: `deer-flow/skills/{public,custom}/`
 - **Format**: Directory with `SKILL.md` (YAML frontmatter: name, description, license, allowed-tools, required-secrets)
-- **Loading**: `load_skills()` recursively scans `skills/{public,custom}` for `SKILL.md`, parses metadata, and reads enabled state from extensions_config.json
+- **Loading**: `load_skills()` scans only direct child directories of `skills/{public,custom}` for `SKILL.md`, parses metadata, and reads enabled state from extensions_config.json. Nested `SKILL.md` files inside a skill package (including eval fixtures) are not registered as separate skills.
 - **Injection (legacy / default)**: Enabled skills are listed in the agent system prompt with full metadata and container paths (`<available_skills>` block). Controlled by `skills.deferred_discovery: false` (default).
 - **Deferred discovery** (`skills.deferred_discovery: true`): Skills are listed by name only in a compact `<skill_index>` block, keeping the system prompt prefix-cache friendly. The agent calls the `describe_skill` tool at runtime to fetch full metadata for skills it wants to use, then loads the SKILL.md via `read_file`. Two new modules support this path:
   - `skills/catalog.py` — `SkillCatalog` (immutable, searchable; query forms: `select:a,b`, `+prefix`, free-text regex); `select:` returns all requested skills without a result cap; other modes cap at `MAX_RESULTS=5`.
@@ -812,7 +809,7 @@ From the **project root** directory:
 make dev
 ```
 
-This starts all services and makes the application available at `http://localhost:2026`.
+This starts local Gateway and Frontend services and makes the application available at `http://localhost:3000`.
 
 **All startup modes:**
 
@@ -826,7 +823,11 @@ This starts all services and makes the application available at `http://localhos
 | **Stop** | `./scripts/serve.sh --stop`<br/>`make stop` | `./scripts/docker.sh stop`<br/>`make docker-stop` |
 | **Restart** | `./scripts/serve.sh --restart [flags]` | `./scripts/docker.sh restart` |
 
-**Nginx routing**:
+**Local routing**:
+- Browser → Frontend (3000)
+- Frontend/Next.js rewrites `/api/*` → Gateway API (8001)
+
+**Docker nginx routing**:
 - `/api/langgraph/*` → Gateway embedded runtime (8001), rewritten to `/api/*`
 - `/api/*` (other) → Gateway API (8001)
 - `/` (non-API) → Frontend (3000)
@@ -846,10 +847,10 @@ Direct access (without nginx):
 ### Frontend Configuration
 
 The frontend uses environment variables to connect to backend services:
-- `NEXT_PUBLIC_LANGGRAPH_BASE_URL` - Defaults to `/api/langgraph` (through nginx)
-- `NEXT_PUBLIC_BACKEND_BASE_URL` - Defaults to empty string (through nginx)
+- `NEXT_PUBLIC_LANGGRAPH_BASE_URL` - Defaults to `/api/langgraph` on the current frontend origin
+- `NEXT_PUBLIC_BACKEND_BASE_URL` - Defaults to empty string on the current frontend origin
 
-When using `make dev` from root, the frontend automatically connects through nginx.
+When using `make dev` from root, the frontend automatically connects through Next.js rewrites to the Gateway.
 
 ## Key Features
 

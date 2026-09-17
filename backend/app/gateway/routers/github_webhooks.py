@@ -317,7 +317,7 @@ async def receive_github_webhook(
             # Pull the operator-set default mention handle from the live
             # ``channels.github`` block so the dispatcher can use it as a
             # fallback when neither the trigger nor the agent's own
-            # ``github.bot_login`` declares one. CLAUDE.md documents this
+             # ``github.bot_login`` declares one. AGENTS.md documents this
             # field as the global default for ``require_mention`` triggers;
             # reading the live config (which tracks UI-driven flips via
             # ``configure_channel``) keeps the documented contract honest

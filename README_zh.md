@@ -1,6 +1,6 @@
 # 🦌 DeerFlow - 2.0
 
-[English](./README.md) | 中文 | [日本語](./README_ja.md) | [Français](./README_fr.md) | [Русский](./README_ru.md)
+[English](./README.md) | 中文
 
 [![Python](https://img.shields.io/badge/Python-3.12%2B-3776AB?logo=python&logoColor=white)](./backend/pyproject.toml)
 [![Node.js](https://img.shields.io/badge/Node.js-22%2B-339933?logo=node.js&logoColor=white)](./Makefile)
@@ -84,7 +84,7 @@ DeerFlow 新近集成了 BytePlus 自研的智能搜索与抓取工具集——[
 如果你在用 Claude Code、Codex、Cursor、Windsurf 或其他 coding agent，可以直接把下面这句话发给它：
 
 ```text
-如果还没 clone DeerFlow，就先 clone，然后按照 https://raw.githubusercontent.com/bytedance/deer-flow/main/Install.md 把它的本地开发环境初始化好
+如果还没 clone DeerFlow，就先 clone，然后按照 `README.md` 和 `backend/docs/SETUP.md` 初始化本地开发环境。
 ```
 
 这条提示词是给 coding agent 用的。它会在需要时先 clone 仓库，优先选择 Docker，完成初始化，并在结束时告诉你下一条启动命令，以及还缺哪些配置需要你补充。
@@ -244,7 +244,7 @@ make down   # 停止并移除容器
 
 访问地址：http://localhost:2026
 
-更完整的 Docker 开发说明见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+更完整的后端设置说明见 [backend/docs/SETUP.md](backend/docs/SETUP.md)。
 
 #### 方式二：本地开发
 
@@ -255,7 +255,7 @@ make down   # 停止并移除容器
 
 1. **检查依赖环境**：
    ```bash
-   make check  # 校验 Node.js 22+、pnpm、uv、nginx
+   make check  # 校验 Node.js 22+、pnpm、uv
    ```
 
 2. **安装依赖**：
@@ -274,7 +274,7 @@ make down   # 停止并移除容器
    make dev
    ```
 
-5. **访问地址**：http://localhost:2026
+5. **访问地址**：http://localhost:3000
 
 ### 进阶配置
 #### Sandbox 模式
@@ -715,8 +715,6 @@ DeerFlow 现在在 workspace 里内置了一个一等的定时任务（scheduled
 
 `deerflow` 是一个面向终端用户的工作台，**内嵌**运行在 `DeerFlowClient` 之上——无需启动 Gateway、前端、nginx 或 Docker，同时沿用与 DeerFlow 其它部分相同的 `config.yaml`、checkpointer、技能、记忆、MCP 和沙箱配置。
 
-![DeerFlow TUI](docs/tui/tui-preview.svg)
-
 ```bash
 uv pip install 'deerflow-harness[tui]'        # 可选的 'textual' 依赖
 
@@ -733,9 +731,9 @@ deerflow --json  "hello"                       # 无头模式，输出按行分�
 
 ## 文档
 
-- [贡献指南](CONTRIBUTING.md) - 开发环境搭建与协作流程
+- [开发指南](AGENTS.md) - 开发环境搭建与协作流程
 - [配置指南](backend/docs/CONFIGURATION.md) - 安装与配置说明
-- [架构概览](backend/CLAUDE.md) - 技术架构说明
+- [架构概览](backend/AGENTS.md) - 技术架构说明
 - [后端架构](backend/README.md) - 后端架构与 API 参考
 
 ## ⚠️ 安全使用
@@ -758,7 +756,7 @@ DeerFlow 具备**系统指令执行、资源操作、业务逻辑调用**等关�
 
 ## 参与贡献
 
-欢迎参与贡献。开发环境、工作流和相关规范见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+欢迎参与贡献。开发环境、工作流和相关规范见 [AGENTS.md](AGENTS.md) 与 [backend/AGENTS.md](backend/AGENTS.md)。
 
 目前回归测试已经覆盖 Docker sandbox 模式识别，以及 `backend/tests/` 中 provisioner kubeconfig-path 处理相关测试。
 

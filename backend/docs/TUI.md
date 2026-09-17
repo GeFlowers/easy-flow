@@ -5,8 +5,6 @@
 services required — while honoring the same `config.yaml`, checkpointer, skills,
 memory, MCP, and sandbox settings as the rest of DeerFlow.
 
-![DeerFlow TUI](../../docs/tui/tui-preview.svg)
-
 ## Install & run
 
 The TUI ships as an optional extra so the core harness install stays lean:

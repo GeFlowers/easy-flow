@@ -145,7 +145,7 @@ def _gather_agent_signature() -> tuple[_Signature, list[tuple[str, str]]]:
             discovered.append((user_id, entry.name))
             seen.add((user_id, entry.name))
 
-    # Legacy shared layout: {base_dir}/agents/{name}/. CLAUDE.md commits
+    # Legacy shared layout: {base_dir}/agents/{name}/. AGENTS.md documents
     # to this as a read-only fallback for unmigrated installs, and
     # load_agent_config() / list_custom_agents() honour it — the webhook
     # path must too, or an unmigrated install with a ``github:`` block on

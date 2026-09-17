@@ -8,7 +8,7 @@ DeerFlow is a LangGraph-based AI super agent with sandbox execution, persistent 
 
 ```
                         ┌──────────────────────────────────────┐
-                        │          Nginx (Port 2026)           │
+                        │   Docker Nginx (Port 2026)           │
                         │      Unified reverse proxy           │
                         └───────┬──────────────────┬───────────┘
                                 │
@@ -29,7 +29,7 @@ DeerFlow is a LangGraph-based AI super agent with sandbox execution, persistent 
                └────────────────────────────────────────┘
 ```
 
-**Request Routing** (via Nginx):
+**Request Routing** (via Docker Nginx):
 - `/api/langgraph/*` → Gateway LangGraph-compatible API - agent interactions, threads, streaming
 - `/api/*` (other) → Gateway API - models, MCP, skills, memory, artifacts, uploads, thread-local cleanup
 - `/` (non-API) → Frontend - Next.js web interface
@@ -192,10 +192,10 @@ export OPENAI_API_KEY="your-api-key-here"
 **Full Application** (from project root):
 
 ```bash
-make dev  # Starts Gateway + Frontend + Nginx
+make dev  # Starts Gateway + Frontend locally
 ```
 
-Access at: http://localhost:2026
+Access at: http://localhost:3000
 
 **Backend Only** (from backend directory):
 
@@ -441,7 +441,7 @@ and switch raw `op.add_column` / `op.drop_column` calls to the idempotent
 helpers in `migrations/_helpers.py` before committing. There is no
 `make migrate` / `make migrate-stamp` target on purpose — Gateway startup is
 the only execution path, which keeps operational mistakes off the table. See
-`backend/CLAUDE.md` (Schema Migrations) for the full design.
+`backend/AGENTS.md` (Schema Migrations) for the full design.
 
 ### Code Style
 
@@ -502,4 +502,4 @@ See the [LICENSE](../LICENSE) file in the project root.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines.
+See [backend/AGENTS.md](AGENTS.md) for development guidelines.
