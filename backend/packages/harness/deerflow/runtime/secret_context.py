@@ -1,6 +1,6 @@
-"""定义 secret_context 模块提供的职责与可复用接口。
+"""
 
-Request-scoped secret carrier in the run context (issue #3861).
+请求范围：secret carrier in the run context (issue #3861).
 
 Callers pass per-request secrets out-of-band in ``config.context.secrets`` — a
 mapping of name -> value. The value never enters the prompt, tool arguments, or
@@ -29,16 +29,15 @@ ACTIVE_SECRETS_CONTEXT_KEY = "__active_skill_secrets"
 
 
 def _string_pairs(raw: Any) -> dict[str, str]:
-    "执行 _string_pairs 的明确职责，并返回与调用约定一致的结果"
     if not isinstance(raw, dict):
         return {}
     return {key: value for key, value in raw.items() if isinstance(key, str) and isinstance(value, str)}
 
 
 def extract_request_secrets(context: Any) -> dict[str, str]:
-    """执行 extract_request_secrets 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Return the caller-supplied request-scoped secrets mapping, or ``{}``.
+    返回：the caller-supplied request-scoped secrets mapping, or ``{}``.
 
         Only string-keyed, string-valued entries are kept; anything else is ignored
         so a malformed carrier can never crash secret resolution or injection.
@@ -49,9 +48,9 @@ def extract_request_secrets(context: Any) -> dict[str, str]:
 
 
 def read_active_secrets(context: Any) -> dict[str, str]:
-    """执行 read_active_secrets 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Return the secrets resolved for the active skill (the per-run injection
+    返回：the secrets resolved for the active skill (the per-run injection
         set), or ``{}``. Read by the bash tool to build the subprocess env."""
     if not isinstance(context, dict):
         return {}
@@ -90,9 +89,9 @@ REDACTED_CONTEXT_KEYS = frozenset(
 
 
 def redact_secret_context_keys(context: Any) -> Any:
-    """执行 redact_secret_context_keys 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Return a shallow copy of ``context`` with secret-bearing keys removed.
+    返回：a shallow copy of ``context`` with secret-bearing keys removed.
 
         Defensive helper for any code path that serializes the run context into an
         observable surface. DeerFlow's own trace-metadata builder never copies the
@@ -105,9 +104,9 @@ def redact_secret_context_keys(context: Any) -> Any:
 
 
 def redact_config_secrets(config: Any) -> Any:
-    """执行 redact_config_secrets 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Return a copy of a run config safe to persist or echo back to clients.
+    返回：a copy of a run config safe to persist or echo back to clients.
 
         The request config (``body.config``) is stored verbatim on the run record
         (``runs.kwargs_json``) and echoed by the run API. Strip the secret-bearing

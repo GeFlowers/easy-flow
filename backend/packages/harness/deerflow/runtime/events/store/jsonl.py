@@ -1,4 +1,4 @@
-"""定义 jsonl 模块提供的职责与可复用接口。
+"""
 
 JSONL file-backed RunEventStore implementation.
 
@@ -41,45 +41,39 @@ _SAFE_ID_PATTERN = re.compile(r"^[A-Za-z0-9_\-]+$")
 
 
 class JsonlRunEventStore(RunEventStore):
-    "封装 JsonlRunEventStore 的状态、协作关系与公开操作"
 
     def __init__(self, base_dir: str | Path | None = None):
-        "实现 __init__ 协议方法，保持对象交互语义一致"
         self._base_dir = Path(base_dir) if base_dir else Path(".deer-flow")
         self._seq_counters: dict[str, int] = {}  # thread_id -> current max seq
         # Per-thread asyncio.Lock — serialises concurrent writes within one process.
         self._write_locks: dict[str, asyncio.Lock] = {}
 
     def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
-        "执行 _get_write_lock 的明确职责，并返回与调用约定一致的结果"
         return self._write_locks.setdefault(thread_id, asyncio.Lock())
 
     @staticmethod
     def _validate_id(value: str, label: str) -> str:
-        """执行 _validate_id 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Validate that an ID is safe for use in filesystem paths."""
+        校验：that an ID is safe for use in filesystem paths."""
         if not value or not _SAFE_ID_PATTERN.match(value):
             raise ValueError(f"Invalid {label}: must be alphanumeric/dash/underscore, got {value!r}")
         return value
 
     def _thread_dir(self, thread_id: str) -> Path:
-        "执行 _thread_dir 的明确职责，并返回与调用约定一致的结果"
         self._validate_id(thread_id, "thread_id")
         return self._base_dir / "threads" / thread_id / "runs"
 
     def _run_file(self, thread_id: str, run_id: str) -> Path:
-        "执行 _run_file 的明确职责，并返回与调用约定一致的结果"
         self._validate_id(run_id, "run_id")
         return self._thread_dir(thread_id) / f"{run_id}.jsonl"
 
     def _next_seq(self, thread_id: str) -> int:
-        "执行 _next_seq 的明确职责，并返回与调用约定一致的结果"
         self._seq_counters[thread_id] = self._seq_counters.get(thread_id, 0) + 1
         return self._seq_counters[thread_id]
 
     def _compute_max_seq(self, thread_id: str) -> int:
-        """执行 _compute_max_seq 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Scan all run files for a thread and return the current max seq (blocking I/O)."""
         max_seq = 0
@@ -95,25 +89,24 @@ class JsonlRunEventStore(RunEventStore):
         return max_seq
 
     async def _ensure_seq_loaded(self, thread_id: str) -> None:
-        """执行 _ensure_seq_loaded 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Load max seq from existing files into the in-memory counter (non-blocking)."""
+        加载：max seq from existing files into the in-memory counter (non-blocking)."""
         if thread_id in self._seq_counters:
             return
         max_seq = await asyncio.to_thread(self._compute_max_seq, thread_id)
         self._seq_counters[thread_id] = max_seq
 
     def _write_record(self, record: dict) -> None:
-        "执行 _write_record 的明确职责，并返回与调用约定一致的结果"
         path = self._run_file(record["thread_id"], record["run_id"])
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "a", encoding="utf-8") as f:
             f.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
 
     def _read_thread_events(self, thread_id: str) -> list[dict]:
-        """执行 _read_thread_events 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Read all events for a thread, sorted by seq (blocking I/O)."""
+        读取：all events for a thread, sorted by seq (blocking I/O)."""
         events = []
         thread_dir = self._thread_dir(thread_id)
         if not thread_dir.exists():
@@ -130,9 +123,9 @@ class JsonlRunEventStore(RunEventStore):
         return events
 
     def _read_run_events(self, thread_id: str, run_id: str) -> list[dict]:
-        """执行 _read_run_events 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Read events for a specific run file (blocking I/O)."""
+        读取：events for a specific run file (blocking I/O)."""
         path = self._run_file(thread_id, run_id)
         if not path.exists():
             return []
@@ -148,20 +141,17 @@ class JsonlRunEventStore(RunEventStore):
         return events
 
     def _delete_thread_files(self, thread_id: str) -> None:
-        "执行 _delete_thread_files 的明确职责，并返回与调用约定一致的结果"
         thread_dir = self._thread_dir(thread_id)
         if thread_dir.exists():
             for f in thread_dir.glob("*.jsonl"):
                 f.unlink()
 
     def _delete_run_file(self, thread_id: str, run_id: str) -> None:
-        "执行 _delete_run_file 的明确职责，并返回与调用约定一致的结果"
         path = self._run_file(thread_id, run_id)
         if path.exists():
             path.unlink()
 
     async def put(self, *, thread_id, run_id, event_type, category, content="", metadata=None, created_at=None):
-        "执行 put 的明确职责，并返回与调用约定一致的结果"
         async with self._get_write_lock(thread_id):
             await self._ensure_seq_loaded(thread_id)
             seq = self._next_seq(thread_id)
@@ -179,9 +169,9 @@ class JsonlRunEventStore(RunEventStore):
             return record
 
     async def put_batch(self, events):
-        """执行 put_batch 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Persist a batch of events atomically per-thread.
+        持久化：a batch of events atomically per-thread.
 
                 All seq numbers for the batch are reserved under a single per-thread
                 write lock and every record is appended in one file write so a
@@ -204,7 +194,6 @@ class JsonlRunEventStore(RunEventStore):
         return results
 
     async def _write_batch_async(self, thread_id: str, batch: list[dict[str, Any]]) -> list[dict[str, Any]]:
-        "执行 _write_batch_async 的明确职责，并返回与调用约定一致的结果"
         async with self._get_write_lock(thread_id):
             await self._ensure_seq_loaded(thread_id)
             records: list[dict[str, Any]] = []
@@ -228,14 +217,12 @@ class JsonlRunEventStore(RunEventStore):
             return records
 
     def _append_records(self, path: Path, records: list[dict[str, Any]]) -> None:
-        "执行 _append_records 的明确职责，并返回与调用约定一致的结果"
         path.parent.mkdir(parents=True, exist_ok=True)
         lines = "".join(json.dumps(r, default=str, ensure_ascii=False) + "\n" for r in records)
         with open(path, "a", encoding="utf-8") as f:
             f.write(lines)
 
     async def list_messages(self, thread_id, *, limit=50, before_seq=None, after_seq=None, user_id: str | None | _AutoSentinel = AUTO):
-        "收集并返回，并遵守 list_messages 所表达的接口约束"
         all_events = await asyncio.to_thread(self._read_thread_events, thread_id)
         messages = [e for e in all_events if e.get("category") == "message"]
 
@@ -249,7 +236,6 @@ class JsonlRunEventStore(RunEventStore):
             return messages[-limit:]
 
     async def list_events(self, thread_id, run_id, *, event_types=None, task_id=None, limit=500, after_seq=None):
-        "收集并返回，并遵守 list_events 所表达的接口约束"
         events = await asyncio.to_thread(self._read_run_events, thread_id, run_id)
         if event_types is not None:
             events = [e for e in events if e.get("event_type") in event_types]
@@ -260,7 +246,6 @@ class JsonlRunEventStore(RunEventStore):
         return events[:limit]
 
     async def list_messages_by_run(self, thread_id, run_id, *, limit=50, before_seq=None, after_seq=None):
-        "收集并返回，并遵守 list_messages_by_run 所表达的接口约束"
         events = await asyncio.to_thread(self._read_run_events, thread_id, run_id)
         filtered = [e for e in events if e.get("category") == "message"]
         if before_seq is not None:
@@ -273,10 +258,8 @@ class JsonlRunEventStore(RunEventStore):
             return filtered[-limit:] if len(filtered) > limit else filtered
 
     async def get_last_visible_ai_seq_by_run(self, thread_id, run_ids, *, user_id: str | None | _AutoSentinel = AUTO):
-        "读取并返回，并遵守 get_last_visible_ai_seq_by_run 所表达的接口约束"
 
         def _scan() -> dict[str, int]:
-            "执行 _scan 的明确职责，并返回与调用约定一致的结果"
             result: dict[str, int] = {}
             for run_id in run_ids:
                 for event in reversed(self._read_run_events(thread_id, run_id)):
@@ -289,12 +272,10 @@ class JsonlRunEventStore(RunEventStore):
         return await asyncio.to_thread(_scan)
 
     async def count_messages(self, thread_id):
-        "执行 count_messages 的明确职责，并返回与调用约定一致的结果"
         all_events = await asyncio.to_thread(self._read_thread_events, thread_id)
         return sum(1 for e in all_events if e.get("category") == "message")
 
     async def delete_by_thread(self, thread_id):
-        "删除目标资源并返回操作结果，并遵守 delete_by_thread 所表达的接口约束"
         async with self._get_write_lock(thread_id):
             all_events = await asyncio.to_thread(self._read_thread_events, thread_id)
             count = len(all_events)
@@ -308,7 +289,6 @@ class JsonlRunEventStore(RunEventStore):
             return count
 
     async def delete_by_run(self, thread_id, run_id):
-        "删除目标资源并返回操作结果，并遵守 delete_by_run 所表达的接口约束"
         async with self._get_write_lock(thread_id):
             events = await asyncio.to_thread(self._read_run_events, thread_id, run_id)
             count = len(events)

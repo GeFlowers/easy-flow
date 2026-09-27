@@ -1,4 +1,4 @@
-"""定义 __init__ 模块提供的职责与可复用接口。
+"""
 
 LangGraph-compatible runtime — runs, streaming, and lifecycle management.
 

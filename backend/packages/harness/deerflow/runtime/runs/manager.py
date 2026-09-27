@@ -1,6 +1,6 @@
-"""定义 manager 模块提供的职责与可复用接口。
+"""
 
-In-memory run registry with optional persistent RunStore backing."""
+内存实现：run registry with optional persistent RunStore backing."""
 
 from __future__ import annotations
 
@@ -48,16 +48,16 @@ _SQLITE_UNIQUE_ERRORCODE = sqlite3.SQLITE_CONSTRAINT_UNIQUE
 
 
 def _generate_worker_id() -> str:
-    """执行 _generate_worker_id 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Generate a unique worker identifier: ``hostname:hex_uuid``."""
+    生成：a unique worker identifier: ``hostname:hex_uuid``."""
     return f"{socket.gethostname()}:{uuid.uuid4().hex}"
 
 
 def _is_unique_violation(exc: BaseException) -> bool:
-    """执行 _is_unique_violation 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Return True when *exc* (or its cause chain) is a unique-constraint violation.
+    返回：True when *exc* (or its cause chain) is a unique-constraint violation.
 
         SQLAlchemy wraps the driver's IntegrityError; the wrapped driver exception is
         reachable via ``exc.orig`` (and ``__cause__`` / ``__context__``). Prefer
@@ -112,9 +112,9 @@ def _is_unique_violation(exc: BaseException) -> bool:
 
 
 def _is_retryable_persistence_error(exc: BaseException) -> bool:
-    """执行 _is_retryable_persistence_error 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Return True for transient SQLite persistence failures.
+    返回：True for transient SQLite persistence failures.
 
         SQLite lock contention normally surfaces through either sqlite3 exceptions
         or SQLAlchemy wrappers.  The short bounded retry here protects run status
@@ -145,7 +145,7 @@ def _is_retryable_persistence_error(exc: BaseException) -> bool:
 
 @dataclass(frozen=True)
 class PersistenceRetryPolicy:
-    """封装 PersistenceRetryPolicy 的状态、协作关系与公开操作。
+    """
 
     Bounded retry policy for short run-store writes."""
 
@@ -157,7 +157,7 @@ class PersistenceRetryPolicy:
 
 @dataclass
 class RunRecord:
-    """封装 RunRecord 的状态、协作关系与公开操作。
+    """
 
     Mutable record for a single run."""
 
@@ -197,9 +197,9 @@ class RunRecord:
 
 
 class RunManager:
-    """封装 RunManager 的状态、协作关系与公开操作。
+    """
 
-    In-memory run registry with optional persistent RunStore backing.
+    内存实现：run registry with optional persistent RunStore backing.
 
         All mutations are protected by an asyncio lock. When a ``store`` is
         provided, serializable metadata is also persisted to the store so
@@ -214,7 +214,6 @@ class RunManager:
         worker_id: str | None = None,
         run_ownership_config: RunOwnershipConfig | None = None,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
         self._runs: dict[str, RunRecord] = {}
         # Secondary index: thread_id -> insertion-ordered run_id set (a dict is
         # used as an ordered set), maintained in lockstep with ``_runs`` so
@@ -230,13 +229,13 @@ class RunManager:
         self._heartbeat_stop: asyncio.Event | None = None
 
     def _index_run_locked(self, record: RunRecord) -> None:
-        """执行 _index_run_locked 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Register *record* in the thread index. Caller must hold ``self._lock``."""
         self._runs_by_thread.setdefault(record.thread_id, {})[record.run_id] = None
 
     def _unindex_run_locked(self, run_id: str, thread_id: str) -> None:
-        """执行 _unindex_run_locked 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Drop *run_id* from the thread index. Caller must hold ``self._lock``."""
         bucket = self._runs_by_thread.get(thread_id)
@@ -246,9 +245,9 @@ class RunManager:
                 self._runs_by_thread.pop(thread_id, None)
 
     def _thread_records_locked(self, thread_id: str) -> list[RunRecord]:
-        """执行 _thread_records_locked 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Return live in-memory records for *thread_id*. Caller must hold ``self._lock``.
+        返回：live in-memory records for *thread_id*. Caller must hold ``self._lock``.
 
                 Uses the ``_runs_by_thread`` index for O(runs-in-thread) lookup instead of
                 scanning every in-memory run. Correctness rests on the index and ``_runs``
@@ -267,7 +266,6 @@ class RunManager:
 
     @staticmethod
     def _store_put_payload(record: RunRecord, *, error: str | None = None, stop_reason: str | None = None) -> dict[str, Any]:
-        "执行 _store_put_payload 的明确职责，并返回与调用约定一致的结果"
         payload = {
             "thread_id": record.thread_id,
             "assistant_id": record.assistant_id,
@@ -293,7 +291,7 @@ class RunManager:
         run_id: str,
         operation: Callable[[], Awaitable[Any]],
     ) -> Any:
-        """执行 _call_store_with_retry 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Run a short store operation with bounded retries for SQLite pressure."""
         policy = self._persistence_retry_policy
@@ -320,7 +318,7 @@ class RunManager:
                 attempt += 1
 
     async def _persist_snapshot_to_store(self, run_id: str, payload: dict[str, Any]) -> bool:
-        """执行 _persist_snapshot_to_store 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Best-effort persist a previously captured run snapshot."""
         if self._store is None:
@@ -337,9 +335,9 @@ class RunManager:
             return False
 
     async def _persist_new_run_to_store(self, record: RunRecord) -> None:
-        """执行 _persist_new_run_to_store 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Persist a newly created run record to the backing store.
+        持久化：a newly created run record to the backing store.
 
                 Initial run creation is part of the run visibility boundary: callers
                 should not observe a run in memory unless its backing store row exists.
@@ -356,7 +354,7 @@ class RunManager:
         )
 
     async def _persist_to_store(self, record: RunRecord, *, error: str | None = None) -> bool:
-        """执行 _persist_to_store 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Best-effort persist run record to backing store."""
         return await self._persist_snapshot_to_store(
@@ -365,7 +363,7 @@ class RunManager:
         )
 
     async def _persist_status(self, record: RunRecord, status: RunStatus, *, error: str | None = None, stop_reason: str | None = None) -> bool:
-        """执行 _persist_status 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Best-effort persist a status transition to the backing store."""
         if self._store is None:
@@ -409,9 +407,9 @@ class RunManager:
 
     @staticmethod
     def _record_from_store(row: dict[str, Any]) -> RunRecord:
-        """执行 _record_from_store 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Build a read-only runtime record from a serialized store row.
+        构建：a read-only runtime record from a serialized store row.
 
                 NULL status/on_disconnect columns (e.g. from rows written before those
                 columns were added) default to ``pending`` and ``cancel`` respectively.
@@ -448,9 +446,9 @@ class RunManager:
         )
 
     async def update_run_completion(self, run_id: str, **kwargs) -> None:
-        """更新目标状态并返回最新结果，并遵守 update_run_completion 所表达的接口约束。
+        """
 
-        Persist token usage and completion data to the backing store."""
+        持久化：token usage and completion data to the backing store."""
         row_recovery_payload: dict[str, Any] | None = None
         async with self._lock:
             record = self._runs.get(run_id)
@@ -487,9 +485,9 @@ class RunManager:
             logger.warning("Failed to persist run completion for %s", run_id, exc_info=True)
 
     async def update_run_progress(self, run_id: str, **kwargs) -> None:
-        """更新目标状态并返回最新结果，并遵守 update_run_progress 所表达的接口约束。
+        """
 
-        Persist a running token/message snapshot without changing status."""
+        持久化：a running token/message snapshot without changing status."""
         should_persist = True
         async with self._lock:
             record = self._runs.get(run_id)
@@ -519,7 +517,7 @@ class RunManager:
     ) -> RunRecord:
         """创建并返回，并遵守 create 所表达的接口约束。
 
-        Create a new pending run and register it.
+        创建：a new pending run and register it.
 
                 Note: this method assumes no active run exists for the thread. It
                 persists via ``store.put`` (upsert) rather than the atomic
@@ -565,9 +563,9 @@ class RunManager:
         return record
 
     async def get(self, run_id: str, *, user_id: str | None = None) -> RunRecord | None:
-        """读取并返回，并遵守 get 所表达的接口约束。
+        """
 
-        Return a run record by ID, or ``None``.
+        返回：a run record by ID, or ``None``.
 
                 Args:
                     run_id: The run ID to look up.
@@ -599,20 +597,20 @@ class RunManager:
             return None
 
     async def aget(self, run_id: str, *, user_id: str | None = None) -> RunRecord | None:
-        """执行 aget 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Return a run record by ID, checking the persistent store as fallback.
+        返回：a run record by ID, checking the persistent store as fallback.
 
                 Alias for :meth:`get` for backward compatibility.
         """
         return await self.get(run_id, user_id=user_id)
 
     async def list_by_thread(self, thread_id: str, *, user_id: str | None = None, limit: int = 100) -> list[RunRecord]:
-        """收集并返回，并遵守 list_by_thread 所表达的接口约束。
+        """
 
-        Return runs for a given thread, newest first, at most ``limit`` records.
+        返回：runs for a given thread, newest first, at most ``limit`` records.
 
-                In-memory runs take precedence only when the same ``run_id`` exists in both
+                内存实现：runs take precedence only when the same ``run_id`` exists in both
                 memory and the backing store. The merged result is then sorted newest-first
                 by ``created_at`` and trimmed to ``limit`` (default 100).
 
@@ -647,9 +645,9 @@ class RunManager:
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> set[str]:
-        """收集并返回，并遵守 list_successful_regenerate_sources 所表达的接口约束。
+        """
 
-        Return all source runs superseded by successful regenerations.
+        返回：all source runs superseded by successful regenerations.
 
                 Unlike :meth:`list_by_thread`, this query is intentionally unbounded.
                 Current-process records override matching persisted status: a latest
@@ -682,7 +680,7 @@ class RunManager:
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict[str, RunRecord]:
-        """读取并返回，并遵守 get_many_by_thread 所表达的接口约束。
+        """
 
         Batch-load selected thread runs with in-memory records preferred."""
         if not run_ids:
@@ -711,7 +709,7 @@ class RunManager:
         return records_by_id
 
     async def set_status(self, run_id: str, status: RunStatus, *, error: str | None = None, stop_reason: str | None = None) -> None:
-        """执行 set_status 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Transition a run to a new status."""
         async with self._lock:
@@ -729,7 +727,7 @@ class RunManager:
         logger.info("Run %s -> %s", run_id, status.value)
 
     async def set_finalizing(self, run_id: str, finalizing: bool) -> None:
-        """执行 set_finalizing 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Mark whether a run is performing post-cancel cleanup."""
         async with self._lock:
@@ -747,7 +745,7 @@ class RunManager:
         *,
         poll_interval: float = 0.01,
     ) -> None:
-        """执行 wait_for_prior_finalizing 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Wait until older same-thread runs have finished post-cancel cleanup."""
         while True:
@@ -769,7 +767,7 @@ class RunManager:
     async def has_later_run(self, thread_id: str, run_id: str) -> bool:
         """判断目标是否具备指定特征并返回布尔结果，并遵守 has_later_run 所表达的接口约束。
 
-        Return whether a newer in-memory run has been admitted for the thread."""
+        返回：whether a newer in-memory run has been admitted for the thread."""
         async with self._lock:
             seen_current = False
             for record in self._thread_records_locked(thread_id):
@@ -783,7 +781,7 @@ class RunManager:
     async def has_later_started_run(self, thread_id: str, run_id: str) -> bool:
         """判断目标是否具备指定特征并返回布尔结果，并遵守 has_later_started_run 所表达的接口约束。
 
-        Return whether a newer same-thread run may have already advanced state."""
+        返回：whether a newer same-thread run may have already advanced state."""
         async with self._lock:
             seen_current = False
             for record in self._thread_records_locked(thread_id):
@@ -795,7 +793,7 @@ class RunManager:
         return False
 
     async def _persist_model_name(self, run_id: str, model_name: str | None) -> None:
-        """执行 _persist_model_name 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Best-effort persist model_name update to the backing store."""
         if self._store is None:
@@ -810,9 +808,9 @@ class RunManager:
             logger.warning("Failed to persist model_name update for run %s", run_id, exc_info=True)
 
     async def update_model_name(self, run_id: str, model_name: str | None) -> None:
-        """更新目标状态并返回最新结果，并遵守 update_model_name 所表达的接口约束。
+        """
 
-        Update the model name for a run."""
+        更新：the model name for a run."""
         async with self._lock:
             record = self._runs.get(run_id)
             if record is None:
@@ -824,7 +822,7 @@ class RunManager:
         logger.info("Run %s model_name=%s", run_id, model_name)
 
     async def cancel(self, run_id: str, *, action: str = "interrupt") -> CancelOutcome:
-        """执行 cancel 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Request cancellation of a run.
 
@@ -969,9 +967,9 @@ class RunManager:
         return CancelOutcome.lease_valid_elsewhere
 
     def _compute_lease_expires_at(self) -> str | None:
-        """执行 _compute_lease_expires_at 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Return the lease expiry ISO timestamp for a freshly created run.
+        返回：the lease expiry ISO timestamp for a freshly created run.
 
                 Returns ``None`` when heartbeat is disabled (single-worker mode) so
                 reconciliation treats crashed runs as orphans (NULL lease) and
@@ -1161,7 +1159,7 @@ class RunManager:
         error: str,
         before: str | None = None,
     ) -> list[RunRecord]:
-        """执行 reconcile_orphaned_inflight_runs 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Mark persisted active runs as failed when their lease has expired.
 
@@ -1218,12 +1216,12 @@ class RunManager:
     async def has_inflight(self, thread_id: str) -> bool:
         """判断目标是否具备指定特征并返回布尔结果，并遵守 has_inflight 所表达的接口约束。
 
-        Return ``True`` if *thread_id* has a pending or running run."""
+        返回：``True`` if *thread_id* has a pending or running run."""
         async with self._lock:
             return any(r.status in (RunStatus.pending, RunStatus.running) or r.finalizing for r in self._thread_records_locked(thread_id))
 
     async def cleanup(self, run_id: str, *, delay: float = 300) -> None:
-        """执行 cleanup 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Remove a run record after an optional delay."""
         if delay > 0:
@@ -1240,25 +1238,25 @@ class RunManager:
 
     @property
     def worker_id(self) -> str:
-        """执行 worker_id 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Return this worker's unique identifier."""
+        返回：this worker's unique identifier."""
         return self._worker_id
 
     @property
     def heartbeat_enabled(self) -> bool:
-        """执行 heartbeat_enabled 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Return ``True`` when the heartbeat background task should run."""
+        返回：``True`` when the heartbeat background task should run."""
         if self._run_ownership_config is None:
             return False
         return self._run_ownership_config.heartbeat_enabled
 
     @property
     def grace_seconds(self) -> int:
-        """执行 grace_seconds 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Return the configured grace seconds.
+        返回：the configured grace seconds.
 
                 All current callers are downstream of ``heartbeat_enabled``, which
                 is False whenever ``_run_ownership_config`` is None.  The fallback
@@ -1268,7 +1266,7 @@ class RunManager:
         return self._run_ownership_config.grace_seconds if self._run_ownership_config else 10
 
     async def start_heartbeat(self) -> None:
-        """执行 start_heartbeat 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Start the background lease-renewal task.
 
@@ -1285,7 +1283,7 @@ class RunManager:
         logger.info("Run lease heartbeat started for worker %s", self._worker_id)
 
     async def stop_heartbeat(self) -> None:
-        """执行 stop_heartbeat 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Stop the background heartbeat task."""
         if self._heartbeat_stop is not None:
@@ -1306,7 +1304,7 @@ class RunManager:
         logger.info("Run lease heartbeat stopped for worker %s", self._worker_id)
 
     async def _heartbeat_loop(self) -> None:
-        """执行 _heartbeat_loop 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Periodically renew leases and reclaim orphaned runs from dead peers.
 
@@ -1352,7 +1350,7 @@ class RunManager:
                     logger.warning("Periodic orphan reconciliation failed", exc_info=True)
 
     async def _renew_leases(self) -> None:
-        """执行 _renew_leases 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Renew the lease on every locally-owned active run."""
         if self._store is None or self._run_ownership_config is None:
@@ -1412,7 +1410,7 @@ class RunManager:
                 logger.warning("Failed to renew lease for run %s", run_id, exc_info=True)
 
     async def _reconcile_orphans_periodic(self) -> None:
-        """执行 _reconcile_orphans_periodic 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Sweep for expired leases owned by dead peers.
 
@@ -1429,7 +1427,7 @@ class RunManager:
             )
 
     async def shutdown(self, *, timeout: float = 5.0) -> None:
-        """执行 shutdown 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Cancel and bounded-await all in-flight runs on process shutdown.
 
@@ -1527,7 +1525,7 @@ class RunManager:
 
 
 class CancelOutcome(StrEnum):
-    """封装 CancelOutcome 的状态、协作关系与公开操作。
+    """
 
     Result of a :meth:`RunManager.cancel` call."""
 
@@ -1540,12 +1538,12 @@ class CancelOutcome(StrEnum):
 
 
 class ConflictError(Exception):
-    """封装 ConflictError 的状态、协作关系与公开操作。
+    """
 
     Raised when multitask_strategy=reject and thread has inflight runs."""
 
 
 class UnsupportedStrategyError(Exception):
-    """封装 UnsupportedStrategyError 的状态、协作关系与公开操作。
+    """
 
     Raised when a multitask_strategy value is not yet implemented."""

@@ -5,8 +5,6 @@ import weakref
 
 from deerflow.sandbox.sandbox import Sandbox
 
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 _LockKey = tuple[str, str]
 _FILE_OPERATION_LOCKS: weakref.WeakValueDictionary[_LockKey, threading.Lock] = weakref.WeakValueDictionary()
 _FILE_OPERATION_LOCKS_GUARD = threading.Lock()

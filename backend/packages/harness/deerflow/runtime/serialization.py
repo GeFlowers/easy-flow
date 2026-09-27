@@ -1,6 +1,6 @@
-"""定义 serialization 模块提供的职责与可复用接口。
+"""
 
-Canonical serialization for LangChain / LangGraph objects.
+统一：serialization for LangChain / LangGraph objects.
 
 Provides a single source of truth for converting LangChain message
 objects, Pydantic models, and LangGraph state dicts into plain
@@ -16,7 +16,7 @@ from typing import Any
 
 
 def serialize_lc_object(obj: Any) -> Any:
-    """执行 serialize_lc_object 的明确职责，并返回与调用约定一致的结果。
+    """
 
     Recursively serialize a LangChain object to a JSON-serialisable dict."""
     if obj is None:
@@ -61,9 +61,9 @@ def serialize_lc_object(obj: Any) -> Any:
 
 
 def serialize_channel_values(channel_values: dict[str, Any]) -> dict[str, Any]:
-    """执行 serialize_channel_values 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Serialize channel values, stripping internal LangGraph keys.
+    序列化：channel values, stripping internal LangGraph keys.
 
         Only ``__pregel_*`` keys are removed — ``__interrupt__`` is deliberately
         preserved so the LangGraph SDK can detect interrupt events from values
@@ -78,7 +78,7 @@ def serialize_channel_values(channel_values: dict[str, Any]) -> dict[str, Any]:
 
 
 def strip_data_url_image_blocks(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """执行 strip_data_url_image_blocks 的明确职责，并返回与调用约定一致的结果。
+    """
 
     Remove ``data:``-scheme ``image_url`` blocks from *hide_from_ui* messages.
 
@@ -116,9 +116,9 @@ def strip_data_url_image_blocks(messages: list[dict[str, Any]]) -> list[dict[str
 
 
 def serialize_channel_values_for_api(channel_values: dict[str, Any]) -> dict[str, Any]:
-    """执行 serialize_channel_values_for_api 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Serialize channel values and strip base64 image data from messages.
+    序列化：channel values and strip base64 image data from messages.
 
         Convenience wrapper combining :func:`serialize_channel_values` with
         :func:`strip_data_url_image_blocks`.  Use this in all REST endpoints
@@ -132,9 +132,9 @@ def serialize_channel_values_for_api(channel_values: dict[str, Any]) -> dict[str
 
 
 def serialize_messages_tuple(obj: Any) -> Any:
-    """执行 serialize_messages_tuple 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Serialize a messages-mode tuple ``(chunk, metadata)``."""
+    序列化：a messages-mode tuple ``(chunk, metadata)``."""
     if isinstance(obj, tuple) and len(obj) == 2:
         chunk, metadata = obj
         return [serialize_lc_object(chunk), metadata if isinstance(metadata, dict) else {}]
@@ -142,9 +142,9 @@ def serialize_messages_tuple(obj: Any) -> Any:
 
 
 def serialize(obj: Any, *, mode: str = "") -> Any:
-    """执行 serialize 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Serialize LangChain objects with mode-specific handling.
+    序列化：LangChain objects with mode-specific handling.
 
         * ``messages`` — obj is ``(message_chunk, metadata_dict)``
         * ``values`` — obj is the full state dict; ``__pregel_*`` keys stripped and

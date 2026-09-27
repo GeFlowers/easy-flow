@@ -1,4 +1,4 @@
-"""定义 provider 模块提供的职责与可复用接口。
+"""
 
 Sync Store factory.
 
@@ -49,9 +49,9 @@ POSTGRES_CONN_REQUIRED = "checkpointer.connection_string is required for the pos
 
 
 def _resolve_store_config(app_config: AppConfig) -> CheckpointerConfig:
-    """执行 _resolve_store_config 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Resolve the Store backend from legacy or unified application config.
+    解析：the Store backend from legacy or unified application config.
 
         The legacy ``checkpointer`` section remains authoritative when present so
         Store and Checkpointer continue to use the same backend. Otherwise the
@@ -73,9 +73,9 @@ def _resolve_store_config(app_config: AppConfig) -> CheckpointerConfig:
 
 
 def _get_store_config() -> CheckpointerConfig:
-    """执行 _get_store_config 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Load Store config without holding the provider singleton lock."""
+    加载：Store config without holding the provider singleton lock."""
     ensure_config_loaded()
 
     # Preserve callers that initialise the legacy config singleton directly.
@@ -96,7 +96,7 @@ def _get_store_config() -> CheckpointerConfig:
 
 @contextlib.contextmanager
 def _sync_store_cm(config) -> Iterator[BaseStore]:
-    """执行 _sync_store_cm 的明确职责，并返回与调用约定一致的结果。
+    """
 
     Context manager that creates and tears down a sync Store.
 
@@ -154,9 +154,9 @@ _store_lock = threading.Lock()
 
 
 def get_store() -> BaseStore:
-    """读取并返回，并遵守 get_store 所表达的接口约束。
+    """
 
-    Return the global sync Store singleton, creating it on first call.
+    返回：the global sync Store singleton, creating it on first call.
 
         The legacy ``checkpointer`` section takes precedence when configured;
         otherwise the unified ``database`` section selects the backend.
@@ -186,9 +186,9 @@ def get_store() -> BaseStore:
 
 
 def reset_store() -> None:
-    """执行 reset_store 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Reset the sync singleton, forcing recreation on the next call.
+    重置：the sync singleton, forcing recreation on the next call.
 
         Closes any open backend connections and clears the cached instance.
         Useful in tests or after a configuration change.
@@ -211,9 +211,9 @@ def reset_store() -> None:
 
 @contextlib.contextmanager
 def store_context() -> Iterator[BaseStore]:
-    """执行 store_context 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Sync context manager that yields a Store and cleans up on exit.
+    同步上下文管理器： that yields a Store and cleans up on exit.
 
         Unlike :func:`get_store`, this does **not** cache the instance — each
         ``with`` block creates and destroys its own connection.  Use it in CLI

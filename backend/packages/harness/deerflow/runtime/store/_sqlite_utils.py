@@ -1,4 +1,4 @@
-"""定义 _sqlite_utils 模块提供的职责与可复用接口。
+"""
 
 Shared SQLite connection utilities for store and checkpointer providers."""
 
@@ -10,9 +10,9 @@ from deerflow.config.paths import resolve_path
 
 
 def resolve_sqlite_conn_str(raw: str) -> str:
-    """执行 resolve_sqlite_conn_str 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Return a SQLite connection string ready for use with store/checkpointer backends.
+    返回：a SQLite connection string ready for use with store/checkpointer backends.
 
         SQLite special strings (``":memory:"`` and ``file:`` URIs) are returned
         unchanged.  Plain filesystem paths — relative or absolute — are resolved
@@ -24,9 +24,9 @@ def resolve_sqlite_conn_str(raw: str) -> str:
 
 
 def ensure_sqlite_parent_dir(conn_str: str) -> None:
-    """执行 ensure_sqlite_parent_dir 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Create parent directory for a SQLite filesystem path.
+    创建：parent directory for a SQLite filesystem path.
 
         No-op for in-memory databases (``":memory:"``) and ``file:`` URIs.
     """

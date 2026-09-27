@@ -1,6 +1,6 @@
-"""定义 base 模块提供的职责与可复用接口。
+"""
 
-Abstract interface for run metadata storage.
+抽象：interface for run metadata storage.
 
 RunManager depends on this interface. The production implementation is
 ``RunRepository`` backed by SQLAlchemy ORM.
@@ -16,7 +16,6 @@ from typing import Any
 
 
 class RunStore(abc.ABC):
-    "封装 RunStore 的状态、协作关系与公开操作"
 
     @abc.abstractmethod
     async def put(
@@ -37,7 +36,6 @@ class RunStore(abc.ABC):
         owner_worker_id: str | None = None,
         lease_expires_at: str | None = None,
     ) -> None:
-        "执行 put 的明确职责，并返回与调用约定一致的结果"
         pass
 
     @abc.abstractmethod
@@ -47,7 +45,6 @@ class RunStore(abc.ABC):
         *,
         user_id: str | None = None,
     ) -> dict[str, Any] | None:
-        "读取并返回，并遵守 get 所表达的接口约束"
         pass
 
     @abc.abstractmethod
@@ -58,7 +55,6 @@ class RunStore(abc.ABC):
         user_id: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        "收集并返回，并遵守 list_by_thread 所表达的接口约束"
         pass
 
     async def list_successful_regenerate_sources(
@@ -67,9 +63,9 @@ class RunStore(abc.ABC):
         *,
         user_id: str | None = None,
     ) -> set[str]:
-        """收集并返回，并遵守 list_successful_regenerate_sources 所表达的接口约束。
+        """
 
-        Return source run IDs superseded by successful regenerations.
+        返回：source run IDs superseded by successful regenerations.
 
                 Implementations must inspect the complete thread and must not apply the
                 normal bounded run-list limit.
@@ -83,7 +79,7 @@ class RunStore(abc.ABC):
         *,
         user_id: str | None = None,
     ) -> dict[str, dict[str, Any]]:
-        """读取并返回，并遵守 get_many_by_thread 所表达的接口约束。
+        """
 
         Batch-load selected runs belonging to one thread."""
         raise NotImplementedError
@@ -97,9 +93,9 @@ class RunStore(abc.ABC):
         error: str | None = None,
         stop_reason: str | None = None,
     ) -> bool | None:
-        """更新目标状态并返回最新结果，并遵守 update_status 所表达的接口约束。
+        """
 
-        Update a run status.
+        更新：a run status.
 
                 Returns ``False`` when the store can prove no row was updated. Older or
                 lightweight stores may return ``None`` when they cannot report rowcount.
@@ -108,7 +104,6 @@ class RunStore(abc.ABC):
 
     @abc.abstractmethod
     async def delete(self, run_id: str) -> None:
-        "删除目标资源并返回操作结果，并遵守 delete 所表达的接口约束"
         pass
 
     @abc.abstractmethod
@@ -117,9 +112,9 @@ class RunStore(abc.ABC):
         run_id: str,
         model_name: str | None,
     ) -> None:
-        """更新目标状态并返回最新结果，并遵守 update_model_name 所表达的接口约束。
+        """
 
-        Update the model_name field for an existing run."""
+        更新：the model_name field for an existing run."""
         pass
 
     @abc.abstractmethod
@@ -141,9 +136,9 @@ class RunStore(abc.ABC):
         first_human_message: str | None = None,
         error: str | None = None,
     ) -> bool | None:
-        """更新目标状态并返回最新结果，并遵守 update_run_completion 所表达的接口约束。
+        """
 
-        Persist final completion fields.
+        持久化：final completion fields.
 
                 Returns ``False`` when the store can prove no row was updated.
         """
@@ -165,28 +160,27 @@ class RunStore(abc.ABC):
         last_ai_message: str | None = None,
         first_human_message: str | None = None,
     ) -> None:
-        """更新目标状态并返回最新结果，并遵守 update_run_progress 所表达的接口约束。
+        """
 
-        Persist a best-effort running snapshot without changing run status."""
+        持久化：a best-effort running snapshot without changing run status."""
         return None
 
     @abc.abstractmethod
     async def list_pending(self, *, before: str | None = None) -> list[dict[str, Any]]:
-        "收集并返回，并遵守 list_pending 所表达的接口约束"
         pass
 
     @abc.abstractmethod
     async def list_inflight(self, *, before: str | None = None) -> list[dict[str, Any]]:
-        """收集并返回，并遵守 list_inflight 所表达的接口约束。
+        """
 
-        Return persisted runs that are still ``pending`` or ``running``."""
+        返回：persisted runs that are still ``pending`` or ``running``."""
         pass
 
     @abc.abstractmethod
     async def aggregate_tokens_by_thread(self, thread_id: str, *, include_active: bool = False) -> dict[str, Any]:
-        """执行 aggregate_tokens_by_thread 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Aggregate token usage for completed runs in a thread.
+        聚合：token usage for completed runs in a thread.
 
                 Returns a dict with keys: total_tokens, total_input_tokens,
                 total_output_tokens, total_runs, by_model (model_name → {tokens, runs}),
@@ -202,7 +196,7 @@ class RunStore(abc.ABC):
         owner_worker_id: str,
         lease_expires_at: str,
     ) -> bool:
-        """更新目标状态并返回最新结果，并遵守 update_lease 所表达的接口约束。
+        """
 
         Renew the lease on an active run. Returns ``False`` when no row matched."""
         pass
@@ -215,7 +209,7 @@ class RunStore(abc.ABC):
         grace_seconds: int,
         error: str,
     ) -> bool:
-        """执行 claim_for_takeover 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Atomically mark an expired-lease active run as ``error``.
 
@@ -238,9 +232,9 @@ class RunStore(abc.ABC):
         before: str | None = None,
         grace_seconds: int = 10,
     ) -> list[dict[str, Any]]:
-        """收集并返回，并遵守 list_inflight_with_expired_lease 所表达的接口约束。
+        """
 
-        Return active runs whose lease has expired (or is NULL for pre-ownership rows)."""
+        返回：active runs whose lease has expired (or is NULL for pre-ownership rows)."""
         pass
 
     @abc.abstractmethod

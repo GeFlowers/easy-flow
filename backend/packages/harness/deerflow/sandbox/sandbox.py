@@ -5,14 +5,6 @@ from abc import ABC, abstractmethod
 
 from deerflow.sandbox.search import GrepMatch
 
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 _ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 

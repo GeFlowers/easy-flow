@@ -1,10 +1,8 @@
-"""定义 converters 模块提供的职责与可复用接口。
+"""
 
-Pure functions to convert LangChain message objects to OpenAI Chat Completions format.
-
-Utility for translating LangChain message types to OpenAI-compatible dicts.
-Not currently wired into RunJournal (which uses message.model_dump() directly),
-but available for consumers that need the OpenAI wire format.
+将 LangChain 消息对象转换为 OpenAI Chat Completions 格式的纯函数。
+当前 RunJournal 仍直接调用 message.model_dump()；本模块供需要 OpenAI
+线协议格式的调用方复用。
 """
 
 from __future__ import annotations
@@ -21,11 +19,11 @@ _ROLE_MAP = {
 
 
 def langchain_to_openai_message(message: Any) -> dict:
-    """执行 langchain_to_openai_message 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Convert a single LangChain BaseMessage to an OpenAI message dict.
+    将单个 LangChain BaseMessage 转换为 OpenAI 消息字典。
 
-        Handles:
+        支持以下消息类型：
         - HumanMessage → {"role": "user", "content": "..."}
         - AIMessage (text only) → {"role": "assistant", "content": "..."}
         - AIMessage (with tool_calls) → {"role": "assistant", "content": null, "tool_calls": [...]}
@@ -76,12 +74,12 @@ def langchain_to_openai_message(message: Any) -> dict:
 
 
 def _infer_finish_reason(message: Any) -> str:
-    """执行 _infer_finish_reason 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Infer OpenAI finish_reason from an AIMessage.
+    从 AIMessage 推断 OpenAI 的 finish_reason。
 
-        Returns "tool_calls" if tool_calls present, else looks in
-        response_metadata.finish_reason, else returns "stop".
+        存在 tool_calls 时返回 ``tool_calls``；否则读取
+        response_metadata.finish_reason，最终回退为 ``stop``。
     """
     tool_calls = getattr(message, "tool_calls", None) or []
     if tool_calls:
@@ -95,11 +93,11 @@ def _infer_finish_reason(message: Any) -> str:
 
 
 def langchain_to_openai_completion(message: Any) -> dict:
-    """执行 langchain_to_openai_completion 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Convert an AIMessage and its metadata to an OpenAI completion response dict.
+    将 AIMessage 及其元数据转换为 OpenAI completion 响应字典。
 
-        Returns:
+        返回结构：
             {
                 "id": message.id,
                 "model": message.response_metadata.get("model_name"),
@@ -140,7 +138,7 @@ def langchain_to_openai_completion(message: Any) -> dict:
 
 
 def langchain_messages_to_openai(messages: list) -> list[dict]:
-    """执行 langchain_messages_to_openai 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Convert a list of LangChain BaseMessages to OpenAI message dicts."""
+    将 LangChain BaseMessage 列表转换为 OpenAI 消息字典列表。"""
     return [langchain_to_openai_message(m) for m in messages]

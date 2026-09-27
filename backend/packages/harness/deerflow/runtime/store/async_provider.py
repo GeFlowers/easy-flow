@@ -1,4 +1,4 @@
-"""定义 async_provider 模块提供的职责与可复用接口。
+"""
 
 Async Store factory — backend mirrors runtime persistence configuration.
 
@@ -44,9 +44,9 @@ logger = logging.getLogger(__name__)
 
 @contextlib.asynccontextmanager
 async def _async_store(config) -> AsyncIterator[BaseStore]:
-    """执行 _async_store 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Async context manager that constructs and tears down a Store.
+    异步上下文管理器： that constructs and tears down a Store.
 
         The ``config`` argument is a :class:`deerflow.config.checkpointer_config.CheckpointerConfig`
         instance — the same object used by the checkpointer factory.
@@ -98,7 +98,7 @@ async def _async_store(config) -> AsyncIterator[BaseStore]:
 
 @contextlib.asynccontextmanager
 async def make_store(app_config: AppConfig | None = None) -> AsyncIterator[BaseStore]:
-    """构造并返回，并遵守 make_store 所表达的接口约束。
+    """
 
     Yield a Store selected from legacy or unified persistence config.
 

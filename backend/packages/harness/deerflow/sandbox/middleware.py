@@ -57,12 +57,10 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @override
     def before_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        # 中文说明：此处用于执行相关处理。
         """在同步智能体运行前按配置预先分配沙箱。"""
         if self._lazy_init:
             return super().before_agent(state, runtime)
 
-            # 中文说明：此处用于执行相关处理。
         if "sandbox" not in state or state["sandbox"] is None:
             thread_id = (runtime.context or {}).get("thread_id")
             if thread_id is None:
@@ -74,13 +72,10 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @override
     async def abefore_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        # 中文说明：此处用于执行相关处理。
         """在异步智能体运行前按配置预先分配沙箱。"""
         if self._lazy_init:
             return await super().abefore_agent(state, runtime)
 
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
         if "sandbox" not in state or state["sandbox"] is None:
             thread_id = (runtime.context or {}).get("thread_id")
             if thread_id is None:
@@ -106,7 +101,6 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             get_sandbox_provider().release(sandbox_id)
             return None
 
-            # 中文说明：此处用于执行相关处理。
         return super().after_agent(state, runtime)
 
     @override
@@ -125,22 +119,10 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             await self._release_sandbox_async(sandbox_id)
             return None
 
-            # 中文说明：此处用于执行相关处理。
         return await super().aafter_agent(state, runtime)
 
     # ------------------------------------------------------------------
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     #
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     # ------------------------------------------------------------------
 
     @staticmethod

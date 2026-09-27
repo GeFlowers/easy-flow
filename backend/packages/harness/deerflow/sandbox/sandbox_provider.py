@@ -40,35 +40,17 @@ class SandboxProvider(ABC):
 
 
 _default_sandbox_provider: SandboxProvider | None = None
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 #
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 _provider_lock = threading.Lock()
 
 
 def get_sandbox_provider(**kwargs) -> SandboxProvider:
     """按配置延迟创建并返回进程内共享的沙箱提供者。"""
     global _default_sandbox_provider
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     with _provider_lock:
         if _default_sandbox_provider is not None:
             return _default_sandbox_provider
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
     config = get_app_config()
     cls = resolve_class(config.sandbox.use, SandboxProvider)
     provider = cls(**kwargs)
@@ -77,13 +59,8 @@ def get_sandbox_provider(**kwargs) -> SandboxProvider:
         if _default_sandbox_provider is None:
             _default_sandbox_provider = provider
             return provider
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
         winner = _default_sandbox_provider
 
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
     if hasattr(provider, "shutdown"):
         provider.shutdown()
     return winner
@@ -92,8 +69,6 @@ def get_sandbox_provider(**kwargs) -> SandboxProvider:
 def reset_sandbox_provider() -> None:
     """清除共享提供者，并重置其内部状态以应用后续配置。"""
     global _default_sandbox_provider
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     with _provider_lock:
         provider = _default_sandbox_provider
         _default_sandbox_provider = None
@@ -104,8 +79,6 @@ def reset_sandbox_provider() -> None:
 def shutdown_sandbox_provider() -> None:
     """清除共享提供者，并在支持时关闭其持有的资源。"""
     global _default_sandbox_provider
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     with _provider_lock:
         provider = _default_sandbox_provider
         _default_sandbox_provider = None

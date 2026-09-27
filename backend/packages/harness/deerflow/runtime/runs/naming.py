@@ -1,4 +1,4 @@
-"""定义 naming 模块提供的职责与可复用接口。
+"""
 
 Run naming helpers for LangChain/LangSmith tracing."""
 

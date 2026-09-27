@@ -72,12 +72,6 @@ class GrepMatch:
     line: str
 
 
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 _EXACT_IGNORE_NAMES = frozenset(os.path.normcase(p) for p in IGNORE_PATTERNS if not any(c in p for c in "*?["))
 _GLOB_IGNORE_PATTERNS = [p for p in IGNORE_PATTERNS if any(c in p for c in "*?[")]
 _GLOB_IGNORE_RE = re.compile("|".join(fnmatch.translate(os.path.normcase(p)) for p in _GLOB_IGNORE_PATTERNS)) if _GLOB_IGNORE_PATTERNS else None
@@ -136,8 +130,6 @@ def find_glob_matches(root: Path, pattern: str, *, include_dirs: bool = False, m
 
     for current_root, dirs, files in os.walk(root):
         dirs[:] = [name for name in dirs if not should_ignore_name(name)]
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
         rel_dir = Path(current_root).relative_to(root)
 
         if include_dirs:
@@ -187,7 +179,6 @@ def find_grep_matches(
     flags = 0 if case_sensitive else re.IGNORECASE
     regex = re.compile(regex_source, flags)
 
-    # 中文说明：此处用于执行相关处理。
     _max_line_chars = line_summary_length * 10
 
     for current_root, dirs, files in os.walk(root):

@@ -1,4 +1,4 @@
-"""定义 async_provider 模块提供的职责与可复用接口。
+"""
 
 Async checkpointer factory.
 
@@ -39,23 +39,21 @@ logger = logging.getLogger(__name__)
 
 
 def _prepare_sqlite_checkpointer_path(raw: str) -> str:
-    "执行 _prepare_sqlite_checkpointer_path 的明确职责，并返回与调用约定一致的结果"
     conn_str = resolve_sqlite_conn_str(raw)
     ensure_sqlite_parent_dir(conn_str)
     return conn_str
 
 
 def _prepare_database_sqlite_checkpointer_path(db_config) -> str:
-    "执行 _prepare_database_sqlite_checkpointer_path 的明确职责，并返回与调用约定一致的结果"
     conn_str = db_config.checkpointer_sqlite_path
     ensure_sqlite_parent_dir(conn_str)
     return conn_str
 
 
 def _build_postgres_pool(conn_string: str):
-    """执行 _build_postgres_pool 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Build an AsyncConnectionPool with TCP keepalive and connection checking."""
+    构建：an AsyncConnectionPool with TCP keepalive and connection checking."""
     from psycopg.rows import dict_row
     from psycopg_pool import AsyncConnectionPool
 
@@ -75,7 +73,7 @@ def _build_postgres_pool(conn_string: str):
 
 
 def _ensure_postgres_imports():
-    """执行 _ensure_postgres_imports 的明确职责，并返回与调用约定一致的结果。
+    """
 
     Import and return (AsyncPostgresSaver, AsyncConnectionPool), raising ImportError on failure."""
     try:
@@ -98,9 +96,9 @@ def _ensure_postgres_imports():
 
 @contextlib.asynccontextmanager
 async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
-    """执行 _async_checkpointer 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Async context manager that constructs and tears down a checkpointer."""
+    异步上下文管理器： that constructs and tears down a checkpointer."""
     if config.type == "memory":
         from langgraph.checkpoint.memory import InMemorySaver
 
@@ -141,9 +139,9 @@ async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
 
 @contextlib.asynccontextmanager
 async def _async_checkpointer_from_database(db_config) -> AsyncIterator[Checkpointer]:
-    """执行 _async_checkpointer_from_database 的明确职责，并返回与调用约定一致的结果。
+    """
 
-    Async context manager that constructs a checkpointer from unified DatabaseConfig."""
+    异步上下文管理器： that constructs a checkpointer from unified DatabaseConfig."""
     if db_config.backend == "sqlite":
         try:
             from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -173,9 +171,9 @@ async def _async_checkpointer_from_database(db_config) -> AsyncIterator[Checkpoi
 
 @contextlib.asynccontextmanager
 async def make_checkpointer(app_config: AppConfig | None = None) -> AsyncIterator[Checkpointer]:
-    """构造并返回，并遵守 make_checkpointer 所表达的接口约束。
+    """
 
-    Async context manager that yields a checkpointer for the caller's lifetime.
+    异步上下文管理器： that yields a checkpointer for the caller's lifetime.
         Resources are opened on enter and closed on exit -- no global state::
 
             async with make_checkpointer(app_config) as checkpointer:

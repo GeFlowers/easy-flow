@@ -1,6 +1,6 @@
-"""定义 base 模块提供的职责与可复用接口。
+"""
 
-Abstract interface for run event storage.
+抽象：interface for run event storage.
 
 RunEventStore is the unified storage interface for run event streams.
 Messages (frontend display) and execution traces (debugging/audit) go
@@ -19,7 +19,7 @@ from deerflow.runtime.user_context import AUTO, _AutoSentinel
 
 
 class RunEventStore(abc.ABC):
-    """封装 RunEventStore 的状态、协作关系与公开操作。
+    """
 
     Run event stream storage interface.
 
@@ -43,13 +43,13 @@ class RunEventStore(abc.ABC):
         metadata: dict | None = None,
         created_at: str | None = None,
     ) -> dict:
-        """执行 put 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Write an event, auto-assign seq, return the complete record."""
+        写入：an event, auto-assign seq, return the complete record."""
 
     @abc.abstractmethod
     async def put_batch(self, events: list[dict]) -> list[dict]:
-        """执行 put_batch 的明确职责，并返回与调用约定一致的结果。
+        """
 
         Batch-write events. Used by RunJournal flush buffer.
 
@@ -67,9 +67,9 @@ class RunEventStore(abc.ABC):
         after_seq: int | None = None,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict]:
-        """收集并返回，并遵守 list_messages 所表达的接口约束。
+        """
 
-        Return displayable messages (category=message) for a thread, ordered by seq ascending.
+        返回：displayable messages (category=message) for a thread, ordered by seq ascending.
 
                 Supports bidirectional cursor pagination:
                 - before_seq: return the last ``limit`` records with seq < before_seq (ascending)
@@ -91,9 +91,9 @@ class RunEventStore(abc.ABC):
         limit: int = 500,
         after_seq: int | None = None,
     ) -> list[dict]:
-        """收集并返回，并遵守 list_events 所表达的接口约束。
+        """
 
-        Return the full event stream for a run, ordered by seq ascending.
+        返回：the full event stream for a run, ordered by seq ascending.
 
                 Optionally filter by ``event_types`` and/or ``task_id`` (matched against
                 ``metadata["task_id"]``). ``after_seq`` is a forward cursor returning the
@@ -112,9 +112,9 @@ class RunEventStore(abc.ABC):
         before_seq: int | None = None,
         after_seq: int | None = None,
     ) -> list[dict]:
-        """收集并返回，并遵守 list_messages_by_run 所表达的接口约束。
+        """
 
-        Return displayable messages (category=message) for a specific run, ordered by seq ascending.
+        返回：displayable messages (category=message) for a specific run, ordered by seq ascending.
 
                 Supports bidirectional cursor pagination:
                 - after_seq: return the first ``limit`` records with seq > after_seq (ascending)
@@ -130,9 +130,9 @@ class RunEventStore(abc.ABC):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict[str, int]:
-        """读取并返回，并遵守 get_last_visible_ai_seq_by_run 所表达的接口约束。
+        """
 
-        Return each run's last non-middleware AI message sequence.
+        返回：each run's last non-middleware AI message sequence.
 
                 ``user_id`` follows the same explicit-caller semantics as
                 :meth:`list_messages`.
@@ -140,18 +140,18 @@ class RunEventStore(abc.ABC):
 
     @abc.abstractmethod
     async def count_messages(self, thread_id: str) -> int:
-        """执行 count_messages 的明确职责，并返回与调用约定一致的结果。
+        """
 
-        Count displayable messages (category=message) in a thread."""
+        统计：displayable messages (category=message) in a thread."""
 
     @abc.abstractmethod
     async def delete_by_thread(self, thread_id: str) -> int:
-        """删除目标资源并返回操作结果，并遵守 delete_by_thread 所表达的接口约束。
+        """
 
-        Delete all events for a thread. Return the number of deleted events."""
+        删除：all events for a thread. Return the number of deleted events."""
 
     @abc.abstractmethod
     async def delete_by_run(self, thread_id: str, run_id: str) -> int:
-        """删除目标资源并返回操作结果，并遵守 delete_by_run 所表达的接口约束。
+        """
 
-        Delete all events for a specific run. Return the number of deleted events."""
+        删除：all events for a specific run. Return the number of deleted events."""
