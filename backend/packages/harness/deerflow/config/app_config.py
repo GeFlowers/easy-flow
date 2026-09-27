@@ -189,7 +189,7 @@ class AppConfig(BaseModel):
         default_factory=DatabaseConfig,
         description=format_field_description(
             "database",
-            field_doc="Unified database backend for run/feedback metadata (memory, sqlite, or postgres).",
+            field_doc="Unified database backend for run/feedback metadata (sqlite or postgres).",
         ),
     )
     run_events: RunEventsConfig = Field(

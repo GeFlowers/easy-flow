@@ -2,8 +2,8 @@
 
 自定义智能体按用户存储在 ``{base_dir}/users/{user_id}/agents/{name}/`` 下。
 为兼容用户隔离功能之前的安装，仍可读取 ``{base_dir}/agents/{name}/`` 中的旧版
-共享布局，直至执行 ``scripts/migrate_user_isolation.py`` 迁移脚本。所有新写入
-始终使用按用户划分的布局。
+共享布局，作为只读回退保留。仓库不再提供旧布局自动迁移脚本，所有新写入始终
+使用按用户划分的布局。
 """
 
 import logging

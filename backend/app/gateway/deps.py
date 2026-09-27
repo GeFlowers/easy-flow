@@ -242,32 +242,23 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
 
         # 初始化仓库，所有仓库共用一次 get_session_factory() 调用。
         sf = get_session_factory()
-        if sf is not None:
-            from deerflow.persistence.feedback import FeedbackRepository
-            from deerflow.persistence.run import RunRepository
+        if sf is None:
+            raise RuntimeError("Database persistence is unavailable; configure database.backend as sqlite or postgres.")
 
-            app.state.run_store = RunRepository(sf)
-            app.state.feedback_repo = FeedbackRepository(sf)
-        else:
-            from deerflow.runtime.runs.store.memory import MemoryRunStore
+        from deerflow.persistence.feedback import FeedbackRepository
+        from deerflow.persistence.run import RunRepository
 
-            app.state.run_store = MemoryRunStore()
-            app.state.feedback_repo = None
+        app.state.run_store = RunRepository(sf)
+        app.state.feedback_repo = FeedbackRepository(sf)
 
         from deerflow.persistence.thread_meta import make_thread_store
 
-        app.state.thread_store = make_thread_store(sf, app.state.store)
-        if sf is not None:
-            from deerflow.persistence.scheduled_task_runs import (
-                ScheduledTaskRunRepository,
-            )
-            from deerflow.persistence.scheduled_tasks import ScheduledTaskRepository
+        app.state.thread_store = make_thread_store(sf)
+        from deerflow.persistence.scheduled_task_runs import ScheduledTaskRunRepository
+        from deerflow.persistence.scheduled_tasks import ScheduledTaskRepository
 
-            app.state.scheduled_task_repo = ScheduledTaskRepository(sf)
-            app.state.scheduled_task_run_repo = ScheduledTaskRunRepository(sf)
-        else:
-            app.state.scheduled_task_repo = None
-            app.state.scheduled_task_run_repo = None
+        app.state.scheduled_task_repo = ScheduledTaskRepository(sf)
+        app.state.scheduled_task_run_repo = ScheduledTaskRunRepository(sf)
 
         # 运行事件存储及配套 ``run_events_config`` 都在启动时冻结，避免 get_run_context
         # 将刚重载的 AppConfig.run_events 与仍绑定旧后端的存储组合。

@@ -5,7 +5,6 @@ Async Store factory — backend mirrors runtime persistence configuration.
 The deprecated ``checkpointer`` section takes precedence when present;
 otherwise Store follows the unified ``database`` section in *config.yaml*:
 
-- ``memory``   → :class:`langgraph.store.memory.InMemoryStore`
 - ``sqlite``   → :class:`langgraph.store.sqlite.aio.AsyncSqliteStore`
 - ``postgres`` → :class:`langgraph.store.postgres.aio.AsyncPostgresStore`
 
@@ -110,8 +109,7 @@ async def make_store(app_config: AppConfig | None = None) -> AsyncIterator[BaseS
             async with make_store(app_config) as store:
                 app.state.store = store
 
-        An :class:`~langgraph.store.memory.InMemoryStore` is returned only when the
-        resolved backend is explicitly ``memory``.
+    The unified database configuration resolves to SQLite or PostgreSQL.
     """
     if app_config is None:
         app_config = get_app_config()

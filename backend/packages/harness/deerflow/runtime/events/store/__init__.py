@@ -15,7 +15,7 @@ def make_run_event_store(config=None) -> RunEventStore:
 
         sf = get_session_factory()
         if sf is None:
-            # database.backend=memory but run_events.backend=db -> fallback
+            # A SQL run-event store requires the configured database backend.
             return MemoryRunEventStore()
         from deerflow.runtime.events.store.db import DbRunEventStore
 

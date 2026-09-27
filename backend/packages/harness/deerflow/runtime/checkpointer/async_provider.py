@@ -5,7 +5,8 @@ Async checkpointer factory.
 Provides an **async context manager** for long-running async servers that need
 proper resource cleanup.
 
-Supported backends: memory, sqlite, postgres.
+Supported database backends: sqlite, postgres. The legacy standalone
+``checkpointer`` configuration may still select an in-process checkpointer.
 
 Usage (e.g. FastAPI lifespan)::
 
@@ -143,12 +144,6 @@ async def _async_checkpointer_from_database(db_config) -> AsyncIterator[Checkpoi
     """执行 _async_checkpointer_from_database 的明确职责，并返回与调用约定一致的结果。
 
     Async context manager that constructs a checkpointer from unified DatabaseConfig."""
-    if db_config.backend == "memory":
-        from langgraph.checkpoint.memory import InMemorySaver
-
-        yield InMemorySaver()
-        return
-
     if db_config.backend == "sqlite":
         try:
             from langgraph.checkpoint.sqlite.aio import AsyncSqliteSaver
@@ -205,7 +200,7 @@ async def make_checkpointer(app_config: AppConfig | None = None) -> AsyncIterato
 
     # Unified database config
     db_config = getattr(app_config, "database", None)
-    if db_config is not None and db_config.backend != "memory":
+    if db_config is not None:
         async with _async_checkpointer_from_database(db_config) as saver:
             yield saver
             return

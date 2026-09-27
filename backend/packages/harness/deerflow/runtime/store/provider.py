@@ -7,7 +7,8 @@ and the embedded :class:`~deerflow.client.DeerFlowClient`.
 
 The deprecated ``checkpointer`` section takes precedence when present;
 otherwise Store follows the unified ``database`` section. Supported backends:
-memory, sqlite, postgres.
+sqlite, postgres (with the legacy standalone checkpointer configuration also
+supporting an in-process store).
 
 Usage::
 
@@ -60,7 +61,7 @@ def _resolve_store_config(app_config: AppConfig) -> CheckpointerConfig:
         return app_config.checkpointer
 
     database = app_config.database
-    if database is None or database.backend == "memory":
+    if database is None:
         return CheckpointerConfig(type="memory")
     if database.backend == "sqlite":
         return CheckpointerConfig(type="sqlite", connection_string=database.checkpointer_sqlite_path)

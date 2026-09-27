@@ -5,7 +5,8 @@ Sync checkpointer factory.
 Provides a **sync singleton** and a **sync context manager** for LangGraph
 graph compilation and CLI tools.
 
-Supported backends: memory, sqlite, postgres.
+Supported database backends: sqlite, postgres. The legacy standalone
+``checkpointer`` configuration may still select an in-process checkpointer.
 
 Usage::
 
@@ -65,7 +66,7 @@ def _resolve_checkpointer_config(app_config: AppConfig) -> CheckpointerConfig:
         return app_config.checkpointer
 
     database = app_config.database
-    if database is None or database.backend == "memory":
+    if database is None:
         return CheckpointerConfig(type="memory")
     if database.backend == "sqlite":
         return CheckpointerConfig(type="sqlite", connection_string=database.checkpointer_sqlite_path)

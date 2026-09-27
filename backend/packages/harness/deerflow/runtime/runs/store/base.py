@@ -2,9 +2,8 @@
 
 Abstract interface for run metadata storage.
 
-RunManager depends on this interface. Implementations:
-- MemoryRunStore: in-memory dict (development, tests)
-- Future: RunRepository backed by SQLAlchemy ORM
+RunManager depends on this interface. The production implementation is
+``RunRepository`` backed by SQLAlchemy ORM.
 
 All methods accept an optional user_id for user isolation.
 When user_id is None, no user filtering is applied (single-user mode).

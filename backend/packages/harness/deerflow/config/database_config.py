@@ -11,9 +11,9 @@ from pydantic import BaseModel, Field
 class DatabaseConfig(BaseModel):
     """\u6267\u884c DatabaseConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
-    backend: Literal["memory", "sqlite", "postgres"] = Field(
-        default="memory",
-        description=("Storage backend for both checkpointer and application data. 'memory' for development (no persistence across restarts), 'sqlite' for single-node deployment, 'postgres' for production multi-node deployment."),
+    backend: Literal["sqlite", "postgres"] = Field(
+        default="sqlite",
+        description=("Storage backend for both checkpointer and application data. 'sqlite' for single-node deployment, 'postgres' for production multi-node deployment."),
     )
     sqlite_dir: str = Field(
         default=".deer-flow/data",

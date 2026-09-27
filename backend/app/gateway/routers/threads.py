@@ -799,7 +799,7 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
             thread_id=r["thread_id"],
             status=r.get("status", "idle"),
             # ``coerce_iso`` heals legacy unix-second values that
-            # ``MemoryThreadMetaStore`` historically wrote with ``time.time()``;
+            # Older thread metadata stores wrote with ``time.time()``;
             # SQL-backed rows already arrive as ISO strings and pass through.
             created_at=coerce_iso(r.get("created_at", "")),
             updated_at=coerce_iso(r.get("updated_at", "")),

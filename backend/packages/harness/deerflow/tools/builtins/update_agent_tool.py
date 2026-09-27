@@ -174,7 +174,7 @@ def update_agent(
     # a brand-new config.yaml/SOUL.md into the memory-only directory
     # instead of blocking (mirrors resolve_agent_dir's guard, see #3390).
     if not (agent_dir / "config.yaml").exists() and (legacy_dir / "config.yaml").exists():
-        return _err(f"Agent '{agent_name}' only exists in the legacy shared layout and is not scoped to a user. Run scripts/migrate_user_isolation.py to move legacy agents into the per-user layout before updating.")
+        return _err(f"Agent '{agent_name}' only exists in the legacy shared layout and is not scoped to a user; legacy agents are read-only and cannot be updated through this tool.")
 
     try:
         existing_cfg = load_agent_config(agent_name, user_id=user_id)

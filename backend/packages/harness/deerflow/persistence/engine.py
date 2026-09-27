@@ -52,10 +52,6 @@ async def init_engine(
     """执行当前持久化组件提供的操作。"""
     global _engine, _session_factory
 
-    if backend == "memory":
-        logger.info("Persistence backend=memory -- ORM engine not initialized")
-        return
-
     if backend == "postgres":
         try:
             import asyncpg  # noqa: F401
@@ -152,9 +148,6 @@ async def init_engine(
 
 async def init_engine_from_config(config) -> None:
     """执行当前持久化组件提供的操作。"""
-    if config.backend == "memory":
-        await init_engine("memory")
-        return
     await init_engine(
         backend=config.backend,
         url=config.app_sqlalchemy_url,

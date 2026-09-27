@@ -341,7 +341,7 @@ async def update_agent(name: str, request: AgentUpdateRequest) -> AgentResponse:
     if not (agent_dir / "config.yaml").exists() and (legacy_dir / "config.yaml").exists():
         raise HTTPException(
             status_code=409,
-            detail=(f"Agent '{name}' only exists in the legacy shared layout and is not scoped to a user. Run scripts/migrate_user_isolation.py to move legacy agents into the per-user layout before updating."),
+            detail=(f"Agent '{name}' only exists in the legacy shared layout and is not scoped to a user; legacy agents are read-only and cannot be updated through this API."),
         )
 
     try:
@@ -522,7 +522,7 @@ async def delete_agent(name: str) -> None:
     if outcome == "legacy":
         raise HTTPException(
             status_code=409,
-            detail=(f"Agent '{name}' only exists in the legacy shared layout and is not scoped to a user. Run scripts/migrate_user_isolation.py to move legacy agents into the per-user layout before deleting."),
+            detail=(f"Agent '{name}' only exists in the legacy shared layout and is not scoped to a user; legacy agents are read-only and cannot be deleted through this API."),
         )
     if outcome == "missing":
         raise HTTPException(status_code=404, detail=f"Agent '{name}' not found")

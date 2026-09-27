@@ -1585,7 +1585,6 @@ skill_evolution:
 # Unified storage backend for the LangGraph checkpointer, LangGraph Store,
 # and DeerFlow application data (runs, threads metadata, feedback, etc.).
 #
-# backend: memory  -- No persistence, data lost on restart
 # backend: sqlite  -- Single-node deployment, files in sqlite_dir
 # backend: postgres -- Production multi-node deployment
 #
@@ -1638,7 +1637,6 @@ database:
 # ============================================================================
 # Storage backend for run events (messages + execution traces).
 #
-# backend: memory  -- No persistence, data lost on restart (default)
 # backend: db      -- SQL database via ORM, full query capability (production)
 # backend: jsonl   -- Append-only JSONL files (lightweight single-node persistence)
 #

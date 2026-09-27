@@ -389,15 +389,7 @@ Gateway 内嵌 runtime 路径由 `AuthMiddleware` 和 `CSRFMiddleware` 保护。
 2. 操作者创建 admin。
 3. 后续启动时，`_ensure_admin_user()` 找到 admin，并把 LangGraph store 中缺少 `metadata.user_id` 的 thread 迁移到 admin。
 
-文件系统旧布局迁移由脚本处理：
-
-```bash
-cd backend
-PYTHONPATH=. python scripts/migrate_user_isolation.py --dry-run
-PYTHONPATH=. python scripts/migrate_user_isolation.py --user-id <target-user-id>
-```
-
-迁移脚本覆盖 legacy `memory.json`、`threads/` 和 `agents/` 到 per-user layout。
+文件系统旧布局目前仅作为只读回退保留；本仓库不再提供自动迁移脚本。
 
 ## 安全不变量
 
@@ -447,7 +439,6 @@ PYTHONPATH=. python scripts/migrate_user_isolation.py --user-id <target-user-id>
 | `deerflow/config/agents_config.py` | per-user custom agents |
 | `app/channels/manager.py` | IM channel 内部认证调用与 owner header |
 | `app/gateway/internal_auth.py` | Internal Auth header 常量、token 校验、合成用户 |
-| `scripts/migrate_user_isolation.py` | legacy 数据迁移到 per-user layout |
 | `.deer-flow/data/deerflow.db` | 统一 SQLite 数据库，包含 users / threads_meta / runs / feedback 等表 |
 | `.deer-flow/users/{user_id}/agents/{agent_name}/` | 用户自定义 agent 配置、SOUL 和 agent memory |
 | `.deer-flow/admin_initial_credentials.txt` | `reset_admin` 生成的新凭据文件（0600，读完应删除） |
