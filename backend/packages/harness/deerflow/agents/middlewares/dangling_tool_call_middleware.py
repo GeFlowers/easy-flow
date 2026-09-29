@@ -57,9 +57,7 @@ def _has_invalid_tool_name(name: object) -> bool:
 
 
 def _parse_json_object(value: object) -> dict | None:
-    """执行 _parse_json_object 的明确职责，并返回与调用约定一致的结果。
-
-    Parse a JSON-object string, returning None for other inputs."""
+    """将字符串解析为 JSON 对象；输入不是对象或解析失败时返回 ``None``。"""
     if not isinstance(value, str):
         return None
     try:
@@ -70,9 +68,7 @@ def _parse_json_object(value: object) -> dict | None:
 
 
 def _normalize_tool_arguments(arguments: object) -> str:
-    """执行 _normalize_tool_arguments 的明确职责，并返回与调用约定一致的结果。
-
-    Return a JSON-object string safe for OpenAI-compatible replay."""
+    """将工具参数规范为可回放的 JSON 对象字符串，无法安全序列化时使用空对象。"""
     if isinstance(arguments, dict):
         try:
             return json.dumps(arguments, ensure_ascii=False, allow_nan=False)
@@ -82,31 +78,11 @@ def _normalize_tool_arguments(arguments: object) -> str:
 
 
 class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
-    """封装 DanglingToolCallMiddleware 的状态、协作关系与公开操作。
-
-    Inserts placeholder ToolMessages for dangling tool calls and drops orphan
-        ToolMessages (tool results whose originating AIMessage tool_call is gone).
-
-        Scans the message history for:
-        - AIMessages whose tool_calls lack corresponding ToolMessages, and injects
-          synthetic error responses immediately after the offending AIMessage
-        - ToolMessages with no matching AIMessage tool_call (orphans), and drops
-          them so strict OpenAI-compatible backends do not reject the request
-    """
+    """修复消息历史中未配对的工具调用，并删除找不到原调用的孤立工具结果。"""
 
     @staticmethod
     def _message_tool_calls(msg) -> list[dict]:
-        """执行 _message_tool_calls 的明确职责，并返回与调用约定一致的结果。
-
-        Return normalized tool calls from structured fields or raw provider payloads.
-
-                LangChain stores malformed provider function calls in ``invalid_tool_calls``.
-                They do not execute, but provider adapters may still serialize enough of
-                the call id/name back into the next request that strict OpenAI-compatible
-                validators expect a matching ToolMessage. Treat them as dangling calls so
-                the next model request stays well-formed and the model sees a recoverable
-                tool error instead of another provider 400.
-        """
+        """合并消息结构字段和供应商原始载荷中的工具调用，并规范工具名称供配对检查。"""
         normalized: list[dict] = []
 
         tool_calls = getattr(msg, "tool_calls", None) or []

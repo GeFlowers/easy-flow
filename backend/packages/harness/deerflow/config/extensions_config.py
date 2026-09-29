@@ -164,8 +164,6 @@ class ExtensionsConfig(BaseModel):
             ):
                 if path.exists():
                     return path
-
-                    # 中文说明：此处用于执行相关处理。
             return None
 
     @classmethod
@@ -173,7 +171,6 @@ class ExtensionsConfig(BaseModel):
         """\u6267\u884c from_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         resolved_path = cls.resolve_config_path(config_path)
         if resolved_path is None:
-            # 中文说明：此处用于执行相关处理。
             return cls(mcp_servers={}, skills={})
 
         try:
@@ -194,9 +191,6 @@ class ExtensionsConfig(BaseModel):
                 return config
             env_value = os.getenv(config[1:])
             if env_value is None:
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
                 return ""
             return env_value
 
@@ -219,7 +213,6 @@ class ExtensionsConfig(BaseModel):
         """\u6267\u884c is_skill_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         skill_config = self.skills.get(skill_name)
         if skill_config is None:
-            # 中文说明：此处用于执行相关处理。
             return skill_category in ("public", "custom", "legacy")
         return skill_config.enabled
 

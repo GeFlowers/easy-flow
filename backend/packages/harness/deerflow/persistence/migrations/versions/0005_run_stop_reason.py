@@ -14,12 +14,12 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """执行本迁移版本定义的数据库架构升级操作。"""
+    """为运行记录增加区分取消、超时等结束路径的停止原因字段。"""
     from deerflow.persistence.migrations._helpers import safe_add_column
 
     safe_add_column("runs", sa.Column("stop_reason", sa.String(50), nullable=True))
 
 
 def downgrade() -> None:
-    """执行本迁移版本定义的数据库架构回退操作。"""
+    """移除运行记录的停止原因字段。"""
     op.drop_column("runs", "stop_reason")

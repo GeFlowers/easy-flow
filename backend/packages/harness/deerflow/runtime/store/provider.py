@@ -1,26 +1,4 @@
-"""
-
-Sync Store factory.
-
-Provides a **sync singleton** and a **sync context manager** for CLI tools
-and the embedded :class:`~deerflow.client.DeerFlowClient`.
-
-The deprecated ``checkpointer`` section takes precedence when present;
-otherwise Store follows the unified ``database`` section. Supported backends:
-sqlite, postgres (with the legacy standalone checkpointer configuration also
-supporting an in-process store).
-
-Usage::
-
-    from deerflow.runtime.store.provider import get_store, store_context
-
-    # Singleton — reused across calls, closed on process exit
-    store = get_store()
-
-    # One-shot — fresh connection, closed on block exit
-    with store_context() as store:
-        store.put(("ns",), "key", {"value": 1})
-"""
+"""提供同步 PostgreSQL Store 的单例访问和短生命周期上下文管理器。"""
 
 from __future__ import annotations
 
@@ -33,7 +11,6 @@ from langgraph.store.base import BaseStore
 
 from deerflow.config.app_config import AppConfig, get_app_config
 from deerflow.config.checkpointer_config import CheckpointerConfig, ensure_config_loaded, get_checkpointer_config
-from deerflow.runtime.store._sqlite_utils import ensure_sqlite_parent_dir, resolve_sqlite_conn_str
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +18,6 @@ logger = logging.getLogger(__name__)
 # Error message constants
 # ---------------------------------------------------------------------------
 
-SQLITE_STORE_INSTALL = "langgraph-checkpoint-sqlite is required for the SQLite store. Install it with: uv add langgraph-checkpoint-sqlite"
 POSTGRES_STORE_INSTALL = (
     "langgraph-checkpoint-postgres is required for the PostgreSQL store. Install the package extra with: pip install 'deerflow-harness[postgres]' (or use: uv sync --all-packages --extra postgres when developing locally)"
 )
@@ -49,33 +25,18 @@ POSTGRES_CONN_REQUIRED = "checkpointer.connection_string is required for the pos
 
 
 def _resolve_store_config(app_config: AppConfig) -> CheckpointerConfig:
-    """
-
-    解析：the Store backend from legacy or unified application config.
-
-        The legacy ``checkpointer`` section remains authoritative when present so
-        Store and Checkpointer continue to use the same backend. Otherwise the
-        unified ``database`` section drives the Store as documented.
-    """
+    """优先复用旧版 checkpointer 配置；否则从统一数据库配置构造 PostgreSQL 参数。"""
     if app_config.checkpointer is not None:
         return app_config.checkpointer
 
     database = app_config.database
-    if database is None:
-        return CheckpointerConfig(type="memory")
-    if database.backend == "sqlite":
-        return CheckpointerConfig(type="sqlite", connection_string=database.checkpointer_sqlite_path)
-    if database.backend == "postgres":
-        if not database.postgres_url:
-            raise ValueError("database.postgres_url is required for the postgres backend")
-        return CheckpointerConfig(type="postgres", connection_string=database.postgres_url)
-    raise ValueError(f"Unknown database backend: {database.backend!r}")
+    if database is None or not database.postgres_url:
+        raise ValueError("database.postgres_url is required for the postgres backend")
+    return CheckpointerConfig(type="postgres", connection_string=database.postgres_url)
 
 
 def _get_store_config() -> CheckpointerConfig:
-    """
-
-    加载：Store config without holding the provider singleton lock."""
+    """在获取单例锁之前解析配置，避免配置重载与 Store 锁发生反向等待。"""
     ensure_config_loaded()
 
     # Preserve callers that initialise the legacy config singleton directly.
@@ -84,8 +45,8 @@ def _get_store_config() -> CheckpointerConfig:
         return legacy_config
     try:
         app_config = get_app_config()
-    except FileNotFoundError:
-        return CheckpointerConfig(type="memory")
+    except FileNotFoundError as exc:
+        raise RuntimeError("PostgreSQL store configuration is required") from exc
     return _resolve_store_config(app_config)
 
 
@@ -96,36 +57,7 @@ def _get_store_config() -> CheckpointerConfig:
 
 @contextlib.contextmanager
 def _sync_store_cm(config) -> Iterator[BaseStore]:
-    """
-
-    Context manager that creates and tears down a sync Store.
-
-        The ``config`` argument is a
-        :class:`~deerflow.config.checkpointer_config.CheckpointerConfig` instance —
-        the same object used by the checkpointer factory.
-    """
-    if config.type == "memory":
-        from langgraph.store.memory import InMemoryStore
-
-        logger.info("Store: using InMemoryStore (in-process, not persistent)")
-        yield InMemoryStore()
-        return
-
-    if config.type == "sqlite":
-        try:
-            from langgraph.store.sqlite import SqliteStore
-        except ImportError as exc:
-            raise ImportError(SQLITE_STORE_INSTALL) from exc
-
-        conn_str = resolve_sqlite_conn_str(config.connection_string or "store.db")
-        ensure_sqlite_parent_dir(conn_str)
-
-        with SqliteStore.from_conn_string(conn_str) as store:
-            store.setup()
-            logger.info("Store: using SqliteStore (%s)", conn_str)
-            yield store
-        return
-
+    """创建并初始化同步 PostgreSQL Store，离开上下文时关闭连接。"""
     if config.type == "postgres":
         try:
             from langgraph.store.postgres import PostgresStore  # type: ignore[import]
@@ -154,17 +86,7 @@ _store_lock = threading.Lock()
 
 
 def get_store() -> BaseStore:
-    """
-
-    返回：the global sync Store singleton, creating it on first call.
-
-        The legacy ``checkpointer`` section takes precedence when configured;
-        otherwise the unified ``database`` section selects the backend.
-
-        Raises:
-            ImportError: If the required package for the configured backend is not installed.
-            ValueError: If the selected backend is missing its required connection value.
-    """
+    """获取同步 Store 单例；首次调用时按当前配置创建并保留连接上下文。"""
     global _store, _store_ctx
 
     if _store is not None:
@@ -186,13 +108,7 @@ def get_store() -> BaseStore:
 
 
 def reset_store() -> None:
-    """
-
-    重置：the sync singleton, forcing recreation on the next call.
-
-        Closes any open backend connections and clears the cached instance.
-        Useful in tests or after a configuration change.
-    """
+    """关闭并清空同步 Store 单例，使后续调用按最新配置重新创建。"""
     global _store, _store_ctx
     with _store_lock:
         if _store_ctx is not None:
@@ -211,20 +127,7 @@ def reset_store() -> None:
 
 @contextlib.contextmanager
 def store_context() -> Iterator[BaseStore]:
-    """
-
-    同步上下文管理器： that yields a Store and cleans up on exit.
-
-        Unlike :func:`get_store`, this does **not** cache the instance — each
-        ``with`` block creates and destroys its own connection.  Use it in CLI
-        scripts or tests where you want deterministic cleanup::
-
-            with store_context() as store:
-                store.put(("threads",), thread_id, {...})
-
-        The legacy ``checkpointer`` section takes precedence when configured;
-        otherwise the unified ``database`` section selects the backend.
-    """
+    """为一次同步操作创建独立 Store；退出 ``with`` 块时关闭连接，不缓存实例。"""
     config = _resolve_store_config(get_app_config())
     with _sync_store_cm(config) as store:
         yield store

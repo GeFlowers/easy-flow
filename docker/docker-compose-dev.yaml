@@ -1,9 +1,9 @@
-# DeerFlow Development Environment
-# Usage: docker-compose -f docker-compose-dev.yaml up --build
+# DeerFlow Docker Compose Application
+# The supported entry point is `make docker-start` from the repository root.
 #
 # Services:
 #   - nginx: Reverse proxy (port 2026)
-#   - frontend: Frontend Next.js dev server (port 3000)
+#   - frontend: Frontend Next.js server (port 3000)
 #   - gateway: Backend Gateway API + agent runtime (port 8001)
 #   - postgres: PostgreSQL persistence for runs, checkpoints, and Store data
 #   - Redis Streams bridge: uses the host Redis configured in ../.env
@@ -36,12 +36,13 @@ services:
   # ── Reverse Proxy ──────────────────────────────────────────────────────
   # Routes API traffic to the gateway and frontend.
   nginx:
-    image: nginx:alpine
+    build:
+      context: ./
+      dockerfile: nginx.Dockerfile
+    image: deer-flow-nginx:local
     container_name: deer-flow-nginx
     ports:
       - "2026:2026"
-    volumes:
-      - ./nginx.conf:/etc/nginx/nginx.conf.template:ro
     command:
       - sh
       - -c
@@ -89,11 +90,6 @@ services:
         UV_INDEX_URL: ${UV_INDEX_URL:-https://pypi.org/simple}
         UV_EXTRAS: ${UV_EXTRAS:-}
     container_name: deer-flow-gateway
-    volumes:
-      - ../config.yaml:/app/project/config.yaml
-      - ../extensions_config.json:/app/project/extensions_config.json
-      - ../skills:/app/skills
-      - ../backend/.deer-flow:/app/backend/.deer-flow
     working_dir: /app
     environment:
       - CI=true

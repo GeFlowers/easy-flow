@@ -88,7 +88,7 @@ KEYCLOAK_CLIENT_SECRET=your-client-secret
 ### Step 3: Restart the backend
 
 ```bash
-cd backend && make dev
+make docker-start
 ```
 
 ## Provider Configuration
@@ -226,7 +226,7 @@ export KEYCLOAK_CLIENT_SECRET="the-secret-from-step-2"
 ### 5. Restart and Test
 
 ```bash
-cd backend && make dev
+make docker-start
 ```
 
 1. Open http://localhost:3000

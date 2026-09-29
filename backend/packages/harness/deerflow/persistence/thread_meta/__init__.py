@@ -23,5 +23,5 @@ __all__ = [
 def make_thread_store(
     session_factory: async_sessionmaker[AsyncSession],
 ) -> ThreadMetaStore:
-    """执行当前持久化组件提供的操作。"""
+    """用 PostgreSQL 会话工厂创建线程元数据仓储。"""
     return ThreadMetaRepository(session_factory)

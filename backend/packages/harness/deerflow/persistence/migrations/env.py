@@ -36,13 +36,12 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """执行当前持久化组件提供的操作。"""
+    """配置 Alembic 离线模式并输出针对目标元数据的迁移操作。"""
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
         literal_binds=True,
-        render_as_batch=True,
         include_object=include_object,
     )
     with context.begin_transaction():
@@ -50,11 +49,10 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection):
-    """执行当前持久化组件提供的操作。"""
+    """在已建立的同步连接上配置元数据筛选并执行迁移脚本。"""
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
-        render_as_batch=True,  # Required for SQLite ALTER TABLE support
         include_object=include_object,
     )
     with context.begin_transaction():
@@ -62,27 +60,8 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
-    """执行当前持久化组件提供的操作。"""
+    """创建异步数据库连接，在其同步桥接上下文中执行迁移并释放引擎。"""
     connectable = create_async_engine(config.get_main_option("sqlalchemy.url"))
-
-    # Cross-process bootstrap safety for SQLite: every connection alembic
-    # opens needs a wide ``busy_timeout`` so that when another process holds
-    # the file write lock (e.g. mid-bootstrap), our writes wait instead of
-    # raising ``database is locked``. The production engine in
-    # ``deerflow.persistence.engine`` sets this on its own connections, but
-    # alembic spawns its OWN engine here -- those connections wouldn't inherit
-    # anything unless we wire the same hook on this one.
-    if connectable.url.drivername.startswith("sqlite"):
-        from sqlalchemy import event
-
-        @event.listens_for(connectable.sync_engine, "connect")
-        def _alembic_sqlite_busy_timeout(dbapi_conn, _record):  # noqa: ARG001
-            """执行持久化流程所需的内部辅助操作。"""
-            cursor = dbapi_conn.cursor()
-            try:
-                cursor.execute("PRAGMA busy_timeout=30000;")
-            finally:
-                cursor.close()
 
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)

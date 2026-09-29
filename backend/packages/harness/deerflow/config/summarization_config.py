@@ -56,9 +56,6 @@ class SummarizationConfig(BaseModel):
         default_factory=lambda: list(DEFAULT_SKILL_FILE_READ_TOOL_NAMES),
         description="Tool names treated as skill-file reads when capturing loaded skills into the durable skill_context channel.",
     )
-
-
-# 中文说明：此处用于执行相关处理。
 _summarization_config: SummarizationConfig = SummarizationConfig()
 
 

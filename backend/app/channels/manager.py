@@ -18,7 +18,7 @@ import httpx
 from langgraph_sdk.errors import ConflictError
 
 # 导入即注册内置策略，确保直接构造 ChannelManager 时与 Gateway 启动路径一致。
-from app.channels import feishu_run_policy as _feishu_run_policy  # noqa: F401
+from app.channels.providers import feishu_run_policy as _feishu_run_policy  # noqa: F401
 from app.channels.commands import KNOWN_CHANNEL_COMMANDS
 from app.channels.message_bus import (
     PENDING_CLARIFICATION_METADATA_KEY,

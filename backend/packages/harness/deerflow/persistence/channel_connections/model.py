@@ -11,7 +11,7 @@ from deerflow.persistence.base import Base
 
 
 def _utc_now() -> datetime:
-    """执行持久化流程所需的内部辅助操作。"""
+    """生成带 UTC 时区的当前时间，供连接记录时间列复用。"""
     return datetime.now(UTC)
 
 
@@ -49,18 +49,12 @@ class ChannelConnectionRow(Base):
             name="uq_channel_connection_owner_provider_identity",
         ),
         Index("idx_channel_connections_event_lookup", "provider", "workspace_id", "bot_user_id"),
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
         Index(
             "uq_channel_connection_active_identity",
             "provider",
             "external_account_id",
             "workspace_id",
             unique=True,
-            sqlite_where=text("status != 'revoked'"),
             postgresql_where=text("status != 'revoked'"),
         ),
     )

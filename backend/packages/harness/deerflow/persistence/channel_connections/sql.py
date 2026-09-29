@@ -25,10 +25,6 @@ from deerflow.utils.time import coerce_iso
 
 logger = logging.getLogger(__name__)
 
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 _UPSERT_MAX_ATTEMPTS = 3
 
 
@@ -41,7 +37,7 @@ class ChannelCredentialCipher:
 
     @classmethod
     def from_key(cls, key: str) -> ChannelCredentialCipher:
-        """执行当前持久化组件提供的操作。"""
+        """将任意长度的配置密钥规范化为 Fernet 可用的加密密钥。"""
         digest = hashlib.sha256(key.encode("utf-8")).digest()
         return cls(Fernet(base64.urlsafe_b64encode(digest)))
 
@@ -73,30 +69,30 @@ class ChannelConnectionRepository:
         self._cipher = cipher
 
     async def close(self) -> None:
-        """执行当前持久化组件提供的操作。"""
+        """关闭仓储共享的异步数据库引擎连接池。"""
         from deerflow.persistence.engine import close_engine
 
         await close_engine()
 
     @staticmethod
     def _new_id() -> str:
-        """执行持久化流程所需的内部辅助操作。"""
+        """生成连接相关记录使用的随机十六进制主键。"""
         return uuid.uuid4().hex
 
     @staticmethod
     def _normalize_optional_identity(value: str | None) -> str:
-        """执行持久化流程所需的内部辅助操作。"""
+        """将缺失的外部账号标识统一为空字符串以参与唯一键匹配。"""
         return value or ""
 
     @staticmethod
     def _coerce_datetime(value: datetime | None) -> datetime | None:
-        """执行持久化流程所需的内部辅助操作。"""
+        """为数据库读出的无时区时间补上 UTC 时区信息。"""
         if value is None or value.tzinfo is not None:
             return value
         return value.replace(tzinfo=UTC)
 
     def _encrypt_optional_secret(self, value: str | None) -> str | None:
-        """执行持久化流程所需的内部辅助操作。"""
+        """加密可选凭据；未配置加密器时拒绝保存明文密钥。"""
         if value is None:
             return None
         if self._cipher is None:
@@ -133,12 +129,12 @@ class ChannelConnectionRepository:
         metadata: dict[str, Any] | None = None,
         status: str = "connected",
     ) -> dict[str, Any]:
-        """执行当前持久化组件提供的操作。"""
+        """按外部账号和工作区唯一身份创建或更新连接，并回收已转移账号的凭据。"""
         external_account_id_value = self._normalize_optional_identity(external_account_id)
         workspace_id_value = self._normalize_optional_identity(workspace_id)
 
         def _apply(row: ChannelConnectionRow) -> None:
-            """执行持久化流程所需的内部辅助操作。"""
+            """将本次连接属性同步到已存在的 ORM 行。"""
             row.status = status
             row.external_account_name = external_account_name
             row.workspace_name = workspace_name
@@ -148,7 +144,7 @@ class ChannelConnectionRepository:
             row.metadata_json = dict(metadata or {})
 
         async def _revoke_other_active_owners(session: AsyncSession) -> None:
-            """执行持久化流程所需的内部辅助操作。"""
+            """账号转移给新用户时撤销旧连接并删除其凭据。"""
             if status != "connected":
                 return
             with session.no_autoflush:
@@ -179,9 +175,6 @@ class ChannelConnectionRepository:
             for _ in range(_UPSERT_MAX_ATTEMPTS):
                 try:
                     row = (await session.execute(stmt)).scalar_one_or_none()
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
                     await _revoke_other_active_owners(session)
                     if row is None:
                         row = ChannelConnectionRow(
@@ -197,10 +190,6 @@ class ChannelConnectionRepository:
                     await session.refresh(row)
                     return self._connection_to_dict(row)
                 except IntegrityError as exc:
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
                     last_error = exc
                     await session.rollback()
             raise last_error  # type: ignore[misc]  # loop runs at least once
@@ -254,7 +243,7 @@ class ChannelConnectionRepository:
         refresh_expires_at: datetime | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        """执行当前持久化组件提供的操作。"""
+        """加密并保存连接凭据，同时递增凭据版本号。"""
         if self._cipher is None:
             raise RuntimeError("channel connection encryption key is required")
         async with self.session_factory() as session:
@@ -350,12 +339,6 @@ class ChannelConnectionRepository:
         current_time = now or datetime.now(UTC)
         async with self.session_factory() as session:
             await self._serialize_oauth_owner_scope(session, owner_user_id, provider)
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
             await session.execute(
                 delete(ChannelOAuthStateRow).where(
                     ChannelOAuthStateRow.owner_user_id == owner_user_id,
@@ -393,7 +376,7 @@ class ChannelConnectionRepository:
             return True
 
     async def _serialize_oauth_owner_scope(self, session: AsyncSession, owner_user_id: str, provider: str) -> None:
-        """执行持久化流程所需的内部辅助操作。"""
+        """通过事务级 advisory lock 串行化同一用户与提供方的 OAuth 状态写入。"""
         try:
             dialect = session.bind.dialect.name if session.bind is not None else ""
         except Exception:
@@ -405,7 +388,6 @@ class ChannelConnectionRepository:
     def _oauth_scope_lock_key(owner_user_id: str, provider: str) -> int:
         """获取并管理数据库架构操作所需的并发互斥锁。"""
         digest = hashlib.sha256(f"{owner_user_id}\x00{provider}".encode()).digest()
-        # 中文说明：此处用于执行相关处理。
         return int.from_bytes(digest[:8], "big") & 0x7FFFFFFFFFFFFFFF
 
     async def delete_expired_oauth_states(self, *, now: datetime | None = None) -> int:
@@ -424,7 +406,7 @@ class ChannelConnectionRepository:
         active_only: bool = False,
         now: datetime | None = None,
     ) -> int:
-        """执行当前持久化组件提供的操作。"""
+        """统计用户针对指定提供方创建的 OAuth 状态，可只统计未过期且未消费项。"""
         current_time = now or datetime.now(UTC)
         conditions = [
             ChannelOAuthStateRow.owner_user_id == owner_user_id,
@@ -449,7 +431,7 @@ class ChannelConnectionRepository:
         state: str,
         now: datetime | None = None,
     ) -> dict[str, Any] | None:
-        """执行当前持久化组件提供的操作。"""
+        """校验并一次性消费 OAuth state，返回授权流程需要的验证信息。"""
         current_time = now or datetime.now(UTC)
         state_hash = self.hash_state(state)
         async with self.session_factory() as session:
@@ -462,10 +444,6 @@ class ChannelConnectionRepository:
             if expires_at is not None and expires_at < current_time:
                 await session.commit()
                 return None
-
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
             result = await session.execute(
                 update(ChannelOAuthStateRow)
                 .where(

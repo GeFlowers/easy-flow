@@ -1,6 +1,6 @@
 # GitHub Event-Driven Agents
 
-GitHub is a **webhook-push** channel: there is no long-polling worker. Every GitHub App / repository delivery lands at `POST /api/webhooks/github`, where it is HMAC-verified, fan-out'd to one `InboundMessage` per matching custom-agent binding, and shipped to the rest of DeerFlow through the same `ChannelManager` that handles Feishu/Slack/Telegram. For the high-level orientation, see [AGENTS.md](../AGENTS.md) → "GitHub event-driven agents".
+GitHub is a **webhook-push** channel: there is no long-polling worker. Every GitHub App / repository delivery lands at `POST /api/webhooks/github`, where it is HMAC-verified, fan-out'd to one `InboundMessage` per matching custom-agent binding, and shipped to the rest of DeerFlow through the same `ChannelManager` that handles Feishu/Slack/Telegram.
 
 This document covers the **architecture** of that pipeline:
 
@@ -248,11 +248,10 @@ This is also why the GitHub channel registers `ChannelRunPolicy.fire_and_forget=
 
 ## Cross-references
 
-- [AGENTS.md](../AGENTS.md) → "GitHub event-driven agents" — the index view in `backend/AGENTS.md` (binding shape, per-event triggers, mention precedence, token env summary)
 - [IM_CHANNEL_CONNECTIONS.md](IM_CHANNEL_CONNECTIONS.md) — interactive IM channels (Telegram/Slack/etc.) for the full `_handle_chat` and owner-scoped file storage flow
 - `app/gateway/github/dispatcher.py` — `fanout_event`, `_is_self_event`, mention precedence chain
 - `app/gateway/github/identity.py` — `resolve_thread_id` (UUID5), `extract_target`
 - `app/gateway/github/triggers.py` — `event_should_fire`, `DEFAULT_TRIGGERS`
 - `app/gateway/github/run_policy.py` — `inject_github_credentials`, `register_policy`
-- `app/gateway/routers/github_webhooks.py` — HMAC verify, route mount predicate
-- `app/channels/github.py` — `GitHubChannel` (log-only outbound)
+- `app/gateway/routers/integrations/github_webhooks.py` — HMAC verify, route mount predicate
+- `app/channels/providers/github.py` — `GitHubChannel` (log-only outbound)

@@ -1,54 +1,10 @@
-"""定义 loop_detection_middleware 模块提供的职责与可复用接口。
+"""检测重复工具调用，避免 Agent 因循环执行而耗尽递归预算。
 
-Middleware to detect and break repetitive tool call loops.
-
-P0 safety: prevents the agent from calling the same tool with the same
-arguments indefinitely until the recursion limit kills the run.
-
-Detection strategy:
-  1. After each model response, hash the tool calls (name + args).
-  2. Track recent hashes in a sliding window.
-  3. If the same hash appears >= warn_threshold times, queue a
-     "you are repeating yourself — wrap up" warning for the current
-     thread/run. The warning is **injected at the next model call** (in
-     ``wrap_model_call``) as a ``HumanMessage`` appended to the message
-     list, *after* all ToolMessage responses to the previous
-     AIMessage(tool_calls).
-  4. If it appears >= hard_limit times, strip all tool_calls from the
-     response so the agent is forced to produce a final text answer.
-
-Why the warning is injected at ``wrap_model_call`` instead of
-``after_model``:
-
-  ``after_model`` fires immediately after the model emits an
-  ``AIMessage`` that may carry ``tool_calls``. The tools node has not
-  run yet, so no matching ``ToolMessage`` exists in the history. Any
-  message we add here lands *between* the assistant's tool_calls and
-  their responses. OpenAI/Moonshot reject the next request with
-  ``"tool_call_ids did not have response messages"`` because their
-  validators require the assistant's tool_calls to be followed
-  immediately by tool messages. Anthropic also disallows mid-stream
-  ``SystemMessage``. By deferring the warning to ``wrap_model_call``,
-  every prior ToolMessage is already present in the request's message
-  list and the warning is appended at the end — pairing intact, no
-  ``AIMessage`` semantics are mutated.
-
-Queued warnings are intentionally transient. If a run ends before the
-next model request drains a queued warning, ``after_agent`` drops it
-instead of carrying it into a later invocation for the same thread. The
-hard-stop path still forces termination when the configured safety limit
-is reached.
-
-Stop-reason surfacing (#3875 Phase 2):
-  Like the token-budget guard, the loop hard stop does NOT raise — it
-  strips ``tool_calls`` so the agent loop terminates naturally with a
-  final answer. To let the caller (the subagent executor) distinguish a
-  loop-capped completion from a clean one, the run that triggered the hard
-  stop is recorded in ``_stop_reason`` and exposed via
-  :meth:`consume_stop_reason`. The executor collects that reason alongside
-  the token-budget guard's so a loop-capped run surfaces as
-  ``completed + loop_capped`` and the lead/ledger can tell it was capped
-  without parsing result text.
+中间件同时按完整工具调用集合和单工具调用频次统计。达到警告阈值时，先暂存
+提示，并在下一次模型请求的末尾追加 HumanMessage；这样不会插入到尚未配对的
+assistant tool call 与 tool response 之间。达到硬上限时则移除最后一条消息的
+工具调用元数据，迫使图以普通文本结束。硬停止原因按 run_id 暂存，供子代理
+执行器在运行结束后读取；未消费的警告会在本轮结束时清理，不带入后续运行。
 """
 
 from __future__ import annotations
@@ -86,14 +42,7 @@ _MAX_PENDING_WARNINGS_PER_RUN = 4
 
 
 def _normalize_tool_call_args(raw_args: object) -> tuple[dict, str | None]:
-    """执行 _normalize_tool_call_args 的明确职责，并返回与调用约定一致的结果。
-
-    Normalize tool call args to a dict plus an optional fallback key.
-
-        Some providers serialize ``args`` as a JSON string instead of a dict.
-        We defensively parse those cases so loop detection does not crash while
-        still preserving a stable fallback key for non-dict payloads.
-    """
+    """将工具参数规范为字典；遇到非字典载荷时生成稳定的回退键。"""
     if isinstance(raw_args, dict):
         return raw_args, None
 
@@ -114,9 +63,7 @@ def _normalize_tool_call_args(raw_args: object) -> tuple[dict, str | None]:
 
 
 def _stable_tool_key(name: str, args: dict, fallback_key: str | None) -> str:
-    """执行 _stable_tool_key 的明确职责，并返回与调用约定一致的结果。
-
-    Derive a stable key from salient args without overfitting to noise."""
+    """提取适合循环比较的参数键，避免无关噪声导致漏检或误判。"""
     if name == "read_file" and fallback_key is None:
         path = args.get("path") or ""
         start_line = args.get("start_line")
@@ -139,9 +86,7 @@ def _stable_tool_key(name: str, args: dict, fallback_key: str | None) -> str:
         bucket_end = (bucket_end - 1) // bucket_size
         return f"{path}:{bucket_start}-{bucket_end}"
 
-    # write_file / str_replace are content-sensitive: same path may be updated
-    # with different payloads during iteration. Using only salient fields (path)
-    # can collapse distinct calls, so we hash full args to reduce false positives.
+    # 写入类工具可能在同一路径提交不同内容，需比较完整参数以免误判重复。
     if name in {"write_file", "str_replace"}:
         if fallback_key is not None:
             return fallback_key
@@ -159,14 +104,8 @@ def _stable_tool_key(name: str, args: dict, fallback_key: str | None) -> str:
 
 
 def _hash_tool_calls(tool_calls: list[dict]) -> str:
-    """执行 _hash_tool_calls 的明确职责，并返回与调用约定一致的结果。
-
-    Deterministic hash of a set of tool calls (name + stable key).
-
-        This is intended to be order-independent: the same multiset of tool calls
-        should always produce the same hash, regardless of their input order.
-    """
-    # Normalize each tool call to a stable (name, key) structure.
+    """对工具名及稳定参数键排序后计算摘要，使调用顺序不影响重复判断。"""
+    # 先规范化每次调用，再排序，以统一等价调用集合的表示。
     normalized: list[str] = []
     for tc in tool_calls:
         name = tc.get("name", "")
@@ -175,7 +114,7 @@ def _hash_tool_calls(tool_calls: list[dict]) -> str:
 
         normalized.append(f"{name}:{key}")
 
-    # Sort so permutations of the same multiset of calls yield the same ordering.
+    # 排序确保同一组调用仅因排列顺序不同仍得到相同摘要。
     normalized.sort()
     blob = json.dumps(normalized, sort_keys=True, default=str)
     return hashlib.md5(blob.encode()).hexdigest()[:12]
@@ -193,38 +132,10 @@ _TOOL_FREQ_HARD_STOP_MSG = "[FORCED STOP] Tool {tool_name} called {count} times 
 
 
 class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
-    """封装 LoopDetectionMiddleware 的状态、协作关系与公开操作。
+    """用滑动窗口记录重复调用，并在警告阈值或硬停止阈值处干预模型循环。
 
-    Detects and breaks repetitive tool call loops.
-
-        Threshold parameters are validated upstream by :class:`LoopDetectionConfig`;
-        construct via :meth:`from_config` to ensure values pass Pydantic validation.
-
-        Args:
-            warn_threshold: Number of identical tool call sets before injecting
-                a warning message. Default: 3.
-            hard_limit: Number of identical tool call sets before stripping
-                tool_calls entirely. Default: 5.
-            window_size: Size of the sliding window for tracking calls.
-                Default: 20.
-            max_tracked_threads: Maximum number of threads to track before
-                evicting the least recently used. Default: 100.
-            tool_freq_warn: Maximum number of same-tool-type calls within a
-                sliding window of ``_tool_freq_window`` before injecting a
-                frequency warning. Catches cross-file read loops that
-                hash-based detection misses. Default: 30 (within a window
-                of 50).
-            tool_freq_hard_limit: Maximum number of same-tool-type calls within
-                a sliding window of ``_tool_freq_window`` before forcing a
-                stop. Default: 50 (within a window of 50).
-            tool_freq_overrides: Per-tool overrides for frequency thresholds,
-                keyed by tool name. Each value is a ``(warn, hard_limit)`` tuple
-                that replaces ``tool_freq_warn`` / ``tool_freq_hard_limit`` for
-                that specific tool. Tools not listed here fall back to the global
-                thresholds. Useful for raising limits on intentionally
-                high-frequency tools (e.g. ``bash`` in batch pipelines) without
-                weakening protection on all other tools. Default: ``None``
-                (no overrides).
+    配置应由 ``LoopDetectionConfig`` 校验后通过 ``from_config`` 创建；频次阈值
+    可按工具单独覆盖，线程状态与待注入警告均有容量上限。
     """
 
     def __init__(
@@ -237,7 +148,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         tool_freq_hard_limit: int = _DEFAULT_TOOL_FREQ_HARD_LIMIT,
         tool_freq_overrides: dict[str, tuple[int, int]] | None = None,
     ):
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """保存检测阈值并初始化有界的线程历史、警告队列和停止原因记录。"""
         super().__init__()
         self.warn_threshold = warn_threshold
         self.hard_limit = hard_limit
@@ -246,17 +157,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         self.tool_freq_warn = tool_freq_warn
         self.tool_freq_hard_limit = tool_freq_hard_limit
         self._tool_freq_overrides: dict[str, tuple[int, int]] = tool_freq_overrides or {}
-        # Layer 2's windowed frequency count can never exceed the deque length,
-        # so the deque MUST be at least as long as the largest hard limit it is
-        # compared against — otherwise the hard-stop branch is dead code. Do NOT
-        # reuse Layer 1's ``window_size`` (which is unrelated and defaults below
-        # the freq thresholds, e.g. 20 < hard 50); size the frequency window to
-        # the largest hard limit in play (global + every per-tool override) so a
-        # tight burst can actually reach it while spread-out calls still decay
-        # out of the window. Warn thresholds are intentionally excluded: a sane
-        # config enforces warn <= hard (covered by sizing to hard), and a misconfig
-        # with warn > hard would hard-stop first anyway, so an unreachable warn
-        # is harmless and must not inflate the window.
+        # 频次窗口至少覆盖最高硬上限（包含单工具覆盖值），否则计数无法触发硬停止。
         self._tool_freq_window = max(
             self.window_size,
             self.tool_freq_hard_limit,
@@ -265,41 +166,22 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         self._lock = threading.Lock()
         self._history: OrderedDict[str, list[str]] = OrderedDict()
         self._warned: dict[str, set[str]] = defaultdict(set)
-        # Windowed per-tool-type frequency: recent tool names per thread,
-        # trimmed to ``window_size`` so the count decays instead of growing
-        # monotonically (replaces the old monotonic ``_tool_freq`` integer).
+        # 保存各线程最近的工具名，使频次随窗口滚动衰减，而非随运行时间无限增长。
         self._tool_name_history: defaultdict[str, deque[str]] = defaultdict(deque)
-        # Per-thread Counter mirroring the deque so freq_count is O(1) instead
-        # of scanning the whole window on every tool call. A single high
-        # per-tool override (e.g. bash: {hard_limit: 1000}) inflates the window
-        # globally, so the scan would cost 1000 per call for every tool; Counter
-        # increments on append and decrements on popleft.
+        # 计数器与队列同步维护，让频次查询保持常数时间，即使窗口因覆盖值变大也如此。
         self._tool_name_counter: defaultdict[str, Counter[str]] = defaultdict(Counter)
-        # Per-thread set of tool names already warned about in Layer 2, so a
-        # frequency warning is enqueued once rather than on every subsequent
-        # call. Cleared per name when the windowed count decays back below the
-        # warn threshold, mirroring the hash-layer ``_warned`` pruning.
+        # 记录已发出频次警告的工具；对应计数跌破阈值后会允许再次提醒。
         self._tool_freq_warned: dict[str, set[str]] = defaultdict(set)
-        # Per-thread/run queue of warnings to inject at the next model call.
-        # Populated by ``after_model`` (detection) and drained by
-        # ``wrap_model_call`` (injection); see module docstring.
+        # after_model 发现问题时暂存，下一次 wrap_model_call 才追加到消息末尾。
         self._pending_warnings: dict[tuple[str, str], list[str]] = defaultdict(list)
         self._pending_warning_touch_order: OrderedDict[tuple[str, str], None] = OrderedDict()
         self._max_pending_warning_keys = max(1, self.max_tracked_threads * 2)
-        # Stop reason set when a hard-stop fires (#3875 Phase 2). Keyed by run_id
-        # (matching ``TokenBudgetMiddleware``) and bounded — the lead agent's
-        # middleware instance is long-lived across many runs, so without a cap
-        # an entry would accumulate for every looped lead run. Intentionally NOT
-        # cleared by ``after_agent``/``_clear_current_run_pending_warnings`` so
-        # the subagent executor can consume it after the run returns; ``reset()``
-        # still drops it.
+        # 停止原因需保留到执行器读取，因此独立于警告队列清理，并限制缓存容量。
         self._stop_reason: BoundedDict[str, str] = BoundedDict(1000)
 
     @classmethod
     def from_config(cls, config: LoopDetectionConfig) -> LoopDetectionMiddleware:
-        """执行 from_config 的明确职责，并返回与调用约定一致的结果。
-
-        Construct from a Pydantic-validated config, trusting its validation."""
+        """从已通过 Pydantic 校验的配置创建中间件，并转换单工具频次覆盖项。"""
         return cls(
             warn_threshold=config.warn_threshold,
             hard_limit=config.hard_limit,
@@ -311,71 +193,31 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         )
 
     def _get_thread_id(self, runtime: Runtime) -> str:
-        """执行 _get_thread_id 的明确职责，并返回与调用约定一致的结果。
-
-        Extract thread_id from runtime context for per-thread tracking."""
+        """读取运行上下文中的线程 ID；上下文缺少该值时使用默认分组。"""
         thread_id = runtime.context.get("thread_id") if runtime.context else None
         if thread_id:
             return str(thread_id)
         return "default"
 
     def _get_run_id(self, runtime: Runtime) -> str:
-        """执行 _get_run_id 的明确职责，并返回与调用约定一致的结果。
-
-        Extract run_id from runtime context for per-run warning scoping.
-
-                Keyed by presence, not truthiness: ``SubagentExecutor`` sets
-                ``context["run_id"] = self.run_id`` unconditionally (no truthiness
-                guard), so an embedded/TUI-dispatched subagent — whose ``run_id`` is
-                never assigned per ``AGENTS.md``'s description of the embedded
-                ``DeerFlowClient`` — runs with a context that legitimately carries
-                ``run_id=None`` (the key is *present*, not absent). The executor
-                later reads the stop reason back with the raw attribute,
-                ``consume_stop_reason(self.run_id)``, so this must return exactly
-                that value (``None`` included) when the key is present, rather than
-                collapsing it to a shared fallback indistinguishable from an absent
-                key. A truthiness check (``if run_id:``) previously conflated
-                "present but None/falsy" with "absent", both mapping to the same
-                literal ``"default"`` — so a genuine ``run_id=None`` hard-stop was
-                recorded under ``"default"`` here but looked up under ``None`` by
-                the executor, silently losing the ``loop_capped`` stop reason.
-                Mirrors ``TokenBudgetMiddleware._get_run_id``.
-        """
+        """读取本轮运行标识；显式存在但值为 ``None`` 时保留该值以匹配执行器查询。"""
         ctx = getattr(runtime, "context", None)
         if isinstance(ctx, dict) and "run_id" in ctx:
             return ctx["run_id"]
-        # Fallback to runtime object ID to prevent collisions across embedded client runs
+        # 无显式运行 ID 时用 Runtime 对象区分并发的嵌入式调用。
         return str(id(runtime))
 
     def consume_stop_reason(self, run_id: str | None) -> str | None:
-        """执行 consume_stop_reason 的明确职责，并返回与调用约定一致的结果。
-
-        Pop and return the stop reason the hard-stop set for this run.
-
-                Returns ``"loop_capped"`` when a repeated tool-call loop tripped the hard
-                stop during the run — the run still completed with a forced final answer
-                (the hard stop strips ``tool_calls`` rather than raising). The subagent
-                executor calls this after the run returns so a loop-capped completion
-                carries ``stop_reason=loop_capped`` to the lead instead of looking like
-                a clean ``completed``. Mirrors ``TokenBudgetMiddleware.consume_stop_reason``;
-                popping keeps the dict from accumulating on a reused instance.
-        """
+        """取出并删除本轮硬停止原因，供执行器区分正常完成与循环上限截断。"""
         with self._lock:
             return self._stop_reason.pop(run_id, None)
 
     def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
-        """执行 _pending_key 的明确职责，并返回与调用约定一致的结果。
-
-        Return the pending-warning key for the current thread/run."""
+        """组合线程 ID 与运行 ID，作为待注入警告队列的隔离键。"""
         return self._get_thread_id(runtime), self._get_run_id(runtime)
 
     def _evict_if_needed(self) -> None:
-        """执行 _evict_if_needed 的明确职责，并返回与调用约定一致的结果。
-
-        Evict least recently used threads if over the limit.
-
-                Must be called while holding self._lock.
-        """
+        """超出线程跟踪上限时淘汰最久未访问的状态，并清理该线程的警告。"""
         while len(self._history) > self.max_tracked_threads:
             evicted_id, _ = self._history.popitem(last=False)
             self._warned.pop(evicted_id, None)
@@ -387,32 +229,17 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             logger.debug("Evicted loop tracking for thread %s (LRU)", evicted_id)
 
     def _drop_pending_warning_key_locked(self, key: tuple[str, str]) -> None:
-        """执行 _drop_pending_warning_key_locked 的明确职责，并返回与调用约定一致的结果。
-
-        Drop all pending-warning bookkeeping for one thread/run key.
-
-                Must be called while holding self._lock.
-        """
+        """删除指定线程和运行对应的警告内容及其 LRU 访问记录。调用方须持锁。"""
         self._pending_warnings.pop(key, None)
         self._pending_warning_touch_order.pop(key, None)
 
     def _touch_pending_warning_key_locked(self, key: tuple[str, str]) -> None:
-        """执行 _touch_pending_warning_key_locked 的明确职责，并返回与调用约定一致的结果。
-
-        Mark a pending-warning key as recently used.
-
-                Must be called while holding self._lock.
-        """
+        """将警告队列标记为最近使用，供容量回收按 LRU 顺序淘汰。调用方须持锁。"""
         self._pending_warning_touch_order[key] = None
         self._pending_warning_touch_order.move_to_end(key)
 
     def _prune_pending_warning_state_locked(self, protected_key: tuple[str, str]) -> None:
-        """执行 _prune_pending_warning_state_locked 的明确职责，并返回与调用约定一致的结果。
-
-        Cap pending-warning state across abnormal or concurrent runs.
-
-                Must be called while holding self._lock.
-        """
+        """限制并发运行产生的警告队列总量，同时保护当前正在写入的键。调用方须持锁。"""
         overflow = len(self._pending_warning_touch_order) - self._max_pending_warning_keys
         if overflow <= 0:
             return
@@ -422,9 +249,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             self._drop_pending_warning_key_locked(key)
 
     def _queue_pending_warning(self, runtime: Runtime, warning: str) -> None:
-        """执行 _queue_pending_warning 的明确职责，并返回与调用约定一致的结果。
-
-        Queue one transient warning for the current thread/run with caps."""
+        """为当前运行暂存去重后的警告，并限制单次和全局队列容量。"""
         pending_key = self._pending_key(runtime)
         with self._lock:
             warnings = self._pending_warnings[pending_key]
@@ -436,19 +261,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             self._prune_pending_warning_state_locked(protected_key=pending_key)
 
     def _track_and_check(self, state: AgentState, runtime: Runtime) -> tuple[str | None, bool]:
-        """执行 _track_and_check 的明确职责，并返回与调用约定一致的结果。
-
-        Track tool calls and check for loops.
-
-                Two detection layers:
-                  1. **Hash-based** (existing): catches identical tool call sets.
-                  2. **Frequency-based** (new): catches the same *tool type* being
-                     called many times with varying arguments (e.g. ``read_file``
-                     on 40 different files).
-
-                Returns:
-                    (warning_message_or_none, should_hard_stop)
-        """
+        """更新线程调用窗口，按调用集合重复次数和单工具频次返回警告或硬停止结果。"""
         messages = state.get("messages", [])
         if not messages:
             return None, False
@@ -465,7 +278,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         call_hash = _hash_tool_calls(tool_calls)
 
         with self._lock:
-            # Touch / create entry (move to end for LRU)
+            # 访问时将线程移到队尾，队首因此始终是最久未使用项。
             if thread_id in self._history:
                 self._history.move_to_end(thread_id)
             else:
@@ -486,7 +299,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             count = history.count(call_hash)
             tool_names = [tc.get("name", "?") for tc in tool_calls]
 
-            # --- Layer 1: hash-based (identical call sets) ---
+            # 第一层：检测完全相同的工具调用集合。
             if count >= self.hard_limit:
                 logger.error(
                     "Loop hard limit reached — forcing stop",
@@ -514,18 +327,14 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
                     )
                     return _WARNING_MSG, False
 
-            # --- Layer 2: per-tool-type frequency (windowed) ---
+            # 第二层：检测参数不同但同一工具被高频重复调用的情况。
             tool_name_history = self._tool_name_history[thread_id]
             name_counter = self._tool_name_counter[thread_id]
             for tc in tool_calls:
                 name = tc.get("name", "")
                 if not name:
                     continue
-                # Windowed counting: append the name and trim to the frequency
-                # window (>= the largest threshold) so the count can reach the
-                # warn/hard limits on a tight burst yet still decay for
-                # spread-out calls. A mirrored Counter gives O(1) freq_count
-                # even when a per-tool override inflates the window globally.
+                # 维护滑动窗口和计数器，使连续调用可触发阈值、间隔调用则逐步衰减。
                 tool_name_history.append(name)
                 name_counter[name] += 1
                 while len(tool_name_history) > self._tool_freq_window:
@@ -567,36 +376,26 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
                         )
                         return _TOOL_FREQ_WARNING_MSG.format(tool_name=name, count=freq_count), False
                 else:
-                    # Windowed count decayed below the warn threshold; allow a
-                    # future burst of this tool to warn again.
+                    # 窗口计数回落后清除提醒标记，后续新一轮高频调用可再次告警。
                     self._tool_freq_warned[thread_id].discard(name)
 
         return None, False
 
     @staticmethod
     def _append_text(content: str | list | None, text: str) -> str | list:
-        """执行 _append_text 的明确职责，并返回与调用约定一致的结果。
-
-        Append *text* to AIMessage content, handling str, list, and None.
-
-                When content is a list of content blocks (e.g. Anthropic thinking mode),
-                we append a new ``{"type": "text", ...}`` block instead of concatenating
-                a string to a list, which would raise ``TypeError``.
-        """
+        """按消息内容类型追加文本，列表内容会新增文本块而不是与字符串拼接。"""
         if content is None:
             return text
         if isinstance(content, list):
             return [*content, {"type": "text", "text": f"\n\n{text}"}]
         if isinstance(content, str):
             return content + f"\n\n{text}"
-        # Fallback: coerce unexpected types to str to avoid TypeError
+        # 对未预期的内容类型转成文本，避免停止路径因类型不符而再次失败。
         return str(content) + f"\n\n{text}"
 
     @staticmethod
     def _build_hard_stop_update(last_msg, content: str | list) -> dict:
-        """执行 _build_hard_stop_update 的明确职责，并返回与调用约定一致的结果。
-
-        Clear tool-call metadata so forced-stop messages serialize as plain assistant text."""
+        """构造硬停止消息更新，移除工具调用字段并将结束原因改为普通停止。"""
         update = {
             "tool_calls": [],
             "content": content,
@@ -615,30 +414,19 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         return update
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 _apply 的明确职责，并返回与调用约定一致的结果"
+        """根据检测结果暂存警告，或移除工具调用并写入 loop_capped 停止原因。"""
         warning, hard_stop = self._track_and_check(state, runtime)
 
         if hard_stop:
-            # Record the stop reason so the executor can surface
-            # ``stop_reason=loop_capped`` after the run returns (#3875 Phase 2).
-            # The hard stop does not raise — it strips tool_calls and lets the
-            # run finish with a forced final answer — so without this the caller
-            # would see a clean ``completed``. See ``consume_stop_reason``.
-            # Written under the lock to match ``TokenBudgetMiddleware``: the lead
-            # agent's middleware instance is shared across concurrent Gateway
-            # threads, so the bounded-dict write needs the same guard.
+            # 记录停止原因供调用方读取；中间件实例会被并发运行共享，因此写入时持锁。
             run_id = self._get_run_id(runtime)
             with self._lock:
                 self._stop_reason[run_id] = "loop_capped"
-            # Also write to runtime.context so the lead worker can read it
-            # without needing a reference to this middleware instance (#4176).
+            # 同时写入运行上下文，便于 Worker 无需持有中间件引用也能读取。
             ctx = getattr(runtime, "context", None)
             if isinstance(ctx, dict):
                 ctx["stop_reason"] = "loop_capped"
-            # Strip tool_calls from the last AIMessage to force text output.
-            # Once tool_calls are stripped, the AIMessage no longer requires
-            # matching ToolMessage responses, so mutating it in place here
-            # is safe for OpenAI/Moonshot pairing validators.
+            # 移除工具调用后，该消息不再要求配套 ToolMessage，可安全作为普通文本结束。
             messages = state.get("messages", [])
             last_msg = messages[-1]
             content = self._append_text(last_msg.content, warning or _HARD_STOP_MSG)
@@ -646,22 +434,14 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             return {"messages": [stripped_msg]}
 
         if warning:
-            # Defer injection to the next model call. We must NOT alter the
-            # AIMessage(tool_calls=...) here (would put framework words in
-            # the model's mouth, polluting downstream consumers like
-            # MemoryMiddleware), nor insert a separate non-tool message
-            # (would break OpenAI/Moonshot tool-call pairing because the
-            # tools node has not produced ToolMessage responses yet). The
-            # warning is delivered via ``wrap_model_call`` below.
+            # 等工具响应进入历史后再注入，避免篡改模型消息或破坏工具调用配对。
             self._queue_pending_warning(runtime, warning)
             return None
 
         return None
 
     def _clear_other_run_pending_warnings(self, runtime: Runtime) -> None:
-        """执行 _clear_other_run_pending_warnings 的明确职责，并返回与调用约定一致的结果。
-
-        Drop stale pending warnings for previous runs in this thread."""
+        """清理同一线程中其他运行遗留的警告，防止跨运行污染模型上下文。"""
         thread_id, current_run_id = self._pending_key(runtime)
         with self._lock:
             for key in list(self._pending_warnings):
@@ -669,59 +449,53 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
                     self._drop_pending_warning_key_locked(key)
 
     def _clear_current_run_pending_warnings(self, runtime: Runtime) -> None:
-        """执行 _clear_current_run_pending_warnings 的明确职责，并返回与调用约定一致的结果。
-
-        Drop pending warnings owned by the current thread/run."""
+        """删除当前线程和运行尚未注入的警告及其队列索引。"""
         pending_key = self._pending_key(runtime)
         with self._lock:
             self._drop_pending_warning_key_locked(pending_key)
 
     @staticmethod
     def _format_warning_message(warnings: list[str]) -> str:
-        """执行 _format_warning_message 的明确职责，并返回与调用约定一致的结果。
-
-        Merge pending warnings into one prompt message."""
+        """去除重复警告并合并为一段提示文本。"""
         deduped = list(dict.fromkeys(warnings))
         return "\n\n".join(deduped)
 
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
+        """运行开始时清理同线程其他运行残留的警告。"""
         self._clear_other_run_pending_warnings(runtime)
         return None
 
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 abefore_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步运行开始时执行与同步钩子相同的跨运行警告清理。"""
         self._clear_other_run_pending_warnings(runtime)
         return None
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
+        """模型返回后检查工具调用是否重复，并决定暂存警告或强制结束。"""
         return self._apply(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
+        """异步模型返回后复用相同的循环检测和停止处理逻辑。"""
         return self._apply(state, runtime)
 
     @override
     def after_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 after_agent 的明确职责，并返回与调用约定一致的结果"
+        """本轮结束时清除尚未注入的警告，不保留到该线程的后续调用。"""
         self._clear_current_run_pending_warnings(runtime)
         return None
 
     @override
     async def aafter_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 aafter_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步运行结束时清除本轮遗留警告。"""
         self._clear_current_run_pending_warnings(runtime)
         return None
 
     def _drain_pending_warnings(self, runtime: Runtime) -> list[str]:
-        """执行 _drain_pending_warnings 的明确职责，并返回与调用约定一致的结果。
-
-        Pop and return all queued warnings for *runtime*'s thread/run."""
+        """取出并删除当前运行的所有待注入警告及其 LRU 记录。"""
         pending_key = self._pending_key(runtime)
         with self._lock:
             warnings = self._pending_warnings.pop(pending_key, [])
@@ -729,17 +503,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         return warnings
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
-        """执行 _augment_request 的明确职责，并返回与调用约定一致的结果。
-
-        Append queued loop warnings (if any) to the outgoing message list.
-
-                The warning is placed *after* every existing message, including the
-                ToolMessage responses to the previous AIMessage(tool_calls). This
-                keeps ``assistant tool_calls -> tool_messages`` pairing intact for
-                OpenAI/Moonshot, avoids the Anthropic mid-stream SystemMessage
-                restriction (we use HumanMessage), and never mutates an existing
-                AIMessage.
-        """
+        """将本轮警告追加到请求消息末尾，保留工具响应配对且不改写已有消息。"""
         warnings = self._drain_pending_warnings(request.runtime)
         if not warnings:
             return request
@@ -755,7 +519,7 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """同步模型调用前注入循环警告，并将增强后的请求传给后续处理器。"""
         return handler(self._augment_request(request))
 
     @override
@@ -764,13 +528,11 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """异步模型调用前注入循环警告，再等待后续处理器完成响应。"""
         return await handler(self._augment_request(request))
 
     def reset(self, thread_id: str | None = None) -> None:
-        """执行 reset 的明确职责，并返回与调用约定一致的结果。
-
-        Clear tracking state. If thread_id given, clear only that thread."""
+        """清空全部循环跟踪状态，或仅清理指定线程的调用与警告历史。"""
         with self._lock:
             if thread_id:
                 self._history.pop(thread_id, None)

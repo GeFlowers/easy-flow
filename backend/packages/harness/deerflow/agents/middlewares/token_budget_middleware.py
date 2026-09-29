@@ -1,32 +1,8 @@
-"""定义 token_budget_middleware 模块提供的职责与可复用接口。
+"""按单次运行累计模型 Token 用量，并在预算告警或硬上限处干预。
 
-Middleware to enforce per-run token budget limits.
-Tracks cumulative token usage (input, output, total) across model calls within
-a single agent run and enforces configurable soft-warning and hard-stop
-thresholds.
-Detection strategy:
-  1. After each model response, sum the `usage_metadata` of all `AIMessage`s
-     in the current thread history. This automatically captures tokens from
-     subagents because `TokenUsageMiddleware` retroactively adds them to the
-     history.
-  2. If the highest fraction (input, output, or total) >= warn_threshold,
-     queue a warning.
-  3. If the highest fraction >= hard_stop_threshold, strip tool_calls.
-Warning injection uses the deferred pattern:
-  - after_model queues the warning (does NOT mutate state).
-  - wrap_model_call injects it as a HumanMessage at the next model call.
-This preserves AIMessage(tool_calls) → ToolMessage pairing.
-
-Stop-reason surfacing (#3875 Phase 2):
-  The hard stop does NOT raise — it strips tool_calls so the agent loop
-  terminates naturally and produces a final answer. To let the caller (e.g.
-  the subagent executor) distinguish a budget-capped completion from a clean
-  one, the run that triggered the hard stop is recorded in ``_stop_reason``
-  and exposed via :meth:`consume_stop_reason`. That dict is intentionally NOT
-  cleared by ``after_agent``/``_clear_run_state`` so the executor can read it
-  after the run returns; the bounded dict prevents unbounded growth on
-  abandoned runs, and each subagent run builds a fresh middleware instance so
-  there is no cross-run contamination.
+统计历史 AIMessage 的用量元数据，以增量方式处理后续补入的子代理用量。警告会在
+下一次模型请求末尾注入，硬停止则移除工具调用使 Agent 返回已收集的结果。停止原因
+会暂存到执行器读取，其他临时计数则在运行结束时清理。
 """
 
 from __future__ import annotations
@@ -56,7 +32,7 @@ _BUDGET_EXCEEDED_MSG = "[TOKEN BUDGET EXCEEDED] The {reason} token usage ({used:
 
 @dataclass
 class TokenUsage:
-    "封装 TokenUsage 的状态、协作关系与公开操作"
+    """分别累计输入、输出和总 Token 数。"""
 
     input: int = 0
     output: int = 0
@@ -64,33 +40,29 @@ class TokenUsage:
 
 
 class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
-    """封装 TokenBudgetMiddleware 的状态、协作关系与公开操作。
-
-    Enforce per-run token budget limits."""
+    """在 Agent 运行期间累计 Token 用量，并实施软提醒和硬停止阈值。"""
 
     def __init__(self, config: TokenBudgetConfig) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """保存预算配置并初始化按 run_id 隔离的有界用量与提醒缓存。"""
         super().__init__()
         self._config = config
         self._lock = threading.Lock()
 
-        # Keyed strictly by run_id (clobber-safe) and bounded (leak-safe)
+        # 按运行 ID 隔离状态，并限制缓存规模以防异常运行造成累积。
         self._warned: BoundedDict[str, bool] = BoundedDict(1000)
         self._pending_warnings: BoundedDict[str, list[str]] = BoundedDict(1000)
         self._seen_messages: BoundedDict[str, dict[str, tuple[int, int]]] = BoundedDict(1000)
         self._cumulative_usage: BoundedDict[str, TokenUsage] = BoundedDict(1000)
-        # Stop reason set when the hard-stop fires. NOT cleared by
-        # ``_clear_run_state``/``after_agent`` so the executor can consume it
-        # after the run returns; bounded so abandoned runs cannot leak.
+        # 停止原因要留给运行结束后的执行器读取，因此独立保留并设置容量上限。
         self._stop_reason: BoundedDict[str, str] = BoundedDict(1000)
 
     @classmethod
     def from_config(cls, config: TokenBudgetConfig) -> TokenBudgetMiddleware:
-        "执行 from_config 的明确职责，并返回与调用约定一致的结果"
+        """根据已校验的 Token 预算配置构造中间件。"""
         return cls(config=config)
 
     def reset(self) -> None:
-        "执行 reset 的明确职责，并返回与调用约定一致的结果"
+        """清空所有运行的累计用量、已发提醒和硬停止原因。"""
         with self._lock:
             self._warned.clear()
             self._pending_warnings.clear()
@@ -99,30 +71,21 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
             self._stop_reason.clear()
 
     def consume_stop_reason(self, run_id: str | None) -> str | None:
-        """执行 consume_stop_reason 的明确职责，并返回与调用约定一致的结果。
-
-        Pop and return the stop reason the hard-stop set for this run.
-
-                Returns ``"token_capped"`` when the budget hard-stop fired during the
-                run, otherwise ``None``. The executor calls this after the run returns
-                to decide whether a completed subagent was actually budget-capped
-                (and should carry ``stop_reason=token_capped`` to the lead). Popping
-                keeps the dict from accumulating across runs on a reused instance.
-        """
+        """取出并删除本次运行的预算停止原因，供执行器标记被预算截断的子代理结果。"""
         with self._lock:
             return self._stop_reason.pop(run_id, None)
 
     @staticmethod
     def _get_run_id(runtime: Runtime) -> str:
-        "执行 _get_run_id 的明确职责，并返回与调用约定一致的结果"
+        """从运行上下文获取 ID；缺失时使用 Runtime 对象身份隔离嵌入式并发调用。"""
         ctx = getattr(runtime, "context", None)
         if isinstance(ctx, dict) and "run_id" in ctx:
             return ctx["run_id"]
-        # Fallback to runtime object ID to prevent collisions across embedded client runs
+        # 嵌入式调用未必有运行 ID，使用 Runtime 身份避免不同调用共用状态。
         return str(id(runtime))
 
     def _clear_run_state(self, run_id: str) -> None:
-        "执行 _clear_run_state 的明确职责，并返回与调用约定一致的结果"
+        """清除指定运行的告警和用量状态，但保留供调用方读取的停止原因。"""
         with self._lock:
             self._warned.pop(run_id, None)
             self._pending_warnings.pop(run_id, None)
@@ -131,11 +94,11 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> None:
-        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
+        """初始化本轮累计器，并将已有消息用量记为基线，不计入新运行预算。"""
         if not self._config.enabled:
             return
 
-        # Mark all old messages from previous runs as 'seen' so they don't count toward THIS run's budget
+        # 已存在的对话消息属于此前运行，仅登记基线，避免重复计费。
         messages = state.get("messages", [])
         if not messages:
             return
@@ -154,26 +117,24 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> None:
-        "执行 abefore_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步启动钩子复用同步逻辑登记历史用量基线。"""
         self.before_agent(state, runtime)
 
     @override
     def after_agent(self, state: AgentState, runtime: Runtime) -> None:
-        "执行 after_agent 的明确职责，并返回与调用约定一致的结果"
+        """Agent 结束后释放本轮用量和警告缓存。"""
         if not self._config.enabled:
             return
         self._clear_run_state(self._get_run_id(runtime))
 
     @override
     async def aafter_agent(self, state: AgentState, runtime: Runtime) -> None:
-        "执行 aafter_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步结束钩子复用同步清理逻辑。"""
         self.after_agent(state, runtime)
 
     @staticmethod
     def _append_text(content: str | list[dict | None] | None, stop_msg: str) -> str | list[dict | str]:
-        """执行 _append_text 的明确职责，并返回与调用约定一致的结果。
-
-        Append a stop message to an AIMessage.content field."""
+        """按内容字段类型追加预算停止说明，兼容文本块列表和空内容。"""
         if content is None:
             return stop_msg
         if isinstance(content, str):
@@ -187,9 +148,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         return f"{content}\n\n{stop_msg}"
 
     def _build_hard_stop_update(self, msg: AIMessage, stop_msg: str) -> dict[str, Any]:
-        """执行 _build_hard_stop_update 的明确职责，并返回与调用约定一致的结果。
-
-        Build the state update dictionary for a hard stop."""
+        """创建硬停止状态更新，移除工具调用数据并规范化结束原因。"""
         updated_content = self._append_text(msg.content, stop_msg)
         kwargs = dict(msg.additional_kwargs) if msg.additional_kwargs else {}
         if "tool_calls" in kwargs:
@@ -206,7 +165,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         return {"messages": [stopped_msg]}
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 _apply 的明确职责，并返回与调用约定一致的结果"
+        """汇总尚未计入的消息用量，选择最先达到的预算维度并生成警告或硬停止。"""
         if not self._config.enabled:
             return None
 
@@ -231,10 +190,10 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
                     input_tokens = usage.get("input_tokens", 0)
                     output_tokens = usage.get("output_tokens", 0)
 
-                    # Check what previously recorded for this exact message
+                    # 按消息 ID 计算相对上次记录的新增用量。
                     prev_input, prev_output = seen.get(msg.id, (0, 0))
 
-                    # Calculate if any new tokens were added (handles retroactive subagent tokens)
+                    # 子代理用量可能稍后补写，因此只累计本次增加的差值。
                     diff_input = max(0, input_tokens - prev_input)
                     diff_output = max(0, output_tokens - prev_output)
 
@@ -268,13 +227,9 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
             if highest_fraction >= self._config.hard_stop_threshold:
                 logger.warning("Token budget hard stop triggered for run %s: %s limit exceeded", run_id, trigger_reason)
-                # Record the stop reason so the executor can surface
-                # ``stop_reason=token_capped`` to the lead after the run
-                # returns (the hard stop itself does not raise). See
-                # ``consume_stop_reason``.
+                # 硬停止通过正常返回结束图，因此额外记录原因供执行器区分预算截断。
                 self._stop_reason[run_id] = "token_capped"
-                # Also write to runtime.context so the lead worker can read it
-                # without needing a reference to this middleware instance (#4176).
+                # 同时写入运行上下文，便于 Worker 无需中间件引用也能读取停止原因。
                 ctx = getattr(runtime, "context", None)
                 if isinstance(ctx, dict):
                     ctx["stop_reason"] = "token_capped"
@@ -286,7 +241,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
                 percent = highest_fraction * 100
                 warn_text = _BUDGET_WARNING_MSG.format(reason=trigger_reason, used=trigger_used, budget=trigger_budget, percent=percent)
                 logger.info("Token budget warning triggered for run %s: %s limit at %.1f%%", run_id, trigger_reason, percent)
-                # queue warning for wrap_model_call
+                # 等待模型调用包装器追加提示，避免改变当前图状态。
                 warnings = self._pending_warnings.setdefault(run_id, [])
                 warnings.append(warn_text)
                 return None
@@ -295,16 +250,16 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
+        """模型返回后更新 Token 用量并检查预算阈值。"""
         return self._apply(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
+        """异步模型返回后执行相同的用量统计与阈值检查。"""
         return self._apply(state, runtime)
 
     def _drain_pending_warnings(self, runtime: Runtime) -> list[str]:
-        "执行 _drain_pending_warnings 的明确职责，并返回与调用约定一致的结果"
+        """取出并删除本轮待注入的预算提醒；预算功能关闭时返回空列表。"""
         if not self._config.enabled:
             return []
 
@@ -314,7 +269,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         return warnings or []
 
     def _inject_warnings(self, request: ModelRequest, warnings: list[str]) -> ModelRequest:
-        "执行 _inject_warnings 的明确职责，并返回与调用约定一致的结果"
+        """将合并后的预算提醒追加到模型请求；无提醒时保持原请求不变。"""
         if not warnings:
             return request
 
@@ -327,7 +282,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
-        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """同步模型调用前注入暂存提醒，再调用下游模型处理器。"""
         warnings = self._drain_pending_warnings(request.runtime)
         request = self._inject_warnings(request, warnings)
 
@@ -335,7 +290,7 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
     @override
     async def awrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]) -> ModelCallResult:
-        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """异步模型调用前注入暂存提醒，再等待下游模型处理器。"""
         warnings = self._drain_pending_warnings(request.runtime)
         request = self._inject_warnings(request, warnings)
         return await handler(request)

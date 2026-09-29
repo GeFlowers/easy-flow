@@ -71,16 +71,14 @@ class Skill:
         return "" if path == "." else path
 
     def get_container_path(self, container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH) -> str:
-        """读取并返回，并遵守 get_container_path 所表达的接口约束。
+        """根据技能类别、相对路径和容器挂载根目录计算技能目录路径。
 
-
-        Get the full path to this skill in the container.
 
         Args:
-            container_base_path: Base path where skills are mounted in the container
+            container_base_path: 技能在容器中的挂载根目录。
 
         Returns:
-            Full container path to the skill directory
+            容器内的技能目录完整路径。
         """
         category_base = f"{container_base_path}/{self.category}"
         skill_path = self.skill_path
@@ -89,16 +87,14 @@ class Skill:
         return category_base
 
     def get_container_file_path(self, container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH) -> str:
-        """读取并返回，并遵守 get_container_file_path 所表达的接口约束。
+        """根据技能目录路径计算其主说明文件 SKILL.md 的容器内路径。
 
-
-        Get the full path to this skill's main file (SKILL.md) in the container.
 
         Args:
-            container_base_path: Base path where skills are mounted in the container
+            container_base_path: 技能在容器中的挂载根目录。
 
         Returns:
-            Full container path to the skill's SKILL.md file
+            容器内 SKILL.md 的完整路径。
         """
         return f"{self.get_container_path(container_base_path)}/SKILL.md"
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import os
 from typing import Literal
 
 from pydantic import BaseModel, Field
@@ -11,13 +10,9 @@ from pydantic import BaseModel, Field
 class DatabaseConfig(BaseModel):
     """\u6267\u884c DatabaseConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
 
-    backend: Literal["sqlite", "postgres"] = Field(
-        default="sqlite",
-        description=("Storage backend for both checkpointer and application data. 'sqlite' for single-node deployment, 'postgres' for production multi-node deployment."),
-    )
-    sqlite_dir: str = Field(
-        default=".deer-flow/data",
-        description=("Directory for the SQLite database file. Both checkpointer and application data share {sqlite_dir}/deerflow.db."),
+    backend: Literal["postgres"] = Field(
+        default="postgres",
+        description="PostgreSQL storage backend for checkpointer and application data.",
     )
     postgres_url: str = Field(
         default="",
@@ -37,40 +32,12 @@ class DatabaseConfig(BaseModel):
         description="Connection pool size for the app ORM engine (postgres only).",
     )
 
-    # 中文说明：此处用于执行相关处理。
-
-    @property
-    def _resolved_sqlite_dir(self) -> str:
-        """\u6267\u884c _resolved_sqlite_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        from pathlib import Path
-
-        return str(Path(self.sqlite_dir).resolve())
-
-    @property
-    def sqlite_path(self) -> str:
-        """\u6267\u884c sqlite_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        return os.path.join(self._resolved_sqlite_dir, "deerflow.db")
-
-        # 中文说明：此处用于执行相关处理。
-
-    @property
-    def checkpointer_sqlite_path(self) -> str:
-        """\u6267\u884c checkpointer_sqlite_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        return self.sqlite_path
-
-    @property
-    def app_sqlite_path(self) -> str:
-        """\u6267\u884c app_sqlite_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        return self.sqlite_path
-
     @property
     def app_sqlalchemy_url(self) -> str:
-        """\u6267\u884c app_sqlalchemy_url \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        if self.backend == "sqlite":
-            return f"sqlite+aiosqlite:///{self.sqlite_path}"
-        if self.backend == "postgres":
-            url = self.postgres_url
-            if url.startswith("postgresql://"):
-                url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
-            return url
-        raise ValueError(f"No SQLAlchemy URL for backend={self.backend!r}")
+        """返回 SQLAlchemy 异步引擎使用的 PostgreSQL URL，并补充 asyncpg 驱动名。"""
+        if not self.postgres_url:
+            raise ValueError("database.postgres_url is required for the postgres backend")
+        url = self.postgres_url
+        if url.startswith("postgresql://"):
+            url = url.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return url

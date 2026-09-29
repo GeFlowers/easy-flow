@@ -21,14 +21,14 @@ if TYPE_CHECKING:
 
 # 通道类按需导入，未启用的平台不会加载其可选 SDK。
 _CHANNEL_REGISTRY: dict[str, str] = {
-    "dingtalk": "app.channels.dingtalk:DingTalkChannel",
-    "discord": "app.channels.discord:DiscordChannel",
-    "feishu": "app.channels.feishu:FeishuChannel",
-    "github": "app.channels.github:GitHubChannel",
-    "slack": "app.channels.slack:SlackChannel",
-    "telegram": "app.channels.telegram:TelegramChannel",
-    "wechat": "app.channels.wechat:WechatChannel",
-    "wecom": "app.channels.wecom:WeComChannel",
+    "dingtalk": "app.channels.providers.dingtalk:DingTalkChannel",
+    "discord": "app.channels.providers.discord:DiscordChannel",
+    "feishu": "app.channels.providers.feishu:FeishuChannel",
+    "github": "app.channels.providers.github:GitHubChannel",
+    "slack": "app.channels.providers.slack:SlackChannel",
+    "telegram": "app.channels.providers.telegram:TelegramChannel",
+    "wechat": "app.channels.providers.wechat:WechatChannel",
+    "wecom": "app.channels.providers.wecom:WeComChannel",
 }
 
 # 这些键只用于判断“已配置但未启用”，不会参与凭据有效性校验。

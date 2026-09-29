@@ -22,7 +22,6 @@ BUILTIN_TOOLS = [
 
 SUBAGENT_TOOLS = [
     task_tool,
-    # 中文说明：此处用于执行相关处理。
 ]
 
 
@@ -55,17 +54,10 @@ def get_available_tools(
     """依据配置、运行时策略和模型能力返回可用工具列表。"""
     config = app_config or get_app_config()
     tool_configs = [tool for tool in config.tools if groups is None or tool.group in groups]
-
-    # 中文说明：此处用于执行相关处理。
     if not is_host_bash_allowed(config):
         tool_configs = [tool for tool in tool_configs if not _is_host_bash_tool(tool)]
 
     loaded_tools_raw = [(cfg, resolve_variable(cfg.use, BaseTool)) for cfg in tool_configs]
-
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     for cfg, loaded in loaded_tools_raw:
         if cfg.name != loaded.name:
             logger.warning(
@@ -76,35 +68,21 @@ def get_available_tools(
             )
 
     loaded_tools = [_ensure_sync_invocable_tool(t) for _, t in loaded_tools_raw]
-
-    # 中文说明：此处用于执行相关处理。
     builtin_tools = BUILTIN_TOOLS.copy()
     skill_evolution_config = getattr(config, "skill_evolution", None)
     if getattr(skill_evolution_config, "enabled", False):
         from deerflow.tools.skill_manage_tool import skill_manage_tool
 
         builtin_tools.append(skill_manage_tool)
-
-        # 中文说明：此处用于执行相关处理。
     if subagent_enabled:
         builtin_tools.extend(SUBAGENT_TOOLS)
         logger.info("Including subagent tools (task)")
-
-        # 中文说明：此处用于执行相关处理。
     if model_name is None and config.models:
         model_name = config.models[0].name
-
-        # 中文说明：此处用于执行相关处理。
     model_config = config.get_model_config(model_name) if model_name else None
     if model_config is not None and model_config.supports_vision:
         builtin_tools.append(view_image_tool)
         logger.info(f"Including view_image_tool for model '{model_name}' (supports_vision=True)")
-
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
     mcp_tools = []
     if include_mcp:
         try:
@@ -116,20 +94,12 @@ def get_available_tools(
                 mcp_tools = get_cached_mcp_tools()
                 if mcp_tools:
                     logger.info(f"Using {len(mcp_tools)} cached MCP tool(s)")
-
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
-                    # 中文说明：此处用于执行相关处理。
                     for t in mcp_tools:
                         tag_mcp_tool(t)
         except ImportError:
             logger.warning("MCP module not available. Install 'langchain-mcp-adapters' package to enable MCP tools.")
         except Exception as e:
             logger.error(f"Failed to get cached MCP tools: {e}")
-
-        # 中文说明：此处用于执行相关处理。
     acp_tools: list[BaseTool] = []
     try:
         from deerflow.tools.builtins.invoke_acp_agent_tool import build_invoke_acp_agent_tool
@@ -147,10 +117,6 @@ def get_available_tools(
         logger.warning(f"Failed to load ACP tool: {e}")
 
     logger.info(f"Total tools loaded: {len(loaded_tools)}, built-in tools: {len(builtin_tools)}, MCP tools: {len(mcp_tools)}, ACP tools: {len(acp_tools)}")
-
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     all_tools = [_ensure_sync_invocable_tool(t) for t in loaded_tools + builtin_tools + mcp_tools + acp_tools]
     seen_names: set[str] = set()
     unique_tools: list[BaseTool] = []

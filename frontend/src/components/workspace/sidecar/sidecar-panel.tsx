@@ -77,7 +77,6 @@ import {
   type UploadLimits,
   type UploadLimitViolation,
 } from "@/core/uploads";
-import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 import {
@@ -189,7 +188,6 @@ export function SidecarPanel({ className }: { className?: string }) {
     threadId: sidecar.sidecarThreadId ?? undefined,
     displayThreadId: sidecar.sidecarThreadId ?? undefined,
     context: sidecar.context,
-    isMock: sidecar.isMock,
     onStart: (createdThreadId) => {
       sidecar.setSidecarThreadId(createdThreadId);
     },
@@ -228,9 +226,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     Boolean(queuedSubmit) ||
     isUploading ||
     hasOpenHumanInputCard ||
-    (hasSidecarThread && isHistoryLoading) ||
-    (sidecar.isMock ?? false) ||
-    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true";
+    (hasSidecarThread && isHistoryLoading);
 
   useEffect(() => {
     if (models.length === 0) {
@@ -597,11 +593,7 @@ export function SidecarPanel({ className }: { className?: string }) {
             sidecarSurface
             initialScroll="instant"
             resizeScroll="instant"
-            onSubmitHumanInput={
-              sidecar.isMock || env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"
-                ? undefined
-                : handleSubmitHumanInput
-            }
+            onSubmitHumanInput={handleSubmitHumanInput}
           />
         ) : (
           <ConversationEmptyState

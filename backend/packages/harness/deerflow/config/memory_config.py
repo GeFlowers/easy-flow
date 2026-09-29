@@ -6,15 +6,7 @@ from typing import Any, Literal
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
-
-# 中文说明：此处用于执行相关处理。
 _SHARED_FIELDS = frozenset({"enabled", "mode", "injection_enabled", "shutdown_flush_timeout_seconds", "manager_class", "backend_config"})
-
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 _LEGACY_DEERMEM_FIELDS = frozenset(
     {
         "storage_path",
@@ -104,9 +96,6 @@ class MemoryConfig(BaseModel):
 def should_use_memory_tools(config: MemoryConfig) -> bool:
     """\u6267\u884c should_use_memory_tools \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
     return config.enabled and config.mode == "tool"
-
-
-# 中文说明：此处用于执行相关处理。
 _memory_config: MemoryConfig = MemoryConfig()
 
 
@@ -133,23 +122,14 @@ def load_memory_config_from_dict(config_dict: dict) -> None:
         if key in _LEGACY_DEERMEM_FIELDS:
             value = config_dict.pop(key)
             if value is None or value == "":
-                continue  # 中文说明：此处用于执行相关处理。
+                continue
             if key == "model_name":
-                # 中文说明：此处用于执行相关处理。
                 model_cfg = dict(backend_config.get("model") or {})
                 if "model" not in model_cfg:
                     model_cfg["model"] = value
                     backend_config["model"] = model_cfg
                     migrated.append(f"{key} -> backend_config.model.model")
             elif key == "storage_path" and str(value).endswith(".json"):
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
-                # 中文说明：此处用于执行相关处理。
                 logger.warning(
                     "Legacy memory.storage_path=%r looks like a file path; DeerMem now "
                     "treats storage_path as a root DIRECTORY (per-user memory under "
@@ -160,7 +140,6 @@ def load_memory_config_from_dict(config_dict: dict) -> None:
                     value,
                 )
             elif key not in backend_config:
-                # 中文说明：此处用于执行相关处理。
                 backend_config[key] = value
                 migrated.append(f"{key} -> backend_config.{key}")
         else:

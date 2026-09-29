@@ -14,7 +14,7 @@ single-purpose modules so each piece can be tested in isolation:
 * :mod:`run_policy` — ChannelRunPolicy entry registered into ChannelManager.
 * :mod:`dispatcher` — orchestrates all of the above and creates a langgraph run.
 
-The router in :mod:`app.gateway.routers.github_webhooks` is the only consumer
+The router in :mod:`app.gateway.routers.integrations.github_webhooks` is the only consumer
 of this package.
 """
 

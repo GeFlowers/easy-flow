@@ -1,58 +1,17 @@
 ---
 title: Deployment Guide
-description: "This guide covers all supported deployment methods for DeerFlow App: local development, Docker Compose, and production with Kubernetes-managed sandboxes."
+description: "This guide covers the supported Docker Compose deployment for DeerFlow App, including Kubernetes-managed sandboxes."
 ---
 
-import { Callout, Steps, Tabs } from "nextra/components";
+import { Callout, Steps } from "nextra/components";
 
 # Deployment Guide
 
-This guide covers all supported deployment methods for DeerFlow App: local development, Docker Compose, and production with Kubernetes-managed sandboxes.
+This guide covers the supported Docker Compose deployment for DeerFlow App, including Kubernetes-managed sandboxes.
 
-## Local development deployment
+## Supported deployment
 
-The local workflow is the fastest way to run DeerFlow. All services run as native processes on your machine.
-
-<Tabs items={["Start", "Stop", "Logs"]}>
-  <Tabs.Tab>
-```bash
-make dev
-```
-
-Services started:
-
-| Service     | Port | Description              |
-| ----------- | ---- | ------------------------ |
-| Gateway API | 8001 | FastAPI backend + embedded agent runtime |
-| Frontend    | 3000 | Next.js UI               |
-| nginx       | 2026 | Unified reverse proxy    |
-
-Access the app at **http://localhost:2026**.
-
-  </Tabs.Tab>
-  <Tabs.Tab>
-```bash
-make stop
-```
-
-Stops all services. Safe to run even if a service is not running.
-
-  </Tabs.Tab>
-  <Tabs.Tab>
-```
-logs/gateway.log     # API gateway and agent runtime logs
-logs/frontend.log    # Next.js dev server logs
-logs/nginx.log       # nginx access/error logs
-```
-
-Tail a log in real time:
-
-```bash
-tail -f logs/gateway.log
-```
-
-  </Tabs.Tab>
-</Tabs>
+This project supports one application startup workflow: Docker Compose through `make docker-start`.
 
 ## Docker Compose deployment
 
@@ -63,18 +22,17 @@ Docker Compose runs all services in containers. Use this for a more production-l
 - Docker (or Docker Desktop / OrbStack on macOS)
 - A configured `config.yaml` at the repo root
 
-### Development compose
+### Start the application
 
 ```bash
-# Set the absolute path to your deer-flow repo root
-export DEER_FLOW_ROOT=/path/to/deer-flow
-
-docker compose -f docker/docker-compose-dev.yaml up --build
+make docker-start
 ```
 
-Services: nginx, frontend, gateway, and optionally provisioner (for K8s-managed sandboxes).
+Services: nginx, frontend, gateway, PostgreSQL, and optionally provisioner (for K8s-managed sandboxes).
 
 Access the app at **http://localhost:2026**.
+
+Stop the services with `make docker-stop`; view logs with `make docker-logs`.
 
 ### Environment variables
 
@@ -121,11 +79,7 @@ For any deployment with more than one concurrent user, use a container-based san
 
 ### Database backend
 
-SQLite is convenient for local development and single-user deployments, but it is not a production backend for concurrent users.
-
-In SQLite mode, DeerFlow stores LangGraph checkpoint data and application data in one `deerflow.db` file. WAL mode allows concurrent reads, but SQLite still permits only one writer at a time. When several users run agents at once, checkpoint writes and application writes can contend for the same file and raise `sqlite3.OperationalError: database is locked`.
-
-For production or any multi-user deployment, use Postgres:
+DeerFlow uses PostgreSQL for LangGraph checkpoints, LangGraph Store data, and application records:
 
 ```bash
 # .env
@@ -142,8 +96,6 @@ database:
 run_events:
   backend: db
 ```
-
-Keep SQLite deployments to local, single-node, or short-lived evaluation environments.
 
 ### K8s Provisioner setup
 

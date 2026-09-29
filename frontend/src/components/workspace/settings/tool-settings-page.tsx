@@ -12,7 +12,6 @@ import { useI18n } from "@/core/i18n/hooks";
 import { MCPConfigRequestError } from "@/core/mcp/api";
 import { useMCPConfig, useEnableMCPServer } from "@/core/mcp/hooks";
 import type { MCPServerConfig } from "@/core/mcp/types";
-import { env } from "@/env";
 
 import { SettingsSection } from "./settings-section";
 
@@ -74,7 +73,6 @@ function MCPServerList({
           <ItemActions>
             <Switch
               checked={config.enabled}
-              disabled={env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"}
               onCheckedChange={(checked) =>
                 enableMCPServer({ serverName: name, enabled: checked })
               }

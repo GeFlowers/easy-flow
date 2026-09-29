@@ -52,14 +52,13 @@ import {
 } from "@/core/threads/hooks";
 import { threadTokenUsageToTokenUsage } from "@/core/threads/token-usage";
 import { textOfMessage } from "@/core/threads/utils";
-import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 /** 管理普通会话的流式消息、历史恢复、分支与输入交互。 */
 export default function ChatPage() {
   const { t } = useI18n();
   const router = useRouter();
-  const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
+  const { threadId, setThreadId, isNewThread, setIsNewThread } =
     useThreadChat();
   // isNewThread 表示后端是否已创建会话，用于阻止 SDK 过早拉取历史；isWelcomeMode 仅控制欢迎布局，提交时立即切换以保证动画及时响应。
   const [isWelcomeMode, setIsWelcomeMode] = useState(isNewThread);
@@ -67,12 +66,11 @@ export default function ChatPage() {
   const [localSettings, setLocalSettings] = useLocalSettings();
   const { tokenUsageEnabled } = useModels();
   const threadTokenUsage = useThreadTokenUsage(
-    isNewThread || isMock ? undefined : threadId,
-    { enabled: tokenUsageEnabled && !isMock },
+    isNewThread ? undefined : threadId,
+    { enabled: tokenUsageEnabled },
   );
   const threadMetadata = useThreadMetadata(threadId, {
-    enabled: !isNewThread && !isMock,
-    isMock,
+    enabled: !isNewThread,
   });
   const branchThread = useBranchThread();
   const backendTokenUsage = threadTokenUsageToTokenUsage(threadTokenUsage.data);
@@ -103,7 +101,6 @@ export default function ChatPage() {
     threadId: isNewThread ? undefined : threadId,
     displayThreadId: threadId,
     context: settings.context,
-    isMock,
     // onSend 只更新视觉状态；不能提前清除 isNewThread，否则 SDK 会假定后端已有会话并过早请求历史。
     onSend: () => {
       setIsWelcomeMode(false);
@@ -137,7 +134,6 @@ export default function ChatPage() {
   useEffect(() => {
     if (
       !isNewThread &&
-      !isMock &&
       threadMetadata.data === null &&
       !threadMetadata.isLoading &&
       !threadMetadata.isFetching &&
@@ -151,7 +147,6 @@ export default function ChatPage() {
     hasMoreHistory,
     hasThreadMessages,
     isHistoryLoading,
-    isMock,
     isNewThread,
     router,
     threadMetadata.data,
@@ -208,11 +203,7 @@ export default function ChatPage() {
   /** 从指定消息创建会话分支，并在成功后导航至新会话。 */
   const handleBranchTurn = useCallback(
     async (messageId: string, messageIds: string[]) => {
-      if (
-        isNewThread ||
-        isMock ||
-        env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"
-      ) {
+      if (isNewThread) {
         return;
       }
 
@@ -230,7 +221,7 @@ export default function ChatPage() {
         );
       }
     },
-    [branchThread, isMock, isNewThread, router, t, threadId],
+    [branchThread, isNewThread, router, t, threadId],
   );
 
   const tokenUsageInlineMode = tokenUsageEnabled
@@ -251,12 +242,8 @@ export default function ChatPage() {
   );
 
   return (
-    <ThreadContext.Provider value={{ thread, isMock }}>
-      <SidecarProvider
-        parentThreadId={threadId}
-        context={settings.context}
-        isMock={isMock}
-      >
+    <ThreadContext.Provider value={{ thread }}>
+      <SidecarProvider parentThreadId={threadId} context={settings.context}>
         <ChatBox threadId={threadId}>
           <div className="relative flex size-full min-h-0 justify-between">
             <header
@@ -304,22 +291,12 @@ export default function ChatPage() {
                   isHistoryLoading={isHistoryLoading}
                   tokenUsageInlineMode={tokenUsageInlineMode}
                   canRegenerate={
-                    !isNewThread &&
-                    !isMock &&
-                    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" &&
-                    !isUploading &&
-                    !thread.isLoading
+                    !isNewThread && !isUploading && !thread.isLoading
                   }
                   onRegenerateMessage={handleRegenerate}
-                  onSubmitHumanInput={
-                    isMock || env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"
-                      ? undefined
-                      : handleSubmitHumanInput
-                  }
+                  onSubmitHumanInput={handleSubmitHumanInput}
                   canBranch={
                     !isNewThread &&
-                    !isMock &&
-                    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" &&
                     !isUploading &&
                     !thread.isLoading &&
                     !branchThread.isPending
@@ -390,8 +367,6 @@ export default function ChatPage() {
                         !hasTodos && <Welcome mode={settings.context.mode} />
                       }
                       disabled={
-                        isMock ||
-                        env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
                         isUploading ||
                         hasOpenHumanInputCard ||
                         (!isNewThread && isHistoryLoading)
@@ -411,11 +386,6 @@ export default function ChatPage() {
                         isWelcomeMode && "-translate-y-2 sm:-translate-y-4",
                       )}
                     />
-                  )}
-                  {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" && (
-                    <div className="text-muted-foreground/67 w-full translate-y-12 text-center text-xs">
-                      {t.common.notAvailableInDemoMode}
-                    </div>
                   )}
                 </div>
               </div>

@@ -14,7 +14,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """执行本迁移版本定义的数据库架构升级操作。"""
+    """创建计划任务和任务运行表，并补充调度、状态查询索引。"""
     bind = op.get_bind()
     inspector = sa.inspect(bind)
     if inspector.has_table("scheduled_tasks"):
@@ -76,7 +76,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """执行本迁移版本定义的数据库架构回退操作。"""
+    """删除计划任务运行表与计划任务表。"""
     with op.batch_alter_table("scheduled_task_runs", schema=None) as batch_op:
         batch_op.drop_index("ix_scheduled_task_runs_status")
         batch_op.drop_index("ix_scheduled_task_runs_thread_id")

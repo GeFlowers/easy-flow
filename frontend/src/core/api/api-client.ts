@@ -3,13 +3,6 @@
 import { Client as LangGraphClient } from "@langchain/langgraph-sdk/client";
 
 import { getLangGraphBaseURL } from "../config";
-import { isStaticWebsiteOnly } from "../static-mode";
-import {
-  loadStaticDemoThread,
-  loadStaticDemoThreads,
-  staticDemoThreadState,
-} from "../threads/static-demo";
-import type { AgentThreadState } from "../threads/types";
 
 import { isStateChangingMethod, readCsrfCookie } from "./fetcher";
 import { sanitizeRunStreamOptions } from "./stream-mode";
@@ -158,12 +151,8 @@ export function clearReconnectRun(
 }
 
 /** 创建兼容 Gateway、CSRF 保护、终态重连和流模式约束的 LangGraph 客户端。 */
-function createCompatibleClient(isMock?: boolean): LangGraphClient {
-  if (isStaticWebsiteOnly() && !isMock) {
-    return createStaticClient();
-  }
-
-  const apiUrl = getLangGraphBaseURL(isMock);
+function createCompatibleClient(): LangGraphClient {
+  const apiUrl = getLangGraphBaseURL();
   console.log(`Creating API client with base URL: ${apiUrl}`);
   const client = new LangGraphClient({
     apiUrl,
@@ -222,55 +211,9 @@ function createCompatibleClient(isMock?: boolean): LangGraphClient {
   return client;
 }
 
-/** 创建供静态网站演示模式使用的本地 LangGraph 客户端替身。 */
-function createStaticClient(): LangGraphClient {
-  const apiUrl =
-    typeof window === "undefined"
-      ? "http://localhost:3000"
-      : window.location.origin;
-  const client = new LangGraphClient({ apiUrl });
-
-  client.threads.search = (async (query) => {
-    return loadStaticDemoThreads(query);
-  }) as typeof client.threads.search;
-
-  client.threads.get = (async (threadId) => {
-    return loadStaticDemoThread(threadId);
-  }) as typeof client.threads.get;
-
-  client.threads.getState = (async (threadId) => {
-    return staticDemoThreadState(await loadStaticDemoThread(threadId));
-  }) as typeof client.threads.getState;
-
-  client.threads.getHistory = (async (threadId) => {
-    return [staticDemoThreadState(await loadStaticDemoThread(threadId))];
-  }) as typeof client.threads.getHistory;
-
-  client.threads.update = (async (threadId) => {
-    return loadStaticDemoThread(threadId);
-  }) as typeof client.threads.update;
-
-  client.runs.list = (async () => []) as typeof client.runs.list;
-  client.runs.stream = async function* () {
-    /* 静态演示模式没有运行流。 */
-  } as typeof client.runs.stream;
-  client.runs.joinStream = async function* () {
-    /* 静态演示模式没有可重新加入的运行流。 */
-  } as typeof client.runs.joinStream;
-
-  return client as LangGraphClient<AgentThreadState>;
-}
-
-const _clients = new Map<string, LangGraphClient>();
-/** 按普通或模拟模式获取并缓存唯一的兼容 LangGraph 客户端。 */
-export function getAPIClient(isMock?: boolean): LangGraphClient {
-  const cacheKey = isMock ? "mock" : "default";
-  let client = _clients.get(cacheKey);
-
-  if (!client) {
-    client = createCompatibleClient(isMock);
-    _clients.set(cacheKey, client);
-  }
-
+let client: LangGraphClient | undefined;
+/** 获取并缓存兼容 Gateway 的 LangGraph 客户端。 */
+export function getAPIClient(): LangGraphClient {
+  client ??= createCompatibleClient();
   return client;
 }

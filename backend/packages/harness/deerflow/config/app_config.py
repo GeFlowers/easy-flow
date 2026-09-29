@@ -54,8 +54,7 @@ logger = logging.getLogger(__name__)
 
 
 CONFIG_FILE_DATABASE_DEFAULTS = {
-    "backend": "sqlite",
-    "sqlite_dir": ".deer-flow/data",
+    "backend": "postgres",
 }
 
 
@@ -189,7 +188,7 @@ class AppConfig(BaseModel):
         default_factory=DatabaseConfig,
         description=format_field_description(
             "database",
-            field_doc="Unified database backend for run/feedback metadata (sqlite or postgres).",
+            field_doc="PostgreSQL database backend for run/feedback metadata.",
         ),
     )
     run_events: RunEventsConfig = Field(
@@ -321,7 +320,7 @@ class AppConfig(BaseModel):
         result = cls.model_validate(config_data)
         if not result.models:
             logger.warning(
-                "No models are configured in %s. Add at least one entry under `models:` (see the commented examples in config.example.yaml) or run `make setup`.",
+                "No models are configured in %s. Add at least one entry under `models:` (see the commented examples in config.example.yaml).",
                 resolved_path,
             )
         acp_agents = cls._validate_acp_agents(config_data.get("acp_agents", {}))

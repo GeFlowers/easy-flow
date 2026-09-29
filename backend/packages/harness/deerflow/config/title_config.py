@@ -30,9 +30,6 @@ class TitleConfig(BaseModel):
         default=("Generate a concise title (max {max_words} words) for this conversation.\nUser: {user_msg}\nAssistant: {assistant_msg}\n\nReturn ONLY the title, no quotes, no explanation."),
         description="Prompt template for LLM title generation when model_name is set",
     )
-
-
-# 中文说明：此处用于执行相关处理。
 _title_config: TitleConfig = TitleConfig()
 
 

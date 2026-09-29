@@ -10,7 +10,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.run.model import RunRow
-from deerflow.runtime.runs.store.base import RunStore
+from deerflow.runtime.runs.store import RunStore
 from deerflow.runtime.user_context import AUTO, _AutoSentinel, resolve_user_id
 from deerflow.utils.time import coerce_iso
 
@@ -29,7 +29,7 @@ class RunRepository(RunStore):
 
     @staticmethod
     def _normalize_model_name(model_name: str | None) -> str | None:
-        """执行持久化流程所需的内部辅助操作。"""
+        """将空白模型名转换为 None，避免保存无效标识。"""
         if model_name is None:
             return None
         if not isinstance(model_name, str):
@@ -73,9 +73,7 @@ class RunRepository(RunStore):
         # Remap JSON columns to match RunStore interface
         d["metadata"] = d.pop("metadata_json", {})
         d["kwargs"] = d.pop("kwargs_json", {})
-        # Convert datetime to ISO string for consistency with the store API.
-        # SQLite drops tzinfo on read despite ``DateTime(timezone=True)`` —
-        # ``coerce_iso`` normalizes naive datetimes as UTC.
+        # 转成 ISO 字符串以统一仓储接口，并兼容历史无时区记录。
         for key in ("created_at", "updated_at", "lease_expires_at"):
             val = d.get(key)
             if isinstance(val, datetime):
@@ -101,7 +99,7 @@ class RunRepository(RunStore):
         owner_worker_id: str | None = None,
         lease_expires_at: str | None = None,
     ):
-        """执行当前持久化组件提供的操作。"""
+        """按运行 ID 插入或更新运行元数据，并返回规范化后的记录。"""
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.put")
         now = datetime.now(UTC)
         created = datetime.fromisoformat(created_at) if created_at else now
@@ -361,7 +359,7 @@ class RunRepository(RunStore):
             await session.commit()
 
     async def aggregate_tokens_by_thread(self, thread_id: str, *, include_active: bool = False) -> dict[str, Any]:
-        """执行当前持久化组件提供的操作。"""
+        """汇总线程各模型的输入、输出和缓存 token 用量。"""
         statuses = ("success", "error", "running") if include_active else ("success", "error")
         _completed = RunRow.status.in_(statuses)
         _thread = RunRow.thread_id == thread_id
@@ -450,7 +448,7 @@ class RunRepository(RunStore):
         grace_seconds: int,
         error: str,
     ) -> bool:
-        """执行当前持久化组件提供的操作。"""
+        """原子认领失联运行记录，避免多个 Gateway 同时接管同一运行。"""
         cutoff = datetime.now(UTC) - timedelta(seconds=grace_seconds)
         async with self._sf() as session:
             result = await session.execute(
@@ -547,14 +545,7 @@ class RunRepository(RunStore):
                 result = await session.execute(stmt)
                 for row in result.scalars():
                     if row.lease_expires_at is not None:
-                        # SQLite drops tzinfo on read despite
-                        # ``DateTime(timezone=True)`` (see ``_row_to_dict``).
-                        # Treat naive values as UTC — same convention as
-                        # ``coerce_iso`` — so the Python-side comparison
-                        # against the aware ``cutoff`` does not raise
-                        # ``TypeError: can't compare offset-naive and
-                        # offset-aware datetimes`` when heartbeat is enabled
-                        # on SQLite.
+                        # 历史数据可能没有时区；比较租约前将其按 UTC 解释。
                         row_lease = row.lease_expires_at
                         if row_lease.tzinfo is None:
                             row_lease = row_lease.replace(tzinfo=UTC)

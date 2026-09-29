@@ -75,11 +75,9 @@ async function createSidecarThreadRequest({
 /** 查找父线程最近创建的侧栏线程。 */
 export async function findLatestSidecarThread({
   parentThreadId,
-  isMock,
-  apiClient = getAPIClient(isMock) as SidecarThreadSearchClient,
+  apiClient = getAPIClient() as SidecarThreadSearchClient,
 }: {
   parentThreadId: string;
-  isMock?: boolean;
   apiClient?: SidecarThreadSearchClient;
 }): Promise<AgentThread | null> {
   const response = await apiClient.threads.search({

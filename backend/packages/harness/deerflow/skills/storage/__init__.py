@@ -1,9 +1,4 @@
-"""定义 __init__ 模块提供的职责与可复用接口。
-
-SkillStorage singleton + reflection-based factory.
-
-Mirrors the pattern used by ``deerflow/sandbox/sandbox_provider.py``.
-"""
+"""根据配置创建并缓存全局或按用户隔离的技能存储实例。"""
 
 from __future__ import annotations
 
@@ -36,31 +31,14 @@ _user_scoped_storage_lock = threading.Lock()
 
 
 def get_or_new_skill_storage(**kwargs) -> SkillStorage:
-    """读取并返回，并遵守 get_or_new_skill_storage 所表达的接口约束。
-
-    Return a ``SkillStorage`` instance — either a new one or the process singleton.
-
-        **New instance** is created (never cached) when:
-        - ``skills_path`` is provided — uses it as the ``host_path`` override (class still resolved via config).
-        - ``app_config`` is provided — constructs a storage from ``app_config.skills``
-          so that per-request config (e.g. Gateway ``Depends(get_config)``) is respected
-          without polluting the process-level singleton.
-
-        **Singleton** is returned (created on first call, then reused) when neither
-        ``skills_path`` nor ``app_config`` is given — uses ``get_app_config()`` to
-        resolve the active configuration.
-
-        This singleton is used for reading **public** skills (global, read-only).
-        For user-scoped custom skill operations, use
-        :func:`get_or_new_user_skill_storage` instead.
-    """
+    """按需返回技能存储；显式路径或配置创建独立实例，否则复用进程级单例。"""
     global _default_skill_storage, _default_skill_storage_config
 
     from deerflow.config import get_app_config
     from deerflow.config.skills_config import SkillsConfig
 
     def _make_storage(skills_config: SkillsConfig, *, host_path: str | None = None, **kwargs) -> SkillStorage:
-        "执行 _make_storage 的明确职责，并返回与调用约定一致的结果"
+        """根据技能配置解析后端类并创建存储实例。"""
         from deerflow.reflection import resolve_class
 
         cls = resolve_class(skills_config.use, SkillStorage)
@@ -107,24 +85,7 @@ def get_or_new_skill_storage(**kwargs) -> SkillStorage:
 
 
 def get_or_new_user_skill_storage(user_id: str, **kwargs) -> SkillStorage:
-    """读取并返回，并遵守 get_or_new_user_skill_storage 所表达的接口约束。
-
-    Return a per-user ``SkillStorage`` instance for custom skill isolation.
-
-        Uses :class:`UserScopedSkillStorage` which redirects custom skill paths
-        to ``{base_dir}/users/{user_id}/skills/custom/`` while keeping public
-        skill reads from the global root.
-
-        ``user_id`` is normalised via :func:`make_safe_user_id` so that external
-        identities (e.g. IM channel ids containing non-``[A-Za-z0-9_-]`` chars)
-        are safely bucketed before reaching :class:`UserScopedSkillStorage`, which
-        calls :func:`_validate_user_id` internally.
-
-        Instances are cached by the *normalised* ``user_id`` with double-check
-        locking to prevent concurrent creation races. When the cache exceeds
-        ``_MAX_USER_SCOPED_STORAGES``, the least-recently-accessed entry is
-        evicted (true LRU, not FIFO).
-    """
+    """按规范化用户 ID 返回隔离存储，并以有容量上限的 LRU 缓存复用实例。"""
     from deerflow.config.paths import make_safe_user_id
 
     safe_id = make_safe_user_id(user_id)
@@ -151,14 +112,7 @@ def get_or_new_user_skill_storage(user_id: str, **kwargs) -> SkillStorage:
 
 
 def user_should_see_legacy_skills(user_id: str, **kwargs) -> bool:
-    """执行 user_should_see_legacy_skills 的明确职责，并返回与调用约定一致的结果。
-
-    Return whether discovery exposes any LEGACY skills for this user.
-
-        Sandbox mounts must not be more permissive than skill discovery. This
-        helper centralizes that contract so local, AIO, and remote providers all
-        follow the same visibility rule.
-    """
+    """判断技能发现结果是否包含该用户可见的迁移期旧技能。"""
     if kwargs:
         from deerflow.config.paths import make_safe_user_id
 
@@ -169,9 +123,7 @@ def user_should_see_legacy_skills(user_id: str, **kwargs) -> bool:
 
 
 def reset_skill_storage() -> None:
-    """执行 reset_skill_storage 的明确职责，并返回与调用约定一致的结果。
-
-    Clear all cached storage instances (used in tests and hot-reload scenarios)."""
+    """清空全局技能存储单例和所有用户级缓存。"""
     global _default_skill_storage, _default_skill_storage_config
     with _skill_storage_lock:
         _default_skill_storage = None
@@ -181,19 +133,7 @@ def reset_skill_storage() -> None:
 
 
 def reset_user_skill_storage(user_id: str | None = None) -> None:
-    """执行 reset_user_skill_storage 的明确职责，并返回与调用约定一致的结果。
-
-    Clear per-user skill storage cache for a specific user, or all users.
-
-        ``user_id`` is normalised via :func:`make_safe_user_id` so that the
-        cache key matches the one used by :func:`get_or_new_user_skill_storage`.
-        Without normalisation, IM-channel user IDs (e.g. ``feishu:xxx``) would
-        fail to clear their stale cache entries.
-
-        Args:
-            user_id: If provided, remove only that user's cached storage.
-                If ``None``, clear the entire per-user cache.
-    """
+    """清除指定用户的技能存储缓存；未指定用户时清空全部用户缓存。"""
     from deerflow.config.paths import make_safe_user_id
 
     with _user_scoped_storage_lock:

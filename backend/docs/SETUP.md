@@ -55,22 +55,6 @@ The backend searches for `config.yaml` in this order:
 
 **Recommended**: Place `config.yaml` in project root (`deer-flow/config.yaml`).
 
-## Sandbox Setup (Optional but Recommended)
-
-If you plan to use Docker/Container-based sandbox (configured in `config.yaml` under `sandbox.use: deerflow.community.aio_sandbox:AioSandboxProvider`), it's highly recommended to pre-pull the container image:
-
-```bash
-# From project root
-make setup-sandbox
-```
-
-**Why pre-pull?**
-- The sandbox image (~500MB+) is pulled on first use, causing a long wait
-- Pre-pulling provides clear progress indication
-- Avoids confusion when first using the agent
-
-If you skip this step, the image will be automatically pulled on first agent execution, which may take several minutes depending on your network speed.
-
 ## Troubleshooting
 
 ### Config file not found
@@ -95,4 +79,4 @@ chmod 600 ../config.yaml  # Protect sensitive configuration
 ## See Also
 
 - [Configuration Guide](CONFIGURATION.md) - Detailed configuration options
-- [Architecture Overview](../AGENTS.md) - System architecture
+- [Architecture Overview](ARCHITECTURE.md) - System architecture

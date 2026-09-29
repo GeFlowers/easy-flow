@@ -48,7 +48,7 @@ EOF
 ### Start the services
 
 ```bash
-docker compose -f docker/docker-compose-dev.yaml up -d
+make docker-start
 ```
 
 ### Verify the deployment
@@ -58,7 +58,7 @@ docker compose -f docker/docker-compose-dev.yaml up -d
 curl http://localhost:2026/api/models
 
 # Follow logs
-docker compose -f docker/docker-compose-dev.yaml logs -f
+make docker-logs
 ```
 
 Open `http://your-server:2026` in your browser.

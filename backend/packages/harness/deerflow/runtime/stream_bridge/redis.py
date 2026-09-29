@@ -1,6 +1,4 @@
-"""
-
-Redis Streams-backed stream bridge."""
+"""通过 Redis Streams 在 Gateway 进程间转发并重放运行事件。"""
 
 from __future__ import annotations
 
@@ -16,20 +14,17 @@ try:
     from redis.asyncio import Redis
     from redis.exceptions import RedisError, ResponseError
 except ImportError:  # pragma: no cover - only hit when the optional extra is missing
-    # ``redis`` is an optional extra (mirrors the ``postgres``/asyncpg path in
-    # persistence/engine.py). This module is imported lazily from
-    # ``make_stream_bridge`` only when ``stream_bridge.type == "redis"``, so the
-    # hint surfaces exactly when a Redis bridge is requested without the package.
+    # Redis remains an optional package extra and is imported only when the
+    # Gateway initializes its configured event bridge.
     raise ImportError(
-        "stream_bridge.type is set to 'redis' but the redis package is not installed.\n"
+        "The Redis stream bridge is configured but the redis package is not installed.\n"
         "Install it with:\n"
         "    cd backend && uv sync --all-packages --extra redis\n"
-        "On the next `make dev` the redis extra is auto-detected from config.yaml\n"
-        "(stream_bridge.type: redis) and reinstalled, so it will not be wiped again.\n"
-        "Or switch to stream_bridge.type: memory in config.yaml for single-process deployment."
+        "The supported Docker image includes the redis extra.\n"
+        "Configure the Redis URL through stream_bridge.redis_url or an environment variable."
     ) from None
 
-from .base import END_SENTINEL, HEARTBEAT_SENTINEL, StreamBridge, StreamEvent
+from .base import END_SENTINEL, HEARTBEAT_SENTINEL, StreamEvent
 
 logger = logging.getLogger(__name__)
 
@@ -50,15 +45,8 @@ _XREAD_COUNT = 64
 _MAX_SUBSCRIBE_RETRIES = 3
 
 
-class RedisStreamBridge(StreamBridge):
-    """
-
-    Per-run stream bridge backed by Redis Streams.
-
-        Each run is stored in one Redis Stream and subscribers read directly with
-        ``XREAD``.  This keeps the SSE bridge usable across multiple gateway
-        worker processes while preserving ``Last-Event-ID`` replay semantics.
-    """
+class RedisStreamBridge:
+    """将每个运行的事件写入 Redis Stream，支持多进程订阅和断线续读。"""
 
     supports_cross_process = True
 
@@ -72,6 +60,7 @@ class RedisStreamBridge(StreamBridge):
         stream_ttl_seconds: int | None = 86400,
         client: Redis | None = None,
     ) -> None:
+        """初始化事件流参数，并复用注入客户端或创建自有 Redis 连接池。"""
         self._redis_url = redis_url
         self._maxsize = max(1, queue_maxsize)
         self._key_prefix = key_prefix.rstrip(":")
@@ -86,9 +75,11 @@ class RedisStreamBridge(StreamBridge):
         self._owns_client = client is None
 
     def _stream_key(self, run_id: str) -> str:
+        """为运行 ID 拼出对应的 Redis Stream 键。"""
         return f"{self._key_prefix}:{run_id}"
 
     async def _xadd_retained(self, key: str, fields: dict[str, str], *, maxlen: int) -> None:
+        """追加事件并在启用保留期限时原子刷新流键 TTL。"""
         if self._stream_ttl_seconds is None:
             await self._redis.xadd(
                 key,
@@ -110,20 +101,24 @@ class RedisStreamBridge(StreamBridge):
 
     @staticmethod
     def _decode(value: Any) -> str:
+        """把 Redis 返回的字节或标量统一转换为字符串。"""
         if isinstance(value, bytes):
             return value.decode("utf-8")
         return str(value)
 
     @classmethod
     def _normalise_fields(cls, fields: Mapping[Any, Any]) -> dict[str, str]:
+        """规范化 Redis 哈希字段的键和值类型。"""
         return {cls._decode(key): cls._decode(value) for key, value in fields.items()}
 
     @staticmethod
     def _encode_data(data: Any) -> str:
+        """将事件数据编码为紧凑的 UTF-8 JSON 文本。"""
         return json.dumps(data, default=str, ensure_ascii=False, separators=(",", ":"))
 
     @staticmethod
     def _decode_data(raw: str | None) -> Any:
+        """解析事件 JSON；遇到旧格式或损坏内容时保留原文。"""
         if raw is None:
             return None
         try:
@@ -133,6 +128,7 @@ class RedisStreamBridge(StreamBridge):
             return raw
 
     def _entry_from_redis(self, event_id: str, fields: Mapping[Any, Any]) -> StreamEvent:
+        """把 Redis Stream 条目转换为运行时事件或终止标记。"""
         payload = self._normalise_fields(fields)
         kind = payload.get("kind", _KIND_EVENT)
         if kind == _KIND_END:
@@ -144,6 +140,7 @@ class RedisStreamBridge(StreamBridge):
         )
 
     async def publish(self, run_id: str, event: str, data: Any) -> None:
+        """保存一条运行事件，并按配置限制可重放的事件数量。"""
         key = self._stream_key(run_id)
         await self._xadd_retained(
             key,
@@ -156,6 +153,7 @@ class RedisStreamBridge(StreamBridge):
         )
 
     async def publish_end(self, run_id: str) -> None:
+        """追加运行终止标记，并额外为该标记预留一个保留位置。"""
         # Keep the configured number of data events plus the internal end marker.
         key = self._stream_key(run_id)
         await self._xadd_retained(
@@ -165,12 +163,11 @@ class RedisStreamBridge(StreamBridge):
         )
 
     async def stream_exists(self, run_id: str) -> bool:
-        """持续产出流式结果并传递终止状态，并遵守 stream_exists 所表达的接口约束。
-
-        返回：whether Redis still has retained stream data for *run_id*."""
+        """检查 Redis 中是否仍保留该运行的事件流。"""
         return bool(await self._redis.exists(self._stream_key(run_id)))
 
     async def _resolve_start_stream_id(self, key: str, last_event_id: str | None) -> str:
+        """校验续读游标，并决定首次读取或非法游标的安全起点。"""
         if last_event_id is None:
             return "0-0"
         if _REDIS_STREAM_ID_RE.fullmatch(last_event_id):
@@ -191,6 +188,7 @@ class RedisStreamBridge(StreamBridge):
         last_event_id: str | None = None,
         heartbeat_interval: float = 15.0,
     ) -> AsyncIterator[StreamEvent]:
+        """从给定事件游标持续读取事件，并在空闲或短暂故障时维护连接。"""
         key = self._stream_key(run_id)
         stream_id = await self._resolve_start_stream_id(key, last_event_id)
         block_ms = max(1, int(heartbeat_interval * 1000)) if heartbeat_interval > 0 else 1
@@ -241,11 +239,13 @@ class RedisStreamBridge(StreamBridge):
                     yield entry
 
     async def cleanup(self, run_id: str, *, delay: float = 0) -> None:
+        """可选等待订阅者读取终止标记后，删除该运行的 Redis Stream。"""
         if delay > 0:
             await asyncio.sleep(delay)
         await self._redis.delete(self._stream_key(run_id))
 
     async def close(self) -> None:
+        """只关闭由当前桥接器创建的 Redis 客户端。"""
         if not self._owns_client:
             return
         close = getattr(self._redis, "aclose", None) or getattr(self._redis, "close", None)

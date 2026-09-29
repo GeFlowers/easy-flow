@@ -32,7 +32,7 @@ class ThreadState(AgentState):
 |---------|--------|------|
 | **LangGraph Studio (本地)** | ❌ 否 | 仅内存存储，重启后丢失 |
 | **LangGraph Platform** | ✅ 是 | 自动持久化到数据库 |
-| **自定义 + Checkpointer** | ✅ 是 | 需配置 PostgreSQL/SQLite checkpointer |
+| **自定义 + Checkpointer** | ✅ 是 | 需配置 PostgreSQL checkpointer |
 
 ### 如何启用持久化
 

@@ -1,6 +1,4 @@
-"""定义 terminal_response_middleware 模块提供的职责与可复用接口。
-
-Ensure tool-using lead-agent turns end with a visible assistant response."""
+"""确保工具执行后的 Agent 轮次最终留下用户可见的助手答复。"""
 
 from __future__ import annotations
 
@@ -30,9 +28,7 @@ _TOOL_CALL_FINISH_REASONS = {"tool_calls", "function_call"}
 
 
 def _has_visible_content(message: AIMessage) -> bool:
-    """执行 _has_visible_content 的明确职责，并返回与调用约定一致的结果。
-
-    Return whether an AI message contains user-visible text."""
+    """判断 AIMessage 是否包含可展示的文本内容块。"""
     content = message.content
     if isinstance(content, str):
         return bool(content.strip())
@@ -48,9 +44,7 @@ def _has_visible_content(message: AIMessage) -> bool:
 
 
 def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
-    """执行 _has_tool_call_intent_or_error 的明确职责，并返回与调用约定一致的结果。
-
-    Keep tool routing and malformed tool-call handling out of this guard."""
+    """检查消息是否仍表达工具调用或工具解析错误，而非最终答复。"""
     if message.tool_calls or getattr(message, "invalid_tool_calls", None):
         return True
     additional_kwargs = message.additional_kwargs or {}
@@ -61,9 +55,7 @@ def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
 
 
 def _tool_result_in_current_turn(messages: list[Any]) -> bool:
-    """执行 _tool_result_in_current_turn 的明确职责，并返回与调用约定一致的结果。
-
-    Return whether a tool result follows the latest real user message."""
+    """判断最近一条真实用户消息之后是否出现工具结果。"""
     latest_user_index = -1
     for index, message in enumerate(messages):
         if not isinstance(message, HumanMessage):
@@ -71,21 +63,17 @@ def _tool_result_in_current_turn(messages: list[Any]) -> bool:
         if (message.additional_kwargs or {}).get("hide_from_ui"):
             continue
         latest_user_index = index
-    # Scope: #4027 covers interactive post-tool turns. Scheduled/internal
-    # invocations without a real HumanMessage need a separate terminal-success
-    # invariant rather than being inferred from arbitrary historical tools.
+    # 只对交互式用户轮次执行恢复；内部调度由其自身的成功条件判断。
     if latest_user_index == -1:
         return False
     return any(isinstance(message, ToolMessage) for message in messages[latest_user_index + 1 :])
 
 
 class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
-    """封装 TerminalResponseMiddleware 的状态、协作关系与公开操作。
-
-    Retry one empty post-tool response, then persist a visible error fallback."""
+    """工具结果后若模型返回空答复则重试一次，仍为空时写入可见错误说明。"""
 
     def __init__(self) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """初始化按线程和运行隔离且有界的重试计数与提示标记。"""
         super().__init__()
         self._lock = threading.Lock()
         self._retry_counts: BoundedDict[tuple[str, str], int] = BoundedDict(1000)
@@ -93,25 +81,24 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _key(runtime: Runtime) -> tuple[str, str]:
-        "执行 _key 的明确职责，并返回与调用约定一致的结果"
+        """从运行上下文生成线程与运行组合键，缺字段时使用安全回退值。"""
         context = getattr(runtime, "context", None)
         if isinstance(context, dict):
             thread_id = str(context.get("thread_id") or "unknown-thread")
             run_id = str(context.get("run_id") or context.get("run_attempt_id") or id(runtime))
             return thread_id, run_id
-        # Defensive fallback for tests/custom embeddings. Production Gateway
-        # runs always provide thread_id and run_id in Runtime.context.
+        # 测试和自定义嵌入调用可能没有标准 Runtime 上下文。
         return "unknown-thread", str(id(runtime))
 
     def _clear(self, runtime: Runtime) -> None:
-        "执行 _clear 的明确职责，并返回与调用约定一致的结果"
+        """清除当前运行的重试预算和待注入提示。"""
         key = self._key(runtime)
         with self._lock:
             self._retry_counts.pop(key, None)
             self._pending_prompts.pop(key, None)
 
     def _clear_other_runs(self, runtime: Runtime) -> None:
-        "执行 _clear_other_runs 的明确职责，并返回与调用约定一致的结果"
+        """清除同一线程其他运行遗留的重试状态。"""
         thread_id, run_id = self._key(runtime)
         with self._lock:
             stale = [key for key in self._retry_counts if key[0] == thread_id and key[1] != run_id]
@@ -120,7 +107,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
                 self._pending_prompts.pop(key, None)
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 _apply 的明确职责，并返回与调用约定一致的结果"
+        """仅处理工具结果后的空终态：首次跳回模型，重试仍为空则替换为错误答复。"""
         messages = list(state.get("messages") or [])
         if not messages or not isinstance(messages[-1], AIMessage):
             return None
@@ -133,18 +120,14 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
 
         key = self._key(runtime)
         with self._lock:
-            # The recovery budget is once per run, not once per empty message.
-            # A retry that calls another tool must not refresh the budget and
-            # create an unbounded empty -> retry -> tool loop.
+            # 重试额度按运行计算，不能因重试期间又调用工具而反复刷新。
             retry_count = self._retry_counts.get(key, 0)
             if retry_count == 0:
                 self._retry_counts[key] = 1
                 self._pending_prompts[key] = True
 
         if retry_count == 0:
-            # The next model call gets a new message id. Remove this empty
-            # terminal message now so a successful recovery does not leave it
-            # in checkpoint history or future model context.
+            # 在重试前移除空消息，避免恢复成功后空终态进入检查点或后续上下文。
             message_updates = [RemoveMessage(id=last.id)] if last.id else []
             return {"messages": message_updates, "jump_to": "model"}
 
@@ -164,7 +147,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         return {"messages": [fallback]}
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
-        "执行 _augment_request 的明确职责，并返回与调用约定一致的结果"
+        """消费当前运行的重试标记，并在模型请求末尾追加隐藏恢复提示。"""
         key = self._key(request.runtime)
         with self._lock:
             pending = key in self._pending_prompts
@@ -180,17 +163,15 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
+        """启动新运行时清理旧运行状态并重置本轮唯一一次的恢复额度。"""
         self._clear_other_runs(runtime)
-        # A prior invocation can bypass after_agent via Command(goto=END).
-        # Reset the same run id here so resume starts with a fresh one-retry
-        # budget; internal jump_to=model loops do not re-run before_agent.
+        # 上次执行可能通过跳转结束而未触发 after_agent，因此在新入口重置重试额度。
         self._clear(runtime)
         return None
 
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 abefore_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步启动钩子清除过期运行状态并初始化新的重试额度。"""
         self._clear_other_runs(runtime)
         self._clear(runtime)
         return None
@@ -198,13 +179,13 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
     @hook_config(can_jump_to=["model"])
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
+        """同步模型返回后判断是否需要一次性恢复。"""
         return self._apply(state, runtime)
 
     @hook_config(can_jump_to=["model"])
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
+        """异步模型返回后复用相同的空答复检测与恢复逻辑。"""
         return self._apply(state, runtime)
 
     @override
@@ -213,7 +194,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """同步模型请求前注入恢复提示，再调用后续处理器。"""
         return handler(self._augment_request(request))
 
     @override
@@ -222,17 +203,17 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """异步模型请求前注入恢复提示，再等待后续处理器。"""
         return await handler(self._augment_request(request))
 
     @override
     def after_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 after_agent 的明确职责，并返回与调用约定一致的结果"
+        """运行正常结束后清除本轮重试状态。"""
         self._clear(runtime)
         return None
 
     @override
     async def aafter_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 aafter_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步运行结束后清除本轮重试状态。"""
         self._clear(runtime)
         return None

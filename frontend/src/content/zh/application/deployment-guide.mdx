@@ -1,58 +1,17 @@
 ---
 title: 部署指南
-description: 本指南涵盖 DeerFlow 应用所有支持的部署方式：本地开发、Docker Compose 以及使用 Kubernetes 管理沙箱的生产环境。
+description: 本指南介绍 DeerFlow 应用支持的 Docker Compose 部署，包括使用 Kubernetes 管理沙箱。
 ---
 
-import { Callout, Steps, Tabs } from "nextra/components";
+import { Callout, Steps } from "nextra/components";
 
 # 部署指南
 
-本指南涵盖 DeerFlow 应用所有支持的部署方式：本地开发、Docker Compose 以及使用 Kubernetes 管理沙箱的生产环境。
+本指南介绍 DeerFlow 应用支持的 Docker Compose 部署，包括使用 Kubernetes 管理沙箱。
 
-## 本地开发部署
+## 支持的部署方式
 
-本地工作流是运行 DeerFlow 最快的方式，所有服务作为原生进程在你的机器上运行。
-
-<Tabs items={["启动", "停止", "日志"]}>
-  <Tabs.Tab>
-```bash
-make dev
-```
-
-启动的服务：
-
-| 服务        | 端口 | 描述                    |
-| ----------- | ---- | ----------------------- |
-| Gateway API | 8001 | FastAPI 后端 + 嵌入式 Agent 运行时 |
-| 前端        | 3000 | Next.js 界面            |
-| nginx       | 2026 | 统一反向代理            |
-
-访问地址：**http://localhost:2026**
-
-  </Tabs.Tab>
-  <Tabs.Tab>
-```bash
-make stop
-```
-
-停止所有服务。即使某个服务没有运行也可以安全执行。
-
-  </Tabs.Tab>
-  <Tabs.Tab>
-```
-logs/gateway.log     # API Gateway 和 Agent 运行时日志
-logs/frontend.log    # Next.js 开发服务器日志
-logs/nginx.log       # nginx 访问/错误日志
-```
-
-实时追踪日志：
-
-```bash
-tail -f logs/gateway.log
-```
-
-  </Tabs.Tab>
-</Tabs>
+本项目仅支持通过 `make docker-start` 启动 Docker Compose 应用。
 
 ## Docker Compose 部署
 
@@ -63,16 +22,15 @@ Docker Compose 在容器中运行所有服务。适用于更接近生产的本�
 - Docker（macOS 上的 Docker Desktop 或 OrbStack）
 - 在仓库根目录中已配置的 `config.yaml`
 
-### 开发 Compose
+### 启动应用
 
 ```bash
-# 设置 deer-flow 仓库根目录的绝对路径
-export DEER_FLOW_ROOT=/path/to/deer-flow
-
-docker compose -f docker/docker-compose-dev.yaml up --build
+make docker-start
 ```
 
 访问地址：**http://localhost:2026**
+
+使用 `make docker-stop` 停止服务，使用 `make docker-logs` 查看日志。
 
 ### 环境变量
 
@@ -118,11 +76,7 @@ BETTER_AUTH_SECRET=your-secret-here-min-32-chars
 
 ### 数据库后端
 
-SQLite 适合本地开发和单用户部署，但不适合作为多用户生产环境的数据库后端。
-
-在 SQLite 模式下，DeerFlow 会把 LangGraph 检查点数据和应用数据写入同一个 `deerflow.db` 文件。WAL 模式可以支持并发读取，但 SQLite 同一时间仍然只有一个写入者。多个用户同时运行 Agent 时，检查点写入和应用写入会竞争同一个文件锁，可能触发 `sqlite3.OperationalError: database is locked`。
-
-生产环境或任何多用户部署请使用 Postgres：
+DeerFlow 的检查点、LangGraph Store 和应用记录统一使用 PostgreSQL：
 
 ```bash
 # .env
@@ -139,8 +93,6 @@ database:
 run_events:
   backend: db
 ```
-
-SQLite 部署应限制在本地、单节点或短期评估场景。
 
 ### K8s Provisioner 配置
 

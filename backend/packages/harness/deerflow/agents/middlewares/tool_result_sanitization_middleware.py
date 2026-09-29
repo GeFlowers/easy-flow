@@ -1,27 +1,4 @@
-"""定义 tool_result_sanitization_middleware 模块提供的职责与可复用接口。
-
-Neutralize prompt-injection control tokens in untrusted tool results.
-
-DeerFlow already treats the genuine user message as untrusted and neutralizes
-framework/injection tags in it (see ``InputSanitizationMiddleware``). Remote
-content that the agent *fetches* — web page bodies and search snippets returned
-by ``web_fetch`` / ``web_search`` / ``image_search``, plus the target site's
-response-status text surfaced by ``web_capture`` — is equally untrusted, yet
-it entered the model context verbatim. A page the attacker controls could embed
-a forged ``<system-reminder>`` block (or a ``--- END USER INPUT ---`` marker) and
-have it reach the model as authoritative framework context.
-
-This middleware narrows that gap by applying the *same* structural
-neutralization (``neutralize_untrusted_tags``) to the results of the first-party
-network tools, so a fetched ``<system-reminder>`` is escaped to
-``&lt;system-reminder&gt;`` exactly like it would be in direct user input. It
-deliberately targets only the remote-content tools: local tool output (bash,
-file reads) is left untouched so legitimate code/log content is never mangled.
-
-Scope note: matching is a name-based allowlist, so MCP-provided remote-content
-tools registered under other names are not yet covered — see
-``_REMOTE_CONTENT_TOOL_NAMES``.
-"""
+"""中和内置网络工具返回内容中的伪造框架标签，避免远程页面内容被误当成可信指令。"""
 
 from __future__ import annotations
 
@@ -38,22 +15,10 @@ from langgraph.types import Command
 
 logger = logging.getLogger(__name__)
 
-# Tool names whose results are attacker-influenceable remote content. The
-# first-party search/fetch providers all normalize to ``web_fetch`` /
-# ``web_search`` / ``image_search`` (see community/*/tools.py), so the set stays
-# provider-agnostic. ``web_capture`` (Browserless screenshot) additionally
-# surfaces the target site's response-status text (``X-Response-Status``, a
-# free-form reason phrase controlled by whatever server is being captured) into
-# its result message, so it is untrusted remote content too and belongs here.
+# 这些内置工具会返回可由远程网站影响的正文或状态文本，结果需经过净化。
 #
-# Known limitation: the gate is name-based. An MCP server may expose a
-# remote-content tool under an arbitrary name (e.g. ``fetch_url`` /
-# ``scrape_page``); its results are equally untrusted but are NOT matched here,
-# so they reach the model unneutralized. A name heuristic (matching
-# fetch/search/crawl substrings) is intentionally avoided because it would also
-# mangle legitimate *local* tool output (e.g. a ``file_search`` result). Robust
-# MCP coverage should tag remote-content tools via metadata at registration
-# rather than by name; tracked as a follow-up.
+# 当前按工具名白名单匹配，尚未覆盖使用任意名称注册的 MCP 网络工具。
+# 不用名称片段猜测工具类型，避免误改本地搜索等可信工具的输出；后续应由注册元数据标记来源。
 _REMOTE_CONTENT_TOOL_NAMES: frozenset[str] = frozenset(
     {
         "web_fetch",
@@ -65,21 +30,8 @@ _REMOTE_CONTENT_TOOL_NAMES: frozenset[str] = frozenset(
 
 
 def _neutralize_content(content: object) -> object:
-    """执行 _neutralize_content 的明确职责，并返回与调用约定一致的结果。
-
-    Return *content* with untrusted tags neutralized, preserving its shape.
-
-        Handles the two shapes a ToolMessage content can take:
-
-        * plain ``str`` (what every web tool returns today);
-        * a list of content blocks — bare ``str`` elements and
-          ``{"type": "text", "text": ...}`` text blocks are rewritten; non-text
-          blocks (images, etc.) pass through untouched. The bare-``str`` case
-          mirrors ``ToolOutputBudgetMiddleware._message_text``, which already
-          anticipates ``str`` items inside a content list.
-    """
-    # Imported lazily so this module can be loaded even when a test stubs the
-    # input-sanitization module, and to mirror the codebase's deferred-import style.
+    """净化字符串或文本块并保持内容结构，图片等非文本块原样保留。"""
+    # 延迟导入净化函数，避免模块初始化时形成不必要的依赖耦合。
     from deerflow.agents.middlewares.input_sanitization_middleware import neutralize_untrusted_tags
 
     if isinstance(content, str):
@@ -98,9 +50,7 @@ def _neutralize_content(content: object) -> object:
 
 
 def _sanitize_tool_message(message: ToolMessage) -> ToolMessage:
-    """执行 _sanitize_tool_message 的明确职责，并返回与调用约定一致的结果。
-
-    Return a copy of *message* with its content neutralized, or the original."""
+    """净化工具消息正文；内容未变化时返回原消息对象。"""
     new_content = _neutralize_content(message.content)
     if new_content == message.content:
         return message
@@ -108,9 +58,7 @@ def _sanitize_tool_message(message: ToolMessage) -> ToolMessage:
 
 
 def _sanitize_result(result: ToolMessage | Command) -> ToolMessage | Command:
-    """执行 _sanitize_result 的明确职责，并返回与调用约定一致的结果。
-
-    Neutralize a tool-call result (``ToolMessage`` or ``Command``)."""
+    """净化工具消息，或命令更新中的工具消息，并保留其他结果字段。"""
     if isinstance(result, ToolMessage):
         return _sanitize_tool_message(result)
     update = getattr(result, "update", None)
@@ -124,24 +72,10 @@ def _sanitize_result(result: ToolMessage | Command) -> ToolMessage | Command:
 
 
 class ToolResultSanitizationMiddleware(AgentMiddleware[AgentState]):
-    """封装 ToolResultSanitizationMiddleware 的状态、协作关系与公开操作。
-
-    Escape injection/framework tags in remote tool results before the model sees them.
-
-        Results of the first-party network tools (``web_fetch`` / ``web_search`` /
-        ``image_search`` / ``web_capture``) are rewritten; every other tool's output
-        is returned unchanged. Mirrors the user-input guardrail so untrusted remote
-        content and untrusted user input receive the same structural neutralization.
-
-        Scope is a name-based allowlist (``_REMOTE_CONTENT_TOOL_NAMES``): it reliably
-        covers the built-in web tools without false positives on local tools. It does
-        NOT cover MCP-provided remote-content tools registered under other names —
-        see the note on ``_REMOTE_CONTENT_TOOL_NAMES`` for why a name heuristic is
-        avoided and the metadata-tagging follow-up.
-    """
+    """只净化白名单内网络工具的结果；其他工具输出保持不变。"""
 
     def _should_sanitize(self, request: ToolCallRequest) -> bool:
-        "执行 _should_sanitize 的明确职责，并返回与调用约定一致的结果"
+        """根据工具名判断其结果是否来自需要净化的远程内容工具。"""
         return request.tool_call.get("name") in _REMOTE_CONTENT_TOOL_NAMES
 
     @override
@@ -150,7 +84,7 @@ class ToolResultSanitizationMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        "执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        """同步执行工具调用，并按白名单净化远程工具结果。"""
         result = handler(request)
         if not self._should_sanitize(request):
             return result
@@ -162,7 +96,7 @@ class ToolResultSanitizationMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        "执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        """异步执行工具调用，并按白名单净化远程工具结果。"""
         result = await handler(request)
         if not self._should_sanitize(request):
             return result

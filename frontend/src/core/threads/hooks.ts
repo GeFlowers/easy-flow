@@ -54,7 +54,6 @@ export type ThreadStreamOptions = {
   threadId?: string | null | undefined;
   displayThreadId?: string | null | undefined;
   context: LocalSettings["context"];
-  isMock?: boolean;
   onSend?: (threadId: string) => void;
   onStart?: (threadId: string, runId: string) => void;
   onFinish?: (state: AgentThreadState) => void;
@@ -65,8 +64,8 @@ type SendMessageOptions = {
   additionalKwargs?: Record<string, unknown>;
   additionalInputMessages?: Message[];
   /**
- * 仅在发送通过进行中保护并实际派发时调用一次。提前返回路径绝不触发，因此调用方可安全执行一次性清理
- * （例如清空引用内容），且并发发送被丢弃时不会丢失状态。
+   * 仅在发送通过进行中保护并实际派发时调用一次。提前返回路径绝不触发，因此调用方可安全执行一次性清理
+   * （例如清空引用内容），且并发发送被丢弃时不会丢失状态。
    */
   onSent?: () => void;
 };
@@ -162,8 +161,8 @@ function dedupeMessagesByIdentity(messages: Message[]): Message[] {
   const lastIndexByIdentity = new Map<string, number>();
   const lastVisibleIndexByIdentity = new Map<string, number>();
 
-// 这是 UI 展示去重规则，不是通用 LangChain 消息流契约。与可见消息共享标识的隐藏消息在此合并视图中
-// 视为控制消息；携带独立追踪／任务语义的隐藏消息应使用不同 id 或自定义流／状态通道，不能依赖消息去重保留。
+  // 这是 UI 展示去重规则，不是通用 LangChain 消息流契约。与可见消息共享标识的隐藏消息在此合并视图中
+  // 视为控制消息；携带独立追踪／任务语义的隐藏消息应使用不同 id 或自定义流／状态通道，不能依赖消息去重保留。
   const preservedTurnDurations = new Map<string, number>();
   messages.forEach((message, index) => {
     const identity = messageIdentity(message);
@@ -252,8 +251,8 @@ export function buildVisibleHistoryMessages(
     (message) => !supersededRunIds.has(message.run_id),
   );
   return dedupeMessagesByIdentity([
-// 将所属 run_id 带到内容消息上，使历史子任务卡片展开时能拉取持久化步骤历史（#3779）。run_id 位于
-// RunMessage 包装层，否则会在此处丢失。
+    // 将所属 run_id 带到内容消息上，使历史子任务卡片展开时能拉取持久化步骤历史（#3779）。run_id 位于
+    // RunMessage 包装层，否则会在此处丢失。
     ...visibleRows.map((message) => ({
       ...message.content,
       run_id: message.run_id,
@@ -344,16 +343,16 @@ export function mergeMessages(
     }),
   );
   const replacementByIdentity = new Map<string, Message>();
-// 此处采用与 resolveTransientHistoryBridge 相同的标识锚点编织方式，但有意保持独立：实时消息可替换
-// 规范副本，且无标识条目必须保留。
+  // 此处采用与 resolveTransientHistoryBridge 相同的标识锚点编织方式，但有意保持独立：实时消息可替换
+  // 规范副本，且无标识条目必须保留。
   const beforeAnchor = new Map<string, Message[]>();
   let pending: Message[] = [];
   let lastAnchorIdentity: string | undefined;
   let hasSharedAnchor = false;
 
-// 摘要化检查点不一定是连续历史后缀：中间件可在前方保留受保护的提示／输入消息，并在后方保留近期尾部。
-// 每个共享标识都是排序锚点，原位替换规范副本。新的实时消息编织到下一个共享锚点之前（或最后一个之后），
-// 从而全局“最后副本”去重永远不会把受保护的早期输入移到尾部。
+  // 摘要化检查点不一定是连续历史后缀：中间件可在前方保留受保护的提示／输入消息，并在后方保留近期尾部。
+  // 每个共享标识都是排序锚点，原位替换规范副本。新的实时消息编织到下一个共享锚点之前（或最后一个之后），
+  // 从而全局“最后副本”去重永远不会把受保护的早期输入移到尾部。
   for (const message of live) {
     const identity = messageIdentity(message);
     const canonicalMessage = identity
@@ -370,14 +369,14 @@ export function mergeMessages(
         ...pending,
       ]);
     }
-// 摘要化检查点可从受保护消息开始，其真实规范位置与此锚点之间可能隔着尚未加载的页面。应抑制该不确定前缀，
-// 而非在视觉上折叠未知间隙。
+    // 摘要化检查点可从受保护消息开始，其真实规范位置与此锚点之间可能隔着尚未加载的页面。应抑制该不确定前缀，
+    // 而非在视觉上折叠未知间隙。
     pending = [];
     hasSharedAnchor = true;
     lastAnchorIdentity = identity;
 
-// 隐藏检查点控制消息不得替换恰巧复用其标识的可见规范用户轮次。其余情况下实时检查点副本更新，应替换历史
-// 但不改变其位置。
+    // 隐藏检查点控制消息不得替换恰巧复用其标识的可见规范用户轮次。其余情况下实时检查点副本更新，应替换历史
+    // 但不改变其位置。
     if (
       !isHiddenFromUIMessage(message) ||
       isHiddenFromUIMessage(canonicalMessage)
@@ -401,8 +400,8 @@ export function mergeMessages(
         : undefined;
       canonicalAndLive.push(replacement ?? message);
     }
-// 仅实时的尾段确定在最后共享锚点之后，但该锚点未必是规范历史末尾（例如其他客户端已持久化较新记录）。
-// 追加实时尾部前必须保留规范来源顺序。
+    // 仅实时的尾段确定在最后共享锚点之后，但该锚点未必是规范历史末尾（例如其他客户端已持久化较新记录）。
+    // 追加实时尾部前必须保留规范来源顺序。
     canonicalAndLive.push(...pending);
   }
 
@@ -489,8 +488,8 @@ export function resolveTransientHistoryBridge(
   );
   const missing = transientMessages.filter((message) => {
     const identity = messageIdentity(message);
-// 有意跳过无标识消息：缺少稳定标识就无法与历史匹配、释放或去重，叠加会产生永久重复；规范历史会在运行日志
-// 刷新并重新拉取页面后呈现它们。
+    // 有意跳过无标识消息：缺少稳定标识就无法与历史匹配、释放或去重，叠加会产生永久重复；规范历史会在运行日志
+    // 刷新并重新拉取页面后呈现它们。
     return identity !== undefined && !presentIdentities.has(identity);
   });
   if (missing.length === 0) {
@@ -503,7 +502,7 @@ export function resolveTransientHistoryBridge(
       return identity ? [[identity, message] as const] : [];
     }),
   );
-// 此处镜像 mergeMessages 的标识锚点编织方式，但临时消息绝不替换规范副本，并有意排除无标识条目以免永久重复。
+  // 此处镜像 mergeMessages 的标识锚点编织方式，但临时消息绝不替换规范副本，并有意排除无标识条目以免永久重复。
   const beforeAnchor = new Map<string, Message[]>();
   const emittedMissingIdentities = new Set<string>();
   let pending: Message[] = [];
@@ -518,7 +517,7 @@ export function resolveTransientHistoryBridge(
           ...pending,
         ]);
       }
-// 第一个已加载锚点之前的前缀没有可信位置：包含其中间历史的游标页可能尚未加载。
+      // 第一个已加载锚点之前的前缀没有可信位置：包含其中间历史的游标页可能尚未加载。
       pending = [];
       hasCanonicalAnchor = true;
       lastAnchorIdentity = identity;
@@ -531,12 +530,12 @@ export function resolveTransientHistoryBridge(
     }
   }
 
-// 没有桥接标识与规范历史重叠。这是原始持久化间隙场景：已加载历史较旧，救回的实时轮次属于其后。
+  // 没有桥接标识与规范历史重叠。这是原始持久化间隙场景：已加载历史较旧，救回的实时轮次属于其后。
   if (!lastAnchorIdentity) {
     return [...visibleHistory, ...missing];
   }
 
-// 在排序快照前新增的候选项（或携带快照中不存在的标识）无法锚定。应按捕获顺序保留在已锚定桥接的尾缘，不能丢弃。
+  // 在排序快照前新增的候选项（或携带快照中不存在的标识）无法锚定。应按捕获顺序保留在已锚定桥接的尾缘，不能丢弃。
   for (const message of missing) {
     const identity = messageIdentity(message);
     if (identity && !emittedMissingIdentities.has(identity)) {
@@ -589,7 +588,7 @@ export function mergeTransientHistoryBridge(
       existing &&
       (!isHiddenFromUIMessage(captured) || isHiddenFromUIMessage(existing))
     ) {
-// 刷新缓冲快照而不移动其首次已知的时间顺序位置；重复压缩可在较新尾部前再次捕获受保护前缀消息。
+      // 刷新缓冲快照而不移动其首次已知的时间顺序位置；重复压缩可在较新尾部前再次捕获受保护前缀消息。
       merged[existingIndex] = captured;
     }
   }
@@ -806,14 +805,13 @@ export function upsertThreadInInfiniteCache(
 export function invalidateStoppedThreadCaches(
   queryClient: QueryClient,
   threadId: string | null | undefined,
-  isMock = false,
 ) {
   void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
   void queryClient.invalidateQueries({
     queryKey: INFINITE_THREADS_QUERY_KEY_PREFIX,
   });
 
-  if (!threadId || isMock) {
+  if (!threadId) {
     return;
   }
 
@@ -822,7 +820,7 @@ export function invalidateStoppedThreadCaches(
     queryKey: threadHistoryQueryKey(threadId),
   });
   void queryClient.invalidateQueries({
-    queryKey: ["thread", "metadata", threadId, isMock],
+    queryKey: ["thread", "metadata", threadId],
   });
   void queryClient.invalidateQueries({
     queryKey: threadTokenUsageQueryKey(threadId),
@@ -836,13 +834,9 @@ export const STOP_THREAD_FINALIZATION_REFETCH_DELAY_MS = 1500;
 function scheduleStoppedThreadFinalizationRefetch(
   queryClient: QueryClient,
   threadId: string | null | undefined,
-  isMock = false,
 ) {
-  if (isMock) {
-    return;
-  }
   globalThis.setTimeout(() => {
-    invalidateStoppedThreadCaches(queryClient, threadId, isMock);
+    invalidateStoppedThreadCaches(queryClient, threadId);
   }, STOP_THREAD_FINALIZATION_REFETCH_DELAY_MS);
 }
 
@@ -851,13 +845,12 @@ export async function stopThreadAndInvalidateCaches(
   queryClient: QueryClient,
   stop: () => Promise<void> | void,
   threadId: string | null | undefined,
-  isMock = false,
 ) {
   try {
     await stop();
   } finally {
-    invalidateStoppedThreadCaches(queryClient, threadId, isMock);
-    scheduleStoppedThreadFinalizationRefetch(queryClient, threadId, isMock);
+    invalidateStoppedThreadCaches(queryClient, threadId);
+    scheduleStoppedThreadFinalizationRefetch(queryClient, threadId);
   }
 }
 
@@ -896,7 +889,7 @@ async function readResponseErrorMessage(
       return data.detail;
     }
   } catch {
-// 响应体不是 JSON 时使用下方回退值。
+    // 响应体不是 JSON 时使用下方回退值。
   }
   return response.statusText || fallback;
 }
@@ -926,7 +919,7 @@ function getHttpStatus(error: unknown): number | undefined {
 /** 判断异常是否表示线程不存在或当前用户无权访问。 */
 function isThreadMissingError(error: unknown): boolean {
   const status = getHttpStatus(error);
-// 此处将 403 等同 404，避免泄露无权访问的线程是否存在；调用方会把过时／不可访问 URL 重定向到空白聊天。
+  // 此处将 403 等同 404，避免泄露无权访问的线程是否存在；调用方会把过时／不可访问 URL 重定向到空白聊天。
   return status === 403 || status === 404;
 }
 
@@ -935,7 +928,6 @@ export function useThreadStream({
   threadId,
   displayThreadId,
   context,
-  isMock,
   onSend,
   onStart,
   onFinish,
@@ -945,7 +937,7 @@ export function useThreadStream({
   const currentViewThreadId = displayThreadId ?? threadId ?? null;
   const currentViewThreadIdRef = useRef(currentViewThreadId);
   currentViewThreadIdRef.current = currentViewThreadId;
-// 服务端流响应前展示的乐观消息。
+  // 服务端流响应前展示的乐观消息。
   const [optimisticMessages, setOptimisticMessages] = useState<Message[]>([]);
   const [optimisticThreadId, setOptimisticThreadId] = useState<string | null>(
     null,
@@ -959,9 +951,9 @@ export function useThreadStream({
   const [pendingSupersededMessageIds, setPendingSupersededMessageIds] =
     useState<ReadonlySet<string>>(() => new Set());
   const [isUploading, setIsUploading] = useState(false);
-// 跟踪当前流式线程 ID，以处理流式期间的线程切换。
+  // 跟踪当前流式线程 ID，以处理流式期间的线程切换。
   const [onStreamThreadId, setOnStreamThreadId] = useState(() => threadId);
-// 此引用可跨异步回调跟踪当前线程 ID 而不触发重渲染，并让 onUpdateEvent 读取当前线程 ID。
+  // 此引用可跨异步回调跟踪当前线程 ID 而不触发重渲染，并让 onUpdateEvent 读取当前线程 ID。
   const threadIdRef = useRef<string | null>(threadId ?? null);
   const startedRef = useRef(false);
   const pendingUsageBaselineMessageIdsRef = useRef<Set<string>>(new Set());
@@ -978,11 +970,10 @@ export function useThreadStream({
     loadMore: loadMoreHistory,
     loading: isHistoryLoading,
   } = useThreadHistory(onStreamThreadId ?? "", {
-    enabled: !isMock,
     pendingSupersededRunIds,
   });
 
-// 使监听器引用始终指向最新回调。
+  // 使监听器引用始终指向最新回调。
   useEffect(() => {
     listeners.current = { onSend, onStart, onFinish, onToolEnd };
   }, [onSend, onStart, onFinish, onToolEnd]);
@@ -990,7 +981,7 @@ export function useThreadStream({
   useEffect(() => {
     const normalizedThreadId = threadId ?? null;
     if (!normalizedThreadId) {
-// UI 切回全新的未保存线程时重置。
+      // UI 切回全新的未保存线程时重置。
       startedRef.current = false;
       setOnStreamThreadId(normalizedThreadId);
     } else {
@@ -1034,7 +1025,7 @@ export function useThreadStream({
   const updateSubtask = useUpdateSubtask();
 
   const thread = useStream<AgentThreadState>({
-    client: getAPIClient(isMock),
+    client: getAPIClient(),
     assistantId: "lead_agent",
     threadId: onStreamThreadId,
     reconnectOnMount: true,
@@ -1068,7 +1059,7 @@ export function useThreadStream({
         },
         interrupts: {},
       });
-      if (context.agent_name && !isMock) {
+      if (context.agent_name) {
         void getAPIClient()
           .threads.update(meta.thread_id, {
             metadata: { agent_name: context.agent_name },
@@ -1210,7 +1201,7 @@ export function useThreadStream({
           .map(messageIdentity)
           .filter((id): id is string => Boolean(id)),
       );
-      if (threadIdRef.current && !isMock) {
+      if (threadIdRef.current) {
         void queryClient.invalidateQueries({
           queryKey: threadHistoryQueryKey(threadIdRef.current),
         });
@@ -1226,7 +1217,7 @@ export function useThreadStream({
           .map(messageIdentity)
           .filter((id): id is string => Boolean(id)),
       );
-      invalidateStoppedThreadCaches(queryClient, threadIdRef.current, isMock);
+      invalidateStoppedThreadCaches(queryClient, threadIdRef.current);
     },
   });
 
@@ -1237,9 +1228,8 @@ export function useThreadStream({
       queryClient,
       () => thread.stop(),
       stoppedThreadId,
-      isMock,
     );
-  }, [displayThreadId, isMock, queryClient, thread, threadId]);
+  }, [displayThreadId, queryClient, thread, threadId]);
 
   const hasVisibleStreamState =
     Boolean(threadId) || liveMessagesThreadId === currentViewThreadId;
@@ -1993,14 +1983,11 @@ export function useThreadRuns(
 /** 查询指定线程的元数据。 */
 export function useThreadMetadata(
   threadId?: string | null,
-  {
-    enabled = true,
-    isMock = false,
-  }: { enabled?: boolean; isMock?: boolean } = {},
+  { enabled = true }: { enabled?: boolean } = {},
 ) {
-  const apiClient = getAPIClient(isMock);
+  const apiClient = getAPIClient();
   return useQuery<AgentThread | null>({
-    queryKey: ["thread", "metadata", threadId, isMock],
+    queryKey: ["thread", "metadata", threadId],
     queryFn: async () => {
       if (!threadId) {
         return null;

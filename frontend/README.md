@@ -26,14 +26,10 @@ cp .env.example .env
 # Edit .env with your configuration
 ```
 
-### Development
+### Run the application
 
-```bash
-# Start development server
-pnpm dev
-
-# The app will be available at http://localhost:3000
-```
+Start the full application from the repository root with `make docker-start`.
+The web interface is available at http://localhost:2026.
 
 ### Build & Test
 
@@ -62,8 +58,6 @@ pnpm test:e2e
 # Build for production
 pnpm build
 
-# Start production server
-pnpm start
 ```
 
 ## Site Map
@@ -128,9 +122,7 @@ src/
 
 | Command             | Description                             |
 | ------------------- | --------------------------------------- |
-| `pnpm dev`          | Start development server with Turbopack |
 | `pnpm build`        | Build for production                    |
-| `pnpm start`        | Start production server                 |
 | `pnpm test`         | Run unit tests with Rstest              |
 | `pnpm test:e2e`     | Run E2E tests with Playwright           |
 | `pnpm format`       | Check formatting with Prettier          |

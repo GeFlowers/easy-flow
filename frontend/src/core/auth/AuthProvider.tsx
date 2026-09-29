@@ -10,8 +10,6 @@ import React, {
   type ReactNode,
 } from "react";
 
-import { isStaticWebsiteOnly } from "../static-mode";
-
 import { type User, buildLoginUrl } from "./types";
 
 // 为使用方重新导出用户类型。
@@ -50,8 +48,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const [isLoading, setIsLoading] = useState(false);
   const router = useRouter();
   const pathname = usePathname();
-  const staticMode = isStaticWebsiteOnly();
-
   const isAuthenticated = user !== null;
 
   /**
@@ -67,8 +63,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
    * 当 ``initialUser`` 可能陈旧时使用（例如标签页曾处于非活动状态）。
    */
   const refreshUser = useCallback(async () => {
-    if (staticMode) return;
-
     try {
       setIsLoading(true);
       const res = await fetch("/api/v1/auth/me", {
@@ -92,7 +86,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [staticMode, pathname, router]);
+  }, [pathname, router]);
 
   /**
    * 登出：调用 FastAPI 登出端点并清除本地状态。
@@ -106,11 +100,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const logout = useCallback(async () => {
     // 立即清除本地状态，防止界面闪烁。
     setUser(null);
-
-    if (staticMode) {
-      router.push("/");
-      return;
-    }
 
     let logoutFailed = false;
     try {
@@ -132,7 +121,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
 
     // 跳转至首页。
     router.push("/");
-  }, [staticMode, router]);
+  }, [router]);
 
   /**
    * 处理可见性变化：标签页重新可见时刷新用户。
@@ -141,8 +130,6 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const lastCheckRef = React.useRef(0);
 
   useEffect(() => {
-    if (staticMode) return;
-
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible" || user === null) return;
       const now = Date.now();
@@ -155,7 +142,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
     return () => {
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [staticMode, user, refreshUser]);
+  }, [user, refreshUser]);
 
   const value: AuthContextType = {
     user,
@@ -191,8 +178,6 @@ export function useRequireAuth(): AuthContextType {
   const pathname = usePathname();
 
   useEffect(() => {
-    if (isStaticWebsiteOnly()) return;
-
     // 仅在确定用户未认证时跳转，不能仅因仍在加载就跳转。
     if (!auth.isLoading && !auth.isAuthenticated) {
       router.push(buildLoginUrl(pathname || "/workspace"));

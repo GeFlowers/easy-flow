@@ -103,7 +103,7 @@ start() {
     "${COMPOSE[@]}" up --build -d --remove-orphans postgres frontend gateway nginx
 
     echo ""
-    echo -e "${GREEN}DeerFlow Docker development environment is starting.${NC}"
+    echo -e "${GREEN}DeerFlow Docker application is starting.${NC}"
     echo "Application: http://localhost:2026"
     echo "Logs:       make docker-logs"
     echo "Stop:       make docker-stop"
@@ -130,14 +130,14 @@ logs() {
 }
 
 stop() {
-    echo "Stopping Docker development services..."
+    echo "Stopping Docker services..."
     cd "$DOCKER_DIR"
     "${COMPOSE[@]}" down
     echo -e "${GREEN}Docker services stopped.${NC}"
 }
 
 restart() {
-    echo "Restarting Docker development services..."
+    echo "Restarting Docker services..."
     cd "$DOCKER_DIR"
     "${COMPOSE[@]}" restart
     echo -e "${GREEN}Docker services restarted.${NC}"
@@ -151,14 +151,14 @@ help() {
     echo ""
     echo "Commands:"
     echo "  init              Check the Docker environment"
-    echo "  start             Start the development services"
-    echo "  restart           Restart the development services"
+    echo "  start             Start the application services"
+    echo "  restart           Restart the application services"
     echo "  logs [option]     Follow logs"
     echo "    --frontend      Frontend logs only"
     echo "    --gateway       Gateway logs only"
     echo "    --nginx         Nginx logs only"
     echo "    --postgres      PostgreSQL logs only"
-    echo "  stop              Stop the development services"
+    echo "  stop              Stop the application services"
     echo "  help              Show this help"
 }
 

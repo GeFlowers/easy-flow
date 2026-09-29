@@ -11,12 +11,12 @@ logger = logging.getLogger(__name__)
 
 
 def _inspector() -> sa.Inspector:
-    """执行持久化流程所需的内部辅助操作。"""
+    """创建指向当前 Alembic 迁移连接的数据库结构检查器。"""
     return sa.inspect(op.get_bind())
 
 
 def _normalize_default(value: object) -> str | None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """规范化数据库反射出的默认值表达式，便于与模型定义比较。"""
     if value is None:
         return None
     if isinstance(value, sa.sql.elements.TextClause):
@@ -36,7 +36,7 @@ def _normalize_default(value: object) -> str | None:
 
 
 def _normalize_type(value: object) -> str:
-    """执行持久化流程所需的内部辅助操作。"""
+    """去除类型参数并统一大小写，得到可比较的 SQL 类型名。"""
     if value is None:
         return ""
     s = value if isinstance(value, str) else repr(value)
@@ -57,7 +57,7 @@ _EQUIVALENT_TYPE_FAMILIES: tuple[frozenset[str], ...] = (frozenset({"JSON", "JSO
 
 
 def _type_equivalent(actual: object, desired: object) -> bool:
-    """执行持久化流程所需的内部辅助操作。"""
+    """判断数据库类型与模型类型是否相同或属于已确认的方言等价类型。"""
     a = _normalize_type(actual)
     d = _normalize_type(desired)
     if not a or not d:
@@ -69,7 +69,7 @@ def _type_equivalent(actual: object, desired: object) -> bool:
 
 
 def _check_column_drift(table: str, desired: sa.Column, actual: dict) -> None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """检查已有列与模型定义的类型、可空性及默认值差异并记录警告。"""
     diffs: list[str] = []
 
     desired_nullable = True if desired.nullable is None else bool(desired.nullable)
@@ -97,7 +97,7 @@ def _check_column_drift(table: str, desired: sa.Column, actual: dict) -> None:
 
 
 def safe_add_column(table: str, column: sa.Column) -> None:
-    """执行当前持久化组件提供的操作。"""
+    """仅在目标列缺失时添加列；已存在但定义不一致时保留现状并告警。"""
     insp = _inspector()
     if table not in insp.get_table_names():
         return
@@ -110,7 +110,7 @@ def safe_add_column(table: str, column: sa.Column) -> None:
 
 
 def safe_drop_column(table: str, column_name: str) -> None:
-    """执行当前持久化组件提供的操作。"""
+    """仅当表和列均存在时删除列，使迁移可兼容部分升级过的数据库。"""
     insp = _inspector()
     if table not in insp.get_table_names():
         return

@@ -95,18 +95,12 @@ Opening a thread from the sidebar loads its full history from persisted state. T
 The `database` section controls the default persistence backend for thread state and application data:
 
 ```yaml
-# SQLite (local development and single-user deployments)
 database:
-  backend: sqlite
-  sqlite_dir: .deer-flow/data
+  backend: postgres
+  postgres_url: $DATABASE_URL
 
-# Postgres (production and multi-user deployments)
-# database:
-#   backend: postgres
-#   postgres_url: $DATABASE_URL
-#
-# run_events:
-#   backend: db
+run_events:
+  backend: db
 ```
 
 <Callout type="info">

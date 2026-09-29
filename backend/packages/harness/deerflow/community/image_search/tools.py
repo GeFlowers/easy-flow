@@ -86,7 +86,7 @@ def image_search_tool(
     type_image: str | None = None,
     layout: str | None = None,
 ) -> str:
-    """Search for images online. Use this tool BEFORE image generation to find reference images for characters, portraits, objects, scenes, or any content requiring visual accuracy.
+    """在线搜索人物、物品或场景图片，为图像创作提供可核对的视觉参考。
 
     **When to use:**
     - Before generating character/portrait images: search for similar poses, expressions, styles

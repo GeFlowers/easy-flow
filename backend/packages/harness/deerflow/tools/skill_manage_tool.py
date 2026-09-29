@@ -268,7 +268,7 @@ async def skill_manage_tool(
     replace: str | None = None,
     expected_count: int | None = None,
 ) -> str:
-    """Manage custom skills under skills/custom/.
+    """管理 skills/custom/ 下的自定义技能，包括创建、更新、补丁应用和删除。
 
     Args:
         action: One of create, patch, edit, delete, write_file, remove_file.

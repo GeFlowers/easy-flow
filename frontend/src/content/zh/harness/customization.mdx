@@ -145,8 +145,8 @@ models:
 
 ```yaml
 checkpointer:
-  type: sqlite
-  connection_string: ./my-checkpoints.db
+  type: postgres
+  connection_string: $DATABASE_URL
 ```
 
 对于自定义后端，实现 LangGraph 的 `BaseCheckpointSaver` 接口，并在初始化 `DeerFlowClient` 时以编程方式配置它。

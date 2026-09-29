@@ -126,8 +126,6 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
         "Give the agent a self-contained task description — it will produce results in its own workspace. "
         "After the agent completes, its output files are accessible at /mnt/acp-workspace/ (read-only)."
     )
-
-    # 中文说明：此处用于执行相关处理。
     _agents = dict(agents)
 
     async def _invoke(agent: str, prompt: str, config: Annotated[RunnableConfig, InjectedToolArg] = None) -> str:

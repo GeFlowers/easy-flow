@@ -319,7 +319,7 @@ export function InputBox({
   const searchParams = useSearchParams();
   const [modelDialogOpen, setModelDialogOpen] = useState(false);
   const { models } = useModels();
-  const { thread, isMock } = useThread();
+  const { thread } = useThread();
   const { attachments, textInput } = usePromptInputController();
   const sidecar = useMaybeSidecar();
   const attachmentParts = attachments.files;
@@ -1056,7 +1056,6 @@ export function InputBox({
     skillSuggestions.length > 0 &&
     dismissedSkillSuggestionValue !== textInput.value;
   const isComposerDisabled = disabled === true;
-  const isMockThread = isMock === true;
   const hasOpenHumanInputCard = useMemo(
     () =>
       hasOpenHumanInputRequest(
@@ -1072,7 +1071,6 @@ export function InputBox({
     (textInput.value ?? "") === inputPolishUndo.rewrittenText;
   const inputPolishDisabled =
     isComposerDisabled ||
-    isMockThread ||
     hasOpenHumanInputCard ||
     polishingInput ||
     (!inputPolishUndoAvailable &&
@@ -1681,7 +1679,7 @@ export function InputBox({
       return;
     }
 
-    if (disabled || isMock) {
+    if (disabled) {
       return;
     }
 
@@ -1756,7 +1754,6 @@ export function InputBox({
   }, [
     context.model_name,
     disabled,
-    isMock,
     status,
     suggestionsConfigLoaded,
     suggestionsEnabled,

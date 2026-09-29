@@ -25,7 +25,7 @@ class SearxngClient:
     ) -> list[dict[str, Any]]:
         """执行 search 的明确职责，并返回与调用约定一致的结果。
 
-        Search the web using SearXNG.
+        通过配置的 SearXNG 实例聚合搜索网络资料。
 
                 Args:
                     query: The search query.

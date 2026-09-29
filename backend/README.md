@@ -189,22 +189,9 @@ export OPENAI_API_KEY="your-api-key-here"
 
 ### Running
 
-**Full Application** (from project root):
-
-```bash
-make dev  # Starts Gateway + Frontend locally
-```
-
-Access at: http://localhost:3000
-
-**Backend Only** (from backend directory):
-
-```bash
-# Gateway API + embedded agent runtime
-make dev
-```
-
-Direct access: Gateway at http://localhost:8001
+Start the full application from the repository root with `make docker-start`.
+Access it at http://localhost:2026. Backend-only local server startup is not a
+supported application workflow.
 
 **Terminal Workbench (TUI)** — a terminal-native UI over the embedded harness,
 no services required:
@@ -257,8 +244,8 @@ backend/
 ├── app/                        # FastAPI Gateway + IM channels (import: app.*)
 │   ├── gateway/                # Gateway API
 │   │   ├── app.py              # Application setup
-│   │   └── routers/            # Route modules
-│   └── channels/               # IM channel integrations
+│   │   └── routers/            # Domain packages: agents, conversations, integrations, configuration, operations
+│   └── channels/               # Shared channel runtime; platform adapters live under providers/
 ├── docs/                       # Documentation
 ├── tests/                      # Test suite
 ├── langgraph.json              # LangGraph graph registry for tooling/Studio compatibility
@@ -408,12 +395,9 @@ If a provider is explicitly enabled but required credentials are missing, or the
 ### Commands
 
 ```bash
-make install    # Install dependencies
-make dev        # Run Gateway API + embedded agent runtime (port 8001)
-make gateway    # Run Gateway API without reload (port 8001)
+make install    # Install backend dependencies
 make lint       # Run linter (ruff)
 make format     # Format code (ruff)
-make detect-blocking-io  # Inventory blocking IO that may block the backend event loop
 ```
 
 ### Schema Migrations
@@ -421,16 +405,16 @@ make detect-blocking-io  # Inventory blocking IO that may block the backend even
 DeerFlow's application tables (`runs`, `threads_meta`, `feedback`, `users`,
 `run_events`, and the `channel_*` tables) are owned by alembic. The Gateway
 runs `alembic upgrade head` automatically on startup via
-`bootstrap_schema(engine, backend=...)`, so operators do not run `alembic`
-manually in production. Bootstrap is concurrency-safe (Postgres advisory lock
-across processes; per-engine `asyncio.Lock` inside one SQLite process) and
-idempotent against pre-existing schemas (empty / legacy / versioned).
+`bootstrap_schema(engine)`, so operators do not run `alembic`
+manually in production. Bootstrap is concurrency-safe through PostgreSQL advisory locks and
+idempotent against pre-existing schemas (empty / legacy / versioned); see
+`packages/harness/deerflow/persistence/bootstrap.py` and the migration environment
+for implementation details.
 
 When you add or change an ORM model, commit a reviewed revision under
 `packages/harness/deerflow/persistence/migrations/versions/`. Gateway startup
 applies committed revisions automatically. This checkout no longer includes a
-convenience script or Make target for generating revisions. See
-`backend/AGENTS.md` (Schema Migrations) for the full design.
+convenience script or Make target for generating revisions.
 
 ### Code Style
 
@@ -446,17 +430,8 @@ convenience script or Make target for generating revisions. See
 uv run pytest
 ```
 
-`make detect-blocking-io` statically scans backend business code for blocking
-IO that may run on the backend event loop and is not test-coverage-bound. It
-prints a concise summary for human review and writes complete JSON findings to
-`.deer-flow/blocking-io-findings.json` at the repository root (regardless of
-whether the target is invoked from the repo root or from `backend/`). JSON
-findings include both broad IO category and review-oriented fields such as
-`priority`, `location`, `blocking_call`, `event_loop_exposure`, `reason`, and
-`code`. `priority` is a deterministic review ordering from the operation type,
-not proof of a bug. Bare-name same-file calls are resolved by function name,
-so duplicate helper names in one file can conservatively over-report async
-reachability.
+`make test-blocking-io` runs focused regression tests for known blocking-I/O
+risks on the backend event loop.
 
 ---
 
@@ -491,4 +466,4 @@ See the [LICENSE](../LICENSE) file in the project root.
 
 ## Contributing
 
-See [backend/AGENTS.md](AGENTS.md) for development guidelines.
+See the contributing and testing sections above for development guidelines.

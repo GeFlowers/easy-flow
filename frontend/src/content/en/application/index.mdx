@@ -56,7 +56,7 @@ The DeerFlow App runs behind a single nginx reverse proxy:
 | Gateway           | FastAPI, Python 3.12, uvicorn                                        |
 | Agent runtime     | LangGraph, LangChain, DeerFlow Harness                               |
 | Reverse proxy     | nginx                                                                |
-| State persistence | Gateway runtime + optional SQLite/PostgreSQL checkpointer             |
+| State persistence | Gateway runtime + PostgreSQL checkpointer                              |
 
 <Cards num={2}>
   <Cards.Card title="Quick Start" href="/docs/application/quick-start" />

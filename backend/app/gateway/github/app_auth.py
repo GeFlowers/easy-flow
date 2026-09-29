@@ -1,24 +1,4 @@
-"""定义 app_auth 模块提供的职责与可复用接口。
-
-GitHub App authentication helpers.
-
-This module owns the two-stage auth dance GitHub Apps use:
-
-1. **App JWT** — signed with our App's RSA private key, lives 10 minutes
-   tops, identifies the App itself. Used only to mint installation
-   tokens.
-
-2. **Installation access token** — short-lived (1 hour) OAuth-style token
-   scoped to one installation (one customer org / one repo set). Used as
-   ``Authorization: token <…>`` on every REST call that does something
-   useful (post a comment, set a label, etc.).
-
-The cache is in-process and intentionally simple: one dict keyed by
-installation id, with a 55-minute TTL so we refresh well before the
-60-minute GitHub limit. If two webhook deliveries land within a few
-seconds we'll mint two tokens — that's fine and well under any
-rate limit.
-"""
+"""负责 GitHub App JWT 签发、安装令牌换取及按安装 ID 的短期令牌缓存。"""
 
 from __future__ import annotations
 
@@ -34,10 +14,9 @@ import jwt
 
 logger = logging.getLogger(__name__)
 
-# How long an App JWT lives. GitHub caps this at 10 minutes; we use 9 to
-# leave headroom for the request itself.
+# GitHub App JWT 最长有效期为 10 分钟；本实现留出请求传输余量。
 _APP_JWT_TTL_SECONDS = 9 * 60
-# Refresh installation tokens this many seconds before they expire.
+# 安装令牌在到期前预留此时长刷新。
 _INSTALLATION_TOKEN_LEEWAY_SECONDS = 5 * 60
 
 _APP_ID_ENV = "GITHUB_APP_ID"
@@ -48,36 +27,26 @@ _GITHUB_API_BASE = "https://api.github.com"
 
 
 class GitHubAppAuthError(RuntimeError):
-    """封装 GitHubAppAuthError 的状态、协作关系与公开操作。
-
-    Raised when GitHub App credentials are missing or invalid."""
+    """GitHub App 凭据缺失、格式错误或令牌交换失败时抛出的异常。"""
 
 
 @dataclass
 class _CachedToken:
-    "封装 _CachedToken 的状态、协作关系与公开操作"
+    """保存安装访问令牌及其本地缓存失效时间。"""
 
     token: str
     expires_at: float  # epoch seconds
 
 
 _token_cache: dict[int, _CachedToken] = {}
-# Per-installation locks so a cold mint for installation A does not block
-# concurrent lookups (cache hits OR independent cold mints) for any other
-# installation. A single process-wide lock would serialize the entire
-# fleet behind one slow GitHub /access_tokens roundtrip; this map gives
-# each installation its own ~hundreds-of-ms HTTPS critical section while
-# letting unrelated installations proceed concurrently.
+# 每个安装分别加锁，避免某个 GitHub 请求拖慢其他安装的缓存读取或令牌刷新。
 _install_locks: dict[int, asyncio.Lock] = {}
-# Guards the _install_locks map itself — only held while we look up /
-# insert the per-installation lock, never while we hold one.
+# 仅保护安装锁映射的查找和插入，不会在持有某个安装锁期间继续占用。
 _install_locks_lock = asyncio.Lock()
 
 
 async def _lock_for(installation_id: int) -> asyncio.Lock:
-    """执行 _lock_for 的明确职责，并返回与调用约定一致的结果。
-
-    Return the lock dedicated to ``installation_id``, creating on demand."""
+    """获取指定安装的互斥锁；不存在时创建，避免不同安装互相阻塞。"""
     async with _install_locks_lock:
         lock = _install_locks.get(installation_id)
         if lock is None:
@@ -87,13 +56,7 @@ async def _lock_for(installation_id: int) -> asyncio.Lock:
 
 
 def app_id() -> int:
-    """执行 app_id 的明确职责，并返回与调用约定一致的结果。
-
-    Return the configured GitHub App id, or raise if unset.
-
-        Read fresh on every call so operators can rotate it without a process
-        restart.
-    """
+    """从环境变量读取 GitHub App ID 并转换为整数，每次调用均读取最新值。"""
     raw = os.environ.get(_APP_ID_ENV)
     if not raw:
         raise GitHubAppAuthError(f"{_APP_ID_ENV} is not set")
@@ -104,15 +67,7 @@ def app_id() -> int:
 
 
 def load_app_private_key() -> str:
-    """加载并返回，并遵守 load_app_private_key 所表达的接口约束。
-
-    Return the App's RSA private key as a PEM string.
-
-        Reads from ``GITHUB_APP_PRIVATE_KEY`` (inline PEM) if set, else from
-        the path in ``GITHUB_APP_PRIVATE_KEY_PATH``. Inline takes precedence
-        so operators can roll a key by setting an env var instead of moving
-        files around in production.
-    """
+    """优先从环境变量读取内联 PEM 私钥，否则读取私钥路径指定的文件。"""
     inline = os.environ.get(_PRIVATE_KEY_ENV)
     if inline and inline.strip():
         return inline
@@ -127,23 +82,13 @@ def load_app_private_key() -> str:
 
 
 def mint_app_jwt(*, now: float | None = None) -> str:
-    """执行 mint_app_jwt 的明确职责，并返回与调用约定一致的结果。
-
-    Sign a short-lived JWT identifying this App to GitHub.
-
-        Args:
-            now: Optional override for ``time.time()`` — tests use this.
-
-        Returns:
-            Signed RS256 JWT suitable for ``Authorization: Bearer <jwt>``.
-    """
+    """用 App 私钥签发短期 RS256 JWT，供 GitHub App 接口认证使用。"""
     issued_at = int(now if now is not None else time.time())
     payload = {
-        # GitHub recommends iat 60s in the past to tolerate clock skew.
+        # 将签发时间回拨 60 秒，容忍服务器时钟偏差。
         "iat": issued_at - 60,
         "exp": issued_at + _APP_JWT_TTL_SECONDS,
-        # iss must be a string in current pyjwt; GitHub accepts the
-        # numeric App id rendered as a decimal string.
+        # 当前 PyJWT 要求 iss 为字符串；GitHub 接受十进制文本形式的 App ID。
         "iss": str(app_id()),
     }
     return jwt.encode(payload, load_app_private_key(), algorithm="RS256")
@@ -154,9 +99,7 @@ async def _request_new_installation_token(
     *,
     client: httpx.AsyncClient | None = None,
 ) -> _CachedToken:
-    """执行 _request_new_installation_token 的明确职责，并返回与调用约定一致的结果。
-
-    Hit ``POST /app/installations/{id}/access_tokens`` once."""
+    """向 GitHub 请求新的安装访问令牌，并计算本地缓存到期时间。"""
     headers = {
         "Authorization": f"Bearer {mint_app_jwt()}",
         "Accept": "application/vnd.github+json",
@@ -165,15 +108,13 @@ async def _request_new_installation_token(
     url = f"{_GITHUB_API_BASE}/app/installations/{installation_id}/access_tokens"
 
     async def _do(c: httpx.AsyncClient) -> _CachedToken:
-        "执行 _do 的明确职责，并返回与调用约定一致的结果"
+        """使用给定 HTTP 客户端发送令牌交换请求并解析响应。"""
         resp = await c.post(url, headers=headers, timeout=15.0)
         if resp.status_code != 201:
             raise GitHubAppAuthError(f"Failed to mint installation token (status={resp.status_code} body={resp.text!r})")
         data = resp.json()
         token = data["token"]
-        # GitHub returns ISO8601 expires_at; we just bake in a 60-minute
-        # life and let the leeway handle the rest. Trusting the wall
-        # clock instead of parsing ISO is fine here.
+        # GitHub 返回 ISO8601 expires_at；此处按一小时有效期估算，再由刷新余量提前失效。
         expires_at = time.time() + 60 * 60
         return _CachedToken(token=token, expires_at=expires_at)
 
@@ -189,41 +130,11 @@ async def mint_installation_token(
     client: httpx.AsyncClient | None = None,
     force_refresh: bool = False,
 ) -> str:
-    """执行 mint_installation_token 的明确职责，并返回与调用约定一致的结果。
-
-    Return a valid installation access token, minting if necessary.
-
-        Concurrency: a per-installation :class:`asyncio.Lock` serializes mints
-        for the same installation (so two parallel cache-misses don't double-
-        mint), but mints for DIFFERENT installations proceed concurrently —
-        a slow GitHub /access_tokens call for installation A no longer
-        blocks lookups for installation B.
-
-        Cache hits take a lock-free fast path: we check the dict before
-        acquiring any lock, since :class:`asyncio.Lock` itself awaits the
-        event loop and there's no need to serialize a pure read on a value
-        that only this function ever mutates. The lock is re-acquired only
-        when we miss and need to mint, and we re-check the cache inside the
-        lock (double-checked locking) in case another coroutine just minted
-        while we were waiting.
-
-        Args:
-            installation_id: GitHub App installation id (per repo set).
-            client: Optional shared :class:`httpx.AsyncClient` — pass one in
-                if you have a long-lived client.
-            force_refresh: Skip the cache. Use after a 401 from the API.
-
-        Returns:
-            The token string. Caller adds ``Authorization: token <token>``.
-    """
+    """返回未过期的安装令牌；缓存未命中时按安装 ID 加锁并向 GitHub 换取。"""
     if installation_id <= 0:
         raise GitHubAppAuthError(f"installation_id must be positive, got {installation_id!r}")
 
-    # Fast path: lock-free cache hit. The dict is mutated only inside
-    # the per-installation lock below, and Python dict reads of an
-    # existing key are atomic, so seeing a stale-but-still-valid entry
-    # here is fine (it's the same logic as the locked check, just
-    # earlier).
+    # 缓存读取快速路径无需加锁；有效的旧令牌仍可安全返回。
     if not force_refresh:
         cached = _token_cache.get(installation_id)
         if cached is not None and cached.expires_at - _INSTALLATION_TOKEN_LEEWAY_SECONDS > time.time():
@@ -231,8 +142,7 @@ async def mint_installation_token(
 
     lock = await _lock_for(installation_id)
     async with lock:
-        # Double-check: another coroutine for the same installation may
-        # have just minted while we were waiting for this lock.
+        # 等待互斥锁期间可能已有协程刷新令牌，因此再次检查缓存。
         cached = _token_cache.get(installation_id)
         if cached is not None and not force_refresh and cached.expires_at - _INSTALLATION_TOKEN_LEEWAY_SECONDS > time.time():
             return cached.token
@@ -243,8 +153,6 @@ async def mint_installation_token(
 
 
 def _clear_token_cache_for_tests() -> None:
-    """执行 _clear_token_cache_for_tests 的明确职责，并返回与调用约定一致的结果。
-
-    Drop every cached token. Tests reach for this between cases."""
+    """清空令牌和安装锁缓存，供测试隔离不同用例的状态。"""
     _token_cache.clear()
     _install_locks.clear()

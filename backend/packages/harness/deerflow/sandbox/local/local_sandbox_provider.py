@@ -140,8 +140,7 @@ class LocalSandboxProvider(SandboxProvider):
                     # Ensure the host path exists before adding mapping.
                     #
                     # ``host_path`` is resolved against the filesystem of the
-                    # process running this provider — for ``make dev`` that is
-                    # the host machine, but for ``make up`` it is the
+                    # process running this provider — for Docker deployment it is the
                     # ``deer-flow-gateway`` container, so any host path that
                     # isn't bind-mounted into the gateway image will be missing
                     # here. Skipping silently makes this a high-cost-to-debug
@@ -159,11 +158,10 @@ class LocalSandboxProvider(SandboxProvider):
                     else:
                         logger.error(
                             "sandbox.mounts entry %s -> %s ignored: host_path %s does not exist from the "
-                            "perspective of the gateway process. In Docker deployments (make up / docker-compose), "
+                            "perspective of the gateway process. In Docker deployments, "
                             "this path must also be bind-mounted into the gateway container — add a matching "
-                            "volume entry under services.gateway.volumes in docker/docker-compose.yaml (and use "
-                            "the in-container path here), or run in local mode (make dev) where the gateway sees "
-                            "the host filesystem directly.",
+                            "volume entry under services.gateway.volumes in docker/docker-compose-dev.yaml (and use "
+                            "the in-container path here).",
                             mount.host_path,
                             mount.container_path,
                             mount.host_path,

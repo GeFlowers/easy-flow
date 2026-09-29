@@ -186,22 +186,13 @@ tools:
 
 DeerFlow uses the `database` section for both LangGraph checkpoint data and application data such as runs, feedback, and thread metadata.
 
-By default, DeerFlow uses SQLite for local, single-node persistence:
-
-```yaml
-database:
-  backend: sqlite
-  sqlite_dir: .deer-flow/data
-```
-
-SQLite mode stores everything in one `deerflow.db` file. This is fine for development or single-user deployments, but concurrent production traffic can hit SQLite's single-writer limit and raise `sqlite3.OperationalError: database is locked`.
-
-For production or multi-user deployments, use Postgres:
+Configure PostgreSQL as the persistence backend for checkpoints and application data:
 
 ```yaml
 database:
   backend: postgres
   postgres_url: $DATABASE_URL
+```
 
 run_events:
   backend: db

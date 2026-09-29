@@ -11,18 +11,18 @@ import { Callout } from "nextra/components";
 
 ## 日志
 
-DeerFlow 应用在 `logs/` 目录中写入每个服务的日志：
+使用以下 Docker Compose 命令查看服务日志：
 
-| 文件                 | 内容                                   |
-| -------------------- | -------------------------------------- |
-| `logs/gateway.log`   | API 请求/响应、Agent 运行时和 Gateway 错误 |
-| `logs/frontend.log`  | Next.js 服务器日志                     |
-| `logs/nginx.log`     | 代理访问和错误日志                     |
+| 服务 | 命令 |
+| ---- | ---- |
+| 全部服务 | `make docker-logs` |
+| Gateway | `make docker-logs-gateway` |
+| 前端 | `make docker-logs-frontend` |
 
 **实时追踪日志**：
 
 ```bash
-tail -f logs/gateway.log     # 查看 API 请求和 Agent 活动
+make docker-logs-gateway     # 查看 API 请求和 Agent 活动
 ```
 
 **调整日志级别**：
@@ -63,8 +63,8 @@ make config-upgrade
 **诊断**：
 
 ```bash
-# 检查 Gateway 日志中的模型错误
-grep -i "error\|apikey\|unauthorized" logs/gateway.log | tail -20
+# 检查 Gateway 容器日志中的模型错误
+docker compose -f docker/docker-compose-dev.yaml logs --tail=20 gateway
 ```
 
 **解决**：
@@ -94,13 +94,11 @@ ls -la backend/.deer-flow/threads/
 
 ---
 
-### SQLite 报 `database is locked`
+### PostgreSQL 连接失败
 
-**症状**：Docker 或团队部署中，多个用户同时使用时出现 `sqlite3.OperationalError: database is locked`。
+**症状**：Gateway 启动时报告数据库连接失败，或持久化相关 API 返回错误。
 
-**原因**：SQLite 支持并发读取，但同一时间只有一个写入者。DeerFlow 的检查点写入和应用写入会共享同一个 SQLite 数据库文件，多用户并发时可能竞争文件锁。
-
-**解决**：生产环境或多用户部署切换到 Postgres：
+**检查**：确认 `.env` 中的 `DATABASE_URL` 指向可访问的 PostgreSQL 服务，并且数据库用户有建表和迁移权限：
 
 ```yaml
 database:
@@ -110,8 +108,6 @@ database:
 run_events:
   backend: db
 ```
-
-SQLite 应只用于本地开发、单用户部署或短期评估环境。
 
 ---
 
@@ -140,7 +136,7 @@ SKIP_ENV_VALIDATION=1 pnpm build
 
 ```bash
 # 检查 MCP 相关错误
-grep -i "mcp\|timeout" logs/gateway.log | tail -20
+docker compose -f docker/docker-compose-dev.yaml logs --tail=20 gateway
 ```
 
 **解决**：
@@ -167,8 +163,7 @@ grep -i "mcp\|timeout" logs/gateway.log | tail -20
 
 - `backend/.deer-flow/threads/`：线程工作目录、上传文件和产出物。
 - `backend/.deer-flow/memory.json` 和 `backend/.deer-flow/agents/`：全局和 Agent 记忆。
-- `${database.sqlite_dir}/deerflow.db`：当使用 `database.backend: sqlite` 时备份，默认路径为 `.deer-flow/data/deerflow.db`。
-- Postgres 数据库备份：当使用 `database.backend: postgres` 时定期导出。
+- PostgreSQL 数据库：定期备份检查点、Store 数据和应用记录。
 - 旧的 `checkpointer.connection_string` 文件：如果你的部署仍配置独立 `checkpointer`。
 - `backend/agents/*/config.yaml`：自定义 Agent 配置。
 
@@ -177,18 +172,8 @@ Docker 部署中，备份绑定挂载的宿主机路径，而不是容器内部�
 ## 停止和重启服务
 
 ```bash
-# 停止所有本地服务
-make stop
-
-# 重启（停止后重新启动）
-make stop && make dev
-```
-
-在 Docker 中：
-
-```bash
-docker compose -f docker/docker-compose-dev.yaml down
-docker compose -f docker/docker-compose-dev.yaml up
+make docker-stop
+make docker-start
 ```
 
 <Cards num={2}>

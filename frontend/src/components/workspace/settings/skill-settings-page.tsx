@@ -27,7 +27,6 @@ import { useI18n } from "@/core/i18n/hooks";
 import { SkillRequestError } from "@/core/skills/api";
 import { useEnableSkill, useSkills } from "@/core/skills/hooks";
 import type { Skill } from "@/core/skills/type";
-import { env } from "@/env";
 
 import { SettingsSection } from "./settings-section";
 
@@ -113,9 +112,7 @@ function SkillSettingsList({
             <ItemActions>
               <Switch
                 checked={skill.enabled}
-                disabled={
-                  env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" || !isAdmin
-                }
+                disabled={!isAdmin}
                 onCheckedChange={(checked) =>
                   enableSkill({ skillName: skill.name, enabled: checked })
                 }

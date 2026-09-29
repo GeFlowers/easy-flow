@@ -160,11 +160,13 @@ class _AutoSentinel:
     _instance: _AutoSentinel | None = None
 
     def __new__(cls) -> _AutoSentinel:
+        """确保 AUTO 标记全局只存在一个实例，以区分参数未传入的情况。"""
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __repr__(self) -> str:
+        """返回稳定的标记名称，便于调试用户作用域解析。"""
         return "<AUTO>"
 
 
@@ -193,7 +195,7 @@ def resolve_user_id(
             raise RuntimeError(f"{method_name} called with user_id=AUTO but no user context is set; pass an explicit user_id, set the contextvar via auth middleware, or opt out with user_id=None for migration/CLI paths.")
         # Coerce to ``str`` at the boundary: ``User.id`` is typed as
         # ``UUID`` for the API surface, but the persistence layer
-        # stores ``user_id`` as ``String(64)`` and aiosqlite cannot
+        # stores ``user_id`` as ``String(64)`` and database drivers cannot
         # bind a raw UUID object to a VARCHAR column ("type 'UUID' is
         # not supported"). Honour the documented return type here
         # rather than ripple a type change through every caller.

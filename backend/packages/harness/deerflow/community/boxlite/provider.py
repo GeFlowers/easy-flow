@@ -1,17 +1,4 @@
-"""定义 provider 模块提供的职责与可复用接口。
-
-``BoxliteProvider`` — DeerFlow :class:`SandboxProvider` backed by BoxLite.
-
-Integrates `BoxLite <https://github.com/boxlite-ai/boxlite>`_ — a daemonless,
-OCI-native micro-VM runtime — as a DeerFlow sandbox backend. See
-https://github.com/bytedance/deer-flow/issues/3936.
-
-Config is read off :class:`SandboxConfig` (``extra="allow"``), so BoxLite keys
-may appear under ``sandbox:`` in ``config.yaml`` even though they are not declared
-on the model — see this package's ``__init__`` docstring for the full set. The
-provider creates one micro-VM per ``(user, thread)`` and reuses it within the
-process.
-"""
+"""将 BoxLite 微型虚拟机适配为 DeerFlow 沙箱，并按用户与线程复用实例。"""
 
 from __future__ import annotations
 
@@ -43,8 +30,7 @@ T = TypeVar("T")
 
 DEFAULT_IMAGE = "python:3.12-slim"
 _BOX_NAME_PREFIX = "deer-flow-boxlite-"
-# DeerFlow's virtual prefixes, materialised on the box rootfs at start so the
-# Sandbox file APIs (which address /mnt/user-data/...) resolve natively.
+# 容器启动时预建这些路径，使沙箱文件接口的虚拟路径可直接映射到容器文件系统。
 _VIRTUAL_DIRS = (
     f"{VIRTUAL_PATH_PREFIX}/workspace",
     f"{VIRTUAL_PATH_PREFIX}/uploads",
@@ -54,13 +40,7 @@ _VIRTUAL_DIRS = (
 
 
 def _import_simplebox() -> type[SimpleBox]:
-    """执行 _import_simplebox 的明确职责，并返回与调用约定一致的结果。
-
-    Import BoxLite's async ``SimpleBox`` lazily.
-
-        Kept out of module import so the harness (and every other provider) installs
-        without BoxLite; the dependency is only needed once this provider is selected.
-    """
+    """延迟导入 BoxLite 异步容器类，使未选择此后端时无需安装可选依赖。"""
     try:
         from boxlite import SimpleBox
     except ImportError as e:  # pragma: no cover - depends on the optional dependency
@@ -69,9 +49,7 @@ def _import_simplebox() -> type[SimpleBox]:
 
 
 def _import_sync_boxlite_runtime():
-    """执行 _import_sync_boxlite_runtime 的明确职责，并返回与调用约定一致的结果。
-
-    Import BoxLite's sync runtime lazily for startup reconciliation."""
+    """延迟导入同步 BoxLite Runtime，仅在启动时查找并认领遗留容器。"""
     try:
         from boxlite import SyncBoxlite
     except ImportError as e:  # pragma: no cover - depends on the optional dependency
@@ -80,20 +58,10 @@ def _import_sync_boxlite_runtime():
 
 
 class _EventLoopThread:
-    """封装 _EventLoopThread 的状态、协作关系与公开操作。
-
-    A private asyncio event loop running on a dedicated daemon thread.
-
-        BoxLite is async-native and its box handles are loop-affine, while DeerFlow's
-        ``Sandbox`` contract is synchronous and may be invoked from arbitrary
-        ``asyncio.to_thread`` workers. Owning one loop here and marshalling every
-        coroutine onto it via ``run_coroutine_threadsafe`` gives a stable, thread-safe
-        bridge without BoxLite's greenlet sync facade (which refuses to run inside an
-        async context and is thread-affine).
-    """
+    """在专用线程持有事件循环，将同步沙箱调用安全转发到 BoxLite 异步 API。"""
 
     def __init__(self) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """启动专用事件循环线程，并等待循环完成初始化。"""
         self._loop: asyncio.AbstractEventLoop | None = None
         self._ready = threading.Event()
         self._thread = threading.Thread(target=self._run_forever, name="boxlite-loop", daemon=True)
@@ -101,7 +69,7 @@ class _EventLoopThread:
         self._ready.wait(timeout=5)
 
     def _run_forever(self) -> None:
-        "执行 _run_forever 的明确职责，并返回与调用约定一致的结果"
+        """在线程中创建事件循环，通知初始化方就绪后持续处理异步任务。"""
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         self._loop.call_soon(self._ready.set)
@@ -114,7 +82,7 @@ class _EventLoopThread:
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
 
     def close(self) -> None:
-        "执行 close 的明确职责，并返回与调用约定一致的结果"
+        """停止并关闭专用事件循环，等待其线程退出。"""
         if self._loop is None:
             return
         self._loop.call_soon_threadsafe(self._loop.stop)
@@ -127,12 +95,10 @@ class _EventLoopThread:
 
 
 class _SyncBoxAdapter:
-    """封装 _SyncBoxAdapter 的状态、协作关系与公开操作。
-
-    Adapt a sync BoxLite ``Box`` handle to the async ``SimpleBox`` methods we use."""
+    """把同步 BoxLite 句柄包装成沙箱对象所需的异步方法接口。"""
 
     def __init__(self, runtime: Any, box: Any) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """保存容器句柄及其 Runtime，以便执行和停止操作访问同一实例。"""
         self._runtime = runtime
         self._box = box
 
@@ -145,7 +111,7 @@ class _SyncBoxAdapter:
         timeout: float | None = None,
         cwd: str | None = None,
     ) -> Any:
-        "执行 exec 的明确职责，并返回与调用约定一致的结果"
+        """将命令及环境、用户、超时和工作目录参数转发给底层容器。"""
         return self._box.exec(
             cmd,
             *args,
@@ -156,7 +122,7 @@ class _SyncBoxAdapter:
         )
 
     async def stop(self) -> None:
-        "执行 stop 的明确职责，并返回与调用约定一致的结果"
+        """停止容器并释放其所属 Runtime，即使停止容器时发生异常也会释放。"""
         try:
             self._box.stop()
         finally:
@@ -164,18 +130,14 @@ class _SyncBoxAdapter:
 
 
 def _run_sync_adapter[T](coro: Awaitable[T], *, timeout: float | None = None) -> T:
-    """执行 _run_sync_adapter 的明确职责，并返回与调用约定一致的结果。
-
-    Run sync-adapter coroutines without using the BoxLite async loop."""
+    """在临时事件循环运行适配器协程，可选设置整体等待超时。"""
     if timeout is None:
         return asyncio.run(coro)
     return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
 
 
 class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
-    """封装 BoxliteProvider 的状态、协作关系与公开操作。
-
-    Run each DeerFlow sandbox as a BoxLite micro-VM."""
+    """以 BoxLite 微型虚拟机实现沙箱 Provider，并回收或复用空闲实例。"""
 
     uses_thread_data_mounts = False
     needs_upload_permission_adjustment = True
@@ -183,19 +145,13 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
 
     @staticmethod
     def _sandbox_id(thread_id: str, user_id: str) -> str:
-        """执行 _sandbox_id 的明确职责，并返回与调用约定一致的结果。
-
-        Deterministic sandbox ID from user/thread scope.
-
-                Includes user_id so a box created for one user's bucket cannot be
-                reclaimed by another user's thread with the same thread_id.
-        """
+        """根据用户和线程生成稳定 ID，避免不同用户的同名线程共享沙箱。"""
         return hashlib.sha256(f"{user_id}:{thread_id}".encode()).hexdigest()[:8]
 
     # ── Provider ────────────────────────────────────────────────────────
 
     def __init__(self) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """初始化活动池与预热池，认领遗留 BoxLite 容器并启动空闲回收器。"""
         self._lock = threading.Lock()
         self._boxes: dict[str, BoxliteBox] = {}
         self._thread_boxes: dict[tuple[str, str], str] = {}
@@ -212,15 +168,14 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         self._start_idle_checker()
 
     def _load_config(self) -> dict[str, Any]:
-        "执行 _load_config 的明确职责，并返回与调用约定一致的结果"
+        """读取沙箱镜像、资源、环境变量、副本数及空闲和健康检查设置。"""
         sandbox_config = get_app_config().sandbox
 
         def _opt(name: str, default: Any = None) -> Any:
-            "执行 _opt 的明确职责，并返回与调用约定一致的结果"
+            """读取可选沙箱配置项，并在配置模型未声明该项时返回默认值。"""
             return getattr(sandbox_config, name, default)
 
-        # $VARS in config.yaml are already resolved by AppConfig.resolve_env_variables
-        # (which raises on a missing var), so the environment dict is used as-is.
+        # 应用配置加载阶段已解析环境变量占位符；此处保留最终环境字典即可。
         replicas = _opt("replicas")
         idle_timeout = _opt("idle_timeout")
         health_check_skip_seconds = _opt("health_check_skip_seconds")
@@ -236,26 +191,24 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
 
     @staticmethod
     def _thread_key(thread_id: str, user_id: str | None) -> tuple[str, str]:
-        "执行 _thread_key 的明确职责，并返回与调用约定一致的结果"
+        """构造带用户范围的线程索引键。"""
         return (user_id or "", thread_id)
 
     @staticmethod
     def _box_name(sandbox_id: str) -> str:
-        "执行 _box_name 的明确职责，并返回与调用约定一致的结果"
+        """为 BoxLite 容器名添加 DeerFlow 专属前缀。"""
         return f"{_BOX_NAME_PREFIX}{sandbox_id}"
 
     @staticmethod
     def _sandbox_id_from_box_name(name: str | None) -> str | None:
-        "执行 _sandbox_id_from_box_name 的明确职责，并返回与调用约定一致的结果"
+        """从 DeerFlow 命名的 BoxLite 容器名提取沙箱 ID。"""
         if not name or not name.startswith(_BOX_NAME_PREFIX):
             return None
         sandbox_id = name[len(_BOX_NAME_PREFIX) :]
         return sandbox_id or None
 
     def _lock_for_sandbox(self, sandbox_id: str) -> threading.Lock:
-        """执行 _lock_for_sandbox 的明确职责，并返回与调用约定一致的结果。
-
-        Return the per-sandbox acquire lock for a deterministic sandbox id."""
+        """获取指定沙箱的创建锁，防止并发请求为同一用户线程重复创建容器。"""
         with self._lock:
             lock = self._acquire_locks.get(sandbox_id)
             if lock is None:
@@ -264,23 +217,17 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             return lock
 
     def _start_idle_checker(self) -> None:
-        """执行 _start_idle_checker 的明确职责，并返回与调用约定一致的结果。
-
-        Start idle cleanup when enabled; idle_timeout=0 keeps it disabled."""
+        """空闲超时为零时关闭回收线程，否则启动通用预热池巡检器。"""
         if self._config["idle_timeout"] <= 0:
             return
         super()._start_idle_checker()
 
     def _active_count_locked(self) -> int:
-        """执行 _active_count_locked 的明确职责，并返回与调用约定一致的结果。
-
-        Return active BoxLite box count while ``_lock`` is held."""
+        """在持有 Provider 锁时返回活动 BoxLite 容器数。"""
         return len(self._boxes)
 
     def _destroy_warm_entry(self, sandbox_id: str, entry: BoxliteBox, *, reason: str) -> None:
-        """执行 _destroy_warm_entry 的明确职责，并返回与调用约定一致的结果。
-
-        Close a removed warm-pool entry and log with context."""
+        """关闭已从预热池移除的容器，并按回收原因记录成功或失败。"""
         with self._lock:
             self._skip_health_check_warm_ids.discard(sandbox_id)
         try:
@@ -300,9 +247,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
                 logger.warning("Error closing BoxLite box %s (reason=%s): %s", sandbox_id, reason, e)
 
     def _invalidate_box(self, sandbox_id: str, reason: str) -> None:
-        """执行 _invalidate_box 的明确职责，并返回与调用约定一致的结果。
-
-        Destroy and deregister a box after a terminal command-path failure."""
+        """命令路径发生不可恢复错误时，从所有索引中注销并关闭对应容器。"""
         box_to_close: BoxliteBox | None = None
         with self._lock:
             active_box = self._boxes.pop(sandbox_id, None)
@@ -320,13 +265,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         box_to_close.close()
 
     def _reconcile_orphans(self) -> None:
-        """执行 _reconcile_orphans 的明确职责，并返回与调用约定一致的结果。
-
-        Adopt DeerFlow-owned BoxLite boxes left by a previous provider/process.
-
-                BoxLite boxes are discovered by a DeerFlow-specific name prefix. Adopted
-                boxes enter the warm pool so the normal idle reaper can reclaim them.
-        """
+        """启动时按 DeerFlow 容器名前缀查找遗留实例，并纳入预热池等待复用或回收。"""
         try:
             adopted = self._adopt_existing_boxes()
         except ImportError:
@@ -340,7 +279,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             logger.info("Startup reconciliation adopted %s BoxLite box(es)", adopted)
 
     def _adopt_existing_boxes(self) -> int:
-        "执行 _adopt_existing_boxes 的明确职责，并返回与调用约定一致的结果"
+        """枚举 BoxLite 容器并包装尚未登记的 DeerFlow 实例，返回认领数量。"""
         runtime_cls = _import_sync_boxlite_runtime()
         now = time.time()
         adopted = 0
@@ -385,7 +324,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
     # ── Acquire / release ────────────────────────────────────────────────
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        "执行 acquire 的明确职责，并返回与调用约定一致的结果"
+        """获取沙箱：优先返回活动实例，其次复用预热实例，否则新建虚拟机。"""
         if thread_id is None:
             sandbox_id = str(uuid.uuid4())[:8]
             box = self._create_box(sandbox_id)
@@ -415,8 +354,8 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             return box.id
 
     def _create_box(self, sandbox_id: str) -> BoxliteBox:
-        # Enforce replica limit: evict oldest warm-pool box if active + warm boxes are at capacity.
-        "执行 _create_box 的明确职责，并返回与调用约定一致的结果"
+        # 达到副本上限时优先淘汰最早进入预热池的容器。
+        """创建 BoxLite 虚拟机并预建 DeerFlow 虚拟目录，包装为沙箱对象。"""
         replicas, total = self._replica_count()
         if total >= replicas:
             evicted = self._evict_oldest_warm()
@@ -425,7 +364,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         mkdir_cmd = "mkdir -p " + " ".join(_VIRTUAL_DIRS)
 
         async def _make() -> SimpleBox:
-            "执行 _make 的明确职责，并返回与调用约定一致的结果"
+            """启动虚拟机并在其文件系统中创建工作区、上传、输出和技能目录。"""
             box = simplebox_cls(
                 name=self._box_name(sandbox_id),
                 image=self._config["image"],
@@ -433,7 +372,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
                 cpus=self._config["cpus"],
             )
             await box.start()
-            # Materialise DeerFlow's virtual prefixes so file ops resolve natively.
+            # 预建沙箱文件接口依赖的虚拟目录。
             await box.exec("sh", "-lc", mkdir_cmd)
             return box
 
@@ -447,14 +386,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             return self._boxes.get(sandbox_id)
 
     def release(self, sandbox_id: str) -> None:
-        """执行 release 的明确职责，并返回与调用约定一致的结果。
-
-        Release a sandbox into the warm pool — VM stays running.
-
-                The box is moved from _boxes to _warm_pool; _thread_boxes entries are
-                cleared so the thread no longer holds an active reference. The VM is
-                NOT stopped unless shutdown has already begun.
-        """
+        """释放活动引用并将虚拟机放入预热池；Provider 关闭过程中则直接关闭实例。"""
         close_box: BoxliteBox | None = None
         with self._lock:
             box = self._boxes.pop(sandbox_id, None)
@@ -476,16 +408,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             logger.info("Released sandbox %s to warm pool (VM still running)", sandbox_id)
 
     def _reclaim_warm_pool(self, sandbox_id: str) -> str | None:
-        """执行 _reclaim_warm_pool 的明确职责，并返回与调用约定一致的结果。
-
-        Try to reclaim a warm-pool box by sandbox_id.
-
-                Returns sandbox_id on success, None if not found or dead.
-
-                Only boxes that *this provider instance* placed in the warm pool via
-                ``release()`` may skip the health check when reclaimed shortly after
-                release; startup-adopted/orphaned boxes always validate before reuse.
-        """
+        """从预热池取回容器；新近由本实例释放的容器可按配置跳过健康检查。"""
 
         with self._lock:
             if sandbox_id not in self._warm_pool:
@@ -495,9 +418,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
 
         skip_seconds = self._config.get("health_check_skip_seconds", 0.0)
         if skip_eligible and skip_seconds > 0 and (time.time() - released_at) < skip_seconds:
-            # Recently released by this provider — promote directly without a
-            # health-check round trip, but never return an adapter that this
-            # process already knows is closed.
+            # 本实例刚释放的容器可按配置免查健康状态，但已知关闭的句柄不能复用。
             with self._lock:
                 warm_entry = self._warm_pool.pop(sandbox_id, None)
                 if warm_entry is None:
@@ -520,7 +441,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             )
             return sandbox_id
 
-        # Health check: run a simple command to verify the VM is alive
+        # 通过轻量命令确认预热虚拟机仍可执行任务。
         try:
             result = box.execute_command("echo ok", timeout=5)
             if "ok" not in result:
@@ -538,7 +459,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
                 self._destroy_warm_entry(sandbox_id, warm_entry[0], reason="health_check_failed")
             return None
 
-        # Promote from warm pool to active
+        # 健康检查通过后再从预热池转为活动实例。
         with self._lock:
             warm_entry = self._warm_pool.pop(sandbox_id, None)
             if warm_entry is None:
@@ -551,16 +472,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         return sandbox_id
 
     def reset(self) -> None:
-        """执行 reset 的明确职责，并返回与调用约定一致的结果。
-
-        Release tracked BoxLite VMs to this instance's warm-pool cleanup.
-
-                ``reset_sandbox_provider()`` drops the provider singleton and calls this
-                lightweight hook so config changes take effect on the next provider
-                construction. Teardown belongs to ``shutdown()``; reset intentionally
-                leaves running VMs alive, but keeps them visible to this instance's idle
-                reaper and atexit shutdown instead of orphaning them.
-        """
+        """清空活动索引但保留虚拟机，将其交由当前实例的预热清理器管理。"""
         with self._lock:
             now = time.time()
             for sandbox_id, box in self._boxes.items():
@@ -571,7 +483,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             self._acquire_locks.clear()
 
     def shutdown(self) -> None:
-        "执行 shutdown 的明确职责，并返回与调用约定一致的结果"
+        """停止空闲巡检，关闭活动和预热容器，并释放专用事件循环线程。"""
         with self._lock:
             if self._shutdown_called:
                 return

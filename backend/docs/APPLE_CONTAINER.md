@@ -118,24 +118,11 @@ Make sure your images are available for the appropriate architecture:
 - AMD64 for Docker on Intel Macs
 - Multi-arch images work on both
 
-### Pre-pulling Images (Recommended)
+### Pre-pulling Images
 
 **Important**: Container images are typically large (500MB+) and are pulled on first use, which can cause a long wait time without clear feedback.
 
-**Best Practice**: Pre-pull the image during setup:
-
-```bash
-# From project root
-make setup-sandbox
-```
-
-This command will:
-1. Read the configured image from `config.yaml` (or use default)
-2. Detect available runtime (Apple Container or Docker)
-3. Pull the image with progress indication
-4. Verify the image is ready for use
-
-**Manual pre-pull**:
+When using this optional container sandbox, you may pull the image manually:
 
 ```bash
 # Using Apple Container
@@ -147,28 +134,11 @@ docker pull enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-
 
 If you skip pre-pulling, the image will be automatically pulled on first agent execution, which may take several minutes depending on your network speed.
 
-## Cleanup Scripts
+## Cleanup
 
-The project includes a unified cleanup script that handles both runtimes:
-
-**Script:** `scripts/cleanup-containers.sh`
-
-**Usage:**
-```bash
-# Clean up all DeerFlow sandbox containers
-./scripts/cleanup-containers.sh deer-flow-sandbox
-
-# Custom prefix
-./scripts/cleanup-containers.sh my-prefix
-```
-
-**Makefile Integration:**
-
-All cleanup commands in `Makefile` automatically handle both runtimes:
-```bash
-make stop   # Stops all services and cleans up containers
-make clean  # Full cleanup including logs
-```
+`make docker-stop` stops the application containers. It does not manage
+containers created by an alternate sandbox provider; use that provider's
+runtime tools to inspect or remove them.
 
 ## Testing
 
@@ -217,10 +187,8 @@ This will:
    docker ps
    ```
 
-2. Run cleanup script manually:
-   ```bash
-   ./scripts/cleanup-containers.sh deer-flow-sandbox
-   ```
+2. Remove only verified, unused DeerFlow sandbox containers with the selected
+   runtime's own container-management command.
 
 ### Performance issues
 

@@ -28,6 +28,7 @@ logger = logging.getLogger(__name__)
 class DbRunEventStore(RunEventStore):
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession], *, max_trace_content: int = 10240):
+        """初始化 PostgreSQL 事件仓储及单进程内按线程排序写入的锁。"""
         self._sf = session_factory
         self._max_trace_content = max_trace_content
         # Per-thread asyncio locks serialize seq assignment for concurrent
@@ -38,9 +39,7 @@ class DbRunEventStore(RunEventStore):
         self._write_locks: dict[str, asyncio.Lock] = {}
 
     def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
-        """
-
-        返回：(creating if needed) the per-thread seq-assignment lock."""
+        """获取或创建该线程分配事件序号时使用的协程锁。"""
         lock = self._write_locks.get(thread_id)
         if lock is None:
             lock = asyncio.Lock()
@@ -49,12 +48,12 @@ class DbRunEventStore(RunEventStore):
 
     @staticmethod
     def _row_to_dict(row: RunEventRow) -> dict:
+        """将数据库事件行还原为 API 格式，并恢复 JSON 内容及 UTC 时间。"""
         d = row.to_dict()
         d["metadata"] = d.pop("event_metadata", {})
         val = d.get("created_at")
         if isinstance(val, datetime):
-            # SQLite drops tzinfo on read despite ``DateTime(timezone=True)``;
-            # ``coerce_iso`` normalizes naive datetimes as UTC.
+            # 兼容历史无时区时间，输出前统一补上 UTC 偏移。
             d["created_at"] = coerce_iso(val)
         d.pop("id", None)
         # Restore structured content that was JSON-serialized on write.
@@ -70,6 +69,7 @@ class DbRunEventStore(RunEventStore):
         return d
 
     def _truncate_trace(self, category: str, content: Any, metadata: dict | None) -> tuple[Any, dict]:
+        """按字节上限截断 trace 正文，并在元数据中记录截断事实。"""
         if category == "trace":
             text = content if isinstance(content, str) else json.dumps(content, default=str, ensure_ascii=False)
             encoded = text.encode("utf-8")
@@ -81,6 +81,7 @@ class DbRunEventStore(RunEventStore):
 
     @staticmethod
     def _content_to_db(content: Any, metadata: dict | None) -> tuple[str, dict]:
+        """把结构化事件内容编码为文本，并标记读取时所需的反序列化信息。"""
         metadata = metadata or {}
         if isinstance(content, str):
             return content, metadata
@@ -93,35 +94,13 @@ class DbRunEventStore(RunEventStore):
 
     @staticmethod
     def _user_id_from_context() -> str | None:
-        """
-
-        Soft read of user_id from contextvar for write paths.
-
-                Returns ``None`` (no filter / no stamp) if contextvar is unset,
-                which is the expected case for background worker writes. HTTP
-                request writes will have the contextvar set by auth middleware
-                and get their user_id stamped automatically.
-
-                Coerces ``user.id`` to ``str`` at the boundary: ``User.id`` is
-                typed as ``UUID`` by the auth layer, but ``run_events.user_id``
-                is ``VARCHAR(64)`` and aiosqlite cannot bind a raw UUID object
-                to a VARCHAR column ("type 'UUID' is not supported") — the
-                INSERT would silently roll back and the worker would hang.
-        """
+        """从请求上下文读取用户 ID 并转成数据库字符串；后台写入可没有用户上下文。"""
         user = get_current_user()
         return str(user.id) if user is not None else None
 
     @staticmethod
     async def _max_seq_for_thread(session: AsyncSession, thread_id: str) -> int | None:
-        """
-
-        返回：the current max seq while serializing writers per thread.
-
-                PostgreSQL rejects ``SELECT max(...) FOR UPDATE`` because aggregate
-                results are not lockable rows. As a release-safe workaround, take a
-                transaction-level advisory lock keyed by thread_id before reading the
-                aggregate. Other dialects keep the existing row-locking statement.
-        """
+        """在事务锁保护下读取线程最大事件序号，供并发写入安全分配下一个序号。"""
         stmt = select(func.max(RunEventRow.seq)).where(RunEventRow.thread_id == thread_id)
         bind = session.get_bind()
         dialect_name = bind.dialect.name if bind is not None else ""
@@ -136,16 +115,7 @@ class DbRunEventStore(RunEventStore):
         return await session.scalar(stmt.with_for_update())
 
     async def put(self, *, thread_id, run_id, event_type, category, content="", metadata=None, created_at=None):  # noqa: D401
-        """
-
-        写入：a single event — low-frequency path only.
-
-                This opens a dedicated transaction with a FOR UPDATE lock to
-                assign a monotonic *seq*.  For high-throughput writes use
-                :meth:`put_batch`, which acquires the lock once for the whole
-                batch.  Currently the only caller is ``worker.run_agent`` for
-                the initial ``human_message`` event (once per run).
-        """
+        """写入单条事件并在事务中分配线程级递增序号。"""
         content, metadata = self._truncate_trace(category, content, metadata)
         db_content, metadata = self._content_to_db(content, metadata)
         user_id = self._user_id_from_context()
@@ -169,6 +139,7 @@ class DbRunEventStore(RunEventStore):
                 return self._row_to_dict(row)
 
     async def put_batch(self, events):
+        """将同一线程的一批事件写入数据库，并在一次事务中连续分配序号。"""
         if not events:
             return []
         thread_ids = {e["thread_id"] for e in events}
@@ -214,6 +185,7 @@ class DbRunEventStore(RunEventStore):
         after_seq=None,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """按线程及可选游标分页读取消息，结果保持事件序号升序。"""
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.list_messages")
         stmt = select(RunEventRow).where(RunEventRow.thread_id == thread_id, RunEventRow.category == "message")
         if resolved_user_id is not None:
@@ -248,6 +220,7 @@ class DbRunEventStore(RunEventStore):
         after_seq=None,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """读取指定运行的事件，可按事件类型、子任务和序号游标筛选。"""
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.list_events")
         stmt = select(RunEventRow).where(RunEventRow.thread_id == thread_id, RunEventRow.run_id == run_id)
         if resolved_user_id is not None:
@@ -258,8 +231,8 @@ class DbRunEventStore(RunEventStore):
             # Filter on metadata["task_id"] in SQL (before LIMIT) so cursor
             # pagination over a single subagent task stays correct (#3779). The
             # query is already scoped to (thread_id, run_id), so the JSON probe
-            # only runs over this run's small candidate set; ``.as_string()``
-            # renders to json_extract (SQLite) / ->> (Postgres).
+            # only runs over this run's small candidate set; PostgreSQL renders
+            # ``.as_string()`` as JSONB text extraction.
             stmt = stmt.where(RunEventRow.event_metadata["task_id"].as_string() == task_id)
         if after_seq is not None:
             stmt = stmt.where(RunEventRow.seq > after_seq)
@@ -278,6 +251,7 @@ class DbRunEventStore(RunEventStore):
         after_seq=None,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """按运行 ID 分页读取消息，并支持向前或向后游标查询。"""
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.list_messages_by_run")
         stmt = select(RunEventRow).where(
             RunEventRow.thread_id == thread_id,
@@ -310,6 +284,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """批量返回每个运行最后一条用户可见助手回复的事件序号。"""
         if not run_ids:
             return {}
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.get_last_visible_ai_seq_by_run")
@@ -339,6 +314,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """统计指定线程中符合用户作用域的消息记录数。"""
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.count_messages")
         stmt = select(func.count()).select_from(RunEventRow).where(RunEventRow.thread_id == thread_id, RunEventRow.category == "message")
         if resolved_user_id is not None:
@@ -352,6 +328,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """删除线程事件并返回删除数，同时回收空闲的序号锁。"""
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.delete_by_thread")
         async with self._sf() as session:
             count_conditions = [RunEventRow.thread_id == thread_id]
@@ -379,6 +356,7 @@ class DbRunEventStore(RunEventStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
+        """删除指定运行在给定线程中的事件并返回删除数。"""
         resolved_user_id = resolve_user_id(user_id, method_name="DbRunEventStore.delete_by_run")
         async with self._sf() as session:
             count_conditions = [RunEventRow.thread_id == thread_id, RunEventRow.run_id == run_id]

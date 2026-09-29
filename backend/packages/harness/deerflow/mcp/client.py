@@ -18,14 +18,12 @@ def build_server_params(server_name: str, config: McpServerConfig) -> dict[str, 
             raise ValueError(f"MCP server '{server_name}' with stdio transport requires 'command' field")
         params["command"] = config.command
         params["args"] = config.args
-        # 中文说明：此处用于执行相关处理。
         if config.env:
             params["env"] = config.env
     elif transport_type in ("sse", "http"):
         if not config.url:
             raise ValueError(f"MCP server '{server_name}' with {transport_type} transport requires 'url' field")
         params["url"] = config.url
-        # 中文说明：此处用于执行相关处理。
         if config.headers:
             params["headers"] = config.headers
     else:

@@ -1,7 +1,5 @@
 # 前端 Dockerfile
-# 支持两个构建目标：
-#   --target dev   — 仅安装依赖，容器启动时执行 `pnpm dev`
-#   --target prod  — 固化完整构建产物，容器启动时执行 `pnpm start`（未指定目标时默认）
+# 构建 Next.js 生产产物，并提供精简运行时镜像。
 
 ARG PNPM_STORE_PATH=/root/.local/share/pnpm/store
 ARG NPM_REGISTRY
@@ -21,11 +19,6 @@ RUN pnpm config set store-dir ${PNPM_STORE_PATH}
 RUN if [ -n "${NPM_REGISTRY}" ]; then pnpm config set registry "${NPM_REGISTRY}"; fi
 WORKDIR /app
 COPY frontend ./frontend
-
-# ── 开发阶段：仅安装依赖，CMD 由 docker-compose 覆盖 ──────────────────────────
-FROM base AS dev
-RUN cd /app/frontend && pnpm install --frozen-lockfile
-EXPOSE 3000
 
 # ── 构建阶段：安装并编译 Next.js ──────────────────────────────────────────────
 FROM base AS builder
@@ -50,4 +43,4 @@ RUN if [ -n "${NPM_REGISTRY}" ]; then pnpm config set registry "${NPM_REGISTRY}"
 WORKDIR /app
 COPY --from=builder /app/frontend ./frontend
 EXPOSE 3000
-CMD ["sh", "-c", "cd /app/frontend && pnpm start"]
+CMD ["sh", "-c", "cd /app/frontend && pnpm exec next start"]

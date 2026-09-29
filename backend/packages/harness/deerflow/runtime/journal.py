@@ -45,6 +45,7 @@ _PERSISTED_HIDDEN_HUMAN_INPUT_RESPONSE_SOURCES = frozenset({"ask_clarification"}
 
 
 def _should_persist_human_input_message(message: BaseMessage) -> bool:
+    """仅保存真实用户输入及需要在对话记录中回放的人工输入回复。"""
     if not isinstance(message, HumanMessage):
         return False
     if message.name == _LEGACY_SUMMARY_MESSAGE_NAME:
@@ -71,6 +72,7 @@ class RunJournal(BaseCallbackHandler):
         progress_reporter: Callable[[dict], Awaitable[None]] | None = None,
         progress_flush_interval: float = 5.0,
     ):
+        """初始化运行事件记录器、批量写缓冲区和 token 统计状态。"""
         super().__init__()
         self.run_id = run_id
         self.thread_id = thread_id
@@ -159,6 +161,7 @@ class RunJournal(BaseCallbackHandler):
         metadata: dict[str, Any] | None = None,
         **kwargs: Any,
     ) -> None:
+        """仅为根图调用记录运行开始事件，忽略内部子链启动。"""
         caller = self._identify_caller(tags)
         if parent_run_id is None:
             # Root graph invocation — emit a single trace event for the run start.
@@ -178,6 +181,7 @@ class RunJournal(BaseCallbackHandler):
         parent_run_id: UUID | None = None,
         **kwargs: Any,
     ) -> None:
+        """在根图结束时补齐遗漏的工具消息、记录输出并刷新事件缓冲。"""
         # Nested chain ends fire for internal graph nodes; only the root chain
         # represents the user-visible run lifecycle.
         if parent_run_id is not None:
@@ -187,6 +191,7 @@ class RunJournal(BaseCallbackHandler):
         self._flush_sync()
 
     def on_chain_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+        """记录根链执行错误并尝试立即刷新运行事件。"""
         self._put(
             event_type="run.error",
             category="error",
@@ -247,6 +252,7 @@ class RunJournal(BaseCallbackHandler):
                     break
 
     def on_llm_start(self, serialized: dict, prompts: list[str], *, run_id: UUID, parent_run_id: UUID | None = None, tags: list[str] | None = None, metadata: dict[str, Any] | None = None, **kwargs: Any) -> None:
+        """在旧式 LLM 回调路径中记录调用起始时间以计算延迟。"""
         # Fallback: on_chat_model_start is preferred. This just tracks latency.
         self._llm_start_times[str(run_id)] = time.monotonic()
 
@@ -259,6 +265,7 @@ class RunJournal(BaseCallbackHandler):
         tags: list[str] | None = None,
         **kwargs: Any,
     ) -> None:
+        """持久化完整模型响应，并累计 token、延迟、模型及调用方统计。"""
         messages: list[AnyMessage] = []
         logger.debug("on_llm_end %s: tags=%s", run_id, tags)
         for generation in response.generations:
@@ -351,6 +358,7 @@ class RunJournal(BaseCallbackHandler):
             self._counted_message_llm_run_ids.add(str(run_id))
 
     def on_llm_error(self, error: BaseException, *, run_id: UUID, **kwargs: Any) -> None:
+        """清理失败调用的计时状态并记录模型错误事件。"""
         self._llm_start_times.pop(str(run_id), None)
         self._put(event_type="llm.error", category="trace", content=str(error))
 
@@ -386,6 +394,7 @@ class RunJournal(BaseCallbackHandler):
 
     @staticmethod
     def _message_identity(message: BaseMessage) -> str | None:
+        """优先用工具调用 ID、其次用消息 ID 构造消息去重键。"""
         tool_call_id = getattr(message, "tool_call_id", None)
         if isinstance(tool_call_id, str) and tool_call_id:
             return f"tool:{tool_call_id}"
@@ -396,11 +405,13 @@ class RunJournal(BaseCallbackHandler):
 
     @staticmethod
     def _tool_call_value(tool_call: Any, key: str) -> Any:
+        """兼容字典或对象形式的工具调用，读取指定属性。"""
         if isinstance(tool_call, Mapping):
             return tool_call.get(key)
         return getattr(tool_call, key, None)
 
     def _remember_current_run_tool_calls(self, message: AnyMessage, *, caller: str) -> None:
+        """记录主 agent 本轮发出的工具调用名称，用于结束时补齐特定回复。"""
         if caller != "lead_agent":
             return
         is_ai_message = isinstance(message, AIMessage) or getattr(message, "type", None) == "ai"
@@ -417,6 +428,7 @@ class RunJournal(BaseCallbackHandler):
             self._current_run_tool_call_names[tool_call_id] = str(name or "")
 
     def _persist_tool_result_message(self, message: BaseMessage) -> None:
+        """写入工具结果消息并更新去重标识及运行消息摘要。"""
         self._put(event_type="llm.tool.result", category="message", content=message.model_dump())
         identity = self._message_identity(message)
         if identity:
@@ -424,12 +436,14 @@ class RunJournal(BaseCallbackHandler):
         self._record_message_summary(message)
 
     def _final_output_messages(self, outputs: Any) -> list[Any]:
+        """从根图输出字典中提取最终 messages 列表。"""
         if isinstance(outputs, Mapping):
             messages = outputs.get("messages", [])
             return messages if isinstance(messages, list) else []
         return []
 
     def _should_reconcile_tool_message(self, message: ToolMessage) -> bool:
+        """判断最终状态中的工具消息是否属于尚未记录的人工输入工具结果。"""
         if message.additional_kwargs.get("hide_from_ui") is True:
             return False
         tool_call_id = getattr(message, "tool_call_id", None)
@@ -445,6 +459,7 @@ class RunJournal(BaseCallbackHandler):
         return identity is not None and identity not in self._persisted_tool_message_identities
 
     def _reconcile_final_tool_messages(self, outputs: Any) -> None:
+        """扫描最终图状态，并补存回调链未捕获的工具结果消息。"""
         for message in self._final_output_messages(outputs):
             if not isinstance(message, ToolMessage):
                 continue
@@ -452,6 +467,7 @@ class RunJournal(BaseCallbackHandler):
                 self._persist_tool_result_message(message)
 
     def _put(self, *, event_type: str, category: str, content: str | dict = "", metadata: dict | None = None) -> None:
+        """把标准化事件加入批次缓冲，达到阈值时触发异步刷新。"""
         self._buffer.append(
             {
                 "thread_id": self.thread_id,
@@ -469,7 +485,7 @@ class RunJournal(BaseCallbackHandler):
     def _flush_sync(self) -> None:
         """
 
-        Best-effort flush of buffer to RunEventStore.
+        在回调线程中调度批量异步写入；没有事件循环时保留缓冲等待显式刷新。
 
                 BaseCallbackHandler methods are synchronous.  If an event loop is
                 running we schedule an async ``put_batch``; otherwise the events
@@ -479,7 +495,7 @@ class RunJournal(BaseCallbackHandler):
         if not self._buffer:
             return
         # Skip if a flush is already in flight — avoids concurrent writes
-        # to the same SQLite file from multiple fire-and-forget tasks.
+        # 同一个运行同时只能有一批事件写入，避免后台任务间并发提交。
         if self._pending_flush_tasks:
             return
         try:
@@ -494,6 +510,7 @@ class RunJournal(BaseCallbackHandler):
         task.add_done_callback(self._on_flush_done)
 
     async def _flush_async(self, batch: list[dict]) -> None:
+        """批量写入事件仓储，失败时将整批事件放回缓冲供后续重试。"""
         try:
             await self._store.put_batch(batch)
         except Exception:
@@ -507,6 +524,7 @@ class RunJournal(BaseCallbackHandler):
             self._buffer = batch + self._buffer
 
     def _on_flush_done(self, task: asyncio.Task) -> None:
+        """回收已完成的刷新任务并记录未处理异常。"""
         self._pending_flush_tasks.discard(task)
         if task.cancelled():
             return
@@ -515,6 +533,7 @@ class RunJournal(BaseCallbackHandler):
             logger.warning("Journal flush task failed: %s", exc)
 
     def _identify_caller(self, tags: list[str] | None) -> str:
+        """从回调标签识别主 agent、子 agent 或中间件调用来源。"""
         _tags = tags or []
         for tag in _tags:
             if isinstance(tag, str) and (tag.startswith("subagent:") or tag.startswith("middleware:") or tag == "lead_agent"):
@@ -534,7 +553,7 @@ class RunJournal(BaseCallbackHandler):
     ) -> None:
         """
 
-        Add a single LLM call's token usage to the per-model accumulator.
+        按模型累计单次调用的 token 用量，并仅在有缓存命中时写入该统计项。
 
                 Missing / empty ``model_name`` collapses into a shared ``"unknown"``
                 bucket so the breakdown stays usable when a provider doesn't surface
@@ -561,7 +580,7 @@ class RunJournal(BaseCallbackHandler):
     def _extract_cache_read(usage_dict: dict) -> int:
         """
 
-        Prompt-cache-hit input tokens from LangChain's normalized usage."""
+        从 LangChain 用量结构提取提示词缓存命中的输入 token 数。"""
         details = usage_dict.get("input_token_details") or {}
         if not isinstance(details, Mapping):
             return 0
@@ -679,7 +698,7 @@ class RunJournal(BaseCallbackHandler):
     async def flush(self) -> None:
         """
 
-        Force flush remaining buffer. Called in worker's finally block."""
+        等待已启动的写入任务，并强制刷新运行结束前剩余的事件。"""
         if self._pending_flush_tasks:
             await asyncio.gather(*tuple(self._pending_flush_tasks), return_exceptions=True)
         while self._pending_progress_task is not None and not self._pending_progress_task.done():
@@ -703,7 +722,7 @@ class RunJournal(BaseCallbackHandler):
     def _schedule_progress_flush(self) -> None:
         """
 
-        Best-effort throttled progress snapshot for active run visibility."""
+        节流安排运行统计快照上报，避免每次模型响应都触发写入。"""
         if self._progress_reporter is None:
             return
         now = time.monotonic()
@@ -723,6 +742,7 @@ class RunJournal(BaseCallbackHandler):
         self._pending_progress_task = loop.create_task(self._flush_progress_async(snapshot=self.get_completion_data()))
 
     def _schedule_delayed_progress_flush(self, delay: float) -> None:
+        """安排延迟的运行进度快照写入，并避免重复创建刷新任务。"""
         if self._pending_progress_task is not None and not self._pending_progress_task.done():
             return
         try:
@@ -734,6 +754,7 @@ class RunJournal(BaseCallbackHandler):
         self._pending_progress_task = loop.create_task(self._flush_progress_async(delay=delay))
 
     async def _flush_progress_async(self, *, snapshot: dict | None = None, delay: float = 0.0) -> None:
+        """按节流策略上报运行统计快照，并在期间有新变化时安排下一次刷新。"""
         if self._progress_reporter is None:
             return
         if delay > 0:
@@ -773,8 +794,10 @@ class RunJournal(BaseCallbackHandler):
 
     @property
     def had_llm_error_fallback(self) -> bool:
+        """指示本次运行是否曾使用模型错误回退响应。"""
         return self._had_llm_error_fallback
 
     @property
     def llm_error_fallback_message(self) -> str | None:
+        """返回本次运行最近记录的模型错误说明。"""
         return self._llm_error_fallback_message

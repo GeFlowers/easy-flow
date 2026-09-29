@@ -74,7 +74,7 @@ class ScheduledTaskRunRepository:
             return [self._row_to_dict(row) for row in result.scalars()]
 
     async def count_active_runs(self) -> int:
-        """执行当前持久化组件提供的操作。"""
+        """统计状态仍处于 queued 或 running 的计划任务运行数。"""
         stmt = select(func.count()).select_from(ScheduledTaskRunRow).where(ScheduledTaskRunRow.status.in_(ACTIVE_RUN_STATUSES))
         async with self._sf() as session:
             result = await session.execute(stmt)
@@ -116,7 +116,7 @@ class ScheduledTaskRunRepository:
             await session.commit()
 
     async def has_active_runs(self, task_id: str) -> bool:
-        """执行当前持久化组件提供的操作。"""
+        """检查任务是否已有排队或执行中的运行记录。"""
         stmt = (
             select(ScheduledTaskRunRow.id)
             .where(
@@ -130,7 +130,7 @@ class ScheduledTaskRunRepository:
             return result.scalars().first() is not None
 
     async def mark_stale_active_runs(self, *, error: str) -> int:
-        """执行当前持久化组件提供的操作。"""
+        """将服务重启后遗留的活动运行标记为中断并保存原因。"""
         stmt = select(ScheduledTaskRunRow).where(ScheduledTaskRunRow.status.in_(ACTIVE_RUN_STATUSES))
         now = datetime.now(UTC)
         async with self._sf() as session:

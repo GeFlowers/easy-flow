@@ -96,16 +96,13 @@ class AioSandbox(Sandbox):
                 return
             self._closed = True
             client = self._client
-            # Drop the reference under the lock for use-after-close safety: any
-            # later command on this instance fails loudly instead of reusing a
-            # half-closed client.
+            # 在锁内清空引用，避免并发调用继续使用已关闭的客户端。
             self._client = None
 
         if client is None:
             return
 
-        # Walk from the real httpx.Client up to the top-level client, picking the
-        # first object that actually exposes close().
+        # 沿 SDK 包装层查找可关闭对象，优先关闭真正持有套接字的客户端。
         wrapper = getattr(client, "_client_wrapper", None)
         fern_http = getattr(wrapper, "httpx_client", None)
         real_httpx = getattr(fern_http, "httpx_client", None)
@@ -124,9 +121,7 @@ class AioSandbox(Sandbox):
 
     @property
     def home_dir(self) -> str:
-        """执行 home_dir 的明确职责，并返回与调用约定一致的结果。
-
-        Get the home directory inside the sandbox."""
+        """返回沙箱内的 home 目录；首次访问时查询服务端并缓存结果。"""
         if self._home_dir is None:
             context = self._client.sandbox.get_context()
             self._home_dir = context.home_dir
@@ -259,9 +254,7 @@ class AioSandbox(Sandbox):
         return output
 
     def _run_bash_exec(self, command: str, env: dict[str, str]) -> str:
-        """执行 _run_bash_exec 的明确职责，并返回与调用约定一致的结果。
-
-        Single bash.exec invocation with injected env (one fresh session)."""
+        """调用一次 bash.exec 并整理输出，同时记录镜像是否支持环境变量注入接口。"""
         with self._lock:
             try:
                 result = self._client.bash.exec(

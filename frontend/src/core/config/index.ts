@@ -20,8 +20,8 @@ export function getBackendBaseURL() {
   }
 }
 
-/** 解析 LangGraph SDK 的完整基础地址，并处理模拟与服务端渲染回退。 */
-export function getLangGraphBaseURL(isMock?: boolean) {
+/** 解析 LangGraph SDK 的完整基础地址，并处理服务端渲染回退。 */
+export function getLangGraphBaseURL() {
   console.log(
     "env.NEXT_PUBLIC_LANGGRAPH_BASE_URL",
     env.NEXT_PUBLIC_LANGGRAPH_BASE_URL,
@@ -31,11 +31,6 @@ export function getLangGraphBaseURL(isMock?: boolean) {
       env.NEXT_PUBLIC_LANGGRAPH_BASE_URL,
       getBaseOrigin(),
     ).toString();
-  } else if (isMock) {
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/mock/api`;
-    }
-    return "http://localhost:3000/mock/api";
   } else {
     // 所用客户端开发工具包要求完整地址，因此基于当前源拼接默认接口地址。
     if (typeof window !== "undefined") {

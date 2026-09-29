@@ -26,7 +26,7 @@ class FeedbackRepository:
         d = row.to_dict()
         val = d.get("created_at")
         if isinstance(val, datetime):
-            # SQLite drops tzinfo on read; normalize via ``coerce_iso`` so output is always tz-aware.
+            # 兼容历史无时区记录，确保 API 时间戳包含时区信息。
             d["created_at"] = coerce_iso(val)
         return d
 
@@ -138,7 +138,7 @@ class FeedbackRepository:
         user_id: str | None | _AutoSentinel = AUTO,
         comment: str | None = None,
     ) -> dict:
-        """执行当前持久化组件提供的操作。"""
+        """按运行和用户身份新增或更新评分反馈，并返回保存后的反馈记录。"""
         if rating not in (1, -1):
             raise ValueError(f"rating must be +1 or -1, got {rating}")
         resolved_user_id = resolve_user_id(user_id, method_name="FeedbackRepository.upsert")
@@ -229,7 +229,7 @@ class FeedbackRepository:
             return {row.run_id: self._row_to_dict(row) for row in result.scalars()}
 
     async def aggregate_by_run(self, thread_id: str, run_id: str) -> dict:
-        """执行当前持久化组件提供的操作。"""
+        """汇总指定运行的正负反馈数及评分结果。"""
         stmt = select(
             func.count().label("total"),
             func.coalesce(func.sum(case((FeedbackRow.rating == 1, 1), else_=0)), 0).label("positive"),

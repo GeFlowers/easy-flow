@@ -1,6 +1,4 @@
-"""定义 summarization_middleware 模块提供的职责与可复用接口。
-
-Summarization middleware extensions for DeerFlow."""
+"""扩展 LangChain 摘要中间件，为 DeerFlow 提供上下文压缩和压缩前回调。"""
 
 from __future__ import annotations
 
@@ -27,9 +25,7 @@ _SUMMARY_TRIGGER_MESSAGE_NAME = "summary"
 
 @dataclass(frozen=True)
 class SummarizationEvent:
-    """封装 SummarizationEvent 的状态、协作关系与公开操作。
-
-    Context emitted before conversation history is summarized away."""
+    """描述即将压缩的消息、保留消息及其所属线程、Agent 和运行上下文。"""
 
     messages_to_summarize: tuple[AnyMessage, ...]
     preserved_messages: tuple[AnyMessage, ...]
@@ -40,9 +36,7 @@ class SummarizationEvent:
 
 @dataclass(frozen=True)
 class ContextCompactionResult:
-    """封装 ContextCompactionResult 的状态、协作关系与公开操作。
-
-    Result of summarizing old context and retaining the active tail."""
+    """返回摘要文本、被摘要消息、保留消息和压缩前 Token 估算。"""
 
     summary_text: str
     messages_to_summarize: tuple[AnyMessage, ...]
@@ -52,19 +46,15 @@ class ContextCompactionResult:
 
 @runtime_checkable
 class BeforeSummarizationHook(Protocol):
-    """封装 BeforeSummarizationHook 的状态、协作关系与公开操作。
-
-    Hook invoked before summarization removes messages from state."""
+    """定义摘要移除消息前调用的同步回调接口。"""
 
     def __call__(self, event: SummarizationEvent) -> None:
-        """实现 __call__ 协议方法，保持对象交互语义一致。"""
+        """接收压缩前事件；回调通常在此持久化或检查即将被裁剪的消息。"""
         ...
 
 
 def _resolve_thread_id(runtime: Runtime) -> str | None:
-    """执行 _resolve_thread_id 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve the current thread ID from runtime context or LangGraph config."""
+    """优先从 Runtime 上下文读取线程 ID，再回退到 LangGraph configurable 配置。"""
     thread_id = runtime.context.get("thread_id") if runtime.context else None
     if thread_id is None:
         try:
@@ -76,9 +66,7 @@ def _resolve_thread_id(runtime: Runtime) -> str | None:
 
 
 def _resolve_agent_name(runtime: Runtime) -> str | None:
-    """执行 _resolve_agent_name 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve the current agent name from runtime context or LangGraph config."""
+    """优先从 Runtime 上下文读取 Agent 名称，再回退到 LangGraph configurable 配置。"""
     agent_name = runtime.context.get("agent_name") if runtime.context else None
     if agent_name is None:
         try:
@@ -90,9 +78,7 @@ def _resolve_agent_name(runtime: Runtime) -> str | None:
 
 
 class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
-    """封装 DeerFlowSummarizationMiddleware 的状态、协作关系与公开操作。
-
-    Summarization middleware with pre-compression hook dispatch."""
+    """在上下文摘要前分发回调，并避免摘要模型输出混入用户消息流。"""
 
     def __init__(
         self,
@@ -100,42 +86,26 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         before_summarization: list[BeforeSummarizationHook] | None = None,
         **kwargs,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """保存压缩前钩子，并创建带不广播标签的摘要模型副本。"""
         super().__init__(*args, **kwargs)
         self._before_summarization_hooks = before_summarization or []
-        # The summary LLM call runs inside a LangGraph middleware hook, so its token
-        # stream would otherwise be captured by the messages-tuple stream callback and
-        # broadcast to the frontend as a phantom AI message. Tag a dedicated model copy
-        # with TAG_NOSTREAM so the streaming handler skips it.
-        # Keep self.model untagged so the parent's profile / ls_params inspection still works.
-        #
-        # Preserve any tags already bound on the model (e.g. "middleware:summarize" set in
-        # lead_agent/agent.py for RunJournal attribution): RunnableBinding.with_config does a
-        # shallow merge that would otherwise overwrite the existing tags list entirely.
+        # 摘要调用属于内部工作：单独给其模型副本设置不广播标签，同时保留原模型的追踪标签。
         existing_tags = list((getattr(self.model, "config", None) or {}).get("tags") or [])
         merged_tags = [*existing_tags, TAG_NOSTREAM] if TAG_NOSTREAM not in existing_tags else existing_tags
         self._summary_model = self.model.with_config(tags=merged_tags)
 
     @override
     def _create_summary(self, messages_to_summarize: list[AnyMessage]) -> str | None:
-        "执行 _create_summary 的明确职责，并返回与调用约定一致的结果"
+        """同步入口委托给摘要专用模型生成历史摘要。"""
         return self._summarize_with(messages_to_summarize)
 
     @override
     async def _acreate_summary(self, messages_to_summarize: list[AnyMessage]) -> str | None:
-        "执行 _acreate_summary 的明确职责，并返回与调用约定一致的结果"
+        """异步入口委托给摘要专用模型生成历史摘要。"""
         return await self._asummarize_with(messages_to_summarize)
 
     def _summarize_with(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
-        """执行 _summarize_with 的明确职责，并返回与调用约定一致的结果。
-
-        Mirror the parent ``_create_summary`` but invoke the nostream-tagged model.
-
-                We do not swap ``self.model`` at the instance level: the agent/middleware is
-                cached and reused across concurrent runs, so a temporary swap would leak the
-                ``RunnableBinding`` to other coroutines during ``await`` and break parent logic
-                that inspects the raw model (``profile`` / ``_get_ls_params``).
-        """
+        """构造摘要提示并同步调用不广播的模型副本；失败时跳过本轮压缩。"""
         if not messages_to_summarize:
             return "No previous conversation history."
         prompt = self._build_summary_prompt(messages_to_summarize, previous_summary=previous_summary)
@@ -152,9 +122,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             return None
 
     async def _asummarize_with(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
-        """执行 _asummarize_with 的明确职责，并返回与调用约定一致的结果。
-
-        Async counterpart of :meth:`_summarize_with` using the nostream model."""
+        """异步构造摘要提示并调用不广播的模型副本；失败时跳过本轮压缩。"""
         if not messages_to_summarize:
             return "No previous conversation history."
         prompt = self._build_summary_prompt(messages_to_summarize, previous_summary=previous_summary)
@@ -172,18 +140,18 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
 
     @staticmethod
     def _summary_count_message(summary_text: str) -> HumanMessage:
-        "执行 _summary_count_message 的明确职责，并返回与调用约定一致的结果"
+        """将已有摘要包装为计数器识别的消息，参与下一次触发阈值估算。"""
         return HumanMessage(content=summary_text, name=_SUMMARY_TRIGGER_MESSAGE_NAME)
 
     def _messages_for_trigger_count(self, messages: list[AnyMessage], summary_text: str | None) -> list[AnyMessage]:
-        "执行 _messages_for_trigger_count 的明确职责，并返回与调用约定一致的结果"
+        """为摘要触发条件补入已有摘要消息，使 Token 估算包含压缩上下文。"""
         if not summary_text:
             return messages
         return [*messages, self._summary_count_message(summary_text)]
 
     @staticmethod
     def _bound_text(text: str, cap: int) -> str:
-        "执行 _bound_text 的明确职责，并返回与调用约定一致的结果"
+        """按字符上限保留文本首尾，并在中间标记省略内容。"""
         if len(text) <= cap:
             return text
         if cap <= 0:
@@ -198,7 +166,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return f"{text[:head]}{omitted_marker}{text[-tail:]}"
 
     def _trim_summary_section_text(self, text: str, max_tokens: int, *, strategy: str) -> str:
-        "执行 _trim_summary_section_text 的明确职责，并返回与调用约定一致的结果"
+        """用模型 Token 计数器裁剪摘要输入；计数失败时退回确定性的字符上限。"""
         if not text.strip():
             return ""
         max_tokens = max(1, max_tokens)
@@ -220,7 +188,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return self._bound_text(text, max_tokens)
 
     def _build_summary_input_text(self, formatted_messages: str, previous_summary: str | None = None) -> str | None:
-        "执行 _build_summary_input_text 的明确职责，并返回与调用约定一致的结果"
+        """在总 Token 上限内分配旧摘要和新消息，并转义 XML 区块内容。"""
         if self.trim_tokens_to_summarize is None:
             trimmed_new_messages = formatted_messages
             trimmed_previous_summary = previous_summary.strip() if previous_summary else ""
@@ -247,16 +215,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
                     strategy="first",
                 )
 
-        # Escape < > & before embedding into the <existing_summary>/<new_messages>
-        # blocks. new_messages is get_buffer_string over the raw state["messages"]
-        # tail (InputSanitizationMiddleware only overrides the ModelRequest, never
-        # state, so the summarizer sees genuine user text); existing_summary is the
-        # prior turn's summary_text. An unescaped value like "</new_messages>..."
-        # would close the block and forge an authority section for the extraction
-        # LLM. Same block-breakout defense #4162 applied to the <conversation> block
-        # and #4097 to the <memory> block. Escape after trimming so a trailing "..."
-        # cannot split an entity; quote=False because content lands in element-text
-        # position (never an attribute value).
+        # 用户消息和旧摘要会被包进结构化标签；先裁剪再转义，防止文本伪造区块边界。
         parts: list[str] = []
         if trimmed_previous_summary:
             parts.extend(
@@ -280,16 +239,13 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return "\n".join(parts)
 
     def _build_summary_prompt(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
-        """执行 _build_summary_prompt 的明确职责，并返回与调用约定一致的结果。
-
-        Build the summary prompt, returning ``None`` when trimming leaves nothing."""
+        """裁剪待摘要消息并填充摘要模板；无有效输入时返回 ``None``。"""
         trimmed_messages = self._trim_messages_for_summary(messages_to_summarize)
         if not trimmed_messages:
             trimmed_messages = messages_to_summarize[-1:]
         if not trimmed_messages:
             return None
-        # Format messages to avoid token inflation from metadata when str() is called on
-        # message objects.
+        # 使用 LangChain 消息格式化器，避免直接转字符串时把元数据计入提示。
         formatted_messages = get_buffer_string(trimmed_messages)
         formatted_messages = self._build_summary_input_text(formatted_messages, previous_summary=previous_summary)
         if not formatted_messages:
@@ -297,11 +253,11 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return self.summary_prompt.format(messages=formatted_messages).rstrip()
 
     def before_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 before_model 的明确职责，并返回与调用约定一致的结果"
+        """同步模型调用前检查是否达到摘要压缩条件。"""
         return self._maybe_summarize(state, runtime)
 
     async def abefore_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 abefore_model 的明确职责，并返回与调用约定一致的结果"
+        """异步模型调用前检查摘要条件并执行异步压缩。"""
         return await self._amaybe_summarize(state, runtime)
 
     def _prepare_compaction(
@@ -310,7 +266,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         *,
         force: bool = False,
     ) -> tuple[list[AnyMessage], list[AnyMessage], str | None, int] | None:
-        "执行 _prepare_compaction 的明确职责，并返回与调用约定一致的结果"
+        """确保消息 ID 存在、评估触发条件并拆分待摘要与保留消息。"""
         messages = state["messages"]
         self._ensure_message_ids(messages)
 
@@ -337,7 +293,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         *,
         force: bool = False,
     ) -> ContextCompactionResult | None:
-        "执行 compact_state 的明确职责，并返回与调用约定一致的结果"
+        """同步执行一次上下文压缩并返回摘要与消息分区，不满足条件则返回空。"""
         prepared = self._prepare_compaction(state, force=force)
         if prepared is None:
             return None
@@ -360,7 +316,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         *,
         force: bool = False,
     ) -> ContextCompactionResult | None:
-        "执行 acompact_state 的明确职责，并返回与调用约定一致的结果"
+        """异步执行一次上下文压缩并返回摘要与消息分区。"""
         prepared = self._prepare_compaction(state, force=force)
         if prepared is None:
             return None
@@ -377,7 +333,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         )
 
     def _maybe_summarize(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 _maybe_summarize 的明确职责，并返回与调用约定一致的结果"
+        """在达到触发条件时返回清空旧消息、保留尾部并写入摘要的状态更新。"""
         result = self.compact_state(state, runtime, force=False)
         if result is None:
             return None
@@ -390,7 +346,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         }
 
     async def _amaybe_summarize(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 _amaybe_summarize 的明确职责，并返回与调用约定一致的结果"
+        """异步摘要触发路径，返回与同步路径相同结构的状态更新。"""
         result = await self.acompact_state(state, runtime, force=False)
         if result is None:
             return None
@@ -407,48 +363,19 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         messages_to_summarize: list[AnyMessage],
         preserved_messages: list[AnyMessage],
     ) -> tuple[list[AnyMessage], list[AnyMessage]]:
-        """执行 _preserve_dynamic_context_reminders 的明确职责，并返回与调用约定一致的结果。
-
-        Keep hidden dynamic-context reminders and their ID-swap peers out of summary compression.
-
-                These reminders carry the current date and optional memory. If summarization
-                removes them, DynamicContextMiddleware can lose the already-injected reminder
-                and inject a replacement into the wrong point of the conversation.
-
-                The ID-swap triplet produced by ``_make_reminder_and_user_messages`` contains
-                three messages: ``SystemMessage(id=X)`` and ``HumanMessage(id=X__memory)`` are
-                both tagged with ``dynamic_context_reminder=True``, but ``HumanMessage(id=X__user)``
-                carries the original user content and is **not** tagged. Without peer rescue,
-                ``__user`` would stay in ``to_summarize`` and be compressed into prose — orphaning
-                the tagged messages and losing the user question from the model's direct context.
-
-                This method rescues tagged reminders and also rescues any untagged messages whose
-                ``id`` shares the same ``stable_id`` prefix (i.e. ``X__user``, ``X__memory``).
-        """
+        """将动态上下文提醒及其同组 ID 消息移入保留区，避免日期、记忆或原问题被摘要吞并。"""
         reminders = [msg for msg in messages_to_summarize if is_dynamic_context_reminder(msg)]
         if not reminders:
             return messages_to_summarize, preserved_messages
 
-        # Collect the base IDs (the stable_id prefix) from tagged reminders.
-        # For a reminder with id="ctx-001__memory", the base is "ctx-001".
-        # For a reminder with id="ctx-001" (SystemMessage), the base is "ctx-001".
-        # removesuffix is suffix-only — it won't strip a "__" that sits in the
-        # middle of a stable_id (e.g. "ctx__001" stays intact, unlike rsplit
-        # which would mis-derive "ctx").  Only known ID-swap suffixes (__memory,
-        # __user) are stripped; __user is not tagged so won't appear in reminders,
-        # but is included defensively.
+        # 仅去除消息 ID 约定的末尾后缀，保留稳定 ID 本身可能含有的双下划线。
         reminder_base_ids: set[str] = set()
         for msg in reminders:
             if msg.id:
                 base = msg.id.removesuffix("__memory").removesuffix("__user")
                 reminder_base_ids.add(base)
 
-        # Single-pass partition: walk messages_to_summarize in chronological order
-        # and rescue both tagged reminders and untagged ID-swap peers (whose id
-        # starts with a known base + "__").  This preserves the original message
-        # order within rescued — critical when multiple triplets land in one
-        # summarization window — and eliminates the need for id(m)-based dedup
-        # that the previous reminders+peers concatenation required.
+        # 单次顺序遍历保留提醒及同组消息的原始先后关系，避免多个消息组重排。
         rescued: list[AnyMessage] = []
         remaining: list[AnyMessage] = []
         for msg in messages_to_summarize:
@@ -464,7 +391,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         preserved_messages: list[AnyMessage],
         runtime: Runtime,
     ) -> None:
-        "执行 _fire_hooks 的明确职责，并返回与调用约定一致的结果"
+        """构造压缩前事件并逐个调用钩子；单个钩子失败只记录错误，不阻断摘要。"""
         if not self._before_summarization_hooks:
             return
 
@@ -490,22 +417,7 @@ def create_summarization_middleware(
     keep: tuple[str, int | float] | None = None,
     skip_memory_flush: bool = False,
 ) -> DeerFlowSummarizationMiddleware | None:
-    """创建并返回，并遵守 create_summarization_middleware 所表达的接口约束。
-
-    Create the configured summarization middleware.
-
-        Both the lead-agent automatic path and the manual context-compaction path
-        use this factory so model resolution, hooks, prompt config, and retention
-        defaults cannot drift.
-
-        ``skip_memory_flush`` omits the ``memory_flush_hook`` that otherwise
-        flushes pre-compaction messages into the durable memory queue. The lead
-        chain keeps it (research should persist); the subagent chain sets it so a
-        subagent's INTERNAL turns (the "Task" human message + intermediate AI/tool
-        turns) are not written into the PARENT thread's durable memory — the hook
-        is keyed by ``thread_id`` and subagents share the parent's ``thread_id``
-        (#3875 Phase 3 review).
-    """
+    """按应用配置构造摘要中间件，并为主 Agent 可选注册压缩前记忆刷新钩子。"""
     resolved_app_config = app_config or get_app_config()
     config = resolved_app_config.summarization
 

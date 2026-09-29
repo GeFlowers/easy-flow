@@ -11,8 +11,8 @@ class VolumeMountConfig(BaseModel):
         description=(
             "Source path for the mount. Resolution depends on the active provider: "
             "``LocalSandboxProvider`` checks this path from the gateway process — in "
-            "``make dev`` that is the host machine, but in Docker deployments "
-            "(``make up`` / docker-compose) it is the path *inside* the "
+            "a local process this is the host machine, but in Docker deployments "
+            "(``make docker-start`` / Docker Compose) it is the path *inside* the "
             "``deer-flow-gateway`` container, so the host directory must also be "
             "bind-mounted into the gateway service for the mount to take effect. "
             "``AioSandboxProvider`` (DooD) passes this value straight to ``docker -v`` "

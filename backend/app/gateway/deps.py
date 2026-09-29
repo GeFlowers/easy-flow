@@ -23,7 +23,7 @@ from deerflow.config.app_config import AppConfig, get_app_config
 from deerflow.persistence.feedback import FeedbackRepository
 from deerflow.runtime import RunContext, RunManager, StreamBridge
 from deerflow.runtime.events.store.base import RunEventStore
-from deerflow.runtime.runs.store.base import RunStore
+from deerflow.runtime.runs.store import RunStore
 
 logger = logging.getLogger(__name__)
 
@@ -33,14 +33,8 @@ logger = logging.getLogger(__name__)
 _RUN_DRAIN_TIMEOUT_SECONDS = 5.0
 
 
-def _enforce_postgres_for_multi_worker(config: AppConfig) -> None:
-    """多工作进程安全前提不满足时，拒绝以 ``GATEWAY_WORKERS > 1`` 启动。
-
-    多工作进程必须同时使用 Postgres（SQLite 写锁不支持多进程并发）并启用
-    ``run_ownership.heartbeat_enabled``；否则运行均无租约，协调过程会将所有在途运行视作
-    无主运行，工作进程 B 可能在滚动更新或扩容时终止工作进程 A 的存活运行。该门禁在任何
-    持久化引擎初始化前仅于启动时执行一次，以便清晰报错并立即退出。
-    """
+def _enforce_multi_worker_run_ownership(config: AppConfig) -> None:
+    """多进程运行时未启用租约心跳时拒绝启动。"""
     try:
         workers = int(os.environ.get("GATEWAY_WORKERS", "1"))
     except (TypeError, ValueError):
@@ -48,10 +42,6 @@ def _enforce_postgres_for_multi_worker(config: AppConfig) -> None:
 
     if workers <= 1:
         return
-
-    backend = getattr(config.database, "backend", None)
-    if backend != "postgres":
-        raise SystemExit(f"GATEWAY_WORKERS={workers} requires database.backend='postgres', but database.backend is '{backend}'. SQLite cannot support concurrent multi-process access. Set GATEWAY_WORKERS=1 or switch to Postgres.")
 
     run_ownership = getattr(config, "run_ownership", None)
     if run_ownership is None or not run_ownership.heartbeat_enabled:
@@ -126,7 +116,7 @@ def _log_recovered_stream_cleanup_result(task: asyncio.Task[None], run_id: str) 
 
 if TYPE_CHECKING:
     from app.gateway.auth.local_provider import LocalAuthProvider
-    from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
+    from app.gateway.auth.repositories.sql import SQLUserRepository
     from deerflow.persistence.thread_meta.base import ThreadMetaStore
     from deerflow.runtime import RunRecord
 
@@ -178,9 +168,7 @@ def get_config() -> AppConfig:
     :mod:`deerflow.config.reload_boundary` and is mirrored by the
     standardised ``"startup-only:"`` prefix on the matching
     ``Field(description=...)`` in :class:`AppConfig` — IDE hover on those
-    fields will surface the boundary inline. See
-     ``backend/AGENTS.md`` "Config Hot-Reload Boundary" for the operator
-    summary.
+    fields will surface the boundary inline.
 
     Any failure to materialise the config (missing file, permission denied,
     YAML parse error, validation error) is reported as 503 — semantically
@@ -205,7 +193,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
     connections, file handles, or singleton providers — so they bind to this
     snapshot and survive across `config.yaml` edits. Request-time consumers
     must still go through :func:`get_config` for any field that should be
-     hot-reloadable. See ``backend/AGENTS.md`` "Config Hot-Reload Boundary".
+    hot-reloadable.
 
     The matching ``run_events_config`` is frozen onto ``app.state`` so
     :func:`get_run_context` pairs a freshly-loaded ``AppConfig`` with the
@@ -225,9 +213,9 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
     from deerflow.runtime.events.store import make_run_event_store
 
     # ------------------------------------------------------------------
-    # 多工作进程安全门禁：GATEWAY_WORKERS > 1 时拒绝 SQLite，其写锁不支持多进程并发。
+    # 多进程运行必须启用租约心跳，以免工作进程互相回收仍在执行的任务。
     # ------------------------------------------------------------------
-    _enforce_postgres_for_multi_worker(startup_config)
+    _enforce_multi_worker_run_ownership(startup_config)
 
     async with AsyncExitStack() as stack:
         config = startup_config
@@ -243,7 +231,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         # 初始化仓库，所有仓库共用一次 get_session_factory() 调用。
         sf = get_session_factory()
         if sf is None:
-            raise RuntimeError("Database persistence is unavailable; configure database.backend as sqlite or postgres.")
+            raise RuntimeError("PostgreSQL persistence is unavailable; check database.postgres_url and the database service.")
 
         from deerflow.persistence.feedback import FeedbackRepository
         from deerflow.persistence.run import RunRepository
@@ -272,9 +260,7 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             store=app.state.run_store,
             run_ownership_config=run_ownership_config,
         )
-        # 启动恢复：将租约已过期的在途运行标记为错误。单工作进程模式（SQLite / memory）
-        # 中运行没有租约，故回收所有在途行；多工作进程模式（Postgres）只回收租约过期的
-        # 运行，并跳过归属其他存活工作进程的运行。
+        # 启动时仅回收租约已过期的运行，仍持有有效租约的其他工作进程任务继续执行。
         from deerflow.utils.time import now_iso
 
         recovered_runs = await app.state.run_manager.reconcile_orphaned_inflight_runs(
@@ -391,7 +377,7 @@ def get_run_context(request: Request) -> RunContext:
 
 # 缓存单例，避免每个请求重复实例化。
 _cached_local_provider: LocalAuthProvider | None = None
-_cached_repo: SQLiteUserRepository | None = None
+_cached_repo: SQLUserRepository | None = None
 
 
 def get_local_provider() -> LocalAuthProvider:
@@ -402,13 +388,13 @@ def get_local_provider() -> LocalAuthProvider:
     """
     global _cached_local_provider, _cached_repo
     if _cached_repo is None:
-        from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
+        from app.gateway.auth.repositories.sql import SQLUserRepository
         from deerflow.persistence.engine import get_session_factory
 
         sf = get_session_factory()
         if sf is None:
             raise RuntimeError("get_local_provider() called before init_engine_from_config(); cannot access users table")
-        _cached_repo = SQLiteUserRepository(sf)
+        _cached_repo = SQLUserRepository(sf)
     if _cached_local_provider is None:
         from app.gateway.auth.local_provider import LocalAuthProvider
 

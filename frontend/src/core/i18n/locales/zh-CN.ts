@@ -35,7 +35,6 @@ export const zhCN: Translations = {
     artifacts: "文件",
     public: "公共",
     custom: "自定义",
-    notAvailableInDemoMode: "在演示模式下不可用",
     loading: "加载中...",
     version: "版本",
     lastUpdated: "最后更新",
@@ -235,7 +234,6 @@ export const zhCN: Translations = {
     chats: "对话",
     channels: "渠道",
     recentChats: "最近的对话",
-    demoChats: "演示对话",
     agents: "智能体",
     scheduledTasks: "定时任务",
     agentsDisabledTooltip: "功能未启用",
@@ -809,7 +807,6 @@ export const zhCN: Translations = {
     continueWith: (provider: string) => `使用 ${provider} 登录`,
     noAccountSignUp: "还没有账号？立即注册",
     haveAccountSignIn: "已有账号？立即登录",
-    backToHome: "← 返回首页",
     networkError: "网络错误，请重试。",
     authFailed: "身份验证失败。",
     errors: {

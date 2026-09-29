@@ -49,7 +49,6 @@ import {
 } from "@/core/threads/hooks";
 import { threadTokenUsageToTokenUsage } from "@/core/threads/token-usage";
 import { textOfMessage } from "@/core/threads/utils";
-import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 /** 管理绑定自定义代理的流式会话及其专属上下文。 */
@@ -63,7 +62,7 @@ export default function AgentChatPage() {
 
   const { agent } = useAgent(agent_name);
 
-  const { threadId, setThreadId, isNewThread, setIsNewThread, isMock } =
+  const { threadId, setThreadId, isNewThread, setIsNewThread } =
     useThreadChat();
   // isNewThread 在后端创建前阻止历史与用量请求；isWelcomeMode 仅控制欢迎布局，可在提交时立即切换而不触发过早加载。
   const [isWelcomeMode, setIsWelcomeMode] = useState(isNewThread);
@@ -71,12 +70,11 @@ export default function AgentChatPage() {
   const [localSettings, setLocalSettings] = useLocalSettings();
   const { tokenUsageEnabled } = useModels();
   const threadTokenUsage = useThreadTokenUsage(
-    isNewThread || isMock ? undefined : threadId,
-    { enabled: tokenUsageEnabled && !isMock },
+    isNewThread ? undefined : threadId,
+    { enabled: tokenUsageEnabled },
   );
   const threadMetadata = useThreadMetadata(threadId, {
-    enabled: !isNewThread && !isMock,
-    isMock,
+    enabled: !isNewThread,
   });
   const backendTokenUsage = threadTokenUsageToTokenUsage(threadTokenUsage.data);
 
@@ -99,7 +97,6 @@ export default function AgentChatPage() {
     threadId: isNewThread ? undefined : threadId,
     displayThreadId: threadId,
     context: { ...settings.context, agent_name: agent_name },
-    isMock,
     onSend: () => {
       setIsWelcomeMode(false);
     },
@@ -136,7 +133,6 @@ export default function AgentChatPage() {
   useEffect(() => {
     if (
       !isNewThread &&
-      !isMock &&
       threadMetadata.data === null &&
       !threadMetadata.isLoading &&
       !threadMetadata.isFetching &&
@@ -151,7 +147,6 @@ export default function AgentChatPage() {
     hasMoreHistory,
     hasThreadMessages,
     isHistoryLoading,
-    isMock,
     isNewThread,
     router,
     threadMetadata.data,
@@ -231,11 +226,10 @@ export default function AgentChatPage() {
   );
 
   return (
-    <ThreadContext.Provider value={{ thread, isMock }}>
+    <ThreadContext.Provider value={{ thread }}>
       <SidecarProvider
         parentThreadId={threadId}
         context={{ ...settings.context, agent_name }}
-        isMock={isMock}
       >
         <ChatBox threadId={threadId}>
           <div className="relative flex size-full min-h-0 justify-between">
@@ -303,18 +297,10 @@ export default function AgentChatPage() {
                   isHistoryLoading={isHistoryLoading}
                   tokenUsageInlineMode={tokenUsageInlineMode}
                   canRegenerate={
-                    !isNewThread &&
-                    !isMock &&
-                    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" &&
-                    !isUploading &&
-                    !thread.isLoading
+                    !isNewThread && !isUploading && !thread.isLoading
                   }
                   onRegenerateMessage={handleRegenerate}
-                  onSubmitHumanInput={
-                    isMock || env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"
-                      ? undefined
-                      : handleSubmitHumanInput
-                  }
+                  onSubmitHumanInput={handleSubmitHumanInput}
                 />
               </div>
 
@@ -383,7 +369,6 @@ export default function AgentChatPage() {
                       )
                     }
                     disabled={
-                      env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" ||
                       isUploading ||
                       hasOpenHumanInputCard ||
                       (!isNewThread && isHistoryLoading)
@@ -395,11 +380,6 @@ export default function AgentChatPage() {
                     onSubmit={handleSubmit}
                     onStop={handleStop}
                   />
-                  {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" && (
-                    <div className="text-muted-foreground/67 w-full translate-y-12 text-center text-xs">
-                      {t.common.notAvailableInDemoMode}
-                    </div>
-                  )}
                 </div>
               </div>
             </main>

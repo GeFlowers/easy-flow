@@ -51,11 +51,6 @@ class LangfuseTracingConfig(BaseModel):
             missing.append("LANGFUSE_SECRET_KEY")
         if missing:
             raise ValueError(f"Langfuse tracing is enabled but required settings are missing: {', '.join(missing)}")
-
-
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 _MONOCLE_EXPORTERS = ("file", "console", "okahu", "s3", "blob", "gcs")
 
 
@@ -68,8 +63,6 @@ class MonocleTracingConfig(BaseModel):
 
     @property
     def is_enabled(self) -> bool:
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
         """\u6267\u884c is_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         return self.enabled
 

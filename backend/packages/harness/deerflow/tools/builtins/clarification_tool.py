@@ -18,7 +18,7 @@ def ask_clarification_tool(
     context: str | None = None,
     options: list[str] | None = None,
 ) -> str:
-    """Ask the user for clarification when you need more information to proceed.
+    """当缺少必要信息而无法可靠继续时，向用户提出澄清问题。
 
     Use this tool when you encounter situations where you cannot proceed without user input:
 

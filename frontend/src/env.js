@@ -6,7 +6,6 @@ export const env = createEnv({
    * 服务端环境变量模式在构建前拒绝无效配置。
    */
   server: {
-    GITHUB_OAUTH_TOKEN: z.string().optional(),
     NODE_ENV: z
       .enum(["development", "test", "production"])
       .default("development"),
@@ -18,7 +17,6 @@ export const env = createEnv({
   client: {
     NEXT_PUBLIC_BACKEND_BASE_URL: z.string().optional(),
     NEXT_PUBLIC_LANGGRAPH_BASE_URL: z.string().optional(),
-    NEXT_PUBLIC_STATIC_WEBSITE_ONLY: z.string().optional(),
   },
 
   /**
@@ -30,9 +28,6 @@ export const env = createEnv({
 
     NEXT_PUBLIC_BACKEND_BASE_URL: process.env.NEXT_PUBLIC_BACKEND_BASE_URL,
     NEXT_PUBLIC_LANGGRAPH_BASE_URL: process.env.NEXT_PUBLIC_LANGGRAPH_BASE_URL,
-    NEXT_PUBLIC_STATIC_WEBSITE_ONLY:
-      process.env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY,
-    GITHUB_OAUTH_TOKEN: process.env.GITHUB_OAUTH_TOKEN,
   },
   /**
    * Docker 等分阶段构建可通过 `SKIP_ENV_VALIDATION` 跳过当前阶段无法满足的校验。

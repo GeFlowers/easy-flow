@@ -51,7 +51,7 @@ class RunEventStore(abc.ABC):
     async def put_batch(self, events: list[dict]) -> list[dict]:
         """
 
-        Batch-write events. Used by RunJournal flush buffer.
+        批量写入同一刷新批次的事件，减少逐条提交的事务开销。
 
                 Each dict's keys match put()'s keyword arguments.
                 Returns complete records with seq assigned.

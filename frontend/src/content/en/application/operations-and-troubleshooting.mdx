@@ -11,18 +11,18 @@ This page covers day-to-day operational tasks and solutions to common problems w
 
 ## Log files
 
-All services write logs to the `logs/` directory when started with `make dev`:
+View service logs with the Docker Compose commands:
 
-| File                 | Service                              |
-| -------------------- | ------------------------------------ |
-| `logs/gateway.log`   | FastAPI Gateway API and agent runtime |
-| `logs/frontend.log`  | Next.js frontend dev server          |
-| `logs/nginx.log`     | nginx reverse proxy                  |
+| Service | Command |
+| ------- | ------- |
+| All services | `make docker-logs` |
+| Gateway | `make docker-logs-gateway` |
+| Frontend | `make docker-logs-frontend` |
 
 Tail logs in real time:
 
 ```bash
-tail -f logs/gateway.log
+make docker-logs-gateway
 ```
 
 Adjust the runtime log level in `config.yaml`:
@@ -61,9 +61,9 @@ grep config_version config.yaml
 
 ### The app loads but the agent doesn't respond
 
-1. Check `logs/gateway.log` for startup errors.
+1. Check the Gateway logs with `make docker-logs-gateway`.
 2. Verify your model is correctly configured in `config.yaml` with a valid API key.
-3. Confirm the API key environment variable is set in the shell that ran `make dev`.
+3. Confirm the API key is set in the project-root `.env` file.
 4. Test the model endpoint directly with `curl` to rule out network issues.
 
 ---
@@ -105,11 +105,9 @@ If file tools (`read_file`, `ls`, `bash`) fail with permission or path errors:
 
 ---
 
-### SQLite reports `database is locked`
+### PostgreSQL connection failures
 
-This usually means SQLite is handling concurrent writes from multiple users or long-running agent runs. SQLite supports concurrent reads, but only one writer can hold the database lock at a time. In DeerFlow, checkpoint writes and application writes share the same SQLite database file.
-
-For production or multi-user deployments, switch to Postgres:
+If Gateway cannot connect during startup or persistence API calls fail, verify that `.env` contains a reachable `DATABASE_URL` and that its database user can create tables and apply migrations:
 
 ```yaml
 database:
@@ -119,8 +117,6 @@ database:
 run_events:
   backend: db
 ```
-
-SQLite should be kept for local development, single-user deployments, or short-lived evaluation environments.
 
 ---
 
@@ -140,7 +136,7 @@ Connection refused: http://provisioner:8002
 
 If MCP tools appear in `extensions_config.json` but are not available in the agent:
 
-1. Check `logs/gateway.log` for MCP initialization errors.
+1. Check Gateway logs with `make docker-logs-gateway` for MCP initialization errors.
 2. Verify the MCP server command is installed (`npx`, `uvx`, or the relevant binary).
 3. Test the server command manually to confirm it starts without errors.
 4. Set `log_level: debug` to see detailed MCP loading output.
@@ -151,7 +147,7 @@ If MCP tools appear in `extensions_config.json` but are not available in the age
 
 - Verify `memory.enabled: true` in `config.yaml`.
 - Check that the storage path is writable: `ls -la backend/.deer-flow/`.
-- Look for memory update errors in `logs/gateway.log` (search for "memory").
+- Look for memory update errors in the Gateway logs (search for "memory").
 
 ## Data backup
 
@@ -159,22 +155,14 @@ Back up the storage backends you use:
 
 - `backend/.deer-flow/threads/` for thread working directories, uploads, and artifacts.
 - `backend/.deer-flow/memory.json` and `backend/.deer-flow/agents/` for learned memory.
-- `${database.sqlite_dir}/deerflow.db` when using `database.backend: sqlite` (default: `.deer-flow/data/deerflow.db`).
-- Regular database dumps when using `database.backend: postgres`.
+- Regular PostgreSQL database dumps for checkpoints, Store data, and application records.
 - The legacy `checkpointer.connection_string` file if your deployment still configures a standalone `checkpointer`.
 
 In Docker deployments, back up the bind-mounted host paths rather than the container filesystem.
 
 ## Restarting services
 
-To restart a single service (local deployment):
-
-```bash
-make stop
-make dev
-```
-
-Individual service restart scripts are in `scripts/`. For targeted restarts, you can kill and relaunch individual processes manually using the PIDs in the log files.
+Use `make docker-stop` to stop the stack and `make docker-start` to build and start it again.
 
 <Cards num={2}>
   <Cards.Card

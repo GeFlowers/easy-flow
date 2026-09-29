@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import logging
-import weakref
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -104,45 +103,19 @@ _BASELINE_INDEX_NAMES: frozenset[str] = frozenset(
 )
 
 
-# Per-engine SQLite bootstrap locks. Per-engine (not module-global) so each
-# engine instance pairs with a lock bound to the event loop that uses that
-# engine -- necessary because ``asyncio.Lock`` binds to the first loop it sees,
-# and pytest gives each async test its own loop. Production uses one engine
-# per process so this dict collapses to a single entry in practice.
-#
-# Keyed by the engine object itself via ``WeakKeyDictionary`` rather than
-# ``id(engine)``: CPython recycles addresses after GC, so a stale ``id`` →
-# ``Lock`` entry from a dead engine could be returned to a new engine that
-# happened to land on the same address. The returned lock would still be bound
-# to the dead engine's event loop and ``async with`` would raise
-# ``RuntimeError: ... bound to a different event loop``. Hashing the engine
-# itself also drops entries automatically when the engine is collected, so this
-# dict never grows past the live engine count.
-_SQLITE_LOCKS: weakref.WeakKeyDictionary[AsyncEngine, asyncio.Lock] = weakref.WeakKeyDictionary()
-
-
-def _get_sqlite_local_lock(engine: AsyncEngine) -> asyncio.Lock:
-    """获取并管理数据库架构操作所需的并发互斥锁。"""
-    lock = _SQLITE_LOCKS.get(engine)
-    if lock is None:
-        lock = asyncio.Lock()
-        _SQLITE_LOCKS[engine] = lock
-    return lock
-
-
 def _escape_url_for_alembic(url: str) -> str:
-    """执行持久化流程所需的内部辅助操作。"""
+    """转义 Alembic 配置语法中的百分号，避免把 DSN 当作插值模板。"""
     return url.replace("%", "%%")
 
 
 def _alembic_safe_url(engine: AsyncEngine) -> str:
-    """执行持久化流程所需的内部辅助操作。"""
+    """读取引擎 DSN 并转换成可安全写入 Alembic 配置的字符串。"""
     rendered = engine.url.render_as_string(hide_password=False)
     return _escape_url_for_alembic(rendered)
 
 
 def _get_alembic_config(engine: AsyncEngine) -> AlembicConfig:
-    """执行持久化流程所需的内部辅助操作。"""
+    """构造指向本项目迁移目录并使用当前引擎 DSN 的 Alembic 配置。"""
     cfg = AlembicConfig()
     cfg.set_main_option("script_location", str(_MIGRATIONS_DIR))
     cfg.set_main_option("sqlalchemy.url", _alembic_safe_url(engine))
@@ -150,7 +123,7 @@ def _get_alembic_config(engine: AsyncEngine) -> AlembicConfig:
 
 
 def _get_head_revision() -> str:
-    """执行持久化流程所需的内部辅助操作。"""
+    """读取并缓存迁移目录中的最新版本号。"""
     global _HEAD_REVISION
     if _HEAD_REVISION is None:
         cfg = AlembicConfig()
@@ -164,7 +137,7 @@ def _get_head_revision() -> str:
 
 
 def _reflect_state(sync_conn: Any) -> dict[str, bool]:
-    """执行持久化流程所需的内部辅助操作。"""
+    """检查数据库是否已有 Alembic 版本表或 DeerFlow 自有表。"""
     from deerflow.persistence.base import Base
 
     # Make sure every ORM model is imported, otherwise ``Base.metadata.tables``
@@ -184,7 +157,7 @@ def _reflect_state(sync_conn: Any) -> dict[str, bool]:
 
 
 def _decide_state(state: dict[str, bool]) -> str:
-    """执行持久化流程所需的内部辅助操作。"""
+    """根据已存在的表结构选择新库、旧库或已版本化数据库流程。"""
     if state["has_alembic_version"]:
         return "versioned"
     if not state["has_deerflow_tables"]:
@@ -196,7 +169,7 @@ def _decide_state(state: dict[str, bool]) -> str:
 
 
 def _run_create_all_sync(sync_conn: Any) -> None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """使用 ORM 元数据创建当前版本缺失的全部业务表。"""
     # Import here to ensure all model classes are registered with Base.metadata.
     from deerflow.persistence.base import Base
 
@@ -209,7 +182,7 @@ def _run_create_all_sync(sync_conn: Any) -> None:
 
 
 def _run_baseline_create_all_sync(sync_conn: Any) -> None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """仅补齐基线版本负责的表和索引，避免抢先创建后续迁移对象。"""
     from deerflow.persistence.base import Base
 
     try:
@@ -257,12 +230,12 @@ def _run_baseline_create_all_sync(sync_conn: Any) -> None:
 
 
 def _stamp(cfg: AlembicConfig, revision: str) -> None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """将数据库标记为指定迁移版本，但不执行该版本的迁移操作。"""
     alembic_command.stamp(cfg, revision)
 
 
 def _upgrade(cfg: AlembicConfig, revision: str) -> None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """运行 Alembic 迁移，将数据库升级到指定版本。"""
     alembic_command.upgrade(cfg, revision)
 
 
@@ -273,7 +246,7 @@ def _upgrade(cfg: AlembicConfig, revision: str) -> None:
 
 @asynccontextmanager
 async def _postgres_lock(engine: AsyncEngine):
-    """获取并管理数据库架构操作所需的并发互斥锁。"""
+    """持有 PostgreSQL 会话级 advisory lock，串行执行架构引导。"""
     async with engine.connect() as conn:
         await conn.execute(text("SET LOCAL idle_in_transaction_session_timeout = 0"))
         await conn.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _PG_LOCK_KEY})
@@ -287,21 +260,9 @@ async def _postgres_lock(engine: AsyncEngine):
                 logger.warning("bootstrap: pg_advisory_unlock raised; session close will release", exc_info=True)
 
 
-@asynccontextmanager
-async def _sqlite_lock(engine: AsyncEngine):
-    """获取并管理数据库架构操作所需的并发互斥锁。"""
-    async with _get_sqlite_local_lock(engine):
-        logger.info("bootstrap: acquired sqlite in-process lock")
-        yield
-
-
-def _bootstrap_lock(engine: AsyncEngine, *, backend: str):
-    """获取并管理数据库架构操作所需的并发互斥锁。"""
-    if backend == "postgres":
-        return _postgres_lock(engine)
-    if backend == "sqlite":
-        return _sqlite_lock(engine)
-    raise ValueError(f"bootstrap: unsupported backend {backend!r}")
+def _bootstrap_lock(engine: AsyncEngine):
+    """返回保护 PostgreSQL 架构修改的 advisory lock 上下文。"""
+    return _postgres_lock(engine)
 
 
 # ---------------------------------------------------------------------------
@@ -309,12 +270,12 @@ def _bootstrap_lock(engine: AsyncEngine, *, backend: str):
 # ---------------------------------------------------------------------------
 
 
-async def bootstrap_schema(engine: AsyncEngine, *, backend: str) -> None:
+async def bootstrap_schema(engine: AsyncEngine) -> None:
     """将数据库架构引导或迁移到当前目标版本。"""
     head = _get_head_revision()
     cfg = _get_alembic_config(engine)
 
-    async with _bootstrap_lock(engine, backend=backend):
+    async with _bootstrap_lock(engine):
         async with engine.connect() as conn:
             state = await conn.run_sync(_reflect_state)
         decision = _decide_state(state)
@@ -353,4 +314,4 @@ async def bootstrap_schema(engine: AsyncEngine, *, backend: str) -> None:
         else:  # pragma: no cover -- defensive
             raise RuntimeError(f"bootstrap: unhandled decision {decision!r}")
 
-    logger.info("bootstrap: complete (backend=%s)", backend)
+    logger.info("bootstrap: complete (backend=postgres)")

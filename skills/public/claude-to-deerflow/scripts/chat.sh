@@ -27,7 +27,7 @@ MODE="${3:-pro}"
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${GATEWAY_URL}/health" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" -ge 400 ]; then
   echo "ERROR: DeerFlow is not reachable at ${GATEWAY_URL} (HTTP ${HTTP_CODE})" >&2
-  echo "Make sure DeerFlow is running. Start it with: cd <deerflow-dir> && make dev" >&2
+  echo "Make sure DeerFlow is running. Start it with: cd <deerflow-dir> && make docker-start" >&2
   exit 1
 fi
 

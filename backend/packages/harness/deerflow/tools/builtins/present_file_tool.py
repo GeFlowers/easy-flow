@@ -75,7 +75,7 @@ def present_file_tool(
     filepaths: list[str],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """Make files visible to the user for viewing and rendering in the client interface.
+    """将生成的文件登记为可供用户查看或渲染的项目产物。
 
     When to use the present_files tool:
 

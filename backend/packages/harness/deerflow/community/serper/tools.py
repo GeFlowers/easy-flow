@@ -227,7 +227,7 @@ def _serper_post(endpoint: str, api_key: str, query: str, max_results: int) -> t
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int = 5) -> str:
-    """Search the web for information using Google Search via Serper.
+    """通过 Serper 调用 Google Search 查询网络信息。
 
     Args:
         query: Search keywords describing what you want to find. Be specific for better results.
@@ -275,7 +275,7 @@ def web_search_tool(query: str, max_results: int = 5) -> str:
 
 @tool("image_search", parse_docstring=True)
 def image_search_tool(query: str, max_results: int = 5) -> str:
-    """Search for images online using Google Images via Serper. Use this tool BEFORE image generation to find reference images for characters, portraits, objects, scenes, or any content requiring visual accuracy.
+    """通过 Serper 查询 Google 图片，为人物、物品或场景创作收集视觉参考。
 
     The returned image URLs can be used as reference images in image generation to significantly improve quality.
 

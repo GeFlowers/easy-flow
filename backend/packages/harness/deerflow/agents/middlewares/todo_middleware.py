@@ -1,18 +1,8 @@
-"""定义 todo_middleware 模块提供的职责与可复用接口。
+"""在上下文裁剪后恢复待办提示，并阻止 Agent 在待办未完成时提前结束。
 
-Middleware that extends TodoListMiddleware with context-loss detection and premature-exit prevention.
-
-When the message history is truncated (e.g., by SummarizationMiddleware), the
-original `write_todos` tool call and its ToolMessage can be scrolled out of the
-active context window. This middleware detects that situation and injects a
-reminder message so the model still knows about the outstanding todo list.
-
-Additionally, this middleware prevents the agent from exiting the loop while
-there are still incomplete todo items. When the model produces a final response
-(no tool calls) but todos are not yet complete, the middleware queues a reminder
-for the next model request and jumps back to the model node to force continued
-engagement. The completion reminder is injected via ``wrap_model_call`` instead
-of being persisted into graph state as a normal user-visible message.
+待办工具调用被摘要裁剪时，中间件会从图状态重建隐藏提醒；若模型尝试给出最终
+答复但仍有未完成项，则暂存提醒并跳回模型节点。控制提示仅在模型请求包装阶段
+追加，不写入图状态或用户可见对话。
 """
 
 from __future__ import annotations
@@ -31,9 +21,7 @@ from deerflow.agents.thread_state import ThreadState
 
 
 def _todos_in_messages(messages: list[Any]) -> bool:
-    """执行 _todos_in_messages 的明确职责，并返回与调用约定一致的结果。
-
-    Return True if any AIMessage in *messages* contains a write_todos tool call."""
+    """判断消息历史中是否仍保留 write_todos 工具调用。"""
     for msg in messages:
         if isinstance(msg, AIMessage) and msg.tool_calls:
             for tc in msg.tool_calls:
@@ -43,9 +31,7 @@ def _todos_in_messages(messages: list[Any]) -> bool:
 
 
 def _reminder_in_messages(messages: list[Any]) -> bool:
-    """执行 _reminder_in_messages 的明确职责，并返回与调用约定一致的结果。
-
-    Return True if a todo_reminder HumanMessage is already present in *messages*."""
+    """判断历史中是否已有上下文恢复提醒，避免重复插入。"""
     for msg in messages:
         if isinstance(msg, HumanMessage) and getattr(msg, "name", None) == "todo_reminder":
             return True
@@ -53,9 +39,7 @@ def _reminder_in_messages(messages: list[Any]) -> bool:
 
 
 def _format_todos(todos: list[Todo]) -> str:
-    """执行 _format_todos 的明确职责，并返回与调用约定一致的结果。
-
-    Format a list of Todo items into a human-readable string."""
+    """将待办项格式化为包含状态和内容的逐行列表。"""
     lines: list[str] = []
     for todo in todos:
         status = todo.get("status", "pending")
@@ -65,9 +49,7 @@ def _format_todos(todos: list[Todo]) -> str:
 
 
 def _format_completion_reminder(todos: list[Todo]) -> str:
-    """执行 _format_completion_reminder 的明确职责，并返回与调用约定一致的结果。
-
-    Format a completion reminder for incomplete todo items."""
+    """只列出未完成待办，生成要求继续执行而非提前总结的控制提示。"""
     incomplete = [t for t in todos if t.get("status") != "completed"]
     incomplete_text = "\n".join(f"- [{t.get('status', 'pending')}] {t.get('content', '')}" for t in incomplete)
     return (
@@ -84,27 +66,14 @@ _TOOL_CALL_FINISH_REASONS = {"tool_calls", "function_call"}
 
 
 def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
-    """执行 _has_tool_call_intent_or_error 的明确职责，并返回与调用约定一致的结果。
-
-    Return True when an AIMessage is not a clean final answer.
-
-        Todo completion reminders should only fire when the model has produced a
-        plain final response. Provider/tool parsing details have moved across
-        LangChain versions and integrations, so keep all tool-intent/error signals
-        behind this helper instead of checking one concrete field at the call site.
-    """
+    """识别结构化工具调用、解析错误和兼容字段，区分最终答复与工具响应。"""
     if message.tool_calls:
         return True
 
     if getattr(message, "invalid_tool_calls", None):
         return True
 
-    # Backward/provider compatibility: some integrations preserve raw or legacy
-    # tool-call intent in additional_kwargs even when structured tool_calls is
-    # empty. If this helper changes, update the matching sentinel test
-    # `TestToolCallIntentOrError.test_langchain_ai_message_tool_fields_are_explicitly_handled`;
-    # if that test fails after a LangChain upgrade, review this helper so new
-    # tool-call/error fields are not silently treated as clean final answers.
+    # 部分模型适配器只在兼容字段中保留工具意图；这里集中兼容，避免误把工具响应当最终答复。
     additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
     if additional_kwargs.get("tool_calls") or additional_kwargs.get("function_call"):
         return True
@@ -114,15 +83,7 @@ def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
 
 
 class TodoMiddleware(TodoListMiddleware):
-    """封装 TodoMiddleware 的状态、协作关系与公开操作。
-
-    Extends TodoListMiddleware with `write_todos` context-loss detection.
-
-        When the original `write_todos` tool call has been truncated from the message
-        history (e.g., after summarization), the model loses awareness of the current
-        todo list. This middleware detects that gap in `before_model` / `abefore_model`
-        and injects a reminder message so the model can continue tracking progress.
-    """
+    """扩展 LangChain 待办中间件，处理历史裁剪恢复和未完成任务续跑。"""
 
     state_schema = ThreadState
 
@@ -132,24 +93,21 @@ class TodoMiddleware(TodoListMiddleware):
         state: ThreadState,
         runtime: Runtime,
     ) -> dict[str, Any] | None:
-        """执行 before_model 的明确职责，并返回与调用约定一致的结果。
-
-        Inject a todo-list reminder when write_todos has left the context window."""
+        """待办状态仍在图中但工具调用已被裁剪时，向模型恢复当前待办列表。"""
         todos: list[Todo] = state.get("todos") or []  # type: ignore[assignment]
         if not todos:
             return None
 
         messages = state.get("messages") or []
         if _todos_in_messages(messages):
-            # write_todos is still visible in context — nothing to do.
+            # 工具调用仍在消息历史中，模型可据此了解待办状态。
             return None
 
         if _reminder_in_messages(messages):
-            # A reminder was already injected and hasn't been truncated yet.
+            # 已有恢复提醒且仍处于上下文中，无需重复追加。
             return None
 
-        # The todo list exists in state but the original write_todos call is gone.
-        # Inject a reminder as a HumanMessage so the model stays aware.
+        # 图状态保留待办项，但对话记录已没有来源工具调用，需要重建提示。
         formatted = _format_todos(todos)
         reminder = HumanMessage(
             name="todo_reminder",
@@ -172,19 +130,16 @@ class TodoMiddleware(TodoListMiddleware):
         state: ThreadState,
         runtime: Runtime,
     ) -> dict[str, Any] | None:
-        """执行 abefore_model 的明确职责，并返回与调用约定一致的结果。
-
-        Async version of before_model."""
+        """异步模型调用前复用同步钩子的待办上下文恢复逻辑。"""
         return self.before_model(state, runtime)
 
-    # Maximum number of completion reminders before allowing the agent to exit.
-    # This prevents infinite loops when the agent cannot make further progress.
+    # 最多要求模型续跑的次数，避免无法推进时陷入无限循环。
     _MAX_COMPLETION_REMINDERS = 2
-    # Hard cap for per-run reminder bookkeeping in long-lived middleware instances.
+    # 长生命周期中间件实例的运行提醒状态上限。
     _MAX_COMPLETION_REMINDER_KEYS = 4096
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """初始化父类待办工具，并创建按线程和运行隔离的提醒及计数状态。"""
         super().__init__(*args, **kwargs)
         self._lock = threading.Lock()
         self._pending_completion_reminders: dict[tuple[str, str], list[str]] = {}
@@ -194,42 +149,42 @@ class TodoMiddleware(TodoListMiddleware):
 
     @staticmethod
     def _get_thread_id(runtime: Runtime) -> str:
-        "执行 _get_thread_id 的明确职责，并返回与调用约定一致的结果"
+        """从运行上下文读取线程 ID；缺失时使用默认线程标识。"""
         context = getattr(runtime, "context", None)
         thread_id = context.get("thread_id") if context else None
         return str(thread_id) if thread_id else "default"
 
     @staticmethod
     def _get_run_id(runtime: Runtime) -> str:
-        "执行 _get_run_id 的明确职责，并返回与调用约定一致的结果"
+        """从运行上下文读取运行 ID；缺失或为空时使用默认运行标识。"""
         context = getattr(runtime, "context", None)
         run_id = context.get("run_id") if context else None
         return str(run_id) if run_id else "default"
 
     def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
-        "执行 _pending_key 的明确职责，并返回与调用约定一致的结果"
+        """用线程 ID 和运行 ID 组成提醒状态的隔离键。"""
         return self._get_thread_id(runtime), self._get_run_id(runtime)
 
     def _touch_completion_reminder_key_locked(self, key: tuple[str, str]) -> None:
-        "执行 _touch_completion_reminder_key_locked 的明确职责，并返回与调用约定一致的结果"
+        """更新时间序号，将提醒状态标记为最近使用。调用方须持锁。"""
         self._completion_reminder_next_order += 1
         self._completion_reminder_touch_order[key] = self._completion_reminder_next_order
 
     def _completion_reminder_keys_locked(self) -> set[tuple[str, str]]:
-        "执行 _completion_reminder_keys_locked 的明确职责，并返回与调用约定一致的结果"
+        """合并待发送提醒、次数统计和访问时间中的键。调用方须持锁。"""
         keys = set(self._pending_completion_reminders)
         keys.update(self._completion_reminder_counts)
         keys.update(self._completion_reminder_touch_order)
         return keys
 
     def _drop_completion_reminder_key_locked(self, key: tuple[str, str]) -> None:
-        "执行 _drop_completion_reminder_key_locked 的明确职责，并返回与调用约定一致的结果"
+        """删除某次运行的提醒、重试计数及 LRU 记录。调用方须持锁。"""
         self._pending_completion_reminders.pop(key, None)
         self._completion_reminder_counts.pop(key, None)
         self._completion_reminder_touch_order.pop(key, None)
 
     def _prune_completion_reminder_state_locked(self, protected_key: tuple[str, str]) -> None:
-        "执行 _prune_completion_reminder_state_locked 的明确职责，并返回与调用约定一致的结果"
+        """超过状态容量时按最久未使用顺序淘汰记录，并保留当前运行。调用方须持锁。"""
         keys = self._completion_reminder_keys_locked()
         overflow = len(keys) - self._MAX_COMPLETION_REMINDER_KEYS
         if overflow <= 0:
@@ -241,7 +196,7 @@ class TodoMiddleware(TodoListMiddleware):
             self._drop_completion_reminder_key_locked(key)
 
     def _queue_completion_reminder(self, runtime: Runtime, reminder: str) -> None:
-        "执行 _queue_completion_reminder 的明确职责，并返回与调用约定一致的结果"
+        """暂存续跑提示并递增本轮提醒次数，同时维护有界状态。"""
         key = self._pending_key(runtime)
         with self._lock:
             self._pending_completion_reminders.setdefault(key, []).append(reminder)
@@ -250,13 +205,13 @@ class TodoMiddleware(TodoListMiddleware):
             self._prune_completion_reminder_state_locked(protected_key=key)
 
     def _completion_reminder_count_for_runtime(self, runtime: Runtime) -> int:
-        "执行 _completion_reminder_count_for_runtime 的明确职责，并返回与调用约定一致的结果"
+        """返回当前运行已触发的待办续跑提醒次数。"""
         key = self._pending_key(runtime)
         with self._lock:
             return self._completion_reminder_counts.get(key, 0)
 
     def _drain_completion_reminders(self, runtime: Runtime) -> list[str]:
-        "执行 _drain_completion_reminders 的明确职责，并返回与调用约定一致的结果"
+        """取出当前运行待注入的续跑提醒；保留重试计数直到本轮结束。"""
         key = self._pending_key(runtime)
         with self._lock:
             reminders = self._pending_completion_reminders.pop(key, [])
@@ -265,7 +220,7 @@ class TodoMiddleware(TodoListMiddleware):
             return reminders
 
     def _clear_other_run_completion_reminders(self, runtime: Runtime) -> None:
-        "执行 _clear_other_run_completion_reminders 的明确职责，并返回与调用约定一致的结果"
+        """开始新运行时，清除同一线程下其他运行遗留的提醒状态。"""
         thread_id, current_run_id = self._pending_key(runtime)
         with self._lock:
             for key in self._completion_reminder_keys_locked():
@@ -273,20 +228,20 @@ class TodoMiddleware(TodoListMiddleware):
                     self._drop_completion_reminder_key_locked(key)
 
     def _clear_current_run_completion_reminders(self, runtime: Runtime) -> None:
-        "执行 _clear_current_run_completion_reminders 的明确职责，并返回与调用约定一致的结果"
+        """删除当前运行的提醒队列和次数记录。"""
         key = self._pending_key(runtime)
         with self._lock:
             self._drop_completion_reminder_key_locked(key)
 
     @override
     def before_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
+        """Agent 启动时清理同线程其他运行遗留的续跑提醒。"""
         self._clear_other_run_completion_reminders(runtime)
         return None
 
     @override
     async def abefore_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 abefore_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步启动钩子执行相同的跨运行提醒清理。"""
         self._clear_other_run_completion_reminders(runtime)
         return None
 
@@ -297,44 +252,28 @@ class TodoMiddleware(TodoListMiddleware):
         state: ThreadState,
         runtime: Runtime,
     ) -> dict[str, Any] | None:
-        """执行 after_model 的明确职责，并返回与调用约定一致的结果。
-
-        Prevent premature agent exit when todo items are still incomplete.
-
-                In addition to the base class check for parallel ``write_todos`` calls,
-                this override intercepts model responses that have no tool calls while
-                there are still incomplete todo items. It injects a reminder
-                ``HumanMessage`` and jumps back to the model node so the agent
-                continues working through the todo list.
-
-                A retry cap of ``_MAX_COMPLETION_REMINDERS`` (default 2) prevents
-                infinite loops when the agent cannot make further progress.
-        """
-        # 1. Preserve base class logic (parallel write_todos detection).
+        """保留父类并行待办校验；模型提前结束时有限次跳回模型继续处理未完成项。"""
+        # 先执行父类对并行 write_todos 调用的既有检查。
         base_result = super().after_model(state, runtime)
         if base_result is not None:
             return base_result
 
-        # 2. Only intervene when the agent wants to exit cleanly. Tool-call
-        # intent or tool-call parse errors should be handled by the tool path
-        # instead of being masked by todo reminders.
+        # 仅拦截干净的最终答复；工具调用或解析错误应留给工具执行路径处理。
         messages = state.get("messages") or []
         last_ai = next((m for m in reversed(messages) if isinstance(m, AIMessage)), None)
         if not last_ai or _has_tool_call_intent_or_error(last_ai):
             return None
 
-        # 3. Allow exit when all todos are completed or there are no todos.
+        # 无待办或全部完成时允许正常结束。
         todos: list[Todo] = state.get("todos") or []  # type: ignore[assignment]
         if not todos or all(t.get("status") == "completed" for t in todos):
             return None
 
-        # 4. Enforce a reminder cap to prevent infinite re-engagement loops.
+        # 达到提醒次数上限后允许退出，避免模型无法推进时反复重试。
         if self._completion_reminder_count_for_runtime(runtime) >= self._MAX_COMPLETION_REMINDERS:
             return None
 
-        # 5. Queue a reminder for the next model request and jump back. We must
-        # not persist this control prompt as a normal HumanMessage, otherwise it
-        # can leak into user-visible message streams and saved transcripts.
+        # 通过请求包装器暂存提示，避免控制消息进入持久化对话或用户界面。
         self._queue_completion_reminder(runtime, _format_completion_reminder(todos))
         return {"jump_to": "model"}
 
@@ -345,18 +284,16 @@ class TodoMiddleware(TodoListMiddleware):
         state: ThreadState,
         runtime: Runtime,
     ) -> dict[str, Any] | None:
-        """执行 aafter_model 的明确职责，并返回与调用约定一致的结果。
-
-        Async version of after_model."""
+        """异步模型返回后复用同步钩子的待办检查与有限续跑逻辑。"""
         return self.after_model(state, runtime)
 
     @staticmethod
     def _format_pending_completion_reminders(reminders: list[str]) -> str:
-        "执行 _format_pending_completion_reminders 的明确职责，并返回与调用约定一致的结果"
+        """去重并合并本轮暂存的待办续跑提醒。"""
         return "\n\n".join(dict.fromkeys(reminders))
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
-        "执行 _augment_request 的明确职责，并返回与调用约定一致的结果"
+        """把待办续跑提示作为隐藏 HumanMessage 追加到下一次模型请求。"""
         reminders = self._drain_completion_reminders(request.runtime)
         if not reminders:
             return request
@@ -376,7 +313,7 @@ class TodoMiddleware(TodoListMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """同步模型调用前注入隐藏续跑提示，再委派给后续处理器。"""
         return handler(self._augment_request(request))
 
     @override
@@ -385,17 +322,17 @@ class TodoMiddleware(TodoListMiddleware):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """异步模型调用前注入隐藏续跑提示，再等待后续处理器。"""
         return await handler(self._augment_request(request))
 
     @override
     def after_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 after_agent 的明确职责，并返回与调用约定一致的结果"
+        """运行结束时清除本轮续跑提醒和次数状态。"""
         self._clear_current_run_completion_reminders(runtime)
         return None
 
     @override
     async def aafter_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 aafter_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步运行结束时清理本轮续跑提醒和计数。"""
         self._clear_current_run_completion_reminders(runtime)
         return None

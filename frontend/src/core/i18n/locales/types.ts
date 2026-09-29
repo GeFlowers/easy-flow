@@ -24,7 +24,6 @@ export interface Translations {
     artifacts: string;
     public: string;
     custom: string;
-    notAvailableInDemoMode: string;
     loading: string;
     version: string;
     lastUpdated: string;
@@ -179,7 +178,6 @@ export interface Translations {
     recentChats: string;
     newChat: string;
     chats: string;
-    demoChats: string;
     agents: string;
     scheduledTasks: string;
     agentsDisabledTooltip: string;
@@ -713,7 +711,6 @@ export interface Translations {
     continueWith: (provider: string) => string;
     noAccountSignUp: string;
     haveAccountSignIn: string;
-    backToHome: string;
     networkError: string;
     authFailed: string;
     errors: {

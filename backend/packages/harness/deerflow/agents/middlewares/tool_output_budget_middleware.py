@@ -1,12 +1,4 @@
-"""定义 tool_output_budget_middleware 模块提供的职责与可复用接口。
-
-Middleware that enforces a per-result budget on tool outputs.
-
-Oversized tool results are persisted to disk and replaced with a compact
-preview containing a file reference.  When disk persistence is
-unavailable the middleware falls back to head+tail truncation so the
-model context is never blown by a single large tool return.
-"""
+"""限制工具结果占用的模型上下文；超长内容优先保存到输出目录并以摘要替代。"""
 
 from __future__ import annotations
 
@@ -34,10 +26,7 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Virtual outputs root inside the sandbox. Host-mounted sandboxes map this to
-# the thread outputs dir on the host; for non-mounted (remote) sandboxes the
-# same path is written directly into the sandbox filesystem so the model's
-# ``read_file`` tool can read it back (issue #3416).
+# 沙箱内的虚拟输出根目录。挂载型沙箱映射到宿主机线程目录，远程沙箱则直接写入自身文件系统。
 _VIRTUAL_OUTPUTS_BASE = "/mnt/user-data/outputs"
 
 
@@ -47,18 +36,12 @@ def _default_config() -> ToolOutputConfig:
 
 
 # ---------------------------------------------------------------------------
-# Text helpers
+# 文本处理辅助函数。
 # ---------------------------------------------------------------------------
 
 
 def _message_text(content: Any) -> str | None:
-    """执行 _message_text 的明确职责，并返回与调用约定一致的结果。
-
-    Extract a plain-text representation from a ToolMessage content field.
-
-        Returns ``None`` for non-string / multimodal content so the caller
-        can skip budget enforcement (images, structured blocks, etc.).
-    """
+    """将工具消息内容提取为纯文本；多模态或结构化内容返回 None 并跳过限额处理。"""
     if isinstance(content, str):
         return content
     if content is None:
@@ -77,17 +60,7 @@ def _message_text(content: Any) -> str | None:
 
 
 def _snap_to_line_boundary(text: str, pos: int) -> int:
-    """执行 _snap_to_line_boundary 的明确职责，并返回与调用约定一致的结果。
-
-    Return *pos* or the nearest preceding newline+1, whichever is closer.
-
-        Used so that previews and truncations end on a complete line when
-        possible.  If no newline exists in the second half of ``text[:pos]``
-        the original *pos* is returned unchanged.
-
-        Only valid for an *end* offset: moving backwards shortens the slice that
-        ends here.  Use :func:`_snap_start_to_line_boundary` for a start offset.
-    """
+    """将截断结束位置尽量移到附近前一个换行之后，避免切断完整行。"""
     if pos <= 0 or pos >= len(text):
         return pos
     half = pos // 2
@@ -98,15 +71,7 @@ def _snap_to_line_boundary(text: str, pos: int) -> int:
 
 
 def _snap_start_to_line_boundary(text: str, pos: int) -> int:
-    """执行 _snap_start_to_line_boundary 的明确职责，并返回与调用约定一致的结果。
-
-    Return *pos* or the nearest following newline+1, whichever is closer.
-
-        The start-offset mirror of :func:`_snap_to_line_boundary`. Snapping a start
-        backwards would *lengthen* the slice beginning there, so the tail of a
-        budgeted preview must snap forward instead. If no newline exists in the
-        first half of ``text[pos:]`` the original *pos* is returned unchanged.
-    """
+    """将尾部预览起点尽量移到附近后一个换行之后，避免向前移动扩大内容。"""
     if pos <= 0 or pos >= len(text):
         return pos
     half = pos + (len(text) - pos) // 2
@@ -117,7 +82,7 @@ def _snap_start_to_line_boundary(text: str, pos: int) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Disk persistence
+# 文件持久化。
 # ---------------------------------------------------------------------------
 
 _EXT_MAP: dict[str, str] = {
@@ -128,22 +93,14 @@ _EXT_MAP: dict[str, str] = {
 
 
 def _sanitize_tool_name(name: str) -> str:
-    """执行 _sanitize_tool_name 的明确职责，并返回与调用约定一致的结果。
-
-    Strip path separators and traversal components from a tool name."""
+    """清理工具名称中的路径穿越和分隔符，生成可用于文件名的部分。"""
     base = os.path.basename(name)
     safe = base.replace("..", "").replace("/", "_").replace("\\", "_")
     return safe or "unknown"
 
 
 def _build_externalized_filename(*, tool_name: str, tool_call_id: str) -> str:
-    """执行 _build_externalized_filename 的明确职责，并返回与调用约定一致的结果。
-
-    Build the on-disk filename for an externalized tool output.
-
-        Shared by the host-disk and sandbox externalization paths so both
-        produce the identical naming scheme.
-    """
+    """按工具名和随机短标识生成外置工具结果的文件名。"""
     safe_name = _sanitize_tool_name(tool_name)
     ext = _EXT_MAP.get(tool_name, "txt")
     short_id = uuid.uuid4().hex[:12]
@@ -158,9 +115,7 @@ def _externalize(
     outputs_path: str,
     storage_subdir: str,
 ) -> str | None:
-    """执行 _externalize 的明确职责，并返回与调用约定一致的结果。
-
-    Write *content* to disk and return the virtual path, or ``None`` on failure."""
+    """将结果写入宿主机输出子目录并返回沙箱虚拟路径，失败时返回 None。"""
     if os.path.isabs(storage_subdir) or ".." in storage_subdir:
         return None
     storage_dir = os.path.join(outputs_path, storage_subdir)
@@ -192,31 +147,17 @@ def _externalize_to_sandbox(
     storage_subdir: str,
     sandbox: Sandbox,
 ) -> str | None:
-    """执行 _externalize_to_sandbox 的明确职责，并返回与调用约定一致的结果。
-
-    Write *content* into the sandbox filesystem and return the virtual path.
-
-        Used when the sandbox does not use thread-data mounts (e.g. a remote AIO
-        sandbox): the host-side :func:`_externalize` virtual path would not exist
-        inside the sandbox, so the model's ``read_file`` tool could not read it
-        back (issue #3416). Returns the same virtual-path contract on success, or
-        ``None`` to signal the caller to fall back to inline truncation.
-    """
+    """将结果直接写入未挂载的远程沙箱，并验证文件可读取后返回虚拟路径。"""
     if os.path.isabs(storage_subdir) or ".." in storage_subdir:
         return None
     filename = _build_externalized_filename(tool_name=tool_name, tool_call_id=tool_call_id)
     virtual_dir = f"{_VIRTUAL_OUTPUTS_BASE}/{storage_subdir}"
     virtual_path = f"{virtual_dir}/{filename}"
     try:
-        # AIO sandbox write_file does NOT create parent directories, so create
-        # them explicitly before writing. execute_command returns its stdout
-        # verbatim (including an "Error: ..." string on failure) rather than
-        # raising, so we cannot rely on exception propagation here.
+        # AIO 的 write_file 不会创建父目录；execute_command 也可能以错误文本返回而不抛异常。
         sandbox.execute_command(f"mkdir -p {shlex.quote(virtual_dir)}")
         sandbox.write_file(virtual_path, content)
-        # Validate the file landed: execute_command may have silently failed
-        # to create the directory, and write_file backends differ. Refuse to
-        # hand the model an unreadable read_file path.
+        # 验证文件确实写入，避免把模型无法读取的路径放回上下文。
         check = sandbox.execute_command(f"test -s {shlex.quote(virtual_path)} && echo OK || echo MISSING")
         if not isinstance(check, str) or check.strip() != "OK":
             logger.warning(
@@ -236,7 +177,7 @@ def _externalize_to_sandbox(
 
 
 # ---------------------------------------------------------------------------
-# Preview / fallback builders
+# 预览和截断文本构造。
 # ---------------------------------------------------------------------------
 
 
@@ -248,9 +189,7 @@ def _build_preview(
     head_chars: int,
     tail_chars: int,
 ) -> str:
-    """执行 _build_preview 的明确职责，并返回与调用约定一致的结果。
-
-    Build a preview with a file reference for externalized output."""
+    """保留结果首尾片段，并插入完整输出文件路径和读取提示。"""
     total = len(content)
     head_end = _snap_to_line_boundary(content, min(head_chars, total))
     tail_start = max(head_end, total - tail_chars)
@@ -278,12 +217,7 @@ def _build_fallback(
     head_chars: int,
     tail_chars: int,
 ) -> str:
-    """执行 _build_fallback 的明确职责，并返回与调用约定一致的结果。
-
-    Build a head+tail truncation when disk persistence is unavailable.
-
-        The returned string is guaranteed to be no longer than *max_chars*.
-    """
+    """无法外置保存时生成首尾截断文本，并保证结果不超过字符上限。"""
     total = len(content)
     if max_chars <= 0 or total <= max_chars:
         return content
@@ -314,14 +248,12 @@ def _build_fallback(
 
 
 # ---------------------------------------------------------------------------
-# Core budget logic
+# 输出预算核心逻辑。
 # ---------------------------------------------------------------------------
 
 
 def _resolve_outputs_path(request: ToolCallRequest) -> str | None:
-    """执行 _resolve_outputs_path 的明确职责，并返回与调用约定一致的结果。
-
-    Best-effort extraction of the thread outputs path."""
+    """从工具运行时线程数据中读取宿主机输出目录。"""
     runtime = getattr(request, "runtime", None)
     if runtime is None:
         return None
@@ -336,17 +268,7 @@ def _resolve_outputs_path(request: ToolCallRequest) -> str | None:
 
 
 def _resolve_sandbox(request: ToolCallRequest) -> Sandbox | None:
-    """执行 _resolve_sandbox 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve the active sandbox for the current tool call, or ``None``.
-
-        Reads the sandbox_id that ``SandboxMiddleware`` (and the sandbox tools
-        themselves) write into ``runtime.state["sandbox"]``. We intentionally do
-        NOT call ``provider.acquire`` here: acquiring a sandbox can trigger
-        blocking remote I/O, and this resolver runs on every tool call. Tools
-        that do not use a sandbox (``web_search``, MCP, ...) will return ``None``
-        here, which is fine -- the caller falls back to inline truncation.
-    """
+    """根据运行状态中的 sandbox_id 查找已存在沙箱，不在工具调用时申请新沙箱。"""
     runtime = getattr(request, "runtime", None)
     state = getattr(runtime, "state", None)
     if not isinstance(state, dict):
@@ -373,9 +295,7 @@ def _budget_content(
     config: ToolOutputConfig,
     sandbox: Sandbox | None = None,
 ) -> str | None:
-    """执行 _budget_content 的明确职责，并返回与调用约定一致的结果。
-
-    Apply budget to *content*. Returns ``None`` if no change needed."""
+    """依配置外置或截断工具文本；内容未超限或无需改动时返回 None。"""
     threshold = config.tool_overrides.get(tool_name, config.externalize_min_chars)
     if threshold <= 0 and config.fallback_max_chars <= 0:
         return None
@@ -384,11 +304,8 @@ def _budget_content(
 
     if threshold > 0 and len(content) > threshold:
         virtual_path: str | None = None
-        # Decide persistence target based on what's available, without touching
-        # the sandbox provider unless a sandbox was actually resolved for this
-        # call. This keeps the legacy host-disk path provider-free, so callers
-        # without a configured sandbox (and CI environments without a
-        # config.yaml) continue to externalize to the host as before.
+        # 根据已解析出的资源决定保存位置；未使用沙箱时不访问 Provider，
+        # 使无沙箱调用仍能直接保存到宿主机输出目录。
         if sandbox is not None:
             provider = None
             try:
@@ -396,10 +313,7 @@ def _budget_content(
             except Exception:
                 logger.exception("Failed to get sandbox provider for tool-output externalization; falling back to inline truncation")
             if provider is not None and getattr(provider, "uses_thread_data_mounts", False):
-                # Host-mounted sandbox: host outputs path is bind-mounted into
-                # the sandbox at the same virtual path, so writing host-side is
-                # equivalent. Preserve the original behavior to avoid extra
-                # sandbox round-trips.
+                # 挂载型沙箱中的虚拟路径映射到宿主机目录，直接写宿主机可避免额外沙箱调用。
                 if outputs_path:
                     virtual_path = _externalize(
                         content,
@@ -417,8 +331,7 @@ def _budget_content(
                     sandbox=sandbox,
                 )
         elif outputs_path:
-            # No sandbox in this call (legacy / non-sandbox tools): write to
-            # host outputs path directly, no provider needed.
+            # 当前调用没有沙箱时直接写宿主机输出目录。
             virtual_path = _externalize(
                 content,
                 tool_name=tool_name,
@@ -460,7 +373,7 @@ def _budget_content(
 
 
 # ---------------------------------------------------------------------------
-# Result patchers
+# 工具结果替换函数。
 # ---------------------------------------------------------------------------
 
 
@@ -470,9 +383,7 @@ def _patch_tool_message(
     outputs_path: str | None,
     sandbox: Sandbox | None = None,
 ) -> ToolMessage:
-    """执行 _patch_tool_message 的明确职责，并返回与调用约定一致的结果。
-
-    Apply budget to a single ToolMessage. Returns the original if unchanged."""
+    """对单条工具消息应用输出预算；无需修改时保留原消息对象。"""
     tool_name = msg.name or "unknown"
     if tool_name in config.exempt_tools:
         return msg
@@ -501,14 +412,7 @@ def _patch_tool_message(
 
 
 def _effective_trigger(tool_name: str, config: ToolOutputConfig) -> int:
-    """执行 _effective_trigger 的明确职责，并返回与调用约定一致的结果。
-
-    Smallest content length that could trigger budgeting for *tool_name*.
-
-        Mirrors the trigger conditions in :func:`_budget_content` (per-tool
-        externalize threshold OR global fallback), so the pre-scan never produces
-        a false negative. Returns ``-1`` when nothing could ever trigger.
-    """
+    """计算该工具触发外置或截断的最小长度；两项策略均关闭时返回 -1。"""
     candidates: list[int] = []
     externalize = config.tool_overrides.get(tool_name, config.externalize_min_chars)
     if externalize > 0:
@@ -519,9 +423,7 @@ def _effective_trigger(tool_name: str, config: ToolOutputConfig) -> int:
 
 
 def _tool_message_over_budget(msg: ToolMessage, config: ToolOutputConfig) -> bool:
-    """执行 _tool_message_over_budget 的明确职责，并返回与调用约定一致的结果。
-
-    Cheap, per-tool-aware check: is this ToolMessage non-exempt and over its trigger?"""
+    """快速判断工具消息是否未豁免且超过该工具的有效处理阈值。"""
     if (msg.name or "") in config.exempt_tools:
         return False
     trigger = _effective_trigger(msg.name or "", config)
@@ -532,9 +434,7 @@ def _tool_message_over_budget(msg: ToolMessage, config: ToolOutputConfig) -> boo
 
 
 def _needs_budget(result: ToolMessage | Command, config: ToolOutputConfig) -> bool:
-    """执行 _needs_budget 的明确职责，并返回与调用约定一致的结果。
-
-    Fast check whether *result* could need budgeting (avoids thread offload for small outputs)."""
+    """扫描工具返回值中的消息，判断是否需要进行输出预算处理。"""
     if isinstance(result, ToolMessage):
         return _tool_message_over_budget(result, config)
     update = getattr(result, "update", None)
@@ -551,9 +451,7 @@ def _patch_result(
     outputs_path: str | None,
     sandbox: Sandbox | None = None,
 ) -> ToolMessage | Command:
-    """执行 _patch_result 的明确职责，并返回与调用约定一致的结果。
-
-    Apply budget to a tool call result (ToolMessage or Command)."""
+    """处理单条工具消息或命令更新中的工具消息，并保留其余返回数据。"""
     if isinstance(result, ToolMessage):
         return _patch_tool_message(result, config, outputs_path, sandbox)
 
@@ -583,20 +481,7 @@ def _patch_result(
 
 
 def _patch_model_messages(messages: list[Any], config: ToolOutputConfig) -> list[Any] | None:
-    """执行 _patch_model_messages 的明确职责，并返回与调用约定一致的结果。
-
-    Apply budget to historical ToolMessages in a model request. Returns ``None`` if unchanged.
-
-        A cheap pre-scan bails out before allocating a new list when no historical
-        ToolMessage exceeds the budget — the common case once every result has
-        already been budgeted at tool-call time, so a long history is not rebuilt
-        on every model call.
-
-        Historical messages do not get a ``sandbox`` argument: any oversized tool
-        message in history was already budgeted (and possibly externalized) at
-        tool-call time, so the only thing left for the history path to do is
-        inline fallback truncation, which needs no sandbox.
-    """
+    """截断消息历史中仍超预算的工具结果；全部符合预算时返回 None。"""
     if not any(isinstance(msg, ToolMessage) and _tool_message_over_budget(msg, config) for msg in messages):
         return None
 
@@ -619,9 +504,7 @@ def _patch_model_messages(messages: list[Any], config: ToolOutputConfig) -> list
 
 
 class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
-    """封装 ToolOutputBudgetMiddleware 的状态、协作关系与公开操作。
-
-    Enforce per-result budget on tool outputs via externalization or truncation."""
+    """在工具调用结果写入上下文前外置超长内容或按首尾保留策略截断。"""
 
     def __init__(self, config: ToolOutputConfig | None = None) -> None:
         """使用给定或默认配置初始化工具输出预算中间件。"""
@@ -636,7 +519,7 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
             return cls(config=tool_output)
         return cls()
 
-    # -- tool call hooks ---------------------------------------------------
+    # 工具调用钩子。
 
     @override
     def wrap_tool_call(
@@ -667,14 +550,12 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         if not _needs_budget(result, self._config):
             return result
         outputs_path = _resolve_outputs_path(request)
-        # _resolve_sandbox only touches runtime.state and the provider's
-        # in-memory sandbox registry, so it is safe to call on the event
-        # loop. The actual sandbox I/O (mkdir/write/test) happens inside
-        # _patch_result, which is offloaded to a worker thread below.
+        # _resolve_sandbox 只读取运行状态和内存注册表，可以在事件循环中调用；
+        # 实际沙箱文件操作由下方工作线程执行。
         sandbox = _resolve_sandbox(request)
         return await asyncio.to_thread(_patch_result, result, self._config, outputs_path, sandbox)
 
-    # -- model call hooks (historical message truncation) ------------------
+    # 模型调用钩子：处理历史消息中的超长工具结果。
 
     @override
     def wrap_model_call(

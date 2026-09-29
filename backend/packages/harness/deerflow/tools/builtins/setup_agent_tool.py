@@ -22,7 +22,7 @@ def setup_agent(
     runtime: Runtime,
     skills: list[str] | None = None,
 ) -> Command:
-    """Setup the custom DeerFlow agent.
+    """创建或修改自定义 agent 的配置，并返回所需设置。
 
     Args:
         soul: Full SOUL.md content defining the agent's personality and behavior.

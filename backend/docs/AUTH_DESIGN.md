@@ -421,7 +421,7 @@ Gateway 内嵌 runtime 路径由 `AuthMiddleware` 和 `CSRFMiddleware` 保护。
 |---|---|
 | `app/gateway/auth_middleware.py` | 全局认证门、JWT 严格验证、写入 user context |
 | `app/gateway/csrf_middleware.py` | CSRF double-submit 和 auth Origin 校验 |
-| `app/gateway/routers/auth.py` | initialize/login/register/logout/me/change-password + SSO OIDC 端点（providers/oauth/callback） |
+| `app/gateway/routers/operations/auth.py` | initialize/login/register/logout/me/change-password + SSO OIDC 端点（providers/oauth/callback） |
 | `app/gateway/auth/jwt.py` | JWT 创建与解析 |
 | `app/gateway/auth/oidc.py` | OIDC 核心服务：discovery、token exchange、ID token 验证、userinfo |
 | `app/gateway/auth/oidc_state.py` | OIDC state 管理：signed cookie 存储 state/nonce/code_verifier |
@@ -439,6 +439,6 @@ Gateway 内嵌 runtime 路径由 `AuthMiddleware` 和 `CSRFMiddleware` 保护。
 | `deerflow/config/agents_config.py` | per-user custom agents |
 | `app/channels/manager.py` | IM channel 内部认证调用与 owner header |
 | `app/gateway/internal_auth.py` | Internal Auth header 常量、token 校验、合成用户 |
-| `.deer-flow/data/deerflow.db` | 统一 SQLite 数据库，包含 users / threads_meta / runs / feedback 等表 |
+| PostgreSQL | 统一持久化用户、线程元数据、运行记录与反馈 |
 | `.deer-flow/users/{user_id}/agents/{agent_name}/` | 用户自定义 agent 配置、SOUL 和 agent memory |
 | `.deer-flow/admin_initial_credentials.txt` | `reset_admin` 生成的新凭据文件（0600，读完应删除） |

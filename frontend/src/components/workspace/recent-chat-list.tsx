@@ -61,7 +61,6 @@ import {
   pathOfThread,
   titleOfThread,
 } from "@/core/threads/utils";
-import { env } from "@/env";
 import { isIMEComposing } from "@/lib/ime";
 
 import { ThreadChannelIcon } from "./thread-channel-source";
@@ -225,11 +224,7 @@ export function RecentChatList() {
   return (
     <>
       <SidebarGroup>
-        <SidebarGroupLabel>
-          {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true"
-            ? t.sidebar.recentChats
-            : t.sidebar.demoChats}
-        </SidebarGroupLabel>
+        <SidebarGroupLabel>{t.sidebar.recentChats}</SidebarGroupLabel>
         <SidebarGroupContent className="group-data-[collapsible=icon]:pointer-events-none group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0">
           <SidebarMenu>
             <div className="flex w-full flex-col gap-1">
@@ -262,71 +257,63 @@ export function RecentChatList() {
                         )}
                       </Link>
                     </SidebarMenuButton>
-                    {env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true" && (
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <SidebarMenuAction
-                            showOnHover
-                            className="bg-background/50 hover:bg-background after:left-0!"
-                          >
-                            <MoreHorizontal />
-                            <span className="sr-only">{t.common.more}</span>
-                          </SidebarMenuAction>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent
-                          className="w-48 rounded-lg"
-                          side={"right"}
-                          align={"start"}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <SidebarMenuAction
+                          showOnHover
+                          className="bg-background/50 hover:bg-background after:left-0!"
                         >
-                          <DropdownMenuItem
-                            onSelect={() =>
-                              handleRenameClick(
-                                thread.thread_id,
-                                titleOfThread(thread),
-                              )
-                            }
-                          >
-                            <Pencil className="text-muted-foreground" />
-                            <span>{t.common.rename}</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onSelect={() => handleShare(thread)}
-                          >
-                            <Share2 className="text-muted-foreground" />
-                            <span>{t.common.share}</span>
-                          </DropdownMenuItem>
-                          <DropdownMenuSub>
-                            <DropdownMenuSubTrigger>
-                              <Download className="text-muted-foreground" />
-                              <span>{t.common.export}</span>
-                            </DropdownMenuSubTrigger>
-                            <DropdownMenuSubContent>
-                              <DropdownMenuItem
-                                onSelect={() =>
-                                  handleExport(thread, "markdown")
-                                }
-                              >
-                                <FileText className="text-muted-foreground" />
-                                <span>{t.common.exportAsMarkdown}</span>
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                onSelect={() => handleExport(thread, "json")}
-                              >
-                                <FileJson className="text-muted-foreground" />
-                                <span>{t.common.exportAsJSON}</span>
-                              </DropdownMenuItem>
-                            </DropdownMenuSubContent>
-                          </DropdownMenuSub>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onSelect={() => handleDelete(thread)}
-                          >
-                            <Trash2 className="text-muted-foreground" />
-                            <span>{t.common.delete}</span>
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    )}
+                          <MoreHorizontal />
+                          <span className="sr-only">{t.common.more}</span>
+                        </SidebarMenuAction>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        className="w-48 rounded-lg"
+                        side={"right"}
+                        align={"start"}
+                      >
+                        <DropdownMenuItem
+                          onSelect={() =>
+                            handleRenameClick(
+                              thread.thread_id,
+                              titleOfThread(thread),
+                            )
+                          }
+                        >
+                          <Pencil className="text-muted-foreground" />
+                          <span>{t.common.rename}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleShare(thread)}>
+                          <Share2 className="text-muted-foreground" />
+                          <span>{t.common.share}</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger>
+                            <Download className="text-muted-foreground" />
+                            <span>{t.common.export}</span>
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent>
+                            <DropdownMenuItem
+                              onSelect={() => handleExport(thread, "markdown")}
+                            >
+                              <FileText className="text-muted-foreground" />
+                              <span>{t.common.exportAsMarkdown}</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem
+                              onSelect={() => handleExport(thread, "json")}
+                            >
+                              <FileJson className="text-muted-foreground" />
+                              <span>{t.common.exportAsJSON}</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => handleDelete(thread)}>
+                          <Trash2 className="text-muted-foreground" />
+                          <span>{t.common.delete}</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </SidebarMenuItem>
                 );
               })}

@@ -52,7 +52,6 @@ import {
   getFileIcon,
   getFileName,
 } from "@/core/utils/files";
-import { env } from "@/env";
 import { cn } from "@/lib/utils";
 
 import { ArtifactLink } from "../citations/artifact-link";
@@ -79,7 +78,7 @@ export function ArtifactFileDetail({
   const { user } = useAuth();
   const isAdmin = user?.system_role === "admin";
   const { artifacts, setOpen, select } = useArtifacts();
-  const { thread, isMock } = useThread();
+  const { thread } = useThread();
   const isWriteFile = useMemo(() => {
     return filepathFromProps.startsWith("write-file:");
   }, [filepathFromProps]);
@@ -265,10 +264,7 @@ export function ArtifactFileDetail({
                   icon={isInstalling ? LoaderIcon : PackageIcon}
                   label={t.common.install}
                   tooltip={t.common.install}
-                  disabled={
-                    isInstalling ||
-                    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true"
-                  }
+                  disabled={isInstalling}
                   onClick={handleInstallSkill}
                 />
               </Tooltip>
@@ -280,7 +276,7 @@ export function ArtifactFileDetail({
                 tooltip={t.common.openInNewWindow}
                 onClick={() => {
                   const w = window.open(
-                    urlOfArtifact({ filepath, threadId, isMock }),
+                    urlOfArtifact({ filepath, threadId }),
                     "_blank",
                     "noopener,noreferrer",
                   );
@@ -322,7 +318,6 @@ export function ArtifactFileDetail({
                       filepath,
                       threadId,
                       download: true,
-                      isMock,
                     }),
                     "_blank",
                     "noopener,noreferrer",
@@ -361,15 +356,11 @@ export function ArtifactFileDetail({
         {!isCodeFile && canPreviewInBrowser && (
           <iframe
             className="size-full"
-            src={urlOfArtifact({ filepath, threadId, isMock })}
+            src={urlOfArtifact({ filepath, threadId })}
           />
         )}
         {!isCodeFile && !canPreviewInBrowser && (
-          <ArtifactDownloadFallback
-            filepath={filepath}
-            threadId={threadId}
-            isMock={isMock}
-          />
+          <ArtifactDownloadFallback filepath={filepath} threadId={threadId} />
         )}
       </ArtifactContent>
     </Artifact>
@@ -379,11 +370,9 @@ export function ArtifactFileDetail({
 function ArtifactDownloadFallback({
   filepath,
   threadId,
-  isMock,
 }: {
   filepath: string;
   threadId: string;
-  isMock?: boolean;
 }) {
   const filename = getFileName(filepath);
   const fileType = getFileExtensionDisplayName(filepath);
@@ -407,7 +396,6 @@ function ArtifactDownloadFallback({
               filepath,
               threadId,
               download: true,
-              isMock,
             })}
             target="_blank"
             rel="noopener noreferrer"

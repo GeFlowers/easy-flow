@@ -6,7 +6,6 @@ import type { AgentThreadState } from "@/core/threads";
 /** 定义消息子树读取当前线程数据所需的最小上下文契约。 */
 export interface ThreadContextType {
   thread: BaseStream<AgentThreadState>;
-  isMock?: boolean;
 }
 
 /** 线程消息上下文；默认 undefined 使缺失 Provider 的装配错误可被显式识别。 */

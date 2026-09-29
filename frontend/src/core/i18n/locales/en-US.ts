@@ -35,7 +35,6 @@ export const enUS: Translations = {
     artifacts: "Artifacts",
     public: "Public",
     custom: "Custom",
-    notAvailableInDemoMode: "Not available in demo mode",
     loading: "Loading...",
     version: "Version",
     lastUpdated: "Last updated",
@@ -248,7 +247,6 @@ export const enUS: Translations = {
     chats: "Chats",
     channels: "Channels",
     recentChats: "Recent chats",
-    demoChats: "Demo chats",
     agents: "Agents",
     scheduledTasks: "Scheduled tasks",
     agentsDisabledTooltip: "Feature not enabled",
@@ -841,7 +839,6 @@ export const enUS: Translations = {
     continueWith: (provider: string) => `Continue with ${provider}`,
     noAccountSignUp: "Don't have an account? Sign up",
     haveAccountSignIn: "Already have an account? Sign in",
-    backToHome: "← Back to home",
     networkError: "Network error. Please try again.",
     authFailed: "Authentication failed.",
     errors: {

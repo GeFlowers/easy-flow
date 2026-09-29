@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+"""PostgreSQL engine, schema bootstrap, and async session lifecycle."""
 
 from __future__ import annotations
 
@@ -8,37 +8,46 @@ import logging
 
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 
-
-def _json_serializer(obj: object) -> str:
-    """处理持久化层使用的结构化数据校验、绑定或比较。"""
-    return json.dumps(obj, ensure_ascii=False)
-
-
 logger = logging.getLogger(__name__)
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
+def _json_serializer(value: object) -> str:
+    """序列化 JSON 字段并保留其中的 Unicode 字符。"""
+    return json.dumps(value, ensure_ascii=False)
+
+
 async def _auto_create_postgres_db(url: str) -> None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """目标数据库不存在时，连接维护库并创建目标数据库。"""
     from sqlalchemy import text
     from sqlalchemy.engine.url import make_url
 
-    parsed = make_url(url)
-    db_name = parsed.database
-    if not db_name:
+    parsed_url = make_url(url)
+    database_name = parsed_url.database
+    if not database_name:
         raise ValueError("Cannot auto-create database: no database name in URL")
 
-        # 中文说明：此处用于执行相关处理。
-    maint_url = parsed.set(database="postgres")
-    maint_engine = create_async_engine(maint_url, isolation_level="AUTOCOMMIT")
+    maintenance_url = parsed_url.set(database="postgres")
+    maintenance_engine = create_async_engine(maintenance_url, isolation_level="AUTOCOMMIT")
     try:
-        async with maint_engine.connect() as conn:
-            await conn.execute(text(f'CREATE DATABASE "{db_name}"'))
-        logger.info("Auto-created PostgreSQL database: %s", db_name)
+        async with maintenance_engine.connect() as connection:
+            await connection.execute(text(f'CREATE DATABASE "{database_name}"'))
+        logger.info("Auto-created PostgreSQL database: %s", database_name)
     finally:
-        await maint_engine.dispose()
+        await maintenance_engine.dispose()
+
+
+def _create_engine(url: str, *, echo: bool, pool_size: int) -> AsyncEngine:
+    """创建供 Gateway 各个仓储共用的异步连接池。"""
+    return create_async_engine(
+        url,
+        echo=echo,
+        pool_size=pool_size,
+        pool_pre_ping=True,
+        json_serializer=_json_serializer,
+    )
 
 
 async def init_engine(
@@ -47,128 +56,64 @@ async def init_engine(
     url: str = "",
     echo: bool = False,
     pool_size: int = 5,
-    sqlite_dir: str = "",
 ) -> None:
-    """执行当前持久化组件提供的操作。"""
+    """建立 PostgreSQL 连接池并将数据库架构升级到当前版本。"""
     global _engine, _session_factory
 
-    if backend == "postgres":
-        try:
-            import asyncpg  # noqa: F401
-        except ImportError:
-            raise ImportError(
-                "database.backend is set to 'postgres' but asyncpg is not installed.\n"
-                "Install it with:\n"
-                "    cd backend && uv sync --all-packages --extra postgres\n"
-                "On the next `make dev` the postgres extra is auto-detected from\n"
-                "config.yaml (database.backend: postgres) and reinstalled, so it\n"
-                "will not be wiped again. Set UV_EXTRAS=postgres in .env to opt in\n"
-                "explicitly. Or switch to backend: sqlite in config.yaml for\n"
-                "single-node deployment."
-            ) from None
+    if backend != "postgres":
+        raise ValueError(f"Unknown persistence backend: {backend!r}; only 'postgres' is supported")
+    if not url:
+        raise ValueError("database.postgres_url is required for the postgres backend")
 
-    if backend == "sqlite":
-        import os
+    try:
+        import asyncpg  # noqa: F401
+    except ImportError:
+        raise ImportError(
+            "PostgreSQL persistence requires asyncpg. Install it with: "
+            "cd backend && uv sync --all-packages --extra postgres"
+        ) from None
 
-        from sqlalchemy import event
-
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        await asyncio.to_thread(os.makedirs, sqlite_dir or ".", exist_ok=True)
-        _engine = create_async_engine(url, echo=echo, json_serializer=_json_serializer)
-
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
-        @event.listens_for(_engine.sync_engine, "connect")
-        def _enable_sqlite_wal(dbapi_conn, _record):  # noqa: ARG001 — SQLAlchemy contract
-            """执行持久化流程所需的内部辅助操作。"""
-            cursor = dbapi_conn.cursor()
-            try:
-                cursor.execute("PRAGMA journal_mode=WAL;")
-                cursor.execute("PRAGMA synchronous=NORMAL;")
-                cursor.execute("PRAGMA foreign_keys=ON;")
-                cursor.execute("PRAGMA busy_timeout=30000;")
-            finally:
-                cursor.close()
-    elif backend == "postgres":
-        _engine = create_async_engine(
-            url,
-            echo=echo,
-            pool_size=pool_size,
-            pool_pre_ping=True,
-            json_serializer=_json_serializer,
-        )
-    else:
-        raise ValueError(f"Unknown persistence backend: {backend!r}")
-
+    _engine = _create_engine(url, echo=echo, pool_size=pool_size)
     _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
 
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     from deerflow.persistence.bootstrap import bootstrap_schema
 
     try:
-        await bootstrap_schema(_engine, backend=backend)
+        await bootstrap_schema(_engine)
     except Exception as exc:
-        if backend == "postgres" and "does not exist" in str(exc):
-            # 中文说明：此处用于执行相关处理。
-            await _auto_create_postgres_db(url)
-            # 中文说明：此处用于执行相关处理。
-            await _engine.dispose()
-            _engine = create_async_engine(url, echo=echo, pool_size=pool_size, pool_pre_ping=True, json_serializer=_json_serializer)
-            _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
-            await bootstrap_schema(_engine, backend=backend)
-        else:
+        if "does not exist" not in str(exc):
             raise
+        await _auto_create_postgres_db(url)
+        await _engine.dispose()
+        _engine = _create_engine(url, echo=echo, pool_size=pool_size)
+        _session_factory = async_sessionmaker(_engine, expire_on_commit=False)
+        await bootstrap_schema(_engine)
 
-    logger.info("Persistence engine initialized: backend=%s", backend)
+    logger.info("Persistence engine initialized: backend=postgres")
 
 
 async def init_engine_from_config(config) -> None:
-    """执行当前持久化组件提供的操作。"""
+    """读取 DatabaseConfig 并初始化共享数据库引擎。"""
     await init_engine(
         backend=config.backend,
         url=config.app_sqlalchemy_url,
         echo=config.echo_sql,
         pool_size=config.pool_size,
-        sqlite_dir=config.sqlite_dir if config.backend == "sqlite" else "",
     )
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession] | None:
-    """按给定条件查询并返回对应的持久化记录。"""
+    """返回共享异步会话工厂；引擎尚未初始化时返回 ``None``。"""
     return _session_factory
 
 
 def get_engine() -> AsyncEngine | None:
-    """按给定条件查询并返回对应的持久化记录。"""
+    """返回当前 SQLAlchemy 引擎；引擎尚未初始化时返回 ``None``。"""
     return _engine
 
 
 async def close_engine() -> None:
-    """执行当前持久化组件提供的操作。"""
+    """释放连接池，并清空共享引擎和会话工厂引用。"""
     global _engine, _session_factory
     if _engine is not None:
         await _engine.dispose()

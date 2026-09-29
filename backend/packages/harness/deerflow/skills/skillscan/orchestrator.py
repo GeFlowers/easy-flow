@@ -110,9 +110,7 @@ _SENSITIVE_PATH_RE = re.compile(r"(~/.ssh|/etc/passwd|/etc/shadow|/var/run/docke
 _EXTERNAL_HTTP_RE = re.compile(r"http://([A-Za-z0-9.-]+)(?::\d+)?(?:/|\b)")
 _URL_RE = re.compile(r"https?://[^\s)'\"<>]+")
 _LOCAL_HTTP_HOSTS = {"localhost", "127.0.0.1", "0.0.0.0", "::1"}
-# `rm` with a recursive flag (any order/combination, optional --no-preserve-root)
-# targeting the filesystem root, a wildcard, or a complete system-root directory.
-# Subpaths like ``/tmp/scratch`` or ``/home/user/project`` stay unflagged.
+# 仅匹配递归删除根目录、通配目标或完整系统目录；普通临时目录不会触发。
 _DESTRUCTIVE_RM_RE = (
     r"\brm\s+(?:-\S+\s+|--no-preserve-root\s+)*-\S*[rR]\S*\s+"
     r"(?:-\S+\s+|--no-preserve-root\s+)*"
@@ -121,7 +119,7 @@ _DESTRUCTIVE_RM_RE = (
 
 
 def skill_scan_enabled(app_config: Any | None = None) -> bool:
-    "执行 skill_scan_enabled 的明确职责，并返回与调用约定一致的结果"
+    """读取 SkillScan 开关；未传配置时加载应用配置，加载失败则默认启用。"""
     if app_config is None:
         try:
             from deerflow.config import get_app_config
@@ -136,7 +134,7 @@ def skill_scan_enabled(app_config: Any | None = None) -> bool:
 
 
 def format_static_findings(findings: list[SecurityFinding]) -> str:
-    "格式化输入并返回规范化文本，并遵守 format_static_findings 所表达的接口约束"
+    """将扫描发现压缩成日志和异常消息可读的单行文本。"""
     parts = []
     for finding in findings:
         location = finding["file"] or "<archive>"
@@ -152,7 +150,7 @@ def enforce_static_scan(
     skill_name: str | None = None,
     app_config: Any | None = None,
 ) -> list[SecurityFinding]:
-    "执行 enforce_static_scan 的明确职责，并返回与调用约定一致的结果"
+    """按配置执行目录扫描；严重发现抛出阻断异常，其余发现以警告形式返回。"""
     if not skill_scan_enabled(app_config):
         return []
 
@@ -173,7 +171,7 @@ def enforce_static_scan(
 
 
 def scan_archive_preflight(archive_path: Path) -> ScanResult:
-    "执行 scan_archive_preflight 的明确职责，并返回与调用约定一致的结果"
+    """读取 ZIP 元数据和有限文件内容，在解包前检查路径、大小及可疑载荷。"""
     findings: list[SecurityFinding] = []
     scanner_errors: list[str] = []
     total_size = 0
@@ -181,8 +179,7 @@ def scan_archive_preflight(archive_path: Path) -> ScanResult:
         with zipfile.ZipFile(archive_path, "r") as zf:
             members = zf.infolist()
             if len(members) > _MAX_ARCHIVE_MEMBERS:
-                # Early-abort before the per-member reads below: a huge member
-                # count is a bounded DoS vector even when the total size is small.
+                # 成员数量本身也会造成扫描资源消耗，因此先限制数量再逐项读取。
                 finding = _finding("package-too-many-members", file=None, evidence=f"{len(members)} members")
                 return _scan_result([finding], scanner_errors)
             for info in members:
@@ -218,7 +215,7 @@ def scan_archive_preflight(archive_path: Path) -> ScanResult:
 
 
 def scan_skill_dir(skill_dir: Path) -> ScanResult:
-    "执行 scan_skill_dir 的明确职责，并返回与调用约定一致的结果"
+    """遍历技能目录，检查包结构属性并将可解码文本交给对应分析器。"""
     root = Path(skill_dir)
     if not root.is_dir():
         raise StaticScannerError(f"skill_dir is not a directory: {root}")
@@ -248,7 +245,7 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
 
 
 def _scan_archive_member_metadata(info: zipfile.ZipInfo, normalized: str) -> list[SecurityFinding]:
-    "执行 _scan_archive_member_metadata 的明确职责，并返回与调用约定一致的结果"
+    """检查 ZIP 成员的绝对路径、目录穿越、符号链接和嵌套技能说明文件。"""
     findings: list[SecurityFinding] = []
     if _archive_member_is_absolute(info.filename):
         findings.append(_finding("package-absolute-path", file=normalized, evidence=info.filename))
@@ -263,7 +260,7 @@ def _scan_archive_member_metadata(info: zipfile.ZipInfo, normalized: str) -> lis
 
 
 def _scan_file_package_properties(rel_path: str, file_bytes: bytes, file_size: int) -> list[SecurityFinding]:
-    "执行 _scan_file_package_properties 的明确职责，并返回与调用约定一致的结果"
+    """检查单个文件的包级风险：嵌套技能文件、体积、敏感隐藏文件和二进制。"""
     findings: list[SecurityFinding] = []
     path = PurePosixPath(rel_path)
     if path.name == "SKILL.md" and len(path.parts) > 1 and not is_eval_fixture_skill_md(path):
@@ -282,7 +279,7 @@ def _scan_file_package_properties(rel_path: str, file_bytes: bytes, file_size: i
 
 
 def _scan_text_file(rel_path: str, text: str) -> list[SecurityFinding]:
-    "执行 _scan_text_file 的明确职责，并返回与调用约定一致的结果"
+    """根据文件类型组合凭据、声明、Python、Shell、网络与资源耗尽规则。"""
     findings: list[SecurityFinding] = []
     findings.extend(_scan_secrets(rel_path, text))
     if PurePosixPath(rel_path).name == "SKILL.md":
@@ -296,7 +293,7 @@ def _scan_text_file(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_secrets(rel_path: str, text: str) -> list[SecurityFinding]:
-    "执行 _scan_secrets 的明确职责，并返回与调用约定一致的结果"
+    """识别私钥、常见服务令牌和非占位符形式的凭据赋值。"""
     findings: list[SecurityFinding] = []
     private_key = re.search(r"-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----", text)
     if private_key:
@@ -324,7 +321,7 @@ def _scan_secrets(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_declaration(rel_path: str, text: str) -> list[SecurityFinding]:
-    "执行 _scan_declaration 的明确职责，并返回与调用约定一致的结果"
+    """检查 SKILL.md 是否声明指令覆盖、敏感能力、敏感路径或外部端点。"""
     findings: list[SecurityFinding] = []
     prompt_re = re.compile(r"(?i)\b(ignore|disregard)\s+(all\s+)?(previous|prior)\s+instructions\b|\boverride\s+(the\s+)?(system|developer)\s+instructions\b")
     if match := prompt_re.search(text):
@@ -347,7 +344,7 @@ def _scan_declaration(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_python(rel_path: str, text: str) -> list[SecurityFinding]:
-    "执行 _scan_python 的明确职责，并返回与调用约定一致的结果"
+    """解析 Python 技能脚本，检测动态执行、Shell、外传、导入和反序列化风险。"""
     findings: list[SecurityFinding] = []
     try:
         tree = ast.parse(text)
@@ -418,10 +415,9 @@ def _scan_python(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_shell(rel_path: str, text: str) -> list[SecurityFinding]:
-    "执行 _scan_shell 的明确职责，并返回与调用约定一致的结果"
+    """检查 Shell 脚本中的反向 Shell、敏感信息外传、危险下载和破坏性命令。"""
     findings: list[SecurityFinding] = []
-    # Unmistakable reverse-shell signals hard-block; weaker idioms (bash -i,
-    # mkfifo) only warn->LLM because they appear in legitimate scripts.
+    # 明确的反向 Shell 特征会阻断；常见于正常运维脚本的弱特征只提示复核。
     if match := re.search(r"(/dev/tcp/|nc\s+-e\b)", text):
         findings.append(_finding_from_match("shell-reverse-shell", rel_path, text, match))
     if match := re.search(r"(bash\s+-i\b|mkfifo\s+)", text):
@@ -438,7 +434,7 @@ def _scan_shell(rel_path: str, text: str) -> list[SecurityFinding]:
 
 
 def _scan_network_and_resource(rel_path: str, text: str) -> list[SecurityFinding]:
-    "执行 _scan_network_and_resource 的明确职责，并返回与调用约定一致的结果"
+    """识别云元数据访问、fork bomb，以及非本地 HTTP 明文地址。"""
     findings: list[SecurityFinding] = []
     if match := re.search(r"(169\.254\.169\.254|metadata\.google\.internal)", text):
         findings.append(_finding_from_match("network-cloud-metadata", rel_path, text, match))
@@ -455,7 +451,7 @@ def _scan_network_and_resource(rel_path: str, text: str) -> list[SecurityFinding
 
 
 def _finding(rule_id: str, *, file: str | None, evidence: str | None, line: int | None = None, severity: FindingSeverity | None = None) -> SecurityFinding:
-    "执行 _finding 的明确职责，并返回与调用约定一致的结果"
+    """依据规则定义组装发现记录，并在保存凭据类证据前将其脱敏。"""
     spec = RULES[rule_id]
     if evidence is not None and rule_id.startswith("secret-"):
         evidence = _redact_secret_evidence(evidence)
@@ -471,23 +467,23 @@ def _finding(rule_id: str, *, file: str | None, evidence: str | None, line: int 
 
 
 def _finding_from_match(rule_id: str, rel_path: str, text: str, match: re.Match[str]) -> SecurityFinding:
-    "执行 _finding_from_match 的明确职责，并返回与调用约定一致的结果"
+    """将正则匹配转换为带有文件路径和准确行号的扫描发现。"""
     return _finding(rule_id, file=rel_path, line=_line_number(text, match.start()), evidence=match.group(0))
 
 
 def _finding_for_text(rule_id: str, rel_path: str, text: str, evidence: str) -> SecurityFinding:
-    "执行 _finding_for_text 的明确职责，并返回与调用约定一致的结果"
+    """按证据文本定位行号并创建扫描发现；找不到文本时定位到首行。"""
     index = text.find(evidence)
     return _finding(rule_id, file=rel_path, line=_line_number(text, index if index >= 0 else 0), evidence=evidence)
 
 
 def _finding_for_node(rule_id: str, rel_path: str, node: ast.AST | None, evidence: str) -> SecurityFinding:
-    "执行 _finding_for_node 的明确职责，并返回与调用约定一致的结果"
+    """用 AST 节点的源码行号创建发现；无节点时使用首行。"""
     return _finding(rule_id, file=rel_path, line=getattr(node, "lineno", 1), evidence=evidence)
 
 
 def _nested_archive_finding(rel_path: str, prefix: bytes, read_data, scanner_errors: list[str]) -> SecurityFinding:
-    "执行 _nested_archive_finding 的明确职责，并返回与调用约定一致的结果"
+    """报告嵌套压缩包；对 ZIP 额外检查有限成员，发现可执行文件时提升严重级别。"""
     name = PurePosixPath(rel_path).name
     if prefix.startswith(b"PK\x03\x04"):
         try:
@@ -501,7 +497,7 @@ def _nested_archive_finding(rel_path: str, prefix: bytes, read_data, scanner_err
 
 
 def _nested_zip_contains_executable(data: bytes) -> bool:
-    "执行 _nested_zip_contains_executable 的明确职责，并返回与调用约定一致的结果"
+    """只检查 ZIP 前若干个非目录成员的文件头，判断是否含可执行二进制。"""
     try:
         with zipfile.ZipFile(io.BytesIO(data)) as nested:
             for info in nested.infolist()[:_NESTED_ZIP_PEEK_MEMBER_LIMIT]:
@@ -519,7 +515,7 @@ def _nested_zip_contains_executable(data: bytes) -> bool:
 
 
 def _read_archive_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes | None:
-    "执行 _read_archive_member 的明确职责，并返回与调用约定一致的结果"
+    """读取大小未超限的 ZIP 成员，并将实际读取量限制在单文件上限以内。"""
     if info.file_size > MAX_FILE_BYTES:
         return None
     with zf.open(info) as member:
@@ -527,21 +523,19 @@ def _read_archive_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes | 
 
 
 def _redact_secret_evidence(value: str) -> str:
-    # Drop the value entirely: the rule_id already names the secret category, and
-    # any retained prefix (e.g. value[:6]) leaks real token bytes into findings
-    # that flow to Gateway responses and LLM context.
-    "执行 _redact_secret_evidence 的明确职责，并返回与调用约定一致的结果"
+    # 发现记录会进入 API 和模型上下文，因此不保留令牌的任何片段。
+    """完全隐藏凭据证据，避免令牌进入 API 响应、日志或模型上下文。"""
     return "[redacted]"
 
 
 def _scan_result(findings: list[SecurityFinding], scanner_errors: list[str]) -> ScanResult:
-    "执行 _scan_result 的明确职责，并返回与调用约定一致的结果"
+    """汇总发现与分析错误，并根据是否存在阻断级发现计算 blocked 状态。"""
     blocked = any(finding["severity"] == _BLOCK_SEVERITY for finding in findings)
     return {"findings": findings, "blocked": blocked, "scanner_errors": scanner_errors}
 
 
 def _dedupe(findings: Iterable[SecurityFinding]) -> list[SecurityFinding]:
-    "执行 _dedupe 的明确职责，并返回与调用约定一致的结果"
+    """按规则 ID、文件和行号去重，同时保留首次发现的顺序。"""
     seen: set[tuple[str, str | None, int | None]] = set()
     deduped: list[SecurityFinding] = []
     for finding in findings:
@@ -554,38 +548,38 @@ def _dedupe(findings: Iterable[SecurityFinding]) -> list[SecurityFinding]:
 
 
 def _line_number(text: str, index: int) -> int:
-    "执行 _line_number 的明确职责，并返回与调用约定一致的结果"
+    """将字符串偏移量转换为从 1 开始的行号。"""
     return text[: max(index, 0)].count("\n") + 1
 
 
 def _normalize_archive_name(name: str) -> str:
-    "执行 _normalize_archive_name 的明确职责，并返回与调用约定一致的结果"
+    """统一 ZIP 成员分隔符并折叠路径片段，便于后续安全检查。"""
     return posixpath.normpath(name.replace("\\", "/")).removeprefix("./")
 
 
 def _archive_member_is_absolute(name: str) -> bool:
-    "执行 _archive_member_is_absolute 的明确职责，并返回与调用约定一致的结果"
+    """同时按 POSIX 和 Windows 路径规则判断压缩包成员是否为绝对路径。"""
     normalized = name.replace("\\", "/")
     return normalized.startswith("/") or PurePosixPath(normalized).is_absolute() or PureWindowsPath(name).is_absolute()
 
 
 def _archive_member_traverses(name: str) -> bool:
-    "执行 _archive_member_traverses 的明确职责，并返回与调用约定一致的结果"
+    """判断归一化前的归档成员是否包含父目录片段。"""
     return ".." in PurePosixPath(name.replace("\\", "/")).parts
 
 
 def _is_symlink_member(info: zipfile.ZipInfo) -> bool:
-    "执行 _is_symlink_member 的明确职责，并返回与调用约定一致的结果"
+    """从 ZIP 外部属性读取 Unix 文件类型并判断成员是否为符号链接。"""
     return stat.S_ISLNK(info.external_attr >> 16)
 
 
 def _relative_file(path: Path, root: Path) -> str:
-    "执行 _relative_file 的明确职责，并返回与调用约定一致的结果"
+    """返回相对于技能根目录的 POSIX 风格路径。"""
     return path.resolve().relative_to(root.resolve()).as_posix()
 
 
 def _is_hidden_sensitive_path(rel_path: str) -> bool:
-    "执行 _is_hidden_sensitive_path 的明确职责，并返回与调用约定一致的结果"
+    """识别环境变量、凭据及包管理器配置等不应随技能分发的隐藏文件。"""
     parts = PurePosixPath(rel_path).parts
     if ".aws" in parts and parts[-1] == "credentials":
         return True
@@ -595,23 +589,23 @@ def _is_hidden_sensitive_path(rel_path: str) -> bool:
 
 
 def _is_nested_archive_name(rel_path: str) -> bool:
-    "执行 _is_nested_archive_name 的明确职责，并返回与调用约定一致的结果"
+    """根据扩展名判断文件是否属于已知压缩包或归档格式。"""
     lower = rel_path.lower()
     return any(lower.endswith(suffix) for suffix in _ARCHIVE_SUFFIXES)
 
 
 def _looks_like_archive(file_bytes: bytes) -> bool:
-    "执行 _looks_like_archive 的明确职责，并返回与调用约定一致的结果"
+    """根据 ZIP、gzip 和 7z 文件头判断内容是否像压缩包。"""
     return file_bytes.startswith(b"PK\x03\x04") or file_bytes.startswith(b"\x1f\x8b") or file_bytes.startswith(b"7z\xbc\xaf\x27\x1c")
 
 
 def _is_executable_binary(prefix: bytes) -> bool:
-    "执行 _is_executable_binary 的明确职责，并返回与调用约定一致的结果"
+    """根据 ELF、PE 和 Mach-O 文件头识别可执行二进制。"""
     return prefix.startswith(b"\x7fELF") or prefix.startswith(b"MZ") or prefix.startswith((b"\xfe\xed\xfa", b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe"))
 
 
 def _binary_magic_evidence(prefix: bytes) -> str:
-    "执行 _binary_magic_evidence 的明确职责，并返回与调用约定一致的结果"
+    """将已识别的可执行文件头转换为便于展示的格式名称。"""
     if prefix.startswith(b"\x7fELF"):
         return "ELF"
     if prefix.startswith(b"MZ"):
@@ -620,9 +614,8 @@ def _binary_magic_evidence(prefix: bytes) -> str:
 
 
 def _decode_text_for_analysis(file_bytes: bytes) -> str | None:
-    # Binaries are rejected by the NUL probe and the decode failure below, so
-    # every NUL-free, UTF-8-decodable file is analyzed regardless of extension.
-    "执行 _decode_text_for_analysis 的明确职责，并返回与调用约定一致的结果"
+    # 按内容而非扩展名识别文本，确保无后缀或伪装类型的文本同样会被扫描。
+    """跳过含 NUL 或无法按 UTF-8 解码的二进制内容，其余返回文本。"""
     if b"\x00" in file_bytes[:4096]:
         return None
     try:
@@ -632,18 +625,18 @@ def _decode_text_for_analysis(file_bytes: bytes) -> str | None:
 
 
 def _is_python_path(rel_path: str, text: str) -> bool:
-    "执行 _is_python_path 的明确职责，并返回与调用约定一致的结果"
+    """依据 .py 后缀或 Python shebang 判断是否使用 Python 分析器。"""
     return PurePosixPath(rel_path).suffix.lower() == ".py" or text.startswith("#!") and "python" in text.splitlines()[0].lower()
 
 
 def _is_shell_path(rel_path: str, text: str) -> bool:
-    "执行 _is_shell_path 的明确职责，并返回与调用约定一致的结果"
+    """依据 Shell 后缀或 shebang 判断是否使用 Shell 分析器。"""
     suffix = PurePosixPath(rel_path).suffix.lower()
     return suffix in {".sh", ".bash"} or text.startswith("#!") and any(shell in text.splitlines()[0].lower() for shell in ("sh", "bash", "zsh"))
 
 
 def _looks_like_placeholder(value: str) -> bool:
-    "执行 _looks_like_placeholder 的明确职责，并返回与调用约定一致的结果"
+    """判断凭据值是否是示例、占位符或运行时变量引用。"""
     normalized = value.strip().strip("\"'").lower()
     if normalized in _PLACEHOLDER_VALUES:
         return True
@@ -651,18 +644,18 @@ def _looks_like_placeholder(value: str) -> bool:
 
 
 def _http_host(url: str) -> str | None:
-    "执行 _http_host 的明确职责，并返回与调用约定一致的结果"
+    """从 HTTP(S) URL 提取主机名，无法解析时返回 ``None``。"""
     match = re.match(r"https?://\[?([^]/:]+)", url)
     return match.group(1) if match else None
 
 
 def _is_outbound_url(value: str) -> bool:
-    "执行 _is_outbound_url 的明确职责，并返回与调用约定一致的结果"
+    """判断字符串是否指向非本地 HTTP(S) 地址。"""
     return bool(value.startswith(("http://", "https://")) and (_http_host(value) or "") not in _LOCAL_HTTP_HOSTS)
 
 
 def _collect_python_aliases(tree: ast.AST) -> dict[str, str]:
-    "执行 _collect_python_aliases 的明确职责，并返回与调用约定一致的结果"
+    """收集 AST 中导入名称到完整模块路径的映射，供危险调用识别使用。"""
     aliases: dict[str, str] = {}
     for node in ast.walk(tree):
         if isinstance(node, ast.Import):
@@ -675,7 +668,7 @@ def _collect_python_aliases(tree: ast.AST) -> dict[str, str]:
 
 
 def _python_name(node: ast.AST, aliases: dict[str, str]) -> str:
-    "执行 _python_name 的明确职责，并返回与调用约定一致的结果"
+    """将 Name 或 Attribute 节点还原为带导入别名解析的限定名称。"""
     if isinstance(node, ast.Name):
         return aliases.get(node.id, node.id)
     if isinstance(node, ast.Attribute):
@@ -685,24 +678,24 @@ def _python_name(node: ast.AST, aliases: dict[str, str]) -> str:
 
 
 def _python_call_name(node: ast.Call, aliases: dict[str, str]) -> str:
-    "执行 _python_call_name 的明确职责，并返回与调用约定一致的结果"
+    """提取调用表达式的函数名，并解析其导入别名。"""
     return _python_name(node.func, aliases)
 
 
 def _compile_mode_is_exec(node: ast.Call) -> bool:
-    "执行 _compile_mode_is_exec 的明确职责，并返回与调用约定一致的结果"
+    """判断 compile 调用的 mode 参数是否指定为可执行代码的 ``exec``。"""
     if len(node.args) >= 3 and isinstance(node.args[2], ast.Constant):
         return node.args[2].value == "exec"
     return any(keyword.arg == "mode" and isinstance(keyword.value, ast.Constant) and keyword.value.value == "exec" for keyword in node.keywords)
 
 
 def _call_has_shell_true(node: ast.Call) -> bool:
-    "执行 _call_has_shell_true 的明确职责，并返回与调用约定一致的结果"
+    """检查调用是否显式设置 ``shell=True``。"""
     return any(keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True for keyword in node.keywords)
 
 
 def _call_is_network_sink(call_name: str) -> bool:
-    "执行 _call_is_network_sink 的明确职责，并返回与调用约定一致的结果"
+    """判断限定函数名是否属于扫描器认可的网络请求或套接字出口。"""
     return call_name in {
         "requests.get",
         "requests.post",
@@ -729,7 +722,7 @@ def _call_is_network_sink(call_name: str) -> bool:
 
 
 def _yaml_load_uses_safe_loader(node: ast.Call) -> bool:
-    "执行 _yaml_load_uses_safe_loader 的明确职责，并返回与调用约定一致的结果"
+    """检查 YAML 加载调用是否显式传入 SafeLoader，避免误报安全解析。"""
     for keyword in node.keywords:
         if keyword.arg in {"Loader", "loader"}:
             name = _python_name(keyword.value, {})

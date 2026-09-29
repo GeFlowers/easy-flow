@@ -1,16 +1,4 @@
-"""定义 tools 模块提供的职责与可复用接口。
-
-
-Web and image search tools powered by the Brave Search API.
-
-Brave Search provides web and image results from an independent search index
-via a REST API. An API key is required. Sign up at
-https://brave.com/search/api/ to get one.
-
-Unlike the DuckDuckGo ``backend: brave`` option (which scrapes results via the
-DDGS aggregator), this provider calls the official Brave Search API directly,
-giving structured results, authenticated quota, and a documented SLA.
-"""
+"""通过 Brave Search 官方 API 提供网页搜索和图片搜索工具。"""
 
 import json
 import logging
@@ -28,17 +16,17 @@ logger = logging.getLogger(__name__)
 _BRAVE_WEB_ENDPOINT = "https://api.search.brave.com/res/v1/web/search"
 _BRAVE_IMAGES_ENDPOINT = "https://api.search.brave.com/res/v1/images/search"
 _DEFAULT_MAX_RESULTS = 5
-# Brave Search API caps the `count` parameter at 20 results per request.
+# 网页搜索接口单次最多返回 20 条。
 _BRAVE_WEB_MAX_COUNT = 20
-# Brave Image Search supports larger batches than web search.
+# 图片搜索接口允许比网页搜索更大的批次。
 _BRAVE_IMAGE_MAX_COUNT = 200
-# NAT64 well-known prefix (RFC 6052): IPv6 literals embedding an IPv4 address.
+# 用于识别 NAT64 地址中嵌入的 IPv4 部分。
 _NAT64_PREFIX = ip_network("64:ff9b::/96")
 _api_key_warned: set[str] = set()
 
 
 def _get_api_key(tool_name: str = "web_search") -> str | None:
-    "执行 _get_api_key 的明确职责，并返回与调用约定一致的结果"
+    """优先从工具配置读取 API 密钥，再回退到 BRAVE_SEARCH_API_KEY 环境变量。"""
     config = get_app_config().get_tool_config(tool_name)
     if config is not None:
         api_key = (config.model_extra or {}).get("api_key")
@@ -56,7 +44,7 @@ def _coerce_max_results(
     default: int = _DEFAULT_MAX_RESULTS,
     max_allowed: int = _BRAVE_WEB_MAX_COUNT,
 ) -> int:
-    "执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果"
+    """将结果数转换为整数并限制在 API 支持范围内；无效值使用默认值。"""
     try:
         coerced = int(value)
     except (TypeError, ValueError):
@@ -71,7 +59,7 @@ def _coerce_max_results(
 
 
 def _clean_query(query: str, *, max_length: int = 400) -> str:
-    "执行 _clean_query 的明确职责，并返回与调用约定一致的结果"
+    """去除查询首尾空白，并截断超长搜索词。"""
     query = query.strip()
     if len(query) > max_length:
         query = query[:max_length]
@@ -79,7 +67,7 @@ def _clean_query(query: str, *, max_length: int = 400) -> str:
 
 
 def _missing_key_error(query: str, tool_name: str) -> str:
-    "执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果"
+    """按工具首次记录缺少密钥的警告，并返回 JSON 格式错误信息。"""
     if tool_name not in _api_key_warned:
         _api_key_warned.add(tool_name)
         logger.warning(
@@ -93,7 +81,7 @@ def _missing_key_error(query: str, tool_name: str) -> str:
 
 
 def _unexpected_format_error(query: str, *, service_name: str = "Brave Search") -> str:
-    "执行 _unexpected_format_error 的明确职责，并返回与调用约定一致的结果"
+    """生成第三方搜索服务响应结构不符合预期时的 JSON 错误。"""
     return json.dumps(
         {"error": f"{service_name} returned an unexpected response format", "query": query},
         ensure_ascii=False,
@@ -101,14 +89,7 @@ def _unexpected_format_error(query: str, *, service_name: str = "Brave Search") 
 
 
 def _decode_ipv4(host: str) -> IPv4Address | None:
-    """执行 _decode_ipv4 的明确职责，并返回与调用约定一致的结果。
-
-    Decode obfuscated IPv4 literals that ``ip_address`` rejects.
-
-        Mirrors the permissive ``inet_aton`` parsing many HTTP clients use, so that
-        integer (``2130706433``), hex (``0x7f000001``) and octal (``0177.0.0.1``)
-        encodings of an address are recognized.
-    """
+    """解析标准库不接受的整数、十六进制和八进制 IPv4 写法。"""
     parts = host.split(".")
     if not 1 <= len(parts) <= 4:
         return None
@@ -143,27 +124,19 @@ def _decode_ipv4(host: str) -> IPv4Address | None:
 
 
 def _is_url_present(value: object) -> bool:
-    "执行 _is_url_present 的明确职责，并返回与调用约定一致的结果"
+    """判断搜索结果字段是否包含非空 URL 字符串。"""
     return isinstance(value, str) and bool(value.strip())
 
 
 def _embedded_ipv4(ip: IPv6Address) -> IPv4Address | None:
-    """执行 _embedded_ipv4 的明确职责，并返回与调用约定一致的结果。
-
-    Extract an IPv4 address embedded in an IPv6 literal, if any.
-
-        Covers IPv4-mapped (``::ffff:a.b.c.d``), 6to4 (``2002::/16``), NAT64
-        (``64:ff9b::/96``), and IPv4-compatible (``::a.b.c.d``) forms. These all
-        smuggle a v4 destination through the IPv6 path, where ``is_global`` on the
-        v6 literal alone would otherwise report a loopback/private target as safe.
-    """
+    """提取 IPv4 映射、6to4、NAT64 或兼容格式 IPv6 地址中嵌入的 IPv4。"""
     if ip.ipv4_mapped is not None:
         return ip.ipv4_mapped
     if ip.sixtofour is not None:
         return ip.sixtofour
     if ip in _NAT64_PREFIX:
         return IPv4Address(int(ip) & 0xFFFFFFFF)
-    # IPv4-compatible ``::a.b.c.d`` (high 96 bits zero, excluding ::/:: 1).
+    # 兼容形式的 IPv4 嵌入 IPv6；排除未指定地址和回环地址。
     packed = int(ip)
     if packed >> 32 == 0 and packed > 1:
         return IPv4Address(packed & 0xFFFFFFFF)
@@ -171,16 +144,10 @@ def _embedded_ipv4(ip: IPv6Address) -> IPv4Address | None:
 
 
 def _safe_public_url(value: object) -> str:
-    """执行 _safe_public_url 的明确职责，并返回与调用约定一致的结果。
+    """仅返回 HTTP(S) 公网地址；拒绝本机、私有 IP 及嵌入非公网 IPv4 的 IPv6。
 
-    Return ``value`` only if it is a safe, public http(s) URL, else "".
-
-        This is a best-effort SSRF guard that rejects non-http(s) schemes,
-        ``localhost``, and private/non-global IP literals (including obfuscated
-        decimal/hex/octal encodings and IPv6 literals embedding a non-global IPv4).
-        It only inspects the URL string and cannot catch public hostnames that
-        resolve to internal IPs; any consumer that actually downloads these URLs
-        must re-validate the resolved IP at fetch time.
+    此检查仅解析 URL 字符串，无法判断公网域名最终解析到的地址；真正下载时
+    仍须再次校验解析后的 IP，避免 DNS 解析造成的 SSRF。
     """
     if not isinstance(value, str):
         return ""
@@ -219,7 +186,7 @@ def _brave_get(
     *,
     service_name: str,
 ) -> tuple[dict | None, str | None]:
-    "执行 _brave_get 的明确职责，并返回与调用约定一致的结果"
+    """发送带密钥的 Brave API 请求，返回对象数据或已格式化的错误响应。"""
     headers = {
         "X-Subscription-Token": api_key,
         "Accept": "application/json",
@@ -246,11 +213,11 @@ def _brave_get(
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int = 5) -> str:
-    """Search the web for information using Brave Search.
+    """通过 Brave Search 查询网络信息并返回相关结果。
 
     Args:
-        query: Search keywords describing what you want to find. Be specific for better results.
-        max_results: Maximum number of search results to return. Default is 5.
+        query: 描述检索目标的关键词，尽量具体以提高结果相关性。
+        max_results: 返回结果的最大数量，默认值为 5。
     """
     config = get_app_config().get_tool_config("web_search")
     if config is not None and "max_results" in (config.model_extra or {}):
@@ -292,13 +259,13 @@ def web_search_tool(query: str, max_results: int = 5) -> str:
 
 @tool("image_search", parse_docstring=True)
 def image_search_tool(query: str, max_results: int = 5) -> str:
-    """Search for images online using Brave Image Search. Use this tool BEFORE image generation to find reference images for characters, portraits, objects, scenes, or any content requiring visual accuracy.
+    """通过 Brave 图片搜索收集人物、物品或场景的视觉参考，供图像创作使用。
 
-    The returned image URLs can be used as reference images in image generation to significantly improve quality.
+    返回的图片网址可作为图像生成的参考素材。
 
     Args:
-        query: Search keywords describing the images you want to find. Be specific for better results.
-        max_results: Maximum number of images to return. Default is 5, capped at 200.
+        query: 描述所需图片内容的关键词，尽量具体以提高结果相关性。
+        max_results: 返回图片的最大数量，默认值为 5，最多为 200。
     """
     config = get_app_config().get_tool_config("image_search")
     extra = (config.model_extra or {}) if config is not None else {}
@@ -349,9 +316,7 @@ def image_search_tool(query: str, max_results: int = 5) -> str:
         safe_thumb = _safe_public_url(raw_thumb)
         safe_source = _safe_public_url(raw_source)
 
-        # Surface a URL and remember which dict it came from, so the reported
-        # width/height describe the URL we actually return rather than a
-        # dropped one.
+        # 只从最终保留的网址来源读取宽高，避免尺寸与返回图片地址不匹配。
         if safe_image:
             image_url, image_dims = safe_image, properties
         elif not _is_url_present(raw_image):

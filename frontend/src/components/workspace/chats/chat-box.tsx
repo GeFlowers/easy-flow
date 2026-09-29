@@ -11,7 +11,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { env } from "@/env";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 
@@ -41,14 +40,12 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
     open: artifactsOpen,
     setOpen: setArtifactsOpen,
     setArtifacts,
-    select: selectArtifact,
     deselect,
     selectedArtifact,
   } = useArtifacts();
   const sidecar = useMaybeSidecar();
   const sidecarOpen = sidecar?.open ?? false;
 
-  const [autoSelectFirstArtifact, setAutoSelectFirstArtifact] = useState(true);
   useEffect(() => {
     const threadArtifacts = Array.isArray(thread.values.artifacts)
       ? thread.values.artifacts
@@ -66,35 +63,9 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
     }
 
     // 切换线程时暂不自动取消选择产物：产物自动发现尚未可靠工作。
+  }, [threadId, deselect, setArtifacts, thread.values.artifacts]);
 
-    if (
-      env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true" &&
-      autoSelectFirstArtifact
-    ) {
-      if (threadArtifacts && threadArtifacts.length > 0) {
-        setAutoSelectFirstArtifact(false);
-        selectArtifact(threadArtifacts[0]!);
-      }
-    }
-  }, [
-    threadId,
-    autoSelectFirstArtifact,
-    deselect,
-    selectArtifact,
-    selectedArtifact,
-    setArtifacts,
-    thread.values.artifacts,
-  ]);
-
-  const artifactPanelOpen = useMemo(() => {
-    if (sidecarOpen) {
-      return false;
-    }
-    if (env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true") {
-      return artifactsOpen && artifacts?.length > 0;
-    }
-    return artifactsOpen;
-  }, [artifactsOpen, artifacts, sidecarOpen]);
+  const artifactPanelOpen = !sidecarOpen && artifactsOpen;
 
   const activeRightPanel: RightPanelKind | null = sidecarOpen
     ? "sidecar"

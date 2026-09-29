@@ -29,29 +29,21 @@ ACTIVE_SECRETS_CONTEXT_KEY = "__active_skill_secrets"
 
 
 def _string_pairs(raw: Any) -> dict[str, str]:
+    """筛出键和值均为字符串的密钥映射项，忽略不可信的其他类型。"""
     if not isinstance(raw, dict):
         return {}
     return {key: value for key, value in raw.items() if isinstance(key, str) and isinstance(value, str)}
 
 
 def extract_request_secrets(context: Any) -> dict[str, str]:
-    """
-
-    返回：the caller-supplied request-scoped secrets mapping, or ``{}``.
-
-        Only string-keyed, string-valued entries are kept; anything else is ignored
-        so a malformed carrier can never crash secret resolution or injection.
-    """
+    """从运行上下文读取调用方提供的请求级密钥，并过滤非字符串项。"""
     if not isinstance(context, dict):
         return {}
     return _string_pairs(context.get(SECRETS_CONTEXT_KEY))
 
 
 def read_active_secrets(context: Any) -> dict[str, str]:
-    """
-
-    返回：the secrets resolved for the active skill (the per-run injection
-        set), or ``{}``. Read by the bash tool to build the subprocess env."""
+    """读取当前激活技能可注入子进程的密钥集合。"""
     if not isinstance(context, dict):
         return {}
     return _string_pairs(context.get(ACTIVE_SECRETS_CONTEXT_KEY))
@@ -89,31 +81,14 @@ REDACTED_CONTEXT_KEYS = frozenset(
 
 
 def redact_secret_context_keys(context: Any) -> Any:
-    """
-
-    返回：a shallow copy of ``context`` with secret-bearing keys removed.
-
-        Defensive helper for any code path that serializes the run context into an
-        observable surface. DeerFlow's own trace-metadata builder never copies the
-        context, so this is belt-and-suspenders for future call sites and custom
-        tracer configurations.
-    """
+    """复制运行上下文并移除密钥及其绑定审计字段，避免序列化时泄漏。"""
     if not isinstance(context, dict):
         return context
     return {key: value for key, value in context.items() if key not in REDACTED_CONTEXT_KEYS}
 
 
 def redact_config_secrets(config: Any) -> Any:
-    """
-
-    返回：a copy of a run config safe to persist or echo back to clients.
-
-        The request config (``body.config``) is stored verbatim on the run record
-        (``runs.kwargs_json``) and echoed by the run API. Strip the secret-bearing
-        keys from its ``context`` so a request-scoped secret is never persisted or
-        returned, while the live config that drives the run (built separately) keeps
-        them. Non-dict / context-less configs pass through unchanged.
-    """
+    """生成可持久化或回传客户端的运行配置副本，并从 context 中剔除密钥。"""
     if not isinstance(config, dict):
         return config
     context = config.get("context")

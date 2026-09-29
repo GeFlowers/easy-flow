@@ -1,6 +1,4 @@
-"""定义 delegation_ledger 模块提供的职责与可复用接口。
-
-Deterministic capture and rendering for task delegations."""
+"""从消息历史提取子代理委派结果，并将其压缩成受预算限制的模型上下文。"""
 
 from __future__ import annotations
 
@@ -34,9 +32,7 @@ def _utc_now_iso() -> str:
 
 
 def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
-    """执行 _bound_text 的明确职责，并返回与调用约定一致的结果。
-
-    Deterministic head/tail truncation. This is not an LLM summary."""
+    """按固定比例保留文本首尾，确定性截断结果摘要而不调用模型。"""
     if len(text) <= cap:
         return text
     if cap <= 0:
@@ -59,11 +55,7 @@ def _escape_context_text(value: object) -> str:
 def _status_guidance(status: str, stop_reason: str | None = None) -> str:
     """根据委派状态和可选终止原因生成后续行动指引。"""
     if stop_reason:
-        # A guardrail cap ended this run early (#3875 Phase 2): the status is
-        # still completed/failed, and ``stop_reason`` carries *why* it stopped
-        # (token_capped / turn_capped / loop_capped). The old contract surfaced
-        # this as a separate ``max_turns_reached`` status; the additive
-        # ``stop_reason`` field replaced it so v1 consumers keep working.
+        # 守卫预算可能提前结束运行；状态仍描述运行结果，stop_reason 单独说明触发的预算上限。
         if status == "completed":
             return "hit a guardrail cap with a partial result; reuse the partial result, retry with a tighter scope, or raise the per-agent budget (max_turns / token_budget)"
         return "hit a guardrail cap with no usable result; retry with a tighter scope or raise the per-agent budget (max_turns / token_budget)"
@@ -106,9 +98,7 @@ def _tool_call_args(tool_call: dict[str, Any]) -> dict[str, Any]:
 
 
 def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
-    """执行 extract_delegations 的明确职责，并返回与调用约定一致的结果。
-
-    Enumerate `task` delegations from AI tool calls and paired results."""
+    """配对历史中的 task 工具调用及其结果消息，生成按调用顺序排列的委派记录。"""
     entries_by_id: dict[str, DelegationEntry] = {}
     order: list[str] = []
     now = _utc_now_iso()
@@ -179,9 +169,7 @@ def _render_entry_line(entry: DelegationEntry) -> str:
 
 
 def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int = _LEDGER_RENDER_CHAR_BUDGET) -> str:
-    """执行 render_delegation_ledger 的明确职责，并返回与调用约定一致的结果。
-
-    Render the delegation ledger as model-visible system context."""
+    """将委派记录按新到旧顺序渲染为模型上下文，并在字符预算不足时省略旧记录。"""
     if not entries:
         return ""
 

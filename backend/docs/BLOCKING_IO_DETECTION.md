@@ -1,48 +1,15 @@
-# Blocking IO detection usage and maintenance
+# Blocking I/O regression tests
 
-This document describes how to use and maintain DeerFlow backend blocking-IO
-detection for async event-loop safety.
+The backend keeps focused regression tests for known blocking-I/O risks on the
+async event loop. This repository no longer includes a static source scanner.
 
-The goal is narrow: find and prevent synchronous IO from blocking backend
-async event-loop paths. Static and runtime detection are complementary, but
-they have different jobs.
+The tests use Blockbuster to protect selected production paths from synchronous
+I/O blocking the asyncio event loop.
 
-## Static detector
+## Run the regression tests
 
-The static detector is the discovery tool. It scans backend source code and
-reports candidate blocking-IO call sites that may need human review.
-
-Run it from the repository root:
-
-```bash
-make detect-blocking-io
-```
-
-Or from `backend/`:
-
-```bash
-make detect-blocking-io
-```
-
-The report is written to:
-
-```text
-.deer-flow/blocking-io-findings.json
-```
-
-Use this output for review and triage. A static finding is a candidate, not
-proof that production blocks the event loop at runtime. The current static
-rules are intentionally broad; prefer triaging existing output before adding
-new static rules.
-
-Add a static rule only when review finds a recurring high-risk blocking
-pattern that is invisible to the current detector.
-
-## Runtime detector
-
-The runtime detector is the CI regression guard. It uses Blockbuster to fail a
-focused test when code under `app.*` or `deerflow.*` performs blocking IO on
-the asyncio event-loop thread.
+The CI regression gate uses Blockbuster to fail when covered code under `app.*`
+or `deerflow.*` performs blocking I/O on the asyncio event-loop thread.
 
 Run it from `backend/`:
 
@@ -55,23 +22,10 @@ paths from regressing. It does not prove that the entire backend is free of
 blocking IO; it only covers the production paths exercised by
 `backend/tests/blocking_io/`.
 
-## Maintenance workflow
+## Maintenance
 
-Use the static detector to find candidates, then use review to decide which
-async production paths are worth protecting in CI.
-
-The normal workflow is:
-
-1. Run the static detector to find backend blocking-IO candidates.
-2. Use human review to pick high-risk production async paths.
-3. Add or update a focused runtime anchor in `backend/tests/blocking_io/`.
-4. Let CI prevent that path from regressing.
-
-Contributors changing backend async code can run the `blocking-io-guard` skill
-(`.agent/skills/blocking-io-guard/`) to execute steps 1–3 for their own diff: it
-scans the change for blocking-IO candidates, drafts or extends a runtime anchor,
-and verifies the anchor fails when the blocking IO regresses.
-
+When a high-risk async production path is identified during development or
+review, add a focused runtime anchor so CI can prevent it from regressing.
 Runtime detection has two maintenance paths.
 
 ### Add a runtime rule
@@ -141,8 +95,7 @@ that production actually executes.
 
 The runtime anchors protect confirmed blocking-IO bug shapes:
 
-- SQLite checkpointer setup, including path resolution and parent-directory
-  creation.
+- PostgreSQL checkpointer setup through the async persistence lifecycle.
 - Subagent skill metadata loading through `SubagentExecutor._load_skills()`.
 - `JsonlRunEventStore` async API (`put` / `list_*` / `delete_*`): the JSONL
   run-event backend offloads its synchronous file IO via `asyncio.to_thread`
@@ -155,5 +108,5 @@ The runtime anchors protect confirmed blocking-IO bug shapes:
 - Gate health checks: Blockbuster catches unoffloaded calls, opt-out works, and
   patches are restored after exceptions.
 
-As static detection and review identify more high-risk async paths, add new
-runtime anchors incrementally.
+As review identifies more high-risk async paths, add runtime anchors
+incrementally.

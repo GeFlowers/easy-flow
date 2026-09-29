@@ -341,8 +341,7 @@ class ScheduledTaskService:
             try:
                 await self.run_once(now=datetime.now(UTC))
             except Exception:
-                # 瞬时数据库错误（例如 SQLite“database is locked”）不能使轮询任务
-                # 在进程剩余生命周期内停止。
+                # 单次数据库故障只影响当前轮询；下一周期继续尝试执行。
                 logger.exception("Scheduled task poll failed; retrying next interval")
             try:
                 await asyncio.wait_for(

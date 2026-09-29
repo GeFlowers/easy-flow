@@ -8,8 +8,6 @@ import shutil
 from pathlib import Path, PureWindowsPath
 
 from deerflow.config.runtime_paths import runtime_home
-
-# 中文说明：此处用于执行相关处理。
 VIRTUAL_PATH_PREFIX = "/mnt/user-data"
 
 _SAFE_THREAD_ID_RE = re.compile(r"^[A-Za-z0-9_\-]+$")
@@ -252,9 +250,6 @@ class Paths:
         """\u6267\u884c resolve_virtual_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
         stripped = virtual_path.lstrip("/")
         prefix = VIRTUAL_PATH_PREFIX.lstrip("/")
-
-        # 中文说明：此处用于执行相关处理。
-        # 中文说明：此处用于执行相关处理。
         if stripped != prefix and not stripped.startswith(prefix + "/"):
             raise ValueError(f"Path must start with /{prefix}")
 
@@ -268,9 +263,6 @@ class Paths:
             raise ValueError("Access denied: path traversal detected")
 
         return actual
-
-
-# 中文说明：此处用于执行相关处理。
 
 _paths: Paths | None = None
 

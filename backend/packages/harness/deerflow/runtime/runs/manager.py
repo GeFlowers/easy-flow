@@ -1,13 +1,10 @@
-"""
-
-内存实现：run registry with optional persistent RunStore backing."""
+"""管理进程内活跃运行，并把运行记录持久化到 PostgreSQL RunStore。"""
 
 from __future__ import annotations
 
 import asyncio
 import logging
 import socket
-import sqlite3
 import uuid
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
@@ -25,52 +22,22 @@ from .schemas import DisconnectMode, RunStatus
 
 if TYPE_CHECKING:
     from deerflow.config.run_ownership_config import RunOwnershipConfig
-    from deerflow.runtime.runs.store.base import RunStore
+    from deerflow.runtime.runs.store import RunStore
 
 logger = logging.getLogger(__name__)
 
-_RETRYABLE_SQLITE_MESSAGES = (
-    "database is locked",
-    "database table is locked",
-    "database is busy",
-)
-
-_RETRYABLE_SQLITE_ERROR_CODES = {
-    sqlite3.SQLITE_BUSY,
-    sqlite3.SQLITE_LOCKED,
-}
-
-# Driver-native unique-constraint signals. These are stable across driver and
-# SQLAlchemy versions — message text is not (SQLite says "UNIQUE constraint
-# failed", Postgres says "duplicate key value violates unique constraint").
+# PostgreSQL SQLSTATE values used when classifying database conflicts.
 _UNIQUE_PGCODE = "23505"
-_SQLITE_UNIQUE_ERRORCODE = sqlite3.SQLITE_CONSTRAINT_UNIQUE
+_RETRYABLE_POSTGRES_STATES = {"40001", "40P01"}
 
 
 def _generate_worker_id() -> str:
-    """
-
-    生成：a unique worker identifier: ``hostname:hex_uuid``."""
+    """生成包含主机名和随机值的工作进程唯一标识。"""
     return f"{socket.gethostname()}:{uuid.uuid4().hex}"
 
 
 def _is_unique_violation(exc: BaseException) -> bool:
-    """
-
-    返回：True when *exc* (or its cause chain) is a unique-constraint violation.
-
-        SQLAlchemy wraps the driver's IntegrityError; the wrapped driver exception is
-        reachable via ``exc.orig`` (and ``__cause__`` / ``__context__``). Prefer
-        driver-native signals — psycopg ``pgcode`` / ``sqlcode`` = "23505" and
-        sqlite3 ``sqlite_errorcode`` = ``SQLITE_CONSTRAINT_UNIQUE`` — over message
-        matching, then fall back to message substrings for cases where the driver
-        exception isn't reachable through the chain.
-
-        Message text drifts across drivers and locales (SQLite raises
-        ``UNIQUE constraint failed: <table>.<index>``; Postgres raises
-        ``duplicate key value violates unique constraint``), so the code/attribute
-        checks are the load-bearing path.
-    """
+    """检查异常及其包装原因，识别 PostgreSQL 唯一键冲突。"""
     pending: list[BaseException] = [exc]
     seen: set[int] = set()
     while pending:
@@ -85,9 +52,6 @@ def _is_unique_violation(exc: BaseException) -> bool:
             return True
         if getattr(current, "sqlstate", None) == _UNIQUE_PGCODE:
             return True
-        if getattr(current, "sqlite_errorcode", None) == _SQLITE_UNIQUE_ERRORCODE:
-            return True
-
         # Message fallbacks are belt-and-suspenders for drivers whose
         # native code attribute isn't reachable through the chain. Gate on
         # an IntegrityError-typed node so an unrelated application
@@ -95,10 +59,8 @@ def _is_unique_violation(exc: BaseException) -> bool:
         # "unique" + "violat" (CHECK constraint message, validation error,
         # arbitrary subsystem string) cannot be misclassified as a unique
         # violation and silently surface as HTTP 409 instead of 500.
-        if isinstance(current, (SAIntegrityError, sqlite3.IntegrityError)):
+        if isinstance(current, SAIntegrityError):
             message = str(current).lower()
-            if "unique constraint failed" in message:
-                return True
             if "unique" in message and "violat" in message:
                 return True
             if "duplicate key" in message:
@@ -112,15 +74,7 @@ def _is_unique_violation(exc: BaseException) -> bool:
 
 
 def _is_retryable_persistence_error(exc: BaseException) -> bool:
-    """
-
-    返回：True for transient SQLite persistence failures.
-
-        SQLite lock contention normally surfaces through either sqlite3 exceptions
-        or SQLAlchemy wrappers.  The short bounded retry here protects run status
-        finalization from transient writer pressure without hiding permanent
-        failures forever.
-    """
+    """识别 PostgreSQL 可安全重试的事务序列化冲突和死锁。"""
 
     pending: list[BaseException] = [exc]
     seen: set[int] = set()
@@ -130,13 +84,10 @@ def _is_retryable_persistence_error(exc: BaseException) -> bool:
             continue
         seen.add(id(current))
 
-        message = str(current).lower()
-        if any(fragment in message for fragment in _RETRYABLE_SQLITE_MESSAGES):
+        if getattr(current, "sqlstate", None) in _RETRYABLE_POSTGRES_STATES:
             return True
-        if isinstance(current, (sqlite3.OperationalError, sqlite3.DatabaseError)):
-            error_code = getattr(current, "sqlite_errorcode", None)
-            if error_code in _RETRYABLE_SQLITE_ERROR_CODES:
-                return True
+        if getattr(current, "pgcode", None) in _RETRYABLE_POSTGRES_STATES:
+            return True
         for chained in (getattr(current, "orig", None), current.__cause__, current.__context__):
             if isinstance(chained, BaseException):
                 pending.append(chained)
@@ -145,9 +96,7 @@ def _is_retryable_persistence_error(exc: BaseException) -> bool:
 
 @dataclass(frozen=True)
 class PersistenceRetryPolicy:
-    """
-
-    Bounded retry policy for short run-store writes."""
+    """限制短事务重试次数和退避时间，防止冲突让运行管理无限等待。"""
 
     max_attempts: int = 5
     initial_delay: float = 0.05
@@ -197,14 +146,7 @@ class RunRecord:
 
 
 class RunManager:
-    """
-
-    内存实现：run registry with optional persistent RunStore backing.
-
-        All mutations are protected by an asyncio lock. When a ``store`` is
-        provided, serializable metadata is also persisted to the store so
-        that run history survives process restarts.
-    """
+    """协调活跃运行、取消信号、跨进程租约及持久化运行历史。"""
 
     def __init__(
         self,
@@ -214,6 +156,7 @@ class RunManager:
         worker_id: str | None = None,
         run_ownership_config: RunOwnershipConfig | None = None,
     ) -> None:
+        """初始化运行注册表、持久化仓储以及跨进程所有权参数。"""
         self._runs: dict[str, RunRecord] = {}
         # Secondary index: thread_id -> insertion-ordered run_id set (a dict is
         # used as an ordered set), maintained in lockstep with ``_runs`` so
@@ -231,13 +174,13 @@ class RunManager:
     def _index_run_locked(self, record: RunRecord) -> None:
         """
 
-        Register *record* in the thread index. Caller must hold ``self._lock``."""
+        将运行记录加入线程索引；调用方需先持有实例锁。"""
         self._runs_by_thread.setdefault(record.thread_id, {})[record.run_id] = None
 
     def _unindex_run_locked(self, run_id: str, thread_id: str) -> None:
         """
 
-        Drop *run_id* from the thread index. Caller must hold ``self._lock``."""
+        从线程索引移除运行 ID；调用方需先持有实例锁。"""
         bucket = self._runs_by_thread.get(thread_id)
         if bucket is not None:
             bucket.pop(run_id, None)
@@ -266,6 +209,7 @@ class RunManager:
 
     @staticmethod
     def _store_put_payload(record: RunRecord, *, error: str | None = None, stop_reason: str | None = None) -> dict[str, Any]:
+        """将运行记录转换为 RunStore 接受的字段，并合并最终错误与停止原因。"""
         payload = {
             "thread_id": record.thread_id,
             "assistant_id": record.assistant_id,
@@ -291,9 +235,7 @@ class RunManager:
         run_id: str,
         operation: Callable[[], Awaitable[Any]],
     ) -> Any:
-        """
-
-        Run a short store operation with bounded retries for SQLite pressure."""
+        """遇到 PostgreSQL 可恢复事务冲突时有限重试存储操作。"""
         policy = self._persistence_retry_policy
         attempt = 1
         delay = policy.initial_delay
@@ -320,7 +262,7 @@ class RunManager:
     async def _persist_snapshot_to_store(self, run_id: str, payload: dict[str, Any]) -> bool:
         """
 
-        Best-effort persist a previously captured run snapshot."""
+        尝试将已捕获的运行快照写入持久化仓储。"""
         if self._store is None:
             return True
         try:
@@ -356,7 +298,7 @@ class RunManager:
     async def _persist_to_store(self, record: RunRecord, *, error: str | None = None) -> bool:
         """
 
-        Best-effort persist run record to backing store."""
+        尝试把运行记录同步到 PostgreSQL 仓储。"""
         return await self._persist_snapshot_to_store(
             record.run_id,
             self._store_put_payload(record, error=error),
@@ -365,7 +307,7 @@ class RunManager:
     async def _persist_status(self, record: RunRecord, status: RunStatus, *, error: str | None = None, stop_reason: str | None = None) -> bool:
         """
 
-        Best-effort persist a status transition to the backing store."""
+        尝试持久化运行状态变更并处理短暂数据库冲突。"""
         if self._store is None:
             return True
         row_recovery_payload = self._store_put_payload(record, error=error, stop_reason=stop_reason)
@@ -682,7 +624,7 @@ class RunManager:
     ) -> dict[str, RunRecord]:
         """
 
-        Batch-load selected thread runs with in-memory records preferred."""
+        批量读取线程运行记录，优先返回内存中较新的记录。"""
         if not run_ids:
             return {}
         resolved_user_id = resolve_user_id(user_id, method_name="RunManager.get_many_by_thread")
@@ -711,7 +653,7 @@ class RunManager:
     async def set_status(self, run_id: str, status: RunStatus, *, error: str | None = None, stop_reason: str | None = None) -> None:
         """
 
-        Transition a run to a new status."""
+        更新运行状态及其可选终态字段，并同步状态事件。"""
         async with self._lock:
             record = self._runs.get(run_id)
             if record is None:
@@ -729,7 +671,7 @@ class RunManager:
     async def set_finalizing(self, run_id: str, finalizing: bool) -> None:
         """
 
-        Mark whether a run is performing post-cancel cleanup."""
+        标记运行是否正在执行取消后的清理流程。"""
         async with self._lock:
             record = self._runs.get(run_id)
             if record is None:
@@ -747,7 +689,7 @@ class RunManager:
     ) -> None:
         """
 
-        Wait until older same-thread runs have finished post-cancel cleanup."""
+        等待同线程较早运行完成取消后的收尾工作。"""
         while True:
             async with self._lock:
                 found_current = False
@@ -795,7 +737,7 @@ class RunManager:
     async def _persist_model_name(self, run_id: str, model_name: str | None) -> None:
         """
 
-        Best-effort persist model_name update to the backing store."""
+        尝试将实际解析出的模型名称更新到持久化记录。"""
         if self._store is None:
             return
         try:
@@ -824,7 +766,7 @@ class RunManager:
     async def cancel(self, run_id: str, *, action: str = "interrupt") -> CancelOutcome:
         """
 
-        Request cancellation of a run.
+        设置取消信号并更新运行记录，供执行协程安全退出。
 
                 When the call lands on the owning worker the run is cancelled
                 locally as before (in-memory abort + status persisted to store).
@@ -1161,7 +1103,7 @@ class RunManager:
     ) -> list[RunRecord]:
         """
 
-        Mark persisted active runs as failed when their lease has expired.
+        将租约过期的持久化活动运行标记为中断并释放所有权。
 
                 In multi-worker deployments (Postgres), a run owned by Worker A that
                 still shows ``pending`` / ``running`` after its lease expired means
@@ -1223,7 +1165,7 @@ class RunManager:
     async def cleanup(self, run_id: str, *, delay: float = 300) -> None:
         """
 
-        Remove a run record after an optional delay."""
+        可选等待指定时间后移除运行记录及其索引。"""
         if delay > 0:
             await asyncio.sleep(delay)
         async with self._lock:
@@ -1268,7 +1210,7 @@ class RunManager:
     async def start_heartbeat(self) -> None:
         """
 
-        Start the background lease-renewal task.
+        启动定期续租和失联运行回收后台任务。
 
                 No-op when ``heartbeat_enabled`` is ``False`` or the task is already running.
         """
@@ -1285,7 +1227,7 @@ class RunManager:
     async def stop_heartbeat(self) -> None:
         """
 
-        Stop the background heartbeat task."""
+        停止心跳任务并等待其完成。"""
         if self._heartbeat_stop is not None:
             self._heartbeat_stop.set()
         if self._heartbeat_task is not None and not self._heartbeat_task.done():
@@ -1306,7 +1248,7 @@ class RunManager:
     async def _heartbeat_loop(self) -> None:
         """
 
-        Periodically renew leases and reclaim orphaned runs from dead peers.
+        周期性续租本进程运行，并检查其他进程遗留的过期租约。
 
                 Lease renewal runs every ``lease_seconds / 3``. Reconciliation
                 (sweeping for expired leases owned by dead workers) runs every
@@ -1352,7 +1294,7 @@ class RunManager:
     async def _renew_leases(self) -> None:
         """
 
-        Renew the lease on every locally-owned active run."""
+        为本进程拥有的活动运行延长数据库租约。"""
         if self._store is None or self._run_ownership_config is None:
             return
         lease_seconds = self._run_ownership_config.lease_seconds
@@ -1412,7 +1354,7 @@ class RunManager:
     async def _reconcile_orphans_periodic(self) -> None:
         """
 
-        Sweep for expired leases owned by dead peers.
+        扫描租约过期的运行并回收已失联进程的所有权。
 
                 Called from ``_heartbeat_loop`` every ``lease_seconds``. Startup
                 reconciliation handles the initial sweep; this periodic pass
@@ -1429,7 +1371,7 @@ class RunManager:
     async def shutdown(self, *, timeout: float = 5.0) -> None:
         """
 
-        Cancel and bounded-await all in-flight runs on process shutdown.
+        关闭进程时取消所有活动运行，并在限定时间内等待其退出。
 
                 Stops the lease heartbeat first so no renewal races against the drain.
 

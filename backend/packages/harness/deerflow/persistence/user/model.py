@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, Index, String, text
+from sqlalchemy import Boolean, DateTime, Index, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from deerflow.persistence.base import Base
@@ -47,6 +47,5 @@ class UserRow(Base):
             "oauth_provider",
             "oauth_id",
             unique=True,
-            sqlite_where=text("oauth_provider IS NOT NULL AND oauth_id IS NOT NULL"),
         ),
     )

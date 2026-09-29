@@ -91,7 +91,7 @@ def _post_search(api_key: str, body: dict) -> dict:
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int | None = None) -> str:
-    """Search the web for information using GroundRoute.
+    """通过 GroundRoute 搜索网络信息并返回结果。
 
     GroundRoute routes the query across six search engines and returns the result
     set from the engine it selected, with failover if one engine is unavailable.
@@ -141,7 +141,7 @@ def web_search_tool(query: str, max_results: int | None = None) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 def web_fetch_tool(url: str) -> str:
-    """Fetch the contents of a web page at a given URL via GroundRoute.
+    """通过 GroundRoute 获取指定网址的网页正文。
     Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
     This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
     Do NOT add www. to URLs that do NOT have them.

@@ -1110,10 +1110,9 @@ sandbox:
   allow_host_bash: false
   # Optional: Mount additional host directories into the sandbox.
   # Each mount maps a host path to a virtual container path accessible by the agent.
-  # Note: with LocalSandboxProvider under `make up` (docker-compose), host_path is
-  # checked from inside the deer-flow-gateway container — you must also bind-mount
-  # the same directory into services.gateway.volumes in docker/docker-compose.yaml
-  # for this mount to take effect (see issue #3244).
+  # With LocalSandboxProvider under `make docker-start`, host_path is checked
+  # from inside the deer-flow-gateway container — bind-mount the same directory
+  # into the gateway service in docker/docker-compose-dev.yaml for it to work.
   # mounts:
   #   - host_path: /home/user/my-project    # Absolute path; see note above for Docker mode
   #     container_path: /mnt/my-project     # Virtual path inside the sandbox
@@ -1572,7 +1571,6 @@ skill_evolution:
 # takes precedence for the LangGraph checkpointer and Store only.
 #
 # checkpointer:
-#   type: sqlite
 #   connection_string: checkpoints.db
 #
 # checkpointer:
@@ -1585,52 +1583,27 @@ skill_evolution:
 # Unified storage backend for the LangGraph checkpointer, LangGraph Store,
 # and DeerFlow application data (runs, threads metadata, feedback, etc.).
 #
-# backend: sqlite  -- Single-node deployment, files in sqlite_dir
 # backend: postgres -- Production multi-node deployment
 #
-# If this section is omitted or empty in config.yaml, DeerFlow uses:
-#   backend: sqlite
-#   sqlite_dir: .deer-flow/data
-#
-# SQLite mode uses a single deerflow.db file with WAL journal mode
-# for the checkpointer, Store, and application data.
+# This section is required. PostgreSQL is the only supported persistent backend.
 #
 # Postgres mode: put your connection URL in .env as DATABASE_URL,
 # then reference it here with $DATABASE_URL.
 #
-# Install the driver — Issue #2754 fix lands `UV_EXTRAS` in every code path:
-#   Local      `make dev` auto-detects from `database.backend: postgres` below
-#              and passes `--extra postgres` to `uv sync` on every restart, so
-#              the extra is no longer wiped. To opt in explicitly (or layer
-#              extras like `postgres,ollama`), set in project-root .env:
-#                  UV_EXTRAS=postgres
-#   Docker dev `make docker-start` reads `UV_EXTRAS` from project-root .env via
-#              `env_file`. Set:
-#                  UV_EXTRAS=postgres
-#              Multiple extras (`postgres,ollama`) supported here too — see
-#              docker/dev-entrypoint.sh.
-#   Docker img build-arg `UV_EXTRAS=postgres,discord docker compose build`
-#              supports comma- or whitespace-separated extras at build time
-#              (backend/Dockerfile expands them to repeated `--extra` flags).
-#
-# First-time bootstrap (before `make dev`):
-#   cd backend && uv sync --all-packages --extra postgres
-#   (--all-packages propagates the extra into workspace members — see PR #2584)
+# The supported Docker image installs this extra by setting UV_EXTRAS=postgres
+# in the repository-root .env before running `make docker-start`. Multiple
+# comma- or whitespace-separated extras are accepted by the backend image build.
 #
 # NOTE: When both `checkpointer` and `database` are configured,
 # `checkpointer` takes precedence for the LangGraph checkpointer and Store;
 # `database` still controls DeerFlow application data.
 # If you use `database`, you can remove the `checkpointer` section.
 # database:
-#   backend: sqlite
-#   sqlite_dir: .deer-flow/data
-#
-# database:
 #   backend: postgres
 #   postgres_url: $DATABASE_URL
 database:
-  backend: sqlite
-  sqlite_dir: .deer-flow/data
+  backend: postgres
+  postgres_url: $DATABASE_URL
 
 # ============================================================================
 # Run Events Configuration
@@ -1641,11 +1614,10 @@ database:
 # backend: jsonl   -- Append-only JSONL files (lightweight single-node persistence)
 #
 # run_events:
-#   backend: memory
 #   max_trace_content: 10240    # Truncation threshold for trace content (db backend, bytes)
 #   track_token_usage: true     # Accumulate token counts to RunRow
 run_events:
-  backend: memory
+  backend: db
   max_trace_content: 10240
   track_token_usage: true
 
@@ -1655,10 +1627,8 @@ run_events:
 # Background scheduler for one-time and recurring (cron) agent runs.
 # All fields are restart-required (captured at Gateway lifespan startup).
 #
-# Multi-worker note: the scheduler runs once per uvicorn worker. SQLite silently
-# ignores row-level locks, so multiple workers can double-fire the same task.
-# For multi-worker deployments (GATEWAY_WORKERS > 1), use the Postgres database
-# backend, where FOR UPDATE SKIP LOCKED serializes claims correctly.
+# Multi-worker note: the scheduler runs once per uvicorn worker. PostgreSQL's
+# row-level locks and FOR UPDATE SKIP LOCKED serialize claims correctly.
 #
 # scheduler:
 #   enabled: false               # Master switch for the background poller
@@ -1702,36 +1672,23 @@ run_ownership:
 # ============================================================================
 # The stream bridge carries live agent events from gateway workers to SSE
 # clients. Docker Compose sets DEER_FLOW_STREAM_BRIDGE_REDIS_URL automatically,
-# so Docker deployments use Redis Streams even if this section is omitted.
+# 因此即使省略本节，Docker 部署仍会使用 Redis Streams。
 #
-# The redis bridge requires the optional `redis` extra. It is auto-detected from
-# this section on `make dev`, and always installed in the Docker image. To install
-# it manually: cd backend && uv sync --all-packages --extra redis
-#
-# stream_bridge:
-#   type: memory                 # single-process only
-#   queue_maxsize: 256
+# Redis 桥接器依赖可选的 `redis` extra；Docker 镜像始终安装该依赖。
+# 手动安装：cd backend && uv sync --all-packages --extra redis
 #
 # stream_bridge:
-#   type: redis                  # recommended for Docker / multi-worker gateway
 #   redis_url: redis://redis:6379/0
-#   queue_maxsize: 256           # events retained per run (redis stream MAXLEN)
-#   stream_ttl_seconds: 86400    # rolling TTL for retained stream buffers.
-#                                # Refreshed on each publish/publish_end; set 0
-#                                # to disable. This is not a run timeout.
-#   recovered_stream_cleanup_delay_seconds: 60  # seconds to wait after
-#                                # publishing END for a recovered orphan run
-#                                # before deleting the stream key.
-#   max_connections: 100         # optional pool ceiling. Each live SSE client
-#                                # holds one connection blocked in XREAD ... BLOCK
-#                                # for up to heartbeat_interval (15s), so hundreds
-#                                # of concurrent clients open hundreds of
-#                                # connections. Unset = redis-py default (unbounded).
+#   queue_maxsize: 256           # 每次运行在 Redis Stream 中保留的事件数量上限
+#   stream_ttl_seconds: 86400    # 事件流缓冲区的滚动过期时间；每次发布事件或结束标记时刷新。
+#                                # 设为 0 可禁用过期；这不是运行超时时间。
+#   recovered_stream_cleanup_delay_seconds: 60  # 孤儿运行恢复并发布结束标记后，等待多久再删除流键
+#   max_connections: 100         # 可选连接池上限；每个 SSE 客户端在 XREAD 阻塞期间占用一个连接。
+#                                # 未设置时使用 redis-py 默认值（不限制连接数）。
 #
-# NOTE: the redis bridge is fail-hard in v1. Redis.from_url is lazy, so a down
-# Redis does not block gateway startup, but the first publish/xread raises. A
-# mid-run Redis outage fails the active run — there is no automatic retry/backoff
-# or fallback to the in-memory bridge. Run Redis with HA / a restart policy.
+# 注意：当前 Redis 桥接器采用失败即报错策略。Redis.from_url 延迟连接，因此 Redis 不可用时网关仍可启动，
+# 但首次发布或读取事件会失败；运行中断连也会导致当前运行失败，不会自动重试或回退到内存桥接器。
+# 部署时应为 Redis 配置高可用或自动重启策略。
 
 # ============================================================================
 # User-Owned IM Channel Connections

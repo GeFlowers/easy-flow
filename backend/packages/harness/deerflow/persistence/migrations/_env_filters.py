@@ -14,7 +14,7 @@ LANGGRAPH_OWNED_TABLES: frozenset[str] = frozenset(
 
 
 def include_object(object_, name, type_, reflected, compare_to):  # noqa: ARG001
-    """执行当前持久化组件提供的操作。"""
+    """阻止 Alembic 将 LangGraph 自主管理的检查点表纳入迁移差异。"""
     if type_ == "table" and name in LANGGRAPH_OWNED_TABLES:
         return False
     parent_table = getattr(object_, "table", None)

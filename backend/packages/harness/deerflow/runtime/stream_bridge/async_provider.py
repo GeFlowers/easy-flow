@@ -31,6 +31,7 @@ _ENV_REDIS_URL = "DEER_FLOW_STREAM_BRIDGE_REDIS_URL"
 
 
 def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
+    """优先从显式应用配置读取桥接设置，并兼容只设置专用环境变量的启动方式。"""
     if app_config is None:
         config = get_stream_bridge_config()
     else:
@@ -39,57 +40,36 @@ def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
     if config is None:
         redis_url = os.getenv(_ENV_REDIS_URL)
         if redis_url:
-            return StreamBridgeConfig(type="redis", redis_url=redis_url)
+            return StreamBridgeConfig(redis_url=redis_url)
     return config
 
 
 def _resolve_redis_url(config: StreamBridgeConfig) -> str:
+    """按配置项、专用环境变量、通用环境变量的顺序解析 Redis 地址。"""
     return config.redis_url or os.getenv(_ENV_REDIS_URL) or os.getenv("REDIS_URL") or "redis://localhost:6379/0"
 
 
 @contextlib.asynccontextmanager
 async def make_stream_bridge(app_config: AppConfig | None = None) -> AsyncIterator[StreamBridge]:
-    """
-
-    异步上下文管理器： that yields a :class:`StreamBridge`.
-
-        Falls back to :class:`MemoryStreamBridge` when no configuration is
-        provided and nothing is set globally.
-    """
+    """创建 Redis 事件桥接器，并在上下文退出时关闭其连接。"""
     config = _resolve_config(app_config)
 
-    if config is None or config.type == "memory":
-        from deerflow.runtime.stream_bridge.memory import MemoryStreamBridge
+    from deerflow.runtime.stream_bridge.redis import RedisStreamBridge
 
-        maxsize = config.queue_maxsize if config is not None else 256
-        bridge = MemoryStreamBridge(queue_maxsize=maxsize)
-        logger.info("Stream bridge initialised: memory (queue_maxsize=%d)", maxsize)
-        try:
-            yield bridge
-        finally:
-            await bridge.close()
-        return
-
-    if config.type == "redis":
-        from deerflow.runtime.stream_bridge.redis import RedisStreamBridge
-
-        redis_url = _resolve_redis_url(config)
-        bridge = RedisStreamBridge(
-            redis_url=redis_url,
-            queue_maxsize=config.queue_maxsize,
-            max_connections=config.max_connections,
-            stream_ttl_seconds=config.stream_ttl_seconds,
-        )
-        logger.info(
-            "Stream bridge initialised: redis (queue_maxsize=%d, max_connections=%s, stream_ttl_seconds=%d)",
-            config.queue_maxsize,
-            config.max_connections,
-            config.stream_ttl_seconds,
-        )
-        try:
-            yield bridge
-        finally:
-            await bridge.close()
-        return
-
-    raise ValueError(f"Unknown stream bridge type: {config.type!r}")
+    config = config or StreamBridgeConfig()
+    bridge = RedisStreamBridge(
+        redis_url=_resolve_redis_url(config),
+        queue_maxsize=config.queue_maxsize,
+        max_connections=config.max_connections,
+        stream_ttl_seconds=config.stream_ttl_seconds,
+    )
+    logger.info(
+        "Stream bridge initialized: redis (queue_maxsize=%d, max_connections=%s, stream_ttl_seconds=%d)",
+        config.queue_maxsize,
+        config.max_connections,
+        config.stream_ttl_seconds,
+    )
+    try:
+        yield bridge
+    finally:
+        await bridge.close()

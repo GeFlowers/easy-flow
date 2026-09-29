@@ -127,7 +127,7 @@ class ScheduledTaskRepository:
         lease_seconds: int,
         limit: int,
     ) -> list[dict[str, Any]]:
-        """执行当前持久化组件提供的操作。"""
+        """锁定并认领到期或租约过期的计划任务，避免并发调度器重复派发。"""
         lease_expires_at = now + timedelta(seconds=lease_seconds)
         stmt = (
             select(ScheduledTaskRow)
@@ -220,7 +220,7 @@ class ScheduledTaskRepository:
             return [self._row_to_dict(row) for row in result.scalars()]
 
     async def cancel_stuck_once_tasks(self, *, error: str) -> int:
-        """执行当前持久化组件提供的操作。"""
+        """取消启动恢复时已失去租约且无法继续执行的一次性任务。"""
         stmt = select(ScheduledTaskRow).where(
             ScheduledTaskRow.schedule_type == "once",
             ScheduledTaskRow.status == "running",

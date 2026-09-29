@@ -4,7 +4,7 @@ Fan out a verified GitHub webhook delivery onto the channel bus.
 
 This module replaces the old "build prompt, create thread, run agent,
 post comment" one-shot dispatcher.  In the new architecture GitHub is a
-first-class :class:`Channel` (see ``app/channels/github.py``):
+first-class :class:`Channel` (see ``app/channels/providers/github.py``):
 
     POST /api/webhooks/github
         → verify HMAC (route)

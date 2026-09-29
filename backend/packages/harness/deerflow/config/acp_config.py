@@ -34,23 +34,19 @@ _acp_agents: dict[str, ACPAgentConfig] = {}
 
 
 def get_acp_agents() -> dict[str, ACPAgentConfig]:
-    """读取并返回，并遵守 get_acp_agents 所表达的接口约束。
-
-    Get the currently configured ACP agents.
+    """返回当前已加载的 ACP agent 配置表。
 
         Returns:
-            Mapping of agent name -> ACPAgentConfig.  Empty dict if no ACP agents are configured.
+            按 agent 名称索引配置；未配置时返回空字典。
     """
     return _acp_agents
 
 
 def load_acp_config_from_dict(config_dict: Mapping[str, Mapping[str, object]] | None) -> None:
-    """加载并返回，并遵守 load_acp_config_from_dict 所表达的接口约束。
-
-    Load ACP agent configuration from a dictionary (typically from config.yaml).
+    """用新字典替换当前 ACP agent 配置，通常由应用配置加载器调用。
 
         Args:
-            config_dict: Mapping of agent name -> config fields.
+            config_dict: 按 agent 名称索引的字段映射；传入 None 时清空配置。
     """
     global _acp_agents
     if config_dict is None:

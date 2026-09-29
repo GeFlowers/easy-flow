@@ -34,7 +34,7 @@ def _get_searxng_client() -> SearxngClient:
 
 @tool("web_search", parse_docstring=True)
 async def web_search_tool(query: str) -> str:
-    """Search the web using SearXNG.
+    """通过配置的 SearXNG 实例聚合搜索网络资料。
 
     Args:
         query: The query to search for.

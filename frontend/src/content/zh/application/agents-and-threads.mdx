@@ -83,18 +83,12 @@ DeerFlow 在每次 Agent 轮次后自动保存线程状态。使用持久化后�
 `database` 配置控制线程状态和应用数据的默认持久化后端：
 
 ```yaml
-# SQLite（本地开发和单用户部署）
 database:
-  backend: sqlite
-  sqlite_dir: .deer-flow/data
+  backend: postgres
+  postgres_url: $DATABASE_URL
 
-# Postgres（生产环境和多用户部署）
-# database:
-#   backend: postgres
-#   postgres_url: $DATABASE_URL
-#
-# run_events:
-#   backend: db
+run_events:
+  backend: db
 ```
 
 旧的 `checkpointer` 配置仍然兼容，用于 LangGraph 状态持久化；如果配置了它，会优先于 `database` 的检查点设置。新的部署应优先使用 `database`。

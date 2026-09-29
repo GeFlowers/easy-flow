@@ -32,10 +32,8 @@ dependencies = [
     "ddgs>=9.10.0",
     "duckdb>=1.4.4",
     "langchain-google-genai>=4.2.1",
-    "langgraph-checkpoint-sqlite>=3.0.3",
     "langgraph-sdk>=0.1.51",
     "sqlalchemy[asyncio]>=2.0,<3.0",
-    "aiosqlite>=0.19",
     "alembic>=1.13",
     "cryptography>=48.0.1",
     "e2b-code-interpreter>=2.8.0",
@@ -59,9 +57,8 @@ postgres = [
     "psycopg[binary]>=3.3.3",
     "psycopg-pool>=3.3.0",
 ]
-# Cross-process SSE stream bridge (stream_bridge.type: redis). Optional so
-# single-process / memory-bridge installs do not pull redis. The Docker image
-# always installs this extra because Docker defaults to the redis bridge.
+# Cross-process SSE stream bridge (configured with the stream_bridge section). Optional so
+# The Gateway installs this extra when stream-bridge settings are present.
 redis = ["redis>=5.0.0"]
 pymupdf = ["pymupdf4llm>=0.0.17"]
 boxlite = ["boxlite>=0.9.7"]

@@ -1,6 +1,4 @@
-"""定义 provider 模块提供的职责与可复用接口。
-
-GuardrailProvider protocol and data structures for pre-tool-call authorization."""
+"""定义工具调用授权时传递的请求、决策数据结构及 Provider 契约。"""
 
 from __future__ import annotations
 
@@ -10,9 +8,7 @@ from typing import Any, Protocol, runtime_checkable
 
 @dataclass
 class GuardrailRequest:
-    """封装 GuardrailRequest 的状态、协作关系与公开操作。
-
-    Context passed to the provider for each tool call."""
+    """携带待授权工具调用及其用户、线程、运行和身份提供方上下文。"""
 
     tool_name: str
     tool_input: dict[str, Any]
@@ -30,9 +26,7 @@ class GuardrailRequest:
 
 @dataclass
 class GuardrailReason:
-    """封装 GuardrailReason 的状态、协作关系与公开操作。
-
-    Structured reason for an allow/deny decision (OAP reason object)."""
+    """描述授权允许或拒绝的原因代码及面向调用方的说明。"""
 
     code: str
     message: str = ""
@@ -40,9 +34,7 @@ class GuardrailReason:
 
 @dataclass
 class GuardrailDecision:
-    """封装 GuardrailDecision 的状态、协作关系与公开操作。
-
-    Provider's allow/deny verdict (aligned with OAP Decision object)."""
+    """保存授权结论、原因、策略标识及 Provider 附带的元数据。"""
 
     allow: bool
     reasons: list[GuardrailReason] = field(default_factory=list)
@@ -52,25 +44,17 @@ class GuardrailDecision:
 
 @runtime_checkable
 class GuardrailProvider(Protocol):
-    """封装 GuardrailProvider 的状态、协作关系与公开操作。
+    """工具调用授权 Provider 的结构化接口，无需继承即可实现。
 
-    Contract for pluggable tool-call authorization.
-
-        Any class with these methods works - no base class required.
-        Providers are loaded by class path via resolve_variable(),
-        the same mechanism DeerFlow uses for models, tools, and sandbox.
+    配置通过类路径动态加载，运行时先尝试同步/异步对应的授权入口。
     """
 
     name: str
 
     def evaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        """执行 evaluate 的明确职责，并返回与调用约定一致的结果。
-
-        Evaluate whether a tool call should proceed."""
+        """同步判断本次工具调用是否可以继续执行。"""
         ...
 
     async def aevaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        """执行 aevaluate 的明确职责，并返回与调用约定一致的结果。
-
-        Async variant."""
+        """异步判断本次工具调用是否可以继续执行。"""
         ...

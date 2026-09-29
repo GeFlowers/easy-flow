@@ -74,42 +74,31 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 _MAX_PENDING_PER_RUN = 3
-# Jaccard word-set computation is capped to avoid O(n) regex work on very large tool results.
+# 限制文本长度，避免对大型工具结果执行无界正则和集合运算。
 _MAX_CONTENT_FOR_WORDSET = 8192
 
 
 # ---------------------------------------------------------------------------
-# State data structures
+# 状态数据结构
 
 
 @dataclass(slots=True)
 class ToolPhaseState:
-    """封装 ToolPhaseState 的状态、协作关系与公开操作。
-
-    Per (thread_id, tool_name) tracking state."""
+    """保存单个线程与工具的阶段、连续问题数、屏蔽原因和近期结果词集。"""
 
     phase: Literal["active", "warned", "blocked"] = "active"
     consecutive_problems: int = 0
     block_reason: str | None = None
-    # Immutable tuple so that dataclasses.replace() calls that omit recent_word_sets
-    # (problem paths) cannot accidentally share a mutable list between the old and new
-    # state objects and cause silent cross-state corruption via .append().
+    # 使用不可变元组，避免 replace 创建的新旧状态意外共享可变列表。
     recent_word_sets: tuple[frozenset[str], ...] = field(default_factory=tuple)
 
 
 # ---------------------------------------------------------------------------
-# Content helpers
+# 内容相似度辅助函数
 
 
 def word_set(content: str) -> frozenset[str]:
-    """执行 word_set 的明确职责，并返回与调用约定一致的结果。
-
-    Extract lowercase words of length >= 3 for Jaccard similarity.
-
-        Content is capped at _MAX_CONTENT_FOR_WORDSET chars to bound memory and CPU cost on
-        large tool results (e.g. web pages).  Tail content beyond the cap is omitted from the
-        set, which is acceptable because duplicate-detection is a heuristic, not a guarantee.
-    """
+    """提取结果中的小写词集合，用于近似重复检测，并限制参与计算的文本长度。"""
     return frozenset(re.findall(r"\b\w{3,}\b", content[:_MAX_CONTENT_FOR_WORDSET].lower()))
 
 
@@ -119,9 +108,7 @@ def is_near_duplicate(
     threshold: float,
     min_words: int,
 ) -> bool:
-    """判断条件是否成立并返回布尔结果，并遵守 is_near_duplicate 所表达的接口约束。
-
-    Return True if current is similar to any of the last 3 recent word sets."""
+    """用 Jaccard 相似度比较最近三次结果；词数不足时不判为重复。"""
     if len(current) < min_words:
         return False
     for prev in recent[-3:]:
@@ -136,14 +123,12 @@ def is_near_duplicate(
 
 
 def _message_content_str(msg: ToolMessage) -> str:
-    "执行 _message_content_str 的明确职责，并返回与调用约定一致的结果"
+    """仅当工具消息内容为字符串时返回正文，其他内容视为空文本。"""
     return msg.content if isinstance(msg.content, str) else ""
 
 
 def _parse_tool_meta(meta_dict: object) -> ToolResultMeta | None:
-    """执行 _parse_tool_meta 的明确职责，并返回与调用约定一致的结果。
-
-    Safely deserialize a ToolResultMeta from a raw dict; returns None on schema mismatch."""
+    """将原始元数据解析为 ToolResultMeta；结构异常时跳过进度跟踪。"""
     if not isinstance(meta_dict, dict):
         return None
     try:
@@ -154,18 +139,17 @@ def _parse_tool_meta(meta_dict: object) -> ToolResultMeta | None:
 
 
 # ---------------------------------------------------------------------------
-# Hint / block reason formatting
+# 提示和屏蔽原因格式化
 
 
 def _format_hint(meta: ToolResultMeta) -> str:
-    "执行 _format_hint 的明确职责，并返回与调用约定一致的结果"
+    """根据结果类型和建议动作生成供模型调整策略的提示。"""
     action_map = {
         "rewrite_query": "Try rephrasing your search query with different keywords or approach.",
         "try_alternative": "Consider using a different tool or strategy.",
         "summarize": "Consider summarizing your current findings and moving forward.",
         "stop": "Do not retry this operation — it is not recoverable.",
-        # Near-duplicate success results: recommended_next_action is "continue" by default,
-        # but the model should still change strategy to avoid re-fetching the same content.
+        # 结果虽成功但内容近似重复，仍需建议模型更换检索策略。
         "continue": "Try rephrasing your query or using a different search term.",
     }
     base = {
@@ -174,7 +158,7 @@ def _format_hint(meta: ToolResultMeta) -> str:
         "rate_limited": "[PROGRESS HINT] The tool is being rate-limited.",
         "transient": "[PROGRESS HINT] The tool encountered repeated transient failures.",
         "partial_success": "[PROGRESS HINT] The tool has returned incomplete results multiple times.",
-        # Jaccard near-duplicate success: the tool is returning the same content repeatedly.
+        # 近似重复的成功结果表示工具反复返回相同内容。
         "success": "[PROGRESS HINT] The tool is returning duplicate results.",
     }.get(
         meta.error_type or meta.status,
@@ -185,7 +169,7 @@ def _format_hint(meta: ToolResultMeta) -> str:
 
 
 def _block_reason(meta: ToolResultMeta) -> str:
-    "执行 _block_reason 的明确职责，并返回与调用约定一致的结果"
+    """把错误类别转换为工具被屏蔽时返回给模型的原因。"""
     return {
         "no_results": "Repeated no-results — rewrite your query or try a different tool.",
         "not_found": "Repeated not-found — rewrite your query or try a different resource.",
@@ -201,13 +185,11 @@ def _block_reason(meta: ToolResultMeta) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Middleware
+# 中间件实现
 
 
 class ToolProgressMiddleware(AgentMiddleware[AgentState]):
-    """封装 ToolProgressMiddleware 的状态、协作关系与公开操作。
-
-    State-machine-based tool stagnation guard (RFC #3177)."""
+    """根据工具结果更新停滞状态，在无进展时注入提示或返回屏蔽消息。"""
 
     def __init__(
         self,
@@ -220,7 +202,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         exempt_tools: set[str] | None = None,
         max_tracked_threads: int = 100,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """保存停滞和相似度阈值，并初始化线程状态表与运行级提示队列。"""
         self._stagnation_threshold = stagnation_threshold
         self._warn_escalation = warn_escalation_count
         self._inject_assessment = inject_assessment
@@ -229,20 +211,16 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         self._exempt_tools: set[str] = exempt_tools if exempt_tools is not None else {"ask_clarification", "write_todos", "present_files", "task"}
         self._max_tracked_threads = max_tracked_threads
 
-        # threading.Lock (not asyncio.Lock): critical sections are short in-memory dict
-        # ops with no I/O, so event-loop stall risk is negligible.  asyncio.Lock would
-        # not protect the sync wrap_tool_call path used by subagent executor thread
-        # pools — two separate locks would be required instead.  This matches the
-        # existing LoopDetectionMiddleware pattern; see module docstring for details.
+        # 临界区只操作内存，线程锁可以同时保护同步子代理和异步 Gateway 调用。
         self._lock = threading.Lock()
-        # LRU-evicting store: thread_id → {tool_name → ToolPhaseState}
+        # 按线程 LRU 淘汰的状态表：线程 ID → 工具名 → 阶段状态。
         self._phase_states: OrderedDict[str, dict[str, ToolPhaseState]] = OrderedDict()
-        # Pending hint queue: (thread_id, run_id) → [hint texts]
+        # 按线程和运行隔离的待注入提示队列。
         self._pending: dict[tuple[str, str], list[str]] = defaultdict(list)
 
     @classmethod
     def from_config(cls, config: ToolProgressConfig) -> ToolProgressMiddleware:
-        "执行 from_config 的明确职责，并返回与调用约定一致的结果"
+        """将配置字段映射为中间件参数，并复制豁免工具集合。"""
         return cls(
             stagnation_threshold=config.stagnation_threshold,
             warn_escalation_count=config.warn_escalation_count,
@@ -254,58 +232,56 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         )
 
     # ------------------------------------------------------------------
-    # Runtime helpers
+    # 运行上下文辅助函数
 
     @staticmethod
     def _thread_id(runtime: Runtime) -> str:
-        "执行 _thread_id 的明确职责，并返回与调用约定一致的结果"
+        """读取运行上下文的线程 ID；缺失时归入默认线程。"""
         tid = runtime.context.get("thread_id") if runtime.context else None
         return str(tid) if tid else "default"
 
     @staticmethod
     def _run_id(runtime: Runtime) -> str:
-        "执行 _run_id 的明确职责，并返回与调用约定一致的结果"
+        """读取运行上下文的运行 ID；缺失时归入默认运行。"""
         rid = runtime.context.get("run_id") if runtime.context else None
         return str(rid) if rid else "default"
 
     def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
-        "执行 _pending_key 的明确职责，并返回与调用约定一致的结果"
+        """组合线程和运行标识，隔离各轮待注入提示。"""
         return self._thread_id(runtime), self._run_id(runtime)
 
     # ------------------------------------------------------------------
-    # State store (caller holds lock)
+    # 状态存储（调用方负责持锁）
 
     def _get_state(self, thread_id: str, tool_name: str) -> ToolPhaseState:
-        "执行 _get_state 的明确职责，并返回与调用约定一致的结果"
+        """读取工具状态；首次访问时创建线程记录并按容量淘汰最久未用线程。"""
         if thread_id not in self._phase_states:
             self._phase_states[thread_id] = {}
             while len(self._phase_states) > self._max_tracked_threads:
                 evicted_thread, _ = self._phase_states.popitem(last=False)
-                # Evict pending hints for the evicted thread to prevent unbounded growth.
+                # 线程状态被淘汰时同步清除其提示队列，避免残留占用。
                 for key in [k for k in self._pending if k[0] == evicted_thread]:
                     del self._pending[key]
         self._phase_states.move_to_end(thread_id)
         return self._phase_states[thread_id].get(tool_name, ToolPhaseState())
 
     def _set_state(self, thread_id: str, tool_name: str, state: ToolPhaseState) -> None:
-        "执行 _set_state 的明确职责，并返回与调用约定一致的结果"
+        """保存指定线程中某个工具的新阶段状态。调用方须持锁。"""
         self._phase_states[thread_id][tool_name] = state
 
     def _get_block_reason(self, runtime: Runtime, tool_name: str) -> str | None:
-        "执行 _get_block_reason 的明确职责，并返回与调用约定一致的结果"
+        """只读检查工具是否已被屏蔽；读取不更新 LRU 顺序。"""
         thread_id = self._thread_id(runtime)
         with self._lock:
             thread_tools = self._phase_states.get(thread_id)
             if thread_tools is None:
                 return None
-            # Read-only check: do NOT call move_to_end here. Bumping recency on the read path
-            # would keep blocked threads permanently warm in the LRU, preventing healthy active
-            # threads from occupying those slots. Recency is updated only on _get_state writes.
+            # 被屏蔽线程的查询不能续期，否则会挤占仍活跃线程的状态容量。
             tool_state = thread_tools.get(tool_name)
             return tool_state.block_reason if tool_state is not None and tool_state.phase == "blocked" else None
 
     def _make_blocked_message(self, request: ToolCallRequest, tool_name: str, block_reason: str) -> ToolMessage:
-        "执行 _make_blocked_message 的明确职责，并返回与调用约定一致的结果"
+        """构造与原工具调用 ID 配对的错误 ToolMessage，并附上可恢复提示元数据。"""
         return ToolMessage(
             content=f"[TOOL_BLOCKED] {block_reason}",
             tool_call_id=str(request.tool_call.get("id", "")),
@@ -328,9 +304,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         tool_name: str,
         runtime: Runtime,
     ) -> ToolMessage | Command:
-        """执行 _update_state_from_result 的明确职责，并返回与调用约定一致的结果。
-
-        Update the state machine from a tool result; queue hints if warranted."""
+        """解析工具结果元数据并更新阶段状态；达到提示条件时排入本轮提示队列。"""
         if not isinstance(result, ToolMessage):
             return result
         meta = _parse_tool_meta((result.additional_kwargs or {}).get(TOOL_META_KEY))
@@ -373,7 +347,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         return result
 
     # ------------------------------------------------------------------
-    # State machine
+    # 状态转换逻辑
 
     def _assess_and_transition(
         self,
@@ -381,29 +355,15 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         meta: ToolResultMeta,
         content: str,
     ) -> tuple[ToolPhaseState, str | None]:
-        """执行 _assess_and_transition 的明确职责，并返回与调用约定一致的结果。
-
-        Return (new_state, hint_text_or_None).
-
-                The outer wrap_tool_call gate intercepts already-blocked states before
-                the handler is called, so this function is normally reached only for
-                active/warned states. If a blocked state arrives (e.g., concurrent
-                transition), the function returns it unchanged — no counter inflation,
-                no phase regression.
-        """
-        # Guard: blocked is a terminal state; nothing should change it here.
-        # (In normal flow this branch is unreachable because wrap_tool_call
-        # intercepts blocked tools before calling the handler.  The check exists
-        # to make concurrent-race semantics well-defined and prevent a
-        # recoverable-error result from silently demoting the phase back to warned.)
+        """按结果可恢复性、连续问题次数及重复度计算新状态和可选提示。"""
+        # BLOCKED 是终态；并发状态变化时不允许后续结果将其降级。
         if state.phase == "blocked":
             return state, None
 
-        # Count this call as a problem before branching so all exit paths leave
-        # consecutive_problems in a consistent state (never 0 when the tool has failed).
+        # 先统一累计问题次数，确保所有失败分支保留一致计数。
         new_count = state.consecutive_problems + 1
 
-        # Immediately block on unrecoverable stop signals (auth, config, internal).
+        # 认证、配置和内部错误等不可恢复问题无需重试，立即屏蔽工具。
         if not meta.recoverable_by_model and meta.recommended_next_action == "stop":
             return replace(
                 state,
@@ -412,13 +372,12 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
                 block_reason=_block_reason(meta),
             ), None
 
-        # Compute word_set only for success results: error/partial_success are problems by
-        # definition and never reach the Jaccard check, so the O(n) regex is wasted on them.
+        # 只有成功结果需要计算词集；错误和部分成功本身已构成问题。
         ws = word_set(content) if meta.status == "success" else frozenset()
         is_problem = meta.status in ("error", "partial_success") or (meta.status == "success" and is_near_duplicate(ws, state.recent_word_sets, self._jaccard_threshold, self._min_words))
 
         if not is_problem:
-            # Good result: reset consecutive count, return to active.
+            # 新结果有进展时清零连续问题数，并记录近期内容供去重判断。
             new_recent = (*state.recent_word_sets, ws)[-3:]
             return replace(state, consecutive_problems=0, phase="active", recent_word_sets=new_recent), None
 
@@ -426,12 +385,11 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
 
         if new_count >= self._stagnation_threshold + self._warn_escalation:
             if meta.recoverable_by_model:
-                # Model can fix this by changing strategy — keep warned, re-inject hint.
-                # BLOCKED would prevent a legitimate retry with different parameters.
+                # 模型可通过换策略恢复，继续提示而不屏蔽不同参数的合理重试。
                 hint = _format_hint(meta)
                 new_state = replace(state, consecutive_problems=new_count, phase="warned")
             else:
-                # Model cannot fix this by retrying — block the tool.
+                # 模型无法靠重试改变故障，停止对该工具继续发起请求。
                 reason = _block_reason(meta)
                 new_state = replace(state, consecutive_problems=new_count, phase="blocked", block_reason=reason)
         elif new_count >= self._stagnation_threshold:
@@ -443,16 +401,14 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         return new_state, hint
 
     # ------------------------------------------------------------------
-    # Pending queue helpers
+    # 待发送提示队列
 
     def _queue_assessment(self, runtime: Runtime, text: str) -> None:
-        "执行 _queue_assessment 的明确职责，并返回与调用约定一致的结果"
+        """为当前运行暂存状态提示，并限制每轮提示数量。"""
         key = self._pending_key(runtime)
         thread_id = key[0]
         with self._lock:
-            # Guard against creating a phantom _pending entry for a thread that was just
-            # evicted from _phase_states by the LRU.  Such entries can never be cleaned up
-            # by the eviction loop (which only walks _phase_states) and accumulate silently.
+            # 状态已被 LRU 淘汰时不创建后续淘汰逻辑无法清理的孤立提示队列。
             if thread_id not in self._phase_states:
                 return
             queue = self._pending[key]
@@ -460,13 +416,13 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
                 queue.append(text)
 
     def _drain_pending(self, runtime: Runtime) -> list[str]:
-        "执行 _drain_pending 的明确职责，并返回与调用约定一致的结果"
+        """取出并删除当前运行待注入的全部提示。"""
         key = self._pending_key(runtime)
         with self._lock:
             return self._pending.pop(key, [])
 
     def _clear_stale_pending(self, runtime: Runtime) -> None:
-        "执行 _clear_stale_pending 的明确职责，并返回与调用约定一致的结果"
+        """清除同线程其他运行遗留的提示，避免提示跨运行串用。"""
         thread_id, current_run = self._pending_key(runtime)
         with self._lock:
             for key in list(self._pending):
@@ -474,29 +430,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
                     del self._pending[key]
 
     def _reset_run_states(self, runtime: Runtime) -> None:
-        """执行 _reset_run_states 的明确职责，并返回与调用约定一致的结果。
-
-        Reset all per-run tool state for the thread at the start of a new agent run.
-
-                Every tool's consecutive_problems counter and recent_word_sets Jaccard window are
-                cleared unconditionally so state from a previous run never bleeds into the next:
-                - BLOCKED/WARNED tools are reset to ACTIVE (they re-block immediately if the root
-                  cause persists, and the model has no memory of the prior-run hint).
-                - ACTIVE tools with non-zero consecutive_problems or non-empty recent_word_sets from
-                  the previous run are also cleared so a single first-call problem in the new run
-                  cannot falsely trip WARNED against stale context from a run the model no longer sees.
-
-                **Cross-run scoping vs LoopDetectionMiddleware**: this per-run reset is an intentional
-                policy choice, not an oversight.  Errors like ``rate_limited`` and ``transient`` are
-                time-bound: their root cause may resolve between user turns, so carrying a stale
-                counter forward risks a false-positive BLOCKED on calls that would now succeed.
-                LoopDetectionMiddleware takes the opposite stance — it retains ``_history`` across
-                runs (only clearing other-run *pending* warnings at ``before_agent``), because
-                call-pattern loops are time-invariant: a model that keeps issuing the same tool_calls
-                regardless of results does so regardless of when the run started.  The two middlewares
-                therefore guard different failure modes (result quality vs. call pattern) and their
-                cross-run scoping policies intentionally differ as a consequence.
-        """
+        """新一轮开始时重置该线程工具状态，避免上一轮暂时性故障造成错误屏蔽。"""
         thread_id = self._thread_id(runtime)
         with self._lock:
             thread_tools = self._phase_states.get(thread_id)
@@ -512,7 +446,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
                 )
 
     # ------------------------------------------------------------------
-    # wrap_tool_call
+    # 工具调用钩子
 
     @override
     def wrap_tool_call(
@@ -520,7 +454,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        "执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        """同步工具调用前拦截已屏蔽工具，其余调用结果用于更新状态机。"""
         tool_name = str(request.tool_call.get("name", ""))
         if not tool_name or tool_name in self._exempt_tools:
             return handler(request)
@@ -544,7 +478,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        "执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        """异步工具调用前检查屏蔽状态，并在执行后跟踪工具结果。"""
         tool_name = str(request.tool_call.get("name", ""))
         if not tool_name or tool_name in self._exempt_tools:
             return await handler(request)
@@ -563,10 +497,10 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         return self._update_state_from_result(await handler(request), tool_name, runtime)
 
     # ------------------------------------------------------------------
-    # wrap_model_call: drain pending hints and inject before model sees messages
+    # 模型调用钩子：取出提示并在模型读取消息前追加
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
-        "执行 _augment_request 的明确职责，并返回与调用约定一致的结果"
+        """将本轮去重后的进展提示追加到模型请求末尾。"""
         hints = self._drain_pending(request.runtime)
         if not hints:
             return request
@@ -588,7 +522,7 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """同步模型调用前注入工具进展提示，再调用下游处理器。"""
         return handler(self._augment_request(request))
 
     @override
@@ -597,22 +531,22 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """异步模型调用前注入工具进展提示，再等待下游处理器。"""
         return await handler(self._augment_request(request))
 
     # ------------------------------------------------------------------
-    # before_agent: clean up stale pending hints from previous runs
+    # Agent 启动钩子：清理先前运行遗留的提示
 
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
+        """每轮开始时清理旧提示并重置该线程的工具状态。"""
         self._clear_stale_pending(runtime)
         self._reset_run_states(runtime)
         return None
 
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 abefore_agent 的明确职责，并返回与调用约定一致的结果"
+        """异步启动钩子执行与同步入口相同的状态清理。"""
         self._clear_stale_pending(runtime)
         self._reset_run_states(runtime)
         return None

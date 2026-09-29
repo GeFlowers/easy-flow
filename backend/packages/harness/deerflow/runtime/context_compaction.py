@@ -1,6 +1,4 @@
-"""
-
-提供线程上下文的手动压缩辅助函数。"""
+"""通过摘要中间件压缩线程检查点中的历史消息。"""
 
 from __future__ import annotations
 
@@ -50,6 +48,7 @@ def _create_compaction_middleware(
     app_config: AppConfig,
     keep: tuple[str, int | float] | None,
 ) -> DeerFlowSummarizationMiddleware:
+    """根据应用配置创建摘要中间件；摘要关闭时明确拒绝压缩请求。"""
     middleware = create_summarization_middleware(app_config=app_config, keep=keep)
     if middleware is None:
         raise ContextCompactionDisabled("Context compaction is disabled.")
@@ -57,6 +56,7 @@ def _create_compaction_middleware(
 
 
 def _checkpoint_namespace(checkpoint_tuple: Any) -> str:
+    """从检查点快照提取写回时必须沿用的命名空间。"""
     config = getattr(checkpoint_tuple, "config", {}) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     checkpoint_ns = configurable.get("checkpoint_ns", "") if isinstance(configurable, dict) else ""
@@ -73,9 +73,7 @@ async def compact_thread_context(
     agent_name: str | None = None,
     app_config: AppConfig | None = None,
 ) -> ThreadCompactionResult:
-    """
-
-    摘要线程中的旧消息，并写入压缩后的检查点。"""
+    """摘要线程的旧消息并写入新检查点，同时保留近期消息及其版本号。"""
     resolved_app_config = app_config or get_app_config()
     middleware = _create_compaction_middleware(app_config=resolved_app_config, keep=keep)
 

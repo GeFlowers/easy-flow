@@ -1,6 +1,4 @@
-"""定义 clarification_middleware 模块提供的职责与可复用接口。
-
-Middleware for intercepting clarification requests and presenting them to the user."""
+"""拦截 Agent 的澄清工具调用，并将问题转换为可供界面展示的中断消息。"""
 
 import json
 import logging
@@ -19,48 +17,28 @@ logger = logging.getLogger(__name__)
 
 
 class ClarificationMiddlewareState(AgentState):
-    """封装 ClarificationMiddlewareState 的状态、协作关系与公开操作。
-
-    Compatible with the `ThreadState` schema."""
+    """与线程状态兼容的澄清中间件状态类型。"""
 
     pass
 
 
 class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
-    """封装 ClarificationMiddleware 的状态、协作关系与公开操作。
-
-    Intercepts clarification tool calls and interrupts execution to present questions to the user.
-
-        When the model calls the `ask_clarification` tool, this middleware:
-        1. Intercepts the tool call before execution
-        2. Extracts the clarification question and metadata
-        3. Formats a user-friendly message
-        4. Returns a Command that interrupts execution and presents the question
-        5. Waits for user response before continuing
-
-        This replaces the tool-based approach where clarification continued the conversation flow.
-    """
+    """将 `ask_clarification` 调用转成可见问题并结束当前图运行，等待用户后续回复。"""
 
     state_schema = ClarificationMiddlewareState
 
     def _stable_message_id(self, tool_call_id: str, formatted_message: str) -> str:
-        """执行 _stable_message_id 的明确职责，并返回与调用约定一致的结果。
-
-        Build a deterministic message ID so retried clarification calls replace, not append."""
+        """依据工具调用 ID 或消息摘要生成稳定 ID，避免重试重复追加问题。"""
         if tool_call_id:
             return f"clarification:{tool_call_id}"
         digest = sha256(formatted_message.encode("utf-8")).hexdigest()[:16]
         return f"clarification:{digest}"
 
     def _normalize_options(self, raw_options: Any) -> list[str]:
-        """执行 _normalize_options 的明确职责，并返回与调用约定一致的结果。
-
-        Normalize tool-provided options into displayable string values."""
+        """把工具参数中的选项统一转换为字符串列表，兼容 JSON 字符串形式。"""
         options = raw_options
 
-        # Some models (e.g. Qwen3-Max) serialize array parameters as JSON strings
-        # instead of native arrays. Deserialize and normalize so `options`
-        # is always a list for the rendering logic below.
+        # 部分模型会把数组参数序列化为 JSON 字符串；在界面渲染前统一还原为列表。
         if isinstance(options, str):
             try:
                 options = json.loads(options)
@@ -75,9 +53,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return [str(option) for option in options]
 
     def _build_human_input_payload(self, args: dict[str, Any], *, tool_call_id: str, request_id: str) -> dict[str, Any]:
-        """执行 _build_human_input_payload 的明确职责，并返回与调用约定一致的结果。
-
-        Build the structured UI payload while keeping ToolMessage.content as fallback."""
+        """生成前端识别的结构化用户输入载荷，同时保留可读文本作为兼容展示。"""
         options = self._normalize_options(args.get("options", []))
         clarification_type = str(args.get("clarification_type", "missing_info"))
 
@@ -111,35 +87,17 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return payload
 
     def _is_chinese(self, text: str) -> bool:
-        """执行 _is_chinese 的明确职责，并返回与调用约定一致的结果。
-
-        Check if text contains Chinese characters.
-
-                Args:
-                    text: Text to check
-
-                Returns:
-                    True if text contains Chinese characters
-        """
+        """检查文本中是否包含中日韩统一表意文字区的汉字。"""
         return any("\u4e00" <= char <= "\u9fff" for char in text)
 
     def _format_clarification_message(self, args: dict) -> str:
-        """执行 _format_clarification_message 的明确职责，并返回与调用约定一致的结果。
-
-        Format the clarification arguments into a user-friendly message.
-
-                Args:
-                    args: The tool call arguments containing clarification details
-
-                Returns:
-                    Formatted message string
-        """
+        """按澄清类型添加图标，并组合背景、问题和可选项供用户阅读。"""
         question = args.get("question", "")
         clarification_type = args.get("clarification_type", "missing_info")
         context = args.get("context")
         options = self._normalize_options(args.get("options", []))
 
-        # Type-specific icons
+        # 按澄清类型选择提示图标。
         type_icons = {
             "missing_info": "❓",
             "ambiguous_requirement": "🤔",
@@ -150,38 +108,28 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
 
         icon = type_icons.get(clarification_type, "❓")
 
-        # Build the message naturally
+        # 组合成自然阅读顺序。
         message_parts = []
 
-        # Add icon and question together for a more natural flow
+        # 有背景时先展示背景，再单独显示问题。
         if context:
-            # If there's context, present it first as background
+            # 先呈现背景，再提出具体问题。
             message_parts.append(f"{icon} {context}")
             message_parts.append(f"\n{question}")
         else:
-            # Just the question with icon
+            # 没有背景时直接显示问题。
             message_parts.append(f"{icon} {question}")
 
-        # Add options in a cleaner format
+        # 将选项按编号列出。
         if options and len(options) > 0:
-            message_parts.append("")  # blank line for spacing
+            message_parts.append("")  # 空行用于分隔问题和选项。
             for i, option in enumerate(options, 1):
                 message_parts.append(f"  {i}. {option}")
 
         return "\n".join(message_parts)
 
     def _is_disabled(self, request: ToolCallRequest) -> bool:
-        """执行 _is_disabled 的明确职责，并返回与调用约定一致的结果。
-
-        Whether clarifications are suppressed for this run.
-
-                Non-interactive channels (e.g. GitHub webhooks) set
-                ``disable_clarification`` in the run context because a clarification
-                would dead-end the run — the human only "replies" via a later
-                webhook delivery, by which point the agent's turn is long over.
-                When set, we don't interrupt; we return a ToolMessage nudging the
-                agent to proceed with its best judgment instead.
-        """
+        """检查当前运行上下文是否禁止交互式澄清。"""
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         if not context:
@@ -189,15 +137,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return bool(context.get("disable_clarification"))
 
     def _handle_disabled_clarification(self, request: ToolCallRequest) -> ToolMessage:
-        """执行 _handle_disabled_clarification 的明确职责，并返回与调用约定一致的结果。
-
-        Suppress a clarification and tell the agent to proceed.
-
-                Returns a plain ToolMessage (not a ``Command(goto=END)``) so the
-                agent loop continues instead of ending — the agent receives this
-                as the tool result and generates again, ideally acting rather
-                than re-asking.
-        """
+        """在非交互运行中不打断流程，而是要求 Agent 基于合理假设继续执行。"""
         tool_call_id = request.tool_call.get("id", "")
         logger.info("ask_clarification suppressed (disable_clarification set); instructing agent to proceed")
         return ToolMessage(
@@ -213,34 +153,24 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         )
 
     def _handle_clarification(self, request: ToolCallRequest) -> Command:
-        """执行 _handle_clarification 的明确职责，并返回与调用约定一致的结果。
-
-        Handle clarification request and return command to interrupt execution.
-
-                Args:
-                    request: Tool call request
-
-                Returns:
-                    Command that interrupts execution with the formatted clarification message
-        """
-        # Extract clarification arguments
+        """构造带结构化 UI 数据的工具消息，并通过图命令结束当前运行。"""
+        # 读取模型传入的澄清问题和选项。
         args = request.tool_call.get("args", {})
         question = args.get("question", "")
 
         logger.info("Intercepted clarification request")
         logger.debug("Clarification question: %s", question)
 
-        # Format the clarification message
+        # 生成用户可直接阅读的问题文本。
         formatted_message = self._format_clarification_message(args)
 
-        # Get the tool call ID
+        # 读取工具调用标识。
         tool_call_id = request.tool_call.get("id", "")
 
         request_id = self._stable_message_id(tool_call_id, formatted_message)
         human_input_payload = self._build_human_input_payload(args, tool_call_id=tool_call_id, request_id=request_id)
 
-        # Create a ToolMessage with the formatted question
-        # This will be added to the message history
+        # 将澄清文本和前端结构化载荷写入消息历史。
         tool_message = ToolMessage(
             id=request_id,
             content=formatted_message,
@@ -249,11 +179,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
             artifact={"human_input": human_input_payload},
         )
 
-        # Return a Command that:
-        # 1. Adds the formatted tool message
-        # 2. Interrupts execution by going to __end__
-        # Note: We don't add an extra AIMessage here - the frontend will detect
-        # and display ask_clarification tool messages directly
+        # 追加工具消息并结束当前图运行；前端会直接识别并展示该澄清消息。
         return Command(
             update={"messages": [tool_message]},
             goto=END,
@@ -265,20 +191,9 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果。
-
-        Intercept ask_clarification tool calls and interrupt execution (sync version).
-
-                Args:
-                    request: Tool call request
-                    handler: Original tool execution handler
-
-                Returns:
-                    Command that interrupts execution with the formatted clarification message
-        """
-        # Check if this is an ask_clarification tool call
+        """同步拦截澄清工具调用；其他工具仍交由原处理器执行。"""
         if request.tool_call.get("name") != "ask_clarification":
-            # Not a clarification call, execute normally
+            # 非澄清工具保持原有执行路径。
             return handler(request)
 
         if self._is_disabled(request):
@@ -292,20 +207,9 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果。
-
-        Intercept ask_clarification tool calls and interrupt execution (async version).
-
-                Args:
-                    request: Tool call request
-                    handler: Original tool execution handler (async)
-
-                Returns:
-                    Command that interrupts execution with the formatted clarification message
-        """
-        # Check if this is an ask_clarification tool call
+        """异步拦截澄清工具调用；其他工具通过异步原处理器继续执行。"""
         if request.tool_call.get("name") != "ask_clarification":
-            # Not a clarification call, execute normally
+            # 非澄清工具保持原有异步执行路径。
             return await handler(request)
 
         if self._is_disabled(request):

@@ -17,7 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def _dedupe_active_runs_per_thread() -> None:
-    """执行持久化流程所需的内部辅助操作。"""
+    """将同线程较旧的重复活动运行标记为错误，为唯一约束清理冲突数据。"""
     bind = op.get_bind()
     cancel_message = "cancelled during migration 0004_run_ownership: superseded by a newer active run for the same thread (partial unique index uq_runs_thread_active)"
     find_dupe_rows = sa.text(
@@ -70,7 +70,7 @@ def _dedupe_active_runs_per_thread() -> None:
 
 
 def upgrade() -> None:
-    """执行本迁移版本定义的数据库架构升级操作。"""
+    """添加运行所有者租约字段和索引，并约束每线程只能有一个活动运行。"""
     from deerflow.persistence.migrations._helpers import safe_add_column
 
     safe_add_column("runs", sa.Column("owner_worker_id", sa.String(length=128), nullable=True))
@@ -95,13 +95,12 @@ def upgrade() -> None:
                 "uq_runs_thread_active",
                 ["thread_id"],
                 unique=True,
-                sqlite_where=sa.text("status IN ('pending', 'running')"),
                 postgresql_where=sa.text("status IN ('pending', 'running')"),
             )
 
 
 def downgrade() -> None:
-    """执行本迁移版本定义的数据库架构回退操作。"""
+    """移除活动运行约束、租约索引和所有者字段。"""
     bind = op.get_bind()
     insp = sa.inspect(bind)
     existing = {ix["name"] for ix in insp.get_indexes("runs")}

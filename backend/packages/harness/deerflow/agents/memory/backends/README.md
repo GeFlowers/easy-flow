@@ -99,7 +99,7 @@ These are backend-agnostic. Don't touch them when swapping backends (unless you'
 | `packages/harness/deerflow/agents/middlewares/memory_middleware.py` | `after_agent` -> `manager.add` |
 | `packages/harness/deerflow/agents/memory/summarization_hook.py` | summarization -> `manager.add_nowait` |
 | `packages/harness/deerflow/agents/lead_agent/prompt.py` | `_get_memory_context` -> `manager.get_context` |
-| `app/gateway/routers/memory.py` | HTTP endpoints -> `manager.*` (hasattr-probed) |
+| `app/gateway/routers/configuration/memory.py` | HTTP endpoints -> `manager.*` (hasattr-probed) |
 | `packages/harness/deerflow/config/memory_config.py` | shared 4 fields (`enabled` / `injection_enabled` / `manager_class` / `backend_config`) |
 | `frontend/src/components/workspace/settings/memory-settings-page.tsx` | frontend memory page (assumes DeerMem shape) |
 

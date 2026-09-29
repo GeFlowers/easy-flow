@@ -1,20 +1,4 @@
-"""定义 input_sanitization_middleware 模块提供的职责与可复用接口。
-
-Input guardrail middleware for prompt-injection defense (issue #3630).
-
-Escapes blocked XML-like tags in the last genuine user message (e.g.
-``<system>`` → ``&lt;system&gt;``) so they render as literal text instead
-of structured-context markers.  This preserves the user's intent ("how do
-I use DeerFlow's <think> tag?") while neutralizing injection attempts —
-the same de-identify-don't-reject strategy as AWS Bedrock's PII ANONYMIZE.
-
-Blocked: system-reserved tags (memory, analysis, etc.) + common injection
-tags (system, instruction, role, etc.). Normal HTML/XML tags (<div>,
-<span>) are NOT escaped.
-
-Clean input is wrapped in plain-text boundary markers as a secondary
-semantic defense (OWASP structured-prompt guidance).
-"""
+"""在模型调用前中和用户文本中的伪造控制标签，并用边界标记隔离原始输入。"""
 
 from __future__ import annotations
 
@@ -40,27 +24,13 @@ logger = logging.getLogger(__name__)
 
 _SUMMARY_MESSAGE_NAME = "summary"
 
-# Finite set of blocked tag names: system-reserved + common injection patterns.
+# 拒绝列表包含框架保留标签和常见提示注入标签。
 _BLOCKED_TAG_NAMES: frozenset[str] = frozenset(
     {
-        # Framework-injected structured/authority blocks. The lead-agent system
-        # prompt's "System-Context Confidentiality" section (agents/lead_agent/
-        # prompt.py) declares *every* such tag trusted internal data — it names a
-        # few then says "and all other structured tags". So the denylist must
-        # cover the framework's authority blocks as a class, not a hand-picked
-        # subset: any one of them, forged in untrusted input, mimics trusted
-        # framework context. Enumerated from the block tags the framework actually
-        # emits into model input (system prompt + hidden-context/reminder
-        # middlewares) and pinned against drift by
-        # test_input_sanitization_middleware.py::test_denylist_covers_framework_authority_blocks.
-        # Both spellings of the reminder block are covered: "system-reminder"
-        # (dynamic-context) and "system_reminder" (todo/terminal middlewares).
+        # 覆盖框架实际注入模型上下文的全部权威标签，避免不可信消息伪造内部提示块。
+        # system-reminder 与 system_reminder 是不同中间件使用的两种拼写。
         #
-        # Subagents share this denylist: build_subagent_runtime_middlewares reuses
-        # the same _build_runtime_middlewares base, so both sanitization paths guard
-        # subagent model input too. The subagent system-prompt blocks
-        # (file_editing_workflow / guidelines / output_format / working_directory)
-        # are therefore authority blocks of the same class as the lead-agent ones.
+        # 子代理复用同一组基础中间件，因此其系统提示标签也必须纳入保护范围。
         "system-reminder",
         "system_reminder",
         "memory",
@@ -92,11 +62,9 @@ _BLOCKED_TAG_NAMES: frozenset[str] = frozenset(
         "guidelines",
         "output_format",
         "working_directory",
-        # Subagent system-prompt block (general_purpose.py): declares the task
-        # tool off-limits. Forging this in untrusted input could trick the
-        # model into believing it has (or lacks) tool restrictions it does not.
+        # 子代理提示块用于声明 task 工具限制，伪造该标签会误导模型对权限的判断。
         "tool_restrictions",
-        # Common prompt-injection tag patterns
+        # 常见提示注入标签。
         "system",
         "instruction",
         "important",
@@ -106,38 +74,33 @@ _BLOCKED_TAG_NAMES: frozenset[str] = frozenset(
     }
 )
 
-# Matches a full blocked tag: <tag>, </tag>, <tag attrs>, <tag/>, bare <tag
+# 匹配完整或不完整的被拒绝标签，包括闭合标签和带属性标签。
 _BLOCKED_TAG_PATTERN = re.compile(
     r"<\s*/?\s*(?:" + "|".join(re.escape(t) for t in sorted(_BLOCKED_TAG_NAMES)) + r")\b[^>]*>?",
     re.IGNORECASE,
 )
 
-# Plain-text boundary markers (OWASP structured-prompt guidance).
+# 用户文本的纯文本边界标记，用于区分数据与指令。
 _USER_INPUT_BEGIN = "--- BEGIN USER INPUT ---"
 _USER_INPUT_END = "--- END USER INPUT ---"
 
-# Neutralized forms injected when the user's text already contains a marker.
-# These look visually similar but do not match the real boundary delimiters.
+# 用户文本若包含真实边界标记，则改成外观相近但无法匹配的中和形式。
 _NEUTRALIZED_BEGIN = "[BEGIN USER INPUT]"
 _NEUTRALIZED_END = "[END USER INPUT]"
 
-# Matches either boundary token as a standalone line or embedded in text.
+# 匹配正文中任意位置出现的真实边界标记。
 _BOUNDARY_TOKEN_RE = re.compile(
     re.escape(_USER_INPUT_BEGIN) + r"|" + re.escape(_USER_INPUT_END),
 )
 
 
 def _escape_tag_match(match: re.Match) -> str:
-    """执行 _escape_tag_match 的明确职责，并返回与调用约定一致的结果。
-
-    Escape < and > in a blocked-tag match so it renders as literal text."""
+    """转义被拒绝标签的尖括号，使其作为普通文本显示。"""
     return match.group(0).replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _neutralize_boundary_tokens(text: str) -> str:
-    """执行 _neutralize_boundary_tokens 的明确职责，并返回与调用约定一致的结果。
-
-    Replace real BEGIN/END USER INPUT markers with look-alike inert forms."""
+    """将正文中伪造或冲突的输入边界标记替换为无结构含义的文本。"""
     return _BOUNDARY_TOKEN_RE.sub(
         lambda m: _NEUTRALIZED_BEGIN if m.group(0) == _USER_INPUT_BEGIN else _NEUTRALIZED_END,
         text,
@@ -145,29 +108,7 @@ def _neutralize_boundary_tokens(text: str) -> str:
 
 
 def neutralize_untrusted_tags(text: str) -> str:
-    """执行 neutralize_untrusted_tags 的明确职责，并返回与调用约定一致的结果。
-
-    Neutralize framework/injection control tokens in untrusted text.
-
-        Shared primitive for any content that originates outside the trust boundary
-        and is about to enter the model context as *data* — currently the genuine
-        user message (via :func:`_check_user_content`) and remote tool results
-        (web_fetch / web_search and friends, via
-        :class:`ToolResultSanitizationMiddleware`).
-
-        Applies exactly the two structural defenses, and nothing else:
-
-        * blocked framework/injection tags (e.g. ``<system-reminder>``) are
-          HTML-escaped to ``&lt;system-reminder&gt;`` so they lose their structural
-          meaning while staying human-readable;
-        * the plain-text ``--- BEGIN/END USER INPUT ---`` boundary markers are
-          neutralized so untrusted content cannot forge or break out of the
-          user-input boundary.
-
-        It intentionally does **not** wrap the text in boundary markers: that
-        framing is specific to the user message. Empty/whitespace-only text is
-        returned unchanged so callers do not emit marker noise.
-    """
+    """中和不可信文本中的框架标签和输入边界标记，但不添加用户消息专用的包裹标记。"""
     if not text.strip():
         return text
     text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
@@ -175,13 +116,7 @@ def neutralize_untrusted_tags(text: str) -> str:
 
 
 def _is_genuine_user_message(message: object) -> bool:
-    """执行 _is_genuine_user_message 的明确职责，并返回与调用约定一致的结果。
-
-    Return True for real user messages, excluding system-injected HumanMessages.
-
-        ``hide_from_ui`` is also used by hidden UI replies from HumanInputCard, so
-        only skip hidden HumanMessages that do not carry a valid user response.
-    """
+    """识别真实用户消息，排除摘要和不含有效人工输入结果的隐藏消息。"""
     if not isinstance(message, HumanMessage):
         return False
     if message.name == _SUMMARY_MESSAGE_NAME:
@@ -192,57 +127,29 @@ def _is_genuine_user_message(message: object) -> bool:
 
 
 def _check_user_content(text: str) -> str:
-    """执行 _check_user_content 的明确职责，并返回与调用约定一致的结果。
-
-    Sanitize user content: escape blocked tags, then wrap in boundary markers.
-
-        * Empty/whitespace-only → return unchanged (no marker noise).
-        * Blocked tags → HTML-escape ``<``/``>`` (e.g. ``<system>`` → ``&lt;system&gt;``).
-        * Boundary tokens in user text → neutralized so they cannot forge boundaries.
-        * Already wrapped (strict prefix+suffix) → return text unchanged (idempotent).
-        * Otherwise → wrap in boundary markers.
-    """
+    """转义保留标签并包裹用户文本，同时保证重复处理不会嵌套边界标记。"""
     if not text.strip():
         return text
     text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
-    # Idempotency: only skip if text is *exactly* wrapped (prefix+suffix),
-    # not if the user merely typed the begin token somewhere.
+    # 只有文本完整包含首尾标记时才视为已处理，单独出现起始标记不算。
     if text.startswith(_USER_INPUT_BEGIN) and text.endswith(_USER_INPUT_END):
-        # Still neutralize boundary tokens in the inner content — a user
-        # can forge the outer wrapping to bypass the neutralization below
-        # and inject inner boundary markers (break-out attack).
+        # 即使已有外层标记也要处理中间正文，防止用户伪造包裹并插入内部边界。
         inner = text[len(_USER_INPUT_BEGIN) : -len(_USER_INPUT_END)]
         neutralized_inner = _neutralize_boundary_tokens(inner)
         if neutralized_inner == inner:
             return text
         return f"{_USER_INPUT_BEGIN}{neutralized_inner}{_USER_INPUT_END}"
-    # Neutralize any boundary tokens the user may have embedded, preventing
-    # both self-suppression (begin token skips wrapping) and break-out
-    # (end token creates a premature boundary inside the payload).
+    # 先中和用户自带的标记，防止跳过包裹或提前关闭输入边界。
     text = _neutralize_boundary_tokens(text)
     return f"{_USER_INPUT_BEGIN}\n{text}\n{_USER_INPUT_END}"
 
 
 class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
-    """封装 InputSanitizationMiddleware 的状态、协作关系与公开操作。
-
-    Guardrail middleware that escapes prompt-injection tags in user input.
-
-        Blocked tags are HTML-escaped (not rejected) so the user's intent is
-        preserved while the tags lose their semantic significance. Clean input
-        is wrapped in plain-text boundary markers. Transformation is temporary
-        (wrap_model_call) — never written to state.
-    """
+    """仅在模型请求副本中净化用户输入，不改写持久化的线程消息。"""
 
     @staticmethod
     def _extract_text_from_content(content: str | list) -> tuple[str, list | None]:
-        """执行 _extract_text_from_content 的明确职责，并返回与调用约定一致的结果。
-
-        Extract concatenated text from a plain-string or content-block-list.
-
-                Returns ``(text, extracted_blocks)``. *extracted_blocks* is None when
-                *content* is a string, or the list of text-content-block dicts when a list.
-        """
+        """从字符串或多模态内容块中提取文本，并返回对应的原文本块引用。"""
         if isinstance(content, str):
             return content, None
         if not isinstance(content, list):
@@ -261,13 +168,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         processed_text: str,
         text_blocks: list[dict],
     ) -> list:
-        """执行 _rebuild_content 的明确职责，并返回与调用约定一致的结果。
-
-        Replace text blocks with a single merged text block, preserving interleaved non-text blocks.
-
-                For ``[text, image, text]`` the image block between the two text blocks
-                is kept in place — only the text blocks are collapsed into one.
-        """
+        """将文本块合并为净化后的单块，同时保留夹在其中的图片等非文本块。"""
         text_block_ids = {id(b) for b in text_blocks}
         first = last = None
         for i, block in enumerate(original_content):
@@ -278,7 +179,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         if first is None:
             return original_content
         result: list = [*original_content[:first], {"type": "text", "text": processed_text}]
-        # Re-insert any non-text blocks that sat between text blocks
+        # 将首尾文本块之间的图片等非文本块按原顺序放回结果。
         for i in range(first + 1, last + 1):
             if id(original_content[i]) not in text_block_ids:
                 result.append(original_content[i])
@@ -286,14 +187,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         return result
 
     def _process_request(self, request: ModelRequest) -> ModelRequest:
-        """执行 _process_request 的明确职责，并返回与调用约定一致的结果。
-
-        Return a request with the last genuine user message sanitized.
-
-                Blocked tags are HTML-escaped (not rejected) so the user's intent is
-                preserved while the tags lose their semantic significance. Transformation
-                is temporary — the original request is never mutated.
-        """
+        """复制模型请求并净化最近一条真实用户消息，原状态和消息对象保持不变。"""
         messages = list(request.messages)
         for i in range(len(messages) - 1, -1, -1):
             msg = messages[i]
@@ -312,7 +206,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
 
             text_content, text_blocks = self._extract_text_from_content(content)
 
-            # No text at all (e.g. image-only message) — pass through
+            # 纯图片等没有文本的消息不做改写。
             if not text_content and not isinstance(content, str):
                 logger.debug("_process_request: no text content in message — passing through")
                 return request
@@ -320,7 +214,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
             processed = _check_user_content(text_content)
 
             if processed == text_content:
-                # Already wrapped — no override needed
+                # 文本已经按规则处理，无需创建新请求。
                 return request
 
             if text_blocks:
@@ -328,11 +222,8 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
             else:
                 new_content = processed
 
-            # Preserve the pre-sanitization user text so downstream consumers that
-            # must see the genuine input (slash skill activation, regenerate) can
-            # recover it after the BEGIN/END wrapping. Keep a valid value set by
-            # UploadsMiddleware or an IM channel, but repair malformed metadata so
-            # persistence never falls back to the wrapped model-facing content.
+            # 保存净化前文本，供斜杠技能识别和重新生成等逻辑读取；保留合法上游值，
+            # 并修复无效元数据，避免持久化时误用模型看到的包裹文本。
             preserved_kwargs = dict(msg.additional_kwargs or {})
             original_user_content = preserved_kwargs.get(ORIGINAL_USER_CONTENT_KEY)
             if not isinstance(original_user_content, str):
@@ -358,19 +249,14 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         return request
 
     def _try_process(self, request: ModelRequest) -> ModelRequest:
-        """执行 _try_process 的明确职责，并返回与调用约定一致的结果。
-
-        Sanitize request; fail-open on unexpected errors.
-
-                GraphBubbleUp propagates; other exceptions return the original request.
-        """
+        """净化模型请求；图控制异常继续传播，其他内部错误则记录并放行原请求。"""
         try:
             return self._process_request(request)
         except GraphBubbleUp:
             raise
         except Exception:
             logger.warning(
-                "Input guardrail processing failed; passing original request to model",
+                "用户输入净化失败，继续使用原请求调用模型",
                 exc_info=True,
             )
             return request

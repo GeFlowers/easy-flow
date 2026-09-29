@@ -65,7 +65,6 @@ class RunRow(Base):
             "uq_runs_thread_active",
             "thread_id",
             unique=True,
-            sqlite_where=text("status IN ('pending', 'running')"),
             postgresql_where=text("status IN ('pending', 'running')"),
         ),
     )

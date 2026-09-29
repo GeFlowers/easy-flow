@@ -147,7 +147,7 @@ def web_search_tool(
     query: str,
     max_results: int = 5,
 ) -> str:
-    """Search the web for information. Use this tool to find current information, news, articles, and facts from the internet.
+    """通过 DuckDuckGo 查询网络上的最新信息、新闻、文章或事实。
 
     Args:
         query: Search keywords describing what you want to find. Be specific for better results.

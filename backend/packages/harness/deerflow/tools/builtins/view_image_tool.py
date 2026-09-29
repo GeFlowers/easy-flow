@@ -56,7 +56,7 @@ def view_image_tool(
     image_path: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """Read an image file.
+    """读取图片文件并返回可供模型分析的图像内容。
 
     Use this tool to read an image file and make it available for display.
 

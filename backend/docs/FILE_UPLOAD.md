@@ -233,7 +233,7 @@ backend/.deer-flow/threads/
 
 ### 组件
 
-1. **Upload Router** (`app/gateway/routers/uploads.py`)
+1. **Upload Router** (`app/gateway/routers/conversations/uploads.py`)
    - 处理文件上传、列表、删除请求
    - 使用 markitdown 转换文档
 
@@ -257,7 +257,7 @@ backend/.deer-flow/threads/
 1. 检查文件大小是否超过限制
 2. 检查 Gateway API 是否正常运行
 3. 检查磁盘空间是否充足
-4. 查看 Gateway 日志：`make gateway`
+4. 查看 Gateway 日志：`make docker-logs-gateway`
 
 ### 文档转换失败
 

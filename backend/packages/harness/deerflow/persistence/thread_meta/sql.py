@@ -33,8 +33,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         for key in ("created_at", "updated_at"):
             val = d.get(key)
             if isinstance(val, datetime):
-                # SQLite drops tzinfo despite ``DateTime(timezone=True)``;
-                # ``coerce_iso`` normalizes naive values as UTC so the wire format always carries tz.
+                # 历史记录可能是无时区时间；统一转成带 UTC 偏移的 ISO 字符串。
                 d[key] = coerce_iso(val)
         return d
 
@@ -85,7 +84,7 @@ class ThreadMetaRepository(ThreadMetaStore):
             return self._row_to_dict(row)
 
     async def check_access(self, thread_id: str, user_id: str, *, require_existing: bool = False) -> bool:
-        """执行当前持久化组件提供的操作。"""
+        """检查线程是否归属指定用户，并按参数处理缺少元数据的线程。"""
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)
             if row is None:
@@ -132,7 +131,7 @@ class ThreadMetaRepository(ThreadMetaStore):
             return [self._row_to_dict(r) for r in result.scalars()]
 
     async def _check_ownership(self, session: AsyncSession, thread_id: str, resolved_user_id: str | None) -> bool:
-        """执行持久化流程所需的内部辅助操作。"""
+        """在当前会话中验证线程归属；None 表示显式跳过所有者过滤。"""
         if resolved_user_id is None:
             return True  # explicit bypass
         row = await session.get(ThreadMetaRow, thread_id)

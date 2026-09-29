@@ -13,7 +13,7 @@ _SECRET_NAME_PATTERNS: tuple[str, ...] = (
     #
     "*PASS*",
     "*CREDENTIAL*",
-    "*DSN*",  # 中文说明：此处用于执行相关处理。
+    "*DSN*",
 )
 
 #

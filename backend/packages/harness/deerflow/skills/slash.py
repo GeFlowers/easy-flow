@@ -42,9 +42,7 @@ class ResolvedSlashSkill:
 
 
 def parse_slash_skill_reference(text: str) -> SlashSkillReference | None:
-    """解析输入并返回结构化结果，并遵守 parse_slash_skill_reference 所表达的接口约束。
-
-    Parse strict `/skill-name task` syntax, ignoring reserved control commands."""
+    """解析严格的 `/skill-name task` 输入，并忽略保留的控制命令。"""
     match = _SLASH_SKILL_RE.match(text)
     if not match:
         return None

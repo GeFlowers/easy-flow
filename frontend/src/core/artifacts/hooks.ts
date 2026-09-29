@@ -18,7 +18,7 @@ export function useArtifactContent({
   const isWriteFile = useMemo(() => {
     return filepath.startsWith("write-file:");
   }, [filepath]);
-  const { thread, isMock } = useThread();
+  const { thread } = useThread();
   const content = useMemo(() => {
     if (isWriteFile) {
       return loadArtifactContentFromToolCall({ url: filepath, thread });
@@ -27,9 +27,9 @@ export function useArtifactContent({
   }, [filepath, isWriteFile, thread]);
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["artifact", filepath, threadId, isMock],
+    queryKey: ["artifact", filepath, threadId],
     queryFn: () => {
-      return loadArtifactContent({ filepath, threadId, isMock });
+      return loadArtifactContent({ filepath, threadId });
     },
     enabled,
     // 缓存制品内容五分钟，避免重复获取，尤其是 .skill ZIP 解压场景。

@@ -15,7 +15,7 @@ from .store import get_store, make_store, reset_store, store_context
 # NOTE: ``RedisStreamBridge`` is intentionally not re-exported — ``redis`` is an
 # optional extra and importing it here would load ``redis.asyncio`` in every
 # process. Import it from ``deerflow.runtime.stream_bridge.redis`` when needed.
-from .stream_bridge import END_SENTINEL, HEARTBEAT_SENTINEL, MemoryStreamBridge, StreamBridge, StreamEvent, make_stream_bridge
+from .stream_bridge import END_SENTINEL, HEARTBEAT_SENTINEL, StreamBridge, StreamEvent, make_stream_bridge
 
 __all__ = [
     # checkpointer
@@ -48,7 +48,6 @@ __all__ = [
     # stream_bridge
     "END_SENTINEL",
     "HEARTBEAT_SENTINEL",
-    "MemoryStreamBridge",
     "StreamBridge",
     "StreamEvent",
     "make_stream_bridge",

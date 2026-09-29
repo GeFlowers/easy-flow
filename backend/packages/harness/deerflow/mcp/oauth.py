@@ -113,12 +113,6 @@ class OAuthTokenManager:
         access_token = payload.get(oauth.token_field)
         if not access_token:
             raise ValueError(f"OAuth token response missing '{oauth.token_field}'")
-
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
-            # 中文说明：此处用于执行相关处理。
         if oauth.grant_type == "refresh_token":
             rotated = payload.get("refresh_token")
             if isinstance(rotated, str) and rotated:

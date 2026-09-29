@@ -212,7 +212,7 @@ def _target_status_warning(result: BrowserlessScreenshotResult) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 async def web_fetch_tool(url: str) -> str:
-    """Fetch the contents of a web page at a given URL using Browserless (headless Chrome).
+    """通过 Browserless 浏览器读取指定网页内容，支持需要页面渲染的站点。
     Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
     This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
     Do NOT add www. to URLs that do NOT have them.
@@ -277,7 +277,7 @@ async def web_capture_tool(
     viewport_width: int | None = None,
     viewport_height: int | None = None,
 ) -> Command:
-    """Capture a rendered webpage screenshot and present it as an artifact.
+    """截取渲染后的网页画面，并将截图作为项目产物呈现。
 
     Use this tool when you need a visual capture of a public webpage, especially JavaScript-heavy pages, UI states, dashboards, or visual evidence for a report.
     Only capture exact URLs provided by the user or discovered through other tools. Do not use this for private pages behind login unless the user has explicitly configured Browserless outside DeerFlow.

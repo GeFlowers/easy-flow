@@ -16,7 +16,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """执行本迁移版本定义的数据库架构升级操作。"""
+    """为运行记录新增按模型统计的 token 用量 JSON 字段。"""
     safe_add_column(
         "runs",
         sa.Column(
@@ -29,5 +29,5 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """执行本迁移版本定义的数据库架构回退操作。"""
+    """移除运行记录中的按模型 token 用量字段。"""
     safe_drop_column("runs", "token_usage_by_model")

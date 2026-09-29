@@ -1,6 +1,4 @@
-"""定义 skill_activation_middleware 模块提供的职责与可复用接口。
-
-Middleware for skill activation: explicit slash + in-context secret binding."""
+"""处理显式斜杠技能激活，并按当前授权状态绑定请求中的技能密钥。"""
 
 from __future__ import annotations
 
@@ -40,27 +38,13 @@ logger = logging.getLogger(__name__)
 _SLASH_SKILL_ACTIVATION_KEY = "slash_skill_activation"
 _SLASH_SKILL_ACTIVATION_TARGET_ID_KEY = "slash_skill_activation_target_id"
 
-# _SECRETS_BINDING_AUDIT_KEY: last audited binding (skill and secret names only,
-# never values) so unchanged bindings are not re-recorded each call.
-# _SLASH_SECRET_SOURCE_KEY: latest slash activation as a secret source, holding
-# ONLY the activated skill's canonical container path (never its declared
-# secrets — those are read from the live registry on each call, #3938). The
-# injection set is recomputed every model call, but a slash-activated skill must
-# stay bound for the rest of the run — the model's tool loop issues many model
-# calls after the single activation call (#3861 semantics).
-# _SLASH_SKILL_ACTIVATION_RUN_KEY: identity of the slash message already activated
-# in this run, so the reminder injection + skill disk read + "activate" audit event
-# fire once per user slash command instead of on every model call. The reminder is
-# added via request.override(messages=...) for a single model call and never
-# persisted to graph state, so the 2nd..Nth model call of a turn rebuilds
-# request.messages from state without it — the run context is the only signal that
-# survives the tool loop. All three live in secret_context so they are covered by
-# REDACTED_CONTEXT_KEYS in one place.
+# 这些内部键分别缓存最近一次密钥绑定审计、显式技能来源路径和本轮已处理的斜杠消息。
+# 只保存路径与名称，不把密钥值放入审计；运行上下文的敏感字段由 secret_context 集中脱敏。
 
 
 @dataclass(frozen=True, slots=True)
 class _Activation:
-    "封装 _Activation 的状态、协作关系与公开操作"
+    """保存一次斜杠激活所需的技能内容、路径、类别和请求剩余文本。"""
 
     skill_name: str
     category: str
@@ -74,28 +58,24 @@ class _Activation:
 
 @dataclass(frozen=True, slots=True)
 class _ActivationResolution:
-    "封装 _ActivationResolution 的状态、协作关系与公开操作"
+    """表示技能激活的解析结果：成功时包含激活数据，失败时包含提示文本。"""
 
     activation: _Activation | None = None
     failure_message: str | None = None
 
 
 def is_slash_skill_activation_reminder(message: object) -> bool:
-    """判断条件是否成立并返回布尔结果，并遵守 is_slash_skill_activation_reminder 所表达的接口约束。
-
-    Return whether a message is hidden slash-skill activation context."""
+    """判断消息是否为隐藏的斜杠技能激活上下文。"""
     return isinstance(message, HumanMessage) and bool(message.additional_kwargs.get(_SLASH_SKILL_ACTIVATION_KEY))
 
 
 def _is_user_activation_target(message: object) -> bool:
-    "执行 _is_user_activation_target 的明确职责，并返回与调用约定一致的结果"
+    """判断消息是否是可触发技能激活的真实用户消息。"""
     return is_real_user_message(message)
 
 
 class SkillActivationMiddleware(AgentMiddleware):
-    """封装 SkillActivationMiddleware 的状态、协作关系与公开操作。
-
-    Inject full SKILL.md content when the user explicitly types /skill-name."""
+    """识别用户的 ``/技能名`` 命令，加载技能说明并按需绑定其请求密钥。"""
 
     def __init__(
         self,
@@ -104,14 +84,14 @@ class SkillActivationMiddleware(AgentMiddleware):
         app_config: AppConfig | None = None,
         user_id: str | None = None,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        """保存可用技能白名单、配置快照和当前用户范围。"""
         super().__init__()
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
 
     def _storage(self) -> SkillStorage:
-        "执行 _storage 的明确职责，并返回与调用约定一致的结果"
+        """按用户和配置范围取得技能存储实例。"""
         if self._user_id is not None:
             return get_or_new_user_skill_storage(self._user_id, app_config=self._app_config)
         if self._app_config is not None:
@@ -120,14 +100,10 @@ class SkillActivationMiddleware(AgentMiddleware):
 
     @staticmethod
     def _read_skill_content(skill_file: Path, skills_root: Path, *, storage: SkillStorage | None = None) -> str:
-        "执行 _read_skill_content 的明确职责，并返回与调用约定一致的结果"
+        """校验技能文件位于允许的存储根中，再以 UTF-8 读取 SKILL.md。"""
         if skill_file.name != SKILL_MD_FILE:
             raise ValueError(f"Expected {SKILL_MD_FILE}, got {skill_file.name}")
-        # Use the storage's path validation if available — UserScopedSkillStorage
-        # stores custom skills in a per-user directory that is not a sub-path of
-        # the global skills root, so the simple relative_to check would reject them.
-        # Fall back to the relative_to check when the storage is a mock (e.g. tests)
-        # that doesn't implement validate_skill_file_path.
+        # 用户级技能可能位于全局技能根之外，优先使用存储后端自己的路径校验。
         if storage is not None and hasattr(storage, "validate_skill_file_path"):
             resolved_file = storage.validate_skill_file_path(skill_file)
         else:
@@ -142,7 +118,7 @@ class SkillActivationMiddleware(AgentMiddleware):
         return resolved_file.read_text(encoding="utf-8")
 
     def _resolve_activation(self, text: str) -> _ActivationResolution | None:
-        "执行 _resolve_activation 的明确职责，并返回与调用约定一致的结果"
+        """解析斜杠命令，校验技能启用和白名单，并安全加载技能说明。"""
         reference = parse_slash_skill_reference(text)
         if reference is None:
             return None
@@ -173,7 +149,7 @@ class SkillActivationMiddleware(AgentMiddleware):
             return _ActivationResolution(failure_message=f"Skill `/{reference.name}` could not be loaded safely. Please check the skill installation.")
 
         content_hash = hashlib.sha256(skill_content.encode("utf-8")).hexdigest()
-        # CUSTOM skills are editable; PUBLIC and LEGACY are read-only
+        # 只有用户自定义技能允许被编辑。
         editable = resolved.skill.category == SkillCategory.CUSTOM
         return _ActivationResolution(
             activation=_Activation(
@@ -190,8 +166,8 @@ class SkillActivationMiddleware(AgentMiddleware):
 
     @staticmethod
     def _build_activation_reminder(activation: _Activation) -> str:
-        "执行 _build_activation_reminder 的明确职责，并返回与调用约定一致的结果"
-        user_request = activation.remaining_text or ("No additional task text was provided after the slash skill command. Ask the user what they want to do with this skill if the next step is unclear.")
+        """生成包含用户原始任务和转义技能正文的隐藏激活提示。"""
+        user_request = activation.remaining_text or ("斜杠技能命令后没有附加任务。若下一步不明确，请询问用户希望如何使用该技能。")
         escaped_user_request = html.escape(user_request, quote=False)
         escaped_skill_content = html.escape(activation.skill_content, quote=False)
         escaped_skill_name = html.escape(activation.skill_name, quote=True)
@@ -217,7 +193,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _has_existing_activation_for_target(messages: list, target_index: int, target: HumanMessage) -> bool:
-        "执行 _has_existing_activation_for_target 的明确职责，并返回与调用约定一致的结果"
+        """检查目标用户消息之前是否已有对应激活提示，避免重复激活。"""
         if target_index <= 0:
             return False
 
@@ -234,15 +210,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _activation_run_key(target: HumanMessage) -> str:
-        """执行 _activation_run_key 的明确职责，并返回与调用约定一致的结果。
-
-        Stable identity for a user slash message, used to activate once per run.
-
-                Prefers the message id (LangGraph assigns and preserves a stable id once a
-                message is in graph state); falls back to a digest of the genuine user text
-                so an id-less message still dedupes within a run. A new user slash message
-                (new id / new text) yields a new key, so it is not suppressed.
-        """
+        """为本轮斜杠消息生成稳定键；优先使用消息 ID，否则摘要原始用户文本。"""
         if target.id:
             return target.id
         content = get_original_user_content_text(target.content, target.additional_kwargs)
@@ -250,30 +218,18 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _run_context(request: ModelRequest) -> dict | None:
-        "执行 _run_context 的明确职责，并返回与调用约定一致的结果"
+        """取得模型请求对应的可变运行上下文；类型不符时返回 ``None``。"""
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         return context if isinstance(context, dict) else None
 
     @staticmethod
     def _already_activated(run_context: dict | None, run_key: str) -> bool:
-        """执行 _already_activated 的明确职责，并返回与调用约定一致的结果。
-
-        Whether ``run_key`` was already recorded as activated earlier in this run.
-
-                Sibling to ``_has_existing_activation_for_target``: that helper catches an
-                activation reminder still present in the scanned ``messages`` window; this
-                one catches a prior activation recorded on ``run_context`` whose reminder
-                already fell out of that window (the tool-loop case — see
-                ``_SLASH_SKILL_ACTIVATION_RUN_KEY``). ``run_key`` is computed once by the
-                caller (``_find_activation_target``) and reused as-is at the write site in
-                ``_prepare_model_request``, so the same key is always used to check and to
-                record — this helper only ever checks membership, never computes the key.
-        """
+        """判断同一斜杠消息是否已在运行上下文登记，覆盖提示已离开消息窗口的情况。"""
         return isinstance(run_context, dict) and run_context.get(_SLASH_SKILL_ACTIVATION_RUN_KEY) == run_key
 
     def _find_activation_target(self, messages: list, *, run_context: dict | None = None) -> tuple[int, HumanMessage, _ActivationResolution, str] | None:
-        "执行 _find_activation_target 的明确职责，并返回与调用约定一致的结果"
+        """从最近的真实用户消息中寻找尚未处理的技能命令并解析其目标。"""
         if not messages:
             return None
 
@@ -286,13 +242,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
             return None
         if self._has_existing_activation_for_target(messages, target_index, target):
             return None
-        # This exact slash message may have already activated earlier in the run.
-        # The message scan above cannot catch it because the reminder lives only in
-        # a per-call request override, never in state — the run context is the
-        # durable signal (see _already_activated / _SLASH_SKILL_ACTIVATION_RUN_KEY).
-        # Skipping here avoids the redundant skill disk read, reminder re-injection,
-        # and duplicate "activate" audit. run_key is computed once here and threaded
-        # through to the write site in _prepare_model_request.
+        # 激活提示只存在于单次请求覆盖中，因此需要运行上下文避免工具循环期间再次读盘和审计。
         run_key = self._activation_run_key(target)
         if self._already_activated(run_context, run_key):
             return None
@@ -305,7 +255,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _record_activation(request: ModelRequest, activation: _Activation, *, hook: str) -> None:
-        "执行 _record_activation 的明确职责，并返回与调用约定一致的结果"
+        """向运行日志记录激活的技能信息，不记录技能密钥值。"""
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         journal = context.get("__run_journal") if isinstance(context, dict) else None
@@ -328,7 +278,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
             logger.debug("Failed to record slash skill activation audit event", exc_info=True)
 
     def _prepare_model_request(self, request: ModelRequest, *, hook: str) -> tuple[ModelRequest | AIMessage | None, _Activation | None]:
-        "执行 _prepare_model_request 的明确职责，并返回与调用约定一致的结果"
+        """完成激活提示插入和审计，并登记本轮激活键以阻止重复处理。"""
         run_context = self._run_context(request)
         target_and_resolution = self._find_activation_target(list(request.messages), run_context=run_context)
         if target_and_resolution is None:
@@ -350,15 +300,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
             activation.content_hash,
         )
         self._record_activation(request, activation, hook=hook)
-        # Mark this slash message as activated for the run so the tool loop's later
-        # model calls skip the redundant re-activation (#3861: one activation call,
-        # many follow-up model calls). A new user slash message keys differently and
-        # still activates. Overwrite (`=`), not append/accumulate, is intentional:
-        # _find_activation_target only ever considers the latest real user message as
-        # an activation target, so there is nothing earlier in the run worth
-        # remembering once a new activation replaces it — do not "fix" this into a
-        # set. run_key is the same value already checked in _find_activation_target
-        # (computed once there, threaded through here) rather than recomputed.
+        # 每轮只需记住最近一次激活目标；新斜杠命令会覆盖旧键，工具循环中的重复请求则被跳过。
         if run_context is not None:
             run_context[_SLASH_SKILL_ACTIVATION_RUN_KEY] = run_key
         activation_msg = self._make_activation_message(target, self._build_activation_reminder(activation))
@@ -367,7 +309,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return request.override(messages=messages), activation
 
     def _handle_model_request(self, request: ModelRequest, *, hook: str) -> ModelRequest | AIMessage:
-        "执行 _handle_model_request 的明确职责，并返回与调用约定一致的结果"
+        """准备激活请求并刷新密钥绑定；解析失败时直接返回给模型的错误消息。"""
         prepared, activation = self._prepare_model_request(request, hook=hook)
         if isinstance(prepared, AIMessage):
             return prepared
@@ -376,43 +318,18 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return effective
 
     def _resolve_secret_bindings(self, request: ModelRequest, activation: _Activation | None, *, hook: str) -> None:
-        """执行 _resolve_secret_bindings 的明确职责，并返回与调用约定一致的结果。
+        """每次模型调用按显式激活和线程技能上下文重算密钥集合，并只注入请求提供的值。
 
-        Recompute the per-run secret injection set (binding point A+, #3861/#3914).
-
-                Sources, unioned on every model call:
-
-                - the most recent slash activation of this run (persisted as a source on
-                  the run context so the whole tool loop after the activation call keeps
-                  the binding — a new slash activation replaces it). The slash source is
-                  validated once, at activation (enabled + allowlist checks in
-                  ``_resolve_activation``), and deliberately NOT re-validated per call:
-                  slash is a run-scoped commitment made by the user, and it dies with
-                  the run anyway;
-                - skills the model loaded earlier in the thread (``ThreadState.skill_context``),
-                  re-validated against the live registry on each call: enabled,
-                  runtime-allowed for this agent, and not opted out via
-                  ``secrets-autonomous: false``. Slash activation is exempt from the
-                  opt-out — it is the explicit-ceremony path.
-
-                The set is recomputed and REPLACED each call, so a skill evicted from
-                skill_context, or a caller that stops supplying a value, loses its
-                injection on the next call automatically. Injected values always come
-                from the caller's request (``context.secrets``) — never the host
-                environment, which ``env_policy.build_sandbox_env`` scrubs before
-                injection — so a skill can never harvest a host platform credential.
-                Secret *values* are never logged; the audit journal records names only.
+        线程上下文中的技能会针对实时注册表重新校验启用状态、白名单和自主读取策略；
+        显式斜杠激活按用户授权保留到本轮结束。注册表读取失败时不绑定任何密钥，审计
+        仅记录技能名、密钥名和缺失项，不记录密钥值。
         """
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         if not isinstance(context, dict):
             return
 
-        # The slash source records only the canonical container path of the
-        # activated skill — never its declared secrets. Both sources resolve the
-        # live registry skill by path on read, so a caller-forged source (the
-        # context is caller-mergeable) can never inject secrets a real, enabled,
-        # allowlisted skill did not declare (#3938).
+        # 运行上下文只保存技能路径，后续从实时注册表取声明，不能由调用方伪造密钥清单。
         if activation is not None:
             context[_SLASH_SECRET_SOURCE_KEY] = {"path": activation.container_file_path}
 
@@ -421,8 +338,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         if request_secrets:
             registry = self._load_skill_registry_by_path()
             if registry is not None:
-                # Slash source: exempt from the ``secrets-autonomous`` opt-out
-                # (explicit ceremony), but still enabled + allowlist checked.
+                # 显式斜杠激活不受自主密钥读取开关限制，但仍须通过启用和白名单校验。
                 slash_source = context.get(_SLASH_SECRET_SOURCE_KEY)
                 slash_path = slash_source.get("path") if isinstance(slash_source, dict) else None
                 slash_skill = self._resolve_registry_skill(registry, slash_path, require_autonomous=False)
@@ -466,25 +382,9 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         self._record_secret_binding(context, audit_state, hook=hook)
 
     def _load_skill_registry_by_path(self) -> dict[str, Skill] | None:
-        """执行 _load_skill_registry_by_path 的明确职责，并返回与调用约定一致的结果。
+        """每次读取实时技能注册表并按规范化容器路径索引；失败时返回 ``None`` 并拒绝绑定。
 
-        Load the live skill registry keyed by normalized container file path.
-
-                Reloaded every call on purpose (not cached): load_skills re-reads the
-                enabled state from extensions_config so an operator disabling a skill
-                revokes its secret binding on the very next model call. A cache keyed on
-                file mtimes would miss enable/disable toggles (which do not touch
-                SKILL.md) and keep injecting after a disable — trading the
-                immediate-revocation security property for speed. The cost is gated: the
-                only caller runs this only when the caller supplied secrets.
-
-                Paths are normalized so a non-canonical ``container_path`` config (e.g. a
-                trailing slash) still matches the canonical path captured in
-                ``skill_context`` (#3938). Returns ``None`` if the registry can't load —
-                both the slash and in-context sources then bind nothing for that call
-                (fail closed). This is a deliberate availability-for-security trade-off:
-                a transient registry read failure mid-run drops the injection for that
-                call rather than trusting stale caller-supplied data.
+        不缓存启用状态，确保管理员禁用技能后下一次模型调用立即撤销其密钥访问。
         """
         try:
             storage = self._storage()
@@ -496,23 +396,10 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return {posixpath.normpath(skill.get_container_file_path(container_root)): skill for skill in skills}
 
     def _resolve_registry_skill(self, registry: dict[str, Skill], path: object, *, require_autonomous: bool) -> Skill | None:
-        """执行 _resolve_registry_skill 的明确职责，并返回与调用约定一致的结果。
+        """按规范化文件路径查找可绑定技能，并校验启用、密钥声明及 Agent 白名单。
 
-        Resolve a container path to a live registry skill eligible for secret
-                binding, or ``None``.
-
-                Match strictly by normalized container file path — never by name. A
-                by-name fallback would be a confused deputy: DeerFlow lets a custom skill
-                shadow a same-named public/legacy one (load_skills de-dupes by name,
-                custom wins), so a reference to public/foo could bind the custom foo's
-                secrets. A path that does not resolve simply binds nothing (the safe
-                direction), which also fails closed on a caller-forged path (#3938).
-
-                Gates: the skill must be enabled, declare secrets, and be allowlisted for
-                this agent. ``require_autonomous`` additionally enforces the
-                ``secrets-autonomous`` opt-out for the in-context path; the slash path
-                passes ``False`` because explicit activation is the ceremony that opt-out
-                is meant to preserve.
+        不按名称回退，避免同名自定义技能冒用公共技能引用；线程上下文来源还需遵守
+        ``secrets-autonomous``，显式斜杠激活则代表用户直接授权。
         """
         if not isinstance(path, str) or not path:
             return None
@@ -526,15 +413,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return skill
 
     def _in_context_secret_sources(self, request: ModelRequest, registry: dict[str, Skill]) -> list[tuple[str, tuple[SecretRequirement, ...]]]:
-        """执行 _in_context_secret_sources 的明确职责，并返回与调用约定一致的结果。
-
-        Map ``ThreadState.skill_context`` entries to declared-secret sources.
-
-                Entries are references to skills the model actually loaded in this
-                thread. Each is re-validated against the live registry so a skill that
-                was disabled, uninstalled, opted out, or removed from the agent's
-                allowlist after being read stops binding immediately.
-        """
+        """将线程状态中的已加载技能路径解析为密钥来源，并按实时注册表逐项复核资格。"""
         state = getattr(request, "state", None) or {}
         try:
             entries = state.get("skill_context") or []
@@ -555,7 +434,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _record_secret_binding(context: dict, audit_state: dict, *, hook: str) -> None:
-        "执行 _record_secret_binding 的明确职责，并返回与调用约定一致的结果"
+        """记录密钥绑定审计摘要；摘要只包含名称，不包含任何密钥值。"""
         journal = context.get("__run_journal")
         if journal is None:
             return
@@ -572,7 +451,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _make_activation_message(target: HumanMessage, activation_content: str) -> HumanMessage:
-        "执行 _make_activation_message 的明确职责，并返回与调用约定一致的结果"
+        """为激活提示创建隐藏消息，并关联原用户消息 ID 以支持去重。"""
         stable_id = target.id or str(uuid.uuid4())
         additional_kwargs = {
             "hide_from_ui": True,
@@ -592,7 +471,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse | AIMessage:
-        "执行 wrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """同步调用前处理斜杠激活和密钥绑定，再执行模型处理器。"""
         prepared = self._handle_model_request(request, hook="wrap_model_call")
         if isinstance(prepared, AIMessage):
             return prepared
@@ -604,7 +483,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse | AIMessage:
-        "执行 awrap_model_call 的明确职责，并返回与调用约定一致的结果"
+        """在线程池执行磁盘读取等同步准备工作，再异步调用模型处理器。"""
         prepared = await asyncio.to_thread(self._handle_model_request, request, hook="awrap_model_call")
         if isinstance(prepared, AIMessage):
             return prepared

@@ -709,9 +709,7 @@ class MemoryUpdater:
         return updated_memory
 
     def update_memory_fact(self, fact_id: str, content: str | None = None, category: str | None = None, confidence: float | None = None, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        """更新目标状态并返回最新结果，并遵守 update_memory_fact 所表达的接口约束。
-
-        Update an existing fact and persist the updated memory data."""
+        """按事实 ID 更新指定字段，并将变更后的记忆数据写回存储。"""
         memory_data = self.get_memory_data(agent_name, user_id=user_id)
         updated_memory = dict(memory_data)
         updated_facts: list[dict[str, Any]] = []

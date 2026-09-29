@@ -7,7 +7,7 @@ objects, Pydantic models, and LangGraph state dicts into plain
 JSON-serialisable Python structures.
 
 Consumers: ``deerflow.runtime.runs.worker`` (SSE publishing) and
-``app.gateway.routers.threads`` (REST responses).
+``app.gateway.routers.conversations.threads`` (REST responses).
 """
 
 from __future__ import annotations
@@ -18,7 +18,7 @@ from typing import Any
 def serialize_lc_object(obj: Any) -> Any:
     """
 
-    Recursively serialize a LangChain object to a JSON-serialisable dict."""
+    递归把 LangChain 消息及相关对象转换为可传输的 JSON 数据。"""
     if obj is None:
         return None
     if isinstance(obj, (str, int, float, bool)):
@@ -80,7 +80,7 @@ def serialize_channel_values(channel_values: dict[str, Any]) -> dict[str, Any]:
 def strip_data_url_image_blocks(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
 
-    Remove ``data:``-scheme ``image_url`` blocks from *hide_from_ui* messages.
+    从隐藏消息中移除内嵌 data URL 图片，避免向界面暴露大块图像数据。
 
         The history and run-wait endpoints return checkpoint-persisted messages to
         the frontend.  ``ViewImageMiddleware`` stores full base64 image payloads in

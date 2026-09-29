@@ -193,7 +193,7 @@ export default function LoginPage() {
   return (
     <div className="bg-background relative flex min-h-screen items-center justify-center overflow-x-hidden overflow-y-auto">
       <FlickeringGrid
-        className="absolute inset-0 z-0 mask-[url(/images/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
+        className="absolute inset-0 z-0 mask-[url(/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
         squareSize={4}
         gridGap={4}
         color={actualTheme === "dark" ? "white" : "black"}
@@ -314,12 +314,6 @@ export default function LoginPage() {
             </button>
           </div>
         )}
-
-        <div className="text-muted-foreground text-center text-xs">
-          <Link href="/" className="hover:underline">
-            {t.login.backToHome}
-          </Link>
-        </div>
       </div>
     </div>
   );

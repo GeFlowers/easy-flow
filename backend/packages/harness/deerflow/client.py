@@ -1005,7 +1005,7 @@ class DeerFlowClient:
 
         # Invalidate the prompt cache for this caller (and for all users if
         # the changed skill is PUBLIC, since PUBLIC state is shared). Mirrors
-        # what ``routers/skills.py::update_skill`` does — without this the
+        # what ``routers/configuration/skills.py::update_skill`` does — without this the
         # cached enabled-state would stay stale until process restart. See
         # review feedback on PR #3889.
         try:

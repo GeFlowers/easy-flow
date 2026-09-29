@@ -1,7 +1,6 @@
 # 后端 Dockerfile — 多阶段构建
 # 阶段 1（builder）：使用 build-essential 编译原生 Python 扩展
-# 阶段 2（dev）：保留工具链，供开发容器启动时执行 uv sync
-# 阶段 3（runtime）：生产镜像不含编译工具链，减少体积与攻击面
+# 阶段 2（runtime）：运行镜像不含编译工具链，减少体积与攻击面
 
 # UV 源镜像；受限网络无法访问 ghcr.io 时可覆盖。
 ARG UV_IMAGE=ghcr.io/astral-sh/uv:0.7.20
@@ -44,6 +43,9 @@ WORKDIR /app
 
 # 复制后端源码进入构建阶段。
 COPY backend ./backend
+COPY config.yaml extensions_config.json ./project/
+COPY skills ./skills
+RUN mkdir -p /app/backend/.deer-flow
 
 # 通过缓存挂载安装依赖。Docker Compose 默认将流桥接到 Redis（DEER_FLOW_STREAM_BRIDGE_REDIS_URL），
 # 故始终安装 `redis`；非 Docker 精简安装中它仍是可选项。UV_EXTRAS 存在时（逗号或空白分隔）
@@ -68,18 +70,7 @@ ENV LANG=C.UTF-8
 ENV LC_ALL=C.UTF-8
 ENV PYTHONIOENCODING=utf-8
 
-# ── 阶段 2：开发 ──────────────────────────────────────────────────────────────
-# 保留构建器的编译工具链，使开发容器启动时的 `uv sync` 能构建源码分发包。
-FROM builder AS dev
-
-# 安装 Docker CLI；DooD 通过宿主 Docker socket 启动沙箱容器时需要它。
-COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/docker
-
-EXPOSE 8001
-
-CMD ["sh", "-c", "cd backend && PYTHONPATH=. uv run uvicorn app.gateway.app:app --host 0.0.0.0 --port 8001"]
-
-# ── 阶段 3：运行时 ────────────────────────────────────────────────────────────
+# ── 阶段 2：运行时 ────────────────────────────────────────────────────────────
 # 不含 build-essential 的干净镜像，可减少约 200 MB 体积和攻击面。
 FROM python:3.12-slim-bookworm AS runtime
 
@@ -104,6 +95,8 @@ WORKDIR /app
 
 # 从构建器复制后端及已构建虚拟环境，运行时不再编译依赖。
 COPY --from=builder /app/backend ./backend
+COPY --from=builder /app/project ./project
+COPY --from=builder /app/skills ./skills
 
 # 暴露 Gateway API 端口。
 EXPOSE 8001

@@ -31,7 +31,6 @@ type SidecarContextValue = {
   parentThreadId: string;
   context: ThreadStreamOptions["context"];
   setContext: (context: ThreadStreamOptions["context"]) => void;
-  isMock?: boolean;
   sidecarThreadId: string | null;
   setSidecarThreadId: (threadId: string | null) => void;
   restoreSidecarThread: (options?: {
@@ -57,12 +56,10 @@ export function SidecarProvider({
   children,
   parentThreadId,
   context,
-  isMock,
 }: {
   children: ReactNode;
   parentThreadId: string;
   context: ThreadStreamOptions["context"];
-  isMock?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [activeReferences, setActiveReferences] = useState<SidecarReference[]>(
@@ -122,7 +119,6 @@ export function SidecarProvider({
 
       const promise = findLatestSidecarThread({
         parentThreadId,
-        isMock,
       })
         .then((thread) => {
           const threadId = thread?.thread_id ?? null;
@@ -154,7 +150,7 @@ export function SidecarProvider({
 
       return promise;
     },
-    [isMock, parentThreadId, updateSidecarThreadId],
+    [parentThreadId, updateSidecarThreadId],
   );
 
   useEffect(() => {
@@ -233,7 +229,6 @@ export function SidecarProvider({
       parentThreadId,
       context: sidecarContext,
       setContext: setSidecarContext,
-      isMock,
       sidecarThreadId,
       setSidecarThreadId: updateSidecarThreadId,
       restoreSidecarThread,
@@ -252,7 +247,6 @@ export function SidecarProvider({
       clearConversationQuotes,
       close,
       conversationQuotes,
-      isMock,
       open,
       openContext,
       openSelectedText,

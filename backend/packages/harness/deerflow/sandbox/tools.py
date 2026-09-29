@@ -1436,7 +1436,7 @@ def _github_env_from_runtime(runtime: Runtime) -> dict[str, str] | None:
 
 @tool("bash", parse_docstring=True)
 def bash_tool(runtime: Runtime, description: str, command: str) -> str:
-    """Execute a bash command in a Linux environment.
+    """在沙箱当前目录运行命令，并返回执行结果。
 
 
     - Use `python` to run Python code.
@@ -1518,7 +1518,7 @@ bash_tool.coroutine = _bash_tool_async
 
 @tool("ls", parse_docstring=True)
 def ls_tool(runtime: Runtime, description: str, path: str) -> str:
-    """List the contents of a directory up to 2 levels deep in tree format.
+    """以树形结构列出目录内容，最多展开两层。
 
     Args:
         description: Explain why you are listing this directory in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
@@ -1594,7 +1594,7 @@ def glob_tool(
     include_dirs: bool = False,
     max_results: int = _DEFAULT_GLOB_MAX_RESULTS,
 ) -> str:
-    """Find files or directories that match a glob pattern under a root directory.
+    """在指定根目录内按 glob 模式查找文件或子目录。
 
     Args:
         description: Explain why you are searching for these paths in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
@@ -1677,7 +1677,7 @@ def grep_tool(
     case_sensitive: bool = False,
     max_results: int = _DEFAULT_GREP_MAX_RESULTS,
 ) -> str:
-    """Search for matching lines inside text files under a root directory.
+    """在指定根目录的文本文件中查找匹配内容，并返回上下文行。
 
     Args:
         description: Explain why you are searching file contents in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
@@ -1797,7 +1797,7 @@ def read_file_tool(
     start_line: int | None = None,
     end_line: int | None = None,
 ) -> str:
-    """Read the contents of a text file. Use this to examine source code, configuration files, logs, or any text-based file.
+    """读取文本文件，供检查源码、配置、日志或其他文字资料。
 
     Args:
         description: Explain why you are reading this file in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
@@ -1884,7 +1884,7 @@ def write_file_tool(
     content: str,
     append: bool = False,
 ) -> str:
-    """Write text content to a file. By default this overwrites the target file; set append=True to add content to the end without replacing existing content.
+    """将文本写入文件；默认覆盖原内容，也可选择追加到文件末尾。
 
     READ-BEFORE-WRITE (issue #3857): if the target file already exists (including
     append=True), you must have read its CURRENT version with read_file first.
@@ -1985,7 +1985,7 @@ def str_replace_tool(
     new_str: str,
     replace_all: bool = False,
 ) -> str:
-    """Replace a substring in a file with another substring.
+    """在文件中查找指定片段并替换为新内容。
     If `replace_all` is False (default), the substring to replace must appear **exactly once** in the file.
 
     READ-BEFORE-WRITE (issue #3857): you must have read the file's CURRENT

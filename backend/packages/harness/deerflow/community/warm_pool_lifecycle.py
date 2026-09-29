@@ -1,6 +1,4 @@
-"""定义 warm_pool_lifecycle 模块提供的职责与可复用接口。
-
-Shared warm-pool lifecycle helpers for community sandbox providers."""
+"""为社区沙箱 Provider 提供预热实例的容量控制与空闲回收逻辑。"""
 
 from __future__ import annotations
 
@@ -17,9 +15,11 @@ IDLE_CHECK_INTERVAL = 60
 
 
 class WarmPoolLifecycleMixin[WarmEntryT]:
-    """封装 WarmPoolLifecycleMixin 的状态、协作关系与公开操作。
+    """管理预热沙箱的副本上限、过期清理和后台巡检线程。
 
-    Mixin for provider warm-pool expiry and replica lifecycle mechanics."""
+    具体 Provider 负责定义活动实例计数与实例销毁方式；本混入类只
+    维护预热池生命周期，所有池状态读写均通过 ``_lock`` 保护。
+    """
 
     DEFAULT_IDLE_TIMEOUT = DEFAULT_IDLE_TIMEOUT
     DEFAULT_REPLICAS = DEFAULT_REPLICAS
@@ -33,30 +33,22 @@ class WarmPoolLifecycleMixin[WarmEntryT]:
     _idle_checker_thread: threading.Thread | None
 
     def _active_count_locked(self) -> int:
-        """执行 _active_count_locked 的明确职责，并返回与调用约定一致的结果。
-
-        Return active entry count while ``_lock`` is held."""
+        """在调用方持有 ``_lock`` 时返回正在使用的沙箱数量。"""
         raise NotImplementedError
 
     def _destroy_warm_entry(self, sandbox_id: str, entry: WarmEntryT, *, reason: str) -> None:
-        """执行 _destroy_warm_entry 的明确职责，并返回与调用约定一致的结果。
-
-        Destroy a warm-pool entry after it has been removed from the pool."""
+        """销毁已从预热池移除的实例；由具体 Provider 执行资源回收。"""
         raise NotImplementedError
 
     def _replica_count(self) -> tuple[int, int]:
-        """执行 _replica_count 的明确职责，并返回与调用约定一致的结果。
-
-        Return configured replicas and current active + warm entry count."""
+        """返回配置的副本上限，以及活动实例与预热实例的总数。"""
         replicas = int(self._config.get("replicas", DEFAULT_REPLICAS))
         with self._lock:
             total = self._active_count_locked() + len(self._warm_pool)
         return replicas, total
 
     def _log_replicas_soft_cap(self, replicas: int, sandbox_id: str, evicted: str | None) -> None:
-        """执行 _log_replicas_soft_cap 的明确职责，并返回与调用约定一致的结果。
-
-        Log the result of enforcing the warm-pool replica soft cap."""
+        """记录副本软上限的处理结果：已淘汰实例或因活动实例占满而超限。"""
         if evicted is not None:
             logger.info("Evicted warm-pool sandbox %s to stay within replicas=%s", evicted, replicas)
             return
@@ -68,9 +60,7 @@ class WarmPoolLifecycleMixin[WarmEntryT]:
         )
 
     def _evict_oldest_warm(self) -> str | None:
-        """执行 _evict_oldest_warm 的明确职责，并返回与调用约定一致的结果。
-
-        Remove and destroy the oldest warm entry by timestamp."""
+        """移除并销毁池中最早加入的预热实例，返回其 ID；池为空则返回 ``None``。"""
         with self._lock:
             if not self._warm_pool:
                 return None
@@ -81,9 +71,7 @@ class WarmPoolLifecycleMixin[WarmEntryT]:
         return sandbox_id
 
     def _reap_expired_warm(self, idle_timeout: float | None = None) -> None:
-        """执行 _reap_expired_warm 的明确职责，并返回与调用约定一致的结果。
-
-        Remove and destroy warm entries older than ``idle_timeout`` seconds."""
+        """按空闲时长找出过期实例，先从池中摘除，再逐个释放底层资源。"""
         timeout = float(self._config.get("idle_timeout", DEFAULT_IDLE_TIMEOUT) if idle_timeout is None else idle_timeout)
         if timeout <= 0:
             return
@@ -101,9 +89,7 @@ class WarmPoolLifecycleMixin[WarmEntryT]:
             self._destroy_warm_entry(sandbox_id, entry, reason="idle_timeout")
 
     def _start_idle_checker(self) -> None:
-        """执行 _start_idle_checker 的明确职责，并返回与调用约定一致的结果。
-
-        Start the daemon thread that periodically cleans idle warm entries."""
+        """启动定期回收空闲实例的守护线程；已有巡检线程运行时不重复启动。"""
         if self._idle_checker_thread is not None and self._idle_checker_thread.is_alive():
             return
 
@@ -117,18 +103,14 @@ class WarmPoolLifecycleMixin[WarmEntryT]:
         logger.info("Started warm-pool idle checker thread (timeout: %ss)", self._config.get("idle_timeout", DEFAULT_IDLE_TIMEOUT))
 
     def _stop_idle_checker(self) -> None:
-        """执行 _stop_idle_checker 的明确职责，并返回与调用约定一致的结果。
-
-        Stop the idle checker thread and wait for it to exit when running."""
+        """通知巡检线程退出，并在非当前线程调用时等待其结束。"""
         self._idle_checker_stop.set()
         thread = self._idle_checker_thread
         if thread is not None and thread.is_alive() and thread is not threading.current_thread():
             thread.join(timeout=5)
 
     def _idle_checker_loop(self) -> None:
-        """执行 _idle_checker_loop 的明确职责，并返回与调用约定一致的结果。
-
-        Run periodic idle cleanup until the stop event is set."""
+        """按固定间隔触发空闲清理，直到收到停止信号；单轮异常只记录日志。"""
         idle_timeout = float(self._config.get("idle_timeout", DEFAULT_IDLE_TIMEOUT))
         while not self._idle_checker_stop.wait(self.IDLE_CHECK_INTERVAL):
             try:
@@ -137,9 +119,7 @@ class WarmPoolLifecycleMixin[WarmEntryT]:
                 logger.exception("Error in warm-pool idle checker loop")
 
     def _cleanup_idle_resources(self, idle_timeout: float) -> None:
-        """执行 _cleanup_idle_resources 的明确职责，并返回与调用约定一致的结果。
-
-        Clean resources idle longer than ``idle_timeout`` seconds."""
+        """执行一轮空闲资源清理，将超时阈值交给预热池回收逻辑。"""
         self._reap_expired_warm(idle_timeout)
 
 

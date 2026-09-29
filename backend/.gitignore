@@ -25,7 +25,7 @@ config.yaml
 .langgraph_api
 
 # Sandbox runtime working dir — pre-created and excluded from uvicorn reload
-# (scripts/serve.sh, docker/dev-entrypoint.sh). Anchored so it does not match
+# (Docker startup). Anchored so it does not match
 # the source package backend/packages/harness/deerflow/sandbox/.
 /sandbox/
 

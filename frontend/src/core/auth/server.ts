@@ -1,10 +1,7 @@
 import { cookies } from "next/headers";
 
-import { isStaticWebsiteOnly } from "../static-mode";
-
 import { AUTH_DISABLED_USER, isAuthDisabledMode } from "./auth-disabled-user";
 import { getGatewayConfig } from "./gateway-config";
-import { STATIC_WEBSITE_USER } from "./static-user";
 import { type AuthResult, userSchema } from "./types";
 
 const SSR_AUTH_TIMEOUT_MS = 5_000;
@@ -14,13 +11,6 @@ const SSR_AUTH_TIMEOUT_MS = 5_000;
  * 返回带标签的 AuthResult；调用方应使用穷尽式 switch，无需 try/catch。
  */
 export async function getServerSideUser(): Promise<AuthResult> {
-  if (isStaticWebsiteOnly()) {
-    return {
-      tag: "authenticated",
-      user: STATIC_WEBSITE_USER,
-    };
-  }
-
   if (isAuthDisabledMode()) {
     return {
       tag: "authenticated",

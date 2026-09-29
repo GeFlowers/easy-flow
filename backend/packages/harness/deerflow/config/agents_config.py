@@ -29,8 +29,8 @@ def _blank_to_none(value: str | None) -> str | None:
     仅含空白字符的字符串（例如 ``"   "``）在 Python 中为真值，因此未执行
     strip 的 ``value or fallback`` 表达式不会回退。``require_mention`` 的
     优先级链（``trigger.mention_login`` -> ``github.bot_login`` ->
-    ``channels.github.default_mention_login`` -> ``agent.name``，详见
-    AGENTS.md）依赖这一回退行为，故在模型层统一规范化这两个来自配置的环节。
+    ``channels.github.default_mention_login`` -> ``agent.name``）依赖这一回退行为，
+    故在模型层统一规范化这两个来自配置的环节。
     这样所有下游读取方（当前及未来）都会看到真实的“未设置”状态，而非永远无法
     匹配真实 ``@mention`` 的字面空白字符串。
     """

@@ -136,25 +136,7 @@ def _strip_external_message_metadata(message: Any) -> Any:
 
 
 def normalize_input(raw_input: dict[str, Any] | None, *, trusted_internal: bool = False) -> dict[str, Any]:
-    """执行 normalize_input 的明确职责，并返回与调用约定一致的结果。
-
-    Convert LangGraph Platform input format to LangChain state dict.
-
-        Delegates dict→message coercion to ``langchain_core.messages.utils.convert_to_messages``
-        so that ``additional_kwargs`` (e.g. uploaded-file metadata — gh #3132), ``id``,
-        ``name``, and non-human roles (ai/system/tool) survive unchanged.  An earlier
-        hand-rolled version only forwarded ``content`` and collapsed every role to
-        ``HumanMessage``, which silently stripped frontend-supplied attachments.
-
-        Malformed message dicts (missing ``role``/``type``/``content``, unsupported
-        role, etc.) raise ``HTTPException(400)`` with the offending index, instead
-        of bubbling up as a 500.  The gateway is a system boundary, so per-entry
-        validation errors are the right shape for clients to retry against.
-
-        ``original_user_content`` and dynamic-context reminder markers are
-        server-owned. External callers cannot supply them; trusted internal channel
-        calls may preserve metadata they added before invoking this boundary.
-    """
+    """将 LangGraph 输入转换为消息状态，保留合法元数据并拒绝外部伪造的服务端字段。"""
     if raw_input is None:
         return {}
     messages = raw_input.get("messages")
@@ -227,15 +209,7 @@ _CONTEXT_RUNTIME_ONLY_KEYS: frozenset[str] = frozenset({"github_token", "disable
 
 
 def strip_internal_context_keys(config: dict[str, Any]) -> None:
-    """执行 strip_internal_context_keys 的明确职责，并返回与调用约定一致的结果。
-
-    Drop internal-only keys a non-internal caller smuggled into the run config.
-
-        Gating :func:`merge_run_context_overrides` is not enough on its own:
-        ``build_run_config`` copies a client-supplied ``body.config['context']`` /
-        ``body.config['configurable']`` verbatim, so the same keys must be scrubbed
-        from both sections after the config is assembled.
-    """
+    """从已组装配置的 context 和 configurable 中移除仅限内部调用的字段。"""
     for section in ("context", "configurable"):
         value = config.get(section)
         if isinstance(value, dict):
@@ -244,28 +218,7 @@ def strip_internal_context_keys(config: dict[str, Any]) -> None:
 
 
 def merge_run_context_overrides(config: dict[str, Any], context: Mapping[str, Any] | None, *, internal: bool = False) -> None:
-    """合并输入并保留既定优先级与不变量，并遵守 merge_run_context_overrides 所表达的接口约束。
-
-    Merge whitelisted keys from ``body.context`` into both ``config['configurable']``
-        and ``config['context']`` so they are visible to legacy configurable readers and
-        to LangGraph ``ToolRuntime.context`` consumers (e.g. the ``setup_agent`` tool —
-        see issue #2677).
-
-        ``user_id`` is intentionally propagated into ``config['context']`` in addition to
-        the whitelisted keys, so non-web callers (e.g. IM channels) that supply identity in
-        ``body.context`` keep it on ``ToolRuntime.context``. It is merged with
-        ``setdefault`` so a server-authenticated id stamped by
-        :func:`inject_authenticated_user_context` always wins over the client-supplied one.
-
-        :data:`_CONTEXT_INTERNAL_CALLER_KEYS`; those keys are dropped from client
-        requests.
-
-        A second set of keys (``_CONTEXT_RUNTIME_ONLY_KEYS`` — e.g. ``github_token``,
-        ``disable_clarification``) is forwarded into ``config['context']`` only, never
-        ``configurable``. These are secrets / runtime flags read by tools and middlewares
-        from ``runtime.context``; keeping them out of ``configurable`` avoids persisting a
-        short-lived token in the checkpoint store.
-    """
+    """按调用方信任级别合并白名单上下文，并将密钥和运行标记限制在运行时 context。"""
     if not context:
         return
     configurable = config.setdefault("configurable", {})
@@ -292,9 +245,7 @@ def merge_run_context_overrides(config: dict[str, Any], context: Mapping[str, An
 
 
 async def resolve_trusted_internal_owner_for_attribution(request: Request, owner_user_id: str | None) -> Any | None:
-    """执行 resolve_trusted_internal_owner_for_attribution 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve the DeerFlow user used only for trusted internal attribution."""
+    """仅在可信内部请求中解析所有者用户，供运行归属信息记录使用。"""
 
     if not owner_user_id:
         return None
@@ -314,14 +265,7 @@ def inject_authenticated_user_context(
     *,
     internal_owner_user: Any | None = None,
 ) -> None:
-    """执行 inject_authenticated_user_context 的明确职责，并返回与调用约定一致的结果。
-
-    Stamp the authenticated user into the run context for background tools.
-
-        Tool execution may happen after the request handler has returned, so tools
-        that persist user-scoped files should not rely only on ambient ContextVars.
-        The value comes from server-side auth state, never from client context.
-    """
+    """将服务端认证得到的用户及身份属性写入运行时上下文，供后台工具使用。"""
 
     user = getattr(request.state, "user", None)
     user_id = getattr(user, "id", None)
@@ -354,16 +298,7 @@ def inject_authenticated_user_context(
 
 
 def resolve_agent_factory(assistant_id: str | None):
-    """执行 resolve_agent_factory 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve the agent factory callable from config.
-
-        Custom agents are implemented as ``lead_agent`` + an ``agent_name``
-        injected into ``configurable`` or ``context`` — see
-        :func:`build_run_config`.  All ``assistant_id`` values therefore map to the
-        same factory; the routing happens inside ``make_lead_agent`` when it reads
-        ``cfg["agent_name"]``.
-    """
+    """返回统一的 lead-agent 工厂；具体 Agent 由运行配置中的 agent_name 选择。"""
     from deerflow.agents.lead_agent.agent import make_lead_agent
 
     return make_lead_agent
@@ -380,14 +315,7 @@ _DEFAULT_MAX_RECURSION_LIMIT = 1000
 
 
 def _resolve_max_recursion_limit() -> int:
-    """执行 _resolve_max_recursion_limit 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve the clamp ceiling from ``AppConfig.max_recursion_limit``.
-
-        Falls back to ``_DEFAULT_MAX_RECURSION_LIMIT`` when the app config cannot be
-        loaded (e.g. no ``config.yaml`` in a bare unit-test environment) so that the
-        clamp still applies rather than crashing the run-config assembly.
-    """
+    """读取服务端递归上限；配置不可用时使用内置上限继续保护运行。"""
     try:
         return get_app_config().max_recursion_limit
     except Exception:
@@ -395,14 +323,7 @@ def _resolve_max_recursion_limit() -> int:
 
 
 def _clamp_recursion_limit(value: Any, max_limit: int) -> int:
-    """执行 _clamp_recursion_limit 的明确职责，并返回与调用约定一致的结果。
-
-    Clamp a client-supplied ``recursion_limit`` into a safe server range.
-
-        Non-integer values (including ``bool``, an ``int`` subclass) and non-positive
-        values fall back to ``_DEFAULT_RECURSION_LIMIT``; valid positive integers are
-        capped at ``max_limit`` (from ``AppConfig.max_recursion_limit``).
-    """
+    """校验客户端递归步数并限制在服务端上限内，无效值回退到默认值。"""
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         return _DEFAULT_RECURSION_LIMIT
     return min(value, max_limit)
@@ -415,25 +336,7 @@ def build_run_config(
     *,
     assistant_id: str | None = None,
 ) -> dict[str, Any]:
-    """构建并返回，并遵守 build_run_config 所表达的接口约束。
-
-    Build a RunnableConfig dict for the agent.
-
-        When *assistant_id* refers to a custom agent (anything other than
-        ``"lead_agent"`` / ``None``), the name is forwarded as ``agent_name`` in
-        both ``configurable`` and ``context`` so it is visible to legacy
-        configurable readers and to LangGraph ``ToolRuntime.context`` consumers
-        (e.g. the ``setup_agent`` tool, which since LangGraph >=1.1.9 no longer
-        falls back from ``context`` to ``configurable``).  An explicit
-        ``agent_name`` in either container takes precedence over the value
-        derived from ``assistant_id``.  ``make_lead_agent`` reads this key to
-        load the matching ``agents/<name>/SOUL.md`` and per-agent config —
-        without it the agent silently runs as the default lead agent.
-
-        This mirrors the channel manager's ``_resolve_run_params`` logic so that
-        the LangGraph Platform-compatible HTTP API and the IM channel path behave
-        identically.
-    """
+    """组装 Agent 运行配置，注入线程与自定义 Agent 名称，并限制递归步数。"""
     # Lead-agent recursion budget (LangGraph super-steps for the lead graph
     # only). Independent of subagent depth: a `task()` dispatch runs the whole
     # subagent inside ONE lead tools-node step, and subagents enforce their own
@@ -532,9 +435,7 @@ async def apply_checkpoint_to_run_config(
     thread_id: str,
     request: Request,
 ) -> None:
-    """执行 apply_checkpoint_to_run_config 的明确职责，并返回与调用约定一致的结果。
-
-    Validate an optional run checkpoint and attach it to RunnableConfig."""
+    """验证请求指定的检查点属于当前线程且存在，再写入运行配置。"""
     checkpoint = getattr(body, "checkpoint", None)
     checkpoint_id = getattr(body, "checkpoint_id", None)
     checkpoint_ns = ""
@@ -596,20 +497,7 @@ async def start_run(
     thread_id: str,
     request: Request,
 ) -> RunRecord:
-    """执行 start_run 的明确职责，并返回与调用约定一致的结果。
-
-    Create a RunRecord and launch the background agent task.
-
-        Parameters
-        ----------
-        body : RunCreateRequest
-            The validated request body (typed as Any to avoid circular import
-            with the router module that defines the Pydantic model).
-        thread_id : str
-            Target thread.
-        request : Request
-            FastAPI request — used to retrieve singletons from ``app.state``.
-    """
+    """验证运行请求和线程权限，创建运行记录并启动后台 Agent 任务。"""
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     run_ctx = get_run_context(request)
@@ -815,14 +703,7 @@ async def sse_consumer(
     request: Request,
     run_mgr: RunManager,
 ):
-    """执行 sse_consumer 的明确职责，并返回与调用约定一致的结果。
-
-    Async generator that yields SSE frames from the bridge.
-
-        The ``finally`` block implements ``on_disconnect`` semantics:
-        - ``cancel``: abort the background task on client disconnect.
-        - ``continue``: let the task run; events are discarded.
-    """
+    """订阅运行事件并编码为 SSE；客户端断开时按运行策略决定是否取消任务。"""
     last_event_id = request.headers.get("Last-Event-ID")
     if await _terminal_record_stream_missing(bridge, record):
         yield format_sse("end", None)
@@ -862,31 +743,7 @@ async def wait_for_run_completion(
     request: Request,
     run_mgr: RunManager,
 ) -> bool:
-    """执行 wait_for_run_completion 的明确职责，并返回与调用约定一致的结果。
-
-    Block until the run publishes ``END_SENTINEL``, honouring on_disconnect.
-
-        The non-streaming ``/wait`` endpoints used to ``await record.task``
-        directly with no disconnect handling.  When the client (or an
-        intermediate HTTP proxy) timed out during a long tool call such as
-        ``pip install``, the handler would swallow ``CancelledError`` and
-        serialize whatever checkpoint happened to exist — masking a half-finished
-        run as a normal completion (issue #3265).
-
-        This helper consumes the same bridge that ``sse_consumer`` does so the
-        wait path shares its disconnect semantics: each wake-up polls
-        ``request.is_disconnected()``; on a real disconnect it cancels the
-        background run when ``record.on_disconnect`` is ``cancel``.  The bridge's
-        heartbeat sentinels guarantee at least one wake-up per
-        ``heartbeat_interval`` even when the agent emits no events for a while.
-
-        Returns:
-            ``True`` when ``END_SENTINEL`` was observed (run reached a terminal
-            state), ``False`` when the loop exited because the client
-            disconnected.  Callers must skip checkpoint serialization on
-            ``False`` so a partial checkpoint is not returned as a normal
-            response.
-    """
+    """等待事件桥发布运行终止标记；客户端断开时按策略取消任务并返回完成状态。"""
     completed = False
     if await _terminal_record_stream_missing(bridge, record):
         return True

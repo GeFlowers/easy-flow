@@ -43,7 +43,7 @@ def memory_search_tool(
     category: str | None = None,
     limit: int = 10,
 ) -> str:
-    """Search existing facts by natural language query.
+    """按自然语言查询已保存的用户或对话事实。
 
     Use this when you need to check what you already know about the user
     - their preferences, past corrections, context, or any stored facts.
@@ -81,7 +81,7 @@ def memory_add_tool(
     category: str = "context",
     confidence: float = 0.7,
 ) -> str:
-    """Store a new fact about the user or conversation context.
+    """将适合后续对话复用的新事实写入长期记忆。
 
     Use this when the user shares something worth remembering for future
     conversations - preferences, corrections, personal details, work context.
@@ -153,8 +153,7 @@ def memory_update_tool(
     category: str | None = None,
     confidence: float | None = None,
 ) -> str:
-    """Update an existing fact. Only provided fields are changed; omitted
-    fields stay as-is.
+    """更新已保存事实中指定的字段，未提供的字段保持原值。
 
     Use this when a stored fact is outdated, incorrect, or needs refinement.
     First use memory_search to find the fact_id, then update it.
@@ -195,7 +194,7 @@ def memory_update_tool(
 
 @tool("memory_delete", parse_docstring=True)
 def memory_delete_tool(runtime: Runtime, fact_id: str) -> str:
-    """Delete a fact by its ID.
+    """按事实 ID 删除一条长期记忆。
 
     Use this when a fact is no longer accurate or relevant. First use
     memory_search to find the fact_id, then delete it.

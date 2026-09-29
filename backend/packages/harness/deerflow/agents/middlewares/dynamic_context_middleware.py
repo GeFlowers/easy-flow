@@ -58,54 +58,32 @@ _INJECT_TIMEOUT_SECONDS = 5.0
 _DATE_RE = re.compile(r"<current_date>([^<]+)</current_date>")
 _DYNAMIC_CONTEXT_REMINDER_KEY = "dynamic_context_reminder"
 # Authoritative injected date, carried in additional_kwargs of the date
-# SystemMessage. Detection reads this instead of regex-parsing message content,
-# so it is never exposed to user-influenceable memory content.
+# 日期标记写入 SystemMessage 的结构化元数据；识别时不扫描可能受用户影响的记忆文本。
 _REMINDER_DATE_KEY = "reminder_date"
 _SUMMARY_MESSAGE_NAME = "summary"
 
 
 def _extract_date(content: str) -> str | None:
-    """执行 _extract_date 的明确职责，并返回与调用约定一致的结果。
-
-    Return the first <current_date> value found in *content*, or None."""
+    """提取内容中第一个 ``<current_date>`` 标签的日期值。"""
     m = _DATE_RE.search(content)
     return m.group(1) if m else None
 
 
 def is_dynamic_context_reminder(message: object) -> bool:
-    """判断条件是否成立并返回布尔结果，并遵守 is_dynamic_context_reminder 所表达的接口约束。
-
-    Return whether *message* is a hidden dynamic-context reminder."""
-    # DEPRECATED: HumanMessage reminders only exist in pre-PR checkpoints.
-    # Once all active checkpoints are migrated, the HumanMessage branch can be
-    # removed and this function can check SystemMessage exclusively.
+    """判断消息是否带有动态上下文提醒的内部标记。"""
+    # 兼容旧检查点中以 HumanMessage 保存的提醒；新消息使用 SystemMessage。
     return isinstance(message, (HumanMessage, SystemMessage)) and bool(message.additional_kwargs.get(_DYNAMIC_CONTEXT_REMINDER_KEY))
 
 
 def _last_injected_date(messages: list) -> str | None:
-    """执行 _last_injected_date 的明确职责，并返回与调用约定一致的结果。
-
-    Scan messages in reverse and return the most recently injected date.
-
-        Detection uses the ``dynamic_context_reminder`` additional_kwargs flag rather
-        than content substring matching, so user messages containing ``<system-reminder>``
-        are not mistakenly treated as injected reminders.
-
-        The authoritative date is the ``reminder_date`` value in additional_kwargs of
-        the date SystemMessage. Reminders without it (the separate ``<memory>``
-        HumanMessage, or any future dateless reminder) carry no date and are skipped,
-        so they cannot shadow the real date reminder.
-    """
+    """从消息末尾向前寻找最近注入的日期，优先读取结构化元数据并兼容旧检查点。"""
     for msg in reversed(messages):
         if not is_dynamic_context_reminder(msg):
             continue
         structured = msg.additional_kwargs.get(_REMINDER_DATE_KEY)
         if isinstance(structured, str) and structured:
             return structured
-        # Backward-compat for checkpoints written before reminder_date existed:
-        # the date lived in content. Scope the regex to SystemMessage so it never
-        # runs on the user-influenceable memory HumanMessage (preserves the OWASP
-        # role separation from #3630 and closes the memory date-spoofing hole).
+        # 旧检查点把日期写在内容中；仅解析 SystemMessage，避免用户可影响的记忆文本伪造日期。
         if isinstance(msg, SystemMessage):
             content_str = msg.content if isinstance(msg.content, str) else str(msg.content)
             date = _extract_date(content_str)
@@ -115,21 +93,15 @@ def _last_injected_date(messages: list) -> str | None:
 
 
 def _is_user_injection_target(message: object) -> bool:
-    """执行 _is_user_injection_target 的明确职责，并返回与调用约定一致的结果。
-
-    Return whether *message* can receive a dynamic-context reminder."""
+    """判断人类消息是否适合插入动态提醒，排除摘要、已有提醒及已处理消息。"""
     if not isinstance(message, HumanMessage):
         return False
     if is_dynamic_context_reminder(message):
         return False
     if message.name == _SUMMARY_MESSAGE_NAME:
         return False
-    # Prevent recursive ID-swap: a message whose ID ends with "__user" was
-    # produced by a prior _make_reminder_and_user_messages call and must not
-    # be processed again — doing so causes unbounded suffix growth
-    # (id__user__user__user...) and ghost-message re-execution.
-    # Using endswith (not substring "in") avoids false positives on IDs that
-    # happen to contain "__user" in the middle.
+    # 由拆分流程生成的用户消息带有 __user 后缀；再次处理会不断追加后缀并重复执行消息。
+    # 使用 endswith 可避免误排除仅在中间包含该字符串的其他 ID。
     if message.id and str(message.id).endswith("__user"):
         return False
     return True

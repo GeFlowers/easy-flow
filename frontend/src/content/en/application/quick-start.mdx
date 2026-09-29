@@ -1,6 +1,6 @@
 ---
 title: Quick Start
-description: This guide walks you through starting DeerFlow App on your local machine using the `make dev` workflow. Gateway, Frontend, and nginx start together and are accessible through a single URL.
+description: Start DeerFlow with the supported Docker Compose workflow.
 ---
 
 import { Callout, Steps } from "nextra/components";
@@ -8,31 +8,25 @@ import { Callout, Steps } from "nextra/components";
 # Quick Start
 
 <Callout type="info" emoji="⚡">
-  Get DeerFlow App running locally in about 10 minutes. You need a machine with
-  Python 3.12+, Node.js 22+, and at least one LLM API key.
+  Start DeerFlow in Docker in about 10 minutes. You need Docker Compose and at
+  least one LLM API key.
 </Callout>
 
-This guide walks you through starting DeerFlow App on your local machine using the `make dev` workflow. Gateway, Frontend, and nginx start together and are accessible through a single URL.
+This guide walks you through starting DeerFlow with the project's Docker Compose configuration. Gateway, frontend, PostgreSQL, and nginx run in containers and are accessible through one URL.
 
 ## Prerequisites
 
-Check that all required tools are installed:
+Check that Docker is available:
 
 ```bash
-make check
+make docker-init
 ```
 
 Required:
 
-| Tool    | Minimum version    |
-| ------- | ------------------ |
-| Python  | 3.12               |
-| uv      | latest             |
-| Node.js | 22                 |
-| pnpm    | 10                 |
-| nginx   | any recent version |
-
-On macOS, install with `brew install python uv node pnpm nginx`. On Linux, use your distribution's package manager.
+| Tool   | Requirement |
+| ------ | ----------- |
+| Docker | Docker Engine/Desktop with Compose support |
 
 ## Steps
 
@@ -45,21 +39,9 @@ git clone https://github.com/bytedance/deer-flow.git
 cd deer-flow
 ```
 
-### Install dependencies
+### Configure a model
 
-```bash
-make install
-```
-
-This installs both backend Python dependencies (via `uv`) and frontend Node.js dependencies (via `pnpm`).
-
-### Create your config file
-
-```bash
-cp config.example.yaml config.yaml
-```
-
-Then edit `config.yaml` to add at least one model. The minimum change is adding a model under the `models:` section:
+On first startup, `make docker-start` creates `config.yaml` from the example if needed. Add at least one model under the `models:` section:
 
 ```yaml
 models:
@@ -72,53 +54,50 @@ models:
     supports_vision: true
 ```
 
-Set the corresponding environment variable before starting:
+Put the corresponding API key in the project-root `.env` file:
 
 ```bash
-export OPENAI_API_KEY=sk-...
+OPENAI_API_KEY=sk-...
 ```
 
 See the [Application Configuration](/docs/application/configuration) page for examples with other model providers.
 
-### Start all services
+### Start DeerFlow
 
 ```bash
-make dev
+make docker-start
 ```
 
 This starts:
 
-- Gateway API and embedded agent runtime on port `8001`
-- Frontend on port `3000`
-- nginx reverse proxy on port `2026`
+- Gateway API, frontend, PostgreSQL, and nginx in Docker containers
 
 Open [http://localhost:2026](http://localhost:2026) in your browser.
 
 ### Stop all services
 
 ```bash
-make stop
+make docker-stop
 ```
 
 </Steps>
 
-## What happens when you run `make dev`
+## What happens when you run `make docker-start`
 
-- Existing service processes are stopped first (safe to run after an interrupted start).
-- Each service is started in the background and writes logs to the `logs/` directory.
-- nginx proxies all traffic through port `2026`, so you only need one URL.
+- Docker builds the frontend and backend images, then starts the application services in the background.
+- nginx proxies the application through port `2026`, so you only need one URL.
 
 Log files:
 
-| Service   | Log file             |
-| --------- | -------------------- |
-| Gateway   | `logs/gateway.log`   |
-| Frontend  | `logs/frontend.log`  |
-| nginx     | `logs/nginx.log`     |
+| Service   | Command |
+| --------- | ------- |
+| All       | `make docker-logs` |
+| Gateway   | `make docker-logs-gateway` |
+| Frontend  | `make docker-logs-frontend` |
 
 <Callout type="tip">
-  If something is not working, check the log files first. Most startup errors
-  (missing API keys, config parsing failures) appear in `logs/gateway.log`.
+  If something is not working, check the Gateway container logs first. Most
+  startup errors (missing API keys, config parsing failures) appear there.
 </Callout>
 
 <Cards num={2}>

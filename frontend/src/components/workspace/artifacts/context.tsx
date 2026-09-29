@@ -7,7 +7,6 @@ import {
 } from "react";
 
 import { useSidebar } from "@/components/ui/sidebar";
-import { env } from "@/env";
 
 /** 定义产物面板共享的列表、当前选择与切换操作契约。 */
 export interface ArtifactsContextType {
@@ -37,18 +36,14 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   const [artifacts, setArtifacts] = useState<string[]>([]);
   const [selectedArtifact, setSelectedArtifact] = useState<string | null>(null);
   const [autoSelect, setAutoSelect] = useState(true);
-  const [open, setOpen] = useState(
-    env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY === "true",
-  );
+  const [open, setOpen] = useState(false);
   const [autoOpen, setAutoOpen] = useState(true);
   const { setOpen: setSidebarOpen } = useSidebar();
 
   const select = useCallback(
     (artifact: string, autoSelect = false) => {
       setSelectedArtifact(artifact);
-      if (env.NEXT_PUBLIC_STATIC_WEBSITE_ONLY !== "true") {
-        setSidebarOpen(false);
-      }
+      setSidebarOpen(false);
       if (!autoSelect) {
         setAutoSelect(false);
       }

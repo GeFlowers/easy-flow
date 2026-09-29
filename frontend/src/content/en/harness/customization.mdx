@@ -148,8 +148,8 @@ Thread state persistence can use any LangGraph-compatible checkpointer:
 
 ```yaml
 checkpointer:
-  type: sqlite
-  connection_string: ./my-checkpoints.db
+  type: postgres
+  connection_string: $DATABASE_URL
 ```
 
 For custom backends, implement the LangGraph `BaseCheckpointSaver` interface and configure it programmatically when initializing the `DeerFlowClient`.

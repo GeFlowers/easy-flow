@@ -108,7 +108,7 @@ guardrails:
 
 **Try it:**
 1. Add the config above to your `config.yaml`
-2. Start DeerFlow: `make dev`
+2. Start DeerFlow: `make docker-start`
 3. Ask the agent: "Use bash to run echo hello"
 4. The agent sees: `Guardrail denied: tool 'bash' was blocked (oap.tool_not_allowed)`
 

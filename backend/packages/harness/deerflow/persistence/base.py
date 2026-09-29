@@ -10,7 +10,7 @@ from sqlalchemy.orm import DeclarativeBase
 
 @cache
 def _column_keys(cls: type) -> tuple[str, ...]:
-    """执行持久化流程所需的内部辅助操作。"""
+    """缓存并返回 ORM 模型映射的列属性名称。"""
     return tuple(c.key for c in sa_inspect(cls).mapper.column_attrs)
 
 

@@ -3,23 +3,11 @@
 from __future__ import annotations
 
 from collections.abc import Iterator
-
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 STARTUP_ONLY_PREFIX = "startup-only:"
-
-
-# 中文说明：此处用于执行相关处理。
 #:
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
-# 中文说明：此处用于执行相关处理。
 STARTUP_ONLY_FIELDS: dict[str, str] = {
     "database": ("init_engine_from_config() runs once during langgraph_runtime() startup; the SQLAlchemy engine holds the connection pool and is not rebuilt on config.yaml edits."),
-    "checkpointer": ("make_checkpointer() binds the persistent checkpointer once at startup, including SQLite WAL / busy_timeout settings."),
+    "checkpointer": ("make_checkpointer() binds the PostgreSQL checkpointer once at startup."),
     "run_events": ("make_run_event_store() picks the memory- vs SQL-backed implementation at startup and is frozen onto app.state.run_events_config to stay paired with the underlying event store."),
     "stream_bridge": ("make_stream_bridge() constructs the stream-bridge singleton once during startup."),
     "sandbox": ("get_sandbox_provider() caches the provider singleton (``_default_sandbox_provider``); a different ``sandbox.use`` class path only takes effect on next process start."),
@@ -31,10 +19,6 @@ STARTUP_ONLY_FIELDS: dict[str, str] = {
         "and TraceMiddleware captures logging.enhance.enabled once at startup so response X-Trace-Id headers, log trace_id fields, and Langfuse "
         "deerflow_trace_id stay coherent. A freshly reloaded AppConfig does not retrigger any of this."
     ),
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
-    # 中文说明：此处用于执行相关处理。
     "channels": ("start_channel_service() is invoked once during startup; the live IM channel clients (Feishu, Slack, Telegram, DingTalk) are not rebuilt when channels.* changes."),
     "channel_connections": (
         "start_channel_service() wires the connection repository and channel workers once at startup, and the channel-connections router caches the merged provider config on app.state; channel_connections.* edits need a restart."

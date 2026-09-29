@@ -1,6 +1,4 @@
-"""定义 sandbox_info 模块提供的职责与可复用接口。
-
-Sandbox metadata for cross-process discovery and state persistence."""
+"""定义跨进程发现和恢复沙箱所需的持久化元数据。"""
 
 from __future__ import annotations
 
@@ -10,14 +8,7 @@ from dataclasses import dataclass, field
 
 @dataclass
 class SandboxInfo:
-    """封装 SandboxInfo 的状态、协作关系与公开操作。
-
-    Persisted sandbox metadata that enables cross-process discovery.
-
-        This dataclass holds all the information needed to reconnect to an
-        existing sandbox from a different process (e.g., gateway vs langgraph,
-        multiple workers, or across K8s pods with shared storage).
-    """
+    """记录沙箱地址及可选容器标识，供其他进程重新连接已有实例。"""
 
     sandbox_id: str
     sandbox_url: str  # e.g. http://localhost:8080 or http://k3s:30001
@@ -26,7 +17,7 @@ class SandboxInfo:
     created_at: float = field(default_factory=time.time)
 
     def to_dict(self) -> dict:
-        "执行 to_dict 的明确职责，并返回与调用约定一致的结果"
+        """将沙箱元数据转换为可持久化或跨进程传递的字典。"""
         return {
             "sandbox_id": self.sandbox_id,
             "sandbox_url": self.sandbox_url,
@@ -37,7 +28,7 @@ class SandboxInfo:
 
     @classmethod
     def from_dict(cls, data: dict) -> SandboxInfo:
-        "执行 from_dict 的明确职责，并返回与调用约定一致的结果"
+        """从持久化字典恢复沙箱元数据，并兼容旧版 ``base_url`` 字段。"""
         return cls(
             sandbox_id=data["sandbox_id"],
             sandbox_url=data.get("sandbox_url", data.get("base_url", "")),

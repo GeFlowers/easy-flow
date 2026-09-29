@@ -14,7 +14,7 @@ class UserNotFoundError(LookupError):
 
 
 class UserRepository(ABC):
-    """用户数据存储的抽象接口，供 SQLite 等不同存储后端实现。"""
+    """定义 Gateway 用户仓储必须实现的持久化操作。"""
 
     @abstractmethod
     async def create_user(self, user: User) -> User:

@@ -44,7 +44,7 @@ EOF
 ### 4. 启动服务
 
 ```bash
-docker compose -f docker/docker-compose-dev.yaml up -d
+make docker-start
 ```
 
 ### 5. 验证部署
@@ -54,7 +54,7 @@ docker compose -f docker/docker-compose-dev.yaml up -d
 curl http://localhost:2026/api/models
 
 # 查看服务日志
-docker compose -f docker/docker-compose-dev.yaml logs -f
+make docker-logs
 ```
 
 访问 `http://your-server:2026` 开始使用。

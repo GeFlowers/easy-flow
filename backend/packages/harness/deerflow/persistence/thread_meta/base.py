@@ -68,7 +68,7 @@ class ThreadMetaStore(abc.ABC):
 
     @abc.abstractmethod
     async def check_access(self, thread_id: str, user_id: str, *, require_existing: bool = False) -> bool:
-        """执行当前持久化组件提供的操作。"""
+        """判断用户是否拥有线程，并按 require_existing 决定缺失线程是否通过。"""
         pass
 
     @abc.abstractmethod

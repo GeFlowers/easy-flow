@@ -15,7 +15,7 @@ from sqlalchemy import select
 
 from app.gateway.auth.credential_file import write_initial_credentials
 from app.gateway.auth.password import hash_password
-from app.gateway.auth.repositories.sqlite import SQLiteUserRepository
+from app.gateway.auth.repositories.sql import SQLUserRepository
 from deerflow.persistence.user.model import UserRow
 
 
@@ -36,7 +36,7 @@ async def _run(email: str | None) -> int:
             print("Error: persistence engine not available (check config.database).", file=sys.stderr)
             return 1
 
-        repo = SQLiteUserRepository(sf)
+        repo = SQLUserRepository(sf)
 
         if email:
             user = await repo.get_user_by_email(email)

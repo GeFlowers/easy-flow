@@ -150,6 +150,7 @@ class RunContext:
 
 
 def _install_runtime_context(config: dict, runtime_context: dict[str, Any]) -> None:
+    """把线程、运行、追踪和应用配置等受信任字段写入 LangGraph 上下文。"""
     existing_context = config.get("context")
     if isinstance(existing_context, dict):
         existing_context.setdefault("thread_id", runtime_context["thread_id"])
@@ -166,6 +167,7 @@ def _install_runtime_context(config: dict, runtime_context: dict[str, Any]) -> N
 
 
 def _compute_agent_factory_supports_app_config(agent_factory: Any) -> bool:
+    """检查 agent 工厂签名是否声明了 app_config 参数。"""
     try:
         return "app_config" in inspect.signature(agent_factory).parameters
     except (TypeError, ValueError):
@@ -174,10 +176,12 @@ def _compute_agent_factory_supports_app_config(agent_factory: Any) -> bool:
 
 @lru_cache(maxsize=128)
 def _cached_agent_factory_supports_app_config(agent_factory: Any) -> bool:
+    """缓存工厂参数能力检查，避免每次运行都重新解析签名。"""
     return _compute_agent_factory_supports_app_config(agent_factory)
 
 
 def _agent_factory_supports_app_config(agent_factory: Any) -> bool:
+    """读取缓存的工厂能力结果，并兼容不可哈希的可调用对象。"""
     try:
         return _cached_agent_factory_supports_app_config(agent_factory)
     except TypeError:
@@ -212,6 +216,7 @@ class _SubagentEventBuffer:
     FLUSH_THRESHOLD = 25
 
     def __init__(self, event_store: Any | None, thread_id: str, run_id: str) -> None:
+        """初始化子任务事件缓冲区及其持久化作用域。"""
         self._event_store = event_store
         self._thread_id = thread_id
         self._run_id = run_id
@@ -220,7 +225,7 @@ class _SubagentEventBuffer:
     async def add(self, chunk: Any) -> None:
         """
 
-        Buffer one custom stream chunk; flush on a terminal event or threshold."""
+        缓存单个自定义流事件；达到阈值或遇到终止事件时批量写入。"""
         if self._event_store is None:
             return
         # Lazy import: importing deerflow.subagents at module load triggers its
@@ -417,6 +422,7 @@ async def run_agent(
         initial_runnable_config = RunnableConfig(**config)
 
         def _continuation_runnable_config() -> RunnableConfig:
+            """构造指向根检查点命名空间的新配置，用于目标自动续跑。"""
             continuation_config = dict(config)
             configurable = dict(continuation_config.get("configurable", {}) or {})
             configurable["checkpoint_ns"] = ""
@@ -487,6 +493,7 @@ async def run_agent(
         goal_evaluator_model: Any | None = None
 
         def _get_goal_evaluator_model() -> Any:
+            """惰性创建并复用本次运行的目标评估模型。"""
             nonlocal goal_evaluator_model
             if goal_evaluator_model is None:
                 goal_evaluator_model = create_goal_evaluator_model(
@@ -496,6 +503,7 @@ async def run_agent(
             return goal_evaluator_model
 
         async def _stream_once(input_payload: Any, stream_config: RunnableConfig) -> None:
+            """执行一轮 agent 流式调用，转发 SSE 并收集目标及子任务事件。"""
             nonlocal llm_error_fallback_message
             async with _checkpoint_thread_lock(thread_id):
                 if len(lg_modes) == 1 and not stream_subgraphs:
@@ -733,6 +741,7 @@ async def run_agent(
 
 
 def _checkpoint_id(checkpoint_tuple: Any) -> str | None:
+    """从检查点元组配置或正文中提取检查点 ID。"""
     config = getattr(checkpoint_tuple, "config", {}) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     checkpoint_id = configurable.get("checkpoint_id") if isinstance(configurable, dict) else None
@@ -745,6 +754,7 @@ def _checkpoint_id(checkpoint_tuple: Any) -> str | None:
 
 
 def _goal_instance_matches(left: GoalState | None, right: GoalState | None) -> bool:
+    """确认两个目标仍代表同一条活动目标，防止并发写入覆盖新目标。"""
     if not left or not right:
         return False
     same_status = left.get("status") == right.get("status") == "active"
@@ -754,6 +764,7 @@ def _goal_instance_matches(left: GoalState | None, right: GoalState | None) -> b
 
 
 def _read_checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
+    """从检查点的 messages 频道读取消息列表，其他格式返回空列表。"""
     checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
     channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
     messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
@@ -761,6 +772,7 @@ def _read_checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
 
 
 def _read_checkpoint_goal(checkpoint_tuple: Any) -> GoalState | None:
+    """从检查点读取目标状态副本，避免调用方意外修改原快照。"""
     checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
     channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
     raw_goal = channel_values.get("goal") if isinstance(channel_values, dict) else None
@@ -768,14 +780,7 @@ def _read_checkpoint_goal(checkpoint_tuple: Any) -> GoalState | None:
 
 
 def _has_durable_goal_turn_receipt(checkpoint_tuple: Any, messages: list[Any]) -> bool:
-    """
-
-    返回：true when a completed visible assistant turn is safely checkpointed.
-
-        ``pending_writes`` is the durability signal: a ``CheckpointTuple`` carries no
-        ``tasks`` field (those live on a ``StateSnapshot``), so the presence of any
-        queued writes is what tells us the turn is still in flight.
-    """
+    """确认检查点已提交且最后一条可见消息是助手回复，作为完成回执。"""
     if _checkpoint_id(checkpoint_tuple) is None:
         return False
     if getattr(checkpoint_tuple, "pending_writes", None):
@@ -790,6 +795,7 @@ def _has_durable_goal_turn_receipt(checkpoint_tuple: Any, messages: list[Any]) -
 
 
 def _stand_down_reason(goal: GoalState, evaluation: GoalEvaluation, no_progress_count: int) -> str | None:
+    """根据阻塞类型、续跑上限和无进展次数决定是否停止自动续跑。"""
     if evaluation["satisfied"]:
         return None
     if evaluation["blocker"] != "goal_not_met_yet":
@@ -816,6 +822,7 @@ async def _persist_goal_evaluation(
     stand_down_reason: str | None = None,
     evidence_signature: str = "",
 ) -> GoalState | None:
+    """校验目标与检查点版本后保存评估结果，并向订阅端广播最新状态。"""
     try:
         async with goal_thread_lock(thread_id):
             checkpoint_tuple = await _call_checkpointer_method(
@@ -864,7 +871,7 @@ async def _persist_goal_evaluation(
 async def _reread_goal_and_checkpoint(checkpointer: Any, thread_id: str) -> tuple[GoalState | None, Any]:
     """
 
-    Re-read the goal and latest checkpoint together for a concurrency re-check."""
+    重新读取目标和最新检查点，判断并发期间状态是否已发生变化。"""
     goal = await read_thread_goal(checkpointer, thread_id)
     checkpoint_tuple = await _call_checkpointer_method(
         checkpointer,
@@ -890,7 +897,7 @@ async def _prepare_goal_continuation_input(
 ) -> dict[str, Any] | None:
     """
 
-    Evaluate the active goal and return a hidden continuation input if needed.
+    评估活动目标，并在目标仍可继续时构造隐藏的续跑输入。
 
         NOTE: The re-reads below catch a racing user message or ``/goal clear``
         before we queue a continuation. Goal writes then serialize per thread and
@@ -1082,7 +1089,7 @@ async def _rollback_to_pre_run_checkpoint(
 ) -> None:
     """
 
-    Restore thread state to the checkpoint snapshot captured before run start."""
+    将线程状态恢复到运行开始前保存的检查点快照。"""
     if checkpointer is None:
         logger.info("Run %s rollback requested but no checkpointer is configured", run_id)
         return
@@ -1167,6 +1174,7 @@ async def _rollback_to_pre_run_checkpoint(
 
 
 def _new_checkpoint_marker() -> dict[str, str]:
+    """创建空检查点并提取重置消息频道所需的 ID 和时间戳。"""
     marker = empty_checkpoint()
     return {"id": marker["id"], "ts": marker["ts"]}
 
@@ -1176,7 +1184,7 @@ def _bump_channel_version(checkpointer: Any, current_version: Any) -> Any:
 
     返回：a strictly-different next version for a checkpoint channel.
 
-        DB-backed LangGraph savers (PostgresSaver / v4 SqliteSaver blob layout)
+        The PostgreSQL-backed LangGraph saver
         persist channel blobs keyed by ``channel_versions[<channel>]``, so the
         new value MUST differ from the prior value. We delegate to the
         checkpointer's ``get_next_version`` when available — that is the canonical
@@ -1214,6 +1222,7 @@ def _bump_channel_version(checkpointer: Any, current_version: Any) -> Any:
 
 
 def _checkpoint_identity(ckpt_tuple: Any | None, checkpoint: dict[str, Any]) -> str | None:
+    """从检查点元组配置优先读取 ID，缺失时回退到检查点正文。"""
     tuple_config = getattr(ckpt_tuple, "config", {}) or {}
     tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
     if isinstance(tuple_configurable, dict):
@@ -1225,6 +1234,7 @@ def _checkpoint_identity(ckpt_tuple: Any | None, checkpoint: dict[str, Any]) -> 
 
 
 def _checkpoint_namespace(ckpt_tuple: Any | None) -> str:
+    """读取检查点元组的命名空间，供写入时定位相同子图状态。"""
     tuple_config = getattr(ckpt_tuple, "config", {}) or {}
     tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
     checkpoint_ns = tuple_configurable.get("checkpoint_ns", "") if isinstance(tuple_configurable, dict) else ""
@@ -1232,6 +1242,7 @@ def _checkpoint_namespace(ckpt_tuple: Any | None) -> str:
 
 
 def _graph_input_messages(graph_input: Any | None) -> list[Any]:
+    """兼容字典输入中的列表或元组消息并统一返回列表。"""
     if not isinstance(graph_input, dict):
         return []
     messages = graph_input.get("messages")
@@ -1243,6 +1254,7 @@ def _graph_input_messages(graph_input: Any | None) -> list[Any]:
 
 
 def _title_generation_state(channel_values: dict[str, Any], graph_input: Any | None) -> dict[str, Any]:
+    """构造标题生成所需状态；检查点消息为空时使用本轮图输入补齐。"""
     state = dict(channel_values)
     messages = state.get("messages")
     if not messages:
@@ -1267,7 +1279,7 @@ async def persist_run_durations(
 ) -> bool:
     """
 
-    Merge validated run durations into a metadata-only checkpoint.
+    将已校验的运行耗时合并进元数据检查点，不重写消息频道。
 
         Durations accumulate so the history fast path can serve every known turn
         from the latest checkpoint.  Per-entry overhead is negligible (~50 bytes
@@ -1396,11 +1408,9 @@ async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_co
         checkpoint.update({"id": marker["id"], "ts": marker["ts"], "channel_values": channel_values})
 
         # Bump ``channel_versions["title"]`` and declare the bump in ``new_versions``
-        # so DB-backed savers (SqliteSaver v4 / PostgresSaver) actually persist the
+        # so the PostgreSQL-backed saver actually persists the
         # new blob — those savers strip inline ``channel_values`` from ``put`` and
-        # only write blobs for channels listed in ``new_versions``. The legacy
-        # single-table sqlite saver ignores ``new_versions`` and inlines the
-        # snapshot, so this path is correct for both layouts. Mirrors
+        # only write blobs for channels listed in ``new_versions``. Mirrors
         # ``_rollback_to_pre_run_checkpoint`` in the same file.
         channel_versions = dict(checkpoint.get("channel_versions", {}) or {})
         next_title_version = _bump_channel_version(checkpointer, channel_versions.get("title"))
@@ -1444,6 +1454,7 @@ def _lg_mode_to_sse_event(mode: str) -> str:
 
 
 def _error_fallback_message_from_metadata(metadata: dict[str, Any], content: Any) -> str:
+    """按错误详情、原因、消息正文的优先级生成可见的模型故障说明。"""
     detail = metadata.get("error_detail")
     if isinstance(detail, str) and detail.strip():
         return detail.strip()
@@ -1458,7 +1469,7 @@ def _error_fallback_message_from_metadata(metadata: dict[str, Any], content: Any
 def _message_id(obj: Any) -> str | None:
     """
 
-    Best-effort extraction of a stable message id from a message-like object."""
+    从消息对象或字典中提取非空字符串消息 ID。"""
     msg_id = getattr(obj, "id", None)
     if isinstance(msg_id, str) and msg_id:
         return msg_id
@@ -1472,7 +1483,7 @@ def _message_id(obj: Any) -> str | None:
 def _try_extract_from_message(obj: Any, pre_existing_ids: set[str] | None = None) -> str | None:
     """
 
-    Try to extract fallback marker from a single message object or dict.
+    检查单条消息是否携带本轮模型错误回退标记。
 
         Messages whose id appears in ``pre_existing_ids`` are skipped — those are
         history checkpointed by a *prior* run on this thread and any fallback
@@ -1532,6 +1543,7 @@ def _extract_llm_error_fallback_message(value: Any, pre_existing_ids: set[str] |
     seen: set[int] = set()
 
     def walk(obj: Any) -> str | None:
+        """递归检查消息容器并避开循环引用，寻找本轮错误回退标记。"""
         oid = id(obj)
         if oid in seen:
             return None
@@ -1561,7 +1573,7 @@ def _extract_llm_error_fallback_message(value: Any, pre_existing_ids: set[str] |
 def _collect_pre_existing_message_ids(snapshot: dict[str, Any] | None) -> set[str]:
     """
 
-    Pull stable message ids out of a pre-run checkpoint snapshot.
+    从运行前检查点提取历史消息 ID，供本轮过滤旧错误标记。
 
         Used by :func:`run_agent` to mask stale ``deerflow_error_fallback`` markers
         on history messages so they don't trip the current run's failure path. A
@@ -1594,7 +1606,7 @@ def _unpack_stream_item(
 ) -> tuple[str | None, Any]:
     """
 
-    Unpack a multi-mode or subgraph stream item into (mode, chunk).
+    将多模式或子图流项目拆成事件模式、命名空间和数据块。
 
         Returns ``(None, None)`` if the item cannot be parsed.
     """

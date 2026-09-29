@@ -72,7 +72,6 @@ models:
 - `CodexChatModel` loads Codex CLI auth from `~/.codex/auth.json`
 - The Codex Responses endpoint currently rejects `max_tokens` and `max_output_tokens`, so `CodexChatModel` does not expose a request-level token cap
 - `ClaudeChatModel` accepts `CLAUDE_CODE_OAUTH_TOKEN`, `ANTHROPIC_AUTH_TOKEN`, `CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`, `CLAUDE_CODE_CREDENTIALS_PATH`, or plaintext `~/.claude/.credentials.json`
-- On macOS, DeerFlow does not probe Keychain automatically. Use `scripts/export_claude_code_oauth.py` to export Claude Code auth explicitly when needed
 
 To use OpenAI's `/v1/responses` endpoint with LangChain, keep using `langchain_openai:ChatOpenAI` and set:
 
@@ -248,7 +247,7 @@ Notes:
 - `enabled: false` keeps background polling off by default.
 - `max_concurrent_runs` is a global cap on active scheduled runs (queued/running run rows); each poll cycle claims only into the remaining budget, so long runs accumulating across cycles cannot exceed it.
 - All scheduler fields are restart-required; edits need a Gateway restart.
-- Multi-worker deployments (`GATEWAY_WORKERS > 1`) must use the Postgres database backend. SQLite silently ignores row-level locks, so multiple workers can double-fire the same task.
+- Multi-worker deployments (`GATEWAY_WORKERS > 1`) require PostgreSQL and `run_ownership.heartbeat_enabled: true` so workers do not reclaim each other's active runs.
 - The MVP supports thread reuse and fresh-thread-per-run execution modes.
 - The MVP supports only `once` and `cron`.
 - Manual trigger uses the same scheduled-task resource and run lifecycle.
