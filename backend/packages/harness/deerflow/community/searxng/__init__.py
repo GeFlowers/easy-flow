@@ -1,4 +1,4 @@
-"定义 __init__ 模块提供的职责与可复用接口"
+'''导出 SearXNG 元搜索工具。'''
 
 from .tools import web_search_tool
 

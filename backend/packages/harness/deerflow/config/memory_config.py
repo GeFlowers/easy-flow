@@ -1,4 +1,4 @@
-"""提供配置、memory、配置相关功能。"""
+'''定义长期记忆开关、调用模式、后端选择及旧配置迁移规则。'''
 
 import logging
 from typing import Any, Literal
@@ -35,7 +35,7 @@ _LEGACY_DEERMEM_FIELDS = frozenset(
 
 
 class MemoryConfig(BaseModel):
-    """\u6267\u884c MemoryConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''分离跨后端通用记忆设置与传递给具体后端的专属参数。'''
 
     enabled: bool = Field(
         default=True,
@@ -94,24 +94,24 @@ class MemoryConfig(BaseModel):
 
 
 def should_use_memory_tools(config: MemoryConfig) -> bool:
-    """\u6267\u884c should_use_memory_tools \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''判断当前记忆配置是否应向智能体注册主动记忆工具。'''
     return config.enabled and config.mode == "tool"
 _memory_config: MemoryConfig = MemoryConfig()
 
 
 def get_memory_config() -> MemoryConfig:
-    """\u6267\u884c get_memory_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回当前应用进程中的长期记忆配置快照。'''
     return _memory_config
 
 
 def set_memory_config(config: MemoryConfig) -> None:
-    """\u6267\u884c set_memory_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''替换内存中的记忆配置，供应用配置装载阶段调用。'''
     global _memory_config
     _memory_config = config
 
 
 def load_memory_config_from_dict(config_dict: dict) -> None:
-    """\u6267\u884c load_memory_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''迁移旧版平铺后端字段，再校验并缓存统一记忆配置。'''
     global _memory_config
     config_dict = dict(config_dict or {})
     backend_config = dict(config_dict.get("backend_config") or {})

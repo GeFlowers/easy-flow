@@ -1,4 +1,4 @@
-"""导出工作区变更快照、比较和响应处理的公共接口。"""
+'''导出工作区变更快照、比较和响应处理的公共接口。'''
 
 from .api import get_workspace_changes_response
 from .diff import compare_snapshots, get_changed_paths

@@ -1,4 +1,4 @@
-"未说明"
+'''构建按需读取技能详情的工具，并生成供代理发现和加载技能的提示片段。'''
 
 from __future__ import annotations
 
@@ -21,12 +21,11 @@ from deerflow.skills.types import SkillCategory
 logger = logging.getLogger(__name__)
 
 
-# ── Setup ────────────────────────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
 class SkillSearchSetup:
-    "未说明"
+    '''保存技能详情工具和可用技能名称集合，供代理提示与工具注册流程共用。'''
 
     describe_skill_tool: BaseTool | None
     skill_names: frozenset[str]
@@ -37,14 +36,14 @@ def build_describe_skill_tool(
     *,
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
 ) -> BaseTool:
-    "未说明"
+    '''创建技能详情工具；调用时搜索目录并返回匹配技能的描述、权限和容器内路径。'''
 
     @tool
     def describe_skill(
         name: str,
         tool_call_id: Annotated[str, InjectedToolCallId],
     ) -> Command:
-        "未说明"
+        '''根据代理提供的技能名搜索目录并返回匹配项的安全转义元数据。'''
         matched = catalog.search(name)
         if not matched:
             content = f"No skills matched: {name}"
@@ -72,7 +71,7 @@ def build_skill_search_setup(
     enabled: bool,
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
 ) -> SkillSearchSetup:
-    "未说明"
+    '''在功能启用且存在技能时创建目录和详情工具，否则返回空配置。'''
     if not enabled or not skills:
         return SkillSearchSetup(None, frozenset())
 
@@ -86,18 +85,15 @@ def build_skill_search_setup(
     )
 
 
-# ── Rendering ────────────────────────────────────────────────────────────────
 
 
 def _render_skill_metadata(skills: list, container_base_path: str) -> str:
-    "未说明"
+    '''将匹配技能的名称、描述、可用工具和容器路径整理为代理可读取的文本。'''
     blocks: list[str] = []
     for s in skills:
         mutability = "[custom, editable]" if s.category == SkillCategory.CUSTOM else "[built-in]"
         tools_line = ", ".join(s.allowed_tools) if s.allowed_tools else "(all)"
         location = s.get_container_file_path(container_base_path)
-        # name/description/allowed-tools come from untrusted ``.skill`` frontmatter;
-        # escape so a value cannot forge a framework tag in the describe_skill output.
         name = html.escape(s.name, quote=False)
         description = html.escape(s.description, quote=False)
         tools = html.escape(tools_line, quote=False)
@@ -106,7 +102,6 @@ def _render_skill_metadata(skills: list, container_base_path: str) -> str:
     return "\n\n".join(blocks)
 
 
-# ── Prompt rendering ─────────────────────────────────────────────────────────
 
 
 def get_skill_index_prompt_section(
@@ -115,7 +110,7 @@ def get_skill_index_prompt_section(
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
     skill_evolution_section: str = "",
 ) -> str:
-    "未说明"
+    '''在提示中说明技能发现、详情读取和斜杠激活流程，并列出当前可用技能。'''
     if not skill_names:
         return ""
 

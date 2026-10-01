@@ -8,14 +8,13 @@ import { cn } from "@/lib/utils";
 
 import { MobileNav } from "./mobile-nav";
 
-/** HeaderProps 的公开类型定义。 */
 export type HeaderProps = {
   className?: string;
   homeURL?: string;
   locale?: Locale;
 };
 
-/** Header 组件：提供对应的界面结构与交互语义。 */
+/** 渲染站点品牌、文档/博客导航和移动菜单，并按当前语言生成文档链接。 */
 export async function Header({ className, homeURL, locale }: HeaderProps) {
   const isExternalHome = !homeURL;
   const { locale: resolvedLocale, t } = await getI18n(locale);

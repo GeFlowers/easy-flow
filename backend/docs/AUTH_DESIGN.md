@@ -287,7 +287,7 @@ OIDC 细节见 [SSO.md](SSO.md)。IM 绑定细节见 [IM_CHANNEL_CONNECTIONS.md]
 |---|---|---|
 | 平台凭证 | `channels.*` 机器人配置 + Gateway 内部调用 | 部署级 `DEER_FLOW_INTERNAL_AUTH_TOKEN` |
 | DeerFlow 用户来源 | 必须绑定到 `users` 表中的真实账号 | **不创建** `users` 行；使用合成 `system_role=internal` 用户 |
-| 外部身份登记 | `channel_connections` + `channel_conversations`（可审计、可撤销） | 请求头 `X-DeerFlow-Owner-User-Id`（平台自声明，如 `feishu_ou_alice`） |
+| 外部身份登记 | `channel_connections` + `channel_conversations`（可审计、可撤销） | 请求头 `X-DeerFlow-Owner-User-Id`（平台自声明，如 `wechat_user_alice`） |
 | 典型调用方 | DeerFlow 内置 IM worker（飞书 / 企业微信 / Slack / Telegram …） | 合作方后端（如飞书或企业微信自建应用网关） |
 | 身份可信度 | Connect code 一次性绑定，DB 唯一约束保证单 owner | 完全信任平台对 `Owner-User-Id` 的正确性 |
 | 用户 / thread 隔离 | 有（按绑定的 `owner_user_id`） | 有（按 header 中的 owner 字符串） |
@@ -314,7 +314,7 @@ export DEER_FLOW_INTERNAL_AUTH_TOKEN="<long-random-secret>"
 | Header | 必填 | 说明 |
 |---|---|---|
 | `X-DeerFlow-Internal-Token` | 是 | 必须等于 Gateway 的 `DEER_FLOW_INTERNAL_AUTH_TOKEN`；缺失或错误 → `401` |
-| `X-DeerFlow-Owner-User-Id` | 需要用户隔离时必填 | 平台侧用户标识，如 `feishu_ou_alice`（飞书 `open_id`）或 `wecom_user_bob`（企业微信成员 id）；同一用户的建 thread / 续聊应保持一致。缺失时落到 `default` 用户桶 |
+| `X-DeerFlow-Owner-User-Id` | 需要用户隔离时必填 | 平台侧用户标识，如 `wechat_user_alice` 或 `wecom_user_bob`（企业微信成员 id）；同一用户的建 thread / 续聊应保持一致。缺失时落到 `default` 用户桶 |
 
 Internal Auth **不使用**浏览器 `access_token` cookie，也**不参与**前端 CSRF double-submit cookie 流程。DeerFlow 内置 IM worker 在进程内同时附带 Internal Token 与 CSRF cookie/header；第三方平台做 server-to-server HTTP 集成时通常只发送 Internal 相关 header。
 

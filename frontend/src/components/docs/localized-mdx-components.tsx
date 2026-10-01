@@ -11,13 +11,13 @@ import { localizeDocsHref } from "./localized-links";
 const DOCS_LINK_CLASS_NAME =
   "x:text-primary-600 x:underline x:hover:no-underline x:decoration-from-font x:[text-underline-position:from-font]";
 
-/** useDocumentLanguage Hook：封装本模块所需的状态或上下文访问。 */
+/** 从当前文档路由参数读取语言代码，供链接组件保持语言路径一致。 */
 function useDocumentLanguage(): string | undefined {
   const { lang } = useParams<{ lang?: string }>();
   return lang;
 }
 
-/** LocalizedDocsLink 组件：提供对应的界面结构与交互语义。 */
+/** 将文档内链接补齐当前语言前缀，同时保留原有锚点和链接属性。 */
 export function LocalizedDocsLink({
   href,
   className,
@@ -36,7 +36,7 @@ export function LocalizedDocsLink({
   );
 }
 
-/** LocalizedCard 组件：提供对应的界面结构与交互语义。 */
+/** 为文档卡片链接补齐当前语言路径，避免点击后离开本地化文档。 */
 export function LocalizedCard({
   href,
   ...props

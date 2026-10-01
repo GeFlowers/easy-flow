@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
-/** InputGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 将输入控件、前后缀和按钮组合成共享边框及焦点状态的整体。 */
 function InputGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -58,7 +58,7 @@ const inputGroupAddonVariants = cva(
   },
 );
 
-/** InputGroupAddon 内部组件：组织对应的界面结构与交互语义。 */
+/** 将图标或辅助文本放在输入框四侧，并可点击后聚焦输入框。 */
 function InputGroupAddon({
   className,
   align = "inline-start",
@@ -99,7 +99,7 @@ const inputGroupButtonVariants = cva(
   },
 );
 
-/** InputGroupButton 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供适配输入组高度的紧凑按钮及图标尺寸。 */
 function InputGroupButton({
   className,
   type = "button",
@@ -119,7 +119,7 @@ function InputGroupButton({
   );
 }
 
-/** InputGroupText 内部组件：组织对应的界面结构与交互语义。 */
+/** 在输入组前后缀位置显示说明文本或图标。 */
 function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
   return (
     <span
@@ -132,7 +132,7 @@ function InputGroupText({ className, ...props }: React.ComponentProps<"span">) {
   );
 }
 
-/** InputGroupInput 内部组件：组织对应的界面结构与交互语义。 */
+/** 将基础文本输入融入输入组边框，避免重复边线和焦点环。 */
 function InputGroupInput({
   className,
   ...props
@@ -149,7 +149,7 @@ function InputGroupInput({
   );
 }
 
-/** InputGroupTextarea 内部组件：组织对应的界面结构与交互语义。 */
+/** 将多行文本区融入输入组，并关闭独立边框以共享容器样式。 */
 function InputGroupTextarea({
   className,
   ...props

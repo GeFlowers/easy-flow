@@ -13,7 +13,7 @@ ARG NODE_MAJOR=22
 ARG APT_MIRROR
 ARG UV_INDEX_URL
 # 要安装的可选 extras（例如 PostgreSQL 支持使用 "postgres"）
-# 用法：docker build --build-arg UV_EXTRAS=postgres,discord ...
+# 用法：docker build --build-arg UV_EXTRAS=postgres ...
 ARG UV_EXTRAS
 
 # 受限网络可选覆盖 apt 镜像（例如 APT_MIRROR=mirrors.aliyun.com）。
@@ -83,9 +83,6 @@ COPY --from=builder /usr/bin/node /usr/bin/node
 COPY --from=builder /usr/lib/node_modules /usr/lib/node_modules
 RUN ln -s ../lib/node_modules/npm/bin/npm-cli.js /usr/bin/npm \
     && ln -s ../lib/node_modules/npm/bin/npx-cli.js /usr/bin/npx
-
-# 安装 Docker CLI；DooD 通过宿主 Docker socket 启动沙箱容器时需要它。
-COPY --from=docker:cli /usr/local/bin/docker /usr/local/bin/docker
 
 # 安装 uv；源镜像可由 UV_IMAGE build-arg 覆盖。
 COPY --from=uv-source /uv /uvx /usr/local/bin/

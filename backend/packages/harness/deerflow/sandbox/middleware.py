@@ -1,4 +1,4 @@
-"""在智能体和工具调用生命周期中管理沙箱的中间件。"""
+'''在智能体和工具调用生命周期中管理沙箱的中间件。'''
 
 import asyncio
 import logging
@@ -21,43 +21,43 @@ logger = logging.getLogger(__name__)
 
 
 class SandboxMiddlewareState(AgentState):
-    """声明沙箱中间件读取和写入的智能体状态字段。"""
+    '''声明沙箱中间件读取和写入的智能体状态字段。'''
 
     sandbox: SandboxStateField
     thread_data: NotRequired[ThreadDataState | None]
 
 
 class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
-    """按需获取、传播并在运行结束时释放线程范围内的沙箱。"""
+    '''按需获取、传播并在运行结束时释放线程范围内的沙箱。'''
 
     state_schema = SandboxMiddlewareState
 
     def __init__(self, lazy_init: bool = True):
-        """初始化中间件，并配置是否延迟获取沙箱。"""
+        '''初始化中间件，并配置是否延迟获取沙箱。'''
         super().__init__()
         self._lazy_init = lazy_init
 
     def _acquire_sandbox(self, thread_id: str, *, user_id: str) -> str:
-        """同步获取指定线程和用户范围内的沙箱标识。"""
+        '''同步获取指定线程和用户范围内的沙箱标识。'''
         provider = get_sandbox_provider()
         sandbox_id = provider.acquire(thread_id, user_id=user_id)
         logger.info(f"Acquiring sandbox {sandbox_id}")
         return sandbox_id
 
     async def _acquire_sandbox_async(self, thread_id: str, *, user_id: str) -> str:
-        """异步获取指定线程和用户范围内的沙箱标识。"""
+        '''异步获取指定线程和用户范围内的沙箱标识。'''
         provider = get_sandbox_provider()
         sandbox_id = await provider.acquire_async(thread_id, user_id=user_id)
         logger.info(f"Acquiring sandbox {sandbox_id}")
         return sandbox_id
 
     async def _release_sandbox_async(self, sandbox_id: str) -> None:
-        """在线程中异步释放指定沙箱，避免阻塞事件循环。"""
+        '''在线程中异步释放指定沙箱，避免阻塞事件循环。'''
         await asyncio.to_thread(get_sandbox_provider().release, sandbox_id)
 
     @override
     def before_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        """在同步智能体运行前按配置预先分配沙箱。"""
+        '''在同步智能体运行前按配置预先分配沙箱。'''
         if self._lazy_init:
             return super().before_agent(state, runtime)
 
@@ -72,7 +72,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @override
     async def abefore_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        """在异步智能体运行前按配置预先分配沙箱。"""
+        '''在异步智能体运行前按配置预先分配沙箱。'''
         if self._lazy_init:
             return await super().abefore_agent(state, runtime)
 
@@ -87,7 +87,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @override
     def after_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        """在同步智能体运行结束后释放状态或上下文中的沙箱。"""
+        '''在同步智能体运行结束后释放状态或上下文中的沙箱。'''
         sandbox = state.get("sandbox")
         if sandbox is not None:
             sandbox_id = sandbox["sandbox_id"]
@@ -105,7 +105,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @override
     async def aafter_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
-        """在异步智能体运行结束后释放状态或上下文中的沙箱。"""
+        '''在异步智能体运行结束后释放状态或上下文中的沙箱。'''
         sandbox = state.get("sandbox")
         if sandbox is not None:
             sandbox_id = sandbox["sandbox_id"]
@@ -121,13 +121,10 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
         return await super().aafter_agent(state, runtime)
 
-    # ------------------------------------------------------------------
-    #
-    # ------------------------------------------------------------------
 
     @staticmethod
     def _read_sandbox_id_from_state(state: object) -> str | None:
-        """从字典形态的状态中安全提取沙箱标识。"""
+        '''从字典形态的状态中安全提取沙箱标识。'''
         if not isinstance(state, dict):
             return None
         sandbox_state = state.get("sandbox")
@@ -138,7 +135,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @staticmethod
     def _attach_sandbox_update(result: ToolMessage | Command, sandbox_id: str) -> ToolMessage | Command:
-        """将新获得的沙箱标识合并到工具结果的状态更新中。"""
+        '''将新获得的沙箱标识合并到工具结果的状态更新中。'''
         sandbox_update = {"sandbox": {"sandbox_id": sandbox_id}}
 
         if isinstance(result, ToolMessage):
@@ -152,7 +149,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
     @staticmethod
     def _read_sandbox_id_from_request(request: ToolCallRequest) -> str | None:
-        """从工具调用请求的运行时状态中读取沙箱标识。"""
+        '''从工具调用请求的运行时状态中读取沙箱标识。'''
         runtime = request.runtime
         if runtime is None or runtime.state is None:
             return None
@@ -164,7 +161,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """执行同步工具调用，并把调用期间延迟初始化的沙箱写回结果。"""
+        '''执行同步工具调用，并把调用期间延迟初始化的沙箱写回结果。'''
         prev_sandbox_id = self._read_sandbox_id_from_request(request)
         result = handler(request)
         if prev_sandbox_id is not None:
@@ -180,7 +177,7 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        """执行异步工具调用，并把调用期间延迟初始化的沙箱写回结果。"""
+        '''执行异步工具调用，并把调用期间延迟初始化的沙箱写回结果。'''
         prev_sandbox_id = self._read_sandbox_id_from_request(request)
         result = await handler(request)
         if prev_sandbox_id is not None:

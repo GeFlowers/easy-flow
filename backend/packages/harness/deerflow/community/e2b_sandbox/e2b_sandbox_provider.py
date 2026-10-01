@@ -1,4 +1,4 @@
-"""定义 e2b_sandbox_provider 模块提供的职责与可复用接口。
+'''管理 E2B 远程沙箱的配置、创建、复用、预热、租约回收和文件挂载。
 
 ``E2BSandboxProvider`` — DeerFlow :class:`SandboxProvider` for e2b cloud.
 
@@ -21,7 +21,7 @@ Configuration is read from :class:`SandboxConfig` (which has
           read_only: true
       environment:                     # forwarded as e2b ``envs`` on create
         OPENAI_API_KEY: $OPENAI_API_KEY
-"""
+'''
 
 from __future__ import annotations
 
@@ -51,16 +51,11 @@ from .e2b_sandbox import DEFAULT_E2B_HOME_DIR, E2BSandbox, _is_sandbox_gone_erro
 logger = logging.getLogger(__name__)
 
 
-# ── Defaults ─────────────────────────────────────────────────────────────
-DEFAULT_TEMPLATE = "code-interpreter-v1"  # the public e2b code-interpreter template
-DEFAULT_IDLE_TIMEOUT = 1800  # 30 minutes; passed to ``Sandbox.set_timeout``.
+DEFAULT_TEMPLATE = "code-interpreter-v1"
+DEFAULT_IDLE_TIMEOUT = 1800
 DEFAULT_REPLICAS = 3
-# Hard upper bound for ``set_timeout`` (e2b currently caps at 24h on the
-# free plan; passing an excessive value is rejected by the control-plane).
 MAX_E2B_TIMEOUT = 24 * 60 * 60
 
-# Metadata keys we attach to every sandbox so we can discover ours via
-# ``Sandbox.list(query={...})`` from any gateway process.
 META_KEY_USER = "deer_flow_user"
 META_KEY_THREAD = "deer_flow_thread"
 META_KEY_PROVIDER = "deer_flow_provider"
@@ -68,29 +63,18 @@ META_VAL_PROVIDER = "e2b_sandbox_provider"
 
 
 class E2BSandboxProvider(SandboxProvider):
-    """封装 E2BSandboxProvider 的状态、协作关系与公开操作。
+    '''管理远程沙箱生命周期，并按用户与线程复用运行中或预热的实例。'''
 
-    Sandbox provider backed by the e2b code-interpreter cloud SDK."""
-
-    # e2b sandboxes are remote: there is no shared host filesystem with the
-    # gateway, so the framework must explicitly sync uploaded files (the
-    # remote backend in AioSandboxProvider sets the same flag).
     uses_thread_data_mounts = False
     needs_upload_permission_adjustment = True
 
-    # ── Construction & config ────────────────────────────────────────────
 
     def __init__(self) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''初始化实例索引、线程锁和预热池，读取配置并注册进程退出清理。'''
         self._lock = threading.Lock()
-        # Active sandboxes, keyed by DeerFlow-side sandbox id (== e2b id).
         self._sandboxes: dict[str, E2BSandbox] = {}
-        # (user_id, thread_id) -> sandbox id for fast in-process lookup.
         self._thread_sandboxes: dict[tuple[str, str], str] = {}
-        # Per-(user,thread) lock to serialise acquire() against itself.
         self._thread_locks: dict[tuple[str, str], threading.Lock] = {}
-        # Warm pool: released sandboxes whose remote micro-VM is still alive.
-        # ``OrderedDict`` maintains insertion / move_to_end order for LRU.
         self._warm_pool: OrderedDict[str, tuple[str, float]] = OrderedDict()
         self._shutdown_called = False
 
@@ -100,13 +84,11 @@ class E2BSandboxProvider(SandboxProvider):
         self._register_signal_handlers()
 
     def _load_config(self) -> dict[str, Any]:
-        """执行 _load_config 的明确职责，并返回与调用约定一致的结果。
-
-        Read e2b options off ``SandboxConfig`` (``extra="allow"``)."""
+        '''从沙箱应用配置和环境变量解析密钥、镜像、超时、副本数、挂载及环境变量。'''
         sandbox_config = get_app_config().sandbox
 
         def _opt(name: str, default: Any = None) -> Any:
-            "执行 _opt 的明确职责，并返回与调用约定一致的结果"
+            '''读取沙箱配置中的可选扩展字段，并在未设置时返回默认值。'''
             return getattr(sandbox_config, name, default)
 
         api_key = _opt("api_key") or os.environ.get("E2B_API_KEY")
@@ -134,7 +116,7 @@ class E2BSandboxProvider(SandboxProvider):
 
     @staticmethod
     def _resolve_env_vars(env_config: dict[str, str]) -> dict[str, str]:
-        "执行 _resolve_env_vars 的明确职责，并返回与调用约定一致的结果"
+        '''解析环境变量配置中的 $NAME 引用，其余值统一转换为字符串。'''
         resolved: dict[str, str] = {}
         for key, value in env_config.items():
             if isinstance(value, str) and value.startswith("$"):
@@ -144,32 +126,28 @@ class E2BSandboxProvider(SandboxProvider):
         return resolved
 
     def _get_sandbox_cls(self) -> type[E2BClientSandbox]:
-        """执行 _get_sandbox_cls 的明确职责，并返回与调用约定一致的结果。
-
-        Return the e2b SDK Sandbox class."""
+        '''返回 E2B 客户端沙箱类，便于测试替换和统一创建调用。'''
         return E2BClientSandbox
 
-    # ── Identity helpers ────────────────────────────────────────────────
 
     @staticmethod
     def _effective_acquire_user_id(user_id: str | None) -> str:
-        "执行 _effective_acquire_user_id 的明确职责，并返回与调用约定一致的结果"
+        '''优先采用调用方提供的用户标识，否则从当前请求上下文解析用户。'''
         return user_id or get_effective_user_id()
 
     @staticmethod
     def _thread_key(thread_id: str, user_id: str) -> tuple[str, str]:
-        "执行 _thread_key 的明确职责，并返回与调用约定一致的结果"
+        '''生成用于隔离不同用户线程沙箱的复合索引键。'''
         return (user_id, thread_id)
 
     @staticmethod
     def _stable_seed(thread_id: str, user_id: str) -> str:
-        "执行 _stable_seed 的明确职责，并返回与调用约定一致的结果"
+        '''根据用户和线程标识生成稳定摘要，用于匹配预热沙箱。'''
         return hashlib.sha256(f"{user_id}:{thread_id}".encode()).hexdigest()[:16]
 
-    # ── Signal / shutdown handling ───────────────────────────────────────
 
     def _register_signal_handlers(self) -> None:
-        "执行 _register_signal_handlers 的明确职责，并返回与调用约定一致的结果"
+        '''注册进程终止信号处理器，在退出前关闭当前提供方管理的沙箱。'''
         try:
             self._original_sigterm = signal.getsignal(signal.SIGTERM)
             self._original_sigint = signal.getsignal(signal.SIGINT)
@@ -178,7 +156,7 @@ class E2BSandboxProvider(SandboxProvider):
             return
 
         def _handler(signum, frame):
-            "执行 _handler 的明确职责，并返回与调用约定一致的结果"
+            '''先关闭沙箱，再按原信号处理方式继续执行默认或已有处理器。'''
             self.shutdown()
             if signum == signal.SIGTERM:
                 original = self._original_sigterm
@@ -205,7 +183,7 @@ class E2BSandboxProvider(SandboxProvider):
                 )
 
     def _get_thread_lock(self, thread_id: str, user_id: str) -> threading.Lock:
-        "执行 _get_thread_lock 的明确职责，并返回与调用约定一致的结果"
+        '''取得用户与线程专属锁，避免同一会话并发申请多个沙箱。'''
         key = self._thread_key(thread_id, user_id)
         with self._lock:
             lock = self._thread_locks.get(key)
@@ -215,7 +193,7 @@ class E2BSandboxProvider(SandboxProvider):
             return lock
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        "执行 acquire 的明确职责，并返回与调用约定一致的结果"
+        '''同步申请沙箱，按当前线程依次尝试复用、回收、远程发现和新建。'''
         effective_user_id = self._effective_acquire_user_id(user_id)
         if thread_id:
             with self._get_thread_lock(thread_id, effective_user_id):
@@ -223,12 +201,12 @@ class E2BSandboxProvider(SandboxProvider):
         return self._acquire_internal(thread_id, user_id=effective_user_id)
 
     async def acquire_async(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        "执行 acquire_async 的明确职责，并返回与调用约定一致的结果"
+        '''在线程池中运行同步申请流程，避免阻塞异步调用方。'''
         effective_user_id = self._effective_acquire_user_id(user_id)
         return await asyncio.to_thread(self.acquire, thread_id, user_id=effective_user_id)
 
     def _acquire_internal(self, thread_id: str | None, *, user_id: str) -> str:
-        "执行 _acquire_internal 的明确职责，并返回与调用约定一致的结果"
+        '''按优先级尝试复用进程内实例、回收预热实例、发现远程实例，最后才创建。'''
         if thread_id:
             cached = self._reuse_in_process_sandbox(thread_id, user_id=user_id)
             if cached is not None:
@@ -246,7 +224,7 @@ class E2BSandboxProvider(SandboxProvider):
         return self._create_sandbox(thread_id, user_id=user_id)
 
     def _reuse_in_process_sandbox(self, thread_id: str, *, user_id: str) -> str | None:
-        "执行 _reuse_in_process_sandbox 的明确职责，并返回与调用约定一致的结果"
+        '''校验线程映射的进程内实例仍可响应，失效时清除缓存并允许重新创建。'''
         key = self._thread_key(thread_id, user_id)
         with self._lock:
             sid = self._thread_sandboxes.get(key)
@@ -254,16 +232,9 @@ class E2BSandboxProvider(SandboxProvider):
                 return None
             sandbox = self._sandboxes.get(sid)
             if sandbox is None:
-                # The mapping pointed at a dead entry — clean it up.
                 self._thread_sandboxes.pop(key, None)
                 return None
 
-        # Drop the cached entry if the e2b VM has been reaped (control-plane
-        # idle-timeout, manual pause, etc.).  We learn about this either via
-        # ``execute_command`` flipping ``is_dead`` from a previous tool call,
-        # or by an explicit ping below — without this check the agent loops
-        # for ever on "sandbox not found" errors before the next acquire
-        # finally rebuilds the sandbox.
         if sandbox.is_dead or not sandbox.ping():
             logger.warning(
                 "In-process e2b sandbox %s is dead (reaped by e2b control plane); evicting cache so acquire() can rebuild a fresh sandbox",
@@ -292,7 +263,7 @@ class E2BSandboxProvider(SandboxProvider):
         return sid
 
     def _reclaim_warm_pool_sandbox(self, thread_id: str, *, user_id: str) -> str | None:
-        "执行 _reclaim_warm_pool_sandbox 的明确职责，并返回与调用约定一致的结果"
+        '''按用户线程摘要从预热池取回实例，重新连接、探活并恢复路径配置。'''
         key = self._thread_key(thread_id, user_id)
         seed = self._stable_seed(thread_id, user_id)
         with self._lock:
@@ -315,12 +286,6 @@ class E2BSandboxProvider(SandboxProvider):
             )
             return None
 
-        # Verify the reconnected client actually corresponds to a live VM.
-        # ``Sandbox.connect`` succeeds for paused/expired sandboxes too on
-        # some SDK versions, but the very next command then fails with
-        # "sandbox not found" mid-tool-call. Pinging here moves that failure
-        # into the acquire path, where we cleanly fall back to creating a
-        # fresh sandbox.
         if not self._client_alive(client):
             logger.warning(
                 "Warm-pool e2b sandbox %s is no longer alive (reaped by control plane); dropping and falling back to create",
@@ -347,14 +312,7 @@ class E2BSandboxProvider(SandboxProvider):
         return target_id
 
     def _discover_remote_sandbox(self, thread_id: str, *, user_id: str) -> str | None:
-        """执行 _discover_remote_sandbox 的明确职责，并返回与调用约定一致的结果。
-
-        Look for a running e2b sandbox tagged with this (user, thread).
-
-                Other gateway processes (or this process before a restart) may have
-                created the sandbox already.  e2b sandboxes survive across reconnects
-                as long as the server-side timeout has not fired.
-        """
+        '''按用户和线程元数据分页查找远程实例，连接并验证后登记到本进程缓存。'''
         sandbox_cls = self._get_sandbox_cls()
         seed = self._stable_seed(thread_id, user_id)
         list_kwargs = self._common_kwargs()
@@ -390,16 +348,8 @@ class E2BSandboxProvider(SandboxProvider):
             )
             return None
 
-        # Pick the first matching candidate; tolerate either ``SandboxInfo``
-        # objects with ``sandbox_id`` or plain dicts.
-        # Normalise the return value of ``Sandbox.list()``:
-        #   * Older SDKs (<= 1.x) returned a plain ``list[SandboxInfo]`` — directly iterable.
-        #   * e2b-code-interpreter >= 2.x returns a ``SandboxPaginator`` exposing
-        #     ``has_next: bool`` and ``next_items() -> list[SandboxInfo]`` instead
-        #     of being iterable. Walking pages keeps discovery correct when the
-        #     org has more sandboxes than fit in a single page.
         def _iter_running(obj):
-            "执行 _iter_running 的明确职责，并返回与调用约定一致的结果"
+            '''兼容直接返回的列表和分页器，逐页遍历可用的运行中实例。'''
             if obj is None:
                 return
             if hasattr(obj, "next_items") and hasattr(obj, "has_next"):
@@ -471,9 +421,7 @@ class E2BSandboxProvider(SandboxProvider):
         return target_id
 
     def _create_sandbox(self, thread_id: str | None, *, user_id: str) -> str:
-        """执行 _create_sandbox 的明确职责，并返回与调用约定一致的结果。
-
-        Allocate a fresh e2b sandbox and hydrate it with configured mounts."""
+        '''按配置创建远程实例，初始化虚拟目录、上传挂载文件并登记用户线程映射。'''
         replicas = int(self._config["replicas"])
         with self._lock:
             in_use = len(self._sandboxes) + len(self._warm_pool)
@@ -513,11 +461,6 @@ class E2BSandboxProvider(SandboxProvider):
 
         sandbox_id: str = getattr(client, "sandbox_id", None) or str(uuid.uuid4())[:8]
 
-        # Materialise DeerFlow's virtual path layout (/mnt/user-data/...) inside
-        # the e2b VM. Without this step shell commands the agent emits — which
-        # use the same /mnt/user-data prefix as LocalSandbox / AioSandbox — fail
-        # with PermissionError because /mnt is owned by root in the e2b
-        # template. See the path-mapping note in :class:`E2BSandbox`.
         try:
             self._bootstrap_sandbox_paths(client)
         except Exception as e:
@@ -527,8 +470,6 @@ class E2BSandboxProvider(SandboxProvider):
                 e,
             )
 
-        # One-shot mount uploads.  e2b has no host bind-mount, so we copy
-        # files from ``host_path`` into ``container_path`` at sandbox start.
         try:
             self._apply_mounts(client)
         except Exception as e:
@@ -551,9 +492,7 @@ class E2BSandboxProvider(SandboxProvider):
         return sandbox_id
 
     def _common_kwargs(self) -> dict[str, Any]:
-        """执行 _common_kwargs 的明确职责，并返回与调用约定一致的结果。
-
-        Kwargs shared by ``Sandbox.create``, ``Sandbox.connect`` and ``Sandbox.list``."""
+        '''构造创建、连接和列举远程实例时共用的鉴权及服务域参数。'''
         kwargs: dict[str, Any] = {}
         if self._config["api_key"]:
             kwargs["api_key"] = self._config["api_key"]
@@ -562,15 +501,15 @@ class E2BSandboxProvider(SandboxProvider):
         return kwargs
 
     def _reconnect_client(self, sandbox_cls: type[E2BClientSandbox], sandbox_id: str) -> E2BClientSandbox:
-        """执行 _reconnect_client 的明确职责，并返回与调用约定一致的结果。
+        '''使用指定客户端类按实例标识重新连接远程沙箱。
 
-        Connect to an existing e2b sandbox by id, with consistent kwargs."""
+        Connect to an existing e2b sandbox by id, with consistent kwargs.'''
         return sandbox_cls.connect(sandbox_id, **self._common_kwargs())  # type: ignore[attr-defined]
 
     def _refresh_remote_timeout(self, client: E2BClientSandbox) -> None:
-        """执行 _refresh_remote_timeout 的明确职责，并返回与调用约定一致的结果。
+        '''将远程实例的空闲超时续期到配置值。
 
-        Push the configured idle timeout to the e2b control plane."""
+        Push the configured idle timeout to the e2b control plane.'''
         idle_timeout = int(self._config["idle_timeout"])
         if idle_timeout <= 0:
             return
@@ -584,7 +523,7 @@ class E2BSandboxProvider(SandboxProvider):
 
     @staticmethod
     def _client_alive(client: E2BClientSandbox) -> bool:
-        """执行 _client_alive 的明确职责，并返回与调用约定一致的结果。
+        '''执行轻量远程命令探测客户端连接是否仍然有效。
 
         Best-effort liveness probe for a freshly reconnected e2b client.
 
@@ -598,7 +537,7 @@ class E2BSandboxProvider(SandboxProvider):
                 Returns ``True`` if the command succeeds, ``False`` if it raises a
                 "sandbox not found / paused" error.  Other transient errors are
                 treated as alive so a single network blip does not nuke the cache.
-        """
+        '''
         try:
             client.commands.run("true")
             return True
@@ -610,14 +549,14 @@ class E2BSandboxProvider(SandboxProvider):
 
     @staticmethod
     def _safe_close_client(client: E2BClientSandbox | None) -> None:
-        """执行 _safe_close_client 的明确职责，并返回与调用约定一致的结果。
+        '''尽力关闭远程客户端并抑制清理期间的次生异常。
 
         Close the host-side HTTP client of *client* without ever raising.
 
                 Used in cleanup paths where we already know the e2b VM is unreachable
                 (paused/expired) and we just want to release sockets in the gateway
                 process.  Any exception is logged at debug level and swallowed.
-        """
+        '''
         if client is None:
             return
         for attr in ("close", "_transport"):
@@ -635,11 +574,11 @@ class E2BSandboxProvider(SandboxProvider):
                 return
 
     def _bootstrap_sandbox_paths(self, client: E2BClientSandbox) -> None:
-        """执行 _bootstrap_sandbox_paths 的明确职责，并返回与调用约定一致的结果。
+        '''创建沙箱内 DeerFlow 所需的虚拟路径和工作目录。
 
         Materialise DeerFlow's virtual path layout inside the e2b VM.
 
-                The local / docker sandboxes expose ``/mnt/user-data/{workspace,uploads,
+                The local sandbox exposes ``/mnt/user-data/{workspace,uploads,
                 outputs}`` and ``/mnt/acp-workspace`` as writable directories, and the
                 agent prompts (and the lead-agent system prompt in particular) instruct
                 the model to write outputs there. e2b's default ``code-interpreter``
@@ -666,8 +605,7 @@ class E2BSandboxProvider(SandboxProvider):
                 commands fail loudly here and we fall back to silently relying on the
                 path remap inside ``E2BSandbox`` — agent shell commands will still
                 fail, but the read/write/list APIs continue to work.
-        """
-        # Use the configured ``home_dir`` so a custom template can move HOME.
+        '''
         home_dir = self._config["home_dir"].rstrip("/") or "/home/user"
         bootstrap_script = (
             f"set -e; "
@@ -675,17 +613,12 @@ class E2BSandboxProvider(SandboxProvider):
             f"{shlex.quote(home_dir)}/uploads "
             f"{shlex.quote(home_dir)}/outputs "
             f"{shlex.quote(home_dir)}/acp-workspace; "
-            # /mnt/user-data -> $home_dir
             f"if [ ! -e /mnt/user-data ] || [ -L /mnt/user-data ]; then "
             f"  sudo ln -sfn {shlex.quote(home_dir)} /mnt/user-data; "
             f"fi; "
-            # /mnt/acp-workspace -> $home_dir/acp-workspace
             f"if [ ! -e /mnt/acp-workspace ] || [ -L /mnt/acp-workspace ]; then "
             f"  sudo ln -sfn {shlex.quote(home_dir)}/acp-workspace /mnt/acp-workspace; "
             f"fi; "
-            # /mnt/skills is left alone here; the optional ``mounts`` config
-            # uploads its content via _apply_mounts and creates the directory
-            # on demand. We only ensure that /mnt itself is traversable.
             f"sudo chmod a+rx /mnt 2>/dev/null || true; "
             f"echo BOOTSTRAP_OK"
         )
@@ -710,7 +643,7 @@ class E2BSandboxProvider(SandboxProvider):
             )
 
     def _apply_mounts(self, client: E2BClientSandbox) -> None:
-        "执行 _apply_mounts 的明确职责，并返回与调用约定一致的结果"
+        '''把配置的宿主机目录内容复制到远程实例目标路径，而非建立共享挂载。'''
         mounts = self._config.get("mounts") or []
         if not mounts:
             return
@@ -746,7 +679,6 @@ class E2BSandboxProvider(SandboxProvider):
             except Exception as e:
                 logger.warning("Failed to upload mount %s -> %s: %s", host_path, container_path, e)
 
-    # ── Output mirroring ────────────────────────────────────────────────
     _SYNC_BACK_SUBDIRS = ("outputs", "workspace")
 
     def _sync_outputs_to_host(
@@ -756,7 +688,7 @@ class E2BSandboxProvider(SandboxProvider):
         thread_id: str,
         user_id: str,
     ) -> None:
-        """执行 _sync_outputs_to_host 的明确职责，并返回与调用约定一致的结果。
+        '''将远程用户数据目录中的产物同步回宿主机线程目录。
 
         Mirror agent artifacts from the e2b VM back to host thread dirs.
 
@@ -776,8 +708,8 @@ class E2BSandboxProvider(SandboxProvider):
                 Failures are logged at WARNING level but never raised: artifact
                 download is non-critical for sandbox lifecycle, and we already log
                 the underlying e2b SDK errors elsewhere.
-        """
-        from deerflow.config.paths import get_paths  # lazy import to avoid cycles
+        '''
+        from deerflow.config.paths import get_paths
 
         client = sandbox.client
         if client is None:
@@ -790,17 +722,6 @@ class E2BSandboxProvider(SandboxProvider):
         thread_root = paths.thread_dir(thread_id, user_id=user_id) / "user-data"
         host_targets: dict[str, Path] = {sub: thread_root / sub for sub in self._SYNC_BACK_SUBDIRS}
 
-        # Build a single shell command that lists all files in the sync dirs
-        # with size + path, NUL-separated for safe parsing of weird filenames.
-        # find -printf '%s\t%p\0' keeps us to one round-trip regardless of
-        # how many subdirs we mirror.
-        #
-        # We list using the *physical* /home/user paths (the bootstrap symlink
-        # /mnt/user-data -> /home/user follows transparently), then translate
-        # each hit back to the /mnt/user-data prefix before calling
-        # ``E2BSandbox.download_file``: that method enforces a security check
-        # that the path is under ``VIRTUAL_PATH_PREFIX`` (/mnt/user-data) and
-        # internally re-resolves it to /home/user via ``_resolve_path``.
         find_targets = " ".join(shlex.quote(f"{home_dir}/{sub}") for sub in self._SYNC_BACK_SUBDIRS)
         list_cmd = f'for d in {find_targets}; do   [ -d "$d" ] && find "$d" -type f -printf \'%s\\t%p\\0\' 2>/dev/null; done'
 
@@ -842,9 +763,6 @@ class E2BSandboxProvider(SandboxProvider):
                 skipped += 1
                 continue
 
-            # Determine which subdir this file belongs to so we can compute
-            # the relative path on the host side.  remote_path is absolute,
-            # e.g. /home/user/outputs/foo/bar.pdf
             sub_match: tuple[str, Path, str] | None = None
             for sub, host_root in host_targets.items():
                 prefix = f"{home_dir}/{sub}/"
@@ -902,9 +820,9 @@ class E2BSandboxProvider(SandboxProvider):
         dest_dir: str,
         read_only: bool,
     ) -> None:
-        """执行 _upload_tree 的明确职责，并返回与调用约定一致的结果。
+        '''遍历宿主机目录并将允许的文件上传到远程沙箱对应目录。
 
-        Recursively upload ``src`` into ``dest_dir`` inside the sandbox."""
+        Recursively upload ``src`` into ``dest_dir`` inside the sandbox.'''
         if src.is_file():
             target = f"{dest_dir}/{src.name}"
             with src.open("rb") as fh:
@@ -938,7 +856,7 @@ class E2BSandboxProvider(SandboxProvider):
                 pass
 
     def _evict_oldest_warm(self) -> str | None:
-        "执行 _evict_oldest_warm 的明确职责，并返回与调用约定一致的结果"
+        '''从预热池中移除最久未使用实例，以释放配置的副本容量。'''
         with self._lock:
             if not self._warm_pool:
                 return None
@@ -971,25 +889,24 @@ class E2BSandboxProvider(SandboxProvider):
         return evict_id
 
     def get(self, sandbox_id: str) -> Sandbox | None:
-        "读取并返回，并遵守 get 所表达的接口约束"
+        '''按沙箱标识读取当前进程登记的活动沙箱，不存在时返回 None。'''
         with self._lock:
             return self._sandboxes.get(sandbox_id)
 
     def release(self, sandbox_id: str) -> None:
-        """执行 release 的明确职责，并返回与调用约定一致的结果。
+        '''解除沙箱与线程的活动映射，并按预热池容量决定保留或关闭实例。
 
         Park a sandbox in the warm pool while keeping the cloud VM alive.
 
                 e2b sandboxes have a server-enforced timeout — we refresh it here so
                 the warm-pool entry stays valid for at least one ``idle_timeout``
                 window after release.
-        """
+        '''
         sandbox: E2BSandbox | None = None
         seed: str | None = None
 
         with self._lock:
             sandbox = self._sandboxes.pop(sandbox_id, None)
-            # Find the (user, thread) the sandbox was bound to.
             removed_keys = [key for key, sid in self._thread_sandboxes.items() if sid == sandbox_id]
             for key in removed_keys:
                 self._thread_sandboxes.pop(key, None)
@@ -1046,7 +963,7 @@ class E2BSandboxProvider(SandboxProvider):
         logger.info("Released e2b sandbox %s to warm pool", sandbox_id)
 
     def _kill_and_close(self, sandbox: E2BSandbox) -> None:
-        "执行 _kill_and_close 的明确职责，并返回与调用约定一致的结果"
+        '''从缓存和预热池移除实例，随后尽力关闭远程连接和沙箱。'''
         client = getattr(sandbox, "_client", None)
         if client is not None:
             kill = getattr(client, "kill", None)
@@ -1065,7 +982,7 @@ class E2BSandboxProvider(SandboxProvider):
             pass
 
     def reset(self) -> None:
-        "执行 reset 的明确职责，并返回与调用约定一致的结果"
+        '''关闭全部活动及预热沙箱，并清空实例、线程和锁索引。'''
         with self._lock:
             self._sandboxes.clear()
             self._thread_sandboxes.clear()
@@ -1073,7 +990,7 @@ class E2BSandboxProvider(SandboxProvider):
             self._warm_pool.clear()
 
     def shutdown(self) -> None:
-        "执行 shutdown 的明确职责，并返回与调用约定一致的结果"
+        '''幂等停止提供方，关闭所有实例并恢复此前注册的进程信号处理器。'''
         with self._lock:
             if self._shutdown_called:
                 return

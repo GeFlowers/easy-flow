@@ -1,4 +1,4 @@
-"""提供配置、summarization、配置相关功能。"""
+'''定义上下文摘要触发阈值、摘要模型和摘要后保留的历史范围。'''
 
 from typing import Literal
 
@@ -9,18 +9,18 @@ DEFAULT_SKILL_FILE_READ_TOOL_NAMES: tuple[str, ...] = ("read_file", "read", "vie
 
 
 class ContextSize(BaseModel):
-    """\u6267\u884c ContextSize \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''以类型和值描述消息数、令牌数或上下文占比阈值。'''
 
     type: ContextSizeType = Field(description="Type of context size specification")
     value: int | float = Field(description="Value for the context size specification")
 
     def to_tuple(self) -> tuple[ContextSizeType, int | float]:
-        """\u6267\u884c to_tuple \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''将阈值模型转换为供摘要策略比较的二元组。'''
         return (self.type, self.value)
 
 
 class SummarizationConfig(BaseModel):
-    """\u6267\u884c SummarizationConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''控制对话何时压缩上下文，以及压缩后保留多少近期内容。'''
 
     enabled: bool = Field(
         default=False,
@@ -60,17 +60,17 @@ _summarization_config: SummarizationConfig = SummarizationConfig()
 
 
 def get_summarization_config() -> SummarizationConfig:
-    """\u6267\u884c get_summarization_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回当前上下文摘要配置。'''
     return _summarization_config
 
 
 def set_summarization_config(config: SummarizationConfig) -> None:
-    """\u6267\u884c set_summarization_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''替换当前上下文摘要配置。'''
     global _summarization_config
     _summarization_config = config
 
 
 def load_summarization_config_from_dict(config_dict: dict) -> None:
-    """\u6267\u884c load_summarization_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''从应用配置字段校验并缓存摘要设置。'''
     global _summarization_config
     _summarization_config = SummarizationConfig(**config_dict)

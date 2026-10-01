@@ -1,8 +1,8 @@
-"""OIDC（OpenID Connect）认证服务。
+'''OIDC（OpenID Connect）认证服务。
 
 提供与供应商无关的 OIDC 发现、授权 URL 生成、令牌交换、ID 令牌验证及用户
 信息读取能力。
-"""
+'''
 
 from __future__ import annotations
 
@@ -22,13 +22,13 @@ logger = logging.getLogger(__name__)
 # ── 数据类型 ──────────────────────────────────────────────────────────────
 
 OIDC_DISCOVERY_PATH = "/.well-known/openid-configuration"
-METADATA_CACHE_TTL = 300  # 5 minutes
+METADATA_CACHE_TTL = 300
 JWKS_CACHE_TTL = 300
 
 
 @dataclass(frozen=True)
 class OIDCMetadata:
-    """完成发现后得到的 OIDC 提供者元数据。"""
+    '''完成发现后得到的 OIDC 提供者元数据。'''
 
     issuer: str
     authorization_endpoint: str
@@ -39,7 +39,7 @@ class OIDCMetadata:
 
 @dataclass(frozen=True)
 class OIDCIdentity:
-    """从 OIDC 提供者响应中提取并标准化的身份信息。"""
+    '''从 OIDC 提供者响应中提取并标准化的身份信息。'''
 
     provider: str
     subject: str
@@ -50,37 +50,37 @@ class OIDCIdentity:
 
 
 class OIDCError(Exception):
-    """OIDC 操作的基础异常，其消息可安全用于 API 响应。"""
+    '''OIDC 操作的基础异常，其消息可安全用于 API 响应。'''
 
 
 class OIDCProviderError(OIDCError):
-    """OIDC 提供者返回错误，例如 ``access_denied``。"""
+    '''OIDC 提供者返回错误，例如 ``access_denied``。'''
 
 
 class OIDCValidationError(OIDCError):
-    """ID 令牌验证失败。"""
+    '''ID 令牌验证失败。'''
 
 
 class OIDCUserInfoMismatch(OIDCError):
-    """UserInfo 的 ``sub`` 与 ID 令牌的 ``sub`` 不匹配。"""
+    '''UserInfo 的 ``sub`` 与 ID 令牌的 ``sub`` 不匹配。'''
 
 
 # ── 服务 ──────────────────────────────────────────────────────────────────
 
 
 class OIDCService:
-    """OIDC 认证服务。
+    '''OIDC 认证服务。
 
     在进程内缓存提供者元数据和 JWKS，并按提供者 ``issuer`` 隔离缓存；构造参数
     可配置两类缓存的存活时间。
-    """
+    '''
 
     def __init__(
         self,
         metadata_cache_ttl: float = METADATA_CACHE_TTL,
         jwks_cache_ttl: float = JWKS_CACHE_TTL,
     ) -> None:
-        """初始化 OIDC HTTP 客户端及提供者元数据、JWKS 缓存。"""
+        '''初始化 OIDC HTTP 客户端及提供者元数据、JWKS 缓存。'''
         self._metadata_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._jwks_cache: dict[str, tuple[float, dict[str, Any]]] = {}
         self._metadata_ttl = metadata_cache_ttl
@@ -88,13 +88,13 @@ class OIDCService:
         self._http = httpx.AsyncClient(timeout=httpx.Timeout(15.0))
 
     async def close(self) -> None:
-        """关闭底层 HTTP 客户端。"""
+        '''关闭底层 HTTP 客户端。'''
         await self._http.aclose()
 
     # ── 发现 ──────────────────────────────────────────────────────────────
 
     async def discover(self, issuer: str, overrides: dict[str, str | None] | None = None) -> OIDCMetadata:
-        """读取并缓存 issuer 的 OIDC 发现元数据，可用 ``overrides`` 覆盖端点。"""
+        '''读取并缓存 issuer 的 OIDC 发现元数据，可用 ``overrides`` 覆盖端点。'''
         now = time.time()
         cached = self._metadata_cache.get(issuer)
         if cached and now - cached[0] < self._metadata_ttl:
@@ -123,7 +123,7 @@ class OIDCService:
         return self._metadata_from_dict(data, overrides)
 
     def _metadata_from_dict(self, data: dict[str, Any], overrides: dict[str, str | None] | None) -> OIDCMetadata:
-        """由发现字典构建 ``OIDCMetadata``，并应用端点覆盖值。"""
+        '''由发现字典构建 ``OIDCMetadata``，并应用端点覆盖值。'''
         overrides = overrides or {}
         return OIDCMetadata(
             issuer=data["issuer"],
@@ -145,7 +145,7 @@ class OIDCService:
         nonce: str | None = None,
         code_challenge: str | None = None,
     ) -> str:
-        """构建浏览器应跳转到的 OIDC 提供者授权 URL。"""
+        '''构建浏览器应跳转到的 OIDC 提供者授权 URL。'''
         params: dict[str, str] = {
             "response_type": "code",
             "client_id": client_id,
@@ -173,7 +173,7 @@ class OIDCService:
         code_verifier: str | None = None,
         auth_method: str = "client_secret_post",
     ) -> dict[str, Any]:
-        """在令牌端点使用授权码交换令牌。"""
+        '''在令牌端点使用授权码交换令牌。'''
         data: dict[str, str] = {
             "grant_type": "authorization_code",
             "code": code,
@@ -210,7 +210,7 @@ class OIDCService:
     # ── 密钥集加载 ───────────────────────────────────────────────────────
 
     async def _load_jwks(self, jwks_uri: str, force_refresh: bool = False) -> dict[str, Any]:
-        """从提供者加载并缓存 JWKS；``force_refresh`` 可在 kid 未命中时跳过缓存。"""
+        '''从提供者加载并缓存 JWKS；``force_refresh`` 可在 kid 未命中时跳过缓存。'''
         now = time.time()
         cached = self._jwks_cache.get(jwks_uri)
         if not force_refresh and cached and now - cached[0] < self._jwks_ttl:
@@ -235,10 +235,10 @@ class OIDCService:
         algorithm: str,
         jwks_uri: str,
     ) -> Any | None:
-        """在 JWKS 中寻找匹配 ``kid`` 的签名密钥，未找到时返回 ``None``。
+        '''在 JWKS 中寻找匹配 ``kid`` 的签名密钥，未找到时返回 ``None``。
 
         无效 JWK（如算法不匹配的密钥类型）只记录警告，避免单个坏条目中断验证。
-        """
+        '''
         for jwk_dict in jwks_data.get("keys", []):
             if kid and jwk_dict.get("kid") != kid:
                 continue
@@ -263,10 +263,10 @@ class OIDCService:
         id_token: str,
         nonce: str | None = None,
     ) -> dict[str, Any]:
-        """验证 ID 令牌并返回声明。
+        '''验证 ID 令牌并返回声明。
 
         验证项包括 JWKS 签名、issuer、audience、过期时间、签发时间及可选 nonce。
-        """
+        '''
         jwks_data = await self._load_jwks(metadata.jwks_uri)
 
         # 使用令牌头部的密钥标识从公开密钥集解析签名密钥。
@@ -321,10 +321,10 @@ class OIDCService:
     # ── 用户信息 ──────────────────────────────────────────────────────────
 
     async def fetch_userinfo(self, metadata: OIDCMetadata, access_token: str, expected_sub: str) -> dict[str, Any]:
-        """从 UserInfo 端点读取用户信息，并验证其 ``sub`` 与 ID 令牌一致。
+        '''从 UserInfo 端点读取用户信息，并验证其 ``sub`` 与 ID 令牌一致。
 
         该一致性校验可防止 UserInfo 注入其他用户身份信息。
-        """
+        '''
         if not metadata.userinfo_endpoint:
             return {}
 
@@ -357,10 +357,10 @@ class OIDCService:
         nonce: str | None = None,
         auth_method: str = "client_secret_post",
     ) -> OIDCIdentity:
-        """编排完整 OIDC 回调：交换令牌、验证 ID 令牌并读取用户信息。
+        '''编排完整 OIDC 回调：交换令牌、验证 ID 令牌并读取用户信息。
 
         返回标准化的 ``OIDCIdentity``。
-        """
+        '''
         token_response = await self.exchange_code(
             metadata=metadata,
             client_id=client_id,
@@ -413,5 +413,5 @@ class OIDCService:
 
 
 def _constant_time_compare(a: str, b: str) -> bool:
-    """以恒定时间比较字符串，避免泄露匹配位置。"""
+    '''以恒定时间比较字符串，避免泄露匹配位置。'''
     return secrets.compare_digest(a, b)

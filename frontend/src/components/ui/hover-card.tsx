@@ -5,14 +5,14 @@ import * as HoverCardPrimitive from "@radix-ui/react-hover-card";
 
 import { cn } from "@/lib/utils";
 
-/** HoverCard 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理悬浮说明卡片的延迟打开与关闭状态。 */
 function HoverCard({
   ...props
 }: React.ComponentProps<typeof HoverCardPrimitive.Root>) {
   return <HoverCardPrimitive.Root data-slot="hover-card" {...props} />;
 }
 
-/** HoverCardTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 指定鼠标悬停或键盘聚焦时显示卡片的触发元素。 */
 function HoverCardTrigger({
   ...props
 }: React.ComponentProps<typeof HoverCardPrimitive.Trigger>) {
@@ -21,7 +21,7 @@ function HoverCardTrigger({
   );
 }
 
-/** HoverCardContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 在 Portal 中定位说明卡片，并按打开方向应用过渡效果。 */
 function HoverCardContent({
   className,
   align = "center",

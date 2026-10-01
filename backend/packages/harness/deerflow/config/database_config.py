@@ -1,4 +1,4 @@
-"""提供配置、database、配置相关功能。"""
+'''定义应用数据库连接、SQL 日志和连接池大小等运行参数。'''
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class DatabaseConfig(BaseModel):
-    """\u6267\u884c DatabaseConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为应用数据仓储和检查点共享 PostgreSQL 连接设置。'''
 
     backend: Literal["postgres"] = Field(
         default="postgres",
@@ -34,7 +34,7 @@ class DatabaseConfig(BaseModel):
 
     @property
     def app_sqlalchemy_url(self) -> str:
-        """返回 SQLAlchemy 异步引擎使用的 PostgreSQL URL，并补充 asyncpg 驱动名。"""
+        '''返回 SQLAlchemy 异步引擎使用的 PostgreSQL URL，并补充 asyncpg 驱动名。'''
         if not self.postgres_url:
             raise ValueError("database.postgres_url is required for the postgres backend")
         url = self.postgres_url

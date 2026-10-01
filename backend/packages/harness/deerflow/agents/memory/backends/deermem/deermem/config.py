@@ -1,20 +1,4 @@
-"""定义 config 模块提供的职责与可复用接口。
-
-DeerMem backend configuration (parsed from ``MemoryConfig.backend_config``).
-
-DeerMem-private config lives here, NOT on the shared ``MemoryConfig`` (which
-only carries host-shared fields: ``enabled`` / ``injection_enabled`` /
-``manager_class`` / ``backend_config``). The factory passes ``backend_config``
-(a dict) to ``DeerMem.__init__``, which parses it into a ``DeerMemConfig``.
-Defaults let DeerMem run with zero ``backend_config``.
-
-Field names mirror the pre-abstraction ``MemoryConfig`` private fields so the
-migration is a pure move (config.yaml ``memory.<field>`` ->
-``memory.backend_config.<field>``). ``model`` is a nested ``DeerMemModelConfig``
-(provider/model/api_key/base_url/temperature) consumed by ``core/llm.py``;
-``tracing_callback`` (step 14) and ``should_keep_hidden_message`` (step 15) are
-optional host-injected hooks (None = DeerMem defaults).
-"""
+'''定义 DeerMem 专属模型与记忆配置，并从后端配置字典解析、校验配置项。'''
 
 from __future__ import annotations
 
@@ -27,9 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 class DeerMemModelConfig(BaseModel):
-    """封装 DeerMemModelConfig 的状态、协作关系与公开操作。
-
-    DeerMem's memory-update LLM config (langchain ``init_chat_model`` params)."""
+    '''保存记忆事实抽取模型所需的供应商、模型标识及连接参数。'''
 
     provider: str | None = Field(
         default=None,
@@ -45,11 +27,8 @@ class DeerMemModelConfig(BaseModel):
 
 
 class DeerMemConfig(BaseModel):
-    """封装 DeerMemConfig 的状态、协作关系与公开操作。
+    '''集中管理记忆存储、更新队列、事实筛选、上下文注入和追踪配置。'''
 
-    DeerMem-private configuration (self-contained, host-agnostic)."""
-
-    # ── Storage ──────────────────────────────────────────────────────────
     storage_path: str = Field(
         default="",
         description=("DeerMem data root. Empty = default (``$DEERMEM_DATA_DIR`` or ``~/.deermem/``); per-user memory at ``{root}/users/{user_id}/memory.json``. Any value (absolute or relative) is used as the root directory."),
@@ -58,14 +37,12 @@ class DeerMemConfig(BaseModel):
         default="",
         description="Dotted class path for an alternative storage provider; empty (default) = FileMemoryStorage (no importlib, portable).",
     )
-    # ── Queue ────────────────────────────────────────────────────────────
     debounce_seconds: int = Field(
         default=30,
         ge=1,
         le=300,
         description="Seconds to wait before processing queued updates (debounce).",
     )
-    # ── Facts ────────────────────────────────────────────────────────────
     max_facts: int = Field(default=100, ge=10, le=500, description="Maximum number of facts to store.")
     fact_confidence_threshold: float = Field(
         default=0.7,
@@ -73,7 +50,6 @@ class DeerMemConfig(BaseModel):
         le=1.0,
         description="Minimum confidence threshold for storing facts.",
     )
-    # ── Injection ────────────────────────────────────────────────────────
     max_injection_tokens: int = Field(
         default=2000,
         ge=100,
@@ -94,7 +70,6 @@ class DeerMemConfig(BaseModel):
         le=2000,
         description="Token ceiling for guaranteed-category facts.",
     )
-    # ── Staleness review ─────────────────────────────────────────────────
     staleness_review_enabled: bool = Field(
         default=True,
         description="Enable staleness review for aged facts.",
@@ -154,7 +129,6 @@ class DeerMemConfig(BaseModel):
             "candidate-selection pass. Default 3650 (10 years)."
         ),
     )
-    # ── Memory consolidation ────────────────────────────────────────────
     consolidation_enabled: bool = Field(
         default=False,
         description=(
@@ -185,7 +159,6 @@ class DeerMemConfig(BaseModel):
         le=20,
         description=("Maximum number of source facts per consolidation group. Prevents the LLM from merging too many facts into one and losing important details."),
     )
-    # ── LLM (step 13: structured model sub-config consumed by core/llm.py build_llm) ──
     model: DeerMemModelConfig = Field(
         default_factory=DeerMemModelConfig,
         description=(
@@ -196,7 +169,6 @@ class DeerMemConfig(BaseModel):
             "but non-LLM ops still work."
         ),
     )
-    # ── Hooks (steps 14-15: optional host-injected callables; None = DeerMem defaults) ──
     tracing_callback: Any = Field(
         default=None,
         description=(
@@ -236,21 +208,7 @@ class DeerMemConfig(BaseModel):
 
     @classmethod
     def from_backend_config(cls, backend_config: dict[str, Any] | None) -> DeerMemConfig:
-        """执行 from_backend_config 的明确职责，并返回与调用约定一致的结果。
-
-        Parse a ``backend_config`` dict.
-
-                Unknown keys are ignored (forward-compat) but logged at WARNING so a
-                typo (e.g. ``storage_pat`` missing the ``h``) does not silently fall
-                back to the default and write memory to an unintended location --
-                mirrors the host layer's ``load_memory_config_from_dict`` warning.
-
-                ``None`` values are dropped so they fall back to the field default:
-                YAML renders an empty key (``model:`` with only commented children, as
-                shipped in ``config.example.yaml``) as ``None``, which non-Optional
-                fields like ``model`` would otherwise reject even though omitting the
-                key entirely is valid.
-        """
+        '''过滤未定义和空值配置；未知键记录警告，空值交由模型字段默认值处理。'''
         if not backend_config:
             return cls()
         known = {k: v for k, v in backend_config.items() if k in cls.model_fields and v is not None}

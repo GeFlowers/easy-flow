@@ -1,4 +1,4 @@
-"未说明"
+'''读取本地目录、技能压缩包或内联说明，并生成受大小与路径安全限制的审查快照。'''
 
 from __future__ import annotations
 
@@ -36,12 +36,12 @@ _ZIP_READ_CHUNK_BYTES = 1024 * 1024
 
 
 def _sha256(data: bytes) -> str:
-    "未说明"
+    '''计算字节内容的 SHA-256 摘要，供快照识别文件内容。'''
     return hashlib.sha256(data).hexdigest()
 
 
 def _decode_text(data: bytes, path: str) -> str | None:
-    "未说明"
+    '''仅将可识别文本文件按 UTF-8 解码，避免把二进制内容误送入文本分析器。'''
     suffix = PurePosixPath(path).suffix.lower()
     if suffix not in _TEXT_EXTENSIONS and b"\0" in data:
         return None
@@ -52,7 +52,7 @@ def _decode_text(data: bytes, path: str) -> str | None:
 
 
 def _truncate_utf8_bytes(content: str, max_bytes: int) -> tuple[str, bytes]:
-    "未说明"
+    '''按字节上限截断 UTF-8 文本，并移除不完整的尾部字符序列。'''
     data = content.encode("utf-8")
     truncated = data[:max_bytes]
     text = truncated.decode("utf-8", errors="ignore")
@@ -66,7 +66,7 @@ def _subject(
     name_hint: str | None = None,
     category: str | None = None,
 ) -> dict[str, Any]:
-    "未说明"
+    '''构造描述技能来源、分类及展示标识的快照主体信息。'''
     return {
         "source": source,
         "category": category,
@@ -76,7 +76,7 @@ def _subject(
 
 
 def _empty_snapshot(subject: dict[str, Any], limits: PackageLimits) -> dict[str, Any]:
-    "执行 _empty_snapshot 的明确职责，并返回与调用约定一致的结果"
+    '''初始化统一快照结构，使不同读取器返回相同字段和限制信息。'''
     return {
         "schema_version": PACKAGE_SNAPSHOT_SCHEMA_VERSION,
         "subject": subject,
@@ -93,7 +93,7 @@ def build_inline_snapshot(
     name_hint: str | None = None,
     limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
 ) -> dict[str, Any]:
-    "构建并返回，并遵守 build_inline_snapshot 所表达的接口约束"
+    '''把调用方直接提供的技能说明包装为单文件快照，并应用单文件字节上限。'''
     data = content.encode("utf-8")
     snapshot = _empty_snapshot(
         _subject(source="inline", display_ref=name_hint or "inline://SKILL.md", name_hint=name_hint),
@@ -123,9 +123,7 @@ def build_inline_snapshot(
 
 
 class LocalDirectoryReader:
-    """封装 LocalDirectoryReader 的状态、协作关系与公开操作。
-
-    Read a local skill directory without following symlink escapes."""
+    '''安全枚举本地技能目录；不跟随符号链接，并记录越界、读取失败和资源超限情况。'''
 
     def __init__(
         self,
@@ -134,7 +132,7 @@ class LocalDirectoryReader:
         subject: dict[str, Any] | None = None,
         limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存待读取目录、快照来源信息和本次读取所用的资源限制。'''
         self.root = Path(root)
         self.limits = limits
         self.subject = subject or _subject(
@@ -144,7 +142,7 @@ class LocalDirectoryReader:
         )
 
     def read(self) -> dict[str, Any]:
-        "执行 read 的明确职责，并返回与调用约定一致的结果"
+        '''逐项读取目录内容，标记文本、二进制及符号链接，并在越过限制时提前结束。'''
         root = self.root
         snapshot = _empty_snapshot(self.subject, self.limits)
         if not root.exists():
@@ -223,7 +221,7 @@ class LocalDirectoryReader:
         return self._sort_snapshot(snapshot)
 
     def _append_symlink(self, snapshot: dict[str, Any], path: Path, root: Path, file_count: int) -> int:
-        "执行 _append_symlink 的明确职责，并返回与调用约定一致的结果"
+        '''将符号链接作为独立快照条目记录目标摘要，不访问链接指向的内容。'''
         rel_path = self._relative(path, root, snapshot)
         if rel_path is None:
             return file_count
@@ -249,7 +247,7 @@ class LocalDirectoryReader:
 
     @staticmethod
     def _relative(path: Path, root: Path, snapshot: dict[str, Any]) -> str | None:
-        "执行 _relative 的明确职责，并返回与调用约定一致的结果"
+        '''把目录项转换为根目录内的规范相对路径；越界项写入读取错误并跳过。'''
         try:
             rel = path.relative_to(root).as_posix()
             return normalize_relative_path(rel)
@@ -259,16 +257,14 @@ class LocalDirectoryReader:
 
     @staticmethod
     def _sort_snapshot(snapshot: dict[str, Any]) -> dict[str, Any]:
-        "执行 _sort_snapshot 的明确职责，并返回与调用约定一致的结果"
+        '''按路径和错误代码排序快照，确保相同输入产生稳定输出。'''
         snapshot["files"] = sorted(snapshot["files"], key=lambda item: item["path"])
         snapshot["reader_errors"] = sorted(snapshot["reader_errors"], key=lambda item: (str(item.get("path") or ""), str(item.get("code") or "")))
         return snapshot
 
 
 class ArchivePackageReader:
-    """封装 ArchivePackageReader 的状态、协作关系与公开操作。
-
-    Inspect a .skill ZIP archive without installing it."""
+    '''直接检查技能 ZIP 压缩包内容，不解压到磁盘，并限制成员数量和解压读取量。'''
 
     def __init__(
         self,
@@ -276,12 +272,12 @@ class ArchivePackageReader:
         *,
         limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存压缩包路径及读取该包时使用的资源限制。'''
         self.archive_path = Path(archive_path)
         self.limits = limits
 
     def read(self) -> dict[str, Any]:
-        "执行 read 的明确职责，并返回与调用约定一致的结果"
+        '''有界读取压缩包成员，识别符号链接和文本文件，并收集损坏或超限错误。'''
         snapshot = _empty_snapshot(
             _subject(source="archive", display_ref=str(self.archive_path.name), name_hint=self.archive_path.stem),
             self.limits,
@@ -354,7 +350,7 @@ class ArchivePackageReader:
 
     @staticmethod
     def _normalize_archive_name(filename: str, snapshot: dict[str, Any]) -> str | None:
-        "执行 _normalize_archive_name 的明确职责，并返回与调用约定一致的结果"
+        '''校验压缩包成员名并转换为安全相对路径，拒绝绝对路径及目录穿越路径。'''
         try:
             return normalize_relative_path(filename)
         except ValueError as exc:
@@ -363,13 +359,13 @@ class ArchivePackageReader:
 
 
 def _zip_member_is_symlink(info: zipfile.ZipInfo) -> bool:
-    "执行 _zip_member_is_symlink 的明确职责，并返回与调用约定一致的结果"
+    '''根据 ZIP 成员的 Unix 文件模式判断其是否为符号链接。'''
     mode = info.external_attr >> 16
     return stat.S_ISLNK(mode)
 
 
 def _read_zip_member_bounded(zf: zipfile.ZipFile, info: zipfile.ZipInfo, *, max_bytes: int) -> tuple[bytes, int, bool]:
-    "执行 _read_zip_member_bounded 的明确职责，并返回与调用约定一致的结果"
+    '''分块读取 ZIP 成员，最多读取上限加一个字节以识别超限而避免无界解压。'''
     chunks: list[bytes] = []
     actual_size = 0
     with zf.open(info) as member:
@@ -387,9 +383,7 @@ def _read_zip_member_bounded(zf: zipfile.ZipFile, info: zipfile.ZipInfo, *, max_
 
 
 class InstalledSkillReader(LocalDirectoryReader):
-    """封装 InstalledSkillReader 的状态、协作关系与公开操作。
-
-    Resolve and read an installed skill by canonical skill:// identity."""
+    '''通过规范的 skill:// 标识定位已安装技能，并复用本地目录读取器生成快照。'''
 
     @classmethod
     def from_target(
@@ -399,7 +393,7 @@ class InstalledSkillReader(LocalDirectoryReader):
         storage: Any,
         limits: PackageLimits = DEFAULT_PACKAGE_LIMITS,
     ) -> InstalledSkillReader:
-        "执行 from_target 的明确职责，并返回与调用约定一致的结果"
+        '''解析技能类别和相对路径，结合存储后端定位技能目录并构造对应读取器。'''
         category, rel_path = parse_skill_uri(target)
         root = _installed_skill_root(storage, category, rel_path)
         return cls(
@@ -415,7 +409,7 @@ class InstalledSkillReader(LocalDirectoryReader):
 
 
 def parse_skill_uri(target: str) -> tuple[str, str]:
-    "解析输入并返回结构化结果，并遵守 parse_skill_uri 所表达的接口约束"
+    '''校验 skill://<category>/<path> 标识，并返回经规范化的类别与相对路径。'''
     if not target.startswith("skill://"):
         raise ValueError("Installed skill targets must use skill://<category>/<relative-path>")
     raw = target[len("skill://") :]
@@ -427,7 +421,7 @@ def parse_skill_uri(target: str) -> tuple[str, str]:
 
 
 def _installed_skill_root(storage: Any, category: str, rel_path: str) -> Path:
-    "执行 _installed_skill_root 的明确职责，并返回与调用约定一致的结果"
+    '''按 public、custom 或 legacy 类别使用存储接口解析已安装技能的磁盘位置。'''
     if category == "custom" and hasattr(storage, "get_user_custom_root"):
         return Path(storage.get_user_custom_root()) / rel_path
     if category == "legacy":

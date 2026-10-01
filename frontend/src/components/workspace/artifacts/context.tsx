@@ -40,6 +40,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
   const [autoOpen, setAutoOpen] = useState(true);
   const { setOpen: setSidebarOpen } = useSidebar();
 
+  /** 选中产物并收起导航侧栏，必要时关闭自动选择行为。 */
   const select = useCallback(
     (artifact: string, autoSelect = false) => {
       setSelectedArtifact(artifact);
@@ -51,6 +52,7 @@ export function ArtifactsProvider({ children }: ArtifactsProviderProps) {
     [setSidebarOpen, setSelectedArtifact, setAutoSelect],
   );
 
+  /** 清除当前产物选择并恢复后续自动选择的默认行为。 */
   const deselect = useCallback(() => {
     setSelectedArtifact(null);
     setAutoSelect(true);

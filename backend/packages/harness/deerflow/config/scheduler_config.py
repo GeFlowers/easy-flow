@@ -1,10 +1,10 @@
-"""提供配置、scheduler、配置相关功能。"""
+'''定义定时任务轮询频率、租约时长及并发运行上限。'''
 
 from pydantic import BaseModel, Field
 
 
 class SchedulerConfig(BaseModel):
-    """\u6267\u884c SchedulerConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''控制定时任务调度器是否启动以及每轮调度的资源边界。'''
 
     enabled: bool = Field(default=False)
     poll_interval_seconds: int = Field(default=5, ge=1, le=300)

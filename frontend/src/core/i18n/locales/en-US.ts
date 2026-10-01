@@ -524,11 +524,6 @@ export const enUS: Translations = {
     saveAndConnect: "Save and connect",
     saveChanges: "Save changes",
     descriptions: {
-      telegram: "Telegram direct messages through your DeerFlow bot.",
-      slack: "Slack workspace messages and mentions.",
-      discord: "Discord server messages through your DeerFlow bot.",
-      feishu: "Feishu and Lark messages through your DeerFlow app.",
-      dingtalk: "DingTalk Stream Push messages through your DeerFlow bot.",
       wechat: "WeChat iLink messages through your DeerFlow bot.",
       wecom: "WeCom messages through your DeerFlow AI bot.",
     },

@@ -1,4 +1,4 @@
-"""提供配置、auth、配置相关功能。"""
+'''描述本地账号与 OIDC 登录提供者的认证配置。'''
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class OIDCProviderConfig(BaseModel):
-    """\u6267\u884c OIDCProviderConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存单个 OIDC 提供者的端点、客户端凭据及用户准入策略。'''
 
     display_name: str = Field(description="Human-readable name shown on the login button")
     issuer: str = Field(description="OIDC issuer URL (e.g. https://keycloak.example.com/realms/deerflow)")
@@ -48,7 +48,7 @@ class OIDCProviderConfig(BaseModel):
 
 
 class OIDCAuthConfig(BaseModel):
-    """\u6267\u884c OIDCAuthConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''控制 OIDC 登录入口以及可用身份提供者列表。'''
 
     enabled: bool = Field(default=False, description="Enable OIDC SSO authentication")
     frontend_base_url: str | None = Field(
@@ -62,6 +62,6 @@ class OIDCAuthConfig(BaseModel):
 
 
 class AuthAppConfig(BaseModel):
-    """\u6267\u884c AuthAppConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''汇总登录方式、会话令牌、安全限制和初始管理员设置。'''
 
     oidc: OIDCAuthConfig = Field(default_factory=OIDCAuthConfig, description="OIDC SSO authentication settings")

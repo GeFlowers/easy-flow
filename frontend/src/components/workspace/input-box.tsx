@@ -145,6 +145,7 @@ import { Tooltip } from "./tooltip";
 
 type InputMode = "flash" | "thinking" | "pro" | "ultra";
 
+/** 聚焦可编辑区域，并将插入光标放到现有内容末尾。 */
 function focusContentEditableEnd(element: HTMLElement | null) {
   if (!element) {
     return;
@@ -163,6 +164,7 @@ function focusContentEditableEnd(element: HTMLElement | null) {
   selection.addRange(range);
 }
 
+/** 仅当选区位于目标编辑器内时替换选区并插入纯文本。 */
 function insertPlainTextAtSelection(container: HTMLElement, text: string) {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0) {
@@ -185,6 +187,7 @@ function insertPlainTextAtSelection(container: HTMLElement, text: string) {
   return true;
 }
 
+/** 根据模型是否支持思考能力，将用户模式解析为可用模式。 */
 function getResolvedMode(
   mode: InputMode | undefined,
   supportsThinking: boolean,
@@ -198,6 +201,7 @@ function getResolvedMode(
   return supportsThinking ? "pro" : "flash";
 }
 
+/** 转义 XML 属性中的特殊字符，避免引用上下文破坏消息标签结构。 */
 function escapeXmlAttribute(value: string) {
   return value
     .replace(/&/g, "&amp;")
@@ -216,6 +220,7 @@ type VoiceRecognitionStartOptions = {
   focusAfterStart?: boolean;
 };
 
+/** 把侧栏引用内容封装成不展示在聊天界面的上下文消息。 */
 function buildHiddenConversationQuoteMessage({
   contexts,
 }: {
@@ -375,6 +380,7 @@ export function InputBox({
   const wasStreamingRef = useRef(false);
   const messagesRef = useRef(thread.messages);
 
+  /** 清除待执行的语音重启计时器，避免完成或取消后再次启动识别。 */
   const clearVoiceRestartTimer = useCallback(() => {
     if (voiceRestartTimerRef.current === null) {
       return;
@@ -383,6 +389,7 @@ export function InputBox({
     voiceRestartTimerRef.current = null;
   }, []);
 
+  /** 移除语音识别监听器并释放浏览器识别实例。 */
   const cleanupVoiceRecognition = useCallback(
     (
       recognition: BrowserSpeechRecognition | null,
@@ -412,6 +419,7 @@ export function InputBox({
     [clearVoiceRestartTimer],
   );
 
+  /** 终止当前语音输入，清理识别状态并丢弃未确认的识别结果。 */
   const abortVoiceInput = useCallback(() => {
     const recognition = voiceRecognitionRef.current;
     voiceStopRequestedRef.current = true;
@@ -447,6 +455,7 @@ export function InputBox({
     [t.inputBox.compactCommandDescription, t.inputBox.goalCommandDescription],
   );
 
+  /** 汇总附件数量和大小超限项，并向用户显示对应上传错误。 */
   const reportUploadLimitViolations = useCallback(
     (violations: UploadLimitViolation[]) => {
       for (const violation of violations) {
@@ -588,6 +597,7 @@ export function InputBox({
     };
   }, [threadId]);
 
+  /** 取消尚未完成的输入润色请求，并重置其进行状态。 */
   const abortInputPolishRequest = useCallback(() => {
     inputPolishRequestRef.current.controller?.abort();
     inputPolishRequestRef.current.controller = null;
@@ -607,6 +617,7 @@ export function InputBox({
     }
   }, [promptHistory.length]);
 
+  /** 切换当前模型并同步能力约束下可用的推理模式。 */
   const handleModelSelect = useCallback(
     (model_name: string) => {
       if (disabled || polishingInput) {
@@ -627,6 +638,7 @@ export function InputBox({
     [disabled, onContextChange, context, models, polishingInput],
   );
 
+  /** 更新代理运行模式，并处理与所选模型能力不兼容的选项。 */
   const handleModeSelect = useCallback(
     (mode: InputMode) => {
       if (disabled || polishingInput) {
@@ -648,6 +660,7 @@ export function InputBox({
     [disabled, onContextChange, context, polishingInput, supportThinking],
   );
 
+  /** 将用户选择的推理强度写入当前线程上下文。 */
   const handleReasoningEffortSelect = useCallback(
     (effort: "minimal" | "low" | "medium" | "high") => {
       if (disabled || polishingInput) {
@@ -661,6 +674,7 @@ export function InputBox({
     [disabled, onContextChange, context, polishingInput],
   );
 
+  /** 解析输入框中的目标命令并将其转换为目标状态操作。 */
   const handleGoalCommand = useCallback(
     async (command: GoalCommand): Promise<boolean> => {
       const request = beginGoalRequest(goalRequestStateRef.current, threadId);
@@ -777,6 +791,7 @@ export function InputBox({
     ],
   );
 
+  /** 处理上下文压缩命令，并将其提交给当前线程运行流程。 */
   const handleCompactCommand = useCallback(async (): Promise<void> => {
     if (isWelcomeMode) {
       textInput.setInput("");
@@ -837,6 +852,7 @@ export function InputBox({
     threadId,
   ]);
 
+  /** 组装当前消息、模型上下文和附件选项后提交线程运行。 */
   const submitThreadMessage = useCallback(
     (message: PromptInputMessage) => {
       const files = message.files.flatMap((file) =>
@@ -886,6 +902,7 @@ export function InputBox({
             },
           }
         : undefined;
+      /** 使用当前上下文提交消息，并保留引用等本次发送附带的选项。 */
       const submit = () => onSubmit?.(message, submitOptions);
 
       // 防止初始模型自动选择副作用尚未把线程设置写入存储/状态前就提交。
@@ -920,6 +937,7 @@ export function InputBox({
     ],
   );
 
+  /** 处理输入表单提交并协调命令解析、附件校验和消息发送。 */
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
       if (status === "streaming") {
@@ -982,11 +1000,13 @@ export function InputBox({
     ],
   );
 
+  /** 通过表单原生提交路径触发当前输入的校验和发送。 */
   const requestFormSubmit = useCallback(() => {
     const form = promptRootRef.current?.querySelector("form");
     form?.requestSubmit();
   }, []);
 
+  /** 将快捷追问作为后续消息提交到当前对话。 */
   const handleFollowupClick = useCallback(
     (suggestion: string) => {
       if (status === "streaming") {
@@ -1005,6 +1025,7 @@ export function InputBox({
     [requestFormSubmit, status, textInput],
   );
 
+  /** 确认以改写后的文本替换输入内容并立即发送。 */
   const confirmReplaceAndSend = useCallback(() => {
     if (!pendingSuggestion) {
       setConfirmOpen(false);
@@ -1017,6 +1038,7 @@ export function InputBox({
     setTimeout(() => requestFormSubmit(), 0);
   }, [pendingSuggestion, requestFormSubmit, textInput]);
 
+  /** 确认将润色结果追加到原输入后再发送。 */
   const confirmAppendAndSend = useCallback(() => {
     if (!pendingSuggestion) {
       setConfirmOpen(false);
@@ -1086,6 +1108,7 @@ export function InputBox({
   );
   const voiceInputSupported = speechRecognitionConstructor !== null;
 
+  /** 将浏览器语音识别错误代码映射为本地化提示文案。 */
   const getVoiceInputErrorMessage = useCallback(
     (kind: SpeechRecognitionErrorKind) => {
       switch (kind) {
@@ -1108,6 +1131,7 @@ export function InputBox({
     [t],
   );
 
+  /** 初始化并启动浏览器语音识别，将识别文本回填到当前输入。 */
   const startVoiceRecognition = useCallback(
     (options: VoiceRecognitionStartOptions = {}) => {
       if (composerLocked || !speechRecognitionConstructor) {
@@ -1209,6 +1233,7 @@ export function InputBox({
     startVoiceRecognitionRef.current = startVoiceRecognition;
   }, [startVoiceRecognition]);
 
+  /** 结束当前语音识别并保留已回填的文本内容。 */
   const stopVoiceInput = useCallback(() => {
     const recognition = voiceRecognitionRef.current;
     voiceStopRequestedRef.current = true;
@@ -1223,6 +1248,7 @@ export function InputBox({
     }
   }, [cleanupVoiceRecognition]);
 
+  /** 按当前录音状态启动或停止语音输入。 */
   const toggleVoiceInput = useCallback(() => {
     if (voiceListening) {
       stopVoiceInput();
@@ -1269,6 +1295,7 @@ export function InputBox({
     setSkillSuggestionIndex(0);
   }, [slashSkillQuery, skillSuggestions.length]);
 
+  /** 将选中的技能命令插入输入框并更新技能建议状态。 */
   const applySkillSuggestion = useCallback(
     (suggestion: SlashSuggestion) => {
       if (suggestion.kind === "skill") {
@@ -1296,6 +1323,7 @@ export function InputBox({
     [textInput],
   );
 
+  /** 使用方向键和回车键操作技能建议列表。 */
   const handleSkillSuggestionKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       if (!showSkillSuggestions) {
@@ -1345,6 +1373,7 @@ export function InputBox({
     ],
   );
 
+  /** 将历史记录中的输入恢复到编辑框并同步光标位置。 */
   const setPromptHistoryValue = useCallback(
     (value: string) => {
       textInput.setInput(value);
@@ -1360,6 +1389,7 @@ export function InputBox({
     [textInput],
   );
 
+  /** 发起当前文本润色请求，并记录可供确认或撤销的原文。 */
   const handlePolishInput = useCallback(async () => {
     if (inputPolishDisabled) {
       return;
@@ -1437,6 +1467,7 @@ export function InputBox({
     threadId,
   ]);
 
+  /** 撤销最近一次输入润色并恢复用户原始文本。 */
   const handleUndoInputPolish = useCallback(() => {
     if (!inputPolishUndoAvailable || inputPolishUndo === null) {
       return;
@@ -1447,6 +1478,7 @@ export function InputBox({
     setInputPolishUndo(null);
   }, [inputPolishUndo, inputPolishUndoAvailable, setPromptHistoryValue]);
 
+  /** 在输入框中用方向键浏览历史提示，并处理历史边界。 */
   const handlePromptHistoryKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       if (
@@ -1502,6 +1534,7 @@ export function InputBox({
     [promptHistory, selectedSlashSkill, setPromptHistoryValue, textInput.value],
   );
 
+  /** 处理已选斜杠技能的键盘确认与取消操作。 */
   const handleSelectedSlashSkillKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       if (
@@ -1522,6 +1555,7 @@ export function InputBox({
     [selectedSlashSkill, textInput.value],
   );
 
+  /** 统一分发输入框快捷键到历史、技能和提交逻辑。 */
   const handlePromptTextareaKeyDown = useCallback(
     (event: KeyboardEvent<HTMLElement>) => {
       handleSkillSuggestionKeyDown(event);
@@ -1541,6 +1575,7 @@ export function InputBox({
     ],
   );
 
+  /** 更新输入内容，并同步技能搜索及文本光标相关状态。 */
   const handlePromptTextareaChange = useCallback(() => {
     if (voiceListening) {
       abortVoiceInput();
@@ -1551,6 +1586,7 @@ export function InputBox({
     promptHistoryDraftRef.current = "";
   }, [abortInputPolishRequest, abortVoiceInput, voiceListening]);
 
+  /** 替换输入文本中的技能命令片段并调整光标位置。 */
   const updateInlineSkillTextInput = useCallback(
     (element: HTMLElement) => {
       if (voiceListening) {
@@ -1574,6 +1610,7 @@ export function InputBox({
     }
   }, [selectedSlashSkill, textInput.value]);
 
+  /** 根据输入内容筛选可内联调用的技能并维护选择状态。 */
   const handleInlineSkillInput = useCallback(
     (event: FormEvent<HTMLSpanElement>) => {
       updateInlineSkillTextInput(event.currentTarget);
@@ -1581,6 +1618,7 @@ export function InputBox({
     [updateInlineSkillTextInput],
   );
 
+  /** 处理粘贴内容中的技能命令补全状态。 */
   const handleInlineSkillPaste = useCallback(
     (event: ClipboardEvent<HTMLSpanElement>) => {
       const pastedFiles = Array.from(event.clipboardData.items)
@@ -1615,6 +1653,7 @@ export function InputBox({
     [attachments, updateInlineSkillTextInput],
   );
 
+  /** 通过键盘选择或关闭内联技能建议。 */
   const handleInlineSkillKeyDown = useCallback(
     (event: KeyboardEvent<HTMLSpanElement>) => {
       handleSelectedSlashSkillKeyDown(event);
@@ -1644,6 +1683,7 @@ export function InputBox({
     [handleSelectedSlashSkillKeyDown, updateInlineSkillTextInput],
   );
 
+  /** 清除当前选中的斜杠技能及其输入框标记。 */
   const clearSelectedSlashSkill = useCallback(() => {
     setSelectedSlashSkill(null);
     requestAnimationFrame(() => {
@@ -1760,6 +1800,7 @@ export function InputBox({
     threadId,
   ]);
 
+  /** 选择占位建议后替换输入文本并将焦点交还给编辑框。 */
   const onSelectPlaceholder = useCallback((newText: string) => {
     const placeholder = findSuggestionTemplatePlaceholder(newText);
     if (placeholder) {
@@ -2424,6 +2465,7 @@ export function InputBox({
   );
 }
 
+/** 展示语音识别支持状态，并提供开始或停止录音的按钮。 */
 function VoiceInputButton({
   disabled,
   listening,
@@ -2468,6 +2510,7 @@ function VoiceInputButton({
   );
 }
 
+/** 根据本地化建议填充输入框，并提供快捷建议和建议菜单。 */
 function SuggestionList({
   onSelectPlaceholder,
 }: {
@@ -2475,6 +2518,7 @@ function SuggestionList({
 }) {
   const { t } = useI18n();
   const { textInput } = usePromptInputController();
+  /** 将建议问题填入输入框，或按当前提交状态立即发送。 */
   const handleSuggestionClick = useCallback(
     (prompt: string | undefined) => {
       if (!prompt) return;
@@ -2529,6 +2573,7 @@ function SuggestionList({
   );
 }
 
+/** 展示附件大小限制提示，并调用提示输入控制器打开文件选择器。 */
 function AddAttachmentsButton({
   className,
   disabled,

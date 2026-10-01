@@ -3,7 +3,7 @@ title: 沙箱
 description: 沙箱为 Lead Agent 提供一个受控环境，在其中可以读取文件、写入输出、运行 Shell 命令并生成产出物。没有沙箱，Agent 只能生成文本；有了沙箱，它可以编写和执行代码、处理数据文件、生成图表并构建交付物。
 ---
 
-import { Callout, Tabs } from "nextra/components";
+import { Callout } from "nextra/components";
 
 # 沙箱
 
@@ -16,7 +16,7 @@ import { Callout, Tabs } from "nextra/components";
 
 ## 沙箱模式
 
-DeerFlow 支持四种沙箱模式，选择适合你部署的一种：
+默认沙箱运行在 Gateway 所在主机上。项目还提供 BoxLite 和 E2B 两种基于虚拟机的可选提供者。
 
 ### LocalSandbox（默认）
 
@@ -30,34 +30,6 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
   allow_host_bash: false # 默认；仅对完全受信任的工作流设置为 true
 ```
-
-### 基于容器的 AIO 沙箱
-
-命令在隔离容器中运行（Linux/Windows 上的 Docker，macOS 上的 Apple Container）。每个沙箱会话获得一个全新的容器环境。
-
-- **适合**：多用户环境、生产部署，或任何需要执行隔离的场景。
-
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-
-  # 可选：容器镜像（下方显示默认值）
-  image: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
-
-  # 可选：最大并发容器数（默认：3，超出时 LRU 淘汰）
-  replicas: 3
-
-  # 可选：空闲超时（秒，默认：600）
-  idle_timeout: 600
-
-  # 可选：自定义挂载
-  mounts:
-    - host_path: /path/on/host
-      container_path: /home/user/shared
-      read_only: false
-```
-
-安装：`cd backend && uv add 'deerflow-harness[aio-sandbox]'`
 
 ### E2B 云端沙箱
 
@@ -199,10 +171,6 @@ sandbox:
 ```
 
 即使没有 `bash`，Agent 也可以通过专用文件工具读写文件。
-
-### 容器沙箱
-
-基于容器的沙箱提供文件系统和进程隔离。Agent 看不到或修改主机文件系统，除非通过显式挂载。Provisioner 管理模式增加了额外一层：每个线程获得自己的隔离 Pod。
 
 ### 审计中间件
 

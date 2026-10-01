@@ -170,7 +170,7 @@ void main() {
 }
 `;
 
-/** Galaxy 组件：提供对应的界面结构与交互语义。 */
+/** 渲染交互式星系粒子背景，并按鼠标位置、旋转和闪烁参数更新画面。 */
 export default function Galaxy({
   focal = [0.5, 0.5],
   rotation = [1.0, 0.0],
@@ -233,6 +233,7 @@ export default function Galaxy({
     /** @type {Program | undefined} */
     let program;
 
+    /** 让 WebGL 画布匹配容器尺寸，并同步着色器使用的分辨率。 */
     function resize() {
       const scale = 1;
       renderer.setSize(ctn.offsetWidth * scale, ctn.offsetHeight * scale);
@@ -287,6 +288,7 @@ export default function Galaxy({
     const mesh = new Mesh(gl, { geometry, program });
     let animateId;
 
+    /** 推进动画帧、平滑鼠标状态并绘制当前星系场景。 */
     function update(t) {
       animateId = requestAnimationFrame(update);
       if (!disableAnimation) {
@@ -312,6 +314,7 @@ export default function Galaxy({
     animateId = requestAnimationFrame(update);
     ctn.appendChild(gl.canvas);
 
+    /** 将容器内鼠标位置归一化后传给着色器作为交互目标。 */
     function handleMouseMove(e) {
       const rect = ctn.getBoundingClientRect();
       const x = (e.clientX - rect.left) / rect.width;
@@ -320,6 +323,7 @@ export default function Galaxy({
       targetMouseActive.current = 1.0;
     }
 
+    /** 鼠标离开画布后关闭鼠标排斥效果。 */
     function handleMouseLeave() {
       targetMouseActive.current = 0.0;
     }

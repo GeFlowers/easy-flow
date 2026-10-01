@@ -1,10 +1,10 @@
-"""提供配置、agents、接口、配置相关功能。"""
+'''定义是否向网关开放自定义智能体提示文件管理接口的配置。'''
 
 from pydantic import BaseModel, Field
 
 
 class AgentsApiConfig(BaseModel):
-    """\u6267\u884c AgentsApiConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''控制自定义智能体的提示文件读写路由是否启用。'''
 
     enabled: bool = Field(
         default=False,
@@ -16,17 +16,17 @@ _agents_api_config: AgentsApiConfig = AgentsApiConfig()
 
 
 def get_agents_api_config() -> AgentsApiConfig:
-    """\u6267\u884c get_agents_api_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回当前进程使用的自定义智能体接口配置。'''
     return _agents_api_config
 
 
 def set_agents_api_config(config: AgentsApiConfig) -> None:
-    """\u6267\u884c set_agents_api_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''替换当前进程中的自定义智能体接口配置。'''
     global _agents_api_config
     _agents_api_config = config
 
 
 def load_agents_api_config_from_dict(config_dict: dict) -> None:
-    """\u6267\u884c load_agents_api_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''用应用配置文件中的字段构造并缓存接口配置模型。'''
     global _agents_api_config
     _agents_api_config = AgentsApiConfig(**config_dict)

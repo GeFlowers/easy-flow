@@ -1,7 +1,7 @@
-"""提供运行反馈的创建、查询、聚合和删除路由。
+'''提供运行反馈的创建、查询、聚合和删除路由。
 
 用户可对运行提交赞或踩，并可选择关联到特定消息。
-"""
+'''
 
 from __future__ import annotations
 
@@ -18,13 +18,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/threads", tags=["feedback"])
 
 
-# ---------------------------------------------------------------------------
-# Request / response models
-# ---------------------------------------------------------------------------
 
 
 class FeedbackCreateRequest(BaseModel):
-    """定义创建运行反馈时的评分、备注和可选消息范围。"""
+    '''定义创建运行反馈时的评分、备注和可选消息范围。'''
 
     rating: int = Field(..., description="Feedback rating: +1 (positive) or -1 (negative)")
     comment: str | None = Field(default=None, description="Optional text feedback")
@@ -32,14 +29,14 @@ class FeedbackCreateRequest(BaseModel):
 
 
 class FeedbackUpsertRequest(BaseModel):
-    """定义幂等写入运行反馈时允许更新的字段。"""
+    '''定义幂等写入运行反馈时允许更新的字段。'''
 
     rating: int = Field(..., description="Feedback rating: +1 (positive) or -1 (negative)")
     comment: str | None = Field(default=None, description="Optional text feedback")
 
 
 class FeedbackResponse(BaseModel):
-    """表示持久化反馈记录的 API 响应结构。"""
+    '''表示持久化反馈记录的 API 响应结构。'''
 
     feedback_id: str
     run_id: str
@@ -52,7 +49,7 @@ class FeedbackResponse(BaseModel):
 
 
 class FeedbackStatsResponse(BaseModel):
-    """表示单次运行的反馈总数及正负评分汇总。"""
+    '''表示单次运行的反馈总数及正负评分汇总。'''
 
     run_id: str
     total: int = 0
@@ -60,9 +57,6 @@ class FeedbackStatsResponse(BaseModel):
     negative: int = 0
 
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
 
 
 @router.put("/{thread_id}/runs/{run_id}/feedback", response_model=FeedbackResponse)
@@ -73,7 +67,7 @@ async def upsert_feedback(
     body: FeedbackUpsertRequest,
     request: Request,
 ) -> dict[str, Any]:
-    """为当前用户幂等创建或更新指定线程运行的反馈。"""
+    '''为当前用户幂等创建或更新指定线程运行的反馈。'''
     if body.rating not in (1, -1):
         raise HTTPException(status_code=400, detail="rating must be +1 or -1")
 
@@ -103,7 +97,7 @@ async def delete_run_feedback(
     run_id: str,
     request: Request,
 ) -> dict[str, bool]:
-    """删除当前用户对指定线程运行提交的反馈。"""
+    '''删除当前用户对指定线程运行提交的反馈。'''
     user_id = await get_current_user(request)
     feedback_repo = get_feedback_repo(request)
     deleted = await feedback_repo.delete_by_run(
@@ -124,7 +118,7 @@ async def create_feedback(
     body: FeedbackCreateRequest,
     request: Request,
 ) -> dict[str, Any]:
-    """校验评分和运行归属后，为当前用户保存指定运行的评价。"""
+    '''校验评分和运行归属后，为当前用户保存指定运行的评价。'''
     if body.rating not in (1, -1):
         raise HTTPException(status_code=400, detail="rating must be +1 or -1")
 
@@ -156,7 +150,7 @@ async def list_feedback(
     run_id: str,
     request: Request,
 ) -> list[dict[str, Any]]:
-    """在已通过线程读取权限校验后列出运行的全部反馈。"""
+    '''在已通过线程读取权限校验后列出运行的全部反馈。'''
     feedback_repo = get_feedback_repo(request)
     return await feedback_repo.list_by_run(thread_id, run_id)
 
@@ -168,7 +162,7 @@ async def feedback_stats(
     run_id: str,
     request: Request,
 ) -> dict[str, Any]:
-    """获取指定运行的正负反馈数量及总数。"""
+    '''获取指定运行的正负反馈数量及总数。'''
     feedback_repo = get_feedback_repo(request)
     return await feedback_repo.aggregate_by_run(thread_id, run_id)
 
@@ -181,7 +175,7 @@ async def delete_feedback(
     feedback_id: str,
     request: Request,
 ) -> dict[str, bool]:
-    """验证反馈归属后删除指定反馈记录。"""
+    '''验证反馈归属后删除指定反馈记录。'''
     feedback_repo = get_feedback_repo(request)
     # 删除前验证反馈确属指定线程和运行。
     existing = await feedback_repo.get(feedback_id)

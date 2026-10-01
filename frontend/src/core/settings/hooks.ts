@@ -22,6 +22,7 @@ export function useLocalSettings(): [LocalSettings, LocalSettingsSetter] {
     () => DEFAULT_LOCAL_SETTINGS,
   );
 
+  /** 将单项偏好写入全局本地设置存储。 */
   const setSettings = useCallback<LocalSettingsSetter>((key, value) => {
     updateLocalSettings(key, value);
   }, []);
@@ -50,6 +51,7 @@ export function useThreadSettings(
     [baseSettings, threadModelName],
   );
 
+  /** 将单项偏好写入当前线程覆盖设置，而不修改全局默认值。 */
   const setSettings = useCallback<LocalSettingsSetter>(
     (key, value) => {
       updateThreadSettings(threadId, key, value);

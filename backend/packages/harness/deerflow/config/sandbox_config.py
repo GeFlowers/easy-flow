@@ -1,31 +1,26 @@
-"""提供配置、沙箱、配置相关功能。"""
+'''定义本地沙箱路径策略、挂载规则及命令执行限制。'''
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class VolumeMountConfig(BaseModel):
-    """\u6267\u884c VolumeMountConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''描述映射到沙箱命名空间的主机目录及其访问模式。'''
 
     host_path: str = Field(
         ...,
         description=(
-            "Source path for the mount. Resolution depends on the active provider: "
-            "``LocalSandboxProvider`` checks this path from the gateway process — in "
-            "a local process this is the host machine, but in Docker deployments "
-            "(``make docker-start`` / Docker Compose) it is the path *inside* the "
-            "``deer-flow-gateway`` container, so the host directory must also be "
-            "bind-mounted into the gateway service for the mount to take effect. "
-            "``AioSandboxProvider`` (DooD) passes this value straight to ``docker -v`` "
-            "for the sandbox container, where it is resolved by the host Docker daemon "
-            "from the host machine's perspective."
+            "Source path visible to the Gateway process. With LocalSandboxProvider, "
+            "this is a path on the host when running locally, or a path inside the "
+            "Gateway container when using Docker Compose. Remote providers may "
+            "upload the configured files instead of mounting them."
         ),
     )
-    container_path: str = Field(..., description="Path inside the container")
+    container_path: str = Field(..., description="Virtual path exposed to the agent")
     read_only: bool = Field(default=False, description="Whether the mount is read-only")
 
 
 class SandboxConfig(BaseModel):
-    """\u6267\u884c SandboxConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为本地沙箱工具提供工作区、命令超时和文件访问配置。'''
 
     use: str = Field(
         ...,
@@ -37,19 +32,11 @@ class SandboxConfig(BaseModel):
     )
     image: str | None = Field(
         default=None,
-        description="Sandbox image to use (Docker/AIO image or BoxLite OCI image)",
-    )
-    port: int | None = Field(
-        default=None,
-        description="Base port for sandbox containers",
+        description="OCI image used by VM-backed sandbox providers such as BoxLite",
     )
     replicas: int | None = Field(
         default=None,
         description="Maximum active + warm sandboxes/VMs per gateway process (default: 3). Warm/least-recently-used entries are evicted to make room; active sandboxes are not forcibly stopped.",
-    )
-    container_prefix: str | None = Field(
-        default=None,
-        description="Prefix for container names",
     )
     idle_timeout: int | None = Field(
         default=None,
@@ -62,11 +49,11 @@ class SandboxConfig(BaseModel):
     )
     mounts: list[VolumeMountConfig] = Field(
         default_factory=list,
-        description="List of volume mounts to share directories between host and container",
+        description="List of host directories to map or upload into the sandbox",
     )
     environment: dict[str, str] = Field(
         default_factory=dict,
-        description="Environment variables to inject into the sandbox container. Values starting with $ will be resolved from host environment variables.",
+        description="Environment variables to pass to the sandbox runtime. Values starting with $ will be resolved from the Gateway environment.",
     )
 
     bash_output_max_chars: int = Field(
@@ -90,16 +77,6 @@ class SandboxConfig(BaseModel):
         description=(
             "Maximum wall-clock seconds a host bash command may run before it is terminated, process group and all (LocalSandboxProvider). "
             "Keeps a blocking foreground command (e.g. an un-backgrounded server) from hanging the turn; background `&` processes return immediately."
-        ),
-    )
-
-    provisioner_api_key: str | None = Field(
-        default=None,
-        description=(
-            "API key sent as X-API-Key header to the provisioner service. "
-            "Must match PROVISIONER_API_KEY on the provisioner container. "
-            "Both sides must be set to the same value; "
-            "the provisioner rejects all /api/* requests when the key is unset or mismatched."
         ),
     )
 

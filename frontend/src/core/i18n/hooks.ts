@@ -13,12 +13,13 @@ import {
   type Locale,
 } from "./index";
 
-/** 提供 useI18n 对应的 React Hook。 */
+/** 返回当前语言、翻译表和切换方法，并在挂载时恢复或检测语言偏好。 */
 export function useI18n() {
   const { locale, setLocale } = useI18nContext();
 
   const t = translations[locale] ?? translations[DEFAULT_LOCALE];
 
+  /** 同步更新上下文语言及 Cookie 中保存的语言设置。 */
   const changeLocale = (newLocale: Locale) => {
     setLocale(newLocale);
     setLocaleInCookie(newLocale);

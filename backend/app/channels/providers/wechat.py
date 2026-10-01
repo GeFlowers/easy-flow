@@ -1,4 +1,4 @@
-"""通过微信 iLink 长轮询接收消息，并处理文本、媒体和二维码登录。"""
+'''通过微信 iLink 长轮询接收消息，并处理文本、媒体和二维码登录。'''
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class MessageItemType(IntEnum):
-    """iLink 入站消息片段的类型编号。"""
+    '''iLink 入站消息片段的类型编号。'''
 
     NONE = 0
     TEXT = 1
@@ -42,7 +42,7 @@ class MessageItemType(IntEnum):
 
 
 class UploadMediaType(IntEnum):
-    """iLink 媒体上传接口使用的媒体类型编号。"""
+    '''iLink 媒体上传接口使用的媒体类型编号。'''
 
     IMAGE = 1
     VIDEO = 2
@@ -51,11 +51,11 @@ class UploadMediaType(IntEnum):
 
 
 def _build_ilink_client_version(version: str) -> str:
-    """将点分版本号编码为 iLink 要求的 24 位整数文本。"""
+    '''将点分版本号编码为 iLink 要求的 24 位整数文本。'''
     parts = [part.strip() for part in version.split(".")]
 
     def _part(index: int) -> int:
-        """解析单个版本分段，并将其限制在无符号字节范围内。"""
+        '''解析单个版本分段，并将其限制在无符号字节范围内。'''
         if index >= len(parts):
             return 0
         try:
@@ -70,30 +70,30 @@ def _build_ilink_client_version(version: str) -> str:
 
 
 def _build_wechat_uin() -> str:
-    """生成随机 32 位微信 UIN 并按协议编码为 Base64。"""
+    '''生成随机 32 位微信 UIN 并按协议编码为 Base64。'''
     return base64.b64encode(str(secrets.randbits(32)).encode("utf-8")).decode("utf-8")
 
 
 def _md5_hex(content: bytes) -> str:
-    """计算媒体内容的 MD5 十六进制摘要，用于 iLink 文件校验字段。"""
+    '''计算媒体内容的 MD5 十六进制摘要，用于 iLink 文件校验字段。'''
     return hashlib.md5(content).hexdigest()
 
 
 def _encrypted_size_for_aes_128_ecb(plaintext_size: int) -> int:
-    """计算 PKCS7 填充后 AES-128-ECB 密文的字节长度。"""
+    '''计算 PKCS7 填充后 AES-128-ECB 密文的字节长度。'''
     if plaintext_size < 0:
         raise ValueError("plaintext_size must be non-negative")
     return ((plaintext_size // 16) + 1) * 16
 
 
 def _validate_aes_128_key(key: bytes) -> None:
-    """确保密钥长度符合 AES-128 算法要求。"""
+    '''确保密钥长度符合 AES-128 算法要求。'''
     if len(key) != 16:
         raise ValueError("AES-128-ECB requires a 16-byte key")
 
 
 def _encrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
-    """使用 PKCS7 填充和 AES-128-ECB 加密媒体密钥材料。"""
+    '''使用 PKCS7 填充和 AES-128-ECB 加密媒体密钥材料。'''
     _validate_aes_128_key(key)
     padder = padding.PKCS7(128).padder()
     padded = padder.update(content) + padder.finalize()
@@ -103,7 +103,7 @@ def _encrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
 
 
 def _decrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
-    """解密 AES-128-ECB 数据并移除 PKCS7 填充。"""
+    '''解密 AES-128-ECB 数据并移除 PKCS7 填充。'''
     _validate_aes_128_key(key)
     cipher = Cipher(algorithms.AES(key), modes.ECB())
     decryptor = cipher.decryptor()
@@ -113,7 +113,7 @@ def _decrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
 
 
 def _safe_media_filename(prefix: str, extension: str, message_id: str | None = None, index: int | None = None) -> str:
-    """组合媒体文件名前缀、消息标识和序号，并清理路径分隔符。"""
+    '''组合媒体文件名前缀、消息标识和序号，并清理路径分隔符。'''
     safe_ext = extension if extension.startswith(".") else f".{extension}" if extension else ""
     safe_msg = (message_id or "msg").replace("/", "_").replace("\\", "_")
     suffix = f"-{index}" if index is not None else ""
@@ -121,17 +121,17 @@ def _safe_media_filename(prefix: str, extension: str, message_id: str | None = N
 
 
 def _build_cdn_upload_url(cdn_base_url: str, upload_param: str, filekey: str) -> str:
-    """对上传参数和文件键进行 URL 编码并构造 CDN 上传地址。"""
+    '''对上传参数和文件键进行 URL 编码并构造 CDN 上传地址。'''
     return f"{cdn_base_url.rstrip('/')}/upload?encrypted_query_param={quote(upload_param, safe='')}&filekey={quote(filekey, safe='')}"
 
 
 def _encode_outbound_media_aes_key(aes_key: bytes) -> str:
-    """将媒体 AES 密钥转换为协议规定的十六进制文本再做 Base64 编码。"""
+    '''将媒体 AES 密钥转换为协议规定的十六进制文本再做 Base64 编码。'''
     return base64.b64encode(aes_key.hex().encode("utf-8")).decode("utf-8")
 
 
 def _detect_image_extension_and_mime(content: bytes) -> tuple[str, str] | None:
-    """根据文件头识别支持的图片扩展名和 MIME 类型，未知格式返回 None。"""
+    '''根据文件头识别支持的图片扩展名和 MIME 类型，未知格式返回 None。'''
     if content.startswith(b"\x89PNG\r\n\x1a\n"):
         return ".png", "image/png"
     if content.startswith(b"\xff\xd8\xff"):
@@ -146,7 +146,7 @@ def _detect_image_extension_and_mime(content: bytes) -> tuple[str, str] | None:
 
 
 class WechatChannel(Channel):
-    """微信 iLink 通道：长轮询接收消息，支持二维码登录及加密媒体收发。"""
+    '''微信 iLink 通道：长轮询接收消息，支持二维码登录及加密媒体收发。'''
 
     DEFAULT_BASE_URL = "https://ilinkai.weixin.qq.com"
     DEFAULT_CDN_BASE_URL = "https://novac2c.cdn.weixin.qq.com/c2c"
@@ -226,7 +226,7 @@ class WechatChannel(Channel):
     )
 
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
-        """初始化 iLink 配置、客户端状态、轮询游标及持久化目录。"""
+        '''初始化 iLink 配置、客户端状态、轮询游标及持久化目录。'''
         super().__init__(name="wechat", bus=bus, config=config)
         self._main_loop: asyncio.AbstractEventLoop | None = None
         self._poll_task: asyncio.Task | None = None
@@ -267,7 +267,7 @@ class WechatChannel(Channel):
         # start() 中通过 asyncio.to_thread 加载状态。
 
     async def start(self) -> None:
-        """加载认证状态并启动微信长轮询；必要时先执行二维码登录。"""
+        '''加载认证状态并启动微信长轮询；必要时先执行二维码登录。'''
         if self._running:
             return
 
@@ -289,7 +289,7 @@ class WechatChannel(Channel):
         logger.info("WeChat channel started")
 
     async def stop(self) -> None:
-        """停止长轮询并关闭 HTTP 客户端，避免遗留网络资源。"""
+        '''停止长轮询并关闭 HTTP 客户端，避免遗留网络资源。'''
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
 
@@ -308,7 +308,7 @@ class WechatChannel(Channel):
         logger.info("WeChat channel stopped")
 
     async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
-        """发送出站文本或媒体消息，并对临时网络错误进行重试。"""
+        '''发送出站文本或媒体消息，并对临时网络错误进行重试。'''
         text = msg.text.strip()
         if not text:
             return
@@ -339,7 +339,7 @@ class WechatChannel(Channel):
         client_id_prefix: str,
         max_retries: int,
     ) -> None:
-        """构造 iLink 文本消息请求，并在请求失败时按策略重试。"""
+        '''构造 iLink 文本消息请求，并在请求失败时按策略重试。'''
         payload = {
             "msg": {
                 "from_user_id": "",
@@ -359,7 +359,7 @@ class WechatChannel(Channel):
         }
 
         async def send_message() -> None:
-            """执行一次带超时控制的文本消息请求。"""
+            '''执行一次带超时控制的文本消息请求。'''
             data = await self._request_json("/ilink/bot/sendmessage", payload)
             self._ensure_success(data, "sendmessage")
 
@@ -370,13 +370,13 @@ class WechatChannel(Channel):
         )
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
-        """按图片或普通文件类型上传附件并发送消息，返回是否成功。"""
+        '''按图片或普通文件类型上传附件并发送消息，返回是否成功。'''
         if attachment.is_image:
             return await self._send_image_attachment(msg, attachment)
         return await self._send_file_attachment(msg, attachment)
 
     async def _send_image_attachment(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
-        """读取图片并加密上传到 CDN，再构造 iLink 图片消息发送。"""
+        '''读取图片并加密上传到 CDN，再构造 iLink 图片消息发送。'''
         if self._max_outbound_image_bytes > 0 and attachment.size > self._max_outbound_image_bytes:
             logger.warning("[WeChat] outbound image too large (%d bytes), skipping: %s", attachment.size, attachment.filename)
             return False
@@ -463,7 +463,7 @@ class WechatChannel(Channel):
             return False
 
     async def _send_file_attachment(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
-        """计算文件摘要与密钥、上传加密文件并发送 iLink 文件消息。"""
+        '''计算文件摘要与密钥、上传加密文件并发送 iLink 文件消息。'''
         if not self._is_allowed_file_type(attachment.filename, attachment.mime_type):
             logger.warning("[WeChat] outbound file type blocked, skipping: %s (%s)", attachment.filename, attachment.mime_type)
             return False
@@ -554,7 +554,7 @@ class WechatChannel(Channel):
             return False
 
     async def _poll_loop(self) -> None:
-        """持续轮询 iLink 更新，处理消息并在失败后按间隔重试。"""
+        '''持续轮询 iLink 更新，处理消息并在失败后按间隔重试。'''
         while self._running:
             try:
                 if not await self._ensure_authenticated():
@@ -606,7 +606,7 @@ class WechatChannel(Channel):
                 await asyncio.sleep(self._retry_delay)
 
     async def _handle_update(self, raw_message: Any) -> None:
-        """校验轮询返回的消息、过滤未授权用户并发布入站事件。"""
+        '''校验轮询返回的消息、过滤未授权用户并发布入站事件。'''
         if not isinstance(raw_message, dict):
             return
         if raw_message.get("message_type") != 1:
@@ -664,7 +664,7 @@ class WechatChannel(Channel):
         await self.bus.publish_inbound(inbound)
 
     async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
-        """根据已绑定的微信连接记录补充 DeerFlow 所有者身份。"""
+        '''根据已绑定的微信连接记录补充 DeerFlow 所有者身份。'''
         return await attach_connection_identity(
             inbound,
             repo=self._connection_repo,
@@ -673,7 +673,7 @@ class WechatChannel(Channel):
         )
 
     async def _bind_connection_from_connect_code(self, *, chat_id: str, context_token: str, code: str) -> bool:
-        """消费一次性绑定码并保存微信用户与 DeerFlow 用户的连接关系。"""
+        '''消费一次性绑定码并保存微信用户与 DeerFlow 用户的连接关系。'''
         if self._connection_repo is None or not code:
             return False
 
@@ -700,7 +700,7 @@ class WechatChannel(Channel):
         return True
 
     async def _send_connection_reply(self, chat_id: str, context_token: str, text: str) -> None:
-        """向指定微信会话发送连接授权结果文本。"""
+        '''向指定微信会话发送连接授权结果文本。'''
         if not context_token:
             return
         await self._send_text_message(
@@ -712,7 +712,7 @@ class WechatChannel(Channel):
         )
 
     async def _ensure_authenticated(self) -> bool:
-        """确认已有有效令牌，或在启用时通过二维码登录获取令牌。"""
+        '''确认已有有效令牌，或在启用时通过二维码登录获取令牌。'''
         async with self._auth_lock:
             if self._bot_token:
                 return True
@@ -732,7 +732,7 @@ class WechatChannel(Channel):
             return bool(auth_state.get("bot_token"))
 
     async def _bind_via_qrcode(self) -> dict[str, Any]:
-        """执行 iLink 二维码登录轮询，并返回认证令牌和用户信息。"""
+        '''执行 iLink 二维码登录轮询，并返回认证令牌和用户信息。'''
         qrcode_data = await self._request_public_get_json(
             "/ilink/bot/get_bot_qrcode",
             params={"bot_type": self._qrcode_bot_type},
@@ -798,7 +798,7 @@ class WechatChannel(Channel):
         raise TimeoutError("Timed out waiting for WeChat QR confirmation")
 
     async def _request_json(self, path: str, payload: dict[str, Any], *, timeout: float | None = None) -> dict[str, Any]:
-        """向受认证的 iLink API 发送 JSON 请求并解析响应正文。"""
+        '''向受认证的 iLink API 发送 JSON 请求并解析响应正文。'''
         client = await self._ensure_client()
         response = await client.post(
             f"{self._base_url}{path}",
@@ -817,7 +817,7 @@ class WechatChannel(Channel):
         *,
         timeout: float | None = None,
     ) -> dict[str, Any]:
-        """请求无需认证的 iLink 公共 GET 接口并解析 JSON 响应。"""
+        '''请求无需认证的 iLink 公共 GET 接口并解析 JSON 响应。'''
         client = await self._ensure_client()
         response = await client.get(
             f"{self._base_url}{path}",
@@ -830,14 +830,14 @@ class WechatChannel(Channel):
         return data if isinstance(data, dict) else {}
 
     async def _ensure_client(self) -> httpx.AsyncClient:
-        """惰性创建并复用配置了连接限制和超时的异步 HTTP 客户端。"""
+        '''惰性创建并复用配置了连接限制和超时的异步 HTTP 客户端。'''
         if self._client is None:
             timeout = max(self._polling_timeout + 5.0, 10.0)
             self._client = httpx.AsyncClient(timeout=timeout)
         return self._client
 
     def _resolve_context_token(self, msg: OutboundMessage) -> str | None:
-        """从消息元数据中解析发送微信消息所需的上下文令牌。"""
+        '''从消息元数据中解析发送微信消息所需的上下文令牌。'''
         metadata_token = msg.metadata.get("context_token")
         if isinstance(metadata_token, str) and metadata_token.strip():
             return metadata_token.strip()
@@ -846,19 +846,19 @@ class WechatChannel(Channel):
         return self._context_tokens_by_chat.get(msg.chat_id)
 
     def _check_user(self, user_id: str) -> bool:
-        """按 allowed_users 配置检查发件人是否有权使用通道。"""
+        '''按 allowed_users 配置检查发件人是否有权使用通道。'''
         if not self._allowed_users:
             return True
         return user_id in self._allowed_users
 
     def _current_longpoll_timeout_seconds(self) -> float:
-        """读取当前长轮询超时时间并应用协议允许的范围限制。"""
+        '''读取当前长轮询超时时间并应用协议允许的范围限制。'''
         if self._respect_server_longpoll_timeout and self._server_longpoll_timeout_seconds is not None:
             return self._server_longpoll_timeout_seconds
         return self._polling_timeout
 
     def _update_longpoll_timeout(self, data: Mapping[str, Any]) -> None:
-        """根据服务端响应中的建议更新后续长轮询超时。"""
+        '''根据服务端响应中的建议更新后续长轮询超时。'''
         if not self._respect_server_longpoll_timeout:
             return
         raw_timeout = data.get("longpolling_timeout_ms")
@@ -873,11 +873,11 @@ class WechatChannel(Channel):
         self._server_longpoll_timeout_seconds = timeout_ms / 1000.0
 
     def _base_info(self) -> dict[str, str]:
-        """组装请求中携带的 iLink 客户端版本和设备标识字段。"""
+        '''组装请求中携带的 iLink 客户端版本和设备标识字段。'''
         return {"channel_version": self._channel_version}
 
     def _common_headers(self) -> dict[str, str]:
-        """生成 iLink API 共用的 HTTP 请求头。"""
+        '''生成 iLink API 共用的 HTTP 请求头。'''
         headers = {
             "iLink-App-ClientVersion": _build_ilink_client_version(self._channel_version),
             "X-WECHAT-UIN": _build_wechat_uin(),
@@ -889,14 +889,14 @@ class WechatChannel(Channel):
         return headers
 
     def _public_headers(self) -> dict[str, str]:
-        """生成二维码登录等未认证接口使用的请求头。"""
+        '''生成二维码登录等未认证接口使用的请求头。'''
         return {
             "Content-Type": "application/json",
             **self._common_headers(),
         }
 
     def _auth_headers(self) -> dict[str, str]:
-        """在通用请求头中附加当前机器人认证令牌。"""
+        '''在通用请求头中附加当前机器人认证令牌。'''
         headers = {
             "Content-Type": "application/json",
             "Authorization": f"Bearer {self._bot_token}",
@@ -907,7 +907,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_cdn_full_url(media: Mapping[str, Any] | None) -> str | None:
-        """从媒体描述中读取有效的 CDN 完整下载地址。"""
+        '''从媒体描述中读取有效的 CDN 完整下载地址。'''
         if not isinstance(media, Mapping):
             return None
         full_url = media.get("full_url")
@@ -915,7 +915,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_upload_full_url(upload_data: Mapping[str, Any] | None) -> str | None:
-        """从上传预签名响应中提取完整上传地址。"""
+        '''从上传预签名响应中提取完整上传地址。'''
         if not isinstance(upload_data, Mapping):
             return None
         upload_full_url = upload_data.get("upload_full_url")
@@ -923,7 +923,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_upload_param(upload_data: Mapping[str, Any] | None) -> str | None:
-        """从上传预签名响应中提取加密查询参数。"""
+        '''从上传预签名响应中提取加密查询参数。'''
         if not isinstance(upload_data, Mapping):
             return None
         upload_param = upload_data.get("upload_param")
@@ -940,7 +940,7 @@ class WechatChannel(Channel):
         thumb_plaintext: bytes | None = None,
         no_need_thumb: bool = False,
     ) -> dict[str, Any]:
-        """组装 iLink 媒体上传申请，包含摘要、大小、密钥和媒体类型。"""
+        '''组装 iLink 媒体上传申请，包含摘要、大小、密钥和媒体类型。'''
         _validate_aes_128_key(aes_key)
         payload: dict[str, Any] = {
             "filekey": filekey,
@@ -964,7 +964,7 @@ class WechatChannel(Channel):
         return payload
 
     async def _download_cdn_bytes(self, url: str, *, timeout: float | None = None) -> bytes:
-        """从 CDN 下载媒体字节，并在 HTTP 状态异常时抛出错误。"""
+        '''从 CDN 下载媒体字节，并在 HTTP 状态异常时抛出错误。'''
         client = await self._ensure_client()
         response = await client.get(url, timeout=timeout or self.DEFAULT_CDN_TIMEOUT)
         response.raise_for_status()
@@ -979,7 +979,7 @@ class WechatChannel(Channel):
         timeout: float | None = None,
         method: str = "PUT",
     ) -> str | None:
-        """将媒体字节 PUT 到 CDN 上传地址，并检查服务端响应状态。"""
+        '''将媒体字节 PUT 到 CDN 上传地址，并检查服务端响应状态。'''
         client = await self._ensure_client()
         request_kwargs = {
             "content": content,
@@ -1000,7 +1000,7 @@ class WechatChannel(Channel):
         *,
         ciphertext_size: int,
     ) -> dict[str, Any]:
-        """构造含 CDN 地址和 AES 密钥信息的 iLink 出站图片片段。"""
+        '''构造含 CDN 地址和 AES 密钥信息的 iLink 出站图片片段。'''
         encoded_aes_key = _encode_outbound_media_aes_key(aes_key)
         media: dict[str, Any] = {
             "aes_key": encoded_aes_key,
@@ -1022,7 +1022,7 @@ class WechatChannel(Channel):
         filename: str,
         plaintext: bytes,
     ) -> dict[str, Any]:
-        """构造含文件名、大小、摘要及解密密钥的出站文件片段。"""
+        '''构造含文件名、大小、摘要及解密密钥的出站文件片段。'''
         media: dict[str, Any] = {
             "aes_key": _encode_outbound_media_aes_key(aes_key),
             "encrypt_type": 1,
@@ -1038,13 +1038,13 @@ class WechatChannel(Channel):
         }
 
     def _download_dir(self) -> Path | None:
-        """解析并创建配置的微信媒体下载目录；未配置时返回 None。"""
+        '''解析并创建配置的微信媒体下载目录；未配置时返回 None。'''
         if not self._state_dir:
             return None
         return self._state_dir / self.DEFAULT_IMAGE_DOWNLOAD_DIRNAME
 
     async def _extract_inbound_files(self, raw_message: Mapping[str, Any]) -> list[dict[str, Any]]:
-        """从 iLink 消息片段中解析图片和文件并下载到本地目录。"""
+        '''从 iLink 消息片段中解析图片和文件并下载到本地目录。'''
         files: list[dict[str, Any]] = []
         item_list = raw_message.get("item_list")
         if not isinstance(item_list, list):
@@ -1066,7 +1066,7 @@ class WechatChannel(Channel):
         return files
 
     async def _extract_image_file(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
-        """下载、解密并校验图片片段，返回供入站消息引用的文件元数据。"""
+        '''下载、解密并校验图片片段，返回供入站消息引用的文件元数据。'''
         image_item = item.get("image_item")
         if not isinstance(image_item, Mapping):
             return None
@@ -1115,7 +1115,7 @@ class WechatChannel(Channel):
         }
 
     async def _extract_file_item(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
-        """下载并解密普通文件片段，验证文件大小后返回本地文件元数据。"""
+        '''下载并解密普通文件片段，验证文件大小后返回本地文件元数据。'''
         file_item = item.get("file_item")
         if not isinstance(file_item, Mapping):
             return None
@@ -1166,7 +1166,7 @@ class WechatChannel(Channel):
         }
 
     def _stage_downloaded_file(self, filename: str, content: bytes) -> Path | None:
-        """将媒体字节写入下载目录的临时文件，再原子替换为目标文件。"""
+        '''将媒体字节写入下载目录的临时文件，再原子替换为目标文件。'''
         download_dir = self._download_dir()
         if download_dir is None:
             return None
@@ -1181,13 +1181,13 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _decode_base64_aes_key(value: str) -> bytes | None:
-        """解码 Base64 AES 密钥，并兼容协议中以十六进制文本再次编码的形式。"""
+        '''解码 Base64 AES 密钥，并兼容协议中以十六进制文本再次编码的形式。'''
         candidate = value.strip()
         if not candidate:
             return None
 
         def _normalize_decoded(decoded: bytes) -> bytes | None:
-            """将解码结果规范为 16 字节密钥，不合法时返回 None。"""
+            '''将解码结果规范为 16 字节密钥，不合法时返回 None。'''
             try:
                 _validate_aes_128_key(decoded)
                 return decoded
@@ -1225,7 +1225,7 @@ class WechatChannel(Channel):
 
     @classmethod
     def _parse_aes_key_candidate(cls, value: Any, *, prefer_hex: bool) -> bytes | None:
-        """按优先格式尝试解析密钥候选值，并验证 AES-128 长度。"""
+        '''按优先格式尝试解析密钥候选值，并验证 AES-128 长度。'''
         if isinstance(value, bytes):
             try:
                 _validate_aes_128_key(value)
@@ -1261,7 +1261,7 @@ class WechatChannel(Channel):
 
     @classmethod
     def _resolve_media_aes_key(cls, *payloads: Mapping[str, Any]) -> bytes | None:
-        """从媒体响应及其嵌套字段中查找可用的 AES 密钥。"""
+        '''从媒体响应及其嵌套字段中查找可用的 AES 密钥。'''
         for payload in payloads:
             if not isinstance(payload, Mapping):
                 continue
@@ -1287,10 +1287,10 @@ class WechatChannel(Channel):
         item_payload: Mapping[str, Any] | None,
         media: Mapping[str, Any] | None,
     ) -> dict[str, Any]:
-        """提取密钥相关字段用于诊断日志，并避免输出完整敏感密钥。"""
+        '''提取密钥相关字段用于诊断日志，并避免输出完整敏感密钥。'''
 
         def _interesting(mapping: Mapping[str, Any] | None) -> dict[str, Any]:
-            """筛选映射中与媒体密钥诊断相关的字段。"""
+            '''筛选映射中与媒体密钥诊断相关的字段。'''
             if not isinstance(mapping, Mapping):
                 return {}
             details: dict[str, Any] = {}
@@ -1325,7 +1325,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_ref_message(raw_message: Mapping[str, Any]) -> dict[str, Any] | None:
-        """从入站消息中提取被引用消息的类型和内容。"""
+        '''从入站消息中提取被引用消息的类型和内容。'''
         item_list = raw_message.get("item_list")
         if not isinstance(item_list, list):
             return None
@@ -1338,7 +1338,7 @@ class WechatChannel(Channel):
         return None
 
     def _is_allowed_file_type(self, filename: str, mime_type: str) -> bool:
-        """根据扩展名白名单和 MIME 类型判断入站文件是否允许处理。"""
+        '''根据扩展名白名单和 MIME 类型判断入站文件是否允许处理。'''
         suffix = Path(filename).suffix.lower()
         if self._allowed_file_extensions and suffix not in self._allowed_file_extensions:
             return False
@@ -1348,7 +1348,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _normalize_inbound_filename(raw_filename: Any, *, default_prefix: str, message_id: str, index: int) -> str:
-        """清理入站文件名中的路径字符，并在缺少名称时生成安全默认名。"""
+        '''清理入站文件名中的路径字符，并在缺少名称时生成安全默认名。'''
         if isinstance(raw_filename, str) and raw_filename.strip():
             candidate = Path(raw_filename.strip()).name
             if candidate:
@@ -1356,7 +1356,7 @@ class WechatChannel(Channel):
         return _safe_media_filename(default_prefix, ".bin", message_id=message_id, index=index)
 
     def _ensure_success(self, data: dict[str, Any], operation: str) -> None:
-        """检查 iLink JSON 响应成功标志，失败时抛出带操作信息的异常。"""
+        '''检查 iLink JSON 响应成功标志，失败时抛出带操作信息的异常。'''
         ret = data.get("ret", 0)
         if ret in (0, None):
             return
@@ -1365,7 +1365,7 @@ class WechatChannel(Channel):
         raise RuntimeError(f"iLink {operation} failed: ret={ret} errcode={errcode} errmsg={errmsg}")
 
     def _load_state(self) -> None:
-        """从状态文件恢复长轮询同步游标，忽略不存在或损坏的文件。"""
+        '''从状态文件恢复长轮询同步游标，忽略不存在或损坏的文件。'''
         self._load_auth_state()
         if not self._cursor_path or not self._cursor_path.exists():
             return
@@ -1379,7 +1379,7 @@ class WechatChannel(Channel):
             self._get_updates_buf = cursor
 
     def _save_state(self) -> None:
-        """将最新长轮询同步游标持久化到状态文件。"""
+        '''将最新长轮询同步游标持久化到状态文件。'''
         if not self._cursor_path:
             return
         try:
@@ -1389,7 +1389,7 @@ class WechatChannel(Channel):
             logger.warning("[WeChat] failed to persist cursor state to %s", self._cursor_path)
 
     def _load_auth_state(self) -> None:
-        """从本地认证状态恢复机器人令牌、上下文令牌和用户标识。"""
+        '''从本地认证状态恢复机器人令牌、上下文令牌和用户标识。'''
         if not self._auth_path or not self._auth_path.exists():
             return
         try:
@@ -1420,7 +1420,7 @@ class WechatChannel(Channel):
         qrcode: str | None = None,
         qrcode_img_content: str | None = None,
     ) -> dict[str, Any]:
-        """将当前认证字段安全保存到本地状态文件。"""
+        '''将当前认证字段安全保存到本地状态文件。'''
         data = dict(self._auth_state)
         data["status"] = status
         data["updated_at"] = int(time.time())
@@ -1470,7 +1470,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _extract_text(raw_message: dict[str, Any]) -> str:
-        """从微信消息的文本片段中拼接可见正文。"""
+        '''从微信消息的文本片段中拼接可见正文。'''
         parts: list[str] = []
         for item in raw_message.get("item_list", []):
             if not isinstance(item, dict) or item.get("type") != int(MessageItemType.TEXT):
@@ -1485,14 +1485,14 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _resolve_state_dir(raw_state_dir: Any) -> Path | None:
-        """解析状态目录配置；空值表示不启用本地状态持久化。"""
+        '''解析状态目录配置；空值表示不启用本地状态持久化。'''
         if not isinstance(raw_state_dir, str) or not raw_state_dir.strip():
             return None
         return Path(raw_state_dir).expanduser()
 
     @staticmethod
     def _coerce_float(value: Any, default: float) -> float:
-        """将配置值转换为浮点数，解析失败时使用默认值。"""
+        '''将配置值转换为浮点数，解析失败时使用默认值。'''
         try:
             return float(value)
         except (TypeError, ValueError):
@@ -1500,7 +1500,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _coerce_int(value: Any, default: int) -> int:
-        """将配置值转换为整数，解析失败时使用默认值。"""
+        '''将配置值转换为整数，解析失败时使用默认值。'''
         try:
             return int(value)
         except (TypeError, ValueError):
@@ -1508,7 +1508,7 @@ class WechatChannel(Channel):
 
     @staticmethod
     def _coerce_str_set(value: Any, default: frozenset[str]) -> set[str]:
-        """把字符串或字符串列表配置规范化为去空白的字符串集合。"""
+        '''把字符串或字符串列表配置规范化为去空白的字符串集合。'''
         if not isinstance(value, (list, tuple, set, frozenset)):
             return set(default)
         normalized = {str(item).strip().lower() if str(item).strip().startswith(".") else f".{str(item).strip().lower()}" for item in value if str(item).strip()}

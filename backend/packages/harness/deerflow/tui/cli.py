@@ -1,4 +1,4 @@
-"未说明"
+'''解析终端启动参数，并在交互界面、单次文本输出和事件流输出间分派。'''
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ Mode = Literal["tui", "print", "json", "headless-help"]
 
 @dataclass
 class LaunchPlan:
-    "未说明"
+    '''记录解析后的启动模式、输入消息、线程选择和不可交互终端原因。'''
 
     mode: Mode
     message: str | None = None
@@ -29,7 +29,7 @@ class LaunchPlan:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    "未说明"
+    '''定义命令行参数、模式切换选项以及线程续接参数。'''
     parser = argparse.ArgumentParser(
         prog="deerflow",
         description="DeerFlow terminal workbench — a TUI over the embedded DeerFlow harness.",
@@ -62,7 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def _strip_chat(argv: Sequence[str]) -> list[str]:
-    "未说明"
+    '''兼容旧式 chat 子命令，将其从参数列表中移除。'''
     argv = list(argv)
     if argv and argv[0] == "chat":
         return argv[1:]
@@ -70,7 +70,7 @@ def _strip_chat(argv: Sequence[str]) -> list[str]:
 
 
 def _truthy(value: object) -> bool:
-    "未说明"
+    '''解析表示已启用的常见环境变量文本值。'''
     return isinstance(value, str) and value.strip().lower() in {"1", "true", "yes", "on"}
 
 
@@ -81,7 +81,7 @@ def plan_launch(
     stdout_isatty: bool,
     env: dict[str, str],
 ) -> LaunchPlan:
-    "未说明"
+    '''根据参数和标准输入输出是否连接终端，决定启动交互界面或无头模式。'''
     args = build_parser().parse_args(_strip_chat(argv))
     positional = " ".join(args.message).strip() or None
     resume = args.resume
@@ -102,7 +102,6 @@ def plan_launch(
     if args.cli:
         if positional:
             return LaunchPlan(mode="print", message=positional, thread_id=resume, continue_recent=continue_recent)
-        # Mirror --print: a piped message or --continue is enough to run headless.
         if continue_recent or not stdin_isatty:
             return LaunchPlan(mode="print", message=None, read_stdin=True, thread_id=resume, continue_recent=continue_recent)
         return LaunchPlan(
@@ -129,9 +128,6 @@ def plan_launch(
     )
 
 
-# --------------------------------------------------------------------------- #
-# Runtime dispatch (not unit-tested here; covered by smoke + integration).
-# --------------------------------------------------------------------------- #
 
 _HEADLESS_HELP = """\
 deerflow — DeerFlow terminal workbench
@@ -147,14 +143,14 @@ deerflow — DeerFlow terminal workbench
 
 
 def _resolve_message(plan: LaunchPlan) -> str:
-    "未说明"
+    '''按启动计划读取管道标准输入，或返回命令行提供的消息文本。'''
     if plan.read_stdin:
         return sys.stdin.read().strip()
     return plan.message or ""
 
 
 def main(argv: Sequence[str] | None = None) -> int:
-    "未说明"
+    '''生成启动计划并执行帮助、单次回答、事件流或交互界面模式。'''
     argv = list(sys.argv[1:] if argv is None else argv)
     plan = plan_launch(
         argv,
@@ -179,17 +175,14 @@ def main(argv: Sequence[str] | None = None) -> int:
 
 
 def _make_session():
-    # Imported lazily so the pure planning path never imports the heavy harness.
-    # Headless one-shots never use the threads_meta writer, so skip persistence
-    # (no background loop / engine / connection pool just to discard it).
-    "未说明"
+    '''延迟创建客户端会话，避免单次无头请求初始化不需要的持久化服务。'''
     from .session import open_session
 
     return open_session(persistence=False)
 
 
 def _run_print(plan: LaunchPlan) -> int:
-    "未说明"
+    '''向客户端提交单次消息并将最终回答写入标准输出。'''
     message = _resolve_message(plan)
     if not message:
         print("No message provided.", file=sys.stderr)
@@ -202,7 +195,7 @@ def _run_print(plan: LaunchPlan) -> int:
 
 
 def _run_json(plan: LaunchPlan) -> int:
-    "未说明"
+    '''逐条输出流事件的 JSON 行，并在没有消息时返回命令行错误码。'''
     message = _resolve_message(plan)
     if not message:
         print("No message provided.", file=sys.stderr)
@@ -217,13 +210,10 @@ def _run_json(plan: LaunchPlan) -> int:
 
 
 def _run_tui(plan: LaunchPlan) -> int:
-    "未说明"
+    '''启动交互终端界面；可选界面依赖缺失时按是否强制启动决定报错或显示帮助。'''
     try:
-        # Absolute import (not `from .app`) so the harness import-boundary check,
-        # which records relative module names verbatim, doesn't mistake the sibling
-        # `deerflow.tui.app` module for the forbidden top-level `app` package.
         from deerflow.tui.app import run_tui
-    except ModuleNotFoundError as exc:  # textual missing
+    except ModuleNotFoundError as exc:
         if getattr(exc, "name", "") == "textual" or "textual" in str(exc):
             msg = "The terminal UI needs the optional 'textual' dependency.\nInstall it with:  uv pip install 'deerflow-harness[tui]'   (or: pip install textual)\n"
             if plan.forced_tui:

@@ -37,7 +37,7 @@ const buttonVariants = cva(
   },
 );
 
-/** Button 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供统一的按钮颜色、尺寸、禁用反馈及可选的子元素透传模式。 */
 function Button({
   className,
   variant = "default",

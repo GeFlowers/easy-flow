@@ -15,6 +15,7 @@ export function AgentGallery() {
   const { agents, isLoading } = useAgents();
   const router = useRouter();
 
+  /** 导航到新建代理页面，供图库标题区的创建按钮使用。 */
   const handleNewAgent = () => {
     router.push("/workspace/agents/new");
   };

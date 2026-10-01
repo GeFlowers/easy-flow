@@ -1,4 +1,4 @@
-"未说明"
+'''读取技能文件并校验 frontmatter，将有效配置转换为运行时技能模型。'''
 
 import logging
 import re
@@ -10,12 +10,11 @@ from .types import SKILL_MD_FILE, SecretRequirement, Skill, SkillCategory
 
 logger = logging.getLogger(__name__)
 
-# Valid POSIX environment-variable name.
 _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
 def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> str:
-    "未说明"
+    '''把 YAML 解析错误整理为包含文件行号和常见未加引号冒号提示的诊断信息。'''
 
     lines = [f"Invalid YAML front-matter in {skill_file}: {exc}"]
 
@@ -24,9 +23,6 @@ def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> st
     if mark is not None and 0 <= mark.line < len(source_lines):
         offending = source_lines[mark.line]
 
-        # mark.line is 0-based within the front-matter body; +1 makes it
-        # 1-based, +1 more accounts for the leading `---` fence that the
-        # front-matter regex strips before yaml.safe_load sees it.
         file_line_number = mark.line + 2
         lines.append(f"  line {file_line_number}: {offending}")
 
@@ -41,7 +37,7 @@ def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> st
 
 
 def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None:
-    "未说明"
+    '''解析允许工具字段；缺省返回 None，格式错误或空工具名则拒绝该技能。'''
     if raw is None:
         return None
     if not isinstance(raw, list):
@@ -59,7 +55,7 @@ def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None
 
 
 def parse_required_secrets(raw: object, skill_file: Path) -> tuple[SecretRequirement, ...]:
-    "未说明"
+    '''解析技能要求的环境变量，校验名称、可选标记并去除重复项。'''
     if raw is None:
         return ()
     if not isinstance(raw, list):
@@ -88,7 +84,7 @@ def parse_required_secrets(raw: object, skill_file: Path) -> tuple[SecretRequire
 
 
 def parse_secrets_autonomous(raw: object, skill_file: Path) -> bool:
-    "未说明"
+    '''解析是否允许技能在无人值守情况下绑定密钥，异常配置按不允许处理。'''
     if raw is None:
         return True
     if isinstance(raw, bool):
@@ -98,15 +94,13 @@ def parse_secrets_autonomous(raw: object, skill_file: Path) -> bool:
 
 
 def parse_skill_file(skill_file: Path, category: SkillCategory, relative_path: Path | None = None) -> Skill | None:
-    "未说明"
+    '''读取并验证 SKILL.md 的名称、描述、许可、工具和密钥声明，构造启用状态待配置的技能对象。'''
     if not skill_file.exists() or skill_file.name != SKILL_MD_FILE:
         return None
 
     try:
         content = skill_file.read_text(encoding="utf-8")
 
-        # Keep parser diagnostics richer than the pure helper's host-path-free
-        # error string; tests and authoring UX depend on the line-specific hint.
         front_matter_match = re.match(r"^---\s*\n(.*?)\n---\s*\n?", content, re.DOTALL)
         if not front_matter_match:
             return None
@@ -120,7 +114,6 @@ def parse_skill_file(skill_file: Path, category: SkillCategory, relative_path: P
             logger.error("Invalid SKILL.md front-matter in %s: Frontmatter must be a YAML dictionary", skill_file)
             return None
 
-        # Extract required fields.  Both must be non-empty strings.
         name = metadata.get("name")
         description = metadata.get("description")
 
@@ -129,7 +122,6 @@ def parse_skill_file(skill_file: Path, category: SkillCategory, relative_path: P
         if not description or not isinstance(description, str):
             return None
 
-        # Normalise: strip surrounding whitespace that YAML may preserve.
         name = name.strip()
         description = description.strip()
 
@@ -163,7 +155,7 @@ def parse_skill_file(skill_file: Path, category: SkillCategory, relative_path: P
             relative_path=relative_path or Path(skill_file.parent.name),
             category=category,
             allowed_tools=allowed_tools,
-            enabled=True,  # Actual state comes from the extensions config file.
+            enabled=True,
             required_secrets=required_secrets,
             secrets_autonomous=secrets_autonomous,
         )

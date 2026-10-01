@@ -51,6 +51,7 @@ export function startConnectionPoll(
   let timer: ReturnType<typeof setTimeout> | undefined;
   let cancelled = false;
 
+  /** 停止后续连接状态轮询，并清除尚未触发的定时器。 */
   const cancel = () => {
     cancelled = true;
     if (timer !== undefined) {
@@ -59,6 +60,7 @@ export function startConnectionPoll(
     }
   };
 
+  /** 安排下一次连接状态查询，直至连接成功、取消或超过有效期限。 */
   const schedule = () => {
     timer = setTimeout(() => {
       timer = undefined;

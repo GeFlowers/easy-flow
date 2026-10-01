@@ -1,6 +1,4 @@
-"""定义 tool_call_metadata 模块提供的职责与可复用接口。
-
-Helpers for keeping AIMessage tool-call metadata consistent."""
+'''在复制或过滤 AIMessage 时同步标准字段与供应商原始工具调用元数据。'''
 
 from __future__ import annotations
 
@@ -10,7 +8,7 @@ from langchain_core.messages import AIMessage
 
 
 def _raw_tool_call_id(raw_tool_call: Any) -> str | None:
-    "执行 _raw_tool_call_id 的明确职责，并返回与调用约定一致的结果"
+    '''从原始工具调用结构中提取有效的字符串标识。'''
     if not isinstance(raw_tool_call, dict):
         return None
 
@@ -24,9 +22,7 @@ def clone_ai_message_with_tool_calls(
     *,
     content: Any | None = None,
 ) -> AIMessage:
-    """执行 clone_ai_message_with_tool_calls 的明确职责，并返回与调用约定一致的结果。
-
-    Clone an AIMessage while keeping raw provider tool-call metadata in sync."""
+    '''复制 AIMessage，并同步工具调用列表、供应商元数据和结束原因。'''
     kept_ids = {tc["id"] for tc in tool_calls if isinstance(tc.get("id"), str) and tc["id"]}
 
     update: dict[str, Any] = {"tool_calls": tool_calls}

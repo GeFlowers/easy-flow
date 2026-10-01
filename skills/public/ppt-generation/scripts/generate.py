@@ -1,4 +1,4 @@
-"""将幻灯片图片和演示计划合成为 PPTX，并附加可选的演讲者备注。"""
+'''将幻灯片图片和演示计划合成为 PPTX，并附加可选的演讲者备注。'''
 
 import json
 import os
@@ -14,11 +14,11 @@ def generate_ppt(
     slide_images: list[str],
     output_file: str,
 ) -> str:
-    """根据 JSON 演示计划和有序图片生成 PPTX。
+    '''根据 JSON 演示计划和有序图片生成 PPTX。
 
     ``plan_file`` 提供画幅和每页备注，``slide_images`` 必须按页序排列；函数将图片按
     原始比例居中裁切填满页面。图片缺失时返回错误文本，其他文件或库错误交由调用方处理。
-    """
+    '''
     # 读取演示计划。
     with open(plan_file, "r", encoding="utf-8") as f:
         plan = json.load(f)

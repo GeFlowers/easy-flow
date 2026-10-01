@@ -1,4 +1,4 @@
-"未说明"
+'''解析技能 Markdown 文件头部的 YAML 元数据，并保留原始头部和正文供后续校验。'''
 
 from __future__ import annotations
 
@@ -26,7 +26,7 @@ _FRONTMATTER_RE = re.compile(r"^---\s*\n(.*?)\n---\s*\n?", re.DOTALL)
 
 @dataclass(frozen=True)
 class SkillMarkdownParts:
-    "未说明"
+    '''保存解析后的元数据、YAML 原文和 frontmatter 后的 Markdown 正文。'''
 
     metadata: dict[str, Any]
     frontmatter_text: str
@@ -34,7 +34,7 @@ class SkillMarkdownParts:
 
 
 def split_skill_markdown(content: str) -> tuple[SkillMarkdownParts | None, str | None]:
-    "未说明"
+    '''拆分技能说明中的 YAML frontmatter 与正文；格式、YAML 或顶层类型错误时返回原因。'''
     match = _FRONTMATTER_RE.match(content)
     if not match:
         return None, "No YAML frontmatter found"

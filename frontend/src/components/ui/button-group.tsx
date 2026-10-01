@@ -21,7 +21,7 @@ const buttonGroupVariants = cva(
   },
 );
 
-/** ButtonGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 将相邻控件合并为水平或垂直按钮组，并协调边框圆角和焦点层级。 */
 function ButtonGroup({
   className,
   orientation,
@@ -38,7 +38,7 @@ function ButtonGroup({
   );
 }
 
-/** ButtonGroupText 内部组件：组织对应的界面结构与交互语义。 */
+/** 在按钮组中显示不可点击的说明文本，也可将样式转交给子元素。 */
 function ButtonGroupText({
   className,
   asChild = false,
@@ -59,7 +59,7 @@ function ButtonGroupText({
   );
 }
 
-/** ButtonGroupSeparator 内部组件：组织对应的界面结构与交互语义。 */
+/** 在按钮组内部添加贴合控件高度的方向分隔线。 */
 function ButtonGroupSeparator({
   className,
   orientation = "vertical",

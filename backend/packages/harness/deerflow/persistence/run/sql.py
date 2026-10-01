@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -16,20 +16,20 @@ from deerflow.utils.time import coerce_iso
 
 
 def _lease_expired_or_null(lease_col, cutoff: datetime):
-    """处理运行记录的租约查询、更新或接管操作。"""
+    '''处理运行记录的租约查询、更新或接管操作。'''
     return or_(lease_col.is_(None), lease_col < cutoff)
 
 
 class RunRepository(RunStore):
-    """定义负责持久化读写及事务边界管理的仓储组件。"""
+    '''定义负责持久化读写及事务边界管理的仓储组件。'''
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
-        """初始化当前持久化组件所需的依赖与内部状态。"""
+        '''初始化当前持久化组件所需的依赖与内部状态。'''
         self._sf = session_factory
 
     @staticmethod
     def _normalize_model_name(model_name: str | None) -> str | None:
-        """将空白模型名转换为 None，避免保存无效标识。"""
+        '''将空白模型名转换为 None，避免保存无效标识。'''
         if model_name is None:
             return None
         if not isinstance(model_name, str):
@@ -41,7 +41,7 @@ class RunRepository(RunStore):
 
     @staticmethod
     def _safe_json(obj: Any) -> Any:
-        """处理持久化层使用的结构化数据校验、绑定或比较。"""
+        '''处理持久化层使用的结构化数据校验、绑定或比较。'''
         if obj is None:
             return None
         if isinstance(obj, (str, int, float, bool)):
@@ -68,9 +68,8 @@ class RunRepository(RunStore):
 
     @staticmethod
     def _row_to_dict(row: RunRow) -> dict[str, Any]:
-        """将持久化记录转换为对外使用的字典表示。"""
+        '''将持久化记录转换为对外使用的字典表示。'''
         d = row.to_dict()
-        # Remap JSON columns to match RunStore interface
         d["metadata"] = d.pop("metadata_json", {})
         d["kwargs"] = d.pop("kwargs_json", {})
         # 转成 ISO 字符串以统一仓储接口，并兼容历史无时区记录。
@@ -99,7 +98,7 @@ class RunRepository(RunStore):
         owner_worker_id: str | None = None,
         lease_expires_at: str | None = None,
     ):
-        """按运行 ID 插入或更新运行元数据，并返回规范化后的记录。"""
+        '''按运行 ID 插入或更新运行元数据，并返回规范化后的记录。'''
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.put")
         now = datetime.now(UTC)
         created = datetime.fromisoformat(created_at) if created_at else now
@@ -135,7 +134,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
-        """按给定条件查询并返回对应的持久化记录。"""
+        '''按给定条件查询并返回对应的持久化记录。'''
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.get")
         async with self._sf() as session:
             row = await session.get(RunRow, run_id)
@@ -152,7 +151,7 @@ class RunRepository(RunStore):
         user_id: str | None | _AutoSentinel = AUTO,
         limit=100,
     ):
-        """查询并返回满足给定条件的持久化记录集合。"""
+        '''查询并返回满足给定条件的持久化记录集合。'''
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.list_by_thread")
         stmt = select(RunRow).where(RunRow.thread_id == thread_id)
         if resolved_user_id is not None:
@@ -168,7 +167,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
-        """查询并返回满足给定条件的持久化记录集合。"""
+        '''查询并返回满足给定条件的持久化记录集合。'''
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.list_successful_regenerate_sources")
         source = RunRow.metadata_json["regenerate_from_run_id"].as_string()
         stmt = select(source).where(
@@ -190,7 +189,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
-        """按给定条件查询并返回对应的持久化记录。"""
+        '''按给定条件查询并返回对应的持久化记录。'''
         if not run_ids:
             return {}
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.get_many_by_thread")
@@ -202,24 +201,19 @@ class RunRepository(RunStore):
             return {row.run_id: self._row_to_dict(row) for row in result.scalars()}
 
     async def update_status(self, run_id, status, *, error=None, stop_reason=None) -> bool:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         values: dict[str, Any] = {"status": status, "updated_at": datetime.now(UTC)}
         if error is not None:
             values["error"] = error
         if stop_reason is not None:
             values["stop_reason"] = stop_reason
-        # Guard: only transition rows that are still active. ``interrupted`` is
-        # included because the rollback path goes ``running → interrupted``
-        # (cancel acknowledged) then ``interrupted → error`` (task finalize).
-        # ``error`` and ``success`` remain locked so a peer's takeover (or a
-        # completed run) cannot be overwritten by a late writer.
         async with self._sf() as session:
             result = await session.execute(update(RunRow).where(RunRow.run_id == run_id, RunRow.status.in_(("pending", "running", "interrupted"))).values(**values))
             await session.commit()
             return result.rowcount != 0
 
     async def update_model_name(self, run_id, model_name):
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         async with self._sf() as session:
             await session.execute(update(RunRow).where(RunRow.run_id == run_id).values(model_name=self._normalize_model_name(model_name), updated_at=datetime.now(UTC)))
             await session.commit()
@@ -230,7 +224,7 @@ class RunRepository(RunStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ):
-        """删除或撤销满足条件的持久化记录并提交事务。"""
+        '''删除或撤销满足条件的持久化记录并提交事务。'''
         resolved_user_id = resolve_user_id(user_id, method_name="RunRepository.delete")
         async with self._sf() as session:
             row = await session.get(RunRow, run_id)
@@ -242,7 +236,7 @@ class RunRepository(RunStore):
             await session.commit()
 
     async def list_pending(self, *, before=None):
-        """查询并返回满足给定条件的持久化记录集合。"""
+        '''查询并返回满足给定条件的持久化记录集合。'''
         if before is None:
             before_dt = datetime.now(UTC)
         elif isinstance(before, datetime):
@@ -255,7 +249,7 @@ class RunRepository(RunStore):
             return [self._row_to_dict(r) for r in result.scalars()]
 
     async def list_inflight(self, *, before=None):
-        """查询并返回满足给定条件的持久化记录集合。"""
+        '''查询并返回满足给定条件的持久化记录集合。'''
         if before is None:
             before_dt = datetime.now(UTC)
         elif isinstance(before, datetime):
@@ -292,7 +286,7 @@ class RunRepository(RunStore):
         first_human_message: str | None = None,
         error: str | None = None,
     ) -> bool:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         values: dict[str, Any] = {
             "status": status,
             "total_input_tokens": total_input_tokens,
@@ -333,7 +327,7 @@ class RunRepository(RunStore):
         last_ai_message: str | None = None,
         first_human_message: str | None = None,
     ) -> None:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         values: dict[str, Any] = {"updated_at": datetime.now(UTC)}
         optional_counters = {
             "total_input_tokens": total_input_tokens,
@@ -359,7 +353,7 @@ class RunRepository(RunStore):
             await session.commit()
 
     async def aggregate_tokens_by_thread(self, thread_id: str, *, include_active: bool = False) -> dict[str, Any]:
-        """汇总线程各模型的输入、输出和缓存 token 用量。"""
+        '''汇总线程各模型的输入、输出和缓存 token 用量。'''
         statuses = ("success", "error", "running") if include_active else ("success", "error")
         _completed = RunRow.status.in_(statuses)
         _thread = RunRow.thread_id == thread_id
@@ -390,9 +384,6 @@ class RunRepository(RunStore):
             subagent += r.subagent_tokens
             middleware += r.middleware_tokens
 
-            # ``or {}`` covers rows written before ``token_usage_by_model``
-            # existed (the column is NULL on a manual ALTER ADD COLUMN without
-            # backfill); fresh rows always carry the journal-produced dict.
             usage_by_model = r.token_usage_by_model or {}
             if usage_by_model:
                 for model, usage in usage_by_model.items():
@@ -418,9 +409,6 @@ class RunRepository(RunStore):
             },
         }
 
-    # ------------------------------------------------------------------
-    # Multi-worker run ownership methods
-    # ------------------------------------------------------------------
 
     async def update_lease(
         self,
@@ -429,7 +417,7 @@ class RunRepository(RunStore):
         owner_worker_id: str,
         lease_expires_at: str,
     ) -> bool:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         lease_dt = datetime.fromisoformat(lease_expires_at)
         values: dict[str, Any] = {
             "owner_worker_id": owner_worker_id,
@@ -448,7 +436,7 @@ class RunRepository(RunStore):
         grace_seconds: int,
         error: str,
     ) -> bool:
-        """原子认领失联运行记录，避免多个 Gateway 同时接管同一运行。"""
+        '''原子认领失联运行记录，避免多个 Gateway 同时接管同一运行。'''
         cutoff = datetime.now(UTC) - timedelta(seconds=grace_seconds)
         async with self._sf() as session:
             result = await session.execute(
@@ -469,7 +457,7 @@ class RunRepository(RunStore):
         before: str | None = None,
         grace_seconds: int = 10,
     ) -> list[dict[str, Any]]:
-        """查询并返回满足给定条件的持久化记录集合。"""
+        '''查询并返回满足给定条件的持久化记录集合。'''
         if before is None:
             before_dt = datetime.now(UTC)
         elif isinstance(before, datetime):
@@ -506,7 +494,7 @@ class RunRepository(RunStore):
         created_at: str | None = None,
         grace_seconds: int = 10,
     ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-        """创建记录并在成功后提交相应的持久化事务。"""
+        '''创建记录并在成功后提交相应的持久化事务。'''
         from deerflow.runtime.runs.manager import ConflictError
 
         resolved_user_id = resolve_user_id(user_id or AUTO, method_name="RunRepository.create_run_atomic")
@@ -550,11 +538,6 @@ class RunRepository(RunStore):
                         if row_lease.tzinfo is None:
                             row_lease = row_lease.replace(tzinfo=UTC)
                         if row_lease >= cutoff and row.owner_worker_id != owner_worker_id:
-                            # Live run owned by another worker — we cannot
-                            # interrupt it and the partial unique index would
-                            # reject our INSERT anyway. Surface as
-                            # ConflictError so the caller gets a clean signal
-                            # instead of a retry loop on IntegrityError.
                             raise ConflictError(f"Thread {thread_id} already has an active run owned by another worker")
                     row.status = "interrupted"
                     row.error = "Cancelled by newer run"

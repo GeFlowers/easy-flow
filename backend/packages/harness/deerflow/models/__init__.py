@@ -1,4 +1,4 @@
-"定义 __init__ 模块提供的职责与可复用接口"
+'''导出当前模型构建和凭据加载所需的公共接口。'''
 
 from .factory import create_chat_model
 

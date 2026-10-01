@@ -1,10 +1,10 @@
-"""提供配置、skill、扫描、配置相关功能。"""
+'''控制确定性技能扫描器是否在模型审核之前运行。'''
 
 from pydantic import BaseModel, Field
 
 
 class SkillScanConfig(BaseModel):
-    """\u6267\u884c SkillScanConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存技能包静态扫描阶段的启用状态。'''
 
     enabled: bool = Field(
         default=True,

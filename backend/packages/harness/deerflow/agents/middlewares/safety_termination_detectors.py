@@ -1,18 +1,4 @@
-"""定义 safety_termination_detectors 模块提供的职责与可复用接口。
-
-Detectors for provider-side safety termination signals.
-
-Different LLM providers signal "I stopped this response for safety reasons"
-through different fields with different values. This module defines a small
-strategy interface and three built-in detectors that cover the major
-providers DeerFlow supports today. New providers (Wenxin, Hunyuan, Bedrock
-adapters, in-house gateways, ...) can be added by implementing
-``SafetyTerminationDetector`` and wiring it through
-``config.yaml: safety_finish_reason.detectors``.
-
-The middleware that consumes these detectors lives in
-``safety_finish_reason_middleware.py``.
-"""
+'''统一识别不同模型供应方在回复元数据中标记的内容安全终止信号。'''
 
 from __future__ import annotations
 
@@ -24,21 +10,7 @@ from langchain_core.messages import AIMessage
 
 @dataclass(frozen=True)
 class SafetyTermination:
-    """封装 SafetyTermination 的状态、协作关系与公开操作。
-
-    A detected safety-related termination signal.
-
-        Attributes:
-            detector: Name of the detector that produced this result. Used for
-                observability so operators can see which provider rule fired.
-            reason_field: The message metadata field that carried the signal
-                (e.g. ``finish_reason``, ``stop_reason``).
-            reason_value: The actual value of that field
-                (e.g. ``content_filter``, ``refusal``, ``SAFETY``).
-            extras: Provider-specific metadata that may help downstream
-                consumers (e.g. Azure OpenAI content_filter_results, Gemini
-                safety_ratings). Detectors are free to populate or skip this.
-    """
+    '''保存触发检测器、承载信号的元数据字段和值，以及可选供应方详情。'''
 
     detector: str
     reason_field: str
@@ -48,37 +20,17 @@ class SafetyTermination:
 
 @runtime_checkable
 class SafetyTerminationDetector(Protocol):
-    """封装 SafetyTerminationDetector 的状态、协作关系与公开操作。
-
-    Strategy interface for provider safety termination detection."""
+    '''安全终止检测器需实现的只读策略接口。'''
 
     name: str
 
     def detect(self, message: AIMessage) -> SafetyTermination | None:
-        """执行 detect 的明确职责，并返回与调用约定一致的结果。
-
-        Return a SafetyTermination if *message* indicates provider safety
-                termination, otherwise return ``None``.
-
-                Implementations must be side-effect free and tolerant of missing or
-                oddly-typed metadata — detectors run on every model response.
-        """
+        '''若模型消息包含该检测器负责识别的安全终止信号则返回结构化结果。'''
         ...
 
 
 def _get_metadata_value(message: AIMessage, field_name: str) -> str | None:
-    """执行 _get_metadata_value 的明确职责，并返回与调用约定一致的结果。
-
-    Read a string-typed value from either ``response_metadata`` or
-        ``additional_kwargs``.
-
-        LangChain provider adapters are inconsistent about where they stash
-        provider stop signals. Most modern adapters use ``response_metadata``,
-        but some legacy / passthrough paths still surface them via
-        ``additional_kwargs``. We check both, in that order, and only accept
-        string values — Pydantic enums or dicts are ignored so we never raise
-        on malformed inputs.
-    """
+    '''依次从响应元数据和扩展字段读取指定字符串值，忽略缺失或类型不符的数据。'''
     for container_name in ("response_metadata", "additional_kwargs"):
         container = getattr(message, container_name, None) or {}
         if not isinstance(container, dict):
@@ -90,35 +42,22 @@ def _get_metadata_value(message: AIMessage, field_name: str) -> str | None:
 
 
 class OpenAICompatibleContentFilterDetector:
-    """封装 OpenAICompatibleContentFilterDetector 的状态、协作关系与公开操作。
-
-    OpenAI-compatible content_filter signal.
-
-        Covers OpenAI, Azure OpenAI, Moonshot/Kimi, DeepSeek, Mistral, vLLM,
-        Qwen (OpenAI-compatible mode), and any other adapter that follows the
-        OpenAI ``finish_reason`` convention.
-
-        Some Chinese providers ship custom OpenAI-compatible gateways that use
-        alternative tokens like ``sensitive`` or ``violation``. Extend the set
-        via the ``finish_reasons`` kwarg in config.
-    """
+    '''识别使用 OpenAI 兼容协议的模型在 finish_reason 字段中返回的内容过滤标记。'''
 
     name = "openai_compatible_content_filter"
 
     def __init__(self, finish_reasons: list[str] | tuple[str, ...] | None = None) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存允许视为内容过滤的结束原因；未配置时只匹配 content_filter。'''
         configured = finish_reasons if finish_reasons is not None else ("content_filter",)
         self._finish_reasons: frozenset[str] = frozenset(r.lower() for r in configured)
 
     def detect(self, message: AIMessage) -> SafetyTermination | None:
-        "执行 detect 的明确职责，并返回与调用约定一致的结果"
+        '''检查结束原因是否命中配置，并附带存在的供应方内容过滤详情。'''
         value = _get_metadata_value(message, "finish_reason")
         if value is None or value.lower() not in self._finish_reasons:
             return None
 
         extras: dict[str, Any] = {}
-        # Azure OpenAI ships a structured content_filter_results block; carry it
-        # through so operators can see *what* was filtered without re-tracing.
         response_metadata = getattr(message, "response_metadata", None) or {}
         if isinstance(response_metadata, dict):
             filter_results = response_metadata.get("content_filter_results")
@@ -134,24 +73,17 @@ class OpenAICompatibleContentFilterDetector:
 
 
 class AnthropicRefusalDetector:
-    """封装 AnthropicRefusalDetector 的状态、协作关系与公开操作。
-
-    Anthropic ``stop_reason == "refusal"`` signal.
-
-        Anthropic models surface safety refusals via a dedicated ``stop_reason``
-        rather than ``finish_reason``. See:
-        https://platform.claude.com/docs/en/test-and-evaluate/strengthen-guardrails/handle-streaming-refusals
-    """
+    '''识别 Anthropic 回复中 stop_reason 字段标记的拒绝结果。'''
 
     name = "anthropic_refusal"
 
     def __init__(self, stop_reasons: list[str] | tuple[str, ...] | None = None) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存拒绝类结束原因；默认仅匹配 refusal。'''
         configured = stop_reasons if stop_reasons is not None else ("refusal",)
         self._stop_reasons: frozenset[str] = frozenset(r.lower() for r in configured)
 
     def detect(self, message: AIMessage) -> SafetyTermination | None:
-        "执行 detect 的明确职责，并返回与调用约定一致的结果"
+        '''匹配 stop_reason 配置值，命中时返回 Anthropic 拒绝信号。'''
         value = _get_metadata_value(message, "stop_reason")
         if value is None or value.lower() not in self._stop_reasons:
             return None
@@ -163,7 +95,7 @@ class AnthropicRefusalDetector:
 
 
 class GeminiSafetyDetector:
-    """封装 GeminiSafetyDetector 的状态、协作关系与公开操作。
+    '''识别 Gemini 和 Vertex AI 的安全、屏蔽、隐私及图像安全结束原因。
 
     Gemini / Vertex AI safety-related finish reasons.
 
@@ -196,30 +128,28 @@ class GeminiSafetyDetector:
           ``FINISH_REASON_UNSPECIFIED``  — too broad to enable by default;
                                            opt in via ``finish_reasons=`` if
                                            your provider abuses these.
-    """
+    '''
 
     name = "gemini_safety"
 
     _DEFAULT_FINISH_REASONS = (
-        # Text safety
         "SAFETY",
         "BLOCKLIST",
         "PROHIBITED_CONTENT",
         "SPII",
         "RECITATION",
-        # Image safety (multimodal generation)
         "IMAGE_SAFETY",
         "IMAGE_PROHIBITED_CONTENT",
         "IMAGE_RECITATION",
     )
 
     def __init__(self, finish_reasons: list[str] | tuple[str, ...] | None = None) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存需识别的结束原因；未配置时采用内置的文本及图像安全类别。'''
         configured = finish_reasons if finish_reasons is not None else self._DEFAULT_FINISH_REASONS
         self._finish_reasons: frozenset[str] = frozenset(r.upper() for r in configured)
 
     def detect(self, message: AIMessage) -> SafetyTermination | None:
-        "执行 detect 的明确职责，并返回与调用约定一致的结果"
+        '''比对大写结束原因，并在命中时附带模型返回的安全评分详情。'''
         value = _get_metadata_value(message, "finish_reason")
         if value is None or value.upper() not in self._finish_reasons:
             return None
@@ -227,7 +157,6 @@ class GeminiSafetyDetector:
         extras: dict[str, Any] = {}
         response_metadata = getattr(message, "response_metadata", None) or {}
         if isinstance(response_metadata, dict):
-            # Gemini surfaces per-category scoring under safety_ratings.
             ratings = response_metadata.get("safety_ratings")
             if ratings:
                 extras["safety_ratings"] = ratings
@@ -241,9 +170,7 @@ class GeminiSafetyDetector:
 
 
 def default_detectors() -> list[SafetyTerminationDetector]:
-    """执行 default_detectors 的明确职责，并返回与调用约定一致的结果。
-
-    Built-in detector set used when no custom detectors are configured."""
+    '''创建兼容 OpenAI 协议、Anthropic 拒绝及 Gemini 安全信号的默认检测器集合。'''
     return [
         OpenAICompatibleContentFilterDetector(),
         AnthropicRefusalDetector(),

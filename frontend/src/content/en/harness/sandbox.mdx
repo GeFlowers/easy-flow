@@ -3,7 +3,7 @@ title: Sandbox
 description: The sandbox gives the Lead Agent a controlled environment where it can read files, write outputs, run shell commands, and produce artifacts. Without a sandbox, the agent can only generate text. With a sandbox, it can write and execute code, process data files, generate charts, and build deliverables.
 ---
 
-import { Callout, Tabs } from "nextra/components";
+import { Callout } from "nextra/components";
 
 # Sandbox
 
@@ -17,7 +17,7 @@ The sandbox gives the Lead Agent a controlled environment where it can read file
 
 ## Sandbox modes
 
-DeerFlow supports four sandbox modes. Choose the one that fits your deployment:
+The default sandbox runs on the Gateway host. Optional BoxLite and E2B providers are also available for VM-backed execution.
 
 ### LocalSandbox (default)
 
@@ -31,41 +31,6 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
   allow_host_bash: false # default; set to true only for fully trusted workflows
 ```
-
-### Container-based AIO Sandbox
-
-Commands run in an isolated container (Docker on Linux/Windows, or Apple Container on macOS). Each sandbox session gets a fresh container environment.
-
-- **Best for**: multi-user environments, production deployments, or any case where you want execution isolation.
-
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-
-  # Optional: container image (default shown below)
-  image: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
-
-  # Optional: max concurrent containers (default: 3, LRU eviction when exceeded)
-  replicas: 3
-
-  # Optional: container name prefix (default: deer-flow-sandbox)
-  container_prefix: deer-flow-sandbox
-
-  # Optional: idle timeout in seconds (default: 600)
-  idle_timeout: 600
-
-  # Optional: custom mounts
-  mounts:
-    - host_path: /path/on/host
-      container_path: /home/user/shared
-      read_only: false
-
-  # Optional: environment variables injected into the container
-  environment:
-    API_KEY: $MY_API_KEY
-```
-
-Install: `cd backend && uv add 'deerflow-harness[aio-sandbox]'`
 
 ### E2B Cloud Sandbox
 
@@ -209,10 +174,6 @@ sandbox:
 ```
 
 Even without `bash`, the agent can still read and write files through the dedicated file tools.
-
-### Container sandbox
-
-Container-based sandboxes provide filesystem and process isolation. The agent cannot see or modify the host filesystem except through explicit mounts. The provisioner-managed mode adds a further layer: each thread gets its own isolated Pod.
 
 ### Audit middleware
 

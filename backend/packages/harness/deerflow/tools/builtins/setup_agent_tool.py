@@ -1,4 +1,4 @@
-"""提供创建并配置自定义代理的内置工具。"""
+'''提供创建并配置自定义代理的内置工具。'''
 
 import logging
 
@@ -22,13 +22,13 @@ def setup_agent(
     runtime: Runtime,
     skills: list[str] | None = None,
 ) -> Command:
-    """创建或修改自定义 agent 的配置，并返回所需设置。
+    '''创建或修改自定义 agent 的配置，并返回所需设置。
 
     Args:
         soul: Full SOUL.md content defining the agent's personality and behavior.
         description: One-line description of what the agent does.
         skills: Optional list of skill names this agent should use. None means use all enabled skills, empty list means no skills.
-    """
+    '''
 
     if not soul or not soul.strip():
         return Command(

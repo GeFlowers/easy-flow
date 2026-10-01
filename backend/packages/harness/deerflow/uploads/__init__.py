@@ -1,4 +1,4 @@
-"定义 __init__ 模块提供的职责与可复用接口"
+'''导出上传文件的解析、暂存和线程关联接口。'''
 
 from .manager import (
     UPLOAD_STAGING_PREFIX,

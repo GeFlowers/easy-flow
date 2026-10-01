@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''比较工作区前后快照，统计文件变化并在安全限制内生成统一差异。'''
 
 from __future__ import annotations
 
@@ -22,7 +22,7 @@ def compare_snapshots(
     *,
     limits: WorkspaceChangeLimits | None = None,
 ) -> WorkspaceChangeResult:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''合并两次快照的路径集合，生成受文件数和字节数限制的变化结果。'''
     resolved_limits = limits or WorkspaceChangeLimits()
     all_paths = sorted(set(before.files) | set(after.files))
     changes: list[WorkspaceFileChange] = []
@@ -96,7 +96,7 @@ def compare_snapshots(
 
 
 def get_changed_paths(before: WorkspaceSnapshot, after: WorkspaceSnapshot) -> set[str]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''仅返回前后快照中内容或元数据发生变化的路径集合。'''
     changed: set[str] = set()
     for path in set(before.files) | set(after.files):
         before_file = before.files.get(path)
@@ -111,7 +111,7 @@ def _status(
     before_file: FileSnapshot | None,
     after_file: FileSnapshot | None,
 ) -> WorkspaceChangeStatus:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''根据文件仅出现在新旧快照哪一侧判定新增、删除或修改。'''
     if before_file is None:
         return "created"
     if after_file is None:
@@ -120,7 +120,7 @@ def _status(
 
 
 def _same_file(before_file: FileSnapshot, after_file: FileSnapshot) -> bool:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''优先比较内容摘要；缺少摘要时以大小和修改时间判断文件是否相同。'''
     if before_file.sha256 is not None and after_file.sha256 is not None:
         return before_file.sha256 == after_file.sha256
     return before_file.size == after_file.size and before_file.mtime_ns == after_file.mtime_ns
@@ -133,7 +133,7 @@ def _build_diff(
     *,
     remaining_bytes: int,
 ) -> tuple[str, int, int, bool, DiffUnavailableReason | None]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''检查内容是否适合比较，读取快照文本并生成统一差异及增删行数。'''
     reason = _diff_unavailable_reason(before_file, after_file)
     if reason is not None:
         return "", 0, 0, False, reason
@@ -166,7 +166,7 @@ def _diff_unavailable_reason(
     before_file: FileSnapshot | None,
     after_file: FileSnapshot | None,
 ) -> DiffUnavailableReason | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''按敏感、二进制、过大优先级确定不能展示差异的原因。'''
     files = [file for file in (before_file, after_file) if file is not None]
     for preferred in ("sensitive", "binary", "large"):
         if any(file.content_unavailable_reason == preferred for file in files):
@@ -175,7 +175,7 @@ def _diff_unavailable_reason(
 
 
 def _snapshot_text(file: FileSnapshot | None) -> str | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''从快照内存内容或临时缓存文件读取文本；缓存失效时返回空值。'''
     if file is None:
         return ""
     if file.text is not None:
@@ -190,13 +190,11 @@ def _snapshot_text(file: FileSnapshot | None) -> str | None:
 
 
 def _count_diff_lines(lines: list[str]) -> tuple[int, int]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''统计统一差异中的新增和删除行，排除文件头部标记。'''
     additions = 0
     deletions = 0
     for line in lines:
-        # ????????????????
-        # ????????????????
-        # ????????????????
+        # unified_diff 的 +++/--- 文件头不是内容变化行，必须排除在统计之外。
         if line.startswith("+++ ") or line.startswith("--- "):
             continue
         if line.startswith("+"):

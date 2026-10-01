@@ -1,4 +1,4 @@
-"""提供配置、subagents、配置相关功能。"""
+'''定义内置与自定义子代理的超时、模型、技能和令牌预算覆盖。'''
 
 import logging
 
@@ -16,23 +16,23 @@ MAX_CONCURRENT_SUBAGENT_CALLS = 4
 
 
 def clamp_subagent_concurrency(value: int) -> int:
-    """\u6267\u884c clamp_subagent_concurrency \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''把并发子代理调用数限制在运行器支持的范围内。'''
     return max(MIN_CONCURRENT_SUBAGENT_CALLS, min(MAX_CONCURRENT_SUBAGENT_CALLS, value))
 
 
 def clamp_total_subagents_per_run(value: int) -> int:
-    """\u6267\u884c clamp_total_subagents_per_run \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''限制单次主代理运行可累计分派的子代理总数。'''
     return max(MIN_TOTAL_SUBAGENTS_PER_RUN, min(MAX_TOTAL_SUBAGENTS_PER_RUN, value))
 
 
 def default_subagent_token_budget(*, summarization_enabled: bool = False) -> TokenBudgetConfig:
-    """\u6267\u884c default_subagent_token_budget \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''按是否启用摘要选择内置子代理的默认令牌预算。'''
     max_tokens = 1_000_000 if summarization_enabled else 2_000_000
     return TokenBudgetConfig(enabled=True, max_tokens=max_tokens, warn_threshold=0.7)
 
 
 class SubagentOverrideConfig(BaseModel):
-    """\u6267\u884c SubagentOverrideConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存对单个内置子代理生效的可选覆盖项。'''
 
     timeout_seconds: int | None = Field(
         default=None,
@@ -60,7 +60,7 @@ class SubagentOverrideConfig(BaseModel):
 
 
 class CustomSubagentConfig(BaseModel):
-    """\u6267\u884c CustomSubagentConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''声明自定义子代理的提示词、工具/技能白名单和执行上限。'''
 
     description: str = Field(
         description="When the lead agent should delegate to this subagent",
@@ -97,7 +97,7 @@ class CustomSubagentConfig(BaseModel):
 
 
 class SubagentsAppConfig(BaseModel):
-    """\u6267\u884c SubagentsAppConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''汇总子代理全局默认值、逐代理覆盖和用户自定义代理定义。'''
 
     timeout_seconds: int = Field(
         default=1800,
@@ -130,26 +130,26 @@ class SubagentsAppConfig(BaseModel):
     _token_budget_is_default: bool = True
 
     def __init__(self, **data):
-        """\u6267\u884c __init__ \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''记录令牌预算是否来自默认值，以便摘要模式变化时重新计算默认预算。'''
         super().__init__(**data)
         self._token_budget_is_default = "token_budget" not in self.model_fields_set
 
     def get_timeout_for(self, agent_name: str) -> int:
-        """\u6267\u884c get_timeout_for \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''返回该子代理的专属超时；没有覆盖时采用全局默认值。'''
         override = self.agents.get(agent_name)
         if override is not None and override.timeout_seconds is not None:
             return override.timeout_seconds
         return self.timeout_seconds
 
     def get_model_for(self, agent_name: str) -> str | None:
-        """\u6267\u884c get_model_for \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''返回该子代理指定的模型，未设置时让调用方继承主代理模型。'''
         override = self.agents.get(agent_name)
         if override is not None and override.model is not None:
             return override.model
         return None
 
     def get_max_turns_for(self, agent_name: str, builtin_default: int) -> int:
-        """\u6267\u884c get_max_turns_for \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''按逐代理覆盖、全局覆盖、内置代理默认值的顺序确定轮数上限。'''
         override = self.agents.get(agent_name)
         if override is not None and override.max_turns is not None:
             return override.max_turns
@@ -158,7 +158,7 @@ class SubagentsAppConfig(BaseModel):
         return builtin_default
 
     def get_skills_for(self, agent_name: str) -> list[str] | None:
-        """\u6267\u884c get_skills_for \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''返回逐代理技能白名单；未设置时由调用方继承全局可用技能。'''
         override = self.agents.get(agent_name)
         if override is not None and override.skills is not None:
             return override.skills
@@ -170,7 +170,7 @@ class SubagentsAppConfig(BaseModel):
         *,
         summarization_enabled: bool = False,
     ) -> TokenBudgetConfig:
-        """\u6267\u884c get_token_budget_for \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''返回逐代理预算或全局预算，并在预算仍为默认值时按摘要状态重算。'''
         override = self.agents.get(agent_name)
         if override is not None and override.token_budget is not None:
             return override.token_budget
@@ -183,12 +183,12 @@ _subagents_config: SubagentsAppConfig = SubagentsAppConfig()
 
 
 def get_subagents_app_config() -> SubagentsAppConfig:
-    """\u6267\u884c get_subagents_app_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回当前进程使用的子代理配置。'''
     return _subagents_config
 
 
 def load_subagents_config_from_dict(config_dict: dict) -> None:
-    """\u6267\u884c load_subagents_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''装载子代理配置，并记录生效覆盖项以便排查运行设置。'''
     global _subagents_config
     tb = config_dict.get("token_budget")
     if tb is not None and tb == default_subagent_token_budget(summarization_enabled=False).model_dump():

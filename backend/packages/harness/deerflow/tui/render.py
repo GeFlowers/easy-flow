@@ -1,4 +1,4 @@
-"未说明"
+'''使用 Rich 组件把终端视图状态渲染为对话记录、运行状态栏、命令列表和页眉。'''
 
 from __future__ import annotations
 
@@ -17,23 +17,20 @@ _TOOL_STATUS_STYLE = {"running": THEME.warning, "ok": THEME.accent, "error": THE
 
 
 def render_transcript(state: ViewState) -> RenderableType:
-    "未说明"
+    '''渲染完整消息记录；当前生成中的回答使用纯文本，其余回答以 Markdown 显示。'''
     if not state.rows:
         return Text(_EMPTY_HINT, style=f"italic {THEME.dim}")
 
-    # Only the message being generated right now renders as plain text (to avoid
-    # Markdown reflow jumpiness). Every other message — all history — renders as
-    # Markdown, so a follow-up turn never reverts prior answers to raw text.
     blocks: list[RenderableType] = []
     for row in state.rows:
         streaming_now = state.streaming and isinstance(row, AssistantRow) and row.id is not None and row.id == state.streaming_id
         blocks.append(render_row(row, as_markdown=not streaming_now))
-        blocks.append(Text(""))  # one blank line between blocks for breathing room
+        blocks.append(Text(""))
     return Group(*blocks[:-1])
 
 
 def render_row(row: Row, *, as_markdown: bool = True) -> RenderableType:
-    "未说明"
+    '''按行类型和内容选择用户、代理、工具或系统消息的展示样式。'''
     if isinstance(row, UserRow):
         text = Text()
         text.append(f"{SYMBOLS['user']} ", style=f"bold {THEME.user}")
@@ -60,10 +57,10 @@ def render_row(row: Row, *, as_markdown: bool = True) -> RenderableType:
 
 
 def _assistant_markdown(text: str) -> RenderableType:
-    "未说明"
+    '''用 Markdown 和固定宽度标记栏渲染代理回答。'''
     grid = Table.grid(padding=(0, 1, 0, 0))
-    grid.add_column(width=1, vertical="top")  # marker
-    grid.add_column(ratio=1)  # markdown body
+    grid.add_column(width=1, vertical="top")
+    grid.add_column(ratio=1)
     grid.add_row(
         Text(SYMBOLS["assistant"], style=f"bold {THEME.assistant}"),
         Markdown(text),
@@ -72,7 +69,7 @@ def _assistant_markdown(text: str) -> RenderableType:
 
 
 def _render_tool(row: ToolRow) -> RenderableType:
-    "未说明"
+    '''渲染工具名称、参数摘要、执行状态及可用的返回内容。'''
     head = Text()
     head.append(f"  {SYMBOLS['tool']} ", style=THEME.tool)
     head.append(row.title, style=f"bold {THEME.tool}")
@@ -86,7 +83,7 @@ def _render_tool(row: ToolRow) -> RenderableType:
 
 
 def render_status(state: ViewState, *, model: str, thread_label: str, spinner: str = "", elapsed: str = "") -> Text:
-    "未说明"
+    '''生成包含流状态、标题、模型、线程、耗时和用量的状态栏。'''
     text = Text(no_wrap=True, overflow="ellipsis")
     if state.streaming:
         text.append(f"{spinner} working", style=f"bold {THEME.warning}")
@@ -113,7 +110,7 @@ def render_status(state: ViewState, *, model: str, thread_label: str, spinner: s
 
 
 def render_palette(items, index: int, limit: int = 8) -> RenderableType:
-    "未说明"
+    '''渲染可滚动选择的命令候选项，并突出当前选中项。'''
     if not items:
         return Text("")
     index = max(0, min(index, len(items) - 1))
@@ -137,7 +134,7 @@ def render_palette(items, index: int, limit: int = 8) -> RenderableType:
 
 
 def render_header(*, model: str, thread_label: str, cwd: str, skills: int = 0) -> Text:
-    "未说明"
+    '''显示产品名、当前模型、线程标识、工作目录和启用技能数量。'''
     text = Text(no_wrap=True, overflow="ellipsis")
     text.append(" DeerFlow ", style=f"bold {THEME.bg} on {THEME.primary}")
     text.append("  ")

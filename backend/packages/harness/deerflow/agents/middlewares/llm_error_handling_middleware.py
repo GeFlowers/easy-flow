@@ -1,6 +1,6 @@
-"""定义 llm_error_handling_middleware 模块提供的职责与可复用接口。
+'''对模型调用错误分类，执行有限重试与熔断，并向代理返回可恢复的用户提示。
 
-LLM error handling middleware with retry/backoff and user-facing fallbacks."""
+LLM error handling middleware with retry/backoff and user-facing fallbacks.'''
 
 from __future__ import annotations
 
@@ -64,35 +64,10 @@ _AUTH_PATTERNS = (
     "未授权",
 )
 
-# Per-exception retry budget overrides.
-#
-# Some transient errors are retriable in principle but expensive to retry at
-# the default budget. StreamChunkTimeoutError in particular fires after the
-# upstream provider has already stalled for `stream_chunk_timeout` seconds
-# (typically 120-240s); a full 3-attempt loop can therefore stack 6-12 minutes
-# of dead air before surfacing the failure to the user. We keep exactly one
-# retry (cheap reconnect that catches genuine transient TCP blips) and then
-# fail fast — the same buffered payload is overwhelmingly likely to fail
-# again at the upstream provider for the same reason.
-#
-# Keys are exception class *names* (not classes) so we don't introduce
-# import-time coupling on optional dependencies like langchain-openai. The
-# value is the absolute max attempt count, NOT additional retries — so a
-# value of 2 means "1 first attempt + 1 retry" (the CR-requested
-# "keep one retry" behavior).
 _RETRY_BUDGET_OVERRIDES: dict[str, int] = {
     "StreamChunkTimeoutError": 2,
 }
 
-# Exception class names that indicate the upstream stream-chunk watchdog
-# fired because the model stalled mid-flight. These deserve a more specific
-# user-facing message than the generic "temporarily unavailable" copy,
-# because the typical root cause is a long tool-call serialization stalling
-# the upstream stream — and the most actionable advice we can give the user
-# is "ask for a shorter / split output" rather than "wait and retry".
-# Generic connection drops (httpx RemoteProtocolError / ReadError) are
-# intentionally excluded: they routinely fire on transient network blips
-# with normal payloads, where the "split the work" guidance is misleading.
 _STREAM_DROP_EXCEPTIONS: frozenset[str] = frozenset(
     {
         "StreamChunkTimeoutError",
@@ -101,22 +76,19 @@ _STREAM_DROP_EXCEPTIONS: frozenset[str] = frozenset(
 
 
 class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
-    """封装 LLMErrorHandlingMiddleware 的状态、协作关系与公开操作。
-
-    Retry transient LLM errors and surface graceful assistant messages."""
+    '''维护重试参数和熔断器状态，在同步或异步模型调用失败时执行统一恢复策略。'''
 
     retry_max_attempts: int = 3
     retry_base_delay_ms: int = 1000
     retry_cap_delay_ms: int = 8000
 
     def __init__(self, *, app_config: AppConfig, **kwargs: Any) -> None:
-        """使用应用熔断配置初始化 LLM 重试与熔断状态。"""
+        '''使用应用熔断配置初始化 LLM 重试与熔断状态。'''
         super().__init__(**kwargs)
 
         self.circuit_failure_threshold = app_config.circuit_breaker.failure_threshold
         self.circuit_recovery_timeout_sec = app_config.circuit_breaker.recovery_timeout_sec
 
-        # Circuit Breaker state
         self._circuit_lock = threading.Lock()
         self._circuit_failure_count = 0
         self._circuit_open_until = 0.0
@@ -124,13 +96,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         self._circuit_probe_in_flight = False
 
     def _max_attempts_for(self, exc: BaseException) -> int:
-        """执行 _max_attempts_for 的明确职责，并返回与调用约定一致的结果。
-
-        Return the effective max attempt count for this exception.
-
-                Falls back to `self.retry_max_attempts` unless the exception class name
-                appears in the per-exception override table.
-        """
+        '''按异常类型的专属限制计算尝试次数，并受中间件全局重试上限约束。'''
         override = _RETRY_BUDGET_OVERRIDES.get(type(exc).__name__)
         if override is None:
             return self.retry_max_attempts
@@ -138,9 +104,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         return min(override, self.retry_max_attempts)
 
     def _check_circuit(self) -> bool:
-        """执行 _check_circuit 的明确职责，并返回与调用约定一致的结果。
-
-        Returns True if circuit is OPEN (fast fail), False otherwise."""
+        '''推进熔断器状态；熔断期间或探测请求已占用时返回 True 以快速失败。'''
         with self._circuit_lock:
             now = time.time()
 
@@ -159,7 +123,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
             return False
 
     def _record_success(self) -> None:
-        """记录一次成功调用并重置熔断器状态。"""
+        '''记录一次成功调用并重置熔断器状态。'''
         with self._circuit_lock:
             if self._circuit_state != "closed" or self._circuit_failure_count > 0:
                 logger.info("Circuit breaker reset (Closed). LLM service recovered.")
@@ -169,7 +133,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
             self._circuit_probe_in_flight = False
 
     def _record_failure(self) -> None:
-        """记录可重试失败，并在达到阈值时打开熔断器。"""
+        '''记录可重试失败，并在达到阈值时打开熔断器。'''
         with self._circuit_lock:
             if self._circuit_state == "half_open":
                 self._circuit_open_until = time.time() + self.circuit_recovery_timeout_sec
@@ -194,20 +158,13 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                     )
 
     def _release_half_open_probe(self) -> None:
-        """执行 _release_half_open_probe 的明确职责，并返回与调用约定一致的结果。
-
-        Release the in-flight half-open probe without recording a failure.
-
-                Used when something other than a classified success/failure consumes the probe (a
-                GraphBubbleUp control-flow signal, or a non-retriable error), so the circuit can admit
-                the next probe instead of fast-failing forever.
-        """
+        '''释放半开状态下占用的探测名额，但不把控制流中断或不可重试错误记作失败。'''
         with self._circuit_lock:
             if self._circuit_state == "half_open":
                 self._circuit_probe_in_flight = False
 
     def _classify_error(self, exc: BaseException) -> tuple[bool, str]:
-        """将异常分类为是否可重试及其面向用户的原因类别。"""
+        '''将异常分类为是否可重试及其面向用户的原因类别。'''
         detail = _extract_error_detail(exc)
         lowered = detail.lower()
         error_code = _extract_error_code(exc)
@@ -223,20 +180,11 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
             "APITimeoutError",
             "APIConnectionError",
             "InternalServerError",
-            "ReadError",  # httpx.ReadError: connection dropped mid-stream
-            "RemoteProtocolError",  # httpx: server closed connection unexpectedly
-            "StreamChunkTimeoutError",  # langchain-openai: chunk gap exceeded stream_chunk_timeout
+            "ReadError",
+            "RemoteProtocolError",
+            "StreamChunkTimeoutError",
         }:
             return True, "transient"
-        # Upstream sometimes returns ``200 OK`` with an empty
-        # ``generations`` list (observed against Volces "coding" /
-        # ark.cn-beijing.volces.com). ``langchain_core.language_models.
-        # chat_models.ainvoke`` then crashes with
-        # ``IndexError: list index out of range`` at
-        # ``llm_result.generations[0][0].message``. That isn't really a
-        # client bug — it's a transient upstream-payload glitch — so we
-        # route it through the same retry/backoff path as other transient
-        # provider failures rather than failing the whole run.
         if isinstance(exc, IndexError):
             return True, "transient"
         if status_code in _RETRIABLE_STATUS_CODES:
@@ -247,7 +195,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         return False, "generic"
 
     def _build_retry_delay_ms(self, attempt: int, exc: BaseException) -> int:
-        """根据重试响应头或指数退避计算下一次等待毫秒数。"""
+        '''根据重试响应头或指数退避计算下一次等待毫秒数。'''
         retry_after = _extract_retry_after_ms(exc)
         if retry_after is not None:
             return retry_after
@@ -255,13 +203,13 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         return min(backoff, self.retry_cap_delay_ms)
 
     def _build_retry_message(self, attempt: int, wait_ms: int, reason: str) -> str:
-        """构造包含次数、原因和等待时间的重试进度消息。"""
+        '''构造包含次数、原因和等待时间的重试进度消息。'''
         seconds = max(1, round(wait_ms / 1000))
         reason_text = "provider is busy" if reason == "busy" else "provider request failed temporarily"
         return f"LLM request retry {attempt}/{self.retry_max_attempts}: {reason_text}. Retrying in {seconds}s."
 
     def _build_circuit_breaker_message(self) -> str:
-        """构造熔断器打开时返回给用户的说明。"""
+        '''构造熔断器打开时返回给用户的说明。'''
         return "The configured LLM provider is currently unavailable due to continuous failures. Circuit breaker is engaged to protect the system. Please wait a moment before trying again."
 
     def _build_error_fallback_message(
@@ -272,7 +220,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         reason: str,
         detail: str,
     ) -> AIMessage:
-        """将错误详情封装为带 DeerFlow 元数据的 AI 降级消息。"""
+        '''将错误详情封装为带 DeerFlow 元数据的 AI 降级消息。'''
         return AIMessage(
             content=content,
             additional_kwargs={
@@ -284,20 +232,13 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         )
 
     def _build_user_message(self, exc: BaseException, reason: str) -> str:
-        """按错误类别生成可执行的用户提示文本。"""
+        '''按错误类别生成可执行的用户提示文本。'''
         detail = _extract_error_detail(exc)
         if reason == "quota":
             return "The configured LLM provider rejected the request because the account is out of quota, billing is unavailable, or usage is restricted. Please fix the provider account and try again."
         if reason == "auth":
             return "The configured LLM provider rejected the request because authentication or access is invalid. Please check the provider credentials and try again."
         if reason in {"busy", "transient"}:
-            # Stream-drop failures (chunk-gap timeout, peer-closed connection,
-            # raw read error) almost always point at a single oversized
-            # tool-call payload — the model spent so long serializing JSON
-            # arguments that the upstream provider buffered and the stream
-            # gap exceeded `stream_chunk_timeout`. Surfacing this distinct
-            # cause lets the user split or shorten their next request
-            # instead of helplessly retrying the same prompt.
             if type(exc).__name__ in _STREAM_DROP_EXCEPTIONS:
                 return (
                     "The model's streaming response was interrupted before it could "
@@ -309,7 +250,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         return f"LLM request failed: {detail}"
 
     def _build_user_fallback_message(self, exc: BaseException, reason: str) -> AIMessage:
-        """构造包含分类信息的用户可见降级 AI 消息。"""
+        '''构造包含分类信息的用户可见降级 AI 消息。'''
         return self._build_error_fallback_message(
             self._build_user_message(exc, reason),
             error_type=type(exc).__name__,
@@ -318,7 +259,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         )
 
     def _emit_retry_event(self, attempt: int, wait_ms: int, reason: str) -> None:
-        """向当前流写入器发送一次 LLM 重试进度事件。"""
+        '''向当前流写入器发送一次 LLM 重试进度事件。'''
         try:
             from langgraph.config import get_stream_writer
 
@@ -342,7 +283,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        """同步调用模型，并执行熔断检查、重试退避和降级回复。"""
+        '''同步调用模型，并执行熔断检查、重试退避和降级回复。'''
         if self._check_circuit():
             return self._build_error_fallback_message(
                 self._build_circuit_breaker_message(),
@@ -358,7 +299,6 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 self._record_success()
                 return response
             except GraphBubbleUp:
-                # Preserve LangGraph control-flow signals (interrupt/pause/resume).
                 self._release_half_open_probe()
                 raise
             except Exception as exc:
@@ -386,7 +326,6 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 if retriable:
                     self._record_failure()
                 else:
-                    # Non-retriable: release the probe without recording a failure.
                     self._release_half_open_probe()
                 return self._build_user_fallback_message(exc, reason)
 
@@ -396,7 +335,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        """异步调用模型，并执行熔断检查、重试退避和降级回复。"""
+        '''异步调用模型，并执行熔断检查、重试退避和降级回复。'''
         if self._check_circuit():
             return self._build_error_fallback_message(
                 self._build_circuit_breaker_message(),
@@ -412,7 +351,6 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 self._record_success()
                 return response
             except GraphBubbleUp:
-                # Preserve LangGraph control-flow signals (interrupt/pause/resume).
                 self._release_half_open_probe()
                 raise
             except Exception as exc:
@@ -440,18 +378,17 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 if retriable:
                     self._record_failure()
                 else:
-                    # Non-retriable: release the probe without recording a failure.
                     self._release_half_open_probe()
                 return self._build_user_fallback_message(exc, reason)
 
 
 def _matches_any(detail: str, patterns: tuple[str, ...]) -> bool:
-    """判断错误详情是否包含任一给定模式。"""
+    '''判断错误详情是否包含任一给定模式。'''
     return any(pattern in detail for pattern in patterns)
 
 
 def _extract_error_code(exc: BaseException) -> Any:
-    """从异常及其响应体中提取提供商错误代码。"""
+    '''从异常及其响应体中提取提供商错误代码。'''
     for attr in ("code", "error_code"):
         value = getattr(exc, attr, None)
         if value not in (None, ""):
@@ -469,7 +406,7 @@ def _extract_error_code(exc: BaseException) -> Any:
 
 
 def _extract_status_code(exc: BaseException) -> int | None:
-    """从异常或其响应对象中提取 HTTP 状态码。"""
+    '''从异常或其响应对象中提取 HTTP 状态码。'''
     for attr in ("status_code", "status"):
         value = getattr(exc, attr, None)
         if isinstance(value, int):
@@ -480,7 +417,7 @@ def _extract_status_code(exc: BaseException) -> int | None:
 
 
 def _extract_retry_after_ms(exc: BaseException) -> int | None:
-    """解析异常响应中的 Retry-After 头并返回等待毫秒数。"""
+    '''解析异常响应中的 Retry-After 头并返回等待毫秒数。'''
     response = getattr(exc, "response", None)
     headers = getattr(response, "headers", None)
     if headers is None:
@@ -510,7 +447,7 @@ def _extract_retry_after_ms(exc: BaseException) -> int | None:
 
 
 def _extract_error_detail(exc: BaseException) -> str:
-    """提取非空异常文本，必要时回退为异常类型名称。"""
+    '''提取非空异常文本，必要时回退为异常类型名称。'''
     detail = str(exc).strip()
     if detail:
         return detail

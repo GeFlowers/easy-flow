@@ -79,11 +79,13 @@ export function SidecarProvider({
     promise: Promise<string | null>;
   } | null>(null);
 
+  /** 同步侧边线程的响应式状态和同步引用，供恢复流程避免陈旧读取。 */
   const updateSidecarThreadId = useCallback((threadId: string | null) => {
     sidecarThreadIdRef.current = threadId;
     setSidecarThreadId(threadId);
   }, []);
 
+  /** 为新引用分配稳定标识，便于独立移除或清理提交过的引用。 */
   const createReference = useCallback((nextContext: SidecarContext) => {
     referenceIdRef.current += 1;
     return {
@@ -104,6 +106,7 @@ export function SidecarProvider({
     setConversationQuotes([]);
   }, [context, parentThreadId, updateSidecarThreadId]);
 
+  /** 查询父线程关联的侧边线程，并合并并发恢复请求与本地缓存。 */
   const restoreSidecarThread = useCallback(
     async (options?: { force?: boolean }) => {
       // 非强制恢复信任缓存 id；强制恢复始终重新查询后端，使其他位置删除的
@@ -157,6 +160,7 @@ export function SidecarProvider({
     void restoreSidecarThread();
   }, [restoreSidecarThread]);
 
+  /** 创建引用并根据当前侧边状态决定如何打开或更新侧边面板。 */
   const openContext = useCallback(
     (nextContext: SidecarContext) => {
       const nextReference = createReference(nextContext);
@@ -175,6 +179,7 @@ export function SidecarProvider({
     [createReference, open, sidecarThreadId],
   );
 
+  /** 将引用加入主对话待发送队列，而不打开侧边面板。 */
   const addContextToConversation = useCallback(
     (nextContext: SidecarContext) => {
       const nextReference = createReference(nextContext);
@@ -185,6 +190,7 @@ export function SidecarProvider({
     [createReference],
   );
 
+  /** 清空全部待发引用，或仅移除指定标识对应的引用。 */
   const clearConversationQuotes = useCallback((ids?: number[]) => {
     if (!ids) {
       setConversationQuotes([]);
@@ -196,14 +202,17 @@ export function SidecarProvider({
     );
   }, []);
 
+  /** 清空仅供侧边对话使用的活动引用。 */
   const clearActiveReferences = useCallback(() => {
     setActiveReferences([]);
   }, []);
 
+  /** 打开侧边面板但不修改已有上下文引用。 */
   const openSidecar = useCallback(() => {
     setOpen(true);
   }, []);
 
+  /** 从消息及其选中文本构造引用上下文，并在有效时打开侧边面板。 */
   const openSelectedText = useCallback(
     (message: Message, selectedText: string, displayIndex?: number) => {
       const nextContext = buildMessageSidecarContext(message, displayIndex, {
@@ -217,6 +226,7 @@ export function SidecarProvider({
     [openContext],
   );
 
+  /** 关闭侧边面板并保留线程和引用状态供再次打开。 */
   const close = useCallback(() => {
     setOpen(false);
   }, []);

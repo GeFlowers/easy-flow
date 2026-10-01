@@ -1,4 +1,4 @@
-"""
+'''
 
 Store provider for the DeerFlow runtime.
 
@@ -18,15 +18,13 @@ Sync usage (CLI / DeerFlowClient)::
 
     store = get_store()                   # singleton
     with store_context() as store: ...    # one-shot
-"""
+'''
 
 from .async_provider import make_store
 from .provider import get_store, reset_store, store_context
 
 __all__ = [
-    # async
     "make_store",
-    # sync
     "get_store",
     "reset_store",
     "store_context",

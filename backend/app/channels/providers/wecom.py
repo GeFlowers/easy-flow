@@ -1,4 +1,4 @@
-"未说明channels未说明"
+'''通过企业微信机器人 WebSocket 接收消息，并将智能体回复和附件回传给用户。'''
 
 from __future__ import annotations
 
@@ -24,10 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 class WeComChannel(Channel):
-    "未说明we?com未说明"
+    '''管理企业微信机器人连接、消息流、附件传输及账号绑定流程。'''
 
     def __init__(self, bus: MessageBus, config: dict[str, Any]) -> None:
-        "未说明"
+        '''保存机器人配置，并初始化 WebSocket 连接、消息帧和流式响应状态。'''
         super().__init__(name="wecom", bus=bus, config=config)
         self._bot_id: str | None = None
         self._bot_secret: str | None = None
@@ -39,18 +39,18 @@ class WeComChannel(Channel):
 
     @property
     def supports_streaming(self) -> bool:
-        "未说明supports?streaming未说明"
+        '''声明该渠道支持通过企业微信流式消息逐步发送回复。'''
         return True
 
     def _clear_ws_context(self, thread_ts: str | None) -> None:
-        "未说明clear?ws?context未说明"
+        '''清除指定消息线程缓存的请求帧和流式消息编号。'''
         if not thread_ts:
             return
         self._ws_frames.pop(thread_ts, None)
         self._ws_stream_ids.pop(thread_ts, None)
 
     async def _send_ws_upload_command(self, req_id: str, body: dict[str, Any], cmd: str) -> dict[str, Any]:
-        "未说明ws未说明command未说明"
+        '''通过 SDK 的 WebSocket 管理器发送媒体分片命令；接口不可用时报告配置错误。'''
         if not self._ws_client:
             raise RuntimeError("WeCom WebSocket client is not available")
 
@@ -63,7 +63,7 @@ class WeComChannel(Channel):
         return await send_reply_async(req_id, body, cmd)
 
     async def start(self) -> None:
-        "未说明start未说明"
+        '''校验机器人凭据，注册各类消息及连接事件回调并启动后台连接任务。'''
         if self._running:
             return
 
@@ -100,7 +100,7 @@ class WeComChannel(Channel):
         logger.info("WeCom channel started")
 
     def _on_ws_task_done(self, task: asyncio.Task) -> None:
-        "未说明on?ws未说明done未说明"
+        '''检查连接任务的结束状态，并记录未处理的连接异常。'''
         if task.cancelled():
             return
         exc = task.exception()
@@ -112,16 +112,16 @@ class WeComChannel(Channel):
         )
 
     def _on_ws_error(self, error: Any) -> None:
-        "未说明on?ws?error未说明"
+        '''记录 SDK 上报的 WebSocket 运行错误。'''
         logger.error("WeCom WebSocket error: %s", error)
 
     def _on_ws_disconnected(self, *args: Any) -> None:
-        "未说明on?ws?disconnected未说明"
+        '''记录断连详情；重连工作由企业微信 SDK 负责。'''
         detail = f" ({args[0]})" if args else ""
         logger.warning("WeCom WebSocket disconnected%s; SDK will attempt to reconnect", detail)
 
     async def stop(self) -> None:
-        "未说明stop未说明"
+        '''取消机器人连接任务、解除事件订阅并清空连接及消息帧缓存。'''
         self._running = False
         self.bus.unsubscribe_outbound(self._on_outbound)
         if self._ws_task:
@@ -141,14 +141,14 @@ class WeComChannel(Channel):
         logger.info("WeCom channel stopped")
 
     async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
-        "未说明"
+        '''将回复发往机器人消息流；连接不可用时仅记录警告。'''
         if self._ws_client:
             await self._send_ws(msg, _max_retries=_max_retries)
             return
         logger.warning("[WeCom] send called but WebSocket client is not available")
 
     async def _on_outbound(self, msg: OutboundMessage) -> None:
-        "未说明on?outbound未说明"
+        '''过滤其他渠道的消息，发送本渠道回复及附件，并在最终回复后释放线程缓存。'''
         if msg.channel_name != self.name:
             return
 
@@ -172,7 +172,7 @@ class WeComChannel(Channel):
             self._clear_ws_context(msg.thread_ts)
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
-        "未说明"
+        '''仅在最终回复时上传附件；按类型检查大小并将媒体发送到原消息会话。'''
         if not msg.is_final:
             return True
         if not self._ws_client:
@@ -213,7 +213,7 @@ class WeComChannel(Channel):
             return False
 
     async def _on_ws_text(self, frame: dict[str, Any]) -> None:
-        "未说明on?ws未说明"
+        '''提取文本消息及引用内容，忽略空消息后发布到内部消息总线。'''
         body = frame.get("body", {}) or {}
         text = ((body.get("text") or {}).get("content") or "").strip()
         quote = (((body.get("quote") or {}).get("text") or {}).get("content") or "").strip()
@@ -222,7 +222,7 @@ class WeComChannel(Channel):
         await self._publish_ws_inbound(frame, text + (f"\nQuote message: {quote}" if quote else ""))
 
     async def _on_ws_mixed(self, frame: dict[str, Any]) -> None:
-        "未说明on?ws?mixed未说明"
+        '''拆分混合消息中的文本、图片和文件条目，再统一发布为一条入站消息。'''
         body = frame.get("body", {}) or {}
         mixed = body.get("mixed") or {}
         items = mixed.get("msg_item") or []
@@ -254,7 +254,7 @@ class WeComChannel(Channel):
         await self._publish_ws_inbound(frame, text, files=files)
 
     async def _on_ws_image(self, frame: dict[str, Any]) -> None:
-        "未说明on?ws?image未说明"
+        '''校验图片消息中的下载地址，并将图片附件元数据发布到入站消息。'''
         body = frame.get("body", {}) or {}
         image = body.get("image") or {}
         url = image.get("url")
@@ -274,7 +274,7 @@ class WeComChannel(Channel):
         )
 
     async def _on_ws_file(self, frame: dict[str, Any]) -> None:
-        "未说明on?ws未说明"
+        '''校验文件消息中的下载地址，并将文件附件元数据发布到入站消息。'''
         body = frame.get("body", {}) or {}
         file_obj = body.get("file") or {}
         url = file_obj.get("url")
@@ -300,7 +300,7 @@ class WeComChannel(Channel):
         *,
         files: list[dict[str, Any]] | None = None,
     ) -> None:
-        "未说明publish?ws?inbound未说明"
+        '''处理机器人入站帧、识别绑定码和命令，建立消息流并发布标准化消息。'''
         if not self._ws_client:
             return
         try:
@@ -327,7 +327,7 @@ class WeComChannel(Channel):
 
         inbound_type = InboundMessageType.COMMAND if is_known_channel_command(text) else InboundMessageType.CHAT
         inbound = self._make_inbound(
-            chat_id=user_id,  # keep user's conversation in memory
+            chat_id=user_id,  # 将用户会话保留在内存中
             user_id=user_id,
             text=text,
             msg_type=inbound_type,
@@ -339,7 +339,7 @@ class WeComChannel(Channel):
                 "message_id": msg_id,
             },
         )
-        inbound.topic_id = user_id  # keep the same thread
+        inbound.topic_id = user_id  # 沿用同一个线程
 
         stream_id = generate_req_id("stream")
         self._ws_frames[msg_id] = frame
@@ -354,7 +354,7 @@ class WeComChannel(Channel):
         await self.bus.publish_inbound(inbound)
 
     async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
-        "未说明attach未说明"
+        '''根据工作区和外部用户信息，为入站消息补充已绑定的连接身份。'''
         return await attach_connection_identity(
             inbound,
             repo=self._connection_repo,
@@ -364,7 +364,7 @@ class WeComChannel(Channel):
         )
 
     async def _bind_connection_from_connect_code(self, *, frame: dict[str, Any], user_id: str, code: str) -> bool:
-        "未说明bind未说明from?connect?code未说明"
+        '''消费一次性连接码并绑定企业微信账号；无效码或缺少用户身份时向会话反馈。'''
         if self._connection_repo is None or not code:
             return False
 
@@ -394,13 +394,13 @@ class WeComChannel(Channel):
         return True
 
     async def _send_connection_reply(self, frame: dict[str, Any], text: str) -> None:
-        "未说明reply未说明"
+        '''通过机器人当前消息帧向用户发送账号绑定结果文本。'''
         if not self._ws_client:
             return
         await self._ws_client.reply(frame, {"msgtype": "text", "text": {"content": text}})
 
     async def _send_ws(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
-        "未说明ws未说明"
+        '''优先向原消息流发送增量回复；没有可用流时改为发送独立 Markdown 消息。'''
         if not self._ws_client:
             return
         try:
@@ -440,7 +440,7 @@ class WeComChannel(Channel):
         path: str,
         size: int,
     ) -> str | None:
-        "未说明media?ws未说明"
+        '''计算文件摘要并按企业微信协议分块上传媒体，完成后返回媒体编号。'''
         if not self._ws_client:
             return None
         try:

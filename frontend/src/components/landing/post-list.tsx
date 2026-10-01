@@ -16,7 +16,7 @@ type PostMetaProps = {
   pathname?: string;
 };
 
-/** formatDate 内部组件：组织对应的界面结构与交互语义。 */
+/** 将有效日期格式化为英文短月份；无效日期保留原始输入以便辨认。 */
 function formatDate(date?: string): string | null {
   if (!date) {
     return null;
@@ -34,7 +34,7 @@ function formatDate(date?: string): string | null {
   }).format(value);
 }
 
-/** PostMeta 组件：提供对应的界面结构与交互语义。 */
+/** 展示文章日期和可用语言切换项；没有可展示信息时省略整行。 */
 export function PostMeta({
   currentLang,
   date,
@@ -81,7 +81,7 @@ export function PostMeta({
   );
 }
 
-/** PostTags 组件：提供对应的界面结构与交互语义。 */
+/** 过滤非字符串标签，并将有效标签链接到规范化后的分类页。 */
 export function PostTags({
   tags,
   className,
@@ -117,7 +117,7 @@ export function PostTags({
   );
 }
 
-/** PostList 组件：提供对应的界面结构与交互语义。 */
+/** 按文章元数据渲染博客列表，并为每篇文章提供标题、摘要、标签和语言信息。 */
 export function PostList({ description, posts, title }: PostListProps) {
   return (
     <div className="mx-auto flex w-full max-w-5xl flex-col gap-12 px-6">

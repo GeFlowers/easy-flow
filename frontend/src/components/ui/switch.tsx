@@ -5,7 +5,7 @@ import * as SwitchPrimitive from "@radix-ui/react-switch";
 
 import { cn } from "@/lib/utils";
 
-/** Switch 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供可访问的二态开关，并显示随状态移动的圆形滑块。 */
 function Switch({
   className,
   ...props

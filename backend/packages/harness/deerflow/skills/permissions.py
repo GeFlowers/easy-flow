@@ -1,11 +1,11 @@
-"未说明"
+'''调整已安装技能文件的权限，使沙箱可读取但不能修改技能内容。'''
 
 import stat
 from pathlib import Path
 
 
 def make_skill_path_sandbox_readable(path: Path) -> None:
-    "未说明"
+    '''将单个非符号链接文件或目录设为沙箱可读，并移除组及其他用户的写权限。'''
     if path.is_symlink():
         return
     mode = stat.S_IMODE(path.stat().st_mode)
@@ -17,14 +17,14 @@ def make_skill_path_sandbox_readable(path: Path) -> None:
 
 
 def make_skill_tree_sandbox_readable(target: Path) -> None:
-    "未说明"
+    '''递归设置技能目录及其全部子项为沙箱只读。'''
     make_skill_path_sandbox_readable(target)
     for path in target.rglob("*"):
         make_skill_path_sandbox_readable(path)
 
 
 def make_skill_written_path_sandbox_readable(skill_root: Path, target: Path) -> None:
-    "未说明"
+    '''沿已验证位于技能根目录内的目标路径设置目录可读权限，并锁定目标项。'''
     resolved_root = skill_root.resolve()
     resolved_target = target.resolve()
     resolved_target.relative_to(resolved_root)

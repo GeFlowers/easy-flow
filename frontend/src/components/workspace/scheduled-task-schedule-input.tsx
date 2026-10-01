@@ -52,6 +52,7 @@ const FALLBACK_TIMEZONES = [
   "America/Los_Angeles",
 ];
 
+/** 读取浏览器的本地时区；运行环境无法提供时区信息时采用协调世界时。 */
 function detectBrowserTimezone(): string {
   try {
     const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -64,6 +65,7 @@ function detectBrowserTimezone(): string {
   return "UTC";
 }
 
+/** 优先使用运行环境支持的时区列表，兼容不支持该接口的浏览器。 */
 function timezoneOptions(): string[] {
   const supported = (
     Intl as unknown as {
@@ -139,10 +141,12 @@ export function ScheduledTaskScheduleInput({
     });
   }, [scheduleType, preset, parts, runAtLocal, timezone]);
 
+  /** 合并用户修改的计划片段，避免覆盖其他未编辑字段。 */
   function updateParts(patch: Partial<CronParts>) {
     setParts((prev) => ({ ...prev, ...patch }));
   }
 
+  /** 切换计划预设并为周、月或自定义计划补充合理初始值。 */
   function changePreset(next: CronPreset) {
     setParts((prev) => {
       const merged = { ...prev };
@@ -160,6 +164,7 @@ export function ScheduledTaskScheduleInput({
     setPreset(next);
   }
 
+  /** 切换重复执行的星期，并确保至少保留一个执行日。 */
   function toggleWeekday(w: Weekday) {
     setParts((prev) => {
       const set = new Set(prev.weekdays ?? []);

@@ -1,4 +1,4 @@
-"定义 crawl4ai_client 模块提供的职责与可复用接口"
+'''封装对自托管 Crawl4AI 服务的请求发送与响应校验。'''
 
 import json
 import logging
@@ -10,28 +10,21 @@ logger = logging.getLogger(__name__)
 
 
 class Crawl4AiClient:
-    """封装 Crawl4AiClient 的状态、协作关系与公开操作。
-
-    Client for a self-hosted Crawl4AI Docker server (POST /md)."""
+    '''保存抓取服务连接参数，并提供网页正文抓取操作。'''
 
     def __init__(self, base_url: str, token: str = "", timeout_s: float = 30.0) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存服务地址、可选访问令牌和请求超时时间。'''
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout_s = timeout_s
 
     async def fetch_markdown(self, url: str, filter_mode: str = "fit") -> str:
-        """执行 fetch_markdown 的明确职责，并返回与调用约定一致的结果。
+        '''请求正文接口，并返回 Markdown 内容或可读错误信息。
 
-        Fetch a page's clean markdown via Crawl4AI's POST /md endpoint.
-
-                Args:
-                    url: The URL to fetch.
-                    filter_mode: Crawl4AI markdown filter ("fit", "raw", "bm25", "llm").
-
-                Returns:
-                    Markdown content, or an "Error: ..." string on failure.
-        """
+        Args:
+            url: 要抓取的网页地址。
+            filter_mode: 服务端支持的正文筛选模式。
+        '''
         payload: dict[str, Any] = {"url": url, "f": filter_mode}
         headers = {"Content-Type": "application/json"}
         if self.token:

@@ -1,24 +1,24 @@
-"""提供配置、loop、detection、配置相关功能。"""
+'''配置工具重复调用检测阈值及工具级频率覆盖规则。'''
 
 from pydantic import BaseModel, Field, model_validator
 
 
 class ToolFreqOverride(BaseModel):
-    """\u6267\u884c ToolFreqOverride \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为指定工具覆盖全局的重复调用次数和时间窗口。'''
 
     warn: int = Field(ge=1)
     hard_limit: int = Field(ge=1)
 
     @model_validator(mode="after")
     def _validate(self) -> "ToolFreqOverride":
-        """\u6267\u884c _validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''拒绝非正的次数或时间窗口，避免无意义的检测配置。'''
         if self.hard_limit < self.warn:
             raise ValueError("hard_limit must be >= warn")
         return self
 
 
 class LoopDetectionConfig(BaseModel):
-    """\u6267\u884c LoopDetectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''设定循环检测的全局阈值、观察窗口及豁免工具。'''
 
     enabled: bool = Field(
         default=True,
@@ -61,7 +61,7 @@ class LoopDetectionConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_thresholds(self) -> "LoopDetectionConfig":
-        """\u6267\u884c validate_thresholds \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''检查检测阈值与时间窗口的组合是否可执行。'''
         if self.hard_limit < self.warn_threshold:
             raise ValueError("hard_limit must be greater than or equal to warn_threshold")
         if self.tool_freq_hard_limit < self.tool_freq_warn:

@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ depends_on: str | Sequence[str] | None = None
 
 
 def _dedupe_active_runs_per_thread() -> None:
-    """将同线程较旧的重复活动运行标记为错误，为唯一约束清理冲突数据。"""
+    '''将同线程较旧的重复活动运行标记为错误，为唯一约束清理冲突数据。'''
     bind = op.get_bind()
     cancel_message = "cancelled during migration 0004_run_ownership: superseded by a newer active run for the same thread (partial unique index uq_runs_thread_active)"
     find_dupe_rows = sa.text(
@@ -70,25 +70,18 @@ def _dedupe_active_runs_per_thread() -> None:
 
 
 def upgrade() -> None:
-    """添加运行所有者租约字段和索引，并约束每线程只能有一个活动运行。"""
+    '''添加运行所有者租约字段和索引，并约束每线程只能有一个活动运行。'''
     from deerflow.persistence.migrations._helpers import safe_add_column
 
     safe_add_column("runs", sa.Column("owner_worker_id", sa.String(length=128), nullable=True))
     safe_add_column("runs", sa.Column("lease_expires_at", sa.DateTime(timezone=True), nullable=True))
 
-    # Idempotent index creation: the legacy bootstrap path runs create_all
-    # (which creates the index from the ORM __table_args__) before upgrade
-    # head, so the migration must not fail when the index already exists.
     insp = sa.inspect(op.get_bind())
     existing = {ix["name"] for ix in insp.get_indexes("runs")}
     if "ix_runs_lease" not in existing:
         with op.batch_alter_table("runs", schema=None) as batch_op:
             batch_op.create_index("ix_runs_lease", ["lease_expires_at"], unique=False)
     if "uq_runs_thread_active" not in existing:
-        # Cancel duplicate active rows first so the partial UNIQUE index can
-        # be built on DBs that already violate the invariant. No-op on clean
-        # DBs (the common path -- create_all already created the index, so
-        # this branch only runs on legacy DBs that pre-date the index).
         _dedupe_active_runs_per_thread()
         with op.batch_alter_table("runs", schema=None) as batch_op:
             batch_op.create_index(
@@ -100,7 +93,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """移除活动运行约束、租约索引和所有者字段。"""
+    '''移除活动运行约束、租约索引和所有者字段。'''
     bind = op.get_bind()
     insp = sa.inspect(bind)
     existing = {ix["name"] for ix in insp.get_indexes("runs")}

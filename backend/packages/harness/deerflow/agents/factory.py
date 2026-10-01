@@ -1,4 +1,4 @@
-"""按运行时功能开关组装代理及其中间件链。"""
+'''按运行时功能开关组装代理及其中间件链。'''
 
 from __future__ import annotations
 
@@ -26,9 +26,6 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 
-# ---------------------------------------------------------------------------
-# TodoMiddleware prompts (minimal SDK version)
-# ---------------------------------------------------------------------------
 
 _TODO_SYSTEM_PROMPT = """
 <todo_list_system>
@@ -45,9 +42,6 @@ You have access to the `write_todos` tool to help you manage and track complex m
 _TODO_TOOL_DESCRIPTION = "Use this tool to create and manage a structured task list for complex work sessions.  Only use for complex tasks (3+ steps)."
 
 
-# ---------------------------------------------------------------------------
-# Public API
-# ---------------------------------------------------------------------------
 
 
 def create_deerflow_agent(
@@ -63,12 +57,12 @@ def create_deerflow_agent(
     checkpointer: BaseCheckpointSaver | None = None,
     name: str = "default",
 ) -> CompiledStateGraph:
-    """创建编译后的代理图。
+    '''创建编译后的代理图。
 
     调用方可直接接管完整中间件链，也可通过 ``features`` 与计划模式按既定
     顺序组装内置中间件和附加工具；两种模式互斥。调用方提供的同名工具优先，
     附加中间件则由其定位装饰器插入。
-    """
+    '''
     if middleware is not None and features is not None:
         raise ValueError("Cannot specify both 'middleware' and 'features'.  Use one or the other.")
     if middleware is not None and extra_middleware:
@@ -91,7 +85,6 @@ def create_deerflow_agent(
             plan_mode=plan_mode,
             extra_middleware=extra_middleware or [],
         )
-        # Deduplicate by tool name — user-provided tools take priority.
         existing_names = {t.name for t in effective_tools}
         for t in extra_tools:
             if t.name not in existing_names:
@@ -109,9 +102,6 @@ def create_deerflow_agent(
     )
 
 
-# ---------------------------------------------------------------------------
-# Internal: feature-driven middleware assembly
-# ---------------------------------------------------------------------------
 
 
 def _assemble_from_features(
@@ -121,16 +111,15 @@ def _assemble_from_features(
     plan_mode: bool = False,
     extra_middleware: list[AgentMiddleware] | None = None,
 ) -> tuple[list[AgentMiddleware], list[BaseTool]]:
-    """根据功能配置构建有序中间件链及其额外工具。
+    '''根据功能配置构建有序中间件链及其额外工具。
 
     保持沙箱、错误处理、记忆、视觉、子代理、预算和澄清等组件的既定顺序。
     记忆工具模式只注册显式记忆工具而不加入被动记忆中间件；澄清中间件始终
     位于内置链末尾。
-    """
+    '''
     chain: list[AgentMiddleware] = []
     extra_tools: list[BaseTool] = []
 
-    # --- [0-2] Sandbox infrastructure ---
     if feat.sandbox is not False:
         if isinstance(feat.sandbox, AgentMiddleware):
             chain.append(feat.sandbox)
@@ -143,33 +132,27 @@ def _assemble_from_features(
             chain.append(UploadsMiddleware())
             chain.append(SandboxMiddleware(lazy_init=True))
 
-    # --- [3] DanglingToolCall (always) ---
     chain.append(DanglingToolCallMiddleware())
 
-    # --- [4] Guardrail ---
     if feat.guardrail is not False:
         if isinstance(feat.guardrail, AgentMiddleware):
             chain.append(feat.guardrail)
         else:
             raise ValueError("guardrail=True requires a custom AgentMiddleware instance (no built-in GuardrailMiddleware yet)")
 
-    # --- [5] ToolErrorHandling (always) ---
     chain.append(ToolErrorHandlingMiddleware())
 
-    # --- [6] Summarization ---
     if feat.summarization is not False:
         if isinstance(feat.summarization, AgentMiddleware):
             chain.append(feat.summarization)
         else:
             raise ValueError("summarization=True requires a custom AgentMiddleware instance (SummarizationMiddleware needs a model argument)")
 
-    # --- [7] TodoMiddleware (plan_mode) ---
     if plan_mode:
         from deerflow.agents.middlewares.todo_middleware import TodoMiddleware
 
         chain.append(TodoMiddleware(system_prompt=_TODO_SYSTEM_PROMPT, tool_description=_TODO_TOOL_DESCRIPTION))
 
-    # --- [8] Auto Title ---
     if feat.auto_title is not False:
         if isinstance(feat.auto_title, AgentMiddleware):
             chain.append(feat.auto_title)
@@ -178,7 +161,6 @@ def _assemble_from_features(
 
             chain.append(TitleMiddleware())
 
-    # --- [9] Memory ---
     if feat.memory is not False:
         if isinstance(feat.memory, AgentMiddleware):
             chain.append(feat.memory)
@@ -196,8 +178,6 @@ def _assemble_from_features(
                         continue
                     extra_tools.append(memory_tool)
                     existing_names.add(memory_tool.name)
-                # MemoryMiddleware is intentionally NOT appended in tool mode.
-                # The model drives memory via tools instead of passive middleware.
             else:
                 if memory_cfg.mode == "tool" and not memory_cfg.enabled:
                     logger.warning("memory.mode is 'tool' but memory.enabled is false; memory tools will not be registered.")
@@ -205,7 +185,6 @@ def _assemble_from_features(
 
                 chain.append(MemoryMiddleware(agent_name=name, memory_config=memory_cfg))
 
-    # --- [10] Vision ---
     if feat.vision is not False:
         if isinstance(feat.vision, AgentMiddleware):
             chain.append(feat.vision)
@@ -219,7 +198,6 @@ def _assemble_from_features(
 
             extra_tools.append(view_image_tool)
 
-    # --- [11] Subagent ---
     if feat.subagent is not False:
         if isinstance(feat.subagent, AgentMiddleware):
             chain.append(feat.subagent)
@@ -231,7 +209,6 @@ def _assemble_from_features(
 
         extra_tools.append(task_tool)
 
-    # --- [12] LoopDetection ---
     if feat.loop_detection is not False:
         if isinstance(feat.loop_detection, AgentMiddleware):
             chain.append(feat.loop_detection)
@@ -241,7 +218,6 @@ def _assemble_from_features(
 
             chain.append(LoopDetectionMiddleware.from_config(LoopDetectionConfig()))
 
-    # --- [13] TokenBudget ---
     if feat.token_budget is not False:
         if isinstance(feat.token_budget, AgentMiddleware):
             chain.append(feat.token_budget)
@@ -251,15 +227,11 @@ def _assemble_from_features(
 
             chain.append(TokenBudgetMiddleware.from_config(TokenBudgetConfig()))
 
-    # --- [14] Clarification (always last among built-ins) ---
     chain.append(ClarificationMiddleware())
     extra_tools.append(ask_clarification_tool)
 
-    # --- Insert extra_middleware via @Next/@Prev ---
     if extra_middleware:
         _insert_extra(chain, extra_middleware)
-        # Invariant: ClarificationMiddleware must always be last.
-        # @Next(ClarificationMiddleware) could push it off the tail.
         clar_idx = next(i for i, m in enumerate(chain) if isinstance(m, ClarificationMiddleware))
         if clar_idx != len(chain) - 1:
             chain.append(chain.pop(clar_idx))
@@ -267,17 +239,14 @@ def _assemble_from_features(
     return chain, extra_tools
 
 
-# ---------------------------------------------------------------------------
-# Internal: extra middleware insertion with @Next/@Prev
-# ---------------------------------------------------------------------------
 
 
 def _insert_extra(chain: list[AgentMiddleware], extras: list[AgentMiddleware]) -> None:
-    """按 ``@Next`` 与 ``@Prev`` 锚点将额外中间件插入既有链。
+    '''按 ``@Next`` 与 ``@Prev`` 锚点将额外中间件插入既有链。
 
     未标注位置的中间件置于澄清中间件之前；带锚点的中间件支持相互锚定并
     迭代解析。重复、相反方向冲突、循环依赖或找不到锚点时抛出明确异常。
-    """
+    '''
     next_targets: dict[type, type] = {}
     prev_targets: dict[type, type] = {}
 
@@ -308,13 +277,11 @@ def _insert_extra(chain: list[AgentMiddleware], extras: list[AgentMiddleware]) -
         else:
             unanchored.append(mw)
 
-    # Unanchored → before ClarificationMiddleware
     clarification_idx = next(i for i, m in enumerate(chain) if isinstance(m, ClarificationMiddleware))
     for mw in unanchored:
         chain.insert(clarification_idx, mw)
         clarification_idx += 1
 
-    # Anchored → iterative insertion (supports external-to-external anchoring)
     pending = list(anchored)
     max_rounds = len(pending) + 1
     for _ in range(max_rounds):

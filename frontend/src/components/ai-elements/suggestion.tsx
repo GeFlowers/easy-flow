@@ -10,10 +10,9 @@ import { cn } from "@/lib/utils";
 const STAGGER_DELAY_MS = 60;
 const STAGGER_DELAY_MS_OFFSET = 250;
 
-/** SuggestionsProps 的公开类型定义。 */
 export type SuggestionsProps = ComponentProps<typeof ScrollArea>;
 
-/** Suggestions 组件：提供对应的界面结构与交互语义。 */
+/** 将建议选项换行排列，逐项错开淡入，并提供横向滚动容器。 */
 export const Suggestions = ({
   className,
   children,
@@ -43,14 +42,13 @@ export const Suggestions = ({
   </ScrollArea>
 );
 
-/** SuggestionProps 的公开类型定义。 */
 export type SuggestionProps = Omit<ComponentProps<typeof Button>, "onClick"> & {
   suggestion: React.ReactNode;
   icon?: LucideIcon;
   onClick?: () => void;
 };
 
-/** Suggestion 组件：提供对应的界面结构与交互语义。 */
+/** 把单条建议呈现为可点击按钮，并可选显示图标及自定义子内容。 */
 export const Suggestion = ({
   suggestion,
   onClick,
@@ -61,6 +59,7 @@ export const Suggestion = ({
   children,
   ...props
 }: SuggestionProps) => {
+  /** 调用可选的建议回调，由父级决定如何填入或提交该建议。 */
   const handleClick = () => {
     onClick?.();
   };

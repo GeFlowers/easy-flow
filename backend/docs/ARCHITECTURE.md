@@ -158,17 +158,15 @@ class ThreadState(AgentState):
                       │  - release()            │
                       └────────────┬────────────┘
                                    │
-              ┌────────────────────┼────────────────────┐
-              │                                         │
-              ▼                                         ▼
-┌─────────────────────────┐              ┌─────────────────────────┐
-│  LocalSandboxProvider   │              │  AioSandboxProvider     │
-│  (packages/harness/deerflow/sandbox/local.py) │              │  (packages/harness/deerflow/community/)       │
-│                         │              │                         │
-│  - Singleton instance   │              │  - Docker-based         │
-│  - Direct execution     │              │  - Isolated containers  │
-│  - Development use      │              │  - Production use       │
-└─────────────────────────┘              └─────────────────────────┘
+                                   ▼
+                      ┌─────────────────────────┐
+                      │ LocalSandboxProvider    │
+                      │ (default implementation)│
+                      │  deerflow/sandbox/local │
+                      │                         │
+                      │  - Singleton instance   │
+                      │  - Local workspace      │
+                      └─────────────────────────┘
 
                       ┌─────────────────────────┐
                       │        Sandbox          │ (Abstract)
@@ -178,6 +176,8 @@ class ThreadState(AgentState):
                       │  - list_dir()           │
                       └─────────────────────────┘
 ```
+
+Optional BoxLite and E2B implementations live in `deerflow.community` and are not shown here.
 
 **Virtual Path Mapping**:
 
@@ -448,7 +448,7 @@ SKILL.md Format:
 
 - Agent code executes within sandbox boundaries
 - Local sandbox: Direct execution (development only)
-- Docker sandbox: Container isolation (production recommended)
+- Local sandbox: Host-side execution controlled by the configured tool policy
 - Path traversal prevention in file operations
 
 ### API Security

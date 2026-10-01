@@ -1,4 +1,4 @@
-"""定义 __init__ 模块提供的职责与可复用接口。
+'''提供 E2B 远程代码沙箱实现和对应的生命周期管理器。
 
 E2B cloud sandbox provider for DeerFlow.
 
@@ -9,7 +9,6 @@ Configuration example (``config.yaml``)::
 
     sandbox:
       use: deerflow.community.e2b_sandbox:E2BSandboxProvider
-      # E2B specific options (read via SandboxConfig's ``extra="allow"``):
       api_key: $E2B_API_KEY            # falls back to E2B_API_KEY env var
       template: code-interpreter-v1     # e2b template id; defaults to e2b code-interpreter
       domain: e2b.dev                  # optional e2b domain (e.g. self-hosted)
@@ -21,7 +20,7 @@ Configuration example (``config.yaml``)::
           read_only: false
       environment:                      # forwarded as e2b ``envs`` on create
         OPENAI_API_KEY: $OPENAI_API_KEY
-"""
+'''
 
 from .e2b_sandbox import E2BSandbox
 from .e2b_sandbox_provider import E2BSandboxProvider

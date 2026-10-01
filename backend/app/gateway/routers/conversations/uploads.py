@@ -1,10 +1,7 @@
-"""定义 uploads 模块提供的职责与可复用接口。
-
-Upload router for handling file uploads."""
+'''处理线程文件上传、列表和删除请求，并在校验后将文件安全保存到线程工作区。'''
 
 import logging
 import os
-import stat
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -50,7 +47,7 @@ DEFAULT_MAX_TOTAL_SIZE = 100 * 1024 * 1024
 
 @dataclass(slots=True)
 class _UploadTempFile:
-    """保存单个上传文件提交前所需的目标路径、临时路径和已打开句柄。"""
+    '''保存单个上传文件提交前所需的目标路径、临时路径和已打开句柄。'''
 
     file_path: Path
     temp_path: Path
@@ -58,7 +55,7 @@ class _UploadTempFile:
 
 
 class UploadedFileInfo(BaseModel):
-    """描述单个上传文件的本地路径、沙箱路径及可选转换结果。"""
+    '''描述单个上传文件的本地路径、沙箱路径及可选转换结果。'''
 
     filename: str
     size: int
@@ -75,7 +72,7 @@ class UploadedFileInfo(BaseModel):
 
 
 class UploadResponse(BaseModel):
-    """汇总上传是否成功、已保存文件及跳过文件。"""
+    '''汇总上传是否成功、已保存文件及跳过文件。'''
 
     success: bool
     files: list[UploadedFileInfo]
@@ -84,51 +81,27 @@ class UploadResponse(BaseModel):
 
 
 class UploadListResponse(BaseModel):
-    """返回线程中的上传文件清单及文件数量。"""
+    '''返回线程中的上传文件清单及文件数量。'''
 
     files: list[UploadedFileInfo]
     count: int
 
 
 class UploadLimits(BaseModel):
-    """向客户端公开单次数量、单文件大小和总上传大小上限。"""
+    '''向客户端公开单次数量、单文件大小和总上传大小上限。'''
 
     max_files: int
     max_file_size: int
     max_total_size: int
 
 
-def _make_file_sandbox_writable(file_path: os.PathLike[str] | str) -> None:
-    """为需要沙箱回写的上传文件补充读写权限，并拒绝跟随符号链接修改权限。"""
-    file_stat = os.lstat(file_path)
-    if stat.S_ISLNK(file_stat.st_mode):
-        logger.warning("Skipping sandbox chmod for symlinked upload path: %s", file_path)
-        return
-
-    writable_mode = stat.S_IMODE(file_stat.st_mode) | stat.S_IWUSR | stat.S_IWGRP | stat.S_IWOTH | stat.S_IRGRP | stat.S_IROTH
-    chmod_kwargs = {"follow_symlinks": False} if os.chmod in os.supports_follow_symlinks else {}
-    os.chmod(file_path, writable_mode, **chmod_kwargs)
-
-
-def _make_file_sandbox_readable(file_path: os.PathLike[str] | str) -> None:
-    """为沙箱进程补充组和其他用户的读取权限，不跟随符号链接改权限。"""
-    file_stat = os.lstat(file_path)
-    if stat.S_ISLNK(file_stat.st_mode):
-        logger.warning("Skipping sandbox chmod for symlinked upload path: %s", file_path)
-        return
-
-    readable_mode = stat.S_IMODE(file_stat.st_mode) | stat.S_IRGRP | stat.S_IROTH
-    chmod_kwargs = {"follow_symlinks": False} if os.chmod in os.supports_follow_symlinks else {}
-    os.chmod(file_path, readable_mode, **chmod_kwargs)
-
-
 def _uses_thread_data_mounts(sandbox_provider: SandboxProvider) -> bool:
-    """判断沙箱提供方是否直接挂载线程数据而无需逐文件同步。"""
+    '''判断沙箱提供方是否直接挂载线程数据而无需逐文件同步。'''
     return bool(getattr(sandbox_provider, "uses_thread_data_mounts", False))
 
 
 def _get_uploads_config_value(app_config: AppConfig, key: str, default: object) -> object:
-    """兼容字典和配置对象两种形式读取 uploads 子配置。"""
+    '''兼容字典和配置对象两种形式读取 uploads 子配置。'''
     uploads_cfg = getattr(app_config, "uploads", None)
     if isinstance(uploads_cfg, dict):
         return uploads_cfg.get(key, default)
@@ -136,7 +109,7 @@ def _get_uploads_config_value(app_config: AppConfig, key: str, default: object) 
 
 
 def _get_upload_limit(app_config: AppConfig, key: str, default: int, *, legacy_key: str | None = None) -> int:
-    """读取单项上传限制，并兼容旧配置键及无效值回退。"""
+    '''读取单项上传限制，并兼容旧配置键及无效值回退。'''
     try:
         value = _get_uploads_config_value(app_config, key, None)
         if value is None and legacy_key is not None:
@@ -153,7 +126,7 @@ def _get_upload_limit(app_config: AppConfig, key: str, default: int, *, legacy_k
 
 
 def _get_upload_limits(app_config: AppConfig) -> UploadLimits:
-    """从应用配置汇总每请求文件数、单文件和总大小限制。"""
+    '''从应用配置汇总每请求文件数、单文件和总大小限制。'''
     return UploadLimits(
         max_files=_get_upload_limit(app_config, "max_files", DEFAULT_MAX_FILES, legacy_key="max_file_count"),
         max_file_size=_get_upload_limit(app_config, "max_file_size", DEFAULT_MAX_FILE_SIZE, legacy_key="max_single_file_size"),
@@ -162,7 +135,7 @@ def _get_upload_limits(app_config: AppConfig) -> UploadLimits:
 
 
 def _cleanup_uploaded_paths(paths: list[os.PathLike[str] | str]) -> None:
-    """按逆序尽力清理本次上传已落盘的路径，不覆盖原始异常。"""
+    '''按逆序尽力清理本次上传已落盘的路径，不覆盖原始异常。'''
     for path in reversed(paths):
         try:
             os.unlink(path)
@@ -173,7 +146,7 @@ def _cleanup_uploaded_paths(paths: list[os.PathLike[str] | str]) -> None:
 
 
 def _prepare_upload_destination(uploads_dir: os.PathLike[str] | str, display_filename: str) -> _UploadTempFile:
-    """验证目标文件名后创建同目录临时文件，供原子上传提交使用。"""
+    '''验证目标文件名后创建同目录临时文件，供原子上传提交使用。'''
     uploads_dir_path = Path(uploads_dir)
     file_path = validate_upload_destination(uploads_dir_path, display_filename)
     temp_fd, temp_path_str = tempfile.mkstemp(prefix=UPLOAD_STAGING_PREFIX, suffix=UPLOAD_STAGING_SUFFIX, dir=uploads_dir_path)
@@ -194,12 +167,12 @@ def _prepare_upload_destination(uploads_dir: os.PathLike[str] | str, display_fil
 
 
 def _write_upload_chunk(upload_temp: _UploadTempFile, chunk: bytes) -> None:
-    """将一个上传数据块写入尚未提交的临时文件。"""
+    '''将一个上传数据块写入尚未提交的临时文件。'''
     upload_temp.handle.write(chunk)
 
 
 def _abort_upload_temp(upload_temp: _UploadTempFile) -> None:
-    """关闭并删除未提交的临时上传文件。"""
+    '''关闭并删除未提交的临时上传文件。'''
     try:
         upload_temp.handle.close()
     finally:
@@ -210,7 +183,7 @@ def _abort_upload_temp(upload_temp: _UploadTempFile) -> None:
 
 
 def _commit_upload_temp(upload_temp: _UploadTempFile) -> None:
-    """关闭临时文件并原子替换最终上传目标。"""
+    '''关闭临时文件并原子替换最终上传目标。'''
     upload_temp.handle.close()
     try:
         os.replace(upload_temp.temp_path, upload_temp.file_path)
@@ -222,20 +195,13 @@ def _commit_upload_temp(upload_temp: _UploadTempFile) -> None:
         raise
 
 
-def _make_uploaded_paths_sandbox_readable(paths: list[os.PathLike[str] | str]) -> None:
-    """调整已上传文件权限，使沙箱进程能够读取它们。"""
-    for file_path in paths:
-        _make_file_sandbox_readable(file_path)
-
-
 def _sync_upload_to_sandbox(sandbox, file_path: os.PathLike[str] | str, virtual_path: str) -> None:
-    """将本地上传文件同步至未挂载线程数据的沙箱虚拟路径。"""
-    _make_file_sandbox_writable(file_path)
+    '''将本地上传文件同步至未挂载线程数据的沙箱虚拟路径。'''
     sandbox.update_file(virtual_path, Path(file_path).read_bytes())
 
 
 def _list_uploaded_files_for_thread(thread_id: str, user_id: str) -> dict:
-    """列出指定用户在线程隔离上传目录中的文件。"""
+    '''列出指定用户在线程隔离上传目录中的文件。'''
     uploads_dir = get_uploads_dir(thread_id, user_id=user_id)
     result = list_files_in_dir(uploads_dir)
     enrich_file_listing(result, thread_id)
@@ -247,7 +213,7 @@ def _list_uploaded_files_for_thread(thread_id: str, user_id: str) -> dict:
 
 
 def _delete_uploaded_file_for_thread(thread_id: str, filename: str, user_id: str) -> dict:
-    """从指定用户的线程上传目录安全删除一个已上传文件。"""
+    '''从指定用户的线程上传目录安全删除一个已上传文件。'''
     uploads_dir = get_uploads_dir(thread_id, user_id=user_id)
     return delete_file_safe(uploads_dir, filename, convertible_extensions=CONVERTIBLE_EXTENSIONS)
 
@@ -261,7 +227,7 @@ async def _write_upload_file_with_limits(
     max_total_size: int,
     total_size: int,
 ) -> tuple[os.PathLike[str] | str, int, int]:
-    """分块写入上传内容并实时校验单文件和总量限制，失败时清理临时文件。"""
+    '''分块写入上传内容并实时校验单文件和总量限制，失败时清理临时文件。'''
     file_size = 0
     upload_temp: _UploadTempFile | None = None
     try:
@@ -286,7 +252,7 @@ async def _write_upload_file_with_limits(
 
 
 def _auto_convert_documents_enabled(app_config: AppConfig) -> bool:
-    """读取文档自动转换开关；仅显式启用时执行，配置异常时默认关闭。"""
+    '''读取文档自动转换开关；仅显式启用时执行，配置异常时默认关闭。'''
     try:
         raw = _get_uploads_config_value(app_config, "auto_convert_documents", False)
         if isinstance(raw, str):
@@ -304,7 +270,7 @@ async def upload_files(
     files: list[UploadFile] = File(...),
     config: AppConfig = Depends(get_config),
 ) -> UploadResponse:
-    """校验并保存多份线程附件，必要时转换文档并同步到非挂载型沙箱。"""
+    '''校验并保存多份线程附件，必要时转换文档并同步到非挂载型沙箱。'''
     if not files:
         raise HTTPException(status_code=400, detail="No files provided")
 
@@ -404,10 +370,6 @@ async def upload_files(
             await run_file_io(_cleanup_uploaded_paths, written_paths)
             raise HTTPException(status_code=500, detail=f"Failed to upload {file.filename}: {str(e)}")
 
-    # 上传文件默认权限为 0o600；Docker 沙箱通常以非 root 用户运行。
-    # 无论目录挂载还是逐文件同步，都需要组和其他用户读取位才能让沙箱访问。
-    await run_file_io(_make_uploaded_paths_sandbox_readable, written_paths)
-
     if sync_to_sandbox:
         for file_path, virtual_path in sandbox_sync_targets:
             await run_file_io(_sync_upload_to_sandbox, sandbox, file_path, virtual_path)
@@ -431,14 +393,14 @@ async def get_upload_limits(
     request: Request,
     config: AppConfig = Depends(get_config),
 ) -> UploadLimits:
-    """返回当前线程上传接口允许的文件大小和数量限制。"""
+    '''返回当前线程上传接口允许的文件大小和数量限制。'''
     return _get_upload_limits(config)
 
 
 @router.get("/list", response_model=UploadListResponse)
 @require_permission("threads", "read", owner_check=True)
 async def list_uploaded_files(thread_id: str, request: Request) -> UploadListResponse:
-    """列出当前线程上传目录中可见的文件及其元数据。"""
+    '''列出当前线程上传目录中可见的文件及其元数据。'''
     try:
         result = await run_file_io(_list_uploaded_files_for_thread, thread_id, get_effective_user_id())
     except ValueError as e:
@@ -450,7 +412,7 @@ async def list_uploaded_files(thread_id: str, request: Request) -> UploadListRes
 @router.delete("/{filename}")
 @require_permission("threads", "delete", owner_check=True, require_existing=True)
 async def delete_uploaded_file(thread_id: str, filename: str, request: Request) -> dict:
-    """删除当前线程上传目录中的指定文件。"""
+    '''删除当前线程上传目录中的指定文件。'''
     try:
         return await run_file_io(_delete_uploaded_file_for_thread, thread_id, filename, get_effective_user_id())
     except FileNotFoundError:

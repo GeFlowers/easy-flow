@@ -1,4 +1,4 @@
-"""定义工具调用授权时传递的请求、决策数据结构及 Provider 契约。"""
+'''定义工具调用授权时传递的请求、决策数据结构及 Provider 契约。'''
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from typing import Any, Protocol, runtime_checkable
 
 @dataclass
 class GuardrailRequest:
-    """携带待授权工具调用及其用户、线程、运行和身份提供方上下文。"""
+    '''携带待授权工具调用及其用户、线程、运行和身份提供方上下文。'''
 
     tool_name: str
     tool_input: dict[str, Any]
@@ -26,7 +26,7 @@ class GuardrailRequest:
 
 @dataclass
 class GuardrailReason:
-    """描述授权允许或拒绝的原因代码及面向调用方的说明。"""
+    '''描述授权允许或拒绝的原因代码及面向调用方的说明。'''
 
     code: str
     message: str = ""
@@ -34,7 +34,7 @@ class GuardrailReason:
 
 @dataclass
 class GuardrailDecision:
-    """保存授权结论、原因、策略标识及 Provider 附带的元数据。"""
+    '''保存授权结论、原因、策略标识及 Provider 附带的元数据。'''
 
     allow: bool
     reasons: list[GuardrailReason] = field(default_factory=list)
@@ -44,17 +44,17 @@ class GuardrailDecision:
 
 @runtime_checkable
 class GuardrailProvider(Protocol):
-    """工具调用授权 Provider 的结构化接口，无需继承即可实现。
+    '''工具调用授权 Provider 的结构化接口，无需继承即可实现。
 
     配置通过类路径动态加载，运行时先尝试同步/异步对应的授权入口。
-    """
+    '''
 
     name: str
 
     def evaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        """同步判断本次工具调用是否可以继续执行。"""
+        '''同步判断本次工具调用是否可以继续执行。'''
         ...
 
     async def aevaluate(self, request: GuardrailRequest) -> GuardrailDecision:
-        """异步判断本次工具调用是否可以继续执行。"""
+        '''异步判断本次工具调用是否可以继续执行。'''
         ...

@@ -1,8 +1,8 @@
-"""重置管理员密码的命令行工具。
+'''重置管理员密码的命令行工具。
 
 新密码写入权限为 0600 的 ``.deer-flow/admin_initial_credentials.txt``，
 而不输出明文，避免 CI 或日志聚合器收集该密钥。
-"""
+'''
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from deerflow.persistence.user.model import UserRow
 
 
 async def _run(email: str | None) -> int:
-    """执行管理员密码重置，并以进程退出码表示处理结果。"""
+    '''执行管理员密码重置，并以进程退出码表示处理结果。'''
     from deerflow.config import get_app_config
     from deerflow.persistence.engine import (
         close_engine,
@@ -73,7 +73,7 @@ async def _run(email: str | None) -> int:
 
 
 def main() -> None:
-    """解析命令行参数、运行异步重置流程并退出。"""
+    '''解析命令行参数、运行异步重置流程并退出。'''
     parser = argparse.ArgumentParser(description="Reset admin password")
     parser.add_argument("--email", help="Admin email (default: first admin found)")
     args = parser.parse_args()

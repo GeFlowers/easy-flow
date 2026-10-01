@@ -9,7 +9,7 @@ interface AuroraTextProps {
   speed?: number;
 }
 
-/** AuroraText 组件：提供对应的界面结构与交互语义。 */
+/** 使用流动的多色渐变强调标题或短文本。 */
 export const AuroraText = memo(
   ({
     children,

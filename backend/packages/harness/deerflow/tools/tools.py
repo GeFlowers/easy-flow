@@ -1,4 +1,4 @@
-"""组装、筛选并返回当前代理可用的工具集合。"""
+'''组装、筛选并返回当前代理可用的工具集合。'''
 
 import logging
 
@@ -26,7 +26,7 @@ SUBAGENT_TOOLS = [
 
 
 def _is_host_bash_tool(tool: object) -> bool:
-    """判断工具配置是否表示宿主机 Bash 执行入口。"""
+    '''判断工具配置是否表示宿主机 Bash 执行入口。'''
     group = getattr(tool, "group", None)
     use = getattr(tool, "use", None)
     if group == "bash":
@@ -37,7 +37,7 @@ def _is_host_bash_tool(tool: object) -> bool:
 
 
 def _ensure_sync_invocable_tool(tool: BaseTool) -> BaseTool:
-    """为同步代理调用方的纯异步工具附加同步包装器。"""
+    '''为同步代理调用方的纯异步工具附加同步包装器。'''
     if getattr(tool, "func", None) is None and getattr(tool, "coroutine", None) is not None:
         tool.func = make_sync_tool_wrapper(tool.coroutine, tool.name)
     return tool
@@ -51,7 +51,7 @@ def get_available_tools(
     *,
     app_config: AppConfig | None = None,
 ) -> list[BaseTool]:
-    """依据配置、运行时策略和模型能力返回可用工具列表。"""
+    '''依据配置、运行时策略和模型能力返回可用工具列表。'''
     config = app_config or get_app_config()
     tool_configs = [tool for tool in config.tools if groups is None or tool.group in groups]
     if not is_host_bash_allowed(config):

@@ -1,4 +1,4 @@
-"""模型、MCP、技能、记忆及管理配置路由。"""
+'''模型、MCP、技能、记忆及管理配置路由。'''
 
 from . import console, features, input_polish, mcp, memory, models, skills
 

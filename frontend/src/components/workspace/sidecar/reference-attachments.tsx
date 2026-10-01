@@ -10,6 +10,7 @@ import { Tooltip } from "../tooltip";
 
 import type { SidecarReference } from "./context";
 
+/** 根据引用数量选择单复数文案，并把数量填入本地化模板。 */
 function formatReferenceCount({
   count,
   one,
@@ -22,10 +23,12 @@ function formatReferenceCount({
   return (count === 1 ? one : many).replace("{count}", String(count));
 }
 
+/** 折叠引用内容中的换行和多余空格，生成紧凑的悬浮预览。 */
 function formatPreviewText(content: string) {
   return content.replace(/\s+/g, " ").trim();
 }
 
+/** 在悬浮提示中逐条展示已附加引用的文本片段。 */
 function ReferencePreview({ references }: { references: SidecarReference[] }) {
   if (references.length === 0) {
     return null;

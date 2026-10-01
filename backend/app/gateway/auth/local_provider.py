@@ -1,4 +1,4 @@
-"""本地邮箱与密码认证提供者。"""
+'''本地邮箱与密码认证提供者。'''
 
 import logging
 
@@ -11,14 +11,14 @@ logger = logging.getLogger(__name__)
 
 
 class LocalAuthProvider(AuthProvider):
-    """使用本地数据库验证邮箱和密码的认证提供者。"""
+    '''使用本地数据库验证邮箱和密码的认证提供者。'''
 
     def __init__(self, repository: UserRepository):
-        """使用指定的 ``UserRepository`` 初始化认证提供者。"""
+        '''使用指定的 ``UserRepository`` 初始化认证提供者。'''
         self._repo = repository
 
     async def authenticate(self, credentials: dict) -> User | None:
-        """使用凭据中的邮箱和密码认证，失败时返回 ``None``。"""
+        '''使用凭据中的邮箱和密码认证，失败时返回 ``None``。'''
         email = credentials.get("email")
         password = credentials.get("password")
 
@@ -47,11 +47,11 @@ class LocalAuthProvider(AuthProvider):
         return user
 
     async def get_user(self, user_id: str) -> User | None:
-        """按用户 ID 查询用户。"""
+        '''按用户 ID 查询用户。'''
         return await self._repo.get_user_by_id(user_id)
 
     async def create_user(self, email: str, password: str | None = None, system_role: str = "user", needs_setup: bool = False) -> User:
-        """创建本地用户，并在提供密码时先安全地计算密码哈希。"""
+        '''创建本地用户，并在提供密码时先安全地计算密码哈希。'''
         password_hash = await hash_password_async(password) if password else None
         user = User(
             email=email,
@@ -62,23 +62,23 @@ class LocalAuthProvider(AuthProvider):
         return await self._repo.create_user(user)
 
     async def get_user_by_oauth(self, provider: str, oauth_id: str) -> User | None:
-        """按 OAuth 提供者和其用户标识查询用户。"""
+        '''按 OAuth 提供者和其用户标识查询用户。'''
         return await self._repo.get_user_by_oauth(provider, oauth_id)
 
     async def count_users(self) -> int:
-        """返回已注册用户总数。"""
+        '''返回已注册用户总数。'''
         return await self._repo.count_users()
 
     async def count_admin_users(self) -> int:
-        """返回管理员用户数量。"""
+        '''返回管理员用户数量。'''
         return await self._repo.count_admin_users()
 
     async def update_user(self, user: User) -> User:
-        """更新已有用户。"""
+        '''更新已有用户。'''
         return await self._repo.update_user(user)
 
     async def get_user_by_email(self, email: str) -> User | None:
-        """按邮箱查询用户。"""
+        '''按邮箱查询用户。'''
         return await self._repo.get_user_by_email(email)
 
     async def create_oauth_user(
@@ -88,7 +88,7 @@ class LocalAuthProvider(AuthProvider):
         oauth_id: str,
         system_role: str = "user",
     ) -> User:
-        """根据 OAuth/OIDC 登录身份创建没有本地密码的新用户。"""
+        '''根据 OAuth/OIDC 登录身份创建没有本地密码的新用户。'''
         user = User(
             email=email,
             password_hash=None,

@@ -1,4 +1,4 @@
-"""FastAPI 的双重提交 Cookie CSRF 防护中间件。"""
+'''FastAPI 的双重提交 Cookie CSRF 防护中间件。'''
 
 import os
 import secrets
@@ -15,21 +15,21 @@ from app.gateway.auth_disabled import is_auth_disabled
 
 CSRF_COOKIE_NAME = "csrf_token"
 CSRF_HEADER_NAME = "X-CSRF-Token"
-CSRF_TOKEN_LENGTH = 64  # bytes
+CSRF_TOKEN_LENGTH = 64  # 字节数
 
 
 def is_secure_request(request: Request) -> bool:
-    """根据受信任代理头判断客户端原始请求是否使用 HTTPS。"""
+    '''根据受信任代理头判断客户端原始请求是否使用 HTTPS。'''
     return _request_scheme(request) == "https"
 
 
 def generate_csrf_token() -> str:
-    """生成密码学安全的随机 CSRF 令牌。"""
+    '''生成密码学安全的随机 CSRF 令牌。'''
     return secrets.token_urlsafe(CSRF_TOKEN_LENGTH)
 
 
 def should_check_csrf(request: Request) -> bool:
-    """判断请求是否需要 CSRF 校验，仅校验可能改变服务端持久化状态的方法。"""
+    '''判断请求是否需要 CSRF 校验，仅校验可能改变服务端持久化状态的方法。'''
     if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
         return False
 
@@ -57,12 +57,12 @@ _AUTH_EXEMPT_PATHS: frozenset[str] = frozenset(
 
 
 def is_auth_endpoint(request: Request) -> bool:
-    """判断是否为首次建立会话时尚无 CSRF 令牌的身份接口。"""
+    '''判断是否为首次建立会话时尚无 CSRF 令牌的身份接口。'''
     return request.url.path.rstrip("/") in _AUTH_EXEMPT_PATHS
 
 
 def _host_with_optional_port(hostname: str, port: int | None, scheme: str) -> str:
-    """返回规范化的主机及可选端口，并省略协议默认端口。"""
+    '''返回规范化的主机及可选端口，并省略协议默认端口。'''
     host = hostname.lower()
     if ":" in host and not host.startswith("["):
         host = f"[{host}]"
@@ -73,7 +73,7 @@ def _host_with_optional_port(hostname: str, port: int | None, scheme: str) -> st
 
 
 def _normalize_origin(origin: str) -> str | None:
-    """将来源规范化为协议、主机和可选端口；非法输入返回空值。"""
+    '''将来源规范化为协议、主机和可选端口；非法输入返回空值。'''
     try:
         parsed = urlsplit(origin.strip())
         port = parsed.port
@@ -92,7 +92,7 @@ def _normalize_origin(origin: str) -> str | None:
 
 
 def _configured_cors_origins() -> set[str]:
-    """返回配置中允许调用身份接口的显式浏览器来源。"""
+    '''返回配置中允许调用身份接口的显式浏览器来源。'''
     origins = set()
     for raw_origin in os.environ.get("GATEWAY_CORS_ORIGINS", "").split(","):
         origin = raw_origin.strip()
@@ -105,12 +105,12 @@ def _configured_cors_origins() -> set[str]:
 
 
 def get_configured_cors_origins() -> set[str]:
-    """返回由环境变量配置并完成规范化的浏览器来源集合。"""
+    '''返回由环境变量配置并完成规范化的浏览器来源集合。'''
     return _configured_cors_origins()
 
 
 def _first_header_value(value: str | None) -> str | None:
-    """从逗号分隔的代理头中取出第一个值。"""
+    '''从逗号分隔的代理头中取出第一个值。'''
     if not value:
         return None
     first = value.split(",", 1)[0].strip()
@@ -118,7 +118,7 @@ def _first_header_value(value: str | None) -> str | None:
 
 
 def _forwarded_param(request: Request, name: str) -> str | None:
-    """从第一个 Forwarded 代理头条目提取指定参数。"""
+    '''从第一个 Forwarded 代理头条目提取指定参数。'''
     forwarded = _first_header_value(request.headers.get("forwarded"))
     if not forwarded:
         return None
@@ -131,13 +131,13 @@ def _forwarded_param(request: Request, name: str) -> str | None:
 
 
 def _request_scheme(request: Request) -> str:
-    """从可信代理头解析客户端原始请求协议。"""
+    '''从可信代理头解析客户端原始请求协议。'''
     scheme = _forwarded_param(request, "proto") or _first_header_value(request.headers.get("x-forwarded-proto")) or request.url.scheme
     return scheme.lower()
 
 
 def _request_origin(request: Request) -> str | None:
-    """构造浏览器当前访问目标的规范化来源。"""
+    '''构造浏览器当前访问目标的规范化来源。'''
     scheme = _request_scheme(request)
     host = _forwarded_param(request, "host") or _first_header_value(request.headers.get("x-forwarded-host")) or request.headers.get("host") or request.url.netloc
 
@@ -149,11 +149,11 @@ def _request_origin(request: Request) -> str | None:
 
 
 def is_allowed_auth_origin(request: Request) -> bool:
-    """仅允许同源或显式配置来源发起会话建立请求。
+    '''仅允许同源或显式配置来源发起会话建立请求。
 
     首次登录等请求没有令牌却会写入会话 Cookie，必须通过来源限制防止登录 CSRF；
     缺少来源头的非浏览器客户端仍可访问。
-    """
+    '''
     origin = request.headers.get("origin")
     if not origin:
         return True
@@ -167,14 +167,14 @@ def is_allowed_auth_origin(request: Request) -> bool:
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):
-    """以双重提交 Cookie 模式保护会改变状态的浏览器请求。"""
+    '''以双重提交 Cookie 模式保护会改变状态的浏览器请求。'''
 
     def __init__(self, app: ASGIApp) -> None:
-        """初始化中间件并保留 Starlette 下游应用。"""
+        '''初始化中间件并保留 Starlette 下游应用。'''
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-        """校验请求令牌及来源，并在建立会话后下发与会话同寿命的令牌。"""
+        '''校验请求令牌及来源，并在建立会话后下发与会话同寿命的令牌。'''
         _is_auth = is_auth_endpoint(request)
 
         if should_check_csrf(request) and _is_auth and not is_allowed_auth_origin(request):
@@ -220,5 +220,5 @@ class CSRFMiddleware(BaseHTTPMiddleware):
 
 
 def get_csrf_token(request: Request) -> str | None:
-    """从当前请求 Cookie 读取 CSRF 令牌，供服务端渲染嵌入表单或请求头。"""
+    '''从当前请求 Cookie 读取 CSRF 令牌，供服务端渲染嵌入表单或请求头。'''
     return request.cookies.get(CSRF_COOKIE_NAME)

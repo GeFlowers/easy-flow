@@ -1,4 +1,4 @@
-"""扩展 LangChain 摘要中间件，为 DeerFlow 提供上下文压缩和压缩前回调。"""
+'''扩展 LangChain 摘要中间件，为 DeerFlow 提供上下文压缩和压缩前回调。'''
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ _SUMMARY_TRIGGER_MESSAGE_NAME = "summary"
 
 @dataclass(frozen=True)
 class SummarizationEvent:
-    """描述即将压缩的消息、保留消息及其所属线程、Agent 和运行上下文。"""
+    '''描述即将压缩的消息、保留消息及其所属线程、Agent 和运行上下文。'''
 
     messages_to_summarize: tuple[AnyMessage, ...]
     preserved_messages: tuple[AnyMessage, ...]
@@ -36,7 +36,7 @@ class SummarizationEvent:
 
 @dataclass(frozen=True)
 class ContextCompactionResult:
-    """返回摘要文本、被摘要消息、保留消息和压缩前 Token 估算。"""
+    '''返回摘要文本、被摘要消息、保留消息和压缩前 Token 估算。'''
 
     summary_text: str
     messages_to_summarize: tuple[AnyMessage, ...]
@@ -46,15 +46,15 @@ class ContextCompactionResult:
 
 @runtime_checkable
 class BeforeSummarizationHook(Protocol):
-    """定义摘要移除消息前调用的同步回调接口。"""
+    '''定义摘要移除消息前调用的同步回调接口。'''
 
     def __call__(self, event: SummarizationEvent) -> None:
-        """接收压缩前事件；回调通常在此持久化或检查即将被裁剪的消息。"""
+        '''接收压缩前事件；回调通常在此持久化或检查即将被裁剪的消息。'''
         ...
 
 
 def _resolve_thread_id(runtime: Runtime) -> str | None:
-    """优先从 Runtime 上下文读取线程 ID，再回退到 LangGraph configurable 配置。"""
+    '''优先从 Runtime 上下文读取线程 ID，再回退到 LangGraph configurable 配置。'''
     thread_id = runtime.context.get("thread_id") if runtime.context else None
     if thread_id is None:
         try:
@@ -66,7 +66,7 @@ def _resolve_thread_id(runtime: Runtime) -> str | None:
 
 
 def _resolve_agent_name(runtime: Runtime) -> str | None:
-    """优先从 Runtime 上下文读取 Agent 名称，再回退到 LangGraph configurable 配置。"""
+    '''优先从 Runtime 上下文读取 Agent 名称，再回退到 LangGraph configurable 配置。'''
     agent_name = runtime.context.get("agent_name") if runtime.context else None
     if agent_name is None:
         try:
@@ -78,7 +78,7 @@ def _resolve_agent_name(runtime: Runtime) -> str | None:
 
 
 class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
-    """在上下文摘要前分发回调，并避免摘要模型输出混入用户消息流。"""
+    '''在上下文摘要前分发回调，并避免摘要模型输出混入用户消息流。'''
 
     def __init__(
         self,
@@ -86,7 +86,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         before_summarization: list[BeforeSummarizationHook] | None = None,
         **kwargs,
     ) -> None:
-        """保存压缩前钩子，并创建带不广播标签的摘要模型副本。"""
+        '''保存压缩前钩子，并创建带不广播标签的摘要模型副本。'''
         super().__init__(*args, **kwargs)
         self._before_summarization_hooks = before_summarization or []
         # 摘要调用属于内部工作：单独给其模型副本设置不广播标签，同时保留原模型的追踪标签。
@@ -96,16 +96,16 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
 
     @override
     def _create_summary(self, messages_to_summarize: list[AnyMessage]) -> str | None:
-        """同步入口委托给摘要专用模型生成历史摘要。"""
+        '''同步入口委托给摘要专用模型生成历史摘要。'''
         return self._summarize_with(messages_to_summarize)
 
     @override
     async def _acreate_summary(self, messages_to_summarize: list[AnyMessage]) -> str | None:
-        """异步入口委托给摘要专用模型生成历史摘要。"""
+        '''异步入口委托给摘要专用模型生成历史摘要。'''
         return await self._asummarize_with(messages_to_summarize)
 
     def _summarize_with(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
-        """构造摘要提示并同步调用不广播的模型副本；失败时跳过本轮压缩。"""
+        '''构造摘要提示并同步调用不广播的模型副本；失败时跳过本轮压缩。'''
         if not messages_to_summarize:
             return "No previous conversation history."
         prompt = self._build_summary_prompt(messages_to_summarize, previous_summary=previous_summary)
@@ -122,7 +122,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
             return None
 
     async def _asummarize_with(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
-        """异步构造摘要提示并调用不广播的模型副本；失败时跳过本轮压缩。"""
+        '''异步构造摘要提示并调用不广播的模型副本；失败时跳过本轮压缩。'''
         if not messages_to_summarize:
             return "No previous conversation history."
         prompt = self._build_summary_prompt(messages_to_summarize, previous_summary=previous_summary)
@@ -140,18 +140,18 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
 
     @staticmethod
     def _summary_count_message(summary_text: str) -> HumanMessage:
-        """将已有摘要包装为计数器识别的消息，参与下一次触发阈值估算。"""
+        '''将已有摘要包装为计数器识别的消息，参与下一次触发阈值估算。'''
         return HumanMessage(content=summary_text, name=_SUMMARY_TRIGGER_MESSAGE_NAME)
 
     def _messages_for_trigger_count(self, messages: list[AnyMessage], summary_text: str | None) -> list[AnyMessage]:
-        """为摘要触发条件补入已有摘要消息，使 Token 估算包含压缩上下文。"""
+        '''为摘要触发条件补入已有摘要消息，使 Token 估算包含压缩上下文。'''
         if not summary_text:
             return messages
         return [*messages, self._summary_count_message(summary_text)]
 
     @staticmethod
     def _bound_text(text: str, cap: int) -> str:
-        """按字符上限保留文本首尾，并在中间标记省略内容。"""
+        '''按字符上限保留文本首尾，并在中间标记省略内容。'''
         if len(text) <= cap:
             return text
         if cap <= 0:
@@ -166,7 +166,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return f"{text[:head]}{omitted_marker}{text[-tail:]}"
 
     def _trim_summary_section_text(self, text: str, max_tokens: int, *, strategy: str) -> str:
-        """用模型 Token 计数器裁剪摘要输入；计数失败时退回确定性的字符上限。"""
+        '''用模型 Token 计数器裁剪摘要输入；计数失败时退回确定性的字符上限。'''
         if not text.strip():
             return ""
         max_tokens = max(1, max_tokens)
@@ -188,7 +188,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return self._bound_text(text, max_tokens)
 
     def _build_summary_input_text(self, formatted_messages: str, previous_summary: str | None = None) -> str | None:
-        """在总 Token 上限内分配旧摘要和新消息，并转义 XML 区块内容。"""
+        '''在总 Token 上限内分配旧摘要和新消息，并转义 XML 区块内容。'''
         if self.trim_tokens_to_summarize is None:
             trimmed_new_messages = formatted_messages
             trimmed_previous_summary = previous_summary.strip() if previous_summary else ""
@@ -239,7 +239,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return "\n".join(parts)
 
     def _build_summary_prompt(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
-        """裁剪待摘要消息并填充摘要模板；无有效输入时返回 ``None``。"""
+        '''裁剪待摘要消息并填充摘要模板；无有效输入时返回 ``None``。'''
         trimmed_messages = self._trim_messages_for_summary(messages_to_summarize)
         if not trimmed_messages:
             trimmed_messages = messages_to_summarize[-1:]
@@ -253,11 +253,11 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         return self.summary_prompt.format(messages=formatted_messages).rstrip()
 
     def before_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        """同步模型调用前检查是否达到摘要压缩条件。"""
+        '''同步模型调用前检查是否达到摘要压缩条件。'''
         return self._maybe_summarize(state, runtime)
 
     async def abefore_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        """异步模型调用前检查摘要条件并执行异步压缩。"""
+        '''异步模型调用前检查摘要条件并执行异步压缩。'''
         return await self._amaybe_summarize(state, runtime)
 
     def _prepare_compaction(
@@ -266,7 +266,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         *,
         force: bool = False,
     ) -> tuple[list[AnyMessage], list[AnyMessage], str | None, int] | None:
-        """确保消息 ID 存在、评估触发条件并拆分待摘要与保留消息。"""
+        '''确保消息 ID 存在、评估触发条件并拆分待摘要与保留消息。'''
         messages = state["messages"]
         self._ensure_message_ids(messages)
 
@@ -293,7 +293,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         *,
         force: bool = False,
     ) -> ContextCompactionResult | None:
-        """同步执行一次上下文压缩并返回摘要与消息分区，不满足条件则返回空。"""
+        '''同步执行一次上下文压缩并返回摘要与消息分区，不满足条件则返回空。'''
         prepared = self._prepare_compaction(state, force=force)
         if prepared is None:
             return None
@@ -316,7 +316,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         *,
         force: bool = False,
     ) -> ContextCompactionResult | None:
-        """异步执行一次上下文压缩并返回摘要与消息分区。"""
+        '''异步执行一次上下文压缩并返回摘要与消息分区。'''
         prepared = self._prepare_compaction(state, force=force)
         if prepared is None:
             return None
@@ -333,7 +333,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         )
 
     def _maybe_summarize(self, state: AgentState, runtime: Runtime) -> dict | None:
-        """在达到触发条件时返回清空旧消息、保留尾部并写入摘要的状态更新。"""
+        '''在达到触发条件时返回清空旧消息、保留尾部并写入摘要的状态更新。'''
         result = self.compact_state(state, runtime, force=False)
         if result is None:
             return None
@@ -346,7 +346,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         }
 
     async def _amaybe_summarize(self, state: AgentState, runtime: Runtime) -> dict | None:
-        """异步摘要触发路径，返回与同步路径相同结构的状态更新。"""
+        '''异步摘要触发路径，返回与同步路径相同结构的状态更新。'''
         result = await self.acompact_state(state, runtime, force=False)
         if result is None:
             return None
@@ -363,7 +363,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         messages_to_summarize: list[AnyMessage],
         preserved_messages: list[AnyMessage],
     ) -> tuple[list[AnyMessage], list[AnyMessage]]:
-        """将动态上下文提醒及其同组 ID 消息移入保留区，避免日期、记忆或原问题被摘要吞并。"""
+        '''将动态上下文提醒及其同组 ID 消息移入保留区，避免日期、记忆或原问题被摘要吞并。'''
         reminders = [msg for msg in messages_to_summarize if is_dynamic_context_reminder(msg)]
         if not reminders:
             return messages_to_summarize, preserved_messages
@@ -391,7 +391,7 @@ class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
         preserved_messages: list[AnyMessage],
         runtime: Runtime,
     ) -> None:
-        """构造压缩前事件并逐个调用钩子；单个钩子失败只记录错误，不阻断摘要。"""
+        '''构造压缩前事件并逐个调用钩子；单个钩子失败只记录错误，不阻断摘要。'''
         if not self._before_summarization_hooks:
             return
 
@@ -417,7 +417,7 @@ def create_summarization_middleware(
     keep: tuple[str, int | float] | None = None,
     skip_memory_flush: bool = False,
 ) -> DeerFlowSummarizationMiddleware | None:
-    """按应用配置构造摘要中间件，并为主 Agent 可选注册压缩前记忆刷新钩子。"""
+    '''按应用配置构造摘要中间件，并为主 Agent 可选注册压缩前记忆刷新钩子。'''
     resolved_app_config = app_config or get_app_config()
     config = resolved_app_config.summarization
 

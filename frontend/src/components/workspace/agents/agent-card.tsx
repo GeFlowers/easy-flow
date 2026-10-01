@@ -105,10 +105,12 @@ export function AgentCard({ agent }: AgentCardProps) {
   const deleteAgent = useDeleteAgent();
   const [deleteOpen, setDeleteOpen] = useState(false);
 
+  /** 跳转到该智能体的新对话路由。 */
   function handleChat() {
     router.push(`/workspace/agents/${agent.name}/chats/new`);
   }
 
+  /** 删除当前智能体，反馈结果并在失败时保留确认弹窗。 */
   async function handleDelete() {
     try {
       await deleteAgent.mutateAsync(agent.name);

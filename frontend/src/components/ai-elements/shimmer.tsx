@@ -10,7 +10,6 @@ import {
   useMemo,
 } from "react";
 
-/** TextShimmerProps 的公开类型定义。 */
 export type TextShimmerProps = {
   children: string;
   as?: ElementType;
@@ -19,6 +18,7 @@ export type TextShimmerProps = {
   spread?: number;
 };
 
+/** 将文本包裹为可配置渐变扫光动画，并按内容长度调整高亮宽度。 */
 const ShimmerComponent = ({
   children,
   as: Component = "p",
@@ -62,5 +62,5 @@ const ShimmerComponent = ({
   );
 };
 
-/** Shimmer 组件：提供对应的界面结构与交互语义。 */
+/** 通过渐变动画突出显示生成中的文字或其他子内容。 */
 export const Shimmer = memo(ShimmerComponent);

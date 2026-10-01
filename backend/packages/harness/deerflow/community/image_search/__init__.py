@@ -1,4 +1,4 @@
-"定义 __init__ 模块提供的职责与可复用接口"
+'''导出供代理调用的图片搜索工具。'''
 
 from .tools import image_search_tool
 

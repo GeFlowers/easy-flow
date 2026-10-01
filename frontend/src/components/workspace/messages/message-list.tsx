@@ -105,6 +105,7 @@ type SelectionToolbarState = {
   placement: "top" | "bottom";
 };
 
+/** 根据历史消息分页状态显示加载中、可继续加载或无更多内容的提示。 */
 function LoadMoreHistoryIndicator({
   isLoading,
   hasMore,
@@ -119,6 +120,7 @@ function LoadMoreHistoryIndicator({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastLoadRef = useRef(0);
 
+  /** 按节流间隔请求更多历史消息，并避免重复排队分页请求。 */
   const throttledLoadMore = useCallback(() => {
     if (!hasMore || isLoading) {
       return;
@@ -358,6 +360,7 @@ export function MessageList({
     setPendingHumanInputRequestIds(new Set());
   }, [pendingHumanInputRequestIds.size, thread.error]);
 
+  /** 从待提交集合移除指定的人类输入请求。 */
   const clearPendingHumanInput = useCallback((requestId: string) => {
     setPendingHumanInputRequestIds((previous) => {
       if (!previous.has(requestId)) {
@@ -369,6 +372,7 @@ export function MessageList({
     });
   }, []);
 
+  /** 提交用户对澄清请求的回答，并在失败时解除等待状态。 */
   const handleSubmitHumanInput = useCallback(
     async (request: HumanInputRequest, response: HumanInputResponse) => {
       setPendingHumanInputRequestIds((previous) => {
@@ -409,6 +413,7 @@ export function MessageList({
     [groupedMessages, thread.isLoading],
   );
 
+  /** 关闭文本选区工具条并清除其锚点数据。 */
   const clearSelectionToolbar = useCallback(() => {
     setSelectionToolbar(null);
   }, []);
@@ -418,9 +423,11 @@ export function MessageList({
       return;
     }
 
+    /** 滚动时关闭文本选区工具条，避免其脱离所选内容位置。 */
     const hideOnScroll = () => {
       setSelectionToolbar(null);
     };
+    /** 按 Escape 键关闭文本选区工具条。 */
     const hideOnEscape = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
         setSelectionToolbar(null);
@@ -435,6 +442,7 @@ export function MessageList({
     };
   }, [selectionToolbar]);
 
+  /** 读取助手正文的有效选区并计算侧边操作工具条的位置。 */
   const handleAssistantTextSelection = useCallback(
     (
       event: MouseEvent<HTMLDivElement>,
@@ -513,6 +521,7 @@ export function MessageList({
     ],
   );
 
+  /** 将所选文本加入当前对话的引用，并清理浏览器选区。 */
   const handleAddSelectionToConversation = useCallback(() => {
     if (!selectionToolbar) {
       return;
@@ -528,6 +537,7 @@ export function MessageList({
     setSelectionToolbar(null);
   }, [selectionToolbar, sidecar, sidecarSurface]);
 
+  /** 将所选文本作为上下文打开侧边对话，并清除临时选区。 */
   const handleAskSelectionInSidecar = useCallback(() => {
     if (!selectionToolbar) {
       return;
@@ -537,6 +547,7 @@ export function MessageList({
     setSelectionToolbar(null);
   }, [selectionToolbar, sidecar]);
 
+  /** 为完整助手回合生成复制、分支和重新生成等可用操作。 */
   const renderAssistantActions = useCallback(
     (
       messages: Message[],
@@ -644,6 +655,7 @@ export function MessageList({
     ],
   );
 
+  /** 按当前展示模式渲染逐轮用量或逐步骤调试用量。 */
   const renderTokenUsage = useCallback(
     ({
       messages,

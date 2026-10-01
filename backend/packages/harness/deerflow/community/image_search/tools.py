@@ -1,8 +1,4 @@
-"""定义 tools 模块提供的职责与可复用接口。
-
-
-Image Search Tool - Search images using DuckDuckGo for reference in image generation.
-"""
+'''通过 DuckDuckGo 搜索图片，并将结果整理为图像生成可使用的视觉参考。'''
 
 import json
 import logging
@@ -25,25 +21,7 @@ def _search_images(
     layout: str | None = None,
     license_image: str | None = None,
 ) -> list[dict]:
-    """执行 _search_images 的明确职责，并返回与调用约定一致的结果。
-
-
-    Execute image search using DuckDuckGo.
-
-    Args:
-        query: Search keywords
-        max_results: Maximum number of results
-        region: Search region
-        safesearch: Safe search level
-        size: Image size (Small/Medium/Large/Wallpaper)
-        color: Color filter
-        type_image: Image type (photo/clipart/gif/transparent/line)
-        layout: Layout (Square/Tall/Wide)
-        license_image: License filter
-
-    Returns:
-        List of search results
-    """
+    '''按地区、安全级别和图片属性调用图片搜索服务，依赖缺失或请求失败时返回空列表。'''
     try:
         from ddgs import DDGS
     except ImportError:
@@ -86,7 +64,7 @@ def image_search_tool(
     type_image: str | None = None,
     layout: str | None = None,
 ) -> str:
-    """在线搜索人物、物品或场景图片，为图像创作提供可核对的视觉参考。
+    '''在线搜索人物、物品或场景图片，为图像创作提供可核对的视觉参考。
 
     **When to use:**
     - Before generating character/portrait images: search for similar poses, expressions, styles
@@ -102,10 +80,9 @@ def image_search_tool(
         size: Image size filter. Options: "Small", "Medium", "Large", "Wallpaper". Use "Large" for reference images.
         type_image: Image type filter. Options: "photo", "clipart", "gif", "transparent", "line". Use "photo" for realistic references.
         layout: Layout filter. Options: "Square", "Tall", "Wide". Choose based on your generation needs.
-    """
+    '''
     config = get_app_config().get_tool_config("image_search")
 
-    # Override max_results from config if set
     if config is not None and "max_results" in config.model_extra:
         max_results = config.model_extra.get("max_results", max_results)
 

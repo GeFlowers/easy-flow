@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -14,13 +14,10 @@ depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
-    """创建计划任务和任务运行表，并补充调度、状态查询索引。"""
+    '''创建计划任务和任务运行表，并补充调度、状态查询索引。'''
     bind = op.get_bind()
     inspector = sa.inspect(bind)
     if inspector.has_table("scheduled_tasks"):
-        # Idempotent: a DB whose full-metadata create_all already provisioned
-        # both scheduled-task tables (e.g. legacy test seeds) must not have them
-        # re-created here.
         return
     op.create_table(
         "scheduled_tasks",
@@ -76,7 +73,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    """删除计划任务运行表与计划任务表。"""
+    '''删除计划任务运行表与计划任务表。'''
     with op.batch_alter_table("scheduled_task_runs", schema=None) as batch_op:
         batch_op.drop_index("ix_scheduled_task_runs_status")
         batch_op.drop_index("ix_scheduled_task_runs_thread_id")

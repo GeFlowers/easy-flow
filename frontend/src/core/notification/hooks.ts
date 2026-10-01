@@ -37,6 +37,7 @@ export function useNotification(): UseNotificationReturn {
     }
   }, []);
 
+  /** 请求浏览器通知权限并同步权限结果到 Hook 状态。 */
   const requestPermission =
     useCallback(async (): Promise<NotificationPermission> => {
       if (!isSupported) {
@@ -51,6 +52,7 @@ export function useNotification(): UseNotificationReturn {
 
   const [settings] = useLocalSettings();
 
+  /** 在功能受支持、已启用且获准时展示通知，并执行频率限制。 */
   const showNotification = useCallback(
     (title: string, options?: NotificationOptions) => {
       if (!isSupported) {

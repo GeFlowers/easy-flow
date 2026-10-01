@@ -1,4 +1,4 @@
-"""定义 dynamic_context_middleware 模块提供的职责与可复用接口。
+'''在会话上下文中注入当前日期和可选长期记忆，并处理跨日后的日期修正。
 
 Middleware to inject dynamic context (memory, current date) as a system-reminder.
 
@@ -26,7 +26,7 @@ Date-update format:
     <system-reminder>
     <current_date>2026-05-09, Saturday</current_date>
     </system-reminder>
-"""
+'''
 
 from __future__ import annotations
 
@@ -49,34 +49,29 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-# Upper bound (seconds) for a single _inject() offload.  If the warm-up at
-# gateway startup failed silently, the first request may still hit a cold
-# tiktoken BPE download that blocks until the OS TCP timeout (~26 min).
-# This cap ensures the request degrades gracefully instead of hanging.
 _INJECT_TIMEOUT_SECONDS = 5.0
 
 _DATE_RE = re.compile(r"<current_date>([^<]+)</current_date>")
 _DYNAMIC_CONTEXT_REMINDER_KEY = "dynamic_context_reminder"
-# Authoritative injected date, carried in additional_kwargs of the date
 # 日期标记写入 SystemMessage 的结构化元数据；识别时不扫描可能受用户影响的记忆文本。
 _REMINDER_DATE_KEY = "reminder_date"
 _SUMMARY_MESSAGE_NAME = "summary"
 
 
 def _extract_date(content: str) -> str | None:
-    """提取内容中第一个 ``<current_date>`` 标签的日期值。"""
+    '''提取内容中第一个 ``<current_date>`` 标签的日期值。'''
     m = _DATE_RE.search(content)
     return m.group(1) if m else None
 
 
 def is_dynamic_context_reminder(message: object) -> bool:
-    """判断消息是否带有动态上下文提醒的内部标记。"""
+    '''判断消息是否带有动态上下文提醒的内部标记。'''
     # 兼容旧检查点中以 HumanMessage 保存的提醒；新消息使用 SystemMessage。
     return isinstance(message, (HumanMessage, SystemMessage)) and bool(message.additional_kwargs.get(_DYNAMIC_CONTEXT_REMINDER_KEY))
 
 
 def _last_injected_date(messages: list) -> str | None:
-    """从消息末尾向前寻找最近注入的日期，优先读取结构化元数据并兼容旧检查点。"""
+    '''从消息末尾向前寻找最近注入的日期，优先读取结构化元数据并兼容旧检查点。'''
     for msg in reversed(messages):
         if not is_dynamic_context_reminder(msg):
             continue
@@ -93,7 +88,7 @@ def _last_injected_date(messages: list) -> str | None:
 
 
 def _is_user_injection_target(message: object) -> bool:
-    """判断人类消息是否适合插入动态提醒，排除摘要、已有提醒及已处理消息。"""
+    '''判断人类消息是否适合插入动态提醒，排除摘要、已有提醒及已处理消息。'''
     if not isinstance(message, HumanMessage):
         return False
     if is_dynamic_context_reminder(message):
@@ -108,7 +103,7 @@ def _is_user_injection_target(message: object) -> bool:
 
 
 class DynamicContextMiddleware(AgentMiddleware):
-    """封装 DynamicContextMiddleware 的状态、协作关系与公开操作。
+    '''首次用户消息固定记录日期与记忆；跨日时仅向当前轮次补充一次日期提醒。
 
     Inject memory and current date as a SystemMessage <system-reminder>.
 
@@ -125,24 +120,16 @@ class DynamicContextMiddleware(AgentMiddleware):
         was injected earlier.  In that case a lightweight date-update reminder is prepended
         to the **current** (last) HumanMessage and persisted.  Subsequent turns on the new
         day see the corrected date in history and skip re-injection.
-    """
+    '''
 
     def __init__(self, agent_name: str | None = None, *, app_config: AppConfig | None = None):
-        """使用代理名称与可选应用配置初始化动态上下文中间件。"""
+        '''使用代理名称与可选应用配置初始化动态上下文中间件。'''
         super().__init__()
         self._agent_name = agent_name
         self._app_config = app_config
 
     def _build_full_reminder(self) -> tuple[str, str | None]:
-        """执行 _build_full_reminder 的明确职责，并返回与调用约定一致的结果。
-
-        Return (date_reminder, memory_block | None).
-
-                Framework-owned data (date) is separated from user-owned data (memory)
-                so the downstream SystemMessage carries only framework authority and
-                memory stays at role:user — preventing untrusted content from gaining
-                system privilege (OWASP LLM01).
-        """
+        '''生成仅含系统日期的提醒，并将用户可影响的记忆内容单独作为普通用户消息返回。'''
         from deerflow.agents.lead_agent.prompt import _get_memory_context
 
         injection_enabled = self._app_config.memory.injection_enabled if self._app_config else True
@@ -162,7 +149,7 @@ class DynamicContextMiddleware(AgentMiddleware):
         return date_reminder, memory_block
 
     def _build_date_update_reminder(self) -> str:
-        """构造仅包含当前日期的跨日更新提醒。"""
+        '''构造仅包含当前日期的跨日更新提醒。'''
         current_date = datetime.now().strftime("%Y-%m-%d, %A")
         return "\n".join(
             [
@@ -180,22 +167,7 @@ class DynamicContextMiddleware(AgentMiddleware):
         *,
         reminder_date: str | None = None,
     ) -> list[SystemMessage | HumanMessage]:
-        """执行 _make_reminder_and_user_messages 的明确职责，并返回与调用约定一致的结果。
-
-        Return messages using the ID-swap technique.
-
-                SystemMessage carries framework-owned data (date, metadata) — takes
-                the original ID so add_messages replaces it in-place.  *reminder_date*
-                is recorded in its additional_kwargs as the authoritative injected date
-                (``_last_injected_date`` reads it instead of parsing content).  Optional
-                HumanMessage carries user-owned memory content with ``{id}__memory``.
-                The actual user message gets ``{id}__user``.
-
-                SystemMessage is used — system context must not masquerade as user
-                input (#3630).  Memory is deliberately kept as HumanMessage so
-                user-influenceable content does not gain system authority (OWASP LLM01)
-                — and it deliberately never carries ``reminder_date``.
-        """
+        '''拆分系统提醒、记忆文本和原始用户输入，并为三者分配稳定且可区分的消息标识。'''
         stable_id = original.id or str(uuid.uuid4())
         messages: list[SystemMessage | HumanMessage] = []
 
@@ -230,7 +202,7 @@ class DynamicContextMiddleware(AgentMiddleware):
         return messages
 
     def _inject(self, state) -> dict | None:
-        """为目标用户消息生成并注入当前日期及可选记忆提醒。"""
+        '''为目标用户消息生成并注入当前日期及可选记忆提醒。'''
         messages = list(state.get("messages", []))
         if not messages:
             return None
@@ -245,7 +217,6 @@ class DynamicContextMiddleware(AgentMiddleware):
         )
 
         if last_date is None:
-            # ── First turn: inject full reminder as a SystemMessage ─────
             first_idx = next((i for i, m in enumerate(messages) if _is_user_injection_target(m)), None)
             if first_idx is None:
                 return None
@@ -259,10 +230,8 @@ class DynamicContextMiddleware(AgentMiddleware):
             return {"messages": result_msgs}
 
         if last_date == current_date:
-            # ── Same day: nothing to do ──────────────────────────────────────────
             return None
 
-        # ── Midnight crossed: inject date-update reminder as a SystemMessage ──
         last_human_idx = next((i for i in reversed(range(len(messages))) if _is_user_injection_target(messages[i])), None)
         if last_human_idx is None:
             return None
@@ -273,25 +242,14 @@ class DynamicContextMiddleware(AgentMiddleware):
 
     @override
     def before_agent(self, state, runtime: Runtime) -> dict | None:
-        """在同步代理执行前注入本轮所需的动态上下文。"""
+        '''在同步代理执行前注入本轮所需的动态上下文。'''
         result = self._inject(state)
         self._record_effective_memory(state, result, runtime)
         return result
 
     @override
     async def abefore_agent(self, state, runtime: Runtime) -> dict | None:
-        """在线程池中异步注入本轮所需的动态上下文。"""
-        # _inject() performs synchronous file I/O (memory JSON loading) and
-        # potentially blocking network calls (tiktoken encoding download on
-        # first use).  Offload to a thread so the event loop is never blocked
-        # — a blocking call here starves all concurrent HTTP handlers (auth,
-        # SSE heartbeats, etc.).  See issue #3402.
-        #
-        # Bounded timeout: if startup warm-up failed silently (e.g. network
-        # blip during deploy), the first request's cold tiktoken download can
-        # block for tens of minutes (OS TCP timeout).  Time-box injection so
-        # the request degrades gracefully (no new dynamic-context update)
-        # rather than hanging. Frozen context already in state remains active.
+        '''在线程池中异步注入本轮所需的动态上下文。'''
         try:
             result = await asyncio.wait_for(
                 asyncio.to_thread(self._inject, state),
@@ -309,15 +267,7 @@ class DynamicContextMiddleware(AgentMiddleware):
 
     @staticmethod
     def _effective_memory_message(state, update: dict | None, runtime: Runtime) -> HumanMessage | None:
-        """执行 _effective_memory_message 的明确职责，并返回与调用约定一致的结果。
-
-        Find server-created memory that is effective for this run.
-
-                A first-run block must come from this middleware's update. A reused
-                block must have existed in the checkpoint before the run; the Gateway
-                strips the reminder marker from untrusted input so a caller cannot
-                replace a known checkpoint ID with forged provenance.
-        """
+        '''从本轮更新或运行前检查点中寻找可信的隐藏记忆消息，拒绝仅由本轮输入伪造的标记。'''
         if isinstance(update, dict):
             update_messages = update.get("messages")
             if isinstance(update_messages, list):
@@ -342,9 +292,7 @@ class DynamicContextMiddleware(AgentMiddleware):
         return None
 
     def _record_effective_memory(self, state, update: dict | None, runtime: Runtime) -> None:
-        """执行 _record_effective_memory 的明确职责，并返回与调用约定一致的结果。
-
-        Attach the effective hidden memory block to the current run ledger."""
+        '''把实际影响本轮提示的记忆内容摘要写入运行日志，不保存原始记忆文本。'''
         context = getattr(runtime, "context", None)
         journal = context.get("__run_journal") if isinstance(context, dict) else None
         if journal is None:

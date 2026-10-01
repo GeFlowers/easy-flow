@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -18,37 +18,15 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 logger = logging.getLogger(__name__)
 
 
-# Where the alembic environment lives, relative to this file.
 _MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
 
-# Cached migration head, computed once per process from the disk script tree.
 _HEAD_REVISION: str | None = None
 
-# Baseline (stamp target for legacy DBs). Pinned here so the bootstrap layer
-# fails loudly if the baseline revision is ever renamed without updating the
-# stamp call. ``tests/test_persistence_bootstrap.py`` asserts this string is a
-# real revision id in the script tree.
 _BASELINE_REVISION = "0001_baseline"
 
-# Stable advisory-lock key for Postgres. Two random 32-bit halves picked once
-# so we never collide with any other application's advisory locks. Do not
-# change without coordinating a one-time migration (a key change effectively
-# releases the prior lock).
 _PG_LOCK_KEY = 0x0DEE_12F1_0BEE_3682
 
 
-# Tables created by ``0001_baseline.upgrade()``. The legacy branch restricts
-# its ``create_all`` backfill to this set so it does NOT pre-empt later
-# ``op.create_table`` revisions for models added after baseline -- those
-# revisions would otherwise fail with ``relation already exists`` if
-# ``create_all`` had created their table first. (Column revisions are
-# already safe via the idempotent helpers in ``migrations/_helpers.py``;
-# there is no analogous ``safe_create_table`` yet, so we keep table-level
-# safety at this layer instead of pushing it onto every future revision.)
-#
-# ``test_baseline_table_names_constant_matches_0001`` pins this set against
-# what 0001 actually creates -- editing 0001 without updating this constant
-# (or vice versa) fires that test.
 _BASELINE_TABLE_NAMES: frozenset[str] = frozenset(
     {
         "channel_connections",
@@ -63,40 +41,29 @@ _BASELINE_TABLE_NAMES: frozenset[str] = frozenset(
     }
 )
 
-# ``test_baseline_index_names_constant_matches_0001`` pins this set against
-# what 0001 actually creates -- editing 0001 without updating this constant
-# (or vice versa) fires that test.
 _BASELINE_INDEX_NAMES: frozenset[str] = frozenset(
     {
-        # channel_connections
         "idx_channel_connections_event_lookup",
         "ix_channel_connections_owner_user_id",
         "ix_channel_connections_provider",
         "uq_channel_connection_active_identity",
-        # channel_conversations
         "ix_channel_conversations_connection_id",
         "ix_channel_conversations_owner_user_id",
         "ix_channel_conversations_provider",
         "ix_channel_conversations_thread_id",
-        # channel_oauth_states
         "ix_channel_oauth_states_owner_user_id",
         "ix_channel_oauth_states_provider",
-        # feedback
         "ix_feedback_run_id",
         "ix_feedback_thread_id",
         "ix_feedback_user_id",
-        # run_events
         "ix_events_run",
         "ix_events_thread_cat_seq",
         "ix_run_events_user_id",
-        # runs
         "ix_runs_thread_id",
         "ix_runs_thread_status",
         "ix_runs_user_id",
-        # threads_meta
         "ix_threads_meta_assistant_id",
         "ix_threads_meta_user_id",
-        # users
         "idx_users_oauth_identity",
         "ix_users_email",
     }
@@ -104,18 +71,18 @@ _BASELINE_INDEX_NAMES: frozenset[str] = frozenset(
 
 
 def _escape_url_for_alembic(url: str) -> str:
-    """转义 Alembic 配置语法中的百分号，避免把 DSN 当作插值模板。"""
+    '''转义 Alembic 配置语法中的百分号，避免把 DSN 当作插值模板。'''
     return url.replace("%", "%%")
 
 
 def _alembic_safe_url(engine: AsyncEngine) -> str:
-    """读取引擎 DSN 并转换成可安全写入 Alembic 配置的字符串。"""
+    '''读取引擎 DSN 并转换成可安全写入 Alembic 配置的字符串。'''
     rendered = engine.url.render_as_string(hide_password=False)
     return _escape_url_for_alembic(rendered)
 
 
 def _get_alembic_config(engine: AsyncEngine) -> AlembicConfig:
-    """构造指向本项目迁移目录并使用当前引擎 DSN 的 Alembic 配置。"""
+    '''构造指向本项目迁移目录并使用当前引擎 DSN 的 Alembic 配置。'''
     cfg = AlembicConfig()
     cfg.set_main_option("script_location", str(_MIGRATIONS_DIR))
     cfg.set_main_option("sqlalchemy.url", _alembic_safe_url(engine))
@@ -123,7 +90,7 @@ def _get_alembic_config(engine: AsyncEngine) -> AlembicConfig:
 
 
 def _get_head_revision() -> str:
-    """读取并缓存迁移目录中的最新版本号。"""
+    '''读取并缓存迁移目录中的最新版本号。'''
     global _HEAD_REVISION
     if _HEAD_REVISION is None:
         cfg = AlembicConfig()
@@ -137,11 +104,9 @@ def _get_head_revision() -> str:
 
 
 def _reflect_state(sync_conn: Any) -> dict[str, bool]:
-    """检查数据库是否已有 Alembic 版本表或 DeerFlow 自有表。"""
+    '''检查数据库是否已有 Alembic 版本表或 DeerFlow 自有表。'''
     from deerflow.persistence.base import Base
 
-    # Make sure every ORM model is imported, otherwise ``Base.metadata.tables``
-    # may miss tables registered by submodules that haven't been imported yet.
     try:
         import deerflow.persistence.models  # noqa: F401
     except ImportError:
@@ -157,20 +122,16 @@ def _reflect_state(sync_conn: Any) -> dict[str, bool]:
 
 
 def _decide_state(state: dict[str, bool]) -> str:
-    """根据已存在的表结构选择新库、旧库或已版本化数据库流程。"""
+    '''根据已存在的表结构选择新库、旧库或已版本化数据库流程。'''
     if state["has_alembic_version"]:
         return "versioned"
     if not state["has_deerflow_tables"]:
-        # Either a brand-new DB or a DB containing only tables we don't own
-        # (e.g. LangGraph's checkpointer tables on a fresh deployment). The
-        # empty branch provisions the tables alembic owns, then stamps head.
         return "empty"
     return "legacy"
 
 
 def _run_create_all_sync(sync_conn: Any) -> None:
-    """使用 ORM 元数据创建当前版本缺失的全部业务表。"""
-    # Import here to ensure all model classes are registered with Base.metadata.
+    '''使用 ORM 元数据创建当前版本缺失的全部业务表。'''
     from deerflow.persistence.base import Base
 
     try:
@@ -182,7 +143,7 @@ def _run_create_all_sync(sync_conn: Any) -> None:
 
 
 def _run_baseline_create_all_sync(sync_conn: Any) -> None:
-    """仅补齐基线版本负责的表和索引，避免抢先创建后续迁移对象。"""
+    '''仅补齐基线版本负责的表和索引，避免抢先创建后续迁移对象。'''
     from deerflow.persistence.base import Base
 
     try:
@@ -193,28 +154,6 @@ def _run_baseline_create_all_sync(sync_conn: Any) -> None:
     baseline_tables = [Base.metadata.tables[name] for name in _BASELINE_TABLE_NAMES if name in Base.metadata.tables]
     Base.metadata.create_all(sync_conn, tables=baseline_tables, checkfirst=True)
 
-    # ``create_all`` with ``checkfirst=True`` skips a table and all its
-    # subordinate ``Index`` objects when the table already exists.  An index
-    # that was added to the ORM model after the table was first provisioned
-    # would therefore never be created, and because the legacy branch stamps
-    # ``0001_baseline`` before running upgrade, alembic's own
-    # ``batch_op.create_index`` for baseline-era indexes is skipped too.
-    # Explicitly creating every baseline-era ``Index`` on every baseline table
-    # (each with its own ``checkfirst=True``) guarantees each index exists
-    # regardless of whether its parent table was just created or already
-    # present.
-    #
-    # **Scope**: Only indexes in ``_BASELINE_INDEX_NAMES`` are created.
-    # ``table.indexes`` is the *current* ORM model's full index set, which
-    # includes post-baseline indexes added by later revisions (e.g.
-    # ``uq_runs_thread_active`` from 0004).  Creating those prematurely would
-    # collide with their owning revision's data prerequisites (dedup steps,
-    # column migrations) and raise ``IntegrityError`` on legacy DBs.
-    #
-    # Post-baseline revisions that add an index to a baseline table must use
-    # the existing ``sa.inspect(bind).get_indexes(...)`` + ``if name not in
-    # existing`` guard pattern (see 0004_run_ownership.py:99-103), or a future
-    # ``safe_create_index`` helper -- mirroring ``safe_add_column``.
     for table in baseline_tables:
         for idx in table.indexes:
             if idx.name not in _BASELINE_INDEX_NAMES:
@@ -230,23 +169,20 @@ def _run_baseline_create_all_sync(sync_conn: Any) -> None:
 
 
 def _stamp(cfg: AlembicConfig, revision: str) -> None:
-    """将数据库标记为指定迁移版本，但不执行该版本的迁移操作。"""
+    '''将数据库标记为指定迁移版本，但不执行该版本的迁移操作。'''
     alembic_command.stamp(cfg, revision)
 
 
 def _upgrade(cfg: AlembicConfig, revision: str) -> None:
-    """运行 Alembic 迁移，将数据库升级到指定版本。"""
+    '''运行 Alembic 迁移，将数据库升级到指定版本。'''
     alembic_command.upgrade(cfg, revision)
 
 
-# ---------------------------------------------------------------------------
-# Cross-process locking
-# ---------------------------------------------------------------------------
 
 
 @asynccontextmanager
 async def _postgres_lock(engine: AsyncEngine):
-    """持有 PostgreSQL 会话级 advisory lock，串行执行架构引导。"""
+    '''持有 PostgreSQL 会话级 advisory lock，串行执行架构引导。'''
     async with engine.connect() as conn:
         await conn.execute(text("SET LOCAL idle_in_transaction_session_timeout = 0"))
         await conn.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _PG_LOCK_KEY})
@@ -261,17 +197,14 @@ async def _postgres_lock(engine: AsyncEngine):
 
 
 def _bootstrap_lock(engine: AsyncEngine):
-    """返回保护 PostgreSQL 架构修改的 advisory lock 上下文。"""
+    '''返回保护 PostgreSQL 架构修改的 advisory lock 上下文。'''
     return _postgres_lock(engine)
 
 
-# ---------------------------------------------------------------------------
-# Top-level entry point
-# ---------------------------------------------------------------------------
 
 
 async def bootstrap_schema(engine: AsyncEngine) -> None:
-    """将数据库架构引导或迁移到当前目标版本。"""
+    '''将数据库架构引导或迁移到当前目标版本。'''
     head = _get_head_revision()
     cfg = _get_alembic_config(engine)
 
@@ -292,16 +225,6 @@ async def bootstrap_schema(engine: AsyncEngine) -> None:
                 _BASELINE_REVISION,
                 head,
             )
-            # ``_run_baseline_create_all_sync`` is restricted to
-            # ``_BASELINE_TABLE_NAMES`` -- a plain ``Base.metadata.create_all``
-            # would also create tables introduced by later revisions and
-            # collide with their ``op.create_table`` on the subsequent
-            # upgrade. With the restriction, missing baseline tables are
-            # backfilled and post-baseline ``create_table`` revisions run
-            # against a DB where their tables genuinely do not yet exist.
-            # The post-create_all column-add revisions still no-op via
-            # ``safe_add_column`` because baseline-era tables now have the
-            # columns those revisions would add.
             async with engine.begin() as conn:
                 await conn.run_sync(_run_baseline_create_all_sync)
             await asyncio.to_thread(_stamp, cfg, _BASELINE_REVISION)

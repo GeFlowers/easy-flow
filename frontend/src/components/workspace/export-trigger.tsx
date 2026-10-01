@@ -28,6 +28,7 @@ export function ExportTrigger({ threadId }: { threadId: string }) {
 
   const messages = thread.messages;
 
+  /** 按选定格式导出当前线程消息，并提示空内容或导出结果。 */
   const handleExport = useCallback(
     (format: "markdown" | "json") => {
       if (messages.length === 0) {

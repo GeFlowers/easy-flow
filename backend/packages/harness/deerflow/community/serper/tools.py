@@ -1,11 +1,4 @@
-"""定义 tools 模块提供的职责与可复用接口。
-
-
-Web and image search tools powered by Serper (Google Search API).
-
-Serper provides real-time Google Search and Google Images results via a JSON
-API. An API key is required. Sign up at https://serper.dev to get one.
-"""
+'''使用 Serper 搜索网页和图片，规范供应商响应并过滤不安全的图片地址。'''
 
 import json
 import logging
@@ -27,7 +20,7 @@ _api_key_warned: set[str] = set()
 
 
 def _get_api_key(tool_name: str) -> str | None:
-    "执行 _get_api_key 的明确职责，并返回与调用约定一致的结果"
+    '''优先从工具配置读取密钥，再回退到 SERPER_API_KEY 环境变量。'''
     config = get_app_config().get_tool_config(tool_name)
     if config is not None:
         api_key = config.model_extra.get("api_key")
@@ -40,9 +33,7 @@ def _get_api_key(tool_name: str) -> str | None:
 
 
 def _coerce_max_results(value: object, default: int = 5, max_allowed: int = _SERPER_MAX_RESULTS) -> int:
-    """执行 _coerce_max_results 的明确职责，并返回与调用约定一致的结果。
-
-    Coerce config/parameter input into a bounded positive result count."""
+    '''把结果数量转换为正整数并限制在服务端允许范围内，错误输入采用默认值。'''
     try:
         count = int(value)
     except (TypeError, ValueError):
@@ -53,7 +44,7 @@ def _coerce_max_results(value: object, default: int = 5, max_allowed: int = _SER
 
 
 def _missing_key_error(query: str, tool_name: str) -> str:
-    "执行 _missing_key_error 的明确职责，并返回与调用约定一致的结果"
+    '''首次发现指定工具缺少密钥时记录提示，并返回结构化配置错误。'''
     if tool_name not in _api_key_warned:
         _api_key_warned.add(tool_name)
         logger.warning("Serper API key is not set for '%s'. Set SERPER_API_KEY in your environment or provide api_key in config.yaml. Sign up at https://serper.dev", tool_name)
@@ -64,7 +55,7 @@ def _missing_key_error(query: str, tool_name: str) -> str:
 
 
 def _unexpected_format_error(query: str) -> str:
-    "执行 _unexpected_format_error 的明确职责，并返回与调用约定一致的结果"
+    '''构造统一的供应商响应格式错误，保留原始查询供调用方诊断。'''
     return json.dumps(
         {"error": "Serper returned an unexpected response format", "query": query},
         ensure_ascii=False,
@@ -72,10 +63,8 @@ def _unexpected_format_error(query: str) -> str:
 
 
 def _response_items(data: dict, field: str, query: str) -> tuple[list[dict] | None, str | None]:
-    "执行 _response_items 的明确职责，并返回与调用约定一致的结果"
+    '''提取供应商响应中的结果数组；缺失字段视为空结果，其他类型视为格式错误。'''
     items = data.get(field)
-    # Treat a missing or null field as "no results" (some APIs return
-    # ``{"organic": null}`` to signal that) rather than a malformed payload.
     if items is None:
         return [], None
     if not isinstance(items, list):
@@ -85,9 +74,7 @@ def _response_items(data: dict, field: str, query: str) -> tuple[list[dict] | No
 
 
 def _clean_query(query: str) -> str:
-    """执行 _clean_query 的明确职责，并返回与调用约定一致的结果。
-
-    Normalize a raw query into the value actually sent to Serper."""
+    '''去除查询首尾空白，并截断超过服务端长度限制的内容。'''
     query = query.strip()
     if len(query) > 500:
         query = query[:500]
@@ -95,16 +82,7 @@ def _clean_query(query: str) -> str:
 
 
 def _decode_ipv4(host: str) -> IPv4Address | None:
-    """执行 _decode_ipv4 的明确职责，并返回与调用约定一致的结果。
-
-    Decode obfuscated IPv4 literals that ``ip_address`` rejects.
-
-        Mirrors the permissive ``inet_aton`` parsing many HTTP clients use, so that
-        integer (``2130706433``), hex (``0x7f000001``) and octal (``0177.0.0.1``)
-        encodings of an address are recognized. Returns an ``IPv4Address`` when the
-        host decodes to one, otherwise ``None`` (e.g. real domains like
-        ``cafe.com`` fail to decode and are left for the caller to treat as a host).
-    """
+    '''识别十进制、十六进制或八进制形式的非标准 IPv4 字面量，防止其绕过地址过滤。'''
     parts = host.split(".")
     if not 1 <= len(parts) <= 4:
         return None
@@ -139,29 +117,12 @@ def _decode_ipv4(host: str) -> IPv4Address | None:
 
 
 def _is_url_present(value: object) -> bool:
-    """执行 _is_url_present 的明确职责，并返回与调用约定一致的结果。
-
-    Return ``True`` when *value* is a non-empty URL string.
-
-        Used to distinguish a field that was *absent* (eligible for cross-field
-        fallback) from one that was *present but filtered* by the SSRF guard (which
-        must stay empty rather than collapse onto its counterpart).
-    """
+    '''判断供应商字段是否提供了非空网址，以区分缺失字段和被安全过滤的字段。'''
     return isinstance(value, str) and bool(value.strip())
 
 
 def _safe_public_url(value: object) -> str:
-    """执行 _safe_public_url 的明确职责，并返回与调用约定一致的结果。
-
-    Return ``value`` only if it is a safe, public http(s) URL, else "".
-
-        This is a best-effort SSRF guard that rejects non-http(s) schemes,
-        ``localhost``, and private/non-global IP literals (including obfuscated
-        decimal/hex/octal encodings). It only inspects the URL string and cannot
-        catch public hostnames that resolve to internal IPs (e.g. DNS rebinding);
-        any consumer that actually downloads these URLs must re-validate the
-        resolved IP at fetch time.
-    """
+    '''仅保留公共 HTTP 或 HTTPS 地址，并拒绝本机、私有及混淆表示的非公网 IP 字面量。'''
     if not isinstance(value, str):
         return ""
     url = value.strip()
@@ -169,9 +130,6 @@ def _safe_public_url(value: object) -> str:
     if parsed.scheme not in {"http", "https"} or not parsed.netloc or not parsed.hostname:
         return ""
 
-    # Strip a single trailing dot (FQDN root label). ``localhost.`` and
-    # ``127.0.0.1.`` resolve to loopback on common resolvers but would
-    # otherwise slip past the localhost/IP checks below.
     host = parsed.hostname.lower().rstrip(".")
     if not host:
         return ""
@@ -188,16 +146,7 @@ def _safe_public_url(value: object) -> str:
 
 
 def _serper_post(endpoint: str, api_key: str, query: str, max_results: int) -> tuple[dict | None, str | None]:
-    """执行 _serper_post 的明确职责，并返回与调用约定一致的结果。
-
-    Send a POST request to a Serper endpoint.
-
-        ``query`` is expected to already be normalized via :func:`_clean_query`.
-
-        Returns a ``(data, error_json)`` tuple: on success ``data`` is the parsed
-        JSON response and ``error_json`` is ``None``; on failure ``data`` is ``None``
-        and ``error_json`` is a serialized structured error ready to return.
-    """
+    '''向指定搜索端点发送请求并解析对象响应；将网络、状态码及响应格式错误序列化返回。'''
     headers = {
         "X-API-KEY": api_key,
         "Content-Type": "application/json",
@@ -227,12 +176,12 @@ def _serper_post(endpoint: str, api_key: str, query: str, max_results: int) -> t
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int = 5) -> str:
-    """通过 Serper 调用 Google Search 查询网络信息。
+    '''通过 Serper 调用 Google Search 查询网络信息。
 
     Args:
         query: Search keywords describing what you want to find. Be specific for better results.
         max_results: Maximum number of search results to return. Default is 5, capped at 10.
-    """
+    '''
     config = get_app_config().get_tool_config("web_search")
     if config is not None and "max_results" in config.model_extra:
         max_results = config.model_extra.get("max_results", max_results)
@@ -253,9 +202,6 @@ def web_search_tool(query: str, max_results: int = 5) -> str:
     if not organic:
         return json.dumps({"error": "No results found", "query": query}, ensure_ascii=False)
 
-    # Search result links are returned verbatim (not passed through
-    # _safe_public_url): they are surfaced as citations for the model to read,
-    # not fetched/downloaded by this tool, unlike image_search image URLs.
     normalized_results = [
         {
             "title": r.get("title", ""),
@@ -275,14 +221,14 @@ def web_search_tool(query: str, max_results: int = 5) -> str:
 
 @tool("image_search", parse_docstring=True)
 def image_search_tool(query: str, max_results: int = 5) -> str:
-    """通过 Serper 查询 Google 图片，为人物、物品或场景创作收集视觉参考。
+    '''通过 Serper 查询 Google 图片，为人物、物品或场景创作收集视觉参考。
 
     The returned image URLs can be used as reference images in image generation to significantly improve quality.
 
     Args:
         query: Search keywords describing the images you want to find. Be specific for better results (e.g., "Japanese woman street photography 1990s" instead of just "woman").
         max_results: Maximum number of images to return. Default is 5, capped at 10.
-    """
+    '''
     config = get_app_config().get_tool_config("image_search")
     if config is not None and "max_results" in config.model_extra:
         max_results = config.model_extra.get("max_results", max_results)
@@ -307,14 +253,8 @@ def image_search_tool(query: str, max_results: int = 5) -> str:
     for r in images:
         raw_image = r.get("imageUrl")
         raw_thumb = r.get("thumbnailUrl")
-        # Evaluate the (non-trivial) SSRF guard once per field instead of twice.
         safe_image = _safe_public_url(raw_image)
         safe_thumb = _safe_public_url(raw_thumb)
-        # Cross-fall back only when the other field was *absent*. A field that
-        # was present but failed the SSRF filter is left empty rather than
-        # collapsed onto its counterpart, so a dropped high-res URL never
-        # silently masquerades as the preview (and vice versa), preserving the
-        # high-res/preview contract callers rely on.
         image_url = safe_image or (safe_thumb if not _is_url_present(raw_image) else "")
         thumbnail_url = safe_thumb or (safe_image if not _is_url_present(raw_thumb) else "")
         if not image_url and not thumbnail_url:

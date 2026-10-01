@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''扫描受监控工作区，排除依赖目录和敏感内容并为安全差异生成快照。'''
 
 from __future__ import annotations
 
@@ -80,7 +80,7 @@ _UTF16_BOMS = (BOM_UTF16_LE, BOM_UTF16_BE)
 
 
 def is_sensitive_workspace_path(path: str) -> bool:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''根据凭据文件名模式识别不得读取或展示内容的路径。'''
     normalized = path.lower()
     parts = [part.lower() for part in Path(path).parts]
     basename = parts[-1] if parts else normalized
@@ -100,7 +100,7 @@ def scan_workspace_roots(
     text_paths: set[str] | None = None,
     text_cache_dir: Path | None = None,
 ) -> WorkspaceSnapshot:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''遍历允许的根目录，跳过符号链接和生成目录并遵守扫描数量上限。'''
     resolved_limits = limits or WorkspaceChangeLimits()
     cache_dir = Path(text_cache_dir) if text_cache_dir is not None else None
     if cache_dir is not None:
@@ -156,7 +156,7 @@ def _snapshot_file(
     text_paths: set[str] | None,
     text_cache_dir: Path | None,
 ) -> FileSnapshot | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''收集文件元数据；仅对安全、可读且在大小限制内的文件保留文本。'''
     try:
         stat = host_file.stat()
         size = stat.st_size
@@ -228,7 +228,7 @@ def _snapshot_file(
 
 
 def _cache_text_file(text: str, virtual_path: str, cache_dir: Path) -> Path:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''把文本写入以虚拟路径摘要命名的临时文件，减少快照常驻内存。'''
     cache_name = hashlib.sha256(virtual_path.encode("utf-8")).hexdigest()
     target = cache_dir / cache_name
     target.write_text(text, encoding="utf-8")
@@ -236,13 +236,13 @@ def _cache_text_file(text: str, virtual_path: str, cache_dir: Path) -> Path:
 
 
 def _read_sample(path: Path) -> bytes:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''仅读取文件开头的有限字节，用于检测编码和二进制内容。'''
     with path.open("rb") as file:
         return file.read(SAMPLE_BYTES)
 
 
 def _sha256_file(path: Path) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''分块计算文件摘要，避免一次性将整个文件载入内存。'''
     digest = hashlib.sha256()
     with path.open("rb") as file:
         for chunk in iter(lambda: file.read(1024 * 1024), b""):
@@ -251,7 +251,7 @@ def _sha256_file(path: Path) -> str:
 
 
 def _decode_text_bytes(data: bytes) -> str | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''按 UTF-8、带 BOM 的 UTF-8 和带 BOM 的 UTF-16 顺序解码文本。'''
     for encoding in ("utf-8-sig", "utf-8"):
         try:
             return data.decode(encoding)
@@ -268,7 +268,7 @@ def _decode_text_bytes(data: bytes) -> str | None:
 
 
 def _sample_decodes_as_text(sample: bytes, encoding: str) -> bool:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''用增量解码器判断样本是否符合指定文本编码。'''
     try:
         decoder = getincrementaldecoder(encoding)()
         decoder.decode(sample, final=False)
@@ -278,7 +278,7 @@ def _sample_decodes_as_text(sample: bytes, encoding: str) -> bool:
 
 
 def _looks_binary(sample: bytes) -> bool:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''通过文件扩展名、空字节和文本解码结果识别二进制文件。'''
     if sample.startswith(_UTF16_BOMS) and _sample_decodes_as_text(sample, "utf-16"):
         return False
     if b"\x00" in sample:

@@ -1,10 +1,10 @@
-"""提供配置、title、配置相关功能。"""
+'''配置对话标题生成开关、长度限制、模型选择和提示词模板。'''
 
 from pydantic import BaseModel, Field
 
 
 class TitleConfig(BaseModel):
-    """\u6267\u884c TitleConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为标题生成器提供模型提示和本地回退标题的边界设置。'''
 
     enabled: bool = Field(
         default=True,
@@ -34,23 +34,23 @@ _title_config: TitleConfig = TitleConfig()
 
 
 def get_title_config() -> TitleConfig:
-    """\u6267\u884c get_title_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回当前标题生成配置。'''
     return _title_config
 
 
 def set_title_config(config: TitleConfig) -> None:
-    """\u6267\u884c set_title_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''替换当前标题生成配置，供应用启动配置阶段使用。'''
     global _title_config
     _title_config = config
 
 
 def load_title_config_from_dict(config_dict: dict) -> None:
-    """\u6267\u884c load_title_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''从应用配置字典创建并缓存标题生成配置。'''
     global _title_config
     _title_config = TitleConfig(**config_dict)
 
 
 def reset_title_config() -> None:
-    """\u6267\u884c reset_title_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''恢复默认标题生成配置，主要供测试和重载流程使用。'''
     global _title_config
     _title_config = TitleConfig()

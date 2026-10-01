@@ -1,8 +1,8 @@
-"""让自定义代理持久化更新自身配置和角色说明的工具。
+'''让自定义代理持久化更新自身配置和角色说明的工具。
 
 该工具仅在现有自定义代理会话中提供。它按用户隔离写入代理目录，并先写入临时文件，
 待全部文件准备完成后再替换目标文件，避免部分失败导致配置与角色说明不一致。
-"""
+'''
 
 from __future__ import annotations
 
@@ -27,20 +27,14 @@ logger = logging.getLogger(__name__)
 
 _NULLISH_STRINGS = frozenset({"null", "none", "undefined"})
 
-# Channels whose inbound messages come from untrusted external commenters
-# (anyone on a GitHub repo, etc.). The lead-agent factory already drops
-# this tool for runs on these channels (see ``_WEBHOOK_CHANNELS`` in
-# ``deerflow.agents.lead_agent.agent``); this set is the in-tool mirror
-# so a custom factory that re-attaches ``update_agent`` cannot silently
-# expose self-mutation over a webhook.
 _UNTRUSTED_CHANNELS: frozenset[str] = frozenset({"github"})
 
 
 def _stage_temp(path: Path, text: str) -> Path:
-    """将文本写入同级临时文件并返回其路径。
+    '''将文本写入同级临时文件并返回其路径。
 
     调用方负责在全部文件准备就绪后替换目标文件，或在失败时删除临时文件。
-    """
+    '''
     path.parent.mkdir(parents=True, exist_ok=True)
     fd = tempfile.NamedTemporaryFile(
         mode="w",
@@ -61,7 +55,7 @@ def _stage_temp(path: Path, text: str) -> Path:
 
 
 def _cleanup_temps(temps: list[Path]) -> None:
-    """尽力删除已暂存的临时文件。"""
+    '''尽力删除已暂存的临时文件。'''
     for tmp in temps:
         try:
             tmp.unlink(missing_ok=True)
@@ -70,12 +64,12 @@ def _cleanup_temps(temps: list[Path]) -> None:
 
 
 def _is_nullish_string(value: object) -> bool:
-    """判断值是否为表示空值的字符串。"""
+    '''判断值是否为表示空值的字符串。'''
     return isinstance(value, str) and value.strip().lower() in _NULLISH_STRINGS
 
 
 def _normalize_nullish_string(value: object) -> object:
-    """将表示空值的字符串规范化为 ``None``。"""
+    '''将表示空值的字符串规范化为 ``None``。'''
     return None if _is_nullish_string(value) else value
 
 
@@ -92,7 +86,7 @@ def update_agent(
     tool_groups: OptionalStringList = None,
     model: OptionalText = None,
 ) -> Command:
-    """持久化更新当前自定义代理的角色说明和配置。
+    '''持久化更新当前自定义代理的角色说明和配置。
 
     Use this when the user asks to refine the agent's identity, description,
     skill whitelist, tool-group whitelist, or default model. Only the fields
@@ -117,22 +111,15 @@ def update_agent(
         Command with a ToolMessage describing the result. Changes take effect
         on the next user turn (when the lead agent is rebuilt with the fresh
         SOUL.md and config.yaml).
-    """
+    '''
     tool_call_id = runtime.tool_call_id
     agent_name_raw: str | None = runtime.context.get("agent_name") if runtime.context else None
     channel_name: str | None = runtime.context.get("channel_name") if runtime.context else None
 
     def _err(message: str) -> Command:
-        """构造包含错误信息的工具结果命令。"""
+        '''构造包含错误信息的工具结果命令。'''
         return Command(update={"messages": [ToolMessage(content=f"Error: {message}", tool_call_id=tool_call_id, status="error")]})
 
-    # Defence in depth — the lead-agent factory already withholds this
-    # tool from webhook-channel runs (see ``_WEBHOOK_CHANNELS`` in
-    # ``deerflow.agents.lead_agent.agent``). The same channel set is
-    # mirrored here so a future code path that re-attaches the tool
-    # without going through ``_make_lead_agent`` (custom factories,
-    # tests, etc.) does not silently accept untrusted self-mutation
-    # requests routed from a webhook.
     if channel_name in _UNTRUSTED_CHANNELS:
         return _err(f"update_agent is disabled on the {channel_name!r} channel. Self-mutation requests must come from an operator-trusted surface (chat UI or the HTTP API), not a webhook fan-out.")
 
@@ -147,32 +134,14 @@ def update_agent(
     if not agent_name:
         return _err("update_agent is only available inside a custom agent's chat. There is no agent_name in the current runtime context, so there is nothing to update. If you are inside the bootstrap flow, use setup_agent instead.")
 
-    # Resolve the active user so that updates only affect this user's agent.
-    # ``resolve_runtime_user_id`` prefers ``runtime.context["user_id"]`` (set by
-    # the gateway from the auth-validated request) and falls back to the
-    # contextvar, then DEFAULT_USER_ID. This matches setup_agent so a user
-    # creating an agent and later refining it always touches the same files,
-    # even if the contextvar gets lost across an async/thread boundary
-    # (issue #2782 / #2862 class of bugs).
     user_id = resolve_runtime_user_id(runtime)
 
-    # Reject an unknown ``model`` *before* touching the filesystem. Otherwise
-    # ``_resolve_model_name`` silently falls back to the default at runtime
-    # and the user sees confusing repeated warnings on every later turn.
     if model is not None and get_app_config().get_model_config(model) is None:
         return _err(f"Unknown model '{model}'. Pass a model name that exists in config.yaml's models section.")
 
     paths = get_paths()
     agent_dir = paths.user_agent_dir(user_id, agent_name)
     legacy_dir = paths.agent_dir(agent_name)
-    # Require config.yaml, not bare directory existence — a per-user agent
-    # directory can exist containing only memory.json (written the first
-    # time this user chats with a legacy shared agent, before update_agent
-    # is ever called). Bare .exists() would miss that case and let this
-    # fall through to load_agent_config, which correctly resolves through
-    # to the legacy shared config via resolve_agent_dir, silently forking
-    # a brand-new config.yaml/SOUL.md into the memory-only directory
-    # instead of blocking (mirrors resolve_agent_dir's guard, see #3390).
     if not (agent_dir / "config.yaml").exists() and (legacy_dir / "config.yaml").exists():
         return _err(f"Agent '{agent_name}' only exists in the legacy shared layout and is not scoped to a user; legacy agents are read-only and cannot be updated through this tool.")
 
@@ -188,8 +157,6 @@ def update_agent(
 
     updated_fields: list[str] = []
 
-    # Force the on-disk ``name`` to match the directory we are writing into,
-    # even if ``existing_cfg.name`` had drifted (e.g. from manual yaml edits).
     config_data: dict[str, Any] = {"name": agent_name}
     new_description = description if description is not None else existing_cfg.description
     config_data["description"] = new_description
@@ -214,22 +181,12 @@ def update_agent(
     if skills is not None and skills != existing_cfg.skills:
         updated_fields.append("skills")
 
-    # Preserve every top-level AgentConfig field that this tool does not
-    # expose as an argument (currently ``github:``, plus any future field
-    # added to :class:`AgentConfig`). The same helper is used by the HTTP
-    # ``PATCH /api/agents/{name}`` route so the two surfaces stay in lockstep.
-    # Without this, operators who hand-author a ``github:`` block on a custom
-    # agent would silently lose it the next time the agent self-updates via
-    # ``update_agent``.
     preserved = preserve_non_managed_fields(existing_cfg)
     for key, value in preserved.items():
         config_data.setdefault(key, value)
 
     config_changed = bool({"description", "model", "tool_groups", "skills"} & set(updated_fields))
 
-    # Stage every file we intend to rewrite into a temp sibling. Only after
-    # *all* temp files exist do we rename them into place — so a failure on
-    # SOUL.md cannot leave config.yaml already replaced.
     pending: list[tuple[Path, Path]] = []
     staged_temps: list[Path] = []
 
@@ -250,11 +207,6 @@ def update_agent(
             pending.append((soul_tmp, soul_target))
             updated_fields.append("soul")
 
-        # Commit phase. ``Path.replace`` is atomic per file on POSIX/NTFS and
-        # the staging step above means any earlier failure has already been
-        # reported. The remaining failure mode is a crash *between* two
-        # ``replace`` calls, which is reported via the partial-write error
-        # branch below so the caller knows which files are now on disk.
         committed: list[Path] = []
         try:
             for tmp, target in pending:

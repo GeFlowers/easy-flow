@@ -1,4 +1,4 @@
-"定义 tools 模块提供的职责与可复用接口"
+'''提供网页抓取工具，并将项目配置转换为 Crawl4AI 客户端参数。'''
 
 import logging
 
@@ -18,9 +18,7 @@ VALID_FILTERS = ("fit", "raw", "bm25", "llm")
 
 
 def _get_tool_config(tool_name: str) -> dict | None:
-    """执行 _get_tool_config 的明确职责，并返回与调用约定一致的结果。
-
-    Return the tool's config extras (model_extra) dict, or None if unconfigured."""
+    '''读取指定工具配置中的扩展字段；未配置时返回 ``None``。'''
     config = get_app_config().get_tool_config(tool_name)
     if config is None:
         return None
@@ -29,14 +27,7 @@ def _get_tool_config(tool_name: str) -> dict | None:
 
 
 def _coerce_timeout(value: object, default: int) -> float:
-    """执行 _coerce_timeout 的明确职责，并返回与调用约定一致的结果。
-
-    Coerce a config timeout into seconds, falling back to ``default`` on bad input.
-
-        Mirrors ``jina_ai._coerce_timeout``: booleans and non-numeric strings fall
-        back to the default so e.g. ``timeout: off`` (YAML ``False``) does not become
-        ``0.0`` and time out every request against a healthy server.
-    """
+    '''将配置值转换为秒数；布尔值、非法字符串和其他类型均回退到默认值。'''
     if isinstance(value, bool):
         return float(default)
     if isinstance(value, (int, float)):
@@ -50,7 +41,7 @@ def _coerce_timeout(value: object, default: int) -> float:
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
-    "执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果"
+    '''将布尔值或常见真假字符串规范化；无法识别时使用默认值。'''
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -63,13 +54,7 @@ def _coerce_bool(value: object, default: bool) -> bool:
 
 
 def _coerce_filter(value: object) -> str:
-    """执行 _coerce_filter 的明确职责，并返回与调用约定一致的结果。
-
-    Normalize and validate the markdown filter, falling back to the default.
-
-        Catches typos / stale values (e.g. ``FIt``, ``fit_content``) at config-read
-        time instead of letting them reach the server as an opaque HTTP 400.
-    """
+    '''校验并规范化正文筛选模式；未知值记录警告并回退到默认模式。'''
     if isinstance(value, str):
         normalized = value.strip().lower()
         if normalized in VALID_FILTERS:
@@ -79,14 +64,7 @@ def _coerce_filter(value: object) -> str:
 
 
 def _build_client(cfg: dict | None) -> Crawl4AiClient:
-    """执行 _build_client 的明确职责，并返回与调用约定一致的结果。
-
-    Build a ``Crawl4AiClient`` from an already-read ``web_fetch`` config dict.
-
-        Takes the config as an argument (rather than reading it again) so a single
-        invocation reads ``get_app_config()`` exactly once and cannot split across a
-        concurrent hot-reload.
-    """
+    '''根据已读取的网页抓取配置创建客户端，避免重复读取热重载配置。'''
     base_url = DEFAULT_BASE_URL
     token = ""
     timeout_s: float = float(DEFAULT_TIMEOUT_S)
@@ -99,17 +77,16 @@ def _build_client(cfg: dict | None) -> Crawl4AiClient:
 
 @tool("web_fetch", parse_docstring=True)
 async def web_fetch_tool(url: str) -> str:
-    """读取指定网页的正文内容并返回给 agent。
-    Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
-    This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
-    Do NOT add www. to URLs that do NOT have them.
-    URLs must include the schema: https://example.com is a valid URL while example.com is an invalid URL.
+    '''读取用户或搜索结果明确提供的网址，并返回网页正文。
+
+    仅抓取完整网址，不补写 ``www``。无法访问需要登录的私有页面；网址必须包含
+    ``http://`` 或 ``https://`` 协议头。
 
     Args:
-        url: The URL to fetch the contents of.
-    """
+        url: 要读取正文的完整网页地址。
+    '''
     try:
-        cfg = _get_tool_config("web_fetch")  # read config once; pass the values down
+        cfg = _get_tool_config("web_fetch")
         allow_private_addresses = _coerce_bool(cfg.get("allow_private_addresses") if cfg is not None else None, False)
         url_error = validate_public_http_url(url, allow_private_addresses=allow_private_addresses)
         if url_error:

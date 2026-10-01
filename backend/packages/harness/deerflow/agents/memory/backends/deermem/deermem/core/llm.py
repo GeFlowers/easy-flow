@@ -1,21 +1,4 @@
-"""定义 llm 模块提供的职责与可复用接口。
-
-DeerMem's own LLM construction (no deer-flow ``create_chat_model``).
-
-``build_llm(model_config)`` builds a langchain ``ChatModel`` from DeerMem's
-model sub-config (provider/model/api_key/base_url/temperature) via
-``langchain.chat_models.init_chat_model``. DeerMem owns the resulting instance
-(``self._llm``) and injects it into ``MemoryUpdater`` (dependency injection).
-
-``DeerMem.__init__`` prefers a host-injected ``host_llm`` (the deer-flow
-factory injects the app default model there when ``model`` is empty, mirroring
-pre-abstraction ``model_name: null``); this ``build_llm`` is the fallback that
-builds from the ``model`` sub-config. Returns ``None`` when ``model`` is empty
-- standalone DeerMem then has no LLM (non-LLM ops still work; an update
-raises), but via the factory ``host_llm`` covers the zero-config case. Any
-provider langchain's ``init_chat_model`` supports works (OpenAI, Anthropic,
-OpenAI-compatible gateways like DeepSeek, ...).
-"""
+'''根据记忆后端的模型配置创建事实抽取模型；配置无效时禁用抽取但保留非模型操作。'''
 
 from __future__ import annotations
 
@@ -29,18 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_llm(model_config: DeerMemModelConfig | None) -> Any:
-    """构建并返回，并遵守 build_llm 所表达的接口约束。
-
-    Build a langchain ChatModel from DeerMem's model config (DI).
-
-        Returns ``None`` if ``model_config`` is None, has no ``model`` set
-        (zero-config: no LLM; non-LLM ops still work, an update will raise), OR if
-        ``init_chat_model`` fails (misconfigured provider/api_key/base_url). The
-        failure path degrades to ``None`` with a WARNING -- mirroring
-        :func:`_host_default_llm` -- so a bad explicit ``model`` does not crash app
-        startup: memory CRUD/read/search still work, extraction is disabled, and an
-        update raises at runtime with the underlying error logged.
-    """
+    '''按供应商、模型名称和可选凭据参数初始化聊天模型；失败时记录警告并返回 None。'''
     if model_config is None or not model_config.model:
         return None
     from langchain.chat_models import init_chat_model

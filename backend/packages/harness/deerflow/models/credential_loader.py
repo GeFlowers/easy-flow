@@ -1,18 +1,4 @@
-"""定义 credential_loader 模块提供的职责与可复用接口。
-
-Auto-load credentials from Claude Code CLI and Codex CLI.
-
-Implements two credential strategies:
-  1. Claude Code OAuth token from explicit env vars or an exported credentials file
-     - Uses Authorization: Bearer header (NOT x-api-key)
-     - Requires anthropic-beta: oauth-2025-04-20,claude-code-20250219
-     - Supports $CLAUDE_CODE_OAUTH_TOKEN, $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR, and $ANTHROPIC_AUTH_TOKEN
-     - Override path with $CLAUDE_CODE_CREDENTIALS_PATH
-  2. Codex CLI token from ~/.codex/auth.json
-     - Uses chatgpt.com/backend-api/codex/responses endpoint
-     - Supports both legacy top-level tokens and current nested tokens shape
-     - Override path with $CODEX_AUTH_PATH
-"""
+'''按显式环境变量或命令行工具的凭据文件加载 Claude Code 与 Codex 的访问令牌。'''
 
 import json
 import logging
@@ -24,22 +10,17 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Required beta headers for Claude Code OAuth tokens
 OAUTH_ANTHROPIC_BETAS = "oauth-2025-04-20,claude-code-20250219,interleaved-thinking-2025-05-14"
 
 
 def is_oauth_token(token: str) -> bool:
-    """判断条件是否成立并返回布尔结果，并遵守 is_oauth_token 所表达的接口约束。
-
-    Check if a token is a Claude Code OAuth token (not a standard API key)."""
+    '''根据令牌标记判断它是否为 Claude Code 的 OAuth 凭据，而非普通接口密钥。'''
     return isinstance(token, str) and "sk-ant-oat" in token
 
 
 @dataclass
 class ClaudeCodeCredential:
-    """封装 ClaudeCodeCredential 的状态、协作关系与公开操作。
-
-    Claude Code CLI OAuth credential."""
+    '''保存 Claude Code 访问令牌、刷新令牌、过期时间和凭据来源。'''
 
     access_token: str
     refresh_token: str = ""
@@ -48,17 +29,15 @@ class ClaudeCodeCredential:
 
     @property
     def is_expired(self) -> bool:
-        "判断条件是否成立并返回布尔结果，并遵守 is_expired 所表达的接口约束"
+        '''判断令牌是否已过期；到期前一分钟即视为过期以留出刷新余量。'''
         if self.expires_at <= 0:
             return False
-        return time.time() * 1000 > self.expires_at - 60_000  # 1 min buffer
+        return time.time() * 1000 > self.expires_at - 60_000
 
 
 @dataclass
 class CodexCliCredential:
-    """封装 CodexCliCredential 的状态、协作关系与公开操作。
-
-    Codex CLI credential."""
+    '''保存 Codex 命令行工具的访问令牌、账户标识和凭据来源。'''
 
     access_token: str
     account_id: str = ""
@@ -66,7 +45,7 @@ class CodexCliCredential:
 
 
 def _resolve_credential_path(env_var: str, default_relative_path: str) -> Path:
-    "执行 _resolve_credential_path 的明确职责，并返回与调用约定一致的结果"
+    '''优先采用环境变量指定的凭据文件，否则将默认相对路径拼接到用户目录。'''
     configured_path = os.getenv(env_var)
     if configured_path:
         return Path(configured_path).expanduser()
@@ -74,7 +53,7 @@ def _resolve_credential_path(env_var: str, default_relative_path: str) -> Path:
 
 
 def _home_dir() -> Path:
-    "执行 _home_dir 的明确职责，并返回与调用约定一致的结果"
+    '''解析用户主目录，优先使用显式设置的 HOME 环境变量。'''
     home = os.getenv("HOME")
     if home:
         return Path(home).expanduser()
@@ -82,7 +61,7 @@ def _home_dir() -> Path:
 
 
 def _load_json_file(path: Path, label: str) -> dict[str, Any] | None:
-    "执行 _load_json_file 的明确职责，并返回与调用约定一致的结果"
+    '''读取凭据 JSON 文件；路径缺失、指向目录或内容无法解析时记录日志并返回 None。'''
     if not path.exists():
         logger.debug(f"{label} not found: {path}")
         return None
@@ -98,7 +77,7 @@ def _load_json_file(path: Path, label: str) -> dict[str, Any] | None:
 
 
 def _read_secret_from_file_descriptor(env_var: str) -> str | None:
-    "执行 _read_secret_from_file_descriptor 的明确职责，并返回与调用约定一致的结果"
+    '''从环境变量指定的文件描述符读取凭据，校验描述符并将空内容视为未提供。'''
     fd_value = os.getenv(env_var)
     if not fd_value:
         return None
@@ -119,7 +98,7 @@ def _read_secret_from_file_descriptor(env_var: str) -> str | None:
 
 
 def _credential_from_direct_token(access_token: str, source: str) -> ClaudeCodeCredential | None:
-    "执行 _credential_from_direct_token 的明确职责，并返回与调用约定一致的结果"
+    '''清理直接提供的令牌文本，并在非空时构造 Claude Code 凭据对象。'''
     token = access_token.strip()
     if not token:
         return None
@@ -127,7 +106,7 @@ def _credential_from_direct_token(access_token: str, source: str) -> ClaudeCodeC
 
 
 def _iter_claude_code_credential_paths() -> list[Path]:
-    "执行 _iter_claude_code_credential_paths 的明确职责，并返回与调用约定一致的结果"
+    '''按优先顺序返回用户指定的凭据路径和 Claude Code 默认凭据路径，且不重复。'''
     paths: list[Path] = []
     override_path = os.getenv("CLAUDE_CODE_CREDENTIALS_PATH")
     if override_path:
@@ -141,7 +120,7 @@ def _iter_claude_code_credential_paths() -> list[Path]:
 
 
 def _extract_claude_code_credential(data: dict[str, Any], source: str) -> ClaudeCodeCredential | None:
-    "执行 _extract_claude_code_credential 的明确职责，并返回与调用约定一致的结果"
+    '''从凭据文件的 OAuth 对象提取访问与刷新令牌，并拒绝已过期的令牌。'''
     oauth = data.get("claudeAiOauth", {})
     access_token = oauth.get("accessToken", "")
     if not access_token:
@@ -163,27 +142,7 @@ def _extract_claude_code_credential(data: dict[str, Any], source: str) -> Claude
 
 
 def load_claude_code_credential() -> ClaudeCodeCredential | None:
-    """加载并返回，并遵守 load_claude_code_credential 所表达的接口约束。
-
-    Load OAuth credential from explicit Claude Code handoff sources.
-
-        Lookup order:
-          1. $CLAUDE_CODE_OAUTH_TOKEN or $ANTHROPIC_AUTH_TOKEN
-          2. $CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR
-          3. $CLAUDE_CODE_CREDENTIALS_PATH
-          4. ~/.claude/.credentials.json
-
-        Exported credentials files contain:
-        {
-          "claudeAiOauth": {
-            "accessToken": "sk-ant-oat01-...",
-            "refreshToken": "sk-ant-ort01-...",
-            "expiresAt": 1773430695128,
-            "scopes": ["user:inference", ...],
-            ...
-          }
-        }
-    """
+    '''按环境变量、文件描述符、指定文件和默认文件的顺序查找 Claude Code 凭据。'''
     direct_token = os.getenv("CLAUDE_CODE_OAUTH_TOKEN") or os.getenv("ANTHROPIC_AUTH_TOKEN")
     if direct_token:
         cred = _credential_from_direct_token(direct_token, "claude-cli-env")
@@ -214,9 +173,7 @@ def load_claude_code_credential() -> ClaudeCodeCredential | None:
 
 
 def load_codex_cli_credential() -> CodexCliCredential | None:
-    """加载并返回，并遵守 load_codex_cli_credential 所表达的接口约束。
-
-    Load credential from Codex CLI (~/.codex/auth.json)."""
+    '''从指定或默认的 Codex 凭据文件读取新旧两种令牌结构，并返回账户信息。'''
     cred_path = _resolve_credential_path("CODEX_AUTH_PATH", ".codex/auth.json")
     data = _load_json_file(cred_path, "Codex CLI credentials")
     if data is None:

@@ -64,10 +64,12 @@ type PendingImport = {
   memory: UserMemory;
 };
 
+/** 收窄未知输入为非空对象，作为记忆导入结构校验的基础判断。 */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
+/** 校验记忆摘要分区所需的文本和更新时间字段。 */
 function isMemorySection(value: unknown): value is {
   summary: string;
   updatedAt: string;
@@ -79,6 +81,7 @@ function isMemorySection(value: unknown): value is {
   );
 }
 
+/** 校验单条记忆事实的字段类型，拒绝不完整或非有限置信度数据。 */
 function isMemoryFact(value: unknown): value is UserMemory["facts"][number] {
   return (
     isRecord(value) &&
@@ -92,6 +95,7 @@ function isMemoryFact(value: unknown): value is UserMemory["facts"][number] {
   );
 }
 
+/** 验证导入文件是否符合当前记忆数据结构，再允许交由导入操作处理。 */
 function isImportedMemory(value: unknown): value is UserMemory {
   if (!isRecord(value)) {
     return false;
@@ -130,6 +134,7 @@ const DEFAULT_FACT_FORM_STATE: FactFormState = {
   confidence: "0.8",
 };
 
+/** 将置信度限制在有效区间并转换成设置页使用的等级键。 */
 function confidenceToLevelKey(confidence: unknown): {
   key: "veryHigh" | "high" | "normal" | "unknown";
   value?: number;
@@ -144,6 +149,7 @@ function confidenceToLevelKey(confidence: unknown): {
   return { key: "normal", value };
 }
 
+/** 把单个记忆分区整理成含摘要与可选更新时间的 Markdown 文本。 */
 function formatMemorySection(
   section: MemorySection,
   t: ReturnType<typeof useI18n>["t"],
@@ -162,6 +168,7 @@ function formatMemorySection(
     .join("\n");
 }
 
+/** 按用户背景和历史背景组织记忆分区，供导出预览复用。 */
 function buildMemorySectionGroups(
   memory: UserMemory,
   t: ReturnType<typeof useI18n>["t"],
@@ -210,6 +217,7 @@ function buildMemorySectionGroups(
   ];
 }
 
+/** 汇总记忆摘要和更新时间，并在不同主题分区之间插入分隔线。 */
 function summariesToMarkdown(
   memory: UserMemory,
   sectionGroups: MemorySectionGroup[],
@@ -246,6 +254,7 @@ function summariesToMarkdown(
   return out.join("\n");
 }
 
+/** 判断六个摘要分区是否都为空，用于区分空记忆与有内容状态。 */
 function isMemorySummaryEmpty(memory: UserMemory) {
   return (
     memory.user.workContext.summary.trim() === "" &&
@@ -257,6 +266,7 @@ function isMemorySummaryEmpty(memory: UserMemory) {
   );
 }
 
+/** 压缩空白并截短记忆事实预览，确保列表卡片长度可控。 */
 function truncateFactPreview(content: string, maxLength = 140) {
   const normalized = content.replace(/\s+/g, " ").trim();
   if (normalized.length <= maxLength) {
@@ -269,6 +279,7 @@ function truncateFactPreview(content: string, maxLength = 140) {
   return `${normalized.slice(0, maxLength - ellipsis.length)}${ellipsis}`;
 }
 
+/** 仅将字符串首字符转为大写，供格式化分类标签使用。 */
 function upperFirst(str: string) {
   return str.charAt(0).toUpperCase() + str.slice(1);
 }
@@ -386,6 +397,7 @@ export function MemorySettingsPage() {
     (showSummaries && filteredSectionGroups.length > 0) ||
     (showFacts && filteredFacts.length > 0);
 
+  /** 获取完整记忆数据并下载为带时间标识的 JSON 文件。 */
   async function handleExportMemory() {
     try {
       setIsExporting(true);
@@ -410,6 +422,7 @@ export function MemorySettingsPage() {
     }
   }
 
+  /** 读取用户选择的文件，验证数据结构后暂存以供确认导入。 */
   async function handleImportFileSelection(event: {
     target: HTMLInputElement;
   }) {
@@ -434,6 +447,7 @@ export function MemorySettingsPage() {
     }
   }
 
+  /** 执行已确认的记忆导入，并在成功后关闭待确认状态。 */
   async function handleConfirmImport() {
     if (!pendingImport) {
       return;
@@ -448,6 +462,7 @@ export function MemorySettingsPage() {
     }
   }
 
+  /** 清空全部记忆；成功后关闭确认框，失败时保留页面状态。 */
   async function handleClearMemory() {
     try {
       await clearMemory.mutateAsync();
@@ -458,6 +473,7 @@ export function MemorySettingsPage() {
     }
   }
 
+  /** 删除当前待处理的单条记忆事实，并清除其确认状态。 */
   async function handleDeleteFact() {
     if (!factToDelete) return;
 
@@ -470,12 +486,14 @@ export function MemorySettingsPage() {
     }
   }
 
+  /** 重置事实编辑表单并打开新建记忆事实对话框。 */
   function openCreateFactDialog() {
     setFactToEdit(null);
     setFactForm(DEFAULT_FACT_FORM_STATE);
     setFactEditorOpen(true);
   }
 
+  /** 将现有事实内容载入表单并打开编辑对话框。 */
   function openEditFactDialog(fact: MemoryFact) {
     setFactToEdit(fact);
     setFactForm({
@@ -486,6 +504,7 @@ export function MemorySettingsPage() {
     setFactEditorOpen(true);
   }
 
+  /** 验证事实文本与置信度后创建或更新事实，并关闭编辑流程。 */
   async function handleSaveFact() {
     const trimmedContent = factForm.content.trim();
     if (!trimmedContent) {

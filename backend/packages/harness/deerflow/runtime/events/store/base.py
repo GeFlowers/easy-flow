@@ -1,4 +1,4 @@
-"""
+'''
 
 抽象：interface for run event storage.
 
@@ -9,7 +9,7 @@ through the same interface, distinguished by the ``category`` field.
 Implementations:
 - MemoryRunEventStore: in-memory dict (development, tests)
 - Future: DB-backed store (SQLAlchemy ORM), JSONL file store
-"""
+'''
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ from deerflow.runtime.user_context import AUTO, _AutoSentinel
 
 
 class RunEventStore(abc.ABC):
-    """
+    '''
 
     Run event stream storage interface.
 
@@ -29,7 +29,7 @@ class RunEventStore(abc.ABC):
         3. list_messages() only returns category="message" events
         4. list_events() returns all events for the specified run
         5. Returned dicts match the RunEvent field structure
-    """
+    '''
 
     @abc.abstractmethod
     async def put(
@@ -43,19 +43,19 @@ class RunEventStore(abc.ABC):
         metadata: dict | None = None,
         created_at: str | None = None,
     ) -> dict:
-        """
+        '''
 
-        写入：an event, auto-assign seq, return the complete record."""
+        写入：an event, auto-assign seq, return the complete record.'''
 
     @abc.abstractmethod
     async def put_batch(self, events: list[dict]) -> list[dict]:
-        """
+        '''
 
         批量写入同一刷新批次的事件，减少逐条提交的事务开销。
 
                 Each dict's keys match put()'s keyword arguments.
                 Returns complete records with seq assigned.
-        """
+        '''
 
     @abc.abstractmethod
     async def list_messages(
@@ -67,7 +67,7 @@ class RunEventStore(abc.ABC):
         after_seq: int | None = None,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict]:
-        """
+        '''
 
         返回：displayable messages (category=message) for a thread, ordered by seq ascending.
 
@@ -78,7 +78,7 @@ class RunEventStore(abc.ABC):
 
                 ``user_id`` may be passed explicitly by request-independent callers;
                 user-scoped backends must apply it according to their isolation model.
-        """
+        '''
 
     @abc.abstractmethod
     async def list_events(
@@ -91,7 +91,7 @@ class RunEventStore(abc.ABC):
         limit: int = 500,
         after_seq: int | None = None,
     ) -> list[dict]:
-        """
+        '''
 
         返回：the full event stream for a run, ordered by seq ascending.
 
@@ -100,7 +100,7 @@ class RunEventStore(abc.ABC):
                 first ``limit`` records with seq > after_seq, so callers can page through
                 a single subagent task's events without the run-wide ``limit`` truncating
                 the tail (#3779).
-        """
+        '''
 
     @abc.abstractmethod
     async def list_messages_by_run(
@@ -112,7 +112,7 @@ class RunEventStore(abc.ABC):
         before_seq: int | None = None,
         after_seq: int | None = None,
     ) -> list[dict]:
-        """
+        '''
 
         返回：displayable messages (category=message) for a specific run, ordered by seq ascending.
 
@@ -120,7 +120,7 @@ class RunEventStore(abc.ABC):
                 - after_seq: return the first ``limit`` records with seq > after_seq (ascending)
                 - before_seq: return the last ``limit`` records with seq < before_seq (ascending)
                 - neither: return the latest ``limit`` records (ascending)
-        """
+        '''
 
     @abc.abstractmethod
     async def get_last_visible_ai_seq_by_run(
@@ -130,28 +130,28 @@ class RunEventStore(abc.ABC):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict[str, int]:
-        """
+        '''
 
         返回：each run's last non-middleware AI message sequence.
 
                 ``user_id`` follows the same explicit-caller semantics as
                 :meth:`list_messages`.
-        """
+        '''
 
     @abc.abstractmethod
     async def count_messages(self, thread_id: str) -> int:
-        """
+        '''
 
-        统计：displayable messages (category=message) in a thread."""
+        统计：displayable messages (category=message) in a thread.'''
 
     @abc.abstractmethod
     async def delete_by_thread(self, thread_id: str) -> int:
-        """
+        '''
 
-        删除：all events for a thread. Return the number of deleted events."""
+        删除：all events for a thread. Return the number of deleted events.'''
 
     @abc.abstractmethod
     async def delete_by_run(self, thread_id: str, run_id: str) -> int:
-        """
+        '''
 
-        删除：all events for a specific run. Return the number of deleted events."""
+        删除：all events for a specific run. Return the number of deleted events.'''

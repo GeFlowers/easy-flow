@@ -1,4 +1,4 @@
-"""提供子代理隔离执行、调度校验或终端异步交互功能。"""
+'''负责构造并运行子代理，隔离事件循环、传播运行上下文并汇总任务状态。'''
 
 import asyncio
 import atexit
@@ -36,10 +36,8 @@ from deerflow.tracing import build_tracing_callbacks, inject_langfuse_metadata
 from deerflow.utils.messages import message_content_to_text
 
 if TYPE_CHECKING:
-    # Imported lazily at runtime inside _build_initial_state: importing
-    # tool_search eagerly would run tools/builtins/__init__ -> task_tool ->
-    # `from deerflow.subagents import SubagentExecutor`, which re-enters this
-    # still-initializing package. Type-only here keeps the annotation precise.
+    # 仅用于类型标注；运行时在 _build_initial_state 内延迟导入，避免工具包初始化时
+    # 通过 task_tool 反向导入尚未完成初始化的 subagents 包。
     from deerflow.tools.builtins.tool_search import DeferredToolSetup
 
 logger = logging.getLogger(__name__)
@@ -52,7 +50,7 @@ if callable(_previous_shutdown_isolated_subagent_loop):
 
 
 class SubagentStatus(Enum):
-    """封装当前模块相关的数据、状态或协作职责。"""
+    '''枚举子代理从排队到运行结束的生命周期状态。'''
 
     PENDING = "pending"
     RUNNING = "running"
@@ -63,7 +61,7 @@ class SubagentStatus(Enum):
 
     @property
     def is_terminal(self) -> bool:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''判断状态是否已进入完成、失败、取消或超时等不可逆终态。'''
         return self in {
             type(self).COMPLETED,
             type(self).FAILED,
@@ -74,7 +72,7 @@ class SubagentStatus(Enum):
 
 @dataclass
 class SubagentResult:
-    """封装当前模块相关的数据、状态或协作职责。"""
+    '''保存子代理执行结果、错误、消息、令牌统计和协作取消信号。'''
 
     task_id: str
     trace_id: str
@@ -91,12 +89,12 @@ class SubagentResult:
     _state_lock: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def __post_init__(self):
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''为未显式提供消息列表的结果创建可追加的空列表。'''
         if self.ai_messages is None:
             self.ai_messages = []
 
     def update_token_usage_records(self, records: list[dict[str, int | str | None]]) -> None:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''在任务尚未终止时原子替换令牌用量快照。'''
         with self._state_lock:
             if not self.status.is_terminal:
                 self.token_usage_records = list(records)
@@ -112,7 +110,7 @@ class SubagentResult:
         ai_messages: list[dict[str, Any]] | None = None,
         token_usage_records: list[dict[str, int | str | None]] | None = None,
     ) -> bool:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''校验终态后只允许首次写入结果，避免超时与执行完成竞争时互相覆盖。'''
         if not status.is_terminal:
             raise ValueError(f"Status {status} is not terminal")
 
@@ -136,7 +134,7 @@ class SubagentResult:
 
 
 def _extract_final_result(final_state: Any, *, trace_id: str, name: str) -> str:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''从最终状态中提取最后一条助手消息；缺少状态或消息时返回稳定的空响应文本。'''
     if final_state is None:
         logger.warning(f"[trace={trace_id}] Subagent {name} no final state")
         return "No response generated"
@@ -166,7 +164,7 @@ def _extract_final_result(final_state: Any, *, trace_id: str, name: str) -> str:
 
 
 def _extract_llm_error_fallback(final_state: Any) -> str | None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''识别错误处理中间件生成的终止助手消息，与真实的部分执行结果区分。'''
     if final_state is None:
         return None
 
@@ -182,10 +180,7 @@ def _extract_llm_error_fallback(final_state: Any) -> str | None:
         if content:
             return content
 
-        # Defensive: ``_build_error_fallback_message`` always sets a non-empty
-        # user-facing ``content`` (and ``error_detail`` via ``_extract_error_detail``,
-        # which falls back to the exception class name). These branches only
-        # guard against a future middleware that emits an empty fallback.
+        # 正常的错误回退消息始终含有面向用户的文本；以下分支仅防御未来中间件意外产生空消息。
         detail = metadata.get("error_detail")
         if isinstance(detail, str) and detail.strip():
             return detail.strip()
@@ -194,16 +189,15 @@ def _extract_llm_error_fallback(final_state: Any) -> str | None:
     return None
 
 
-# Global storage for background task results
+# 保存后台子代理的结果，供状态查询、取消和清理接口共用。
 _background_tasks: dict[str, SubagentResult] = {}
 _background_tasks_lock = threading.Lock()
 
-# Thread pool for background task scheduling and orchestration
+# 线程池仅负责调度后台任务；真正的异步代理运行复用下方隔离事件循环。
 _scheduler_pool = ThreadPoolExecutor(max_workers=3, thread_name_prefix="subagent-scheduler-")
 
-# Persistent event loop for isolated subagent executions triggered from an
-# already-running parent loop. Reusing one long-lived loop avoids creating a
-# fresh loop per execution and then closing async resources bound to it.
+# 当父任务已有事件循环时，将子代理送入独立的常驻循环执行，避免每次新建循环导致
+# 绑定于循环的异步客户端资源无法复用或被过早关闭。
 _isolated_subagent_loop: asyncio.AbstractEventLoop | None = None
 _isolated_subagent_loop_thread: threading.Thread | None = None
 _isolated_subagent_loop_started: threading.Event | None = None
@@ -214,7 +208,7 @@ def _run_isolated_subagent_loop(
     loop: asyncio.AbstractEventLoop,
     started_event: threading.Event,
 ) -> None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''在线程中运行专用异步循环，并在启动后通知等待方。'''
     asyncio.set_event_loop(loop)
     loop.call_soon(started_event.set)
     try:
@@ -224,7 +218,7 @@ def _run_isolated_subagent_loop(
 
 
 def _shutdown_isolated_subagent_loop() -> None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''停止隔离循环并等待线程退出；仅在循环确实停止后关闭它。'''
     global _isolated_subagent_loop, _isolated_subagent_loop_thread, _isolated_subagent_loop_started
 
     with _isolated_subagent_loop_lock:
@@ -261,7 +255,7 @@ atexit.register(_shutdown_isolated_subagent_loop)
 
 
 def _get_isolated_subagent_loop() -> asyncio.AbstractEventLoop:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''返回正在运行的隔离循环；若实例失效则创建线程并等待其就绪。'''
     global _isolated_subagent_loop, _isolated_subagent_loop_thread, _isolated_subagent_loop_started
     with _isolated_subagent_loop_lock:
         thread_is_alive = _isolated_subagent_loop_thread is not None and _isolated_subagent_loop_thread.is_alive()
@@ -295,7 +289,7 @@ def _submit_to_isolated_loop_in_context(
     context: Context,
     coro_factory: Callable[[], Coroutine[Any, Any, SubagentResult]],
 ) -> Future[SubagentResult]:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''在父任务复制的上下文中向隔离循环提交协程，保留用户和追踪上下文。'''
     return context.run(
         lambda: asyncio.run_coroutine_threadsafe(
             coro_factory(),
@@ -309,15 +303,15 @@ def _filter_tools(
     allowed: list[str] | None,
     disallowed: list[str] | None,
 ) -> list[BaseTool]:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''先应用允许列表再应用拒绝列表，得到该子代理实际可调用的工具集合。'''
     filtered = all_tools
 
-    # Apply allowlist if specified
+    # 配置了允许列表时，只保留名单中的工具。
     if allowed is not None:
         allowed_set = set(allowed)
         filtered = [t for t in filtered if t.name in allowed_set]
 
-    # Apply denylist
+    # 拒绝列表在允许列表之后生效，显式拒绝优先。
     if disallowed is not None:
         disallowed_set = set(disallowed)
         filtered = [t for t in filtered if t.name not in disallowed_set]
@@ -326,7 +320,7 @@ def _filter_tools(
 
 
 class SubagentExecutor:
-    """封装当前模块相关的数据、状态或协作职责。"""
+    '''创建并执行一个子代理，同时管理工具策略、上下文继承和结果生命周期。'''
 
     def __init__(
         self,
@@ -346,13 +340,12 @@ class SubagentExecutor:
         channel_user_id: str | None = None,
         deerflow_trace_id: str | None = None,
     ):
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''保存代理执行所需的身份、配置、工具、沙箱和追踪上下文。'''
         self.config = config
         self.app_config = app_config
         self.parent_model = parent_model
-        # Resolve eagerly only when it does not require loading config.yaml; otherwise defer
-        # to _create_agent (which already loads app_config) so unit tests can construct
-        # executors without a config file present.
+        # 已有明确模型或应用配置时立即解析；否则延迟到创建代理时读取配置，
+        # 允许无配置文件的测试和嵌入式调用先构造执行器。
         if config.model != "inherit" or parent_model is not None or app_config is not None:
             self.model_name: str | None = resolve_subagent_model_name(config, parent_model, app_config=app_config)
         else:
@@ -360,17 +353,16 @@ class SubagentExecutor:
         self.sandbox_state = sandbox_state
         self.thread_data = thread_data
         self.thread_id = thread_id
-        # Generate trace_id if not provided (for top-level calls)
+        # 顶层调用未提供追踪标识时生成短 ID，便于日志关联。
         self.trace_id = trace_id or str(uuid.uuid4())[:8]
         self.user_id = user_id
-        # Guardrail attribution propagated from the parent runtime context.
+        # 将父运行的权限身份传给子代理及其工具调用。
         self.user_role = user_role
         self.oauth_provider = oauth_provider
         self.oauth_id = oauth_id
         self.run_id = run_id
-        # IM-channel sender identity captured at task_tool dispatch: group
-        # chats share one thread across senders, so delegated bash commands
-        # must export the dispatching turn's id, not none at all.
+        # 群聊线程由多人共享；子代理命令必须使用触发本次委派的发送者身份，
+        # 不能因线程共享而丢失用户归属。
         self.channel_user_id = channel_user_id
         self.deerflow_trace_id = deerflow_trace_id
 
@@ -380,19 +372,14 @@ class SubagentExecutor:
             config.disallowed_tools,
         )
         self.tools = self._base_tools
-        # Guard middlewares that expose ``consume_stop_reason`` (currently
-        # ``TokenBudgetMiddleware`` and ``LoopDetectionMiddleware``), captured in
-        # ``_create_agent`` so ``_aexecute`` can read each after the run and
-        # surface whichever cap fired (token_capped / loop_capped) to the lead
-        # (#3875 Phase 2). Collected as a list — every guard must be checked,
-        # not just the first — because the v2 contract advertises more than one
-        # cap reason.
+        # 收集可报告停止原因的预算与循环检测中间件；运行结束后逐个检查，
+        # 让主代理知道是哪项限制提前结束了子代理。
         self._stop_reason_middlewares: list[Any] = []
 
         logger.info(f"[trace={self.trace_id}] SubagentExecutor initialized: {config.name} with {len(self.tools)} tools")
 
     def _create_agent(self, tools: list[BaseTool] | None = None, *, deferred_setup: "DeferredToolSetup | None" = None):
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''依据当前模型和运行配置构建代理图及共享运行中间件。'''
         app_config = self.app_config or get_app_config()
         if self.model_name is None:
             self.model_name = resolve_subagent_model_name(self.config, self.parent_model, app_config=app_config)
@@ -400,8 +387,7 @@ class SubagentExecutor:
 
         from deerflow.agents.middlewares.tool_error_handling_middleware import build_subagent_runtime_middlewares
 
-        # Reuse shared middleware composition with lead agent. ``agent_name``
-        # lets the builder resolve the per-agent token_budget override.
+        # 与主代理共用中间件装配逻辑，并用代理名读取专属令牌预算。
         mcp_routing_middleware = None
         if deferred_setup is not None and deferred_setup.deferred_names:
             from deerflow.tools.builtins.tool_search import build_mcp_routing_middleware
@@ -421,16 +407,11 @@ class SubagentExecutor:
         if mcp_routing_middleware is not None:
             middleware_kwargs["mcp_routing_middleware"] = mcp_routing_middleware
         middlewares = build_subagent_runtime_middlewares(**middleware_kwargs)
-        # Collect every guard middleware that exposes ``consume_stop_reason``
-        # (TokenBudgetMiddleware, LoopDetectionMiddleware) so _aexecute can read
-        # each after the run and surface whichever cap fired. Duck-typed
-        # (``hasattr``) so this file needs no import of the middleware classes;
-        # a list (not ``next(...)``) so every guard is checked and a later one
-        # is picked up automatically.
+        # 通过能力探测收集报告停止原因的中间件，避免此模块依赖具体实现类，
+        # 并保留多个保护措施同时工作的可能性。
         self._stop_reason_middlewares = [m for m in middlewares if hasattr(m, "consume_stop_reason")]
 
-        # system_prompt is included in initial state messages (see _build_initial_state)
-        # to avoid multiple SystemMessages which some LLM APIs don't support.
+        # 系统提示已在初始状态中与技能说明合并；避免某些模型不接受多个系统消息。
         return create_agent(
             model=model,
             tools=tools if tools is not None else self.tools,
@@ -441,7 +422,7 @@ class SubagentExecutor:
         )
 
     def _consume_guard_stop_reason(self) -> str | None:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''读取首个中间件报告的停止原因，并消费该次运行的临时标记。'''
         for mw in self._stop_reason_middlewares:
             reason = mw.consume_stop_reason(self.run_id)
             if reason is not None:
@@ -449,7 +430,7 @@ class SubagentExecutor:
         return None
 
     async def _load_skills(self) -> list[Skill]:
-        """异步处理当前步骤，并保持既有取消、轮询和状态收敛语义。"""
+        '''按技能白名单加载已启用技能，并将磁盘读取移出事件循环。'''
         if self.config.skills is not None and len(self.config.skills) == 0:
             logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} skills=[] — skipping skill loading")
             return []
@@ -459,7 +440,7 @@ class SubagentExecutor:
 
             storage_kwargs = {"app_config": self.app_config} if self.app_config is not None else {}
             storage = await asyncio.to_thread(get_or_new_skill_storage, **storage_kwargs)
-            # Use asyncio.to_thread to avoid blocking the event loop (LangGraph ASGI requirement)
+            # 磁盘扫描可能阻塞，因此放入线程池，避免卡住网关异步请求循环。
             all_skills = await asyncio.to_thread(storage.load_skills, enabled_only=True)
             logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} loaded {len(all_skills)} enabled skills from disk")
         except Exception:
@@ -470,31 +451,29 @@ class SubagentExecutor:
             logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} no enabled skills found")
             return []
 
-        # Filter by config.skills whitelist
+        # 若配置了技能白名单，仅向子代理提供名单中的技能。
         if self.config.skills is not None:
             allowed = set(self.config.skills)
             return [s for s in all_skills if s.name in allowed]
         return all_skills
 
     def _apply_skill_allowed_tools(self, skills: list[Skill]) -> list[BaseTool]:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''根据已加载技能声明的工具白名单进一步收窄基础工具集合。'''
         return filter_tools_by_skill_allowed_tools(self._base_tools, skills)
 
     async def _load_skill_messages(self, skills: list[Skill]) -> list[SystemMessage]:
-        """异步处理当前步骤，并保持既有取消、轮询和状态收敛语义。"""
+        '''读取技能说明文件并转义不可信内容，再合成为代理系统消息。'''
         if not skills:
             return []
 
-        # Read each skill's SKILL.md content and create conversation items
+        # 每个技能说明都以独立片段读取，之后合并到代理系统提示中。
         messages = []
         for skill in skills:
             try:
                 content = await asyncio.to_thread(skill.skill_file.read_text, encoding="utf-8")
                 content = content.strip()
                 if content:
-                    # name/body are untrusted (installable ``.skill`` archive); escape
-                    # both so the body cannot forge a framework tag, matching the
-                    # slash-activation sibling (name quote=True attribute, body quote=False).
+                    # 可安装技能包是不可信输入；转义名称与正文，防止内容伪造外围技能标签。
                     messages.append(SystemMessage(content=f'<skill name="{html.escape(skill.name, quote=True)}">\n{html.escape(content, quote=False)}\n</skill>'))
                     logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} loaded skill: {skill.name}")
             except Exception:
@@ -503,35 +482,25 @@ class SubagentExecutor:
         return messages
 
     async def _build_initial_state(self, task: str) -> tuple[dict[str, Any], list[BaseTool], "DeferredToolSetup"]:
-        """异步处理当前步骤，并保持既有取消、轮询和状态收敛语义。"""
-        # Lazy import: see the TYPE_CHECKING note at the top of this module -
-        # importing tool_search runs tools/builtins/__init__, which would
-        # re-enter this package during its own initialization.
+        '''加载技能和延迟工具提示，合并系统消息，并继承父代理沙箱状态。'''
+        # 延迟导入以避免工具包初始化期间反向导入正在初始化的 subagents 包。
         from deerflow.tools.builtins.tool_search import assemble_deferred_tools, get_deferred_tools_prompt_section, get_mcp_routing_hints_prompt_section
 
-        # Load skills as conversation items (Codex pattern)
+        # 先加载技能，再据技能策略过滤可用工具。
         skills = await self._load_skills()
         filtered_tools = self._apply_skill_allowed_tools(skills)
-        # Assemble deferred tool_search AFTER policy filtering (fail-closed),
-        # mirroring the lead path so subagents stop binding full MCP schemas.
-        # The generated tool_search helper is intentionally not subject to the
-        # subagent's name-level allow/deny (config.tools / disallowed_tools):
-        # its catalog is built from the already-filtered list, so it can never
-        # surface a tool the policy denied. This matches the lead agent.
+        # 先执行工具策略再构造延迟搜索目录；目录只含已许可工具，避免搜索绕过拒绝规则。
         enabled = (self.app_config or get_app_config()).tool_search.enabled
         final_tools, deferred_setup = assemble_deferred_tools(filtered_tools, enabled=enabled)
         skill_messages = await self._load_skill_messages(skills)
 
-        # Combine system_prompt and skills into a single SystemMessage.
-        # Some LLM APIs reject multiple SystemMessages with
-        # "System message must be at the beginning."
+        # 将代理提示、技能说明和工具路由提示合并成一条系统消息，兼容只接受单条系统消息的模型。
         system_parts: list[str] = []
         if self.config.system_prompt:
             system_parts.append(self.config.system_prompt)
         for skill_msg in skill_messages:
             system_parts.append(skill_msg.content)
-        # Name the deferred MCP tools in the prompt; their schemas stay withheld
-        # until tool_search promotes them. Empty set -> "" -> appends nothing.
+        # 只在提示中列出延迟工具名称，完整参数结构由后续工具搜索按需加载。
         deferred_section = get_deferred_tools_prompt_section(deferred_names=deferred_setup.deferred_names)
         if deferred_section:
             system_parts.append(deferred_section)
@@ -543,14 +512,14 @@ class SubagentExecutor:
         if system_parts:
             messages.append(SystemMessage(content="\n\n".join(system_parts)))
 
-        # Then the actual task
+        # 最后追加本次委派的实际任务内容。
         messages.append(HumanMessage(content=task))
 
         state: dict[str, Any] = {
             "messages": messages,
         }
 
-        # Pass through sandbox and thread data from parent
+        # 继承父代理已解析的沙箱和线程数据，保持子代理访问同一工作区。
         if self.sandbox_state is not None:
             state["sandbox"] = self.sandbox_state
         if self.thread_data is not None:
@@ -559,12 +528,12 @@ class SubagentExecutor:
         return state, final_tools, deferred_setup
 
     async def _aexecute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
-        """异步处理当前步骤，并保持既有取消、轮询和状态收敛语义。"""
+        '''运行代理并持续收集消息和令牌用量，统一处理取消、预算耗尽及异常终态。'''
         if result_holder is not None:
-            # Use the provided result holder (for async execution with real-time updates)
+            # 后台任务传入共享结果对象，以便轮询接口实时观察执行进度。
             result = result_holder
         else:
-            # Create a new result for synchronous execution
+            # 同步调用在此新建执行结果，返回前会将其推进到终态。
             task_id = str(uuid.uuid4())[:8]
             result = SubagentResult(
                 task_id=task_id,
@@ -576,14 +545,9 @@ class SubagentExecutor:
         if ai_messages is None:
             ai_messages = []
             result.ai_messages = ai_messages
-        # O(1) duplicate detection for streamed AI messages. ``stream_mode="values"``
-        # re-yields the full state every super-step, so the same trailing message is
-        # re-examined on each chunk; an id-keyed set keeps that check O(1) instead of
-        # rescanning the append-only ``ai_messages`` list (O(n) per chunk -> O(n^2)
-        # over a run, which reaches max_turns=150 for deep-research subagents).
+        # values 流每轮会重发完整状态；按消息 ID 去重避免反复扫描历史造成二次复杂度增长。
         seen_message_ids: set[str] = {mid for msg in ai_messages if (mid := msg.get("id"))}
-        # Cursor into the append-only message history so each ``values``-mode
-        # chunk only re-scans the newly-appended tail (see capture_new_step_messages).
+        # 记录已处理消息数量，使每个流数据块只检查历史尾部的新消息。
         processed_message_count = 0
 
         collector: SubagentTokenCollector | None = None
@@ -591,41 +555,33 @@ class SubagentExecutor:
             state, final_tools, deferred_setup = await self._build_initial_state(task)
             agent = self._create_agent(final_tools, deferred_setup=deferred_setup)
 
-            # Token collector for subagent LLM calls
+            # 统计子代理自身的模型调用用量，并传回主运行账本。
             collector_caller = f"subagent:{self.config.name}"
             collector = SubagentTokenCollector(caller=collector_caller)
 
-            # Do not put checkpoint coordinates (thread_id/checkpoint_ns/etc.)
-            # in the child config. LangGraph inherits those coordinates from
-            # the ambient parent run so this execution keeps its subgraph
-            # namespace. Business consumers receive thread_id via ``context``
-            # below instead.
+            # 不在子调用配置中重写检查点坐标，让 LangGraph 从父运行继承子图命名空间；
+            # 业务工具所需线程标识通过下方 context 传递。
             run_config: RunnableConfig = {
                 "recursion_limit": self.config.max_turns,
                 "callbacks": [collector],
                 "tags": [collector_caller],
             }
 
-            # Inject tracing callbacks at the graph level so a single subagent run
-            # produces one trace with all node / LLM / tool calls as child spans.
-            # This mirrors the lead agent pattern: graph-level tracing paired with
-            # attach_tracing=False on the model avoids double-counted traces.
+            # 在代理图层级注入追踪回调，让节点、模型和工具调用处于同一子代理追踪下，
+            # 同时避免模型层再次附加回调造成重复记录。
             tracing_callbacks = build_tracing_callbacks()
             if tracing_callbacks:
                 existing_callbacks = list(run_config.get("callbacks") or [])
                 run_config["callbacks"] = [*existing_callbacks, *tracing_callbacks]
 
-            # Normalize subagent name for tracing so it matches the lead-agent
-            # naming shape (lowercase, hyphens only). Inline because there is no
-            # shared helper — runtime/runs/naming.py only handles lead-agent runs.
+            # 将名称规范为小写连字符形式，使追踪标识与主代理命名风格一致。
             if self.config.name:
                 normalized_name = self.config.name.strip().lower().replace("_", "-")
                 assistant_id = f"subagent:{normalized_name}"
             else:
                 assistant_id = "subagent"
 
-            # Inject Langfuse trace-attribute metadata so the subagent trace
-            # links to the parent thread and carries the correct session/user IDs.
+            # 添加线程、用户与环境元数据，使子代理追踪能关联到父线程。
             inject_langfuse_metadata(
                 run_config,
                 thread_id=self.thread_id,
@@ -641,10 +597,7 @@ class SubagentExecutor:
                 context["thread_id"] = self.thread_id
             if self.app_config is not None:
                 context["app_config"] = self.app_config
-            # Propagate guardrail attribution so delegated tool calls are
-            # evaluated with the parent run's identity (role-aware policy,
-            # audit). user_id reuses the resolved tracing id; on every
-            # authenticated/IM path this equals the parent context value.
+            # 透传父运行的用户和授权身份，让委派工具调用沿用同一权限判定与审计归属。
             context["user_id"] = self.user_id
             context["user_role"] = self.user_role
             context["oauth_provider"] = self.oauth_provider
@@ -658,11 +611,10 @@ class SubagentExecutor:
 
             logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} starting async execution with max_turns={self.config.max_turns}")
 
-            # Use stream instead of invoke to get real-time updates
-            # This allows us to collect AI messages as they are generated
+            # 使用流式执行以逐步收集助手消息和工具输出。
             final_state = None
 
-            # Pre-check: bail out immediately if already cancelled before streaming starts
+            # 若流式执行尚未开始就已收到取消请求，则直接结束任务。
             if result.cancel_event.is_set():
                 logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} cancelled before streaming")
                 result.try_set_terminal(
@@ -673,10 +625,7 @@ class SubagentExecutor:
                 return result
 
             async for chunk in agent.astream(state, config=run_config, context=context, stream_mode="values"):  # type: ignore[arg-type]
-                # Cooperative cancellation: check if parent requested stop.
-                # Note: cancellation is only detected at astream iteration boundaries,
-                # so long-running tool calls within a single iteration will not be
-                # interrupted until the next chunk is yielded.
+                # 在流数据块边界检查父运行的协作式取消；单个长工具调用需等到下个数据块才会响应。
                 if result.cancel_event.is_set():
                     logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} cancelled by parent")
                     result.try_set_terminal(
@@ -689,11 +638,7 @@ class SubagentExecutor:
                 final_state = chunk
                 result.update_token_usage_records(collector.snapshot_records())
 
-                # Capture every step message (assistant turns AND tool outputs)
-                # appended since the last chunk. A single super-step can append
-                # several ToolMessages when the model emits multiple tool calls in
-                # one turn, so capturing only messages[-1] would drop all but the
-                # last output (#3779). Dedup/serialization live in capture_step_message.
+                # 捕获上次处理后新增的全部消息；一次模型轮次可能产生多条工具结果，不能只取末条。
                 messages = chunk.get("messages", [])
                 previous_count = len(ai_messages)
                 processed_message_count = capture_new_step_messages(messages, ai_messages, seen_message_ids, processed_message_count)
@@ -711,14 +656,8 @@ class SubagentExecutor:
                 )
             else:
                 final_result = _extract_final_result(final_state, trace_id=self.trace_id, name=self.config.name)
-                # A guard hard-stop (token budget or loop detection) does not raise
-                # — it strips tool_calls so the run completes with a final answer.
-                # ``consume_stop_reason`` on each guard tells us whether that
-                # happened so we can mark the completed result with the cap reason
-                # (token_capped / loop_capped) for the lead (#3875 Phase 2). It
-                # pops the reason, so keep it on the branch that consumes it — a
-                # fallback carries no tool_calls, so no guard hard-stop can have
-                # co-occurred on the FAILED branch anyway.
+                # 预算或循环保护会移除工具调用并让模型给出最终答案；消费保护器原因后，
+                # 将触发原因附在成功结果上供主代理识别。
                 stop_reason = self._consume_guard_stop_reason()
                 result.try_set_terminal(
                     SubagentStatus.COMPLETED,
@@ -728,33 +667,16 @@ class SubagentExecutor:
                 )
 
         except GraphRecursionError:
-            # ``recursion_limit`` on run_config == ``self.config.max_turns``
-            # (set above). Hitting it means the subagent exhausted its turn
-            # budget. Route into the additive ``stop_reason`` channel (#3875
-            # Phase 2) rather than a dedicated status enum (which would break v1
-            # contract consumers). If the run streamed usable partial work,
-            # surface it as ``completed``; otherwise ``failed``. Either way the
-            # lead can tell "out of budget" from "broken subagent" without
-            # parsing result text.
-            #
-            # Prefer a guard's stop reason if one already fired this run: a
-            # token-budget / loop hard-stop strips tool_calls to force a final
-            # answer, and if ``recursion_limit`` then trips on the next
-            # super-step before that answer lands, the guard was the binding
-            # constraint — not the turn budget. Consulting the guards here (same
-            # lookup as the normal-completion path above) keeps the two paths
-            # consistent and pops the reason so it is not orphaned in the dict.
+            # 达到 LangGraph 递归上限即耗尽轮数预算。若已有可用部分结果则保留为 completed，
+            # 否则标记 failed，并通过附加停止原因保持状态枚举兼容。若令牌或循环保护已触发，
+            # 则优先报告该限制，因为它可能先于轮数上限约束本次运行。
             max_turns = self.config.max_turns
             logger.warning(f"[trace={self.trace_id}] Subagent {self.config.name} reached max_turns={max_turns} (GraphRecursionError); recovering partial result")
             records = collector.snapshot_records() if collector is not None else None
             stop_reason = self._consume_guard_stop_reason() or "turn_capped"
 
-            # A handled LLM provider failure (#4042) carries non-empty
-            # user-facing text on its terminal ``AIMessage`` just like genuine
-            # partial output, so it must be checked here too or it is
-            # indistinguishable from the raw-text scan below and gets
-            # misclassified as a completed task. Consult the same marker the
-            # normal-completion path above uses, before falling back to that scan.
+            # 模型供应商错误也可能在终态消息中带有文本；先检查错误标记，避免把错误提示
+            # 误当成成功的部分结果。
             llm_error = _extract_llm_error_fallback(final_state)
             if llm_error is not None:
                 result.try_set_terminal(
@@ -798,7 +720,7 @@ class SubagentExecutor:
         return result
 
     def _execute_in_isolated_loop(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''将同步调用提交到常驻隔离事件循环，并按代理超时限制等待结果。'''
         future: Future[SubagentResult] | None = None
         parent_context = copy_context()
         try:
@@ -827,7 +749,7 @@ class SubagentExecutor:
             raise
 
     def execute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+        '''根据调用线程是否已有事件循环选择安全执行路径，并把异常转换为失败结果。'''
         try:
             try:
                 loop = asyncio.get_running_loop()
@@ -838,11 +760,11 @@ class SubagentExecutor:
                 logger.debug(f"[trace={self.trace_id}] Subagent {self.config.name} detected running event loop, using isolated loop")
                 return self._execute_in_isolated_loop(task, result_holder)
 
-            # Standard path: no running event loop, use asyncio.run
+            # 当前线程没有运行中的事件循环时，直接通过 asyncio.run 执行。
             return asyncio.run(self._aexecute(task, result_holder))
         except Exception as e:
             logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} execution failed")
-            # Create a result with error if we don't have one
+            # 若调用方未提供共享结果对象，则创建一条可返回的失败结果。
             if result_holder is not None:
                 result = result_holder
             else:
@@ -855,12 +777,12 @@ class SubagentExecutor:
             return result
 
     def execute_async(self, task: str, task_id: str | None = None) -> str:
-        """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
-        # Use provided task_id or generate a new one
+        '''登记待执行任务并在线程池后台启动子代理，立即返回任务标识供轮询。'''
+        # 优先沿用调用方生成的任务标识，否则创建新的短标识。
         if task_id is None:
             task_id = str(uuid.uuid4())[:8]
 
-        # Create initial pending result
+        # 先登记排队状态，供状态查询接口立即读取。
         result = SubagentResult(
             task_id=task_id,
             trace_id=self.trace_id,
@@ -874,27 +796,26 @@ class SubagentExecutor:
 
         parent_context = copy_context()
 
-        # Submit to scheduler pool
+        # 调度线程负责切换运行状态、等待异步任务并处理超时。
         def run_task():
-            """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+            '''在调度线程中标记后台任务开始，提交隔离执行并处理超时和异常。'''
             with _background_tasks_lock:
                 _background_tasks[task_id].status = SubagentStatus.RUNNING
                 _background_tasks[task_id].started_at = datetime.now()
                 result_holder = _background_tasks[task_id]
 
             try:
-                # Submit execution directly to the persistent isolated loop so the
-                # background path does not create a temporary loop via execute().
+                # 直接提交到常驻隔离循环，避免后台执行路径重复创建临时循环。
                 execution_future = _submit_to_isolated_loop_in_context(
                     parent_context,
                     lambda: self._aexecute(task, result_holder),
                 )
                 try:
-                    # Wait for execution with timeout
+                    # 等待任务完成，超过代理配置的上限则触发协作式取消。
                     execution_future.result(timeout=self.config.timeout_seconds)
                 except FuturesTimeoutError:
                     logger.error(f"[trace={self.trace_id}] Subagent {self.config.name} execution timed out after {self.config.timeout_seconds}s")
-                    # Signal cooperative cancellation and cancel the future
+                    # 通知运行中的代理停止，并取消尚未完成的调度任务。
                     result_holder.cancel_event.set()
                     result_holder.try_set_terminal(
                         SubagentStatus.TIMED_OUT,
@@ -915,7 +836,7 @@ MAX_CONCURRENT_SUBAGENTS = 3
 
 
 def request_cancel_background_task(task_id: str) -> None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''请求后台任务尽快取消；具体停止时机取决于当前模型或工具调用是否让出控制权。'''
     with _background_tasks_lock:
         result = _background_tasks.get(task_id)
         if result is not None:
@@ -924,28 +845,27 @@ def request_cancel_background_task(task_id: str) -> None:
 
 
 def get_background_task_result(task_id: str) -> SubagentResult | None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''按任务标识读取后台任务结果，不存在时返回空值。'''
     with _background_tasks_lock:
         return _background_tasks.get(task_id)
 
 
 def list_background_tasks() -> list[SubagentResult]:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''返回当前进程所有后台子代理结果的列表快照。'''
     with _background_tasks_lock:
         return list(_background_tasks.values())
 
 
 def cleanup_background_task(task_id: str) -> None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''仅删除已进入终态的后台记录，避免与仍在运行的任务发生竞争。'''
     with _background_tasks_lock:
         result = _background_tasks.get(task_id)
         if result is None:
-            # Nothing to clean up; may have been removed already.
+            # 记录可能已被其他清理操作移除，无需重复处理。
             logger.debug("Requested cleanup for unknown background task %s", task_id)
             return
 
-        # Only clean up tasks that are in a terminal state to avoid races with
-        # the background executor still updating the task entry.
+        # 运行中的执行器仍会更新结果对象，因此只允许清理已经进入终态的记录。
         if result.status.is_terminal or result.completed_at is not None:
             del _background_tasks[task_id]
             logger.debug("Cleaned up background task: %s", task_id)

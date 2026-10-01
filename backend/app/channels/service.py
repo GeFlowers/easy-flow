@@ -1,4 +1,4 @@
-"""管理全部即时通讯通道及其共享调度器的生命周期。"""
+'''管理全部即时通讯通道及其共享调度器的生命周期。'''
 
 from __future__ import annotations
 
@@ -21,23 +21,12 @@ if TYPE_CHECKING:
 
 # 通道类按需导入，未启用的平台不会加载其可选 SDK。
 _CHANNEL_REGISTRY: dict[str, str] = {
-    "dingtalk": "app.channels.providers.dingtalk:DingTalkChannel",
-    "discord": "app.channels.providers.discord:DiscordChannel",
-    "feishu": "app.channels.providers.feishu:FeishuChannel",
-    "github": "app.channels.providers.github:GitHubChannel",
-    "slack": "app.channels.providers.slack:SlackChannel",
-    "telegram": "app.channels.providers.telegram:TelegramChannel",
     "wechat": "app.channels.providers.wechat:WechatChannel",
     "wecom": "app.channels.providers.wecom:WeComChannel",
 }
 
 # 这些键只用于判断“已配置但未启用”，不会参与凭据有效性校验。
 _CHANNEL_CREDENTIAL_KEYS: dict[str, list[str]] = {
-    "dingtalk": ["client_id", "client_secret"],
-    "discord": ["bot_token"],
-    "feishu": ["app_id", "app_secret"],
-    "slack": ["bot_token", "app_token"],
-    "telegram": ["bot_token"],
     "wecom": ["bot_id", "bot_secret"],
     "wechat": ["bot_token"],
 }
@@ -47,13 +36,13 @@ _CHANNELS_GATEWAY_URL_ENV = "DEER_FLOW_CHANNELS_GATEWAY_URL"
 
 
 def _channel_has_credentials(name: str, channel_config: dict[str, Any]) -> bool:
-    """判断通道是否至少填写了一个非布尔凭据字段。"""
+    '''判断通道是否至少填写了一个非布尔凭据字段。'''
     cred_keys = _CHANNEL_CREDENTIAL_KEYS.get(name, [])
     return any(not isinstance(channel_config.get(key), bool) and channel_config.get(key) is not None and str(channel_config[key]).strip() for key in cred_keys)
 
 
 def _resolve_service_url(config: dict[str, Any], config_key: str, env_key: str, default: str) -> str:
-    """按通道配置、环境变量、默认值的顺序解析服务地址。"""
+    '''按通道配置、环境变量、默认值的顺序解析服务地址。'''
     value = config.pop(config_key, None)
     if isinstance(value, str) and value.strip():
         return value
@@ -64,13 +53,13 @@ def _resolve_service_url(config: dict[str, Any], config_key: str, env_key: str, 
 
 
 def _merge_channel_connection_runtime_config(channels_config: dict[str, Any], app_config: AppConfig) -> None:
-    """把界面持久化的运行时连接覆盖合并到静态通道配置。"""
+    '''把界面持久化的运行时连接覆盖合并到静态通道配置。'''
     connection_config = getattr(app_config, "channel_connections", None)
     merge_runtime_channel_configs(channels_config, connection_config)
 
 
 def _make_connection_repo(connection_config: ChannelConnectionsConfig | None):
-    """在连接功能和数据库均可用时创建连接仓库。"""
+    '''在连接功能和数据库均可用时创建连接仓库。'''
     if connection_config is None or not getattr(connection_config, "enabled", False):
         return None
 
@@ -89,11 +78,11 @@ def _make_connection_repo(connection_config: ChannelConnectionsConfig | None):
 
 
 class ChannelService:
-    """统一管理配置中的通道实例与共享 ``ChannelManager``。
+    '''统一管理配置中的通道实例与共享 ``ChannelManager``。
 
     服务读取 ``config.yaml`` 的 ``channels`` 配置及运行时覆盖，只实例化已启用通道，
     并确保平台工作线程与管理器按正确顺序启动和停止。
-    """
+    '''
 
     def __init__(
         self,
@@ -102,7 +91,7 @@ class ChannelService:
         connection_repo: Any | None = None,
         require_bound_identity: bool = False,
     ) -> None:
-        """构造共享总线、映射存储、管理器及通道配置快照。"""
+        '''构造共享总线、映射存储、管理器及通道配置快照。'''
         self.bus = MessageBus()
         self.store = ChannelStore()
         self._connection_repo = connection_repo
@@ -128,7 +117,7 @@ class ChannelService:
 
     @classmethod
     def from_app_config(cls, app_config: AppConfig | None = None) -> ChannelService:
-        """从应用配置与运行时覆盖构造通道服务。"""
+        '''从应用配置与运行时覆盖构造通道服务。'''
         if app_config is None:
             from deerflow.config.app_config import get_app_config
 
@@ -149,7 +138,7 @@ class ChannelService:
         )
 
     async def start(self) -> None:
-        """先启动管理器，再尝试启动全部已启用通道。"""
+        '''先启动管理器，再尝试启动全部已启用通道。'''
         if self._running:
             return
 
@@ -161,7 +150,7 @@ class ChannelService:
         logger.info("ChannelService started with %d/%d ready channels", ready_count, len(ready_status))
 
     async def ensure_ready_channels(self, *, attempts: int = 1) -> dict[str, bool]:
-        """启动或恢复尚未就绪的已启用通道，并返回逐通道结果。"""
+        '''启动或恢复尚未就绪的已启用通道，并返回逐通道结果。'''
         ready_status: dict[str, bool] = {}
         for name, channel_config in self._config.items():
             if not isinstance(channel_config, dict):
@@ -185,7 +174,7 @@ class ChannelService:
         *,
         attempts: int = 1,
     ) -> bool:
-        """使用当前有效配置确保指定通道处于运行状态。"""
+        '''使用当前有效配置确保指定通道处于运行状态。'''
         if not self._running:
             logger.warning("ChannelService is not running; cannot ensure channel readiness")
             return False
@@ -223,7 +212,7 @@ class ChannelService:
             return False
 
     async def stop(self) -> None:
-        """先停止所有平台通道，再停止共享管理器。"""
+        '''先停止所有平台通道，再停止共享管理器。'''
         for name, channel in list(self._channels.items()):
             try:
                 await channel.stop()
@@ -237,12 +226,12 @@ class ChannelService:
         logger.info("ChannelService stopped")
 
     def _load_channel_config(self, name: str) -> dict[str, Any] | None:
-        """从磁盘重新加载指定通道的最新有效配置。
+        '''从磁盘重新加载指定通道的最新有效配置。
 
         ``get_app_config()`` 会根据配置签名识别 ``config.yaml`` 变化；随后必须重新
         应用界面运行时覆盖，避免丢失浏览器录入凭据或重新启用已主动断开的通道。
         加载失败时回退到内存快照。
-        """
+        '''
         try:
             from deerflow.config.app_config import get_app_config
 
@@ -260,7 +249,7 @@ class ChannelService:
         return self._config.get(name)
 
     async def restart_channel(self, name: str, *, reload_config: bool = True) -> bool:
-        """停止并重新创建指定通道，成功时返回真。"""
+        '''停止并重新创建指定通道，成功时返回真。'''
         if name in self._channels:
             try:
                 await self._channels[name].stop()
@@ -284,7 +273,7 @@ class ChannelService:
         return await self._start_channel(name, config)
 
     async def configure_channel(self, name: str, config: dict[str, Any]) -> bool:
-        """应用权威运行时配置，并在服务运行时立即重启通道。"""
+        '''应用权威运行时配置，并在服务运行时立即重启通道。'''
         self._config[name] = dict(config)
         if not self._running:
             return True
@@ -292,7 +281,7 @@ class ChannelService:
         return await self.restart_channel(name, reload_config=False)
 
     async def remove_channel(self, name: str) -> bool:
-        """删除运行时配置，并停止仍在运行的对应通道。"""
+        '''删除运行时配置，并停止仍在运行的对应通道。'''
         self._config.pop(name, None)
         channel = self._channels.pop(name, None)
         if channel is None:
@@ -306,7 +295,7 @@ class ChannelService:
             return False
 
     async def _start_channel(self, name: str, config: dict[str, Any]) -> bool:
-        """惰性解析通道类，注入共享依赖并验证其成功进入运行状态。"""
+        '''惰性解析通道类，注入共享依赖并验证其成功进入运行状态。'''
         import_path = _CHANNEL_REGISTRY.get(name)
         if not import_path:
             logger.warning("Unknown channel type")
@@ -340,7 +329,7 @@ class ChannelService:
             return False
 
     def get_status(self) -> dict[str, Any]:
-        """返回服务及所有已知通道的启用与运行状态。"""
+        '''返回服务及所有已知通道的启用与运行状态。'''
         channels_status = {}
         for name in _CHANNEL_REGISTRY:
             config = self._config.get(name, {})
@@ -356,27 +345,25 @@ class ChannelService:
         }
 
     def get_channel(self, name: str) -> Channel | None:
-        """按名称返回已注册通道实例，不存在时返回 ``None``。"""
+        '''按名称返回已注册通道实例，不存在时返回 ``None``。'''
         return self._channels.get(name)
 
     def is_channel_enabled(self, name: str) -> bool:
-        """读取实时配置中的 ``channels.<name>.enabled``。
+        '''读取实时配置中的 ``channels.<name>.enabled``。
 
         ``_config`` 是运行时权威快照，界面切换状态后无需重新读取 config.yaml。
-        GitHub Webhook 路由以此作为分发开关；关闭通道只停止分发，不会卸载由
-        ``GITHUB_WEBHOOK_SECRET`` 控制的路由。
-        """
+        '''
         config = self._config.get(name)
         if not isinstance(config, dict):
             return False
         return bool(config.get("enabled", False))
 
     def get_channel_config(self, name: str) -> dict[str, Any] | None:
-        """返回实时 ``channels.<name>`` 配置的浅拷贝。
+        '''返回实时 ``channels.<name>`` 配置的浅拷贝。
 
         返回 ``None`` 表示未配置，与“已配置为空或默认值”明确区分；复制可防止调用方
         意外修改管理器正在使用的权威内存状态。
-        """
+        '''
         config = self._config.get(name)
         if not isinstance(config, dict):
             return None
@@ -389,12 +376,12 @@ _channel_service: ChannelService | None = None
 
 
 def get_channel_service() -> ChannelService | None:
-    """返回已启动的全局 ``ChannelService``，尚未创建时返回 ``None``。"""
+    '''返回已启动的全局 ``ChannelService``，尚未创建时返回 ``None``。'''
     return _channel_service
 
 
 async def start_channel_service(app_config: AppConfig | None = None) -> ChannelService:
-    """从应用配置创建并启动全局 ``ChannelService``。"""
+    '''从应用配置创建并启动全局 ``ChannelService``。'''
     global _channel_service
     if _channel_service is not None:
         return _channel_service
@@ -405,7 +392,7 @@ async def start_channel_service(app_config: AppConfig | None = None) -> ChannelS
 
 
 async def stop_channel_service() -> None:
-    """停止并清除全局 ``ChannelService``。"""
+    '''停止并清除全局 ``ChannelService``。'''
     global _channel_service
     if _channel_service is not None:
         await _channel_service.stop()

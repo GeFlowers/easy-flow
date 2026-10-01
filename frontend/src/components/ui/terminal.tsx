@@ -21,11 +21,11 @@ interface SequenceContextValue {
 
 const SequenceContext = createContext<SequenceContextValue | null>(null);
 
-/** useSequence Hook：封装本模块所需的状态或上下文访问。 */
+/** 读取终端序列播放控制器；没有序列模式时返回 null。 */
 const useSequence = () => useContext(SequenceContext);
 
 const ItemIndexContext = createContext<number | null>(null);
-/** useItemIndex Hook：封装本模块所需的状态或上下文访问。 */
+/** 读取当前动画条目在终端顺序播放中的索引。 */
 const useItemIndex = () => useContext(ItemIndexContext);
 
 interface AnimatedSpanProps extends MotionProps {
@@ -35,7 +35,7 @@ interface AnimatedSpanProps extends MotionProps {
   startOnView?: boolean;
 }
 
-/** AnimatedSpan 组件：提供对应的界面结构与交互语义。 */
+/** 在终端序列轮到当前条目或元素进入视口时淡入文字内容。 */
 export const AnimatedSpan = ({
   children,
   delay = 0,
@@ -91,7 +91,7 @@ interface TypingAnimationProps extends MotionProps {
   startOnView?: boolean;
 }
 
-/** TypingAnimation 组件：提供对应的界面结构与交互语义。 */
+/** 按字符间隔逐步呈现文本，并可等待视口可见或前序条目完成后开始。 */
 export const TypingAnimation = ({
   children,
   className,
@@ -192,7 +192,7 @@ interface TerminalProps {
   startOnView?: boolean;
 }
 
-/** Terminal 组件：提供对应的界面结构与交互语义。 */
+/** 协调终端子项的可视触发与顺序动画，前一项完成后才启动下一项。 */
 export const Terminal = ({
   children,
   className,

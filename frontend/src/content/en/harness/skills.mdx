@@ -99,12 +99,12 @@ skills:
   # Uncomment to customize:
   # path: /absolute/path/to/custom/skills
 
-  # Path where skills are mounted in the sandbox container.
+  # Virtual path where skills are available inside the sandbox.
   # The agent uses this path to access skill files during execution.
   container_path: /mnt/skills
 ```
 
-The `container_path` is important: it tells the agent where to find skill resources inside the sandbox. The harness automatically mounts the host skills directory to this container path.
+The `container_path` tells the agent where to find skill resources inside the sandbox. The harness maps or transfers the host skills directory to this virtual path, depending on the provider.
 
 ## Enabling and disabling skills
 

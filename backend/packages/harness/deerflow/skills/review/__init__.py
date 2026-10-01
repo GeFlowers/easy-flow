@@ -1,4 +1,4 @@
-"未说明"
+'''汇总技能包审查器、快照读取器、资源限制和版本化报告结构的公共接口。'''
 
 from deerflow.skills.review.analyzer import analyze_skill_package
 from deerflow.skills.review.models import (

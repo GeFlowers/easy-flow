@@ -1,4 +1,4 @@
-"""
+'''
 
 Sync checkpointer factory.
 
@@ -12,13 +12,11 @@ Usage::
 
     from deerflow.runtime.checkpointer.provider import get_checkpointer, checkpointer_context
 
-    # Singleton — reused across calls, closed on process exit
     cp = get_checkpointer()
 
-    # One-shot — fresh connection, closed on block exit
     with checkpointer_context() as cp:
         graph.invoke(input, config={"configurable": {"thread_id": "1"}})
-"""
+'''
 
 from __future__ import annotations
 
@@ -34,9 +32,6 @@ from deerflow.config.checkpointer_config import CheckpointerConfig, ensure_confi
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Error message constants — imported by aio.provider too
-# ---------------------------------------------------------------------------
 
 POSTGRES_INSTALL = (
     "langgraph-checkpoint-postgres is required for the PostgreSQL checkpointer. Install the package extra with: pip install 'deerflow-harness[postgres]' (or use: uv sync --all-packages --extra postgres when developing locally)"
@@ -44,13 +39,10 @@ POSTGRES_INSTALL = (
 POSTGRES_CONN_REQUIRED = "checkpointer.connection_string is required for the postgres backend"
 
 
-# ---------------------------------------------------------------------------
-# Config resolution
-# ---------------------------------------------------------------------------
 
 
 def _resolve_checkpointer_config(app_config: AppConfig) -> CheckpointerConfig:
-    """
+    '''
 
     解析：the checkpointer backend from legacy or unified application config.
 
@@ -59,7 +51,7 @@ def _resolve_checkpointer_config(app_config: AppConfig) -> CheckpointerConfig:
         ``database`` section drives the checkpointer, matching the async
         :func:`~deerflow.runtime.checkpointer.async_provider.make_checkpointer`
         factory and the sync Store provider's ``_resolve_store_config``.
-    """
+    '''
     if app_config.checkpointer is not None:
         return app_config.checkpointer
 
@@ -70,12 +62,11 @@ def _resolve_checkpointer_config(app_config: AppConfig) -> CheckpointerConfig:
 
 
 def _get_checkpointer_config() -> CheckpointerConfig:
-    """
+    '''
 
-    加载：checkpointer config without holding the provider singleton lock."""
+    加载：checkpointer config without holding the provider singleton lock.'''
     ensure_config_loaded()
 
-    # Preserve callers that initialise the legacy config singleton directly.
     legacy_config = get_checkpointer_config()
     if legacy_config is not None:
         return legacy_config
@@ -86,14 +77,11 @@ def _get_checkpointer_config() -> CheckpointerConfig:
     return _resolve_checkpointer_config(app_config)
 
 
-# ---------------------------------------------------------------------------
-# Sync factory
-# ---------------------------------------------------------------------------
 
 
 @contextlib.contextmanager
 def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
-    """
+    '''
 
     创建同步 PostgreSQL 检查点器并在上下文结束时关闭连接。
 
@@ -101,7 +89,7 @@ def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
         underlying connections or pools is handled by higher-level helpers in
         this module (such as the singleton factory or context manager); this
         function does not return a separate cleanup callback.
-    """
+    '''
     if config.type == "postgres":
         try:
             from langgraph.checkpoint.postgres import PostgresSaver
@@ -120,17 +108,14 @@ def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
     raise ValueError(f"Unknown checkpointer type: {config.type!r}")
 
 
-# ---------------------------------------------------------------------------
-# Sync singleton
-# ---------------------------------------------------------------------------
 
 _checkpointer: Checkpointer | None = None
-_checkpointer_ctx = None  # open context manager keeping the connection alive
+_checkpointer_ctx = None
 _checkpointer_lock = threading.Lock()
 
 
 def get_checkpointer() -> Checkpointer:
-    """
+    '''
 
     返回：the global sync checkpointer singleton, creating it on first call.
 
@@ -140,14 +125,12 @@ def get_checkpointer() -> Checkpointer:
         Raises:
             ImportError: If the required package for the configured backend is not installed.
             ValueError: If ``connection_string`` is missing for a backend that requires it.
-    """
+    '''
     global _checkpointer, _checkpointer_ctx
 
     if _checkpointer is not None:
         return _checkpointer
 
-    # Config loading can reset both persistence singletons. Resolve the full
-    # config outside this provider lock to avoid cross-provider lock-order inversion.
     config = _get_checkpointer_config()
 
     with _checkpointer_lock:
@@ -163,13 +146,13 @@ def get_checkpointer() -> Checkpointer:
 
 
 def reset_checkpointer() -> None:
-    """
+    '''
 
     重置：the sync singleton, forcing recreation on the next call.
 
         Closes any open backend connections and clears the cached instance.
         Useful in tests or after a configuration change.
-    """
+    '''
     global _checkpointer, _checkpointer_ctx
     with _checkpointer_lock:
         if _checkpointer_ctx is not None:
@@ -181,14 +164,11 @@ def reset_checkpointer() -> None:
         _checkpointer = None
 
 
-# ---------------------------------------------------------------------------
-# Sync context manager
-# ---------------------------------------------------------------------------
 
 
 @contextlib.contextmanager
 def checkpointer_context() -> Iterator[Checkpointer]:
-    """
+    '''
 
     同步上下文管理器： that yields a checkpointer and cleans up on exit.
 
@@ -201,7 +181,7 @@ def checkpointer_context() -> Iterator[Checkpointer]:
 
         The legacy ``checkpointer`` section takes precedence when configured;
         otherwise the unified PostgreSQL ``database`` section selects the backend.
-    """
+    '''
 
     config = _resolve_checkpointer_config(get_app_config())
     with _sync_checkpointer_cm(config) as saver:

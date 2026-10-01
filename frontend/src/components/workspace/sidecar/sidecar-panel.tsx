@@ -96,6 +96,7 @@ import { Tooltip } from "../tooltip";
 import { type SidecarReference, useSidecar } from "./context";
 import { ReferenceAttachmentSummary } from "./reference-attachments";
 
+/** 将父对话背景封装为隐藏的人类消息，供侧边对话使用但不重复显示。 */
 function buildHiddenSidecarContextMessage({
   prompt,
   parentThreadId,
@@ -116,6 +117,7 @@ function buildHiddenSidecarContextMessage({
 
 type SidecarInputMode = NonNullable<ThreadStreamOptions["context"]["mode"]>;
 
+/** 根据模型是否支持思考能力修正侧边对话模式，避免提交无效模式。 */
 function getResolvedMode(
   mode: ThreadStreamOptions["context"]["mode"],
   supportsThinking: boolean,
@@ -129,6 +131,7 @@ function getResolvedMode(
   return supportsThinking ? "pro" : "flash";
 }
 
+/** 将侧边模式映射到请求协议所需的推理强度值。 */
 function reasoningEffortForMode(mode: SidecarInputMode) {
   return mode === "ultra"
     ? "high"
@@ -139,6 +142,7 @@ function reasoningEffortForMode(mode: SidecarInputMode) {
         : "minimal";
 }
 
+/** 从输入消息附件中提取真实浏览器文件，忽略历史或远程附件引用。 */
 function promptMessageFiles(message: PromptInputMessage) {
   return message.files.flatMap((file) =>
     file.file instanceof File ? [file.file] : [],
@@ -258,6 +262,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     });
   }, [models, sidecar]);
 
+  /** 将文件数、单文件大小和总大小超限转换为对应的用户提示。 */
   const reportUploadLimitViolations = useCallback(
     (violations: UploadLimitViolation[]) => {
       for (const violation of violations) {
@@ -285,6 +290,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     [t.uploads],
   );
 
+  /** 更新侧边对话所用模型，并同步模型支持的模式和推理强度。 */
   const handleModelSelect = useCallback(
     (modelName: string) => {
       const model = models.find((candidate) => candidate.name === modelName);
@@ -309,6 +315,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     [models, sidecar],
   );
 
+  /** 更新侧边模式并为选定模式设置匹配的推理强度。 */
   const handleModeSelect = useCallback(
     (mode: SidecarInputMode) => {
       const nextMode = getResolvedMode(mode, supportThinking);
@@ -321,6 +328,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     [sidecar, supportThinking],
   );
 
+  /** 复用或恢复侧边线程；只有存在上下文时才创建新线程。 */
   const ensureSidecarThread = useCallback(
     async (references: SidecarReference[]) => {
       if (sidecar.sidecarThreadId) {
@@ -348,6 +356,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     [sidecar, t.sidecar.noContext],
   );
 
+  /** 将消息、父对话背景和引用元数据发送到指定侧边线程。 */
   const submitToSidecarThread = useCallback(
     async (
       threadId: string,
@@ -386,6 +395,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     [parentThread.messages, sendMessage, sidecar.parentThreadId],
   );
 
+  /** 将澄清答案作为隐藏上下文响应提交到侧边线程。 */
   const handleSubmitHumanInput = useCallback(
     async (request: HumanInputRequest, response: HumanInputResponse) => {
       if (!sidecar.sidecarThreadId) {
@@ -449,6 +459,7 @@ export function SidecarPanel({ className }: { className?: string }) {
     thread.isLoading,
   ]);
 
+  /** 校验附件和输入内容，必要时创建侧边线程后提交消息。 */
   const handleSubmit = useCallback(
     async (message: PromptInputMessage) => {
       const text = message.text.trim();
@@ -497,12 +508,14 @@ export function SidecarPanel({ className }: { className?: string }) {
     ],
   );
 
+  /** 丢弃草稿引用与未创建线程标识，并关闭侧边面板。 */
   const discardDraftAndClose = useCallback(() => {
     sidecar.clearActiveReferences();
     sidecar.setSidecarThreadId(null);
     sidecar.close();
   }, [sidecar]);
 
+  /** 删除当前侧边线程并清理草稿状态；草稿尚未创建时只关闭面板。 */
   const handleDelete = useCallback(async () => {
     const threadId = sidecar.sidecarThreadId;
     // 防御处理：删除按钮仅在线程存在时打开此对话框，因此此处缺少 id 表示草稿已被
@@ -723,6 +736,7 @@ export function SidecarPanel({ className }: { className?: string }) {
   );
 }
 
+/** 将选择的文本或文件引用加入侧边输入，并显示当前可执行的添加操作。 */
 function SidecarAddAttachmentsButton({
   uploadLimits,
 }: {
@@ -752,6 +766,7 @@ function SidecarAddAttachmentsButton({
   );
 }
 
+/** 提供侧边对话模式切换菜单，并展示各模式的简要用途。 */
 function SidecarModeMenu({
   context,
   supportThinking,
@@ -916,6 +931,7 @@ function SidecarModeMenu({
   );
 }
 
+/** 选择侧边对话使用的模型，并在模型列表中呈现当前选中项。 */
 function SidecarModelSelector({
   className,
   context,

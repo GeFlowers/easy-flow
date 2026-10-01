@@ -71,7 +71,6 @@ interface TokenUsageAttribution {
 
 // 精确的 write_todos 标签来自后端的归因载荷。
 // 前端回退逻辑有意保持通用，避免复制
-// backend/packages/harness/deerflow/agents/middlewares/token_usage_middleware.py
 //::_build_todo_actions，从而使两套差异比较算法逐渐产生偏差。
 
 /** 将详细令牌用量偏好归并为对应的界面预设。 */
@@ -194,7 +193,7 @@ export function buildTokenDebugSteps(
   return steps;
 }
 
-/** 获取 getTokenUsageAttribution 所需的结果或配置。 */
+/** 从助手消息的附加参数中读取并校验 token 用量归属数据。 */
 function getTokenUsageAttribution(
   message: Message,
 ): TokenUsageAttribution | null {
@@ -227,7 +226,7 @@ function buildActionLabelsFromAttribution(
     .filter((label): label is string => !!label);
 }
 
-/** 实现 describeAttributionAction 的受限辅助逻辑。 */
+/** 按动作类别生成面向用户的摘要，覆盖待办、搜索、子代理和工具操作。 */
 function describeAttributionAction(
   action: TokenUsageAttributionAction,
   t: Translations,
@@ -273,7 +272,7 @@ function describeAttributionAction(
   }
 }
 
-/** 实现 describeToolCall 的受限辅助逻辑。 */
+/** 将已知工具调用转换为本地化步骤说明，未知工具使用其描述或名称。 */
 function describeToolCall(
   toolCall: {
     name: string;
@@ -422,7 +421,7 @@ function normalizeTokenUsageAttributionAction(
   }
 }
 
-/** 实现 asRecord 的受限辅助逻辑。 */
+/** 仅接受非数组对象，供解析不可信事件数据时安全读取字段。 */
 function asRecord(value: unknown): Record<string, unknown> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return null;
@@ -431,7 +430,7 @@ function asRecord(value: unknown): Record<string, unknown> | null {
   return value as Record<string, unknown>;
 }
 
-/** 解析并提取 readString 所需的数据。 */
+/** 从未知值中读取非空字符串，并去掉首尾空白。 */
 function readString(value: unknown): string | undefined {
   if (typeof value !== "string") {
     return undefined;
@@ -441,7 +440,7 @@ function readString(value: unknown): string | undefined {
   return normalized.length > 0 ? normalized : undefined;
 }
 
-/** 判断 isTokenUsageAttributionKind 所表达的条件是否成立。 */
+/** 收窄归属事件类型，避免把未知事件误当成可展示的用量动作。 */
 function isTokenUsageAttributionKind(
   value: unknown,
 ): value is NonNullable<TokenUsageAttribution["kind"]> {

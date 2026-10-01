@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
-"""
-OpenAI YAML Generator - Creates agents/openai.yaml for a skill folder.
+'''
+为技能目录生成 agents/openai.yaml 文件。
 
-Usage:
-    generate_openai_yaml.py <skill_dir> [--name <skill_name>] [--interface key=value]
-"""
+用法：
+    generate_openai_yaml.py <技能目录> [--name <技能名称>] [--interface 字段=值]
+'''
 
 import argparse
 import re
@@ -48,11 +48,13 @@ ALLOWED_INTERFACE_KEYS = {
 
 
 def yaml_quote(value):
+    '''转义 YAML 字符串中的特殊字符，并以双引号包裹后返回。'''
     escaped = value.replace("\\", "\\\\").replace('"', '\\"').replace("\n", "\\n")
     return f'"{escaped}"'
 
 
 def format_display_name(skill_name):
+    '''将技能名称转换为界面展示名称，并保留常见缩写、品牌名和小词写法。'''
     words = [word for word in skill_name.split("-") if word]
     formatted = []
     for index, word in enumerate(words):
@@ -72,6 +74,7 @@ def format_display_name(skill_name):
 
 
 def generate_short_description(display_name):
+    '''根据展示名称生成符合界面长度限制的英文技能简介。'''
     description = f"Help with {display_name} tasks"
 
     if len(description) < 25:
@@ -102,6 +105,7 @@ def generate_short_description(display_name):
 
 
 def read_frontmatter_name(skill_dir):
+    '''读取技能说明文件的 YAML 元数据，校验并返回其中的技能名称。'''
     skill_md = Path(skill_dir) / "SKILL.md"
     if not skill_md.exists():
         print(f"[ERROR] SKILL.md not found in {skill_dir}")
@@ -131,6 +135,7 @@ def read_frontmatter_name(skill_dir):
 
 
 def parse_interface_overrides(raw_overrides):
+    '''解析并校验命令行传入的界面字段覆盖值，同时保留可选字段顺序。'''
     overrides = {}
     optional_order = []
     for item in raw_overrides:
@@ -157,6 +162,7 @@ def parse_interface_overrides(raw_overrides):
 
 
 def write_openai_yaml(skill_dir, skill_name, raw_overrides):
+    '''组合技能展示元数据并写入 agents/openai.yaml；参数不合法时返回 None。'''
     overrides, optional_order = parse_interface_overrides(raw_overrides)
     if overrides is None:
         return None
@@ -193,6 +199,7 @@ def write_openai_yaml(skill_dir, skill_name, raw_overrides):
 
 
 def main():
+    '''解析命令行参数，确定技能名称并调用元数据文件生成流程。'''
     parser = argparse.ArgumentParser(
         description="Create agents/openai.yaml for a skill directory.",
     )

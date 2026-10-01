@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''为标题、建议等单次辅助请求调用模型，并附带统一的追踪上下文。'''
 
 from __future__ import annotations
 
@@ -14,7 +14,7 @@ from deerflow.utils.llm_text import extract_response_text
 
 
 def _resolve_environment() -> str | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''从部署环境变量解析运行环境名称，供追踪元数据标记使用。'''
     return os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT")
 
 
@@ -27,7 +27,7 @@ async def run_oneshot_llm(
     model_name: str | None = None,
     thread_id: str | None = None,
 ) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''构造一次不启用思考模式的模型调用并返回纯文本结果。'''
     model = create_chat_model(name=model_name, thinking_enabled=False, app_config=app_config)
     invoke_config: dict = {"run_name": run_name}
     inject_langfuse_metadata(

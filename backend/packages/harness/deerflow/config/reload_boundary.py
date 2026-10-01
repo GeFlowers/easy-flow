@@ -1,10 +1,9 @@
-"""提供配置、reload、boundary相关功能。"""
+'''标注需要重启才能生效的配置字段，并生成面向配置界面的解释。'''
 
 from __future__ import annotations
 
 from collections.abc import Iterator
 STARTUP_ONLY_PREFIX = "startup-only:"
-#:
 STARTUP_ONLY_FIELDS: dict[str, str] = {
     "database": ("init_engine_from_config() runs once during langgraph_runtime() startup; the SQLAlchemy engine holds the connection pool and is not rebuilt on config.yaml edits."),
     "checkpointer": ("make_checkpointer() binds the PostgreSQL checkpointer once at startup."),
@@ -35,17 +34,17 @@ STARTUP_ONLY_FIELDS: dict[str, str] = {
 
 
 def iter_startup_only_field_paths() -> Iterator[str]:
-    """\u6267\u884c iter_startup_only_field_paths \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''按声明顺序枚举仅在进程启动时读取的配置字段路径。'''
     return iter(STARTUP_ONLY_FIELDS)
 
 
 def is_startup_only_field(field_path: str) -> bool:
-    """\u6267\u884c is_startup_only_field \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''判断配置字段是否属于需要重启应用才能生效的启动期字段。'''
     return field_path in STARTUP_ONLY_FIELDS
 
 
 def format_field_description(field_path: str, *, field_doc: str | None = None) -> str:
-    """\u6267\u884c format_field_description \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''把重启要求和原字段说明合并为配置接口可展示的描述文本。'''
     reason = STARTUP_ONLY_FIELDS[field_path]
     header = f"{STARTUP_ONLY_PREFIX} {reason}"
     if field_doc is None:

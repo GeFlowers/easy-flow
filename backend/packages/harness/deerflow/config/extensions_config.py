@@ -1,4 +1,4 @@
-"""提供配置、extensions、配置相关功能。"""
+'''加载 MCP 服务和技能启用状态，并解析路由覆盖及环境变量引用。'''
 
 import json
 import logging
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 class McpRoutingConfig(BaseModel):
-    """\u6267\u884c McpRoutingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''描述工具路由提示的开关、优先级和关键词。'''
 
     mode: Literal["off", "prefer"] = Field(
         default="off",
@@ -33,7 +33,7 @@ class McpRoutingConfig(BaseModel):
     @field_validator("priority")
     @classmethod
     def _clamp_priority(cls, value: int) -> int:
-        """\u6267\u884c _clamp_priority \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''将路由优先级限制在 0 到 100，避免异常排序值。'''
         if value < 0:
             logger.warning("MCP routing priority %s is below 0; clamping to 0.", value)
             return 0
@@ -44,14 +44,14 @@ class McpRoutingConfig(BaseModel):
 
 
 class McpToolOverride(BaseModel):
-    """\u6267\u884c McpToolOverride \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存单个远程工具相对于服务级默认值的路由覆盖。'''
 
     routing: McpRoutingConfig = Field(default_factory=McpRoutingConfig)
     model_config = ConfigDict(extra="allow")
 
 
 class McpOAuthConfig(BaseModel):
-    """\u6267\u884c McpOAuthConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''描述连接远程 MCP 服务时获取或刷新访问令牌所需的参数。'''
 
     enabled: bool = Field(default=True, description="Whether OAuth token injection is enabled")
     token_url: str = Field(description="OAuth token endpoint URL")
@@ -74,7 +74,7 @@ class McpOAuthConfig(BaseModel):
 
 
 class McpServerConfig(BaseModel):
-    """\u6267\u884c McpServerConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存 MCP 服务传输方式、地址、凭据、工具覆盖及调用超时。'''
 
     enabled: bool = Field(default=True, description="Whether this MCP server is enabled")
     type: str = Field(default="stdio", description="Transport type: 'stdio', 'sse', or 'http'")
@@ -96,7 +96,7 @@ class McpServerConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _accept_transport_alias(cls, data: Any) -> Any:
-        """\u6267\u884c _accept_transport_alias \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''兼容旧配置中的 ``transport`` 字段，并将其归一为 ``type``。'''
         if isinstance(data, dict):
             transport = data.get("transport")
             if transport and not data.get("type"):
@@ -105,7 +105,7 @@ class McpServerConfig(BaseModel):
 
 
 def resolve_effective_mcp_routing(server_config: McpServerConfig | None, original_tool_name: str) -> dict[str, Any]:
-    """\u6267\u884c resolve_effective_mcp_routing \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''合并服务默认路由提示与单个工具覆盖，返回最终生效值。'''
     if server_config is None:
         return McpRoutingConfig().model_dump(mode="json")
 
@@ -117,13 +117,13 @@ def resolve_effective_mcp_routing(server_config: McpServerConfig | None, origina
 
 
 class SkillStateConfig(BaseModel):
-    """\u6267\u884c SkillStateConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''记录某个技能是否允许进入发现和调用流程。'''
 
     enabled: bool = Field(default=True, description="Whether this skill is enabled")
 
 
 class ExtensionsConfig(BaseModel):
-    """\u6267\u884c ExtensionsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''承载所有外部工具服务和技能开关配置，并处理文件加载。'''
 
     mcp_servers: dict[str, McpServerConfig] = Field(
         default_factory=dict,
@@ -138,7 +138,7 @@ class ExtensionsConfig(BaseModel):
 
     @classmethod
     def resolve_config_path(cls, config_path: str | None = None) -> Path | None:
-        """\u6267\u884c resolve_config_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''按显式路径、环境变量、项目配置和兼容旧路径的优先级定位文件。'''
         if config_path:
             path = Path(config_path)
             if not path.exists():
@@ -168,7 +168,7 @@ class ExtensionsConfig(BaseModel):
 
     @classmethod
     def from_file(cls, config_path: str | None = None) -> "ExtensionsConfig":
-        """\u6267\u884c from_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''读取 JSON 配置、解析环境变量引用并校验为扩展配置模型。'''
         resolved_path = cls.resolve_config_path(config_path)
         if resolved_path is None:
             return cls(mcp_servers={}, skills={})
@@ -185,7 +185,7 @@ class ExtensionsConfig(BaseModel):
 
     @classmethod
     def resolve_env_variables(cls, config: Any) -> Any:
-        """\u6267\u884c resolve_env_variables \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''递归替换以 ``$`` 开头的字符串为对应环境变量值。'''
         if isinstance(config, str):
             if not config.startswith("$"):
                 return config
@@ -206,11 +206,11 @@ class ExtensionsConfig(BaseModel):
         return config
 
     def get_enabled_mcp_servers(self) -> dict[str, McpServerConfig]:
-        """\u6267\u884c get_enabled_mcp_servers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''筛出已启用的远程工具服务供客户端建立连接。'''
         return {name: config for name, config in self.mcp_servers.items() if config.enabled}
 
     def is_skill_enabled(self, skill_name: str, skill_category: str) -> bool:
-        """\u6267\u884c is_skill_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''按显式技能设置判断可用性；未配置时保留内置类别默认启用。'''
         skill_config = self.skills.get(skill_name)
         if skill_config is None:
             return skill_category in ("public", "custom", "legacy")
@@ -221,7 +221,7 @@ _extensions_config: ExtensionsConfig | None = None
 
 
 def get_extensions_config() -> ExtensionsConfig:
-    """\u6267\u884c get_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回扩展配置单例；首次访问时从配置文件加载。'''
     global _extensions_config
     if _extensions_config is None:
         _extensions_config = ExtensionsConfig.from_file()
@@ -229,19 +229,19 @@ def get_extensions_config() -> ExtensionsConfig:
 
 
 def reload_extensions_config(config_path: str | None = None) -> ExtensionsConfig:
-    """\u6267\u884c reload_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''重新读取扩展配置文件并替换进程内缓存。'''
     global _extensions_config
     _extensions_config = ExtensionsConfig.from_file(config_path)
     return _extensions_config
 
 
 def reset_extensions_config() -> None:
-    """\u6267\u884c reset_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''清空扩展配置缓存，使下次读取重新加载。'''
     global _extensions_config
     _extensions_config = None
 
 
 def set_extensions_config(config: ExtensionsConfig) -> None:
-    """\u6267\u884c set_extensions_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''直接替换扩展配置缓存，供应用装配或测试注入使用。'''
     global _extensions_config
     _extensions_config = config

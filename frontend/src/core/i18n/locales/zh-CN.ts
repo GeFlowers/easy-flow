@@ -503,11 +503,6 @@ export const zhCN: Translations = {
     saveAndConnect: "保存并连接",
     saveChanges: "保存修改",
     descriptions: {
-      telegram: "通过 DeerFlow Bot 接收 Telegram 私聊消息。",
-      slack: "接收 Slack 工作区消息和提及。",
-      discord: "通过 DeerFlow Bot 接收 Discord 服务器消息。",
-      feishu: "通过 DeerFlow 应用接收飞书和 Lark 消息。",
-      dingtalk: "通过 DeerFlow Bot 接收钉钉 Stream Push 消息。",
       wechat: "通过 DeerFlow Bot 接收微信 iLink 消息。",
       wecom: "通过 DeerFlow AI Bot 接收企业微信消息。",
     },

@@ -6,7 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-/** Tabs 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理标签页当前值，并在横向或纵向布局下协调选项与内容。 */
 function Tabs({
   className,
   orientation = "horizontal",
@@ -41,7 +41,7 @@ const tabsListVariants = cva(
   },
 );
 
-/** TabsList 内部组件：组织对应的界面结构与交互语义。 */
+/** 根据默认或下划线变体排列标签页切换项。 */
 function TabsList({
   className,
   variant = "default",
@@ -58,7 +58,7 @@ function TabsList({
   );
 }
 
-/** TabsTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 切换到对应标签页，并标示当前选中状态及键盘焦点。 */
 function TabsTrigger({
   className,
   ...props
@@ -78,7 +78,7 @@ function TabsTrigger({
   );
 }
 
-/** TabsContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 呈现当前激活标签页的面板内容。 */
 function TabsContent({
   className,
   ...props

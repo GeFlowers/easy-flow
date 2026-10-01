@@ -1,4 +1,4 @@
-"""提供基于近期对话生成后续问题建议的受权限保护路由。"""
+'''提供基于近期对话生成后续问题建议的受权限保护路由。'''
 
 import json
 import logging
@@ -18,14 +18,14 @@ router = APIRouter(prefix="/api", tags=["suggestions"])
 
 
 class SuggestionMessage(BaseModel):
-    """表示用于生成建议的一条纯文本用户或助手消息。"""
+    '''表示用于生成建议的一条纯文本用户或助手消息。'''
 
     role: str = Field(..., description="Message role: user|assistant")
     content: str = Field(..., description="Message content as plain text")
 
 
 class SuggestionsRequest(BaseModel):
-    """定义后续问题建议生成的消息上下文和数量上限。"""
+    '''定义后续问题建议生成的消息上下文和数量上限。'''
 
     messages: list[SuggestionMessage] = Field(..., description="Recent conversation messages")
     n: int = Field(default=3, ge=1, le=5, description="Number of suggestions to generate")
@@ -33,13 +33,13 @@ class SuggestionsRequest(BaseModel):
 
 
 class SuggestionsResponse(BaseModel):
-    """返回清洗后的后续问题建议列表。"""
+    '''返回清洗后的后续问题建议列表。'''
 
     suggestions: list[str] = Field(default_factory=list, description="Suggested follow-up questions")
 
 
 class SuggestionsConfigResponse(BaseModel):
-    """返回全局后续问题建议功能是否启用。"""
+    '''返回全局后续问题建议功能是否启用。'''
 
     enabled: bool = Field(..., description="Whether follow-up suggestions are enabled globally")
 
@@ -49,7 +49,7 @@ _strip_think_blocks = llm_text.strip_think_blocks
 
 
 def _parse_json_string_list(text: str) -> list[str] | None:
-    """从模型输出中解析 JSON 字符串列表，无法解析时返回 None。"""
+    '''从模型输出中解析 JSON 字符串列表，无法解析时返回 None。'''
     candidate = _strip_think_blocks(text)
     candidate = _strip_markdown_code_fence(candidate)
     start = candidate.find("[")
@@ -75,7 +75,7 @@ def _parse_json_string_list(text: str) -> list[str] | None:
 
 
 def _format_conversation(messages: list[SuggestionMessage]) -> str:
-    """将近期消息格式化为供建议模型理解的紧凑对话上下文。"""
+    '''将近期消息格式化为供建议模型理解的紧凑对话上下文。'''
     parts: list[str] = []
     for m in messages:
         role = m.role.strip().lower()
@@ -97,7 +97,7 @@ def _format_conversation(messages: list[SuggestionMessage]) -> str:
 async def get_suggestions_config(
     config: AppConfig = Depends(get_config),
 ) -> SuggestionsConfigResponse:
-    """读取并返回当前应用配置中的后续建议开关。"""
+    '''读取并返回当前应用配置中的后续建议开关。'''
     return SuggestionsConfigResponse(enabled=config.suggestions.enabled)
 
 
@@ -114,7 +114,7 @@ async def generate_suggestions(
     request: Request,
     config: AppConfig = Depends(get_config),
 ) -> SuggestionsResponse:
-    """在通过线程读取权限校验后，根据近期对话生成后续问题建议。"""
+    '''在通过线程读取权限校验后，根据近期对话生成后续问题建议。'''
     if not config.suggestions.enabled:
         return SuggestionsResponse(suggestions=[])
     if not body.messages:

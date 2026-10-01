@@ -1,4 +1,4 @@
-"""将 BoxLite 微型虚拟机适配为 DeerFlow 沙箱，并按用户与线程复用实例。"""
+'''将 BoxLite 微型虚拟机适配为 DeerFlow 沙箱，并按用户与线程复用实例。'''
 
 from __future__ import annotations
 
@@ -40,7 +40,7 @@ _VIRTUAL_DIRS = (
 
 
 def _import_simplebox() -> type[SimpleBox]:
-    """延迟导入 BoxLite 异步容器类，使未选择此后端时无需安装可选依赖。"""
+    '''延迟导入 BoxLite 异步容器类，使未选择此后端时无需安装可选依赖。'''
     try:
         from boxlite import SimpleBox
     except ImportError as e:  # pragma: no cover - depends on the optional dependency
@@ -49,7 +49,7 @@ def _import_simplebox() -> type[SimpleBox]:
 
 
 def _import_sync_boxlite_runtime():
-    """延迟导入同步 BoxLite Runtime，仅在启动时查找并认领遗留容器。"""
+    '''延迟导入同步 BoxLite Runtime，仅在启动时查找并认领遗留容器。'''
     try:
         from boxlite import SyncBoxlite
     except ImportError as e:  # pragma: no cover - depends on the optional dependency
@@ -58,10 +58,10 @@ def _import_sync_boxlite_runtime():
 
 
 class _EventLoopThread:
-    """在专用线程持有事件循环，将同步沙箱调用安全转发到 BoxLite 异步 API。"""
+    '''在专用线程持有事件循环，将同步沙箱调用安全转发到 BoxLite 异步 API。'''
 
     def __init__(self) -> None:
-        """启动专用事件循环线程，并等待循环完成初始化。"""
+        '''启动专用事件循环线程，并等待循环完成初始化。'''
         self._loop: asyncio.AbstractEventLoop | None = None
         self._ready = threading.Event()
         self._thread = threading.Thread(target=self._run_forever, name="boxlite-loop", daemon=True)
@@ -69,20 +69,20 @@ class _EventLoopThread:
         self._ready.wait(timeout=5)
 
     def _run_forever(self) -> None:
-        """在线程中创建事件循环，通知初始化方就绪后持续处理异步任务。"""
+        '''在线程中创建事件循环，通知初始化方就绪后持续处理异步任务。'''
         self._loop = asyncio.new_event_loop()
         asyncio.set_event_loop(self._loop)
         self._loop.call_soon(self._ready.set)
         self._loop.run_forever()
 
     def run(self, coro: Awaitable[T], *, timeout: float | None = None) -> T:
-        "执行任务并返回执行结果，并遵守 run 所表达的接口约束"
+        '''将协程提交到专用事件循环线程执行，并按需限制同步等待时长。'''
         if self._loop is None:
             raise RuntimeError("BoxLite event loop is not ready")
         return asyncio.run_coroutine_threadsafe(coro, self._loop).result(timeout)
 
     def close(self) -> None:
-        """停止并关闭专用事件循环，等待其线程退出。"""
+        '''停止并关闭专用事件循环，等待其线程退出。'''
         if self._loop is None:
             return
         self._loop.call_soon_threadsafe(self._loop.stop)
@@ -95,10 +95,10 @@ class _EventLoopThread:
 
 
 class _SyncBoxAdapter:
-    """把同步 BoxLite 句柄包装成沙箱对象所需的异步方法接口。"""
+    '''把同步 BoxLite 句柄包装成沙箱对象所需的异步方法接口。'''
 
     def __init__(self, runtime: Any, box: Any) -> None:
-        """保存容器句柄及其 Runtime，以便执行和停止操作访问同一实例。"""
+        '''保存容器句柄及其 Runtime，以便执行和停止操作访问同一实例。'''
         self._runtime = runtime
         self._box = box
 
@@ -111,7 +111,7 @@ class _SyncBoxAdapter:
         timeout: float | None = None,
         cwd: str | None = None,
     ) -> Any:
-        """将命令及环境、用户、超时和工作目录参数转发给底层容器。"""
+        '''将命令及环境、用户、超时和工作目录参数转发给底层容器。'''
         return self._box.exec(
             cmd,
             *args,
@@ -122,7 +122,7 @@ class _SyncBoxAdapter:
         )
 
     async def stop(self) -> None:
-        """停止容器并释放其所属 Runtime，即使停止容器时发生异常也会释放。"""
+        '''停止容器并释放其所属 Runtime，即使停止容器时发生异常也会释放。'''
         try:
             self._box.stop()
         finally:
@@ -130,14 +130,14 @@ class _SyncBoxAdapter:
 
 
 def _run_sync_adapter[T](coro: Awaitable[T], *, timeout: float | None = None) -> T:
-    """在临时事件循环运行适配器协程，可选设置整体等待超时。"""
+    '''在临时事件循环运行适配器协程，可选设置整体等待超时。'''
     if timeout is None:
         return asyncio.run(coro)
     return asyncio.run(asyncio.wait_for(coro, timeout=timeout))
 
 
 class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
-    """以 BoxLite 微型虚拟机实现沙箱 Provider，并回收或复用空闲实例。"""
+    '''以 BoxLite 微型虚拟机实现沙箱 Provider，并回收或复用空闲实例。'''
 
     uses_thread_data_mounts = False
     needs_upload_permission_adjustment = True
@@ -145,13 +145,12 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
 
     @staticmethod
     def _sandbox_id(thread_id: str, user_id: str) -> str:
-        """根据用户和线程生成稳定 ID，避免不同用户的同名线程共享沙箱。"""
+        '''根据用户和线程生成稳定 ID，避免不同用户的同名线程共享沙箱。'''
         return hashlib.sha256(f"{user_id}:{thread_id}".encode()).hexdigest()[:8]
 
-    # ── Provider ────────────────────────────────────────────────────────
 
     def __init__(self) -> None:
-        """初始化活动池与预热池，认领遗留 BoxLite 容器并启动空闲回收器。"""
+        '''初始化活动池与预热池，认领遗留 BoxLite 容器并启动空闲回收器。'''
         self._lock = threading.Lock()
         self._boxes: dict[str, BoxliteBox] = {}
         self._thread_boxes: dict[tuple[str, str], str] = {}
@@ -168,11 +167,11 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         self._start_idle_checker()
 
     def _load_config(self) -> dict[str, Any]:
-        """读取沙箱镜像、资源、环境变量、副本数及空闲和健康检查设置。"""
+        '''读取沙箱镜像、资源、环境变量、副本数及空闲和健康检查设置。'''
         sandbox_config = get_app_config().sandbox
 
         def _opt(name: str, default: Any = None) -> Any:
-            """读取可选沙箱配置项，并在配置模型未声明该项时返回默认值。"""
+            '''读取可选沙箱配置项，并在配置模型未声明该项时返回默认值。'''
             return getattr(sandbox_config, name, default)
 
         # 应用配置加载阶段已解析环境变量占位符；此处保留最终环境字典即可。
@@ -191,24 +190,24 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
 
     @staticmethod
     def _thread_key(thread_id: str, user_id: str | None) -> tuple[str, str]:
-        """构造带用户范围的线程索引键。"""
+        '''构造带用户范围的线程索引键。'''
         return (user_id or "", thread_id)
 
     @staticmethod
     def _box_name(sandbox_id: str) -> str:
-        """为 BoxLite 容器名添加 DeerFlow 专属前缀。"""
+        '''为 BoxLite 容器名添加 DeerFlow 专属前缀。'''
         return f"{_BOX_NAME_PREFIX}{sandbox_id}"
 
     @staticmethod
     def _sandbox_id_from_box_name(name: str | None) -> str | None:
-        """从 DeerFlow 命名的 BoxLite 容器名提取沙箱 ID。"""
+        '''从 DeerFlow 命名的 BoxLite 容器名提取沙箱 ID。'''
         if not name or not name.startswith(_BOX_NAME_PREFIX):
             return None
         sandbox_id = name[len(_BOX_NAME_PREFIX) :]
         return sandbox_id or None
 
     def _lock_for_sandbox(self, sandbox_id: str) -> threading.Lock:
-        """获取指定沙箱的创建锁，防止并发请求为同一用户线程重复创建容器。"""
+        '''获取指定沙箱的创建锁，防止并发请求为同一用户线程重复创建容器。'''
         with self._lock:
             lock = self._acquire_locks.get(sandbox_id)
             if lock is None:
@@ -217,17 +216,17 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             return lock
 
     def _start_idle_checker(self) -> None:
-        """空闲超时为零时关闭回收线程，否则启动通用预热池巡检器。"""
+        '''空闲超时为零时关闭回收线程，否则启动通用预热池巡检器。'''
         if self._config["idle_timeout"] <= 0:
             return
         super()._start_idle_checker()
 
     def _active_count_locked(self) -> int:
-        """在持有 Provider 锁时返回活动 BoxLite 容器数。"""
+        '''在持有 Provider 锁时返回活动 BoxLite 容器数。'''
         return len(self._boxes)
 
     def _destroy_warm_entry(self, sandbox_id: str, entry: BoxliteBox, *, reason: str) -> None:
-        """关闭已从预热池移除的容器，并按回收原因记录成功或失败。"""
+        '''关闭已从预热池移除的容器，并按回收原因记录成功或失败。'''
         with self._lock:
             self._skip_health_check_warm_ids.discard(sandbox_id)
         try:
@@ -247,7 +246,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
                 logger.warning("Error closing BoxLite box %s (reason=%s): %s", sandbox_id, reason, e)
 
     def _invalidate_box(self, sandbox_id: str, reason: str) -> None:
-        """命令路径发生不可恢复错误时，从所有索引中注销并关闭对应容器。"""
+        '''命令路径发生不可恢复错误时，从所有索引中注销并关闭对应容器。'''
         box_to_close: BoxliteBox | None = None
         with self._lock:
             active_box = self._boxes.pop(sandbox_id, None)
@@ -265,7 +264,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         box_to_close.close()
 
     def _reconcile_orphans(self) -> None:
-        """启动时按 DeerFlow 容器名前缀查找遗留实例，并纳入预热池等待复用或回收。"""
+        '''启动时按 DeerFlow 容器名前缀查找遗留实例，并纳入预热池等待复用或回收。'''
         try:
             adopted = self._adopt_existing_boxes()
         except ImportError:
@@ -279,7 +278,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             logger.info("Startup reconciliation adopted %s BoxLite box(es)", adopted)
 
     def _adopt_existing_boxes(self) -> int:
-        """枚举 BoxLite 容器并包装尚未登记的 DeerFlow 实例，返回认领数量。"""
+        '''枚举 BoxLite 容器并包装尚未登记的 DeerFlow 实例，返回认领数量。'''
         runtime_cls = _import_sync_boxlite_runtime()
         now = time.time()
         adopted = 0
@@ -321,10 +320,9 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
 
         return adopted
 
-    # ── Acquire / release ────────────────────────────────────────────────
 
     def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        """获取沙箱：优先返回活动实例，其次复用预热实例，否则新建虚拟机。"""
+        '''获取沙箱：优先返回活动实例，其次复用预热实例，否则新建虚拟机。'''
         if thread_id is None:
             sandbox_id = str(uuid.uuid4())[:8]
             box = self._create_box(sandbox_id)
@@ -355,7 +353,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
 
     def _create_box(self, sandbox_id: str) -> BoxliteBox:
         # 达到副本上限时优先淘汰最早进入预热池的容器。
-        """创建 BoxLite 虚拟机并预建 DeerFlow 虚拟目录，包装为沙箱对象。"""
+        '''创建 BoxLite 虚拟机并预建 DeerFlow 虚拟目录，包装为沙箱对象。'''
         replicas, total = self._replica_count()
         if total >= replicas:
             evicted = self._evict_oldest_warm()
@@ -364,7 +362,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         mkdir_cmd = "mkdir -p " + " ".join(_VIRTUAL_DIRS)
 
         async def _make() -> SimpleBox:
-            """启动虚拟机并在其文件系统中创建工作区、上传、输出和技能目录。"""
+            '''启动虚拟机并在其文件系统中创建工作区、上传、输出和技能目录。'''
             box = simplebox_cls(
                 name=self._box_name(sandbox_id),
                 image=self._config["image"],
@@ -381,12 +379,12 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         return BoxliteBox(sandbox_id, box, self._loop.run, default_env=self._config["environment"], on_terminal_failure=self._invalidate_box)
 
     def get(self, sandbox_id: str) -> Sandbox | None:
-        "读取并返回，并遵守 get 所表达的接口约束"
+        '''按标识返回当前进程管理的活动沙箱；未登记时返回 None。'''
         with self._lock:
             return self._boxes.get(sandbox_id)
 
     def release(self, sandbox_id: str) -> None:
-        """释放活动引用并将虚拟机放入预热池；Provider 关闭过程中则直接关闭实例。"""
+        '''释放活动引用并将虚拟机放入预热池；Provider 关闭过程中则直接关闭实例。'''
         close_box: BoxliteBox | None = None
         with self._lock:
             box = self._boxes.pop(sandbox_id, None)
@@ -408,7 +406,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             logger.info("Released sandbox %s to warm pool (VM still running)", sandbox_id)
 
     def _reclaim_warm_pool(self, sandbox_id: str) -> str | None:
-        """从预热池取回容器；新近由本实例释放的容器可按配置跳过健康检查。"""
+        '''从预热池取回容器；新近由本实例释放的容器可按配置跳过健康检查。'''
 
         with self._lock:
             if sandbox_id not in self._warm_pool:
@@ -422,7 +420,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             with self._lock:
                 warm_entry = self._warm_pool.pop(sandbox_id, None)
                 if warm_entry is None:
-                    return None  # Raced with another thread
+                    return None
                 self._skip_health_check_warm_ids.discard(sandbox_id)
                 box, _ = warm_entry
                 if box.is_closed:
@@ -463,7 +461,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         with self._lock:
             warm_entry = self._warm_pool.pop(sandbox_id, None)
             if warm_entry is None:
-                return None  # Raced with another thread
+                return None
             self._skip_health_check_warm_ids.discard(sandbox_id)
             box, _ = warm_entry
             self._boxes[sandbox_id] = box
@@ -472,7 +470,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
         return sandbox_id
 
     def reset(self) -> None:
-        """清空活动索引但保留虚拟机，将其交由当前实例的预热清理器管理。"""
+        '''清空活动索引但保留虚拟机，将其交由当前实例的预热清理器管理。'''
         with self._lock:
             now = time.time()
             for sandbox_id, box in self._boxes.items():
@@ -483,7 +481,7 @@ class BoxliteProvider(WarmPoolLifecycleMixin[BoxliteBox], SandboxProvider):
             self._acquire_locks.clear()
 
     def shutdown(self) -> None:
-        """停止空闲巡检，关闭活动和预热容器，并释放专用事件循环线程。"""
+        '''停止空闲巡检，关闭活动和预热容器，并释放专用事件循环线程。'''
         with self._lock:
             if self._shutdown_called:
                 return

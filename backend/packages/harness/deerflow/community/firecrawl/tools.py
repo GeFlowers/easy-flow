@@ -1,4 +1,4 @@
-"定义 tools 模块提供的职责与可复用接口"
+'''封装 Firecrawl 搜索与网页抓取工具，并将结果整理为智能体可读文本。'''
 
 import json
 
@@ -9,7 +9,7 @@ from deerflow.config import get_app_config
 
 
 def _get_firecrawl_client(tool_name: str = "web_search") -> FirecrawlApp:
-    "执行 _get_firecrawl_client 的明确职责，并返回与调用约定一致的结果"
+    '''读取指定工具配置的 API 密钥并创建 Firecrawl 客户端。'''
     config = get_app_config().get_tool_config(tool_name)
     api_key = None
     if config is not None and "api_key" in config.model_extra:
@@ -19,11 +19,11 @@ def _get_firecrawl_client(tool_name: str = "web_search") -> FirecrawlApp:
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str) -> str:
-    """搜索网络并返回与查询相关的资料。
+    '''搜索网络并返回与查询相关的资料。
 
     Args:
         query: The query to search for.
-    """
+    '''
     try:
         config = get_app_config().get_tool_config("web_search")
         max_results = 5
@@ -33,7 +33,7 @@ def web_search_tool(query: str) -> str:
         client = _get_firecrawl_client("web_search")
         result = client.search(query, limit=max_results)
 
-        # result.web contains list of SearchResultWeb objects
+        # 搜索结果对象通过 web 字段提供网页条目。
         web_results = result.web or []
         normalized_results = [
             {
@@ -51,7 +51,7 @@ def web_search_tool(query: str) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 def web_fetch_tool(url: str) -> str:
-    """读取指定网页的正文内容并返回给 agent。
+    '''读取指定网页的正文内容并返回给 agent。
     Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
     This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
     Do NOT add www. to URLs that do NOT have them.
@@ -59,7 +59,7 @@ def web_fetch_tool(url: str) -> str:
 
     Args:
         url: The URL to fetch the contents of.
-    """
+    '''
     try:
         client = _get_firecrawl_client("web_fetch")
         result = client.scrape(url, formats=["markdown"])

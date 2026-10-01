@@ -1,11 +1,11 @@
-"""提供配置、runtime、paths相关功能。"""
+'''解析项目根目录、运行数据根目录以及相对配置文件路径。'''
 
 import os
 from pathlib import Path
 
 
 def project_root() -> Path:
-    """\u6267\u884c project_root \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''读取项目根目录环境变量；未设置时以当前工作目录作为项目根。'''
     if env_root := os.getenv("DEER_FLOW_PROJECT_ROOT"):
         root = Path(env_root).resolve()
         if not root.exists():
@@ -17,14 +17,14 @@ def project_root() -> Path:
 
 
 def runtime_home() -> Path:
-    """\u6267\u884c runtime_home \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回运行数据目录，默认放在项目根下的 ``.deer-flow``。'''
     if env_home := os.getenv("DEER_FLOW_HOME"):
         return Path(env_home).resolve()
     return project_root() / ".deer-flow"
 
 
 def resolve_path(value: str | os.PathLike[str], *, base: Path | None = None) -> Path:
-    """\u6267\u884c resolve_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''将相对路径相对于指定基准或项目根解析为绝对路径。'''
     path = Path(value)
     if not path.is_absolute():
         path = (base or project_root()) / path
@@ -32,7 +32,7 @@ def resolve_path(value: str | os.PathLike[str], *, base: Path | None = None) -> 
 
 
 def existing_project_file(names: tuple[str, ...]) -> Path | None:
-    """\u6267\u884c existing_project_file \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''按候选名称顺序查找项目根目录中的第一个现存文件。'''
     root = project_root()
     for name in names:
         candidate = root / name

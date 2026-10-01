@@ -29,6 +29,7 @@ export function TodoList({
   const isControlled = controlledCollapsed !== undefined;
   const collapsed = isControlled ? controlledCollapsed : internalCollapsed;
 
+  /** 按受控模式委托展开状态变更，或切换组件内部状态。 */
   const handleToggle = () => {
     if (isControlled) {
       onToggle?.();

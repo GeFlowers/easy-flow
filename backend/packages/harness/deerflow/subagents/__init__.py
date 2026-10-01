@@ -1,4 +1,4 @@
-"""提供子代理包的公开导入接口。"""
+'''提供子代理包的公开导入接口。'''
 
 from .config import SubagentConfig
 from .registry import get_available_subagent_names, get_subagent_config, list_subagents
@@ -14,7 +14,7 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """按需加载执行器导出，避免包初始化时产生循环导入。"""
+    '''按需加载执行器导出，避免包初始化时产生循环导入。'''
     if name in {"SubagentExecutor", "SubagentResult"}:
         from .executor import SubagentExecutor, SubagentResult
 

@@ -1,9 +1,9 @@
-"""
+'''
 
 将 LangChain 消息对象转换为 OpenAI Chat Completions 格式的纯函数。
 当前 RunJournal 仍直接调用 message.model_dump()；本模块供需要 OpenAI
 线协议格式的调用方复用。
-"""
+'''
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ _ROLE_MAP = {
 
 
 def langchain_to_openai_message(message: Any) -> dict:
-    """
+    '''
 
     将单个 LangChain BaseMessage 转换为 OpenAI 消息字典。
 
@@ -31,7 +31,7 @@ def langchain_to_openai_message(message: Any) -> dict:
         - AIMessage (list content / multimodal) → content preserved as list
         - SystemMessage → {"role": "system", "content": "..."}
         - ToolMessage → {"role": "tool", "tool_call_id": "...", "content": "..."}
-    """
+    '''
     msg_type = getattr(message, "type", "")
     role = _ROLE_MAP.get(msg_type, msg_type)
     content = getattr(message, "content", "")
@@ -61,7 +61,6 @@ def langchain_to_openai_message(message: Any) -> dict:
                         },
                     }
                 )
-            # If no text content, set content to null per OpenAI spec
             result["content"] = content if (isinstance(content, list) and content) or (isinstance(content, str) and content) else None
             result["tool_calls"] = openai_tool_calls
         else:
@@ -69,18 +68,17 @@ def langchain_to_openai_message(message: Any) -> dict:
 
         return result
 
-    # user / system / unknown
     return {"role": role, "content": content}
 
 
 def _infer_finish_reason(message: Any) -> str:
-    """
+    '''
 
     从 AIMessage 推断 OpenAI 的 finish_reason。
 
         存在 tool_calls 时返回 ``tool_calls``；否则读取
         response_metadata.finish_reason，最终回退为 ``stop``。
-    """
+    '''
     tool_calls = getattr(message, "tool_calls", None) or []
     if tool_calls:
         return "tool_calls"
@@ -93,7 +91,7 @@ def _infer_finish_reason(message: Any) -> str:
 
 
 def langchain_to_openai_completion(message: Any) -> dict:
-    """
+    '''
 
     将 AIMessage 及其元数据转换为 OpenAI completion 响应字典。
 
@@ -104,7 +102,7 @@ def langchain_to_openai_completion(message: Any) -> dict:
                 "choices": [{"index": 0, "message": <openai_message>, "finish_reason": <inferred>}],
                 "usage": {"prompt_tokens": ..., "completion_tokens": ..., "total_tokens": ...} or None,
             }
-    """
+    '''
     resp_meta = getattr(message, "response_metadata", None) or {}
     model_name = resp_meta.get("model_name") if isinstance(resp_meta, dict) else None
 
@@ -138,7 +136,7 @@ def langchain_to_openai_completion(message: Any) -> dict:
 
 
 def langchain_messages_to_openai(messages: list) -> list[dict]:
-    """
+    '''
 
-    将 LangChain BaseMessage 列表转换为 OpenAI 消息字典列表。"""
+    将 LangChain BaseMessage 列表转换为 OpenAI 消息字典列表。'''
     return [langchain_to_openai_message(m) for m in messages]

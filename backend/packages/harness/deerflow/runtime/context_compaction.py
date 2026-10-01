@@ -1,4 +1,4 @@
-"""通过摘要中间件压缩线程检查点中的历史消息。"""
+'''通过摘要中间件压缩线程检查点中的历史消息。'''
 
 from __future__ import annotations
 
@@ -16,22 +16,22 @@ from deerflow.utils.time import now_iso
 
 
 class ContextCompactionDisabled(RuntimeError):
-    """
+    '''
 
-    在未启用摘要功能时请求手动压缩会抛出此异常。"""
+    在未启用摘要功能时请求手动压缩会抛出此异常。'''
 
 
 class ContextCompactionFailed(RuntimeError):
-    """
+    '''
 
-    线程存在可压缩内容但摘要操作失败时抛出此异常。"""
+    线程存在可压缩内容但摘要操作失败时抛出此异常。'''
 
 
 @dataclass(frozen=True)
 class ThreadCompactionResult:
-    """
+    '''
 
-    表示一次手动上下文压缩的结果。"""
+    表示一次手动上下文压缩的结果。'''
 
     thread_id: str
     compacted: bool
@@ -48,7 +48,7 @@ def _create_compaction_middleware(
     app_config: AppConfig,
     keep: tuple[str, int | float] | None,
 ) -> DeerFlowSummarizationMiddleware:
-    """根据应用配置创建摘要中间件；摘要关闭时明确拒绝压缩请求。"""
+    '''根据应用配置创建摘要中间件；摘要关闭时明确拒绝压缩请求。'''
     middleware = create_summarization_middleware(app_config=app_config, keep=keep)
     if middleware is None:
         raise ContextCompactionDisabled("Context compaction is disabled.")
@@ -56,7 +56,7 @@ def _create_compaction_middleware(
 
 
 def _checkpoint_namespace(checkpoint_tuple: Any) -> str:
-    """从检查点快照提取写回时必须沿用的命名空间。"""
+    '''从检查点快照提取写回时必须沿用的命名空间。'''
     config = getattr(checkpoint_tuple, "config", {}) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     checkpoint_ns = configurable.get("checkpoint_ns", "") if isinstance(configurable, dict) else ""
@@ -73,7 +73,7 @@ async def compact_thread_context(
     agent_name: str | None = None,
     app_config: AppConfig | None = None,
 ) -> ThreadCompactionResult:
-    """摘要线程的旧消息并写入新检查点，同时保留近期消息及其版本号。"""
+    '''摘要线程的旧消息并写入新检查点，同时保留近期消息及其版本号。'''
     resolved_app_config = app_config or get_app_config()
     middleware = _create_compaction_middleware(app_config=resolved_app_config, keep=keep)
 

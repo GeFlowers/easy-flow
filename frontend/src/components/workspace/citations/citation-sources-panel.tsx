@@ -77,6 +77,7 @@ export function CitationSourcesPanel({
   );
 }
 
+/** 复制单条来源的 Markdown 引用，并短暂显示复制成功状态。 */
 function CitationSourceCopyButton({ source }: { source: CitationSource }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
@@ -92,6 +93,7 @@ function CitationSourceCopyButton({ source }: { source: CitationSource }) {
     };
   }, []);
 
+  /** 复制格式化后的引用文本，并显示短暂的成功状态。 */
   const handleCopy = useCallback(() => {
     void (async () => {
       const didCopy = await writeTextToClipboard(

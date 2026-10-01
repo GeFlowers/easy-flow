@@ -39,6 +39,7 @@ export function ArtifactFileList({
   const { select: selectArtifact, setOpen } = useArtifacts();
   const [installingFile, setInstallingFile] = useState<string | null>(null);
 
+  /** 选择所点文件并打开对应的产物详情面板。 */
   const handleClick = useCallback(
     (filepath: string) => {
       selectArtifact(filepath);
@@ -47,6 +48,7 @@ export function ArtifactFileList({
     [selectArtifact, setOpen],
   );
 
+  /** 将当前产物中的技能包提交安装，并反馈权限或安装结果。 */
   const handleInstallSkill = useCallback(
     async (e: React.MouseEvent, filepath: string) => {
       e.stopPropagation();

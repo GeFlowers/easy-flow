@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-/** Input 内部组件：组织对应的界面结构与交互语义。 */
+/** 为单行表单输入统一焦点、错误、禁用和文件选择器样式。 */
 function Input({ className, type, ...props }: React.ComponentProps<"input">) {
   return (
     <input

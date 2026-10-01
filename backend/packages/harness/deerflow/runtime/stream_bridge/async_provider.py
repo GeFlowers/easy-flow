@@ -1,4 +1,4 @@
-"""
+'''
 
 Async stream bridge factory.
 
@@ -11,7 +11,7 @@ Usage (e.g. FastAPI lifespan)::
 
     async with make_stream_bridge() as bridge:
         app.state.stream_bridge = bridge
-"""
+'''
 
 from __future__ import annotations
 
@@ -31,7 +31,7 @@ _ENV_REDIS_URL = "DEER_FLOW_STREAM_BRIDGE_REDIS_URL"
 
 
 def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
-    """优先从显式应用配置读取桥接设置，并兼容只设置专用环境变量的启动方式。"""
+    '''优先从显式应用配置读取桥接设置，并兼容只设置专用环境变量的启动方式。'''
     if app_config is None:
         config = get_stream_bridge_config()
     else:
@@ -45,13 +45,13 @@ def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
 
 
 def _resolve_redis_url(config: StreamBridgeConfig) -> str:
-    """按配置项、专用环境变量、通用环境变量的顺序解析 Redis 地址。"""
+    '''按配置项、专用环境变量、通用环境变量的顺序解析 Redis 地址。'''
     return config.redis_url or os.getenv(_ENV_REDIS_URL) or os.getenv("REDIS_URL") or "redis://localhost:6379/0"
 
 
 @contextlib.asynccontextmanager
 async def make_stream_bridge(app_config: AppConfig | None = None) -> AsyncIterator[StreamBridge]:
-    """创建 Redis 事件桥接器，并在上下文退出时关闭其连接。"""
+    '''创建 Redis 事件桥接器，并在上下文退出时关闭其连接。'''
     config = _resolve_config(app_config)
 
     from deerflow.runtime.stream_bridge.redis import RedisStreamBridge

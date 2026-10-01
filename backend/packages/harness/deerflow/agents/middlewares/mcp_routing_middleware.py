@@ -1,6 +1,4 @@
-"""定义 mcp_routing_middleware 模块提供的职责与可复用接口。
-
-Auto-promote deferred MCP tools from routing metadata before model calls."""
+'''根据用户消息中的路由关键词，在模型调用前自动提升匹配的延迟工具。'''
 
 from __future__ import annotations
 
@@ -20,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class McpRoutingIndexEntry(TypedDict):
-    "封装 McpRoutingIndexEntry 的状态、协作关系与公开操作"
+    '''描述单个工具的匹配优先级和触发关键词。'''
 
     priority: int
     keywords: list[str]
@@ -30,7 +28,7 @@ McpRoutingIndex = Mapping[str, McpRoutingIndexEntry]
 
 
 class McpRoutingMiddleware(AgentMiddleware[AgentState]):
-    """封装 McpRoutingMiddleware 的状态、协作关系与公开操作。
+    '''只读取序列化路由索引并更新已提升工具状态，不持有或执行工具对象。
 
     Write minimal deferred-tool promotion state from latest user text.
 
@@ -38,7 +36,7 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
         not hold ``BaseTool`` objects, does not execute tools, and does not filter
         tool calls. ``DeferredToolFilterMiddleware`` remains responsible for hiding
         unpromoted schemas and blocking unpromoted deferred tool calls.
-    """
+    '''
 
     def __init__(
         self,
@@ -46,7 +44,7 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
         catalog_hash: str | None,
         top_k: int,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存目录版本、自动提升数量上限和规范化后的路由索引。'''
         super().__init__()
         self._catalog_hash = catalog_hash
         self._top_k = clamp_auto_promote_top_k(top_k)
@@ -54,12 +52,7 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _normalize_index(routing_index: McpRoutingIndex) -> dict[str, tuple[int, tuple[str, ...]]]:
-        # Defensive re-normalization: this middleware is built to accept arbitrary
-        # serialized routing data, not only the output of
-        # tool_search._routing_priority / _routing_keywords. In practice it is a
-        # no-op over the builder's output; keep the coercion rules aligned with
-        # those two helpers if either side changes.
-        "执行 _normalize_index 的明确职责，并返回与调用约定一致的结果"
+        '''校验并规范化序列化路由条目，跳过名称或关键词无效的记录。'''
         normalized: dict[str, tuple[int, tuple[str, ...]]] = {}
         for raw_name, raw_entry in routing_index.items():
             name = str(raw_name)
@@ -80,14 +73,14 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _latest_user_message(messages: list[Any]) -> HumanMessage | None:
-        "执行 _latest_user_message 的明确职责，并返回与调用约定一致的结果"
+        '''从消息列表末尾向前查找最近一条真实用户消息。'''
         for message in reversed(messages):
             if is_real_user_message(message):
                 return message
         return None
 
     def _matched_names(self, state: Mapping[str, Any] | None) -> list[str]:
-        "执行 _matched_names 的明确职责，并返回与调用约定一致的结果"
+        '''按用户消息关键词匹配工具，并依据优先级和名称稳定排序后截取前若干项。'''
         if not self._catalog_hash or not self._routing_index:
             return []
         messages = list((state or {}).get("messages") or [])
@@ -112,7 +105,7 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
         return [name for _, name in matched[: self._top_k]]
 
     def _state_update(self, state: Mapping[str, Any] | None) -> dict[str, Any] | None:
-        "执行 _state_update 的明确职责，并返回与调用约定一致的结果"
+        '''将本轮自动匹配结果写入带目录版本标识的提升状态。'''
         names = self._matched_names(state)
         if not names:
             return None
@@ -131,19 +124,17 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
 
     @override
     def before_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 before_model 的明确职责，并返回与调用约定一致的结果"
+        '''在同步模型调用前更新符合关键词的延迟工具状态。'''
         return self._state_update(state)
 
     @override
     async def abefore_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        "执行 abefore_model 的明确职责，并返回与调用约定一致的结果"
+        '''在异步模型调用前复用相同的延迟工具自动匹配逻辑。'''
         return self._state_update(state)
 
 
 def assert_mcp_routing_before_deferred_filter(middlewares: Sequence[AgentMiddleware]) -> None:
-    """执行 assert_mcp_routing_before_deferred_filter 的明确职责，并返回与调用约定一致的结果。
-
-    Fail fast if auto-promote would run after deferred schema filtering."""
+    '''确保自动提升中间件先于延迟工具过滤器执行，否则立即报错。'''
     from deerflow.agents.middlewares.deferred_tool_filter_middleware import DeferredToolFilterMiddleware
 
     routing_idx = next((idx for idx, middleware in enumerate(middlewares) if isinstance(middleware, McpRoutingMiddleware)), None)

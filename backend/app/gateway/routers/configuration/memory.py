@@ -1,4 +1,4 @@
-"""提供用户长期记忆的读取、编辑、导入导出和状态查询接口。"""
+'''提供用户长期记忆的读取、编辑、导入导出和状态查询接口。'''
 
 from typing import Literal
 
@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api", tags=["memory"])
 
 
 def _resolve_memory_user_id(request: Request) -> str:
-    """解析当前请求的记忆所有者；可信内部通道请求使用其绑定用户并规范化 ID。"""
+    '''解析当前请求的记忆所有者；可信内部通道请求使用其绑定用户并规范化 ID。'''
     raw_owner = get_trusted_internal_owner_user_id(request)
     if raw_owner:
         return make_safe_user_id(raw_owner)
@@ -23,14 +23,14 @@ def _resolve_memory_user_id(request: Request) -> str:
 
 
 class ContextSection(BaseModel):
-    """表示带更新时间的单段记忆摘要。"""
+    '''表示带更新时间的单段记忆摘要。'''
 
     summary: str = Field(default="", description="Summary content")
     updatedAt: str = Field(default="", description="Last update timestamp")
 
 
 class UserContext(BaseModel):
-    """表示工作、个人和当前关注事项等用户背景记忆。"""
+    '''表示工作、个人和当前关注事项等用户背景记忆。'''
 
     workContext: ContextSection = Field(default_factory=ContextSection)
     personalContext: ContextSection = Field(default_factory=ContextSection)
@@ -38,7 +38,7 @@ class UserContext(BaseModel):
 
 
 class HistoryContext(BaseModel):
-    """表示近期历史、较早上下文和长期背景摘要。"""
+    '''表示近期历史、较早上下文和长期背景摘要。'''
 
     recentMonths: ContextSection = Field(default_factory=ContextSection)
     earlierContext: ContextSection = Field(default_factory=ContextSection)
@@ -46,7 +46,7 @@ class HistoryContext(BaseModel):
 
 
 class Fact(BaseModel):
-    """表示一条可分类、带置信度和来源信息的记忆事实。"""
+    '''表示一条可分类、带置信度和来源信息的记忆事实。'''
 
     id: str = Field(..., description="Unique identifier for the fact")
     content: str = Field(..., description="Fact content")
@@ -58,7 +58,7 @@ class Fact(BaseModel):
 
 
 class MemoryResponse(BaseModel):
-    """封装记忆版本、更新时间、用户背景、历史摘要及事实列表。"""
+    '''封装记忆版本、更新时间、用户背景、历史摘要及事实列表。'''
 
     version: str = Field(default="1.0", description="Memory schema version")
     lastUpdated: str = Field(default="", description="Last update timestamp")
@@ -68,7 +68,7 @@ class MemoryResponse(BaseModel):
 
 
 def _map_memory_fact_value_error(exc: ValueError) -> HTTPException:
-    """将事实校验异常映射为稳定的 HTTP 400 错误说明。"""
+    '''将事实校验异常映射为稳定的 HTTP 400 错误说明。'''
     if exc.args and exc.args[0] == "confidence":
         detail = "Invalid confidence value; must be between 0 and 1."
     else:
@@ -77,7 +77,7 @@ def _map_memory_fact_value_error(exc: ValueError) -> HTTPException:
 
 
 def _require_capability(name: str, *, label: str):
-    """从当前记忆后端获取可选操作能力；后端未实现时返回 HTTP 501。"""
+    '''从当前记忆后端获取可选操作能力；后端未实现时返回 HTTP 501。'''
     manager = get_memory_manager()
     if not hasattr(manager, name):
         raise HTTPException(
@@ -88,7 +88,7 @@ def _require_capability(name: str, *, label: str):
 
 
 class FactCreateRequest(BaseModel):
-    """定义新增长期记忆事实所需的正文、类别和置信度。"""
+    '''定义新增长期记忆事实所需的正文、类别和置信度。'''
 
     content: str = Field(..., min_length=1, description="Fact content")
     category: str = Field(default="context", description="Fact category")
@@ -96,7 +96,7 @@ class FactCreateRequest(BaseModel):
 
 
 class FactPatchRequest(BaseModel):
-    """定义记忆事实的局部更新字段；未提供的字段保持原值。"""
+    '''定义记忆事实的局部更新字段；未提供的字段保持原值。'''
 
     content: str | None = Field(default=None, min_length=1, description="Fact content")
     category: str | None = Field(default=None, description="Fact category")
@@ -104,7 +104,7 @@ class FactPatchRequest(BaseModel):
 
 
 class MemoryConfigResponse(BaseModel):
-    """描述记忆功能开关、运行模式和当前后端专属配置。"""
+    '''描述记忆功能开关、运行模式和当前后端专属配置。'''
 
     enabled: bool = Field(..., description="Whether the memory mechanism is enabled (call-site gate).")
     mode: Literal["middleware", "tool"] = Field(..., description="Memory operation mode: 'middleware' (passive per-turn LLM summarization) or 'tool' (model calls memory tools directly). Mechanism-level, applies to any backend.")
@@ -115,7 +115,7 @@ class MemoryConfigResponse(BaseModel):
 
 
 class MemoryStatusResponse(BaseModel):
-    """组合记忆配置和当前记忆数据，供状态接口一次性返回。"""
+    '''组合记忆配置和当前记忆数据，供状态接口一次性返回。'''
 
     config: MemoryConfigResponse
     data: MemoryResponse
@@ -129,7 +129,7 @@ class MemoryStatusResponse(BaseModel):
     description="Retrieve the current global memory data including user context, history, and facts.",
 )
 async def get_memory(http_request: Request) -> MemoryResponse:
-    """读取当前用户可访问的长期记忆数据。
+    '''读取当前用户可访问的长期记忆数据。
 
         Returns:
             The current memory data with user context, history, and facts.
@@ -161,7 +161,7 @@ async def get_memory(http_request: Request) -> MemoryResponse:
                 ]
             }
             ```
-    """
+    '''
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
     return MemoryResponse(**memory_data)
 
@@ -174,7 +174,7 @@ async def get_memory(http_request: Request) -> MemoryResponse:
     description="Reload memory data from the storage file, refreshing the in-memory cache.",
 )
 async def reload_memory(http_request: Request) -> MemoryResponse:
-    """要求后端刷新持久化记忆；不支持显式重载的后端退回读取当前数据。"""
+    '''要求后端刷新持久化记忆；不支持显式重载的后端退回读取当前数据。'''
     user_id = _resolve_memory_user_id(http_request)
     manager = get_memory_manager()
     if hasattr(manager, "reload_memory"):
@@ -193,7 +193,7 @@ async def reload_memory(http_request: Request) -> MemoryResponse:
     description="Delete all saved memory data and reset the memory structure to an empty state.",
 )
 async def clear_memory(http_request: Request) -> MemoryResponse:
-    """清除当前用户的持久化记忆并返回清空后的数据结构。"""
+    '''清除当前用户的持久化记忆并返回清空后的数据结构。'''
     try:
         memory_data = get_memory_manager().clear_memory(user_id=_resolve_memory_user_id(http_request))
     except OSError as exc:
@@ -210,7 +210,7 @@ async def clear_memory(http_request: Request) -> MemoryResponse:
     description="Create a single saved memory fact manually.",
 )
 async def create_memory_fact_endpoint(request: FactCreateRequest, http_request: Request) -> MemoryResponse:
-    """将用户手动提交的单条事实写入长期记忆。"""
+    '''将用户手动提交的单条事实写入长期记忆。'''
     try:
         create_fact = _require_capability("create_fact", label="create fact")
         memory_data, fact_id = create_fact(
@@ -238,7 +238,7 @@ async def create_memory_fact_endpoint(request: FactCreateRequest, http_request: 
     description="Delete a single saved memory fact by its fact id.",
 )
 async def delete_memory_fact_endpoint(fact_id: str, http_request: Request) -> MemoryResponse:
-    """按事实 ID 删除长期记忆中的单条记录。"""
+    '''按事实 ID 删除长期记忆中的单条记录。'''
     try:
         delete_fact = _require_capability("delete_fact", label="delete fact")
         memory_data = delete_fact(fact_id, user_id=_resolve_memory_user_id(http_request))
@@ -258,7 +258,7 @@ async def delete_memory_fact_endpoint(fact_id: str, http_request: Request) -> Me
     description="Partially update a single saved memory fact by its fact id while preserving omitted fields.",
 )
 async def update_memory_fact_endpoint(fact_id: str, request: FactPatchRequest, http_request: Request) -> MemoryResponse:
-    """仅更新请求中提供字段的单条记忆事实。"""
+    '''仅更新请求中提供字段的单条记忆事实。'''
     try:
         update_fact = _require_capability("update_fact", label="update fact")
         memory_data = update_fact(
@@ -286,7 +286,7 @@ async def update_memory_fact_endpoint(fact_id: str, request: FactPatchRequest, h
     description="Export the current global memory data as JSON for backup or transfer.",
 )
 async def export_memory(http_request: Request) -> MemoryResponse:
-    """读取并返回当前用户的记忆数据，供备份或迁移使用。"""
+    '''读取并返回当前用户的记忆数据，供备份或迁移使用。'''
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
     return MemoryResponse(**memory_data)
 
@@ -299,7 +299,7 @@ async def export_memory(http_request: Request) -> MemoryResponse:
     description="Import and overwrite the current global memory data from a JSON payload.",
 )
 async def import_memory(request: MemoryResponse, http_request: Request) -> MemoryResponse:
-    """用请求中的完整数据覆盖当前用户记忆，并返回持久化后的结果。"""
+    '''用请求中的完整数据覆盖当前用户记忆，并返回持久化后的结果。'''
     try:
         memory_data = get_memory_manager().import_memory(request.model_dump(), user_id=_resolve_memory_user_id(http_request))
     except OSError as exc:
@@ -315,7 +315,7 @@ async def import_memory(request: MemoryResponse, http_request: Request) -> Memor
     description="Retrieve the current memory system configuration.",
 )
 async def get_memory_config_endpoint() -> MemoryConfigResponse:
-    """读取当前生效的记忆系统配置。
+    '''读取当前生效的记忆系统配置。
 
         Returns:
             The current memory configuration. The response is backend-agnostic:
@@ -345,7 +345,7 @@ async def get_memory_config_endpoint() -> MemoryConfigResponse:
                 }
             }
             ```
-    """
+    '''
     config = get_memory_config()
     return MemoryConfigResponse(
         enabled=config.enabled,
@@ -365,11 +365,11 @@ async def get_memory_config_endpoint() -> MemoryConfigResponse:
     description="Retrieve both memory configuration and current data in a single request.",
 )
 async def get_memory_status(http_request: Request) -> MemoryStatusResponse:
-    """读取记忆系统的运行状态、配置摘要和数据概况。
+    '''读取记忆系统的运行状态、配置摘要和数据概况。
 
         Returns:
             Combined memory configuration and current data.
-    """
+    '''
     config = get_memory_config()
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
 

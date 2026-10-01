@@ -116,11 +116,6 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
   allow_host_bash: false
 
-# 基于容器（推荐用于多用户）
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  replicas: 3
-  idle_timeout: 600
 ```
 
 ### 工具

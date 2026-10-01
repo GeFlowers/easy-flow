@@ -1,4 +1,4 @@
-"""按应用持久化配置创建异步 PostgreSQL Store，并管理连接生命周期。"""
+'''按应用持久化配置创建异步 PostgreSQL Store，并管理连接生命周期。'''
 
 from __future__ import annotations
 
@@ -17,14 +17,11 @@ from deerflow.runtime.store.provider import (
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Internal backend factory
-# ---------------------------------------------------------------------------
 
 
 @contextlib.asynccontextmanager
 async def _async_store(config) -> AsyncIterator[BaseStore]:
-    """创建并初始化异步 PostgreSQL Store，离开上下文时关闭连接。"""
+    '''创建并初始化异步 PostgreSQL Store，离开上下文时关闭连接。'''
     if config.type == "postgres":
         try:
             from langgraph.store.postgres.aio import AsyncPostgresStore  # type: ignore[import]
@@ -43,14 +40,11 @@ async def _async_store(config) -> AsyncIterator[BaseStore]:
     raise ValueError(f"Unknown store backend type: {config.type!r}")
 
 
-# ---------------------------------------------------------------------------
-# Public async context manager
-# ---------------------------------------------------------------------------
 
 
 @contextlib.asynccontextmanager
 async def make_store(app_config: AppConfig | None = None) -> AsyncIterator[BaseStore]:
-    """从传入或当前应用配置解析后端，创建异步 Store 并在退出时释放连接。"""
+    '''从传入或当前应用配置解析后端，创建异步 Store 并在退出时释放连接。'''
     if app_config is None:
         app_config = get_app_config()
 

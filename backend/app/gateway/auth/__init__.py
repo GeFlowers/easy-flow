@@ -1,7 +1,7 @@
-"""DeerFlow 的认证模块。
+'''DeerFlow 的认证模块。
 
 本模块提供基于 JWT 的认证、可扩展认证提供者以及用户存储仓储接口。
-"""
+'''
 
 from app.gateway.auth.config import AuthConfig, get_auth_config, set_auth_config
 from app.gateway.auth.errors import AuthErrorCode, AuthErrorResponse, TokenError

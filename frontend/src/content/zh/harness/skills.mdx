@@ -95,11 +95,11 @@ skills:
   # 取消注释以自定义：
   # path: /absolute/path/to/custom/skills
 
-  # 在沙箱容器中挂载技能的路径
+  # Agent 在沙箱运行环境中访问技能的虚拟路径
   container_path: /mnt/skills
 ```
 
-`container_path` 很重要：它告诉 Agent 在沙箱内哪里找到技能文件。Harness 自动将主机技能目录挂载到这个容器路径。
+`container_path` 很重要：它告诉 Agent 在沙箱内哪里找到技能文件。Harness 会通过路径映射或远程文件传输，让技能内容在这个虚拟路径下可用。
 
 ## 启用和禁用技能
 

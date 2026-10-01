@@ -1,6 +1,4 @@
-"""定义 security_scanner 模块提供的职责与可复用接口。
-
-Security screening for agent-managed skill writes."""
+'''在写入技能内容前结合静态发现和模型审查给出安全决定。'''
 
 from __future__ import annotations
 
@@ -20,17 +18,17 @@ logger = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class ScanResult:
-    "封装 ScanResult 的状态、协作关系与公开操作"
+    '''保存技能审查的放行、警告或阻止结论及原因。'''
 
     decision: str
     reason: str
 
 
 def _extract_json_object(raw: str) -> dict | None:
-    "执行 _extract_json_object 的明确职责，并返回与调用约定一致的结果"
+    '''从模型文本中解析 JSON 对象，兼容代码围栏和附带说明的响应。'''
     raw = raw.strip()
 
-    # Strip markdown code fences (```json ... ``` or ``` ... ```)
+    # 去除模型可能添加的 JSON 代码围栏。
     fence_match = re.match(r"^```(?:json)?\s*\n?(.*?)\n?\s*```$", raw, re.DOTALL)
     if fence_match:
         raw = fence_match.group(1).strip()
@@ -40,7 +38,7 @@ def _extract_json_object(raw: str) -> dict | None:
     except json.JSONDecodeError:
         pass
 
-    # Brace-balanced extraction with string-awareness
+    # 按大括号平衡提取对象，并忽略字符串内部的大括号。
     start = raw.find("{")
     if start == -1:
         return None
@@ -74,7 +72,7 @@ def _extract_json_object(raw: str) -> dict | None:
 
 
 def _format_static_findings_context(static_findings: list[dict[str, Any]]) -> str:
-    "执行 _format_static_findings_context 的明确职责，并返回与调用约定一致的结果"
+    '''将静态扫描发现格式化为提供给模型审查的上下文。'''
     if not static_findings:
         return "None."
     lines = []
@@ -94,9 +92,7 @@ async def scan_skill_content(
     app_config: AppConfig | None = None,
     static_findings: list[dict[str, Any]] | None = None,
 ) -> ScanResult:
-    """执行 scan_skill_content 的明确职责，并返回与调用约定一致的结果。
-
-    Screen skill content before it is written to disk."""
+    '''让配置的审查模型评估技能内容；审查不可用或响应无效时默认阻止写入。'''
     rubric = (
         "You are a security reviewer for AI agent skills. "
         "Classify the content as allow, warn, or block. "

@@ -1,15 +1,4 @@
-"""定义 thread_runs 模块提供的职责与可复用接口。
-
-Runs endpoints — create, stream, wait, cancel.
-
-Implements the LangGraph Platform runs API on top of
-:class:`deerflow.agents.runs.RunManager` and
-:class:`deerflow.agents.stream_bridge.StreamBridge`.
-
-SSE format is aligned with the LangGraph Platform protocol so that
-the ``useStream`` React hook from ``@langchain/langgraph-sdk/react``
-works without modification.
-"""
+'''提供线程运行的创建、流式订阅、等待、取消和历史查询接口，并连接运行管理器与事件桥。'''
 
 from __future__ import annotations
 
@@ -35,21 +24,21 @@ from deerflow.workspace_changes import get_workspace_changes_response
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/threads", tags=["runs"])
 REGENERATE_HISTORY_SCAN_LIMIT = 200
-# Doubled to keep ~200 effective checkpoints when duration-only checkpoints
-# (one per successful run in steady state) consume roughly half of history.
+# 扫描数量加倍，以便在仅包含运行时长的检查点（稳定状态下每次成功运行生成一个）占用约一半历史记录时，
+# 仍能覆盖约 200 个有效检查点。
 REGENERATE_HISTORY_RAW_SCAN_LIMIT = REGENERATE_HISTORY_SCAN_LIMIT * 2
 THREAD_MESSAGE_PAGE_SCAN_BATCH = 201
 
 
 def _is_duration_only_checkpoint(checkpoint_tuple: Any) -> bool:
-    """判断检查点是否只写入运行耗时补充信息。"""
+    '''判断检查点是否只写入运行耗时补充信息。'''
     metadata = getattr(checkpoint_tuple, "metadata", None)
     writes = metadata.get("writes") if isinstance(metadata, dict) else None
     return isinstance(writes, dict) and "runtime_run_duration" in writes
 
 
 def compute_run_durations(runs) -> dict[str, int]:
-    """根据运行记录的创建和更新时间计算持续秒数，忽略无法解析的时间戳。"""
+    '''根据运行记录的创建和更新时间计算持续秒数，忽略无法解析的时间戳。'''
     from datetime import datetime
 
     durations: dict[str, int] = {}
@@ -65,13 +54,10 @@ def compute_run_durations(runs) -> dict[str, int]:
     return durations
 
 
-# ---------------------------------------------------------------------------
-# Request / response models
-# ---------------------------------------------------------------------------
 
 
 class RunCreateRequest(BaseModel):
-    """定义 LangGraph 兼容运行创建请求。"""
+    '''定义 LangGraph 兼容运行创建请求。'''
 
     assistant_id: str | None = Field(default=None, description="Agent / assistant to use")
     input: dict[str, Any] | None = Field(default=None, description="Graph input (e.g. {messages: [...]})")
@@ -96,13 +82,13 @@ class RunCreateRequest(BaseModel):
 
 
 class RegeneratePrepareRequest(BaseModel):
-    """定义为重新生成定位助手消息的请求。"""
+    '''定义为重新生成定位助手消息的请求。'''
 
     message_id: str = Field(..., min_length=1, description="Assistant message id to regenerate")
 
 
 class RegeneratePrepareResponse(BaseModel):
-    """返回重新生成所需的图输入与基准检查点。"""
+    '''返回重新生成所需的图输入与基准检查点。'''
 
     input: dict[str, Any]
     checkpoint: dict[str, Any]
@@ -111,7 +97,7 @@ class RegeneratePrepareResponse(BaseModel):
 
 
 class ThreadMessagesPageResponse(BaseModel):
-    """表示线程消息分页结果。"""
+    '''表示线程消息分页结果。'''
 
     data: list[dict[str, Any]]
     has_more: bool
@@ -119,7 +105,7 @@ class ThreadMessagesPageResponse(BaseModel):
 
 
 class RunResponse(BaseModel):
-    """表示 LangGraph 兼容运行的状态响应。"""
+    '''表示 LangGraph 兼容运行的状态响应。'''
 
     run_id: str
     thread_id: str
@@ -142,7 +128,7 @@ class RunResponse(BaseModel):
 
 
 class ThreadTokenUsageModelBreakdown(BaseModel):
-    """按模型汇总线程运行令牌使用量。"""
+    '''按模型汇总线程运行令牌使用量。'''
 
     tokens: int = 0
     runs: int = Field(
@@ -152,7 +138,7 @@ class ThreadTokenUsageModelBreakdown(BaseModel):
 
 
 class ThreadTokenUsageCallerBreakdown(BaseModel):
-    """按主代理与子代理汇总令牌使用量。"""
+    '''按主代理与子代理汇总令牌使用量。'''
 
     lead_agent: int = 0
     subagent: int = 0
@@ -160,7 +146,7 @@ class ThreadTokenUsageCallerBreakdown(BaseModel):
 
 
 class ThreadTokenUsageResponse(BaseModel):
-    """表示线程令牌使用量及其拆分结果。"""
+    '''表示线程令牌使用量及其拆分结果。'''
 
     thread_id: str
     total_tokens: int = 0
@@ -171,20 +157,17 @@ class ThreadTokenUsageResponse(BaseModel):
     by_caller: ThreadTokenUsageCallerBreakdown = Field(default_factory=ThreadTokenUsageCallerBreakdown)
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 def _cancel_conflict_detail(run_id: str, record: RunRecord) -> str:
-    """为无法取消的运行构造与其状态一致的冲突说明。"""
+    '''为无法取消的运行构造与其状态一致的冲突说明。'''
     if record.status in (RunStatus.pending, RunStatus.running):
         return f"Run {run_id} is not active on this worker and cannot be cancelled"
     return f"Run {run_id} is not cancellable (status: {record.status.value})"
 
 
 def _compute_retry_after(lease_expires_at: str | None, grace_seconds: int) -> int | None:
-    """计算租约到期并经过宽限期前的秒数，供冲突响应 Retry-After 使用。"""
+    '''计算租约到期并经过宽限期前的秒数，供冲突响应 Retry-After 使用。'''
     if lease_expires_at is None:
         return None
     try:
@@ -199,10 +182,10 @@ def _compute_retry_after(lease_expires_at: str | None, grace_seconds: int) -> in
 
 async def _raise_lease_valid_elsewhere(
     run_id: str,
-    run_mgr,  # RunManager (avoid import for testability)
+    run_mgr,  # 避免为了测试而提前导入运行管理器
     record: RunRecord,
 ) -> None:
-    """重新读取其他工作进程的运行租约，并以 409 和可选 Retry-After 拒绝操作。"""
+    '''重新读取其他工作进程的运行租约，并以 409 和可选 Retry-After 拒绝操作。'''
     fresh = await run_mgr.get(run_id)
     if fresh is not None:
         record = fresh
@@ -218,7 +201,7 @@ async def _raise_lease_valid_elsewhere(
 
 
 def _record_to_response(record: RunRecord) -> RunResponse:
-    """将内部运行记录转换为兼容 API 响应模型。"""
+    '''将内部运行记录转换为兼容 API 响应模型。'''
     return RunResponse(
         run_id=record.run_id,
         thread_id=record.thread_id,
@@ -242,7 +225,7 @@ def _record_to_response(record: RunRecord) -> RunResponse:
 
 
 def _message_id(message: Any) -> str | None:
-    """从消息对象或字典读取标识。"""
+    '''从消息对象或字典读取标识。'''
     value = getattr(message, "id", None)
     if value is None and isinstance(message, dict):
         value = message.get("id")
@@ -250,7 +233,7 @@ def _message_id(message: Any) -> str | None:
 
 
 def _message_type(message: Any) -> str | None:
-    """从消息对象或字典读取类型。"""
+    '''从消息对象或字典读取类型。'''
     value = getattr(message, "type", None)
     if value is None and isinstance(message, dict):
         value = message.get("type") or message.get("role")
@@ -260,7 +243,7 @@ def _message_type(message: Any) -> str | None:
 
 
 def _message_name(message: Any) -> str | None:
-    """从消息对象或字典读取名称。"""
+    '''从消息对象或字典读取名称。'''
     value = getattr(message, "name", None)
     if value is None and isinstance(message, dict):
         value = message.get("name")
@@ -268,19 +251,19 @@ def _message_name(message: Any) -> str | None:
 
 
 def _message_content(message: Any) -> Any:
-    """从消息对象或字典读取内容字段。"""
+    '''从消息对象或字典读取内容字段。'''
     if isinstance(message, dict):
         return message.get("content")
     return getattr(message, "content", None)
 
 
 def _message_text(message: Any) -> str:
-    """将任意消息内容转换为用于比较的纯文本。"""
+    '''将任意消息内容转换为用于比较的纯文本。'''
     return message_to_text(message)
 
 
 def _message_additional_kwargs(message: Any) -> dict[str, Any]:
-    """从消息对象或字典读取附加元数据。"""
+    '''从消息对象或字典读取附加元数据。'''
     value = getattr(message, "additional_kwargs", None)
     if value is None and isinstance(message, dict):
         value = message.get("additional_kwargs")
@@ -288,29 +271,29 @@ def _message_additional_kwargs(message: Any) -> dict[str, Any]:
 
 
 def _is_hidden_or_control_message(message: Any) -> bool:
-    """判断消息是否为不应向客户端展示的控制消息。"""
+    '''判断消息是否为不应向客户端展示的控制消息。'''
     message_type = _message_type(message)
     additional_kwargs = _message_additional_kwargs(message)
     return message_type == "remove" or _message_name(message) == "summary" or additional_kwargs.get("hide_from_ui") is True
 
 
 def _is_visible_human_message(message: Any) -> bool:
-    """判断消息是否为可展示的用户消息。"""
+    '''判断消息是否为可展示的用户消息。'''
     return _message_type(message) == "human" and not _is_hidden_or_control_message(message)
 
 
 def _is_visible_ai_message(message: Any) -> bool:
-    """判断消息是否为可展示的助手消息。"""
+    '''判断消息是否为可展示的助手消息。'''
     return _message_type(message) == "ai" and not _is_hidden_or_control_message(message)
 
 
 def _is_middleware_message_row(row: dict[str, Any]) -> bool:
-    """判断事件存储行是否由中间件写入。"""
+    '''判断事件存储行是否由中间件写入。'''
     return str((row.get("metadata") or {}).get("caller", "")).startswith("middleware:")
 
 
 def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
-    """从检查点中读取消息通道内容。"""
+    '''从检查点中读取消息通道内容。'''
     checkpoint = getattr(checkpoint_tuple, "checkpoint", None) or {}
     channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
     messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
@@ -318,14 +301,14 @@ def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
 
 
 def _checkpoint_configurable(checkpoint_tuple: Any) -> dict[str, Any]:
-    """从检查点配置提取 configurable 字典。"""
+    '''从检查点配置提取 configurable 字典。'''
     config = getattr(checkpoint_tuple, "config", None) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     return dict(configurable) if isinstance(configurable, dict) else {}
 
 
 def _checkpoint_response(checkpoint_tuple: Any) -> dict[str, Any]:
-    """将检查点转换为兼容 API 的精简响应。"""
+    '''将检查点转换为兼容 API 的精简响应。'''
     configurable = _checkpoint_configurable(checkpoint_tuple)
     checkpoint_id = configurable.get("checkpoint_id")
     if not checkpoint_id:
@@ -338,7 +321,7 @@ def _checkpoint_response(checkpoint_tuple: Any) -> dict[str, Any]:
 
 
 def _clean_human_message_for_regenerate(message: Any) -> dict[str, Any]:
-    """清除用户消息中的运行控制信息，保留可重新执行的原始内容。"""
+    '''清除用户消息中的运行控制信息，保留可重新执行的原始内容。'''
     additional_kwargs = _message_additional_kwargs(message)
     content = get_original_user_content_text(_message_content(message), additional_kwargs)
     additional_kwargs.pop(ORIGINAL_USER_CONTENT_KEY, None)
@@ -359,7 +342,7 @@ def _clean_human_message_for_regenerate(message: Any) -> dict[str, Any]:
 
 
 def _event_message_id(row: dict[str, Any]) -> str | None:
-    """从持久化事件行内容中提取消息标识。"""
+    '''从持久化事件行内容中提取消息标识。'''
     content = row.get("content")
     if isinstance(content, BaseMessage):
         return _message_id(content)
@@ -369,7 +352,7 @@ def _event_message_id(row: dict[str, Any]) -> str | None:
 
 
 def _run_last_ai_matches_message(record: RunRecord, message: Any) -> bool:
-    """判断运行末条助手文本是否对应目标消息。"""
+    '''判断运行末条助手文本是否对应目标消息。'''
     last_ai_message = (record.last_ai_message or "").strip()
     if not last_ai_message:
         return False
@@ -380,7 +363,7 @@ def _run_last_ai_matches_message(record: RunRecord, message: Any) -> bool:
 
 
 async def _find_target_run_id(thread_id: str, message_id: str, target_message: Any, request: Request) -> str:
-    """在受线程权限保护的事件历史中定位目标消息所属运行。"""
+    '''在受线程权限保护的事件历史中定位目标消息所属运行。'''
     event_store = get_run_event_store(request)
     rows = await event_store.list_messages(thread_id, limit=REGENERATE_HISTORY_SCAN_LIMIT)
     for row in reversed(rows):
@@ -410,7 +393,7 @@ async def _find_target_run_id(thread_id: str, message_id: str, target_message: A
 
 
 async def _find_base_checkpoint_before_human(thread_id: str, human_message_id: str, request: Request) -> Any:
-    """查找目标用户消息之前可用于重新生成的检查点。"""
+    '''查找目标用户消息之前可用于重新生成的检查点。'''
     checkpointer = get_checkpointer(request)
     base_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
@@ -448,7 +431,7 @@ async def _find_base_checkpoint_before_human(thread_id: str, human_message_id: s
 
 
 async def _prepare_regenerate_payload(thread_id: str, message_id: str, request: Request) -> RegeneratePrepareResponse:
-    """构造 LangGraph 兼容重新生成接口所需的输入和检查点载荷。"""
+    '''构造 LangGraph 兼容重新生成接口所需的输入和检查点载荷。'''
     checkpointer = get_checkpointer(request)
     latest_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
@@ -494,9 +477,6 @@ async def _prepare_regenerate_payload(thread_id: str, message_id: str, request: 
     )
 
 
-# ---------------------------------------------------------------------------
-# Endpoints
-# ---------------------------------------------------------------------------
 
 
 @router.post("/{thread_id}/runs/regenerate/prepare", response_model=RegeneratePrepareResponse)
@@ -506,14 +486,14 @@ async def prepare_regenerate_run(
     body: RegeneratePrepareRequest,
     request: Request,
 ) -> RegeneratePrepareResponse:
-    """为指定助手消息准备重新生成所需的图输入、元数据和基准检查点。"""
+    '''为指定助手消息准备重新生成所需的图输入、元数据和基准检查点。'''
     return await _prepare_regenerate_payload(thread_id, body.message_id, request)
 
 
 @router.post("/{thread_id}/runs", response_model=RunResponse)
 @require_permission("runs", "create", owner_check=True, require_existing=True)
 async def create_run(thread_id: str, body: RunCreateRequest, request: Request) -> RunResponse:
-    """启动后台 agent 运行并立即返回运行标识。"""
+    '''启动后台 agent 运行并立即返回运行标识。'''
     record = await start_run(body, thread_id, request)
     return _record_to_response(record)
 
@@ -521,12 +501,11 @@ async def create_run(thread_id: str, body: RunCreateRequest, request: Request) -
 @router.post("/{thread_id}/runs/stream")
 @require_permission("runs", "create", owner_check=True, require_existing=True)
 async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -> StreamingResponse:
-    """启动 agent 运行，并通过 SSE 持续发送运行事件和结束状态。
+    '''启动 agent 运行，并通过 SSE 持续发送运行事件和结束状态。
 
-        The response includes a ``Content-Location`` header with the run's
-        resource URL, matching the LangGraph Platform protocol.  The
-        ``useStream`` React hook uses this to extract run metadata.
-    """
+        响应中的 ``Content-Location`` 标头包含运行资源地址，符合 LangGraph Platform 协议。
+        ``useStream`` React 钩子会据此提取运行元数据。
+    '''
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     record = await start_run(body, thread_id, request)
@@ -538,9 +517,8 @@ async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-            # LangGraph Platform includes run metadata in this header.
-            # The SDK uses a greedy regex to extract the run id from this path,
-            # so it must point at the canonical run resource without extra suffixes.
+            # LangGraph Platform 使用此标头传递运行元数据。软件开发工具包会用贪婪正则表达式从路径中
+            # 提取运行编号，因此路径必须指向标准运行资源，不能带有额外后缀。
             "Content-Location": f"/api/threads/{thread_id}/runs/{record.run_id}",
         },
     )
@@ -549,7 +527,7 @@ async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -
 @router.post("/{thread_id}/runs/wait", response_model=dict)
 @require_permission("runs", "create", owner_check=True, require_existing=True)
 async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> dict:
-    """启动运行并等待结束，完成后返回检查点状态或运行错误信息。"""
+    '''启动运行并等待结束，完成后返回检查点状态或运行错误信息。'''
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
     record = await start_run(body, thread_id, request)
@@ -576,7 +554,7 @@ async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> 
 @router.get("/{thread_id}/runs", response_model=list[RunResponse])
 @require_permission("runs", "read", owner_check=True)
 async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
-    """按创建时间顺序分页列出线程运行记录。"""
+    '''按创建时间顺序分页列出线程运行记录。'''
     run_mgr = get_run_manager(request)
     user_id = await get_current_user(request)
     records = await run_mgr.list_by_thread(thread_id, user_id=user_id)
@@ -586,7 +564,7 @@ async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
 @router.get("/{thread_id}/runs/{run_id}", response_model=RunResponse)
 @require_permission("runs", "read", owner_check=True)
 async def get_run(thread_id: str, run_id: str, request: Request) -> RunResponse:
-    """读取指定运行的状态、错误和持久化详情。"""
+    '''读取指定运行的状态、错误和持久化详情。'''
     run_mgr = get_run_manager(request)
     user_id = await get_current_user(request)
     record = await run_mgr.get(run_id, user_id=user_id)
@@ -604,7 +582,7 @@ async def cancel_run(
     wait: bool = Query(default=False, description="Block until run completes after cancel"),
     action: Literal["interrupt", "rollback"] = Query(default="interrupt", description="Cancel action"),
 ) -> Response:
-    """取消运行并按 interrupt/rollback 策略处理检查点，可选择等待取消完成。"""
+    '''取消运行并按 interrupt/rollback 策略处理检查点，可选择等待取消完成。'''
     run_mgr = get_run_manager(request)
     record = await run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -625,14 +603,13 @@ async def cancel_run(
     if outcome == CancelOutcome.lease_valid_elsewhere:
         await _raise_lease_valid_elsewhere(run_id, run_mgr, record)
 
-    # not_cancellable, not_active_locally, unknown
     raise HTTPException(status_code=409, detail=_cancel_conflict_detail(run_id, record))
 
 
 @router.get("/{thread_id}/runs/{run_id}/join")
 @require_permission("runs", "read", owner_check=True)
 async def join_run(thread_id: str, run_id: str, request: Request) -> StreamingResponse:
-    """订阅已有运行的 SSE 事件流，不会创建新的运行。"""
+    '''订阅已有运行的 SSE 事件流，不会创建新的运行。'''
     run_mgr = get_run_manager(request)
     record = await run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -652,10 +629,9 @@ async def join_run(thread_id: str, run_id: str, request: Request) -> StreamingRe
     )
 
 
-# Register GET and POST as separate routes so each method gets a unique OpenAPI
-# operationId. ``api_route(methods=["GET", "POST"])`` shares one route registration
-# across both methods, which makes FastAPI emit the same ``operationId`` twice and
-# warn about a duplicate operation id during OpenAPI generation.
+# 将 GET 和 POST 注册为独立路由，使每个方法都具有唯一的 OpenAPI operationId。
+# ``api_route(methods=["GET", "POST"])`` 会让两个方法共用一条路由注册，导致 FastAPI
+# 生成 OpenAPI 时重复输出同一个 operationId 并产生警告。
 @router.get("/{thread_id}/runs/{run_id}/stream", response_model=None)
 @router.post("/{thread_id}/runs/{run_id}/stream", response_model=None)
 @require_permission("runs", "read", owner_check=True)
@@ -666,13 +642,12 @@ async def stream_existing_run(
     action: Literal["interrupt", "rollback"] | None = Query(default=None, description="Cancel action"),
     wait: int = Query(default=0, description="Block until cancelled (1) or return immediately (0)"),
 ):
-    """连接已有运行的 SSE 流，或按请求先取消运行再订阅其收尾事件。
+    '''连接已有运行的 SSE 流，或按请求先取消运行再订阅其收尾事件。
 
-        The LangGraph SDK's ``joinStream`` and ``useStream`` stop button both use
-        ``POST`` to this endpoint.  When ``action=interrupt`` or ``action=rollback``
-        is present the run is cancelled first; the response then streams any
-        remaining buffered events so the client observes a clean shutdown.
-    """
+        LangGraph 软件开发工具包的 ``joinStream`` 和 ``useStream`` 停止按钮都会通过 ``POST``
+        请求此接口。提供 ``action=interrupt`` 或 ``action=rollback`` 时先取消运行，再流式返回
+        缓冲区中剩余事件，使客户端能观察到完整的收尾过程。
+    '''
     run_mgr = get_run_manager(request)
     record = await run_mgr.get(run_id)
     if record is None or record.thread_id != thread_id:
@@ -681,14 +656,12 @@ async def stream_existing_run(
     if record.store_only and action is None and not bridge.supports_cross_process:
         raise HTTPException(status_code=409, detail=f"Run {run_id} is not active on this worker and cannot be streamed")
 
-    # Cancel if an action was requested (stop-button / interrupt flow)
+    # 请求了操作时先取消运行（停止按钮或中断流程）。
     if action is not None:
         outcome = await run_mgr.cancel(run_id, action=action)
         if outcome == CancelOutcome.taken_over:
-            # The run was on another worker and is now marked ``error`` in the
-            # store.  There is no local stream to drain — return immediately so
-            # the client doesn't hang on an SSE subscription this worker can
-            # never serve.
+            # 运行原先位于其他工作器，现在已在存储中标为 ``error``。当前工作器没有可排空的本地事件流，
+            # 因此立即返回，避免客户端等待本工作器无法提供的 SSE 订阅。
             return Response(status_code=202)
         if outcome != CancelOutcome.cancelled:
             if outcome == CancelOutcome.lease_valid_elsewhere:
@@ -712,9 +685,6 @@ async def stream_existing_run(
     )
 
 
-# ---------------------------------------------------------------------------
-# Messages / Events / Token usage endpoints
-# ---------------------------------------------------------------------------
 
 
 @router.get("/{thread_id}/messages")
@@ -726,25 +696,23 @@ async def list_thread_messages(
     before_seq: int | None = Query(default=None),
     after_seq: int | None = Query(default=None),
 ) -> list[dict]:
-    """汇总线程各次运行中可展示的消息，并附加对应反馈信息。"""
+    '''汇总线程各次运行中可展示的消息，并附加对应反馈信息。'''
     event_store = get_run_event_store(request)
     messages = await event_store.list_messages(thread_id, limit=limit, before_seq=before_seq, after_seq=after_seq)
 
-    # Resolve the caller once; it is needed both to scope the feedback query
-    # below and to list the thread's runs for turn-duration injection.
+    # 只解析一次调用用户，供下方反馈查询限定范围，以及读取会话运行记录并补入轮次时长。
     user_id = await get_current_user(request)
 
-    # Find the last AI message per run_id. AI messages are persisted by
-    # RunJournal with event_type "llm.ai.response" (see runtime/journal.py);
-    # the event store returns that value verbatim, so match on it here.
-    last_ai_per_run: dict[str, int] = {}  # run_id -> index in messages list
+    # 找出每个 run_id 对应的最后一条智能体消息。RunJournal 将其以
+    # event_type="llm.ai.response" 保存（见 runtime/journal.py），事件存储会原样返回该值，
+    # 因此在此按该类型匹配。
+    last_ai_per_run: dict[str, int] = {}
     for i, msg in enumerate(messages):
         if msg.get("event_type") == "llm.ai.response":
             last_ai_per_run[msg["run_id"]] = i
 
-    # Attach feedback to the last AI message of each run. Only query when there
-    # is an AI message to attach it to — threads with no completed AI turn yet
-    # would otherwise pay for a grouped feedback lookup whose result is unused.
+    # 将反馈附加到每次运行的最后一条智能体消息。只有存在可关联的智能体消息时才查询反馈，
+    # 避免尚无已完成智能体轮次的会话执行无用的分组查询。
     feedback_map: dict[str, dict] = {}
     if last_ai_per_run:
         feedback_repo = get_feedback_repo(request)
@@ -792,7 +760,7 @@ async def _scan_thread_message_page(
     request: Request,
     user_id: str | None,
 ) -> tuple[list[dict[str, Any]], bool]:
-    """按游标向前扫描事件记录，跳过中间件和已被重新生成取代的消息。"""
+    '''按游标向前扫描事件记录，跳过中间件和已被重新生成取代的消息。'''
     event_store = get_run_event_store(request)
     run_mgr = get_run_manager(request)
     superseded_run_ids = await run_mgr.list_successful_regenerate_sources(thread_id, user_id=user_id)
@@ -853,7 +821,7 @@ async def _enrich_thread_message_page(
     request: Request,
     user_id: str | None,
 ) -> list[dict[str, Any]]:
-    """复制消息记录后补充运行耗时和末条助手回复的反馈，不修改存储原始行。"""
+    '''复制消息记录后补充运行耗时和末条助手回复的反馈，不修改存储原始行。'''
     data = deepcopy(rows)
     if not data:
         return data
@@ -897,7 +865,7 @@ async def list_thread_messages_page(
     limit: int = Query(default=50, ge=1, le=200),
     before_seq: int | None = Query(default=None, ge=1),
 ) -> ThreadMessagesPageResponse:
-    """按线程全局事件序号向前分页读取可展示消息。"""
+    '''按线程全局事件序号向前分页读取可展示消息。'''
     if "after_seq" in request.query_params:
         raise HTTPException(status_code=422, detail="after_seq is not supported by this backward-only endpoint")
 
@@ -927,10 +895,10 @@ async def list_run_messages(
     before_seq: int | None = Query(default=None),
     after_seq: int | None = Query(default=None),
 ) -> dict:
-    """按序号游标分页读取指定运行的对话消息。
+    '''按序号游标分页读取指定运行的对话消息。
 
         Response: { data: [...], has_more: bool }
-    """
+    '''
     event_store = get_run_event_store(request)
     rows = await event_store.list_messages_by_run(
         thread_id,
@@ -971,11 +939,11 @@ async def list_run_events(
     limit: int = Query(default=500, le=2000),
     after_seq: int | None = Query(default=None),
 ) -> list[dict]:
-    """读取指定运行的事件记录，供调试和审计使用。
+    '''读取指定运行的事件记录，供调试和审计使用。
 
         ``task_id`` + ``after_seq`` let the subtask card page through one subagent
         task's persisted steps without the run-wide ``limit`` truncating the tail (#3779).
-    """
+    '''
     event_store = get_run_event_store(request)
     types = event_types.split(",") if event_types else None
     return await event_store.list_events(thread_id, run_id, event_types=types, task_id=task_id, limit=limit, after_seq=after_seq)
@@ -990,7 +958,7 @@ async def get_run_workspace_changes(
     include_files: bool = Query(default=True),
     include_diff: bool = Query(default=True),
 ) -> dict:
-    """读取指定运行记录的工作区和输出文件变更摘要。"""
+    '''读取指定运行记录的工作区和输出文件变更摘要。'''
     event_store = get_run_event_store(request)
     return await get_workspace_changes_response(
         event_store,
@@ -1008,7 +976,7 @@ async def thread_token_usage(
     request: Request,
     include_active: bool = Query(default=False, description="Include running run progress snapshots"),
 ) -> ThreadTokenUsageResponse:
-    """汇总线程 Token 用量；可选包含仍在运行的进度快照。"""
+    '''汇总线程 Token 用量；可选包含仍在运行的进度快照。'''
     run_store = get_run_store(request)
     if include_active:
         agg = await run_store.aggregate_tokens_by_thread(thread_id, include_active=True)

@@ -41,6 +41,7 @@ export function ToolSettingsPage() {
   );
 }
 
+/** 列出已配置的工具服务器及其启用状态，并提交开关变更。 */
 function MCPServerList({
   servers,
 }: {

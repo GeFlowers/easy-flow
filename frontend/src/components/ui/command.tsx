@@ -12,7 +12,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
-/** Command 内部组件：组织对应的界面结构与交互语义。 */
+/** 为可搜索、可键盘导航的命令列表提供统一根容器。 */
 function Command({
   className,
   ...props
@@ -29,7 +29,7 @@ function Command({
   );
 }
 
-/** CommandDialog 内部组件：组织对应的界面结构与交互语义。 */
+/** 将命令面板放入对话框，并添加仅供辅助技术读取的标题和说明。 */
 function CommandDialog({
   title = "Command Palette",
   description = "Search for a command to run...",
@@ -59,7 +59,7 @@ function CommandDialog({
   );
 }
 
-/** CommandInput 内部组件：组织对应的界面结构与交互语义。 */
+/** 在搜索框前放置放大镜图标，并包装命令面板的文本输入。 */
 function CommandInput({
   className,
   ...props
@@ -82,7 +82,7 @@ function CommandInput({
   );
 }
 
-/** CommandList 内部组件：组织对应的界面结构与交互语义。 */
+/** 限制结果列表最大高度，并仅允许内容纵向滚动。 */
 function CommandList({
   className,
   ...props
@@ -99,7 +99,7 @@ function CommandList({
   );
 }
 
-/** CommandEmpty 内部组件：组织对应的界面结构与交互语义。 */
+/** 搜索没有匹配命令时显示空结果内容。 */
 function CommandEmpty({
   ...props
 }: React.ComponentProps<typeof CommandPrimitive.Empty>) {
@@ -112,7 +112,7 @@ function CommandEmpty({
   );
 }
 
-/** CommandGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 将命令选项分组，并统一组标题与内部间距。 */
 function CommandGroup({
   className,
   ...props
@@ -129,7 +129,7 @@ function CommandGroup({
   );
 }
 
-/** CommandSeparator 内部组件：组织对应的界面结构与交互语义。 */
+/** 在命令结果组之间绘制横向分隔线。 */
 function CommandSeparator({
   className,
   ...props
@@ -143,7 +143,7 @@ function CommandSeparator({
   );
 }
 
-/** CommandItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供具有选中、禁用及图标状态样式的单条命令选项。 */
 function CommandItem({
   className,
   ...props
@@ -160,7 +160,7 @@ function CommandItem({
   );
 }
 
-/** CommandShortcut 内部组件：组织对应的界面结构与交互语义。 */
+/** 在命令选项右侧展示对应的键盘快捷键。 */
 function CommandShortcut({
   className,
   ...props

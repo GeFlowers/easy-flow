@@ -130,6 +130,7 @@ export function AuthProvider({ children, initialUser }: AuthProviderProps) {
   const lastCheckRef = React.useRef(0);
 
   useEffect(() => {
+    /** 页面重新可见且用户已登录时，按节流间隔刷新当前账户信息。 */
     const handleVisibilityChange = () => {
       if (document.visibilityState !== "visible" || user === null) return;
       const now = Date.now();

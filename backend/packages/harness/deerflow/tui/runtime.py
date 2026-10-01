@@ -1,4 +1,4 @@
-"未说明"
+'''把客户端流事件转换成终端视图动作，并将异常呈现为可显示的运行结果。'''
 
 from __future__ import annotations
 
@@ -18,21 +18,21 @@ from .view_state import (
 
 
 class _StreamEventLike(Protocol):
-    "未说明"
+    '''描述终端流解析器需要读取的事件类型和数据载荷。'''
 
     type: str
     data: dict
 
 
 class _ClientLike(Protocol):
-    "未说明"
+    '''定义终端客户端的流式调用接口，便于复用和替换客户端实现。'''
 
     def stream(self, message: str, *, thread_id: str | None = None, **kwargs: Any) -> Iterator[Any]:
-        "未说明"
+        '''按消息、线程和其他运行参数产生流式事件。'''
 
 
 def translate(event: _StreamEventLike) -> list[Action]:
-    "未说明"
+    '''将客户端事件转换为助手增量、工具结果、标题或运行完成动作。'''
     if event.type == "messages-tuple":
         return _translate_message(event.data)
     if event.type == "end":
@@ -43,12 +43,11 @@ def translate(event: _StreamEventLike) -> list[Action]:
         if isinstance(title, str) and title.strip():
             return [ThreadTitle(title=title.strip())]
         return []
-    # "custom" events are not rendered incrementally.
     return []
 
 
 def _translate_message(data: Any) -> list[Action]:
-    "未说明"
+    '''解析消息事件中的助手文本和工具调用或工具执行结果。'''
     if not isinstance(data, dict):
         return []
 
@@ -84,21 +83,18 @@ def _translate_message(data: Any) -> list[Action]:
 
 
 def _as_str(value: Any) -> str:
-    # Provider stream chunks can carry an explicit ``None`` id/name (the key is
-    # present, so ``.get(k, "")`` would return None, and ``str(None) == "None"``
-    # — a truthy value that would defeat the empty-id guard downstream).
-    "未说明"
+    '''将可选值转换为文本，避免空标识被错误格式化为字符串 None。'''
     return "" if value is None else str(value)
 
 
 def stream_actions(client: _ClientLike, message: str, *, thread_id: str | None = None, **kwargs: Any) -> Iterator[Action]:
-    "未说明"
+    '''发出运行开始动作，再逐个转换客户端事件，并将异常映射为界面错误。'''
     yield RunStarted()
     try:
         for event in client.stream(message, thread_id=thread_id, **kwargs):
             yield from translate(event)
             if event.type == "end":
-                return  # RunEnded already emitted by translate()
+                return
         yield RunEnded()
     except Exception as exc:  # noqa: BLE001 - surface any model/runtime error in-UI
         yield AssistantError(str(exc) or exc.__class__.__name__)
@@ -106,7 +102,7 @@ def stream_actions(client: _ClientLike, message: str, *, thread_id: str | None =
 
 
 def _extract_text(content: Any) -> str:
-    "未说明"
+    '''从纯文本或多模态内容块中提取文本片段。'''
     if content is None:
         return ""
     if isinstance(content, str):

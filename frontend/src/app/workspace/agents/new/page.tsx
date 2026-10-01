@@ -102,11 +102,13 @@ export default function NewAgentPage() {
       mode: "flash",
       is_bootstrap: true,
     },
+    /** 初始化运行结束但智能体尚未生成时，恢复向导的等待状态。 */
     onFinish() {
       if (!agent && setupAgentStatus === "requested") {
         setSetupAgentStatus("idle");
       }
     },
+    /** 监听 setup_agent 工具完成事件，并回读新建的智能体配置。 */
     onToolEnd({ name }) {
       if (name !== "setup_agent" || !agentName) return;
       setSetupAgentStatus("completed");

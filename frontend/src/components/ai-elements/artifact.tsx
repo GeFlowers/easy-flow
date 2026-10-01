@@ -11,10 +11,9 @@ import { cn } from "@/lib/utils";
 import { type LucideIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 
-/** ArtifactProps 的公开类型定义。 */
 export type ArtifactProps = HTMLAttributes<HTMLDivElement>;
 
-/** Artifact 组件：提供对应的界面结构与交互语义。 */
+/** 产物预览面板的纵向容器，统一承载标题栏、操作区和可滚动内容。 */
 export const Artifact = ({ className, ...props }: ArtifactProps) => (
   <div
     className={cn(
@@ -25,10 +24,9 @@ export const Artifact = ({ className, ...props }: ArtifactProps) => (
   />
 );
 
-/** ArtifactHeaderProps 的公开类型定义。 */
 export type ArtifactHeaderProps = HTMLAttributes<HTMLDivElement>;
 
-/** ArtifactHeader 组件：提供对应的界面结构与交互语义。 */
+/** 展示产物标题及操作按钮，并以底部分隔线与正文区分。 */
 export const ArtifactHeader = ({
   className,
   ...props
@@ -42,10 +40,9 @@ export const ArtifactHeader = ({
   />
 );
 
-/** ArtifactCloseProps 的公开类型定义。 */
 export type ArtifactCloseProps = ComponentProps<typeof Button>;
 
-/** ArtifactClose 组件：提供对应的界面结构与交互语义。 */
+/** 关闭产物面板的按钮；未提供子元素时使用叉号图标。 */
 export const ArtifactClose = ({
   className,
   children,
@@ -68,10 +65,9 @@ export const ArtifactClose = ({
   </Button>
 );
 
-/** ArtifactTitleProps 的公开类型定义。 */
 export type ArtifactTitleProps = HTMLAttributes<HTMLParagraphElement>;
 
-/** ArtifactTitle 组件：提供对应的界面结构与交互语义。 */
+/** 以紧凑强调样式显示当前产物名称。 */
 export const ArtifactTitle = ({ className, ...props }: ArtifactTitleProps) => (
   <div
     className={cn("text-foreground text-sm font-medium", className)}
@@ -79,10 +75,9 @@ export const ArtifactTitle = ({ className, ...props }: ArtifactTitleProps) => (
   />
 );
 
-/** ArtifactDescriptionProps 的公开类型定义。 */
 export type ArtifactDescriptionProps = HTMLAttributes<HTMLParagraphElement>;
 
-/** ArtifactDescription 组件：提供对应的界面结构与交互语义。 */
+/** 在产物名称下展示低强调度的说明文本。 */
 export const ArtifactDescription = ({
   className,
   ...props
@@ -90,10 +85,9 @@ export const ArtifactDescription = ({
   <p className={cn("text-muted-foreground text-sm", className)} {...props} />
 );
 
-/** ArtifactActionsProps 的公开类型定义。 */
 export type ArtifactActionsProps = HTMLAttributes<HTMLDivElement>;
 
-/** ArtifactActions 组件：提供对应的界面结构与交互语义。 */
+/** 将产物工具栏中的多个操作按钮水平对齐。 */
 export const ArtifactActions = ({
   className,
   ...props
@@ -101,14 +95,13 @@ export const ArtifactActions = ({
   <div className={cn("flex items-center gap-1", className)} {...props} />
 );
 
-/** ArtifactActionProps 的公开类型定义。 */
 export type ArtifactActionProps = ComponentProps<typeof Button> & {
   tooltip?: string;
   label?: string;
   icon?: LucideIcon;
 };
 
-/** ArtifactAction 组件：提供对应的界面结构与交互语义。 */
+/** 构造带可选图标、无障碍名称和悬浮提示的产物操作按钮。 */
 export const ArtifactAction = ({
   tooltip,
   label,
@@ -151,10 +144,9 @@ export const ArtifactAction = ({
   return button;
 };
 
-/** ArtifactContentProps 的公开类型定义。 */
 export type ArtifactContentProps = HTMLAttributes<HTMLDivElement>;
 
-/** ArtifactContent 组件：提供对应的界面结构与交互语义。 */
+/** 填充剩余面板空间，并允许长内容独立滚动。 */
 export const ArtifactContent = ({
   className,
   ...props

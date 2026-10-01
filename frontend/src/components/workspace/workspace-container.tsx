@@ -129,6 +129,7 @@ export function WorkspaceBody({
   );
 }
 
+/** 将工作区路由片段转换为面包屑文案，其余片段保留原名并首字母大写。 */
 function nameOfSegment(
   segment: string | undefined,
   t: ReturnType<typeof useI18n>["t"],

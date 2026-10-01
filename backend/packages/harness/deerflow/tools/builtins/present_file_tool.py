@@ -1,4 +1,4 @@
-"""提供将线程内文件呈现给用户的内置工具。"""
+'''提供将线程内文件呈现给用户的内置工具。'''
 
 from pathlib import Path
 from typing import Annotated
@@ -16,7 +16,7 @@ OUTPUTS_VIRTUAL_PREFIX = f"{VIRTUAL_PATH_PREFIX}/outputs"
 
 
 def _get_thread_id(runtime: Runtime) -> str | None:
-    """从运行时状态和配置中解析线程标识。"""
+    '''从运行时状态和配置中解析线程标识。'''
     thread_id = runtime.context.get("thread_id") if runtime.context else None
     if thread_id:
         return thread_id
@@ -36,7 +36,7 @@ def _normalize_presented_filepath(
     runtime: Runtime,
     filepath: str,
 ) -> str:
-    """验证并规范化允许呈现给用户的文件路径。"""
+    '''验证并规范化允许呈现给用户的文件路径。'''
     if runtime.state is None:
         raise ValueError("Thread runtime state is not available")
 
@@ -75,7 +75,7 @@ def present_file_tool(
     filepaths: list[str],
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """将生成的文件登记为可供用户查看或渲染的项目产物。
+    '''将生成的文件登记为可供用户查看或渲染的项目产物。
 
     When to use the present_files tool:
 
@@ -93,7 +93,7 @@ def present_file_tool(
 
     Args:
         filepaths: List of absolute file paths to present to the user. **Only** files in `/mnt/user-data/outputs` can be presented.
-    """
+    '''
     try:
         normalized_paths = [_normalize_presented_filepath(runtime, filepath) for filepath in filepaths]
     except ValueError as exc:

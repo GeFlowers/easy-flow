@@ -100,6 +100,7 @@ export function WorkspaceChangeBadge({
   );
 }
 
+/** 在变更摘要列表中呈现文件路径及其新增、删除行数。 */
 function WorkspaceChangeSummaryRow({ file }: { file: WorkspaceFileChange }) {
   const pathParts = formatWorkspacePath(file.path);
 
@@ -122,6 +123,7 @@ function WorkspaceChangeSummaryRow({ file }: { file: WorkspaceFileChange }) {
   );
 }
 
+/** 并排展示一项或一组文件变更的新增与删除行数。 */
 function SummaryDelta({
   additions,
   deletions,
@@ -144,6 +146,7 @@ function SummaryDelta({
   );
 }
 
+/** 去掉容器工作区前缀，并把虚拟路径拆成目录和文件名。 */
 function formatWorkspacePath(path: string) {
   const compact = path
     .replace(/^\/mnt\/user-data\/workspace\//, "")

@@ -1,4 +1,4 @@
-"""在模型调用前中和用户文本中的伪造控制标签，并用边界标记隔离原始输入。"""
+'''在模型调用前中和用户文本中的伪造控制标签，并用边界标记隔离原始输入。'''
 
 from __future__ import annotations
 
@@ -29,7 +29,6 @@ _BLOCKED_TAG_NAMES: frozenset[str] = frozenset(
     {
         # 覆盖框架实际注入模型上下文的全部权威标签，避免不可信消息伪造内部提示块。
         # system-reminder 与 system_reminder 是不同中间件使用的两种拼写。
-        #
         # 子代理复用同一组基础中间件，因此其系统提示标签也必须纳入保护范围。
         "system-reminder",
         "system_reminder",
@@ -95,12 +94,12 @@ _BOUNDARY_TOKEN_RE = re.compile(
 
 
 def _escape_tag_match(match: re.Match) -> str:
-    """转义被拒绝标签的尖括号，使其作为普通文本显示。"""
+    '''转义被拒绝标签的尖括号，使其作为普通文本显示。'''
     return match.group(0).replace("<", "&lt;").replace(">", "&gt;")
 
 
 def _neutralize_boundary_tokens(text: str) -> str:
-    """将正文中伪造或冲突的输入边界标记替换为无结构含义的文本。"""
+    '''将正文中伪造或冲突的输入边界标记替换为无结构含义的文本。'''
     return _BOUNDARY_TOKEN_RE.sub(
         lambda m: _NEUTRALIZED_BEGIN if m.group(0) == _USER_INPUT_BEGIN else _NEUTRALIZED_END,
         text,
@@ -108,7 +107,7 @@ def _neutralize_boundary_tokens(text: str) -> str:
 
 
 def neutralize_untrusted_tags(text: str) -> str:
-    """中和不可信文本中的框架标签和输入边界标记，但不添加用户消息专用的包裹标记。"""
+    '''中和不可信文本中的框架标签和输入边界标记，但不添加用户消息专用的包裹标记。'''
     if not text.strip():
         return text
     text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
@@ -116,7 +115,7 @@ def neutralize_untrusted_tags(text: str) -> str:
 
 
 def _is_genuine_user_message(message: object) -> bool:
-    """识别真实用户消息，排除摘要和不含有效人工输入结果的隐藏消息。"""
+    '''识别真实用户消息，排除摘要和不含有效人工输入结果的隐藏消息。'''
     if not isinstance(message, HumanMessage):
         return False
     if message.name == _SUMMARY_MESSAGE_NAME:
@@ -127,7 +126,7 @@ def _is_genuine_user_message(message: object) -> bool:
 
 
 def _check_user_content(text: str) -> str:
-    """转义保留标签并包裹用户文本，同时保证重复处理不会嵌套边界标记。"""
+    '''转义保留标签并包裹用户文本，同时保证重复处理不会嵌套边界标记。'''
     if not text.strip():
         return text
     text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
@@ -145,11 +144,11 @@ def _check_user_content(text: str) -> str:
 
 
 class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
-    """仅在模型请求副本中净化用户输入，不改写持久化的线程消息。"""
+    '''仅在模型请求副本中净化用户输入，不改写持久化的线程消息。'''
 
     @staticmethod
     def _extract_text_from_content(content: str | list) -> tuple[str, list | None]:
-        """从字符串或多模态内容块中提取文本，并返回对应的原文本块引用。"""
+        '''从字符串或多模态内容块中提取文本，并返回对应的原文本块引用。'''
         if isinstance(content, str):
             return content, None
         if not isinstance(content, list):
@@ -168,7 +167,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         processed_text: str,
         text_blocks: list[dict],
     ) -> list:
-        """将文本块合并为净化后的单块，同时保留夹在其中的图片等非文本块。"""
+        '''将文本块合并为净化后的单块，同时保留夹在其中的图片等非文本块。'''
         text_block_ids = {id(b) for b in text_blocks}
         first = last = None
         for i, block in enumerate(original_content):
@@ -187,7 +186,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         return result
 
     def _process_request(self, request: ModelRequest) -> ModelRequest:
-        """复制模型请求并净化最近一条真实用户消息，原状态和消息对象保持不变。"""
+        '''复制模型请求并净化最近一条真实用户消息，原状态和消息对象保持不变。'''
         messages = list(request.messages)
         for i in range(len(messages) - 1, -1, -1):
             msg = messages[i]
@@ -249,7 +248,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         return request
 
     def _try_process(self, request: ModelRequest) -> ModelRequest:
-        """净化模型请求；图控制异常继续传播，其他内部错误则记录并放行原请求。"""
+        '''净化模型请求；图控制异常继续传播，其他内部错误则记录并放行原请求。'''
         try:
             return self._process_request(request)
         except GraphBubbleUp:
@@ -267,7 +266,7 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        """清洗同步模型请求中的用户输入后执行后续处理器。"""
+        '''清洗同步模型请求中的用户输入后执行后续处理器。'''
         return handler(self._try_process(request))
 
     @override
@@ -276,5 +275,5 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        """清洗异步模型请求中的用户输入后等待后续处理器执行。"""
+        '''清洗异步模型请求中的用户输入后等待后续处理器执行。'''
         return await handler(self._try_process(request))

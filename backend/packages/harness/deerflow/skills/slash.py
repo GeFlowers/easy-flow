@@ -1,4 +1,4 @@
-"定义 slash 模块提供的职责与可复用接口"
+'''解析输入中的技能斜杠命令，并匹配已启用且允许使用的技能。'''
 
 from __future__ import annotations
 
@@ -8,23 +8,13 @@ from dataclasses import dataclass
 from deerflow.constants import DEFAULT_SKILLS_CONTAINER_PATH
 from deerflow.skills.types import Skill
 
-#: Composer control commands that own the leading slash and must never be
-#: treated as ``/skill`` activations. These values plus :data:`_SLASH_SKILL_RE`
-#: are mirrored by the frontend display parser in
-#: ``frontend/src/core/skills/slash.ts``; both sides are pinned to the shared
-#: fixture at ``contracts/slash_skill_contract.json`` by contract tests
-#: (``tests/test_slash_skill_contract.py`` here, ``slash-contract.test.ts`` on
-#: the frontend), so a reserved command or grammar change in only one language
-#: fails CI.
 RESERVED_SLASH_SKILL_NAMES = frozenset({"bootstrap", "goal", "help", "memory", "models", "new", "status"})
 _SLASH_SKILL_RE = re.compile(r"^/([a-z0-9]+(?:-[a-z0-9]+)*)(?:\s+|$)")
 
 
 @dataclass(frozen=True, slots=True)
 class SlashSkillReference:
-    """封装 SlashSkillReference 的状态、协作关系与公开操作。
-
-    Parsed slash-skill command with the skill name and remaining task text."""
+    '''保存解析出的技能名称以及斜杠命令后剩余的任务文本。'''
 
     name: str
     remaining_text: str
@@ -32,9 +22,7 @@ class SlashSkillReference:
 
 @dataclass(frozen=True, slots=True)
 class ResolvedSlashSkill:
-    """封装 ResolvedSlashSkill 的状态、协作关系与公开操作。
-
-    Slash-skill activation resolved against enabled runtime-visible skills."""
+    '''保存已匹配的技能、剩余任务文本及其运行时文件路径。'''
 
     skill: Skill
     remaining_text: str
@@ -42,7 +30,7 @@ class ResolvedSlashSkill:
 
 
 def parse_slash_skill_reference(text: str) -> SlashSkillReference | None:
-    """解析严格的 `/skill-name task` 输入，并忽略保留的控制命令。"""
+    '''解析严格的 `/skill-name task` 输入，并忽略保留的控制命令。'''
     match = _SLASH_SKILL_RE.match(text)
     if not match:
         return None
@@ -62,9 +50,7 @@ def resolve_slash_skill(
     available_skills: set[str] | None = None,
     container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
 ) -> ResolvedSlashSkill | None:
-    """执行 resolve_slash_skill 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve text into an enabled, whitelisted skill activation if possible."""
+    '''将斜杠输入解析为可运行的技能；保留命令、未启用或不可用时返回 ``None``。'''
     reference = parse_slash_skill_reference(text)
     if reference is None:
         return None

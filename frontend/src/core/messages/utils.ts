@@ -43,6 +43,7 @@ export function getMessageGroups(messages: Message[]): MessageGroup[] {
   const groups: MessageGroup[] = [];
 
   // 若最后一个分组仍可接收工具消息则返回它，即正在处理中的分组，而非终态的人类或助手分组。
+  /** 返回仍可接收后续工具消息的末尾分组；终态分组不再复用。 */
   function lastOpenGroup() {
     const last = groups[groups.length - 1];
     if (
@@ -158,6 +159,7 @@ export function getBranchableAssistantGroupIds(
   const branchableGroupIds = new Set<string>();
   let lastAIGroup: MessageGroup | null = null;
 
+  /** 结束当前可见回合，并在末尾分组是助手回答时记录其可分支标识。 */
   const completeTurn = () => {
     if (lastAIGroup?.type === "assistant" && lastAIGroup.id) {
       branchableGroupIds.add(lastAIGroup.id);
@@ -324,7 +326,7 @@ export function getMessageCopyData(message: Message) {
   return extractReasoningContentFromMessage(message) ?? "";
 }
 
-/** 解析并提取 extractTextFromMessage 所需的数据。 */
+/** 从字符串或多模态消息内容中拼接纯文本，供摘要和复制流程使用。 */
 export function extractTextFromMessage(message: Message) {
   if (typeof message.content === "string") {
     return (
@@ -366,7 +368,6 @@ function splitInlineReasoning(content: string) {
   // 流式安全处理：尚未收到 `</think>` 的 `<think>` 起始标记意味着该片段余下部分
   // 是正在输出的推理。将它放入推理区域而非作为消息内容渲染，否则原始 HTML 的
   // Markdown 管线会在闭合标记到达前将内部文本显示到屏幕上。
-  //
   // 若起始标记紧跟反引号则跳过：这表示模型在 Markdown 内联代码中原样讨论
   // `<think>`，并非实际流式输出推理。
   const openTagIndex = cleaned.indexOf(THINK_OPEN_TAG);
@@ -453,7 +454,7 @@ export function removeReasoningContentFromMessage(message: Message) {
   delete message.additional_kwargs.reasoning_content;
 }
 
-/** 解析并提取 extractURLFromImageURLContent 所需的数据。 */
+/** 从图片消息片段读取图片地址，兼容字符串和带 URL 字段的对象。 */
 export function extractURLFromImageURLContent(
   content:
     | string

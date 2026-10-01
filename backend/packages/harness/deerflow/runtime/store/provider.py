@@ -1,4 +1,4 @@
-"""提供同步 PostgreSQL Store 的单例访问和短生命周期上下文管理器。"""
+'''提供同步 PostgreSQL Store 的单例访问和短生命周期上下文管理器。'''
 
 from __future__ import annotations
 
@@ -14,9 +14,6 @@ from deerflow.config.checkpointer_config import CheckpointerConfig, ensure_confi
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
-# Error message constants
-# ---------------------------------------------------------------------------
 
 POSTGRES_STORE_INSTALL = (
     "langgraph-checkpoint-postgres is required for the PostgreSQL store. Install the package extra with: pip install 'deerflow-harness[postgres]' (or use: uv sync --all-packages --extra postgres when developing locally)"
@@ -25,7 +22,7 @@ POSTGRES_CONN_REQUIRED = "checkpointer.connection_string is required for the pos
 
 
 def _resolve_store_config(app_config: AppConfig) -> CheckpointerConfig:
-    """优先复用旧版 checkpointer 配置；否则从统一数据库配置构造 PostgreSQL 参数。"""
+    '''优先复用旧版 checkpointer 配置；否则从统一数据库配置构造 PostgreSQL 参数。'''
     if app_config.checkpointer is not None:
         return app_config.checkpointer
 
@@ -36,10 +33,9 @@ def _resolve_store_config(app_config: AppConfig) -> CheckpointerConfig:
 
 
 def _get_store_config() -> CheckpointerConfig:
-    """在获取单例锁之前解析配置，避免配置重载与 Store 锁发生反向等待。"""
+    '''在获取单例锁之前解析配置，避免配置重载与 Store 锁发生反向等待。'''
     ensure_config_loaded()
 
-    # Preserve callers that initialise the legacy config singleton directly.
     legacy_config = get_checkpointer_config()
     if legacy_config is not None:
         return legacy_config
@@ -50,14 +46,11 @@ def _get_store_config() -> CheckpointerConfig:
     return _resolve_store_config(app_config)
 
 
-# ---------------------------------------------------------------------------
-# Sync factory
-# ---------------------------------------------------------------------------
 
 
 @contextlib.contextmanager
 def _sync_store_cm(config) -> Iterator[BaseStore]:
-    """创建并初始化同步 PostgreSQL Store，离开上下文时关闭连接。"""
+    '''创建并初始化同步 PostgreSQL Store，离开上下文时关闭连接。'''
     if config.type == "postgres":
         try:
             from langgraph.store.postgres import PostgresStore  # type: ignore[import]
@@ -76,24 +69,19 @@ def _sync_store_cm(config) -> Iterator[BaseStore]:
     raise ValueError(f"Unknown store backend type: {config.type!r}")
 
 
-# ---------------------------------------------------------------------------
-# Sync singleton
-# ---------------------------------------------------------------------------
 
 _store: BaseStore | None = None
-_store_ctx = None  # open context manager keeping the connection alive
+_store_ctx = None
 _store_lock = threading.Lock()
 
 
 def get_store() -> BaseStore:
-    """获取同步 Store 单例；首次调用时按当前配置创建并保留连接上下文。"""
+    '''获取同步 Store 单例；首次调用时按当前配置创建并保留连接上下文。'''
     global _store, _store_ctx
 
     if _store is not None:
         return _store
 
-    # Config loading can reset both persistence singletons. Resolve the full
-    # config outside this provider lock to avoid lock-order inversion.
     config = _get_store_config()
 
     with _store_lock:
@@ -108,7 +96,7 @@ def get_store() -> BaseStore:
 
 
 def reset_store() -> None:
-    """关闭并清空同步 Store 单例，使后续调用按最新配置重新创建。"""
+    '''关闭并清空同步 Store 单例，使后续调用按最新配置重新创建。'''
     global _store, _store_ctx
     with _store_lock:
         if _store_ctx is not None:
@@ -120,14 +108,11 @@ def reset_store() -> None:
         _store = None
 
 
-# ---------------------------------------------------------------------------
-# Sync context manager
-# ---------------------------------------------------------------------------
 
 
 @contextlib.contextmanager
 def store_context() -> Iterator[BaseStore]:
-    """为一次同步操作创建独立 Store；退出 ``with`` 块时关闭连接，不缓存实例。"""
+    '''为一次同步操作创建独立 Store；退出 ``with`` 块时关闭连接，不缓存实例。'''
     config = _resolve_store_config(get_app_config())
     with _sync_store_cm(config) as store:
         yield store

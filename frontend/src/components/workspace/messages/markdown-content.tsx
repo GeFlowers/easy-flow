@@ -35,6 +35,7 @@ type StreamingCodeProps = ComponentProps<"code"> & {
 
 const StreamingCodeBlockContext = createContext(false);
 
+/** 为流式代码围栏提供语言标题和独立滚动区域。 */
 function StreamingPre({ children }: ComponentProps<"pre">) {
   const childClassName = isValidElement<{ className?: string }>(children)
     ? children.props.className
@@ -62,6 +63,7 @@ function StreamingPre({ children }: ComponentProps<"pre">) {
   );
 }
 
+/** 区分行内代码与流式代码块，并应用对应的排版样式。 */
 function StreamingCode({
   children,
   className,

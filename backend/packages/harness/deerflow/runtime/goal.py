@@ -1,4 +1,4 @@
-"""提供线程目标状态、完成评估和自动续跑所需的运行时逻辑。"""
+'''提供线程目标状态、完成评估和自动续跑所需的运行时逻辑。'''
 
 from __future__ import annotations
 
@@ -56,12 +56,12 @@ _goal_locks_by_loop: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, dict[s
 
 
 class GoalWriteConflict(RuntimeError):
-    """目标写入期间检查点已变化时抛出的并发冲突。"""
+    '''目标写入期间检查点已变化时抛出的并发冲突。'''
 
 
 @asynccontextmanager
 async def goal_thread_lock(thread_id: str) -> AsyncIterator[None]:
-    """按线程串行化当前事件循环中的目标读改写操作。"""
+    '''按线程串行化当前事件循环中的目标读改写操作。'''
     loop = asyncio.get_running_loop()
     with _goal_locks_guard:
         locks = _goal_locks_by_loop.get(loop)
@@ -78,14 +78,14 @@ async def goal_thread_lock(thread_id: str) -> AsyncIterator[None]:
 
 
 class GoalCommand(NamedTuple):
-    """保存 `/goal` 参数解析出的操作类型和目标文本。"""
+    '''保存 `/goal` 参数解析出的操作类型和目标文本。'''
 
     kind: Literal["status", "clear", "set"]
     objective: str = ""
 
 
 def parse_goal_command(args: str) -> GoalCommand:
-    """将 `/goal` 参数解析为查看、清除或设置目标三种操作。"""
+    '''将 `/goal` 参数解析为查看、清除或设置目标三种操作。'''
     stripped = args.strip()
     if not stripped:
         return GoalCommand("status")
@@ -95,7 +95,7 @@ def parse_goal_command(args: str) -> GoalCommand:
 
 
 def normalize_goal_objective(objective: str) -> str:
-    """合并多余空白，并校验目标文本非空且未超过长度上限。"""
+    '''合并多余空白，并校验目标文本非空且未超过长度上限。'''
     normalized = " ".join(objective.strip().split())
     if not normalized:
         raise ValueError("Goal objective must not be empty.")
@@ -111,7 +111,7 @@ def build_goal_state(
     max_no_progress_continuations: int = DEFAULT_MAX_NO_PROGRESS_CONTINUATIONS,
     now: str | None = None,
 ) -> GoalState:
-    """创建线程的新目标状态，并将续跑次数限制在允许范围内。"""
+    '''创建线程的新目标状态，并将续跑次数限制在允许范围内。'''
     objective = normalize_goal_objective(objective)
     capped_max = max(0, min(int(max_continuations), DEFAULT_MAX_GOAL_CONTINUATIONS))
     timestamp = now or now_iso()
@@ -128,7 +128,7 @@ def build_goal_state(
 
 
 def parse_goal_evaluation_response(text: str) -> GoalEvaluation:
-    """从评估模型文本中提取 JSON，并校验完成状态、原因和阻塞类型。"""
+    '''从评估模型文本中提取 JSON，并校验完成状态、原因和阻塞类型。'''
     candidate = _strip_markdown_code_fence(_strip_think_blocks(text))
     start = candidate.find("{")
     end = candidate.rfind("}")
@@ -155,14 +155,14 @@ def parse_goal_evaluation_response(text: str) -> GoalEvaluation:
 
 
 def _normalize_evaluation_text(value: object, *, max_chars: int) -> str:
-    """将评估器文本压成单行，并限制长度以控制持久化内容。"""
+    '''将评估器文本压成单行，并限制长度以控制持久化内容。'''
     if not isinstance(value, str):
         return ""
     return " ".join(value.strip().split())[:max_chars]
 
 
 def _normalize_goal_blocker(value: object, *, satisfied: bool) -> GoalBlocker:
-    """将评估器给出的阻塞原因限制为支持的枚举值。"""
+    '''将评估器给出的阻塞原因限制为支持的枚举值。'''
     if satisfied:
         return "none"
     if isinstance(value, str) and value in GOAL_BLOCKERS and value != "none":
@@ -171,7 +171,7 @@ def _normalize_goal_blocker(value: object, *, satisfied: bool) -> GoalBlocker:
 
 
 def _message_type(message: Any) -> str | None:
-    """统一读取 LangChain 消息对象或字典消息的角色名称。"""
+    '''统一读取 LangChain 消息对象或字典消息的角色名称。'''
     value = getattr(message, "type", None)
     if value is None and isinstance(message, dict):
         value = message.get("type") or message.get("role")
@@ -183,7 +183,7 @@ def _message_type(message: Any) -> str | None:
 
 
 def _additional_kwargs(message: Any) -> dict[str, Any]:
-    """从消息对象或字典中安全提取附加元数据。"""
+    '''从消息对象或字典中安全提取附加元数据。'''
     value = getattr(message, "additional_kwargs", None)
     if value is None and isinstance(message, dict):
         value = message.get("additional_kwargs")
@@ -191,19 +191,19 @@ def _additional_kwargs(message: Any) -> dict[str, Any]:
 
 
 def _is_visible_message(message: Any) -> bool:
-    """排除内部隐藏消息，只保留可作为目标证据的用户和助手消息。"""
+    '''排除内部隐藏消息，只保留可作为目标证据的用户和助手消息。'''
     if _additional_kwargs(message).get("hide_from_ui") is True:
         return False
     return _message_type(message) in {"human", "ai"}
 
 
 def has_visible_assistant_evidence(messages: list[Any]) -> bool:
-    """检查可见对话中是否至少有一条非空的助手回复可供评估。"""
+    '''检查可见对话中是否至少有一条非空的助手回复可供评估。'''
     return any(_is_visible_message(message) and _message_type(message) == "ai" and bool(message_to_text(message).strip()) for message in messages)
 
 
 def visible_conversation_signature(messages: list[Any]) -> str:
-    """将最近的可见用户与助手消息编码为稳定 JSON，用于比较评估证据。"""
+    '''将最近的可见用户与助手消息编码为稳定 JSON，用于比较评估证据。'''
     visible = []
     for message in messages:
         if not _is_visible_message(message):
@@ -218,7 +218,7 @@ def visible_conversation_signature(messages: list[Any]) -> str:
 
 
 def format_visible_conversation(messages: list[Any]) -> str:
-    """把最近的可见对话整理成带角色标记的文本，并截断到评估长度上限。"""
+    '''把最近的可见对话整理成带角色标记的文本，并截断到评估长度上限。'''
     lines: list[str] = []
     visible = [message for message in messages if _is_visible_message(message)]
     for message in visible[-MAX_GOAL_CONVERSATION_MESSAGES:]:
@@ -238,7 +238,7 @@ def create_goal_evaluator_model(
     model_name: str | None = None,
     app_config: Any | None = None,
 ) -> Any:
-    """创建关闭扩展思考的目标评估模型，并为独立模型调用附加追踪回调。"""
+    '''创建关闭扩展思考的目标评估模型，并为独立模型调用附加追踪回调。'''
     return create_chat_model(
         name=model_name,
         thinking_enabled=False,
@@ -248,7 +248,7 @@ def create_goal_evaluator_model(
 
 
 def _resolve_environment() -> str | None:
-    """按优先级读取追踪元数据使用的部署环境名称。"""
+    '''按优先级读取追踪元数据使用的部署环境名称。'''
     return os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT")
 
 
@@ -263,7 +263,7 @@ async def evaluate_goal_completion(
     user_id: str | None = None,
     deerflow_trace_id: str | None = None,
 ) -> GoalEvaluation:
-    """用独立模型评估目标进度，并将会话、用户和追踪标识写入追踪元数据。"""
+    '''用独立模型评估目标进度，并将会话、用户和追踪标识写入追踪元数据。'''
     conversation = format_visible_conversation(messages)
     if not conversation or not has_visible_assistant_evidence(messages):
         return GoalEvaluation(
@@ -305,7 +305,7 @@ async def evaluate_goal_completion(
 
 
 def should_continue_goal(goal: GoalState, evaluation: GoalEvaluation, *, no_progress_count: int | None = None) -> bool:
-    """依据阻塞类型、总续跑上限和无进展上限判断是否自动续跑。"""
+    '''依据阻塞类型、总续跑上限和无进展上限判断是否自动续跑。'''
     if evaluation["satisfied"]:
         return False
     if evaluation["blocker"] not in CONTINUABLE_GOAL_BLOCKERS:
@@ -318,7 +318,7 @@ def should_continue_goal(goal: GoalState, evaluation: GoalEvaluation, *, no_prog
 
 
 def latest_visible_assistant_signature(messages: list[Any]) -> str:
-    """对最近一条可见助手回复计算哈希，供自动续跑的停滞检测使用。"""
+    '''对最近一条可见助手回复计算哈希，供自动续跑的停滞检测使用。'''
     for message in reversed(messages):
         if not _is_visible_message(message) or _message_type(message) != "ai":
             continue
@@ -329,7 +329,7 @@ def latest_visible_assistant_signature(messages: list[Any]) -> str:
 
 
 def compute_goal_progress_key(evaluation: GoalEvaluation, *, evidence_signature: str = "") -> str:
-    """组合阻塞类型和可见回复签名，生成不受评估文案改写影响的进展键。"""
+    '''组合阻塞类型和可见回复签名，生成不受评估文案改写影响的进展键。'''
     return json.dumps(
         {
             "satisfied": evaluation["satisfied"],
@@ -342,7 +342,7 @@ def compute_goal_progress_key(evaluation: GoalEvaluation, *, evidence_signature:
 
 
 def compute_no_progress_count(goal: GoalState, evaluation: GoalEvaluation, *, evidence_signature: str = "") -> int:
-    """相同未完成评估连续出现时递增计数；目标完成或状态变化时归零。"""
+    '''相同未完成评估连续出现时递增计数；目标完成或状态变化时归零。'''
     if evaluation["satisfied"]:
         return 0
     progress_key = compute_goal_progress_key(evaluation, evidence_signature=evidence_signature)
@@ -353,7 +353,7 @@ def compute_no_progress_count(goal: GoalState, evaluation: GoalEvaluation, *, ev
 
 
 def make_goal_continuation_message(goal: GoalState, evaluation: GoalEvaluation) -> HumanMessage:
-    """构造仅供模型读取的续跑提示，并标记为不展示给用户的内部消息。"""
+    '''构造仅供模型读取的续跑提示，并标记为不展示给用户的内部消息。'''
     content = (
         "<goal_continuation>\n"
         f"Active goal: {goal['objective']}\n"
@@ -373,7 +373,7 @@ def make_goal_continuation_message(goal: GoalState, evaluation: GoalEvaluation) 
 
 
 async def _call_checkpointer_method(checkpointer: Any, async_name: str, sync_name: str, *args: Any, **kwargs: Any) -> Any:
-    """优先调用检查点异步接口，并将同步接口转移到工作线程执行。"""
+    '''优先调用检查点异步接口，并将同步接口转移到工作线程执行。'''
     async_method = getattr(checkpointer, async_name, None)
     if async_method is not None:
         result = async_method(*args, **kwargs)
@@ -381,14 +381,12 @@ async def _call_checkpointer_method(checkpointer: Any, async_name: str, sync_nam
     sync_method = getattr(checkpointer, sync_name, None)
     if sync_method is None:
         raise AttributeError(f"Missing checkpointer method: {async_name}/{sync_name}")
-    # Offload the synchronous checkpointer call so its blocking IO never runs on
-    # the event loop.
     result = await asyncio.to_thread(sync_method, *args, **kwargs)
     return await result if inspect.isawaitable(result) else result
 
 
 def _next_channel_version(checkpointer: Any, current_version: Any) -> Any:
-    """按检查点实现的版本策略递增频道版本，兼容整数版本回退。"""
+    '''按检查点实现的版本策略递增频道版本，兼容整数版本回退。'''
     get_next_version = getattr(checkpointer, "get_next_version", None)
     if callable(get_next_version):
         return get_next_version(current_version, None)
@@ -398,7 +396,7 @@ def _next_channel_version(checkpointer: Any, current_version: Any) -> Any:
 
 
 async def ensure_thread_checkpoint(checkpointer: Any, thread_id: str) -> None:
-    """在线程尚无根检查点时创建空检查点，已有检查点则保持不变。"""
+    '''在线程尚无根检查点时创建空检查点，已有检查点则保持不变。'''
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     checkpoint_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", config)
     if checkpoint_tuple is not None:
@@ -414,7 +412,7 @@ async def ensure_thread_checkpoint(checkpointer: Any, thread_id: str) -> None:
 
 
 def _checkpoint_id_from_tuple(checkpoint_tuple: Any) -> str | None:
-    """从检查点配置或快照正文中解析检查点 ID。"""
+    '''从检查点配置或快照正文中解析检查点 ID。'''
     config = getattr(checkpoint_tuple, "config", {}) or {}
     configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
     checkpoint_id = configurable.get("checkpoint_id") if isinstance(configurable, dict) else None
@@ -427,7 +425,7 @@ def _checkpoint_id_from_tuple(checkpoint_tuple: Any) -> str | None:
 
 
 async def read_thread_goal(checkpointer: Any, thread_id: str) -> GoalState | None:
-    """从线程最新根检查点读取目标状态，并复制后返回以隔离调用方修改。"""
+    '''从线程最新根检查点读取目标状态，并复制后返回以隔离调用方修改。'''
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     checkpoint_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", config)
     if checkpoint_tuple is None:
@@ -447,7 +445,7 @@ async def write_thread_goal(
     create_if_missing: bool = False,
     expected_checkpoint_id: str | None = None,
 ) -> dict[str, Any]:
-    """通过新检查点设置或清除目标，并可校验写入前检查点避免覆盖并发更新。"""
+    '''通过新检查点设置或清除目标，并可校验写入前检查点避免覆盖并发更新。'''
     if create_if_missing:
         await ensure_thread_checkpoint(checkpointer, thread_id)
 
@@ -505,7 +503,7 @@ def attach_goal_evaluation(
     stand_down_reason: str | None = None,
     evidence_signature: str = "",
 ) -> GoalState:
-    """复制目标并附上本次评估、续跑计数、证据签名及可选停止原因。"""
+    '''复制目标并附上本次评估、续跑计数、证据签名及可选停止原因。'''
     next_goal = copy.deepcopy(goal)
     if continuation_count is not None:
         next_goal["continuation_count"] = continuation_count

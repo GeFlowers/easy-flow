@@ -1,4 +1,4 @@
-"定义 __init__ 模块提供的职责与可复用接口"
+'''导出 Crawl4AI 网页抓取客户端和相关工具。'''
 
 from .crawl4ai_client import Crawl4AiClient
 from .tools import web_fetch_tool

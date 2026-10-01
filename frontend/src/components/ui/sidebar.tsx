@@ -44,7 +44,7 @@ type SidebarContextProps = {
 
 const SidebarContext = React.createContext<SidebarContextProps | null>(null);
 
-/** useSidebar Hook：封装本模块所需的状态或上下文访问。 */
+/** 读取侧边栏开合状态和切换操作；未处于 Provider 内时报告装配错误。 */
 function useSidebar() {
   const context = React.useContext(SidebarContext);
   if (!context) {
@@ -54,7 +54,7 @@ function useSidebar() {
   return context;
 }
 
-/** SidebarProvider 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理桌面/移动侧栏状态、Cookie 持久化、快捷键和共享上下文。 */
 function SidebarProvider({
   defaultOpen = true,
   open: openProp,
@@ -74,6 +74,7 @@ function SidebarProvider({
   // 这是侧边栏的内部状态；通过 openProp 与 setOpenProp 支持外部受控使用。
   const [_open, _setOpen] = React.useState(defaultOpen);
   const open = openProp ?? _open;
+  /** 同步受控或内部侧栏状态，并持久化当前展开状态。 */
   const setOpen = React.useCallback(
     (value: boolean | ((value: boolean) => boolean)) => {
       const openState = typeof value === "function" ? value(open) : value;
@@ -89,13 +90,14 @@ function SidebarProvider({
     [setOpenProp, open],
   );
 
-  // 用于切换侧边栏的辅助函数。
+  /** 根据设备类型切换桌面侧栏或移动端侧栏。 */
   const toggleSidebar = React.useCallback(() => {
     return isMobile ? setOpenMobile((open) => !open) : setOpen((open) => !open);
   }, [isMobile, setOpen, setOpenMobile]);
 
   // 注册键盘快捷键以切换侧边栏，同时避免在输入框中误触发。
   React.useEffect(() => {
+    /** 支持通过键盘快捷键切换侧栏展开状态。 */
     const handleKeyDown = (event: KeyboardEvent) => {
       if (
         event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
@@ -151,7 +153,7 @@ function SidebarProvider({
   );
 }
 
-/** Sidebar 内部组件：组织对应的界面结构与交互语义。 */
+/** 按设备和折叠模式渲染固定侧栏或移动抽屉，并维持桌面占位。 */
 function Sidebar({
   side = "left",
   variant = "sidebar",
@@ -254,7 +256,7 @@ function Sidebar({
   );
 }
 
-/** SidebarTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 显示当前开合方向图标，并切换对应设备上的侧栏状态。 */
 function SidebarTrigger({
   className,
   onClick,
@@ -281,7 +283,7 @@ function SidebarTrigger({
   );
 }
 
-/** SidebarRail 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供窄边缘拖拽/点击区域，用于切换侧栏并提示调整方向。 */
 function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   const { toggleSidebar } = useSidebar();
 
@@ -307,7 +309,7 @@ function SidebarRail({ className, ...props }: React.ComponentProps<"button">) {
   );
 }
 
-/** SidebarInset 内部组件：组织对应的界面结构与交互语义。 */
+/** 承载侧栏旁边的主页面区域，并适配内嵌侧栏布局。 */
 function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   return (
     <main
@@ -322,7 +324,7 @@ function SidebarInset({ className, ...props }: React.ComponentProps<"main">) {
   );
 }
 
-/** SidebarInput 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供适配侧栏宽度和边框主题的搜索或筛选输入框。 */
 function SidebarInput({
   className,
   ...props
@@ -337,7 +339,7 @@ function SidebarInput({
   );
 }
 
-/** SidebarHeader 内部组件：组织对应的界面结构与交互语义。 */
+/** 排列侧栏顶部的品牌、切换器或主要导航信息。 */
 function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -349,7 +351,7 @@ function SidebarHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** SidebarFooter 内部组件：组织对应的界面结构与交互语义。 */
+/** 排列侧栏底部的账户信息和辅助操作。 */
 function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -361,7 +363,7 @@ function SidebarFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** SidebarSeparator 内部组件：组织对应的界面结构与交互语义。 */
+/** 在侧栏内容分区之间绘制主题化分隔线。 */
 function SidebarSeparator({
   className,
   ...props
@@ -376,7 +378,7 @@ function SidebarSeparator({
   );
 }
 
-/** SidebarContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 承载可滚动的主要导航内容，收起为图标时隐藏溢出部分。 */
 function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -391,7 +393,7 @@ function SidebarContent({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** SidebarGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 将相关导航链接和菜单控件组合为带内边距的分区。 */
 function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -403,7 +405,7 @@ function SidebarGroup({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** SidebarGroupLabel 内部组件：组织对应的界面结构与交互语义。 */
+/** 显示导航分区标题，图标折叠模式下随分区内容一同隐藏。 */
 function SidebarGroupLabel({
   className,
   asChild = false,
@@ -425,7 +427,7 @@ function SidebarGroupLabel({
   );
 }
 
-/** SidebarGroupAction 内部组件：组织对应的界面结构与交互语义。 */
+/** 将新增或更多操作按钮定位在导航分区右上方。 */
 function SidebarGroupAction({
   className,
   asChild = false,
@@ -449,7 +451,7 @@ function SidebarGroupAction({
   );
 }
 
-/** SidebarGroupContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 承载分区中的导航菜单并提供标准文字尺寸。 */
 function SidebarGroupContent({
   className,
   ...props
@@ -464,7 +466,7 @@ function SidebarGroupContent({
   );
 }
 
-/** SidebarMenu 内部组件：组织对应的界面结构与交互语义。 */
+/** 纵向排列侧栏中的一级导航列表。 */
 function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -476,7 +478,7 @@ function SidebarMenu({ className, ...props }: React.ComponentProps<"ul">) {
   );
 }
 
-/** SidebarMenuItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 为单条一级导航及其悬停操作提供定位容器。 */
 function SidebarMenuItem({ className, ...props }: React.ComponentProps<"li">) {
   return (
     <li
@@ -510,7 +512,7 @@ const sidebarMenuButtonVariants = cva(
   },
 );
 
-/** SidebarMenuButton 内部组件：组织对应的界面结构与交互语义。 */
+/** 渲染导航链接或按钮，标记当前项，并在图标折叠模式提供悬浮提示。 */
 function SidebarMenuButton({
   asChild = false,
   isActive = false,
@@ -561,7 +563,7 @@ function SidebarMenuButton({
   );
 }
 
-/** SidebarMenuAction 内部组件：组织对应的界面结构与交互语义。 */
+/** 在导航项右侧提供操作按钮，可配置为仅悬停或聚焦时显示。 */
 function SidebarMenuAction({
   className,
   asChild = false,
@@ -594,7 +596,7 @@ function SidebarMenuAction({
   );
 }
 
-/** SidebarMenuBadge 内部组件：组织对应的界面结构与交互语义。 */
+/** 在导航按钮右侧显示不可交互的计数或状态徽标。 */
 function SidebarMenuBadge({
   className,
   ...props
@@ -617,7 +619,7 @@ function SidebarMenuBadge({
   );
 }
 
-/** SidebarMenuSkeleton 内部组件：组织对应的界面结构与交互语义。 */
+/** 在导航数据加载期间显示可选图标和随机宽度的占位行。 */
 function SidebarMenuSkeleton({
   className,
   showIcon = false,
@@ -656,7 +658,7 @@ function SidebarMenuSkeleton({
   );
 }
 
-/** SidebarMenuSub 内部组件：组织对应的界面结构与交互语义。 */
+/** 以缩进和左侧边线呈现嵌套导航列表，图标折叠时隐藏。 */
 function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
   return (
     <ul
@@ -672,7 +674,7 @@ function SidebarMenuSub({ className, ...props }: React.ComponentProps<"ul">) {
   );
 }
 
-/** SidebarMenuSubItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 为单条子导航和其附加元素提供定位容器。 */
 function SidebarMenuSubItem({
   className,
   ...props
@@ -687,7 +689,7 @@ function SidebarMenuSubItem({
   );
 }
 
-/** SidebarMenuSubButton 内部组件：组织对应的界面结构与交互语义。 */
+/** 呈现带尺寸和激活状态的子导航链接，并支持将样式转交给子元素。 */
 function SidebarMenuSubButton({
   asChild = false,
   size = "md",

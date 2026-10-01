@@ -1,6 +1,4 @@
-"""定义 subagent_limit_middleware 模块提供的职责与可复用接口。
-
-Middleware to enforce subagent tool-call limits."""
+'''限制每次模型回复及单次运行可以发起的子代理任务数量。'''
 
 import logging
 from typing import Any, override
@@ -23,7 +21,6 @@ from deerflow.subagents.executor import MAX_CONCURRENT_SUBAGENTS
 
 logger = logging.getLogger(__name__)
 
-# Valid range for max_concurrent_subagents
 MIN_SUBAGENT_LIMIT = MIN_CONCURRENT_SUBAGENT_CALLS
 MAX_SUBAGENT_LIMIT = MAX_CONCURRENT_SUBAGENT_CALLS
 DEFAULT_MAX_TOTAL_SUBAGENTS = DEFAULT_MAX_TOTAL_SUBAGENTS_PER_RUN
@@ -38,21 +35,17 @@ _TOTAL_LIMIT_STOP_MSG = (
 
 
 def _clamp_subagent_limit(value: int) -> int:
-    """执行 _clamp_subagent_limit 的明确职责，并返回与调用约定一致的结果。
-
-    Clamp subagent limit to valid range [2, 4]."""
+    '''将并发子代理数量限制在应用支持的配置范围内。'''
     return clamp_subagent_concurrency(value)
 
 
 def _clamp_total_subagent_limit(value: int) -> int:
-    """执行 _clamp_total_subagent_limit 的明确职责，并返回与调用约定一致的结果。
-
-    Clamp total subagent limit to a bounded positive range."""
+    '''将单次运行的子代理总数限制在允许的正整数范围内。'''
     return clamp_total_subagents_per_run(value)
 
 
 def _append_text(content: Any, text: str) -> Any:
-    "执行 _append_text 的明确职责，并返回与调用约定一致的结果"
+    '''按消息内容类型追加总量上限提示，并保留多模态内容列表结构。'''
     if content is None:
         return text
     if isinstance(content, str):
@@ -65,7 +58,7 @@ def _append_text(content: Any, text: str) -> Any:
 
 
 def _delegation_id(entry: object) -> str | None:
-    "执行 _delegation_id 的明确职责，并返回与调用约定一致的结果"
+    '''从委派记录中读取并规范化委派标识。'''
     if not isinstance(entry, dict):
         return None
     entry_id = entry.get("id")
@@ -73,7 +66,7 @@ def _delegation_id(entry: object) -> str | None:
 
 
 def _delegation_run_id(entry: object) -> str | None:
-    "执行 _delegation_run_id 的明确职责，并返回与调用约定一致的结果"
+    '''从委派记录中读取并规范化运行标识。'''
     if not isinstance(entry, dict):
         return None
     run_id = entry.get("run_id")
@@ -81,7 +74,7 @@ def _delegation_run_id(entry: object) -> str | None:
 
 
 def _runtime_run_id(runtime: Runtime | None) -> str | None:
-    "执行 _runtime_run_id 的明确职责，并返回与调用约定一致的结果"
+    '''从运行时上下文读取当前运行标识。'''
     context = getattr(runtime, "context", None)
     if not isinstance(context, dict):
         return None
@@ -90,7 +83,7 @@ def _runtime_run_id(runtime: Runtime | None) -> str | None:
 
 
 def _count_prior_delegations(delegations: object, *, run_id: str | None) -> int:
-    "执行 _count_prior_delegations 的明确职责，并返回与调用约定一致的结果"
+    '''统计当前运行中不同的既有子代理委派数量。'''
     if not isinstance(delegations, list):
         return 0
     ids = set()
@@ -104,32 +97,16 @@ def _count_prior_delegations(delegations: object, *, run_id: str | None) -> int:
 
 
 class SubagentLimitMiddleware(AgentMiddleware[AgentState]):
-    """封装 SubagentLimitMiddleware 的状态、协作关系与公开操作。
-
-    Truncates excess 'task' tool calls from a single model response/run.
-
-        When an LLM generates more than max_concurrent parallel task tool calls
-        in one response, this middleware keeps only the first max_concurrent and
-        discards the rest. It also enforces a total per-run cap using entries in
-        the durable delegation ledger tagged with the current run_id, so repeated
-        planning checkpoints in one run cannot keep launching more legal-sized
-        batches indefinitely. This is more reliable than prompt-based limits.
-
-        Args:
-            max_concurrent: Maximum number of concurrent subagent calls allowed.
-                Defaults to MAX_CONCURRENT_SUBAGENTS (3). Clamped to [2, 4].
-            max_total: Maximum number of subagent calls allowed across the run.
-                Defaults to 6. Clamped to [1, 50].
-    """
+    '''按并发上限和持久化委派账本中的本轮调用数修剪超额 task 工具调用。'''
 
     def __init__(self, max_concurrent: int = MAX_CONCURRENT_SUBAGENTS, max_total: int = DEFAULT_MAX_TOTAL_SUBAGENTS):
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存经配置范围校验后的并发调用上限和单次运行总调用上限。'''
         super().__init__()
         self.max_concurrent = _clamp_subagent_limit(max_concurrent)
         self.max_total = _clamp_total_subagent_limit(max_total)
 
     def _truncate_task_calls(self, state: AgentState, runtime: Runtime | None = None) -> dict | None:
-        "执行 _truncate_task_calls 的明确职责，并返回与调用约定一致的结果"
+        '''检查最后一条模型消息中的 task 调用数，移除超过并发或本轮总额的调用。'''
         messages = state.get("messages", [])
         if not messages:
             return None
@@ -142,7 +119,6 @@ class SubagentLimitMiddleware(AgentMiddleware[AgentState]):
         if not tool_calls:
             return None
 
-        # Count task tool calls
         task_indices = [i for i, tc in enumerate(tool_calls) if tc.get("name") == "task"]
         if not task_indices:
             return None
@@ -157,7 +133,6 @@ class SubagentLimitMiddleware(AgentMiddleware[AgentState]):
         if len(task_indices) <= allowed_task_calls:
             return None
 
-        # Build set of indices to drop (excess task calls beyond the limit)
         indices_to_drop = set(task_indices[allowed_task_calls:])
         truncated_tool_calls = [tc for i, tc in enumerate(tool_calls) if i not in indices_to_drop]
         dropped_count = len(indices_to_drop)
@@ -169,23 +144,19 @@ class SubagentLimitMiddleware(AgentMiddleware[AgentState]):
             prior_delegation_count,
         )
 
-        # Stamp stop_reason when the total per-run cap is exhausted so the
-        # worker surfaces this capped completion alongside loop_capped /
-        # token_capped / safety_capped (#4176).
         if remaining_total == 0 and isinstance(getattr(runtime, "context", None), dict):
             runtime.context["stop_reason"] = "subagent_limit_capped"
 
-        # Replace the AIMessage with truncated tool_calls (same id triggers replacement)
         content = _append_text(last_msg.content, _TOTAL_LIMIT_STOP_MSG) if remaining_total == 0 else None
         updated_msg = clone_ai_message_with_tool_calls(last_msg, truncated_tool_calls, content=content)
         return {"messages": [updated_msg]}
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
+        '''在同步模型返回后应用子代理调用上限。'''
         return self._truncate_task_calls(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
+        '''在异步模型返回后应用同一套子代理调用上限。'''
         return self._truncate_task_calls(state, runtime)

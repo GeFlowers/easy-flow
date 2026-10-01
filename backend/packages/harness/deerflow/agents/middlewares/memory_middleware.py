@@ -1,6 +1,4 @@
-"""定义 memory_middleware 模块提供的职责与可复用接口。
-
-Middleware for memory mechanism."""
+'''在代理运行结束后将本轮对话交给记忆管理器，由其筛选并排队处理可保留的对话内容。'''
 
 import logging
 from typing import TYPE_CHECKING, override
@@ -22,59 +20,29 @@ logger = logging.getLogger(__name__)
 
 
 class MemoryMiddlewareState(AgentState):
-    """封装 MemoryMiddlewareState 的状态、协作关系与公开操作。
-
-    Compatible with the `ThreadState` schema."""
+    '''复用代理线程状态结构，供记忆中间件读取本轮消息。'''
 
     pass
 
 
 class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
-    """封装 MemoryMiddleware 的状态、协作关系与公开操作。
-
-    Middleware that queues conversation for memory update after agent execution.
-
-        This middleware:
-        1. After each agent execution, queues the conversation for memory update
-        2. Only includes user inputs and final assistant responses (ignores tool calls)
-        3. The queue uses debouncing to batch multiple updates together
-        4. Memory is updated asynchronously via LLM summarization
-    """
+    '''代理执行完成后采集线程、用户及追踪上下文，并将消息交由记忆后端过滤和异步排队。'''
 
     state_schema = MemoryMiddlewareState
 
     def __init__(self, agent_name: str | None = None, *, memory_config: "MemoryConfig | None" = None):
-        """实现 __init__ 协议方法，保持对象交互语义一致。
-
-        Initialize the MemoryMiddleware.
-
-                Args:
-                    agent_name: If provided, memory is stored per-agent. If None, uses global memory.
-                    memory_config: Explicit memory config. When omitted, legacy global
-                        config fallback is used.
-        """
+        '''保存可选的代理名称和记忆配置；未显式传入配置时使用全局记忆配置。'''
         super().__init__()
         self._agent_name = agent_name
         self._memory_config = memory_config
 
     @override
     def after_agent(self, state: MemoryMiddlewareState, runtime: Runtime) -> dict | None:
-        """执行 after_agent 的明确职责，并返回与调用约定一致的结果。
-
-        Queue conversation for memory update after agent completes.
-
-                Args:
-                    state: The current agent state.
-                    runtime: The runtime context.
-
-                Returns:
-                    None (no state changes needed from this middleware).
-        """
+        '''检查记忆是否启用并取得线程、用户和追踪标识，再将本轮消息交给记忆管理器。'''
         config = self._memory_config or get_memory_config()
         if not config.enabled:
             return None
 
-        # Get thread ID from runtime context first, then fall back to LangGraph's configurable metadata
         thread_id = runtime.context.get("thread_id") if runtime.context else None
         if thread_id is None:
             config_data = get_config()
@@ -83,15 +51,11 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
             logger.debug("No thread_id in context, skipping memory update")
             return None
 
-        # Get messages from state
         messages = state.get("messages", [])
         if not messages:
             logger.debug("No messages in state, skipping memory update")
             return None
 
-        # Capture user_id at enqueue time while the request context is still alive.
-        # threading.Timer fires on a different thread where ContextVar values are not
-        # propagated, so we must store user_id explicitly in ConversationContext.
         user_id = get_effective_user_id()
         runtime_context = runtime.context if isinstance(runtime.context, dict) else {}
         trace_id = normalize_trace_id(runtime_context.get(DEERFLOW_TRACE_METADATA_KEY))
@@ -105,8 +69,6 @@ class MemoryMiddleware(AgentMiddleware[MemoryMiddlewareState]):
         if trace_id is None:
             trace_id = get_current_trace_id()
 
-        # Hand raw messages to the manager; the backend filters to user + final-AI
-        # turns, validates, detects correction/reinforcement, and enqueues.
         get_memory_manager().add(
             thread_id,
             messages,

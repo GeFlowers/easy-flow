@@ -1,4 +1,4 @@
-"""定义 config 模块提供的职责与可复用接口。
+'''定义空记忆后端的配置解析范例，并展示宿主注入字段的标准入口。
 
 Noop backend config -- TEMPLATE for parsing ``backend_config``.
 
@@ -35,7 +35,7 @@ What the factory (``manager.py::get_memory_manager``) injects into
 
 ``NoopConfig`` below mirrors that surface. Noop stores nothing, so it ignores
 every field -- but copy this structure, rename, and fill in your own knobs.
-"""
+'''
 
 from __future__ import annotations
 
@@ -46,48 +46,19 @@ from typing import Any
 
 @dataclass
 class NoopConfig:
-    """封装 NoopConfig 的状态、协作关系与公开操作。
+    '''保存空记忆后端可识别的宿主注入字段；该后端不实际使用这些配置。'''
 
-    Parsed config for the noop backend (template -- noop ignores all fields).
-
-        A real backend declares its own knobs here (e.g. ``model``, ``vector_store``,
-        ``max_facts``) and parses them in :meth:`from_backend_config`.
-    """
-
-    #: Writable state dir, host-injected. A real backend lands its storage
-    #: (DB / vector store / JSON) under here. Noop ignores it.
     storage_path: str = ""
 
-    #: Example backend-private knob (would come from config.yaml
-    #: ``memory.backend_config.example_option``). Replace with your own.
     example_option: str = "default"
 
-    #: Host-injected hook (optional). A backend that traces its LLM calls calls
-    #: ``self._config.tracing_callback(invoke_config, *, thread_id, user_id,
-    #: trace_id, model_name)`` before invoking. ``None`` = no tracing.
     tracing_callback: Callable[..., Any] | None = None
 
-    #: Host-injected hook (optional). A backend that filters ``hide_from_ui``
-    #: messages calls ``self._config.should_keep_hidden_message(additional_kwargs)``
-    #: -> bool (True = keep despite hide_from_ui). ``None`` = skip all hidden.
     should_keep_hidden_message: Callable[[Any], bool] | None = None
 
     @classmethod
     def from_backend_config(cls, backend_config: dict[str, Any] | None) -> NoopConfig:
-        """执行 from_backend_config 的明确职责，并返回与调用约定一致的结果。
-
-        Build a config from the ``backend_config`` dict.
-
-                Usage in your manager's ``__init__``::
-
-                    super().__init__(backend_config)
-                    self._config = YourConfig.from_backend_config(backend_config)
-
-                Reads ONLY known keys; unknown keys (including host-injected slots this
-                backend doesn't consume) are ignored -- so the host can safely inject
-                shared slots like ``tracing_callback`` for every backend without
-                breaking ones that don't use them.
-        """
+        '''从后端配置字典读取已知字段，并忽略该后端不消费的其他配置项。'''
         cfg = dict(backend_config or {})
         return cls(
             storage_path=str(cfg.get("storage_path") or ""),

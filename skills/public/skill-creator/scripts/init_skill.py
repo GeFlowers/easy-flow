@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
-"""
-Skill Initializer - Creates a new skill from template
+'''
+从模板初始化新技能目录。
 
-Usage:
+用法：
     init_skill.py <skill-name> --path <path> [--resources scripts,references,assets] [--examples] [--interface key=value]
 
-Examples:
+示例：
     init_skill.py my-new-skill --path skills/public
     init_skill.py my-new-skill --path skills/public --resources scripts,references
     init_skill.py my-api-helper --path skills/private --resources scripts --examples
     init_skill.py custom-skill --path /custom/location
     init_skill.py my-skill --path skills/public --interface short_description="Short UI label"
-"""
+'''
 
 import argparse
 import re
@@ -28,31 +28,29 @@ name: {skill_name}
 description: "[TODO: Briefly describe what this skill does and when it applies.]"
 ---
 
-# {skill_title}
 
 [TODO: Add the task-specific guidance Codex needs. Reference supporting files only when they are relevant.]
 """
 
-EXAMPLE_SCRIPT = '''#!/usr/bin/env python3
-"""
-Example helper script for {skill_name}
+EXAMPLE_SCRIPT = """#!/usr/bin/env python3
+'''{skill_name} 技能的示例辅助脚本。
 
-This is a placeholder script that can be executed directly.
-Replace with actual implementation or delete if not needed.
+此脚本是可直接运行的占位示例；请替换为实际实现，或在不需要时删除。
 
-Example real scripts from other skills:
-- pdf/scripts/fill_fillable_fields.py - Fills PDF form fields
-- pdf/scripts/convert_pdf_to_images.py - Converts PDF pages to images
-"""
+其他技能中的真实脚本示例：
+- pdf/scripts/fill_fillable_fields.py：填写 PDF 表单字段
+- pdf/scripts/convert_pdf_to_images.py：将 PDF 页面转换为图像
+'''
 
 def main():
+    '''输出示例脚本提示，供新技能作者替换为实际逻辑。'''
     print("This is an example script for {skill_name}")
-    # TODO: Add actual script logic here
-    # This could be data processing, file conversion, API calls, etc.
+    # TODO：在此添加实际脚本逻辑。
+    # 可在此实现数据处理、文件转换或接口调用等工作。
 
 if __name__ == "__main__":
     main()
-'''
+"""
 
 EXAMPLE_REFERENCE = """# Reference for {skill_title}
 
@@ -77,7 +75,6 @@ Example asset files from other skills:
 - Typography: custom-font.ttf, font-family.woff2
 - Data: sample_data.csv, test_dataset.json
 
-## Common Asset Types
 
 - Templates: .pptx, .docx, boilerplate directories
 - Images: .png, .jpg, .svg, .gif
@@ -91,7 +88,7 @@ Note: This is a text placeholder. Actual assets can be any file type.
 
 
 def normalize_skill_name(skill_name):
-    """Normalize a skill name to lowercase hyphen-case."""
+    '''将技能名称规范化为小写连字符格式。'''
     normalized = skill_name.strip().lower()
     normalized = re.sub(r"[^a-z0-9]+", "-", normalized)
     normalized = normalized.strip("-")
@@ -100,11 +97,12 @@ def normalize_skill_name(skill_name):
 
 
 def title_case_skill_name(skill_name):
-    """Convert hyphenated skill name to Title Case for display."""
+    '''将连字符分隔的技能名称转换为便于展示的标题格式。'''
     return " ".join(word.capitalize() for word in skill_name.split("-"))
 
 
 def parse_resources(raw_resources):
+    '''解析逗号分隔的资源目录选项，去重并拒绝不支持的目录类型。'''
     if not raw_resources:
         return []
     resources = [item.strip() for item in raw_resources.split(",") if item.strip()]
@@ -126,6 +124,7 @@ def parse_resources(raw_resources):
 def create_resource_dirs(
     skill_dir, skill_name, skill_title, resources, include_examples
 ):
+    '''按选项创建脚本、参考资料或资源目录，并可选择写入示例文件。'''
     for resource in resources:
         resource_dir = skill_dir / resource
         resource_dir.mkdir(exist_ok=True)
@@ -156,7 +155,7 @@ def create_resource_dirs(
 
 
 def init_skill(skill_name, path, resources, include_examples, interface_overrides):
-    """
+    '''
     Initialize a new skill directory with template SKILL.md.
 
     Args:
@@ -167,16 +166,13 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
 
     Returns:
         Path to created skill directory, or None if error
-    """
-    # Determine skill directory path
+    '''
     skill_dir = Path(path).resolve() / skill_name
 
-    # Check if directory already exists
     if skill_dir.exists():
         print(f"[ERROR] Skill directory already exists: {skill_dir}")
         return None
 
-    # Create skill directory
     try:
         skill_dir.mkdir(parents=True, exist_ok=False)
         print(f"[OK] Created skill directory: {skill_dir}")
@@ -184,7 +180,7 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         print(f"[ERROR] Error creating directory: {e}")
         return None
 
-    # Create SKILL.md from template
+    # 根据模板生成 SKILL.md。
     skill_title = title_case_skill_name(skill_name)
     skill_content = SKILL_TEMPLATE.format(
         skill_name=skill_name, skill_title=skill_title
@@ -198,7 +194,6 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         print(f"[ERROR] Error creating SKILL.md: {e}")
         return None
 
-    # Create agents/openai.yaml
     try:
         result = write_openai_yaml(skill_dir, skill_name, interface_overrides)
         if not result:
@@ -207,7 +202,6 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         print(f"[ERROR] Error creating agents/openai.yaml: {e}")
         return None
 
-    # Create resource directories if requested
     if resources:
         try:
             create_resource_dirs(
@@ -217,7 +211,6 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
             print(f"[ERROR] Error creating resource directories: {e}")
             return None
 
-    # Print next steps
     print(f"\n[OK] Skill '{skill_name}' initialized successfully at {skill_dir}")
     print("\nNext steps:")
     print("1. Edit SKILL.md to complete the TODO items and update the description")
@@ -242,6 +235,7 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
 
 
 def main():
+    '''解析初始化选项、规范化技能名称，并执行目录和模板文件的创建。'''
     parser = argparse.ArgumentParser(
         description="Create a new skill directory with a SKILL.md template.",
     )

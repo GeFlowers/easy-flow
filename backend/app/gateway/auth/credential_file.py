@@ -1,8 +1,8 @@
-"""将初始管理员凭据写入受限文件，避免记录到日志。
+'''将初始管理员凭据写入受限文件，避免记录到日志。
 
 明文密钥写入标准输出或标准错误会被生产日志系统收集并扩散。本辅助函数
 将凭据写入仅进程用户可读的 0600 文件，并仅返回文件路径供调用方记录。
-"""
+'''
 
 from __future__ import annotations
 
@@ -15,13 +15,13 @@ _CREDENTIAL_FILENAME = "admin_initial_credentials.txt"
 
 
 def write_initial_credentials(email: str, password: str, *, label: str = "initial") -> Path:
-    """将管理员邮箱和密码写入 ``{base_dir}/admin_initial_credentials.txt``。
+    '''将管理员邮箱和密码写入 ``{base_dir}/admin_initial_credentials.txt``。
 
     文件通过 ``os.open`` 以 0600 权限原子创建，避免写入与改权限之间的窗口
     使密码被其他用户读取。``label`` 在文件头区分初始创建和密码重置事件。
 
     返回凭据文件的绝对 :class:`Path`。
-    """
+    '''
     target = get_paths().base_dir / _CREDENTIAL_FILENAME
     target.parent.mkdir(parents=True, exist_ok=True)
 

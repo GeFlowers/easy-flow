@@ -1,4 +1,4 @@
-"""提供配置、tool、output、配置相关功能。"""
+'''定义工具输出外置存储、预览裁剪及磁盘不可用时的回退上限。'''
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class ToolOutputConfig(BaseModel):
-    """\u6267\u884c ToolOutputConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''控制大型工具结果如何保存，并限制返回给模型的文本体积。'''
 
     enabled: bool = Field(
         default=True,

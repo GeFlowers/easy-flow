@@ -71,17 +71,17 @@ export function shouldClearPendingHumanInputOnThreadError({
   );
 }
 
-/** 判断 isRecord 所表达的条件是否成立。 */
+/** 确认未知输入是非空、非数组对象，以便继续校验请求字段。 */
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null;
 }
 
-/** 判断 isNonEmptyString 所表达的条件是否成立。 */
+/** 确认值为含有非空白字符的字符串。 */
 function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-/** 判断 isHumanInputMode 所表达的条件是否成立。 */
+/** 限定交互模式为支持的自由文本、单选或带补充文本选项。 */
 function isHumanInputMode(value: unknown): value is HumanInputMode {
   return (
     value === "free_text" ||
@@ -90,12 +90,12 @@ function isHumanInputMode(value: unknown): value is HumanInputMode {
   );
 }
 
-/** 解析并提取 readOptionalString 所需的数据。 */
+/** 仅在未知值确为字符串时保留它，供中断请求字段校验使用。 */
 function readOptionalString(value: unknown) {
   return typeof value === "string" ? value : undefined;
 }
 
-/** 解析并提取 parseOptions 所需的数据。 */
+/** 校验选项数组中每一项的标识和显示文本，拒绝结构不完整的数据。 */
 function parseOptions(value: unknown): HumanInputOption[] | undefined {
   if (value === undefined) {
     return undefined;

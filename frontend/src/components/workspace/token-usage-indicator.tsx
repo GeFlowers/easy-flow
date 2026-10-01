@@ -157,6 +157,7 @@ export function TokenUsageIndicator({
   );
 }
 
+/** 将统计视图预设标识映射到本地化键，兼容单独命名的逐轮选项。 */
 function presetKeyToTranslationKey(preset: TokenUsageViewPreset) {
   switch (preset) {
     case "per_turn":

@@ -38,16 +38,19 @@ export function CommandPalette() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [isMac, setIsMac] = useState(false);
 
+  /** 导航到新对话并关闭命令面板。 */
   const handleNewChat = useCallback(() => {
     router.push("/workspace/chats/new");
     setOpen(false);
   }, [router]);
 
+  /** 关闭命令面板并打开工作区设置。 */
   const handleOpenSettings = useCallback(() => {
     setOpen(false);
     setSettingsOpen(true);
   }, []);
 
+  /** 关闭命令面板并展示快捷键说明。 */
   const handleShowShortcuts = useCallback(() => {
     setOpen(false);
     setShortcutsOpen(true);

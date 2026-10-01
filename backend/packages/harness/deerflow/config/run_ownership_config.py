@@ -1,4 +1,4 @@
-"""提供配置、run、ownership、配置相关功能。"""
+'''控制运行事件与线程访问是否按当前用户身份隔离。'''
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class RunOwnershipConfig(BaseModel):
-    """\u6267\u884c RunOwnershipConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为运行记录所有权校验提供启用开关和兼容模式选项。'''
 
     lease_seconds: int = Field(
         default=30,

@@ -1,6 +1,4 @@
-"""定义 uploads_middleware 模块提供的职责与可复用接口。
-
-Middleware to inject uploaded files information into agent context."""
+'''在智能体上下文中列出本轮及历史上传文件，并提供文件大纲和检索提示。'''
 
 import logging
 import re
@@ -29,20 +27,20 @@ _QUERY_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
 def _extension_label(file: dict) -> str:
-    "执行 _extension_label 的明确职责，并返回与调用约定一致的结果"
+    '''从文件元数据或文件名取得统一的小写扩展名。'''
     extension = str(file.get("extension") or Path(str(file.get("filename") or "")).suffix).lower()
     return extension or "(no extension)"
 
 
 def _format_omitted_file_types(files: list[dict]) -> str:
-    "执行 _format_omitted_file_types 的明确职责，并返回与调用约定一致的结果"
+    '''统计被上下文截断的文件类型，生成简洁的数量摘要。'''
     counts = Counter(_extension_label(file) for file in files)
     parts = [f"{count} {extension}" for extension, count in sorted(counts.items())]
     return ", ".join(parts)
 
 
 def _query_match_strength(file: dict, query_text: str) -> int:
-    "执行 _query_match_strength 的明确职责，并返回与调用约定一致的结果"
+    '''按完整文件名、名称片段或扩展名评估文件与当前问题的相关程度。'''
     query = query_text.lower()
     if not query:
         return 0
@@ -71,21 +69,7 @@ def _query_match_strength(file: dict, query_text: str) -> int:
 
 
 def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
-    """执行 _extract_outline_for_file 的明确职责，并返回与调用约定一致的结果。
-
-    Return the document outline and fallback preview for *file_path*.
-
-        Looks for a sibling ``<stem>.md`` file produced by the upload conversion
-        pipeline.
-
-        Returns:
-            (outline, preview) where:
-            - outline: list of ``{title, line}`` dicts (plus optional sentinel).
-              Empty when no headings are found or no .md exists.
-            - preview: first few non-empty lines of the .md, used as a content
-              anchor when outline is empty so the agent has some context.
-              Empty when outline is non-empty (no fallback needed).
-    """
+    '''读取上传转换生成的同名 Markdown 文件，返回标题大纲或无标题时的开头摘要。'''
     md_path = file_path.with_suffix(".md")
     if not md_path.is_file():
         return [], []
@@ -95,7 +79,6 @@ def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
         logger.debug("Extracted %d outline entries from %s", len(outline), file_path.name)
         return outline, []
 
-    # outline is empty — read the first few non-empty lines as a content preview
     preview: list[str] = []
     try:
         with md_path.open(encoding="utf-8") as f:
@@ -111,22 +94,13 @@ def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
 
 
 class UploadsMiddlewareState(AgentState):
-    """封装 UploadsMiddlewareState 的状态、协作关系与公开操作。
-
-    State schema for uploads middleware."""
+    '''声明上传文件中间件写入智能体状态的文件元数据字段。'''
 
     uploaded_files: NotRequired[list[dict] | None]
 
 
 class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
-    """封装 UploadsMiddleware 的状态、协作关系与公开操作。
-
-    Middleware to inject uploaded files information into the agent context.
-
-        Reads file metadata from the current message's additional_kwargs.files
-        (set by the frontend after upload) and prepends an <uploaded_files> block
-        to the last human message so the model knows which files are available.
-    """
+    '''把当前消息和线程目录中的上传文件整理为有上限的上下文，并附加到最近一条用户消息。'''
 
     state_schema = UploadsMiddlewareState
 
@@ -136,15 +110,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         *,
         max_files_per_context_section: int = _MAX_FILES_PER_CONTEXT_SECTION,
     ):
-        """实现 __init__ 协议方法，保持对象交互语义一致。
-
-        Initialize the middleware.
-
-                Args:
-                    base_dir: Base directory for thread data. Defaults to Paths resolution.
-                    max_files_per_context_section: Maximum number of files listed in
-                        each uploaded-files prompt section.
-        """
+        '''配置线程文件路径解析器和每个上下文区段可列出的文件上限。'''
         super().__init__()
         if max_files_per_context_section < 1:
             raise ValueError("max_files_per_context_section must be at least 1")
@@ -152,9 +118,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         self._max_files_per_context_section = max_files_per_context_section
 
     def _format_file_entry(self, file: dict, lines: list[str]) -> None:
-        """执行 _format_file_entry 的明确职责，并返回与调用约定一致的结果。
-
-        Append a single file entry (name, size, path, optional outline) to lines."""
+        '''将文件名、大小、虚拟路径及可用的大纲或预览追加到上下文文本。'''
         size_kb = file["size"] / 1024
         size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
         lines.append(f"- {file['filename']} ({size_str})")
@@ -186,9 +150,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         *,
         recency_key: str | None = None,
     ) -> tuple[list[dict], list[dict]]:
-        """执行 _select_files_for_context 的明确职责，并返回与调用约定一致的结果。
-
-        Return bounded context files, prioritizing current-query matches."""
+        '''优先选择与问题匹配的文件；匹配度相同时按新近程度或原顺序排序并限制数量。'''
         ranked: list[tuple[tuple, dict]] = []
         for index, file in enumerate(files):
             selected_file = dict(file)
@@ -216,21 +178,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         omitted_new_files: list[dict] | None = None,
         omitted_historical_files: list[dict] | None = None,
     ) -> str:
-        """执行 _create_files_message 的明确职责，并返回与调用约定一致的结果。
-
-        Create a formatted message listing uploaded files.
-
-                Args:
-                    new_files: Files uploaded in the current message.
-                    historical_files: Files uploaded in previous messages.
-                        Each file dict may contain an optional ``outline`` key — a list of
-                        ``{title, line}`` dicts extracted from the converted Markdown file.
-                    omitted_new_files: Current-message files omitted from the prompt context.
-                    omitted_historical_files: Older historical files omitted from the prompt context.
-
-                Returns:
-                    Formatted string inside <uploaded_files> tags.
-        """
+        '''生成带有新上传、历史文件、大纲和省略统计的结构化提示文本。'''
         lines = ["<uploaded_files>"]
 
         lines.append("The following files were uploaded in this message:")
@@ -272,22 +220,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         return "\n".join(lines)
 
     def _files_from_kwargs(self, message: HumanMessage, uploads_dir: Path | None = None) -> list[dict] | None:
-        """执行 _files_from_kwargs 的明确职责，并返回与调用约定一致的结果。
-
-        Extract file info from message additional_kwargs.files.
-
-                The frontend sends uploaded file metadata in additional_kwargs.files
-                after a successful upload. Each entry has: filename, size (bytes),
-                path (virtual path), status.
-
-                Args:
-                    message: The human message to inspect.
-                    uploads_dir: Physical uploads directory used to verify file existence.
-                                 When provided, entries whose files no longer exist are skipped.
-
-                Returns:
-                    List of file dicts with virtual paths, or None if the field is absent or empty.
-        """
+        '''读取消息附带的上传元数据，过滤非法名称、暂存文件及磁盘上已不存在的文件。'''
         kwargs_files = (message.additional_kwargs or {}).get("files")
         if not isinstance(kwargs_files, list) or not kwargs_files:
             return None
@@ -313,25 +246,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
 
     @override
     def before_agent(self, state: UploadsMiddlewareState, runtime: Runtime) -> dict | None:
-        """执行 before_agent 的明确职责，并返回与调用约定一致的结果。
-
-        Inject uploaded files information before agent execution.
-
-                New files come from the current message's additional_kwargs.files.
-                Historical files are scanned from the thread's uploads directory,
-                excluding the new ones.
-
-                Prepends <uploaded_files> context to the last human message content.
-                The original additional_kwargs (including files metadata) is preserved
-                on the updated message so the frontend can read it from the stream.
-
-                Args:
-                    state: Current agent state.
-                    runtime: Runtime context containing thread_id.
-
-                Returns:
-                    State updates including uploaded files list.
-        """
+        '''在运行前收集当前与历史上传文件，将可用文件信息注入最近的用户消息并保留原始元数据。'''
         messages = list(state.get("messages", []))
         if not messages:
             return None
@@ -342,7 +257,6 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         if not isinstance(last_message, HumanMessage):
             return None
 
-        # Resolve uploads directory for existence checks
         thread_id = (runtime.context or {}).get("thread_id")
         if thread_id is None:
             try:
@@ -350,16 +264,14 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
 
                 thread_id = get_config().get("configurable", {}).get("thread_id")
             except RuntimeError:
-                pass  # get_config() raises outside a runnable context (e.g. unit tests)
+                pass
         uploads_dir = self._paths.sandbox_uploads_dir(thread_id, user_id=get_effective_user_id()) if thread_id else None
 
         query_text = get_original_user_content_text(last_message.content, last_message.additional_kwargs)
 
-        # Get newly uploaded files from the current message's additional_kwargs.files
         new_files = self._files_from_kwargs(last_message, uploads_dir) or []
         context_new_files, omitted_new_files = self._select_files_for_context(new_files, query_text)
 
-        # Collect historical files from the uploads directory (all except the new ones)
         new_filenames = {f["filename"] for f in new_files}
         historical_candidates: list[dict] = []
         if uploads_dir and uploads_dir.exists():
@@ -391,7 +303,6 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
             file["outline"] = outline
             file["outline_preview"] = preview
 
-        # Attach outlines to new files as well
         if uploads_dir:
             new_files_by_name = {file["filename"]: file for file in new_files}
             for file in context_new_files:
@@ -408,7 +319,6 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
 
         logger.debug(f"New files: {[f['filename'] for f in new_files]}, historical: {[f['filename'] for f in historical_files]}")
 
-        # Create files message and prepend to the last human message content
         files_message = self._create_files_message(
             context_new_files,
             historical_files,
@@ -416,7 +326,6 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
             omitted_historical_files=omitted_historical_files,
         )
 
-        # Extract original content - handle both string and list formats
         original_content = last_message.content
         additional_kwargs = dict(last_message.additional_kwargs or {})
         original_user_content = additional_kwargs.get(ORIGINAL_USER_CONTENT_KEY)
@@ -429,21 +338,13 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
                 )
             additional_kwargs[ORIGINAL_USER_CONTENT_KEY] = message_content_to_text(original_content)
         if isinstance(original_content, str):
-            # Simple case: string content, just prepend files message
             updated_content = f"{files_message}\n\n{original_content}"
         elif isinstance(original_content, list):
-            # Complex case: list content (multimodal), preserve all blocks
-            # Prepend files message as the first text block
             files_block = {"type": "text", "text": f"{files_message}\n\n"}
-            # Keep all original blocks (including images)
             updated_content = [files_block, *original_content]
         else:
-            # Other types, preserve as-is
             updated_content = original_content
 
-        # Create new message with combined content.
-        # Preserve additional_kwargs (including files metadata) so the frontend
-        # can read structured file info from the streamed message.
         updated_message = HumanMessage(
             content=updated_content,
             id=last_message.id,
@@ -460,15 +361,5 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
 
     @override
     async def abefore_agent(self, state: UploadsMiddlewareState, runtime: Runtime) -> dict | None:
-        """执行 abefore_agent 的明确职责，并返回与调用约定一致的结果。
-
-        Async hook that offloads the synchronous uploads scan off the event loop.
-
-                ``before_agent`` performs blocking filesystem IO (directory enumeration,
-                ``stat``, reading sibling ``.md`` outlines). When the graph runs async,
-                langgraph would otherwise execute the sync hook directly on the event
-                loop, so it is dispatched to a worker thread via ``run_in_executor``.
-                ``run_in_executor`` copies the current context, so the ``user_id``
-                contextvar read by ``get_effective_user_id()`` is preserved.
-        """
+        '''把包含目录扫描和文件读取的同步准备流程移至工作线程，避免阻塞异步事件循环。'''
         return await run_in_executor(None, self.before_agent, state, runtime)

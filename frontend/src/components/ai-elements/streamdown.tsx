@@ -5,7 +5,6 @@ import { Streamdown } from "streamdown";
 
 import { installClipboardFallback } from "@/core/clipboard";
 
-/** ClipboardSafeStreamdownProps 的公开类型定义。 */
 export type ClipboardSafeStreamdownProps = ComponentProps<typeof Streamdown>;
 
 // 仅在客户端修补浏览器全局对象，服务端渲染期间跳过。
@@ -21,10 +20,12 @@ class StreamdownFallbackBoundary extends Component<
 > {
   state = { errored: false, prevRaw: this.props.raw };
 
+  /** 捕获 Markdown 渲染树抛出的错误，切换到纯文本降级界面。 */
   static getDerivedStateFromError() {
     return { errored: true };
   }
 
+  /** 内容变化时清除旧错误状态，让新的流式内容重新尝试渲染。 */
   static getDerivedStateFromProps(
     props: { raw: ClipboardSafeStreamdownProps["children"] },
     state: {
@@ -39,6 +40,7 @@ class StreamdownFallbackBoundary extends Component<
     return null;
   }
 
+  /** 显示降级文本或正常 Markdown 子树。 */
   render() {
     if (this.state.errored) {
       return (
@@ -51,7 +53,7 @@ class StreamdownFallbackBoundary extends Component<
   }
 }
 
-/** ClipboardSafeStreamdown 组件：提供对应的界面结构与交互语义。 */
+/** 渲染流式 Markdown；渲染失败时回退为原始文本，保证复制内容可见。 */
 export function ClipboardSafeStreamdown({
   children,
   ...props

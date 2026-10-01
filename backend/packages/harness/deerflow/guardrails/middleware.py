@@ -1,6 +1,4 @@
-"""定义 middleware 模块提供的职责与可复用接口。
-
-GuardrailMiddleware - evaluates tool calls against a GuardrailProvider before execution."""
+'''在工具执行前调用防护策略，并按故障关闭或放行配置处理策略异常。'''
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -22,7 +20,7 @@ _REASON_MESSAGE_LIMIT = 500
 
 
 class GuardrailMiddleware(AgentMiddleware[AgentState]):
-    """封装 GuardrailMiddleware 的状态、协作关系与公开操作。
+    '''执行工具调用授权检查，并将拒绝原因或审计信息反馈给运行流程。
 
     Evaluate tool calls against a GuardrailProvider before execution.
 
@@ -30,23 +28,23 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         If the provider raises, behavior depends on fail_closed:
           - True (default): block the call
           - False: allow it through with a warning
-    """
+    '''
 
     def __init__(self, provider: GuardrailProvider, *, fail_closed: bool = True, passport: str | None = None):
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存防护策略及其异常时的默认处理方式。'''
         self.provider = provider
         self.fail_closed = fail_closed
         self.passport = passport
 
     @staticmethod
     def _resolve_context(request: ToolCallRequest) -> dict:
-        "执行 _resolve_context 的明确职责，并返回与调用约定一致的结果"
+        '''从工具调用请求中安全提取运行时上下文字典。'''
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None) if runtime is not None else None
         return context if isinstance(context, dict) else {}
 
     def _build_request(self, request: ToolCallRequest, context: dict) -> GuardrailRequest:
-        "执行 _build_request 的明确职责，并返回与调用约定一致的结果"
+        '''把工具调用和运行上下文整理为防护策略统一使用的请求对象。'''
         return GuardrailRequest(
             tool_name=str(request.tool_call.get("name", "")),
             tool_input=request.tool_call.get("args", {}),
@@ -63,7 +61,7 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         )
 
     def _build_denied_message(self, request: ToolCallRequest, decision: GuardrailDecision) -> ToolMessage:
-        "执行 _build_denied_message 的明确职责，并返回与调用约定一致的结果"
+        '''将策略拒绝决定转换为带工具调用标识的错误消息。'''
         tool_name = str(request.tool_call.get("name", "unknown_tool"))
         tool_call_id = str(request.tool_call.get("id", "missing_id"))
         reason_text = decision.reasons[0].message if decision.reasons else "blocked by guardrail policy"
@@ -84,15 +82,7 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         action: str,
         provider_error: bool,
     ) -> None:
-        """执行 _record_guardrail_event 的明确职责，并返回与调用约定一致的结果。
-
-        Persist a security-relevant guardrail decision to RunJournal.
-
-                This follows the optional-Journal pattern used by existing middleware:
-                audit persistence is best-effort and must never change tool execution
-                behavior. Runtimes without ``__run_journal`` (including embedded and
-                subagent execution) skip persistence.
-        """
+        '''尽力将防护判定写入运行日志；没有日志对象或写入失败均不改变工具执行结果。'''
         journal = context.get("__run_journal")
         if journal is None:
             return
@@ -104,8 +94,7 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
             "tool_name": guardrail_request.tool_name,
             "tool_call_id": guardrail_request.tool_call_id,
             "agent_id": guardrail_request.agent_id,
-            # Native subagents do not currently inherit __run_journal; custom
-            # runtimes may still provide one with subagent attribution.
+            # 内置子智能体通常没有运行日志；自定义运行时仍可提供带子智能体标记的日志。
             "is_subagent": guardrail_request.is_subagent,
             "user_role": guardrail_request.user_role,
             "allow": decision.allow,
@@ -133,13 +122,13 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        "执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        '''同步运行防护策略；按故障关闭设置拒绝或放行，并只在获准后调用工具。'''
         context = self._resolve_context(request)
         gr = self._build_request(request, context)
         try:
             decision = self.provider.evaluate(gr)
         except GraphBubbleUp:
-            # Preserve LangGraph control-flow signals (interrupt/pause/resume).
+            # 保留图运行时用于中断、暂停和恢复的控制流异常。
             raise
         except Exception:
             logger.exception("Guardrail provider error (sync)")
@@ -181,13 +170,13 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        "执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        '''异步运行防护策略；按故障关闭设置拒绝或放行，并只在获准后等待工具执行。'''
         context = self._resolve_context(request)
         gr = self._build_request(request, context)
         try:
             decision = await self.provider.aevaluate(gr)
         except GraphBubbleUp:
-            # Preserve LangGraph control-flow signals (interrupt/pause/resume).
+            # 保留图运行时用于中断、暂停和恢复的控制流异常。
             raise
         except Exception:
             logger.exception("Guardrail provider error (async)")

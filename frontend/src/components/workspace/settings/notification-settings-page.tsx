@@ -18,16 +18,19 @@ export function NotificationSettingsPage() {
 
   const [settings, setSettings] = useLocalSettings();
 
+  /** 触发浏览器通知权限申请。 */
   const handleRequestPermission = async () => {
     await requestPermission();
   };
 
+  /** 使用当前本地化文案发送测试通知，便于用户确认权限生效。 */
   const handleTestNotification = () => {
     showNotification(t.settings.notification.testTitle, {
       body: t.settings.notification.testBody,
     });
   };
 
+  /** 更新通知偏好，并由设置存储同步持久化状态。 */
   const handleEnableNotification = async (enabled: boolean) => {
     setSettings("notification", {
       enabled,

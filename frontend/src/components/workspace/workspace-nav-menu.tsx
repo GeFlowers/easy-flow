@@ -30,6 +30,7 @@ import { useI18n } from "@/core/i18n/hooks";
 import { GithubIcon } from "./github-icon";
 import { SettingsDialog } from "./settings";
 
+/** 根据侧栏展开状态呈现完整设置入口或紧凑图标按钮。 */
 function NavMenuButtonContent({
   isSidebarOpen,
   t,

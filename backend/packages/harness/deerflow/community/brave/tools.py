@@ -1,4 +1,4 @@
-"""通过 Brave Search 官方 API 提供网页搜索和图片搜索工具。"""
+'''通过 Brave Search 官方 API 提供网页搜索和图片搜索工具。'''
 
 import json
 import logging
@@ -26,7 +26,7 @@ _api_key_warned: set[str] = set()
 
 
 def _get_api_key(tool_name: str = "web_search") -> str | None:
-    """优先从工具配置读取 API 密钥，再回退到 BRAVE_SEARCH_API_KEY 环境变量。"""
+    '''优先从工具配置读取 API 密钥，再回退到 BRAVE_SEARCH_API_KEY 环境变量。'''
     config = get_app_config().get_tool_config(tool_name)
     if config is not None:
         api_key = (config.model_extra or {}).get("api_key")
@@ -44,7 +44,7 @@ def _coerce_max_results(
     default: int = _DEFAULT_MAX_RESULTS,
     max_allowed: int = _BRAVE_WEB_MAX_COUNT,
 ) -> int:
-    """将结果数转换为整数并限制在 API 支持范围内；无效值使用默认值。"""
+    '''将结果数转换为整数并限制在 API 支持范围内；无效值使用默认值。'''
     try:
         coerced = int(value)
     except (TypeError, ValueError):
@@ -59,7 +59,7 @@ def _coerce_max_results(
 
 
 def _clean_query(query: str, *, max_length: int = 400) -> str:
-    """去除查询首尾空白，并截断超长搜索词。"""
+    '''去除查询首尾空白，并截断超长搜索词。'''
     query = query.strip()
     if len(query) > max_length:
         query = query[:max_length]
@@ -67,7 +67,7 @@ def _clean_query(query: str, *, max_length: int = 400) -> str:
 
 
 def _missing_key_error(query: str, tool_name: str) -> str:
-    """按工具首次记录缺少密钥的警告，并返回 JSON 格式错误信息。"""
+    '''按工具首次记录缺少密钥的警告，并返回 JSON 格式错误信息。'''
     if tool_name not in _api_key_warned:
         _api_key_warned.add(tool_name)
         logger.warning(
@@ -81,7 +81,7 @@ def _missing_key_error(query: str, tool_name: str) -> str:
 
 
 def _unexpected_format_error(query: str, *, service_name: str = "Brave Search") -> str:
-    """生成第三方搜索服务响应结构不符合预期时的 JSON 错误。"""
+    '''生成第三方搜索服务响应结构不符合预期时的 JSON 错误。'''
     return json.dumps(
         {"error": f"{service_name} returned an unexpected response format", "query": query},
         ensure_ascii=False,
@@ -89,7 +89,7 @@ def _unexpected_format_error(query: str, *, service_name: str = "Brave Search") 
 
 
 def _decode_ipv4(host: str) -> IPv4Address | None:
-    """解析标准库不接受的整数、十六进制和八进制 IPv4 写法。"""
+    '''解析标准库不接受的整数、十六进制和八进制 IPv4 写法。'''
     parts = host.split(".")
     if not 1 <= len(parts) <= 4:
         return None
@@ -124,12 +124,12 @@ def _decode_ipv4(host: str) -> IPv4Address | None:
 
 
 def _is_url_present(value: object) -> bool:
-    """判断搜索结果字段是否包含非空 URL 字符串。"""
+    '''判断搜索结果字段是否包含非空 URL 字符串。'''
     return isinstance(value, str) and bool(value.strip())
 
 
 def _embedded_ipv4(ip: IPv6Address) -> IPv4Address | None:
-    """提取 IPv4 映射、6to4、NAT64 或兼容格式 IPv6 地址中嵌入的 IPv4。"""
+    '''提取 IPv4 映射、6to4、NAT64 或兼容格式 IPv6 地址中嵌入的 IPv4。'''
     if ip.ipv4_mapped is not None:
         return ip.ipv4_mapped
     if ip.sixtofour is not None:
@@ -144,11 +144,11 @@ def _embedded_ipv4(ip: IPv6Address) -> IPv4Address | None:
 
 
 def _safe_public_url(value: object) -> str:
-    """仅返回 HTTP(S) 公网地址；拒绝本机、私有 IP 及嵌入非公网 IPv4 的 IPv6。
+    '''仅返回 HTTP(S) 公网地址；拒绝本机、私有 IP 及嵌入非公网 IPv4 的 IPv6。
 
     此检查仅解析 URL 字符串，无法判断公网域名最终解析到的地址；真正下载时
     仍须再次校验解析后的 IP，避免 DNS 解析造成的 SSRF。
-    """
+    '''
     if not isinstance(value, str):
         return ""
     url = value.strip()
@@ -186,7 +186,7 @@ def _brave_get(
     *,
     service_name: str,
 ) -> tuple[dict | None, str | None]:
-    """发送带密钥的 Brave API 请求，返回对象数据或已格式化的错误响应。"""
+    '''发送带密钥的 Brave API 请求，返回对象数据或已格式化的错误响应。'''
     headers = {
         "X-Subscription-Token": api_key,
         "Accept": "application/json",
@@ -213,12 +213,12 @@ def _brave_get(
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str, max_results: int = 5) -> str:
-    """通过 Brave Search 查询网络信息并返回相关结果。
+    '''通过 Brave Search 查询网络信息并返回相关结果。
 
     Args:
         query: 描述检索目标的关键词，尽量具体以提高结果相关性。
         max_results: 返回结果的最大数量，默认值为 5。
-    """
+    '''
     config = get_app_config().get_tool_config("web_search")
     if config is not None and "max_results" in (config.model_extra or {}):
         max_results = config.model_extra["max_results"]
@@ -259,14 +259,14 @@ def web_search_tool(query: str, max_results: int = 5) -> str:
 
 @tool("image_search", parse_docstring=True)
 def image_search_tool(query: str, max_results: int = 5) -> str:
-    """通过 Brave 图片搜索收集人物、物品或场景的视觉参考，供图像创作使用。
+    '''通过 Brave 图片搜索收集人物、物品或场景的视觉参考，供图像创作使用。
 
     返回的图片网址可作为图像生成的参考素材。
 
     Args:
         query: 描述所需图片内容的关键词，尽量具体以提高结果相关性。
         max_results: 返回图片的最大数量，默认值为 5，最多为 200。
-    """
+    '''
     config = get_app_config().get_tool_config("image_search")
     extra = (config.model_extra or {}) if config is not None else {}
     if "max_results" in extra:

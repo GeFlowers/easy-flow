@@ -75,11 +75,8 @@ import {
 } from "react";
 import { toast } from "sonner";
 
-// ============================================================================
 // Provider 上下文与类型。
-// ============================================================================
 
-/** AttachmentsContext 的公开类型定义。 */
 export type AttachmentsContext = {
   files: (PromptInputFilePart & { id: string })[];
   add: (files: File[] | FileList) => void;
@@ -89,14 +86,12 @@ export type AttachmentsContext = {
   fileInputRef: RefObject<HTMLInputElement | null>;
 };
 
-/** TextInputContext 的公开类型定义。 */
 export type TextInputContext = {
   value: string;
   setInput: (v: string) => void;
   clear: () => void;
 };
 
-/** PromptInputControllerProps 的公开类型定义。 */
 export type PromptInputControllerProps = {
   textInput: TextInputContext;
   attachments: AttachmentsContext;
@@ -117,7 +112,7 @@ const PromptInputValidationContext = createContext<
   ((files: File[] | FileList) => File[]) | null
 >(null);
 
-/** usePromptInputController Hook：封装相关状态与交互逻辑。 */
+/** 从 PromptInputProvider 读取文本和附件控制器；脱离 Provider 使用时立即报错。 */
 export const usePromptInputController = () => {
   const ctx = useContext(PromptInputController);
   if (!ctx) {
@@ -129,11 +124,11 @@ export const usePromptInputController = () => {
 };
 
 // 可选变体（不得抛错），供双模式组件使用。
-/** useOptionalPromptInputController Hook：封装本模块所需的状态或上下文访问。 */
+/** 在提示输入上下文存在时返回控制器，允许独立控件脱离表单安全复用。 */
 const useOptionalPromptInputController = () =>
   useContext(PromptInputController);
 
-/** useProviderAttachments Hook：封装相关状态与交互逻辑。 */
+/** 读取 Provider 统一维护的附件集合，供不在 PromptInput 子树中的控件使用。 */
 export const useProviderAttachments = () => {
   const ctx = useContext(ProviderAttachmentsContext);
   if (!ctx) {
@@ -144,13 +139,12 @@ export const useProviderAttachments = () => {
   return ctx;
 };
 
-/** useOptionalProviderAttachments Hook：封装本模块所需的状态或上下文访问。 */
+/** 可选读取由外层提供的附件状态，未设置提供器时返回空值。 */
 const useOptionalProviderAttachments = () =>
   useContext(ProviderAttachmentsContext);
-/** usePromptInputValidation Hook：封装本模块所需的状态或上下文访问。 */
+/** 按当前输入、附件数量和禁用状态计算提交是否可用及对应错误。 */
 const usePromptInputValidation = () => useContext(PromptInputValidationContext);
 
-/** PromptInputProviderProps 的公开类型定义。 */
 export type PromptInputProviderProps = PropsWithChildren<{
   initialInput?: string;
 }>;
@@ -165,6 +159,7 @@ export function PromptInputProvider({
 }: PromptInputProviderProps) {
   // ----- 文本输入状态。
   const [textInput, setTextInput] = useState(initialTextInput);
+  /** 清空由输入提供器统一管理的文本内容。 */
   const clearInput = useCallback(() => setTextInput(""), []);
 
   // ----- 附件状态（被 Provider 包裹时为全局状态）。
@@ -174,6 +169,7 @@ export function PromptInputProvider({
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const openRef = useRef<() => void>(() => {});
 
+  /** 将所选文件加入共享附件列表，并为每项创建可预览地址。 */
   const add = useCallback((files: File[] | FileList) => {
     const incoming = Array.from(files);
     if (incoming.length === 0) {
@@ -194,6 +190,7 @@ export function PromptInputProvider({
     );
   }, []);
 
+  /** 从共享附件列表移除指定项目并释放其临时预览地址。 */
   const remove = useCallback((id: string) => {
     setAttachmentFiles((prev) => {
       const found = prev.find((f) => f.id === id);
@@ -204,6 +201,7 @@ export function PromptInputProvider({
     });
   }, []);
 
+  /** 清除全部共享附件并回收已创建的临时预览地址。 */
   const clear = useCallback(() => {
     setAttachmentFiles((prev) => {
       for (const f of prev) {
@@ -230,6 +228,7 @@ export function PromptInputProvider({
     };
   }, []);
 
+  /** 通过已注册的文件输入框打开系统文件选择器。 */
   const openFileDialog = useCallback(() => {
     openRef.current?.();
   }, []);
@@ -246,6 +245,7 @@ export function PromptInputProvider({
     [attachmentFiles, add, remove, clear, openFileDialog],
   );
 
+  /** 由附件输入组件注册文件输入框及其打开操作。 */
   const __registerFileInput = useCallback(
     (ref: RefObject<HTMLInputElement | null>, open: () => void) => {
       fileInputRef.current = ref.current;
@@ -276,13 +276,11 @@ export function PromptInputProvider({
   );
 }
 
-// ============================================================================
 // 组件上下文与 Hook。
-// ============================================================================
 
 const LocalAttachmentsContext = createContext<AttachmentsContext | null>(null);
 
-/** usePromptInputAttachments Hook：封装相关状态与交互逻辑。 */
+/** 优先读取 Provider 附件状态，否则使用当前 PromptInput 的本地状态。 */
 export const usePromptInputAttachments = () => {
   // 双模式：优先使用 Provider；不存在时使用本地状态。
   const provider = useOptionalProviderAttachments();
@@ -296,13 +294,12 @@ export const usePromptInputAttachments = () => {
   return context;
 };
 
-/** PromptInputAttachmentProps 的公开类型定义。 */
 export type PromptInputAttachmentProps = HTMLAttributes<HTMLDivElement> & {
   data: PromptInputFilePart & { id: string };
   className?: string;
 };
 
-/** PromptInputAttachment 组件：提供对应的界面结构与交互语义。 */
+/** 展示单个待发送附件，并根据文件类型提供预览和移除操作。 */
 export function PromptInputAttachment({
   data,
   className,
@@ -394,7 +391,6 @@ export function PromptInputAttachment({
   );
 }
 
-/** PromptInputAttachmentsProps 的公开类型定义。 */
 export type PromptInputAttachmentsProps = Omit<
   HTMLAttributes<HTMLDivElement>,
   "children"
@@ -402,7 +398,7 @@ export type PromptInputAttachmentsProps = Omit<
   children: (attachment: PromptInputFilePart & { id: string }) => ReactNode;
 };
 
-/** PromptInputAttachments 组件：提供对应的界面结构与交互语义。 */
+/** 将输入框中待发送的附件预览按统一间距排列。 */
 export function PromptInputAttachments({
   children,
   className,
@@ -428,14 +424,13 @@ export function PromptInputAttachments({
   );
 }
 
-/** PromptInputActionAddAttachmentsProps 的公开类型定义。 */
 export type PromptInputActionAddAttachmentsProps = ComponentProps<
   typeof DropdownMenuItem
 > & {
   label?: string;
 };
 
-/** PromptInputActionAddAttachments 组件：提供对应的界面结构与交互语义。 */
+/** 打开文件选择器并将选中的文件交给提示输入控制器。 */
 export const PromptInputActionAddAttachments = ({
   label = "Add photos or files",
   ...props
@@ -455,13 +450,11 @@ export const PromptInputActionAddAttachments = ({
   );
 };
 
-/** PromptInputMessage 的公开类型定义。 */
 export type PromptInputMessage = {
   text: string;
   files: PromptInputFilePart[];
 };
 
-/** PromptInputProps 的公开类型定义。 */
 export type PromptInputProps = Omit<
   HTMLAttributes<HTMLFormElement>,
   "onSubmit" | "onError"
@@ -475,7 +468,7 @@ export type PromptInputProps = Omit<
   syncHiddenInput?: boolean;
   // 最小约束。
   maxFiles?: number;
-  maxFileSize?: number; // bytes
+  maxFileSize?: number; // 字节数
   onError?: (err: {
     code: "max_files" | "max_file_size" | "accept" | "unsupported_package";
     message: string;
@@ -486,7 +479,7 @@ export type PromptInputProps = Omit<
   ) => void | Promise<void>;
 };
 
-/** PromptInput 组件：提供对应的界面结构与交互语义。 */
+/** 管理提示文本、附件和提交状态，并为输入区子组件提供共享控制器。 */
 export const PromptInput = ({
   className,
   accept,
@@ -523,10 +516,12 @@ export const PromptInput = ({
     providerTextRef.current = controller.textInput.value;
   }
 
+  /** 打开当前输入组件内部的文件选择器。 */
   const openFileDialogLocal = useCallback(() => {
     inputRef.current?.click();
   }, []);
 
+  /** 按浏览器文件选择器的 accept 规则判断文件是否可添加。 */
   const matchesAccept = useCallback(
     (f: File) => {
       if (!accept || accept.trim() === "") {
@@ -549,6 +544,7 @@ export const PromptInput = ({
     [accept],
   );
 
+  /** 在未使用共享提供器时校验数量、大小和类型后维护本地附件。 */
   const addLocal = useCallback(
     (fileList: File[] | FileList) => {
       const incoming = Array.from(fileList);
@@ -560,6 +556,7 @@ export const PromptInput = ({
         });
         return;
       }
+      /** 按单文件大小上限筛选附件；未配置上限时保留所有已接受文件。 */
       const withinSize = (f: File) =>
         maxFileSize ? f.size <= maxFileSize : true;
       const sized = accepted.filter(withinSize);
@@ -601,6 +598,7 @@ export const PromptInput = ({
     [matchesAccept, maxFiles, maxFileSize, onError],
   );
 
+  /** 从本地附件列表移除项目并释放预览地址。 */
   const removeLocal = useCallback(
     (id: string) =>
       setItems((prev) => {
@@ -613,6 +611,7 @@ export const PromptInput = ({
     [],
   );
 
+  /** 清空本地附件并释放所有临时预览地址。 */
   const clearLocal = useCallback(
     () =>
       setItems((prev) => {
@@ -633,6 +632,7 @@ export const PromptInput = ({
     ? controller.attachments.openFileDialog
     : openFileDialogLocal;
 
+  /** 过滤不支持上传的文件，并在需要时向用户报告拒绝原因。 */
   const sanitizeIncomingFiles = useCallback(
     (fileList: File[] | FileList) => {
       const { accepted, message } = splitUnsupportedUploadFiles(fileList);
@@ -668,13 +668,15 @@ export const PromptInput = ({
   useEffect(() => {
     const form = formRef.current;
     if (!form) return;
-    if (globalDrop) return; // when global drop is on, let the document-level handler own drops
+    if (globalDrop) return; // 启用全局拖放时由文档级处理器接管
 
+    /** 阻止文件拖入表单时浏览器直接打开文件。 */
     const onDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes("Files")) {
         e.preventDefault();
       }
     };
+    /** 接收表单区域拖入的文件，先校验类型再加入附件状态。 */
     const onDrop = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes("Files")) {
         e.preventDefault();
@@ -697,11 +699,13 @@ export const PromptInput = ({
   useEffect(() => {
     if (!globalDrop) return;
 
+    /** 阻止文件拖入页面时浏览器直接导航到该文件。 */
     const onDragOver = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes("Files")) {
         e.preventDefault();
       }
     };
+    /** 接收页面任意区域拖入的文件并复用附件校验流程。 */
     const onDrop = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes("Files")) {
         e.preventDefault();
@@ -733,6 +737,7 @@ export const PromptInput = ({
     [usingProvider],
   );
 
+  /** 处理文件选择器变更，加入通过校验的文件后清空选择器值。 */
   const handleChange: ChangeEventHandler<HTMLInputElement> = (event) => {
     if (event.currentTarget.files) {
       const accepted = sanitizeIncomingFiles(event.currentTarget.files);
@@ -744,6 +749,7 @@ export const PromptInput = ({
     event.currentTarget.value = "";
   };
 
+  /** 将临时附件地址转换为可随提交消息传递的数据地址。 */
   const convertBlobUrlToDataUrl = async (
     url: string,
   ): Promise<string | null> => {
@@ -773,6 +779,7 @@ export const PromptInput = ({
     [files, add, remove, clear, openFileDialog],
   );
 
+  /** 收集输入文本和附件并提交；提交后只清理本次使用的状态。 */
   const handleSubmit: FormEventHandler<HTMLFormElement> = (event) => {
     event.preventDefault();
 
@@ -791,6 +798,7 @@ export const PromptInput = ({
 
     // 异步将 Blob URL 转换为数据 URL。
     const submittedFileIds = files.map((file) => file.id);
+    /** 移除本次提交的附件和文本，同时保留提交期间新加入的输入。 */
     const clearSubmittedState = () => {
       const currentFileIds = new Set(filesRef.current.map((file) => file.id));
       const submittedFileIdsStillPresent = submittedFileIds.filter((id) =>
@@ -884,10 +892,9 @@ export const PromptInput = ({
   );
 };
 
-/** PromptInputBodyProps 的公开类型定义。 */
 export type PromptInputBodyProps = HTMLAttributes<HTMLDivElement>;
 
-/** PromptInputBody 组件：提供对应的界面结构与交互语义。 */
+/** 承载文本输入及其内部装饰，并限制输入区域的布局边界。 */
 export const PromptInputBody = ({
   className,
   ...props
@@ -895,12 +902,11 @@ export const PromptInputBody = ({
   <div className={cn("contents", className)} {...props} />
 );
 
-/** PromptInputTextareaProps 的公开类型定义。 */
 export type PromptInputTextareaProps = ComponentProps<
   typeof InputGroupTextarea
 >;
 
-/** PromptInputTextarea 组件：提供对应的界面结构与交互语义。 */
+/** 将多行文本框绑定到提示输入状态，并按验证结果启用或禁用输入。 */
 export const PromptInputTextarea = ({
   onChange,
   onKeyDown,
@@ -913,6 +919,7 @@ export const PromptInputTextarea = ({
   const sanitizeIncomingFiles = usePromptInputValidation();
   const [isComposing, setIsComposing] = useState(false);
 
+  /** 按提交设置处理快捷键，并避免干扰输入法组合输入。 */
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     onKeyDown?.(e);
     if (e.defaultPrevented) {
@@ -940,6 +947,7 @@ export const PromptInputTextarea = ({
     }
   };
 
+  /** 将剪贴板文件作为附件加入，同时保留普通文本粘贴行为。 */
   const handlePaste: ClipboardEventHandler<HTMLTextAreaElement> = (event) => {
     const items = event.clipboardData?.items;
 
@@ -996,13 +1004,12 @@ export const PromptInputTextarea = ({
   );
 };
 
-/** PromptInputHeaderProps 的公开类型定义。 */
 export type PromptInputHeaderProps = Omit<
   ComponentProps<typeof InputGroupAddon>,
   "align"
 >;
 
-/** PromptInputHeader 组件：提供对应的界面结构与交互语义。 */
+/** 为输入框顶部的附件预览或状态信息提供排列区域。 */
 export const PromptInputHeader = ({
   className,
   ...props
@@ -1014,13 +1021,12 @@ export const PromptInputHeader = ({
   />
 );
 
-/** PromptInputFooterProps 的公开类型定义。 */
 export type PromptInputFooterProps = Omit<
   ComponentProps<typeof InputGroupAddon>,
   "align"
 >;
 
-/** PromptInputFooter 组件：提供对应的界面结构与交互语义。 */
+/** 在输入区底部排列工具、模式选择和提交控件。 */
 export const PromptInputFooter = ({
   className,
   ...props
@@ -1032,10 +1038,9 @@ export const PromptInputFooter = ({
   />
 );
 
-/** PromptInputToolsProps 的公开类型定义。 */
 export type PromptInputToolsProps = HTMLAttributes<HTMLDivElement>;
 
-/** PromptInputTools 组件：提供对应的界面结构与交互语义。 */
+/** 将输入框底部的辅助按钮集中排列，并与提交区分隔。 */
 export const PromptInputTools = ({
   className,
   ...props
@@ -1043,10 +1048,9 @@ export const PromptInputTools = ({
   <div className={cn("flex items-center gap-1", className)} {...props} />
 );
 
-/** PromptInputButtonProps 的公开类型定义。 */
 export type PromptInputButtonProps = ComponentProps<typeof InputGroupButton>;
 
-/** PromptInputButton 组件：提供对应的界面结构与交互语义。 */
+/** 提供与输入区域视觉匹配的可选图标按钮。 */
 export const PromptInputButton = ({
   variant = "ghost",
   className,
@@ -1064,17 +1068,15 @@ export const PromptInputButton = ({
   );
 };
 
-/** PromptInputActionMenuProps 的公开类型定义。 */
 export type PromptInputActionMenuProps = ComponentProps<typeof DropdownMenu>;
-/** PromptInputActionMenu 组件：提供对应的界面结构与交互语义。 */
+/** 管理提示输入工具菜单的开合状态。 */
 export const PromptInputActionMenu = (props: PromptInputActionMenuProps) => (
   <DropdownMenu {...props} />
 );
 
-/** PromptInputActionMenuTriggerProps 的公开类型定义。 */
 export type PromptInputActionMenuTriggerProps = PromptInputButtonProps;
 
-/** PromptInputActionMenuTrigger 组件：提供对应的界面结构与交互语义。 */
+/** 触发输入工具菜单展开或收起。 */
 export const PromptInputActionMenuTrigger = ({
   className,
   children,
@@ -1087,11 +1089,10 @@ export const PromptInputActionMenuTrigger = ({
   </DropdownMenuTrigger>
 );
 
-/** PromptInputActionMenuContentProps 的公开类型定义。 */
 export type PromptInputActionMenuContentProps = ComponentProps<
   typeof DropdownMenuContent
 >;
-/** PromptInputActionMenuContent 组件：提供对应的界面结构与交互语义。 */
+/** 显示输入工具菜单选项，并统一浮层位置和外观。 */
 export const PromptInputActionMenuContent = ({
   className,
   ...props
@@ -1099,11 +1100,10 @@ export const PromptInputActionMenuContent = ({
   <DropdownMenuContent align="start" className={cn(className)} {...props} />
 );
 
-/** PromptInputActionMenuItemProps 的公开类型定义。 */
 export type PromptInputActionMenuItemProps = ComponentProps<
   typeof DropdownMenuItem
 >;
-/** PromptInputActionMenuItem 组件：提供对应的界面结构与交互语义。 */
+/** 表示菜单中的单项输入操作，并在选取后交由调用方处理。 */
 export const PromptInputActionMenuItem = ({
   className,
   ...props
@@ -1113,12 +1113,11 @@ export const PromptInputActionMenuItem = ({
 
 // 注意：打开文件对话框等具有副作用的操作由按需启用的模块提供（如 prompt-input-attachments）。
 
-/** PromptInputSubmitProps 的公开类型定义。 */
 export type PromptInputSubmitProps = ComponentProps<typeof InputGroupButton> & {
   status?: ChatStatus;
 };
 
-/** PromptInputSubmit 组件：提供对应的界面结构与交互语义。 */
+/** 根据输入校验和运行状态提交消息，并在生成期间切换为停止操作。 */
 export const PromptInputSubmit = ({
   className,
   variant = "default",
@@ -1205,7 +1204,6 @@ declare global {
   }
 }
 
-/** PromptInputSpeechButtonProps 的公开类型定义。 */
 export type PromptInputSpeechButtonProps = ComponentProps<
   typeof PromptInputButton
 > & {
@@ -1213,7 +1211,7 @@ export type PromptInputSpeechButtonProps = ComponentProps<
   onTranscriptionChange?: (text: string) => void;
 };
 
-/** PromptInputSpeechButton 组件：提供对应的界面结构与交互语义。 */
+/** 控制语音识别录入，并将识别文本写入提示输入状态。 */
 export const PromptInputSpeechButton = ({
   className,
   textareaRef,
@@ -1291,6 +1289,7 @@ export const PromptInputSpeechButton = ({
     };
   }, []);
 
+  /** 开始或停止当前语音识别器，并忽略尚未初始化的情形。 */
   const toggleListening = useCallback(() => {
     if (!recognition) {
       return;
@@ -1319,20 +1318,18 @@ export const PromptInputSpeechButton = ({
   );
 };
 
-/** PromptInputSelectProps 的公开类型定义。 */
 export type PromptInputSelectProps = ComponentProps<typeof Select>;
 
-/** PromptInputSelect 组件：提供对应的界面结构与交互语义。 */
+/** 管理输入模式或目标选项的下拉选择状态。 */
 export const PromptInputSelect = (props: PromptInputSelectProps) => (
   <Select {...props} />
 );
 
-/** PromptInputSelectTriggerProps 的公开类型定义。 */
 export type PromptInputSelectTriggerProps = ComponentProps<
   typeof SelectTrigger
 >;
 
-/** PromptInputSelectTrigger 组件：提供对应的界面结构与交互语义。 */
+/** 显示当前输入选项并触发下拉列表。 */
 export const PromptInputSelectTrigger = ({
   className,
   ...props
@@ -1347,12 +1344,11 @@ export const PromptInputSelectTrigger = ({
   />
 );
 
-/** PromptInputSelectContentProps 的公开类型定义。 */
 export type PromptInputSelectContentProps = ComponentProps<
   typeof SelectContent
 >;
 
-/** PromptInputSelectContent 组件：提供对应的界面结构与交互语义。 */
+/** 在浮层中展示可选择的输入模式选项。 */
 export const PromptInputSelectContent = ({
   className,
   ...props
@@ -1360,10 +1356,9 @@ export const PromptInputSelectContent = ({
   <SelectContent className={cn(className)} {...props} />
 );
 
-/** PromptInputSelectItemProps 的公开类型定义。 */
 export type PromptInputSelectItemProps = ComponentProps<typeof SelectItem>;
 
-/** PromptInputSelectItem 组件：提供对应的界面结构与交互语义。 */
+/** 表示下拉菜单中的单个输入模式选项。 */
 export const PromptInputSelectItem = ({
   className,
   ...props
@@ -1371,10 +1366,9 @@ export const PromptInputSelectItem = ({
   <SelectItem className={cn(className)} {...props} />
 );
 
-/** PromptInputSelectValueProps 的公开类型定义。 */
 export type PromptInputSelectValueProps = ComponentProps<typeof SelectValue>;
 
-/** PromptInputSelectValue 组件：提供对应的界面结构与交互语义。 */
+/** 将当前已选输入模式渲染在触发按钮中。 */
 export const PromptInputSelectValue = ({
   className,
   ...props
@@ -1382,10 +1376,9 @@ export const PromptInputSelectValue = ({
   <SelectValue className={cn(className)} {...props} />
 );
 
-/** PromptInputHoverCardProps 的公开类型定义。 */
 export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard>;
 
-/** PromptInputHoverCard 组件：提供对应的界面结构与交互语义。 */
+/** 管理鼠标悬停时显示的输入控件补充信息面板。 */
 export const PromptInputHoverCard = ({
   openDelay = 0,
   closeDelay = 0,
@@ -1394,22 +1387,20 @@ export const PromptInputHoverCard = ({
   <HoverCard closeDelay={closeDelay} openDelay={openDelay} {...props} />
 );
 
-/** PromptInputHoverCardTriggerProps 的公开类型定义。 */
 export type PromptInputHoverCardTriggerProps = ComponentProps<
   typeof HoverCardTrigger
 >;
 
-/** PromptInputHoverCardTrigger 组件：提供对应的界面结构与交互语义。 */
+/** 指定悬停或聚焦时打开补充信息卡片的元素。 */
 export const PromptInputHoverCardTrigger = (
   props: PromptInputHoverCardTriggerProps,
 ) => <HoverCardTrigger {...props} />;
 
-/** PromptInputHoverCardContentProps 的公开类型定义。 */
 export type PromptInputHoverCardContentProps = ComponentProps<
   typeof HoverCardContent
 >;
 
-/** PromptInputHoverCardContent 组件：提供对应的界面结构与交互语义。 */
+/** 定位并呈现输入控件的悬停说明内容。 */
 export const PromptInputHoverCardContent = ({
   align = "start",
   ...props
@@ -1417,28 +1408,25 @@ export const PromptInputHoverCardContent = ({
   <HoverCardContent align={align} {...props} />
 );
 
-/** PromptInputTabsListProps 的公开类型定义。 */
 export type PromptInputTabsListProps = HTMLAttributes<HTMLDivElement>;
 
-/** PromptInputTabsList 组件：提供对应的界面结构与交互语义。 */
+/** 排列相互排斥的提示输入模式标签。 */
 export const PromptInputTabsList = ({
   className,
   ...props
 }: PromptInputTabsListProps) => <div className={cn(className)} {...props} />;
 
-/** PromptInputTabProps 的公开类型定义。 */
 export type PromptInputTabProps = HTMLAttributes<HTMLDivElement>;
 
-/** PromptInputTab 组件：提供对应的界面结构与交互语义。 */
+/** 选择对应输入模式，并同步标签页当前值。 */
 export const PromptInputTab = ({
   className,
   ...props
 }: PromptInputTabProps) => <div className={cn(className)} {...props} />;
 
-/** PromptInputTabLabelProps 的公开类型定义。 */
 export type PromptInputTabLabelProps = HTMLAttributes<HTMLHeadingElement>;
 
-/** PromptInputTabLabel 组件：提供对应的界面结构与交互语义。 */
+/** 展示输入模式标签上的标题或图标。 */
 export const PromptInputTabLabel = ({
   className,
   ...props
@@ -1452,10 +1440,9 @@ export const PromptInputTabLabel = ({
   />
 );
 
-/** PromptInputTabBodyProps 的公开类型定义。 */
 export type PromptInputTabBodyProps = HTMLAttributes<HTMLDivElement>;
 
-/** PromptInputTabBody 组件：提供对应的界面结构与交互语义。 */
+/** 显示当前输入模式对应的面板内容。 */
 export const PromptInputTabBody = ({
   className,
   ...props
@@ -1463,10 +1450,9 @@ export const PromptInputTabBody = ({
   <div className={cn("space-y-1", className)} {...props} />
 );
 
-/** PromptInputTabItemProps 的公开类型定义。 */
 export type PromptInputTabItemProps = HTMLAttributes<HTMLDivElement>;
 
-/** PromptInputTabItem 组件：提供对应的界面结构与交互语义。 */
+/** 将同一模式下可选内容组织为标签页条目。 */
 export const PromptInputTabItem = ({
   className,
   ...props
@@ -1480,19 +1466,17 @@ export const PromptInputTabItem = ({
   />
 );
 
-/** PromptInputCommandProps 的公开类型定义。 */
 export type PromptInputCommandProps = ComponentProps<typeof Command>;
 
-/** PromptInputCommand 组件：提供对应的界面结构与交互语义。 */
+/** 为输入框的命令补全和搜索结果提供命令面板根节点。 */
 export const PromptInputCommand = ({
   className,
   ...props
 }: PromptInputCommandProps) => <Command className={cn(className)} {...props} />;
 
-/** PromptInputCommandInputProps 的公开类型定义。 */
 export type PromptInputCommandInputProps = ComponentProps<typeof CommandInput>;
 
-/** PromptInputCommandInput 组件：提供对应的界面结构与交互语义。 */
+/** 输入用于筛选提示输入命令的查询文本。 */
 export const PromptInputCommandInput = ({
   className,
   ...props
@@ -1500,10 +1484,9 @@ export const PromptInputCommandInput = ({
   <CommandInput className={cn(className)} {...props} />
 );
 
-/** PromptInputCommandListProps 的公开类型定义。 */
 export type PromptInputCommandListProps = ComponentProps<typeof CommandList>;
 
-/** PromptInputCommandList 组件：提供对应的界面结构与交互语义。 */
+/** 承载经过查询过滤的命令建议列表。 */
 export const PromptInputCommandList = ({
   className,
   ...props
@@ -1511,10 +1494,9 @@ export const PromptInputCommandList = ({
   <CommandList className={cn(className)} {...props} />
 );
 
-/** PromptInputCommandEmptyProps 的公开类型定义。 */
 export type PromptInputCommandEmptyProps = ComponentProps<typeof CommandEmpty>;
 
-/** PromptInputCommandEmpty 组件：提供对应的界面结构与交互语义。 */
+/** 查询没有匹配命令时展示空结果内容。 */
 export const PromptInputCommandEmpty = ({
   className,
   ...props
@@ -1522,10 +1504,9 @@ export const PromptInputCommandEmpty = ({
   <CommandEmpty className={cn(className)} {...props} />
 );
 
-/** PromptInputCommandGroupProps 的公开类型定义。 */
 export type PromptInputCommandGroupProps = ComponentProps<typeof CommandGroup>;
 
-/** PromptInputCommandGroup 组件：提供对应的界面结构与交互语义。 */
+/** 将命令建议按用途或类别分组。 */
 export const PromptInputCommandGroup = ({
   className,
   ...props
@@ -1533,10 +1514,9 @@ export const PromptInputCommandGroup = ({
   <CommandGroup className={cn(className)} {...props} />
 );
 
-/** PromptInputCommandItemProps 的公开类型定义。 */
 export type PromptInputCommandItemProps = ComponentProps<typeof CommandItem>;
 
-/** PromptInputCommandItem 组件：提供对应的界面结构与交互语义。 */
+/** 提供可由键盘或鼠标选取的命令建议项。 */
 export const PromptInputCommandItem = ({
   className,
   ...props
@@ -1544,12 +1524,11 @@ export const PromptInputCommandItem = ({
   <CommandItem className={cn(className)} {...props} />
 );
 
-/** PromptInputCommandSeparatorProps 的公开类型定义。 */
 export type PromptInputCommandSeparatorProps = ComponentProps<
   typeof CommandSeparator
 >;
 
-/** PromptInputCommandSeparator 组件：提供对应的界面结构与交互语义。 */
+/** 在不同命令建议组之间绘制分隔线。 */
 export const PromptInputCommandSeparator = ({
   className,
   ...props

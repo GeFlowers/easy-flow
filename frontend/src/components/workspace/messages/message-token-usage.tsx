@@ -7,6 +7,7 @@ import { accumulateUsage, formatTokenCount } from "@/core/messages/usage";
 import type { TokenDebugStep } from "@/core/messages/usage-model";
 import { cn } from "@/lib/utils";
 
+/** 以统一格式呈现输入、输出和总 token 数量，供消息统计视图复用。 */
 function TokenUsageSummary({
   className,
   inputTokens,

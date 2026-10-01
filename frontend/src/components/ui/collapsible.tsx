@@ -4,14 +4,14 @@ import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 
 import { cn } from "@/lib/utils";
 
-/** Collapsible 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理一组内容的受控或非受控展开状态。 */
 function Collapsible({
   ...props
 }: React.ComponentProps<typeof CollapsiblePrimitive.Root>) {
   return <CollapsiblePrimitive.Root data-slot="collapsible" {...props} />;
 }
 
-/** CollapsibleTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 将子按钮注册为内容展开/收起开关。 */
 function CollapsibleTrigger({
   className,
   ...props
@@ -25,7 +25,7 @@ function CollapsibleTrigger({
   );
 }
 
-/** CollapsibleContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 按根节点状态呈现或隐藏折叠内容。 */
 function CollapsibleContent({
   ...props
 }: React.ComponentProps<typeof CollapsiblePrimitive.CollapsibleContent>) {

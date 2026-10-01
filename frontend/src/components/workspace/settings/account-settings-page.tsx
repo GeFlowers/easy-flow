@@ -24,6 +24,7 @@ export function AccountSettingsPage() {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
+  /** 校验新密码后提交修改请求，并根据服务端结果显示状态或结束会话。 */
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");

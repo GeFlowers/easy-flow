@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''从运行事件存储中恢复工作区变化，并按接口参数隐藏文件详情或差异。'''
 
 from __future__ import annotations
 
@@ -24,7 +24,7 @@ async def get_workspace_changes_response(
     include_files: bool = True,
     include_diff: bool = True,
 ) -> dict[str, Any]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''读取一次运行最新的工作区变化事件，返回可供前端展示的结构。'''
     events = await event_store.list_events(
         thread_id,
         run_id,
@@ -51,7 +51,7 @@ async def get_workspace_changes_response(
 
 
 def _empty_response() -> dict[str, Any]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''构造尚无工作区变化事件时使用的稳定空响应。'''
     return {
         "available": False,
         "version": 1,
@@ -62,7 +62,7 @@ def _empty_response() -> dict[str, Any]:
 
 
 def _extract_workspace_changes_payload(event: dict[str, Any]) -> Any:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''兼容事件元数据和旧式事件正文两种工作区变化载荷位置。'''
     metadata = event.get("metadata") or {}
     if isinstance(metadata, dict) and WORKSPACE_CHANGES_METADATA_KEY in metadata:
         return metadata[WORKSPACE_CHANGES_METADATA_KEY]
@@ -73,7 +73,7 @@ def _extract_workspace_changes_payload(event: dict[str, Any]) -> Any:
 
 
 def _without_diff(file: Any) -> Any:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''复制文件变化记录并清空差异文本，保留路径和摘要等元数据。'''
     if not isinstance(file, dict):
         return file
     sanitized = dict(file)

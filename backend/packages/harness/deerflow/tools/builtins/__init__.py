@@ -1,4 +1,4 @@
-"""汇集 DeerFlow 内置工具的公开导出。"""
+'''汇集 DeerFlow 内置工具的公开导出。'''
 
 from .clarification_tool import ask_clarification_tool
 from .present_file_tool import present_file_tool

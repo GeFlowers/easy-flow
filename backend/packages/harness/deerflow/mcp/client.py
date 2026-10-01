@@ -1,4 +1,4 @@
-"""将 MCP 扩展配置转换为客户端所需的服务器连接参数。"""
+'''将 MCP 扩展配置转换为客户端所需的服务器连接参数。'''
 
 import logging
 from typing import Any
@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_server_params(server_name: str, config: McpServerConfig) -> dict[str, Any]:
-    """根据单个 MCP 服务器配置构建对应的连接参数。"""
+    '''根据单个 MCP 服务器配置构建对应的连接参数。'''
     transport_type = config.type or "stdio"
     params: dict[str, Any] = {"transport": transport_type}
 
@@ -33,7 +33,7 @@ def build_server_params(server_name: str, config: McpServerConfig) -> dict[str, 
 
 
 def build_servers_config(extensions_config: ExtensionsConfig) -> dict[str, dict[str, Any]]:
-    """为全部已启用的 MCP 服务器构建客户端连接配置。"""
+    '''为全部已启用的 MCP 服务器构建客户端连接配置。'''
     enabled_servers = extensions_config.get_enabled_mcp_servers()
 
     if not enabled_servers:

@@ -35,6 +35,7 @@ import { cn } from "@/lib/utils";
 import { ChannelProviderIcon } from "./channel-provider-icon";
 import { ChannelRuntimeConfigDialog } from "./channel-runtime-config-dialog";
 
+/** 按服务端原因、启用状态和配置状态生成通道不可用提示。 */
 function getProviderUnavailableReason(
   provider: ChannelProvider,
   t: ReturnType<typeof useI18n>["t"],
@@ -63,6 +64,7 @@ export function WorkspaceChannelsList() {
   );
   const visibleProviders = providers.filter((provider) => provider.enabled);
 
+  /** 启动渠道授权流程并管理预打开窗口，避免浏览器拦截异步弹窗。 */
   const startConnect = (
     provider: ChannelProvider,
     preparedWindow?: Window | null,

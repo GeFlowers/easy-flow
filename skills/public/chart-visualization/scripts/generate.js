@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 
-// Chart type mapping, consistent with src/utils/callTool.ts
+// 图表工具名称到服务端图表类型的映射，与 src/utils/callTool.ts 保持一致。
 const CHART_TYPE_MAP = {
   generate_area_chart: "area",
   generate_bar_chart: "bar",
@@ -169,5 +169,5 @@ if (require.main === module) {
   });
 }
 
-// Export functions for testing
+// 导出函数和类型映射，供其他模块调用。
 module.exports = { generateChartUrl, generateMap, httpPost, CHART_TYPE_MAP };

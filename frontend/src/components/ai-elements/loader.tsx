@@ -5,7 +5,7 @@ type LoaderIconProps = {
   size?: number;
 };
 
-/** LoaderIcon 内部组件：组织对应的界面结构与交互语义。 */
+/** 绘制项目的内联 SVG 加载标志，并按给定尺寸缩放。 */
 const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
   <svg
     height={size}
@@ -80,12 +80,11 @@ const LoaderIcon = ({ size = 16 }: LoaderIconProps) => (
   </svg>
 );
 
-/** LoaderProps 的公开类型定义。 */
 export type LoaderProps = HTMLAttributes<HTMLDivElement> & {
   size?: number;
 };
 
-/** Loader 组件：提供对应的界面结构与交互语义。 */
+/** 将加载标志包装为持续旋转的内联状态指示器。 */
 export const Loader = ({ className, size = 16, ...props }: LoaderProps) => (
   <div
     className={cn(

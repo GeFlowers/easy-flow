@@ -1,9 +1,9 @@
-"""提供配置、suggestions、配置相关功能。"""
+'''控制助手回复完成后是否生成后续问题建议。'''
 
 from pydantic import BaseModel, Field
 
 
 class SuggestionsConfig(BaseModel):
-    """\u6267\u884c SuggestionsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为前端建议问题功能提供统一开关。'''
 
     enabled: bool = Field(default=True, description="Whether to enable follow-up question suggestions at the end of an AI response")

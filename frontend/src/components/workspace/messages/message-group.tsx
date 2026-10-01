@@ -152,6 +152,7 @@ export function MessageGroup({
     toolCallCountByMessageId,
   ]);
 
+  /** 仅在该消息的首个合资格步骤处插入 token 归属摘要。 */
   const renderDebugSummary = (
     messageId: string | undefined,
     stepIndex: number,
@@ -201,6 +202,7 @@ export function MessageGroup({
     );
   };
 
+  /** 为工具步骤补充加载态和可单独归属的 token 调试信息。 */
   const renderToolCall = (
     step: CoTToolCallStep,
     options?: { isLast?: boolean },
@@ -223,6 +225,7 @@ export function MessageGroup({
     );
   };
 
+  /** 将助手可见文本步骤委托给 Markdown 渲染器并保留流式状态。 */
   const renderAssistantText = (step: CoTAssistantTextStep) => (
     <ChainOfThoughtStep
       key={step.id}
@@ -237,6 +240,7 @@ export function MessageGroup({
     ></ChainOfThoughtStep>
   );
 
+  /** 按步骤种类组合调试摘要、推理正文或工具调用视图。 */
   const renderStep = (step: CoTStep) => {
     const stepIndex = steps.indexOf(step);
     if (step.type === "assistantText") {
@@ -387,6 +391,7 @@ export function MessageGroup({
   );
 }
 
+/** 将当前推理步骤的 token 总量格式化为界面文案；无统计时返回不可用提示。 */
 function formatDebugToken(
   debugStep: TokenDebugStep,
   t: ReturnType<typeof useI18n>["t"],
@@ -396,6 +401,7 @@ function formatDebugToken(
     : t.tokenUsage.unavailableShort;
 }
 
+/** 仅在推理用量可单独归属且没有工具调用时，决定是否显示内联统计。 */
 function shouldInlineThinkingToken({
   debugStep,
   toolCallCount,
@@ -422,6 +428,7 @@ function shouldInlineThinkingToken({
   return formatDebugToken(debugStep, t);
 }
 
+/** 将步骤名称与可选用量并排展示，供推理摘要和工具步骤共用。 */
 function DebugStepLabel({
   label,
   token,
@@ -441,6 +448,7 @@ function DebugStepLabel({
   );
 }
 
+/** 按工具类型把调用参数和结果映射为对话中的步骤描述及关联产物操作。 */
 function ToolCall({
   id,
   messageId,
@@ -466,6 +474,7 @@ function ToolCall({
   const tokenLabel = tokenDebugStep
     ? formatDebugToken(tokenDebugStep, t)
     : null;
+  /** 有 token 调试数据时显示步骤标签及用量，否则使用普通工具说明。 */
   const resolveLabel = (fallback: React.ReactNode) =>
     tokenDebugStep ? (
       <DebugStepLabel label={tokenDebugStep.label} token={tokenLabel} />
@@ -736,6 +745,7 @@ interface CoTAssistantTextStep extends GenericCoTStep<"assistantText"> {
 
 type CoTStep = CoTAssistantTextStep | CoTReasoningStep | CoTToolCallStep;
 
+/** 将一组消息按推理、工具调用和助手文本的顺序整理为可渲染步骤。 */
 function convertToSteps(messages: Message[]): CoTStep[] {
   const steps: CoTStep[] = [];
   for (const [messageIndex, message] of messages.entries()) {

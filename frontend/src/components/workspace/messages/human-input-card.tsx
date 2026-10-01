@@ -74,6 +74,7 @@ export function HumanInputCard({
         ? t.humanInput.readOnly
         : null;
 
+  /** 校验当前请求状态后提交答案，并在成功后清空文本输入。 */
   const submitResponse = async (response: HumanInputResponse) => {
     if (isDisabled || !onSubmit) {
       return;
@@ -85,10 +86,12 @@ export function HumanInputCard({
     }
   };
 
+  /** 将所选预设选项转换为结构化答案并提交。 */
   const handleOptionClick = (option: HumanInputOption) => {
     void submitResponse(createHumanInputOptionResponse(request, option));
   };
 
+  /** 校验自由文本非空后构造文本答案并提交。 */
   const handleTextSubmit = (event: { preventDefault(): void }) => {
     event.preventDefault();
     const value = text.trim();
@@ -99,6 +102,7 @@ export function HumanInputCard({
     void submitResponse(createHumanInputTextResponse(request, value));
   };
 
+  /** 在允许提交的快捷键触发时提交文本，并跳过输入法组合阶段。 */
   const handleTextKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (shouldSubmitHumanInputTextOnKeyDown(event, isComposing)) {
       event.preventDefault();

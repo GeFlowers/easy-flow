@@ -1,10 +1,10 @@
-"""提供配置、token、budget、配置相关功能。"""
+'''设置单次智能体运行的总令牌预算、分项上限和警告/停止阈值。'''
 
 from pydantic import BaseModel, Field, model_validator
 
 
 class TokenBudgetConfig(BaseModel):
-    """\u6267\u884c TokenBudgetConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为运行期预算中间件声明强制上限和软警告边界。'''
 
     enabled: bool = Field(default=False, description="Whether to enable per-run token budget enforcement.")
     max_tokens: int = Field(default=200000, ge=1000, description="Maximum total tokens (input + output) allowed per run.")
@@ -15,7 +15,7 @@ class TokenBudgetConfig(BaseModel):
 
     @model_validator(mode="after")
     def validate_thresholds(self) -> "TokenBudgetConfig":
-        """\u6267\u884c validate_thresholds \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''保证强制停止阈值不低于警告阈值，避免配置顺序颠倒。'''
         if self.hard_stop_threshold < self.warn_threshold:
             raise ValueError("hard_stop_threshold must be >= warn_threshold")
         return self

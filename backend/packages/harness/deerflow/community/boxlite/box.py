@@ -1,4 +1,4 @@
-"""定义 box 模块提供的职责与可复用接口。
+'''通过事件循环桥接异步 BoxLite 虚拟机，为同步沙箱接口提供命令、文件和搜索操作。
 
 ``BoxliteBox`` — DeerFlow :class:`Sandbox` backed by a BoxLite micro-VM.
 
@@ -13,7 +13,7 @@ Every operation is a shell command run inside the box (``cat`` / ``find`` /
 ``grep`` / chunked ``base64``), parsed with the shared ``deerflow.sandbox.search``
 helpers — the same exec-driven approach as ``community/e2b_sandbox``. Commands
 use only busybox-portable flags so any OCI image works.
-"""
+'''
 
 from __future__ import annotations
 
@@ -40,14 +40,11 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T")
 
 _MAX_DOWNLOAD_SIZE = 100 * 1024 * 1024  # 100 MB
-# One base64 chunk stays well under Linux MAX_ARG_STRLEN (128 KiB per argv entry),
-# and 60000 is a multiple of 4 so each chunk is a self-contained base64 unit whose
-# decoded bytes concatenate losslessly.
 _B64_CHUNK = 60000
 
 
 class BoxliteBox(Sandbox):
-    """封装 BoxliteBox 的状态、协作关系与公开操作。
+    '''把同步沙箱操作转发到提供方管理的虚拟机，并合并默认及单次调用环境变量。
 
     Adapter that delegates to a running BoxLite ``SimpleBox``.
 
@@ -59,7 +56,7 @@ class BoxliteBox(Sandbox):
                 (blocking the caller thread).
             default_env: Static environment merged into every command, overridden by
                 per-call ``env`` (request-scoped secrets).
-    """
+    '''
 
     TERMINAL_ERROR_MARKERS = (
         "vsock",
@@ -87,7 +84,7 @@ class BoxliteBox(Sandbox):
         default_env: dict[str, str] | None = None,
         on_terminal_failure: Callable[[str, str], None] | None = None,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存虚拟机、异步调用桥和环境变量，并初始化关闭状态与并发锁。'''
         super().__init__(id)
         self._box = box
         self._run = run
@@ -98,7 +95,7 @@ class BoxliteBox(Sandbox):
 
     @classmethod
     def _is_terminal_box_failure(cls, error: Exception) -> bool:
-        "执行 _is_terminal_box_failure 的明确职责，并返回与调用约定一致的结果"
+        '''区分虚拟机终止类连接故障和可稍后重试的暂时性错误。'''
         if isinstance(error, (BrokenPipeError, ConnectionError, EOFError)):
             return True
         if not isinstance(error, RuntimeError | OSError):
@@ -108,7 +105,6 @@ class BoxliteBox(Sandbox):
             return False
         return any(marker in msg for marker in cls.TERMINAL_ERROR_MARKERS)
 
-    # ── bridge helpers ──────────────────────────────────────────────────
 
     def _exec(
         self,
@@ -116,7 +112,7 @@ class BoxliteBox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ):
-        "执行 _exec 的明确职责，并返回与调用约定一致的结果"
+        '''在虚拟机上运行命令，并在终止性故障时通知提供方清理实例。'''
         try:
             with self._lock:
                 if self._closed:
@@ -137,11 +133,11 @@ class BoxliteBox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ):
-        "执行 _sh 的明确职责，并返回与调用约定一致的结果"
+        '''通过虚拟机内的登录 Shell 执行命令文本。'''
         return self._exec("sh", "-lc", script, env=env, timeout=timeout)
 
     def close(self) -> None:
-        "执行 close 的明确职责，并返回与调用约定一致的结果"
+        '''幂等关闭沙箱并请求停止虚拟机；停止失败仅记录警告。'''
         with self._lock:
             if self._closed:
                 return
@@ -153,15 +149,14 @@ class BoxliteBox(Sandbox):
 
     @property
     def is_closed(self) -> bool:
-        "判断条件是否成立并返回布尔结果，并遵守 is_closed 所表达的接口约束"
+        '''在线程锁保护下返回沙箱是否已经关闭。'''
         with self._lock:
             return self._closed
 
-    # ── path safety (mirrors community/e2b_sandbox) ─────────────────────
 
     @staticmethod
     def _guard_traversal(path: str) -> str:
-        "执行 _guard_traversal 的明确职责，并返回与调用约定一致的结果"
+        '''拒绝空路径和任何父目录片段，防止路径越界访问。'''
         if not path:
             raise ValueError("path must be a non-empty string")
         normalized = path.replace("\\", "/")
@@ -171,12 +166,9 @@ class BoxliteBox(Sandbox):
         return normalized
 
     def _resolve_path(self, path: str) -> str:
-        # The provider materialises the /mnt/user-data prefix on the box rootfs,
-        # so DeerFlow's virtual paths are used as-is; we only reject traversal.
-        "执行 _resolve_path 的明确职责，并返回与调用约定一致的结果"
+        '''保留已映射到虚拟机根目录的虚拟路径，仅执行目录穿越检查。'''
         return self._guard_traversal(path)
 
-    # ── command execution ───────────────────────────────────────────────
 
     def execute_command(
         self,
@@ -184,7 +176,7 @@ class BoxliteBox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> str:
-        """执行 execute_command 的明确职责，并返回与调用约定一致的结果。
+        '''在虚拟机中执行 Shell 命令，合并环境变量并将标准输出和错误输出整理为文本。
 
         Run ``command`` through a shell in the box and return its output.
 
@@ -196,8 +188,8 @@ class BoxliteBox(Sandbox):
                 command timeout inside the VM, and the event-loop bridge receives the
                 same value so ``run_coroutine_threadsafe(...).result(timeout)`` cannot
                 block the caller forever if the SDK future itself never resolves.
-        """
-        _validate_extra_env(env)  # POSIX env-var key rule; raises ValueError on a bad key
+        '''
+        _validate_extra_env(env)
         if self.is_closed:
             return "Error: sandbox has been closed"
         merged_env = {**self._default_env, **(env or {})} or None
@@ -217,10 +209,9 @@ class BoxliteBox(Sandbox):
             output = f"Command exited with code {result.exit_code}"
         return output if output else "(no output)"
 
-    # ── file operations ─────────────────────────────────────────────────
 
     def read_file(self, path: str) -> str:
-        "执行 read_file 的明确职责，并返回与调用约定一致的结果"
+        '''读取虚拟机中的指定文件，失败时返回可供代理理解的错误文本。'''
         resolved = self._resolve_path(path)
         try:
             r = self._exec("cat", "--", resolved)
@@ -232,15 +223,15 @@ class BoxliteBox(Sandbox):
         return r.stdout or ""
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
-        "执行 write_file 的明确职责，并返回与调用约定一致的结果"
+        '''将 UTF-8 文本写入指定路径，可选择追加到已有内容后。'''
         self._write_bytes(self._resolve_path(path), content.encode("utf-8"), append=append)
 
     def update_file(self, path: str, content: bytes) -> None:
-        "更新目标状态并返回最新结果，并遵守 update_file 所表达的接口约束"
+        '''用给定字节内容覆盖虚拟机中的指定文件。'''
         self._write_bytes(self._resolve_path(path), content, append=False)
 
     def _write_bytes(self, resolved: str, data: bytes, *, append: bool) -> None:
-        "执行 _write_bytes 的明确职责，并返回与调用约定一致的结果"
+        '''按 Base64 分块传输文件内容，先创建父目录并支持覆盖或追加写入。'''
         parent = posixpath.dirname(resolved)
         if parent:
             mk = self._sh(f"mkdir -p {shlex.quote(parent)}")
@@ -248,7 +239,7 @@ class BoxliteBox(Sandbox):
                 raise OSError(f"cannot create parent of '{resolved}': {(mk.stderr or '').strip()}")
 
         b64 = base64.b64encode(data).decode("ascii")
-        if not b64:  # empty file — create/truncate without piping
+        if not b64:
             r = self._sh(f": {'>>' if append else '>'} {shlex.quote(resolved)}")
             if r.exit_code not in (0, None):
                 raise OSError(f"write '{resolved}' failed: {(r.stderr or '').strip()}")
@@ -264,14 +255,13 @@ class BoxliteBox(Sandbox):
             first = False
 
     def download_file(self, path: str) -> bytes:
-        "执行 download_file 的明确职责，并返回与调用约定一致的结果"
+        '''仅下载用户数据虚拟目录内且未超过大小限制的文件，并解码为原始字节。'''
         normalized = self._guard_traversal(path)
         stripped = normalized.lstrip("/")
         allowed = VIRTUAL_PATH_PREFIX.lstrip("/")
         if stripped != allowed and not stripped.startswith(f"{allowed}/"):
             raise PermissionError(f"Access denied: path must be under '{VIRTUAL_PATH_PREFIX}': '{path}'")
 
-        # Enforce the size cap before buffering the whole payload.
         size_r = self._sh(f"wc -c < {shlex.quote(normalized)}")
         if size_r.exit_code not in (0, None):
             raise OSError(f"cannot read '{path}' from box: {(size_r.stderr or '').strip() or 'not found'}")
@@ -291,7 +281,7 @@ class BoxliteBox(Sandbox):
             raise OSError(f"failed to decode '{path}' from box: {e}") from e
 
     def list_dir(self, path: str, max_depth: int = 2) -> list[str]:
-        "收集并返回，并遵守 list_dir 所表达的接口约束"
+        '''使用 find 列出指定目录深度内的文件和目录，最多返回五百项。'''
         resolved = self._resolve_path(path)
         r = self._sh(f"find {shlex.quote(resolved)} -maxdepth {int(max_depth)} \\( -type f -o -type d \\) 2>/dev/null | head -500")
         return [line.strip() for line in (r.stdout or "").splitlines() if line.strip()]
@@ -304,7 +294,7 @@ class BoxliteBox(Sandbox):
         include_dirs: bool = False,
         max_results: int = 200,
     ) -> tuple[list[str], bool]:
-        "执行 glob 的明确职责，并返回与调用约定一致的结果"
+        '''枚举指定目录下匹配相对路径模式的文件，并返回是否达到结果上限。'''
         resolved = self._resolve_path(path)
         types = ("f", "d") if include_dirs else ("f",)
         type_expr = " -o ".join(f"-type {t}" for t in types)
@@ -339,18 +329,11 @@ class BoxliteBox(Sandbox):
         case_sensitive: bool = False,
         max_results: int = 100,
     ) -> tuple[list[GrepMatch], bool]:
-        # Sanity-check a regex pattern as a Python regex at the boundary (grep uses
-        # POSIX ERE, but this catches gross errors); a literal needs no validation.
-        # grep receives the RAW pattern: -F matches it literally, -E as a regex.
-        "执行 grep 的明确职责，并返回与调用约定一致的结果"
+        '''在虚拟机文件中递归搜索文本，将匹配行转换为统一结果并应用路径过滤。'''
         if not literal:
             re.compile(pattern, 0 if case_sensitive else re.IGNORECASE)
 
         resolved = self._resolve_path(path)
-        # busybox+GNU-portable flags: -r recursive (also prints the filename),
-        # -n line numbers, -I skip binary, -E/-F regex vs fixed. --include and -m
-        # are omitted for busybox portability; glob-scoping and the result cap are
-        # applied in Python below.
         flags = ["-r", "-n", "-I"]
         if not case_sensitive:
             flags.append("-i")

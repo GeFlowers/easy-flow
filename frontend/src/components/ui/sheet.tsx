@@ -6,33 +6,33 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-/** Sheet 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理侧边抽屉弹层的打开状态及焦点行为。 */
 function Sheet({ ...props }: React.ComponentProps<typeof SheetPrimitive.Root>) {
   return <SheetPrimitive.Root data-slot="sheet" {...props} />;
 }
 
-/** SheetTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 将按钮或其他元素注册为打开抽屉的触发器。 */
 function SheetTrigger({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Trigger>) {
   return <SheetPrimitive.Trigger data-slot="sheet-trigger" {...props} />;
 }
 
-/** SheetClose 内部组件：组织对应的界面结构与交互语义。 */
+/** 将子元素注册为关闭当前抽屉的控件。 */
 function SheetClose({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Close>) {
   return <SheetPrimitive.Close data-slot="sheet-close" {...props} />;
 }
 
-/** SheetPortal 内部组件：组织对应的界面结构与交互语义。 */
+/** 将抽屉内容放到页面根层，避开父级裁剪和层叠上下文。 */
 function SheetPortal({
   ...props
 }: React.ComponentProps<typeof SheetPrimitive.Portal>) {
   return <SheetPrimitive.Portal data-slot="sheet-portal" {...props} />;
 }
 
-/** SheetOverlay 内部组件：组织对应的界面结构与交互语义。 */
+/** 在抽屉后方绘制随打开状态渐变的半透明遮罩。 */
 function SheetOverlay({
   className,
   ...props
@@ -49,7 +49,7 @@ function SheetOverlay({
   );
 }
 
-/** SheetContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 按指定边缘滑入抽屉面板，并提供遮罩及默认关闭按钮。 */
 function SheetContent({
   className,
   children,
@@ -87,7 +87,7 @@ function SheetContent({
   );
 }
 
-/** SheetHeader 内部组件：组织对应的界面结构与交互语义。 */
+/** 纵向排列抽屉标题及其说明，并应用统一内边距。 */
 function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -98,7 +98,7 @@ function SheetHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** SheetFooter 内部组件：组织对应的界面结构与交互语义。 */
+/** 将抽屉操作区推至内容底部并纵向排列按钮。 */
 function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -109,7 +109,7 @@ function SheetFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** SheetTitle 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供抽屉面板的可访问标题和强调样式。 */
 function SheetTitle({
   className,
   ...props
@@ -123,7 +123,7 @@ function SheetTitle({
   );
 }
 
-/** SheetDescription 内部组件：组织对应的界面结构与交互语义。 */
+/** 为抽屉标题提供辅助说明文本。 */
 function SheetDescription({
   className,
   ...props

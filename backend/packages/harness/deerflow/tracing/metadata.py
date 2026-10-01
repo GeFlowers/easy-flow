@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''为 Langfuse 追踪补充会话、用户、模型、环境和 DeerFlow 请求关联标识。'''
 
 from __future__ import annotations
 
@@ -7,8 +7,7 @@ from typing import Any
 from deerflow.config import get_enabled_tracing_providers
 from deerflow.trace_context import DEERFLOW_TRACE_METADATA_KEY, get_current_trace_id, normalize_trace_id
 
-# Lazy-imported below to avoid a circular import: ``deerflow.runtime`` eagerly
-# imports the run worker, which in turn needs ``deerflow.tracing``.
+# 延迟导入运行时用户上下文，避免 runtime 加载运行工作器时反向导入 tracing 形成循环依赖。
 _DEFAULT_TRACE_NAME = "lead-agent"
 
 
@@ -21,7 +20,7 @@ def build_langfuse_trace_metadata(
     environment: str | None = None,
     deerflow_trace_id: str | None = None,
 ) -> dict[str, Any]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''追踪启用时生成 Langfuse 元数据；关闭时返回空字典，不影响普通调用。'''
     if "langfuse" not in get_enabled_tracing_providers():
         return {}
 
@@ -57,7 +56,7 @@ def inject_langfuse_metadata(
     environment: str | None = None,
     deerflow_trace_id: str | None = None,
 ) -> None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''将生成的 Langfuse 元数据合并进调用配置，保留调用方显式设置的值。'''
     langfuse_metadata = build_langfuse_trace_metadata(
         thread_id=thread_id,
         user_id=user_id,

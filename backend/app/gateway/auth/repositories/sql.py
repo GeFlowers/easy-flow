@@ -1,9 +1,9 @@
-"""由 SQLAlchemy 支持的 ``UserRepository`` 实现。
+'''由 SQLAlchemy 支持的 ``UserRepository`` 实现。
 
 该仓储使用 ``deerflow.persistence.engine`` 的共享异步会话工厂，``users`` 表
 与 ``threads_meta``、``runs``、``run_events`` 和 ``feedback`` 共用数据库。
 调用方须在 ``init_engine_from_config()`` 后传入会话工厂构造本仓储。
-"""
+'''
 
 from __future__ import annotations
 
@@ -20,17 +20,17 @@ from deerflow.persistence.user.model import UserRow
 
 
 class SQLUserRepository(UserRepository):
-    """由共享 SQLAlchemy 引擎支持的异步用户仓储。"""
+    '''由共享 SQLAlchemy 引擎支持的异步用户仓储。'''
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
-        """保存用于创建独立异步数据库会话的会话工厂。"""
+        '''保存用于创建独立异步数据库会话的会话工厂。'''
         self._sf = session_factory
 
     # ── 模型转换 ──────────────────────────────────────────────────────
 
     @staticmethod
     def _row_to_user(row: UserRow) -> User:
-        """将持久化 ``UserRow`` 转换为应用层 ``User`` 模型。"""
+        '''将持久化 ``UserRow`` 转换为应用层 ``User`` 模型。'''
         return User(
             id=UUID(row.id),
             email=row.email,
@@ -46,7 +46,7 @@ class SQLUserRepository(UserRepository):
 
     @staticmethod
     def _user_to_row(user: User) -> UserRow:
-        """将应用层 ``User`` 模型转换为可持久化的 ``UserRow``。"""
+        '''将应用层 ``User`` 模型转换为可持久化的 ``UserRow``。'''
         return UserRow(
             id=str(user.id),
             email=user.email,
@@ -62,7 +62,7 @@ class SQLUserRepository(UserRepository):
     # ── 增删改查 ──────────────────────────────────────────────────────
 
     async def create_user(self, user: User) -> User:
-        """插入新用户；邮箱重复时抛出 ``ValueError``。"""
+        '''插入新用户；邮箱重复时抛出 ``ValueError``。'''
         row = self._user_to_row(user)
         async with self._sf() as session:
             session.add(row)
@@ -74,13 +74,13 @@ class SQLUserRepository(UserRepository):
         return user
 
     async def get_user_by_id(self, user_id: str) -> User | None:
-        """按用户 ID 查询并转换用户；不存在时返回 ``None``。"""
+        '''按用户 ID 查询并转换用户；不存在时返回 ``None``。'''
         async with self._sf() as session:
             row = await session.get(UserRow, user_id)
             return self._row_to_user(row) if row is not None else None
 
     async def get_user_by_email(self, email: str) -> User | None:
-        """按邮箱查询并转换用户；不存在时返回 ``None``。"""
+        '''按邮箱查询并转换用户；不存在时返回 ``None``。'''
         stmt = select(UserRow).where(UserRow.email == email)
         async with self._sf() as session:
             result = await session.execute(stmt)
@@ -88,7 +88,7 @@ class SQLUserRepository(UserRepository):
             return self._row_to_user(row) if row is not None else None
 
     async def update_user(self, user: User) -> User:
-        """更新用户行；若行已被并发删除则明确抛出 ``UserNotFoundError``。"""
+        '''更新用户行；若行已被并发删除则明确抛出 ``UserNotFoundError``。'''
         async with self._sf() as session:
             row = await session.get(UserRow, str(user.id))
             if row is None:
@@ -107,19 +107,19 @@ class SQLUserRepository(UserRepository):
         return user
 
     async def count_users(self) -> int:
-        """统计用户表中的全部用户数量。"""
+        '''统计用户表中的全部用户数量。'''
         stmt = select(func.count()).select_from(UserRow)
         async with self._sf() as session:
             return await session.scalar(stmt) or 0
 
     async def count_admin_users(self) -> int:
-        """统计角色为管理员的用户数量。"""
+        '''统计角色为管理员的用户数量。'''
         stmt = select(func.count()).select_from(UserRow).where(UserRow.system_role == "admin")
         async with self._sf() as session:
             return await session.scalar(stmt) or 0
 
     async def get_user_by_oauth(self, provider: str, oauth_id: str) -> User | None:
-        """按 OAuth 提供者和其用户标识查询用户；不存在时返回 ``None``。"""
+        '''按 OAuth 提供者和其用户标识查询用户；不存在时返回 ``None``。'''
         stmt = select(UserRow).where(UserRow.oauth_provider == provider, UserRow.oauth_id == oauth_id)
         async with self._sf() as session:
             result = await session.execute(stmt)

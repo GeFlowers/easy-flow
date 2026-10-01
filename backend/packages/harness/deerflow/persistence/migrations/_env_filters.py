@@ -1,8 +1,7 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
-# Tables owned by LangGraph -- alembic must never propose DDL for them.
 LANGGRAPH_OWNED_TABLES: frozenset[str] = frozenset(
     {
         "checkpoints",
@@ -14,7 +13,7 @@ LANGGRAPH_OWNED_TABLES: frozenset[str] = frozenset(
 
 
 def include_object(object_, name, type_, reflected, compare_to):  # noqa: ARG001
-    """阻止 Alembic 将 LangGraph 自主管理的检查点表纳入迁移差异。"""
+    '''阻止 Alembic 将 LangGraph 自主管理的检查点表纳入迁移差异。'''
     if type_ == "table" and name in LANGGRAPH_OWNED_TABLES:
         return False
     parent_table = getattr(object_, "table", None)

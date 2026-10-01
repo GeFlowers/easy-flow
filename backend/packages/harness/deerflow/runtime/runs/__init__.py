@@ -1,6 +1,6 @@
-"""
+'''
 
-Run lifecycle management for LangGraph Platform API compatibility."""
+Run lifecycle management for LangGraph Platform API compatibility.'''
 
 from .manager import CancelOutcome, ConflictError, RunManager, RunRecord, UnsupportedStrategyError
 from .schemas import DisconnectMode, RunStatus

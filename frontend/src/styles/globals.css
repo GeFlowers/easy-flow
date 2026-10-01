@@ -3,59 +3,59 @@
 
 @source "../node_modules/streamdown/dist/index.js";
 
-/* Heading */
+/* 标题 */
 @source inline("text-{xs,sm,base,lg,xl,2xl,3xl,4xl,5xl,6xl}");
 @source inline("font-{normal,medium,semibold,bold,extrabold}");
 @source inline("leading-{none,tight,snug,normal,relaxed,loose}");
 
-/* Spacing */
+/* 间距 */
 @source inline("m{t,b,l,r,x,y}-{0,1,2,3,4,5,6,8,10,12,16,20,24}");
 @source inline("p{t,b,l,r,x,y}-{0,1,2,3,4,5,6,8,10,12,16,20,24}");
 @source inline("space-{x,y}-{1,2,3,4,5,6,8}");
 
-/* List */
+/* 列表 */
 @source inline("list-{disc,decimal,none,inside,outside}");
 
-/* Text */
+/* 文本 */
 @source inline("text-{left,center,right,justify}");
 @source inline("text-{slate,gray,zinc,neutral,stone}-{50,100,200,300,400,500,600,700,800,900,950}");
 @source inline("italic");
 @source inline("underline");
 @source inline("line-through");
 
-/* Code */
+/* 代码 */
 @source inline("font-mono");
 @source inline("bg-{slate,gray,zinc,muted}-{50,100,200}");
 @source inline("rounded{,-sm,-md,-lg,-xl}");
 @source inline("border{,-2,-4}");
 @source inline("border-{slate,gray,zinc,border}-{200,300}");
 
-/* Blockquote */
+/* 引用块 */
 @source inline("border-l-{2,4}");
 @source inline("border-l-{slate,gray,primary}-{300,400,500}");
 
-/* Link */
+/* 链接 */
 @source inline("text-{blue,primary,accent}-{500,600,700}");
 @source inline("hover:text-{blue,primary,accent}-{600,700,800}");
 @source inline("hover:underline");
 
-/* Table */
+/* 表格 */
 @source inline("border-collapse");
 @source inline("table-auto");
 @source inline("w-full");
 @source inline("divide-{x,y}");
 @source inline("divide-{slate,gray,border}-{200,300}");
 
-/* Image */
+/* 图像 */
 @source inline("max-w-{xs,sm,md,lg,xl,2xl,full}");
 @source inline("h-auto");
 @source inline("object-cover");
 
-/* Horizontal Rule */
+/* 分隔线 */
 @source inline("border-t");
 @source inline("border-{slate,gray,border}-{200,300}");
 
-/* General */
+/* 通用样式 */
 @source inline("block");
 @source inline("inline");
 @source inline("inline-block");
@@ -63,7 +63,7 @@
 @source inline("overflow-{auto,hidden,x-auto}");
 @source inline("whitespace-pre-wrap");
 
-/* Shadcn Colors */
+/* Shadcn 颜色变量 */
 @source inline("text-{foreground,muted-foreground,primary,secondary,accent}");
 @source inline("bg-{background,muted,primary,secondary,accent}");
 @source inline("border-{border,input}");
@@ -383,11 +383,9 @@
     text-fill-color: transparent;
   }
 
-  /* KaTeX rendering polish for chat messages.
-     Keep this narrowly scoped to KaTeX classes so normal Markdown text is not
-     affected. Display equations can be wider than the chat column; horizontal
-     scrolling is safer than wrapping/corrupting matrices, aligned equations, or
-     long PGD/DDPM expressions. */
+  /* 优化聊天消息中的 KaTeX 公式显示。
+     样式仅作用于 KaTeX 类，避免影响普通 Markdown 文本。显示公式可能宽于聊天列，
+     使用横向滚动比强制换行更安全，避免矩阵、对齐公式或较长表达式变形。 */
   .katex {
     font-size: 1.02em;
     line-height: 1.35;

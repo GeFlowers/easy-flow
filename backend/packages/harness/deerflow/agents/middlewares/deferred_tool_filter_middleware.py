@@ -1,4 +1,4 @@
-"""定义 deferred_tool_filter_middleware 模块提供的职责与可复用接口。
+'''工具搜索启用时，在模型发现工具前隐藏其参数结构并阻止提前调用。
 
 Middleware to filter deferred tool schemas from model binding.
 
@@ -12,7 +12,7 @@ The deferred name set and the catalog hash are injected at construction time
 (no ContextVar). Promotion state is read from graph state (``state["promoted"]``),
 scoped by catalog hash so a stale persisted promotion cannot expose a renamed
 or drifted tool.
-"""
+'''
 
 import logging
 from collections.abc import Awaitable, Callable
@@ -29,34 +29,34 @@ logger = logging.getLogger(__name__)
 
 
 class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
-    """封装 DeferredToolFilterMiddleware 的状态、协作关系与公开操作。
+    '''按工具目录版本筛选模型可见工具，并拦截尚未提升的延迟工具调用。
 
     Hide deferred tool schemas from the bound model until promoted.
 
         ToolNode still holds all tools (including deferred) for execution routing,
         but the LLM only sees active tool schemas plus tools that have already been
         promoted (recorded in ``state["promoted"]`` under the current catalog hash).
-    """
+    '''
 
     def __init__(self, deferred_names: frozenset[str], catalog_hash: str | None):
-        """使用延迟工具名称集合及其目录版本标识初始化过滤器。"""
+        '''使用延迟工具名称集合及其目录版本标识初始化过滤器。'''
         super().__init__()
         self._deferred = deferred_names
         self._catalog_hash = catalog_hash
 
     def _promoted(self, state) -> set[str]:
-        """从当前目录版本对应的状态中取得已提升工具名称。"""
+        '''从当前目录版本对应的状态中取得已提升工具名称。'''
         promoted = (state or {}).get("promoted")
         if promoted and promoted.get("catalog_hash") == self._catalog_hash:
             return set(promoted.get("names") or [])
         return set()
 
     def _hidden(self, state) -> set[str]:
-        """计算当前仍应对模型隐藏的延迟工具名称。"""
+        '''计算当前仍应对模型隐藏的延迟工具名称。'''
         return set(self._deferred) - self._promoted(state)
 
     def _filter_tools(self, request: ModelRequest) -> ModelRequest:
-        """从模型请求中移除尚未提升的延迟工具 schema。"""
+        '''从模型请求中移除尚未提升的延迟工具 schema。'''
         if not self._deferred:
             return request
         hide = self._hidden(request.state)
@@ -68,7 +68,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         return request.override(tools=active)
 
     def _blocked_tool_message(self, request: ToolCallRequest) -> ToolMessage | None:
-        """为尚未提升的延迟工具调用生成阻止消息，或返回 None。"""
+        '''为尚未提升的延迟工具调用生成阻止消息，或返回 None。'''
         if not self._deferred:
             return None
         name = str(request.tool_call.get("name") or "")
@@ -88,7 +88,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        """过滤同步模型调用可见的工具后执行后续处理器。"""
+        '''过滤同步模型调用可见的工具后执行后续处理器。'''
         return handler(self._filter_tools(request))
 
     @override
@@ -97,7 +97,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """阻止未提升的工具调用，其余调用交由后续处理器执行。"""
+        '''阻止未提升的工具调用，其余调用交由后续处理器执行。'''
         blocked = self._blocked_tool_message(request)
         if blocked is not None:
             return blocked
@@ -109,7 +109,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        """过滤异步模型调用可见的工具后等待后续处理器执行。"""
+        '''过滤异步模型调用可见的工具后等待后续处理器执行。'''
         return await handler(self._filter_tools(request))
 
     @override
@@ -118,7 +118,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        """异步阻止未提升的工具调用，或等待后续处理器执行。"""
+        '''异步阻止未提升的工具调用，或等待后续处理器执行。'''
         blocked = self._blocked_tool_message(request)
         if blocked is not None:
             return blocked

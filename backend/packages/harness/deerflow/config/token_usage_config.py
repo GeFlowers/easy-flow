@@ -1,9 +1,9 @@
-"""提供配置、token、usage、配置相关功能。"""
+'''控制运行期间的模型令牌用量统计中间件。'''
 
 from pydantic import BaseModel, Field
 
 
 class TokenUsageConfig(BaseModel):
-    """\u6267\u884c TokenUsageConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''指定是否收集并附加每次运行的令牌用量数据。'''
 
     enabled: bool = Field(default=True, description="Enable token usage tracking middleware")

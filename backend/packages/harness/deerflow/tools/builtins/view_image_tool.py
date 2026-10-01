@@ -1,4 +1,4 @@
-"""提供工具、builtins、view、图像、tool相关功能。"""
+'''实现受线程目录限制的图像读取工具，并校验格式、内容签名和文件大小。'''
 
 import mimetypes
 from pathlib import Path
@@ -28,12 +28,12 @@ _EXTENSION_TO_MIME = {
 
 
 def _is_allowed_image_virtual_path(image_path: str) -> bool:
-    """\u6267\u884c _is_allowed_image_virtual_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''仅接受工作区、上传和产物目录下的虚拟图像路径。'''
     return any(image_path == root or image_path.startswith(f"{root}/") for root in _ALLOWED_IMAGE_VIRTUAL_ROOTS)
 
 
 def _detect_image_mime(image_data: bytes) -> str | None:
-    """\u6267\u884c _detect_image_mime \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''根据文件头识别支持的图像格式，避免仅信任扩展名。'''
     if image_data.startswith(b"\xff\xd8\xff"):
         return "image/jpeg"
     if image_data.startswith(b"\x89PNG\r\n\x1a\n"):
@@ -44,7 +44,7 @@ def _detect_image_mime(image_data: bytes) -> str | None:
 
 
 def _sanitize_image_error(error: Exception, thread_data: ThreadDataState | None) -> str:
-    """\u6267\u884c _sanitize_image_error \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''屏蔽异常文本中的宿主机路径后再返回给模型。'''
     from deerflow.sandbox.tools import mask_local_paths_in_output
 
     return mask_local_paths_in_output(f"{type(error).__name__}: {error}", thread_data)
@@ -56,7 +56,7 @@ def view_image_tool(
     image_path: str,
     tool_call_id: Annotated[str, InjectedToolCallId],
 ) -> Command:
-    """读取图片文件并返回可供模型分析的图像内容。
+    '''读取图片文件并返回可供模型分析的图像内容。
 
     Use this tool to read an image file and make it available for display.
 
@@ -69,7 +69,7 @@ def view_image_tool(
 
     Args:
         image_path: Absolute /mnt/user-data virtual path to the image file. Common formats supported: jpg, jpeg, png, webp.
-    """
+    '''
     from deerflow.sandbox.exceptions import SandboxRuntimeError
     from deerflow.sandbox.tools import (
         get_thread_data,

@@ -78,10 +78,7 @@ This turns the agent from a text generator into a system that can do work. Inste
 
 Isolation is important because execution should be reproducible and controllable. The sandbox is the reason DeerFlow can support genuine action rather than only conversation.
 
-Two modes are available:
-
-- **LocalSandbox**: commands run directly on the host. Suitable for trusted, single-user local workflows.
-- **Container-based sandbox**: commands run in an isolated container (Docker or Apple Container). Suitable for multi-user environments and production deployments.
+The default **LocalSandbox** runs commands through the Gateway host and is intended for trusted, single-user workflows. Optional BoxLite and E2B providers offer VM-backed execution when stronger isolation is needed.
 
 ## Context engineering keeps long tasks tractable
 

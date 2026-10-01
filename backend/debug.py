@@ -1,5 +1,10 @@
 #!/usr/bin/env python
-'定义 debug 模块提供的职责与可复用接口。\n\n\nDebug script for lead_agent.\nRun this file directly in VS Code with breakpoints.\n\nRequirements:\n    Run with `uv run` from the backend/ directory so that the uv workspace\n    resolves deerflow-harness and app packages correctly:\n\n        cd backend && PYTHONPATH=. uv run python debug.py\n\nUsage:\n    1. Set breakpoints in agent.py or other files\n    2. Press F5 or use "Run and Debug" panel\n    3. Input messages in the terminal to interact with the agent\n'
+'''提供可在终端交互的主智能体调试入口。
+
+从 ``backend/`` 目录运行时会加载项目环境、初始化工具并创建主智能体，随后逐条
+读取输入、打印回复及本轮新生成的文件路径。运行日志统一写入当前目录的
+``debug.log``，便于本地调试时检查完整过程。
+'''
 
 import asyncio
 import logging
@@ -21,7 +26,11 @@ _LOG_DATEFMT = "%Y-%m-%d %H:%M:%S"
 
 
 def _setup_logging(log_level: int = logging.INFO) -> None:
-    "执行 _setup_logging 的明确职责，并返回与调用约定一致的结果。\n\nRoute logs to ``debug.log`` using *log_level* for the initial root/file setup.\n\n    This configures the root logger and the ``debug.log`` file handler so logs do\n    not print on the interactive console. It is idempotent: any pre-existing\n    handlers on the root logger (e.g. installed by ``logging.basicConfig`` in\n    transitively imported modules) are removed so the debug session output only\n    lands in ``debug.log``.\n\n    Note: later config-driven logging adjustments may change named logger\n    verbosity without raising the root logger or file-handler thresholds set\n    here, so the eventual contents of ``debug.log`` may not be filtered solely by\n    this function's ``log_level`` argument.\n    "
+    '''将根日志器的现有处理器替换为写入 debug.log 的文件处理器。
+
+    文件和根日志级别由 ``log_level`` 初始化；清理旧处理器可避免日志输出到交互
+    终端。后续配置可以调整具名日志器级别，但不会自动改变这里设置的文件处理器级别。
+    '''
     root = logging.root
     for h in list(root.handlers):
         root.removeHandler(h)
@@ -35,9 +44,8 @@ def _setup_logging(log_level: int = logging.INFO) -> None:
 
 
 async def main():
-    # Install file logging first so warnings emitted while loading config do not
-    # leak onto the interactive terminal via Python's lastResort handler.
-    '执行 main 的明确职责，并返回与调用约定一致的结果'
+    # 先安装文件日志，避免加载配置期间的警告落到交互终端。
+    '''初始化运行配置和工具，创建主智能体并处理逐轮交互输入。'''
     _setup_logging()
 
     from deerflow.config import get_app_config
@@ -46,10 +54,7 @@ async def main():
     app_config = get_app_config()
     apply_logging_level(app_config.log_level)
 
-    # Delay the rest of the deerflow imports until *after* logging is installed
-    # so that any import-time side effects (e.g. deerflow.agents starts a
-    # background skill-loader thread on import) emit logs to debug.log instead
-    # of leaking onto the interactive terminal via Python's lastResort handler.
+    # 延后导入运行时模块，使导入期间产生的日志也写入调试文件。
     from langchain_core.messages import HumanMessage
     from langgraph.runtime import Runtime
 
@@ -58,19 +63,19 @@ async def main():
     from deerflow.mcp import initialize_mcp_tools
     from deerflow.runtime.user_context import get_effective_user_id
 
-    # Initialize MCP tools at startup
+    # 启动时连接并注册已配置的 MCP 工具。
     try:
         await initialize_mcp_tools()
     except Exception as e:
         print(f"Warning: Failed to initialize MCP tools: {e}")
 
-    # Create agent with default config
+    # 使用专用调试线程标识和调试选项创建本轮运行配置。
     config = {
         "configurable": {
             "thread_id": "debug-thread-001",
             "thinking_enabled": True,
             "is_plan_mode": True,
-            # Uncomment to use a specific model
+            # 如需调试其他模型，可在此设置模型名称。
             "model_name": "kimi-k2.5",
         }
     }
@@ -104,16 +109,16 @@ async def main():
                 print("Goodbye!")
                 break
 
-            # Invoke the agent
+            # 将用户输入交给主智能体执行一轮。
             state = {"messages": [HumanMessage(content=user_input)]}
             result = await agent.ainvoke(state, config=config)
 
-            # Print the response
+            # 输出本轮最后一条智能体消息。
             if result.get("messages"):
                 last_message = result["messages"][-1]
                 print(f"\nAgent: {last_message.content}")
 
-            # Show files presented to the user this turn (new artifacts only)
+            # 只展示此前未报告过的产物，并解析其虚拟路径对应的本地位置。
             artifacts = result.get("artifacts") or []
             new_artifacts = [p for p in artifacts if p not in seen_artifacts]
             if new_artifacts:

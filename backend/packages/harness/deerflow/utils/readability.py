@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''将网页 HTML 正文提取为文章对象，并转换为 Markdown 或多模态消息。'''
 
 import logging
 import re
@@ -12,17 +12,17 @@ logger = logging.getLogger(__name__)
 
 
 class Article:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''保存网页标题和正文 HTML，供摘要工具选择不同输出格式。'''
 
     url: str
 
     def __init__(self, title: str, html_content: str):
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''将正文 HTML 转成 Markdown，可按需在开头加入文章标题。'''
         self.title = title
         self.html_content = html_content
 
     def to_markdown(self, including_title: bool = True) -> str:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''把 Markdown 中的图片链接拆成文本块和图片块供多模态模型读取。'''
         markdown = ""
         if including_title:
             markdown += f"# {self.title}\n\n"
@@ -35,7 +35,7 @@ class Article:
         return markdown
 
     def to_message(self) -> list[dict]:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''将 Markdown 正文拆分为文本和图片块，并把相对图片地址解析为绝对地址。'''
         image_pattern = r"!\[.*?\]\((.*?)\)"
 
         content: list[dict[str, str]] = []
@@ -55,7 +55,7 @@ class Article:
                 if text_part:
                     content.append({"type": "text", "text": text_part})
 
-                # ????????????????
+                # 普通 Markdown 片段以文本块保留，图片 URL 则在上方单独转换。
         if not content:
             content = [{"type": "text", "text": "No content available"}]
 
@@ -63,10 +63,10 @@ class Article:
 
 
 class ReadabilityExtractor:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''优先使用 Readability 提取正文，外部解析器失败时回退到纯 Python 提取。'''
 
     def extract_article(self, html: str) -> Article:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''调用 Readability 提取网页正文；命令或依赖故障时使用纯 Python 模式重试。'''
         try:
             article = simple_json_from_html_string(html, use_readability=True)
         except (subprocess.CalledProcessError, FileNotFoundError) as exc:

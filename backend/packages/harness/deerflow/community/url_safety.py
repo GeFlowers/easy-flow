@@ -1,6 +1,4 @@
-"""定义 url_safety 模块提供的职责与可复用接口。
-
-Shared URL safety checks for server-side web tools."""
+'''为服务端网页工具提供统一的网址和目标地址安全校验。'''
 
 from __future__ import annotations
 
@@ -13,9 +11,7 @@ _BLOCKED_HOSTNAMES = {"localhost", "metadata.google.internal"}
 
 
 def resolve_host_addresses(hostname: str) -> list[ipaddress._BaseAddress]:
-    """执行 resolve_host_addresses 的明确职责，并返回与调用约定一致的结果。
-
-    Resolve a hostname to all IP addresses for SSRF screening."""
+    '''解析主机名对应的所有地址，供后续检查是否指向受限网络。'''
     addresses: list[ipaddress._BaseAddress] = []
     try:
         infos = socket.getaddrinfo(hostname, None)
@@ -31,9 +27,7 @@ def resolve_host_addresses(hostname: str) -> list[ipaddress._BaseAddress]:
 
 
 def is_blocked_address(address: ipaddress._BaseAddress) -> bool:
-    """判断条件是否成立并返回布尔结果，并遵守 is_blocked_address 所表达的接口约束。
-
-    Return True for addresses web tools should not reach by default."""
+    '''判断地址是否属于默认禁止访问的私有、环回、保留或特殊用途范围。'''
     return address.is_private or address.is_loopback or address.is_link_local or address.is_reserved or address.is_multicast or address.is_unspecified
 
 
@@ -44,15 +38,11 @@ def validate_public_http_url(
     action: str = "fetch",
     resolver: Callable[[str], list[ipaddress._BaseAddress]] | None = None,
 ) -> str | None:
-    """校验输入并在约束不满足时报告错误，并遵守 validate_public_http_url 所表达的接口约束。
+    '''在服务端抓取前检查协议、主机名解析和地址范围，拦截访问内网的请求。
 
-    Validate an http(s) URL before a server-side web tool fetches it.
-
-        Returns an ``"Error: ..."`` string when the URL should be rejected, or
-        ``None`` when the caller may proceed.  The check is intentionally conservative
-        for self-hosted fetch/render services because those services run inside the
-        deployment network and can otherwise reach cloud metadata or private hosts.
-    """
+    返回拒绝原因字符串表示网址不允许访问；返回 ``None`` 表示可以继续请求。
+    自托管抓取服务运行在部署网络内，因此此检查默认阻止云元数据和私有地址。
+    '''
     parsed = urlparse(url)
     if parsed.scheme not in {"http", "https"} or not parsed.netloc:
         return "Error: Only http:// and https:// URLs are supported"

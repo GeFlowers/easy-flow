@@ -1,6 +1,6 @@
-"""定义 security_static_scanner 模块提供的职责与可复用接口。
+'''保留旧模块路径，并从原生技能扫描器重新导出兼容类型与函数。
 
-Compatibility exports for the native SkillScan implementation."""
+Compatibility exports for the native SkillScan implementation.'''
 
 from deerflow.skills.skillscan import (
     SecurityFinding as StaticFinding,

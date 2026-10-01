@@ -1,17 +1,14 @@
 #!/usr/bin/env bash
 # chat.sh — 向 DeerFlow 发送消息并收集流式响应。
-#
 # 用法：
-#   bash chat.sh "Your question here"
-#   bash chat.sh "Your question" <thread_id>          # continue conversation
-#   bash chat.sh "Your question" "" pro                # specify mode
-#   DEERFLOW_URL=http://host:2026 bash chat.sh "hi"   # custom endpoint
-#
+#   bash chat.sh "你的问题"
+#   bash chat.sh "你的问题" <thread_id>          # 继续已有会话
+#   bash chat.sh "你的问题" "" pro                # 指定运行模式
+#   DEERFLOW_URL=http://host:2026 bash chat.sh "你好"   # 指定服务地址
 # 环境变量：
 #   DEERFLOW_URL          — 统一代理基地址（默认：http://localhost:2026）
-#   DEERFLOW_GATEWAY_URL  — Gateway API 基地址（默认：$DEERFLOW_URL）
-#   DEERFLOW_LANGGRAPH_URL — LangGraph API 基地址（默认：$DEERFLOW_URL/api/langgraph）
-#
+#   DEERFLOW_GATEWAY_URL  — 网关接口基地址（默认：$DEERFLOW_URL）
+#   DEERFLOW_LANGGRAPH_URL — LangGraph 接口基地址（默认：$DEERFLOW_URL/api/langgraph）
 # 模式：flash、standard、pro（默认）、ultra
 
 set -euo pipefail
@@ -90,7 +87,7 @@ ENDJSON
 )
 
 # --- 流式执行并提取最终响应 ---
-# 收集完整 SSE 输出，再解析最后一个 values 事件以取得 AI 响应。
+# 收集完整 SSE 输出，再解析最后一个 values 事件以取得智能体响应。
 TMPFILE=$(mktemp)
 trap "rm -f '$TMPFILE'" EXIT
 
@@ -98,7 +95,7 @@ curl -s -N -X POST "${LANGGRAPH_URL}/threads/${THREAD_ID}/runs/stream" \
   -H "Content-Type: application/json" \
   -d "$BODY" > "$TMPFILE"
 
-# 解析 SSE 输出：提取最后一个 "event: values" 数据块并取得最终 AI 消息。
+# 解析 SSE 输出：提取最后一个 "event: values" 数据块并取得最终智能体消息。
 python3 - "$TMPFILE" "$GATEWAY_URL" "$THREAD_ID" << 'PYEOF'
 import json
 import sys
@@ -112,7 +109,7 @@ if not sse_file:
 with open(sse_file, "r") as f:
     raw = f.read()
 
-# Parse SSE events
+# 解析 SSE 事件。
 events = []
 current_event = None
 current_data_lines = []
@@ -131,24 +128,24 @@ for line in raw.split("\n"):
         current_event = None
         current_data_lines = []
 
-# Flush remaining
+# 处理缓冲区中剩余的数据。
 if current_event and current_data_lines:
     events.append((current_event, "\n".join(current_data_lines)))
 
 import posixpath
 
 def extract_response_text(messages):
-    """Mirror manager.py _extract_response_text: handles ask_clarification interrupt + regular AI."""
+    """与 manager.py 中的 _extract_response_text 保持一致，提取澄清中断或普通智能体消息。"""
     for msg in reversed(messages):
         if not isinstance(msg, dict):
             continue
         msg_type = msg.get("type")
-        # ask_clarification interrupt: tool message with name ask_clarification
+        # 处理 ask_clarification 中断：工具消息的名称为 ask_clarification。
         if msg_type == "tool" and msg.get("name") == "ask_clarification":
             content = msg.get("content", "")
             if isinstance(content, str) and content:
                 return content
-        # Regular AI message
+        # 处理普通智能体消息。
         if msg_type == "ai":
             content = msg.get("content", "")
             if isinstance(content, str) and content:
@@ -166,7 +163,7 @@ def extract_response_text(messages):
     return ""
 
 def extract_artifacts(messages):
-    """Mirror manager.py _extract_artifacts: only artifacts from the last response cycle."""
+    """与 manager.py 中的 _extract_artifacts 保持一致，只提取最近一次响应产生的文件。"""
     artifacts = []
     for msg in reversed(messages):
         if not isinstance(msg, dict):
@@ -182,8 +179,8 @@ def extract_artifacts(messages):
     return artifacts
 
 def artifact_url(virtual_path):
-    # virtual_path like /mnt/user-data/outputs/file.md
-    # API endpoint: {gateway}/api/threads/{thread_id}/artifacts/{path without leading slash}
+    # virtual_path 示例：/mnt/user-data/outputs/file.md。
+    # 接口路径：{gateway}/api/threads/{thread_id}/artifacts/{去除开头斜杠后的路径}。
     path = virtual_path.lstrip("/")
     return f"{gateway_url}/api/threads/{thread_id}/artifacts/{path}"
 
@@ -193,7 +190,7 @@ def format_artifact_text(artifacts):
         return f"Created File: {urls[0]}"
     return "Created Files:\n" + "\n".join(urls)
 
-# Find the last "values" event with messages
+# 查找最后一个包含消息的 "values" 事件。
 result_messages = None
 for event_type, data_str in reversed(events):
     if event_type != "values":
@@ -218,7 +215,7 @@ if result_messages is not None:
         print("(No response from agent)", file=sys.stderr)
         sys.exit(1)
 else:
-    # Check for error events
+    # 检查是否存在错误事件。
     for event_type, data_str in events:
         if event_type == "error":
             print(f"ERROR from DeerFlow: {data_str}", file=sys.stderr)

@@ -1,6 +1,4 @@
-"""定义 message_processing 模块提供的职责与可复用接口。
-
-Shared helpers for turning conversations into memory update inputs."""
+'''从对话消息中提取记忆更新所需文本，并过滤框架消息、识别用户反馈信号。'''
 
 from __future__ import annotations
 
@@ -41,9 +39,7 @@ _REINFORCEMENT_PATTERNS = (
 
 
 def extract_message_text(message: Any) -> str:
-    """执行 extract_message_text 的明确职责，并返回与调用约定一致的结果。
-
-    Extract plain text from message content for filtering and signal detection."""
+    '''从纯文本或多模态内容块中拼接可读文本，供筛选和反馈检测使用。'''
     content = getattr(message, "content", "")
     if isinstance(content, list):
         text_parts: list[str] = []
@@ -59,29 +55,12 @@ def extract_message_text(message: Any) -> str:
 
 
 def _non_empty_str(value: object) -> str | None:
-    """执行 _non_empty_str 的明确职责，并返回与调用约定一致的结果。
-
-    Return ``value`` if it is a non-empty (stripped) string, else None."""
+    '''保留非空字符串原值；其他类型或仅含空白的字符串返回 None。'''
     return value if isinstance(value, str) and value.strip() else None
 
 
 def _is_human_clarification_response(additional_kwargs: Any) -> bool:
-    """执行 _is_human_clarification_response 的明确职责，并返回与调用约定一致的结果。
-
-    Return True iff ``additional_kwargs`` carries a well-formed human
-        clarification response (a user-authored answer worth remembering).
-
-        Host-agnostic structural mirror of deer-flow's ``read_human_input_response``
-        (which the host injects via ``should_keep_hidden_message`` in production):
-        a ``human_input_response`` mapping with version 1 + kind
-        ``human_input_response``, non-empty source/request_id/value, and (for
-        option responses) a non-empty option_id. Malformed/partial payloads return
-        False so they are excluded like other hide_from_ui framework messages.
-        Kept inline (no host import) so the bare ``filter_messages_for_memory``
-        does the right thing standalone and in tests. NOTE: if the
-        human_input_response format changes, keep this in sync with
-        ``read_human_input_response`` (the production path) -- they must agree.
-    """
+    '''验证隐藏消息是否包含结构完整的用户澄清答复，以便将真实用户输入纳入记忆。'''
     if not isinstance(additional_kwargs, Mapping):
         return False
     raw = additional_kwargs.get("human_input_response")
@@ -100,39 +79,15 @@ def _is_human_clarification_response(additional_kwargs: Any) -> bool:
 
 
 def filter_messages_for_memory(messages: list[Any], *, should_keep_hidden_message: Any = None) -> list[Any]:
-    """执行 filter_messages_for_memory 的明确职责，并返回与调用约定一致的结果。
-
-    Keep only user inputs and final assistant responses for memory updates.
-
-        ``hide_from_ui`` framework messages are skipped, but user-authored
-        clarification answers (a well-formed ``human_input_response``) are kept by
-        default via a host-agnostic structural check (mirrors deer-flow's
-        ``read_human_input_response``). Pass a ``should_keep_hidden_message(
-        additional_kwargs) -> bool`` hook to override the keep decision; the host
-        injects one delegating to the authoritative ``read_human_input_response``
-        in production.
-    """
+    '''仅保留用户输入和最终助手答复，排除框架隐藏消息，并移除上传文件提示块。'''
     filtered = []
     skip_next_ai = False
     for msg in messages:
         msg_type = getattr(msg, "type", None)
 
         if msg_type == "human":
-            # Middleware-injected hidden messages (e.g. TodoMiddleware.todo_reminder,
-            # ViewImageMiddleware, p0 DynamicContextMiddleware.__memory) carry
-            # hide_from_ui and must never reach the memory-updating LLM — otherwise
-            # framework-internal text pollutes long-term memory (and the p0 __memory
-            # payload could trigger a self-amplification loop).
             additional_kwargs = getattr(msg, "additional_kwargs", {}) or {}
             if additional_kwargs.get("hide_from_ui"):
-                # Framework-injected hidden messages (TodoMiddleware reminders,
-                # ViewImage payloads, p0 __memory self-amplification guard) are
-                # excluded. User-authored clarification answers (a well-formed
-                # human_input_response) ARE real content worth remembering, so
-                # they are kept by default via a host-agnostic structural check.
-                # A host ``should_keep_hidden_message`` hook, when supplied,
-                # overrides this (production DeerMem injects one delegating to
-                # the authoritative read_human_input_response).
                 if should_keep_hidden_message is not None:
                     keep = should_keep_hidden_message(additional_kwargs)
                 else:
@@ -164,9 +119,7 @@ def filter_messages_for_memory(messages: list[Any], *, should_keep_hidden_messag
 
 
 def detect_correction(messages: list[Any]) -> bool:
-    """执行 detect_correction 的明确职责，并返回与调用约定一致的结果。
-
-    Detect explicit user corrections in recent conversation turns."""
+    '''检查最近用户消息是否包含已知的纠正表达，用于提高相关记忆的修订优先级。'''
     recent_user_msgs = [msg for msg in messages[-6:] if getattr(msg, "type", None) == "human"]
 
     for msg in recent_user_msgs:
@@ -178,9 +131,7 @@ def detect_correction(messages: list[Any]) -> bool:
 
 
 def detect_reinforcement(messages: list[Any]) -> bool:
-    """执行 detect_reinforcement 的明确职责，并返回与调用约定一致的结果。
-
-    Detect explicit positive reinforcement signals in recent conversation turns."""
+    '''检查最近用户消息是否包含肯定反馈，以便在记忆更新时保留被认可的信息。'''
     recent_user_msgs = [msg for msg in messages[-6:] if getattr(msg, "type", None) == "human"]
 
     for msg in recent_user_msgs:

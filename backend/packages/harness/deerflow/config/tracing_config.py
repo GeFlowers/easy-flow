@@ -1,4 +1,4 @@
-"""提供配置、追踪、配置相关功能。"""
+'''从环境变量构造 LangSmith、Langfuse 和 Monocle 的追踪配置并校验凭据。'''
 
 import os
 import threading
@@ -9,7 +9,7 @@ _config_lock = threading.Lock()
 
 
 class LangSmithTracingConfig(BaseModel):
-    """\u6267\u884c LangSmithTracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存 LangSmith 追踪开关、密钥、项目名和服务端点。'''
 
     enabled: bool = Field(...)
     api_key: str | None = Field(...)
@@ -18,17 +18,17 @@ class LangSmithTracingConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
-        """\u6267\u884c is_configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''只有启用追踪且存在 API 密钥时才视为可连接。'''
         return self.enabled and bool(self.api_key)
 
     def validate(self) -> None:
-        """\u6267\u884c validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''在启用但缺少密钥时中止配置装载，避免静默丢失追踪数据。'''
         if self.enabled and not self.api_key:
             raise ValueError("LangSmith tracing is enabled but LANGSMITH_API_KEY (or LANGCHAIN_API_KEY) is not set.")
 
 
 class LangfuseTracingConfig(BaseModel):
-    """\u6267\u884c LangfuseTracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存 Langfuse 追踪端点以及公钥、密钥和启用状态。'''
 
     enabled: bool = Field(...)
     public_key: str | None = Field(...)
@@ -37,11 +37,11 @@ class LangfuseTracingConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
-        """\u6267\u884c is_configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''检查追踪开关和成对凭据是否齐备。'''
         return self.enabled and bool(self.public_key) and bool(self.secret_key)
 
     def validate(self) -> None:
-        """\u6267\u884c validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''列出缺失的 Langfuse 凭据，并在启用配置不完整时报错。'''
         if not self.enabled:
             return
         missing: list[str] = []
@@ -55,7 +55,7 @@ _MONOCLE_EXPORTERS = ("file", "console", "okahu", "s3", "blob", "gcs")
 
 
 class MonocleTracingConfig(BaseModel):
-    """\u6267\u884c MonocleTracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''配置 Monocle 追踪开关、导出器列表及 Okahu 凭据。'''
 
     enabled: bool = Field(...)
     exporters: str = Field(...)
@@ -63,16 +63,16 @@ class MonocleTracingConfig(BaseModel):
 
     @property
     def is_enabled(self) -> bool:
-        """\u6267\u884c is_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''返回 Monocle 导出是否启用；该集成无需每次运行创建回调。'''
         return self.enabled
 
     @property
     def exporter_list(self) -> list[str]:
-        """\u6267\u884c exporter_list \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''将逗号分隔的导出器配置解析为去除空白的名称列表。'''
         return [e.strip() for e in self.exporters.split(",") if e.strip()]
 
     def validate(self) -> None:
-        """\u6267\u884c validate \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''拒绝未知导出器，并检查 Okahu 导出器所需密钥。'''
         if not self.enabled:
             return
         selected = self.exporter_list
@@ -84,7 +84,7 @@ class MonocleTracingConfig(BaseModel):
 
 
 class TracingConfig(BaseModel):
-    """\u6267\u884c TracingConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''汇总多个追踪供应商设置，并提供统一的可用性判定。'''
 
     langsmith: LangSmithTracingConfig = Field(...)
     langfuse: LangfuseTracingConfig = Field(...)
@@ -92,12 +92,12 @@ class TracingConfig(BaseModel):
 
     @property
     def is_configured(self) -> bool:
-        """\u6267\u884c is_configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''根据已具备凭据的 LangSmith 或 Langfuse 配置判断追踪是否可用。'''
         return bool(self.enabled_providers)
 
     @property
     def explicitly_enabled_providers(self) -> list[str]:
-        """\u6267\u884c explicitly_enabled_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''列出用户显式打开的追踪服务，即使其凭据尚未配置。'''
         enabled: list[str] = []
         if self.langsmith.enabled:
             enabled.append("langsmith")
@@ -107,7 +107,7 @@ class TracingConfig(BaseModel):
 
     @property
     def enabled_providers(self) -> list[str]:
-        """\u6267\u884c enabled_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''只列出已启用且凭据齐全、能够实际创建回调的服务。'''
         enabled: list[str] = []
         if self.langsmith.is_configured:
             enabled.append("langsmith")
@@ -116,7 +116,7 @@ class TracingConfig(BaseModel):
         return enabled
 
     def validate_enabled(self) -> None:
-        """\u6267\u884c validate_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''校验已开启的 LangSmith 和 Langfuse 配置是否具备必需凭据。'''
         self.langsmith.validate()
         self.langfuse.validate()
 
@@ -128,7 +128,7 @@ _TRUTHY_VALUES = {"1", "true", "yes", "on"}
 
 
 def _env_flag_preferred(*names: str) -> bool:
-    """\u6267\u884c _env_flag_preferred \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''按变量优先级读取布尔开关，第一个非空值决定最终结果。'''
     for name in names:
         value = os.environ.get(name)
         if value is not None and value.strip():
@@ -137,7 +137,7 @@ def _env_flag_preferred(*names: str) -> bool:
 
 
 def _first_env_value(*names: str) -> str | None:
-    """\u6267\u884c _first_env_value \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''按给定优先级返回第一个非空环境变量值。'''
     for name in names:
         value = os.environ.get(name)
         if value and value.strip():
@@ -146,7 +146,7 @@ def _first_env_value(*names: str) -> str | None:
 
 
 def get_tracing_config() -> TracingConfig:
-    """\u6267\u884c get_tracing_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''线程安全地从环境变量构造并缓存所有追踪供应商配置。'''
     global _tracing_config
     if _tracing_config is not None:
         return _tracing_config
@@ -176,32 +176,32 @@ def get_tracing_config() -> TracingConfig:
 
 
 def get_enabled_tracing_providers() -> list[str]:
-    """\u6267\u884c get_enabled_tracing_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回当前凭据完整且可创建回调的追踪供应商名称。'''
     return get_tracing_config().enabled_providers
 
 
 def get_explicitly_enabled_tracing_providers() -> list[str]:
-    """\u6267\u884c get_explicitly_enabled_tracing_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回环境配置中被显式打开的追踪供应商名称。'''
     return get_tracing_config().explicitly_enabled_providers
 
 
 def validate_enabled_tracing_providers() -> None:
-    """\u6267\u884c validate_enabled_tracing_providers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''在应用启动时校验所有显式启用且需要凭据的追踪服务。'''
     get_tracing_config().validate_enabled()
 
 
 def is_tracing_enabled() -> bool:
-    """\u6267\u884c is_tracing_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''判断是否至少有一个已配置的回调式追踪供应商。'''
     return get_tracing_config().is_configured
 
 
 def is_monocle_tracing_enabled() -> bool:
-    """\u6267\u884c is_monocle_tracing_enabled \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''判断是否开启 Monocle 进程级追踪导出。'''
     return get_tracing_config().monocle.is_enabled
 
 
 def reset_tracing_config() -> None:
-    """\u6267\u884c reset_tracing_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''清空追踪配置缓存，使后续读取重新采集环境变量。'''
     global _tracing_config
     with _config_lock:
         _tracing_config = None

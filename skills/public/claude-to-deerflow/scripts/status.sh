@@ -1,19 +1,17 @@
 #!/usr/bin/env bash
 # status.sh — 检查 DeerFlow 状态并列出可用资源。
-#
 # 用法：
-#   bash status.sh                  # health + summary
-#   bash status.sh models           # list models
-#   bash status.sh skills           # list skills
-#   bash status.sh agents           # list agents
-#   bash status.sh threads          # list recent threads
-#   bash status.sh memory           # show memory
-#   bash status.sh thread <id>      # show thread history
-#
+#   bash status.sh                  # 查看服务状态和摘要
+#   bash status.sh models           # 列出模型
+#   bash status.sh skills           # 列出技能
+#   bash status.sh agents           # 列出智能体
+#   bash status.sh threads          # 列出近期会话
+#   bash status.sh memory           # 查看记忆
+#   bash status.sh thread <id>      # 查看会话历史
 # 环境变量：
 #   DEERFLOW_URL           — 统一代理基地址（默认：http://localhost:2026）
-#   DEERFLOW_GATEWAY_URL   — Gateway API 基地址（默认：$DEERFLOW_URL）
-#   DEERFLOW_LANGGRAPH_URL — LangGraph API 基地址（默认：$DEERFLOW_URL/api/langgraph）
+#   DEERFLOW_GATEWAY_URL   — 网关接口基地址（默认：$DEERFLOW_URL）
+#   DEERFLOW_LANGGRAPH_URL — LangGraph 接口基地址（默认：$DEERFLOW_URL/api/langgraph）
 
 set -euo pipefail
 

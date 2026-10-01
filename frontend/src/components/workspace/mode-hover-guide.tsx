@@ -7,6 +7,7 @@ import { Tooltip } from "./tooltip";
 
 export type AgentMode = "flash" | "thinking" | "pro" | "ultra";
 
+/** 把模式标识映射到本地化标签键，供输入框显示当前模式名称。 */
 function getModeLabelKey(
   mode: AgentMode,
 ): keyof Pick<
@@ -25,6 +26,7 @@ function getModeLabelKey(
   }
 }
 
+/** 把模式标识映射到对应的本地化说明键，避免界面散落条件判断。 */
 function getModeDescriptionKey(
   mode: AgentMode,
 ): keyof Pick<

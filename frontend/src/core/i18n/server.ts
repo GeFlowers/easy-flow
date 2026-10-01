@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { DEFAULT_LOCALE, normalizeLocale, type Locale } from "./locale";
 import { translations } from "./translations";
 
-/** 实现 detectLocaleServer 的受限辅助逻辑。 */
+/** 从服务端请求 Cookie 读取语言偏好，并规范化为项目支持的语言。 */
 export async function detectLocaleServer(): Promise<Locale> {
   const cookieStore = await cookies();
   let locale = cookieStore.get("locale")?.value;
@@ -18,7 +18,7 @@ export async function detectLocaleServer(): Promise<Locale> {
   return normalizeLocale(locale);
 }
 
-/** 实现 setLocale 的受限辅助逻辑。 */
+/** 规范化语言标识并写入服务端响应 Cookie，供后续请求复用。 */
 export async function setLocale(locale: string | Locale): Promise<Locale> {
   const normalizedLocale = normalizeLocale(locale);
   const cookieStore = await cookies();
@@ -31,7 +31,7 @@ export async function setLocale(locale: string | Locale): Promise<Locale> {
   return normalizedLocale;
 }
 
-/** 获取 getI18n 所需的结果或配置。 */
+/** 使用显式语言或请求 Cookie 选择翻译表，并返回语言与翻译对象。 */
 export async function getI18n(localeOverride?: string | Locale) {
   const locale = localeOverride
     ? normalizeLocale(localeOverride)

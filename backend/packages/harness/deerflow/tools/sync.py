@@ -1,4 +1,4 @@
-"""为同步代理调用路径执行异步工具提供桥接工具。"""
+'''为同步代理调用路径执行异步工具提供桥接工具。'''
 
 import asyncio
 import atexit
@@ -20,7 +20,7 @@ atexit.register(lambda: _SYNC_TOOL_EXECUTOR.shutdown(wait=False))
 
 
 def _get_runnable_config_param(func: Callable[..., Any]) -> str | None:
-    """返回协程中用于接收 LangChain ``RunnableConfig`` 的参数名。"""
+    '''返回协程中用于接收 LangChain ``RunnableConfig`` 的参数名。'''
     if isinstance(func, functools.partial):
         func = func.func
 
@@ -36,15 +36,15 @@ def _get_runnable_config_param(func: Callable[..., Any]) -> str | None:
 
 
 def make_sync_tool_wrapper(coro: Callable[..., Any], tool_name: str) -> Callable[..., Any]:
-    """为异步工具协程构建可供 ``BaseTool.func`` 使用的同步包装器。
+    '''为异步工具协程构建可供 ``BaseTool.func`` 使用的同步包装器。
 
     若协程声明了 ``RunnableConfig`` 参数，包装器会暴露 ``config`` 参数，
     以便 LangChain 注入运行时配置并转发给协程实际使用的配置参数。
-    """
+    '''
     config_param = _get_runnable_config_param(coro)
 
     def run_coroutine(*args: Any, **kwargs: Any) -> Any:
-        """在当前线程或共享线程池中安全地等待协程完成。"""
+        '''在当前线程或共享线程池中安全地等待协程完成。'''
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -63,7 +63,7 @@ def make_sync_tool_wrapper(coro: Callable[..., Any], tool_name: str) -> Callable
     if config_param:
 
         def sync_wrapper(*args: Any, config: RunnableConfig = None, **kwargs: Any) -> Any:
-            """转发参数，并在需要时注入运行时配置。"""
+            '''转发参数，并在需要时注入运行时配置。'''
             if config is not None or config_param not in kwargs:
                 kwargs[config_param] = config
             return run_coroutine(*args, **kwargs)
@@ -71,7 +71,7 @@ def make_sync_tool_wrapper(coro: Callable[..., Any], tool_name: str) -> Callable
         return sync_wrapper
 
     def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
-        """转发参数并同步执行底层协程。"""
+        '''转发参数并同步执行底层协程。'''
         return run_coroutine(*args, **kwargs)
 
     return sync_wrapper

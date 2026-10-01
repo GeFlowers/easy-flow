@@ -1,4 +1,4 @@
-"""提供配置、safety、finish、reason、配置相关功能。"""
+'''配置模型终止原因的安全检测和工具循环终止保护。'''
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 class SafetyDetectorConfig(BaseModel):
-    """\u6267\u884c SafetyDetectorConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''定义单个终止原因检测器的启用状态与判定参数。'''
 
     use: str = Field(
         description=("Class path of a SafetyTerminationDetector implementation (e.g. 'deerflow.agents.middlewares.safety_termination_detectors:OpenAICompatibleContentFilterDetector')."),
@@ -18,7 +18,7 @@ class SafetyDetectorConfig(BaseModel):
 
 
 class SafetyFinishReasonConfig(BaseModel):
-    """\u6267\u884c SafetyFinishReasonConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''汇总运行结束原因检查及不安全工具循环的兜底行为。'''
 
     enabled: bool = Field(
         default=True,

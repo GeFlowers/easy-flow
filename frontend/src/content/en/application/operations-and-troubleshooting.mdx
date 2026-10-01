@@ -100,8 +100,6 @@ Or set it in your `.env` file at the repo root.
 If file tools (`read_file`, `ls`, `bash`) fail with permission or path errors:
 
 1. For `LocalSandboxProvider`: check that `allow_host_bash` is set correctly and that the agent has read/write access to the thread data directory.
-2. For container sandboxes: verify Docker (or Apple Container) is running and the sandbox image is accessible.
-3. For K8s Provisioner: check that the provisioner service is healthy (`curl http://localhost:8002/health`) and that the K8s cluster is reachable.
 
 ---
 
@@ -117,18 +115,6 @@ database:
 run_events:
   backend: db
 ```
-
----
-
-### K8s Provisioner not connecting
-
-```
-Connection refused: http://provisioner:8002
-```
-
-- Ensure the provisioner service is running: `docker compose ps`.
-- Check that `K8S_API_SERVER` is set correctly (should point to the K8s API from inside the container, not `localhost`).
-- Verify `~/.kube/config` is mounted and the cluster is reachable from the container host.
 
 ---
 

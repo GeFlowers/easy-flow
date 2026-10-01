@@ -1,4 +1,4 @@
-"未说明"
+'''定义可在隔离上下文中执行终端命令并汇报输出的 Bash 专用子代理配置。'''
 
 from deerflow.subagents.config import SubagentConfig
 
@@ -43,7 +43,7 @@ You have access to the sandbox environment:
 - Prefer relative paths from the workspace, such as `hello.txt`, `../uploads/input.csv`, and `../outputs/result.md`, when composing commands or helper scripts
 </working_directory>
 """,
-    tools=["bash", "ls", "read_file", "write_file", "str_replace"],  # Sandbox tools only
+    tools=["bash", "ls", "read_file", "write_file", "str_replace"],
     disallowed_tools=["task", "ask_clarification", "present_files"],
     model="inherit",
     max_turns=60,

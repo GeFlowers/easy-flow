@@ -1,4 +1,4 @@
-"""提供无需预先创建线程的运行、SSE 等待及按运行查询接口。"""
+'''提供无需预先创建线程的运行、SSE 等待及按运行查询接口。'''
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 
 def _resolve_thread_id(body: RunCreateRequest) -> str:
-    """复用运行配置中的线程 ID；未提供时生成新的临时线程标识。"""
+    '''复用运行配置中的线程 ID；未提供时生成新的临时线程标识。'''
     thread_id = (body.config or {}).get("configurable", {}).get("thread_id")
     if thread_id:
         return str(thread_id)
@@ -29,7 +29,7 @@ def _resolve_thread_id(body: RunCreateRequest) -> str:
 
 @router.post("/stream")
 async def stateless_stream(body: RunCreateRequest, request: Request) -> StreamingResponse:
-    """启动无状态入口运行并通过 SSE 返回事件，可复用请求给出的线程历史。"""
+    '''启动无状态入口运行并通过 SSE 返回事件，可复用请求给出的线程历史。'''
     thread_id = _resolve_thread_id(body)
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
@@ -49,7 +49,7 @@ async def stateless_stream(body: RunCreateRequest, request: Request) -> Streamin
 
 @router.post("/wait", response_model=dict)
 async def stateless_wait(body: RunCreateRequest, request: Request) -> dict:
-    """启动无状态入口运行并等待结束，随后返回最终检查点状态或运行错误。"""
+    '''启动无状态入口运行并等待结束，随后返回最终检查点状态或运行错误。'''
     thread_id = _resolve_thread_id(body)
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
@@ -74,13 +74,10 @@ async def stateless_wait(body: RunCreateRequest, request: Request) -> dict:
     return {"status": record.status.value, "error": record.error}
 
 
-# ---------------------------------------------------------------------------
-# Run-scoped read endpoints
-# ---------------------------------------------------------------------------
 
 
 async def _resolve_run(run_id: str, request: Request) -> dict:
-    """按当前用户读取运行记录；记录不存在或不可见时返回 404。"""
+    '''按当前用户读取运行记录；记录不存在或不可见时返回 404。'''
     run_store = get_run_store(request)
     record = await run_store.get(run_id)  # AUTO 根据当前用户上下文执行所有权过滤。
     if record is None:
@@ -97,7 +94,7 @@ async def run_messages(
     before_seq: int | None = Query(default=None),
     after_seq: int | None = Query(default=None),
 ) -> dict:
-    """按序号游标分页读取运行消息，并返回是否还有更多结果。"""
+    '''按序号游标分页读取运行消息，并返回是否还有更多结果。'''
     run = await _resolve_run(run_id, request)
     event_store = get_run_event_store(request)
     rows = await event_store.list_messages_by_run(
@@ -114,7 +111,7 @@ async def run_messages(
 @router.get("/{run_id}/feedback")
 @require_permission("runs", "read")
 async def run_feedback(run_id: str, request: Request) -> list[dict]:
-    """读取指定运行关联的全部用户反馈记录。"""
+    '''读取指定运行关联的全部用户反馈记录。'''
     run = await _resolve_run(run_id, request)
     feedback_repo = get_feedback_repo(request)
     return await feedback_repo.list_by_run(run["thread_id"], run_id)

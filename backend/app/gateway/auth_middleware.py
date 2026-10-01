@@ -1,9 +1,9 @@
-"""全局认证中间件，以失败关闭方式作为安全兜底。
+'''全局认证中间件，以失败关闭方式作为安全兜底。
 
 该中间件为非公开路径拒绝未认证请求，并将已验证 JWT 对应的 ``User`` 写入
 ``request.state.user`` 与用户上下文，以自动执行仓储层所有者过滤；细粒度权限
 控制仍由 ``authz.py`` 的装饰器完成。
-"""
+'''
 
 from collections.abc import Callable
 
@@ -51,7 +51,7 @@ _PUBLIC_EXACT_PATHS: frozenset[str] = frozenset(
 
 
 def _is_public(path: str) -> bool:
-    """判断请求路径是否属于无需认证的公开路径。"""
+    '''判断请求路径是否属于无需认证的公开路径。'''
     stripped = path.rstrip("/")
     if stripped in _PUBLIC_EXACT_PATHS:
         return True
@@ -59,19 +59,19 @@ def _is_public(path: str) -> bool:
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
-    """严格认证关卡，拒绝没有有效会话的请求。
+    '''严格认证关卡，拒绝没有有效会话的请求。
 
     对非公开路径先检查 Cookie 是否存在，再严格验证 JWT；成功后写入请求状态和
     用户上下文，使仓储层所有者过滤自动生效。资源级授权仍应使用
     ``@require_permission(..., owner_check=True)`` 显式检查。
-    """
+    '''
 
     def __init__(self, app: ASGIApp) -> None:
-        """使用 ASGI 应用初始化认证中间件。"""
+        '''使用 ASGI 应用初始化认证中间件。'''
         super().__init__(app)
 
     async def dispatch(self, request: Request, call_next: Callable) -> Response:
-        """认证请求、建立用户上下文，并将请求交给后续中间件或处理器。"""
+        '''认证请求、建立用户上下文，并将请求交给后续中间件或处理器。'''
         if _is_public(request.url.path):
             return await call_next(request)
 

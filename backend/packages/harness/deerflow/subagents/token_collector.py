@@ -1,4 +1,4 @@
-"""提供子代理、调度或终端界面的相关功能。"""
+'''从子代理模型回调中收集令牌用量，并按真实模型记录给主运行账本。'''
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ from langchain_core.callbacks import BaseCallbackHandler
 
 
 class SubagentTokenCollector(BaseCallbackHandler):
-    """封装当前模块相关的数据与协作职责。"""
+    '''保存子代理调用方名称、已计费运行标识和收集到的用量记录。'''
 
     def __init__(self, caller: str):
-        """处理当前步骤，并保持既有输入、输出和状态语义。"""
+        '''初始化回调记录，并保留调用者标签用于区分不同子代理来源。'''
         super().__init__()
         self.caller = caller
         self._records: list[dict[str, int | str | None]] = []
@@ -26,7 +26,7 @@ class SubagentTokenCollector(BaseCallbackHandler):
         tags: list[str] | None = None,
         **kwargs: Any,
     ) -> None:
-        """处理当前步骤，并保持既有输入、输出和状态语义。"""
+        '''读取模型响应中的输入、输出和缓存令牌数，每个模型运行只登记一次。'''
         rid = str(run_id)
         if rid in self._counted_run_ids:
             return
@@ -44,7 +44,7 @@ class SubagentTokenCollector(BaseCallbackHandler):
                     total_tk = input_tk + output_tk
                 if total_tk <= 0:
                     continue
-                # Prompt-cache hits (needed for cache-aware cost accounting)
+                # 缓存命中令牌用于按实际计费口径统计模型成本。
                 details = usage_dict.get("input_token_details") or {}
                 cache_read_tk = 0
                 if isinstance(details, Mapping):
@@ -52,9 +52,7 @@ class SubagentTokenCollector(BaseCallbackHandler):
                         cache_read_tk = max(int(details.get("cache_read") or 0), 0)
                     except (TypeError, ValueError):
                         cache_read_tk = 0
-                # Capture the model that actually produced this response so the
-                # parent journal can bucket tokens by real model rather than the
-                # lead agent's resolved model
+                # 记录实际生成响应的模型，避免把子代理用量错误计入主代理模型。
                 response_metadata = getattr(gen.message, "response_metadata", None) or {}
                 model_name: str | None = None
                 if isinstance(response_metadata, Mapping):
@@ -68,13 +66,12 @@ class SubagentTokenCollector(BaseCallbackHandler):
                     "output_tokens": output_tk,
                     "total_tokens": total_tk,
                 }
-                # Sparse, matching the journal's per-model buckets: the key is
-                # only present when the provider actually reported cache hits.
+                # 仅在供应商报告缓存命中时写入该字段，与账本的稀疏字段约定一致。
                 if cache_read_tk > 0:
                     record["cache_read_tokens"] = cache_read_tk
                 self._records.append(record)
                 return
 
     def snapshot_records(self) -> list[dict[str, int | str | None]]:
-        """处理当前步骤，并保持既有输入、输出和状态语义。"""
+        '''返回用量记录列表的副本，避免调用方修改回调内部状态。'''
         return list(self._records)

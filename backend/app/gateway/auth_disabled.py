@@ -1,4 +1,4 @@
-"""本地与端到端测试的禁用认证模式共用辅助函数。"""
+'''本地与端到端测试的禁用认证模式共用辅助函数。'''
 
 from __future__ import annotations
 
@@ -23,22 +23,22 @@ logger = logging.getLogger(__name__)
 
 
 def is_explicit_production_environment() -> bool:
-    """当环境变量明确标记为生产环境时返回 ``True``。"""
+    '''当环境变量明确标记为生产环境时返回 ``True``。'''
     return any(os.environ.get(name, "").strip().lower() in _PRODUCTION_ENV_VALUES for name in _PRODUCTION_ENV_VARS)
 
 
 def is_auth_disabled_requested() -> bool:
-    """检查是否通过环境变量显式请求禁用认证。"""
+    '''检查是否通过环境变量显式请求禁用认证。'''
     return os.environ.get(AUTH_DISABLED_ENV_VAR) == "1"
 
 
 def is_auth_disabled() -> bool:
-    """仅在非生产环境且已请求时确认启用禁用认证模式。"""
+    '''仅在非生产环境且已请求时确认启用禁用认证模式。'''
     return is_auth_disabled_requested() and not is_explicit_production_environment()
 
 
 def warn_if_auth_disabled_enabled() -> None:
-    """启用禁用认证模式时记录其安全边界警告。"""
+    '''启用禁用认证模式时记录其安全边界警告。'''
     if not is_auth_disabled():
         return
 
@@ -50,7 +50,7 @@ def warn_if_auth_disabled_enabled() -> None:
 
 
 def get_auth_disabled_user():
-    """返回禁用认证模式使用的合成管理员用户。"""
+    '''返回禁用认证模式使用的合成管理员用户。'''
     return SimpleNamespace(
         id=AUTH_DISABLED_USER_ID,
         email=AUTH_DISABLED_USER_EMAIL,

@@ -1,4 +1,4 @@
-"""定义沙箱进程环境变量的筛选策略。"""
+'''定义沙箱进程环境变量的筛选策略。'''
 
 from __future__ import annotations
 
@@ -9,14 +9,11 @@ _SECRET_NAME_PATTERNS: tuple[str, ...] = (
     "*KEY*",
     "*SECRET*",
     "*TOKEN*",
-    #
-    #
     "*PASS*",
     "*CREDENTIAL*",
     "*DSN*",
 )
 
-#
 _BLOCKED_EXACT_NAMES: frozenset[str] = frozenset(
     {
         "DATABASE_URL",
@@ -43,7 +40,7 @@ _BLOCKED_EXACT_NAMES: frozenset[str] = frozenset(
 
 
 def is_blocked_env_name(name: str) -> bool:
-    """判断环境变量名是否应从继承的沙箱环境中排除。"""
+    '''判断环境变量名是否应从继承的沙箱环境中排除。'''
     upper = name.upper()
     if upper in _BLOCKED_EXACT_NAMES:
         return True
@@ -51,7 +48,7 @@ def is_blocked_env_name(name: str) -> bool:
 
 
 def build_sandbox_env(injected: dict[str, str] | None = None) -> dict[str, str]:
-    """构建已排除敏感宿主变量并可叠加显式变量的沙箱环境。"""
+    '''构建已排除敏感宿主变量并可叠加显式变量的沙箱环境。'''
     env = {key: value for key, value in os.environ.items() if not is_blocked_env_name(key)}
     if injected:
         env.update(injected)

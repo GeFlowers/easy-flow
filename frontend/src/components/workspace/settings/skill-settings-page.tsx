@@ -56,6 +56,7 @@ export function SkillSettingsPage({ onClose }: { onClose?: () => void } = {}) {
   );
 }
 
+/** 按公开或自定义分类筛选技能，并提供创建入口和启用开关。 */
 function SkillSettingsList({
   skills,
   onClose,
@@ -73,6 +74,7 @@ function SkillSettingsList({
     () => skills.filter((skill) => skill.category === filter),
     [skills, filter],
   );
+  /** 关闭设置窗口后跳转到带技能创建模式的新对话。 */
   const handleCreateSkill = () => {
     onClose?.();
     router.push("/workspace/chats/new?mode=skill");
@@ -124,6 +126,7 @@ function SkillSettingsList({
   );
 }
 
+/** 在筛选结果为空时说明当前状态，并保留直接创建技能的操作入口。 */
 function EmptySkill({ onCreateSkill }: { onCreateSkill: () => void }) {
   const { t } = useI18n();
   return (

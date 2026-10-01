@@ -1,4 +1,4 @@
-"未说明"
+'''识别技能包内的评测清单格式，并汇总用例数量及触发正反例统计。'''
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from deerflow.skills.review.models import make_finding
 
 
 def analyze_eval_manifests(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    "未说明"
+    '''解析所有 evals 下的 JSON 清单，收集格式错误并汇总各清单统计信息。'''
     files = {str(entry["path"]): entry for entry in snapshot.get("files", [])}
     eval_files = [path for path in sorted(files) if path.startswith("evals/") and path.endswith(".json")]
     findings: list[dict[str, Any]] = []
@@ -71,7 +71,7 @@ def analyze_eval_manifests(snapshot: dict[str, Any]) -> tuple[dict[str, Any], li
 
 
 def _classify_manifest(payload: Any) -> dict[str, Any]:
-    "未说明"
+    '''识别版本化、技能创建器或旧式列表清单，并统一成统计结构。'''
     if isinstance(payload, dict) and isinstance(payload.get("schema_version"), str):
         cases = payload.get("cases")
         if isinstance(cases, list):
@@ -88,7 +88,7 @@ def _classify_manifest(payload: Any) -> dict[str, Any]:
 
 
 def _case_stats(schema: str, cases: list[Any]) -> dict[str, Any]:
-    "未说明"
+    '''统计用例总数及明确标记为应触发或不应触发的用例数。'''
     positive = 0
     negative = 0
     for case in cases:

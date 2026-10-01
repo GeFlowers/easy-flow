@@ -1,9 +1,9 @@
-"""维护按即时通讯通道划分的 Agent 运行策略。
+'''维护按即时通讯通道划分的 Agent 运行策略。
 
 策略注册表与 ``ChannelRunPolicy`` 独立于管理器定义，使通道能够在导入时注册能力，
 又不会与 :mod:`app.channels.manager` 形成循环依赖。``ChannelManager`` 在
 ``_resolve_run_params`` 之后按 ``msg.channel_name`` 应用对应策略。
-"""
+'''
 
 from __future__ import annotations
 
@@ -17,7 +17,7 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True, slots=True)
 class ChannelRunPolicy:
-    """描述 :meth:`ChannelManager._apply_channel_policy` 应用的通道差异。
+    '''描述 :meth:`ChannelManager._apply_channel_policy` 应用的通道差异。
 
     普通交互式通道采用保守默认值；Webhook 驱动的自治通道则可集中声明更高递归
     上限、禁止同步澄清、动态凭据、身份门禁例外或无需等待最终回复等能力。把这些
@@ -31,7 +31,7 @@ class ChannelRunPolicy:
     ``/connect`` 身份流程。``fire_and_forget`` 使用 ``runs.create``，适合自行回写
     平台且可能超过 SDK 等待超时的任务。``serialize_thread_runs`` 则只串行化同一
     DeerFlow 线程，避免快速连续消息触发运行冲突，同时保留不同线程之间的并发。
-    """
+    '''
 
     is_interactive: bool = True
     default_recursion_limit: int | None = None

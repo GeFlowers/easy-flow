@@ -1,4 +1,4 @@
-"""使用 Codex CLI OAuth 凭据调用 ChatGPT Responses API，并适配 LangChain 对话模型接口。"""
+'''使用 Codex CLI OAuth 凭据调用 ChatGPT Responses API，并适配 LangChain 对话模型接口。'''
 
 import json
 import logging
@@ -19,7 +19,7 @@ CODEX_BASE_URL = "https://chatgpt.com/backend-api/codex"
 
 
 def _build_usage_metadata(oai_usage: dict) -> dict:
-    """将 Responses API 用量字段转换为 LangChain AIMessage 的 Token 元数据。"""
+    '''将 Responses API 用量字段转换为 LangChain AIMessage 的 Token 元数据。'''
     input_tokens = oai_usage.get("input_tokens", 0)
     output_tokens = oai_usage.get("output_tokens", 0)
     total_tokens = oai_usage.get("total_tokens", input_tokens + output_tokens)
@@ -43,7 +43,7 @@ MAX_RETRIES = 3
 
 
 class CodexChatModel(BaseChatModel):
-    """把消息、工具和用量数据转换为 Codex Responses API 协议。"""
+    '''把消息、工具和用量数据转换为 Codex Responses API 协议。'''
 
     model: str = "gpt-5.4"
     reasoning_effort: str = "medium"
@@ -55,21 +55,21 @@ class CodexChatModel(BaseChatModel):
 
     @classmethod
     def is_lc_serializable(cls) -> bool:
-        """允许 LangChain 将该自定义模型纳入序列化流程。"""
+        '''允许 LangChain 将该自定义模型纳入序列化流程。'''
         return True
 
     @property
     def _llm_type(self) -> str:
-        """返回 LangChain 用于标识该模型实现的类型名。"""
+        '''返回 LangChain 用于标识该模型实现的类型名。'''
         return "codex-responses"
 
     def _validate_retry_config(self) -> None:
-        """确保重试次数至少为一次，避免模型请求被静默跳过。"""
+        '''确保重试次数至少为一次，避免模型请求被静默跳过。'''
         if self.retry_max_attempts < 1:
             raise ValueError("retry_max_attempts must be >= 1")
 
     def model_post_init(self, __context: Any) -> None:
-        """校验重试配置并加载 Codex CLI 凭据；无凭据时拒绝创建模型。"""
+        '''校验重试配置并加载 Codex CLI 凭据；无凭据时拒绝创建模型。'''
         self._validate_retry_config()
 
         cred = self._load_codex_auth()
@@ -83,12 +83,12 @@ class CodexChatModel(BaseChatModel):
         super().model_post_init(__context)
 
     def _load_codex_auth(self) -> CodexCliCredential | None:
-        """从 Codex CLI 凭据来源读取访问令牌和账号标识。"""
+        '''从 Codex CLI 凭据来源读取访问令牌和账号标识。'''
         return load_codex_cli_credential()
 
     @classmethod
     def _normalize_content(cls, content: Any) -> str:
-        """将 LangChain 文本块、嵌套字典或其他内容规范化为字符串。"""
+        '''将 LangChain 文本块、嵌套字典或其他内容规范化为字符串。'''
         if isinstance(content, str):
             return content
 
@@ -115,7 +115,7 @@ class CodexChatModel(BaseChatModel):
             return str(content)
 
     def _convert_messages(self, messages: list[BaseMessage]) -> tuple[str, list[dict]]:
-        """将系统消息合并为 instructions，并把用户、助手和工具消息转换为 input 项。"""
+        '''将系统消息合并为 instructions，并把用户、助手和工具消息转换为 input 项。'''
         instructions_parts: list[str] = []
         input_items = []
 
@@ -155,7 +155,7 @@ class CodexChatModel(BaseChatModel):
         return instructions, input_items
 
     def _convert_tools(self, tools: list[dict]) -> list[dict]:
-        """兼容 LangChain 与 OpenAI 函数格式，转换成 Responses API 工具定义。"""
+        '''兼容 LangChain 与 OpenAI 函数格式，转换成 Responses API 工具定义。'''
         responses_tools = []
         for tool in tools:
             if tool.get("type") == "function" and "function" in tool:
@@ -180,7 +180,7 @@ class CodexChatModel(BaseChatModel):
         return responses_tools
 
     def _call_codex_api(self, messages: list[BaseMessage], tools: list[dict] | None = None) -> dict:
-        """构造 Codex API 请求，处理流式响应，并对限流或服务端错误指数退避重试。"""
+        '''构造 Codex API 请求，处理流式响应，并对限流或服务端错误指数退避重试。'''
         instructions, input_items = self._convert_messages(messages)
 
         payload = {
@@ -223,7 +223,7 @@ class CodexChatModel(BaseChatModel):
         raise last_error
 
     def _stream_response(self, headers: dict, payload: dict) -> dict:
-        """读取 SSE 事件并组装完成响应；若终态未携带输出则合并流中已完成的项目。"""
+        '''读取 SSE 事件并组装完成响应；若终态未携带输出则合并流中已完成的项目。'''
         completed_response = None
         streamed_output_items: dict[int, dict[str, Any]] = {}
 
@@ -270,7 +270,7 @@ class CodexChatModel(BaseChatModel):
 
     @staticmethod
     def _parse_sse_data_line(line: str) -> dict[str, Any] | None:
-        """解析 SSE 的 data 行，忽略空数据、结束标记和无效 JSON。"""
+        '''解析 SSE 的 data 行，忽略空数据、结束标记和无效 JSON。'''
         if not line.startswith("data:"):
             return None
 
@@ -287,7 +287,7 @@ class CodexChatModel(BaseChatModel):
         return data if isinstance(data, dict) else None
 
     def _parse_tool_call_arguments(self, output_item: dict[str, Any]) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
-        """将工具参数解码为对象；格式错误或非对象内容转成 invalid_tool_call。"""
+        '''将工具参数解码为对象；格式错误或非对象内容转成 invalid_tool_call。'''
         raw_arguments = output_item.get("arguments", "{}")
         if isinstance(raw_arguments, dict):
             return raw_arguments, None
@@ -316,7 +316,7 @@ class CodexChatModel(BaseChatModel):
         return parsed_arguments, None
 
     def _parse_response(self, response: dict) -> ChatResult:
-        """把 Codex 输出项解析为 AIMessage、工具调用、推理摘要和用量信息。"""
+        '''把 Codex 输出项解析为 AIMessage、工具调用、推理摘要和用量信息。'''
         content = ""
         tool_calls = []
         invalid_tool_calls = []
@@ -386,13 +386,13 @@ class CodexChatModel(BaseChatModel):
         run_manager: CallbackManagerForLLMRun | None = None,
         **kwargs: Any,
     ) -> ChatResult:
-        """实现 LangChain 同步生成入口，调用 Codex API 并转换响应对象。"""
+        '''实现 LangChain 同步生成入口，调用 Codex API 并转换响应对象。'''
         tools = kwargs.get("tools", None)
         response = self._call_codex_api(messages, tools=tools)
         return self._parse_response(response)
 
     def bind_tools(self, tools: list, **kwargs: Any) -> Any:
-        """把 LangChain 工具转换为函数调用定义，并绑定到后续模型请求。"""
+        '''把 LangChain 工具转换为函数调用定义，并绑定到后续模型请求。'''
         from langchain_core.runnables import RunnableBinding
         from langchain_core.tools import BaseTool
         from langchain_core.utils.function_calling import convert_to_openai_function

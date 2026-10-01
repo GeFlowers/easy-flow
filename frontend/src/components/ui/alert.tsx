@@ -19,7 +19,7 @@ const alertVariants = cva(
   },
 );
 
-/** Alert 内部组件：组织对应的界面结构与交互语义。 */
+/** 作为可访问的告警区域展示普通提示或危险状态消息。 */
 function Alert({
   className,
   variant,
@@ -35,7 +35,7 @@ function Alert({
   );
 }
 
-/** AlertTitle 内部组件：组织对应的界面结构与交互语义。 */
+/** 告警内容的单行强调标题。 */
 function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -49,7 +49,7 @@ function AlertTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** AlertDescription 内部组件：组织对应的界面结构与交互语义。 */
+/** 告警标题下方的补充说明及其段落布局。 */
 function AlertDescription({
   className,
   ...props

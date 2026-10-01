@@ -5,12 +5,10 @@ description = "DeerFlow agent harness framework"
 requires-python = ">=3.12"
 dependencies = [
     "agent-client-protocol>=0.4.0",
-    "agent-sandbox>=0.0.19",
     "croniter>=6.0.0",
     "dotenv>=0.9.9",
     "exa-py>=1.0.0",
     "httpx>=0.28.0",
-    "kubernetes>=30.0.0",
     "langchain>=1.2.15",
     "langchain-anthropic>=1.4.1",
     "langchain-deepseek>=1.0.1",
@@ -43,12 +41,11 @@ dependencies = [
 deerflow = "deerflow.tui.cli:main"
 
 [project.optional-dependencies]
-# Terminal workbench (TUI). Kept optional so the core harness install stays lean;
-# the `deerflow` console script degrades to headless help when textual is absent.
+# 终端工作台依赖保持可选，以精简核心运行环境；未安装 textual 时，
+# `deerflow` 命令行程序会退化为不依赖终端界面的帮助输出。
 tui = ["textual>=0.80"]
-# GroundRoute needs no extra packages (httpx is already a core dependency). This
-# empty extra exists so the documented `uv add 'deerflow-harness[groundroute]'`
-# install command resolves cleanly without an "unknown extra" warning.
+# GroundRoute 无需额外安装依赖（httpx 已是核心依赖）。保留空的可选依赖组，
+# 使 `uv add 'deerflow-harness[groundroute]'` 安装命令不会报告未知依赖组。
 groundroute = []
 ollama = ["langchain-ollama>=0.3.0"]
 postgres = [
@@ -57,13 +54,13 @@ postgres = [
     "psycopg[binary]>=3.3.3",
     "psycopg-pool>=3.3.0",
 ]
-# Cross-process SSE stream bridge (configured with the stream_bridge section). Optional so
-# The Gateway installs this extra when stream-bridge settings are present.
+# 跨进程事件流桥接（由 stream_bridge 配置段控制）。该依赖组保持可选，
+# 网关检测到桥接配置后再安装对应组件。
 redis = ["redis>=5.0.0"]
 pymupdf = ["pymupdf4llm>=0.0.17"]
 boxlite = ["boxlite>=0.9.7"]
-# Agent observability (Monocle). Optional so a default install stays free of the
-# OpenTelemetry stack; only pulled in when MONOCLE_TRACING is used.
+# 智能体可观测性组件（Monocle）保持可选，默认安装不包含 OpenTelemetry 依赖；
+# 仅在启用 MONOCLE_TRACING 时使用。
 monocle = ["monocle_apptrace>=0.8.8"]
 
 [build-system]

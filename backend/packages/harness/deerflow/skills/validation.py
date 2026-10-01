@@ -1,9 +1,4 @@
-"""定义 validation 模块提供的职责与可复用接口。
-
-Skill frontmatter validation utilities.
-
-Pure-logic validation of SKILL.md frontmatter — no FastAPI or HTTP dependencies.
-"""
+'''校验技能说明文件的元数据字段、命名规则和工具权限声明。'''
 
 import re
 from pathlib import Path
@@ -14,16 +9,7 @@ from deerflow.skills.types import SKILL_MD_FILE
 
 
 def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]:
-    """执行 _validate_skill_frontmatter 的明确职责，并返回与调用约定一致的结果。
-
-    Validate a skill directory's SKILL.md frontmatter.
-
-        Args:
-            skill_dir: Path to the skill directory containing SKILL.md.
-
-        Returns:
-            Tuple of (is_valid, message, skill_name).
-    """
+    '''校验技能目录中的 ``SKILL.md`` 元数据，并返回校验状态、原因和技能名。'''
     skill_md = skill_dir / SKILL_MD_FILE
     if not skill_md.exists():
         return False, f"{SKILL_MD_FILE} not found", None
@@ -36,18 +22,18 @@ def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]
         return False, "Invalid frontmatter format", None
     frontmatter = parts.metadata
 
-    # Check for unexpected properties
+    # 拒绝当前规范未定义的元数据字段。
     unexpected_keys = set(frontmatter.keys()) - ALLOWED_FRONTMATTER_PROPERTIES
     if unexpected_keys:
         return False, f"Unexpected key(s) in SKILL.md frontmatter: {', '.join(sorted(unexpected_keys))}", None
 
-    # Check required fields
+    # 确认名称和描述这两个必填字段存在。
     if "name" not in frontmatter:
         return False, "Missing 'name' in frontmatter", None
     if "description" not in frontmatter:
         return False, "Missing 'description' in frontmatter", None
 
-    # Validate name
+    # 校验名称类型、非空性、字符格式和长度限制。
     name = frontmatter.get("name", "")
     if not isinstance(name, str):
         return False, f"Name must be a string, got {type(name).__name__}", None
@@ -55,7 +41,7 @@ def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]
     if not name:
         return False, "Name cannot be empty", None
 
-    # Check naming convention (hyphen-case: lowercase with hyphens)
+    # 名称采用小写字母、数字和连字符组成的 kebab-case 格式。
     if not re.match(r"^[a-z0-9-]+$", name):
         return False, f"Name '{name}' should be hyphen-case (lowercase letters, digits, and hyphens only)", None
     if name.startswith("-") or name.endswith("-") or "--" in name:
@@ -63,7 +49,7 @@ def _validate_skill_frontmatter(skill_dir: Path) -> tuple[bool, str, str | None]
     if len(name) > 64:
         return False, f"Name is too long ({len(name)} characters). Maximum is 64 characters.", None
 
-    # Validate description
+    # 描述必须为字符串，且不得包含尖括号或超过长度限制。
     description = frontmatter.get("description", "")
     if not isinstance(description, str):
         return False, f"Description must be a string, got {type(description).__name__}", None

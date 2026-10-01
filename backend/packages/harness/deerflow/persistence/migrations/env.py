@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -15,17 +15,13 @@ from deerflow.persistence.migrations._env_filters import (
     include_object,
 )
 
-# Re-export under the module namespace for any consumer that addresses them
-# via ``env.LANGGRAPH_OWNED_TABLES`` / ``env.include_object``.
 __all__ = ["LANGGRAPH_OWNED_TABLES", "include_object"]
 
-# Import all models so metadata is populated.
 try:
-    import deerflow.persistence.models as models  # register ORM models with Base.metadata
+    import deerflow.persistence.models as models
 
     _ = models
 except ImportError:
-    # Models not available — migration will work with existing metadata only.
     logging.getLogger(__name__).warning("Could not import deerflow.persistence.models; Alembic may not detect all tables")
 
 config = context.config
@@ -36,7 +32,7 @@ target_metadata = Base.metadata
 
 
 def run_migrations_offline() -> None:
-    """配置 Alembic 离线模式并输出针对目标元数据的迁移操作。"""
+    '''配置 Alembic 离线模式并输出针对目标元数据的迁移操作。'''
     url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
@@ -49,7 +45,7 @@ def run_migrations_offline() -> None:
 
 
 def do_run_migrations(connection):
-    """在已建立的同步连接上配置元数据筛选并执行迁移脚本。"""
+    '''在已建立的同步连接上配置元数据筛选并执行迁移脚本。'''
     context.configure(
         connection=connection,
         target_metadata=target_metadata,
@@ -60,7 +56,7 @@ def do_run_migrations(connection):
 
 
 async def run_migrations_online() -> None:
-    """创建异步数据库连接，在其同步桥接上下文中执行迁移并释放引擎。"""
+    '''创建异步数据库连接，在其同步桥接上下文中执行迁移并释放引擎。'''
     connectable = create_async_engine(config.get_main_option("sqlalchemy.url"))
 
     async with connectable.connect() as connection:

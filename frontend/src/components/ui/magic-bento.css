@@ -143,7 +143,7 @@
   }
 }
 
-/* Border glow effect */
+/* 边框辉光效果 */
 .magic-bento-card--border-glow::after {
   content: "";
   position: absolute;
@@ -203,7 +203,7 @@
     0 0 30px var(--purple-glow);
 }
 
-/* Global spotlight styles */
+/* 全局聚光样式 */
 .global-spotlight {
   mix-blend-mode: screen;
   will-change: transform, opacity;

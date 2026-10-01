@@ -1,70 +1,31 @@
-"""提供配置、channel、connections、配置相关功能。"""
+'''配置即时通信账号绑定流程及各通道的连接状态。'''
 
 from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
 
-class SlackChannelConnectionConfig(BaseModel):
-    """\u6267\u884c SlackChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-
-    enabled: bool = False
-
-    @property
-    def configured(self) -> bool:
-        """\u6267\u884c configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        return True
-
-
-class TelegramChannelConnectionConfig(BaseModel):
-    """\u6267\u884c TelegramChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-
-    enabled: bool = False
-    bot_username: str = ""
-
-    @property
-    def configured(self) -> bool:
-        """\u6267\u884c configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        return bool(self.bot_username)
-
-
-class DiscordChannelConnectionConfig(BaseModel):
-    """\u6267\u884c DiscordChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-
-    enabled: bool = False
-
-    @property
-    def configured(self) -> bool:
-        """\u6267\u884c configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
-        return True
-
-
 class BindingCodeChannelConnectionConfig(BaseModel):
-    """\u6267\u884c BindingCodeChannelConnectionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''记录一种即时通信提供者的绑定功能是否开放。'''
 
     enabled: bool = False
 
     @property
     def configured(self) -> bool:
-        """\u6267\u884c configured \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''告知绑定码连接器无需独立凭据即可完成配置。'''
         return True
 
 
 class ChannelConnectionsConfig(BaseModel):
-    """\u6267\u884c ChannelConnectionsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''汇总通道绑定开关、身份绑定要求和各提供者状态。'''
 
     enabled: bool = False
     require_bound_identity: bool = True
-    slack: SlackChannelConnectionConfig = Field(default_factory=SlackChannelConnectionConfig)
-    telegram: TelegramChannelConnectionConfig = Field(default_factory=TelegramChannelConnectionConfig)
-    discord: DiscordChannelConnectionConfig = Field(default_factory=DiscordChannelConnectionConfig)
-    feishu: BindingCodeChannelConnectionConfig = Field(default_factory=BindingCodeChannelConnectionConfig)
-    dingtalk: BindingCodeChannelConnectionConfig = Field(default_factory=BindingCodeChannelConnectionConfig)
     wechat: BindingCodeChannelConnectionConfig = Field(default_factory=BindingCodeChannelConnectionConfig)
     wecom: BindingCodeChannelConnectionConfig = Field(default_factory=BindingCodeChannelConnectionConfig)
 
     def provider_status(self, provider: str) -> dict[str, bool]:
-        """\u6267\u884c provider_status \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''返回指定通道是否启用且具备连接配置。'''
         config = getattr(self, provider, None)
         if config is None:
             return {"enabled": False, "configured": False}

@@ -10,6 +10,7 @@ import { AuroraText } from "../ui/aurora-text";
 
 let waved = false;
 
+/** 保留欢迎说明中的换行，同时允许较长文本在窄屏中折行。 */
 function WelcomeDescription({ children }: { children: string }) {
   return (
     <p className="max-w-full text-wrap break-words whitespace-pre-line">

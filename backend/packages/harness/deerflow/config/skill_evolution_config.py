@@ -1,10 +1,10 @@
-"""提供配置、skill、evolution、配置相关功能。"""
+'''控制智能体是否可创建或修改自定义技能，以及可选的审核模型。'''
 
 from pydantic import BaseModel, Field
 
 
 class SkillEvolutionConfig(BaseModel):
-    """\u6267\u884c SkillEvolutionConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为技能演化工具提供启用状态和安全审核模型设置。'''
 
     enabled: bool = Field(
         default=False,

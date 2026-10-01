@@ -2,6 +2,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 
 const STAGGER_MS = 60;
 
+/** 按入场顺序绘制单条消息占位，并支持调整动画方向与尺寸。 */
 function SkeletonBar({
   className,
   style,

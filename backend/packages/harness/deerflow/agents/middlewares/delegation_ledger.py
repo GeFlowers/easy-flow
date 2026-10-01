@@ -1,4 +1,4 @@
-"""从消息历史提取子代理委派结果，并将其压缩成受预算限制的模型上下文。"""
+'''从消息历史提取子代理委派结果，并将其压缩成受预算限制的模型上下文。'''
 
 from __future__ import annotations
 
@@ -27,12 +27,12 @@ _STATUS_ONLY_RESULT_BRIEFS = {
 
 
 def _utc_now_iso() -> str:
-    """返回以 Z 结尾的当前 UTC ISO 8601 时间字符串。"""
+    '''返回以 Z 结尾的当前 UTC ISO 8601 时间字符串。'''
     return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
 def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
-    """按固定比例保留文本首尾，确定性截断结果摘要而不调用模型。"""
+    '''按固定比例保留文本首尾，确定性截断结果摘要而不调用模型。'''
     if len(text) <= cap:
         return text
     if cap <= 0:
@@ -48,12 +48,12 @@ def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
 
 
 def _escape_context_text(value: object) -> str:
-    """压缩空白并转义将注入模型上下文的文本。"""
+    '''压缩空白并转义将注入模型上下文的文本。'''
     return escape(" ".join(str(value).split()), quote=False)
 
 
 def _status_guidance(status: str, stop_reason: str | None = None) -> str:
-    """根据委派状态和可选终止原因生成后续行动指引。"""
+    '''根据委派状态和可选终止原因生成后续行动指引。'''
     if stop_reason:
         # 守卫预算可能提前结束运行；状态仍描述运行结果，stop_reason 单独说明触发的预算上限。
         if status == "completed":
@@ -75,7 +75,7 @@ def _status_guidance(status: str, stop_reason: str | None = None) -> str:
 
 
 def _tool_call_name(tool_call: dict[str, Any]) -> str:
-    """从标准或嵌套 function 格式的工具调用中提取名称。"""
+    '''从标准或嵌套 function 格式的工具调用中提取名称。'''
     name = tool_call.get("name")
     if isinstance(name, str):
         return name
@@ -86,19 +86,19 @@ def _tool_call_name(tool_call: dict[str, Any]) -> str:
 
 
 def _tool_call_id(tool_call: dict[str, Any]) -> str | None:
-    """提取工具调用 ID，并在缺失时返回 None。"""
+    '''提取工具调用 ID，并在缺失时返回 None。'''
     tool_call_id = tool_call.get("id")
     return str(tool_call_id) if tool_call_id else None
 
 
 def _tool_call_args(tool_call: dict[str, Any]) -> dict[str, Any]:
-    """提取字典类型的工具调用参数，其他情况返回空字典。"""
+    '''提取字典类型的工具调用参数，其他情况返回空字典。'''
     args = tool_call.get("args")
     return args if isinstance(args, dict) else {}
 
 
 def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
-    """配对历史中的 task 工具调用及其结果消息，生成按调用顺序排列的委派记录。"""
+    '''配对历史中的 task 工具调用及其结果消息，生成按调用顺序排列的委派记录。'''
     entries_by_id: dict[str, DelegationEntry] = {}
     order: list[str] = []
     now = _utc_now_iso()
@@ -151,12 +151,12 @@ def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
 
 
 def _fits_budget(lines: list[str], candidate: str, max_chars: int) -> bool:
-    """判断追加候选行后是否仍满足总字符预算。"""
+    '''判断追加候选行后是否仍满足总字符预算。'''
     return len("\n".join([*lines, candidate])) <= max_chars
 
 
 def _render_entry_line(entry: DelegationEntry) -> str:
-    """将单条委派记录渲染为安全的模型可见列表行。"""
+    '''将单条委派记录渲染为安全的模型可见列表行。'''
     status = _escape_context_text(entry["status"])
     description = _escape_context_text(entry["description"])
     subagent_type = _escape_context_text(entry["subagent_type"])
@@ -169,7 +169,7 @@ def _render_entry_line(entry: DelegationEntry) -> str:
 
 
 def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int = _LEDGER_RENDER_CHAR_BUDGET) -> str:
-    """将委派记录按新到旧顺序渲染为模型上下文，并在字符预算不足时省略旧记录。"""
+    '''将委派记录按新到旧顺序渲染为模型上下文，并在字符预算不足时省略旧记录。'''
     if not entries:
         return ""
 

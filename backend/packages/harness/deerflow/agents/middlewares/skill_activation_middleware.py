@@ -1,4 +1,4 @@
-"""处理显式斜杠技能激活，并按当前授权状态绑定请求中的技能密钥。"""
+'''处理显式斜杠技能激活，并按当前授权状态绑定请求中的技能密钥。'''
 
 from __future__ import annotations
 
@@ -44,7 +44,7 @@ _SLASH_SKILL_ACTIVATION_TARGET_ID_KEY = "slash_skill_activation_target_id"
 
 @dataclass(frozen=True, slots=True)
 class _Activation:
-    """保存一次斜杠激活所需的技能内容、路径、类别和请求剩余文本。"""
+    '''保存一次斜杠激活所需的技能内容、路径、类别和请求剩余文本。'''
 
     skill_name: str
     category: str
@@ -58,24 +58,24 @@ class _Activation:
 
 @dataclass(frozen=True, slots=True)
 class _ActivationResolution:
-    """表示技能激活的解析结果：成功时包含激活数据，失败时包含提示文本。"""
+    '''表示技能激活的解析结果：成功时包含激活数据，失败时包含提示文本。'''
 
     activation: _Activation | None = None
     failure_message: str | None = None
 
 
 def is_slash_skill_activation_reminder(message: object) -> bool:
-    """判断消息是否为隐藏的斜杠技能激活上下文。"""
+    '''判断消息是否为隐藏的斜杠技能激活上下文。'''
     return isinstance(message, HumanMessage) and bool(message.additional_kwargs.get(_SLASH_SKILL_ACTIVATION_KEY))
 
 
 def _is_user_activation_target(message: object) -> bool:
-    """判断消息是否是可触发技能激活的真实用户消息。"""
+    '''判断消息是否是可触发技能激活的真实用户消息。'''
     return is_real_user_message(message)
 
 
 class SkillActivationMiddleware(AgentMiddleware):
-    """识别用户的 ``/技能名`` 命令，加载技能说明并按需绑定其请求密钥。"""
+    '''识别用户的 ``/技能名`` 命令，加载技能说明并按需绑定其请求密钥。'''
 
     def __init__(
         self,
@@ -84,14 +84,14 @@ class SkillActivationMiddleware(AgentMiddleware):
         app_config: AppConfig | None = None,
         user_id: str | None = None,
     ) -> None:
-        """保存可用技能白名单、配置快照和当前用户范围。"""
+        '''保存可用技能白名单、配置快照和当前用户范围。'''
         super().__init__()
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._app_config = app_config
         self._user_id = user_id
 
     def _storage(self) -> SkillStorage:
-        """按用户和配置范围取得技能存储实例。"""
+        '''按用户和配置范围取得技能存储实例。'''
         if self._user_id is not None:
             return get_or_new_user_skill_storage(self._user_id, app_config=self._app_config)
         if self._app_config is not None:
@@ -100,7 +100,7 @@ class SkillActivationMiddleware(AgentMiddleware):
 
     @staticmethod
     def _read_skill_content(skill_file: Path, skills_root: Path, *, storage: SkillStorage | None = None) -> str:
-        """校验技能文件位于允许的存储根中，再以 UTF-8 读取 SKILL.md。"""
+        '''校验技能文件位于允许的存储根中，再以 UTF-8 读取 SKILL.md。'''
         if skill_file.name != SKILL_MD_FILE:
             raise ValueError(f"Expected {SKILL_MD_FILE}, got {skill_file.name}")
         # 用户级技能可能位于全局技能根之外，优先使用存储后端自己的路径校验。
@@ -118,7 +118,7 @@ class SkillActivationMiddleware(AgentMiddleware):
         return resolved_file.read_text(encoding="utf-8")
 
     def _resolve_activation(self, text: str) -> _ActivationResolution | None:
-        """解析斜杠命令，校验技能启用和白名单，并安全加载技能说明。"""
+        '''解析斜杠命令，校验技能启用和白名单，并安全加载技能说明。'''
         reference = parse_slash_skill_reference(text)
         if reference is None:
             return None
@@ -166,7 +166,7 @@ class SkillActivationMiddleware(AgentMiddleware):
 
     @staticmethod
     def _build_activation_reminder(activation: _Activation) -> str:
-        """生成包含用户原始任务和转义技能正文的隐藏激活提示。"""
+        '''生成包含用户原始任务和转义技能正文的隐藏激活提示。'''
         user_request = activation.remaining_text or ("斜杠技能命令后没有附加任务。若下一步不明确，请询问用户希望如何使用该技能。")
         escaped_user_request = html.escape(user_request, quote=False)
         escaped_skill_content = html.escape(activation.skill_content, quote=False)
@@ -193,7 +193,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _has_existing_activation_for_target(messages: list, target_index: int, target: HumanMessage) -> bool:
-        """检查目标用户消息之前是否已有对应激活提示，避免重复激活。"""
+        '''检查目标用户消息之前是否已有对应激活提示，避免重复激活。'''
         if target_index <= 0:
             return False
 
@@ -210,7 +210,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _activation_run_key(target: HumanMessage) -> str:
-        """为本轮斜杠消息生成稳定键；优先使用消息 ID，否则摘要原始用户文本。"""
+        '''为本轮斜杠消息生成稳定键；优先使用消息 ID，否则摘要原始用户文本。'''
         if target.id:
             return target.id
         content = get_original_user_content_text(target.content, target.additional_kwargs)
@@ -218,18 +218,18 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _run_context(request: ModelRequest) -> dict | None:
-        """取得模型请求对应的可变运行上下文；类型不符时返回 ``None``。"""
+        '''取得模型请求对应的可变运行上下文；类型不符时返回 ``None``。'''
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         return context if isinstance(context, dict) else None
 
     @staticmethod
     def _already_activated(run_context: dict | None, run_key: str) -> bool:
-        """判断同一斜杠消息是否已在运行上下文登记，覆盖提示已离开消息窗口的情况。"""
+        '''判断同一斜杠消息是否已在运行上下文登记，覆盖提示已离开消息窗口的情况。'''
         return isinstance(run_context, dict) and run_context.get(_SLASH_SKILL_ACTIVATION_RUN_KEY) == run_key
 
     def _find_activation_target(self, messages: list, *, run_context: dict | None = None) -> tuple[int, HumanMessage, _ActivationResolution, str] | None:
-        """从最近的真实用户消息中寻找尚未处理的技能命令并解析其目标。"""
+        '''从最近的真实用户消息中寻找尚未处理的技能命令并解析其目标。'''
         if not messages:
             return None
 
@@ -255,7 +255,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _record_activation(request: ModelRequest, activation: _Activation, *, hook: str) -> None:
-        """向运行日志记录激活的技能信息，不记录技能密钥值。"""
+        '''向运行日志记录激活的技能信息，不记录技能密钥值。'''
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         journal = context.get("__run_journal") if isinstance(context, dict) else None
@@ -278,7 +278,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
             logger.debug("Failed to record slash skill activation audit event", exc_info=True)
 
     def _prepare_model_request(self, request: ModelRequest, *, hook: str) -> tuple[ModelRequest | AIMessage | None, _Activation | None]:
-        """完成激活提示插入和审计，并登记本轮激活键以阻止重复处理。"""
+        '''完成激活提示插入和审计，并登记本轮激活键以阻止重复处理。'''
         run_context = self._run_context(request)
         target_and_resolution = self._find_activation_target(list(request.messages), run_context=run_context)
         if target_and_resolution is None:
@@ -309,7 +309,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return request.override(messages=messages), activation
 
     def _handle_model_request(self, request: ModelRequest, *, hook: str) -> ModelRequest | AIMessage:
-        """准备激活请求并刷新密钥绑定；解析失败时直接返回给模型的错误消息。"""
+        '''准备激活请求并刷新密钥绑定；解析失败时直接返回给模型的错误消息。'''
         prepared, activation = self._prepare_model_request(request, hook=hook)
         if isinstance(prepared, AIMessage):
             return prepared
@@ -318,12 +318,12 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return effective
 
     def _resolve_secret_bindings(self, request: ModelRequest, activation: _Activation | None, *, hook: str) -> None:
-        """每次模型调用按显式激活和线程技能上下文重算密钥集合，并只注入请求提供的值。
+        '''每次模型调用按显式激活和线程技能上下文重算密钥集合，并只注入请求提供的值。
 
         线程上下文中的技能会针对实时注册表重新校验启用状态、白名单和自主读取策略；
         显式斜杠激活按用户授权保留到本轮结束。注册表读取失败时不绑定任何密钥，审计
         仅记录技能名、密钥名和缺失项，不记录密钥值。
-        """
+        '''
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         if not isinstance(context, dict):
@@ -382,10 +382,10 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         self._record_secret_binding(context, audit_state, hook=hook)
 
     def _load_skill_registry_by_path(self) -> dict[str, Skill] | None:
-        """每次读取实时技能注册表并按规范化容器路径索引；失败时返回 ``None`` 并拒绝绑定。
+        '''每次读取实时技能注册表并按规范化容器路径索引；失败时返回 ``None`` 并拒绝绑定。
 
         不缓存启用状态，确保管理员禁用技能后下一次模型调用立即撤销其密钥访问。
-        """
+        '''
         try:
             storage = self._storage()
             skills = storage.load_skills(enabled_only=False)
@@ -396,11 +396,11 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return {posixpath.normpath(skill.get_container_file_path(container_root)): skill for skill in skills}
 
     def _resolve_registry_skill(self, registry: dict[str, Skill], path: object, *, require_autonomous: bool) -> Skill | None:
-        """按规范化文件路径查找可绑定技能，并校验启用、密钥声明及 Agent 白名单。
+        '''按规范化文件路径查找可绑定技能，并校验启用、密钥声明及 Agent 白名单。
 
         不按名称回退，避免同名自定义技能冒用公共技能引用；线程上下文来源还需遵守
         ``secrets-autonomous``，显式斜杠激活则代表用户直接授权。
-        """
+        '''
         if not isinstance(path, str) or not path:
             return None
         skill = registry.get(posixpath.normpath(path))
@@ -413,7 +413,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         return skill
 
     def _in_context_secret_sources(self, request: ModelRequest, registry: dict[str, Skill]) -> list[tuple[str, tuple[SecretRequirement, ...]]]:
-        """将线程状态中的已加载技能路径解析为密钥来源，并按实时注册表逐项复核资格。"""
+        '''将线程状态中的已加载技能路径解析为密钥来源，并按实时注册表逐项复核资格。'''
         state = getattr(request, "state", None) or {}
         try:
             entries = state.get("skill_context") or []
@@ -434,7 +434,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _record_secret_binding(context: dict, audit_state: dict, *, hook: str) -> None:
-        """记录密钥绑定审计摘要；摘要只包含名称，不包含任何密钥值。"""
+        '''记录密钥绑定审计摘要；摘要只包含名称，不包含任何密钥值。'''
         journal = context.get("__run_journal")
         if journal is None:
             return
@@ -451,7 +451,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
 
     @staticmethod
     def _make_activation_message(target: HumanMessage, activation_content: str) -> HumanMessage:
-        """为激活提示创建隐藏消息，并关联原用户消息 ID 以支持去重。"""
+        '''为激活提示创建隐藏消息，并关联原用户消息 ID 以支持去重。'''
         stable_id = target.id or str(uuid.uuid4())
         additional_kwargs = {
             "hide_from_ui": True,
@@ -471,7 +471,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelResponse | AIMessage:
-        """同步调用前处理斜杠激活和密钥绑定，再执行模型处理器。"""
+        '''同步调用前处理斜杠激活和密钥绑定，再执行模型处理器。'''
         prepared = self._handle_model_request(request, hook="wrap_model_call")
         if isinstance(prepared, AIMessage):
             return prepared
@@ -483,7 +483,7 @@ Follow this skill before choosing a general workflow. Load supporting resources 
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelResponse | AIMessage:
-        """在线程池执行磁盘读取等同步准备工作，再异步调用模型处理器。"""
+        '''在线程池执行磁盘读取等同步准备工作，再异步调用模型处理器。'''
         prepared = await asyncio.to_thread(self._handle_model_request, request, hook="awrap_model_call")
         if isinstance(prepared, AIMessage):
             return prepared

@@ -1,8 +1,8 @@
-"""生成音乐：调用 MiniMax 音乐接口，将十六进制 MP3 数据写入指定输出路径。
+'''生成音乐：调用 MiniMax 音乐接口，将十六进制 MP3 数据写入指定输出路径。
 
 提示 JSON 决定歌词、纯音乐或歌词优化模式；请求与 ``base_resp`` 错误、空音频、无效
 十六进制数据和写入错误均向调用方传播。仅缺少 MiniMax 密钥时返回可读状态字符串。
-"""
+'''
 
 import argparse
 import json
@@ -14,19 +14,19 @@ MINIMAX_DEFAULT_HOST = "https://api.minimaxi.com"
 
 
 def _check_base_resp(payload: dict) -> None:
-    """校验 MiniMax ``base_resp`` 是否表示成功，非零状态时抛出含服务端信息的异常。"""
+    '''校验 MiniMax ``base_resp`` 是否表示成功，非零状态时抛出含服务端信息的异常。'''
     base = payload.get("base_resp") or {}
     if base.get("status_code", 0) != 0:
         raise Exception(f"MiniMax error {base.get('status_code')}: {base.get('status_msg')}")
 
 
 def generate_music(prompt_file: str, output_file: str) -> str:
-    """通过 MiniMax ``/v1/music_generation`` 依据 JSON 规格生成 MP3。
+    '''通过 MiniMax ``/v1/music_generation`` 依据 JSON 规格生成 MP3。
 
     从 UTF-8 JSON 读取 ``prompt``，并按 ``lyrics``、``is_instrumental`` 的优先级设置
     请求：有歌词直接提交，否则纯音乐，最后使用歌词优化。成功响应的十六进制音频会在
     创建输出父目录后写入 ``output_file``；格式、API、解码和文件系统错误均向调用方传播。
-    """
+    '''
     with open(prompt_file, "r", encoding="utf-8") as f:
         spec = json.load(f)
 
@@ -37,7 +37,7 @@ def generate_music(prompt_file: str, output_file: str) -> str:
     prompt = (spec.get("prompt") or "").strip()
     if not prompt:
         raise ValueError("`prompt` is required in the music spec")
-    lyrics = spec.get("lyrics") or None  # treat empty string the same as absent
+    lyrics = spec.get("lyrics") or None  # 空字符串按未提供歌词处理。
     is_instrumental = bool(spec.get("is_instrumental", False))
 
     body = {

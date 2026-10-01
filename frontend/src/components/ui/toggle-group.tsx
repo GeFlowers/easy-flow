@@ -17,7 +17,7 @@ const ToggleGroupContext = React.createContext<
   spacing: 0,
 });
 
-/** ToggleGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理单选或多选切换组，并向每个选项共享外观和间距设置。 */
 function ToggleGroup({
   className,
   variant,
@@ -49,7 +49,7 @@ function ToggleGroup({
   );
 }
 
-/** ToggleGroupItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 继承组级外观的单个切换项，并保持相邻边框圆角连续。 */
 function ToggleGroupItem({
   className,
   children,

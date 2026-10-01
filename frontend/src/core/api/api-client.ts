@@ -35,13 +35,11 @@ function injectCsrfHeader(_url: URL, init: RequestInit): RequestInit {
 // 永久阻塞在已耗尽的条件变量上。这会让 ``isLoading`` 一直为 true，使提交按钮
 // 保持“停止”状态，并导致刷新后的第一条消息无法发送。下方 ``joinStream`` 包装器
 // 会在真正加入流之前短路这些情形。
-//
 // 包含 ``interrupted``，因为它在 DeerFlow 中只由 ``RunManager.cancel()`` 写入
 // （即用户主动停止）；可恢复的人机交互路径使用
 // ``Command(goto=END)``（``ClarificationMiddleware``），会将运行以
 // ``success`` 而非 ``interrupted`` 结束。因此，被中断的运行已没有内容可流式传输：
 // 其状态保存在由 ``useThreadHistory`` 独立获取的检查点中，恢复意味着重新 ``submit``。
-//
 // 错误和超时状态同样是终态，因此在约 60 秒的桥接器回收窗口内刷新页面时，
 // 不再会通过 ``onError`` 重放缓冲的错误事件，临时错误提示
 // （``getStreamErrorMessage``）会被丢弃。持久化的错误状态仍由

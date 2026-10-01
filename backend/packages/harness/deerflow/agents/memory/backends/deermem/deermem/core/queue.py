@@ -1,6 +1,4 @@
-"""定义 queue 模块提供的职责与可复用接口。
-
-Memory update queue with debounce mechanism."""
+'''按用户、代理和线程聚合待处理对话，并通过防抖定时器执行记忆更新。'''
 
 from __future__ import annotations
 
@@ -21,9 +19,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ConversationContext:
-    """封装 ConversationContext 的状态、协作关系与公开操作。
-
-    Context for a conversation to be processed for memory update."""
+    '''保存一组待处理对话及其目标身份、追踪信息和用户反馈信号。'''
 
     thread_id: str
     messages: list[Any]
@@ -36,29 +32,16 @@ class ConversationContext:
 
 
 class MemoryUpdateQueue:
-    """封装 MemoryUpdateQueue 的状态、协作关系与公开操作。
-
-    Queue for memory updates with debounce mechanism.
-
-        This queue collects conversation contexts and processes them after
-        a configurable debounce period. Multiple conversations received within
-        the debounce window are batched together.
-    """
+    '''合并同一记忆目标的更新请求，并在线程中延迟批量处理，支持关闭时限内刷新。'''
 
     def __init__(self, config: DeerMemConfig, updater: MemoryUpdater):
-        """实现 __init__ 协议方法，保持对象交互语义一致。
-
-        Initialize the memory update queue with injected config + updater."""
+        '''保存更新器与防抖配置，并初始化待处理项、线程锁和工作状态。'''
         self._config = config
         self._updater = updater
         self._queue: list[ConversationContext] = []
         self._lock = threading.Lock()
         self._timer: threading.Timer | None = None
         self._processing = False
-        # Thread currently running ``_process_queue`` (None when idle). ``flush_sync``
-        # joins an in-flight worker instead of reporting a false-positive "completed"
-        # while contexts it already pulled out of the queue are still being processed
-        # (and would be lost on exit). See ``flush_sync`` step (1).
         self._processing_thread: threading.Thread | None = None
         self._reprocess_pending = False
 
@@ -68,9 +51,7 @@ class MemoryUpdateQueue:
         user_id: str | None,
         agent_name: str | None,
     ) -> tuple[str, str | None, str | None]:
-        """执行 _queue_key 的明确职责，并返回与调用约定一致的结果。
-
-        Return the debounce identity for a memory update target."""
+        '''组合线程、用户和代理标识，确定可以合并的记忆更新目标。'''
         return (thread_id, user_id, agent_name)
 
     def add(
@@ -83,22 +64,7 @@ class MemoryUpdateQueue:
         correction_detected: bool = False,
         reinforcement_detected: bool = False,
     ) -> None:
-        """执行 add 的明确职责，并返回与调用约定一致的结果。
-
-        Add a conversation to the update queue.
-
-                Args:
-                    thread_id: The thread ID.
-                    messages: The conversation messages.
-                    agent_name: If provided, memory is stored per-agent. If None, uses global memory.
-                    user_id: The user ID captured at enqueue time. Stored in ConversationContext so it
-                        survives the threading.Timer boundary (ContextVar does not propagate across
-                        raw threads).
-                    trace_id: Request trace id captured at enqueue time so the
-                        later Timer thread can attach it to memory LLM tracing metadata.
-                    correction_detected: Whether recent turns include an explicit correction signal.
-                    reinforcement_detected: Whether recent turns include a positive reinforcement signal.
-        """
+        '''登记或替换同一目标的待处理对话，并在最后一次请求后重新计时防抖窗口。'''
         with self._lock:
             self._enqueue_locked(
                 thread_id=thread_id,
@@ -123,9 +89,7 @@ class MemoryUpdateQueue:
         correction_detected: bool = False,
         reinforcement_detected: bool = False,
     ) -> None:
-        """执行 add_nowait 的明确职责，并返回与调用约定一致的结果。
-
-        Add a conversation and start processing immediately in the background."""
+        '''登记待处理对话并安排立即在后台刷新队列。'''
         with self._lock:
             self._enqueue_locked(
                 thread_id=thread_id,
@@ -151,7 +115,7 @@ class MemoryUpdateQueue:
         correction_detected: bool,
         reinforcement_detected: bool,
     ) -> None:
-        "执行 _enqueue_locked 的明确职责，并返回与调用约定一致的结果"
+        '''在锁保护下合并同一目标的对话上下文，并保留已检测到的反馈信号。'''
         queue_key = self._queue_key(thread_id, user_id, agent_name)
         existing_context = next(
             (context for context in self._queue if self._queue_key(context.thread_id, context.user_id, context.agent_name) == queue_key),
@@ -173,19 +137,14 @@ class MemoryUpdateQueue:
         self._queue.append(context)
 
     def _reset_timer(self) -> None:
-        """执行 _reset_timer 的明确职责，并返回与调用约定一致的结果。
-
-        Reset the debounce timer."""
+        '''按配置的防抖时长重新安排队列处理。'''
         config = self._config
         self._schedule_timer(config.debounce_seconds)
 
         logger.debug("Memory update timer set for %ss", config.debounce_seconds)
 
     def _schedule_timer(self, delay_seconds: float) -> None:
-        """执行 _schedule_timer 的明确职责，并返回与调用约定一致的结果。
-
-        Schedule queue processing after the provided delay."""
-        # Cancel existing timer if any
+        '''取消旧定时器并启动一个守护线程定时器，在指定延迟后处理队列。'''
         if self._timer is not None:
             self._timer.cancel()
 
@@ -197,23 +156,9 @@ class MemoryUpdateQueue:
         self._timer.start()
 
     def _process_queue(self, *, skip_inter_item_delay: bool = False) -> None:
-        """执行 _process_queue 的明确职责，并返回与调用约定一致的结果。
-
-        Process all queued conversation contexts.
-
-                Args:
-                    skip_inter_item_delay: When set, skip the inter-item rate-limit
-                        ``time.sleep``. Intended for the shutdown-drain path
-                        (:meth:`flush_sync`), which races a bounded timeout and should
-                        not waste budget sleeping between items.
-        """
+        '''原子取出当前队列并逐项更新记忆；并发触发时登记一次补跑，避免重复工作线程。'''
         with self._lock:
             if self._processing:
-                # Another worker is already draining the queue. Instead of
-                # spawning a tight timer spin (repeatedly re-scheduling a
-                # 0-delay Timer thread while busy), defer a single re-run: the
-                # active worker checks this flag in its finally block and
-                # reschedules once if work remains.
                 self._reprocess_pending = True
                 return
 
@@ -253,17 +198,9 @@ class MemoryUpdateQueue:
                     failed += 1
                     logger.error("Error updating memory for thread %s (trace_id=%s): %s", context.thread_id, context.trace_id, e)
 
-                # Small delay between updates to avoid rate limiting.
-                # Skipped on the shutdown-drain path, which races a bounded
-                # timeout and should spend that budget on LLM calls, not on
-                # sleeping between items.
                 if not skip_inter_item_delay and len(contexts_to_process) > 1:
                     time.sleep(0.5)
         finally:
-            # Summary count disambiguates "drained" (queue emptied) from "saved"
-            # (every extraction persisted): per-item ``update_memory`` failures are
-            # swallowed above, so without this an operator debugging missing
-            # memories would see only the happy-path "Processing N" line.
             if succeeded or failed:
                 logger.info("Memory update batch done: %d succeeded, %d failed", succeeded, failed)
             with self._lock:
@@ -275,17 +212,7 @@ class MemoryUpdateQueue:
                         self._schedule_timer(0)
 
     def flush(self, *, skip_inter_item_delay: bool = False) -> None:
-        """执行 flush 的明确职责，并返回与调用约定一致的结果。
-
-        Force immediate processing of the queue.
-
-                This is useful for testing or graceful shutdown.
-
-                Args:
-                    skip_inter_item_delay: Forwarded to :meth:`_process_queue`; skip the
-                        inter-item rate-limit sleep. Intended for the shutdown-drain
-                        path (:meth:`flush_sync`).
-        """
+        '''取消尚未触发的防抖定时器，并在当前线程立即处理队列。'''
         with self._lock:
             if self._timer is not None:
                 self._timer.cancel()
@@ -294,61 +221,22 @@ class MemoryUpdateQueue:
         self._process_queue(skip_inter_item_delay=skip_inter_item_delay)
 
     def flush_sync(self, timeout: float) -> bool:
-        """执行 flush_sync 的明确职责，并返回与调用约定一致的结果。
-
-        Best-effort synchronous flush bounded by ``timeout`` seconds.
-
-                Unlike :meth:`flush_nowait` (which only schedules a daemon timer that
-                is killed on process exit), this runs :meth:`flush` on a daemon thread
-                and waits up to ``timeout`` seconds for it to finish. Intended for
-                graceful shutdown: without it, any updates enqueued since the last
-                timer fire are lost on restart / rolling deploy / SIGTERM, because the
-                queue is pure in-memory and the debounce Timer is a daemon thread.
-
-                The drain accounts for two races a naive ``flush()`` would miss:
-
-                - **In-flight worker.** If the debounce Timer already fired, an
-                  ``_process_queue`` worker is mid-LLM-call holding contexts it already
-                  pulled out of the queue (``_processing=True``, queue empty). ``flush``
-                  alone would see ``_processing=True``, no-op, and report success while
-                  that worker is still running and likely killed on exit. So we join
-                  the in-flight worker first (bounded by the remaining budget).
-                - **Failed flush.** ``flush`` makes a synchronous LLM call that can
-                  raise; success is tracked on the happy path only, so the return value
-                  matches the docstring's "completed".
-
-                Note: steps (1) and (3) share the same ``deadline`` budget. A slow
-                in-flight worker can consume most/all of it, leaving step (3) to no-op;
-                ``timeout`` must therefore cover both a slow in-flight worker *and* the
-                remaining queue (best-effort: any tail not drained in budget is dropped,
-                same failure direction as no flush, scoped to the tail).
-
-                Returns ``True`` only if the drain genuinely finished (queue empty, no
-                worker still running, flush did not raise) within ``timeout``.
-        """
+        '''在统一超时预算内等待正在处理的线程并尝试排空余项；仅完整结束时返回 True。'''
         deadline = time.monotonic() + timeout
 
-        # (1) Wait for an in-flight _process_queue first (bounded). Otherwise
-        # flush() would see _processing=True, no-op, and we would report
-        # success while that worker is still mid-LLM-call on a daemon thread
-        # that exit will kill — losing the contexts it already pulled out.
         with self._lock:
             in_flight = self._processing_thread
         if in_flight is not None:
             in_flight.join(timeout=max(0.0, deadline - time.monotonic()))
 
-        # (2) Genuine idle: nothing pending and no worker still running.
         if self.pending_count == 0 and not self.is_processing:
             return True
 
-        # (3) Drain the queue on a daemon thread so the timeout is a real hard
-        # stop: flush() makes a synchronous LLM call that cannot be
-        # interrupted, so we wait on Event.wait, not on Thread.join.
         success = False
         done = threading.Event()
 
         def _run() -> None:
-            "执行 _run 的明确职责，并返回与调用约定一致的结果"
+            '''在线程中刷新队列并记录异常，最后通知等待方刷新已结束。'''
             nonlocal success
             try:
                 self.flush(skip_inter_item_delay=True)
@@ -363,25 +251,15 @@ class MemoryUpdateQueue:
         finished = done.wait(timeout=max(0.0, deadline - time.monotonic()))
         if not finished:
             return False
-        # flush() returned; only report success if no worker raced back in.
         return bool(success) and not self.is_processing
 
     def flush_nowait(self) -> None:
-        """执行 flush_nowait 的明确职责，并返回与调用约定一致的结果。
-
-        Start queue processing immediately in a background thread."""
+        '''安排后台立即刷新，不等待更新完成。'''
         with self._lock:
-            # Daemon thread: queued messages may be lost if the process exits
-            # before _process_queue completes. Acceptable for best-effort memory updates.
             self._schedule_timer(0)
 
     def clear(self) -> None:
-        """执行 clear 的明确职责，并返回与调用约定一致的结果。
-
-        Clear the queue without processing.
-
-                This is useful for testing.
-        """
+        '''取消定时器并清除排队项及处理状态，不执行记忆更新。'''
         with self._lock:
             if self._timer is not None:
                 self._timer.cancel()
@@ -393,16 +271,12 @@ class MemoryUpdateQueue:
 
     @property
     def pending_count(self) -> int:
-        """执行 pending_count 的明确职责，并返回与调用约定一致的结果。
-
-        Get the number of pending updates."""
+        '''在线程锁保护下返回尚未被工作线程取走的更新项数量。'''
         with self._lock:
             return len(self._queue)
 
     @property
     def is_processing(self) -> bool:
-        """判断条件是否成立并返回布尔结果，并遵守 is_processing 所表达的接口约束。
-
-        Check if the queue is currently being processed."""
+        '''在线程锁保护下报告当前是否有工作线程正在处理更新。'''
         with self._lock:
             return self._processing

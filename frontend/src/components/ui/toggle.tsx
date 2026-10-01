@@ -28,7 +28,7 @@ const toggleVariants = cva(
   },
 );
 
-/** Toggle 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供支持按下状态的按钮，并统一默认/描边变体及尺寸。 */
 function Toggle({
   className,
   variant,

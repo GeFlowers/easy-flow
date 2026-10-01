@@ -1,4 +1,4 @@
-"""提供配置、run、events、配置相关功能。"""
+'''配置运行事件记录的持久化后端、保留策略与查询边界。'''
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ from pydantic import BaseModel, Field
 
 
 class RunEventsConfig(BaseModel):
-    """\u6267\u884c RunEventsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''指定网关运行事件存储方式及事件保留参数。'''
 
     backend: Literal["memory", "db", "jsonl"] = Field(
         default="memory",

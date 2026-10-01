@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -19,15 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class ThreadMetaRepository(ThreadMetaStore):
-    """定义负责持久化读写及事务边界管理的仓储组件。"""
+    '''定义负责持久化读写及事务边界管理的仓储组件。'''
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
-        """初始化当前持久化组件所需的依赖与内部状态。"""
+        '''初始化当前持久化组件所需的依赖与内部状态。'''
         self._sf = session_factory
 
     @staticmethod
     def _row_to_dict(row: ThreadMetaRow) -> dict[str, Any]:
-        """将持久化记录转换为对外使用的字典表示。"""
+        '''将持久化记录转换为对外使用的字典表示。'''
         d = row.to_dict()
         d["metadata"] = d.pop("metadata_json", None) or {}
         for key in ("created_at", "updated_at"):
@@ -46,9 +46,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         display_name: str | None = None,
         metadata: dict | None = None,
     ) -> dict:
-        # Auto-resolve user_id from contextvar when AUTO; explicit None
-        # creates an orphan row (used by migration scripts).
-        """创建记录并在成功后提交相应的持久化事务。"""
+        '''创建记录并在成功后提交相应的持久化事务。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.create")
         now = datetime.now(UTC)
         row = ThreadMetaRow(
@@ -72,19 +70,18 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> dict | None:
-        """按给定条件查询并返回对应的持久化记录。"""
+        '''按给定条件查询并返回对应的持久化记录。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.get")
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)
             if row is None:
                 return None
-            # Enforce owner filter unless explicitly bypassed (user_id=None).
             if resolved_user_id is not None and row.user_id != resolved_user_id:
                 return None
             return self._row_to_dict(row)
 
     async def check_access(self, thread_id: str, user_id: str, *, require_existing: bool = False) -> bool:
-        """检查线程是否归属指定用户，并按参数处理缺少元数据的线程。"""
+        '''检查线程是否归属指定用户，并按参数处理缺少元数据的线程。'''
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)
             if row is None:
@@ -102,7 +99,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         offset: int = 0,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> list[dict[str, Any]]:
-        """查询并返回满足给定条件的持久化记录集合。"""
+        '''查询并返回满足给定条件的持久化记录集合。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.search")
         stmt = select(ThreadMetaRow).order_by(ThreadMetaRow.updated_at.desc(), ThreadMetaRow.thread_id.desc())
         if resolved_user_id is not None:
@@ -119,9 +116,6 @@ class ThreadMetaRepository(ThreadMetaStore):
                 except (ValueError, TypeError) as exc:
                     logger.warning("Skipping metadata filter key %s: %s", ascii(key), exc)
             if applied == 0:
-                # Comma-separated plain string (no list repr / nested
-                # quoting) so the 400 detail surfaced by the Gateway is
-                # easy for clients to read. Sorted for determinism.
                 rejected_keys = ", ".join(sorted(str(k) for k in metadata))
                 raise InvalidMetadataFilterError(f"All metadata filter keys were rejected as unsafe: {rejected_keys}")
 
@@ -131,9 +125,9 @@ class ThreadMetaRepository(ThreadMetaStore):
             return [self._row_to_dict(r) for r in result.scalars()]
 
     async def _check_ownership(self, session: AsyncSession, thread_id: str, resolved_user_id: str | None) -> bool:
-        """在当前会话中验证线程归属；None 表示显式跳过所有者过滤。"""
+        '''在当前会话中验证线程归属；None 表示显式跳过所有者过滤。'''
         if resolved_user_id is None:
-            return True  # explicit bypass
+            return True
         row = await session.get(ThreadMetaRow, thread_id)
         return row is not None and row.user_id == resolved_user_id
 
@@ -144,7 +138,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_display_name")
         async with self._sf() as session:
             if not await self._check_ownership(session, thread_id, resolved_user_id):
@@ -159,7 +153,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_status")
         async with self._sf() as session:
             if not await self._check_ownership(session, thread_id, resolved_user_id):
@@ -174,7 +168,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_metadata")
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)
@@ -195,7 +189,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.update_owner")
         async with self._sf() as session:
             if not await self._check_ownership(session, thread_id, resolved_user_id):
@@ -209,7 +203,7 @@ class ThreadMetaRepository(ThreadMetaStore):
         *,
         user_id: str | None | _AutoSentinel = AUTO,
     ) -> None:
-        """删除或撤销满足条件的持久化记录并提交事务。"""
+        '''删除或撤销满足条件的持久化记录并提交事务。'''
         resolved_user_id = resolve_user_id(user_id, method_name="ThreadMetaRepository.delete")
         async with self._sf() as session:
             row = await session.get(ThreadMetaRow, thread_id)

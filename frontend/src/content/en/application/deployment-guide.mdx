@@ -1,13 +1,13 @@
 ---
 title: Deployment Guide
-description: "This guide covers the supported Docker Compose deployment for DeerFlow App, including Kubernetes-managed sandboxes."
+description: "This guide covers the supported Docker Compose deployment for DeerFlow App."
 ---
 
-import { Callout, Steps } from "nextra/components";
+import { Callout } from "nextra/components";
 
 # Deployment Guide
 
-This guide covers the supported Docker Compose deployment for DeerFlow App, including Kubernetes-managed sandboxes.
+This guide covers the supported Docker Compose deployment for DeerFlow App.
 
 ## Supported deployment
 
@@ -28,7 +28,7 @@ Docker Compose runs all services in containers. Use this for a more production-l
 make docker-start
 ```
 
-Services: nginx, frontend, gateway, PostgreSQL, and optionally provisioner (for K8s-managed sandboxes).
+Services: nginx, frontend, gateway, and PostgreSQL.
 
 Access the app at **http://localhost:2026**.
 
@@ -71,11 +71,9 @@ For production, use a named volume or a Persistent Volume Claim (PVC) instead of
 | Sandbox                                | Use case                                   |
 | -------------------------------------- | ------------------------------------------ |
 | `LocalSandboxProvider`                 | Single-user, trusted local workflows       |
-| `AioSandboxProvider` (Docker)          | Multi-user, moderate isolation requirement |
 | `E2BSandboxProvider` (e2b cloud)       | Hosted/serverless, no Docker/K8s ops, instant Jupyter |
-| `AioSandboxProvider` + K8s Provisioner | Production, strong isolation, multi-user   |
 
-For any deployment with more than one concurrent user, use a container-based sandbox to prevent users from interfering with each other's execution environments.
+The configured default is `LocalSandboxProvider`, intended for trusted single-user workflows. Choose a VM-backed provider when stronger execution isolation is required.
 
 ### Database backend
 
@@ -96,45 +94,6 @@ database:
 run_events:
   backend: db
 ```
-
-### K8s Provisioner setup
-
-The provisioner manages sandbox Pods in a Kubernetes cluster. It is included in `docker/docker-compose-dev.yaml`.
-
-<Steps>
-
-#### Configure the provisioner
-
-Set required environment variables in your `.env` or compose override:
-
-```bash
-K8S_NAMESPACE=deer-flow
-SANDBOX_IMAGE=enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
-DEER_FLOW_ROOT=/absolute/path/to/deer-flow
-```
-
-#### Configure the sandbox provider
-
-```yaml
-# config.yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  provisioner_url: http://provisioner:8002
-```
-
-#### Configure data persistence
-
-For production, use PVCs instead of hostPath volumes:
-
-```bash
-# In .env or compose environment
-USERDATA_PVC_NAME=deer-flow-userdata-pvc
-SKILLS_PVC_NAME=deer-flow-skills-pvc
-```
-
-When `USERDATA_PVC_NAME` is set, the provisioner automatically uses subPath (`deer-flow/users/{user_id}/threads/{thread_id}/user-data`) so each user's threads get their own directories in the PVC.
-
-</Steps>
 
 ### nginx configuration
 
@@ -158,7 +117,6 @@ openssl rand -base64 32
 | ------------------------------- | ---------------- | ---------------- |
 | Gateway + agent runtime         | 2 vCPU, 4 GB RAM | 4 vCPU, 8 GB RAM |
 | Frontend                        | 0.5 vCPU, 512 MB | 1 vCPU, 1 GB     |
-| Sandbox container (per session) | 1 vCPU, 1 GB     | 2 vCPU, 2 GB     |
 
 ## Deployment verification
 

@@ -6,35 +6,35 @@ import { XIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-/** Dialog 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理模态对话框的打开状态及其无障碍焦点行为。 */
 function Dialog({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />;
 }
 
-/** DialogTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 将子按钮注册为打开对话框的触发元素。 */
 function DialogTrigger({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Trigger>) {
   return <DialogPrimitive.Trigger data-slot="dialog-trigger" {...props} />;
 }
 
-/** DialogPortal 内部组件：组织对应的界面结构与交互语义。 */
+/** 将对话框内容挂载到页面根层，避免受父级裁剪和层叠影响。 */
 function DialogPortal({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Portal>) {
   return <DialogPrimitive.Portal data-slot="dialog-portal" {...props} />;
 }
 
-/** DialogClose 内部组件：组织对应的界面结构与交互语义。 */
+/** 将子元素注册为关闭当前对话框的控件。 */
 function DialogClose({
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Close>) {
   return <DialogPrimitive.Close data-slot="dialog-close" {...props} />;
 }
 
-/** DialogOverlay 内部组件：组织对应的界面结构与交互语义。 */
+/** 在弹窗后方绘制遮罩，并按打开状态执行淡入淡出。 */
 function DialogOverlay({
   className,
   ...props
@@ -51,7 +51,7 @@ function DialogOverlay({
   );
 }
 
-/** DialogContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 组合遮罩和居中弹窗内容，并可选提供默认关闭按钮。 */
 function DialogContent({
   className,
   children,
@@ -86,7 +86,7 @@ function DialogContent({
   );
 }
 
-/** DialogHeader 内部组件：组织对应的界面结构与交互语义。 */
+/** 将对话框标题和说明纵向排列，并在宽屏恢复左对齐。 */
 function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -97,7 +97,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** DialogFooter 内部组件：组织对应的界面结构与交互语义。 */
+/** 将确认与取消操作排列在对话框底部，窄屏下反转按钮顺序。 */
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -111,7 +111,7 @@ function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** DialogTitle 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供对话框的语义标题及统一强调样式。 */
 function DialogTitle({
   className,
   ...props
@@ -125,7 +125,7 @@ function DialogTitle({
   );
 }
 
-/** DialogDescription 内部组件：组织对应的界面结构与交互语义。 */
+/** 为对话框标题补充说明文字和描述性语义。 */
 function DialogDescription({
   className,
   ...props

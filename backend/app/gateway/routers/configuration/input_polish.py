@@ -1,4 +1,4 @@
-"""提供发送前输入润色接口，且不创建运行或持久化消息。"""
+'''提供发送前输入润色接口，且不创建运行或持久化消息。'''
 
 import logging
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/api", tags=["input-polish"])
 
 
 class InputPolishRequest(BaseModel):
-    """定义输入润色请求中的草稿、语言提示和仅用于追踪的线程标识。"""
+    '''定义输入润色请求中的草稿、语言提示和仅用于追踪的线程标识。'''
 
     text: str = Field(..., description="Draft text currently shown in the composer")
     locale: str | None = Field(default=None, description="Optional UI locale hint")
@@ -25,14 +25,14 @@ class InputPolishRequest(BaseModel):
 
 
 class InputPolishResponse(BaseModel):
-    """返回模型润色后的草稿以及是否与原文不同的标记。"""
+    '''返回模型润色后的草稿以及是否与原文不同的标记。'''
 
     rewritten_text: str = Field(..., description="Polished draft text")
     changed: bool = Field(..., description="Whether the model changed the original draft")
 
 
 def _clean_rewritten_text(text: str) -> str:
-    """移除完整思考块和 Markdown 围栏，同时保留合法的未闭合标签文本。"""
+    '''移除完整思考块和 Markdown 围栏，同时保留合法的未闭合标签文本。'''
     # 润色草稿可合法包含字面量 "<think>"，例如询问该标签的草稿；因此不能在未闭合
     # 开始标签处截断，否则会悄然丢失有效改写的后半段并错误返回 503。完整的
     # <think>...</think> 块仍会被移除。
@@ -42,7 +42,7 @@ def _clean_rewritten_text(text: str) -> str:
 
 
 def _build_system_instruction() -> str:
-    """构造约束润色模型保留用户意图且只输出改写结果的系统指令。"""
+    '''构造约束润色模型保留用户意图且只输出改写结果的系统指令。'''
     return (
         "You are DeerFlow's pre-send prompt optimizer.\n"
         "Rewrite the user's rough draft into a clearer instruction for an AI agent before it is sent.\n"
@@ -57,7 +57,7 @@ def _build_system_instruction() -> str:
 
 
 def _build_user_content(text: str, locale: str | None) -> str:
-    """将草稿及可选语言提示封装为单次模型调用的用户内容。"""
+    '''将草稿及可选语言提示封装为单次模型调用的用户内容。'''
     locale_hint = locale.strip() if locale else "same language as the draft"
     return f"Locale hint: {locale_hint}\n\nRewrite this draft while preserving its intent:\n<draft>\n{text}\n</draft>"
 
@@ -74,7 +74,7 @@ async def polish_input(
     request: Request,
     config: AppConfig = Depends(get_config),
 ) -> InputPolishResponse:
-    """在通过创建运行权限校验后润色草稿，但不启动或写入任何线程运行。"""
+    '''在通过创建运行权限校验后润色草稿，但不启动或写入任何线程运行。'''
     del request  # 认证装饰器要求保留该参数。
 
     if not config.input_polish.enabled:

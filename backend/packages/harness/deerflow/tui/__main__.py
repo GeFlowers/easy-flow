@@ -1,4 +1,4 @@
-"未说明"
+'''支持通过 python -m deerflow.tui 启动终端界面。'''
 
 from .cli import main
 

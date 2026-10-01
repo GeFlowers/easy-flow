@@ -53,6 +53,7 @@ export function useThreadChat() {
     () => threadIdFromPath === "new",
   );
 
+  /** 创建新的临时线程标识，并将聊天状态切换到未创建线程模式。 */
   const resetToNewThread = useCallback(() => {
     const nextThreadId = uuid();
     newThreadIdRef.current = nextThreadId;
@@ -79,6 +80,7 @@ export function useThreadChat() {
   }, [pathname, threadIdFromPath]);
 
   useEffect(() => {
+    /** 响应线程重置事件；仅当事件对应当前线程时清除本地聊天状态。 */
     const handleReset = (event: Event) => {
       const detail = (event as CustomEvent<ThreadChatResetDetail>).detail;
       if (!detail?.nextPath) {
@@ -106,11 +108,13 @@ export function useThreadChat() {
       window.removeEventListener(THREAD_CHAT_RESET_EVENT, handleReset);
   }, [resetToNewThread, threadId, threadIdFromPath]);
 
+  /** 接受已创建的线程标识，并清除尚未提交的新线程标记。 */
   const setThreadId = useCallback((nextThreadId: string) => {
     newThreadIdRef.current = null;
     setThreadIdState(nextThreadId);
   }, []);
 
+  /** 更新新线程状态，并在进入已有线程时丢弃临时线程标识。 */
   const setIsNewThread = useCallback((nextIsNewThread: boolean) => {
     if (!nextIsNewThread) {
       newThreadIdRef.current = null;

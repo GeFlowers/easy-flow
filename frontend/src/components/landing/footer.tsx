@@ -2,12 +2,11 @@ import { useMemo } from "react";
 
 import { cn } from "@/lib/utils";
 
-/** FooterProps 的公开类型定义。 */
 export type FooterProps = {
   className?: string;
 };
 
-/** Footer 组件：提供对应的界面结构与交互语义。 */
+/** 展示开源声明、许可证和根据当前年份生成的版权信息。 */
 export function Footer({ className }: FooterProps) {
   const year = useMemo(() => new Date().getFullYear(), []);
   return (

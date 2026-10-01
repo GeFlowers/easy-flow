@@ -1,4 +1,4 @@
-"定义 browserless_client 模块提供的职责与可复用接口"
+'''封装对无头浏览器服务的异步调用，用于获取渲染页面内容和网页截图。'''
 
 import logging
 from dataclasses import dataclass
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass(frozen=True)
 class BrowserlessScreenshotResult:
-    "封装 BrowserlessScreenshotResult 的状态、协作关系与公开操作"
+    '''保存截图字节、媒体类型、目标页面状态和最终访问地址。'''
 
     content: bytes
     content_type: str
@@ -21,7 +21,7 @@ class BrowserlessScreenshotResult:
 
 
 def _get_header(headers: Any, name: str) -> str:
-    "执行 _get_header 的明确职责，并返回与调用约定一致的结果"
+    '''按大小写不敏感方式取得响应头，并统一返回字符串。'''
     value = headers.get(name)
     if value:
         return str(value)
@@ -29,12 +29,10 @@ def _get_header(headers: Any, name: str) -> str:
 
 
 class BrowserlessClient:
-    """封装 BrowserlessClient 的状态、协作关系与公开操作。
-
-    Client for Browserless headless Chrome API."""
+    '''保存浏览器服务地址、可选访问令牌和每次请求的超时限制。'''
 
     def __init__(self, base_url: str, token: str = "", timeout_s: float = 30) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''去除服务地址尾部斜杠并保存连接参数，供页面内容和截图请求共用。'''
         self.base_url = base_url.rstrip("/")
         self.token = token
         self.timeout_s = timeout_s
@@ -49,25 +47,7 @@ class BrowserlessClient:
         reject_resource_types: list[str] | None = None,
         reject_request_pattern: list[str] | None = None,
     ) -> str:
-        """执行 fetch_html 的明确职责，并返回与调用约定一致的结果。
-
-        Fetch the rendered HTML of a page using Browserless.
-
-                Only sends accepted parameters for the current Browserless API version.
-                Sets a default navigation timeout (30s) via query param.
-
-                Args:
-                    url: The URL to fetch.
-                    wait_for_event: Wait for a page event (e.g. "networkidle", "load").
-                    wait_for_timeout_ms: Extra wait after page load.
-                    wait_for_selector: CSS selector to wait for.
-                    wait_for_selector_timeout_ms: Timeout for selector wait.
-                    reject_resource_types: Resource types to block (e.g. ["image"]).
-                    reject_request_pattern: URL patterns to block.
-
-                Returns:
-                    Rendered HTML content.
-        """
+        '''请求浏览器渲染指定网址，可配置等待事件、选择器和需拦截资源，并返回页面 HTML 或错误文本。'''
         payload: dict[str, Any] = {
             "url": url,
         }
@@ -136,24 +116,7 @@ class BrowserlessClient:
         wait_for_timeout_ms: int = 0,
         best_attempt: bool = False,
     ) -> BrowserlessScreenshotResult | str:
-        """执行 capture_screenshot 的明确职责，并返回与调用约定一致的结果。
-
-        Capture a rendered screenshot of a URL using Browserless.
-
-                Args:
-                    url: URL to render.
-                    full_page: Capture the full page instead of just the viewport.
-                    output_format: Image format: png, jpeg, or webp.
-                    quality: Optional quality for jpeg/webp outputs.
-                    viewport: Optional browser viewport dictionary.
-                    wait_for_selector: CSS selector to wait for before capture.
-                    wait_for_selector_timeout_ms: Timeout for selector wait.
-                    wait_for_timeout_ms: Extra wait after navigation.
-                    best_attempt: Continue when waits time out.
-
-                Returns:
-                    Screenshot result with binary content, or an error string.
-        """
+        '''请求浏览器渲染并截取网页，按格式、视口和等待条件配置；返回截图及目标响应信息或错误文本。'''
         payload: dict[str, Any] = {
             "url": url,
             "options": {

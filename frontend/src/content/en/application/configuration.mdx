@@ -126,34 +126,11 @@ models:
 
 Choose the execution environment for agent file and command operations:
 
-<Tabs items={["Local (default)", "Docker container", "K8s Provisioner"]}>
-  <Tabs.Tab>
 ```yaml
 sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
   allow_host_bash: false  # set true only for trusted single-user workflows
 ```
-  </Tabs.Tab>
-  <Tabs.Tab>
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  image: enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
-  replicas: 3
-  idle_timeout: 600
-```
-
-Install: `cd backend && uv add 'deerflow-harness[aio-sandbox]'`
-
-  </Tabs.Tab>
-  <Tabs.Tab>
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  provisioner_url: http://provisioner:8002
-```
-  </Tabs.Tab>
-</Tabs>
 
 ### Tools
 

@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''统一读取 LangChain 消息文本，并恢复面向模型前临时改写过的用户消息。'''
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ SUMMARY_MESSAGE_NAME = "summary"
 
 
 def message_content_to_text(content: Any) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''从纯文本或多模态内容块中拼接可读文本部分。'''
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -30,7 +30,7 @@ def message_content_to_text(content: Any) -> str:
 
 
 def message_to_text(message: Any, *, text_attribute_fallback: bool = False) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''兼容 LangChain 消息、映射对象及可选的 ``text`` 属性回退读取。'''
     content = message.get("content") if isinstance(message, Mapping) else getattr(message, "content", None)
     if isinstance(content, str):
         return content
@@ -61,7 +61,7 @@ def message_to_text(message: Any, *, text_attribute_fallback: bool = False) -> s
 
 
 def get_original_user_content_text(content: Any, additional_kwargs: Mapping[str, Any] | None) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''优先取回保存于附加元数据中的原始用户输入，否则从当前内容提取文本。'''
     original_content = (additional_kwargs or {}).get(ORIGINAL_USER_CONTENT_KEY)
     if isinstance(original_content, str):
         return original_content
@@ -69,7 +69,7 @@ def get_original_user_content_text(content: Any, additional_kwargs: Mapping[str,
 
 
 def restore_original_human_message(message: HumanMessage) -> HumanMessage:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''把原始用户文本放回消息，同时深拷贝多模态内容以隔离展示副本。'''
     original_content = message.additional_kwargs.get(ORIGINAL_USER_CONTENT_KEY)
     if not isinstance(original_content, str):
         return message
@@ -103,10 +103,6 @@ def restore_original_human_message(message: HumanMessage) -> HumanMessage:
 
     return message.model_copy(
         update={
-            # Pydantic deep-copies the original model for ``deep=True``, but
-            # applies values supplied through ``update`` without copying them.
-            # Keep the persisted/UI copy fully isolated from the model-facing
-            # message, including nested image/file blocks and metadata.
             "content": deepcopy(restored_content),
             "additional_kwargs": deepcopy(additional_kwargs),
         },
@@ -115,7 +111,7 @@ def restore_original_human_message(message: HumanMessage) -> HumanMessage:
 
 
 def is_real_user_message(message: object) -> bool:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''排除摘要和标记为隐藏的消息，只让真实用户输入进入记忆流程。'''
     if not isinstance(message, HumanMessage):
         return False
     if message.name == SUMMARY_MESSAGE_NAME:

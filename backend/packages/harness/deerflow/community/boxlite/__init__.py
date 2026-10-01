@@ -1,4 +1,4 @@
-"""定义 __init__ 模块提供的职责与可复用接口。
+'''提供 BoxLite 虚拟机沙箱实现和创建该沙箱的提供方。
 
 BoxLite micro-VM backend for DeerFlow sandboxes.
 
@@ -31,7 +31,7 @@ Install the optional runtime before selecting this provider::
 Host requirement: BoxLite boots micro-VMs, so a Linux host needs KVM (nested
 virtualization when DeerFlow itself runs inside a cloud VM); macOS uses
 Hypervisor.framework.
-"""
+'''
 
 from .box import BoxliteBox
 from .provider import BoxliteProvider

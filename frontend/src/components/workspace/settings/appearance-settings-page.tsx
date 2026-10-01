@@ -112,6 +112,7 @@ export function AppearanceSettingsPage() {
   );
 }
 
+/** 展示主题选项的模拟界面，并将系统主题解析为实际预览配色。 */
 function ThemePreviewCard({
   icon: Icon,
   label,

@@ -13,7 +13,7 @@ interface ConfettiButtonProps extends React.ComponentProps<typeof Button> {
   onClick?: MouseEventHandler<HTMLButtonElement>;
 }
 
-/** ConfettiButton 组件：提供对应的界面结构与交互语义。 */
+/** 点击按钮时播放彩纸粒子效果，并继续执行传入的按钮事件。 */
 export function ConfettiButton({
   className,
   children,
@@ -24,6 +24,7 @@ export function ConfettiButton({
   onClick,
   ...props
 }: ConfettiButtonProps) {
+  /** 在按钮中心触发庆祝动画后继续执行调用方提供的点击处理。 */
   const handleClick: MouseEventHandler<HTMLButtonElement> = (event) => {
     const target = event.currentTarget;
     if (target) {

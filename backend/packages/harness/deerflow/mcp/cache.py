@@ -1,4 +1,4 @@
-"""缓存 MCP 工具，并在扩展配置发生变化时自动失效。"""
+'''缓存 MCP 工具，并在扩展配置发生变化时自动失效。'''
 
 import asyncio
 import hashlib
@@ -18,14 +18,14 @@ _config_signature: _ConfigSignature | None = None
 
 
 def _resolve_config_path() -> Path | None:
-    """解析当前扩展配置文件的路径。"""
+    '''解析当前扩展配置文件的路径。'''
     from deerflow.config.extensions_config import ExtensionsConfig
 
     return ExtensionsConfig.resolve_config_path()
 
 
 def _get_config_signature(config_path: Path) -> _ConfigSignature | None:
-    """返回用于检测配置内容变化的文件签名。"""
+    '''返回用于检测配置内容变化的文件签名。'''
     try:
         stat_result = config_path.stat()
     except OSError:
@@ -42,7 +42,7 @@ def _get_config_signature(config_path: Path) -> _ConfigSignature | None:
 
 
 def _current_config_state() -> tuple[Path | None, _ConfigSignature | None]:
-    """获取当前配置文件路径及其签名。"""
+    '''获取当前配置文件路径及其签名。'''
     config_path = _resolve_config_path()
     if config_path is None:
         return None, None
@@ -50,7 +50,7 @@ def _current_config_state() -> tuple[Path | None, _ConfigSignature | None]:
 
 
 def _is_cache_stale() -> bool:
-    """判断已初始化的 MCP 工具缓存是否因配置变化而过期。"""
+    '''判断已初始化的 MCP 工具缓存是否因配置变化而过期。'''
     if not _cache_initialized:
         return False
 
@@ -70,7 +70,7 @@ def _is_cache_stale() -> bool:
 
 
 async def initialize_mcp_tools() -> list[BaseTool]:
-    """初始化并缓存当前已启用 MCP 服务器提供的工具。"""
+    '''初始化并缓存当前已启用 MCP 服务器提供的工具。'''
     global _mcp_tools_cache, _cache_initialized, _config_path, _config_signature
 
     async with _initialization_lock:
@@ -90,7 +90,7 @@ async def initialize_mcp_tools() -> list[BaseTool]:
 
 
 def get_cached_mcp_tools() -> list[BaseTool]:
-    """返回缓存的 MCP 工具，必要时同步完成惰性初始化。"""
+    '''返回缓存的 MCP 工具，必要时同步完成惰性初始化。'''
     global _cache_initialized
     if _is_cache_stale():
         logger.info("MCP cache is stale, resetting for re-initialization...")
@@ -122,13 +122,12 @@ def get_cached_mcp_tools() -> list[BaseTool]:
 
 
 def reset_mcp_tools_cache() -> None:
-    """清空 MCP 工具缓存，并关闭和重置关联的会话池。"""
+    '''清空 MCP 工具缓存，并关闭和重置关联的会话池。'''
     global _mcp_tools_cache, _cache_initialized, _config_path, _config_signature
     _mcp_tools_cache = None
     _cache_initialized = False
     _config_path = None
     _config_signature = None
-    #
     try:
         from deerflow.mcp.session_pool import get_session_pool
 

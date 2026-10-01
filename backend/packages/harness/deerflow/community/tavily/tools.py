@@ -1,4 +1,4 @@
-"定义 tools 模块提供的职责与可复用接口"
+'''从应用配置读取密钥并创建 Tavily 搜索客户端。'''
 
 import json
 
@@ -9,7 +9,7 @@ from deerflow.config import get_app_config
 
 
 def _get_tavily_client() -> TavilyClient:
-    "执行 _get_tavily_client 的明确职责，并返回与调用约定一致的结果"
+    '''使用搜索工具配置中的密钥创建 Tavily 客户端。'''
     config = get_app_config().get_tool_config("web_search")
     api_key = None
     if config is not None and "api_key" in config.model_extra:
@@ -19,11 +19,11 @@ def _get_tavily_client() -> TavilyClient:
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str) -> str:
-    """搜索网络并返回与查询相关的资料。
+    '''搜索网络并返回与查询相关的资料。
 
     Args:
         query: The query to search for.
-    """
+    '''
     config = get_app_config().get_tool_config("web_search")
     max_results = 5
     if config is not None and "max_results" in config.model_extra:
@@ -45,7 +45,7 @@ def web_search_tool(query: str) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 def web_fetch_tool(url: str) -> str:
-    """读取指定网页的正文内容并返回给 agent。
+    '''读取指定网页的正文内容并返回给 agent。
     Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
     This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
     Do NOT add www. to URLs that do NOT have them.
@@ -53,7 +53,7 @@ def web_fetch_tool(url: str) -> str:
 
     Args:
         url: The URL to fetch the contents of.
-    """
+    '''
     client = _get_tavily_client()
     res = client.extract([url])
     if "failed_results" in res and len(res["failed_results"]) > 0:

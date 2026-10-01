@@ -2,7 +2,7 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-/** Card 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供带边框、背景和纵向间距的通用卡片外框。 */
 function Card({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -16,7 +16,7 @@ function Card({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** CardHeader 内部组件：组织对应的界面结构与交互语义。 */
+/** 排列卡片标题区，并在存在操作按钮时预留独立网格列。 */
 function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -30,7 +30,7 @@ function CardHeader({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** CardTitle 内部组件：组织对应的界面结构与交互语义。 */
+/** 用较粗字重显示卡片标题。 */
 function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -41,7 +41,7 @@ function CardTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** CardDescription 内部组件：组织对应的界面结构与交互语义。 */
+/** 展示卡片标题下方的低强调度说明。 */
 function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -52,7 +52,7 @@ function CardDescription({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** CardAction 内部组件：组织对应的界面结构与交互语义。 */
+/** 将卡片操作定位在标题区网格的右上角。 */
 function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -66,7 +66,7 @@ function CardAction({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** CardContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 为卡片主体内容提供与标题区一致的水平内边距。 */
 function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -77,7 +77,7 @@ function CardContent({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** CardFooter 内部组件：组织对应的界面结构与交互语义。 */
+/** 对齐卡片底部操作，并在上边框存在时增加分隔间距。 */
 function CardFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

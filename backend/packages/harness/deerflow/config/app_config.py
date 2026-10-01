@@ -1,4 +1,4 @@
-"""DeerFlow 应用的总配置定义与加载功能。"""
+'''DeerFlow 应用的总配置定义与加载功能。'''
 
 import hashlib
 import logging
@@ -59,27 +59,27 @@ CONFIG_FILE_DATABASE_DEFAULTS = {
 
 
 class CircuitBreakerConfig(BaseModel):
-    """LLM 熔断器的配置。"""
+    '''LLM 熔断器的配置。'''
 
     failure_threshold: int = Field(default=5, description="Number of consecutive failures before tripping the circuit")
     recovery_timeout_sec: int = Field(default=60, description="Time in seconds before attempting to recover the circuit")
 
 
 class LoggingEnhanceConfig(BaseModel):
-    """请求链路追踪日志的增强设置。"""
+    '''请求链路追踪日志的增强设置。'''
 
     enabled: bool = Field(default=False, description="Enable request-level trace ids in Gateway response headers and log records.")
     format: Literal["text", "json"] = Field(default="text", description="Enhanced log output format.")
 
 
 class LoggingConfig(BaseModel):
-    """日志配置。"""
+    '''日志配置。'''
 
     enhance: LoggingEnhanceConfig = Field(default_factory=LoggingEnhanceConfig, description="Request trace correlation logging settings.")
 
 
 def is_trace_correlation_enabled(config: Any) -> bool:
-    """当 *config* 的 ``logging.enhance.enabled`` 已设置时返回 ``True``。
+    '''当 *config* 的 ``logging.enhance.enabled`` 已设置时返回 ``True``。
 
     此函数是请求链路关联开关的唯一事实来源，供 Gateway 的 ``TraceMiddleware`` 与
     内嵌 ``DeerFlowClient`` 共用，确保两个入口不会在何时输出
@@ -87,32 +87,32 @@ def is_trace_correlation_enabled(config: Any) -> bool:
     接受任何通过 ``getattr`` 链暴露 ``logging.enhance.enabled`` 的对象
     （如 ``AppConfig``、``SimpleNamespace`` 测试夹具等）；缺失的中间属性会静默
     降级为 ``False``。
-    """
+    '''
     logging_config = getattr(config, "logging", None)
     enhance = getattr(logging_config, "enhance", None)
     return bool(getattr(enhance, "enabled", False))
 
 
 def _legacy_config_candidates() -> tuple[Path, ...]:
-    """返回为兼容单体仓库而保留的源码树 config.yaml 位置。"""
+    '''返回为兼容单体仓库而保留的源码树 config.yaml 位置。'''
     backend_dir = Path(__file__).resolve().parents[4]
     repo_root = backend_dir.parent
     return (backend_dir / "config.yaml", repo_root / "config.yaml")
 
 
 def logging_level_from_config(name: str | None) -> int:
-    """将 ``config.yaml`` 的 ``log_level`` 字符串映射为 :mod:`logging` 级别常量。"""
+    '''将 ``config.yaml`` 的 ``log_level`` 字符串映射为 :mod:`logging` 级别常量。'''
     mapping = logging.getLevelNamesMapping()
     return mapping.get((name or "info").strip().upper(), logging.INFO)
 
 
 def apply_logging_level(name: str | None) -> None:
-    """将 *name* 解析为日志级别，并应用到 ``deerflow``/``app`` 日志器层级。
+    '''将 *name* 解析为日志级别，并应用到 ``deerflow``/``app`` 日志器层级。
 
     仅修改 ``deerflow`` 与 ``app`` 的日志级别，避免影响第三方库（如 uvicorn、
     sqlalchemy）的日志详细程度。根处理器级别只会降低而不会提高，确保已配置日志器的
     消息能够向上传播且不被过滤，同时保留可能有意限制第三方日志输出的处理器阈值。
-    """
+    '''
     level = logging_level_from_config(name)
     for logger_name in ("deerflow", "app"):
         logging.getLogger(logger_name).setLevel(level)
@@ -122,7 +122,7 @@ def apply_logging_level(name: str | None) -> None:
 
 
 class AppConfig(BaseModel):
-    """DeerFlow 应用的配置。"""
+    '''DeerFlow 应用的配置。'''
 
     log_level: str = Field(
         default="info",
@@ -149,7 +149,7 @@ class AppConfig(BaseModel):
     sandbox: SandboxConfig = Field(
         description=format_field_description(
             "sandbox",
-            field_doc="Sandbox provider configuration (local filesystem or Docker-based aio sandbox).",
+            field_doc="沙箱配置，用于定义 Agent 的文件与命令执行环境。",
         ),
     )
     tools: list[ToolConfig] = Field(default_factory=list, description="Available tools")
@@ -227,10 +227,6 @@ class AppConfig(BaseModel):
         ),
     )
 
-    # Name -> config lookup tables, (re)built after validation by
-    # ``_build_name_indexes``. They make ``get_model_config`` / ``get_tool_config``
-    # / ``get_tool_group_config`` O(1) instead of an O(n) ``next(...)`` scan per
-    # call. Private attrs are excluded from serialization.
     _models_by_name: dict[str, ModelConfig] = PrivateAttr(default_factory=dict)
     _tools_by_name: dict[str, ToolConfig] = PrivateAttr(default_factory=dict)
     _tool_groups_by_name: dict[str, ToolGroupConfig] = PrivateAttr(default_factory=dict)
@@ -238,7 +234,7 @@ class AppConfig(BaseModel):
     @model_validator(mode="before")
     @classmethod
     def _drop_null_config_sections(cls, data: Any) -> Any:
-        """将存在但值为 null 的配置节视为缺失，以便应用其默认值。
+        '''将存在但值为 null 的配置节视为缺失，以便应用其默认值。
 
         在顶层 YAML 键（例如列表 ``models:`` 或对象 ``memory:``）下仅保留注释，
         如 ``config.example.yaml`` 中的写法，会使 PyYAML 将其值解析为 ``None``。
@@ -252,21 +248,21 @@ class AppConfig(BaseModel):
         ``_apply_database_defaults``（在 ``from_file`` 中）负责应用 null 规范化之外的
         具体默认值。没有默认值的必填节（``sandbox``）在值为 null 时仍会刻意报错，
         因为它没有可回退的值。
-        """
+        '''
         if isinstance(data, dict):
             return {key: value for key, value in data.items() if value is not None}
         return data
 
     @classmethod
     def resolve_config_path(cls, config_path: str | None = None) -> Path:
-        """解析配置文件路径。
+        '''解析配置文件路径。
 
         优先级：
         1. 若提供 ``config_path`` 参数，则使用它。
         2. 若设置 ``DEER_FLOW_CONFIG_PATH`` 环境变量，则使用它。
         3. 否则搜索调用方项目根目录。
         4. 最后为兼容单体仓库而搜索旧版 backend/仓库根目录默认位置。
-        """
+        '''
         if config_path:
             path = Path(config_path)
             if not Path.exists(path):
@@ -289,7 +285,7 @@ class AppConfig(BaseModel):
 
     @classmethod
     def from_file(cls, config_path: str | None = None) -> Self:
-        """从 YAML 文件加载配置。
+        '''从 YAML 文件加载配置。
 
         更多细节参见 ``resolve_config_path``。
 
@@ -298,22 +294,19 @@ class AppConfig(BaseModel):
 
         返回：
             已加载的 ``AppConfig``。
-        """
+        '''
         resolved_path = cls.resolve_config_path(config_path)
         with open(resolved_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f) or {}
 
-        # Check config version before processing
         cls._check_config_version(config_data, resolved_path)
 
         config_data = cls.resolve_env_variables(config_data)
         cls._apply_database_defaults(config_data)
 
-        # Load circuit_breaker config if present
         if "circuit_breaker" in config_data:
             config_data["circuit_breaker"] = config_data["circuit_breaker"]
 
-        # Load extensions config separately (it's in a different file)
         extensions_config = ExtensionsConfig.from_file()
         config_data["extensions"] = extensions_config.model_dump()
 
@@ -332,14 +325,14 @@ class AppConfig(BaseModel):
         cls,
         config_data: Mapping[str, Mapping[str, object]] | None,
     ) -> dict[str, ACPAgentConfig]:
-        """验证并构建 ACP 智能体配置映射。"""
+        '''验证并构建 ACP 智能体配置映射。'''
         if config_data is None:
             config_data = {}
         return {name: ACPAgentConfig(**cfg) for name, cfg in config_data.items()}
 
     @classmethod
     def _apply_singleton_configs(cls, config: Self, acp_agents: dict[str, ACPAgentConfig]) -> None:
-        """将应用配置同步到运行时单例配置。"""
+        '''将应用配置同步到运行时单例配置。'''
         from deerflow.config.checkpointer_config import get_checkpointer_config
 
         previous_checkpointer_config = get_checkpointer_config()
@@ -357,8 +350,6 @@ class AppConfig(BaseModel):
         load_acp_config_from_dict({name: agent.model_dump() for name, agent in acp_agents.items()})
 
         if previous_checkpointer_config != config.checkpointer:
-            # These runtime singletons derive their backend from checkpointer config.
-            # Keep imports local to avoid cycles: both providers import get_app_config.
             from deerflow.runtime.checkpointer import reset_checkpointer
             from deerflow.runtime.store import reset_store
 
@@ -367,7 +358,7 @@ class AppConfig(BaseModel):
 
     @classmethod
     def _apply_database_defaults(cls, config_data: dict[str, Any]) -> None:
-        """当持久化配置节缺失时，应用 config.yaml 中的默认值。"""
+        '''当持久化配置节缺失时，应用 config.yaml 中的默认值。'''
         database_config = config_data.get("database")
         if database_config is None:
             database_config = {}
@@ -379,20 +370,19 @@ class AppConfig(BaseModel):
 
     @classmethod
     def _check_config_version(cls, config_data: dict, config_path: Path) -> None:
-        """检查用户的 config.yaml 是否比 config.example.yaml 过时。
+        '''检查用户的 config.yaml 是否比 config.example.yaml 过时。
 
         当用户的 config_version 低于示例版本时发出警告。缺失的 config_version
         视为版本 0（版本控制引入之前）。
-        """
+        '''
         try:
             user_version = int(config_data.get("config_version", 0))
         except (TypeError, ValueError):
             user_version = 0
 
-        # Find config.example.yaml by searching config.yaml's directory and its parents
         example_path = None
         search_dir = config_path.parent
-        for _ in range(5):  # search up to 5 levels
+        for _ in range(5):
             candidate = search_dir / "config.example.yaml"
             if candidate.exists():
                 example_path = candidate
@@ -424,7 +414,7 @@ class AppConfig(BaseModel):
 
     @classmethod
     def resolve_env_variables(cls, config: Any) -> Any:
-        """递归解析配置中的环境变量。
+        '''递归解析配置中的环境变量。
 
         环境变量通过 ``os.getenv`` 函数解析，例如：``$OPENAI_API_KEY``。
 
@@ -433,7 +423,7 @@ class AppConfig(BaseModel):
 
         返回：
             已解析环境变量的配置。
-        """
+        '''
         if isinstance(config, str):
             if config.startswith("$"):
                 env_value = os.getenv(config[1:])
@@ -449,14 +439,14 @@ class AppConfig(BaseModel):
 
     @model_validator(mode="after")
     def _build_name_indexes(self) -> "AppConfig":
-        """为 O(1) 的 ``get_*_config`` 构建名称到配置的查询表。
+        '''为 O(1) 的 ``get_*_config`` 构建名称到配置的查询表。
 
         每次社区工具调用（如 web_search）会运行 ``get_tool_config`` 2 至 3 次，
         每次构建智能体会运行 ``get_model_config`` 多次，因此原先 O(n) 的
         ``next(...)`` 扫描处于热路径。配置重载会构造新的 ``AppConfig``，故在此重建
         查询表以刷新它们。``setdefault`` 在名称重复时保留首项，延续原有
         ``next(...)`` 的首次匹配语义。
-        """
+        '''
         models_by_name: dict[str, ModelConfig] = {}
         for model in self.models:
             models_by_name.setdefault(model.name, model)
@@ -472,42 +462,39 @@ class AppConfig(BaseModel):
         return self
 
     def get_model_config(self, name: str) -> ModelConfig | None:
-        """按名称获取模型配置。
+        '''按名称获取模型配置。
 
         参数：
             name: 要获取配置的模型名称。
 
         返回：
             找到时返回模型配置，否则返回 None。
-        """
+        '''
         return self._models_by_name.get(name)
 
     def get_tool_config(self, name: str) -> ToolConfig | None:
-        """按名称获取工具配置。
+        '''按名称获取工具配置。
 
         参数：
             name: 要获取配置的工具名称。
 
         返回：
             找到时返回工具配置，否则返回 None。
-        """
+        '''
         return self._tools_by_name.get(name)
 
     def get_tool_group_config(self, name: str) -> ToolGroupConfig | None:
-        """按名称获取工具组配置。
+        '''按名称获取工具组配置。
 
         参数：
             name: 要获取配置的工具组名称。
 
         返回：
             找到时返回工具组配置，否则返回 None。
-        """
+        '''
         return self._tool_groups_by_name.get(name)
 
 
-# Compatibility singleton layer for code paths that have not yet been
-# migrated to explicit ``AppConfig`` threading. New composition roots should
-# prefer constructing ``AppConfig`` once and passing it down directly.
 _app_config: AppConfig | None = None
 _app_config_path: Path | None = None
 _app_config_mtime: float | None = None
@@ -519,7 +506,7 @@ _current_app_config_stack: ContextVar[tuple[AppConfig | None, ...]] = ContextVar
 
 
 def _get_config_mtime(config_path: Path) -> float | None:
-    """在配置文件存在时获取其修改时间。"""
+    '''在配置文件存在时获取其修改时间。'''
     try:
         return config_path.stat().st_mtime
     except OSError:
@@ -527,7 +514,7 @@ def _get_config_mtime(config_path: Path) -> float | None:
 
 
 def _get_config_signature(config_path: Path) -> _ConfigSignature | None:
-    """获取配置文件的缓存元数据，其中包含内容摘要。"""
+    '''获取配置文件的缓存元数据，其中包含内容摘要。'''
     try:
         stat_result = config_path.stat()
     except OSError:
@@ -545,7 +532,7 @@ def _get_config_signature(config_path: Path) -> _ConfigSignature | None:
 
 
 def _load_and_cache_app_config(config_path: str | None = None) -> AppConfig:
-    """从磁盘加载配置并刷新缓存元数据。"""
+    '''从磁盘加载配置并刷新缓存元数据。'''
     global _app_config, _app_config_path, _app_config_mtime, _app_config_signature, _app_config_is_custom
 
     resolved_path = AppConfig.resolve_config_path(config_path)
@@ -558,11 +545,11 @@ def _load_and_cache_app_config(config_path: str | None = None) -> AppConfig:
 
 
 def get_app_config() -> AppConfig:
-    """获取 DeerFlow 配置实例。
+    '''获取 DeerFlow 配置实例。
 
     返回缓存的单例实例；当底层配置文件路径或内容签名变化时会自动重载。可使用
     ``reload_app_config()`` 强制重载，或使用 ``reset_app_config()`` 清除缓存。
-    """
+    '''
     global _app_config, _app_config_path, _app_config_mtime, _app_config_signature
 
     runtime_override = _current_app_config.get()
@@ -591,7 +578,7 @@ def get_app_config() -> AppConfig:
 
 
 def reload_app_config(config_path: str | None = None) -> AppConfig:
-    """从文件重新加载配置并更新缓存实例。
+    '''从文件重新加载配置并更新缓存实例。
 
     配置文件被修改后，如需不重启应用即可获取变更，此函数十分有用。
 
@@ -600,16 +587,16 @@ def reload_app_config(config_path: str | None = None) -> AppConfig:
 
     返回：
         新加载的 ``AppConfig`` 实例。
-    """
+    '''
     return _load_and_cache_app_config(config_path)
 
 
 def reset_app_config() -> None:
-    """重置缓存的配置实例。
+    '''重置缓存的配置实例。
 
     此操作会清除单例缓存，使下一次调用 ``get_app_config()`` 时从文件重新加载。
     适用于测试或切换不同配置的场景。
-    """
+    '''
     global _app_config, _app_config_path, _app_config_mtime, _app_config_signature, _app_config_is_custom
     _app_config = None
     _app_config_path = None
@@ -619,13 +606,13 @@ def reset_app_config() -> None:
 
 
 def set_app_config(config: AppConfig) -> None:
-    """设置自定义配置实例。
+    '''设置自定义配置实例。
 
     可用于在测试中注入自定义配置或模拟配置。
 
     参数：
         config: 要使用的 ``AppConfig`` 实例。
-    """
+    '''
     global _app_config, _app_config_path, _app_config_mtime, _app_config_signature, _app_config_is_custom
     _app_config = config
     _app_config_path = None
@@ -635,19 +622,19 @@ def set_app_config(config: AppConfig) -> None:
 
 
 def peek_current_app_config() -> AppConfig | None:
-    """在存在时返回运行时作用域内的 AppConfig 覆盖项。"""
+    '''在存在时返回运行时作用域内的 AppConfig 覆盖项。'''
     return _current_app_config.get()
 
 
 def push_current_app_config(config: AppConfig) -> None:
-    """为当前执行上下文压入运行时作用域内的 AppConfig 覆盖项。"""
+    '''为当前执行上下文压入运行时作用域内的 AppConfig 覆盖项。'''
     stack = _current_app_config_stack.get()
     _current_app_config_stack.set(stack + (_current_app_config.get(),))
     _current_app_config.set(config)
 
 
 def pop_current_app_config() -> None:
-    """弹出当前执行上下文中最新的运行时作用域 AppConfig 覆盖项。"""
+    '''弹出当前执行上下文中最新的运行时作用域 AppConfig 覆盖项。'''
     stack = _current_app_config_stack.get()
     if not stack:
         _current_app_config.set(None)

@@ -343,12 +343,6 @@ sandbox:
    allow_host_bash: false # default; host bash is disabled unless explicitly re-enabled
 ```
 
-**Docker Execution** (runs sandbox code in isolated Docker containers):
-```yaml
-sandbox:
-   use: deerflow.community.aio_sandbox:AioSandboxProvider # Docker-based sandbox
-```
-
 **BoxLite micro-VM Sandbox** (runs sandbox code in daemonless OCI micro-VMs):
 ```yaml
 sandbox:
@@ -414,16 +408,9 @@ Notes specific to `E2BSandboxProvider`:
   sandbox and surfaced through the standard artifact pipeline) to ship files
   back to the gateway.
 
-Choose between local execution or Docker-based isolation:
+`allow_host_bash` is intentionally `false` by default. DeerFlow's local sandbox is a host-side convenience mode, not a secure shell isolation boundary. Only set `allow_host_bash: true` for fully trusted single-user local workflows.
 
-**Option 1: Local Sandbox** (default, simpler setup):
-```yaml
-sandbox:
-  use: deerflow.sandbox.local:LocalSandboxProvider
-  allow_host_bash: false
-```
-
-`allow_host_bash` is intentionally `false` by default. DeerFlow's local sandbox is a host-side convenience mode, not a secure shell isolation boundary. If you need `bash`, prefer `AioSandboxProvider`. Only set `allow_host_bash: true` for fully trusted single-user local workflows.
+#### Local sandbox paths in Docker Compose deployments
 
 When `LocalSandboxProvider` runs under `make docker-start`, it runs inside the `deer-flow-gateway` container. In that mode, `sandbox.mounts[].host_path` is resolved from the gateway container's filesystem, not from your Docker host. If you need a custom mount, bind the host directory into the gateway service first, then use the in-container path in `config.yaml`:
 
@@ -446,72 +433,7 @@ sandbox:
 
 If the configured `host_path` is not visible to the gateway process, DeerFlow logs an error and ignores that mount.
 
-**Option 2: Docker Sandbox** (isolated, more secure):
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  port: 8080
-  auto_start: true
-  container_prefix: deer-flow-sandbox
-
-  # Optional: Additional mounts
-  mounts:
-    - host_path: /path/on/host
-      container_path: /path/in/container
-      read_only: false
-```
-
 When you configure `sandbox.mounts`, DeerFlow exposes those `container_path` values in the agent prompt so the agent can discover and operate on mounted directories directly instead of assuming everything must live under `/mnt/user-data`.
-
-For bare-metal Docker sandbox runs that use localhost, DeerFlow binds the sandbox HTTP port to `127.0.0.1` by default so it is not exposed on every host interface. Docker-outside-of-Docker deployments that connect through `host.docker.internal` keep the broad legacy bind for compatibility. Set `DEER_FLOW_SANDBOX_BIND_HOST` explicitly if your deployment needs a different bind address.
-
-### Building a Custom AIO Sandbox Image
-
-`AioSandboxProvider` talks to the sandbox container through the `agent-sandbox` SDK. The Dockerfile for the default `enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest` image is not part of this repository; DeerFlow treats that image as an upstream AIO sandbox runtime.
-
-For persistent system or language dependencies, extend the published image and keep its startup command intact:
-
-```dockerfile
-FROM enterprise-public-cn-beijing.cr.volces.com/vefaas-public/all-in-one-sandbox:latest
-
-USER root
-# Example user dependency; not required by DeerFlow itself.
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends graphviz \
-    && rm -rf /var/lib/apt/lists/*
-
-# Example Python dependency for work done inside the sandbox.
-RUN python -m pip install --no-cache-dir pandas
-
-# Do not override ENTRYPOINT or CMD; keep the upstream sandbox server startup.
-```
-
-Use the custom image in local Docker or Apple Container mode with `sandbox.image`:
-
-```yaml
-sandbox:
-  use: deerflow.community.aio_sandbox:AioSandboxProvider
-  image: your-registry/your-aio-sandbox:tag
-```
-
-If you rebuild the runtime from scratch instead of extending the published image, it must expose the same HTTP API used by `agent-sandbox`. DeerFlow currently depends on:
-
-- `sandbox.get_context()`, including `home_dir`
-- `shell.exec_command(...)`
-- `bash.exec(...)` — only exercised for per-command environment injection (skills that declare `required-secrets`). The `/v1/bash/*` routes exist since upstream all-in-one-sandbox `1.9.3`; on older images (including a `latest` tag still frozen on the `1.0.0.x` line) DeerFlow fails fast with an actionable error instead of surfacing the raw 404. Pin `sandbox.image` to `1.9.3` or newer (e.g. `1.11.0`) and recreate the sandbox container to use `required-secrets` with the AIO sandbox.
-- `file.read_file(...)`
-- `file.write_file(...)`, including base64 writes for binary content
-- streamed `file.download_file(...)`
-- `file.find_files(...)`
-- `file.list_path(...)`
-- `file.search_in_file(...)`
-
-Custom images must also keep these compatibility constraints:
-
-- The container should listen on the configured sandbox port, `8080` by default.
-- `/mnt/user-data` must remain writable because DeerFlow mounts thread workspace, uploads, and outputs there.
-- `home_dir` comes from the sandbox context endpoint; do not assume DeerFlow hardcodes it.
-- Shell command handling must remain compatible with serialized `exec_command` calls. DeerFlow serializes shell access on the host side to avoid corrupting the sandbox's persistent shell session.
 
 ### Skills
 
@@ -530,7 +452,7 @@ skills:
 - Skills are stored in `deer-flow/skills/{public,custom}/`
 - Each skill has a `SKILL.md` file with metadata
 - Skills are automatically discovered and loaded
-- Available in both local and Docker sandbox via path mapping
+- Available in local and remote sandboxes through their configured path mapping or file transfer
 
 Skill installs and agent-managed skill writes also run through native deterministic SkillScan before the LLM scanner:
 
@@ -608,7 +530,7 @@ DeerFlow searches for configuration in this order:
 4. Legacy backend/repository-root locations for monorepo compatibility
 
 ## Security Notes
-### Sandbox Isolation in Docker Development
+### Local sandbox inside the Docker Compose Gateway
 
 This project's retained Compose stack uses
 `deerflow.sandbox.local:LocalSandboxProvider`. Commands run inside the gateway
@@ -650,7 +572,6 @@ adapter's documented environment-variable authentication.
 3. **Use environment variables for secrets** - Don't hardcode API keys
 4. **Keep `config.example.yaml` updated** - Document all new options
 5. **Test configuration changes locally** - Before deploying
-6. **Use Docker sandbox for production** - Better isolation and security
 
 ## Troubleshooting
 
@@ -667,11 +588,6 @@ adapter's documented environment-variable authentication.
 - Check that `deer-flow/skills/` directory exists
 - Verify skills have valid `SKILL.md` files
 - Check `skills.path` or `DEER_FLOW_SKILLS_PATH` if using a custom path
-
-### "Docker sandbox fails to start"
-- Ensure Docker is running
-- Check port 8080 (or configured port) is available
-- Verify Docker image is accessible
 
 ## Examples
 

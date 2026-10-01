@@ -1,4 +1,4 @@
-"定义 thread_data_middleware 模块提供的职责与可复用接口"
+'''为会话解析或创建工作区、上传区和产物目录，并写入线程运行信息。'''
 
 import logging
 from datetime import UTC, datetime
@@ -18,15 +18,13 @@ logger = logging.getLogger(__name__)
 
 
 class ThreadDataMiddlewareState(AgentState):
-    """封装 ThreadDataMiddlewareState 的状态、协作关系与公开操作。
-
-    Compatible with the `ThreadState` schema."""
+    '''扩展智能体状态，用于保存当前线程的数据目录路径。'''
 
     thread_data: NotRequired[ThreadDataState | None]
 
 
 class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
-    """封装 ThreadDataMiddleware 的状态、协作关系与公开操作。
+    '''在智能体开始运行前解析用户隔离的数据目录，并按需创建目录。
 
     Create thread data directories for each thread execution.
 
@@ -38,37 +36,18 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
         Lifecycle Management:
         - With lazy_init=True (default): Only compute paths, directories created on-demand
         - With lazy_init=False: Eagerly create directories in before_agent()
-    """
+    '''
 
     state_schema = ThreadDataMiddlewareState
 
     def __init__(self, base_dir: str | None = None, lazy_init: bool = True):
-        """实现 __init__ 协议方法，保持对象交互语义一致。
-
-        Initialize the middleware.
-
-                Args:
-                    base_dir: Base directory for thread data. Defaults to Paths resolution.
-                    lazy_init: If True, defer directory creation until needed.
-                              If False, create directories eagerly in before_agent().
-                              Default is True for optimal performance.
-        """
+        '''配置线程目录解析器，以及延迟创建或启动时立即创建目录的策略。'''
         super().__init__()
         self._paths = Paths(base_dir) if base_dir else get_paths()
         self._lazy_init = lazy_init
 
     def _get_thread_paths(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
-        """执行 _get_thread_paths 的明确职责，并返回与调用约定一致的结果。
-
-        Get the paths for a thread's data directories.
-
-                Args:
-                    thread_id: The thread ID.
-                    user_id: Optional user ID for per-user path isolation.
-
-                Returns:
-                    Dictionary with workspace_path, uploads_path, and outputs_path.
-        """
+        '''返回线程工作区、上传区和产物目录的路径，但不创建文件夹。'''
         return {
             "workspace_path": str(self._paths.sandbox_work_dir(thread_id, user_id=user_id)),
             "uploads_path": str(self._paths.sandbox_uploads_dir(thread_id, user_id=user_id)),
@@ -76,23 +55,13 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
         }
 
     def _create_thread_directories(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
-        """执行 _create_thread_directories 的明确职责，并返回与调用约定一致的结果。
-
-        Create the thread data directories.
-
-                Args:
-                    thread_id: The thread ID.
-                    user_id: Optional user ID for per-user path isolation.
-
-                Returns:
-                    Dictionary with the created directory paths.
-        """
+        '''确保线程数据目录存在，并返回这些目录的路径。'''
         self._paths.ensure_thread_dirs(thread_id, user_id=user_id)
         return self._get_thread_paths(thread_id, user_id=user_id)
 
     @override
     def before_agent(self, state: ThreadDataMiddlewareState, runtime: Runtime) -> dict | None:
-        "执行 before_agent 的明确职责，并返回与调用约定一致的结果"
+        '''在智能体运行前写入线程目录状态，并为最新用户消息附加运行标记。'''
         context = runtime.context or {}
         thread_id = context.get("thread_id")
         if thread_id is None:
@@ -105,10 +74,10 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
         user_id = get_effective_user_id()
 
         if self._lazy_init:
-            # Lazy initialization: only compute paths, don't create directories
+            # 延迟模式只计算路径，目录由首次写入操作按需创建。
             paths = self._get_thread_paths(thread_id, user_id=user_id)
         else:
-            # Eager initialization: create directories immediately
+            # 立即模式在智能体运行开始时创建线程目录。
             paths = self._create_thread_directories(thread_id, user_id=user_id)
             logger.debug("Created thread data directories for thread %s", thread_id)
 

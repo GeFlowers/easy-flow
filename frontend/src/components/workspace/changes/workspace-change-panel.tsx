@@ -108,6 +108,7 @@ export function WorkspaceChangePanel({
   );
 }
 
+/** 展示单个文件的变更状态、差异内容及可用时的文件链接。 */
 function WorkspaceChangeFile({
   file,
   threadId,
@@ -168,6 +169,7 @@ function WorkspaceChangeFile({
   );
 }
 
+/** 按行渲染统一差异，并依据新增、删除和上下文类型着色。 */
 function WorkspaceDiff({ diff }: { diff: string }) {
   return (
     <pre className="border-border/70 bg-muted/30 max-h-[520px] overflow-auto border-t p-0 font-mono text-xs leading-5">
@@ -186,6 +188,7 @@ function WorkspaceDiff({ diff }: { diff: string }) {
   );
 }
 
+/** 根据文件变更状态选择新增、删除或修改图标。 */
 function StatusIcon({ status }: { status: WorkspaceChangeStatus }) {
   const className = "mt-0.5 size-4 shrink-0";
   if (status === "created") {
@@ -197,6 +200,7 @@ function StatusIcon({ status }: { status: WorkspaceChangeStatus }) {
   return <FilePenLineIcon className={cn(className, "text-sky-500")} />;
 }
 
+/** 将新增、删除和修改状态映射到本地化文案。 */
 function statusLabel(
   status: WorkspaceChangeStatus,
   t: ReturnType<typeof useI18n>["t"],
@@ -210,6 +214,7 @@ function statusLabel(
   return t.workspaceChanges.modified;
 }
 
+/** 将差异不可用原因转换为对应的本地化提示。 */
 function unavailableLabel(
   reason: DiffUnavailableReason | null,
   t: ReturnType<typeof useI18n>["t"],
@@ -229,6 +234,7 @@ function unavailableLabel(
   return t.workspaceChanges.diffUnavailable;
 }
 
+/** 将差异行分类映射为新增、删除、区块头或元数据样式。 */
 function diffLineClassName(line: string) {
   const lineClass = getWorkspaceChangeLineClass(line);
   if (lineClass === "addition") {

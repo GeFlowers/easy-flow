@@ -1,4 +1,4 @@
-"""提供配置、init相关功能。"""
+'''汇总应用配置模型与常用配置读取器，供运行时子系统统一导入。'''
 
 from .app_config import get_app_config
 from .extensions_config import ExtensionsConfig, get_extensions_config

@@ -1,4 +1,4 @@
-"""为 PostgreSQL JSONB 元数据字段构造经过校验的类型匹配条件。"""
+'''为 PostgreSQL JSONB 元数据字段构造经过校验的类型匹配条件。'''
 
 from __future__ import annotations
 
@@ -19,19 +19,19 @@ ALLOWED_FILTER_VALUE_TYPES: tuple[type, ...] = (type(None), bool, int, float, st
 
 
 def validate_metadata_filter_key(key: object) -> bool:
-    """检查 JSON 字段名是否只包含 SQL 路径允许的字符。"""
+    '''检查 JSON 字段名是否只包含 SQL 路径允许的字符。'''
     return isinstance(key, str) and bool(_KEY_CHARSET_RE.fullmatch(key))
 
 
 def validate_metadata_filter_value(value: object) -> bool:
-    """限制元数据筛选值为 JSON 标量，并确保整数能由 PostgreSQL BIGINT 表示。"""
+    '''限制元数据筛选值为 JSON 标量，并确保整数能由 PostgreSQL BIGINT 表示。'''
     if not isinstance(value, ALLOWED_FILTER_VALUE_TYPES):
         return False
     return not isinstance(value, int) or isinstance(value, bool) or _INT64_MIN <= value <= _INT64_MAX
 
 
 class JsonMatch(ColumnElement[bool]):
-    """表示一个 PostgreSQL JSONB 对象字段的类型安全相等条件。"""
+    '''表示一个 PostgreSQL JSONB 对象字段的类型安全相等条件。'''
 
     inherit_cache = True
     type = Boolean()
@@ -43,7 +43,7 @@ class JsonMatch(ColumnElement[bool]):
     ]
 
     def __init__(self, column: ColumnElement[Any], key: str, value: object) -> None:
-        """验证筛选条件并保存 SQLAlchemy 编译器需要的列、键和值。"""
+        '''验证筛选条件并保存 SQLAlchemy 编译器需要的列、键和值。'''
         if not validate_metadata_filter_key(key):
             raise ValueError(f"JsonMatch key must match {_KEY_CHARSET_RE.pattern!r}; got: {key!r}")
         if not validate_metadata_filter_value(value):
@@ -57,12 +57,12 @@ class JsonMatch(ColumnElement[bool]):
 
 
 def _bind(compiler: SQLCompiler, value: object, value_type: TypeEngine[Any], **kw: Any) -> str:
-    """把筛选值作为有明确 SQL 类型的绑定参数交给驱动。"""
+    '''把筛选值作为有明确 SQL 类型的绑定参数交给驱动。'''
     return compiler.process(bindparam(None, value, type_=value_type), **kw)
 
 
 def _compile_postgres(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> str:
-    """生成 PostgreSQL JSONB 标量比较，避免跨类型隐式转换造成误匹配。"""
+    '''生成 PostgreSQL JSONB 标量比较，避免跨类型隐式转换造成误匹配。'''
     if not validate_metadata_filter_key(element.key):
         raise ValueError(f"Key escaped validation: {element.key!r}")
 
@@ -89,16 +89,16 @@ def _compile_postgres(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> s
 
 @compiles(JsonMatch, "postgresql")
 def _compile_postgres_json_match(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> str:
-    """将 JSON 匹配表达式委托给 PostgreSQL SQL 生成器。"""
+    '''将 JSON 匹配表达式委托给 PostgreSQL SQL 生成器。'''
     return _compile_postgres(element, compiler, **kw)
 
 
 @compiles(JsonMatch)
 def _reject_unsupported_json_match(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> str:
-    """对未配置的数据库方言明确报错，避免生成不兼容的 JSON 查询。"""
+    '''对未配置的数据库方言明确报错，避免生成不兼容的 JSON 查询。'''
     raise NotImplementedError(f"JsonMatch supports only PostgreSQL; got dialect: {compiler.dialect.name}")
 
 
 def json_match(column: ColumnElement[Any], key: str, value: object) -> JsonMatch:
-    """创建 JSONB 键值条件，供线程元数据搜索组合到 SQLAlchemy 查询中。"""
+    '''创建 JSONB 键值条件，供线程元数据搜索组合到 SQLAlchemy 查询中。'''
     return JsonMatch(column, key, value)

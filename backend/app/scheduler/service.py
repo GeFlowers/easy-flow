@@ -1,4 +1,4 @@
-"""提供定时任务轮询、分派及运行结果回调的应用服务。"""
+'''提供定时任务轮询、分派及运行结果回调的应用服务。'''
 
 from __future__ import annotations
 
@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class ScheduledTaskService:
-    """协调定时任务的轮询抢占、重叠处理、运行分派与生命周期收尾。"""
+    '''协调定时任务的轮询抢占、重叠处理、运行分派与生命周期收尾。'''
 
     def __init__(
         self,
@@ -30,7 +30,7 @@ class ScheduledTaskService:
         lease_seconds: int,
         max_concurrent_runs: int,
     ) -> None:
-        """初始化仓储、运行分派器以及轮询和租约控制参数。"""
+        '''初始化仓储、运行分派器以及轮询和租约控制参数。'''
         self._task_repo = task_repo
         self._task_run_repo = task_run_repo
         self._launch_run = launch_run
@@ -42,7 +42,7 @@ class ScheduledTaskService:
         self._stop = asyncio.Event()
 
     async def run_once(self, *, now: datetime) -> None:
-        """执行一次轮询：在全局并发余量内抢占到期任务并分派运行。"""
+        '''执行一次轮询：在全局并发余量内抢占到期任务并分派运行。'''
         # ``max_concurrent_runs`` 限制的是全部活跃的定时运行，而非单次轮询的抢占批次：
         # 长时间运行会跨多个轮询周期累积，因此每轮只能按剩余并发额度抢占任务。
         active = await self._task_run_repo.count_active_runs()
@@ -60,14 +60,14 @@ class ScheduledTaskService:
 
     @staticmethod
     def _is_overlap_conflict(exc: Exception) -> bool:
-        """判断异常是否表示同一执行线程已被占用的重叠冲突。"""
+        '''判断异常是否表示同一执行线程已被占用的重叠冲突。'''
         if isinstance(exc, ConflictError):
             return True
         return isinstance(exc, HTTPException) and exc.status_code == 409
 
     @staticmethod
     def _task_status_for_failure(task: dict[str, Any], *, trigger: str) -> str:
-        """根据触发方式和调度类型确定启动失败后任务应保留的状态。"""
+        '''根据触发方式和调度类型确定启动失败后任务应保留的状态。'''
         if trigger == "manual":
             # 手动触发失败不能消耗任务未来的调度机会：若一次性任务的 run_at 仍未到达，
             # 否则它会被改为“failed”，从而再也不会被抢占执行。
@@ -78,7 +78,7 @@ class ScheduledTaskService:
 
     @staticmethod
     def _task_status_for_skip(task: dict[str, Any]) -> str:
-        """根据调度类型确定因重叠而跳过后任务应保留的状态。"""
+        '''根据调度类型确定因重叠而跳过后任务应保留的状态。'''
         if task["schedule_type"] == "once":
             # 唯一一次执行已因重叠运行而错过；标为“completed”会错误地表示它执行过。
             return "failed"
@@ -91,7 +91,7 @@ class ScheduledTaskService:
         now: datetime,
         trigger: str,
     ) -> dict[str, Any]:
-        """创建任务运行记录，处理重叠策略并通过既有运行链路分派任务。"""
+        '''创建任务运行记录，处理重叠策略并通过既有运行链路分派任务。'''
         execution_thread_id = task.get("thread_id")
         if task.get("context_mode") == "fresh_thread_per_run" or not execution_thread_id:
             execution_thread_id = str(uuid.uuid4())
@@ -222,7 +222,7 @@ class ScheduledTaskService:
         now: datetime,
         error: str,
     ) -> dict[str, Any]:
-        """将因重叠而跳过的运行和关联任务更新为相应状态并返回结果。"""
+        '''将因重叠而跳过的运行和关联任务更新为相应状态并返回结果。'''
         next_at = next_run_at(
             task["schedule_type"],
             task["schedule_spec"],
@@ -255,7 +255,7 @@ class ScheduledTaskService:
         }
 
     async def handle_run_completion(self, record: RunRecord) -> None:
-        """接收运行完成回调，写入终态并收尾一次性任务的状态。"""
+        '''接收运行完成回调，写入终态并收尾一次性任务的状态。'''
         metadata = record.metadata or {}
         task_id = metadata.get("scheduled_task_id")
         task_run_id = metadata.get("scheduled_task_run_id")
@@ -306,7 +306,7 @@ class ScheduledTaskService:
         await self._task_repo.update(task_id, user_id=user_id, updates=updates)
 
     async def start(self) -> None:
-        """清理重启遗留状态后启动后台定时任务轮询循环。"""
+        '''清理重启遗留状态后启动后台定时任务轮询循环。'''
         if self._task is not None:
             return
         restart_error = "interrupted: gateway restarted before the run reached a terminal state"
@@ -328,7 +328,7 @@ class ScheduledTaskService:
         self._task = asyncio.create_task(self._run_loop())
 
     async def stop(self) -> None:
-        """发出停止信号并等待后台轮询循环有序结束。"""
+        '''发出停止信号并等待后台轮询循环有序结束。'''
         if self._task is None:
             return
         self._stop.set()
@@ -336,7 +336,7 @@ class ScheduledTaskService:
         self._task = None
 
     async def _run_loop(self) -> None:
-        """持续轮询到期任务；单次轮询失败时记录异常并在下个周期重试。"""
+        '''持续轮询到期任务；单次轮询失败时记录异常并在下个周期重试。'''
         while not self._stop.is_set():
             try:
                 await self.run_once(now=datetime.now(UTC))

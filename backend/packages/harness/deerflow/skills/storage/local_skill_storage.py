@@ -1,4 +1,4 @@
-"""使用本地文件系统实现技能发现、编辑、安装和历史记录操作。"""
+'''使用本地文件系统实现技能发现、编辑、安装和历史记录操作。'''
 
 from __future__ import annotations
 
@@ -20,13 +20,11 @@ from deerflow.skills.types import SkillCategory
 
 logger = logging.getLogger(__name__)
 
-# Bound for the best-effort temp-dir cleanup so a stalled filesystem (e.g. NFS)
-# cannot hold back the install outcome propagating out of the finally block.
 _INSTALL_TMP_CLEANUP_TIMEOUT_SECONDS = 5.0
 
 
 def _iter_direct_skill_files(category_path: Path) -> Iterable[Path]:
-    """仅枚举目标目录直属子文件夹中的 SKILL.md，不递归进入嵌套目录。"""
+    '''仅枚举目标目录直属子文件夹中的 SKILL.md，不递归进入嵌套目录。'''
     for skill_dir in sorted(category_path.iterdir(), key=lambda path: path.name):
         if skill_dir.name.startswith(".") or not skill_dir.is_dir():
             continue
@@ -36,7 +34,7 @@ def _iter_direct_skill_files(category_path: Path) -> Iterable[Path]:
 
 
 class LocalSkillStorage(SkillStorage):
-    """本地文件系统技能仓储，公共技能只读、自定义技能可编辑并记录历史。"""
+    '''本地文件系统技能仓储，公共技能只读、自定义技能可编辑并记录历史。'''
 
     def __init__(
         self,
@@ -44,7 +42,7 @@ class LocalSkillStorage(SkillStorage):
         container_path: str = DEFAULT_SKILLS_CONTAINER_PATH,
         app_config=None,
     ) -> None:
-        """根据配置或显式宿主机路径确定技能根目录。"""
+        '''根据配置或显式宿主机路径确定技能根目录。'''
         super().__init__(container_path=container_path)
         if host_path is None:
             from deerflow.config import get_app_config
@@ -53,33 +51,25 @@ class LocalSkillStorage(SkillStorage):
             self._app_config = config
             self._host_root: Path = config.skills.get_skills_path()
         else:
-            # Keep app_config as-is (may be None). This host_path constructor is used by
-            # tests and non-user-scoped storage; eagerly calling get_app_config() here would
-            # break config-free environments (e.g. CI). The skill_scan.enabled kill switch is
-            # resolved lazily at scan time by skill_scan_enabled(), which also picks up
-            # hot-reloaded config, so a None here is honored, not ignored.
             self._app_config = app_config
             self._host_root = resolve_path(host_path)
 
-    # ------------------------------------------------------------------
-    # Abstract operation implementations
-    # ------------------------------------------------------------------
 
     def get_skills_root_path(self) -> Path:
-        """返回当前实例使用的宿主机技能根目录。"""
+        '''返回当前实例使用的宿主机技能根目录。'''
         return self._host_root
 
     def custom_skill_exists(self, name: str) -> bool:
-        """检查自定义技能说明文件是否存在。"""
+        '''检查自定义技能说明文件是否存在。'''
         return self.get_custom_skill_file(name).exists()
 
     def public_skill_exists(self, name: str) -> bool:
-        """检查公共技能说明文件是否存在。"""
+        '''检查公共技能说明文件是否存在。'''
         normalized_name = self.validate_skill_name(name)
         return (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists()
 
     def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
-        """逐类别枚举直属技能目录中的说明文件，不递归扫描子目录。"""
+        '''逐类别枚举直属技能目录中的说明文件，不递归扫描子目录。'''
         if not self._host_root.exists():
             return
         for category in SkillCategory:
@@ -90,13 +80,13 @@ class LocalSkillStorage(SkillStorage):
                 yield category, category_path, skill_file
 
     def read_custom_skill(self, name: str) -> str:
-        """读取自定义技能说明文件；技能不存在时抛出文件未找到错误。"""
+        '''读取自定义技能说明文件；技能不存在时抛出文件未找到错误。'''
         if not self.custom_skill_exists(name):
             raise FileNotFoundError(f"Custom skill '{name}' not found.")
         return (self.get_custom_skill_dir(name) / SKILL_MD_FILE).read_text(encoding="utf-8")
 
     def write_custom_skill(self, name: str, relative_path: str, content: str) -> None:
-        """在自定义技能目录内原子写入文件，并调整权限以供沙箱读取。"""
+        '''在自定义技能目录内原子写入文件，并调整权限以供沙箱读取。'''
         target = self.validate_relative_path(relative_path, self.get_custom_skill_dir(name))
         target.parent.mkdir(parents=True, exist_ok=True)
         with tempfile.NamedTemporaryFile(
@@ -111,7 +101,7 @@ class LocalSkillStorage(SkillStorage):
         make_skill_written_path_sandbox_readable(self.get_custom_skill_dir(name), target)
 
     async def ainstall_skill_from_archive(self, archive_path: str | Path) -> dict:
-        """在线程池中处理文件操作、异步扫描技能包并提交安装结果。"""
+        '''在线程池中处理文件操作、异步扫描技能包并提交安装结果。'''
         from deerflow.skills.installer import _scan_skill_archive_contents_or_raise
 
         logger.info("Installing skill from %s", archive_path)
@@ -144,14 +134,14 @@ class LocalSkillStorage(SkillStorage):
 
     @staticmethod
     def _cleanup_install_tmp(tmp: str) -> None:
-        """尽力清理安装临时目录；清理失败只记日志，不覆盖安装结果。"""
+        '''尽力清理安装临时目录；清理失败只记日志，不覆盖安装结果。'''
         try:
             shutil.rmtree(tmp)
         except OSError:
             logger.warning("Failed to clean up skill install temp dir %s", tmp, exc_info=True)
 
     def _prepare_skill_archive(self, path: Path, tmp_path: Path, custom_dir: Path, archive_path: str | Path) -> tuple[Path, str, Path]:
-        """解压并校验技能归档，返回技能目录、名称及最终安装目标路径。"""
+        '''解压并校验技能归档，返回技能目录、名称及最终安装目标路径。'''
         import zipfile
 
         from deerflow.skills.installer import (
@@ -197,7 +187,7 @@ class LocalSkillStorage(SkillStorage):
         return skill_dir, skill_name, target
 
     def _commit_skill_install(self, skill_dir: Path, skill_name: str, custom_dir: Path, target: Path) -> None:
-        """将已校验技能复制到暂存目录，再原子移入目标位置并设置沙箱可读权限。"""
+        '''将已校验技能复制到暂存目录，再原子移入目标位置并设置沙箱可读权限。'''
         from deerflow.skills.installer import _move_staged_skill_into_reserved_target
 
         with tempfile.TemporaryDirectory(prefix=f".installing-{skill_name}-", dir=custom_dir) as staging_root:
@@ -207,7 +197,7 @@ class LocalSkillStorage(SkillStorage):
         make_skill_written_path_sandbox_readable(custom_dir, target)
 
     def delete_custom_skill(self, name: str, *, history_meta: dict | None = None) -> None:
-        """验证技能可编辑后删除其目录；若提供元数据，先尽力保存删除前内容。"""
+        '''验证技能可编辑后删除其目录；若提供元数据，先尽力保存删除前内容。'''
         self.validate_skill_name(name)
         self.ensure_custom_skill_is_editable(name)
         target = self.get_custom_skill_dir(name)
@@ -227,7 +217,7 @@ class LocalSkillStorage(SkillStorage):
             shutil.rmtree(target)
 
     def append_history(self, name: str, record: dict) -> None:
-        """给历史记录补充 UTC 时间戳并追加到技能 JSONL 历史文件。"""
+        '''给历史记录补充 UTC 时间戳并追加到技能 JSONL 历史文件。'''
         self.validate_skill_name(name)
         payload = {"ts": datetime.now(UTC).isoformat(), **record}
         history_path = self.get_skill_history_file(name)
@@ -237,7 +227,7 @@ class LocalSkillStorage(SkillStorage):
             f.write("\n")
 
     def read_history(self, name: str) -> list[dict]:
-        """读取并解析技能 JSONL 历史；历史文件不存在时返回空列表。"""
+        '''读取并解析技能 JSONL 历史；历史文件不存在时返回空列表。'''
         self.validate_skill_name(name)
         history_path = self.get_skill_history_file(name)
         if not history_path.exists():

@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -11,20 +11,16 @@ from deerflow.persistence.base import Base
 
 
 class RunEventRow(Base):
-    """定义与持久化数据表对应的行模型。"""
+    '''定义与持久化数据表对应的行模型。'''
 
     __tablename__ = "run_events"
 
     id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
     thread_id: Mapped[str] = mapped_column(String(64), nullable=False)
     run_id: Mapped[str] = mapped_column(String(64), nullable=False)
-    # Owner of the conversation this event belongs to. Nullable for data
-    # created before auth was introduced; populated by auth middleware on
-    # new writes and by the boot-time orphan migration on existing rows.
     user_id: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
     event_type: Mapped[str] = mapped_column(String(32), nullable=False)
     category: Mapped[str] = mapped_column(String(16), nullable=False)
-    # "message" | "trace" | "lifecycle"
     content: Mapped[str] = mapped_column(Text, default="")
     event_metadata: Mapped[dict] = mapped_column(JSON, default=dict)
     seq: Mapped[int] = mapped_column(nullable=False)

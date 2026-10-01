@@ -1,11 +1,11 @@
-"""集中访问存储于 ``app.state`` 的单例对象。
+'''集中访问存储于 ``app.state`` 的单例对象。
 
 供路由使用的获取器在必需依赖缺失时返回 503，唯有 ``get_store`` 可返回 ``None``。
 ``AppConfig`` 刻意不缓存于 ``app.state``，路由和运行路径经由支持 mtime 热重载的
 ``get_app_config`` 解析，使 config.yaml 修改在下一请求生效。``langgraph_runtime`` 创建的
 流桥、持久化、检查点、存储及运行事件存储使用启动快照，按设计必须重启后才更新，以确保
 正在运行的进程内部一致。初始化由 app.py 通过 ``AsyncExitStack`` 直接完成。
-"""
+'''
 
 from __future__ import annotations
 
@@ -34,7 +34,7 @@ _RUN_DRAIN_TIMEOUT_SECONDS = 5.0
 
 
 def _enforce_multi_worker_run_ownership(config: AppConfig) -> None:
-    """多进程运行时未启用租约心跳时拒绝启动。"""
+    '''多进程运行时未启用租约心跳时拒绝启动。'''
     try:
         workers = int(os.environ.get("GATEWAY_WORKERS", "1"))
     except (TypeError, ValueError):
@@ -55,12 +55,12 @@ def _enforce_multi_worker_run_ownership(config: AppConfig) -> None:
 
 
 async def _drain_inflight_runs(run_manager: RunManager) -> None:
-    """在销毁检查点前排空在途运行，避免运行任务仍写入检查点时关闭其连接池。
+    '''在销毁检查点前排空在途运行，避免运行任务仍写入检查点时关闭其连接池。
 
     对有内部时限的排空操作做屏蔽；即使生命周期协程在关闭中因第二个 SIGINT 或服务器
     优雅关闭超时而被取消，也允许已启动的排空在 ``RunManager.shutdown`` 的时限内完成，
     随后再传播取消。
-    """
+    '''
     drain = asyncio.create_task(run_manager.shutdown(timeout=_RUN_DRAIN_TIMEOUT_SECONDS))
     try:
         await asyncio.shield(drain)
@@ -81,7 +81,7 @@ async def _publish_recovered_run_stream_end(
     *,
     cleanup_delay: float = 60.0,
 ) -> None:
-    """为启动时恢复为无主状态的运行终止保留事件流。"""
+    '''为启动时恢复为无主状态的运行终止保留事件流。'''
     for record in recovered_runs:
         stream_exists = getattr(bridge, "stream_exists", None)
         if stream_exists is not None:
@@ -105,7 +105,7 @@ async def _publish_recovered_run_stream_end(
 
 
 def _log_recovered_stream_cleanup_result(task: asyncio.Task[None], run_id: str) -> None:
-    """记录恢复运行的延迟事件流清理任务异常，取消任务无需额外处理。"""
+    '''记录恢复运行的延迟事件流清理任务异常，取消任务无需额外处理。'''
     if task.cancelled():
         return
     try:
@@ -129,7 +129,7 @@ async def _mark_latest_recovered_threads_error(
     thread_store: ThreadMetaStore,
     recovered_runs: list[RunRecord],
 ) -> None:
-    """仅当线程最新运行被恢复时才将其状态标记为错误。"""
+    '''仅当线程最新运行被恢复时才将其状态标记为错误。'''
     recovered_by_thread: dict[str, set[str]] = {}
     for record in recovered_runs:
         recovered_by_thread.setdefault(record.thread_id, set()).add(record.run_id)
@@ -149,32 +149,23 @@ async def _mark_latest_recovered_threads_error(
 
 
 def get_config() -> AppConfig:
-    """返回当前请求的最新 ``AppConfig``。
+    '''返回当前请求的最新 ``AppConfig``。
 
-    Routes through :func:`deerflow.config.app_config.get_app_config`, which
-    honours runtime ``ContextVar`` overrides and reloads ``config.yaml`` from
-    disk when its mtime changes. ``AppConfig`` is not cached on ``app.state``
-    at all — the only startup-time snapshot lives as a local
-    ``startup_config`` variable inside ``lifespan()`` and is passed
-    explicitly into :func:`langgraph_runtime` for the engines that are
-    restart-required by design. Routing every request through
-    :func:`get_app_config` closes the bytedance/deer-flow issue #3107 BUG-001
-    split-brain where the worker / lead-agent thread saw a stale startup
-    snapshot.
+    通过 :func:`deerflow.config.app_config.get_app_config` 获取配置，以支持运行时
+    ``ContextVar`` 覆盖，并在 ``config.yaml`` 的修改时间变化时从磁盘重载。这里不把
+    ``AppConfig`` 缓存在 ``app.state``；启动阶段的配置快照仅保存在 ``lifespan()`` 的
+    ``startup_config`` 局部变量中，并显式传给 :func:`langgraph_runtime`，供必须重启才能
+    生效的引擎使用。每个请求都调用 :func:`get_app_config`，以修复 bytedance/deer-flow
+    问题 #3107 BUG-001 中工作器与主智能体线程仍读取旧启动配置的情况。
 
-    Hot-reload boundary: fields backed by startup-time singletons
-    (engines, sandbox provider, IM channels, logging handler) require a
-    process restart to change at runtime. The authoritative list lives in
-    :mod:`deerflow.config.reload_boundary` and is mirrored by the
-    standardised ``"startup-only:"`` prefix on the matching
-    ``Field(description=...)`` in :class:`AppConfig` — IDE hover on those
-    fields will surface the boundary inline.
+    热重载边界：由启动阶段单例支撑的字段（引擎、沙箱提供者、即时通信渠道、日志处理器）
+    需要重启进程才能变更。权威清单位于 :mod:`deerflow.config.reload_boundary`；
+    :class:`AppConfig` 中对应字段的 ``Field(description=...)`` 使用统一的
+    ``"startup-only:"`` 前缀标注，方便在集成开发环境中查看限制。
 
-    Any failure to materialise the config (missing file, permission denied,
-    YAML parse error, validation error) is reported as 503 — semantically
-    "the gateway cannot serve requests without a usable configuration" — and
-    logged with the original exception so operators have something to debug.
-    """
+    配置读取或构建失败（文件缺失、权限不足、YAML 解析错误、校验错误）时返回 503，表示
+    网关缺少可用配置，无法处理请求；同时记录原始异常，便于排查。
+    '''
     try:
         return get_app_config()
     except Exception as exc:  # noqa: BLE001 - 请求边界：记录日志并优雅降级。
@@ -184,37 +175,29 @@ def get_config() -> AppConfig:
 
 @asynccontextmanager
 async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGenerator[None, None]:
-    """引导并销毁所有 LangGraph 运行时单例。
+    '''引导并销毁所有 LangGraph 运行时单例。
 
-    ``startup_config`` is the ``AppConfig`` snapshot taken once during
-    ``lifespan()`` for one-shot infrastructure bootstrap. The engines and
-    stores constructed here (stream bridge, persistence engine, checkpointer,
-    store, run-event store) are restart-required by design — they hold live
-    connections, file handles, or singleton providers — so they bind to this
-    snapshot and survive across `config.yaml` edits. Request-time consumers
-    must still go through :func:`get_config` for any field that should be
-    hot-reloadable.
+    ``startup_config`` 是 ``lifespan()`` 启动时为基础设施初始化读取的一次性 ``AppConfig`` 快照。
+    此处创建的引擎和存储（流桥接器、持久化引擎、检查点保存器、通用存储和运行事件存储）
+    持有活动连接、文件句柄或单例提供者，设计上需要重启才能更改，因此始终使用此快照。
+    请求处理期间需要读取可热重载字段的代码仍须调用 :func:`get_config`。
+    可热重载。
 
-    The matching ``run_events_config`` is frozen onto ``app.state`` so
-    :func:`get_run_context` pairs a freshly-loaded ``AppConfig`` with the
-    *startup-time* run-events configuration the underlying ``event_store``
-    was built from — otherwise the runtime could end up combining a live
-    new ``run_events_config`` with an event store still bound to the
-    previous backend.
+    对应的 ``run_events_config`` 固定保存在 ``app.state`` 中，使 :func:`get_run_context` 将
+    最新读取的 ``AppConfig`` 与底层 ``event_store`` 创建时使用的启动配置配对；否则运行时可能把
+    新的 ``run_events_config`` 与仍绑定旧后端的事件存储混用。
 
-    Usage in ``app.py``::
+    在 ``app.py`` 中的用法：
 
         async with langgraph_runtime(app, startup_config):
             yield
-    """
+    '''
     from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
     from deerflow.runtime import make_store, make_stream_bridge
     from deerflow.runtime.checkpointer.async_provider import make_checkpointer
     from deerflow.runtime.events.store import make_run_event_store
 
-    # ------------------------------------------------------------------
     # 多进程运行必须启用租约心跳，以免工作进程互相回收仍在执行的任务。
-    # ------------------------------------------------------------------
     _enforce_multi_worker_run_ownership(startup_config)
 
     async with AsyncExitStack() as stack:
@@ -286,16 +269,14 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             await close_engine()
 
 
-# ---------------------------------------------------------------------------
 # 供路由按请求调用的获取器。
-# ---------------------------------------------------------------------------
 
 
 def _require(attr: str, label: str) -> Callable[[Request], T]:
-    """创建返回 ``app.state.<attr>`` 的 FastAPI 依赖；缺失时返回 503。"""
+    '''创建返回 ``app.state.<attr>`` 的 FastAPI 依赖；缺失时返回 503。'''
 
     def dep(request: Request) -> T:
-        """从应用状态读取已初始化依赖；缺失时向当前请求返回 503。"""
+        '''从应用状态读取已初始化依赖；缺失时向当前请求返回 503。'''
         val = getattr(request.app.state, attr, None)
         if val is None:
             raise HTTPException(status_code=503, detail=f"{label} not available")
@@ -314,12 +295,12 @@ get_run_store: Callable[[Request], RunStore] = _require("run_store", "Run store"
 
 
 def get_store(request: Request):
-    """返回全局存储；未配置时可能为 ``None``。"""
+    '''返回全局存储；未配置时可能为 ``None``。'''
     return getattr(request.app.state, "store", None)
 
 
 def get_thread_store(request: Request) -> ThreadMetaStore:
-    """返回线程元数据存储，可由 SQL 或内存后端支撑。"""
+    '''返回线程元数据存储，可由 SQL 或内存后端支撑。'''
     val = getattr(request.app.state, "thread_store", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Thread metadata store not available")
@@ -327,7 +308,7 @@ def get_thread_store(request: Request) -> ThreadMetaStore:
 
 
 def get_scheduled_task_repo(request: Request):
-    """返回调度任务持久化仓库，供路由在当前应用生命周期内访问。"""
+    '''返回调度任务持久化仓库，供路由在当前应用生命周期内访问。'''
     val = getattr(request.app.state, "scheduled_task_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Scheduled task repo not available")
@@ -335,7 +316,7 @@ def get_scheduled_task_repo(request: Request):
 
 
 def get_scheduled_task_run_repo(request: Request):
-    """返回调度任务运行记录仓库，保留执行历史的持久化边界。"""
+    '''返回调度任务运行记录仓库，保留执行历史的持久化边界。'''
     val = getattr(request.app.state, "scheduled_task_run_repo", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Scheduled task run repo not available")
@@ -343,7 +324,7 @@ def get_scheduled_task_run_repo(request: Request):
 
 
 def get_scheduled_task_service(request: Request):
-    """返回已初始化的调度服务，用于创建、变更和触发后台任务。"""
+    '''返回已初始化的调度服务，用于创建、变更和触发后台任务。'''
     val = getattr(request.app.state, "scheduled_task_service", None)
     if val is None:
         raise HTTPException(status_code=503, detail="Scheduled task service not available")
@@ -351,15 +332,13 @@ def get_scheduled_task_service(request: Request):
 
 
 def get_run_context(request: Request) -> RunContext:
-    """从 ``app.state`` 单例构建 :class:`RunContext`。
+    '''从 ``app.state`` 单例构建 :class:`RunContext`。
 
-    Returns a *base* context with infrastructure dependencies. The
-    ``app_config`` field is resolved live so per-run fields (e.g.
-    ``models[*].max_tokens``) follow ``config.yaml`` edits; the
-    ``event_store`` / ``run_events_config`` pair stays frozen to the snapshot
-    captured in :func:`langgraph_runtime` so callers never see a store bound
-    to one backend paired with a config pointing at another.
-    """
+    返回包含基础设施依赖的基础上下文。``app_config`` 每次实时解析，使每轮运行使用的
+    ``models[*].max_tokens`` 等字段能够跟随 ``config.yaml`` 更新；``event_store`` 与
+    ``run_events_config`` 则固定使用 :func:`langgraph_runtime` 捕获的启动快照，避免存储
+    绑定的后端与配置指定的后端不一致。
+    '''
     return RunContext(
         checkpointer=get_checkpointer(request),
         store=get_store(request),
@@ -371,9 +350,7 @@ def get_run_context(request: Request) -> RunContext:
     )
 
 
-# ---------------------------------------------------------------------------
 # 认证辅助函数，供 authz.py 与认证中间件使用。
-# ---------------------------------------------------------------------------
 
 # 缓存单例，避免每个请求重复实例化。
 _cached_local_provider: LocalAuthProvider | None = None
@@ -381,11 +358,10 @@ _cached_repo: SQLUserRepository | None = None
 
 
 def get_local_provider() -> LocalAuthProvider:
-    """获取或创建缓存的 LocalAuthProvider 单例。
+    '''获取或创建缓存的 LocalAuthProvider 单例。
 
-    Must be called after ``init_engine_from_config()`` — the shared
-    session factory is required to construct the user repository.
-    """
+    必须在 ``init_engine_from_config()`` 之后调用，因为创建用户仓储需要共享会话工厂。
+    '''
     global _cached_local_provider, _cached_repo
     if _cached_repo is None:
         from app.gateway.auth.repositories.sql import SQLUserRepository
@@ -403,10 +379,10 @@ def get_local_provider() -> LocalAuthProvider:
 
 
 async def get_current_user_from_request(request: Request):
-    """从请求 Cookie 获取当前已认证用户。
+    '''从请求 Cookie 获取当前已认证用户。
 
-    Raises HTTPException 401 if not authenticated.
-    """
+    未通过认证时抛出状态码为 401 的 HTTPException。
+    '''
     state = getattr(request, "state", None)
     state_user = getattr(state, "user", None)
     from app.gateway.auth_disabled import AUTH_SOURCE_AUTH_DISABLED, AUTH_SOURCE_INTERNAL, AUTH_SOURCE_SESSION
@@ -454,19 +430,16 @@ async def get_current_user_from_request(request: Request):
 
 
 async def require_admin_user(request: Request, *, detail: str) -> None:
-    """要求已认证调用方为管理员用户。
+    '''要求已认证调用方为管理员用户。
 
-    ``AuthMiddleware`` normally stamps ``request.state.user`` before the request
-    reaches a router. Falling back to the strict dependency keeps the route safe
-    in tests or alternative ASGI compositions that mount a router without the
-    global middleware. ``detail`` is the route-specific 403 message.
+    通常 ``AuthMiddleware`` 会在请求进入路由前写入 ``request.state.user``。在测试或其他
+    未挂载全局中间件的 ASGI 组合中，此处回退到严格的依赖项进行认证，确保路由仍然安全。
+    ``detail`` 是此路由专用的 403 错误信息。
 
-    Centralising this here means a future change to the admin definition (e.g.
-    allowing an internal system role, adding audit logging, or switching to a
-    permission-based check) lands in one place instead of drifting across the
-    per-router copies that previously existed in ``mcp``, ``channel_connections``
-    and ``channels``.
-    """
+    将检查集中在此处，后续若调整管理员定义（例如允许内部系统角色、增加审计日志或改为权限
+    检查），只需修改一处，避免逻辑分散在 ``mcp``、``channel_connections`` 和 ``channels``
+    等路由各自维护的副本中。
+    '''
     user = getattr(request.state, "user", None)
     if user is None:
         user = await get_current_user_from_request(request)
@@ -476,10 +449,10 @@ async def require_admin_user(request: Request, *, detail: str) -> None:
 
 
 async def get_optional_user_from_request(request: Request):
-    """从请求获取可选的已认证用户。
+    '''从请求获取可选的已认证用户。
 
-    Returns None if not authenticated.
-    """
+    未通过认证时返回 None。
+    '''
     try:
         return await get_current_user_from_request(request)
     except HTTPException:
@@ -487,11 +460,11 @@ async def get_optional_user_from_request(request: Request):
 
 
 async def get_current_user(request: Request) -> str | None:
-    """从请求 Cookie 提取 user_id；未认证时返回 None。
+    '''从请求 Cookie 提取 user_id；未认证时返回 None。
 
-    Thin adapter that returns the string id for callers that only need
-    identification (e.g., ``feedback.py``). Full-user callers should use
-    ``get_current_user_from_request`` or ``get_optional_user_from_request``.
-    """
+    为只需要用户标识的调用方（例如 ``feedback.py``）提供轻量适配，返回字符串形式的编号。
+    需要完整用户对象的调用方应使用 ``get_current_user_from_request`` 或
+    ``get_optional_user_from_request``。
+    '''
     user = await get_optional_user_from_request(request)
     return str(user.id) if user else None

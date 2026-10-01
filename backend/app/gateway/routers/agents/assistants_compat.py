@@ -1,9 +1,9 @@
-"""提供向 LangGraph Assistants API 兼容转换的只读端点。
+'''提供向 LangGraph Assistants API 兼容转换的只读端点。
 
 接口由 ``langgraph.json`` 图注册表和 ``config.yaml`` 代理定义支撑，以最小化实现
 满足 ``useStream`` React 钩子的初始化请求（``assistants.search()`` 与
 ``assistants.get()``），而非提供完整的平台图检查能力。
-"""
+'''
 
 from __future__ import annotations
 
@@ -19,7 +19,7 @@ router = APIRouter(prefix="/api/assistants", tags=["assistants-compat"])
 
 
 class AssistantResponse(BaseModel):
-    """描述兼容层返回给 LangGraph 客户端的助手元数据。"""
+    '''描述兼容层返回给 LangGraph 客户端的助手元数据。'''
 
     assistant_id: str
     graph_id: str
@@ -33,7 +33,7 @@ class AssistantResponse(BaseModel):
 
 
 class AssistantSearchRequest(BaseModel):
-    """定义兼容助手检索接口接受的可选筛选与分页参数。"""
+    '''定义兼容助手检索接口接受的可选筛选与分页参数。'''
 
     graph_id: str | None = None
     name: str | None = None
@@ -43,7 +43,7 @@ class AssistantSearchRequest(BaseModel):
 
 
 def _get_default_assistant() -> AssistantResponse:
-    """构造代表默认主代理的兼容助手记录。"""
+    '''构造代表默认主代理的兼容助手记录。'''
     now = datetime.now(UTC).isoformat()
     return AssistantResponse(
         assistant_id="lead_agent",
@@ -59,7 +59,7 @@ def _get_default_assistant() -> AssistantResponse:
 
 
 def _list_assistants() -> list[AssistantResponse]:
-    """汇总默认主代理及配置目录中可用的自定义代理。"""
+    '''汇总默认主代理及配置目录中可用的自定义代理。'''
     assistants = [_get_default_assistant()]
 
     # 同时纳入 config.yaml 指定的代理目录中的自定义代理。
@@ -89,10 +89,10 @@ def _list_assistants() -> list[AssistantResponse]:
 
 @router.post("/search", response_model=list[AssistantResponse])
 async def search_assistants(body: AssistantSearchRequest | None = None) -> list[AssistantResponse]:
-    """按图标识或名称筛选兼容助手，并应用分页。
+    '''按图标识或名称筛选兼容助手，并应用分页。
 
     返回已注册助手，即主代理及配置中的自定义代理。
-    """
+    '''
     assistants = _list_assistants()
 
     if body and body.graph_id:
@@ -107,7 +107,7 @@ async def search_assistants(body: AssistantSearchRequest | None = None) -> list[
 
 @router.get("/{assistant_id}", response_model=AssistantResponse)
 async def get_assistant_compat(assistant_id: str) -> AssistantResponse:
-    """按标识返回兼容助手；未注册时返回 404。"""
+    '''按标识返回兼容助手；未注册时返回 404。'''
     for a in _list_assistants():
         if a.assistant_id == assistant_id:
             return a
@@ -116,10 +116,10 @@ async def get_assistant_compat(assistant_id: str) -> AssistantResponse:
 
 @router.get("/{assistant_id}/graph")
 async def get_assistant_graph(assistant_id: str) -> dict:
-    """返回兼容客户端所需的最小图结构。
+    '''返回兼容客户端所需的最小图结构。
 
     Gateway 不提供完整图检查；空节点和边仅满足 SDK 的结构校验。
-    """
+    '''
     found = any(a.assistant_id == assistant_id for a in _list_assistants())
     if not found:
         raise HTTPException(status_code=404, detail=f"Assistant {assistant_id} not found")
@@ -133,10 +133,10 @@ async def get_assistant_graph(assistant_id: str) -> dict:
 
 @router.get("/{assistant_id}/schemas")
 async def get_assistant_schemas(assistant_id: str) -> dict:
-    """返回兼容客户端所需的输入、输出与状态 JSON Schema 占位结构。
+    '''返回兼容客户端所需的输入、输出与状态 JSON Schema 占位结构。
 
     Gateway 不支持完整检查，因此各 Schema 为空对象。
-    """
+    '''
     found = any(a.assistant_id == assistant_id for a in _list_assistants())
     if not found:
         raise HTTPException(status_code=404, detail=f"Assistant {assistant_id} not found")

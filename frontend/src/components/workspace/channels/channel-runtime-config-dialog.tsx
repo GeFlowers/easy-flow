@@ -81,6 +81,7 @@ export function ChannelRuntimeConfigDialog({
 
   const isEditing = provider.configured;
 
+  /** 阻止表单默认导航并将当前字段值交给渠道配置回调保存。 */
   const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     onSubmit(provider, values);

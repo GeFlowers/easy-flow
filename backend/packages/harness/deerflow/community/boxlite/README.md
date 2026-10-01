@@ -3,7 +3,7 @@
 Runs each DeerFlow sandbox as a [BoxLite](https://github.com/boxlite-ai/boxlite)
 micro-VM — a daemonless, OCI-native VM with its own kernel (libkrun/KVM on Linux,
 Hypervisor.framework on macOS). Motivated by the resource/cold-start pain with
-the default AIO Docker sandbox in
+container-based sandboxing discussed in
 [#3439](https://github.com/bytedance/deer-flow/issues/3439) and
 [#3213](https://github.com/bytedance/deer-flow/issues/3213); discussion in
 [#3936](https://github.com/bytedance/deer-flow/issues/3936).

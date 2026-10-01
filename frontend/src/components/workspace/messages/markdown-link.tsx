@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 
 import { CitationLink } from "../citations/citation-link";
 
+/** 识别外部 HTTP(S) 地址，以便为新窗口链接补充安全属性。 */
 function isExternalUrl(href: string | undefined): boolean {
   return !!href && /^https?:\/\//.test(href);
 }

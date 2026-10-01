@@ -1,4 +1,4 @@
-"定义 __init__ 模块提供的职责与可复用接口"
+'''导出 Serper 网页搜索和图片搜索工具。'''
 
 from .tools import image_search_tool, web_search_tool
 

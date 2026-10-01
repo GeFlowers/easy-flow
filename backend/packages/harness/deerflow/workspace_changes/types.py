@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''定义工作区扫描快照、文件变化、差异摘要及对外序列化结构。'''
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ DiffUnavailableReason = Literal["binary", "large", "sensitive", "truncated"]
 
 @dataclass(frozen=True)
 class WorkspaceChangeLimits:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''限制扫描文件数、单文件差异大小和总差异字节数。'''
 
     max_files: int = 200
     max_scanned_files: int = 2000
@@ -23,27 +23,27 @@ class WorkspaceChangeLimits:
     max_total_diff_bytes: int = 1024 * 1024
 
     def to_dict(self) -> dict:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''将不可变限制配置转换为事件和 API 使用的字典。'''
         return asdict(self)
 
 
 @dataclass(frozen=True)
 class WorkspaceRoot:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''描述一个可扫描根目录及其暴露给智能体的虚拟路径前缀。'''
 
     name: str
     host_path: Path
     virtual_prefix: str
 
     def __post_init__(self) -> None:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''统一宿主路径类型，并移除虚拟前缀末尾多余斜线。'''
         object.__setattr__(self, "host_path", Path(self.host_path))
         object.__setattr__(self, "virtual_prefix", self.virtual_prefix.rstrip("/"))
 
 
 @dataclass(frozen=True)
 class FileSnapshot:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''记录单个文件扫描结果及因二进制、敏感或过大而不可读取的原因。'''
 
     path: str
     root: str
@@ -59,7 +59,7 @@ class FileSnapshot:
 
 @dataclass(frozen=True)
 class WorkspaceSnapshot:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''保存一次工作区扫描的文件映射及扫描是否因上限而截断。'''
 
     files: dict[str, FileSnapshot] = field(default_factory=dict)
     truncated: bool = False
@@ -68,7 +68,7 @@ class WorkspaceSnapshot:
 
 @dataclass(frozen=True)
 class WorkspaceFileChange:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''表示新增、修改或删除文件，并附带差异、安全标记和行数统计。'''
 
     path: str
     root: str
@@ -86,13 +86,13 @@ class WorkspaceFileChange:
     deletions: int = 0
 
     def to_dict(self) -> dict:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''将文件变化字段转换为事件存储所需的字典。'''
         return asdict(self)
 
 
 @dataclass(frozen=True)
 class WorkspaceChangeSummary:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''累计文件变化数量、增删行数，并标记结果是否不完整。'''
 
     created: int = 0
     modified: int = 0
@@ -102,13 +102,13 @@ class WorkspaceChangeSummary:
     truncated: bool = False
 
     def to_dict(self) -> dict:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''将变化摘要转换为可持久化的普通字典。'''
         return asdict(self)
 
 
 @dataclass(frozen=True)
 class WorkspaceChangeResult:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''封装工作区变化摘要、逐文件详情和本次使用的安全限制。'''
 
     summary: WorkspaceChangeSummary
     files: list[WorkspaceFileChange]
@@ -116,11 +116,11 @@ class WorkspaceChangeResult:
     version: int = 1
 
     def has_changes(self) -> bool:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''判断摘要中是否存在文件变化或差异行。'''
         return bool(self.summary.created or self.summary.modified or self.summary.deleted or self.summary.additions or self.summary.deletions)
 
     def to_dict(self) -> dict:
-        """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+        '''生成供运行事件和网关响应共用的稳定数据结构。'''
         return {
             "version": self.version,
             "summary": self.summary.to_dict(),

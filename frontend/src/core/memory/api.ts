@@ -12,6 +12,7 @@ async function readMemoryResponse(
   response: Response,
   fallbackMessage: string,
 ): Promise<UserMemory> {
+  /** 将接口返回的字符串、校验列表或对象错误整理为可读详情。 */
   function formatErrorDetail(detail: unknown): string | null {
     if (typeof detail === "string") {
       return detail;

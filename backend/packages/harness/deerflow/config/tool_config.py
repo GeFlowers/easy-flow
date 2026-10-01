@@ -1,17 +1,17 @@
-"""提供配置、tool、配置相关功能。"""
+'''定义工具组及工具提供者的配置格式，供应用装配阶段解析。'''
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ToolGroupConfig(BaseModel):
-    """\u6267\u884c ToolGroupConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''标识一组相关工具，并允许工具组声明扩展属性。'''
 
     name: str = Field(..., description="Unique name for the tool group")
     model_config = ConfigDict(extra="allow")
 
 
 class ToolConfig(BaseModel):
-    """\u6267\u884c ToolConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''将工具名称、所属分组和工厂导入路径绑定为一项配置。'''
 
     name: str = Field(..., description="Unique name for the tool")
     group: str = Field(..., description="Group name for the tool")

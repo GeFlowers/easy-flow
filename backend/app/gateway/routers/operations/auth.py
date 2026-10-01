@@ -1,4 +1,4 @@
-"""身份验证端点。"""
+'''身份验证端点。'''
 
 import asyncio
 import logging
@@ -45,7 +45,7 @@ router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 
 class LoginResponse(BaseModel):
-    """登录的响应模型 — 令牌仅存在于 HttpOnly cookie 中。"""
+    '''登录的响应模型 — 令牌仅存在于 HttpOnly cookie 中。'''
 
     expires_in: int  # 有效期（秒）
     needs_setup: bool = False
@@ -97,28 +97,28 @@ _COMMON_PASSWORDS: frozenset[str] = frozenset(
 
 
 def _password_is_common(password: str) -> bool:
-    """不区分大小写地检查密码是否在常见弱密码黑名单中。
+    '''不区分大小写地检查密码是否在常见弱密码黑名单中。
 
     将输入转为小写，使 ``Password`` 和 ``PASSWORD`` 等简单变体也会被拒绝。
     不对数字替换进行归一化；``p@ssw0rd`` 以字面量方式包含在黑名单中，以保持规则
     低成本且可预测。
-    """
+    '''
     return password.lower() in _COMMON_PASSWORDS
 
 
 def _validate_strong_password(value: str) -> str:
-    """供 `RegisterRequest` 与 `ChangePasswordRequest` 共用的 Pydantic 字段验证器。
+    '''供 `RegisterRequest` 与 `ChangePasswordRequest` 共用的 Pydantic 字段验证器。
 
     密码强度约束提取为函数而非类型级 mixin：两个请求模型不存在继承关系，只共享
     校验规则。各模型通过 ``@field_validator(field_name)`` 绑定该函数，无需引入继承。
-    """
+    '''
     if _password_is_common(value):
         raise ValueError("Password is too common; choose a stronger password.")
     return value
 
 
 class RegisterRequest(BaseModel):
-    """用户注册请求模型。"""
+    '''用户注册请求模型。'''
 
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -127,7 +127,7 @@ class RegisterRequest(BaseModel):
 
 
 class ChangePasswordRequest(BaseModel):
-    """密码更改的请求模型（还处理设置流程）。"""
+    '''密码更改的请求模型（还处理设置流程）。'''
 
     current_password: str
     new_password: str = Field(..., min_length=8)
@@ -137,7 +137,7 @@ class ChangePasswordRequest(BaseModel):
 
 
 class MessageResponse(BaseModel):
-    """通用消息响应。"""
+    '''通用消息响应。'''
 
     message: str
 
@@ -146,7 +146,7 @@ class MessageResponse(BaseModel):
 
 
 def _set_session_cookie(response: Response, token: str, request: Request) -> None:
-    """在响应上设置 access_token HttpOnly cookie。"""
+    '''在响应上设置 access_token HttpOnly cookie。'''
     config = get_auth_config()
     is_https = is_secure_request(request)
     response.set_cookie(
@@ -161,7 +161,6 @@ def _set_session_cookie(response: Response, token: str, request: Request) -> Non
 
 # ── 限流 ─────────────────────────────────────────────────────────────────
 # 进程内字典，不在多个 worker 间共享。
-#
 # **限制**：多 worker 部署（如 `gunicorn -w N`）中，每个 worker 维护各自的锁定表，
 # 攻击者在所有 worker 被锁定前实际上可尝试 `N × _MAX_LOGIN_ATTEMPTS` 次。生产环境
 # 的多 worker 部署应替换为共享存储（Redis 或数据库计数器），才能严格执行每 IP 限制。
@@ -174,12 +173,12 @@ _login_attempts: dict[str, tuple[int, float]] = {}
 
 
 def _trusted_proxies() -> list:
-    """将环境变量 `AUTH_TRUSTED_PROXIES` 解析为 `ip_network` 对象列表。
+    '''将环境变量 `AUTH_TRUSTED_PROXIES` 解析为 `ip_network` 对象列表。
 
     该变量接受以逗号分隔的 CIDR 或单个 IP。空值或未设置表示不信任任何代理
     （直连模式）。无效条目会被跳过并记录警告。每次实时读取，以便环境变量覆盖
     立即生效，测试也可通过 ``monkeypatch.setenv`` 生效而无需修改模块级缓存。
-    """
+    '''
     raw = os.getenv("AUTH_TRUSTED_PROXIES", "").strip()
     if not raw:
         return []
@@ -196,7 +195,7 @@ def _trusted_proxies() -> list:
 
 
 def _get_client_ip(request: Request) -> str:
-    """提取用于限流的真实客户端 IP。
+    '''提取用于限流的真实客户端 IP。
 
     信任模型：
 
@@ -209,7 +208,7 @@ def _get_client_ip(request: Request) -> str:
       直连网关模式中轮换该请求头以绕过每 IP 限流。
 
     有意不使用 `X-Forwarded-For`：其首跳天然可由客户端控制，且信任链难以按请求审计。
-    """
+    '''
     peer_host = request.client.host if request.client else None
 
     trusted = _trusted_proxies()
@@ -228,7 +227,7 @@ def _get_client_ip(request: Request) -> str:
 
 
 def _check_rate_limit(ip: str) -> None:
-    """如果 IP 当前被锁定，则引发 429。"""
+    '''如果 IP 当前被锁定，则引发 429。'''
     record = _login_attempts.get(ip)
     if record is None:
         return
@@ -246,7 +245,7 @@ _MAX_TRACKED_IPS = 10000
 
 
 def _record_login_failure(ip: str) -> None:
-    """记录给定 IP 的失败登录尝试。"""
+    '''记录给定 IP 的失败登录尝试。'''
     # 字典过大时清理已过期的锁定记录。
     if len(_login_attempts) >= _MAX_TRACKED_IPS:
         now = time.time()
@@ -270,7 +269,7 @@ def _record_login_failure(ip: str) -> None:
 
 
 def _record_login_success(ip: str) -> None:
-    """成功登录后清除给定 IP 的失败计数器。"""
+    '''成功登录后清除给定 IP 的失败计数器。'''
     _login_attempts.pop(ip, None)
 
 
@@ -283,7 +282,7 @@ async def login_local(
     response: Response,
     form_data: OAuth2PasswordRequestForm = Depends(),
 ):
-    """本地电子邮件/密码登录。"""
+    '''本地电子邮件/密码登录。'''
     client_ip = _get_client_ip(request)
     _check_rate_limit(client_ip)
 
@@ -308,11 +307,11 @@ async def login_local(
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(request: Request, response: Response, body: RegisterRequest):
-    """注册新的用户账户（固定授予 `user` 角色）。
+    '''注册新的用户账户（固定授予 `user` 角色）。
 
     首个管理员须通过 `/initialize` 显式创建；本端点仅创建普通用户，并通过设置会话
     cookie 自动登录。
-    """
+    '''
     try:
         user = await get_local_provider().create_user(email=body.email, password=body.password, system_role="user")
     except ValueError:
@@ -329,20 +328,20 @@ async def register(request: Request, response: Response, body: RegisterRequest):
 
 @router.post("/logout", response_model=MessageResponse)
 async def logout(request: Request, response: Response):
-    """通过清除 cookie 注销当前用户。"""
+    '''通过清除 cookie 注销当前用户。'''
     response.delete_cookie(key="access_token", secure=is_secure_request(request), samesite="lax")
     return MessageResponse(message="Successfully logged out")
 
 
 @router.post("/change-password", response_model=MessageResponse)
 async def change_password(request: Request, response: Response, body: ChangePasswordRequest):
-    """修改当前已认证用户的密码，并处理首次启动设置。
+    '''修改当前已认证用户的密码，并处理首次启动设置。
 
     - 提供 `new_email` 时更新邮箱并校验唯一性；
     - 当 `user.needs_setup` 为 `True` 且提供 `new_email` 时，清除 `needs_setup`；
     - 始终递增 `token_version`，使旧会话失效；
     - 使用新的 `token_version` 重新签发会话 cookie。
-    """
+    '''
     from app.gateway.auth.password import hash_password_async, verify_password_async
     from app.gateway.auth_disabled import AUTH_SOURCE_AUTH_DISABLED
 
@@ -391,7 +390,7 @@ async def change_password(request: Request, response: Response, body: ChangePass
 
 @router.get("/me", response_model=UserResponse)
 async def get_me(request: Request):
-    """获取当前经过身份验证的用户信息。"""
+    '''获取当前经过身份验证的用户信息。'''
     user = await get_current_user_from_request(request)
     return UserResponse(
         id=str(user.id),
@@ -414,7 +413,7 @@ _SETUP_STATUS_INFLIGHT_GUARD = asyncio.Lock()
 
 @router.get("/setup-status")
 async def setup_status(request: Request):
-    """检查是否存在管理员账户；不存在时返回 `needs_setup=True`。"""
+    '''检查是否存在管理员账户；不存在时返回 `needs_setup=True`。'''
     client_ip = _get_client_ip(request)
     now = time.time()
 
@@ -448,7 +447,7 @@ async def setup_status(request: Request):
                         del _SETUP_STATUS_CACHE[k]
 
             async def _compute_setup_status() -> dict:
-                """查询管理员数量并生成首次设置状态。"""
+                '''查询管理员数量并生成首次设置状态。'''
                 admin_count = await get_local_provider().count_admin_users()
                 return {"needs_setup": admin_count == 0}
 
@@ -471,7 +470,7 @@ async def setup_status(request: Request):
 
 
 class InitializeAdminRequest(BaseModel):
-    """请求创建首次启动管理员帐户的模型。"""
+    '''请求创建首次启动管理员帐户的模型。'''
 
     email: EmailStr
     password: str = Field(..., min_length=8)
@@ -481,11 +480,11 @@ class InitializeAdminRequest(BaseModel):
 
 @router.post("/initialize", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def initialize_admin(request: Request, response: Response, body: InitializeAdminRequest):
-    """在系统首次设置期间创建首个管理员账户。
+    '''在系统首次设置期间创建首个管理员账户。
 
     仅在不存在管理员时可调用；若管理员已存在则返回 409 Conflict。成功后以
     `needs_setup=False` 创建管理员账户，并设置会话 cookie。
-    """
+    '''
     admin_count = await get_local_provider().count_admin_users()
     if admin_count > 0:
         raise HTTPException(
@@ -519,14 +518,14 @@ _OIDC_PROVIDER_KEY_RE = re.compile(r"^[a-zA-Z0-9_-]+$")
 
 
 def _get_oidc_service() -> OIDCService:
-    """获取（或创建）单例 OIDC 服务实例。"""
+    '''获取（或创建）单例 OIDC 服务实例。'''
     if not hasattr(_get_oidc_service, "_instance"):
         _get_oidc_service._instance = OIDCService()  # type: ignore[attr-defined]
     return _get_oidc_service._instance  # type: ignore[attr-defined]
 
 
 async def close_oidc_service() -> None:
-    """关闭已创建的 OIDC 服务实例并清除单例缓存。"""
+    '''关闭已创建的 OIDC 服务实例并清除单例缓存。'''
     service = getattr(_get_oidc_service, "_instance", None)
     if service is not None:
         await service.close()
@@ -534,7 +533,7 @@ async def close_oidc_service() -> None:
 
 
 def _set_csrf_cookie(response: Response, request: Request) -> None:
-    """设置 CSRF 双重提交 cookie（基于 GET 的 OIDC 回调需要）。"""
+    '''设置 CSRF 双重提交 cookie（基于 GET 的 OIDC 回调需要）。'''
     csrf_token = generate_csrf_token()
     is_https = is_secure_request(request)
     response.set_cookie(
@@ -550,10 +549,10 @@ def _set_csrf_cookie(response: Response, request: Request) -> None:
 
 
 def _resolve_oidc_redirect_uri(request: Request, provider_id: str, provider_config: OIDCProviderConfig) -> str:
-    """解析 OIDC 提供商的回调 URI。
+    '''解析 OIDC 提供商的回调 URI。
 
     优先使用显式配置的 `redirect_uri`；未配置时，基于请求自身的基础 URL 构造开发环境回调地址。
-    """
+    '''
     if provider_config.redirect_uri:
         return provider_config.redirect_uri
 
@@ -568,10 +567,10 @@ def _resolve_oidc_redirect_uri(request: Request, provider_id: str, provider_conf
 
 @router.get("/providers")
 async def list_auth_providers():
-    """列出登录页可用的 SSO 提供商。
+    '''列出登录页可用的 SSO 提供商。
 
     仅返回可安全暴露给前端的元数据，不包含密钥、端点或内部配置。
-    """
+    '''
     from deerflow.config.app_config import get_app_config
 
     app_config = get_app_config()
@@ -599,11 +598,11 @@ async def oauth_login(
     # 有意使用内置名称 `next`，以与查询参数名保持一致。
     next: str | None = None,  # noqa: A002
 ):
-    """发起 OIDC 登录流程。
+    '''发起 OIDC 登录流程。
 
     重定向至 OIDC 提供商的授权 URL，并携带 state、nonce 与 PKCE 参数。`next` 查询参数
     指定登录成功后的跳转位置，默认为 `/workspace`。
-    """
+    '''
     from deerflow.config.app_config import get_app_config
 
     app_config = get_app_config()
@@ -678,11 +677,11 @@ async def oauth_callback(
     error: str | None = None,
     error_description: str | None = None,
 ):
-    """处理 OIDC 授权后的回调。
+    '''处理 OIDC 授权后的回调。
 
     验证 state cookie，以授权码交换令牌并校验 ID Token，随后创建或关联 DeerFlow 用户，
     最后设置会话 cookie。
-    """
+    '''
     from deerflow.config.app_config import get_app_config
 
     app_config = get_app_config()
@@ -787,16 +786,16 @@ async def oauth_callback(
 
 
 def _build_error_redirect(frontend_base_url: str | None, error_code: str) -> str:
-    """构建带有错误参数的前端重定向 URL。"""
+    '''构建带有错误参数的前端重定向 URL。'''
     base = frontend_base_url or ""
     return f"{base}/login?error={error_code}"
 
 
 def validate_next_param(next_param: str | None) -> str | None:
-    """校验并清理 `next` 重定向参数。
+    '''校验并清理 `next` 重定向参数。
 
     仅允许以 `/` 开头的相对路径；拒绝协议相对 URL（`//`）、绝对 URL 以及内嵌协议的 URL。
-    """
+    '''
     if not next_param:
         return None
     if not next_param.startswith("/"):

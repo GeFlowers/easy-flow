@@ -1,17 +1,17 @@
-"""提供配置、安全护栏、配置相关功能。"""
+'''定义安全护栏提供者及其启用、失败处理和初始化参数。'''
 
 from pydantic import BaseModel, Field
 
 
 class GuardrailProviderConfig(BaseModel):
-    """\u6267\u884c GuardrailProviderConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''指定负责判定工具调用是否允许的护栏实现。'''
 
     use: str = Field(description="Class path (e.g. 'deerflow.guardrails.builtin:AllowlistProvider')")
     config: dict = Field(default_factory=dict, description="Provider-specific settings passed as kwargs")
 
 
 class GuardrailsConfig(BaseModel):
-    """\u6267\u884c GuardrailsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''控制工具调用前的护栏检查及提供者故障时的默认策略。'''
 
     enabled: bool = Field(default=False, description="Enable guardrail middleware")
     fail_closed: bool = Field(default=True, description="Block tool calls if provider errors")
@@ -23,7 +23,7 @@ _guardrails_config: GuardrailsConfig | None = None
 
 
 def get_guardrails_config() -> GuardrailsConfig:
-    """\u6267\u884c get_guardrails_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回已缓存的护栏配置，未设置时创建默认实例。'''
     global _guardrails_config
     if _guardrails_config is None:
         _guardrails_config = GuardrailsConfig()
@@ -31,13 +31,13 @@ def get_guardrails_config() -> GuardrailsConfig:
 
 
 def load_guardrails_config_from_dict(data: dict) -> GuardrailsConfig:
-    """\u6267\u884c load_guardrails_config_from_dict \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''校验应用配置字段并替换当前护栏配置。'''
     global _guardrails_config
     _guardrails_config = GuardrailsConfig.model_validate(data)
     return _guardrails_config
 
 
 def reset_guardrails_config() -> None:
-    """\u6267\u884c reset_guardrails_config \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''清除护栏配置缓存，供测试或配置重载使用。'''
     global _guardrails_config
     _guardrails_config = None

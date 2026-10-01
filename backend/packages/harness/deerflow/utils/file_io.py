@@ -1,4 +1,4 @@
-"""为文件系统工作提供专用的异步线程池卸载辅助函数。"""
+'''为文件系统工作提供专用的异步线程池卸载辅助函数。'''
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 def _default_file_io_workers() -> int:
-    """读取环境变量并返回文件输入输出线程池的有效工作线程数。"""
+    '''读取环境变量并返回文件输入输出线程池的有效工作线程数。'''
     raw = os.getenv("DEER_FLOW_FILE_IO_WORKERS")
     if raw:
         try:
@@ -32,7 +32,7 @@ _FILE_IO_EXECUTOR = ThreadPoolExecutor(max_workers=_default_file_io_workers(), t
 
 
 def _shutdown_file_io_executor() -> None:
-    """在解释器退出时非阻塞地关闭文件输入输出线程池。"""
+    '''在解释器退出时非阻塞地关闭文件输入输出线程池。'''
     _FILE_IO_EXECUTOR.shutdown(wait=False, cancel_futures=True)
 
 
@@ -40,11 +40,11 @@ atexit.register(_shutdown_file_io_executor)
 
 
 async def run_file_io[**P, T](func: Callable[P, T], /, *args: P.args, **kwargs: P.kwargs) -> T:
-    """在线程池中运行阻塞型文件操作，并保留当前的上下文变量。
+    '''在线程池中运行阻塞型文件操作，并保留当前的上下文变量。
 
     高层异步辅助函数会自动复制上下文变量，而底层执行器不会。
     因此此处显式复制当前上下文，确保用户作用域信息在线程中仍能正常工作。
-    """
+    '''
     loop = asyncio.get_running_loop()
     ctx = contextvars.copy_context()
     call = functools.partial(func, *args, **kwargs)

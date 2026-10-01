@@ -235,11 +235,13 @@ export function installClipboardFallback(): void {
       items: Record<string, Blob | string>;
       types: string[];
 
+      /** 保存 MIME 类型与内容映射，模拟浏览器剪贴板项目构造器。 */
       constructor(items: Record<string, Blob | string>) {
         this.items = items;
         this.types = Object.keys(items);
       }
 
+      /** 按请求类型返回 Blob，并将字符串内容包装成对应类型的数据。 */
       getType(type: string): Promise<Blob> {
         const value = this.items[type];
         if (value instanceof Blob) {

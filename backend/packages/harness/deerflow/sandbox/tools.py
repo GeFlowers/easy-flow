@@ -1,4 +1,4 @@
-"""实现沙箱工具的路径隔离、访问校验、输出脱敏与文件操作。"""
+'''实现沙箱工具的路径隔离、访问校验、输出脱敏与文件操作。'''
 
 import asyncio
 import json
@@ -35,9 +35,6 @@ from deerflow.tools.types import Runtime
 logger = logging.getLogger(__name__)
 
 _ABSOLUTE_PATH_PATTERN = re.compile(r"(?<![:\w])(?<!:/)/(?:[^\s\"'`;&|<>()]+)")
-# A ``{...}`` block holding a single identifier-like placeholder (e.g. ``{id}``
-# in a REST template or ``{port}`` in an f-string). Bash brace expansion such as
-# ``{passwd,shadow}`` or ``{,.bak}`` does NOT match (commas/dots/empty inner).
 _IDENTIFIER_BRACE_BLOCK_PATTERN = re.compile(r"\{([^{}]*)\}")
 _IDENTIFIER_PATTERN = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 _FILE_URL_PATTERN = re.compile(r"\bfile://\S+", re.IGNORECASE)
@@ -61,13 +58,6 @@ _DEFAULT_GREP_MAX_RESULTS = 100
 _MAX_GREP_MAX_RESULTS = 500
 _DEFAULT_WRITE_FILE_ERROR_MAX_CHARS = 2000
 
-# Maximum bytes accepted in a single non-append write_file call (issue #3189).
-# Oversized single-shot writes correlate with LLM streaming chunk-gap timeouts
-# because the tool-call JSON payload (which the model must emit as one
-# continuous stream) grows past the safe window. 80 KB ≈ 20K tokens, a
-# comfortable headroom under the factory-default 240s stream_chunk_timeout.
-# Deployments can override via env var DEERFLOW_WRITE_FILE_MAX_BYTES; set to
-# 0 (or negative) to disable the guard entirely.
 _WRITE_FILE_CONTENT_MAX_BYTES = 80 * 1024
 _WRITE_FILE_MAX_BYTES_ENV = "DEERFLOW_WRITE_FILE_MAX_BYTES"
 _LOCAL_BASH_CWD_COMMANDS = {"cd", "pushd"}
@@ -109,7 +99,7 @@ _SHELL_REDIRECTION_OPERATORS = {
 
 
 def _get_skills_container_path() -> str:
-    """从配置获取技能容器路径，失败时使用默认值；仅缓存成功的读取结果。"""
+    '''从配置获取技能容器路径，失败时使用默认值；仅缓存成功的读取结果。'''
     cached = getattr(_get_skills_container_path, "_cached", None)
     if cached is not None:
         return cached
@@ -124,7 +114,7 @@ def _get_skills_container_path() -> str:
 
 
 def _get_skills_host_path() -> str | None:
-    """从配置获取技能宿主路径；路径不存在或读取失败时返回空值且不缓存失败。"""
+    '''从配置获取技能宿主路径；路径不存在或读取失败时返回空值且不缓存失败。'''
     cached = getattr(_get_skills_host_path, "_cached", None)
     if cached is not None:
         return cached
@@ -143,42 +133,35 @@ def _get_skills_host_path() -> str | None:
 
 
 def _is_skills_path(path: str) -> bool:
-    """判断路径是否位于技能容器路径下。"""
+    '''判断路径是否位于技能容器路径下。'''
     skills_prefix = _get_skills_container_path()
     return path == skills_prefix or path.startswith(f"{skills_prefix}/")
 
 
 def _extract_skill_name_from_skills_path(path: str) -> str | None:
-    """从虚拟技能路径提取技能名称；路径不符合技能目录结构时返回空值。"""
+    '''从虚拟技能路径提取技能名称；路径不符合技能目录结构时返回空值。'''
     skills_prefix = _get_skills_container_path()
     if not _is_skills_path(path):
         return None
-    # Strip the skills prefix, e.g. "/mnt/skills/"
     relative = path[len(skills_prefix) :].lstrip("/")
     if not relative:
         return None
-    # Expected patterns: "public/<name>/...", "custom/<name>/...", "legacy/<name>/..."
-    # or "<name>/..." (direct skill access). Empty segments are dropped so a
-    # directory entry ("public/", as `ls` emits for dirs) is still recognized as
-    # a category root rather than yielding an empty skill name.
     parts = [part for part in relative.split("/") if part]
     if len(parts) >= 2 and parts[0] in ("public", "custom", "legacy"):
         return parts[1]
     if len(parts) == 1 and parts[0] in ("public", "custom", "legacy"):
-        # Category root like /mnt/skills/custom — not a skill path.
         return None
     if len(parts) >= 1:
-        # Direct path like /mnt/skills/my-skill/SKILL.md
         return parts[0]
     return None
 
 
 def _is_disabled_skill_path(path: str, *, user_id: str | None = None) -> bool:
-    """判断路径是否属于已禁用技能。
+    '''判断路径是否属于已禁用技能。
 
     公共技能状态来自全局配置；自定义和旧版技能状态来自用户级状态文件。状态无法确定时
     以拒绝访问处理，避免向调用方暴露已禁用的技能文件。
-    """
+    '''
     skill_name = _extract_skill_name_from_skills_path(path)
     if skill_name is None:
         return False
@@ -186,7 +169,6 @@ def _is_disabled_skill_path(path: str, *, user_id: str | None = None) -> bool:
         from deerflow.runtime.user_context import get_effective_user_id
         from deerflow.skills.storage import get_or_new_user_skill_storage
 
-        # Determine the category from the path
         skills_prefix = _get_skills_container_path()
         relative = path[len(skills_prefix) :].lstrip("/")
         if relative.startswith("public/"):
@@ -196,13 +178,12 @@ def _is_disabled_skill_path(path: str, *, user_id: str | None = None) -> bool:
         elif relative.startswith("legacy/"):
             category = "legacy"
         else:
-            # Try to infer from storage
             effective_uid = user_id or get_effective_user_id()
             storage = get_or_new_user_skill_storage(effective_uid)
             all_skills = storage.load_skills(enabled_only=False)
             matching = next((s for s in all_skills if s.name == skill_name), None)
             if matching is None:
-                return False  # Skill doesn't exist, not a disabled skill path
+                return False
             category = matching.category.value
 
         if category == "public":
@@ -211,21 +192,16 @@ def _is_disabled_skill_path(path: str, *, user_id: str | None = None) -> bool:
             ext_config = ExtensionsConfig.from_file()
             return not ext_config.is_skill_enabled(skill_name, category)
         else:
-            # CUSTOM / LEGACY: use per-user state
             effective_uid = user_id or get_effective_user_id()
             storage = get_or_new_user_skill_storage(effective_uid)
             return not storage.get_skill_enabled_state(skill_name)
     except (OSError, ValueError, KeyError, json.JSONDecodeError) as exc:
-        # Access-control check must fail closed: when we can't determine the
-        # enabled state (corrupt _skill_states.json, mid-write race, missing
-        # config), refuse access rather than silently serving a disabled
-        # skill's files. See review feedback on PR #3889.
         logger.warning("Failed to determine enabled state, denying access: %s", exc)
         return True
 
 
 def _drop_disabled_skill_paths(paths: list[str], *, user_id: str | None = None) -> list[str]:
-    """过滤属于已禁用技能的结果路径，并按技能缓存单次调用中的状态判定。"""
+    '''过滤属于已禁用技能的结果路径，并按技能缓存单次调用中的状态判定。'''
     skills_prefix = _get_skills_container_path()
     verdicts: dict[tuple[str, str], bool] = {}
     kept: list[str] = []
@@ -234,9 +210,6 @@ def _drop_disabled_skill_paths(paths: list[str], *, user_id: str | None = None) 
         if skill_name is None:
             kept.append(path)
             continue
-        # Leading segment (the category, or the skill itself in the direct
-        # layout) plus the name identifies the skill the same way
-        # _is_disabled_skill_path does, so paths sharing a key share a verdict.
         category = path[len(skills_prefix) :].lstrip("/").split("/")[0]
         key = (category, skill_name)
         if key not in verdicts:
@@ -247,11 +220,11 @@ def _drop_disabled_skill_paths(paths: list[str], *, user_id: str | None = None) 
 
 
 def _resolve_skills_path(path: str) -> str:
-    """将虚拟技能路径解析为宿主路径。
+    '''将虚拟技能路径解析为宿主路径。
 
     本地沙箱中的技能路径应由获取沙箱时绑定用户的路径映射解析；本函数只用于输出脱敏和
     非沙箱调用。技能目录未配置或不存在时抛出文件未找到异常。
-    """
+    '''
     skills_container = _get_skills_container_path()
     skills_host = _get_skills_host_path()
     if skills_host is None:
@@ -262,14 +235,6 @@ def _resolve_skills_path(path: str) -> str:
 
     relative = path[len(skills_container) :].lstrip("/")
 
-    # Per-user custom skills: resolve to user-specific directory.
-    # ``skill_manage_tool`` writes custom skills to the per-user directory,
-    # and ``LocalSandboxProvider._build_thread_path_mappings`` mounts
-    # ``/mnt/skills/custom`` to that same per-user dir.  Without this
-    # branch, ``_resolve_skills_path("/mnt/skills/custom")`` would map to
-    # the global ``{skills_host}/custom/`` which is the repository-level
-    # ``skills/custom/`` — an entirely different directory that may be
-    # empty or contain legacy skills only.
     if relative == "custom" or relative.startswith("custom/"):
         from deerflow.config.paths import get_paths
         from deerflow.runtime.user_context import get_effective_user_id
@@ -286,12 +251,12 @@ def _resolve_skills_path(path: str) -> str:
 
 
 def _is_acp_workspace_path(path: str) -> bool:
-    """判断路径是否位于 ACP 工作区虚拟路径下。"""
+    '''判断路径是否位于 ACP 工作区虚拟路径下。'''
     return path == _ACP_WORKSPACE_VIRTUAL_PATH or path.startswith(f"{_ACP_WORKSPACE_VIRTUAL_PATH}/")
 
 
 def _get_custom_mounts():
-    """读取沙箱配置中的现有自定义挂载；仅缓存成功读取的结果。"""
+    '''读取沙箱配置中的现有自定义挂载；仅缓存成功读取的结果。'''
     cached = getattr(_get_custom_mounts, "_cached", None)
     if cached is not None:
         return cached
@@ -303,20 +268,15 @@ def _get_custom_mounts():
         config = get_app_config()
         mounts = []
         if config.sandbox and config.sandbox.mounts:
-            # Only include mounts whose host_path exists, consistent with
-            # LocalSandboxProvider._setup_path_mappings() which also filters
-            # by host_path.exists().
             mounts = [m for m in config.sandbox.mounts if Path(m.host_path).exists()]
         _get_custom_mounts._cached = mounts  # type: ignore[attr-defined]
         return mounts
     except Exception:
-        # If config loading fails, return an empty list without caching so that
-        # a later call can retry once the config is available.
         return []
 
 
 def _is_custom_mount_path(path: str) -> bool:
-    """判断路径是否位于某个自定义挂载的容器路径下。"""
+    '''判断路径是否位于某个自定义挂载的容器路径下。'''
     for mount in _get_custom_mounts():
         if path == mount.container_path or path.startswith(f"{mount.container_path}/"):
             return True
@@ -324,7 +284,7 @@ def _is_custom_mount_path(path: str) -> bool:
 
 
 def _get_custom_mount_for_path(path: str):
-    """返回与路径匹配且前缀最长的自定义挂载配置。"""
+    '''返回与路径匹配且前缀最长的自定义挂载配置。'''
     best = None
     for mount in _get_custom_mounts():
         if path == mount.container_path or path.startswith(f"{mount.container_path}/"):
@@ -334,25 +294,24 @@ def _get_custom_mount_for_path(path: str):
 
 
 def _extract_thread_id_from_thread_data(thread_data: "ThreadDataState | None") -> str | None:
-    """通过工作区路径的目录结构从线程数据中提取线程标识。"""
+    '''通过工作区路径的目录结构从线程数据中提取线程标识。'''
     if thread_data is None:
         return None
     workspace_path = thread_data.get("workspace_path")
     if not workspace_path:
         return None
     try:
-        # {base_dir}/threads/{thread_id}/user-data/workspace → parent.parent = threads/{thread_id}
         return Path(workspace_path).parent.parent.name
     except Exception:
         return None
 
 
 def _get_acp_workspace_host_path(thread_id: str | None = None) -> str | None:
-    """获取 ACP 工作区的宿主路径。
+    '''获取 ACP 工作区的宿主路径。
 
     指定线程时使用该线程的工作区且不缓存；未指定线程时回退到全局工作区，并仅缓存成功
     解析的结果。目录不存在时返回空值。
-    """
+    '''
     if thread_id is not None:
         try:
             from deerflow.config.paths import get_paths
@@ -382,11 +341,11 @@ def _get_acp_workspace_host_path(thread_id: str | None = None) -> str | None:
 
 
 def _resolve_acp_workspace_path(path: str, thread_id: str | None = None) -> str:
-    """将虚拟 ACP 工作区路径解析为宿主路径，并拒绝路径遍历。
+    '''将虚拟 ACP 工作区路径解析为宿主路径，并拒绝路径遍历。
 
     指定线程时解析该线程的工作区；否则使用全局工作区。工作区不存在时抛出文件未找到
     异常，路径越界时抛出权限异常。
-    """
+    '''
     _reject_path_traversal(path)
 
     host_path = _get_acp_workspace_host_path(thread_id)
@@ -419,7 +378,7 @@ def _resolve_acp_workspace_path(path: str, thread_id: str | None = None) -> str:
 
 
 def _get_mcp_allowed_paths() -> list[str]:
-    """从 MCP 文件系统服务器配置中提取允许访问的路径列表。"""
+    '''从 MCP 文件系统服务器配置中提取允许访问的路径列表。'''
     allowed_paths = []
     try:
         from deerflow.config.extensions_config import get_extensions_config
@@ -430,13 +389,10 @@ def _get_mcp_allowed_paths() -> list[str]:
             if not server.enabled:
                 continue
 
-            # Only check the filesystem server
             args = server.args or []
-            # Check if args has server-filesystem package
             has_filesystem = any("server-filesystem" in arg for arg in args)
             if not has_filesystem:
                 continue
-            # Unpack the allowed file system paths in config
             for arg in args:
                 if not arg.startswith("-") and arg.startswith("/"):
                     allowed_paths.append(arg.rstrip("/") + "/")
@@ -448,7 +404,7 @@ def _get_mcp_allowed_paths() -> list[str]:
 
 
 def _get_tool_config_int(name: str, key: str, default: int) -> int:
-    """读取工具配置中的整数值；不可用时返回默认值。"""
+    '''读取工具配置中的整数值；不可用时返回默认值。'''
     try:
         tool_config = get_app_config().get_tool_config(name)
         if tool_config is not None and key in tool_config.model_extra:
@@ -461,14 +417,14 @@ def _get_tool_config_int(name: str, key: str, default: int) -> int:
 
 
 def _clamp_max_results(value: int, *, default: int, upper_bound: int) -> int:
-    """将结果数量限制在有效默认值和最大上限之间。"""
+    '''将结果数量限制在有效默认值和最大上限之间。'''
     if value <= 0:
         return default
     return min(value, upper_bound)
 
 
 def _resolve_max_results(name: str, requested: int, *, default: int, upper_bound: int) -> int:
-    """综合调用方请求和工具配置，得出允许的最大结果数。"""
+    '''综合调用方请求和工具配置，得出允许的最大结果数。'''
     requested_max_results = _clamp_max_results(requested, default=default, upper_bound=upper_bound)
     configured_max_results = _clamp_max_results(
         _get_tool_config_int(name, "max_results", default),
@@ -479,20 +435,15 @@ def _resolve_max_results(name: str, requested: int, *, default: int, upper_bound
 
 
 def _resolve_local_read_path(path: str, thread_data: ThreadDataState) -> str:
-    """校验本地只读路径，并解析用户数据路径或保留映射路径。"""
+    '''校验本地只读路径，并解析用户数据路径或保留映射路径。'''
     validate_local_tool_path(path, thread_data, read_only=True)
     if _is_skills_path(path) or _is_acp_workspace_path(path):
-        # Skills and ACP workspace paths are resolved by the sandbox's
-        # PathMapping (which uses the user_id from acquire time), not
-        # by _resolve_skills_path / _resolve_acp_workspace_path (which
-        # use get_effective_user_id() from contextvar and may differ
-        # from the sandbox mapping's user_id).
         return path
     return _resolve_and_validate_user_data_path(path, thread_data)
 
 
 def _format_glob_results(root_path: str, matches: list[str], truncated: bool) -> str:
-    """将通配搜索结果格式化为面向工具调用者的文本。"""
+    '''将通配搜索结果格式化为面向工具调用者的文本。'''
     if not matches:
         return f"No files matched under {root_path}"
 
@@ -506,7 +457,7 @@ def _format_glob_results(root_path: str, matches: list[str], truncated: bool) ->
 
 
 def _format_grep_results(root_path: str, matches: list[GrepMatch], truncated: bool) -> str:
-    """将文本搜索结果格式化为面向工具调用者的文本。"""
+    '''将文本搜索结果格式化为面向工具调用者的文本。'''
     if not matches:
         return f"No matches found under {root_path}"
 
@@ -520,17 +471,17 @@ def _format_grep_results(root_path: str, matches: list[GrepMatch], truncated: bo
 
 
 def _path_variants(path: str) -> set[str]:
-    """返回同一路径的原始、正斜杠和反斜杠表示。"""
+    '''返回同一路径的原始、正斜杠和反斜杠表示。'''
     return {path, path.replace("\\", "/"), path.replace("/", "\\")}
 
 
 def _path_separator_for_style(path: str) -> str:
-    """根据路径现有风格选择拼接时使用的分隔符。"""
+    '''根据路径现有风格选择拼接时使用的分隔符。'''
     return "\\" if "\\" in path and "/" not in path else "/"
 
 
 def _join_path_preserving_style(base: str, relative: str) -> str:
-    """拼接基础路径和相对路径，同时保留基础路径的分隔符风格。"""
+    '''拼接基础路径和相对路径，同时保留基础路径的分隔符风格。'''
     if not relative:
         return base
     separator = _path_separator_for_style(base)
@@ -540,7 +491,7 @@ def _join_path_preserving_style(base: str, relative: str) -> str:
 
 
 def _sanitize_error(error: Exception, runtime: Runtime | None = None) -> str:
-    """清理错误消息，避免在本地沙箱模式中泄露宿主文件系统路径。"""
+    '''清理错误消息，避免在本地沙箱模式中泄露宿主文件系统路径。'''
     msg = f"{type(error).__name__}: {error}"
     if runtime is not None and is_local_sandbox(runtime):
         thread_data = get_thread_data(runtime)
@@ -549,7 +500,7 @@ def _sanitize_error(error: Exception, runtime: Runtime | None = None) -> str:
 
 
 def _truncate_write_file_error_detail(detail: str, max_chars: int) -> str:
-    """从中间截断写文件错误详情，并保留首尾内容。"""
+    '''从中间截断写文件错误详情，并保留首尾内容。'''
     if max_chars == 0:
         return detail
     if len(detail) <= max_chars:
@@ -573,7 +524,7 @@ def _format_write_file_error(
     *,
     max_chars: int = _DEFAULT_WRITE_FILE_ERROR_MAX_CHARS,
 ) -> str:
-    """返回长度受限且已脱敏的写文件失败错误文本。"""
+    '''返回长度受限且已脱敏的写文件失败错误文本。'''
     header = f"Error: Failed to write file '{requested_path}'"
     detail = _sanitize_error(error, runtime)
     if max_chars == 0:
@@ -585,7 +536,7 @@ def _format_write_file_error(
 
 
 def replace_virtual_path(path: str, thread_data: ThreadDataState | None) -> str:
-    """将 ``/mnt/user-data`` 下的虚拟路径替换为线程数据中的实际路径。"""
+    '''将 ``/mnt/user-data`` 下的虚拟路径替换为线程数据中的实际路径。'''
     if thread_data is None:
         return path
 
@@ -593,7 +544,6 @@ def replace_virtual_path(path: str, thread_data: ThreadDataState | None) -> str:
     if not mappings:
         return path
 
-    # Longest-prefix-first replacement with segment-boundary checks.
     for virtual_base, actual_base in sorted(mappings.items(), key=lambda item: len(item[0]), reverse=True):
         if path == virtual_base:
             return actual_base
@@ -608,7 +558,7 @@ def replace_virtual_path(path: str, thread_data: ThreadDataState | None) -> str:
 
 
 def _thread_virtual_to_actual_mappings(thread_data: ThreadDataState) -> dict[str, str]:
-    """为线程建立从虚拟路径到实际路径的映射。"""
+    '''为线程建立从虚拟路径到实际路径的映射。'''
     mappings: dict[str, str] = {}
 
     workspace = thread_data.get("workspace_path")
@@ -622,7 +572,6 @@ def _thread_virtual_to_actual_mappings(thread_data: ThreadDataState) -> dict[str
     if outputs:
         mappings[f"{VIRTUAL_PATH_PREFIX}/outputs"] = outputs
 
-    # Also map the virtual root when all known dirs share the same parent.
     actual_dirs = [Path(p) for p in (workspace, uploads, outputs) if p]
     if actual_dirs:
         common_parent = str(Path(actual_dirs[0]).parent)
@@ -633,30 +582,16 @@ def _thread_virtual_to_actual_mappings(thread_data: ThreadDataState) -> dict[str
 
 
 def _thread_actual_to_virtual_mappings(thread_data: ThreadDataState) -> dict[str, str]:
-    """为输出脱敏建立从实际路径到虚拟路径的映射。"""
+    '''为输出脱敏建立从实际路径到虚拟路径的映射。'''
     return {actual: virtual for virtual, actual in _thread_virtual_to_actual_mappings(thread_data).items()}
 
 
 @lru_cache(maxsize=512)
 def _compiled_mask_patterns(sources: tuple[tuple[str, str], ...]) -> tuple[tuple[re.Pattern[str], str, str], ...]:
-    """按源路径集合编译并缓存宿主路径到虚拟路径的脱敏模式。"""
-    # The segment boundary and path tail are shared with
-    # ``LocalSandbox._reverse_output_patterns`` — see
-    # ``deerflow.sandbox.path_patterns``, which owns that rule so the two copies
-    # cannot drift again (#4035 fixed one and missed the other; #4053 fixed the
-    # other).
-    #
-    # ``separator_agnostic=True`` is the one thing this site does differently:
-    # its bases come from ``_path_variants``, which yields Windows-style
-    # spellings, and they are matched against output whose separators this layer
-    # does not control.
+    '''按源路径集合编译并缓存宿主路径到虚拟路径的脱敏模式。'''
     compiled: list[tuple[re.Pattern[str], str, str]] = []
     for host_base, virtual_base in sources:
         seen: set[str] = set()
-        # Same base set as ``_path_variants(raw) | _path_variants(resolved)``;
-        # ordered deterministically so the cached tuple is stable (variants of
-        # one host map to the same virtual and don't overlap after substitution,
-        # so order within a source is irrelevant to the result).
         for root in (str(Path(host_base)), str(Path(host_base).resolve())):
             for variant in sorted(_path_variants(root)):
                 if variant in seen:
@@ -667,23 +602,13 @@ def _compiled_mask_patterns(sources: tuple[tuple[str, str], ...]) -> tuple[tuple
 
 
 def mask_local_paths_in_output(output: str, thread_data: ThreadDataState | None) -> str:
-    """使用虚拟路径遮蔽本地沙箱输出中的宿主绝对路径。"""
-    # Build the ordered (host_base, virtual_base) source list. Order is
-    # preserved from the original implementation: skills, then per-user
-    # custom skills, then ACP workspace, then user-data mappings (longest
-    # host path first). Custom mount host paths are masked by
-    # LocalSandbox._reverse_resolve_paths_in_output().
+    '''使用虚拟路径遮蔽本地沙箱输出中的宿主绝对路径。'''
     sources: list[tuple[str, str]] = []
 
     skills_host = _get_skills_host_path()
     if skills_host:
         sources.append((skills_host, _get_skills_container_path()))
 
-    # Per-user custom skills: mask host paths under the user's custom
-    # skills directory back to /mnt/skills/custom. The sandbox's
-    # _reverse_resolve_path handles this for its own operations, but
-    # mask_local_paths_in_output serves as a safety net for edge cases
-    # where host paths appear in output that bypassed sandbox resolution.
     try:
         from deerflow.config.paths import get_paths
         from deerflow.runtime.user_context import get_effective_user_id
@@ -712,7 +637,7 @@ def mask_local_paths_in_output(output: str, thread_data: ThreadDataState | None)
     for pattern, base, virtual in _compiled_mask_patterns(tuple(sources)):
 
         def replace_match(match: re.Match, _base: str = base, _virtual: str = virtual) -> str:
-            """将匹配到的宿主路径替换为对应虚拟路径。"""
+            '''将匹配到的宿主路径替换为对应虚拟路径。'''
             matched_path = match.group(0)
             if matched_path == _base:
                 return _virtual
@@ -725,8 +650,7 @@ def mask_local_paths_in_output(output: str, thread_data: ThreadDataState | None)
 
 
 def _reject_path_traversal(path: str) -> None:
-    """拒绝包含上级目录片段的路径，防止目录遍历。"""
-    # Normalise to forward slashes, then check for '..' segments.
+    '''拒绝包含上级目录片段的路径，防止目录遍历。'''
     normalised = path.replace("\\", "/")
     for segment in normalised.split("/"):
         if segment == "..":
@@ -734,33 +658,29 @@ def _reject_path_traversal(path: str) -> None:
 
 
 def validate_local_tool_path(path: str, thread_data: ThreadDataState | None, *, read_only: bool = False) -> None:
-    """验证虚拟路径是否允许被本地沙箱访问。
+    '''验证虚拟路径是否允许被本地沙箱访问。
 
     这是安全门，仅校验访问权限而不负责解析宿主路径。用户数据可读写；技能和 ACP
     工作区只允许只读访问；自定义挂载遵循自身只读设置。线程数据缺失或路径越界时抛出异常。
-    """
+    '''
     if thread_data is None:
         raise SandboxRuntimeError("Thread data not available for local sandbox")
 
     _reject_path_traversal(path)
 
-    # Skills paths — read-only access only
     if _is_skills_path(path):
         if not read_only:
             raise PermissionError(f"Write access to skills path is not allowed: {path}")
         return
 
-    # ACP workspace paths — read-only access only
     if _is_acp_workspace_path(path):
         if not read_only:
             raise PermissionError(f"Write access to ACP workspace is not allowed: {path}")
         return
 
-    # User-data paths
     if path.startswith(f"{VIRTUAL_PATH_PREFIX}/"):
         return
 
-    # Custom mount paths — respect read_only config
     if _is_custom_mount_path(path):
         mount = _get_custom_mount_for_path(path)
         if mount and mount.read_only and not read_only:
@@ -771,7 +691,7 @@ def validate_local_tool_path(path: str, thread_data: ThreadDataState | None, *, 
 
 
 def _validate_resolved_user_data_path(resolved: Path, thread_data: ThreadDataState) -> None:
-    """验证解析后的宿主路径仍处于该线程允许的工作区、上传或输出目录内。"""
+    '''验证解析后的宿主路径仍处于该线程允许的工作区、上传或输出目录内。'''
     allowed_roots = [
         Path(p).resolve()
         for p in (
@@ -796,7 +716,7 @@ def _validate_resolved_user_data_path(resolved: Path, thread_data: ThreadDataSta
 
 
 def _resolve_and_validate_user_data_path(path: str, thread_data: ThreadDataState) -> str:
-    """解析用户数据虚拟路径，并验证结果未越出线程允许范围。"""
+    '''解析用户数据虚拟路径，并验证结果未越出线程允许范围。'''
     resolved_str = replace_virtual_path(path, thread_data)
     resolved = Path(resolved_str).resolve()
     _validate_resolved_user_data_path(resolved, thread_data)
@@ -804,7 +724,7 @@ def _resolve_and_validate_user_data_path(path: str, thread_data: ThreadDataState
 
 
 def _is_non_file_url_token(token: str) -> bool:
-    """判断令牌是否为不应当作文件路径处理的非文件 URL。"""
+    '''判断令牌是否为不应当作文件路径处理的非文件 URL。'''
     values = [token]
     if "=" in token:
         values.append(token.split("=", 1)[1])
@@ -817,7 +737,7 @@ def _is_non_file_url_token(token: str) -> bool:
 
 
 def _non_file_url_spans(command: str) -> list[tuple[int, int]]:
-    """返回命令中非文件 URL 所占的文本区间。"""
+    '''返回命令中非文件 URL 所占的文本区间。'''
     spans = []
     for match in _URL_IN_COMMAND_PATTERN.finditer(command):
         if not match.group().lower().startswith("file://"):
@@ -826,19 +746,19 @@ def _non_file_url_spans(command: str) -> list[tuple[int, int]]:
 
 
 def _is_in_spans(position: int, spans: list[tuple[int, int]]) -> bool:
-    """判断位置是否落在任一给定文本区间内。"""
+    '''判断位置是否落在任一给定文本区间内。'''
     return any(start <= position < end for start, end in spans)
 
 
 def _has_dotdot_path_segment(token: str) -> bool:
-    """判断非 URL 令牌是否含有上级目录路径片段。"""
+    '''判断非 URL 令牌是否含有上级目录路径片段。'''
     if _is_non_file_url_token(token):
         return False
     return bool(_DOTDOT_PATH_SEGMENT_PATTERN.search(token))
 
 
 def _split_shell_tokens(command: str) -> list[str]:
-    """尽力将命令解释器命令拆分为令牌；引号错误时回退为简单拆分。"""
+    '''尽力将命令解释器命令拆分为令牌；引号错误时回退为简单拆分。'''
     try:
         normalized = command.replace("\r\n", "\n").replace("\r", "\n").replace("\n", " ; ")
         lexer = shlex.shlex(normalized, posix=True, punctuation_chars=True)
@@ -846,23 +766,21 @@ def _split_shell_tokens(command: str) -> list[str]:
         lexer.commenters = ""
         return list(lexer)
     except ValueError:
-        # The shell will reject malformed quoting later; keep validation
-        # best-effort instead of turning syntax errors into security messages.
         return command.split()
 
 
 def _is_shell_command_separator(token: str) -> bool:
-    """判断令牌是否为命令解释器命令分隔符。"""
+    '''判断令牌是否为命令解释器命令分隔符。'''
     return token in _SHELL_COMMAND_SEPARATORS
 
 
 def _is_shell_redirection_operator(token: str) -> bool:
-    """判断令牌是否为命令解释器重定向运算符。"""
+    '''判断令牌是否为命令解释器重定向运算符。'''
     return token in _SHELL_REDIRECTION_OPERATORS
 
 
 def _is_shell_assignment(token: str) -> bool:
-    """判断令牌是否为合法的命令解释器环境变量赋值。"""
+    '''判断令牌是否为合法的命令解释器环境变量赋值。'''
     name, separator, _ = token.partition("=")
     if not separator or not name:
         return False
@@ -870,8 +788,7 @@ def _is_shell_assignment(token: str) -> bool:
 
 
 def _is_allowed_local_bash_absolute_path(path: str, allowed_paths: list[str], *, allow_system_paths: bool) -> bool:
-    # Check for MCP filesystem server allowed paths
-    """判断绝对路径是否属于允许的挂载、用户数据或系统路径。"""
+    '''判断绝对路径是否属于允许的挂载、用户数据或系统路径。'''
     if any(path.startswith(allowed_path) or path == allowed_path.rstrip("/") for allowed_path in allowed_paths):
         _reject_path_traversal(path)
         return True
@@ -880,17 +797,14 @@ def _is_allowed_local_bash_absolute_path(path: str, allowed_paths: list[str], *,
         _reject_path_traversal(path)
         return True
 
-    # Allow skills container path (resolved by tools.py before passing to sandbox)
     if _is_skills_path(path):
         _reject_path_traversal(path)
         return True
 
-    # Allow ACP workspace path (path-traversal check only)
     if _is_acp_workspace_path(path):
         _reject_path_traversal(path)
         return True
 
-    # Allow custom mount container paths
     if _is_custom_mount_path(path):
         _reject_path_traversal(path)
         return True
@@ -902,7 +816,7 @@ def _is_allowed_local_bash_absolute_path(path: str, allowed_paths: list[str], *,
 
 
 def _next_cd_target(tokens: list[str], start_index: int) -> tuple[str | None, int]:
-    """从令牌序列中读取下一个 ``cd`` 或 ``pushd`` 的目标路径。"""
+    '''从令牌序列中读取下一个 ``cd`` 或 ``pushd`` 的目标路径。'''
     index = start_index
     while index < len(tokens):
         token = tokens[index]
@@ -925,7 +839,7 @@ def _next_cd_target(tokens: list[str], start_index: int) -> tuple[str | None, in
 
 
 def _validate_local_bash_cwd_target(command_name: str, target: str | None, allowed_paths: list[str]) -> None:
-    """校验本地命令解释器改变工作目录的目标路径是否安全。"""
+    '''校验本地命令解释器改变工作目录的目标路径是否安全。'''
     if target is None or target == "-":
         raise PermissionError(f"Unsafe working directory change in command: {command_name}. Use paths under {VIRTUAL_PATH_PREFIX}")
     if target.startswith(("$", "`")):
@@ -939,7 +853,7 @@ def _validate_local_bash_cwd_target(command_name: str, target: str | None, allow
 
 
 def _validate_local_bash_root_path_args(command_name: str, tokens: list[str], start_index: int) -> None:
-    """拒绝特定文件工具把根目录作为路径参数使用。"""
+    '''拒绝特定文件工具把根目录作为路径参数使用。'''
     if command_name not in _LOCAL_BASH_ROOT_PATH_COMMANDS:
         return
 
@@ -957,7 +871,7 @@ def _validate_local_bash_root_path_args(command_name: str, tokens: list[str], st
 
 
 def _validate_local_bash_shell_tokens(command: str, allowed_paths: list[str]) -> None:
-    """保守地拒绝绝对路径扫描未捕获的相对路径逃逸。"""
+    '''保守地拒绝绝对路径扫描未捕获的相对路径逃逸。'''
     if re.search(r"\$\([^)]*\b(?:cd|pushd)\b", command):
         raise PermissionError(f"Unsafe working directory change in command substitution. Use paths under {VIRTUAL_PATH_PREFIX}")
 
@@ -1017,31 +931,30 @@ def _validate_local_bash_shell_tokens(command: str, allowed_paths: list[str]) ->
 
 
 def resolve_and_validate_user_data_path(path: str, thread_data: ThreadDataState) -> str:
-    """公开解析并验证用户数据虚拟路径仍在允许边界内。"""
+    '''公开解析并验证用户数据虚拟路径仍在允许边界内。'''
     return _resolve_and_validate_user_data_path(path, thread_data)
 
 
 def _braces_are_identifier_placeholders_only(fragment: str) -> bool:
-    """仅当每个花括号块都是单一标识符占位符时返回真。
+    '''仅当每个花括号块都是单一标识符占位符时返回真。
 
     REST 模板和格式化字符串中的标识符占位符是文本；命令解释器花括号或变量展开可能在运行时
     还原真实宿主路径，因此不能豁免。游离、空或嵌套花括号同样不被接受。
-    """
+    '''
     if "${" in fragment:
         return False
     blocks = _IDENTIFIER_BRACE_BLOCK_PATTERN.findall(fragment)
-    # Every brace must be part of a balanced ``{...}`` block (no stray/nested braces).
     if fragment.count("{") != len(blocks) or fragment.count("}") != len(blocks):
         return False
     return all(_IDENTIFIER_PATTERN.fullmatch(inner) for inner in blocks)
 
 
 def _is_non_path_literal_fragment(fragment: str) -> bool:
-    """判断类似 ``/片段`` 的命中几乎确定是文本而非路径。
+    '''判断类似 ``/片段`` 的命中几乎确定是文本而非路径。
 
     原始命令扫描也会命中字面量、格式化字符串和 REST 模板；非 ASCII 字符及单一标识符
     占位符可消除这类误报。此规则不是安全边界，真正的 ASCII 宿主路径仍会被拒绝。
-    """
+    '''
     if any(ord(ch) > 127 for ch in fragment):
         return True
     if "{" in fragment or "}" in fragment:
@@ -1050,16 +963,15 @@ def _is_non_path_literal_fragment(fragment: str) -> bool:
 
 
 def validate_local_bash_command_paths(command: str, thread_data: ThreadDataState | None) -> None:
-    """校验本地沙箱命令解释器命令中的绝对路径。
+    '''校验本地沙箱命令解释器命令中的绝对路径。
 
     此校验仅是显式允许宿主命令时的尽力防护，不构成宿主文件系统隔离。用户数据必须使用
     虚拟路径；技能、ACP 工作区和自定义挂载允许通过遍历检查；常见可执行文件和设备路径
     使用较小的白名单。
-    """
+    '''
     if thread_data is None:
         raise SandboxRuntimeError("Thread data not available for local sandbox")
 
-    # Block file:// URLs which bypass the absolute-path regex but allow local file exfiltration
     file_url_match = _FILE_URL_PATTERN.search(command)
     if file_url_match:
         raise PermissionError(f"Unsafe file:// URL in command: {file_url_match.group()}. Use paths under {VIRTUAL_PATH_PREFIX}")
@@ -1086,36 +998,19 @@ def validate_local_bash_command_paths(command: str, thread_data: ThreadDataState
 
 
 def replace_virtual_paths_in_command(command: str, thread_data: ThreadDataState | None) -> str:
-    """将本地沙箱命令中的用户数据虚拟路径替换为实际线程路径。
+    '''将本地沙箱命令中的用户数据虚拟路径替换为实际线程路径。
 
     技能和 ACP 工作区路径由执行时的路径映射解析，以使用获取沙箱时绑定的正确用户标识；
     这里不预先解析它们。
-    """
+    '''
     result = command
 
-    # Skills, ACP workspace, and custom mount paths are resolved by
-    # LocalSandbox._resolve_paths_in_command() via PathMapping.
 
-    # Replace user-data paths
     if VIRTUAL_PATH_PREFIX in result and thread_data is not None:
-        # The segment-boundary lookahead is what keeps the virtual root from
-        # matching inside a sibling that merely shares its prefix
-        # (``/mnt/user-data`` inside ``/mnt/user-data-backup``). The trailing
-        # group needs a ``/`` to consume anything, so without the lookahead the
-        # bare root still matches and the sibling is rewritten into the thread's
-        # host directory — a real path outside the mount contract. Same defect as
-        # #4035 (reverse patterns) and #4053 (masking patterns), mirrored into
-        # this direction.
-        #
-        # The class mirrors ``LocalSandbox._content_pattern``'s rather than
-        # ``_command_pattern``'s: a virtual root can legitimately be followed by
-        # ``:`` (PATH-style concatenation) or ``,``, which the shell-oriented
-        # class rejects — narrowing to it would stop translating paths that
-        # translate today. ``$`` covers a command ending exactly at the root.
         pattern = re.compile(rf"{re.escape(VIRTUAL_PATH_PREFIX)}(?=/|$|[^\w./-])(/[^\s\"';&|<>()]*)?")
 
         def replace_user_data_match(match: re.Match) -> str:
-            """将匹配到的用户数据虚拟路径替换为实际线程路径。"""
+            '''将匹配到的用户数据虚拟路径替换为实际线程路径。'''
             return replace_virtual_path(match.group(0), thread_data).replace("\\", "/")
 
         result = pattern.sub(replace_user_data_match, result)
@@ -1124,14 +1019,14 @@ def replace_virtual_paths_in_command(command: str, thread_data: ThreadDataState 
 
 
 def _apply_cwd_prefix(command: str, thread_data: ThreadDataState | None) -> str:
-    """为命令添加工作区切换前缀，使相对路径锚定到线程工作区。"""
+    '''为命令添加工作区切换前缀，使相对路径锚定到线程工作区。'''
     if thread_data and (workspace := thread_data.get("workspace_path")):
         return f"cd {shlex.quote(workspace)} && {command}"
     return command
 
 
 def get_thread_data(runtime: Runtime | None) -> ThreadDataState | None:
-    """从运行时状态中提取线程数据。"""
+    '''从运行时状态中提取线程数据。'''
     if runtime is None:
         return None
     if runtime.state is None:
@@ -1140,7 +1035,7 @@ def get_thread_data(runtime: Runtime | None) -> ThreadDataState | None:
 
 
 def is_local_sandbox(runtime: Runtime | None) -> bool:
-    """判断当前沙箱是否为通用或线程范围的本地沙箱。"""
+    '''判断当前沙箱是否为通用或线程范围的本地沙箱。'''
     if runtime is None:
         return False
     if runtime.state is None:
@@ -1155,7 +1050,7 @@ def is_local_sandbox(runtime: Runtime | None) -> bool:
 
 
 def sandbox_from_runtime(runtime: Runtime | None = None) -> Sandbox:
-    """从工具运行时取得已初始化的沙箱实例；缺失时抛出相应异常。"""
+    '''从工具运行时取得已初始化的沙箱实例；缺失时抛出相应异常。'''
     if runtime is None:
         raise SandboxRuntimeError("Tool runtime not available")
     if runtime.state is None:
@@ -1171,19 +1066,18 @@ def sandbox_from_runtime(runtime: Runtime | None = None) -> Sandbox:
         raise SandboxNotFoundError(f"Sandbox with ID '{sandbox_id}' not found", sandbox_id=sandbox_id)
 
     if runtime.context is not None:
-        runtime.context["sandbox_id"] = sandbox_id  # Ensure sandbox_id is in context for downstream use
+        runtime.context["sandbox_id"] = sandbox_id
     return sandbox
 
 
 def ensure_sandbox_initialized(runtime: Runtime | None = None) -> Sandbox:
-    """确保沙箱已初始化；首次调用时按线程延迟获取并写入运行时状态。"""
+    '''确保沙箱已初始化；首次调用时按线程延迟获取并写入运行时状态。'''
     if runtime is None:
         raise SandboxRuntimeError("Tool runtime not available")
 
     if runtime.state is None:
         raise SandboxRuntimeError("Tool runtime state not available")
 
-    # Check if sandbox already exists in state
     sandbox_state = runtime.state.get("sandbox")
     if sandbox_state is not None:
         sandbox_id = sandbox_state.get("sandbox_id")
@@ -1191,11 +1085,9 @@ def ensure_sandbox_initialized(runtime: Runtime | None = None) -> Sandbox:
             sandbox = get_sandbox_provider().get(sandbox_id)
             if sandbox is not None:
                 if runtime.context is not None:
-                    runtime.context["sandbox_id"] = sandbox_id  # Ensure sandbox_id is in context for releasing in after_agent
+                    runtime.context["sandbox_id"] = sandbox_id
                 return sandbox
-            # Sandbox was released, fall through to acquire new one
 
-    # Lazy acquisition: get thread_id and acquire sandbox
     thread_id = runtime.context.get("thread_id") if runtime.context else None
     if thread_id is None:
         thread_id = runtime.config.get("configurable", {}).get("thread_id") if runtime.config else None
@@ -1205,21 +1097,19 @@ def ensure_sandbox_initialized(runtime: Runtime | None = None) -> Sandbox:
     provider = get_sandbox_provider()
     sandbox_id = provider.acquire(thread_id, user_id=resolve_runtime_user_id(runtime))
 
-    # Update runtime state - this persists across tool calls
     runtime.state["sandbox"] = {"sandbox_id": sandbox_id}
 
-    # Retrieve and return the sandbox
     sandbox = provider.get(sandbox_id)
     if sandbox is None:
         raise SandboxNotFoundError("Sandbox not found after acquisition", sandbox_id=sandbox_id)
 
     if runtime.context is not None:
-        runtime.context["sandbox_id"] = sandbox_id  # Ensure sandbox_id is in context for releasing in after_agent
+        runtime.context["sandbox_id"] = sandbox_id
     return sandbox
 
 
 async def ensure_sandbox_initialized_async(runtime: Runtime | None = None) -> Sandbox:
-    """异步运行时的延迟沙箱初始化入口，使用提供者异步获取钩子。"""
+    '''异步运行时的延迟沙箱初始化入口，使用提供者异步获取钩子。'''
     if runtime is None:
         raise SandboxRuntimeError("Tool runtime not available")
 
@@ -1261,7 +1151,7 @@ async def _run_sync_tool_after_async_sandbox_init(
     runtime: Runtime,
     *args: object,
 ) -> str:
-    """通过异步提供者延迟初始化沙箱，再在线程中运行同步工具主体。"""
+    '''通过异步提供者延迟初始化沙箱，再在线程中运行同步工具主体。'''
     try:
         await ensure_sandbox_initialized_async(runtime)
     except SandboxError as e:
@@ -1276,11 +1166,10 @@ async def _run_sync_tool_after_async_sandbox_init(
 
 
 def ensure_thread_directories_exist(runtime: Runtime | None) -> None:
-    """确保线程的工作区、上传和输出目录存在；仅本地沙箱创建实体目录。"""
+    '''确保线程的工作区、上传和输出目录存在；仅本地沙箱创建实体目录。'''
     if runtime is None:
         return
 
-    # Only create directories for local sandbox
     if not is_local_sandbox(runtime):
         return
 
@@ -1288,11 +1177,9 @@ def ensure_thread_directories_exist(runtime: Runtime | None) -> None:
     if thread_data is None:
         return
 
-    # Check if directories have already been created
     if runtime.state.get("thread_directories_created"):
         return
 
-    # Create the three directories
     import os
 
     for key in ["workspace_path", "uploads_path", "outputs_path"]:
@@ -1300,27 +1187,20 @@ def ensure_thread_directories_exist(runtime: Runtime | None) -> None:
         if path:
             os.makedirs(path, exist_ok=True)
 
-    # Mark as created to avoid redundant operations
     runtime.state["thread_directories_created"] = True
 
 
 _SECRET_REDACTION = "[redacted]"
 
-# Values shorter than this are not redacted from bash output. A short secret
-# value (a 2-char region code, a numeric id, a PIN) would otherwise shred
-# unrelated bytes of tool output — exit codes, timestamps, sizes, paths —
-# corrupting the result the model reads back. The redaction of a value this
-# short is more likely noise than genuine leak protection; the secret is still
-# injected into the subprocess, only the output mask skips it.
 _MIN_MASK_LENGTH = 8
 
 
 def mask_secret_values(output: str, injected_env: dict[str, str] | None) -> str:
-    """在命令输出重新进入上下文前遮蔽注入的密钥值。
+    '''在命令输出重新进入上下文前遮蔽注入的密钥值。
 
     按长度从长到短替换非空密钥，避免较短值先替换而泄露较长值的一部分；过短值不遮蔽，
     以免破坏无关输出。
-    """
+    '''
     if not injected_env or not output:
         return output
     for value in sorted((v for v in injected_env.values() if v and len(v) >= _MIN_MASK_LENGTH), key=len, reverse=True):
@@ -1329,14 +1209,12 @@ def mask_secret_values(output: str, injected_env: dict[str, str] | None) -> str:
 
 
 def _truncate_bash_output(output: str, max_chars: int) -> str:
-    """从中间截断命令输出并等量保留首尾；零上限表示不截断。"""
+    '''从中间截断命令输出并等量保留首尾；零上限表示不截断。'''
     if max_chars == 0:
         return output
     if len(output) <= max_chars:
         return output
     total_len = len(output)
-    # Compute the exact worst-case marker length: skipped chars is at most
-    # total_len, so this is a tight upper bound.
     marker_max_len = len(f"\n... [middle truncated: {total_len} chars skipped] ...\n")
     kept = max(0, max_chars - marker_max_len)
     if kept == 0:
@@ -1349,14 +1227,12 @@ def _truncate_bash_output(output: str, max_chars: int) -> str:
 
 
 def _truncate_read_file_output(output: str, max_chars: int) -> str:
-    """从尾部截断读文件输出并保留开头；零上限表示不截断。"""
+    '''从尾部截断读文件输出并保留开头；零上限表示不截断。'''
     if max_chars == 0:
         return output
     if len(output) <= max_chars:
         return output
     total = len(output)
-    # Compute the exact worst-case marker length: both numeric fields are at
-    # their maximum (total chars), so this is a tight upper bound.
     marker_max_len = len(f"\n... [truncated: showing first {total} of {total} chars. Use start_line/end_line to read a specific range] ...")
     kept = max(0, max_chars - marker_max_len)
     if kept == 0:
@@ -1366,7 +1242,7 @@ def _truncate_read_file_output(output: str, max_chars: int) -> str:
 
 
 def _truncate_ls_output(output: str, max_chars: int) -> str:
-    """从尾部截断目录列表输出并保留开头；零上限表示不截断。"""
+    '''从尾部截断目录列表输出并保留开头；零上限表示不截断。'''
     if max_chars == 0:
         return output
     if len(output) <= max_chars:
@@ -1380,30 +1256,24 @@ def _truncate_ls_output(output: str, max_chars: int) -> str:
     return f"{output[:kept]}{marker}"
 
 
-# Fixed env var exposing the IM-channel platform user id (Feishu open_id,
-# Slack Uxxx, ...) to sandbox commands, so skills can act on the current end
-# user's channel identity (#3914). An identifier, not a secret.
 CHANNEL_USER_ID_ENV = "DEERFLOW_CHANNEL_USER_ID"
 
 _CHANNEL_USER_ID_CONTEXT_KEY = "channel_user_id"
 
-# body.context is client-writable on web requests, so bound the value: real
-# platform ids are tens of chars; anything past this is hostile or corrupt and
-# must not bloat every command string sent to the sandbox.
 _CHANNEL_USER_ID_MAX_LEN = 256
 
 
 def _is_windows() -> bool:
-    """判断当前运行平台是否为 Windows。"""
+    '''判断当前运行平台是否为 Windows。'''
     return os.name == "nt"
 
 
 def _channel_identity_prefix(runtime: Runtime) -> str | None:
-    """构造设置或清除渠道用户标识环境变量的命令前缀。
+    '''构造设置或清除渠道用户标识环境变量的命令前缀。
 
     非即时通讯运行不修改命令；即时通讯运行每次都会显式导出有效标识，或清除无效标识，
     以免共享命令解释器会话继承此前发送者的标识。该标识不是密钥，可保留在审计可见命令中。
-    """
+    '''
     context = getattr(runtime, "context", None)
     if not isinstance(context, dict) or _CHANNEL_USER_ID_CONTEXT_KEY not in context:
         return None
@@ -1413,30 +1283,9 @@ def _channel_identity_prefix(runtime: Runtime) -> str | None:
     return f"unset {CHANNEL_USER_ID_ENV}; "
 
 
-def _github_env_from_runtime(runtime: Runtime) -> dict[str, str] | None:
-    """构建携带 GitHub 应用安装令牌的单次调用环境覆盖。
-
-    运行时可提供令牌文本或零参数刷新函数；本函数将其作为不透明数据映射为命令工具使用的
-    两个环境变量。令牌不可用或刷新失败时返回空值，不改变非 GitHub 运行的行为。
-    """
-    context = runtime.context if runtime.context is not None else None
-    value = context.get("github_token") if context else None
-    if callable(value):
-        try:
-            token = value()
-        except Exception:
-            logger.warning("github_token provider raised; skipping env overlay", exc_info=True)
-            return None
-    else:
-        token = value
-    if not isinstance(token, str) or not token:
-        return None
-    return {"GH_TOKEN": token, "GITHUB_TOKEN": token}
-
-
 @tool("bash", parse_docstring=True)
 def bash_tool(runtime: Runtime, description: str, command: str) -> str:
-    """在沙箱当前目录运行命令，并返回执行结果。
+    '''在沙箱当前目录运行命令，并返回执行结果。
 
 
     - Use `python` to run Python code.
@@ -1450,18 +1299,11 @@ def bash_tool(runtime: Runtime, description: str, command: str) -> str:
     Args:
         description: Explain why you are running this command in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
         command: The bash command to execute. Always use absolute paths for files and directories.
-    """
+    '''
     try:
         sandbox = ensure_sandbox_initialized(runtime)
-        # Request-scoped secrets resolved for the active skill (#3861), plus a
-        # short-lived GitHub App installation token threaded through by the
-        # GitHub channel. Both are injected as per-call env into the subprocess,
-        # never placed in the command string.
         injected_env = read_active_secrets(getattr(runtime, "context", None)) or None
         identity_prefix = _channel_identity_prefix(runtime)
-        github_env = _github_env_from_runtime(runtime)
-        if github_env:
-            injected_env = {**(injected_env or {}), **github_env}
         if is_local_sandbox(runtime):
             if not is_host_bash_allowed():
                 return f"Error: {LOCAL_HOST_BASH_DISABLED_MESSAGE}"
@@ -1470,8 +1312,6 @@ def bash_tool(runtime: Runtime, description: str, command: str) -> str:
             validate_local_bash_command_paths(command, thread_data)
             command = replace_virtual_paths_in_command(command, thread_data)
             command = _apply_cwd_prefix(command, thread_data)
-            # POSIX-only: the Windows local sandbox may execute via
-            # PowerShell/cmd.exe where `export` is not valid syntax.
             if identity_prefix and not _is_windows():
                 command = identity_prefix + command
             try:
@@ -1509,7 +1349,7 @@ def bash_tool(runtime: Runtime, description: str, command: str) -> str:
 
 
 async def _bash_tool_async(runtime: Runtime, description: str, command: str) -> str:
-    """异步初始化沙箱后在线程中执行命令工具。"""
+    '''异步初始化沙箱后在线程中执行命令工具。'''
     return await _run_sync_tool_after_async_sandbox_init(bash_tool.func, runtime, description, command)
 
 
@@ -1518,15 +1358,14 @@ bash_tool.coroutine = _bash_tool_async
 
 @tool("ls", parse_docstring=True)
 def ls_tool(runtime: Runtime, description: str, path: str) -> str:
-    """以树形结构列出目录内容，最多展开两层。
+    '''以树形结构列出目录内容，最多展开两层。
 
     Args:
         description: Explain why you are listing this directory in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
         path: The **absolute** path to the directory to list.
-    """
+    '''
     try:
         user_id = resolve_runtime_user_id(runtime)
-        # Block access to disabled skill directories
         if _is_disabled_skill_path(path, user_id=user_id):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
             return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
@@ -1538,23 +1377,15 @@ def ls_tool(runtime: Runtime, description: str, path: str) -> str:
             thread_data = get_thread_data(runtime)
             validate_local_tool_path(path, thread_data, read_only=True)
             if _is_skills_path(path) or _is_acp_workspace_path(path):
-                # Skills and ACP workspace paths are resolved by the sandbox's
-                # PathMapping (which uses the user_id from acquire time), not
-                # by _resolve_skills_path / _resolve_acp_workspace_path (which
-                # use get_effective_user_id() from contextvar and may differ
-                # from the sandbox mapping's user_id).
                 pass
             elif not _is_custom_mount_path(path):
                 path = _resolve_and_validate_user_data_path(path, thread_data)
-            # Custom mount paths and skills/ACP paths are resolved by LocalSandbox._resolve_path()
         children = sandbox.list_dir(path)
         if not children:
             return "(empty)"
         output = "\n".join(children)
         if thread_data is not None:
             output = mask_local_paths_in_output(output, thread_data)
-        # The gate above only covers `path` itself; the listing descends into
-        # children, so a root above a disabled skill still exposes its files.
         entries = _drop_disabled_skill_paths(output.splitlines(), user_id=user_id)
         if not entries:
             return "(empty)"
@@ -1578,7 +1409,7 @@ def ls_tool(runtime: Runtime, description: str, path: str) -> str:
 
 
 async def _ls_tool_async(runtime: Runtime, description: str, path: str) -> str:
-    """异步初始化沙箱后在线程中执行目录列表工具。"""
+    '''异步初始化沙箱后在线程中执行目录列表工具。'''
     return await _run_sync_tool_after_async_sandbox_init(ls_tool.func, runtime, description, path)
 
 
@@ -1594,7 +1425,7 @@ def glob_tool(
     include_dirs: bool = False,
     max_results: int = _DEFAULT_GLOB_MAX_RESULTS,
 ) -> str:
-    """在指定根目录内按 glob 模式查找文件或子目录。
+    '''在指定根目录内按 glob 模式查找文件或子目录。
 
     Args:
         description: Explain why you are searching for these paths in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
@@ -1602,10 +1433,9 @@ def glob_tool(
         path: The **absolute** root directory to search under.
         include_dirs: Whether matching directories should also be returned. Default is False.
         max_results: Maximum number of paths to return. Default is 200.
-    """
+    '''
     try:
         user_id = resolve_runtime_user_id(runtime)
-        # Block access to disabled skill directories
         if _is_disabled_skill_path(path, user_id=user_id):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
             return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
@@ -1627,8 +1457,6 @@ def glob_tool(
         matches, truncated = sandbox.glob(path, pattern, include_dirs=include_dirs, max_results=effective_max_results)
         if thread_data is not None:
             matches = [mask_local_paths_in_output(match, thread_data) for match in matches]
-        # The gate above only covers `path` itself; the search descends into it,
-        # so a root above a disabled skill still surfaces its files.
         matches = _drop_disabled_skill_paths(matches, user_id=user_id)
         return _format_glob_results(requested_path, matches, truncated)
     except SandboxError as e:
@@ -1651,7 +1479,7 @@ async def _glob_tool_async(
     include_dirs: bool = False,
     max_results: int = _DEFAULT_GLOB_MAX_RESULTS,
 ) -> str:
-    """异步初始化沙箱后在线程中执行通配搜索工具。"""
+    '''异步初始化沙箱后在线程中执行通配搜索工具。'''
     return await _run_sync_tool_after_async_sandbox_init(
         glob_tool.func,
         runtime,
@@ -1677,7 +1505,7 @@ def grep_tool(
     case_sensitive: bool = False,
     max_results: int = _DEFAULT_GREP_MAX_RESULTS,
 ) -> str:
-    """在指定根目录的文本文件中查找匹配内容，并返回上下文行。
+    '''在指定根目录的文本文件中查找匹配内容，并返回上下文行。
 
     Args:
         description: Explain why you are searching file contents in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
@@ -1687,10 +1515,9 @@ def grep_tool(
         literal: Whether to treat `pattern` as a plain string. Default is False.
         case_sensitive: Whether matching is case-sensitive. Default is False.
         max_results: Maximum number of matching lines to return. Default is 100.
-    """
+    '''
     try:
         user_id = resolve_runtime_user_id(runtime)
-        # Block access to disabled skill directories
         if _is_disabled_skill_path(path, user_id=user_id):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
             return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
@@ -1726,8 +1553,6 @@ def grep_tool(
                 )
                 for match in matches
             ]
-        # The gate above only covers `path` itself; the search descends into it,
-        # so a root above a disabled skill still surfaces its file contents.
         allowed = set(_drop_disabled_skill_paths([match.path for match in matches], user_id=user_id))
         matches = [match for match in matches if match.path in allowed]
         return _format_grep_results(requested_path, matches, truncated)
@@ -1755,7 +1580,7 @@ async def _grep_tool_async(
     case_sensitive: bool = False,
     max_results: int = _DEFAULT_GREP_MAX_RESULTS,
 ) -> str:
-    """异步初始化沙箱后在线程中执行文本搜索工具。"""
+    '''异步初始化沙箱后在线程中执行文本搜索工具。'''
     return await _run_sync_tool_after_async_sandbox_init(
         grep_tool.func,
         runtime,
@@ -1773,7 +1598,7 @@ grep_tool.coroutine = _grep_tool_async
 
 
 def read_current_file_content(runtime: Runtime | None, path: str) -> str:
-    """按读文件工具的路径解析规则读取文件当前完整内容，供读写门禁复用。"""
+    '''按读文件工具的路径解析规则读取文件当前完整内容，供读写门禁复用。'''
     sandbox = ensure_sandbox_initialized(runtime)
     ensure_thread_directories_exist(runtime)
     if is_local_sandbox(runtime):
@@ -1785,7 +1610,6 @@ def read_current_file_content(runtime: Runtime | None, path: str) -> str:
             path = _resolve_acp_workspace_path(path, _extract_thread_id_from_thread_data(thread_data))
         elif not _is_custom_mount_path(path):
             path = _resolve_and_validate_user_data_path(path, thread_data)
-        # Custom mount paths are resolved by LocalSandbox._resolve_path()
     return sandbox.read_file(path)
 
 
@@ -1797,16 +1621,15 @@ def read_file_tool(
     start_line: int | None = None,
     end_line: int | None = None,
 ) -> str:
-    """读取文本文件，供检查源码、配置、日志或其他文字资料。
+    '''读取文本文件，供检查源码、配置、日志或其他文字资料。
 
     Args:
         description: Explain why you are reading this file in short words. ALWAYS PROVIDE THIS PARAMETER FIRST.
         path: The **absolute** path to the file to read.
         start_line: Optional starting line number (1-indexed, inclusive). Use with end_line to read a specific range.
         end_line: Optional ending line number (1-indexed, inclusive). Use with start_line to read a specific range.
-    """
+    '''
     try:
-        # Block access to disabled skill files
         if _is_disabled_skill_path(path, user_id=resolve_runtime_user_id(runtime)):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
             return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
@@ -1858,7 +1681,7 @@ async def _read_file_tool_async(
     start_line: int | None = None,
     end_line: int | None = None,
 ) -> str:
-    """异步初始化沙箱后在线程中执行读文件工具。"""
+    '''异步初始化沙箱后在线程中执行读文件工具。'''
     return await _run_sync_tool_after_async_sandbox_init(read_file_tool.func, runtime, description, path, start_line, end_line)
 
 
@@ -1866,7 +1689,7 @@ read_file_tool.coroutine = _read_file_tool_async
 
 
 def _effective_write_file_max_bytes() -> int:
-    """返回非追加写入的当前大小上限；无效配置回退默认值，非正值关闭限制。"""
+    '''返回非追加写入的当前大小上限；无效配置回退默认值，非正值关闭限制。'''
     raw = os.environ.get(_WRITE_FILE_MAX_BYTES_ENV)
     if raw is None:
         return _WRITE_FILE_CONTENT_MAX_BYTES
@@ -1884,7 +1707,7 @@ def write_file_tool(
     content: str,
     append: bool = False,
 ) -> str:
-    """将文本写入文件；默认覆盖原内容，也可选择追加到文件末尾。
+    '''将文本写入文件；默认覆盖原内容，也可选择追加到文件末尾。
 
     READ-BEFORE-WRITE (issue #3857): if the target file already exists (including
     append=True), you must have read its CURRENT version with read_file first.
@@ -1917,7 +1740,7 @@ def write_file_tool(
         path: The **absolute** path to the file to write to. ALWAYS PROVIDE THIS PARAMETER SECOND.
         content: The content to write to the file. ALWAYS PROVIDE THIS PARAMETER THIRD.
         append: Whether to append content to the end of the file instead of overwriting it. Defaults to False.
-    """
+    '''
     if not append:
         max_bytes = _effective_write_file_max_bytes()
         if max_bytes > 0:
@@ -1940,7 +1763,6 @@ def write_file_tool(
             validate_local_tool_path(path, thread_data)
             if not _is_custom_mount_path(path):
                 path = _resolve_and_validate_user_data_path(path, thread_data)
-            # Custom mount paths are resolved by LocalSandbox._resolve_path()
         with get_file_operation_lock(sandbox, path):
             sandbox.write_file(path, content, append)
         return "OK"
@@ -1969,7 +1791,7 @@ async def _write_file_tool_async(
     content: str,
     append: bool = False,
 ) -> str:
-    """异步初始化沙箱后在线程中执行写文件工具。"""
+    '''异步初始化沙箱后在线程中执行写文件工具。'''
     return await _run_sync_tool_after_async_sandbox_init(write_file_tool.func, runtime, description, path, content, append)
 
 
@@ -1985,7 +1807,7 @@ def str_replace_tool(
     new_str: str,
     replace_all: bool = False,
 ) -> str:
-    """在文件中查找指定片段并替换为新内容。
+    '''在文件中查找指定片段并替换为新内容。
     If `replace_all` is False (default), the substring to replace must appear **exactly once** in the file.
 
     READ-BEFORE-WRITE (issue #3857): you must have read the file's CURRENT
@@ -1997,7 +1819,7 @@ def str_replace_tool(
         old_str: The substring to replace. ALWAYS PROVIDE THIS PARAMETER THIRD.
         new_str: The new substring. ALWAYS PROVIDE THIS PARAMETER FOURTH.
         replace_all: Whether to replace all occurrences of the substring. If False, only the first occurrence will be replaced. Default is False.
-    """
+    '''
     try:
         sandbox = ensure_sandbox_initialized(runtime)
         ensure_thread_directories_exist(runtime)
@@ -2007,7 +1829,6 @@ def str_replace_tool(
             validate_local_tool_path(path, thread_data)
             if not _is_custom_mount_path(path):
                 path = _resolve_and_validate_user_data_path(path, thread_data)
-            # Custom mount paths are resolved by LocalSandbox._resolve_path()
         with get_file_operation_lock(sandbox, path):
             content = sandbox.read_file(path)
             if not content:
@@ -2040,7 +1861,7 @@ async def _str_replace_tool_async(
     new_str: str,
     replace_all: bool = False,
 ) -> str:
-    """异步初始化沙箱后在线程中执行字符串替换工具。"""
+    '''异步初始化沙箱后在线程中执行字符串替换工具。'''
     return await _run_sync_tool_after_async_sandbox_init(
         str_replace_tool.func,
         runtime,

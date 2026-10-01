@@ -1,4 +1,4 @@
-"定义 resolvers 模块提供的职责与可复用接口"
+'''按配置路径动态导入对象，并提供依赖缺失和类型不符时的诊断信息。'''
 
 from importlib import import_module
 
@@ -11,14 +11,11 @@ MODULE_TO_PACKAGE_HINTS = {
 
 
 def _build_missing_dependency_hint(module_path: str, err: ImportError) -> str:
-    """执行 _build_missing_dependency_hint 的明确职责，并返回与调用约定一致的结果。
-
-    Build an actionable hint when module import fails."""
+    '''根据缺失模块推断安装包名称，生成可执行的依赖安装提示。'''
     module_root = module_path.split(".", 1)[0]
     missing_module = getattr(err, "name", None) or module_root
 
-    # Prefer provider package hints for known integrations, even when the import
-    # error is triggered by a transitive dependency (e.g. `google`).
+    # 对已知模型集成优先使用对应发行包名，即使报错来自其传递依赖。
     package_name = MODULE_TO_PACKAGE_HINTS.get(module_root)
     if package_name is None:
         package_name = MODULE_TO_PACKAGE_HINTS.get(missing_module, missing_module.replace("_", "-"))
@@ -30,22 +27,21 @@ def resolve_variable[T](
     variable_path: str,
     expected_type: type[T] | tuple[type, ...] | None = None,
 ) -> T:
-    """执行 resolve_variable 的明确职责，并返回与调用约定一致的结果。
+    '''根据 ``module:attribute`` 路径导入并返回指定对象。
 
     Resolve a variable from a path.
 
         Args:
-            variable_path: The path to the variable (e.g. "parent_package_name.sub_package_name.module_name:variable_name").
-            expected_type: Optional type or tuple of types to validate the resolved variable against.
-                If provided, uses isinstance() to check if the variable is an instance of the expected type(s).
+            variable_path: 形如 ``package.module:object_name`` 的导入路径。
+            expected_type: 可选的类型或类型元组；提供时会校验对象实例类型。
 
         Returns:
-            The resolved variable.
+            解析得到的对象。
 
         Raises:
-            ImportError: If the module path is invalid or the attribute doesn't exist.
-            ValueError: If the resolved variable doesn't pass the validation checks.
-    """
+            ImportError: 路径无效、模块无法导入或属性不存在时抛出。
+            ValueError: 对象类型不符合要求时抛出。
+    '''
     try:
         module_path, variable_name = variable_path.rsplit(":", 1)
     except ValueError as err:
@@ -59,7 +55,7 @@ def resolve_variable[T](
         if isinstance(err, ModuleNotFoundError) or err_name == module_root:
             hint = _build_missing_dependency_hint(module_path, err)
             raise ImportError(f"Could not import module {module_path}. {hint}") from err
-        # Preserve the original ImportError message for non-missing-module failures.
+        # 非依赖缺失导致的导入失败保留原始错误原因。
         raise ImportError(f"Error importing module {module_path}: {err}") from err
 
     try:
@@ -67,7 +63,7 @@ def resolve_variable[T](
     except AttributeError as err:
         raise ImportError(f"Module {module_path} does not define a {variable_name} attribute/class") from err
 
-    # Type validation
+    # 如果调用方提供了期望类型，则验证导入对象。
     if expected_type is not None:
         if not isinstance(variable, expected_type):
             type_name = expected_type.__name__ if isinstance(expected_type, type) else " or ".join(t.__name__ for t in expected_type)
@@ -77,21 +73,21 @@ def resolve_variable[T](
 
 
 def resolve_class[T](class_path: str, base_class: type[T] | None = None) -> type[T]:
-    """执行 resolve_class 的明确职责，并返回与调用约定一致的结果。
+    '''解析类路径，并可选验证该类是否继承指定基类。
 
     Resolve a class from a module path and class name.
 
         Args:
-            class_path: The path to the class (e.g. "langchain_openai:ChatOpenAI").
-            base_class: The base class to check if the resolved class is a subclass of.
+            class_path: 形如 ``package.module:ClassName`` 的类路径。
+            base_class: 可选的基类约束。
 
         Returns:
-            The resolved class.
+            解析得到的类。
 
         Raises:
-            ImportError: If the module path is invalid or the attribute doesn't exist.
-            ValueError: If the resolved object is not a class or not a subclass of base_class.
-    """
+            ImportError: 模块路径无效或类不存在时抛出。
+            ValueError: 对象不是类或不满足基类约束时抛出。
+    '''
     model_class = resolve_variable(class_path, expected_type=type)
 
     if not isinstance(model_class, type):

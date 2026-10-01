@@ -9,10 +9,9 @@ import { cn } from "@/lib/utils";
 import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
-/** TaskItemFileProps 的公开类型定义。 */
 export type TaskItemFileProps = ComponentProps<"div">;
 
-/** TaskItemFile 组件：提供对应的界面结构与交互语义。 */
+/** 将关联文件名显示为紧凑的次级标签。 */
 export const TaskItemFile = ({
   children,
   className,
@@ -29,20 +28,18 @@ export const TaskItemFile = ({
   </div>
 );
 
-/** TaskItemProps 的公开类型定义。 */
 export type TaskItemProps = ComponentProps<"div">;
 
-/** TaskItem 组件：提供对应的界面结构与交互语义。 */
+/** 以弱化文字样式呈现任务说明或执行结果。 */
 export const TaskItem = ({ children, className, ...props }: TaskItemProps) => (
   <div className={cn("text-muted-foreground text-sm", className)} {...props}>
     {children}
   </div>
 );
 
-/** TaskProps 的公开类型定义。 */
 export type TaskProps = ComponentProps<typeof Collapsible>;
 
-/** Task 组件：提供对应的界面结构与交互语义。 */
+/** 提供默认展开的可折叠任务详情区域。 */
 export const Task = ({
   defaultOpen = true,
   className,
@@ -51,12 +48,11 @@ export const Task = ({
   <Collapsible className={cn(className)} defaultOpen={defaultOpen} {...props} />
 );
 
-/** TaskTriggerProps 的公开类型定义。 */
 export type TaskTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {
   title: string;
 };
 
-/** TaskTrigger 组件：提供对应的界面结构与交互语义。 */
+/** 以可点击标题切换任务详情，并在未传子节点时生成默认图标布局。 */
 export const TaskTrigger = ({
   children,
   className,
@@ -74,10 +70,9 @@ export const TaskTrigger = ({
   </CollapsibleTrigger>
 );
 
-/** TaskContentProps 的公开类型定义。 */
 export type TaskContentProps = ComponentProps<typeof CollapsibleContent>;
 
-/** TaskContent 组件：提供对应的界面结构与交互语义。 */
+/** 为折叠内容添加展开/收起过渡，并在任务详情左侧绘制层级标记。 */
 export const TaskContent = ({
   children,
   className,

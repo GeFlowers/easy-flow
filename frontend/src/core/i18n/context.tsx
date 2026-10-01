@@ -11,7 +11,7 @@ export interface I18nContextType {
 
 export const I18nContext = createContext<I18nContextType | null>(null);
 
-/** 实现 I18nProvider 的受限辅助逻辑。 */
+/** 提供当前语言和切换入口，并将用户选择写入浏览器 Cookie。 */
 export function I18nProvider({
   children,
   initialLocale,
@@ -21,6 +21,7 @@ export function I18nProvider({
 }) {
   const [locale, setLocale] = useState<Locale>(initialLocale);
 
+  /** 更新上下文语言并写入长期有效的语言偏好。 */
   const handleSetLocale = (newLocale: Locale) => {
     setLocale(newLocale);
     document.cookie = `locale=${newLocale}; path=/; max-age=31536000`;
@@ -33,7 +34,7 @@ export function I18nProvider({
   );
 }
 
-/** 提供 useI18nContext 对应的 React Hook。 */
+/** 从语言上下文读取当前语言；未安装语言提供器时报告装配错误。 */
 export function useI18nContext() {
   const context = useContext(I18nContext);
   if (!context) {

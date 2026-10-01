@@ -1,6 +1,4 @@
-"""定义 resource_graph 模块提供的职责与可复用接口。
-
-Deterministic package resource graph checks."""
+'''分析技能包内部的文件引用，报告缺失、越界和未被引用的资源。'''
 
 from __future__ import annotations
 
@@ -18,7 +16,7 @@ _RESOURCE_DIRS = {"references", "scripts", "templates", "assets", "evals"}
 
 
 def build_resource_graph(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    "构建并返回，并遵守 build_resource_graph 所表达的接口约束"
+    '''构建包内资源引用图，并生成缺失引用、越界引用和孤立文件问题。'''
     files = {str(entry["path"]): entry for entry in snapshot.get("files", [])}
     nodes = [{"path": path, "kind": files[path].get("kind", "unknown")} for path in sorted(files)]
     edges: set[tuple[str, str]] = set()
@@ -90,7 +88,7 @@ def build_resource_graph(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list
 
 
 def _extract_references(content: str) -> set[str]:
-    "执行 _extract_references 的明确职责，并返回与调用约定一致的结果"
+    '''从 Markdown 链接、代码片段和常见资源路径中提取文件引用。'''
     refs: set[str] = set()
     for match in _MARKDOWN_LINK_RE.finditer(content):
         refs.add(match.group(1).split("#", 1)[0])
@@ -104,7 +102,7 @@ def _extract_references(content: str) -> set[str]:
 
 
 def _resolve_reference(source_path: str, raw_ref: str) -> str | None:
-    "执行 _resolve_reference 的明确职责，并返回与调用约定一致的结果"
+    '''将引用解析为包内相对路径，并标记试图越出技能包的绝对路径。'''
     ref = raw_ref.strip().strip("\"'")
     if not ref or ref.startswith("#") or re.match(r"^[A-Za-z][A-Za-z0-9+.-]*:", ref):
         return None

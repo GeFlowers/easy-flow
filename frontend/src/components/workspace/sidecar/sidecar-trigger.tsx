@@ -22,6 +22,7 @@ export function SidecarTrigger() {
 
   const label = sidecar.open ? t.sidecar.close : t.sidecar.open;
 
+  /** 切换侧边面板；打开前校验缓存的侧边线程仍存在。 */
   const handleClick = async () => {
     if (sidecar.open) {
       sidecar.close();

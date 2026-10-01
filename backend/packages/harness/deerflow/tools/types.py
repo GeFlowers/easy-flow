@@ -1,4 +1,4 @@
-"""定义 DeerFlow 工具使用的运行时类型。"""
+'''定义 DeerFlow 工具使用的运行时类型。'''
 
 from typing import Any
 

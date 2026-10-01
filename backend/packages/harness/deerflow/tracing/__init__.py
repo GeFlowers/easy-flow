@@ -1,4 +1,4 @@
-"定义 __init__ 模块提供的职责与可复用接口"
+'''导出追踪回调构建、Langfuse 元数据注入和 Monocle 初始化接口。'''
 
 from .factory import build_tracing_callbacks
 from .metadata import build_langfuse_trace_metadata, inject_langfuse_metadata

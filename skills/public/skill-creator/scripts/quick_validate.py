@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""
-Quick validation script for skills - minimal version
-"""
+'''
+技能目录快速校验脚本，提供最基本的结构检查。
+'''
 
 import re
 import sys
@@ -13,7 +13,7 @@ MAX_SKILL_NAME_LENGTH = 64
 
 
 def validate_skill(skill_path):
-    """Basic validation of a skill"""
+    '''检查技能目录及其必需文件是否符合基本结构要求。'''
     skill_path = Path(skill_path)
 
     skill_md = skill_path / "SKILL.md"

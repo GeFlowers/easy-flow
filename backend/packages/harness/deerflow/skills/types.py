@@ -1,4 +1,4 @@
-"定义 types 模块提供的职责与可复用接口"
+'''定义技能元数据、来源类别、密钥声明及其容器内路径转换。'''
 
 from dataclasses import dataclass, field
 from enum import StrEnum
@@ -10,16 +10,14 @@ SKILL_MD_FILE = "SKILL.md"
 
 
 class SkillCategory(StrEnum):
-    """封装 SkillCategory 的状态、协作关系与公开操作。
-
-    Source category for a skill.
+    '''区分随项目提供、用户自建和迁移遗留的技能来源。
 
         - ``PUBLIC``: built-in skill bundled with the platform, read-only.
         - ``CUSTOM``: user-authored skill that can be edited or deleted.
         - ``LEGACY``: global custom skill from before user-isolation migration,
           presented as read-only (visible but not editable/deletable). These
           skills are mounted at ``/mnt/skills/legacy/<name>/`` in the sandbox.
-    """
+    '''
 
     PUBLIC = "public"
     CUSTOM = "custom"
@@ -28,14 +26,7 @@ class SkillCategory(StrEnum):
 
 @dataclass(frozen=True)
 class SecretRequirement:
-    """封装 SecretRequirement 的状态、协作关系与公开操作。
-
-    A request-scoped secret a skill declares it needs (issue #3861).
-
-        ``name`` is both the key looked up in the request's ``context.secrets`` and
-        the environment variable name injected into the skill's sandbox subprocess
-        when the skill is activated.
-    """
+    '''声明技能运行时需要的请求级密钥及其是否为可选项。'''
 
     name: str
     optional: bool = False
@@ -43,35 +34,29 @@ class SecretRequirement:
 
 @dataclass(frozen=True)
 class Skill:
-    """封装 Skill 的状态、协作关系与公开操作。
-
-    Represents a skill with its metadata and file path"""
+    '''保存技能元数据、来源、启用状态和磁盘位置。'''
 
     name: str
     description: str
     license: str | None
     skill_dir: Path
     skill_file: Path
-    relative_path: Path  # Relative path from category root to skill directory
-    category: SkillCategory  # 'public' or 'custom'
+    relative_path: Path  # 技能目录相对于所属类别根目录的路径。
+    category: SkillCategory  # 技能来源类别。
     allowed_tools: tuple[str, ...] | None = None
-    enabled: bool = False  # Whether this skill is enabled
+    enabled: bool = False  # 是否允许该技能进入运行时。
     required_secrets: tuple[SecretRequirement, ...] = field(default_factory=tuple)
-    # Whether declared secrets may bind when the skill is in-context via an
-    # autonomous model load (skill_context), or only on explicit /slash
-    # activation. Frontmatter: ``secrets-autonomous`` (default true).
+    # 控制声明的密钥能否随模型自主加载技能而绑定；关闭时仅显式斜杠激活可绑定。
     secrets_autonomous: bool = True
 
     @property
     def skill_path(self) -> str:
-        """执行 skill_path 的明确职责，并返回与调用约定一致的结果。
-
-        Returns the relative path from the category root (skills/{category}) to this skill's directory"""
+        '''返回技能目录相对其来源类别根目录的规范路径。'''
         path = self.relative_path.as_posix()
         return "" if path == "." else path
 
     def get_container_path(self, container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH) -> str:
-        """根据技能类别、相对路径和容器挂载根目录计算技能目录路径。
+        '''根据技能类别、相对路径和容器挂载根目录计算技能目录路径。
 
 
         Args:
@@ -79,7 +64,7 @@ class Skill:
 
         Returns:
             容器内的技能目录完整路径。
-        """
+        '''
         category_base = f"{container_base_path}/{self.category}"
         skill_path = self.skill_path
         if skill_path:
@@ -87,7 +72,7 @@ class Skill:
         return category_base
 
     def get_container_file_path(self, container_base_path: str = DEFAULT_SKILLS_CONTAINER_PATH) -> str:
-        """根据技能目录路径计算其主说明文件 SKILL.md 的容器内路径。
+        '''根据技能目录路径计算其主说明文件 SKILL.md 的容器内路径。
 
 
         Args:
@@ -95,9 +80,9 @@ class Skill:
 
         Returns:
             容器内 SKILL.md 的完整路径。
-        """
+        '''
         return f"{self.get_container_path(container_base_path)}/SKILL.md"
 
     def __repr__(self) -> str:
-        "实现 __repr__ 协议方法，保持对象交互语义一致"
+        '''生成包含技能名称、描述和来源类别的调试表示。'''
         return f"Skill(name={self.name!r}, description={self.description!r}, category={self.category!r})"

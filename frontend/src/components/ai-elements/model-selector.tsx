@@ -18,28 +18,25 @@ import {
 import { cn } from "@/lib/utils";
 import type { ComponentProps, ReactNode } from "react";
 
-/** ModelSelectorProps 的公开类型定义。 */
 export type ModelSelectorProps = ComponentProps<typeof Dialog>;
 
-/** ModelSelector 组件：提供对应的界面结构与交互语义。 */
+/** 模型选择弹窗的根状态容器，复用基础对话框行为。 */
 export const ModelSelector = (props: ModelSelectorProps) => (
   <Dialog {...props} />
 );
 
-/** ModelSelectorTriggerProps 的公开类型定义。 */
 export type ModelSelectorTriggerProps = ComponentProps<typeof DialogTrigger>;
 
-/** ModelSelectorTrigger 组件：提供对应的界面结构与交互语义。 */
+/** 打开模型选择弹窗的触发器。 */
 export const ModelSelectorTrigger = (props: ModelSelectorTriggerProps) => (
   <DialogTrigger {...props} />
 );
 
-/** ModelSelectorContentProps 的公开类型定义。 */
 export type ModelSelectorContentProps = ComponentProps<typeof DialogContent> & {
   title?: ReactNode;
 };
 
-/** ModelSelectorContent 组件：提供对应的界面结构与交互语义。 */
+/** 将命令搜索列表置于弹窗中，并补充屏幕阅读器可读的标题。 */
 export const ModelSelectorContent = ({
   className,
   children,
@@ -54,18 +51,16 @@ export const ModelSelectorContent = ({
   </DialogContent>
 );
 
-/** ModelSelectorDialogProps 的公开类型定义。 */
 export type ModelSelectorDialogProps = ComponentProps<typeof CommandDialog>;
 
-/** ModelSelectorDialog 组件：提供对应的界面结构与交互语义。 */
+/** 将命令面板包装为可单独控制的弹窗形式。 */
 export const ModelSelectorDialog = (props: ModelSelectorDialogProps) => (
   <CommandDialog {...props} />
 );
 
-/** ModelSelectorInputProps 的公开类型定义。 */
 export type ModelSelectorInputProps = ComponentProps<typeof CommandInput>;
 
-/** ModelSelectorInput 组件：提供对应的界面结构与交互语义。 */
+/** 提供模型名称搜索输入框，并调整其高度和内边距。 */
 export const ModelSelectorInput = ({
   className,
   ...props
@@ -73,57 +68,50 @@ export const ModelSelectorInput = ({
   <CommandInput className={cn("h-auto py-3.5", className)} {...props} />
 );
 
-/** ModelSelectorListProps 的公开类型定义。 */
 export type ModelSelectorListProps = ComponentProps<typeof CommandList>;
 
-/** ModelSelectorList 组件：提供对应的界面结构与交互语义。 */
+/** 承载可键盘导航的模型搜索结果列表。 */
 export const ModelSelectorList = (props: ModelSelectorListProps) => (
   <CommandList {...props} />
 );
 
-/** ModelSelectorEmptyProps 的公开类型定义。 */
 export type ModelSelectorEmptyProps = ComponentProps<typeof CommandEmpty>;
 
-/** ModelSelectorEmpty 组件：提供对应的界面结构与交互语义。 */
+/** 搜索无匹配模型时显示空结果说明。 */
 export const ModelSelectorEmpty = (props: ModelSelectorEmptyProps) => (
   <CommandEmpty {...props} />
 );
 
-/** ModelSelectorGroupProps 的公开类型定义。 */
 export type ModelSelectorGroupProps = ComponentProps<typeof CommandGroup>;
 
-/** ModelSelectorGroup 组件：提供对应的界面结构与交互语义。 */
+/** 将模型选项按供应商或其他类别分组。 */
 export const ModelSelectorGroup = (props: ModelSelectorGroupProps) => (
   <CommandGroup {...props} />
 );
 
-/** ModelSelectorItemProps 的公开类型定义。 */
 export type ModelSelectorItemProps = ComponentProps<typeof CommandItem>;
 
-/** ModelSelectorItem 组件：提供对应的界面结构与交互语义。 */
+/** 可通过鼠标或键盘选择的单个模型选项。 */
 export const ModelSelectorItem = (props: ModelSelectorItemProps) => (
   <CommandItem {...props} />
 );
 
-/** ModelSelectorShortcutProps 的公开类型定义。 */
 export type ModelSelectorShortcutProps = ComponentProps<typeof CommandShortcut>;
 
-/** ModelSelectorShortcut 组件：提供对应的界面结构与交互语义。 */
+/** 在命令选项右侧显示键盘快捷键提示。 */
 export const ModelSelectorShortcut = (props: ModelSelectorShortcutProps) => (
   <CommandShortcut {...props} />
 );
 
-/** ModelSelectorSeparatorProps 的公开类型定义。 */
 export type ModelSelectorSeparatorProps = ComponentProps<
   typeof CommandSeparator
 >;
 
-/** ModelSelectorSeparator 组件：提供对应的界面结构与交互语义。 */
+/** 在相邻模型分组之间绘制视觉分隔线。 */
 export const ModelSelectorSeparator = (props: ModelSelectorSeparatorProps) => (
   <CommandSeparator {...props} />
 );
 
-/** ModelSelectorLogoProps 的公开类型定义。 */
 export type ModelSelectorLogoProps = Omit<
   ComponentProps<"img">,
   "src" | "alt"
@@ -188,7 +176,7 @@ export type ModelSelectorLogoProps = Omit<
     | (string & {});
 };
 
-/** ModelSelectorLogo 组件：提供对应的界面结构与交互语义。 */
+/** 根据供应商标识加载模型服务商图标。 */
 export const ModelSelectorLogo = ({
   provider,
   className,
@@ -204,10 +192,9 @@ export const ModelSelectorLogo = ({
   />
 );
 
-/** ModelSelectorLogoGroupProps 的公开类型定义。 */
 export type ModelSelectorLogoGroupProps = ComponentProps<"div">;
 
-/** ModelSelectorLogoGroup 组件：提供对应的界面结构与交互语义。 */
+/** 将多个供应商图标以重叠圆形徽标形式排列。 */
 export const ModelSelectorLogoGroup = ({
   className,
   ...props
@@ -221,10 +208,9 @@ export const ModelSelectorLogoGroup = ({
   />
 );
 
-/** ModelSelectorNameProps 的公开类型定义。 */
 export type ModelSelectorNameProps = ComponentProps<"span">;
 
-/** ModelSelectorName 组件：提供对应的界面结构与交互语义。 */
+/** 展示并截断模型名称，使长名称不挤压选项中的其他内容。 */
 export const ModelSelectorName = ({
   className,
   ...props

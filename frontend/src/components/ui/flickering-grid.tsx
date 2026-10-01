@@ -21,7 +21,7 @@ interface FlickeringGridProps extends React.HTMLAttributes<HTMLDivElement> {
   maxOpacity?: number;
 }
 
-/** FlickeringGrid 组件：提供对应的界面结构与交互语义。 */
+/** 在画布上绘制会随机闪烁的网格点，并随容器尺寸调整密度。 */
 export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   squareSize = 4,
   gridGap = 6,
@@ -39,6 +39,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
 
   const memoizedColor = useMemo(() => {
+    /** 借助画布把浏览器可解析的颜色转换成可附加透明度的 RGBA 前缀。 */
     const toRGBA = (color: string) => {
       if (typeof window === "undefined") {
         return `rgba(0, 0, 0,`;
@@ -55,6 +56,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
     return toRGBA(color);
   }, [color]);
 
+  /** 按设备像素比配置画布尺寸，并初始化网格点及随机透明度。 */
   const setupCanvas = useCallback(
     (canvas: HTMLCanvasElement, width: number, height: number) => {
       const dpr = window.devicePixelRatio || 1;
@@ -75,6 +77,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
     [squareSize, gridGap, maxOpacity],
   );
 
+  /** 按闪烁概率更新网格点的透明度，形成逐帧随机变化。 */
   const updateSquares = useCallback(
     (squares: Float32Array, deltaTime: number) => {
       for (let i = 0; i < squares.length; i++) {
@@ -86,6 +89,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
     [flickerChance, maxOpacity],
   );
 
+  /** 根据网格尺寸和各点透明度在二维画布上重绘全部方块。 */
   const drawGrid = useCallback(
     (
       ctx: CanvasRenderingContext2D,
@@ -127,6 +131,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
     let animationFrameId: number;
     let gridParams: ReturnType<typeof setupCanvas>;
 
+    /** 根据显式尺寸或容器尺寸重设画布，并重建网格随机状态。 */
     const updateCanvasSize = () => {
       const newWidth = width || container.clientWidth;
       const newHeight = height || container.clientHeight;
@@ -137,6 +142,7 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
     updateCanvasSize();
 
     let lastTime = 0;
+    /** 在画布可见时按帧更新闪烁点并重绘网格。 */
     const animate = (time: number) => {
       if (!isInView) return;
 

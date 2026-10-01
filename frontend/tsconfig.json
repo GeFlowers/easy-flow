@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    /* Base Options: */
+    /* 基础编译选项 */
     "esModuleInterop": true,
     "skipLibCheck": true,
     "target": "es2022",
@@ -9,12 +9,12 @@
     "moduleDetection": "force",
     "isolatedModules": true,
     "verbatimModuleSyntax": true,
-    /* Strictness */
+    /* 类型严格度 */
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitAny": false,
     "checkJs": false,
-    /* Bundled projects */
+    /* 打包项目配置 */
     "lib": ["dom", "dom.iterable", "ES2022"],
     "noEmit": true,
     "module": "ESNext",
@@ -26,7 +26,7 @@
       }
     ],
     "incremental": true,
-    /* Path Aliases */
+    /* 路径别名 */
     "baseUrl": ".",
     "paths": {
       "@/*": ["./src/*"]

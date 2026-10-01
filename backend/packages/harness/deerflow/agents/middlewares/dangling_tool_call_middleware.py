@@ -1,24 +1,4 @@
-"""定义 dangling_tool_call_middleware 模块提供的职责与可复用接口。
-
-Middleware to fix dangling tool calls and orphan tool results in message history.
-
-A dangling tool call occurs when an AIMessage contains tool_calls but there are
-no corresponding ToolMessages in the history (e.g., due to user interruption or
-request cancellation). An orphan ToolMessage occurs when a tool result exists
-without a matching AIMessage tool_call (e.g., after summarization/branching
-dropped the upstream AIMessage). Both cause strict-provider rejections.
-
-This middleware intercepts the model call to:
-- Sanitize malformed tool-call names and arguments before provider serialization
-- Insert synthetic ToolMessages with an error indicator for each dangling AIMessage
-  tool_call, ensuring correct message ordering
-- Drop orphan ToolMessages whose originating tool_call is no longer present in the
-  request, preventing strict OpenAI-compatible backends from returning HTTP 400
-
-Note: Uses wrap_model_call instead of before_model to ensure patches are inserted
-at the correct positions (immediately after each dangling AIMessage), not appended
-to the end of the message list as before_model + add_messages reducer would do.
-"""
+'''在模型调用前修正消息历史中的未完成工具调用、孤立结果及无法序列化的工具参数。'''
 
 import json
 import logging
@@ -33,31 +13,28 @@ from langchain_core.messages import ToolMessage
 
 logger = logging.getLogger(__name__)
 
-# Workaround for issue #2894: malformed write_file calls can carry huge Markdown
-# payloads in invalid tool-call args. Keep recovery error details short so the
-# synthetic ToolMessage does not echo large or malformed content back to the model.
 _MAX_RECOVERY_ERROR_DETAIL_LEN = 500
 _UNKNOWN_TOOL_NAME = "unknown_tool"
 _EMPTY_TOOL_NAME_ERROR = "Tool call could not be executed because its name was missing or empty."
 
 
 def _valid_tool_name(name: object) -> bool:
-    """判断工具名称是否为非空白字符串。"""
+    '''判断工具名称是否为非空白字符串。'''
     return isinstance(name, str) and bool(name.strip())
 
 
 def _normalize_tool_name(name: object) -> str:
-    """返回去除首尾空白的有效名称，或统一的未知工具名称。"""
+    '''返回去除首尾空白的有效名称，或统一的未知工具名称。'''
     return name.strip() if _valid_tool_name(name) else _UNKNOWN_TOOL_NAME
 
 
 def _has_invalid_tool_name(name: object) -> bool:
-    """判断工具名称是否无效。"""
+    '''判断工具名称是否无效。'''
     return not _valid_tool_name(name)
 
 
 def _parse_json_object(value: object) -> dict | None:
-    """将字符串解析为 JSON 对象；输入不是对象或解析失败时返回 ``None``。"""
+    '''将字符串解析为 JSON 对象；输入不是对象或解析失败时返回 ``None``。'''
     if not isinstance(value, str):
         return None
     try:
@@ -68,7 +45,7 @@ def _parse_json_object(value: object) -> dict | None:
 
 
 def _normalize_tool_arguments(arguments: object) -> str:
-    """将工具参数规范为可回放的 JSON 对象字符串，无法安全序列化时使用空对象。"""
+    '''将工具参数规范为可回放的 JSON 对象字符串，无法安全序列化时使用空对象。'''
     if isinstance(arguments, dict):
         try:
             return json.dumps(arguments, ensure_ascii=False, allow_nan=False)
@@ -78,11 +55,11 @@ def _normalize_tool_arguments(arguments: object) -> str:
 
 
 class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
-    """修复消息历史中未配对的工具调用，并删除找不到原调用的孤立工具结果。"""
+    '''修复消息历史中未配对的工具调用，并删除找不到原调用的孤立工具结果。'''
 
     @staticmethod
     def _message_tool_calls(msg) -> list[dict]:
-        """合并消息结构字段和供应商原始载荷中的工具调用，并规范工具名称供配对检查。"""
+        '''合并消息结构字段和供应商原始载荷中的工具调用，并规范工具名称供配对检查。'''
         normalized: list[dict] = []
 
         tool_calls = getattr(msg, "tool_calls", None) or []
@@ -141,16 +118,13 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _synthetic_tool_message_content(tool_call: dict) -> str:
-        """为未执行的工具调用构造简短且可恢复的合成错误内容。"""
+        '''为未执行的工具调用构造简短且可恢复的合成错误内容。'''
         if tool_call.get("invalid_tool_name"):
             return f"[{_EMPTY_TOOL_NAME_ERROR} Use one of the available tool names when retrying.]"
         if tool_call.get("invalid"):
             name = tool_call.get("name")
             error = tool_call.get("error")
             error_text = error[:_MAX_RECOVERY_ERROR_DETAIL_LEN] if isinstance(error, str) and error else ""
-            # Workaround for issue #2894: malformed write_file calls can carry huge Markdown
-            # payloads in invalid tool-call args. Keep recovery guidance actionable without
-            # echoing large or malformed content back to the model.
             if name == "write_file":
                 details = f" Parser error: {error_text}" if error_text else ""
                 return (
@@ -169,9 +143,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
 
     @staticmethod
     def _sanitize_ai_message_tool_calls(msg):
-        """执行 _sanitize_ai_message_tool_calls 的明确职责，并返回与调用约定一致的结果。
-
-        Return an AIMessage with model-bound tool calls safe to serialize."""
+        '''规范模型消息中的工具名称和参数格式；没有变化时复用原消息。'''
         if getattr(msg, "type", None) != "ai":
             return msg
 
@@ -260,13 +232,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         return msg.model_copy(update=update)
 
     def _build_patched_messages(self, messages: list) -> list | None:
-        """执行 _build_patched_messages 的明确职责，并返回与调用约定一致的结果。
-
-        Return messages with tool results grouped after their tool-call AIMessage.
-
-                This normalizes model-bound causal order before provider serialization while
-                preserving already-valid transcripts unchanged.
-        """
+        '''按工具调用顺序配对工具结果，为缺失结果补充错误消息，并移除失去原调用的孤立结果。'''
         tool_messages_by_id: dict[str, deque[ToolMessage]] = defaultdict(deque)
         for msg in messages:
             if isinstance(msg, ToolMessage):
@@ -287,12 +253,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         for msg in messages:
             if isinstance(msg, ToolMessage):
                 if msg.tool_call_id in tool_call_ids:
-                    continue  # Will be re-emitted after its AIMessage
-                # Orphan: ToolMessage whose originating AIMessage tool_call is
-                # no longer in the request (e.g. removed by summarization).
-                # Drop it silently from the model request so strict providers
-                # do not reject it with HTTP 400. Persisted state is untouched;
-                # this only affects the single model call.
+                    continue
                 drop_count += 1
                 continue
 
@@ -301,8 +262,6 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
             if getattr(msg, "type", None) != "ai":
                 continue
 
-            # Intentionally inspect the original message so empty names can be
-            # classified before the sanitized message replaces them.
             for tc in self._message_tool_calls(msg):
                 tc_id = tc.get("id")
                 if not tc_id:
@@ -341,7 +300,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        """在同步模型调用前修补工具消息顺序并交由后续处理器执行。"""
+        '''在同步模型调用前修补工具消息顺序并交由后续处理器执行。'''
         patched = self._build_patched_messages(request.messages)
         if patched is not None:
             request = request.override(messages=patched)
@@ -353,7 +312,7 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        """在异步模型调用前修补工具消息顺序并等待后续处理器执行。"""
+        '''在异步模型调用前修补工具消息顺序并等待后续处理器执行。'''
         patched = self._build_patched_messages(request.messages)
         if patched is not None:
             request = request.override(messages=patched)

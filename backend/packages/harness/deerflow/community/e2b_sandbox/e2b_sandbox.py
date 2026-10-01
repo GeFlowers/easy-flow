@@ -1,4 +1,4 @@
-"定义 e2b_sandbox 模块提供的职责与可复用接口"
+'''通过 E2B 远程代码执行服务实现 DeerFlow 沙箱的命令和文件操作。'''
 
 from __future__ import annotations
 
@@ -18,9 +18,6 @@ logger = logging.getLogger(__name__)
 
 _MAX_DOWNLOAD_SIZE = 100 * 1024 * 1024  # 100 MB
 
-# Where DeerFlow's ``/mnt/user-data`` virtual prefix is materialised inside
-# the e2b sandbox.  e2b code-interpreter templates default to ``/home/user``
-# as the working directory.
 DEFAULT_E2B_HOME_DIR = "/home/user"
 
 _E2B_NOT_FOUND_SIGNATURES = (
@@ -31,13 +28,13 @@ _E2B_NOT_FOUND_SIGNATURES = (
 
 
 def _is_sandbox_gone_error(exc: BaseException) -> bool:
-    "执行 _is_sandbox_gone_error 的明确职责，并返回与调用约定一致的结果"
+    '''根据服务端错误文本判断远程沙箱是否已不存在或已被关闭。'''
     msg = str(exc).lower()
     return any(sig in msg for sig in _E2B_NOT_FOUND_SIGNATURES)
 
 
 class E2BSandbox(Sandbox):
-    """封装 E2BSandbox 的状态、协作关系与公开操作。
+    '''把 E2B 客户端对象适配为 DeerFlow 沙箱接口，并处理远程会话失效。
 
     DeerFlow Sandbox adapter that delegates to an e2b cloud sandbox.
 
@@ -50,7 +47,7 @@ class E2BSandbox(Sandbox):
             home_dir: Directory inside the sandbox that backs the
                 ``VIRTUAL_PATH_PREFIX`` (``/mnt/user-data``) prefix.  Defaults to
                 :data:`DEFAULT_E2B_HOME_DIR`.
-    """
+    '''
 
     def __init__(
         self,
@@ -59,7 +56,7 @@ class E2BSandbox(Sandbox):
         *,
         home_dir: str = DEFAULT_E2B_HOME_DIR,
     ) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存远程沙箱客户端、沙箱标识和可选路径映射信息。'''
         super().__init__(id)
         self._client = client
         self._home_dir = home_dir.rstrip("/") or "/"
@@ -67,27 +64,26 @@ class E2BSandbox(Sandbox):
         self._closed = False
         self._dead = False
 
-    # ── Properties / lifecycle ───────────────────────────────────────────
 
     @property
     def client(self) -> E2BClientSandbox:
-        "执行 client 的明确职责，并返回与调用约定一致的结果"
+        '''返回底层 E2B 沙箱客户端。'''
         return self._client
 
     @property
     def home_dir(self) -> str:
-        "执行 home_dir 的明确职责，并返回与调用约定一致的结果"
+        '''返回远程沙箱中用户主目录路径。'''
         return self._home_dir
 
     @property
     def sandbox_id(self) -> str:
-        """执行 sandbox_id 的明确职责，并返回与调用约定一致的结果。
+        '''返回服务端沙箱标识，该标识与 DeerFlow 内部缓存键不同。
 
-        e2b-side sandbox id (different from DeerFlow's ``self.id`` cache key)."""
+        e2b-side sandbox id (different from DeerFlow's ``self.id`` cache key).'''
         return getattr(self._client, "sandbox_id", self.id)
 
     def close(self) -> None:
-        "执行 close 的明确职责，并返回与调用约定一致的结果"
+        '''关闭远程沙箱会话并释放服务端资源。'''
         with self._lock:
             if self._closed:
                 return
@@ -110,16 +106,16 @@ class E2BSandbox(Sandbox):
                 return
 
     def _resolve_path(self, path: str) -> str:
-        """执行 _resolve_path 的明确职责，并返回与调用约定一致的结果。
+        '''将项目虚拟路径转换为沙箱内路径，并拒绝逃逸挂载根目录的路径。
 
         Map DeerFlow virtual paths into the e2b sandbox filesystem.
 
                 ``VIRTUAL_PATH_PREFIX`` (``/mnt/user-data``) is rewritten under
-                :attr:`home_dir`, mirroring how ``LocalContainerBackend`` bind-mounts
-                the host workspace into the AIO container at ``/mnt/user-data``.
+                :attr:`home_dir`, which acts as the remote counterpart of the
+                local workspace mounted at ``/mnt/user-data``.
                 Other absolute paths are returned verbatim so the sandbox can reach
                 system directories (``/tmp``, ``/etc``, …) when needed.
-        """
+        '''
         if not path:
             raise ValueError("path must be a non-empty string")
         normalised = path.replace("\\", "/")
@@ -137,7 +133,7 @@ class E2BSandbox(Sandbox):
         env: dict[str, str] | None = None,
         timeout: float | None = None,
     ) -> str:
-        """执行 execute_command 的明确职责，并返回与调用约定一致的结果。
+        '''在远程沙箱执行命令，应用超时和环境变量并返回标准输出与错误输出。
 
         Execute a shell command via ``sandbox.commands.run``.
 
@@ -154,7 +150,7 @@ class E2BSandbox(Sandbox):
                         placed in the command string.
                     timeout: Optional per-call command timeout in seconds. ``None`` keeps
                         the e2b SDK default (60s).
-        """
+        '''
         _validate_extra_env(env)
         with self._lock:
             client = self._client
@@ -187,19 +183,19 @@ class E2BSandbox(Sandbox):
 
     @property
     def is_dead(self) -> bool:
-        """判断条件是否成立并返回布尔结果，并遵守 is_dead 所表达的接口约束。
+        '''通过远程客户端状态判断沙箱是否已终止或无法继续使用。
 
         Whether the underlying e2b VM is known to be reaped.
 
                 Updated lazily by ``execute_command`` and the provider's ``ping`` /
                 bootstrap calls — there is no proactive heartbeat. Reading the value
                 does *not* round-trip to the API.
-        """
+        '''
         with self._lock:
             return self._dead
 
     def ping(self) -> bool:
-        """执行 ping 的明确职责，并返回与调用约定一致的结果。
+        '''向远程服务发起轻量检查，确认沙箱仍可响应。
 
         Cheap health check: returns False if the e2b VM has been reaped.
 
@@ -208,7 +204,7 @@ class E2BSandbox(Sandbox):
                 ``_dead = True`` on the same "sandbox not found" signature
                 :func:`_is_sandbox_gone_error` recognises so subsequent calls
                 short-circuit.
-        """
+        '''
         with self._lock:
             if self._dead or self._client is None:
                 return False
@@ -225,7 +221,7 @@ class E2BSandbox(Sandbox):
             return True
 
     def read_file(self, path: str) -> str:
-        "执行 read_file 的明确职责，并返回与调用约定一致的结果"
+        '''读取远程沙箱中的文本文件，并把服务错误转换为工具可识别的错误文本。'''
         resolved = self._resolve_path(path)
         try:
             content = self._client.files.read(resolved)
@@ -237,7 +233,7 @@ class E2BSandbox(Sandbox):
             return f"Error: {e}"
 
     def download_file(self, path: str) -> bytes:
-        "执行 download_file 的明确职责，并返回与调用约定一致的结果"
+        '''从沙箱下载指定文件的原始字节内容。'''
         normalised = path.replace("\\", "/")
         for segment in normalised.split("/"):
             if segment == "..":
@@ -255,14 +251,6 @@ class E2BSandbox(Sandbox):
             raise PermissionError(f"Access denied: path must be under '{VIRTUAL_PATH_PREFIX}': '{path}'")
 
         resolved = self._resolve_path(path)
-        # Prefer the streaming API so the 100 MB cap is enforced *before* the
-        # whole payload is buffered in the gateway process.  ``format="bytes"``
-        # is implemented by the e2b SDK as ``bytearray(r.content)`` — i.e. the
-        # entire file is materialised in memory before returning — which would
-        # let a multi-GB artifact OOM the shared gateway on hosted deployments.
-        # ``format="stream"`` returns a ``FileStreamReader`` (an
-        # ``Iterator[bytes]``) that owns its HTTP response and releases the
-        # pooled connection on exhaustion / close / error.
         with self._lock:
             client = self._client
             if client is None:
@@ -282,8 +270,6 @@ class E2BSandbox(Sandbox):
         if data is None:
             return b""
 
-        # Buffered fallbacks (bytes/bytearray/str): apply the cap up front so
-        # we still refuse oversize payloads even on this path.
         if isinstance(data, (bytes, bytearray)):
             if len(data) > _MAX_DOWNLOAD_SIZE:
                 raise OSError(
@@ -333,7 +319,7 @@ class E2BSandbox(Sandbox):
         return b"".join(chunks)
 
     def list_dir(self, path: str, max_depth: int = 2) -> list[str]:
-        "收集并返回，并遵守 list_dir 所表达的接口约束"
+        '''列出指定路径下限深度的目录项。'''
         resolved = self._resolve_path(path)
         with self._lock:
             client = self._client
@@ -348,7 +334,7 @@ class E2BSandbox(Sandbox):
                 return []
 
     def write_file(self, path: str, content: str, append: bool = False) -> None:
-        "执行 write_file 的明确职责，并返回与调用约定一致的结果"
+        '''将文本写入远程文件，可选追加到现有文件末尾。'''
         resolved = self._resolve_path(path)
         with self._lock:
             client = self._client
@@ -370,15 +356,13 @@ class E2BSandbox(Sandbox):
                 raise
 
     def update_file(self, path: str, content: bytes) -> None:
-        "更新目标状态并返回最新结果，并遵守 update_file 所表达的接口约束"
+        '''以给定字节内容覆盖远程文件。'''
         resolved = self._resolve_path(path)
         with self._lock:
             client = self._client
             if client is None:
                 raise RuntimeError("sandbox client has been closed")
             try:
-                # e2b's ``files.write`` accepts either ``str`` or ``bytes`` —
-                # passing bytes preserves binary content losslessly.
                 client.files.write(resolved, content)
             except Exception as e:
                 logger.error("Failed to update file %s in e2b sandbox: %s", resolved, e)
@@ -392,7 +376,7 @@ class E2BSandbox(Sandbox):
         include_dirs: bool = False,
         max_results: int = 200,
     ) -> tuple[list[str], bool]:
-        "执行 glob 的明确职责，并返回与调用约定一致的结果"
+        '''按相对路径模式筛选沙箱目录中的文件，并指示结果是否达到上限。'''
         resolved = self._resolve_path(path)
         types = "f,d" if include_dirs else "f"
         with self._lock:
@@ -438,14 +422,11 @@ class E2BSandbox(Sandbox):
         case_sensitive: bool = False,
         max_results: int = 100,
     ) -> tuple[list[GrepMatch], bool]:
-        "执行 grep 的明确职责，并返回与调用约定一致的结果"
+        '''在远程目录递归搜索文本，支持文件模式、字面量和大小写选项。'''
         regex_source = re.escape(pattern) if literal else pattern
         re.compile(regex_source, 0 if case_sensitive else re.IGNORECASE)
 
         resolved = self._resolve_path(path)
-        # Build a portable ``grep`` invocation:
-        # -r recursive, -n line numbers, -H always print filename, -I skip
-        # binary files, -E extended regex (or -F for literal/fixed strings).
         flags = ["-r", "-n", "-H", "-I"]
         if not case_sensitive:
             flags.append("-i")

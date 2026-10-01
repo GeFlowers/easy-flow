@@ -112,6 +112,7 @@ export function RecentChatList() {
   const [renameThreadId, setRenameThreadId] = useState<string | null>(null);
   const [renameValue, setRenameValue] = useState("");
 
+  /** 删除所选线程，并在其为当前线程时重置聊天路由和输入状态。 */
   const handleDelete = useCallback(
     (thread: AgentThread) => {
       const currentPathname =
@@ -150,6 +151,7 @@ export function RecentChatList() {
     ],
   );
 
+  /** 初始化重命名表单并打开目标线程的重命名对话框。 */
   const handleRenameClick = useCallback(
     (threadId: string, currentTitle: string) => {
       setRenameThreadId(threadId);
@@ -159,6 +161,7 @@ export function RecentChatList() {
     [],
   );
 
+  /** 校验非空标题后保存重命名结果并关闭对话框。 */
   const handleRenameSubmit = useCallback(() => {
     if (renameThreadId && renameValue.trim()) {
       renameThread({ threadId: renameThreadId, title: renameValue.trim() });
@@ -168,6 +171,7 @@ export function RecentChatList() {
     }
   }, [renameThread, renameThreadId, renameValue]);
 
+  /** 生成可访问的线程分享链接并复制到剪贴板。 */
   const handleShare = useCallback(
     async (thread: AgentThread) => {
       // 本地环境生成 Vercel 地址，确保接收者可访问分享链接。
@@ -193,6 +197,7 @@ export function RecentChatList() {
     [t],
   );
 
+  /** 拉取线程完整状态并按用户选择的格式导出对话内容。 */
   const handleExport = useCallback(
     async (thread: AgentThread, format: "markdown" | "json") => {
       try {

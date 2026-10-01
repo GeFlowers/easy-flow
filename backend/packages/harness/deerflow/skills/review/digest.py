@@ -1,4 +1,4 @@
-"未说明"
+'''按稳定排序后的文件元数据与内容摘要生成技能包指纹。'''
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from deerflow.skills.review.models import normalize_relative_path
 
 
 def compute_package_digest(snapshot: dict[str, Any]) -> str:
-    "未说明"
+    '''规范化每个文件路径并组合类型、大小和内容摘要，计算与输入顺序无关的包摘要。'''
     records: list[bytes] = []
     for file_entry in snapshot.get("files", []):
         path = normalize_relative_path(str(file_entry["path"]))

@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -11,12 +11,12 @@ from deerflow.persistence.base import Base
 
 
 def _utc_now() -> datetime:
-    """生成带 UTC 时区的当前时间，供连接记录时间列复用。"""
+    '''生成带 UTC 时区的当前时间，供连接记录时间列复用。'''
     return datetime.now(UTC)
 
 
 class ChannelConnectionRow(Base):
-    """定义与持久化数据表对应的行模型。"""
+    '''定义与持久化数据表对应的行模型。'''
 
     __tablename__ = "channel_connections"
 
@@ -61,7 +61,7 @@ class ChannelConnectionRow(Base):
 
 
 class ChannelCredentialRow(Base):
-    """定义与持久化数据表对应的行模型。"""
+    '''定义与持久化数据表对应的行模型。'''
 
     __tablename__ = "channel_credentials"
 
@@ -81,7 +81,7 @@ class ChannelCredentialRow(Base):
 
 
 class ChannelOAuthStateRow(Base):
-    """定义与持久化数据表对应的行模型。"""
+    '''定义与持久化数据表对应的行模型。'''
 
     __tablename__ = "channel_oauth_states"
 
@@ -99,7 +99,7 @@ class ChannelOAuthStateRow(Base):
 
 
 class ChannelConversationRow(Base):
-    """定义与持久化数据表对应的行模型。"""
+    '''定义与持久化数据表对应的行模型。'''
 
     __tablename__ = "channel_conversations"
 

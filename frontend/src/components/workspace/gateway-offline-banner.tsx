@@ -38,6 +38,7 @@ export function GatewayOfflineBanner({
     // 完整刷新前会一直为 true）。
     if (user !== null) return;
 
+    /** 低频探测认证接口，确认网关恢复后更新横幅状态并停止轮询。 */
     const probe = async () => {
       if (inFlightRef.current) return;
       inFlightRef.current = true;

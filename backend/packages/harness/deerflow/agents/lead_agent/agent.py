@@ -1,10 +1,10 @@
-"""构建主代理，并在图调用根节点统一配置追踪。
+'''构建主代理，并在图调用根节点统一配置追踪。
 
 追踪回调会在 :func:`_make_lead_agent` 的图调用根节点附加到
 ``config["callbacks"]``。本模块及该图可达的中间件内每次调用
 ``create_chat_model(...)`` 时都必须传入 ``attach_tracing=False``，以免重复
 生成跨度，并确保追踪处理器能够把会话和用户属性写入根追踪。
-"""
+'''
 
 from __future__ import annotations
 
@@ -50,13 +50,13 @@ _WEBHOOK_CHANNELS: frozenset[str] = frozenset({"github"})
 
 
 def _default_max_total_subagents(app_config: object) -> int:
-    """从应用配置读取单次运行的子代理总数默认上限。"""
+    '''从应用配置读取单次运行的子代理总数默认上限。'''
     subagents_config = getattr(app_config, "subagents", None)
     return getattr(subagents_config, "max_total_per_run", DEFAULT_MAX_TOTAL_SUBAGENTS_PER_RUN)
 
 
 def _append_memory_tools_without_name_conflicts(tools: list) -> None:
-    """追加记忆工具，同时保留同名的既有非记忆工具。"""
+    '''追加记忆工具，同时保留同名的既有非记忆工具。'''
     from deerflow.agents.memory.tools import get_memory_tools
 
     existing_names = {getattr(tool, "name", None) for tool in tools}
@@ -69,7 +69,7 @@ def _append_memory_tools_without_name_conflicts(tools: list) -> None:
 
 
 def _get_runtime_config(config: RunnableConfig) -> dict:
-    """合并旧版可配置参数与 ``LangGraph`` 运行上下文中的参数。"""
+    '''合并旧版可配置参数与 ``LangGraph`` 运行上下文中的参数。'''
     cfg = dict(config.get("configurable", {}) or {})
     context = config.get("context", {}) or {}
     if isinstance(context, dict):
@@ -78,7 +78,7 @@ def _get_runtime_config(config: RunnableConfig) -> dict:
 
 
 def _resolve_model_name(requested_model_name: str | None = None, *, app_config: AppConfig | None = None) -> str:
-    """安全解析运行时模型名；无效时回退默认模型，未配置模型时返回空值。"""
+    '''安全解析运行时模型名；无效时回退默认模型，未配置模型时返回空值。'''
     app_config = app_config or get_app_config()
     default_model_name = app_config.models[0].name if app_config.models else None
     if default_model_name is None:
@@ -93,12 +93,12 @@ def _resolve_model_name(requested_model_name: str | None = None, *, app_config: 
 
 
 def _create_summarization_middleware(*, app_config: AppConfig | None = None) -> DeerFlowSummarizationMiddleware | None:
-    """根据应用配置创建会话摘要中间件。"""
+    '''根据应用配置创建会话摘要中间件。'''
     return create_summarization_middleware(app_config=app_config)
 
 
 def _create_todo_list_middleware(is_plan_mode: bool) -> TodoMiddleware | None:
-    """在计划模式启用时创建待办事项中间件，否则不创建。"""
+    '''在计划模式启用时创建待办事项中间件，否则不创建。'''
     if not is_plan_mode:
         return None
 
@@ -143,7 +143,6 @@ Writing todos takes time and tokens - use it when helpful for managing complex p
 
 **IMPORTANT: Only use this tool for complex tasks (3+ steps). For simple requests, just do the work directly.**
 
-## When to Use
 
 Use this tool in these scenarios:
 1. **Complex multi-step tasks**: When a task requires 3 or more distinct steps or actions
@@ -152,7 +151,6 @@ Use this tool in these scenarios:
 4. **Multiple tasks**: When users provide a list of things to be done
 5. **Dynamic planning**: When the plan may need updates based on intermediate results
 
-## When NOT to Use
 
 Skip this tool when:
 1. The task is straightforward and takes less than 3 steps
@@ -160,20 +158,17 @@ Skip this tool when:
 3. The task is purely conversational or informational
 4. It's clear what needs to be done and you can just do it
 
-## How to Use
 
 1. **Starting a task**: Mark it as `in_progress` BEFORE beginning work
 2. **Completing a task**: Mark it as `completed` IMMEDIATELY after finishing
 3. **Updating the list**: Add new tasks, remove irrelevant ones, or update descriptions as needed
 4. **Multiple updates**: You can make several updates at once (e.g., complete one task and start the next)
 
-## Task States
 
 - `pending`: Task not yet started
 - `in_progress`: Currently working on (can have multiple if tasks run in parallel)
 - `completed`: Task finished successfully
 
-## Task Completion Requirements
 
 **CRITICAL: Only mark a task as completed when you have FULLY accomplished it.**
 
@@ -186,7 +181,6 @@ Never mark a task as completed if:
 
 If blocked, keep the task as `in_progress` and create a new task describing what needs to be resolved.
 
-## Best Practices
 
 - Create specific, actionable items
 - Break complex tasks into smaller, manageable steps
@@ -227,7 +221,7 @@ def build_middlewares(
     mcp_routing_middleware: AgentMiddleware | None = None,
     user_id: str | None = None,
 ):
-    """按运行时配置组装主代理完整且顺序固定的中间件链。"""
+    '''按运行时配置组装主代理完整且顺序固定的中间件链。'''
     resolved_app_config = app_config or get_app_config()
     middlewares = build_lead_runtime_middlewares(app_config=resolved_app_config, lazy_init=True)
 
@@ -303,7 +297,6 @@ def build_middlewares(
 
     # 请求到达提供方前，将所有 SystemMessage 合并成唯一的首条消息。严格后端
     # （vLLM、SGLang、Qwen、Anthropic）会拒绝非首位的 SystemMessage，详见
-    # system_message_coalescing_middleware.py。
     from deerflow.agents.middlewares.system_message_coalescing_middleware import SystemMessageCoalescingMiddleware
 
     middlewares.append(SystemMessageCoalescingMiddleware())
@@ -348,7 +341,7 @@ def build_middlewares(
 
 
 def _available_skill_names(agent_config, is_bootstrap: bool) -> set[str] | None:
-    """确定当前代理允许加载的技能名称集合。"""
+    '''确定当前代理允许加载的技能名称集合。'''
     if is_bootstrap:
         return set(_BOOTSTRAP_SKILL_NAMES)
     if agent_config and agent_config.skills is not None:
@@ -357,7 +350,7 @@ def _available_skill_names(agent_config, is_bootstrap: bool) -> set[str] | None:
 
 
 def _load_enabled_skills_for_tool_policy(available_skills: set[str] | None, *, app_config: AppConfig, user_id: str | None = None) -> list[Skill]:
-    """加载已启用且符合当前技能白名单的工具策略技能。"""
+    '''加载已启用且符合当前技能白名单的工具策略技能。'''
     try:
         from deerflow.agents.lead_agent.prompt import get_enabled_skills_for_config
 
@@ -372,14 +365,14 @@ def _load_enabled_skills_for_tool_policy(available_skills: set[str] | None, *, a
 
 
 def make_lead_agent(config: RunnableConfig):
-    """提供与 ``LangGraph Server`` 兼容的主代理图工厂入口。"""
+    '''提供与 ``LangGraph Server`` 兼容的主代理图工厂入口。'''
     runtime_config = _get_runtime_config(config)
     runtime_app_config = runtime_config.get("app_config")
     return _make_lead_agent(config, app_config=runtime_app_config or get_app_config())
 
 
 def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
-    """按配置、工具策略和运行上下文构造具体的主代理图。"""
+    '''按配置、工具策略和运行上下文构造具体的主代理图。'''
     # 延迟导入，避免循环依赖。
     from deerflow.tools import get_available_tools
     from deerflow.tools.builtins import setup_agent, update_agent

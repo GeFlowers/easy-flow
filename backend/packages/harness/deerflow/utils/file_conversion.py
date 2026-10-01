@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''把上传的办公文档转换为 Markdown，并提取可供智能体浏览的文档大纲。'''
 
 import asyncio
 import logging
@@ -9,7 +9,7 @@ from deerflow.config.app_config import get_app_config
 
 logger = logging.getLogger(__name__)
 
-# File extensions that should be converted to markdown
+# 这些格式在上传后会转换为 Markdown，便于智能体读取内容。
 CONVERTIBLE_EXTENSIONS = {
     ".pdf",
     ".ppt",
@@ -20,21 +20,16 @@ CONVERTIBLE_EXTENSIONS = {
     ".docx",
 }
 
-# Files larger than this threshold are converted in a background thread.
-# Small files complete in < 1s synchronously; spawning a thread adds unnecessary
-# scheduling overhead for them.
+# 大文件在线程池中转换，避免阻塞异步请求；小文件直接转换以减少调度开销。
 _ASYNC_THRESHOLD_BYTES = 1 * 1024 * 1024  # 1 MB
 
-# If pymupdf4llm produces fewer characters *per page* than this threshold,
-# the PDF is likely image-based or encrypted — fall back to MarkItDown.
-# Rationale: normal text PDFs yield 200-2000 chars/page; image-based PDFs
-# yield close to 0. 50 chars/page gives a wide safety margin.
-# Falls back to absolute 200-char check when page count is unavailable.
+# 若每页文本少于此阈值，通常意味着 PDF 是扫描件或受保护文档，应改用通用转换器；
+# 无法取得页数时则用总字符数阈值判断。
 _MIN_CHARS_PER_PAGE = 50
 
 
 def _pymupdf_output_too_sparse(text: str, file_path: Path) -> bool:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''判断转换结果是否短得异常，区分解析失败与内容本来就很短的文档。'''
     chars = len(text.strip())
     doc = None
     pages: int | None = None
@@ -53,12 +48,12 @@ def _pymupdf_output_too_sparse(text: str, file_path: Path) -> bool:
                 pass
     if pages is not None and pages > 0:
         return (chars / pages) < _MIN_CHARS_PER_PAGE
-    # Fallback: absolute threshold when page count is unavailable
+    # 无法读取页数时，以绝对文本量阈值作为保守回退判断。
     return chars < 200
 
 
 def _convert_pdf_with_pymupdf4llm(file_path: Path) -> str | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''尝试用 pymupdf4llm 转换 PDF；依赖缺失或解析失败时返回空值交由回退处理。'''
     try:
         import pymupdf4llm
     except ImportError:
@@ -72,7 +67,7 @@ def _convert_pdf_with_pymupdf4llm(file_path: Path) -> str | None:
 
 
 def _convert_with_markitdown(file_path: Path) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''使用 MarkItDown 转换器读取文档并返回 Markdown 文本。'''
     from markitdown import MarkItDown
 
     md = MarkItDown()
@@ -80,21 +75,19 @@ def _convert_with_markitdown(file_path: Path) -> str:
 
 
 def _do_convert(file_path: Path, pdf_converter: str) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''按配置尝试 PDF 专用转换器，并在自动模式解析质量差时回退通用转换器。'''
     is_pdf = file_path.suffix.lower() == ".pdf"
 
     if is_pdf and pdf_converter != "markitdown":
-        # Try pymupdf4llm first (auto or explicit)
+        # 自动模式和显式指定时都先尝试 PDF 专用转换器。
         pymupdf_text = _convert_pdf_with_pymupdf4llm(file_path)
 
         if pymupdf_text is not None:
-            # pymupdf4llm is installed
+            # 专用转换器已安装且成功返回内容。
             if pdf_converter == "pymupdf4llm":
-                # Explicit — use as-is regardless of output length
+                # 显式指定该转换器时尊重用户选择，不按文本长度回退。
                 return pymupdf_text
-            # auto mode: fall back if output looks like a failed parse.
-            # Use chars-per-page to distinguish image-based PDFs (near 0) from
-            # legitimately short documents.
+            # 自动模式根据每页文本量判断是否解析失败，避免把正常短文误判为扫描件。
             if not _pymupdf_output_too_sparse(pymupdf_text, file_path):
                 return pymupdf_text
             logger.warning(
@@ -102,13 +95,13 @@ def _do_convert(file_path: Path, pdf_converter: str) -> str:
                 len(pymupdf_text.strip()),
                 file_path.name,
             )
-        # pymupdf4llm not installed or fallback triggered → use MarkItDown
+        # 专用依赖缺失或自动质量检查未通过时改由通用转换器处理。
 
     return _convert_with_markitdown(file_path)
 
 
 async def convert_file_to_markdown(file_path: Path) -> Path | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''转换单个上传文件并写入同目录 Markdown 文件；失败时记录日志并返回空值。'''
     try:
         pdf_converter = _get_pdf_converter()
         file_size = file_path.stat().st_size
@@ -128,55 +121,32 @@ async def convert_file_to_markdown(file_path: Path) -> Path | None:
         return None
 
 
-# Regex for bold-only lines that look like section headings.
-# Targets SEC filing structural headings that pymupdf4llm renders as **bold**
-# rather than # Markdown headings (because they use same font size as body text,
-# distinguished only by bold+caps formatting).
-#
-# Pattern requires ALL of:
-#   1. Entire line is a single **...** block (no surrounding prose)
-#   2. Starts with a recognised structural keyword:
-#      - ITEM / PART / SECTION (with optional number/letter after)
-#      - SCHEDULE, EXHIBIT, APPENDIX, ANNEX, CHAPTER
-#      All-caps addresses, boilerplate ("CURRENT REPORT", "SIGNATURES",
-#      "WASHINGTON, DC 20549") do NOT start with these keywords and are excluded.
-#
-# Chinese headings (第三节...) are already captured as standard # headings
-# by pymupdf4llm, so they don't need this pattern.
+# 识别转换器未标成 Markdown 标题、但以粗体输出的证券文件结构标题。
+# 要求整行只有一个粗体块且以章节关键词开头，避免将地址和固定页眉误认为标题。
 _BOLD_HEADING_RE = re.compile(r"^\*\*((ITEM|PART|SECTION|SCHEDULE|EXHIBIT|APPENDIX|ANNEX|CHAPTER)\b[A-Z0-9 .,\-]*)\*\*\s*$")
 
-# Regex for split-bold headings produced by pymupdf4llm when a heading spans
-# multiple text spans in the PDF (e.g. section number and title are separate spans).
-# Matches lines like:  **1** **Introduction**  or  **3.2** **Multi-Head Attention**
-# Requirements:
-#   1. Entire line consists only of **...** blocks separated by whitespace (no prose)
-#   2. First block is a section number (digits and dots, e.g. "1", "3.2", "A.1")
-#   3. Second block must not be purely numeric/punctuation — excludes financial table
-#      headers like **2023** **2022** **2021** while allowing non-ASCII titles such as
-#      **1** **概述** or accented words (negative lookahead instead of [A-Za-z])
-#   4. At most two additional blocks (four total) with [^*]+ (no * inside) to keep
-#      the regex linear and avoid ReDoS on attacker-controlled content
+# 识别编号和标题被 PDF 拆成多个粗体片段的章节行，同时排除纯数字表格表头；
+# 限制片段数量和内容形态，避免对上传文本执行高复杂度正则匹配。
 _SPLIT_BOLD_HEADING_RE = re.compile(r"^\*\*[\dA-Z][\d\.]*\*\*\s+\*\*(?!\d[\d\s.,\-–—/:()%]*\*\*)[^*]+\*\*(?:\s+\*\*[^*]+\*\*){0,2}\s*$")
 
-# Maximum number of outline entries injected into the agent context.
-# Keeps prompt size bounded even for very long documents.
+# 限制注入智能体上下文的大纲条目数，避免长文档挤占提示空间。
 MAX_OUTLINE_ENTRIES = 50
 
 _ALLOWED_PDF_CONVERTERS = {"auto", "pymupdf4llm", "markitdown"}
 
 
 def _clean_bold_title(raw: str) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
-    # Merge adjacent bold spans: "** **" → " "
+    '''合并相邻粗体片段并移除整段包裹标记，得到可展示的标题文本。'''
+    # 相邻粗体区块通常来自 PDF 中被拆开的连续文本。
     merged = re.sub(r"\*\*\s*\*\*", " ", raw).strip()
-    # Strip outermost **...** if the whole string is wrapped
+    # 如果整行仍由粗体标记包围，则仅去掉最外层标记。
     if m := re.fullmatch(r"\*\*(.+?)\*\*", merged, re.DOTALL):
         return m.group(1).strip()
     return merged
 
 
 def extract_outline(md_path: Path) -> list[dict]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''扫描转换后的 Markdown 标题，并兼容 PDF 结构标题的粗体写法。'''
     outline: list[dict] = []
     try:
         with md_path.open(encoding="utf-8") as f:
@@ -185,29 +155,26 @@ def extract_outline(md_path: Path) -> list[dict]:
                 if not stripped:
                     continue
 
-                # Style 1: standard Markdown heading
+                # 第一种格式：标准 Markdown 标题。
                 if stripped.startswith("#"):
                     title = _clean_bold_title(stripped.lstrip("#").strip())
                     if title:
                         outline.append({"title": title, "line": lineno})
 
-                # Style 2: single bold block with SEC structural keyword
+                # 第二种格式：以结构关键词开头的单个粗体标题块。
                 elif m := _BOLD_HEADING_RE.match(stripped):
                     title = m.group(1).strip()
                     if title:
                         outline.append({"title": title, "line": lineno})
 
-                # Style 3: split-bold heading — **<num>** **<title>**
-                # Regex already enforces max 4 blocks and non-numeric second block.
+                # 第三种格式：章节编号和标题被拆分成多个粗体块。
                 elif _SPLIT_BOLD_HEADING_RE.match(stripped):
                     title = " ".join(re.findall(r"\*\*([^*]+)\*\*", stripped))
                     if title:
                         outline.append({"title": title, "line": lineno})
 
                 if len(outline) > MAX_OUTLINE_ENTRIES:
-                    # We collected one heading beyond the limit, which proves the
-                    # document genuinely has more than MAX_OUTLINE_ENTRIES headings.
-                    # Drop that extra entry and append the truncation sentinel.
+                    # 多读到的这一项证明大纲超限；丢弃它并添加截断标记。
                     outline.pop()
                     outline.append({"truncated": True})
                     break
@@ -218,7 +185,7 @@ def extract_outline(md_path: Path) -> list[dict]:
 
 
 def _get_uploads_config_value(key: str, default: object) -> object:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''从应用配置读取上传转换选项，并兼容配置模型和字典两种表示。'''
     cfg = get_app_config()
     uploads_cfg = getattr(cfg, "uploads", None)
     if isinstance(uploads_cfg, dict):
@@ -227,7 +194,7 @@ def _get_uploads_config_value(key: str, default: object) -> object:
 
 
 def _get_pdf_converter() -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''校验 PDF 转换器选项；配置缺失或非法时安全回退到自动模式。'''
     try:
         raw = str(_get_uploads_config_value("pdf_converter", "auto")).strip().lower()
         if raw not in _ALLOWED_PDF_CONVERTERS:

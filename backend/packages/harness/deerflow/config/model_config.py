@@ -1,10 +1,10 @@
-"""提供配置、model、配置相关功能。"""
+'''定义聊天模型供应商、默认模型及调用参数的应用配置结构。'''
 
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class ModelConfig(BaseModel):
-    """\u6267\u884c ModelConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''保存模型名称、供应商凭据引用、采样参数和上下文能力声明。'''
 
     name: str = Field(..., description="Unique name for the model")
     display_name: str | None = Field(..., default_factory=lambda: None, description="Display name for the model")

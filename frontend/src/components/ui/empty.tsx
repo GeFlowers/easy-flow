@@ -2,7 +2,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 
 import { cn } from "@/lib/utils";
 
-/** Empty 内部组件：组织对应的界面结构与交互语义。 */
+/** 在无数据或无结果时占据可用空间并居中展示空状态内容。 */
 function Empty({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -16,7 +16,7 @@ function Empty({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** EmptyHeader 内部组件：组织对应的界面结构与交互语义。 */
+/** 将空状态图标、标题和说明约束在窄幅居中区域。 */
 function EmptyHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -45,7 +45,7 @@ const emptyMediaVariants = cva(
   },
 );
 
-/** EmptyMedia 内部组件：组织对应的界面结构与交互语义。 */
+/** 展示空状态图像或带底色图标，并依据 variant 应用对应外观。 */
 function EmptyMedia({
   className,
   variant = "default",
@@ -61,7 +61,7 @@ function EmptyMedia({
   );
 }
 
-/** EmptyTitle 内部组件：组织对应的界面结构与交互语义。 */
+/** 显示空状态的简短标题。 */
 function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
@@ -72,7 +72,7 @@ function EmptyTitle({ className, ...props }: React.ComponentProps<"div">) {
   );
 }
 
-/** EmptyDescription 内部组件：组织对应的界面结构与交互语义。 */
+/** 显示空状态详情，并为其中的链接提供一致强调样式。 */
 function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   return (
     <div
@@ -86,7 +86,7 @@ function EmptyDescription({ className, ...props }: React.ComponentProps<"p">) {
   );
 }
 
-/** EmptyContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 限制空状态后续操作区域的宽度并纵向排列内容。 */
 function EmptyContent({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div

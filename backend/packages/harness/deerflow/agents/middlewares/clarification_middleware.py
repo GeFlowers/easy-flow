@@ -1,4 +1,4 @@
-"""拦截 Agent 的澄清工具调用，并将问题转换为可供界面展示的中断消息。"""
+'''拦截 Agent 的澄清工具调用，并将问题转换为可供界面展示的中断消息。'''
 
 import json
 import logging
@@ -17,25 +17,25 @@ logger = logging.getLogger(__name__)
 
 
 class ClarificationMiddlewareState(AgentState):
-    """与线程状态兼容的澄清中间件状态类型。"""
+    '''与线程状态兼容的澄清中间件状态类型。'''
 
     pass
 
 
 class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
-    """将 `ask_clarification` 调用转成可见问题并结束当前图运行，等待用户后续回复。"""
+    '''将 `ask_clarification` 调用转成可见问题并结束当前图运行，等待用户后续回复。'''
 
     state_schema = ClarificationMiddlewareState
 
     def _stable_message_id(self, tool_call_id: str, formatted_message: str) -> str:
-        """依据工具调用 ID 或消息摘要生成稳定 ID，避免重试重复追加问题。"""
+        '''依据工具调用 ID 或消息摘要生成稳定 ID，避免重试重复追加问题。'''
         if tool_call_id:
             return f"clarification:{tool_call_id}"
         digest = sha256(formatted_message.encode("utf-8")).hexdigest()[:16]
         return f"clarification:{digest}"
 
     def _normalize_options(self, raw_options: Any) -> list[str]:
-        """把工具参数中的选项统一转换为字符串列表，兼容 JSON 字符串形式。"""
+        '''把工具参数中的选项统一转换为字符串列表，兼容 JSON 字符串形式。'''
         options = raw_options
 
         # 部分模型会把数组参数序列化为 JSON 字符串；在界面渲染前统一还原为列表。
@@ -53,7 +53,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return [str(option) for option in options]
 
     def _build_human_input_payload(self, args: dict[str, Any], *, tool_call_id: str, request_id: str) -> dict[str, Any]:
-        """生成前端识别的结构化用户输入载荷，同时保留可读文本作为兼容展示。"""
+        '''生成前端识别的结构化用户输入载荷，同时保留可读文本作为兼容展示。'''
         options = self._normalize_options(args.get("options", []))
         clarification_type = str(args.get("clarification_type", "missing_info"))
 
@@ -87,11 +87,11 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return payload
 
     def _is_chinese(self, text: str) -> bool:
-        """检查文本中是否包含中日韩统一表意文字区的汉字。"""
+        '''检查文本中是否包含中日韩统一表意文字区的汉字。'''
         return any("\u4e00" <= char <= "\u9fff" for char in text)
 
     def _format_clarification_message(self, args: dict) -> str:
-        """按澄清类型添加图标，并组合背景、问题和可选项供用户阅读。"""
+        '''按澄清类型添加图标，并组合背景、问题和可选项供用户阅读。'''
         question = args.get("question", "")
         clarification_type = args.get("clarification_type", "missing_info")
         context = args.get("context")
@@ -129,7 +129,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return "\n".join(message_parts)
 
     def _is_disabled(self, request: ToolCallRequest) -> bool:
-        """检查当前运行上下文是否禁止交互式澄清。"""
+        '''检查当前运行上下文是否禁止交互式澄清。'''
         runtime = getattr(request, "runtime", None)
         context = getattr(runtime, "context", None)
         if not context:
@@ -137,7 +137,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return bool(context.get("disable_clarification"))
 
     def _handle_disabled_clarification(self, request: ToolCallRequest) -> ToolMessage:
-        """在非交互运行中不打断流程，而是要求 Agent 基于合理假设继续执行。"""
+        '''在非交互运行中不打断流程，而是要求 Agent 基于合理假设继续执行。'''
         tool_call_id = request.tool_call.get("id", "")
         logger.info("ask_clarification suppressed (disable_clarification set); instructing agent to proceed")
         return ToolMessage(
@@ -153,7 +153,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         )
 
     def _handle_clarification(self, request: ToolCallRequest) -> Command:
-        """构造带结构化 UI 数据的工具消息，并通过图命令结束当前运行。"""
+        '''构造带结构化 UI 数据的工具消息，并通过图命令结束当前运行。'''
         # 读取模型传入的澄清问题和选项。
         args = request.tool_call.get("args", {})
         question = args.get("question", "")
@@ -191,7 +191,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """同步拦截澄清工具调用；其他工具仍交由原处理器执行。"""
+        '''同步拦截澄清工具调用；其他工具仍交由原处理器执行。'''
         if request.tool_call.get("name") != "ask_clarification":
             # 非澄清工具保持原有执行路径。
             return handler(request)
@@ -207,7 +207,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """异步拦截澄清工具调用；其他工具通过异步原处理器继续执行。"""
+        '''异步拦截澄清工具调用；其他工具通过异步原处理器继续执行。'''
         if request.tool_call.get("name") != "ask_clarification":
             # 非澄清工具保持原有异步执行路径。
             return await handler(request)

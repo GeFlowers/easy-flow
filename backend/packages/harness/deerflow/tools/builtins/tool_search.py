@@ -1,8 +1,8 @@
-"""在运行时搜索并发现延迟加载的工具。
+'''在运行时搜索并发现延迟加载的工具。
 
 本模块构建不可变的延迟工具目录、搜索工具和路由中间件。代理先看到工具名称，
 再通过搜索工具取得完整模式；提升状态保存在每个线程的图状态中。
-"""
+'''
 
 import hashlib
 import html
@@ -27,59 +27,51 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-MAX_RESULTS = 5  # Max tools returned per search
+MAX_RESULTS = 5
 
 
 def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
-    """不区分大小写地编译模式；无效模式退化为字面量匹配而不抛出异常。"""
+    '''不区分大小写地编译模式；无效模式退化为字面量匹配而不抛出异常。'''
     try:
         return re.compile(pattern, re.IGNORECASE)
     except re.error:
         return re.compile(re.escape(pattern), re.IGNORECASE)
 
 
-# ── Catalog ──
 
 
-# NOTE: frozen=True without slots=True keeps __dict__, which is what lets the
-# @cached_property fields below cache (they write to instance.__dict__, bypassing
-# the frozen __setattr__). Do NOT add slots=True or hash/names break at runtime.
 @dataclass(frozen=True)
 class DeferredToolCatalog:
-    """不可变的延迟工具目录，仅提供无副作用的搜索。"""
+    '''不可变的延迟工具目录，仅提供无副作用的搜索。'''
 
     tools: tuple[BaseTool, ...]
 
     @cached_property
     def names(self) -> frozenset[str]:
-        """返回目录中全部工具名称的不可变集合。"""
+        '''返回目录中全部工具名称的不可变集合。'''
         return frozenset(t.name for t in self.tools)
 
     @cached_property
     def hash(self) -> str:
-        """返回由目录工具模式计算出的稳定短哈希。"""
+        '''返回由目录工具模式计算出的稳定短哈希。'''
         canon = [{"name": t.name, "schema": convert_to_openai_function(t)} for t in sorted(self.tools, key=lambda t: t.name)]
         blob = json.dumps(canon, sort_keys=True, ensure_ascii=False, default=str)
         return hashlib.sha256(blob.encode("utf-8")).hexdigest()[:16]
 
     def search(self, query: str) -> list[BaseTool]:
-        """按照查询语法返回匹配的延迟工具。"""
+        '''按照查询语法返回匹配的延迟工具。'''
         query = query.strip()
         if not query:
             return []
 
         if query.startswith("select:"):
-            # No cap: ``select:`` names the tools explicitly, so returning a
-            # subset silently drops schemas the model asked for by name. Mirrors
-            # ``SkillCatalog.search`` (``skills/catalog.py``); the ranked modes
-            # below stay capped at ``MAX_RESULTS``.
             wanted = {n.strip() for n in query[7:].split(",")}
             return [t for t in self.tools if t.name in wanted]
 
         if query.startswith("+"):
             parts = query[1:].split(None, 1)
             if not parts:
-                return []  # bare "+" with no required token — nothing to require
+                return []
             required = parts[0].lower()
             candidates = [t for t in self.tools if required in t.name.lower()]
             if len(parts) > 1:
@@ -97,20 +89,19 @@ class DeferredToolCatalog:
 
 
 def _catalog_regex_score(pattern: str, t: BaseTool) -> int:
-    """计算模式在工具名称及描述中的匹配次数。"""
+    '''计算模式在工具名称及描述中的匹配次数。'''
     regex = _compile_catalog_regex(pattern)
     return len(regex.findall(f"{t.name} {t.description or ''}"))
 
 
-# ── Setup / tool ──
 
 
 @dataclass(frozen=True)
 class DeferredToolSetup:
-    """一次代理构建所需的延迟工具配置。
+    '''一次代理构建所需的延迟工具配置。
 
     三个字段必须保持一致：没有搜索工具时，延迟名称集合为空且目录哈希为空。
-    """
+    '''
 
     tool_search_tool: BaseTool | None
     deferred_names: frozenset[str]
@@ -118,15 +109,15 @@ class DeferredToolSetup:
 
 
 def build_tool_search_tool(catalog: DeferredToolCatalog) -> BaseTool:
-    """基于延迟工具目录构建工具搜索工具。"""
+    '''基于延迟工具目录构建工具搜索工具。'''
     catalog_hash = catalog.hash
 
     @tool
     def tool_search(query: str, tool_call_id: Annotated[str, InjectedToolCallId]) -> Command:
-        """取得延迟工具的完整模式定义，使其可以被调用。
+        '''取得延迟工具的完整模式定义，使其可以被调用。
 
         支持按确切名称选择、按关键字搜索，以及以加号开头的名称限定搜索。
-        """
+        '''
         matched = catalog.search(query)
         if not matched:
             content, names = f"No tools found matching: {query}", []
@@ -144,26 +135,24 @@ def build_tool_search_tool(catalog: DeferredToolCatalog) -> BaseTool:
 
 
 def build_deferred_tool_setup(filtered_tools: list[BaseTool], *, enabled: bool) -> DeferredToolSetup:
-    """从已通过策略过滤的工具列表构建延迟工具配置。
+    '''从已通过策略过滤的工具列表构建延迟工具配置。
 
     必须在策略过滤后调用，确保目录不会暴露当前代理无权使用的工具。
-    """
+    '''
     if not enabled:
-        # Deferral disabled: defer nothing; the model binds every tool as before.
         return DeferredToolSetup(None, frozenset(), None)
     deferred = [t for t in filtered_tools if is_mcp_tool(t)]
     if not deferred:
-        # Enabled, but no MCP tool to defer: same empty result, different reason.
         return DeferredToolSetup(None, frozenset(), None)
     catalog = DeferredToolCatalog(tuple(deferred))
     return DeferredToolSetup(build_tool_search_tool(catalog), catalog.names, catalog.hash)
 
 
 def assemble_deferred_tools(filtered_tools: list[BaseTool], *, enabled: bool) -> tuple[list[BaseTool], DeferredToolSetup]:
-    """从已通过策略过滤的列表构建最终工具列表及延迟工具配置。
+    '''从已通过策略过滤的列表构建最终工具列表及延迟工具配置。
 
     若启用延迟加载但无法恢复应延迟的 MCP 工具集合，则拒绝绑定其模式。
-    """
+    '''
     deferred_setup = build_deferred_tool_setup(filtered_tools, enabled=enabled)
     if enabled and not deferred_setup.deferred_names and any(is_mcp_tool(t) for t in filtered_tools):
         raise RuntimeError("tool_search enabled and MCP tools survived policy filtering, but no deferred set was recovered - refusing to bind MCP schemas (fail-closed).")
@@ -174,10 +163,7 @@ def assemble_deferred_tools(filtered_tools: list[BaseTool], *, enabled: bool) ->
 
 
 def _routing_priority(value: Any) -> int:
-    # Produces the typed priority stored in the routing index. McpRoutingMiddleware
-    # ._normalize_index re-parses this defensively (it is built to accept arbitrary
-    # serialized data), so keep the two coercion rules in sync if either changes.
-    """将路由优先级安全转换为整数。"""
+    '''将路由优先级安全转换为整数。'''
     try:
         return int(value)
     except (TypeError, ValueError):
@@ -185,9 +171,7 @@ def _routing_priority(value: Any) -> int:
 
 
 def _routing_keywords(value: Any) -> list[str]:
-    # See _routing_priority: McpRoutingMiddleware._normalize_index re-normalizes
-    # keywords defensively; keep both coercion rules aligned.
-    """将路由关键字安全规范化为字符串列表。"""
+    '''将路由关键字安全规范化为字符串列表。'''
     if not isinstance(value, list):
         return []
     return [keyword for keyword in (str(item).strip() for item in value) if keyword]
@@ -199,10 +183,10 @@ def build_mcp_routing_middleware(
     *,
     top_k: int,
 ) -> "AgentMiddleware | None":
-    """从已通过策略过滤的延迟工具构建自动提升路由中间件。
+    '''从已通过策略过滤的延迟工具构建自动提升路由中间件。
 
     构建时可读取工具元数据，返回的中间件只接收可序列化的扁平路由索引。
-    """
+    '''
     if deferred_setup.catalog_hash is None or not deferred_setup.deferred_names:
         return None
 
@@ -232,35 +216,31 @@ def build_mcp_routing_middleware(
     return McpRoutingMiddleware(routing_index, deferred_setup.catalog_hash, top_k)
 
 
-# Prompt rendering
 
 
 def get_deferred_tools_prompt_section(*, deferred_names: frozenset[str] = frozenset()) -> str:
-    """根据明确的延迟工具名称集合生成可用工具提示区段。
+    '''根据明确的延迟工具名称集合生成可用工具提示区段。
 
     仅列出名称；没有延迟工具时返回空字符串，名称会在输出前进行转义。
-    """
+    '''
     if not deferred_names:
         return ""
-    # Names come verbatim from external MCP servers; escape so a crafted tool
-    # name cannot close this block and forge a framework tag. Mirrors
-    # get_skill_index_prompt_section.
     names = "\n".join(html.escape(name, quote=False) for name in sorted(deferred_names))
     return f"<available-deferred-tools>\n{names}\n</available-deferred-tools>"
 
 
 def _format_keyword_list(keywords: list[str]) -> str:
-    """将关键字列表格式化为自然语言短语。"""
+    '''将关键字列表格式化为自然语言短语。'''
     if len(keywords) == 1:
         return keywords[0]
     return f"{', '.join(keywords[:-1])}, or {keywords[-1]}"
 
 
 def get_mcp_routing_hints_prompt_section(tools: Iterable[BaseTool], *, deferred_names: frozenset[str] = frozenset()) -> str:
-    """从携带路由元数据的 MCP 工具渲染路由提示区段。
+    '''从携带路由元数据的 MCP 工具渲染路由提示区段。
 
     已延迟的工具会提示代理先提升工具，再尝试调用其模式。
-    """
+    '''
     hints: list[tuple[int, str, list[str]]] = []
     for candidate in tools:
         routing = get_mcp_routing(candidate)
@@ -276,8 +256,6 @@ def get_mcp_routing_hints_prompt_section(tools: Iterable[BaseTool], *, deferred_
 
     lines = ["<mcp_routing_hints>"]
     for priority, tool_name, keywords in sorted(hints, key=lambda item: (-item[0], item[1])):
-        # tool_name comes verbatim from the external MCP server; escape at render
-        # (keep the raw name for the deferred_names membership check above).
         esc_name = html.escape(tool_name, quote=False)
         lines.append(f"When the user's request involves {_format_keyword_list(keywords)}:")
         if tool_name in deferred_names:

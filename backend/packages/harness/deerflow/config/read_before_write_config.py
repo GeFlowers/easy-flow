@@ -1,10 +1,10 @@
-"""提供配置、read、before、write、配置相关功能。"""
+'''配置沙箱写文件前是否要求读取目标内容及其适用工具范围。'''
 
 from pydantic import BaseModel, Field
 
 
 class ReadBeforeWriteConfig(BaseModel):
-    """\u6267\u884c ReadBeforeWriteConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''定义读后写校验的启用状态、覆盖范围和豁免规则。'''
 
     enabled: bool = Field(
         default=True,

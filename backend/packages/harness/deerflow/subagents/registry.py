@@ -1,4 +1,4 @@
-"""提供子代理隔离执行、调度校验或终端异步交互功能。"""
+'''合并内置和自定义子代理定义，并应用全局及逐代理配置覆盖。'''
 
 import logging
 from dataclasses import replace
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def _resolve_subagents_app_config(app_config: Any | None = None):
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''允许调用方注入完整配置或子代理配置；未传时读取进程级配置。'''
     if app_config is None:
         from deerflow.config.subagents_config import get_subagents_app_config
 
@@ -21,7 +21,7 @@ def _resolve_subagents_app_config(app_config: Any | None = None):
 
 
 def _build_custom_subagent_config(name: str, *, app_config: Any | None = None) -> SubagentConfig | None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''把应用配置中的自定义子代理字段转换为执行器使用的数据类。'''
     subagents_config = _resolve_subagents_app_config(app_config)
     custom = subagents_config.custom_agents.get(name)
     if custom is None:
@@ -41,26 +41,23 @@ def _build_custom_subagent_config(name: str, *, app_config: Any | None = None) -
 
 
 def get_subagent_config(name: str, *, app_config: Any | None = None) -> SubagentConfig | None:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
-    # Step 1: Look up built-in, then fall back to custom_agents
+    '''查找指定子代理，并仅将适用的全局默认值和逐代理覆盖合并到配置中。'''
+    # 先查内置定义，未命中时再查配置文件中的自定义代理。
     config = BUILTIN_SUBAGENTS.get(name)
     if config is None:
         config = _build_custom_subagent_config(name, app_config=app_config)
     if config is None:
         return None
 
-    # Step 2: Apply per-agent overrides from config.yaml agents section.
-    # Only explicit per-agent overrides are applied here. Global defaults
-    # (timeout_seconds, max_turns at the top level) apply to built-in agents
-    # but must NOT override custom agents' own values — custom agents define
-    # their own defaults in the custom_agents section.
+    # 逐代理覆盖始终生效；全局超时和轮数默认值只覆盖内置代理，
+    # 自定义代理继续使用自身定义的默认值。
     subagents_config = _resolve_subagents_app_config(app_config)
     is_builtin = name in BUILTIN_SUBAGENTS
     agent_override = subagents_config.agents.get(name)
 
     overrides = {}
 
-    # Timeout: per-agent override > global default (builtins only) > config's own value
+    # 超时优先级：逐代理值、内置代理全局默认值、代理自身配置。
     if agent_override is not None and agent_override.timeout_seconds is not None:
         if agent_override.timeout_seconds != config.timeout_seconds:
             logger.debug("Subagent '%s': timeout overridden (%ss -> %ss)", name, config.timeout_seconds, agent_override.timeout_seconds)
@@ -69,7 +66,7 @@ def get_subagent_config(name: str, *, app_config: Any | None = None) -> Subagent
         logger.debug("Subagent '%s': timeout from global default (%ss -> %ss)", name, config.timeout_seconds, subagents_config.timeout_seconds)
         overrides["timeout_seconds"] = subagents_config.timeout_seconds
 
-    # Max turns: per-agent override > global default (builtins only) > config's own value
+    # 最大轮数优先级与超时相同，避免全局默认值覆盖自定义代理的专属约束。
     if agent_override is not None and agent_override.max_turns is not None:
         if agent_override.max_turns != config.max_turns:
             logger.debug("Subagent '%s': max_turns overridden (%s -> %s)", name, config.max_turns, agent_override.max_turns)
@@ -78,13 +75,13 @@ def get_subagent_config(name: str, *, app_config: Any | None = None) -> Subagent
         logger.debug("Subagent '%s': max_turns from global default (%s -> %s)", name, config.max_turns, subagents_config.max_turns)
         overrides["max_turns"] = subagents_config.max_turns
 
-    # Model: per-agent override only (no global default for model)
+    # 模型仅接受逐代理覆盖，不存在子代理全局模型默认值。
     effective_model = subagents_config.get_model_for(name)
     if effective_model is not None and effective_model != config.model:
         logger.debug("Subagent '%s': model overridden (%s -> %s)", name, config.model, effective_model)
         overrides["model"] = effective_model
 
-    # Skills: per-agent override only (no global default for skills)
+    # 技能白名单仅按代理单独覆盖，未设置时保留其继承策略。
     effective_skills = subagents_config.get_skills_for(name)
     if effective_skills is not None and effective_skills != config.skills:
         logger.debug("Subagent '%s': skills overridden (%s -> %s)", name, config.skills, effective_skills)
@@ -97,7 +94,7 @@ def get_subagent_config(name: str, *, app_config: Any | None = None) -> Subagent
 
 
 def list_subagents(*, app_config: Any | None = None) -> list[SubagentConfig]:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''按名称顺序返回所有可解析的内置及自定义子代理配置。'''
     configs = []
     for name in get_subagent_names(app_config=app_config):
         config = get_subagent_config(name, app_config=app_config)
@@ -107,10 +104,10 @@ def list_subagents(*, app_config: Any | None = None) -> list[SubagentConfig]:
 
 
 def get_subagent_names(*, app_config: Any | None = None) -> list[str]:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''返回去重后的内置与配置文件自定义子代理名称。'''
     names = list(BUILTIN_SUBAGENTS.keys())
 
-    # Merge custom_agents from config.yaml
+    # 将配置文件中的自定义代理追加到内置列表，不覆盖同名内置项。
     subagents_config = _resolve_subagents_app_config(app_config)
     for custom_name in subagents_config.custom_agents:
         if custom_name not in names:
@@ -120,7 +117,7 @@ def get_subagent_names(*, app_config: Any | None = None) -> list[str]:
 
 
 def get_available_subagent_names(*, app_config: Any | None = None) -> list[str]:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''根据本地宿主命令权限过滤不可安全提供的 Bash 子代理。'''
     names = get_subagent_names(app_config=app_config)
     try:
         host_bash_allowed = is_host_bash_allowed(app_config) if hasattr(app_config, "sandbox") else is_host_bash_allowed()

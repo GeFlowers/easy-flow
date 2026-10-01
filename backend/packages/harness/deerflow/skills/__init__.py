@@ -1,4 +1,4 @@
-"未说明"
+'''导出技能目录、读取、安装、搜索及元数据校验所需的公共接口。'''
 
 from __future__ import annotations
 

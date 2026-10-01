@@ -1,31 +1,4 @@
-"""定义 read_before_write_middleware 模块提供的职责与可复用接口。
-
-Deterministic read-before-write gate for file-modifying tools (issue #3857).
-
-The lead agent's duplicate-output failure mode (the same report section
-appended five times) came from "append-only, never read back" writes. This
-middleware enforces a version gate: modifying an existing file requires a
-``read_file`` of the file's *current* version earlier in the conversation.
-
-Design invariants:
-- Tools stay stateless. The read mark (``sha256`` of the full file content)
-  is stamped on the ``read_file`` ToolMessage's ``additional_kwargs``, so the
-  gate's state lives in ``state["messages"]``.
-- Summarization deleting the read result deletes the mark with it — the gate
-  can never pass while the read content is gone from context.
-- Writes never refresh marks: any successful write changes the file hash and
-  therefore invalidates every earlier read, forcing a re-read between
-  consecutive modifications.
-- Gate check and tool execution are serialized per (scope, path): LangGraph
-  runs the tool calls of one AIMessage concurrently, so without a critical
-  section two same-turn writes could both pass on one stale mark before
-  either mutation lands. The same lock covers ``read_file`` + mark stamping,
-  so a mark always hashes the version the model was actually shown.
-- Fail-open: if the gate itself cannot inspect the file (sandbox hiccup,
-  binary content, or sandboxes like AIO/E2B that report read failures as
-  ``"Error: ..."`` strings instead of raising), it lets the tool run and
-  produce its own error.
-"""
+'''要求修改已有文件前先读取当前版本，并按线程和路径串行化读取、校验及写入。'''
 
 import asyncio
 import hashlib
@@ -51,9 +24,6 @@ READ_MARK_KEY = "deerflow_read_mark"
 _READ_TOOLS = frozenset({"read_file"})
 _GATED_WRITE_TOOLS = frozenset({"write_file", "str_replace"})
 
-# AIO/E2B-style sandboxes convert read failures (including missing files)
-# into "Error: ..." strings instead of raising. Content with this prefix is
-# treated as "cannot inspect" — the gate fails open and no mark is stamped.
 _UNINSPECTABLE_CONTENT_PREFIX = "Error:"
 
 _BLOCK_MESSAGE = (
@@ -63,16 +33,12 @@ _BLOCK_MESSAGE = (
     "before an append), check what is already there, then retry."
 )
 
-# Per-(scope, path) locks serializing gate check + tool execution. Same
-# WeakValueDictionary pattern as sandbox/file_operation_lock.py, but a
-# separate namespace: the tool-internal file lock only guards the mutation,
-# while this one also spans the authorization that precedes it.
 _GATE_LOCKS: weakref.WeakValueDictionary[tuple[str, str], threading.Lock] = weakref.WeakValueDictionary()
 _GATE_LOCKS_GUARD = threading.Lock()
 
 
 def _get_gate_lock(scope: str, norm_path: str) -> threading.Lock:
-    "执行 _get_gate_lock 的明确职责，并返回与调用约定一致的结果"
+    '''按运行范围和规范化路径复用互斥锁，防止并发修改同时通过同一份旧读取标记。'''
     key = (scope, norm_path)
     with _GATE_LOCKS_GUARD:
         lock = _GATE_LOCKS.get(key)
@@ -83,22 +49,20 @@ def _get_gate_lock(scope: str, norm_path: str) -> threading.Lock:
 
 
 def _normalize_mark_path(path: str) -> str:
-    "执行 _normalize_mark_path 的明确职责，并返回与调用约定一致的结果"
+    '''使用 POSIX 规则规范化读取标记中的文件路径。'''
     return posixpath.normpath(path)
 
 
 def _content_hash(content: str) -> str:
-    "执行 _content_hash 的明确职责，并返回与调用约定一致的结果"
+    '''计算文件 UTF-8 文本内容的 SHA-256 摘要，用于比较读取版本是否仍为最新。'''
     return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
 class ReadBeforeWriteMiddleware(AgentMiddleware):
-    """封装 ReadBeforeWriteMiddleware 的状态、协作关系与公开操作。
-
-    Version gate: block writes to existing files not read at their current version."""
+    '''为读取结果附加内容摘要，并阻止使用过期读取结果修改已存在文件。'''
 
     def __init__(self, content_reader: Callable[[Any, str], str] | None = None) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''允许注入文件内容读取器，未指定时使用沙箱的当前文件读取实现。'''
         super().__init__()
         self._content_reader = content_reader or read_current_file_content
 
@@ -108,7 +72,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        "执行 wrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        '''同步拦截读取和写入工具，对同路径操作加锁，并在写入前验证最近读取摘要。'''
         name = request.tool_call.get("name")
         if name in _GATED_WRITE_TOOLS:
             path = self._requested_path(request)
@@ -117,8 +81,6 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
             with self._lock_for(request, path):
                 blocked = self._check_write_gate(request)
                 if blocked is not None:
-                    # Stamp deerflow_tool_meta so ToolProgressMiddleware can classify
-                    # the blocked write even though it bypasses ToolErrorHandlingMiddleware.
                     return normalize_tool_result(blocked)
                 return handler(request)
         if name in _READ_TOOLS:
@@ -137,15 +99,12 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        "执行 awrap_tool_call 的明确职责，并返回与调用约定一致的结果"
+        '''异步拦截读取和写入工具，在工作线程获取锁并保证检查与执行不可交错。'''
         name = request.tool_call.get("name")
         if name in _GATED_WRITE_TOOLS:
             path = self._requested_path(request)
             if path is None:
                 return await handler(request)
-            # threading.Lock may be released from a different thread than the
-            # acquiring one, so acquiring in a worker thread and releasing on
-            # the event-loop thread is safe.
             lock = self._lock_for(request, path)
             await asyncio.to_thread(lock.acquire)
             try:
@@ -169,17 +128,14 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
                 lock.release()
         return await handler(request)
 
-    # -- locking ---------------------------------------------------------
 
     def _lock_for(self, request: ToolCallRequest, path: str) -> threading.Lock:
-        "执行 _lock_for 的明确职责，并返回与调用约定一致的结果"
+        '''根据当前运行范围和规范化路径取得对应的读写互斥锁。'''
         return _get_gate_lock(self._lock_scope(request), _normalize_mark_path(path))
 
     @staticmethod
     def _lock_scope(request: ToolCallRequest) -> str:
-        """执行 _lock_scope 的明确职责，并返回与调用约定一致的结果。
-
-        Scope locks per thread (or sandbox) so unrelated agents never contend."""
+        '''优先用线程标识隔离锁；缺失时退回沙箱标识，避免无关会话竞争。'''
         context = getattr(request.runtime, "context", None)
         if isinstance(context, dict):
             thread_id = context.get("thread_id")
@@ -194,10 +150,9 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
                     return sandbox_id
         return "global"
 
-    # -- gate ----------------------------------------------------------
 
     def _check_write_gate(self, request: ToolCallRequest) -> ToolMessage | None:
-        "执行 _check_write_gate 的明确职责，并返回与调用约定一致的结果"
+        '''读取文件当前内容并与最近成功读取摘要比对；不一致时返回阻止写入的工具错误。'''
         tool_call = request.tool_call
         path = self._requested_path(request)
         if path is None:
@@ -205,15 +160,11 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
         try:
             current = self._content_reader(request.runtime, path)
         except FileNotFoundError:
-            # write_file creates the file; str_replace surfaces its own error.
             return None
         except Exception:
             logger.warning("read-before-write gate could not inspect %r; allowing the write (fail-open)", path, exc_info=True)
             return None
         if current.startswith(_UNINSPECTABLE_CONTENT_PREFIX):
-            # Error-string sandbox read channel (AIO/E2B): "missing" and
-            # "unreadable" are indistinguishable here, so fail open — creation
-            # proceeds and genuine failures surface from the tool itself.
             logger.debug("read-before-write gate got an error-string read for %r; allowing the write (fail-open)", path)
             return None
         norm_path = _normalize_mark_path(path)
@@ -229,7 +180,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
 
     @staticmethod
     def _requested_path(request: ToolCallRequest) -> str | None:
-        "执行 _requested_path 的明确职责，并返回与调用约定一致的结果"
+        '''从工具调用参数中提取非空文件路径，参数结构不符合预期时返回 None。'''
         args = request.tool_call.get("args") or {}
         if not isinstance(args, dict):
             return None
@@ -238,7 +189,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
 
     @staticmethod
     def _latest_mark_hash(state: Any, norm_path: str) -> str | None:
-        "执行 _latest_mark_hash 的明确职责，并返回与调用约定一致的结果"
+        '''从最近的工具消息中查找指定路径的读取摘要。'''
         messages = state.get("messages") if isinstance(state, dict) else getattr(state, "messages", None)
         if not messages:
             return None
@@ -251,10 +202,9 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
                 return mark_hash if isinstance(mark_hash, str) else None
         return None
 
-    # -- mark stamping ---------------------------------------------------
 
     def _attach_read_mark(self, request: ToolCallRequest, result: ToolMessage | Command) -> None:
-        "执行 _attach_read_mark 的明确职责，并返回与调用约定一致的结果"
+        '''读取成功后重新读取文件当前内容，并把路径及其摘要写入对应工具消息。'''
         path = self._requested_path(request)
         if path is None:
             return
@@ -276,7 +226,7 @@ class ReadBeforeWriteMiddleware(AgentMiddleware):
 
     @staticmethod
     def _extract_tool_message(result: ToolMessage | Command) -> ToolMessage | None:
-        "执行 _extract_tool_message 的明确职责，并返回与调用约定一致的结果"
+        '''从直接结果或状态更新命令中提取最后一条工具消息。'''
         if isinstance(result, ToolMessage):
             return result
         if isinstance(result, Command) and isinstance(result.update, dict):

@@ -11,13 +11,9 @@ dependencies = [
     "python-multipart>=0.0.31",
     "sse-starlette>=2.1.0",
     "uvicorn[standard]>=0.34.0",
-    "lark-oapi>=1.4.0",
-    "slack-sdk>=3.33.0",
-    "python-telegram-bot>=21.0",
     "langgraph-sdk>=0.1.51",
     "markdown-to-mrkdwn>=0.3.1",
     "wecom-aibot-python-sdk>=0.1.6",
-    "dingtalk-stream>=0.24.3",
     "bcrypt>=4.0.0",
     "pyjwt>=2.13.0",
     "email-validator>=2.0.0",
@@ -27,22 +23,20 @@ dependencies = [
 [project.optional-dependencies]
 postgres = ["deerflow-harness[postgres]"]
 redis = ["deerflow-harness[redis]"]
-discord = ["discord.py>=2.7.0"]
 monocle = ["deerflow-harness[monocle]"]
 
 [dependency-groups]
 dev = [
     "prompt-toolkit>=3.0.0",
     "ruff>=0.14.11",
-    # Monocle tracer (also the deerflow-harness[monocle] extra); kept in the dev
-    # group so the tracing tests can import it without forcing it onto installs.
+    # Monocle 追踪器也属于 deerflow-harness[monocle] 可选依赖；放在开发依赖组中，
+    # 供追踪测试导入，同时避免普通安装被强制带入。
     "monocle_apptrace>=0.8.8",
-    # redis is an optional runtime extra (deerflow-harness[redis]); pin it in the
-    # dev group so the stream-bridge tests can always import/exercise the redis
-    # bridge without forcing it onto production installs.
+    # Redis 是可选运行依赖（deerflow-harness[redis]）；在开发依赖组中固定版本，
+    # 确保流桥接测试可以导入并验证 Redis 桥接，而生产安装无需强制携带。
     "redis>=5.0.0",
-    # TUI runtime dep (also declared as the deerflow-harness[tui] extra); kept in
-    # the dev group so the terminal workbench can be run and tested locally / in CI.
+    # 终端界面的运行依赖也属于 deerflow-harness[tui] 可选依赖；放在开发依赖组中，
+    # 供本地或持续集成环境运行和测试终端工作台。
     "textual>=0.80",
 ]
 

@@ -74,6 +74,7 @@ export function CitationLink({
   );
 }
 
+/** 提取引用地址的主机名并移除常见的 www 前缀，解析失败时保留原值。 */
 function extractDomain(url: string): string {
   try {
     return new URL(url).hostname.replace(/^www\./i, "");

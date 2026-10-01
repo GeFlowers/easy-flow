@@ -31,6 +31,7 @@ const CodeBlockContext = createContext<CodeBlockContextType>({
 
 const lineNumberTransformer: ShikiTransformer = {
   name: "line-numbers",
+  /** 在高亮代码每行前插入不可选中的行号节点。 */
   line(node, line) {
     node.children.unshift({
       type: "element",
@@ -74,7 +75,7 @@ export async function highlightCode(
   ]);
 }
 
-/** CodeBlock 组件：提供对应的界面结构与交互语义。 */
+/** 异步生成亮色和暗色语法高亮结果，并按主题显示对应代码视图。 */
 export const CodeBlock = ({
   code,
   language,
@@ -132,14 +133,13 @@ export const CodeBlock = ({
   );
 };
 
-/** CodeBlockCopyButtonProps 的公开类型定义。 */
 export type CodeBlockCopyButtonProps = ComponentProps<typeof Button> & {
   onCopy?: () => void;
   onError?: (error: Error) => void;
   timeout?: number;
 };
 
-/** CodeBlockCopyButton 组件：提供对应的界面结构与交互语义。 */
+/** 将当前代码复制到剪贴板，提供成功反馈并向调用方报告复制错误。 */
 export const CodeBlockCopyButton = ({
   onCopy,
   onError,
@@ -151,6 +151,7 @@ export const CodeBlockCopyButton = ({
   const [isCopied, setIsCopied] = useState(false);
   const { code } = useContext(CodeBlockContext);
 
+  /** 复制代码并处理复制成功状态、回调通知和异步失败反馈。 */
   const copyToClipboard = () => {
     void (async () => {
       const didCopy = await writeTextToClipboard(code);

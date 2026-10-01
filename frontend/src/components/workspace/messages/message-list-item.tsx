@@ -64,6 +64,7 @@ import { SlashSkillChip } from "../slash-skill-chip";
 import { MarkdownContent } from "./markdown-content";
 import { createMarkdownLinkComponent } from "./markdown-link";
 
+/** 显示助手回答的评价操作，并依据当前线程状态控制可用性。 */
 function FeedbackButtons({
   threadId,
   runId,
@@ -78,6 +79,7 @@ function FeedbackButtons({
   );
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  /** 更新当前回答的评价；再次选择相同评分时撤销已有评价。 */
   const handleClick = useCallback(
     async (rating: number) => {
       if (isSubmitting) return;
@@ -225,6 +227,7 @@ function MessageImage({
 
 const clientTurnDurations = new Map<string, number>();
 
+/** 渲染用户文本，并将识别出的斜杠技能命令交给专用展示组件。 */
 function HumanMessageText({ content }: { content: string }) {
   // `parseSlashSkillReference` 仅作正则判断且不订阅数据，绝大多数纯文本消息无需
   // 订阅技能查询。只有字面符合 `/skill …` 激活格式的消息才挂载拥有 `useSkills()`
@@ -238,6 +241,7 @@ function HumanMessageText({ content }: { content: string }) {
   return <HumanSlashSkillText content={content} />;
 }
 
+/** 将用户消息中的斜杠技能调用突出显示，同时保留其余原文。 */
 function HumanSlashSkillText({ content }: { content: string }) {
   const { skills } = useSkills();
   const slashSkill = resolveSlashSkillDisplay(content, skills);
@@ -258,6 +262,7 @@ function HumanSlashSkillText({ content }: { content: string }) {
   );
 }
 
+/** 根据消息角色和内容类型选择文本、推理或附件的呈现方式。 */
 function MessageContent_({
   className,
   message,
@@ -296,6 +301,7 @@ function MessageContent_({
     }
   }, [rawTurnDuration, message.id, threadId]);
 
+  /** 缓存客户端测得的助手回合时长，供线程消息重新渲染时恢复。 */
   const handleDurationChange = useCallback(
     (d: number | undefined) => {
       if (d !== undefined && message.id) {
@@ -505,11 +511,13 @@ const FILE_TYPE_MAP: Record<string, string> = {
 
 const IMAGE_EXTENSIONS = ["png", "jpg", "jpeg", "gif", "webp", "svg", "bmp"];
 
+/** 根据扩展名返回附件卡片使用的类型标签。 */
 function getFileTypeLabel(filename: string): string {
   const ext = getFileExt(filename);
   return FILE_TYPE_MAP[ext] ?? (ext.toUpperCase() || "FILE");
 }
 
+/** 判断附件是否属于当前消息组件支持预览的图片类型。 */
 function isImageFile(filename: string): boolean {
   return IMAGE_EXTENSIONS.includes(getFileExt(filename));
 }

@@ -1,4 +1,4 @@
-"""PostgreSQL engine, schema bootstrap, and async session lifecycle."""
+'''管理 PostgreSQL 引擎、数据库结构初始化及异步会话生命周期。'''
 
 from __future__ import annotations
 
@@ -15,12 +15,12 @@ _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
 def _json_serializer(value: object) -> str:
-    """序列化 JSON 字段并保留其中的 Unicode 字符。"""
+    '''序列化 JSON 字段并保留其中的 Unicode 字符。'''
     return json.dumps(value, ensure_ascii=False)
 
 
 async def _auto_create_postgres_db(url: str) -> None:
-    """目标数据库不存在时，连接维护库并创建目标数据库。"""
+    '''目标数据库不存在时，连接维护库并创建目标数据库。'''
     from sqlalchemy import text
     from sqlalchemy.engine.url import make_url
 
@@ -40,7 +40,7 @@ async def _auto_create_postgres_db(url: str) -> None:
 
 
 def _create_engine(url: str, *, echo: bool, pool_size: int) -> AsyncEngine:
-    """创建供 Gateway 各个仓储共用的异步连接池。"""
+    '''创建供 Gateway 各个仓储共用的异步连接池。'''
     return create_async_engine(
         url,
         echo=echo,
@@ -57,7 +57,7 @@ async def init_engine(
     echo: bool = False,
     pool_size: int = 5,
 ) -> None:
-    """建立 PostgreSQL 连接池并将数据库架构升级到当前版本。"""
+    '''建立 PostgreSQL 连接池并将数据库架构升级到当前版本。'''
     global _engine, _session_factory
 
     if backend != "postgres":
@@ -93,7 +93,7 @@ async def init_engine(
 
 
 async def init_engine_from_config(config) -> None:
-    """读取 DatabaseConfig 并初始化共享数据库引擎。"""
+    '''读取 DatabaseConfig 并初始化共享数据库引擎。'''
     await init_engine(
         backend=config.backend,
         url=config.app_sqlalchemy_url,
@@ -103,17 +103,17 @@ async def init_engine_from_config(config) -> None:
 
 
 def get_session_factory() -> async_sessionmaker[AsyncSession] | None:
-    """返回共享异步会话工厂；引擎尚未初始化时返回 ``None``。"""
+    '''返回共享异步会话工厂；引擎尚未初始化时返回 ``None``。'''
     return _session_factory
 
 
 def get_engine() -> AsyncEngine | None:
-    """返回当前 SQLAlchemy 引擎；引擎尚未初始化时返回 ``None``。"""
+    '''返回当前 SQLAlchemy 引擎；引擎尚未初始化时返回 ``None``。'''
     return _engine
 
 
 async def close_engine() -> None:
-    """释放连接池，并清空共享引擎和会话工厂引用。"""
+    '''释放连接池，并清空共享引擎和会话工厂引用。'''
     global _engine, _session_factory
     if _engine is not None:
         await _engine.dispose()

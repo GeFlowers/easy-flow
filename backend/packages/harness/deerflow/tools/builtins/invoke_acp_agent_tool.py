@@ -1,4 +1,4 @@
-"""提供工具、builtins、invoke、acp、agent、tool相关功能。"""
+'''把已配置的外部 ACP 智能体封装为工具，并桥接会话、权限和 MCP 服务。'''
 
 import logging
 import os
@@ -13,14 +13,14 @@ logger = logging.getLogger(__name__)
 
 
 class _InvokeACPAgentInput(BaseModel):
-    """\u6267\u884c _InvokeACPAgentInput \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''约束外部智能体调用只接受目标代理名和独立任务提示。'''
 
     agent: str = Field(description="Name of the ACP agent to invoke")
     prompt: str = Field(description="The concise task prompt to send to the agent")
 
 
 def _get_work_dir(thread_id: str | None) -> str:
-    """\u6267\u884c _get_work_dir \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''为当前线程创建 ACP 工作目录；无效线程标识时退回共享临时工作区。'''
     from deerflow.config.paths import get_paths
     from deerflow.runtime.user_context import get_effective_user_id
 
@@ -40,7 +40,7 @@ def _get_work_dir(thread_id: str | None) -> str:
 
 
 def _build_mcp_servers() -> dict[str, dict[str, Any]]:
-    """\u6267\u884c _build_mcp_servers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''将应用扩展配置转换为 ACP 客户端可连接的 MCP 服务配置。'''
     from deerflow.config.extensions_config import ExtensionsConfig
     from deerflow.mcp.client import build_servers_config
 
@@ -48,7 +48,7 @@ def _build_mcp_servers() -> dict[str, dict[str, Any]]:
 
 
 def _build_acp_mcp_servers() -> list[dict[str, Any]]:
-    """\u6267\u884c _build_acp_mcp_servers \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''筛选已启用服务并转换为 ACP 会话要求的传输专属字段结构。'''
     from deerflow.config.extensions_config import ExtensionsConfig
 
     extensions_config = ExtensionsConfig.from_file()
@@ -79,7 +79,7 @@ def _build_acp_mcp_servers() -> list[dict[str, Any]]:
 
 
 def _build_permission_response(options: list[Any], *, auto_approve: bool) -> Any:
-    """\u6267\u884c _build_permission_response \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''按代理是否允许自动授权选择一次性批准选项，否则拒绝该权限请求。'''
     from acp import RequestPermissionResponse
     from acp.schema import AllowedOutcome, DeniedOutcome
 
@@ -103,7 +103,7 @@ def _build_permission_response(options: list[Any], *, auto_approve: bool) -> Any
 
 
 def _format_invocation_error(agent: str, cmd: str, exc: Exception) -> str:
-    """\u6267\u884c _format_invocation_error \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''将启动失败转换为可操作的错误提示，特别说明 Codex 命令与 ACP 适配器区别。'''
     if not isinstance(exc, FileNotFoundError):
         return f"Error invoking ACP agent '{agent}': {exc}"
 
@@ -115,7 +115,7 @@ def _format_invocation_error(agent: str, cmd: str, exc: Exception) -> str:
 
 
 def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
-    """\u6267\u884c build_invoke_acp_agent_tool \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''构造可调用外部 ACP 代理的工具，并将会话输出汇总为文本返回。'''
     agent_lines = "\n".join(f"- {name}: {cfg.description}" for name, cfg in agents.items())
     description = (
         "Invoke an external ACP-compatible agent and return its final response.\n\n"
@@ -129,7 +129,7 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
     _agents = dict(agents)
 
     async def _invoke(agent: str, prompt: str, config: Annotated[RunnableConfig, InjectedToolArg] = None) -> str:
-        """\u6267\u884c _invoke \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''校验代理名称，启动独立进程并执行一次 ACP 提示会话。'''
         logger.info("Invoking ACP agent %s (prompt length: %d)", agent, len(prompt))
         logger.debug("Invoking ACP agent %s with prompt: %.200s%s", agent, prompt, "..." if len(prompt) > 200 else "")
         if agent not in _agents:
@@ -146,19 +146,19 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
             return "Error: agent-client-protocol package is not installed. Run `uv sync` to install project dependencies."
 
         class _CollectingClient(Client):
-            """\u6267\u884c _CollectingClient \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+            '''收集 ACP 会话响应，并依据代理配置处理权限请求。'''
 
             def __init__(self) -> None:
-                """\u6267\u884c __init__ \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+                '''初始化本次会话的文本片段缓冲区。'''
                 self._chunks: list[str] = []
 
             @property
             def collected_text(self) -> str:
-                """\u6267\u884c collected_text \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+                '''将会话过程中收到的文本片段拼接为最终响应。'''
                 return "".join(self._chunks)
 
             async def session_update(self, session_id: str, update, **kwargs) -> None:  # type: ignore[override]
-                """\u6267\u884c session_update \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+                '''从 ACP 会话更新中提取文本内容并追加到响应缓冲区。'''
                 try:
                     from acp.schema import TextContentBlock
 
@@ -168,7 +168,7 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
                     pass
 
             async def request_permission(self, options, session_id: str, tool_call, **kwargs):  # type: ignore[override]
-                """\u6267\u884c request_permission \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+                '''依据 ``auto_approve_permissions`` 决定批准或拒绝外部代理的工具权限请求。'''
                 response = _build_permission_response(options, auto_approve=agent_config.auto_approve_permissions)
                 outcome = response.outcome.outcome
                 if outcome == "selected":

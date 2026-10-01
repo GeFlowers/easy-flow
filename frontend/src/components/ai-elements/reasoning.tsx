@@ -24,7 +24,7 @@ type ReasoningContextValue = {
 
 const ReasoningContext = createContext<ReasoningContextValue | null>(null);
 
-/** useReasoning Hook：封装相关状态与交互逻辑。 */
+/** 读取思考面板共享的展开、流式状态和计时信息；必须位于 Reasoning 内部。 */
 export const useReasoning = () => {
   const context = useContext(ReasoningContext);
   if (!context) {
@@ -33,7 +33,6 @@ export const useReasoning = () => {
   return context;
 };
 
-/** ReasoningProps 的公开类型定义。 */
 export type ReasoningProps = ComponentProps<typeof Collapsible> & {
   isStreaming?: boolean;
   open?: boolean;
@@ -47,7 +46,7 @@ export type ReasoningProps = ComponentProps<typeof Collapsible> & {
 const AUTO_CLOSE_DELAY = 1000;
 const MS_IN_S = 1000;
 
-/** Reasoning 组件：提供对应的界面结构与交互语义。 */
+/** 管理思考过程的展开状态、流式耗时，并在生成完成后延迟收起。 */
 export const Reasoning = memo(
   ({
     className,
@@ -105,6 +104,7 @@ export const Reasoning = memo(
       }
     }, [isStreaming, isOpen, defaultOpen, setIsOpen, hasAutoClosed]);
 
+    /** 把折叠控件的开合事件同步到推理上下文状态。 */
     const handleOpenChange = (newOpen: boolean) => {
       setIsOpen(newOpen);
     };
@@ -126,7 +126,6 @@ export const Reasoning = memo(
   },
 );
 
-/** ReasoningTriggerProps 的公开类型定义。 */
 export type ReasoningTriggerProps = ComponentProps<
   typeof CollapsibleTrigger
 > & {
@@ -138,11 +137,12 @@ export type ReasoningTriggerProps = ComponentProps<
   hasContent?: boolean;
 };
 
-/** LiveTimer 内部组件：组织对应的界面结构与交互语义。 */
+/** 按秒刷新思考时长，并在组件卸载或计时起点变化时清理定时器。 */
 const LiveTimer = ({ startTime }: { startTime: number }) => {
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
+    /** 根据起始时间计算已等待秒数，供计时器首次渲染和后续刷新共用。 */
     const calculateElapsed = () => Math.floor((Date.now() - startTime) / 1000);
     setElapsed(calculateElapsed());
 
@@ -161,6 +161,7 @@ const LiveTimer = ({ startTime }: { startTime: number }) => {
   );
 };
 
+/** 按流式状态和持续时间生成思考提示，运行中显示计时或扫光文案。 */
 const defaultGetThinkingMessage = (
   isStreaming: boolean,
   duration?: number,
@@ -178,7 +179,7 @@ const defaultGetThinkingMessage = (
   return <span>Thought for {duration} seconds</span>;
 };
 
-/** ReasoningTrigger 组件：提供对应的界面结构与交互语义。 */
+/** 展示思考状态和耗时，并在存在正文时提供折叠切换入口。 */
 export const ReasoningTrigger = memo(
   ({
     className,
@@ -217,14 +218,13 @@ export const ReasoningTrigger = memo(
   },
 );
 
-/** ReasoningContentProps 的公开类型定义。 */
 export type ReasoningContentProps = ComponentProps<
   typeof CollapsibleContent
 > & {
   children: string;
 };
 
-/** ReasoningContent 组件：提供对应的界面结构与交互语义。 */
+/** 使用防剪贴板注入的 Markdown 渲染器呈现模型思考文本。 */
 export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent

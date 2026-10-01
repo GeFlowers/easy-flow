@@ -1,4 +1,4 @@
-"""认证流程使用的用户 Pydantic 模型。"""
+'''认证流程使用的用户 Pydantic 模型。'''
 
 from datetime import UTC, datetime
 from typing import Literal
@@ -8,12 +8,12 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 def _utc_now() -> datetime:
-    """返回带时区信息的当前 UTC 时间。"""
+    '''返回带时区信息的当前 UTC 时间。'''
     return datetime.now(UTC)
 
 
 class User(BaseModel):
-    """系统内部使用的用户表示。"""
+    '''系统内部使用的用户表示。'''
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -33,7 +33,7 @@ class User(BaseModel):
 
 
 class UserResponse(BaseModel):
-    """用户信息接口的响应模型。"""
+    '''用户信息接口的响应模型。'''
 
     id: str
     email: str

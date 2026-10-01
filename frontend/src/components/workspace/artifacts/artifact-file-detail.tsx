@@ -183,6 +183,7 @@ export function ArtifactFileDetail({
     setViewMode(artifactViewState.initialViewMode);
   }, [artifactViewState.initialViewMode]);
 
+  /** 安装当前预览的技能文件，并反馈成功、权限不足或失败状态。 */
   const handleInstallSkill = useCallback(async () => {
     if (isInstalling) return;
 
@@ -367,6 +368,7 @@ export function ArtifactFileDetail({
   );
 }
 
+/** 对浏览器无法预览的产物显示文件类型信息和安全下载链接。 */
 function ArtifactDownloadFallback({
   filepath,
   threadId,
@@ -443,6 +445,7 @@ export function ArtifactFilePreview({
       return;
     }
 
+    /** 校验预览框发来的滚动消息，并保存位置或回复恢复位置请求。 */
     const handleMessage = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) {
         return;
@@ -526,6 +529,7 @@ export function ArtifactFilePreview({
   return null;
 }
 
+/** 校验来自预览 iframe 的滚动消息是否属于当前文件和会话。 */
 function isArtifactScrollMessage(
   data: unknown,
   key: string,
@@ -546,12 +550,14 @@ function isArtifactScrollMessage(
   );
 }
 
+/** 仅接受有限数值作为 iframe 滚动坐标，拒绝任意消息数据。 */
 function scrollCoordinate(value: unknown) {
   return typeof value === "number" && Number.isFinite(value)
     ? value
     : undefined;
 }
 
+/** 限制流式文件预览的刷新频率，并在文件切换时立即同步新内容。 */
 function useThrottledValue(
   value: string,
   intervalMs: number,

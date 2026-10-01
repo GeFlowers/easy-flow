@@ -1,4 +1,4 @@
-"""提供配置、技能、配置相关功能。"""
+'''定义内置与用户技能存储位置，以及技能在沙箱中的虚拟路径。'''
 
 import os
 from pathlib import Path
@@ -10,14 +10,14 @@ from deerflow.constants import DEFAULT_SKILLS_CONTAINER_PATH
 
 
 def _legacy_skills_candidates() -> tuple[Path, ...]:
-    """\u6267\u884c _legacy_skills_candidates \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''返回仓库旧版布局中可回退读取的技能目录候选项。'''
     backend_dir = Path(__file__).resolve().parents[4]
     repo_root = backend_dir.parent
     return (repo_root / "skills",)
 
 
 class SkillsConfig(BaseModel):
-    """\u6267\u884c SkillsConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''配置技能存储实现、主机目录和沙箱内技能挂载路径。'''
 
     use: str = Field(
         default="deerflow.skills.storage.local_skill_storage:LocalSkillStorage",
@@ -29,7 +29,7 @@ class SkillsConfig(BaseModel):
     )
     container_path: str = Field(
         default=DEFAULT_SKILLS_CONTAINER_PATH,
-        description="Path where skills are mounted in the sandbox container",
+        description="Virtual path where skills are available inside the sandbox",
     )
     deferred_discovery: bool = Field(
         default=False,
@@ -37,7 +37,7 @@ class SkillsConfig(BaseModel):
     )
 
     def get_skills_path(self) -> Path:
-        """\u6267\u884c get_skills_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''解析技能目录配置；未设置时优先使用项目默认目录再回退旧布局。'''
         if self.path:
             return resolve_path(self.path)
         if env_path := os.getenv("DEER_FLOW_SKILLS_PATH"):
@@ -54,5 +54,5 @@ class SkillsConfig(BaseModel):
         return project_default
 
     def get_skill_container_path(self, skill_name: str, category: str = "public") -> str:
-        """\u6267\u884c get_skill_container_path \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+        '''返回技能目录在沙箱命名空间中的规范绝对路径。'''
         return f"{self.container_path}/{category}/{skill_name}"

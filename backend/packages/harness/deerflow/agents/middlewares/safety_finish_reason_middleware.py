@@ -1,38 +1,4 @@
-"""定义 safety_finish_reason_middleware 模块提供的职责与可复用接口。
-
-Suppress tool execution when the provider safety-terminated the response.
-
-Background — see issue bytedance/deer-flow#3028.
-
-Some providers (OpenAI ``finish_reason='content_filter'``, Anthropic
-``stop_reason='refusal'``, Gemini ``finish_reason='SAFETY'`` ...) can stop
-generation mid-stream while still returning partially-formed ``tool_calls``.
-LangChain's tool router treats any AIMessage with a non-empty ``tool_calls``
-field as "go execute these", so half-truncated arguments — e.g. a markdown
-``write_file`` that stops in the middle of a sentence — get dispatched as if
-they were complete. The agent then sees the truncated file, tries to fix it,
-gets filtered again, and loops.
-
-This middleware sits at ``after_model`` and gates that behaviour: when a
-configured ``SafetyTerminationDetector`` fires *and* the AIMessage carries
-tool calls, we strip the tool calls (both structured and raw provider
-payloads), append a user-facing explanation, and stash observability fields
-in ``additional_kwargs.safety_termination`` so logs, traces, and SSE
-consumers can see what happened.
-
-Hook choice: ``after_model`` (not ``wrap_model_call``) because the response
-is a *normal* return — not an exception — and we want to participate in the
-same after-model chain as ``LoopDetectionMiddleware``, with which we share
-the same tool-call-suppression mechanic but a different trigger.
-
-Placement: register *after* ``LoopDetectionMiddleware`` in the middleware
-list. LangChain factory wires ``after_model`` edges in reverse list order
-(``langchain/agents/factory.py:add_edge("model", middleware_w_after_model[-1])``,
-then walks ``range(len-1, 0, -1)``), so the *last* registered middleware is
-the *first* to observe the model output. Registering Safety after Loop
-means Safety sees the raw response first, clears tool calls if it fires,
-and Loop then accounts against the cleaned message.
-"""
+'''当供应商因安全原因中止生成时，阻止执行可能被截断的工具调用并记录判定信息。'''
 
 from __future__ import annotations
 
@@ -67,27 +33,16 @@ _USER_FACING_MESSAGE = (
 
 
 class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
-    """封装 SafetyFinishReasonMiddleware 的状态、协作关系与公开操作。
-
-    Strip tool_calls from AIMessages flagged by a SafetyTerminationDetector."""
+    '''根据可配置检测器识别安全终止信号，并清除同一响应中的不完整工具调用。'''
 
     def __init__(self, detectors: list[SafetyTerminationDetector] | None = None) -> None:
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''复制传入检测器列表，或在未配置时创建项目内置检测器。'''
         super().__init__()
-        # Copy so caller mutations after construction don't leak into us.
         self._detectors: list[SafetyTerminationDetector] = list(detectors) if detectors else default_detectors()
 
     @classmethod
     def from_config(cls, config: SafetyFinishReasonConfig) -> SafetyFinishReasonMiddleware:
-        """执行 from_config 的明确职责，并返回与调用约定一致的结果。
-
-        Construct from validated Pydantic config, honouring the
-                reflection-loaded detector list when provided.
-
-                An explicit empty list is intentionally rejected — it would silently
-                disable detection while leaving the middleware in the chain, which
-                is the worst of both worlds. Use ``enabled: false`` instead.
-        """
+        '''根据校验后的应用配置加载自定义检测器；显式空列表报错以避免静默关闭检测。'''
         if config.detectors is None:
             return cls()
 
@@ -106,10 +61,9 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
             detectors.append(detector)
         return cls(detectors=detectors)
 
-    # ----- detection -------------------------------------------------------
 
     def _detect(self, message: AIMessage) -> SafetyTermination | None:
-        "执行 _detect 的明确职责，并返回与调用约定一致的结果"
+        '''依次调用检测器，跳过发生异常的实现，并返回首个识别到的终止信号。'''
         for detector in self._detectors:
             try:
                 hit = detector.detect(message)
@@ -120,18 +74,10 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
                 return hit
         return None
 
-    # ----- message rewriting ----------------------------------------------
 
     @staticmethod
     def _append_user_message(content: object, text: str) -> str | list:
-        """执行 _append_user_message 的明确职责，并返回与调用约定一致的结果。
-
-        Append a plain-text explanation to AIMessage content.
-
-                Mirrors ``LoopDetectionMiddleware._append_text`` so list-content
-                responses (Anthropic thinking blocks, vLLM reasoning splits) keep
-                their structure instead of being string-coerced into a TypeError.
-        """
+        '''按消息内容类型追加面向用户的说明，保留分块消息的原始结构。'''
         if content is None or content == "":
             return text
         if isinstance(content, list):
@@ -145,7 +91,7 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         message: AIMessage,
         termination: SafetyTermination,
     ) -> AIMessage:
-        "执行 _build_suppressed_message 的明确职责，并返回与调用约定一致的结果"
+        '''复制模型回复，清空结构化和原始工具调用，并附加终止原因与被抑制工具信息。'''
         suppressed_names = [tc.get("name") or "unknown" for tc in (message.tool_calls or [])]
         explanation = _USER_FACING_MESSAGE.format(
             reason_field=termination.reason_field,
@@ -154,17 +100,8 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         )
         new_content = self._append_user_message(message.content, explanation)
 
-        # clone_ai_message_with_tool_calls handles structured tool_calls,
-        # raw additional_kwargs.tool_calls, and function_call in one shot.
-        # It only rewrites finish_reason when the old value was "tool_calls",
-        # which is not our case — content_filter / refusal / SAFETY stay put
-        # so downstream SSE / converters keep seeing the real provider reason.
         cleared = clone_ai_message_with_tool_calls(message, [], content=new_content)
 
-        # Re-clone additional_kwargs so we don't accidentally mutate the
-        # dict returned by clone_ai_message_with_tool_calls (which already
-        # made a shallow copy, but downstream model_copy still references
-        # it). Then stamp the observability record.
         kwargs = dict(getattr(cleared, "additional_kwargs", None) or {})
         kwargs["safety_termination"] = {
             "detector": termination.detector,
@@ -176,7 +113,6 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         }
         return cleared.model_copy(update={"additional_kwargs": kwargs})
 
-    # ----- observability ---------------------------------------------------
 
     def _emit_event(
         self,
@@ -184,12 +120,7 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         suppressed_names: list[str],
         runtime: Runtime,
     ) -> None:
-        """执行 _emit_event 的明确职责，并返回与调用约定一致的结果。
-
-        Notify SSE consumers (e.g. the web UI) that a tool turn was
-                suppressed so they can reconcile any "tool starting..." placeholders
-                already streamed to the user. Failures are logged at debug and
-                ignored — this is a best-effort signal."""
+        '''向实时流发送工具调用被抑制的事件，便于界面清理已经显示的工具运行占位。'''
         try:
             from langgraph.config import get_stream_writer
 
@@ -224,24 +155,7 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         tool_calls: list[dict],
         runtime: Runtime,
     ) -> None:
-        """执行 _record_audit_event 的明确职责，并返回与调用约定一致的结果。
-
-        Write a ``middleware:safety_termination`` record to RunEventStore
-                for post-run auditability.
-
-                The custom stream event in ``_emit_event`` is consumed by live SSE
-                clients and disappears after the run; this event is persisted so an
-                operator can answer "which runs were safety-suppressed today?" from
-                a single SQL query without joining the message body. Worker exposes
-                the run-scoped ``RunJournal`` via ``runtime.context["__run_journal"]``;
-                absent in unit-test / subagent / no-event-store paths, in which case
-                we silently skip.
-
-                Tool **arguments** are deliberately **not** recorded — those are the
-                very content the provider filtered; persisting them would defeat the
-                purpose of the safety filter. Names / count / ids are sufficient for
-                audit and debugging (issue #3028 review).
-        """
+        '''将终止信号及被抑制工具的名称、数量和标识写入运行日志，不记录工具参数。'''
         journal = None
         if runtime is not None and getattr(runtime, "context", None):
             context = runtime.context
@@ -273,13 +187,11 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
                 changes=changes,
             )
         except Exception:  # noqa: BLE001
-            # Audit-event persistence must never break agent execution.
             logger.debug("Failed to record middleware:safety_termination event", exc_info=True)
 
-    # ----- main apply ------------------------------------------------------
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 _apply 的明确职责，并返回与调用约定一致的结果"
+        '''仅在最后一条模型消息包含工具调用且检测到安全终止时清理调用并发出审计事件。'''
         messages = state.get("messages", [])
         if not messages:
             return None
@@ -288,9 +200,6 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         if not isinstance(last, AIMessage):
             return None
 
-        # Issue scope: only intervene when there's something to suppress.
-        # ``content_filter`` without tool_calls is allowed through unchanged
-        # so the partial text response (if any) reaches the user naturally.
         tool_calls = last.tool_calls
         if not tool_calls:
             return None
@@ -299,8 +208,6 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         if termination is None:
             return None
 
-        # Stamp stop_reason so the worker can surface this capped completion
-        # alongside loop_capped / token_capped (#4176).
         ctx = getattr(runtime, "context", None)
         if isinstance(ctx, dict):
             ctx["stop_reason"] = "safety_capped"
@@ -327,14 +234,13 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
 
         return {"messages": [patched]}
 
-    # ----- hooks -----------------------------------------------------------
 
     @override
     def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 after_model 的明确职责，并返回与调用约定一致的结果"
+        '''在同步模型返回后应用工具调用抑制逻辑。'''
         return self._apply(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        "执行 aafter_model 的明确职责，并返回与调用约定一致的结果"
+        '''在异步模型返回后应用同一套工具调用抑制逻辑。'''
         return self._apply(state, runtime)

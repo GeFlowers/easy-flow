@@ -1,4 +1,4 @@
-"""JWT 令牌的创建与验证。"""
+'''JWT 令牌的创建与验证。'''
 
 from datetime import UTC, datetime, timedelta
 
@@ -10,16 +10,16 @@ from app.gateway.auth.errors import TokenError
 
 
 class TokenPayload(BaseModel):
-    """JWT 令牌负载。"""
+    '''JWT 令牌负载。'''
 
-    sub: str  # user_id
+    sub: str  # 用户标识
     exp: datetime
     iat: datetime | None = None
-    ver: int = 0  # token_version — must match User.token_version
+    ver: int = 0  # 令牌版本，必须与 User.token_version 一致
 
 
 def create_access_token(user_id: str, expires_delta: timedelta | None = None, token_version: int = 0) -> str:
-    """为用户创建访问 JWT，并写入过期时间与令牌版本以支持失效控制。"""
+    '''为用户创建访问 JWT，并写入过期时间与令牌版本以支持失效控制。'''
     config = get_auth_config()
     expiry = expires_delta or timedelta(days=config.token_expiry_days)
 
@@ -29,7 +29,7 @@ def create_access_token(user_id: str, expires_delta: timedelta | None = None, to
 
 
 def decode_token(token: str) -> TokenPayload | TokenError:
-    """解码并验证 JWT；成功返回负载，失败返回具体 ``TokenError``。"""
+    '''解码并验证 JWT；成功返回负载，失败返回具体 ``TokenError``。'''
     config = get_auth_config()
     try:
         payload = jwt.decode(token, config.jwt_secret, algorithms=["HS256"])

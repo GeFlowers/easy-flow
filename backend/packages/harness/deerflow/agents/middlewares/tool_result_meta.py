@@ -1,11 +1,4 @@
-"""定义 tool_result_meta 模块提供的职责与可复用接口。
-
-Unified tool result semantics for structured signal production.
-
-Every tool result that passes through ToolErrorHandlingMiddleware gets a
-``deerflow_tool_meta`` entry in additional_kwargs. Downstream consumers
-(ToolProgressMiddleware, etc.) read this key instead of parsing text.
-"""
+'''将工具结果和异常归一为结构化状态，供进度展示及后续策略判断复用。'''
 
 from __future__ import annotations
 
@@ -25,8 +18,6 @@ _PARTIAL_MARKERS = (
     "limited results",
     "truncated",
     "results may be incomplete",
-    # Tools that return status="success" with a no-results body (instead of status="error")
-    # must still be caught by stagnation detection so the model is prompted to try a different query.
     "no results found",
     "no content found",
     "no images found",
@@ -35,7 +26,7 @@ _PARTIAL_MARKERS = (
 
 @dataclass(frozen=True, slots=True)
 class ToolResultMeta:
-    "封装 ToolResultMeta 的状态、协作关系与公开操作"
+    '''描述工具执行状态、错误类型、模型可恢复性、建议后续动作及状态来源。'''
 
     status: Literal["success", "error", "partial_success"]
     error_type: str | None
@@ -85,26 +76,13 @@ _UNKNOWN_ERROR: dict[str, object] = {
     "recommended_next_action": "try_alternative",
 }
 
-# Pre-compiled at module load from _ERROR_RULES. Anchoring bare numeric codes (401, 403, 404,
-# 500) to word boundaries prevents substring hits on unrelated numbers like "took 500ms".
-# Computed here (after _ERROR_RULES) so the set is authoritative and thread-safe — no lazy
-# writes on the hot classification path.
 _NUMERIC_KW_RE: dict[str, re.Pattern[str]] = {kw: re.compile(rf"\b{kw}\b") for rule_keywords, _ in _ERROR_RULES for kw in rule_keywords if kw.isdigit()}
 
 _SEMANTIC_ZERO_ERROR_STRINGS: frozenset[str] = frozenset({"none", "null", "false", "no", "ok", "success", "n/a", ""})
 
 
 def _extract_json_error_text(content: str) -> str | None:
-    """执行 _extract_json_error_text 的明确职责，并返回与调用约定一致的结果。
-
-    Return the error string from a JSON-wrapped error like {"error": "...", "query": "..."}.
-
-        Returns None when the ``error`` field is falsy (JSON null / 0 / false / empty
-        string) or is a sentinel string that conventionally means "no error" (e.g.
-        ``"none"``, ``"null"``, ``"false"``).  This prevents tools that return
-        ``{"error": "none", "results": [...]}`` on success from being misclassified
-        as errors.
-    """
+    '''仅提取 JSON 对象中的 error 字段，并忽略通常表示成功的空值和哨兵文本。'''
     try:
         data = json.loads(content)
     except (json.JSONDecodeError, ValueError):
@@ -114,23 +92,18 @@ def _extract_json_error_text(content: str) -> str | None:
         return None
     if isinstance(error, str) and error.lower().strip() in _SEMANTIC_ZERO_ERROR_STRINGS:
         return None
-    # Serialize non-string values to JSON so _classify_error_text sees a predictable
-    # format (e.g. {"error": 404} → "404", {"error": [...]} → "[...]") instead of
-    # Python repr which can spuriously match keyword rules like "missing required".
     return error if isinstance(error, str) else json.dumps(error)
 
 
 def _match_keyword(kw: str, lower: str) -> bool:
-    """执行 _match_keyword 的明确职责，并返回与调用约定一致的结果。
-
-    Match a keyword against lowercased text, using word boundaries for numeric codes."""
+    '''按规则匹配错误关键词；纯数字状态码使用单词边界，避免命中普通数值片段。'''
     if kw.isdigit():
         return bool(_NUMERIC_KW_RE[kw].search(lower))
     return kw in lower
 
 
 def _classify_error_text(text: str) -> dict[str, object]:
-    "执行 _classify_error_text 的明确职责，并返回与调用约定一致的结果"
+    '''按错误规则表识别认证、配额、网络、配置、权限等类别及建议动作。'''
     lower = text.lower()
     for keywords, attrs in _ERROR_RULES:
         if any(_match_keyword(kw, lower) for kw in keywords):
@@ -139,7 +112,7 @@ def _classify_error_text(text: str) -> dict[str, object]:
 
 
 def _make_meta(*, status: str, source: str, error_type: str | None = None, recoverable_by_model: bool = True, recommended_next_action: str = "continue") -> dict[str, object]:
-    "执行 _make_meta 的明确职责，并返回与调用约定一致的结果"
+    '''构造统一的工具结果元数据字段，并允许调用方指定状态、错误来源和恢复建议。'''
     return {
         "status": status,
         "error_type": error_type,
@@ -150,14 +123,7 @@ def _make_meta(*, status: str, source: str, error_type: str | None = None, recov
 
 
 def stamp_exception_meta(msg: ToolMessage, exc_info: str) -> ToolMessage:
-    """执行 stamp_exception_meta 的明确职责，并返回与调用约定一致的结果。
-
-    Stamp deerflow_tool_meta with source='exception' onto an exception-derived ToolMessage.
-
-        Unlike normalize_tool_message (which preserves existing stamps), this function always
-        overwrites any pre-existing TOOL_META_KEY entry.  Exception-derived classification is
-        more authoritative than a tool's own return-time stamp.
-    """
+    '''根据异常详情分类并覆盖工具消息上的旧元数据，以异常处理结果作为最终判定。'''
     attrs = _classify_error_text(exc_info)
     updated_kwargs = dict(msg.additional_kwargs or {})
     updated_kwargs[TOOL_META_KEY] = _make_meta(status="error", source="exception", **attrs)
@@ -166,32 +132,19 @@ def stamp_exception_meta(msg: ToolMessage, exc_info: str) -> ToolMessage:
 
 
 def normalize_tool_message(msg: ToolMessage) -> ToolMessage:
-    """执行 normalize_tool_message 的明确职责，并返回与调用约定一致的结果。
-
-    Attach deerflow_tool_meta to a ToolMessage if not already present."""
+    '''保留已有元数据；否则根据错误状态、JSON 错误字段和部分结果提示标记消息。'''
     existing = (msg.additional_kwargs or {}).get(TOOL_META_KEY)
     if existing is not None:
         return msg
 
     content = msg.content if isinstance(msg.content, str) else ""
-    # Pre-compute once; reused by the partial-success marker check below to avoid calling
-    # content.lower() once per _PARTIAL_MARKERS entry inside the generator.
     content_lower = content.lower()
 
-    # Non-standard error: tool returned status="error" without the "Error:" prefix convention.
-    # (Actual exceptions from ToolErrorHandlingMiddleware are pre-stamped by stamp_exception_meta
-    # and exit early above — they never reach this branch.)
-    # Try JSON extraction first so classification uses only the "error" field value, not
-    # keywords that appear incidentally in other JSON fields (e.g. "query").
     if msg.status == "error" and not content.startswith(_ERROR_PREFIX):
         json_error = _extract_json_error_text(content)
         if json_error is not None:
             attrs = _classify_error_text(json_error)
         else:
-            # Determine whether content is a JSON object that simply has no 'error' key.
-            # If so, do NOT classify from the raw JSON string — incidental field values
-            # (e.g. {"user_id": 401}) would spuriously match keyword rules and hard-block
-            # the tool.  Classify raw text only when the content is not valid JSON.
             try:
                 is_json_dict = isinstance(json.loads(content), dict)
             except (json.JSONDecodeError, ValueError):
@@ -220,9 +173,7 @@ def normalize_tool_message(msg: ToolMessage) -> ToolMessage:
 
 
 def normalize_tool_result(result: ToolMessage | Command) -> ToolMessage | Command:
-    """执行 normalize_tool_result 的明确职责，并返回与调用约定一致的结果。
-
-    Normalize a tool result, handling Command wrappers transparently."""
+    '''规范化直接返回的工具消息；对包含状态更新命令的结果保持原样。'''
     if isinstance(result, ToolMessage):
         return normalize_tool_message(result)
     return result

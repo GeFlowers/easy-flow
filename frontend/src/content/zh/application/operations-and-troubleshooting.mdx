@@ -90,7 +90,6 @@ ls -la backend/.deer-flow/threads/
 
 1. 确保 `backend/.deer-flow/` 对运行 DeerFlow 的进程可写。
 2. 在 Docker 部署中，验证卷挂载路径正确（`DEER_FLOW_ROOT` 设置为绝对路径）。
-3. 如果使用基于容器的沙箱，确认 Docker 已运行并且容器镜像已拉取。
 
 ---
 
@@ -146,16 +145,6 @@ docker compose -f docker/docker-compose-dev.yaml logs --tail=20 gateway
 3. 检查 MCP 服务器是否需要网络访问或特定环境变量。
 
 ---
-
-### K8s Provisioner 连接失败
-
-**症状**：沙箱工具请求挂起，日志中有连接拒绝错误。
-
-**解决**：
-
-1. 验证 `config.yaml` 中 `provisioner_url` 正确且 Provisioner Pod 运行正常。
-2. 检查 `K8S_NAMESPACE` 和 RBAC 配置是否允许 Provisioner 创建 Pod。
-3. 验证 `SANDBOX_IMAGE` 可以从 K8s 节点拉取。
 
 ## 数据备份
 

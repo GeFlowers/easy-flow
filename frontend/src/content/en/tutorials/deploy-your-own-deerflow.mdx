@@ -71,7 +71,7 @@ Open `http://your-server:2026` in your browser.
 - Set `BETTER_AUTH_SECRET` to a strong random string (minimum 32 characters)
 - Configure firewall rules to allow only necessary ports
 - Back up `backend/.deer-flow/` directory regularly
-- Consider using a container-based sandbox (`AioSandboxProvider`) for multi-user isolation
+- Keep `allow_host_bash` disabled unless the environment and users are fully trusted
 
 ## Next steps
 

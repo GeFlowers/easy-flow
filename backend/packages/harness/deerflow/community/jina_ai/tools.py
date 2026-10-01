@@ -1,4 +1,4 @@
-"定义 tools 模块提供的职责与可复用接口"
+'''从工具配置构造 Jina 客户端，并提取抓取结果中的正文。'''
 
 import asyncio
 
@@ -12,7 +12,7 @@ readability_extractor = ReadabilityExtractor()
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
-    "执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果"
+    '''解析布尔值或常见真假字符串；无法识别时返回默认值。'''
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -25,7 +25,7 @@ def _coerce_bool(value: object, default: bool) -> bool:
 
 
 def _coerce_timeout(value: object, default: int) -> int:
-    "执行 _coerce_timeout 的明确职责，并返回与调用约定一致的结果"
+    '''将超时配置转换为整数；布尔值、非法字符串和其他类型回退到默认值。'''
     if isinstance(value, bool):
         return default
     if isinstance(value, int):
@@ -39,7 +39,7 @@ def _coerce_timeout(value: object, default: int) -> int:
 
 
 def _coerce_proxy(value: object) -> str | None:
-    "执行 _coerce_proxy 的明确职责，并返回与调用约定一致的结果"
+    '''清理代理配置并返回非空地址；非字符串或空内容返回 ``None``。'''
     if not isinstance(value, str):
         return None
     proxy = value.strip()
@@ -48,7 +48,7 @@ def _coerce_proxy(value: object) -> str | None:
 
 @tool("web_fetch", parse_docstring=True)
 async def web_fetch_tool(url: str) -> str:
-    """读取指定网页的正文内容并返回给 agent。
+    '''读取指定网页的正文内容并返回给 agent。
     Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
     This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
     Do NOT add www. to URLs that do NOT have them.
@@ -56,7 +56,7 @@ async def web_fetch_tool(url: str) -> str:
 
     Args:
         url: The URL to fetch the contents of.
-    """
+    '''
     jina_client = JinaClient()
     timeout = 10
     proxy = None

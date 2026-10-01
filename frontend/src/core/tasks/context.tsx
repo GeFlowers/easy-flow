@@ -23,7 +23,7 @@ export const SubtaskContext = createContext<SubtaskContextValue>({
   tasks: {},
   tasksRef: { current: {} },
   setTasks: () => {
-    /* noop */
+    // 初始上下文不承载状态更新；实际更新由 SubtasksProvider 注入。
   },
 });
 
@@ -70,6 +70,7 @@ export function useUpdateSubtask() {
     setTasks({ ...tasksRef.current });
   });
 
+  /** 合并子任务最新事件，并按变化类型及时或延后通知界面更新。 */
   const updateSubtask = useCallback(
     (task: Partial<Subtask> & { id: string }) => {
       // 通过引用读取最新状态而非闭包快照，避免迟到的步骤回填覆盖 SSE 步骤、状态或并发新增的兄弟子任务。

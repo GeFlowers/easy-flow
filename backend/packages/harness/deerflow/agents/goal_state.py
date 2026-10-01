@@ -1,4 +1,4 @@
-"""定义跨续跑目标及其评估结果的线程状态结构。"""
+'''定义跨续跑目标及其评估结果的线程状态结构。'''
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ GoalBlocker = Literal[
 
 
 class GoalEvaluation(TypedDict):
-    """记录一次目标完成度评估的结论、阻塞原因与证据摘要。"""
+    '''记录一次目标完成度评估的结论、阻塞原因与证据摘要。'''
 
     satisfied: bool
     blocker: GoalBlocker
@@ -24,7 +24,7 @@ class GoalEvaluation(TypedDict):
 
 
 class GoalState(TypedDict):
-    """保存活动目标的续跑计数、进度阈值和最近评估结果。"""
+    '''保存活动目标的续跑计数、进度阈值和最近评估结果。'''
 
     objective: str
     status: Literal["active"]

@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -29,26 +29,26 @@ _UPSERT_MAX_ATTEMPTS = 3
 
 
 class ChannelCredentialCipher:
-    """定义用于保护持久化凭据内容的加密组件。"""
+    '''定义用于保护持久化凭据内容的加密组件。'''
 
     def __init__(self, fernet: Fernet) -> None:
-        """初始化当前持久化组件所需的依赖与内部状态。"""
+        '''初始化当前持久化组件所需的依赖与内部状态。'''
         self._fernet = fernet
 
     @classmethod
     def from_key(cls, key: str) -> ChannelCredentialCipher:
-        """将任意长度的配置密钥规范化为 Fernet 可用的加密密钥。"""
+        '''将任意长度的配置密钥规范化为 Fernet 可用的加密密钥。'''
         digest = hashlib.sha256(key.encode("utf-8")).digest()
         return cls(Fernet(base64.urlsafe_b64encode(digest)))
 
     def encrypt_text(self, value: str | None) -> str | None:
-        """加密待持久化的敏感文本内容。"""
+        '''加密待持久化的敏感文本内容。'''
         if value is None:
             return None
         return "fernet:v1:" + self._fernet.encrypt(value.encode("utf-8")).decode("ascii")
 
     def decrypt_text(self, value: str | None) -> str | None:
-        """解密从持久化记录中读取的敏感文本内容。"""
+        '''解密从持久化记录中读取的敏感文本内容。'''
         if value is None:
             return None
         token = value.removeprefix("fernet:v1:")
@@ -56,7 +56,7 @@ class ChannelCredentialCipher:
 
 
 class ChannelConnectionRepository:
-    """定义负责持久化读写及事务边界管理的仓储组件。"""
+    '''定义负责持久化读写及事务边界管理的仓储组件。'''
 
     def __init__(
         self,
@@ -64,35 +64,35 @@ class ChannelConnectionRepository:
         *,
         cipher: ChannelCredentialCipher | None = None,
     ) -> None:
-        """初始化当前持久化组件所需的依赖与内部状态。"""
+        '''初始化当前持久化组件所需的依赖与内部状态。'''
         self.session_factory = session_factory
         self._cipher = cipher
 
     async def close(self) -> None:
-        """关闭仓储共享的异步数据库引擎连接池。"""
+        '''关闭仓储共享的异步数据库引擎连接池。'''
         from deerflow.persistence.engine import close_engine
 
         await close_engine()
 
     @staticmethod
     def _new_id() -> str:
-        """生成连接相关记录使用的随机十六进制主键。"""
+        '''生成连接相关记录使用的随机十六进制主键。'''
         return uuid.uuid4().hex
 
     @staticmethod
     def _normalize_optional_identity(value: str | None) -> str:
-        """将缺失的外部账号标识统一为空字符串以参与唯一键匹配。"""
+        '''将缺失的外部账号标识统一为空字符串以参与唯一键匹配。'''
         return value or ""
 
     @staticmethod
     def _coerce_datetime(value: datetime | None) -> datetime | None:
-        """为数据库读出的无时区时间补上 UTC 时区信息。"""
+        '''为数据库读出的无时区时间补上 UTC 时区信息。'''
         if value is None or value.tzinfo is not None:
             return value
         return value.replace(tzinfo=UTC)
 
     def _encrypt_optional_secret(self, value: str | None) -> str | None:
-        """加密可选凭据；未配置加密器时拒绝保存明文密钥。"""
+        '''加密可选凭据；未配置加密器时拒绝保存明文密钥。'''
         if value is None:
             return None
         if self._cipher is None:
@@ -101,7 +101,7 @@ class ChannelConnectionRepository:
 
     @staticmethod
     def _connection_to_dict(row: ChannelConnectionRow) -> dict[str, Any]:
-        """将持久化记录转换为对外使用的字典表示。"""
+        '''将持久化记录转换为对外使用的字典表示。'''
         data = row.to_dict()
         data["external_account_id"] = data["external_account_id"] or None
         data["workspace_id"] = data["workspace_id"] or None
@@ -129,12 +129,12 @@ class ChannelConnectionRepository:
         metadata: dict[str, Any] | None = None,
         status: str = "connected",
     ) -> dict[str, Any]:
-        """按外部账号和工作区唯一身份创建或更新连接，并回收已转移账号的凭据。"""
+        '''按外部账号和工作区唯一身份创建或更新连接，并回收已转移账号的凭据。'''
         external_account_id_value = self._normalize_optional_identity(external_account_id)
         workspace_id_value = self._normalize_optional_identity(workspace_id)
 
         def _apply(row: ChannelConnectionRow) -> None:
-            """将本次连接属性同步到已存在的 ORM 行。"""
+            '''将本次连接属性同步到已存在的 ORM 行。'''
             row.status = status
             row.external_account_name = external_account_name
             row.workspace_name = workspace_name
@@ -144,7 +144,7 @@ class ChannelConnectionRepository:
             row.metadata_json = dict(metadata or {})
 
         async def _revoke_other_active_owners(session: AsyncSession) -> None:
-            """账号转移给新用户时撤销旧连接并删除其凭据。"""
+            '''账号转移给新用户时撤销旧连接并删除其凭据。'''
             if status != "connected":
                 return
             with session.no_autoflush:
@@ -195,13 +195,13 @@ class ChannelConnectionRepository:
             raise last_error  # type: ignore[misc]  # loop runs at least once
 
     async def list_connections(self, owner_user_id: str) -> list[dict[str, Any]]:
-        """查询并返回满足给定条件的持久化记录集合。"""
+        '''查询并返回满足给定条件的持久化记录集合。'''
         async with self.session_factory() as session:
             result = await session.execute(select(ChannelConnectionRow).where(ChannelConnectionRow.owner_user_id == owner_user_id).order_by(ChannelConnectionRow.updated_at.desc(), ChannelConnectionRow.id.desc()))
             return [self._connection_to_dict(row) for row in result.scalars()]
 
     async def disconnect_connection(self, *, connection_id: str, owner_user_id: str) -> bool:
-        """删除或撤销满足条件的持久化记录并提交事务。"""
+        '''删除或撤销满足条件的持久化记录并提交事务。'''
         async with self.session_factory() as session:
             row = await session.get(ChannelConnectionRow, connection_id)
             if row is None or row.owner_user_id != owner_user_id:
@@ -215,7 +215,7 @@ class ChannelConnectionRepository:
             return True
 
     async def disconnect_provider_connections(self, *, provider: str) -> int:
-        """删除或撤销满足条件的持久化记录并提交事务。"""
+        '''删除或撤销满足条件的持久化记录并提交事务。'''
         async with self.session_factory() as session:
             result = await session.execute(
                 select(ChannelConnectionRow.id).where(
@@ -243,7 +243,7 @@ class ChannelConnectionRepository:
         refresh_expires_at: datetime | None = None,
         extra: dict[str, Any] | None = None,
     ) -> None:
-        """加密并保存连接凭据，同时递增凭据版本号。"""
+        '''加密并保存连接凭据，同时递增凭据版本号。'''
         if self._cipher is None:
             raise RuntimeError("channel connection encryption key is required")
         async with self.session_factory() as session:
@@ -261,7 +261,7 @@ class ChannelConnectionRepository:
             await session.commit()
 
     async def get_credentials(self, connection_id: str) -> dict[str, Any] | None:
-        """按给定条件查询并返回对应的持久化记录。"""
+        '''按给定条件查询并返回对应的持久化记录。'''
         if self._cipher is None:
             return None
         async with self.session_factory() as session:
@@ -288,7 +288,7 @@ class ChannelConnectionRepository:
 
     @staticmethod
     def hash_state(state: str) -> str:
-        """计算可安全存储和比较的摘要值。"""
+        '''计算可安全存储和比较的摘要值。'''
         return hashlib.sha256(state.encode("utf-8")).hexdigest()
 
     async def create_oauth_state(
@@ -304,7 +304,7 @@ class ChannelConnectionRepository:
         requested_scopes: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> None:
-        """创建记录并在成功后提交相应的持久化事务。"""
+        '''创建记录并在成功后提交相应的持久化事务。'''
         row = ChannelOAuthStateRow(
             state_hash=self.hash_state(state),
             owner_user_id=owner_user_id,
@@ -335,7 +335,7 @@ class ChannelConnectionRepository:
         requested_scopes: list[str] | None = None,
         metadata: dict[str, Any] | None = None,
     ) -> bool:
-        """创建记录并在成功后提交相应的持久化事务。"""
+        '''创建记录并在成功后提交相应的持久化事务。'''
         current_time = now or datetime.now(UTC)
         async with self.session_factory() as session:
             await self._serialize_oauth_owner_scope(session, owner_user_id, provider)
@@ -376,7 +376,7 @@ class ChannelConnectionRepository:
             return True
 
     async def _serialize_oauth_owner_scope(self, session: AsyncSession, owner_user_id: str, provider: str) -> None:
-        """通过事务级 advisory lock 串行化同一用户与提供方的 OAuth 状态写入。"""
+        '''通过事务级 advisory lock 串行化同一用户与提供方的 OAuth 状态写入。'''
         try:
             dialect = session.bind.dialect.name if session.bind is not None else ""
         except Exception:
@@ -386,12 +386,12 @@ class ChannelConnectionRepository:
 
     @staticmethod
     def _oauth_scope_lock_key(owner_user_id: str, provider: str) -> int:
-        """获取并管理数据库架构操作所需的并发互斥锁。"""
+        '''获取并管理数据库架构操作所需的并发互斥锁。'''
         digest = hashlib.sha256(f"{owner_user_id}\x00{provider}".encode()).digest()
         return int.from_bytes(digest[:8], "big") & 0x7FFFFFFFFFFFFFFF
 
     async def delete_expired_oauth_states(self, *, now: datetime | None = None) -> int:
-        """删除或撤销满足条件的持久化记录并提交事务。"""
+        '''删除或撤销满足条件的持久化记录并提交事务。'''
         current_time = now or datetime.now(UTC)
         async with self.session_factory() as session:
             result = await session.execute(delete(ChannelOAuthStateRow).where(ChannelOAuthStateRow.expires_at < current_time))
@@ -406,7 +406,7 @@ class ChannelConnectionRepository:
         active_only: bool = False,
         now: datetime | None = None,
     ) -> int:
-        """统计用户针对指定提供方创建的 OAuth 状态，可只统计未过期且未消费项。"""
+        '''统计用户针对指定提供方创建的 OAuth 状态，可只统计未过期且未消费项。'''
         current_time = now or datetime.now(UTC)
         conditions = [
             ChannelOAuthStateRow.owner_user_id == owner_user_id,
@@ -431,7 +431,7 @@ class ChannelConnectionRepository:
         state: str,
         now: datetime | None = None,
     ) -> dict[str, Any] | None:
-        """校验并一次性消费 OAuth state，返回授权流程需要的验证信息。"""
+        '''校验并一次性消费 OAuth state，返回授权流程需要的验证信息。'''
         current_time = now or datetime.now(UTC)
         state_hash = self.hash_state(state)
         async with self.session_factory() as session:
@@ -470,7 +470,7 @@ class ChannelConnectionRepository:
         external_account_id: str,
         workspace_id: str | None = None,
     ) -> dict[str, Any] | None:
-        """按给定条件查询并返回对应的持久化记录。"""
+        '''按给定条件查询并返回对应的持久化记录。'''
         async with self.session_factory() as session:
             result = await session.execute(
                 select(ChannelConnectionRow)
@@ -496,7 +496,7 @@ class ChannelConnectionRepository:
         thread_id: str,
         external_topic_id: str | None = None,
     ) -> None:
-        """更新指定持久化记录的状态或字段并提交事务。"""
+        '''更新指定持久化记录的状态或字段并提交事务。'''
         topic_id = external_topic_id or ""
         async with self.session_factory() as session:
             stmt = select(ChannelConversationRow).where(
@@ -528,7 +528,7 @@ class ChannelConnectionRepository:
         external_conversation_id: str,
         external_topic_id: str | None = None,
     ) -> str | None:
-        """按给定条件查询并返回对应的持久化记录。"""
+        '''按给定条件查询并返回对应的持久化记录。'''
         async with self.session_factory() as session:
             stmt = select(ChannelConversationRow.thread_id).where(
                 ChannelConversationRow.connection_id == connection_id,

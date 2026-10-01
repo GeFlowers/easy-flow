@@ -1,10 +1,10 @@
-"""提供配置、tool、progress、配置相关功能。"""
+'''配置工具调用进展跟踪、重复结果识别及停滞警告策略。'''
 
 from pydantic import BaseModel, Field
 
 
 class ToolProgressConfig(BaseModel):
-    """\u6267\u884c ToolProgressConfig \u5b9a\u4e49\u7684\u64cd\u4f5c\u3002"""
+    '''设置多次无进展工具调用触发提示或升级处理的阈值。'''
 
     enabled: bool = Field(
         default=False,

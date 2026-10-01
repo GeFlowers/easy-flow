@@ -1,4 +1,4 @@
-"""认证、反馈和计划任务等运行管理路由。"""
+'''认证、反馈和计划任务等运行管理路由。'''
 
 from . import auth, feedback, scheduled_tasks
 

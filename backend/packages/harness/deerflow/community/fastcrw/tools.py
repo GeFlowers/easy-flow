@@ -1,4 +1,4 @@
-"定义 tools 模块提供的职责与可复用接口"
+'''通过 Firecrawl 兼容接口提供 FastCRW 搜索和网页抓取工具。'''
 
 import json
 import os
@@ -9,15 +9,13 @@ from langchain.tools import tool
 from deerflow.community.url_safety import validate_public_http_url
 from deerflow.config import get_app_config
 
-# fastCRW is a Firecrawl-compatible web data engine (single Rust binary; self-host
-# or cloud). Because the REST API is Firecrawl-compatible, this provider reuses the
-# Firecrawl client and only swaps the base URL. Cloud default points at the managed
-# service; override `base_url` in the tool config (or set CRW_API_URL) for self-host.
+# FastCRW 兼容 Firecrawl 接口，因此复用其客户端并允许替换服务地址；自托管地址
+# 可通过工具配置中的 ``base_url`` 或环境变量 ``CRW_API_URL`` 指定。
 DEFAULT_BASE_URL = "https://fastcrw.com/api"
 
 
 def _get_fastcrw_client(tool_name: str = "web_search") -> FirecrawlApp:
-    "执行 _get_fastcrw_client 的明确职责，并返回与调用约定一致的结果"
+    '''优先读取工具配置，再从环境变量获取凭据和服务地址并创建客户端。'''
     config = get_app_config().get_tool_config(tool_name)
     api_key = None
     base_url = None
@@ -34,13 +32,13 @@ def _get_fastcrw_client(tool_name: str = "web_search") -> FirecrawlApp:
 
 
 def _get_tool_config_extra(tool_name: str) -> dict:
-    "执行 _get_tool_config_extra 的明确职责，并返回与调用约定一致的结果"
+    '''返回指定工具的扩展配置副本；工具未配置时返回空字典。'''
     config = get_app_config().get_tool_config(tool_name)
     return dict(config.model_extra or {}) if config is not None else {}
 
 
 def _coerce_bool(value: object, default: bool) -> bool:
-    "执行 _coerce_bool 的明确职责，并返回与调用约定一致的结果"
+    '''解析布尔值或常见真假字符串；无法识别时返回调用方给定的默认值。'''
     if isinstance(value, bool):
         return value
     if isinstance(value, str):
@@ -54,11 +52,11 @@ def _coerce_bool(value: object, default: bool) -> bool:
 
 @tool("web_search", parse_docstring=True)
 def web_search_tool(query: str) -> str:
-    """搜索网络并返回与查询相关的资料。
+    '''搜索网络并返回与查询相关的资料。
 
     Args:
         query: The query to search for.
-    """
+    '''
     try:
         config = get_app_config().get_tool_config("web_search")
         max_results = 5
@@ -68,7 +66,7 @@ def web_search_tool(query: str) -> str:
         client = _get_fastcrw_client("web_search")
         result = client.search(query, limit=max_results)
 
-        # result.web contains list of SearchResultWeb objects
+        # SDK 将网页搜索结果放在 result.web 字段中。
         web_results = result.web or []
         normalized_results = [
             {
@@ -86,7 +84,7 @@ def web_search_tool(query: str) -> str:
 
 @tool("web_fetch", parse_docstring=True)
 def web_fetch_tool(url: str) -> str:
-    """读取指定网页的正文内容并返回给 agent。
+    '''读取指定网页的正文内容并返回给 agent。
     Only fetch EXACT URLs that have been provided directly by the user or have been returned in results from the web_search and web_fetch tools.
     This tool can NOT access content that requires authentication, such as private Google Docs or pages behind login walls.
     Do NOT add www. to URLs that do NOT have them.
@@ -94,7 +92,7 @@ def web_fetch_tool(url: str) -> str:
 
     Args:
         url: The URL to fetch the contents of.
-    """
+    '''
     try:
         cfg = _get_tool_config_extra("web_fetch")
         allow_private_addresses = _coerce_bool(cfg.get("allow_private_addresses"), False)

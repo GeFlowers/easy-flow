@@ -26,6 +26,7 @@ const RIGHT_PANEL_ANIMATION_MS = 280;
 
 type RightPanelKind = "sidecar" | "artifacts";
 
+/** 组织聊天页右侧的侧边对话和产物面板，并协调移动端呈现方式。 */
 const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
   children,
   threadId,

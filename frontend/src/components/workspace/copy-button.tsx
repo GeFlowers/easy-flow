@@ -17,6 +17,7 @@ export function CopyButton({
 }) {
   const { t } = useI18n();
   const [copied, setCopied] = useState(false);
+  /** 复制调用方提供的文本，并在成功或失败时反馈当前状态。 */
   const handleCopy = useCallback(() => {
     void (async () => {
       const didCopy = await writeTextToClipboard(clipboardData);

@@ -1,4 +1,4 @@
-"""根据应用配置解析并构造聊天模型，同时规范化供应商参数。"""
+'''根据应用配置解析并构造聊天模型，同时规范化供应商参数。'''
 
 import logging
 
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 
 def _deep_merge_dicts(base: dict | None, override: dict) -> dict:
-    """递归合并配置字典；嵌套字典逐层合并，其他值由覆盖项替换。"""
+    '''递归合并配置字典；嵌套字典逐层合并，其他值由覆盖项替换。'''
     merged = dict(base or {})
     for key, value in override.items():
         if isinstance(value, dict) and isinstance(merged.get(key), dict):
@@ -25,7 +25,7 @@ def _deep_merge_dicts(base: dict | None, override: dict) -> dict:
 
 
 def _vllm_disable_chat_template_kwargs(chat_template_kwargs: dict) -> dict:
-    """为 vLLM/Qwen 生成关闭思考模式的模板参数，只修改调用方实际提供的开关。"""
+    '''为 vLLM/Qwen 生成关闭思考模式的模板参数，只修改调用方实际提供的开关。'''
     disable_kwargs: dict[str, bool] = {}
     if "thinking" in chat_template_kwargs:
         disable_kwargs["thinking"] = False
@@ -35,15 +35,15 @@ def _vllm_disable_chat_template_kwargs(chat_template_kwargs: dict) -> dict:
 
 
 def _declares_api_base(model_class: type) -> bool:
-    """判断模型类是否将 ``api_base`` 声明为自身字段，以区分真实参数和别名误用。"""
+    '''判断模型类是否将 ``api_base`` 声明为自身字段，以区分真实参数和别名误用。'''
     return "api_base" in getattr(model_class, "model_fields", {})
 
 
 def _normalize_openai_base_url(model_class: type, model_settings_from_config: dict) -> None:
-    """将 OpenAI 兼容模型配置中的 ``api_base`` 别名规范为 ``base_url``。
+    '''将 OpenAI 兼容模型配置中的 ``api_base`` 别名规范为 ``base_url``。
 
     原生声明 ``api_base`` 的供应商类保留该字段；若同时提供规范 endpoint 字段，则丢弃别名并记录警告。
-    """
+    '''
     if not issubclass(model_class, BaseChatOpenAI) or _declares_api_base(model_class):
         return
     if "api_base" not in model_settings_from_config:
@@ -58,10 +58,10 @@ def _normalize_openai_base_url(model_class: type, model_settings_from_config: di
 
 
 def _warn_unknown_model_settings(model_class, model_name: str, model_settings_from_config: dict) -> None:
-    """在构造 OpenAI 兼容模型时提示拼写错误或不受支持的配置键。
+    '''在构造 OpenAI 兼容模型时提示拼写错误或不受支持的配置键。
 
     按 Pydantic 字段名和别名校验，并允许工厂及 OpenAI 客户端使用的标准透传参数；其他供应商不套用此规则。
-    """
+    '''
     if not issubclass(model_class, BaseChatOpenAI):
         return
     known = getattr(model_class, "model_fields", None)
@@ -99,7 +99,7 @@ _DEFAULT_STREAM_CHUNK_TIMEOUT_SECONDS: float = 240.0
 
 
 def _apply_stream_chunk_timeout_default(model_class: type, model_settings_from_config: dict) -> None:
-    """为 OpenAI 兼容模型补充流式分块超时，并从其他模型配置中移除不适用的参数。"""
+    '''为 OpenAI 兼容模型补充流式分块超时，并从其他模型配置中移除不适用的参数。'''
     if not issubclass(model_class, BaseChatOpenAI):
         model_settings_from_config.pop("stream_chunk_timeout", None)
         return
@@ -109,7 +109,7 @@ def _apply_stream_chunk_timeout_default(model_class: type, model_settings_from_c
 
 
 def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *, app_config: AppConfig | None = None, attach_tracing: bool = True, **kwargs) -> BaseChatModel:
-    """按模型配置创建聊天模型，并按调用场景控制思考模式和追踪回调。
+    '''按模型配置创建聊天模型，并按调用场景控制思考模式和追踪回调。
 
         Args:
             name: 要创建的模型名称；None 时使用配置中的首个模型。
@@ -129,7 +129,7 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
 
         Returns:
             已配置完成的聊天模型实例。
-    """
+    '''
     config = app_config or get_app_config()
     if name is None:
         name = config.models[0].name
@@ -151,14 +151,9 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             "when_thinking_disabled",
             "thinking",
             "supports_vision",
-            # Presentation-only metadata (consumed by the console's cost
-            # display) — must never reach the provider client, which would
-            # forward unknown kwargs into the completion request payload.
             "pricing",
         },
     )
-    # Compute effective when_thinking_enabled by merging in the `thinking` shortcut field.
-    # The `thinking` shortcut is equivalent to setting when_thinking_enabled["thinking"].
     has_thinking_settings = (model_config.when_thinking_enabled is not None) or (model_config.thinking is not None)
     effective_wte: dict = dict(model_config.when_thinking_enabled) if model_config.when_thinking_enabled else {}
     if model_config.thinking is not None:
@@ -171,41 +166,32 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             model_settings_from_config.update(effective_wte)
     if not thinking_enabled:
         if model_config.when_thinking_disabled is not None:
-            # User-provided disable settings take full precedence
             model_settings_from_config.update(model_config.when_thinking_disabled)
         elif has_thinking_settings and effective_wte.get("extra_body", {}).get("thinking", {}).get("type"):
-            # OpenAI-compatible gateway: thinking is nested under extra_body
             model_settings_from_config["extra_body"] = _deep_merge_dicts(
                 model_settings_from_config.get("extra_body"),
                 {"thinking": {"type": "disabled"}},
             )
             model_settings_from_config["reasoning_effort"] = "minimal"
         elif has_thinking_settings and (disable_chat_template_kwargs := _vllm_disable_chat_template_kwargs(effective_wte.get("extra_body", {}).get("chat_template_kwargs") or {})):
-            # vLLM uses chat template kwargs to switch thinking on/off.
             model_settings_from_config["extra_body"] = _deep_merge_dicts(
                 model_settings_from_config.get("extra_body"),
                 {"chat_template_kwargs": disable_chat_template_kwargs},
             )
         elif has_thinking_settings and effective_wte.get("thinking", {}).get("type"):
-            # Native langchain_anthropic: thinking is a direct constructor parameter
             model_settings_from_config["thinking"] = {"type": "disabled"}
     if not model_config.supports_reasoning_effort:
         kwargs.pop("reasoning_effort", None)
         model_settings_from_config.pop("reasoning_effort", None)
 
-    # Normalize the api_base -> base_url alias FIRST, so the downstream OpenAI-compatible
-    # heuristics (stream_usage default below / stream_chunk_timeout) see the canonical endpoint key.
     _normalize_openai_base_url(model_class, model_settings_from_config)
     _apply_stream_chunk_timeout_default(model_class, model_settings_from_config)
 
-    # For Codex Responses API models: map thinking mode to reasoning_effort
     from deerflow.models.openai_codex_provider import CodexChatModel
 
     if issubclass(model_class, CodexChatModel):
-        # The ChatGPT Codex endpoint currently rejects max_tokens/max_output_tokens.
         model_settings_from_config.pop("max_tokens", None)
 
-        # Use explicit reasoning_effort from frontend if provided (low/medium/high)
         explicit_effort = kwargs.pop("reasoning_effort", None)
         if not thinking_enabled:
             model_settings_from_config["reasoning_effort"] = "none"
@@ -214,17 +200,9 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
         elif "reasoning_effort" not in model_settings_from_config:
             model_settings_from_config["reasoning_effort"] = "medium"
 
-    # For MindIE models: enforce conservative retry defaults.
-    # Timeout normalization is handled inside MindIEChatModel itself.
     if getattr(model_class, "__name__", "") == "MindIEChatModel":
-        # Enforce max_retries constraint to prevent cascading timeouts.
         model_settings_from_config["max_retries"] = model_settings_from_config.get("max_retries", 1)
 
-    # Ensure stream_usage is enabled so that token usage metadata is available
-    # in streaming responses.  LangChain's BaseChatOpenAI only defaults
-    # stream_usage=True when no custom base_url/api_base is set, so models
-    # hitting third-party endpoints (e.g. doubao, deepseek) silently lose
-    # usage data.  We default it to True unless explicitly configured.
     if "stream_usage" not in model_settings_from_config and "stream_usage" not in kwargs:
         if "stream_usage" in getattr(model_class, "model_fields", {}):
             model_settings_from_config["stream_usage"] = True

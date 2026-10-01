@@ -1,4 +1,4 @@
-"""限制工具结果占用的模型上下文；超长内容优先保存到输出目录并以摘要替代。"""
+'''限制工具结果占用的模型上下文；超长内容优先保存到输出目录并以摘要替代。'''
 
 from __future__ import annotations
 
@@ -31,17 +31,15 @@ _VIRTUAL_OUTPUTS_BASE = "/mnt/user-data/outputs"
 
 
 def _default_config() -> ToolOutputConfig:
-    """创建默认的工具输出预算配置。"""
+    '''创建默认的工具输出预算配置。'''
     return ToolOutputConfig()
 
 
-# ---------------------------------------------------------------------------
 # 文本处理辅助函数。
-# ---------------------------------------------------------------------------
 
 
 def _message_text(content: Any) -> str | None:
-    """将工具消息内容提取为纯文本；多模态或结构化内容返回 None 并跳过限额处理。"""
+    '''将工具消息内容提取为纯文本；多模态或结构化内容返回 None 并跳过限额处理。'''
     if isinstance(content, str):
         return content
     if content is None:
@@ -60,7 +58,7 @@ def _message_text(content: Any) -> str | None:
 
 
 def _snap_to_line_boundary(text: str, pos: int) -> int:
-    """将截断结束位置尽量移到附近前一个换行之后，避免切断完整行。"""
+    '''将截断结束位置尽量移到附近前一个换行之后，避免切断完整行。'''
     if pos <= 0 or pos >= len(text):
         return pos
     half = pos // 2
@@ -71,7 +69,7 @@ def _snap_to_line_boundary(text: str, pos: int) -> int:
 
 
 def _snap_start_to_line_boundary(text: str, pos: int) -> int:
-    """将尾部预览起点尽量移到附近后一个换行之后，避免向前移动扩大内容。"""
+    '''将尾部预览起点尽量移到附近后一个换行之后，避免向前移动扩大内容。'''
     if pos <= 0 or pos >= len(text):
         return pos
     half = pos + (len(text) - pos) // 2
@@ -81,9 +79,7 @@ def _snap_start_to_line_boundary(text: str, pos: int) -> int:
     return pos
 
 
-# ---------------------------------------------------------------------------
 # 文件持久化。
-# ---------------------------------------------------------------------------
 
 _EXT_MAP: dict[str, str] = {
     "bash": "log",
@@ -93,14 +89,14 @@ _EXT_MAP: dict[str, str] = {
 
 
 def _sanitize_tool_name(name: str) -> str:
-    """清理工具名称中的路径穿越和分隔符，生成可用于文件名的部分。"""
+    '''清理工具名称中的路径穿越和分隔符，生成可用于文件名的部分。'''
     base = os.path.basename(name)
     safe = base.replace("..", "").replace("/", "_").replace("\\", "_")
     return safe or "unknown"
 
 
 def _build_externalized_filename(*, tool_name: str, tool_call_id: str) -> str:
-    """按工具名和随机短标识生成外置工具结果的文件名。"""
+    '''按工具名和随机短标识生成外置工具结果的文件名。'''
     safe_name = _sanitize_tool_name(tool_name)
     ext = _EXT_MAP.get(tool_name, "txt")
     short_id = uuid.uuid4().hex[:12]
@@ -115,7 +111,7 @@ def _externalize(
     outputs_path: str,
     storage_subdir: str,
 ) -> str | None:
-    """将结果写入宿主机输出子目录并返回沙箱虚拟路径，失败时返回 None。"""
+    '''将结果写入宿主机输出子目录并返回沙箱虚拟路径，失败时返回 None。'''
     if os.path.isabs(storage_subdir) or ".." in storage_subdir:
         return None
     storage_dir = os.path.join(outputs_path, storage_subdir)
@@ -147,7 +143,7 @@ def _externalize_to_sandbox(
     storage_subdir: str,
     sandbox: Sandbox,
 ) -> str | None:
-    """将结果直接写入未挂载的远程沙箱，并验证文件可读取后返回虚拟路径。"""
+    '''将结果直接写入未挂载的远程沙箱，并验证文件可读取后返回虚拟路径。'''
     if os.path.isabs(storage_subdir) or ".." in storage_subdir:
         return None
     filename = _build_externalized_filename(tool_name=tool_name, tool_call_id=tool_call_id)
@@ -176,9 +172,7 @@ def _externalize_to_sandbox(
     return virtual_path
 
 
-# ---------------------------------------------------------------------------
 # 预览和截断文本构造。
-# ---------------------------------------------------------------------------
 
 
 def _build_preview(
@@ -189,7 +183,7 @@ def _build_preview(
     head_chars: int,
     tail_chars: int,
 ) -> str:
-    """保留结果首尾片段，并插入完整输出文件路径和读取提示。"""
+    '''保留结果首尾片段，并插入完整输出文件路径和读取提示。'''
     total = len(content)
     head_end = _snap_to_line_boundary(content, min(head_chars, total))
     tail_start = max(head_end, total - tail_chars)
@@ -217,7 +211,7 @@ def _build_fallback(
     head_chars: int,
     tail_chars: int,
 ) -> str:
-    """无法外置保存时生成首尾截断文本，并保证结果不超过字符上限。"""
+    '''无法外置保存时生成首尾截断文本，并保证结果不超过字符上限。'''
     total = len(content)
     if max_chars <= 0 or total <= max_chars:
         return content
@@ -247,13 +241,11 @@ def _build_fallback(
     return "".join(parts)
 
 
-# ---------------------------------------------------------------------------
 # 输出预算核心逻辑。
-# ---------------------------------------------------------------------------
 
 
 def _resolve_outputs_path(request: ToolCallRequest) -> str | None:
-    """从工具运行时线程数据中读取宿主机输出目录。"""
+    '''从工具运行时线程数据中读取宿主机输出目录。'''
     runtime = getattr(request, "runtime", None)
     if runtime is None:
         return None
@@ -268,7 +260,7 @@ def _resolve_outputs_path(request: ToolCallRequest) -> str | None:
 
 
 def _resolve_sandbox(request: ToolCallRequest) -> Sandbox | None:
-    """根据运行状态中的 sandbox_id 查找已存在沙箱，不在工具调用时申请新沙箱。"""
+    '''根据运行状态中的 sandbox_id 查找已存在沙箱，不在工具调用时申请新沙箱。'''
     runtime = getattr(request, "runtime", None)
     state = getattr(runtime, "state", None)
     if not isinstance(state, dict):
@@ -295,7 +287,7 @@ def _budget_content(
     config: ToolOutputConfig,
     sandbox: Sandbox | None = None,
 ) -> str | None:
-    """依配置外置或截断工具文本；内容未超限或无需改动时返回 None。"""
+    '''依配置外置或截断工具文本；内容未超限或无需改动时返回 None。'''
     threshold = config.tool_overrides.get(tool_name, config.externalize_min_chars)
     if threshold <= 0 and config.fallback_max_chars <= 0:
         return None
@@ -372,9 +364,7 @@ def _budget_content(
     return None
 
 
-# ---------------------------------------------------------------------------
 # 工具结果替换函数。
-# ---------------------------------------------------------------------------
 
 
 def _patch_tool_message(
@@ -383,7 +373,7 @@ def _patch_tool_message(
     outputs_path: str | None,
     sandbox: Sandbox | None = None,
 ) -> ToolMessage:
-    """对单条工具消息应用输出预算；无需修改时保留原消息对象。"""
+    '''对单条工具消息应用输出预算；无需修改时保留原消息对象。'''
     tool_name = msg.name or "unknown"
     if tool_name in config.exempt_tools:
         return msg
@@ -412,7 +402,7 @@ def _patch_tool_message(
 
 
 def _effective_trigger(tool_name: str, config: ToolOutputConfig) -> int:
-    """计算该工具触发外置或截断的最小长度；两项策略均关闭时返回 -1。"""
+    '''计算该工具触发外置或截断的最小长度；两项策略均关闭时返回 -1。'''
     candidates: list[int] = []
     externalize = config.tool_overrides.get(tool_name, config.externalize_min_chars)
     if externalize > 0:
@@ -423,7 +413,7 @@ def _effective_trigger(tool_name: str, config: ToolOutputConfig) -> int:
 
 
 def _tool_message_over_budget(msg: ToolMessage, config: ToolOutputConfig) -> bool:
-    """快速判断工具消息是否未豁免且超过该工具的有效处理阈值。"""
+    '''快速判断工具消息是否未豁免且超过该工具的有效处理阈值。'''
     if (msg.name or "") in config.exempt_tools:
         return False
     trigger = _effective_trigger(msg.name or "", config)
@@ -434,7 +424,7 @@ def _tool_message_over_budget(msg: ToolMessage, config: ToolOutputConfig) -> boo
 
 
 def _needs_budget(result: ToolMessage | Command, config: ToolOutputConfig) -> bool:
-    """扫描工具返回值中的消息，判断是否需要进行输出预算处理。"""
+    '''扫描工具返回值中的消息，判断是否需要进行输出预算处理。'''
     if isinstance(result, ToolMessage):
         return _tool_message_over_budget(result, config)
     update = getattr(result, "update", None)
@@ -451,7 +441,7 @@ def _patch_result(
     outputs_path: str | None,
     sandbox: Sandbox | None = None,
 ) -> ToolMessage | Command:
-    """处理单条工具消息或命令更新中的工具消息，并保留其余返回数据。"""
+    '''处理单条工具消息或命令更新中的工具消息，并保留其余返回数据。'''
     if isinstance(result, ToolMessage):
         return _patch_tool_message(result, config, outputs_path, sandbox)
 
@@ -481,7 +471,7 @@ def _patch_result(
 
 
 def _patch_model_messages(messages: list[Any], config: ToolOutputConfig) -> list[Any] | None:
-    """截断消息历史中仍超预算的工具结果；全部符合预算时返回 None。"""
+    '''截断消息历史中仍超预算的工具结果；全部符合预算时返回 None。'''
     if not any(isinstance(msg, ToolMessage) and _tool_message_over_budget(msg, config) for msg in messages):
         return None
 
@@ -498,22 +488,19 @@ def _patch_model_messages(messages: list[Any], config: ToolOutputConfig) -> list
     return updated if changed else None
 
 
-# ---------------------------------------------------------------------------
-# Middleware class
-# ---------------------------------------------------------------------------
 
 
 class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
-    """在工具调用结果写入上下文前外置超长内容或按首尾保留策略截断。"""
+    '''在工具调用结果写入上下文前外置超长内容或按首尾保留策略截断。'''
 
     def __init__(self, config: ToolOutputConfig | None = None) -> None:
-        """使用给定或默认配置初始化工具输出预算中间件。"""
+        '''使用给定或默认配置初始化工具输出预算中间件。'''
         super().__init__()
         self._config = config if config is not None else _default_config()
 
     @classmethod
     def from_app_config(cls, app_config: Any) -> ToolOutputBudgetMiddleware:
-        """从应用配置中读取工具输出预算设置并构造中间件。"""
+        '''从应用配置中读取工具输出预算设置并构造中间件。'''
         tool_output = getattr(app_config, "tool_output", None)
         if isinstance(tool_output, ToolOutputConfig):
             return cls(config=tool_output)
@@ -527,7 +514,7 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], ToolMessage | Command],
     ) -> ToolMessage | Command:
-        """同步执行工具调用，并对超预算结果外置或截断。"""
+        '''同步执行工具调用，并对超预算结果外置或截断。'''
         result = handler(request)
         if not self._config.enabled:
             return result
@@ -543,7 +530,7 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         request: ToolCallRequest,
         handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
     ) -> ToolMessage | Command:
-        """异步执行工具调用，并在线程中处理超预算结果。"""
+        '''异步执行工具调用，并在线程中处理超预算结果。'''
         result = await handler(request)
         if not self._config.enabled:
             return result
@@ -563,7 +550,7 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], ModelResponse],
     ) -> ModelCallResult:
-        """在同步模型调用前截断历史中超预算的工具消息。"""
+        '''在同步模型调用前截断历史中超预算的工具消息。'''
         if self._config.enabled:
             messages = getattr(request, "messages", None)
             if isinstance(messages, list):
@@ -578,7 +565,7 @@ class ToolOutputBudgetMiddleware(AgentMiddleware[AgentState]):
         request: ModelRequest,
         handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
     ) -> ModelCallResult:
-        """在异步模型调用前截断历史中超预算的工具消息。"""
+        '''在异步模型调用前截断历史中超预算的工具消息。'''
         if self._config.enabled:
             messages = getattr(request, "messages", None)
             if isinstance(messages, list):

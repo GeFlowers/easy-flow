@@ -5,7 +5,7 @@ import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
 import { cn } from "@/lib/utils";
 
-/** TooltipProvider 内部组件：组织对应的界面结构与交互语义。 */
+/** 配置同一交互区域内提示框的延迟和共享行为。 */
 function TooltipProvider({
   delayDuration = 0,
   ...props
@@ -19,7 +19,7 @@ function TooltipProvider({
   );
 }
 
-/** Tooltip 内部组件：组织对应的界面结构与交互语义。 */
+/** 创建单个提示框状态根，并套用项目默认提示延迟。 */
 function Tooltip({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Root>) {
@@ -30,14 +30,14 @@ function Tooltip({
   );
 }
 
-/** TooltipTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 指定鼠标悬停或键盘聚焦时显示提示的元素。 */
 function TooltipTrigger({
   ...props
 }: React.ComponentProps<typeof TooltipPrimitive.Trigger>) {
   return <TooltipPrimitive.Trigger data-slot="tooltip-trigger" {...props} />;
 }
 
-/** TooltipContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 在 Portal 中定位提示文本，并提供默认偏移及开合动画。 */
 function TooltipContent({
   className,
   sideOffset,

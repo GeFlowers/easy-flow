@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''按已启用的供应商创建每次智能体运行需要的追踪回调。'''
 
 from __future__ import annotations
 
@@ -17,19 +17,18 @@ logger = logging.getLogger(__name__)
 
 
 def _create_langsmith_tracer(config) -> Any:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''为 LangSmith 创建绑定到当前项目名称的 LangChain 追踪器。'''
     from langchain_core.tracers.langchain import LangChainTracer
 
     return LangChainTracer(project_name=config.project)
 
 
 def _create_langfuse_handler(config) -> Any:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''先初始化 Langfuse 客户端凭据，再创建供模型调用使用的回调处理器。'''
     from langfuse import Langfuse
     from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
 
-    # langfuse>=4 initializes project-specific credentials through the client
-    # singleton; the LangChain callback then attaches to that configured client.
+    # Langfuse 4 及以上版本从客户端单例读取项目凭据；回调随后复用此客户端。
     Langfuse(
         secret_key=config.secret_key,
         public_key=config.public_key,
@@ -39,10 +38,9 @@ def _create_langfuse_handler(config) -> Any:
 
 
 def build_tracing_callbacks() -> list[Any]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''先验证配置，再创建已启用的回调；Monocle 则由应用生命周期单独初始化。'''
     validate_enabled_tracing_providers()
-    # Monocle is not a callback provider; this per-run path is just where an
-    # embedded process that skipped Gateway-lifespan setup can be told about it.
+    # Monocle 在进程级初始化；此处仅提醒跳过网关生命周期的嵌入式调用方。
     if is_monocle_tracing_enabled() and not is_monocle_setup_completed():
         logger.debug(
             "MONOCLE_TRACING is set but Monocle is not initialized in this process — only the Gateway lifespan runs setup automatically; embedded/TUI callers must call deerflow.tracing.setup_monocle_tracing_if_enabled() themselves."

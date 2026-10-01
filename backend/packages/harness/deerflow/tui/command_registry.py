@@ -1,4 +1,4 @@
-"未说明"
+'''维护终端命令目录，并解析用户输入为内置命令、技能命令或普通消息。'''
 
 from __future__ import annotations
 
@@ -8,16 +8,16 @@ from typing import Literal
 
 @dataclass(frozen=True)
 class Command:
-    "未说明"
+    '''描述一条内置命令或技能命令及其显示类别。'''
 
-    name: str  # without leading slash
+    name: str
     description: str
     category: Literal["builtin", "skill"] = "builtin"
 
 
 @dataclass(frozen=True)
 class Resolution:
-    "未说明"
+    '''保存斜杠输入解析后的类别、命令名称、参数和原始文本。'''
 
     kind: Literal["builtin", "skill", "unknown", "message"]
     name: str = ""
@@ -25,7 +25,6 @@ class Resolution:
     text: str = ""
 
 
-# Built-in commands, ordered for display in /help and the picker.
 BUILTIN_COMMANDS: tuple[Command, ...] = (
     Command("help", "Show commands and keybindings"),
     Command("new", "Start a fresh thread"),
@@ -50,7 +49,7 @@ _BUILTIN_NAMES = frozenset(c.name for c in BUILTIN_COMMANDS)
 
 
 def build_registry(skills: list[dict]) -> list[Command]:
-    "未说明"
+    '''合并内置命令和当前启用的技能，同时排除与内置命令同名的技能。'''
     commands = list(BUILTIN_COMMANDS)
     for skill in skills:
         if not skill.get("enabled", False):
@@ -63,7 +62,7 @@ def build_registry(skills: list[dict]) -> list[Command]:
 
 
 def filter_commands(commands: list[Command], query: str) -> list[Command]:
-    "未说明"
+    '''按命令名前缀、名称包含关系和描述匹配的优先顺序筛选目录。'''
     q = query.strip().lower()
     if not q:
         return commands
@@ -83,7 +82,7 @@ def filter_commands(commands: list[Command], query: str) -> list[Command]:
 
 
 def resolve(text: str, skills: list[str] | None = None) -> Resolution:
-    "未说明"
+    '''将斜杠输入解析为内置命令或技能；非斜杠输入保留为普通消息。'''
     stripped = text.strip()
     if not stripped.startswith("/"):
         return Resolution(kind="message", text=text)

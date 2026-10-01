@@ -2,7 +2,6 @@ import { gsap } from "gsap";
 import React, { useRef, useEffect, useCallback, useState } from "react";
 import "./magic-bento.css";
 
-/** BentoCardProps 的公开类型定义。 */
 export interface BentoCardProps {
   color?: string;
   title?: React.ReactNode;
@@ -12,7 +11,6 @@ export interface BentoCardProps {
   disableAnimations?: boolean;
 }
 
-/** BentoProps 的公开类型定义。 */
 export interface BentoProps {
   textAutoHide?: boolean;
   enableStars?: boolean;
@@ -33,6 +31,7 @@ const DEFAULT_SPOTLIGHT_RADIUS = 300;
 const DEFAULT_GLOW_COLOR = "132, 0, 255";
 const MOBILE_BREAKPOINT = 768;
 
+/** 创建用于卡片交互效果的粒子节点，并设置其初始坐标与发光样式。 */
 const createParticleElement = (
   x: number,
   y: number,
@@ -55,12 +54,13 @@ const createParticleElement = (
   return el;
 };
 
-/** calculateSpotlightValues 内部组件：组织对应的界面结构与交互语义。 */
+/** 根据指针位置计算聚光边缘尺寸和透明度，供卡片悬停效果使用。 */
 const calculateSpotlightValues = (radius: number) => ({
   proximity: radius * 0.5,
   fadeDistance: radius * 0.75,
 });
 
+/** 将指针位置换算为卡片内相对坐标，并写入聚光效果所需的样式变量。 */
 const updateCardGlowProperties = (
   card: HTMLElement,
   mouseX: number,
@@ -78,6 +78,7 @@ const updateCardGlowProperties = (
   card.style.setProperty("--glow-radius", `${radius}px`);
 };
 
+/** 为卡片组合粒子、倾斜、磁吸和点击波纹等可选交互效果。 */
 const ParticleCard: React.FC<{
   children: React.ReactNode;
   className?: string;
@@ -107,6 +108,7 @@ const ParticleCard: React.FC<{
   const particlesInitialized = useRef(false);
   const magnetismAnimationRef = useRef<gsap.core.Tween | null>(null);
 
+  /** 按卡片当前尺寸预生成可复用粒子节点，避免每次悬停重新创建。 */
   const initializeParticles = useCallback(() => {
     if (particlesInitialized.current || !cardRef.current) return;
 
@@ -121,6 +123,7 @@ const ParticleCard: React.FC<{
     particlesInitialized.current = true;
   }, [particleCount, glowColor]);
 
+  /** 取消待执行动画、停止磁吸并移除卡片当前显示的粒子。 */
   const clearAllParticles = useCallback(() => {
     timeoutsRef.current.forEach(clearTimeout);
     timeoutsRef.current = [];
@@ -140,6 +143,7 @@ const ParticleCard: React.FC<{
     particlesRef.current = [];
   }, []);
 
+  /** 错开生成预设粒子并播放移动、旋转和透明度动画。 */
   const animateParticles = useCallback(() => {
     if (!cardRef.current || !isHoveredRef.current) return;
 
@@ -189,6 +193,7 @@ const ParticleCard: React.FC<{
 
     const element = cardRef.current;
 
+    /** 指针进入卡片时启动粒子，并应用初始倾斜反馈。 */
     const handleMouseEnter = () => {
       isHoveredRef.current = true;
       animateParticles();
@@ -204,6 +209,7 @@ const ParticleCard: React.FC<{
       }
     };
 
+    /** 指针离开卡片时清理粒子并恢复倾斜和磁吸偏移。 */
     const handleMouseLeave = () => {
       isHoveredRef.current = false;
       clearAllParticles();
@@ -227,6 +233,7 @@ const ParticleCard: React.FC<{
       }
     };
 
+    /** 按指针相对卡片中心的位置更新倾斜角度和磁吸位移。 */
     const handleMouseMove = (e: MouseEvent) => {
       if (!enableTilt && !enableMagnetism) return;
 
@@ -262,6 +269,7 @@ const ParticleCard: React.FC<{
       }
     };
 
+    /** 在点击坐标创建扩散波纹，并在动画完成后移除节点。 */
     const handleClick = (e: MouseEvent) => {
       if (!clickEffect) return;
 
@@ -341,6 +349,7 @@ const ParticleCard: React.FC<{
   );
 };
 
+/** 跟踪页面指针位置，协调各卡片的聚光强度和全局光斑动画。 */
 const GlobalSpotlight: React.FC<{
   gridRef: React.RefObject<HTMLDivElement | null>;
   disableAnimations?: boolean;
@@ -384,6 +393,7 @@ const GlobalSpotlight: React.FC<{
     document.body.appendChild(spotlight);
     spotlightRef.current = spotlight;
 
+    /** 更新光斑位置，并按指针到卡片的距离计算每张卡片的高亮度。 */
     const handleMouseMove = (e: MouseEvent) => {
       if (!spotlightRef.current || !gridRef.current) return;
 
@@ -465,6 +475,7 @@ const GlobalSpotlight: React.FC<{
       });
     };
 
+    /** 离开页面时重置卡片高亮并淡出全局光斑。 */
     const handleMouseLeave = () => {
       isInsideSection.current = false;
       gridRef.current?.querySelectorAll(".magic-bento-card").forEach((card) => {
@@ -492,6 +503,7 @@ const GlobalSpotlight: React.FC<{
   return null;
 };
 
+/** 为一组 Bento 卡片提供统一网格容器和聚光效果定位锚点。 */
 const BentoCardGrid: React.FC<{
   children: React.ReactNode;
   gridRef?: React.RefObject<HTMLDivElement | null>;
@@ -501,11 +513,12 @@ const BentoCardGrid: React.FC<{
   </div>
 );
 
-/** useMobileDetection Hook：封装本模块所需的状态或上下文访问。 */
+/** 监听视口宽度并报告当前是否低于 Bento 布局的移动端断点。 */
 const useMobileDetection = () => {
   const [isMobile, setIsMobile] = useState(false);
 
   useEffect(() => {
+    /** 根据视口宽度更新移动端标记，供调整动画策略使用。 */
     const checkMobile = () =>
       setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
 
@@ -518,6 +531,7 @@ const useMobileDetection = () => {
   return isMobile;
 };
 
+/** 组合卡片网格与全局交互效果，并根据设备能力控制动画。 */
 const MagicBento: React.FC<BentoProps> = ({
   textAutoHide = true,
   enableStars = true,
@@ -591,6 +605,7 @@ const MagicBento: React.FC<BentoProps> = ({
               ref={(el) => {
                 if (!el) return;
 
+                /** 更新当前卡片的聚光坐标和强度。 */
                 const handleMouseMove = (e: MouseEvent) => {
                   if (shouldDisableAnimations) return;
 
@@ -624,6 +639,7 @@ const MagicBento: React.FC<BentoProps> = ({
                   }
                 };
 
+                /** 清除鼠标离开当前卡片后的发光强度。 */
                 const handleMouseLeave = () => {
                   if (shouldDisableAnimations) return;
 
@@ -646,6 +662,7 @@ const MagicBento: React.FC<BentoProps> = ({
                   }
                 };
 
+                /** 在卡片点击位置触发交互反馈。 */
                 const handleClick = (e: MouseEvent) => {
                   if (!clickEffect || shouldDisableAnimations) return;
 

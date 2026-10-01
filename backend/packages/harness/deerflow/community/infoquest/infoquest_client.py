@@ -1,10 +1,4 @@
-"""定义 infoquest_client 模块提供的职责与可复用接口。
-
-Util that calls InfoQuest Search And Fetch API.
-
-In order to set this up, follow instructions at:
-https://docs.byteplus.com/en/docs/InfoQuest/What_is_Info_Quest
-"""
+'''封装 InfoQuest 的网页搜索、网页抓取和图片搜索请求及结果规范化。'''
 
 import json
 import logging
@@ -17,12 +11,10 @@ logger = logging.getLogger(__name__)
 
 
 class InfoQuestClient:
-    """封装 InfoQuestClient 的状态、协作关系与公开操作。
-
-    Client for interacting with the InfoQuest web search and fetch API."""
+    '''保存 InfoQuest 查询选项，并提供搜索、抓取与结果整理方法。'''
 
     def __init__(self, fetch_time: int = -1, fetch_timeout: int = -1, fetch_navigation_timeout: int = -1, search_time_range: int = -1, image_search_time_range: int = -1, image_size: str = "i"):
-        "实现 __init__ 协议方法，保持对象交互语义一致"
+        '''保存搜索时间范围、抓取超时和图片筛选选项。'''
         logger.info("\n============================================\n🚀 BytePlus InfoQuest Client Initialization 🚀\n============================================")
 
         self.fetch_time = fetch_time
@@ -48,7 +40,7 @@ class InfoQuestClient:
             logger.debug("\n" + "*" * 70 + "\n")
 
     def fetch(self, url: str, return_format: str = "html") -> str:
-        "执行 fetch 的明确职责，并返回与调用约定一致的结果"
+        '''请求 InfoQuest 抓取网页，并从响应中提取正文或返回错误信息。'''
         if logger.isEnabledFor(logging.DEBUG):
             url_truncated = url[:50] + "..." if len(url) > 50 else url
             logger.debug(
@@ -61,48 +53,38 @@ class InfoQuestClient:
                 f"request_type=sync"
             )
 
-        # Prepare headers
         headers = self._prepare_headers()
 
-        # Prepare request data
         data = self._prepare_crawl_request_data(url, return_format)
 
         logger.debug("Sending crawl request to InfoQuest API")
         try:
             response = requests.post("https://reader.infoquest.bytepluses.com", headers=headers, json=data)
 
-            # Check if status code is not 200
             if response.status_code != 200:
                 error_message = f"fetch API returned status {response.status_code}: {response.text}"
                 logger.debug("InfoQuest Crawler fetch API return status %d: %s for URL: %s", response.status_code, response.text, url)
                 return f"Error: {error_message}"
 
-            # Check for empty response
             if not response.text or not response.text.strip():
                 error_message = "no result found"
                 logger.debug("InfoQuest Crawler returned empty response for URL: %s", url)
                 return f"Error: {error_message}"
 
-            # Try to parse response as JSON and extract reader_result
             try:
                 response_data = json.loads(response.text)
-                # Extract reader_result if it exists
                 if "reader_result" in response_data:
                     logger.debug("Successfully extracted reader_result from JSON response")
                     return response_data["reader_result"]
                 elif "content" in response_data:
-                    # Fallback to content field if reader_result is not available
                     logger.debug("reader_result missing in JSON response, falling back to content field: %s", response_data["content"])
                     return response_data["content"]
                 else:
-                    # If neither field exists, return the original response
                     logger.warning("Neither reader_result nor content field found in JSON response")
             except json.JSONDecodeError:
-                # If response is not JSON, return the original text
                 logger.debug("Response is not in JSON format, returning as-is")
                 return response.text
 
-            # Print partial response for debugging
             if logger.isEnabledFor(logging.DEBUG):
                 response_sample = response.text[:200] + ("..." if len(response.text) > 200 else "")
                 logger.debug("Successfully received response, content length: %d bytes, first 200 chars: %s", len(response.text), response_sample)
@@ -114,14 +96,11 @@ class InfoQuestClient:
 
     @staticmethod
     def _prepare_headers() -> dict[str, str]:
-        """执行 _prepare_headers 的明确职责，并返回与调用约定一致的结果。
-
-        Prepare request headers."""
+        '''构造请求头，并在环境变量存在时附加 InfoQuest 授权密钥。'''
         headers = {
             "Content-Type": "application/json",
         }
 
-        # Add API key if available
         if os.getenv("INFOQUEST_API_KEY"):
             headers["Authorization"] = f"Bearer {os.getenv('INFOQUEST_API_KEY')}"
             logger.debug("API key added to request headers")
@@ -131,10 +110,7 @@ class InfoQuestClient:
         return headers
 
     def _prepare_crawl_request_data(self, url: str, return_format: str) -> dict[str, Any]:
-        """执行 _prepare_crawl_request_data 的明确职责，并返回与调用约定一致的结果。
-
-        Prepare request data with formatted parameters."""
-        # Normalize return_format
+        '''构造抓取请求正文，并仅附加已启用的超时选项。'''
         if return_format and return_format.lower() == "html":
             normalized_format = "HTML"
         else:
@@ -142,7 +118,6 @@ class InfoQuestClient:
 
         data = {"url": url, "format": normalized_format}
 
-        # Add timeout parameters if set to positive values
         timeout_params = {}
         if self.fetch_time > 0:
             timeout_params["fetch_time"] = self.fetch_time
@@ -151,7 +126,6 @@ class InfoQuestClient:
         if self.fetch_navigation_timeout > 0:
             timeout_params["navi_timeout"] = self.fetch_navigation_timeout
 
-        # Log applied timeout parameters
         if timeout_params:
             logger.debug("Applying timeout parameters: %s", timeout_params)
             data.update(timeout_params)
@@ -164,9 +138,7 @@ class InfoQuestClient:
         site: str,
         output_format: str = "JSON",
     ) -> dict:
-        """执行 web_search_raw_results 的明确职责，并返回与调用约定一致的结果。
-
-        Get results from the InfoQuest Web-Search API synchronously."""
+        '''发送原始网页搜索请求并返回服务端的 JSON 结构。'''
         headers = self._prepare_headers()
 
         params = {"format": output_format, "query": query}
@@ -179,7 +151,7 @@ class InfoQuestClient:
         response = requests.post("https://search.infoquest.bytepluses.com", headers=headers, json=params)
         response.raise_for_status()
 
-        # Print partial response for debugging
+        # 仅在调试日志启用时记录截断后的响应样例。
         response_json = response.json()
         if logger.isEnabledFor(logging.DEBUG):
             response_sample = json.dumps(response_json)[:200] + ("..." if len(json.dumps(response_json)) > 200 else "")
@@ -189,9 +161,7 @@ class InfoQuestClient:
 
     @staticmethod
     def clean_results(raw_results: list[dict[str, dict[str, dict[str, Any]]]]) -> list[dict]:
-        """执行 clean_results 的明确职责，并返回与调用约定一致的结果。
-
-        Clean results from InfoQuest Web-Search API."""
+        '''提取网页和新闻结果，统一字段并按网址去重。'''
         logger.debug("Processing web-search results")
 
         seen_urls = set()
@@ -251,7 +221,7 @@ class InfoQuestClient:
         site: str = "",
         output_format: str = "JSON",
     ) -> str:
-        "执行 web_search 的明确职责，并返回与调用约定一致的结果"
+        '''执行网页搜索，将服务端结果整理为 JSON；异常时返回错误文本。'''
         if logger.isEnabledFor(logging.DEBUG):
             query_truncated = query[:50] + "..." if len(query) > 50 else query
             logger.debug(
@@ -283,12 +253,12 @@ class InfoQuestClient:
                 return result_json
 
             elif "content" in raw_results:
-                # Fallback to content field if search_result is not available
+                # 响应缺少标准搜索结果字段时返回格式错误。
                 error_message = "web search API return wrong format"
                 logger.error("web search API return wrong format, no search_result nor content field found in JSON response, content: %s", raw_results["content"])
                 return f"Error: {error_message}"
             else:
-                # If neither field exists, return the original response
+                # 响应没有可识别的结果字段时保留原始 JSON 供调用方检查。
                 logger.warning("InfoQuest Web-Search - Neither search_result nor content field found in JSON response")
                 return json.dumps(raw_results, indent=2, ensure_ascii=False)
 
@@ -299,9 +269,7 @@ class InfoQuestClient:
 
     @staticmethod
     def clean_results_with_image_search(raw_results: list[dict[str, dict[str, dict[str, Any]]]]) -> list[dict]:
-        """执行 clean_results_with_image_search 的明确职责，并返回与调用约定一致的结果。
-
-        Clean results from InfoQuest Web-Search API."""
+        '''提取图片原图地址和标题，按图片地址去重。'''
         logger.debug("Processing web-search results")
 
         seen_urls = set()
@@ -335,24 +303,22 @@ class InfoQuestClient:
         site: str = "",
         output_format: str = "JSON",
     ) -> dict:
-        """执行 image_search_raw_results 的明确职责，并返回与调用约定一致的结果。
-
-        Get image search results from the InfoQuest Web-Search API synchronously."""
+        '''构造图片搜索筛选条件并返回服务端的原始 JSON 结果。'''
         headers = self._prepare_headers()
 
         params = {"format": output_format, "query": query, "search_type": "Images"}
 
-        # Add time_range filter if specified (1-365)
+        # 仅接受服务端允许范围内的图片搜索时间筛选。
         if 1 <= self.image_search_time_range <= 365:
             params["time_range"] = self.image_search_time_range
         elif self.image_search_time_range > 0:
             logger.warning(f"time_range {self.image_search_time_range} is out of valid range (1-365), ignoring")
 
-        # Add site filter if specified
+        # 配置了站点时，将搜索范围限制在该站点。
         if site:
             params["site"] = site
 
-        # Add image_size filter if specified
+        # 仅发送服务端支持的图片尺寸代码。
         if self.image_size and self.image_size in ["l", "m", "i"]:
             params["image_size"] = self.image_size
         elif self.image_size:
@@ -361,7 +327,7 @@ class InfoQuestClient:
         response = requests.post("https://search.infoquest.bytepluses.com", headers=headers, json=params)
         response.raise_for_status()
 
-        # Print partial response for debugging
+        # 仅在调试日志启用时记录截断后的响应样例。
         response_json = response.json()
         if logger.isEnabledFor(logging.DEBUG):
             response_sample = json.dumps(response_json)[:200] + ("..." if len(json.dumps(response_json)) > 200 else "")
@@ -375,7 +341,7 @@ class InfoQuestClient:
         site: str = "",
         output_format: str = "JSON",
     ) -> str:
-        "执行 image_search 的明确职责，并返回与调用约定一致的结果"
+        '''执行图片搜索并输出去重后的图片地址和标题；异常时返回错误文本。'''
         if logger.isEnabledFor(logging.DEBUG):
             query_truncated = query[:50] + "..." if len(query) > 50 else query
             logger.debug(
@@ -409,12 +375,12 @@ class InfoQuestClient:
                 return result_json
 
             elif "content" in raw_results:
-                # Fallback to content field if search_result is not available
+                # 响应缺少标准图片结果字段时返回格式错误。
                 error_message = "image search API return wrong format"
                 logger.error("image search API return wrong format, no search_result nor content field found in JSON response, content: %s", raw_results["content"])
                 return f"Error: {error_message}"
             else:
-                # If neither field exists, return the original response
+                # 响应没有可识别的结果字段时保留原始 JSON 供调用方检查。
                 logger.warning("InfoQuest Image Search - Neither search_result nor content field found in JSON response")
                 return json.dumps(raw_results, indent=2, ensure_ascii=False)
 

@@ -1,5 +1,5 @@
 /** 频道提供商的标识；预置值之外允许后端扩展。 */
-export type ChannelProviderId = "telegram" | "slack" | "discord" | string;
+export type ChannelProviderId = "wechat" | "wecom";
 
 /** 描述提供商运行时配置表单中的单个凭据字段。 */
 export interface ChannelCredentialField {

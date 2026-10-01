@@ -1,4 +1,4 @@
-"""提供子代理步骤和运行事件的构造功能。"""
+'''提供子代理步骤和运行事件的构造功能。'''
 
 from __future__ import annotations
 
@@ -11,18 +11,10 @@ from deerflow.utils.messages import message_content_to_text
 
 from .status_contract import normalize_token_usage
 
-#: Default per-step character cap for the ``text`` field. Tool outputs (web
-#: search results, file contents) can be large; this cap bounds the persisted
-#: run-event row and the streamed frame. It only affects display/storage — the
-#: subagent's own LLM context is bounded separately by ToolOutputBudgetMiddleware.
 SUBAGENT_STEP_MAX_CHARS = 8192
 
-#: ``RunEvent.category`` for persisted subagent steps. A dedicated category (not
-#: ``"message"``) keeps these events out of ``list_messages`` (the thread message
-#: feed) while still being returned by ``list_events`` for fetch-on-expand (#3779).
 SUBAGENT_EVENT_CATEGORY = "subagent"
 
-#: Map of ``task_*`` terminal custom-event types to their persisted status.
 _TERMINAL_EVENT_STATUS: dict[str, str] = {
     "task_completed": "completed",
     "task_failed": "failed",
@@ -36,7 +28,7 @@ def capture_step_message(
     captured: list[dict[str, Any]],
     seen_ids: set[str],
 ) -> bool:
-    """处理步骤事件提取与构造，并保持既有状态语义。"""
+    '''处理步骤事件提取与构造，并保持既有状态语义。'''
     if not isinstance(message, (AIMessage, ToolMessage)):
         return False
 
@@ -60,7 +52,7 @@ def capture_new_step_messages(
     seen_ids: set[str],
     processed_count: int,
 ) -> int:
-    """处理步骤事件提取与构造，并保持既有状态语义。"""
+    '''处理步骤事件提取与构造，并保持既有状态语义。'''
     total = len(messages)
     if total < processed_count:
         processed_count = total
@@ -74,14 +66,14 @@ def capture_new_step_messages(
 
 
 def truncate_step_text(text: str, max_chars: int) -> tuple[str, bool]:
-    """处理步骤事件提取与构造，并保持既有状态语义。"""
+    '''处理步骤事件提取与构造，并保持既有状态语义。'''
     if max_chars >= 0 and len(text) > max_chars:
         return text[:max_chars], True
     return text, False
 
 
 def _bounded_tool_call(call: dict[str, Any], max_chars: int) -> dict[str, Any]:
-    """处理步骤事件提取与构造，并保持既有状态语义。"""
+    '''处理步骤事件提取与构造，并保持既有状态语义。'''
     name = call.get("name")
     args = call.get("args")
     serialized = args if isinstance(args, str) else json.dumps(args, default=str, ensure_ascii=False)
@@ -97,10 +89,8 @@ def build_subagent_step(
     message_index: int,
     max_chars: int = SUBAGENT_STEP_MAX_CHARS,
 ) -> dict[str, Any]:
-    """处理步骤事件提取与构造，并保持既有状态语义。"""
+    '''处理步骤事件提取与构造，并保持既有状态语义。'''
     kind = "tool" if message.get("type") == "tool" else "ai"
-    # ``... or ""`` keeps a tool-call-only turn's content=None rendering as ""
-    # (message_content_to_text would otherwise str()-ify it to "None").
     text, truncated = truncate_step_text(message_content_to_text(message.get("content") or ""), max_chars)
 
     step: dict[str, Any] = {
@@ -120,7 +110,7 @@ def build_subagent_step(
 
 
 def subagent_run_event(chunk: Any) -> dict[str, Any] | None:
-    """处理步骤事件提取与构造，并保持既有状态语义。"""
+    '''处理步骤事件提取与构造，并保持既有状态语义。'''
     if not isinstance(chunk, dict):
         return None
 
@@ -156,9 +146,6 @@ def subagent_run_event(chunk: Any) -> dict[str, Any] | None:
         usage = normalize_token_usage(chunk.get("usage"))
         if usage is not None:
             content["usage"] = usage
-        # The final result/error can be a multi-page report; cap it so the
-        # persisted run-event row stays bounded (it is also kept verbatim on the
-        # terminal ToolMessage, which the card reads separately).
         if chunk.get("result") is not None:
             result, result_truncated = truncate_step_text(str(chunk["result"]), SUBAGENT_STEP_MAX_CHARS)
             content["result"] = result

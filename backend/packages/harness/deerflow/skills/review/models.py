@@ -1,4 +1,4 @@
-"未说明"
+'''定义技能包审查所用的版本标识、严重级别、资源限制和统一发现结构。'''
 
 from __future__ import annotations
 
@@ -32,14 +32,14 @@ SKILLSCAN_SEVERITY_MAP: dict[str, Severity] = {
 
 @dataclass(frozen=True)
 class PackageLimits:
-    "未说明"
+    '''限制单个包允许的文件数量、单文件大小及累计内容大小。'''
 
     max_files: int = 4096
     max_file_bytes: int = 64 * 1024 * 1024
     max_total_bytes: int = 512 * 1024 * 1024
 
     def to_dict(self) -> dict[str, int]:
-        "未说明"
+        '''以字段名为键返回资源限制，供快照记录和序列化使用。'''
         return {
             "max_files": self.max_files,
             "max_file_bytes": self.max_file_bytes,
@@ -51,12 +51,12 @@ DEFAULT_PACKAGE_LIMITS = PackageLimits()
 
 
 def stable_json_dumps(data: Any) -> str:
-    "未说明"
+    '''生成键排序且无多余空格的 JSON 文本，保证报告序列化稳定。'''
     return json.dumps(data, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def normalize_relative_path(path: str) -> str:
-    "未说明"
+    '''规范包内相对路径并拒绝空路径、绝对路径和目录向上跳转。'''
     raw = path.replace("\\", "/").strip()
     if not raw:
         raise ValueError("path must not be empty")
@@ -85,7 +85,7 @@ def make_finding(
     evidence: Any | None = None,
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
-    "未说明"
+    '''按统一字段构造审查发现，并合并调用方提供的扩展字段。'''
     finding = {
         "rule_id": rule_id,
         "source": source,
@@ -103,7 +103,7 @@ def make_finding(
 
 
 def sort_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    "未说明"
+    '''按严重级别、路径、行号和规则标识对发现项排序，确保输出稳定。'''
     return sorted(
         findings,
         key=lambda item: (
@@ -117,7 +117,7 @@ def sort_findings(findings: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def summarize_findings(findings: list[dict[str, Any]]) -> dict[str, int]:
-    "未说明"
+    '''统计阻断、错误、警告和提示各级别发现的数量。'''
     summary = {"blockers": 0, "errors": 0, "warnings": 0, "infos": 0}
     for finding in findings:
         severity = finding.get("severity")

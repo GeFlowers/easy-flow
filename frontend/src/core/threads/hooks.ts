@@ -990,6 +990,7 @@ export function useThreadStream({
     threadIdRef.current = normalizedThreadId;
   }, [threadId]);
 
+  /** 记录流对应的线程，并仅在本轮首次启动时通知外部监听器。 */
   const handleStreamStart = useCallback((_threadId: string, _runId: string) => {
     threadIdRef.current = _threadId;
     setOptimisticThreadId((currentOptimisticThreadId) => {
@@ -1030,6 +1031,7 @@ export function useThreadStream({
     threadId: onStreamThreadId,
     reconnectOnMount: true,
     fetchStateHistory: { limit: 1 },
+    /** 新线程创建后立即补入两个线程列表缓存，并保存所选代理信息。 */
     onCreated(meta) {
       handleStreamStart(meta.thread_id, meta.run_id);
       const now = new Date().toISOString();
@@ -1067,6 +1069,7 @@ export function useThreadStream({
           .catch(() => ({}));
       }
     },
+    /** 转发工具调用结束事件，供聊天界面执行后续展示或联动。 */
     onLangChainEvent(event) {
       if (event.event === "on_tool_end") {
         listeners.current.onToolEnd?.({
@@ -1075,6 +1078,7 @@ export function useThreadStream({
         });
       }
     },
+    /** 合并流式状态更新，处理摘要过渡消息并同步线程标题缓存。 */
     onUpdateEvent(data) {
       const _messages = getSummarizationMiddlewareMessages(data);
       if (_messages && _messages.length >= 2) {
@@ -1152,6 +1156,7 @@ export function useThreadStream({
         }
       }
     },
+    /** 解析任务和重试事件，更新子代理步骤或向用户提示重试信息。 */
     onCustomEvent(event: unknown) {
       // 仅收窄一次 `event.type`；taskEventToSubtaskUpdate 已验证 task_* 事件，
       // 因此下方各分支从这一唯一事实来源读取，避免每次都重新检查对象结构。
@@ -1189,6 +1194,7 @@ export function useThreadStream({
         }
       }
     },
+    /** 清除本次运行的临时消息状态并刷新受影响的历史和用量缓存。 */
     onError(error) {
       setOptimisticMessages([]);
       setOptimisticThreadId(null);
@@ -1210,6 +1216,7 @@ export function useThreadStream({
         });
       }
     },
+    /** 通知调用方运行完成，并刷新线程、历史记录和用量相关缓存。 */
     onFinish(state) {
       listeners.current.onFinish?.(state.values);
       pendingUsageBaselineMessageIdsRef.current = new Set(
@@ -1221,6 +1228,7 @@ export function useThreadStream({
     },
   });
 
+  /** 停止当前运行，并同步刷新相关线程缓存与运行状态。 */
   const stopThread = useCallback(async () => {
     const stoppedThreadId =
       threadIdRef.current ?? displayThreadId ?? threadId ?? null;
@@ -1340,6 +1348,7 @@ export function useThreadStream({
     }
   }, [hasHumanOptimistic, humanMessageCount, optimisticMessageCount]);
 
+  /** 添加乐观消息、上传附件并提交新消息，同时处理失败回滚和状态通知。 */
   const sendMessage = useCallback(
     async (
       threadId: string,
@@ -1543,6 +1552,7 @@ export function useThreadStream({
     ],
   );
 
+  /** 通过服务端准备的检查点重新生成目标回答，并隐藏被替代的旧消息。 */
   const regenerateMessage = useCallback(
     async (
       threadId: string,
@@ -2042,6 +2052,7 @@ export function useBranchThread() {
       messageIds?: string[];
       title?: string;
     }) => branchThreadFromTurn(threadId, { messageId, messageIds, title }),
+    /** 分支线程创建后失效源线程与新线程的元数据和列表缓存。 */
     onSuccess(response, { threadId }) {
       void queryClient.invalidateQueries({
         queryKey: ["thread", "metadata", response.thread_id],
@@ -2208,6 +2219,7 @@ export function useDeleteThread() {
       await deleteLocalThreadData(threadId);
       return deletedSidecarThreadIds;
     },
+    /** 删除成功后从普通列表和分页缓存移除主线程及其侧边线程。 */
     onSuccess(deletedSidecarThreadIds, { threadId }) {
       const deletedThreadIds = new Set([threadId, ...deletedSidecarThreadIds]);
       queryClient.setQueriesData(
@@ -2235,6 +2247,7 @@ export function useDeleteThread() {
       );
     },
 
+    /** 无论删除成功与否都重新验证线程列表，修复可能的缓存偏差。 */
     onSettled() {
       void queryClient.invalidateQueries({ queryKey: ["threads", "search"] });
       void queryClient.invalidateQueries({
@@ -2260,6 +2273,7 @@ export function useRenameThread() {
         values: { title },
       });
     },
+    /** 重命名成功后同步更新普通列表和无限滚动列表中的线程标题。 */
     onSuccess(_, { threadId, title }) {
       queryClient.setQueriesData(
         {

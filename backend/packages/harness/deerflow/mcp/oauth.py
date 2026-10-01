@@ -1,4 +1,4 @@
-"""为 MCP 服务器获取、缓存并注入 OAuth 访问令牌。"""
+'''为 MCP 服务器获取、缓存并注入 OAuth 访问令牌。'''
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class _OAuthToken:
-    """保存 OAuth 访问令牌及其认证方案和到期时间。"""
+    '''保存 OAuth 访问令牌及其认证方案和到期时间。'''
 
     access_token: str
     token_type: str
@@ -23,17 +23,17 @@ class _OAuthToken:
 
 
 class OAuthTokenManager:
-    """按 MCP 服务器管理 OAuth 令牌的获取、缓存与刷新。"""
+    '''按 MCP 服务器管理 OAuth 令牌的获取、缓存与刷新。'''
 
     def __init__(self, oauth_by_server: dict[str, McpOAuthConfig]):
-        """使用按服务器名索引的 OAuth 配置初始化令牌管理器。"""
+        '''使用按服务器名索引的 OAuth 配置初始化令牌管理器。'''
         self._oauth_by_server = oauth_by_server
         self._tokens: dict[str, _OAuthToken] = {}
         self._locks: dict[str, asyncio.Lock] = {name: asyncio.Lock() for name in oauth_by_server}
 
     @classmethod
     def from_extensions_config(cls, extensions_config: ExtensionsConfig) -> OAuthTokenManager:
-        """从扩展配置中提取启用了 OAuth 的 MCP 服务器。"""
+        '''从扩展配置中提取启用了 OAuth 的 MCP 服务器。'''
         oauth_by_server: dict[str, McpOAuthConfig] = {}
         for server_name, server_config in extensions_config.get_enabled_mcp_servers().items():
             if server_config.oauth and server_config.oauth.enabled:
@@ -41,15 +41,15 @@ class OAuthTokenManager:
         return cls(oauth_by_server)
 
     def has_oauth_servers(self) -> bool:
-        """判断是否存在启用了 OAuth 的 MCP 服务器。"""
+        '''判断是否存在启用了 OAuth 的 MCP 服务器。'''
         return bool(self._oauth_by_server)
 
     def oauth_server_names(self) -> list[str]:
-        """返回启用了 OAuth 的 MCP 服务器名称列表。"""
+        '''返回启用了 OAuth 的 MCP 服务器名称列表。'''
         return list(self._oauth_by_server.keys())
 
     async def get_authorization_header(self, server_name: str) -> str | None:
-        """返回指定服务器当前有效的 Authorization 请求头。"""
+        '''返回指定服务器当前有效的 Authorization 请求头。'''
         oauth = self._oauth_by_server.get(server_name)
         if not oauth:
             return None
@@ -71,12 +71,12 @@ class OAuthTokenManager:
 
     @staticmethod
     def _is_expiring(token: _OAuthToken, oauth: McpOAuthConfig) -> bool:
-        """判断令牌是否已到期或已进入配置的提前刷新窗口。"""
+        '''判断令牌是否已到期或已进入配置的提前刷新窗口。'''
         now = datetime.now(UTC)
         return token.expires_at <= now + timedelta(seconds=max(oauth.refresh_skew_seconds, 0))
 
     async def _fetch_token(self, oauth: McpOAuthConfig) -> _OAuthToken:
-        """向 OAuth 令牌端点请求令牌，并转换为内部令牌对象。"""
+        '''向 OAuth 令牌端点请求令牌，并转换为内部令牌对象。'''
         import httpx  # pyright: ignore[reportMissingImports]
 
         data: dict[str, str] = {
@@ -131,13 +131,13 @@ class OAuthTokenManager:
 
 
 def build_oauth_tool_interceptor(extensions_config: ExtensionsConfig) -> Any | None:
-    """构建在每次 MCP 工具调用前注入 OAuth 请求头的拦截器。"""
+    '''构建在每次 MCP 工具调用前注入 OAuth 请求头的拦截器。'''
     token_manager = OAuthTokenManager.from_extensions_config(extensions_config)
     if not token_manager.has_oauth_servers():
         return None
 
     async def oauth_interceptor(request: Any, handler: Any) -> Any:
-        """为需要 OAuth 的工具调用补充最新的 Authorization 请求头。"""
+        '''为需要 OAuth 的工具调用补充最新的 Authorization 请求头。'''
         header = await token_manager.get_authorization_header(request.server_name)
         if not header:
             return await handler(request)
@@ -150,7 +150,7 @@ def build_oauth_tool_interceptor(extensions_config: ExtensionsConfig) -> Any | N
 
 
 async def get_initial_oauth_headers(extensions_config: ExtensionsConfig) -> dict[str, str]:
-    """获取用于 MCP 连接和工具发现的初始 OAuth 请求头。"""
+    '''获取用于 MCP 连接和工具发现的初始 OAuth 请求头。'''
     token_manager = OAuthTokenManager.from_extensions_config(extensions_config)
     if not token_manager.has_oauth_servers():
         return {}

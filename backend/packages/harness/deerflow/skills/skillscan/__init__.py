@@ -1,6 +1,4 @@
-"""定义 __init__ 模块提供的职责与可复用接口。
-
-Native deterministic safety scanner for DeerFlow skills."""
+'''导出技能静态安全扫描规则、结果类型和目录及归档扫描入口。'''
 
 from deerflow.skills.skillscan.models import (
     FindingSeverity,

@@ -1,11 +1,11 @@
-"""只读运维控制台端点。
+'''只读运维控制台端点。
 
 汇总当前用户全部线程的可观测性数据，包括运行历史、时间范围内的 Token 支出和资产
 计数，可作为运维仪表盘或外部监控消费者的数据层。
 
 该模块仅负责报表，不参与运行时执行：它对 harness 管理的 ``runs`` / ``threads_meta``
 表执行短生命周期的只读查询，而不扩展运行时 `RunStore` 的接口。报表查询使用 PostgreSQL。
-"""
+'''
 
 import asyncio
 import logging
@@ -34,13 +34,11 @@ _FAILED_STATUSES = ("error", "timeout")
 _ERROR_EXCERPT_CHARS = 300
 
 
-# ---------------------------------------------------------------------------
 # 响应模型
-# ---------------------------------------------------------------------------
 
 
 class ConsoleStatsResponse(BaseModel):
-    """控制台仪表盘的核心统计计数。"""
+    '''控制台仪表盘的核心统计计数。'''
 
     total_runs: int = Field(..., description="All recorded runs for the current user")
     active_runs: int = Field(..., description="Runs currently pending or running")
@@ -53,7 +51,7 @@ class ConsoleStatsResponse(BaseModel):
 
 
 class ConsoleRunItem(BaseModel):
-    """跨线程运行列表中的一次运行。"""
+    '''跨线程运行列表中的一次运行。'''
 
     run_id: str
     thread_id: str
@@ -71,14 +69,14 @@ class ConsoleRunItem(BaseModel):
 
 
 class ConsoleRunsResponse(BaseModel):
-    """分页的跨线程运行列表，最新的在前。"""
+    '''分页的跨线程运行列表，最新的在前。'''
 
     runs: list[ConsoleRunItem]
     has_more: bool
 
 
 class ConsoleUsageDay(BaseModel):
-    """按本地时间单日汇总的 Token 使用量。"""
+    '''按本地时间单日汇总的 Token 使用量。'''
 
     date: str = Field(..., description="Local date (YYYY-MM-DD) per the requested tz offset")
     total_tokens: int = 0
@@ -89,7 +87,7 @@ class ConsoleUsageDay(BaseModel):
 
 
 class ConsoleUsageModelBreakdown(BaseModel):
-    """归因到单个模型的 Token 使用量。"""
+    '''归因到单个模型的 Token 使用量。'''
 
     tokens: int = 0
     runs: int = Field(default=0, description="Runs that used this model (non-exclusive)")
@@ -99,7 +97,7 @@ class ConsoleUsageModelBreakdown(BaseModel):
 
 
 class ConsoleUsageResponse(BaseModel):
-    """时间窗口内按日汇总的 Token 使用序列及按模型明细。"""
+    '''时间窗口内按日汇总的 Token 使用序列及按模型明细。'''
 
     days: list[ConsoleUsageDay]
     by_model: dict[str, ConsoleUsageModelBreakdown]
@@ -109,13 +107,11 @@ class ConsoleUsageResponse(BaseModel):
     currency: str | None = Field(default=None, description="Display currency taken from the first configured pricing entry")
 
 
-# ---------------------------------------------------------------------------
 # 辅助函数
-# ---------------------------------------------------------------------------
 
 
 def _session_factory_or_503():
-    """返回 SQL 会话工厂；未配置 SQL 后端时返回 503。"""
+    '''返回 SQL 会话工厂；未配置 SQL 后端时返回 503。'''
     sf = get_session_factory()
     if sf is None:
         raise HTTPException(
@@ -126,19 +122,17 @@ def _session_factory_or_503():
 
 
 def _as_utc(dt: datetime | None) -> datetime | None:
-    """为历史无时区时间戳补上 UTC，保证报表时间可以统一比较。"""
+    '''为历史无时区时间戳补上 UTC，保证报表时间可以统一比较。'''
     if dt is None:
         return None
     return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
-# ---------------------------------------------------------------------------
 # 定价：实际支出估算
-# ---------------------------------------------------------------------------
 
 
 class _ModelPricing(NamedTuple):
-    """每百万 Token 的模型定价配置。"""
+    '''每百万 Token 的模型定价配置。'''
 
     input_per_million: float
     output_per_million: float
@@ -149,14 +143,14 @@ class _ModelPricing(NamedTuple):
 
 
 def _build_pricing_map() -> dict[str, _ModelPricing]:
-    """从 `config.yaml` 的 `models[*].pricing` 收集各模型定价。
+    '''从 `config.yaml` 的 `models[*].pricing` 收集各模型定价。
 
     `ModelConfig` 允许额外字段，因此运营方可为模型添加例如
     ``pricing: {currency: CNY, input_per_million: 8, output_per_million: 32,
     input_cache_hit_per_million: 0.8}`` 的配置，无需修改模式。定价同时以配置的 `name`
     和提供商 `model` ID（及其小写形式）为键，因为 `token_usage_by_model` 的分桶使用
     提供商报告的模型名称。
-    """
+    '''
     try:
         models = get_app_config().models
     except Exception:  # pragma: no cover - 防御性处理：成本展示不得导致控制台不可用。
@@ -188,23 +182,23 @@ def _build_pricing_map() -> dict[str, _ModelPricing]:
 
 
 def _pricing_currency(pricing: dict[str, _ModelPricing]) -> str | None:
-    """返回展示货币，即首个配置定价条目的货币（每个部署使用一种货币）。"""
+    '''返回展示货币，即首个配置定价条目的货币（每个部署使用一种货币）。'''
     return next(iter(pricing.values())).currency if pricing else None
 
 
 def _lookup_pricing(pricing: dict[str, _ModelPricing], model: str | None) -> _ModelPricing | None:
-    """按模型名称查找定价，同时兼容大小写差异。"""
+    '''按模型名称查找定价，同时兼容大小写差异。'''
     if not model:
         return None
     return pricing.get(model) or pricing.get(model.lower())
 
 
 def _token_cost(input_tokens: int, output_tokens: int, price: _ModelPricing, cache_read_tokens: int = 0) -> float:
-    """计算缓存感知的支出：缓存命中输入 Token 按命中价格计费。
+    '''计算缓存感知的支出：缓存命中输入 Token 按命中价格计费。
 
     `cache_read_tokens` 会被限制在 `[0, input_tokens]` 区间内，其余输入按完整
     （缓存未命中）输入价格计费。未配置命中价格时，所有输入均按未命中价格计费。
-    """
+    '''
     cache_read = min(max(int(cache_read_tokens or 0), 0), max(int(input_tokens or 0), 0))
     uncached = max(int(input_tokens or 0), 0) - cache_read
     hit_price = price.input_cache_hit_per_million if price.input_cache_hit_per_million is not None else price.input_per_million
@@ -219,11 +213,11 @@ def _run_cost(
     total_output_tokens: int | None,
     token_usage_by_model: dict | None,
 ) -> float | None:
-    """估算单次运行的支出；若所用模型均未定价则返回 `None`。
+    '''估算单次运行的支出；若所用模型均未定价则返回 `None`。
 
     优先使用按模型明细，以准确覆盖子智能体使用不同模型等多模型运行；旧记录则回退为
     按 `model_name` 的运行级合计。缺少输入/输出拆分的分桶会被跳过，不进行猜测。
-    """
+    '''
     cost = 0.0
     priced = False
     if isinstance(token_usage_by_model, dict):
@@ -251,9 +245,7 @@ def _run_cost(
     return _token_cost(input_tokens, output_tokens, price)
 
 
-# ---------------------------------------------------------------------------
 # 端点
-# ---------------------------------------------------------------------------
 
 
 @router.get(
@@ -264,7 +256,7 @@ def _run_cost(
 )
 @require_permission("runs", "read")
 async def console_stats(request: Request) -> ConsoleStatsResponse:
-    """返回仪表板的标题计数器。"""
+    '''返回仪表板的标题计数器。'''
     sf = _session_factory_or_503()
     user_id = await get_current_user(request)
     run_where = (RunRow.user_id == user_id,) if user_id else ()
@@ -338,7 +330,7 @@ async def console_runs(
     offset: int = Query(default=0, ge=0),
     status: str | None = Query(default=None, description="Filter by run status (e.g. running, success, error)"),
 ) -> ConsoleRunsResponse:
-    """返回用户在所有线程中运行的页面。"""
+    '''返回用户在所有线程中运行的页面。'''
     sf = _session_factory_or_503()
     user_id = await get_current_user(request)
 
@@ -401,7 +393,7 @@ async def console_usage(
     days: int = Query(default=14, ge=1, le=90),
     tz_offset_minutes: int = Query(default=0, ge=-840, le=840, description="Local-time offset from UTC for day bucketing"),
 ) -> ConsoleUsageResponse:
-    """按当地时间和型号汇总令牌使用情况。"""
+    '''按当地时间和型号汇总令牌使用情况。'''
     sf = _session_factory_or_503()
     user_id = await get_current_user(request)
 

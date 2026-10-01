@@ -1,4 +1,4 @@
-"""提供持久化层的模型、仓储、迁移与数据库辅助实现。"""
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -11,18 +11,15 @@ from deerflow.persistence.base import Base
 
 
 class UserRow(Base):
-    """定义与持久化数据表对应的行模型。"""
+    '''定义与持久化数据表对应的行模型。'''
 
     __tablename__ = "users"
 
-    # UUIDs are stored as 36-char strings for cross-backend portability.
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
 
     email: Mapped[str] = mapped_column(String(320), unique=True, nullable=False, index=True)
     password_hash: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    # "admin" | "user" — kept as plain string to avoid ALTER TABLE pain
-    # when new roles are introduced.
     system_role: Mapped[str] = mapped_column(String(16), nullable=False, default="user")
 
     created_at: Mapped[datetime] = mapped_column(
@@ -31,13 +28,9 @@ class UserRow(Base):
         default=lambda: datetime.now(UTC),
     )
 
-    # OAuth linkage (optional). A partial unique index enforces one
-    # account per (provider, oauth_id) pair, leaving NULL/NULL rows
-    # unconstrained so plain password accounts can coexist.
     oauth_provider: Mapped[str | None] = mapped_column(String(32), nullable=True)
     oauth_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
 
-    # Auth lifecycle flags
     needs_setup: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     token_version: Mapped[int] = mapped_column(nullable=False, default=0)
 

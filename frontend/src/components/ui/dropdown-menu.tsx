@@ -6,14 +6,14 @@ import { CheckIcon, ChevronRightIcon, CircleIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-/** DropdownMenu 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理下拉菜单的打开状态、焦点移动和键盘交互。 */
 function DropdownMenu({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Root>) {
   return <DropdownMenuPrimitive.Root data-slot="dropdown-menu" {...props} />;
 }
 
-/** DropdownMenuPortal 内部组件：组织对应的界面结构与交互语义。 */
+/** 将菜单浮层挂载到页面根层，避免被祖先容器裁剪。 */
 function DropdownMenuPortal({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Portal>) {
@@ -22,7 +22,7 @@ function DropdownMenuPortal({
   );
 }
 
-/** DropdownMenuTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 将触发元素与菜单状态关联，并提供基础交互语义。 */
 function DropdownMenuTrigger({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Trigger>) {
@@ -34,7 +34,7 @@ function DropdownMenuTrigger({
   );
 }
 
-/** DropdownMenuContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 在 Portal 中展示定位菜单，并提供开合过渡与滚动边界。 */
 function DropdownMenuContent({
   className,
   sideOffset = 4,
@@ -55,7 +55,7 @@ function DropdownMenuContent({
   );
 }
 
-/** DropdownMenuGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 将一组相关菜单项作为可访问的逻辑分组。 */
 function DropdownMenuGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Group>) {
@@ -64,7 +64,7 @@ function DropdownMenuGroup({
   );
 }
 
-/** DropdownMenuItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供普通或危险操作菜单项，并支持缩进和禁用状态样式。 */
 function DropdownMenuItem({
   className,
   inset,
@@ -88,7 +88,7 @@ function DropdownMenuItem({
   );
 }
 
-/** DropdownMenuCheckboxItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 展示可勾选菜单项，并在选中时显示勾号指示器。 */
 function DropdownMenuCheckboxItem({
   className,
   children,
@@ -115,7 +115,7 @@ function DropdownMenuCheckboxItem({
   );
 }
 
-/** DropdownMenuRadioGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理互斥菜单选项的当前选中值。 */
 function DropdownMenuRadioGroup({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.RadioGroup>) {
@@ -127,7 +127,7 @@ function DropdownMenuRadioGroup({
   );
 }
 
-/** DropdownMenuRadioItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 展示单选菜单项，并以圆点标识当前选中项。 */
 function DropdownMenuRadioItem({
   className,
   children,
@@ -152,7 +152,7 @@ function DropdownMenuRadioItem({
   );
 }
 
-/** DropdownMenuLabel 内部组件：组织对应的界面结构与交互语义。 */
+/** 在菜单分组顶部显示说明标签，可与菜单项缩进对齐。 */
 function DropdownMenuLabel({
   className,
   inset,
@@ -173,7 +173,7 @@ function DropdownMenuLabel({
   );
 }
 
-/** DropdownMenuSeparator 内部组件：组织对应的界面结构与交互语义。 */
+/** 在菜单内容之间绘制横向分隔线。 */
 function DropdownMenuSeparator({
   className,
   ...props
@@ -187,7 +187,7 @@ function DropdownMenuSeparator({
   );
 }
 
-/** DropdownMenuShortcut 内部组件：组织对应的界面结构与交互语义。 */
+/** 将快捷键说明推至菜单项右侧并弱化显示。 */
 function DropdownMenuShortcut({
   className,
   ...props
@@ -204,14 +204,14 @@ function DropdownMenuShortcut({
   );
 }
 
-/** DropdownMenuSub 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理嵌套子菜单的独立打开状态。 */
 function DropdownMenuSub({
   ...props
 }: React.ComponentProps<typeof DropdownMenuPrimitive.Sub>) {
   return <DropdownMenuPrimitive.Sub data-slot="dropdown-menu-sub" {...props} />;
 }
 
-/** DropdownMenuSubTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 打开子菜单并显示方向指示符，支持与上级菜单项一致的缩进。 */
 function DropdownMenuSubTrigger({
   className,
   inset,
@@ -236,7 +236,7 @@ function DropdownMenuSubTrigger({
   );
 }
 
-/** DropdownMenuSubContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 渲染嵌套子菜单面板，并沿用主菜单的浮层和过渡样式。 */
 function DropdownMenuSubContent({
   className,
   ...props

@@ -6,28 +6,28 @@ import { CheckIcon, ChevronDownIcon, ChevronUpIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
-/** Select 内部组件：组织对应的界面结构与交互语义。 */
+/** 管理下拉选择值、受控状态及选项列表关系。 */
 function Select({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Root>) {
   return <SelectPrimitive.Root data-slot="select" {...props} />;
 }
 
-/** SelectGroup 内部组件：组织对应的界面结构与交互语义。 */
+/** 将相关选项归入同一可访问分组。 */
 function SelectGroup({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Group>) {
   return <SelectPrimitive.Group data-slot="select-group" {...props} />;
 }
 
-/** SelectValue 内部组件：组织对应的界面结构与交互语义。 */
+/** 在触发按钮中显示当前选择项或占位内容。 */
 function SelectValue({
   ...props
 }: React.ComponentProps<typeof SelectPrimitive.Value>) {
   return <SelectPrimitive.Value data-slot="select-value" {...props} />;
 }
 
-/** SelectTrigger 内部组件：组织对应的界面结构与交互语义。 */
+/** 打开选择菜单并展示所选值、占位状态和下拉指示符。 */
 function SelectTrigger({
   className,
   size = "default",
@@ -54,7 +54,7 @@ function SelectTrigger({
   );
 }
 
-/** SelectContent 内部组件：组织对应的界面结构与交互语义。 */
+/** 在 Portal 浮层中展示可滚动选项，并添加上下滚动指示按钮。 */
 function SelectContent({
   className,
   children,
@@ -92,7 +92,7 @@ function SelectContent({
   );
 }
 
-/** SelectLabel 内部组件：组织对应的界面结构与交互语义。 */
+/** 为选项组添加低强调度分组名称。 */
 function SelectLabel({
   className,
   ...props
@@ -106,7 +106,7 @@ function SelectLabel({
   );
 }
 
-/** SelectItem 内部组件：组织对应的界面结构与交互语义。 */
+/** 提供可选条目，并在当前选中项右侧显示勾选标记。 */
 function SelectItem({
   className,
   children,
@@ -134,7 +134,7 @@ function SelectItem({
   );
 }
 
-/** SelectSeparator 内部组件：组织对应的界面结构与交互语义。 */
+/** 分隔下拉列表中的选项区域。 */
 function SelectSeparator({
   className,
   ...props
@@ -148,7 +148,7 @@ function SelectSeparator({
   );
 }
 
-/** SelectScrollUpButton 内部组件：组织对应的界面结构与交互语义。 */
+/** 选项列表可向上滚动时显示的方向按钮。 */
 function SelectScrollUpButton({
   className,
   ...props
@@ -167,7 +167,7 @@ function SelectScrollUpButton({
   );
 }
 
-/** SelectScrollDownButton 内部组件：组织对应的界面结构与交互语义。 */
+/** 选项列表可向下滚动时显示的方向按钮。 */
 function SelectScrollDownButton({
   className,
   ...props

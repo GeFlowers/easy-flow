@@ -1,4 +1,4 @@
-"""
+'''
 
 统一：serialization for LangChain / LangGraph objects.
 
@@ -8,7 +8,7 @@ JSON-serialisable Python structures.
 
 Consumers: ``deerflow.runtime.runs.worker`` (SSE publishing) and
 ``app.gateway.routers.conversations.threads`` (REST responses).
-"""
+'''
 
 from __future__ import annotations
 
@@ -16,9 +16,9 @@ from typing import Any
 
 
 def serialize_lc_object(obj: Any) -> Any:
-    """
+    '''
 
-    递归把 LangChain 消息及相关对象转换为可传输的 JSON 数据。"""
+    递归把 LangChain 消息及相关对象转换为可传输的 JSON 数据。'''
     if obj is None:
         return None
     if isinstance(obj, (str, int, float, bool)):
@@ -27,20 +27,16 @@ def serialize_lc_object(obj: Any) -> Any:
         return {k: serialize_lc_object(v) for k, v in obj.items()}
     if isinstance(obj, (list, tuple)):
         return [serialize_lc_object(item) for item in obj]
-    # Pydantic v2
     if hasattr(obj, "model_dump"):
         try:
             return obj.model_dump()
         except Exception:
             pass
-    # Pydantic v1 / older objects
     if hasattr(obj, "dict"):
         try:
             return obj.dict()
         except Exception:
             pass
-    # Interrupt is a __slots__ class — no model_dump/dict/__dict__, so it
-    # would reach str() and produce a malformed payload.
     try:
         from langgraph.types import Interrupt
     except ImportError:
@@ -53,7 +49,6 @@ def serialize_lc_object(obj: Any) -> Any:
                     "id": getattr(obj, "id", None),
                 }
             )
-    # Last resort
     try:
         return str(obj)
     except Exception:
@@ -61,14 +56,14 @@ def serialize_lc_object(obj: Any) -> Any:
 
 
 def serialize_channel_values(channel_values: dict[str, Any]) -> dict[str, Any]:
-    """
+    '''
 
     序列化：channel values, stripping internal LangGraph keys.
 
         Only ``__pregel_*`` keys are removed — ``__interrupt__`` is deliberately
         preserved so the LangGraph SDK can detect interrupt events from values
         chunks (see issue #3595).
-    """
+    '''
     result: dict[str, Any] = {}
     for key, value in channel_values.items():
         if key.startswith("__pregel_"):
@@ -78,7 +73,7 @@ def serialize_channel_values(channel_values: dict[str, Any]) -> dict[str, Any]:
 
 
 def strip_data_url_image_blocks(messages: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """
+    '''
 
     从隐藏消息中移除内嵌 data URL 图片，避免向界面暴露大块图像数据。
 
@@ -91,14 +86,13 @@ def strip_data_url_image_blocks(messages: list[dict[str, Any]]) -> list[dict[str
         are stripped.  Text blocks, ``https://`` image URLs, and non-hidden
         messages are left untouched so that message ordering and count are
         preserved.
-    """
+    '''
     result: list[dict[str, Any]] = []
     for msg in messages:
         if not isinstance(msg, dict):
             result.append(msg)
             continue
 
-        # Only touch messages explicitly flagged as hidden from the UI.
         additional_kwargs = msg.get("additional_kwargs")
         if not (isinstance(additional_kwargs, dict) and additional_kwargs.get("hide_from_ui") is True):
             result.append(msg)
@@ -109,14 +103,13 @@ def strip_data_url_image_blocks(messages: list[dict[str, Any]]) -> list[dict[str
             result.append(msg)
             continue
 
-        # Filter out image_url blocks with data: scheme.
         filtered = [block for block in content if not (isinstance(block, dict) and block.get("type") == "image_url" and isinstance(block.get("image_url"), dict) and str(block["image_url"].get("url", "")).startswith("data:"))]
         result.append({**msg, "content": filtered})
     return result
 
 
 def serialize_channel_values_for_api(channel_values: dict[str, Any]) -> dict[str, Any]:
-    """
+    '''
 
     序列化：channel values and strip base64 image data from messages.
 
@@ -124,7 +117,7 @@ def serialize_channel_values_for_api(channel_values: dict[str, Any]) -> dict[str
         :func:`strip_data_url_image_blocks`.  Use this in all REST endpoints
         that return channel values to the frontend so that ``data:``-scheme
         base64 image payloads are never sent over the wire.
-    """
+    '''
     result = serialize_channel_values(channel_values)
     if isinstance(result.get("messages"), list):
         result["messages"] = strip_data_url_image_blocks(result["messages"])
@@ -132,9 +125,9 @@ def serialize_channel_values_for_api(channel_values: dict[str, Any]) -> dict[str
 
 
 def serialize_messages_tuple(obj: Any) -> Any:
-    """
+    '''
 
-    序列化：a messages-mode tuple ``(chunk, metadata)``."""
+    序列化：a messages-mode tuple ``(chunk, metadata)``.'''
     if isinstance(obj, tuple) and len(obj) == 2:
         chunk, metadata = obj
         return [serialize_lc_object(chunk), metadata if isinstance(metadata, dict) else {}]
@@ -142,7 +135,7 @@ def serialize_messages_tuple(obj: Any) -> Any:
 
 
 def serialize(obj: Any, *, mode: str = "") -> Any:
-    """
+    '''
 
     序列化：LangChain objects with mode-specific handling.
 
@@ -150,11 +143,9 @@ def serialize(obj: Any, *, mode: str = "") -> Any:
         * ``values`` — obj is the full state dict; ``__pregel_*`` keys stripped and
           base64 ``data:`` image blocks dropped from hide_from_ui messages
         * everything else — recursive ``model_dump()`` / ``dict()`` fallback
-    """
+    '''
     if mode == "messages":
         return serialize_messages_tuple(obj)
     if mode == "values":
-        # ``values`` snapshots stream the full state to the frontend, so they
-        # must drop base64 image payloads the same way the REST endpoints do.
         return serialize_channel_values_for_api(obj) if isinstance(obj, dict) else serialize_lc_object(obj)
     return serialize_lc_object(obj)

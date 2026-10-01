@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
-#
 # config-upgrade.sh - 将 config.yaml 升级为与 config.example.yaml 兼容的结构
-#
 # 1. 执行特定版本迁移（值替换、重命名等）
 # 2. 将示例中缺失的字段合并至用户配置
 # 3. 修改前备份 config.yaml 至 config.yaml.bak，保留可恢复副本。
@@ -70,10 +68,10 @@ if user_version >= example_version:
 print(f'Upgrading config.yaml: version {user_version} -> {example_version}')
 print()
 
-# ── Migrations ───────────────────────────────────────────────────────────
+# ── 配置迁移 ────────────────────────────────────────────────────────────
 # 每个迁移函数只负责一个明确的版本升级。
-# 'replacements': list of (old_string, new_string) applied to the raw YAML text.
-#   This handles value changes that a dict merge cannot catch.
+# 'replacements'：按顺序应用于原始 YAML 文本的 (old_string, new_string) 列表。
+#   用于处理字典合并无法识别的文本值变更。
 
 MIGRATIONS = {
     1: {
@@ -86,10 +84,8 @@ MIGRATIONS = {
         ],
     },
     # 后续迁移函数在此处按版本顺序调用：
-    # 2: {
-    #     'description': '...',
-    #     'replacements': [('old', 'new')],
-    # },
+    #     'description': '迁移说明',
+    #     'replacements': [('旧值', '新值')],
 }
 
 # 按版本顺序应用位于 (user_version, example_version] 区间内的迁移
@@ -113,7 +109,7 @@ if migrated:
         print(f'  ~ {m}')
     print()
 
-# ── Merge missing fields ─────────────────────────────────────────────────
+# ── 合并缺失字段 ────────────────────────────────────────────────────────
 
 added = []
 
@@ -132,7 +128,7 @@ merge(user, example)
 # 无论是否执行迁移，都将 config_version 更新为示例版本
 user['config_version'] = example_version
 
-# ── Write ─────────────────────────────────────────────────────────────────
+# ── 写入配置 ────────────────────────────────────────────────────────────
 
 backup = config_path.with_suffix('.yaml.bak')
 shutil.copy2(config_path, backup)

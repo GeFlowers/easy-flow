@@ -4,9 +4,9 @@ from deerflow.runtime.events.store.memory import MemoryRunEventStore
 
 
 def make_run_event_store(config=None) -> RunEventStore:
-    """
+    '''
 
-    创建：a RunEventStore based on run_events.backend configuration."""
+    创建：a RunEventStore based on run_events.backend configuration.'''
     if config is None or config.backend == "memory":
         return MemoryRunEventStore()
     if config.backend == "db":
@@ -14,7 +14,6 @@ def make_run_event_store(config=None) -> RunEventStore:
 
         sf = get_session_factory()
         if sf is None:
-            # A SQL run-event store requires the configured database backend.
             return MemoryRunEventStore()
         from deerflow.runtime.events.store.db import DbRunEventStore
 

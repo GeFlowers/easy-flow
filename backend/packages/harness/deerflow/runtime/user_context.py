@@ -1,4 +1,4 @@
-"""
+'''
 
 保存用于用户授权的请求范围用户上下文。
 
@@ -29,7 +29,7 @@ isolated. ``asyncio.create_task`` and ``asyncio.to_thread`` inherit the
 parent task's context, which is typically the intended behaviour; if
 a background task must *not* see the foreground user, wrap it with
 ``contextvars.copy_context()`` to get a clean copy.
-"""
+'''
 
 from __future__ import annotations
 
@@ -39,13 +39,13 @@ from typing import Final, Protocol, runtime_checkable
 
 @runtime_checkable
 class CurrentUser(Protocol):
-    """
+    '''
 
     当前认证用户的结构化类型。
 
         任何具有 ``.id: str`` 属性的对象都满足此协议；具体实现位于
         ``app.gateway.auth.models.User``。
-    """
+    '''
 
     id: str
 
@@ -54,61 +54,58 @@ _current_user: Final[ContextVar[CurrentUser | None]] = ContextVar("deerflow_curr
 
 
 def set_current_user(user: CurrentUser) -> Token[CurrentUser | None]:
-    """
+    '''
 
     为当前异步任务设置用户。
 
         返回一个重置令牌，调用方应在 ``finally`` 中将其传给
         :func:`reset_current_user`，以恢复之前的上下文。
-    """
+    '''
     return _current_user.set(user)
 
 
 def reset_current_user(token: Token[CurrentUser | None]) -> None:
-    """
+    '''
 
-    将上下文恢复为 ``token`` 捕获的状态。"""
+    将上下文恢复为 ``token`` 捕获的状态。'''
     _current_user.reset(token)
 
 
 def get_current_user() -> CurrentUser | None:
-    """
+    '''
 
     返回当前用户；未设置时返回 ``None``。
 
         可在任意上下文调用，适用于迁移脚本和公开接口等允许无用户的路径。
-    """
+    '''
     return _current_user.get()
 
 
 def require_current_user() -> CurrentUser:
-    """
+    '''
 
     返回当前用户；没有用户上下文时抛出 :class:`RuntimeError`。
 
         供必须运行在已认证请求中的持久化代码使用，错误信息包含调用路径定位线索。
-    """
+    '''
     user = _current_user.get()
     if user is None:
         raise RuntimeError("repository accessed without user context")
     return user
 
 
-# ---------------------------------------------------------------------------
-# Effective user_id helpers (filesystem isolation)
-# ---------------------------------------------------------------------------
 
 DEFAULT_USER_ID: Final[str] = "default"
 
 
 def get_effective_user_id() -> str:
-    """
+    '''
 
     返回当前用户的字符串 ID；未设置时返回 DEFAULT_USER_ID。
 
         与 :func:`require_current_user` 不同，本函数不会抛出异常，专门用于始终需要
         有效用户目录的文件系统路径解析。
-    """
+    '''
     user = _current_user.get()
     if user is None:
         return DEFAULT_USER_ID
@@ -116,7 +113,7 @@ def get_effective_user_id() -> str:
 
 
 def resolve_runtime_user_id(runtime: object | None) -> str:
-    """
+    '''
 
     解析工具或中间件有效 user_id 的唯一入口。
 
@@ -134,7 +131,7 @@ def resolve_runtime_user_id(runtime: object | None) -> str:
 
         保存用户范围状态的工具（自定义 Agent、记忆、上传）必须调用本函数，
         以使用 setup_agent 依赖的 runtime.context 通道。
-    """
+    '''
     context = getattr(runtime, "context", None)
     if isinstance(context, dict):
         ctx_user_id = context.get("user_id")
@@ -143,30 +140,23 @@ def resolve_runtime_user_id(runtime: object | None) -> str:
     return get_effective_user_id()
 
 
-# ---------------------------------------------------------------------------
-# Sentinel-based user_id resolution
-# ---------------------------------------------------------------------------
-#
-# Repository methods accept a ``user_id`` keyword-only argument that
-# defaults to ``AUTO``. The three possible values drive distinct
-# behaviours; see the docstring on :func:`resolve_user_id`.
 
 
 class _AutoSentinel:
-    """
+    '''
 
-    表示“从 ContextVar 解析 user_id”的单例标记。"""
+    表示“从 ContextVar 解析 user_id”的单例标记。'''
 
     _instance: _AutoSentinel | None = None
 
     def __new__(cls) -> _AutoSentinel:
-        """确保 AUTO 标记全局只存在一个实例，以区分参数未传入的情况。"""
+        '''确保 AUTO 标记全局只存在一个实例，以区分参数未传入的情况。'''
         if cls._instance is None:
             cls._instance = super().__new__(cls)
         return cls._instance
 
     def __repr__(self) -> str:
-        """返回稳定的标记名称，便于调试用户作用域解析。"""
+        '''返回稳定的标记名称，便于调试用户作用域解析。'''
         return "<AUTO>"
 
 
@@ -178,7 +168,7 @@ def resolve_user_id(
     *,
     method_name: str = "repository method",
 ) -> str | None:
-    """
+    '''
 
     解析传给持久化方法的 user_id 参数。
 
@@ -188,16 +178,10 @@ def resolve_user_id(
           :class:`RuntimeError`，这是请求范围调用的常规路径。
         - 显式 ``str``：原样使用传入 ID，适合测试和管理员覆盖流程。
         - 显式 ``None``：不添加 user_id 过滤，仅供有意绕过隔离的迁移脚本和命令行工具使用。
-    """
+    '''
     if isinstance(value, _AutoSentinel):
         user = _current_user.get()
         if user is None:
             raise RuntimeError(f"{method_name} called with user_id=AUTO but no user context is set; pass an explicit user_id, set the contextvar via auth middleware, or opt out with user_id=None for migration/CLI paths.")
-        # Coerce to ``str`` at the boundary: ``User.id`` is typed as
-        # ``UUID`` for the API surface, but the persistence layer
-        # stores ``user_id`` as ``String(64)`` and database drivers cannot
-        # bind a raw UUID object to a VARCHAR column ("type 'UUID' is
-        # not supported"). Honour the documented return type here
-        # rather than ripple a type change through every caller.
         return str(user.id)
     return value

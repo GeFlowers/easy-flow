@@ -46,6 +46,7 @@ import { ChannelRuntimeConfigDialog } from "../channels/channel-runtime-config-d
 
 import { SettingsSection } from "./settings-section";
 
+/** 读取配置提供方的说明；缺少单独说明时回退到其显示名称。 */
 function getProviderDescription(
   provider: ChannelProvider,
   descriptions: Record<string, string>,
@@ -53,6 +54,7 @@ function getProviderDescription(
   return descriptions[provider.provider] ?? provider.display_name;
 }
 
+/** 从连接信息中优先组合账号与工作区名称，生成设置页显示标签。 */
 function getConnectionLabel(connection: ChannelConnection): string | null {
   const account = connection.external_account_name;
   const workspace = connection.workspace_name;
@@ -62,6 +64,7 @@ function getConnectionLabel(connection: ChannelConnection): string | null {
   return account ?? workspace ?? connection.external_account_id ?? null;
 }
 
+/** 综合提供方配置状态与实际连接状态，返回对应的本地化标签。 */
 function getStatusLabel(
   provider: ChannelProvider,
   connection: ChannelConnection | undefined,
@@ -89,6 +92,7 @@ function getStatusLabel(
   return t.channels.notConnected;
 }
 
+/** 解析提供方不可用原因，并为未配置或已禁用情形补充界面提示。 */
 function getProviderUnavailableReason(
   provider: ChannelProvider,
   t: ReturnType<typeof useI18n>["t"],
@@ -105,6 +109,7 @@ function getProviderUnavailableReason(
   return provider.unavailable_reason ?? undefined;
 }
 
+/** 管理单个消息渠道的连接、运行时配置和断开操作。 */
 function ChannelProviderItem({
   provider,
   connection,
@@ -138,6 +143,7 @@ function ChannelProviderItem({
   const statusLabel = getStatusLabel(provider, connection, t);
   const unavailableReason = getProviderUnavailableReason(provider, t);
 
+  /** 执行渠道授权跳转，并在失败或返回说明时清理预开的浏览器窗口。 */
   const startConnect = (
     connectProvider: ChannelProvider,
     preparedWindow?: Window | null,

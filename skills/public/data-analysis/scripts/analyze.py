@@ -1,4 +1,4 @@
-"""以 DuckDB 加载 CSV 与 Excel 文件，提供缓存、结构检查、查询、导出和统计摘要。"""
+'''以 DuckDB 加载 CSV 与 Excel 文件，提供缓存、结构检查、查询、导出和统计摘要。'''
 
 import argparse
 import hashlib
@@ -31,7 +31,7 @@ TABLE_MAP_SUFFIX = ".table_map.json"
 
 
 def compute_files_hash(files: list[str]) -> str:
-    """计算输入文件内容和路径的组合 SHA256，作为持久化缓存键。"""
+    '''计算输入文件内容和路径的组合 SHA256，作为持久化缓存键。'''
     hasher = hashlib.sha256()
     for file_path in sorted(files):
         try:
@@ -39,31 +39,31 @@ def compute_files_hash(files: list[str]) -> str:
                 while chunk := f.read(8192):
                     hasher.update(chunk)
         except OSError:
-            # Include path as fallback if file can't be read
+            # 文件读取失败时将路径本身纳入缓存键。
             hasher.update(file_path.encode())
     return hasher.hexdigest()
 
 
 def get_cache_db_path(files_hash: str) -> str:
-    """根据缓存键返回 DuckDB 数据库文件路径，不创建或打开文件。"""
+    '''根据缓存键返回 DuckDB 数据库文件路径，不创建或打开文件。'''
     os.makedirs(CACHE_DIR, exist_ok=True)
     return os.path.join(CACHE_DIR, f"{files_hash}.duckdb")
 
 
 def get_table_map_path(files_hash: str) -> str:
-    """根据缓存键返回原始表名映射 JSON 的路径。"""
+    '''根据缓存键返回原始表名映射 JSON 的路径。'''
     return os.path.join(CACHE_DIR, f"{files_hash}{TABLE_MAP_SUFFIX}")
 
 
 def save_table_map(files_hash: str, table_map: dict[str, str]) -> None:
-    """将原始名称到安全 SQL 表名的映射保存到缓存数据库旁。"""
+    '''将原始名称到安全 SQL 表名的映射保存到缓存数据库旁。'''
     path = get_table_map_path(files_hash)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(table_map, f, ensure_ascii=False)
 
 
 def load_table_map(files_hash: str) -> dict[str, str] | None:
-    """读取缓存表名映射；缓存不存在时返回 ``None``。"""
+    '''读取缓存表名映射；缓存不存在时返回 ``None``。'''
     path = get_table_map_path(files_hash)
     if not os.path.exists(path):
         return None
@@ -75,7 +75,7 @@ def load_table_map(files_hash: str) -> dict[str, str] | None:
 
 
 def sanitize_table_name(name: str) -> str:
-    """将工作表或文件名转成合法 SQL 表名，避免特殊字符和首字符非法。"""
+    '''将工作表或文件名转成合法 SQL 表名，避免特殊字符和首字符非法。'''
     sanitized = re.sub(r"[^\w]", "_", name)
     if sanitized and sanitized[0].isdigit():
         sanitized = f"t_{sanitized}"
@@ -83,7 +83,7 @@ def sanitize_table_name(name: str) -> str:
 
 
 def load_files(con: duckdb.DuckDBPyConnection, files: list[str]) -> dict[str, str]:
-    """将 Excel 或 CSV 文件加载为 DuckDB 表，并返回原名到安全表名的映射。"""
+    '''将 Excel 或 CSV 文件加载为 DuckDB 表，并返回原名到安全表名的映射。'''
     con.execute("INSTALL spatial; LOAD spatial;")
     table_map: dict[str, str] = {}
 
@@ -107,7 +107,7 @@ def load_files(con: duckdb.DuckDBPyConnection, files: list[str]) -> dict[str, st
 def _load_excel(
     con: duckdb.DuckDBPyConnection, file_path: str, table_map: dict[str, str]
 ) -> None:
-    """将 Excel 的所有工作表载入 DuckDB，重名表会加后缀防止覆盖。"""
+    '''将 Excel 的所有工作表载入 DuckDB，重名表会加后缀防止覆盖。'''
     import openpyxl
 
     wb = openpyxl.load_workbook(file_path, read_only=True, data_only=True)
@@ -117,7 +117,7 @@ def _load_excel(
     for sheet_name in sheet_names:
         table_name = sanitize_table_name(sheet_name)
 
-        # Handle duplicate table names
+        # 为重名数据表添加序号，避免覆盖已有表。
         original_table_name = table_name
         counter = 1
         while table_name in table_map.values():
@@ -149,11 +149,11 @@ def _load_excel(
 def _load_csv(
     con: duckdb.DuckDBPyConnection, file_path: str, table_map: dict[str, str]
 ) -> None:
-    """使用 DuckDB 自动识别 CSV 格式并载入单表，处理表名冲突。"""
+    '''使用 DuckDB 自动识别 CSV 格式并载入单表，处理表名冲突。'''
     base_name = os.path.splitext(os.path.basename(file_path))[0]
     table_name = sanitize_table_name(base_name)
 
-    # Handle duplicate table names
+    # 为重名数据表添加序号，避免覆盖已有表。
     original_table_name = table_name
     counter = 1
     while table_name in table_map.values():
@@ -177,7 +177,7 @@ def _load_csv(
 
 
 def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) -> str:
-    """输出表的行数、字段类型、非空计数和有限样本，辅助数据探索。"""
+    '''输出表的行数、字段类型、非空计数和有限样本，辅助数据探索。'''
     output_parts = []
 
     for original_name, table_name in table_map.items():
@@ -185,11 +185,11 @@ def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) ->
         output_parts.append(f'Table: {original_name} (SQL name: "{table_name}")')
         output_parts.append(f"{'=' * 60}")
 
-        # Get row count
+        # 获取行数。
         row_count = con.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
         output_parts.append(f"Rows: {row_count}")
 
-        # Get column info
+        # 获取列信息。
         columns = con.execute(f'DESCRIBE "{table_name}"').fetchall()
         output_parts.append(f"\nColumns ({len(columns)}):")
         output_parts.append(f"{'Name':<30} {'Type':<15} {'Nullable'}")
@@ -198,7 +198,7 @@ def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) ->
             col_name, col_type, nullable = col[0], col[1], col[2]
             output_parts.append(f"{col_name:<30} {col_type:<15} {nullable}")
 
-        # Get non-null counts per column
+        # 统计每列非空值数量。
         col_names = [col[0] for col in columns]
         non_null_parts = []
         for c in col_names:
@@ -212,7 +212,7 @@ def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) ->
         except Exception:
             pass
 
-        # Sample data (first 5 rows)
+        # 读取前五行作为样本。
         output_parts.append("\nSample data (first 5 rows):")
         try:
             sample = con.execute(f'SELECT * FROM "{table_name}" LIMIT 5').fetchdf()
@@ -235,14 +235,14 @@ def action_query(
     table_map: dict[str, str],
     output_file: str | None = None,
 ) -> str:
-    """执行用户 SQL，并按需要格式化或导出结果；查询前替换原始表名映射。"""
-    # Replace original sheet/file names with sanitized table names in SQL
+    '''执行用户 SQL，并按需要格式化或导出结果；查询前替换原始表名映射。'''
+    # 在查询中将原始工作表或文件名替换为安全表名。
     modified_sql = sql
     for original_name, table_name in sorted(
         table_map.items(), key=lambda x: len(x[0]), reverse=True
     ):
         if original_name != table_name:
-            # Replace occurrences not already quoted
+            # 仅替换尚未加引号的名称。
             modified_sql = re.sub(
                 rf"\b{re.escape(original_name)}\b",
                 f'"{table_name}"',
@@ -262,32 +262,32 @@ def action_query(
         print(error_msg)
         return error_msg
 
-    # Format output
+    # 根据指定路径导出结果。
     if output_file:
         return _export_results(columns, rows, output_file)
 
-    # Print as table
+    # 将结果格式化为表格输出。
     return _format_table(columns, rows)
 
 
 def _format_table(columns: list[str], rows: list[tuple]) -> str:
-    """将查询列和行转换为限宽的终端可读表格。"""
+    '''将查询列和行转换为限宽的终端可读表格。'''
     if not rows:
         msg = "Query returned 0 rows."
         print(msg)
         return msg
 
-    # Calculate column widths
+    # 计算各列宽度。
     col_widths = [len(str(c)) for c in columns]
     for row in rows:
         for i, val in enumerate(row):
             col_widths[i] = max(col_widths[i], len(str(val)))
 
-    # Cap column width
+    # 限制最大列宽。
     max_width = 40
     col_widths = [min(w, max_width) for w in col_widths]
 
-    # Build table
+    # 组装表格内容。
     parts = []
     header = " | ".join(str(c).ljust(col_widths[i]) for i, c in enumerate(columns))
     separator = "-+-".join("-" * col_widths[i] for i in range(len(columns)))
@@ -306,7 +306,7 @@ def _format_table(columns: list[str], rows: list[tuple]) -> str:
 
 
 def _export_results(columns: list[str], rows: list[tuple], output_file: str) -> str:
-    """将结果导出为 CSV、JSON 或 Markdown；不支持的格式会报错。"""
+    '''将结果导出为 CSV、JSON 或 Markdown；不支持的格式会报错。'''
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     ext = os.path.splitext(output_file)[1].lower()
 
@@ -324,7 +324,7 @@ def _export_results(columns: list[str], rows: list[tuple], output_file: str) -> 
             record = {}
             for i, col in enumerate(columns):
                 val = row[i]
-                # Handle non-JSON-serializable types
+                # 将无法直接序列化为 JSON 的值转换为可写入形式。
                 if hasattr(val, "isoformat"):
                     val = val.isoformat()
                 elif isinstance(val, (bytes, bytearray)):
@@ -336,10 +336,10 @@ def _export_results(columns: list[str], rows: list[tuple], output_file: str) -> 
 
     elif ext == ".md":
         with open(output_file, "w", encoding="utf-8") as f:
-            # Header
+            # 写入表头。
             f.write("| " + " | ".join(columns) + " |\n")
             f.write("| " + " | ".join("---" for _ in columns) + " |\n")
-            # Rows
+            # 写入数据行。
             for row in rows:
                 f.write(
                     "| " + " | ".join(str(v).replace("|", "\\|") for v in row) + " |\n"
@@ -359,8 +359,8 @@ def action_summary(
     table_name: str,
     table_map: dict[str, str],
 ) -> str:
-    """按字段类型汇总行数、空值、数值统计和高频类别。"""
-    # Resolve table name
+    '''按字段类型汇总行数、空值、数值统计和高频类别。'''
+    # 将原始表名解析为实际表名。
     resolved = table_map.get(table_name, table_name)
 
     try:
@@ -395,7 +395,7 @@ def action_summary(
         col_name, col_type = col[0], col[1].upper()
         output_parts.append(f"\n--- {col_name} ({col[1]}) ---")
 
-        # Check base type (strip parameterized parts)
+        # 去除类型参数，取得基础类型。
         base_type = re.sub(r"\(.*\)", "", col_type).strip()
 
         if base_type in numeric_types:
@@ -446,7 +446,7 @@ def action_summary(
                 output_parts.append(f"  top     : {stats[2]}")
                 output_parts.append(f"  nulls   : {stats[3]}")
 
-                # Show top 5 values
+                # 展示出现频率最高的五个值。
                 top_vals = con.execute(f"""
                     SELECT "{col_name}", COUNT(*) as freq
                     FROM "{resolved}"
@@ -469,7 +469,7 @@ def action_summary(
 
 
 def main():
-    """解析命令行参数，复用或创建缓存数据库，并执行选定的数据分析操作。"""
+    '''解析命令行参数，复用或创建缓存数据库，并执行选定的数据分析操作。'''
     parser = argparse.ArgumentParser(description="Analyze Excel/CSV files using DuckDB")
     parser.add_argument(
         "--files",
@@ -503,19 +503,19 @@ def main():
     )
     args = parser.parse_args()
 
-    # Validate arguments
+    # 校验参数之间的依赖关系。
     if args.action == "query" and not args.sql:
         parser.error("--sql is required for 'query' action")
     if args.action == "summary" and not args.table:
         parser.error("--table is required for 'summary' action")
 
-    # Compute file hash for caching
+    # 计算文件内容哈希，用于查找缓存。
     files_hash = compute_files_hash(args.files)
     db_path = get_cache_db_path(files_hash)
     cached_table_map = load_table_map(files_hash)
 
     if cached_table_map and os.path.exists(db_path):
-        # Cache hit: connect to existing DB
+        # 命中缓存：以只读方式连接已有数据库。
         logger.info(f"Cache hit! Using cached database: {db_path}")
         con = duckdb.connect(db_path, read_only=True)
         table_map = cached_table_map
@@ -523,27 +523,27 @@ def main():
             f"Loaded {len(table_map)} table(s) from cache: {', '.join(table_map.keys())}"
         )
     else:
-        # Cache miss: load files and persist to DB
+        # 未命中缓存：载入文件并将结果保存到数据库。
         logger.info("Loading files (first time, will cache for future use)...")
         con = duckdb.connect(db_path)
         table_map = load_files(con, args.files)
 
         if not table_map:
             logger.error("No tables were loaded. Check file paths and formats.")
-            # Clean up empty DB file
+            # 删除未能载入任何数据的空数据库文件。
             con.close()
             if os.path.exists(db_path):
                 os.remove(db_path)
             sys.exit(1)
 
-        # Save table map for future cache lookups
+        # 保存表名映射，供后续缓存查询使用。
         save_table_map(files_hash, table_map)
         logger.info(
             f"\nLoaded {len(table_map)} table(s): {', '.join(table_map.keys())}"
         )
         logger.info(f"Cached database saved to: {db_path}")
 
-    # Perform action
+    # 执行所选分析操作。
     if args.action == "inspect":
         action_inspect(con, table_map)
     elif args.action == "query":

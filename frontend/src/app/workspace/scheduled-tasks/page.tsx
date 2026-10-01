@@ -116,26 +116,33 @@ export default function ScheduledTasksPage() {
   const triggerTask = useTriggerScheduledTask();
   const deleteTask = useDeleteScheduledTask();
 
+  /** 把任务计划类型标识转换为本地化标签，未知值保留原始文本。 */
   const scheduleTypeLabel = (v: string) =>
     v === "cron"
       ? st.scheduleType.cron
       : v === "once"
         ? st.scheduleType.once
         : v;
+  /** 显示任务状态对应的本地化名称，并兼容服务端新增状态值。 */
   const statusLabel = (v: string) =>
     (st.status as Record<string, string>)[v] ?? v;
+  /** 将每次运行新建线程或复用线程的策略转为设置页文案。 */
   const contextModeLabel = (v: string) =>
     v === "fresh_thread_per_run"
       ? st.context.fresh
       : v === "reuse_thread"
         ? st.context.reuse
         : v;
+  /** 将运行触发来源映射为本地化文本，保留未识别的来源标识。 */
   const runTriggerLabel = (v: string) =>
     (st.runTrigger as Record<string, string>)[v] ?? v;
+  /** 将单次运行状态映射为本地化文本，兼容未知状态。 */
   const runStatusLabel = (v: string) =>
     (st.runStatus as Record<string, string>)[v] ?? v;
+  /** 组合任务的计划类型和当前状态，供任务列表摘要显示。 */
   const taskSummary = (task: ScheduledTask) =>
     `${scheduleTypeLabel(task.schedule_type)} · ${statusLabel(task.status)}`;
+  /** 组合单次运行的触发来源和执行状态，供运行历史列表显示。 */
   const runSummary = (run: ScheduledTaskRun) =>
     `${runTriggerLabel(run.trigger)} · ${runStatusLabel(run.status)}`;
   /** 将预设配方写入创建表单，并重置计划输入组件。 */

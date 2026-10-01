@@ -1,4 +1,4 @@
-"""提供向用户请求澄清信息的内置工具。"""
+'''提供向用户请求澄清信息的内置工具。'''
 
 from typing import Literal
 
@@ -18,7 +18,7 @@ def ask_clarification_tool(
     context: str | None = None,
     options: list[str] | None = None,
 ) -> str:
-    """当缺少必要信息而无法可靠继续时，向用户提出澄清问题。
+    '''当缺少必要信息而无法可靠继续时，向用户提出澄清问题。
 
     Use this tool when you encounter situations where you cannot proceed without user input:
 
@@ -50,5 +50,5 @@ def ask_clarification_tool(
         clarification_type: The type of clarification needed (missing_info, ambiguous_requirement, approach_choice, risk_confirmation, suggestion).
         context: Optional context explaining why clarification is needed. Helps the user understand the situation.
         options: Optional list of choices (for approach_choice or suggestion types). Present clear options for the user to choose from.
-    """
+    '''
     return "Clarification request processed by middleware"

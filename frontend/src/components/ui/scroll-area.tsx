@@ -5,7 +5,7 @@ import * as ScrollAreaPrimitive from "@radix-ui/react-scroll-area";
 
 import { cn } from "@/lib/utils";
 
-/** ScrollArea 内部组件：组织对应的界面结构与交互语义。 */
+/** 包装自定义滚动视口并隐藏浏览器原生滚动条外观。 */
 function ScrollArea({
   className,
   children,
@@ -29,7 +29,7 @@ function ScrollArea({
   );
 }
 
-/** ScrollBar 内部组件：组织对应的界面结构与交互语义。 */
+/** 根据滚动方向显示可拖动的自定义滚动条。 */
 function ScrollBar({
   className,
   orientation = "vertical",

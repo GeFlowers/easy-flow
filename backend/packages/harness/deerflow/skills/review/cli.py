@@ -1,4 +1,4 @@
-"未说明"
+'''提供技能包审查命令行入口，可输出 JSON 或文本报告并按发现等级设置退出码。'''
 
 from __future__ import annotations
 
@@ -13,7 +13,7 @@ from deerflow.skills.review.readers import ArchivePackageReader, LocalDirectoryR
 
 
 def main(argv: list[str] | None = None) -> int:
-    "未说明"
+    '''解析命令行选项，选择目录或归档读取器，运行技能审查并输出结果。'''
     parser = argparse.ArgumentParser(description="Analyze a skill package without executing it.")
     parser.add_argument("target", help="Skill directory or .skill archive to review")
     parser.add_argument("--profile", choices=["deerflow", "agentskills"], default="deerflow")
@@ -48,7 +48,7 @@ def main(argv: list[str] | None = None) -> int:
 
 
 def _print_text(facts: dict[str, Any]) -> None:
-    "未说明"
+    '''以人类可读格式打印包标识、审查摘要、完整度和逐项发现。'''
     subject = facts.get("subject", {})
     summary = facts.get("summary", {})
     completeness = facts.get("completeness", {})
@@ -64,7 +64,7 @@ def _print_text(facts: dict[str, Any]) -> None:
 
 
 def _exit_code(facts: dict[str, Any], fail_on: str, *, fail_on_incomplete: bool = False) -> int:
-    "未说明"
+    '''按指定严重级别和完整度要求决定命令行进程是否以失败状态退出。'''
     if fail_on_incomplete and facts.get("completeness", {}).get("not_assessed"):
         return 1
     if fail_on == "never":

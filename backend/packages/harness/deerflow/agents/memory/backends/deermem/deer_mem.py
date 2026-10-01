@@ -1,4 +1,4 @@
-"""定义 deer_mem 模块提供的职责与可复用接口。
+'''将 DeerMem 内部的存储、队列和事实更新流程适配到统一记忆管理器接口。
 
 DeerMem -- the default :class:`MemoryManager` backend (self-contained).
 
@@ -21,7 +21,7 @@ Methods not on the ABC (``warm`` / ``reload_memory`` / ``create_fact`` /
 at startup and the gateway/client probe ``hasattr(manager, "create_fact")`` for
 fact CRUD, rather than importing DeerMem, so a non-DeerMem (or removed) backend
 never breaks those modules at import time (see MemoryManager plan, step 8).
-"""
+'''
 
 from __future__ import annotations
 
@@ -46,30 +46,16 @@ logger = logging.getLogger(__name__)
 
 
 class DeerMem(MemoryManager):
-    """封装 DeerMem 的状态、协作关系与公开操作。
-
-    Default memory backend: file-backed facts + debounced LLM extraction."""
+    '''负责将对话整理为记忆事实、异步排队更新，并向智能体提供记忆读写能力。'''
 
     def __init__(self, backend_config: dict[str, Any] | None = None) -> None:
-        """实现 __init__ 协议方法，保持对象交互语义一致。
-
-        Construct DeerMem with its dependencies (dependency injection).
-
-                Args:
-                    backend_config: DeerMem-private config dict (from
-                        ``MemoryConfig.backend_config``). Parsed into a
-                        :class:`DeerMemConfig` (defaults apply when empty/None).
-        """
+        '''解析后端配置并创建存储、模型、事实更新器和延迟更新队列。'''
         self._config = DeerMemConfig.from_backend_config(backend_config)
         self._storage = create_storage(self._config)
-        # host_llm (host-injected default model) takes precedence over build_llm(model)
-        # so zero-config DeerMem (empty `model`) still extracts via the app default,
-        # mirroring pre-abstraction `model_name: null`. Standalone (no factory) -> None.
         self._llm = self._config.host_llm if self._config.host_llm is not None else build_llm(self._config.model)
         self._updater = MemoryUpdater(self._config, self._storage, self._llm)
         self._queue = MemoryUpdateQueue(self._config, self._updater)
 
-    # ── Write ────────────────────────────────────────────────────────────
     def add(
         self,
         thread_id: str,
@@ -79,14 +65,7 @@ class DeerMem(MemoryManager):
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> None:
-        """执行 add 的明确职责，并返回与调用约定一致的结果。
-
-        Filter, validate, detect signals, then enqueue (debounced).
-
-                Mirrors the preprocessing that lived in ``MemoryMiddleware.after_agent``
-                before the abstraction. The ``enabled`` gate and
-                ``thread_id``/``user_id``/``trace_id`` resolution stay at the call site.
-        """
+        '''筛选有效对话并识别纠正或强化信号，再将记忆更新加入防抖队列。'''
         prepared = self._prepare_update(messages)
         if prepared is None:
             return
@@ -109,13 +88,7 @@ class DeerMem(MemoryManager):
         agent_name: str | None = None,
         user_id: str | None = None,
     ) -> None:
-        """执行 add_nowait 的明确职责，并返回与调用约定一致的结果。
-
-        Filter, validate, detect signals, then enqueue for immediate flush.
-
-                Mirrors the preprocessing that lived in ``memory_flush_hook`` before
-                the abstraction. Used right before summarization removes messages.
-        """
+        '''整理当前对话并请求立即刷新队列，供消息摘要裁剪前保存记忆使用。'''
         prepared = self._prepare_update(messages)
         if prepared is None:
             return
@@ -133,15 +106,7 @@ class DeerMem(MemoryManager):
         self,
         messages: list[Any],
     ) -> tuple[list[Any], bool, bool] | None:
-        """执行 _prepare_update 的明确职责，并返回与调用约定一致的结果。
-
-        Filter to user+final-AI messages, require both, detect signals.
-
-                Returns ``(filtered, correction_detected, reinforcement_detected)``
-                or ``None`` when there is no meaningful conversation (missing a user
-                or an assistant turn). Identical logic to the pre-abstraction
-                middleware/hook so behaviour is unchanged.
-        """
+        '''筛出有效的用户和助手对话；缺少任一方时跳过，否则检测纠正与强化信号。'''
         filtered = filter_messages_for_memory(
             messages,
             should_keep_hidden_message=self._config.should_keep_hidden_message,
@@ -154,7 +119,6 @@ class DeerMem(MemoryManager):
         reinforcement_detected = not correction_detected and detect_reinforcement(filtered)
         return filtered, correction_detected, reinforcement_detected
 
-    # ── Read ─────────────────────────────────────────────────────────────
     def get_context(
         self,
         user_id: str | None,
@@ -162,15 +126,7 @@ class DeerMem(MemoryManager):
         agent_name: str | None = None,
         thread_id: str | None = None,
     ) -> str:
-        """读取并返回，并遵守 get_context 所表达的接口约束。
-
-        Load memory and format it for injection (plain text, no wrap).
-
-                Format parameters come from DeerMem's own ``DeerMemConfig`` (set at
-                construction from ``backend_config``). The ``enabled``/
-                ``injection_enabled`` gate and the ``<memory>`` wrapping stay at the
-                call site (``_get_memory_context``); this returns only the body.
-        """
+        '''读取用户记忆并按配置裁剪、格式化为可注入提示的纯文本内容。'''
         memory_data = self._updater.get_memory_data(agent_name=agent_name, user_id=user_id)
         return format_memory_for_injection(
             memory_data,
@@ -189,18 +145,7 @@ class DeerMem(MemoryManager):
         agent_name: str | None = None,
         category: str | None = None,
     ) -> list[dict[str, Any]]:
-        """执行 search 的明确职责，并返回与调用约定一致的结果。
-
-        Case-insensitive substring search over stored facts.
-
-                Stand-in for the planned BM25+vector+MMR retrieval
-                (``core/retrieval.py``): returns facts whose ``content`` contains the
-                query, ranked by confidence desc, capped at ``top_k``. ``category``
-                filters BEFORE the ``top_k`` slice so a category-scoped search is not
-                starved by higher-confidence facts in other categories. Sufficient for
-                the tool-driven memory mode; upgrade to semantic retrieval later
-                without changing call sites.
-        """
+        '''在用户事实中执行不区分大小写的内容包含搜索，可按类别筛选并按置信度排序。'''
         if not query or not query.strip() or top_k <= 0:
             return []
         query_lower = query.strip().lower()
@@ -209,14 +154,13 @@ class DeerMem(MemoryManager):
         matched.sort(key=_coerce_source_confidence, reverse=True)
         return matched[:top_k]
 
-    # ── Manage ───────────────────────────────────────────────────────────
     def get_memory(
         self,
         *,
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        "读取并返回，并遵守 get_memory 所表达的接口约束"
+        '''返回指定用户和代理的完整记忆数据。'''
         return self._updater.get_memory_data(agent_name=agent_name, user_id=user_id)
 
     def delete_memory(
@@ -225,9 +169,7 @@ class DeerMem(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> None:
-        """删除目标资源并返回操作结果，并遵守 delete_memory 所表达的接口约束。
-
-        Not implemented this phase (storage/updater deletion is a future ``core/`` addition)."""
+        '''整份记忆删除尚未实现；当前存储层没有对应的删除操作。'''
         raise NotImplementedError("DeerMem.delete_memory is not implemented yet")
 
     def clear_memory(
@@ -236,7 +178,7 @@ class DeerMem(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        "执行 clear_memory 的明确职责，并返回与调用约定一致的结果"
+        '''清除指定用户和代理的全部记忆数据。'''
         return self._updater.clear_memory_data(agent_name=agent_name, user_id=user_id)
 
     def import_memory(
@@ -246,7 +188,7 @@ class DeerMem(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        "执行 import_memory 的明确职责，并返回与调用约定一致的结果"
+        '''将提供的记忆数据导入指定用户和代理的存储。'''
         return self._updater.import_memory_data(memory_data, agent_name=agent_name, user_id=user_id)
 
     def export_memory(
@@ -255,39 +197,15 @@ class DeerMem(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        """执行 export_memory 的明确职责，并返回与调用约定一致的结果。
-
-        Not implemented this phase (no distinct export yet; /export routes via get_memory)."""
+        '''独立导出流程尚未实现；当前接口由调用方读取记忆数据完成导出。'''
         raise NotImplementedError("DeerMem.export_memory is not implemented yet")
 
-    # ── Lifecycle ───────────────────────────────────────────────────────
     def shutdown_flush(self, timeout: float) -> bool:
-        """执行 shutdown_flush 的明确职责，并返回与调用约定一致的结果。
-
-        Drain the debounce queue within ``timeout`` on graceful shutdown.
-
-                Delegates to the queue's bounded synchronous flush, which joins an
-                in-flight worker first (so contexts a debounce Timer already pulled out
-                of the queue are not lost on exit) and otherwise drains the queue on a
-                daemon thread with a real hard timeout (the memory-update LLM call is
-                synchronous and cannot be interrupted). Returns ``True`` only when the
-                drain genuinely finished within ``timeout``.
-        """
+        '''在给定时限内同步刷新待处理记忆，供服务优雅关闭时尽量避免丢失更新。'''
         return self._queue.flush_sync(timeout)
 
-    # ── DeerMem-internal (NOT on the ABC; reached via hasattr probing) ───
     def warm(self) -> bool:
-        """执行 warm 的明确职责，并返回与调用约定一致的结果。
-
-        Pre-warm DeerMem-specific resources (the tiktoken encoding cache).
-
-                Backend-agnostic startup code probes ``hasattr(manager, "warm")`` and
-                calls this off the event loop. Non-DeerMem backends lack the attribute,
-                so their warm-up is skipped entirely (e.g. mem0 does not use tiktoken).
-                Returns True if the encoding loaded (or was already cached, or warming
-                was unnecessary); False if tiktoken is unavailable or the download
-                failed.
-        """
+        '''若使用基于编码器的令牌计数，则提前加载其缓存；字符计数模式无需预热。'''
         if self._config.token_counting == "char":
             logger.info("token_counting='char'; tiktoken not used, skipping warm-up")
             return True
@@ -299,9 +217,7 @@ class DeerMem(MemoryManager):
         user_id: str | None = None,
         agent_name: str | None = None,
     ) -> dict[str, Any]:
-        """执行 reload_memory 的明确职责，并返回与调用约定一致的结果。
-
-        Drop the cached memory document and reload from disk."""
+        '''丢弃指定用户记忆的内存缓存并从持久化存储重新载入。'''
         return self._updater.reload_memory_data(agent_name=agent_name, user_id=user_id)
 
     def create_fact(
@@ -313,7 +229,7 @@ class DeerMem(MemoryManager):
         agent_name: str | None = None,
         user_id: str | None = None,
     ) -> tuple[dict[str, Any], str | None]:
-        "创建并返回，并遵守 create_fact 所表达的接口约束"
+        '''创建一条记忆事实，并返回新事实及可能的校验错误。'''
         return self._updater.create_memory_fact(
             content,
             category=category,
@@ -329,7 +245,7 @@ class DeerMem(MemoryManager):
         agent_name: str | None = None,
         user_id: str | None = None,
     ) -> dict[str, Any]:
-        "删除目标资源并返回操作结果，并遵守 delete_fact 所表达的接口约束"
+        '''按事实编号删除指定用户记忆中的一条事实。'''
         return self._updater.delete_memory_fact(fact_id, agent_name=agent_name, user_id=user_id)
 
     def update_fact(
@@ -342,7 +258,7 @@ class DeerMem(MemoryManager):
         agent_name: str | None = None,
         user_id: str | None = None,
     ) -> dict[str, Any]:
-        "更新目标状态并返回最新结果，并遵守 update_fact 所表达的接口约束"
+        '''按事实编号更新内容、类别或置信度，并返回更新后的记忆结果。'''
         return self._updater.update_memory_fact(
             fact_id,
             content=content,

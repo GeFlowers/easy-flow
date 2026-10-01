@@ -1,4 +1,4 @@
-"""提供子代理隔离执行、调度校验或终端异步交互功能。"""
+'''定义执行器实际使用的子代理配置，并解析继承或显式指定的模型。'''
 
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING
@@ -9,7 +9,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class SubagentConfig:
-    """封装当前模块相关的数据、状态或协作职责。"""
+    '''统一描述内置或自定义子代理的提示词、工具、技能和执行上限。'''
 
     name: str
     description: str
@@ -23,14 +23,14 @@ class SubagentConfig:
 
 
 def _default_model_name(app_config: "AppConfig") -> str:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''在没有模型配置时明确报错，避免子代理以不确定模型启动。'''
     if not app_config.models:
         raise ValueError("No chat models are configured. Please configure at least one model in config.yaml.")
     return app_config.models[0].name
 
 
 def resolve_subagent_model_name(config: SubagentConfig, parent_model: str | None, *, app_config: "AppConfig | None" = None) -> str:
-    """处理当前步骤，并保持既有输入、输出、隔离和状态语义。"""
+    '''优先采用子代理显式模型，其次继承父代理模型，最后选用应用默认模型。'''
     if config.model != "inherit":
         return config.model
 

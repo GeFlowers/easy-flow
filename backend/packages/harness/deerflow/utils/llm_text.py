@@ -1,17 +1,17 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''清理模型输出中的思考标签和代码围栏，并统一提取文本内容。'''
 
 from __future__ import annotations
 
 import re
 
-# Matches a complete <think>...</think> block (case-insensitive, spans newlines).
+# 匹配完整的思考标签区块，忽略大小写并允许跨行内容。
 _THINK_BLOCK_RE = re.compile(r"<think\b[^>]*>.*?</think\s*>", re.IGNORECASE | re.DOTALL)
-# Matches a dangling, unclosed <think> (model truncated at max_tokens mid-thought).
+# 匹配未闭合的思考标签，用于截断模型输出中未完成的思考内容。
 _OPEN_THINK_RE = re.compile(r"<think\b[^>]*>", re.IGNORECASE)
 
 
 def strip_think_blocks(text: str, *, truncate_unclosed: bool = True) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''移除完整思考区块，并可选择丢弃未闭合标签之后的截断内容。'''
     text = _THINK_BLOCK_RE.sub("", text)
     if truncate_unclosed:
         open_match = _OPEN_THINK_RE.search(text)
@@ -21,7 +21,7 @@ def strip_think_blocks(text: str, *, truncate_unclosed: bool = True) -> str:
 
 
 def strip_markdown_code_fence(text: str) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''去除包裹整段回答的 Markdown 代码围栏，不改动普通文本。'''
     stripped = text.strip()
     if not stripped.startswith("```"):
         return stripped
@@ -32,7 +32,7 @@ def strip_markdown_code_fence(text: str) -> str:
 
 
 def extract_response_text(content: object) -> str:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''从字符串、分段文本块或空响应中提取适合展示和后续处理的文本。'''
     if isinstance(content, str):
         return content
     if isinstance(content, list):

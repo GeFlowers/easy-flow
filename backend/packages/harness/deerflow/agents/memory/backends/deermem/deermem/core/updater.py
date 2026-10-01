@@ -1,6 +1,4 @@
-"""定义 updater 模块提供的职责与可复用接口。
-
-Memory updater for reading, writing, and updating memory data."""
+'''校验并合并记忆事实，解析模型生成的更新方案，并管理记忆的读取、写入与复核。'''
 
 import asyncio
 import atexit
@@ -31,11 +29,6 @@ from .storage import (
 logger = logging.getLogger(__name__)
 
 
-# Thread pool for offloading sync memory updates when called from an async
-# context.  Unlike the previous asyncio.run() approach, this runs *sync*
-# model.invoke() calls — no event loop is created, so the langchain async
-# httpx client pool (globally cached via @lru_cache) is never touched and
-# cross-loop connection reuse is impossible.
 _SYNC_MEMORY_UPDATER_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
     max_workers=4,
     thread_name_prefix="memory-updater-sync",
@@ -43,29 +36,15 @@ _SYNC_MEMORY_UPDATER_EXECUTOR = concurrent.futures.ThreadPoolExecutor(
 atexit.register(lambda: _SYNC_MEMORY_UPDATER_EXECUTOR.shutdown(wait=False))
 
 
-# Data-access + fact-CRUD functions (_save_memory_to_file / get_memory_data /
-# reload_memory_data / import_memory_data / clear_memory_data / create_memory_fact /
-# delete_memory_fact / update_memory_fact) moved into MemoryUpdater as instance
-# methods (use self._storage). See the class below.
 def _validate_confidence(confidence: float) -> float:
-    """执行 _validate_confidence 的明确职责，并返回与调用约定一致的结果。
-
-    Validate persisted fact confidence so stored JSON stays standards-compliant."""
+    '''要求置信度为有限且介于 0 到 1 之间的数值，否则拒绝保存。'''
     if not math.isfinite(confidence) or confidence < 0 or confidence > 1:
         raise ValueError("confidence")
     return confidence
 
 
 def _coerce_source_confidence(fact: dict[str, Any]) -> float:
-    """执行 _coerce_source_confidence 的明确职责，并返回与调用约定一致的结果。
-
-    Return a stored fact's confidence as a finite float in [0, 1], defaulting to 0.5.
-
-        dict.get(key, default) returns the stored value (including None) when the key
-        exists, so a fact written with "confidence": null would propagate None into
-        arithmetic and crash max(). This helper guards against null, bool, non-numeric,
-        and non-finite values from corrupted or manually edited memory files.
-    """
+    '''将可能损坏或类型不符的事实置信度安全转换为有限区间值，异常时采用默认值。'''
     raw = fact.get("confidence")
     if raw is None or isinstance(raw, bool):
         return 0.5
@@ -77,37 +56,14 @@ def _coerce_source_confidence(fact: dict[str, Any]) -> float:
 
 
 def _trim_facts_to_max(facts: list[dict[str, Any]], max_facts: int) -> list[dict[str, Any]]:
-    """执行 _trim_facts_to_max 的明确职责，并返回与调用约定一致的结果。
-
-    Keep the highest-confidence facts within ``max_facts`` (confidence coerced).
-
-        Confidence is read via :func:`_coerce_source_confidence` so legacy / imported
-        facts with ``null`` or non-numeric confidence never crash the sort -- the
-        pre-#4023 ``key=lambda f: f.get("confidence", 0)`` form compared ``None`` /
-        ``str`` against ``float`` and raised ``TypeError`` once ``len(facts) >
-        max_facts``. Mirrors upstream's ``_trim_facts_to_max`` (introduced in #4023)
-        so the vendored copy no longer lags the coercion fix the
-        monolithic->vendored rename silently dropped.
-    """
+    '''超出事实数量上限时，按安全转换后的置信度从高到低保留事实。'''
     if len(facts) <= max_facts:
         return facts
     return sorted(facts, key=_coerce_source_confidence, reverse=True)[:max_facts]
 
 
 def _extract_text(content: Any) -> str:
-    """执行 _extract_text 的明确职责，并返回与调用约定一致的结果。
-
-    Extract plain text from LLM response content (str or list of content blocks).
-
-        Modern LLMs may return structured content as a list of blocks instead of a
-        plain string, e.g. [{"type": "text", "text": "..."}]. Using str() on such
-        content produces Python repr instead of the actual text, breaking JSON
-        parsing downstream.
-
-        String chunks are concatenated without separators to avoid corrupting
-        chunked JSON/text payloads. Dict-based text blocks are treated as full text
-        blocks and joined with newlines for readability.
-    """
+    '''提取模型响应中的纯文本，正确合并分块文本并读取结构化文本内容块。'''
     if isinstance(content, str):
         return content
     if isinstance(content, list):
@@ -115,7 +71,7 @@ def _extract_text(content: Any) -> str:
         pending_str_parts: list[str] = []
 
         def flush_pending_str_parts() -> None:
-            "执行 flush_pending_str_parts 的明确职责，并返回与调用约定一致的结果"
+            '''将连续的字符串片段合并为一个文本块，并清空暂存片段。'''
             if pending_str_parts:
                 pieces.append("".join(pending_str_parts))
                 pending_str_parts.clear()
@@ -138,9 +94,7 @@ _REQUIRED_MEMORY_UPDATE_TOP_LEVEL_KEYS = frozenset({"user", "history", "newFacts
 
 
 def _normalize_memory_update_fact(fact: Any) -> dict[str, Any] | None:
-    """执行 _normalize_memory_update_fact 的明确职责，并返回与调用约定一致的结果。
-
-    Normalize a single fact entry from a model-produced memory update."""
+    '''校验并规范一条模型生成的事实，丢弃内容、类别或置信度格式无效的条目。'''
     if not isinstance(fact, dict):
         return None
 
@@ -184,9 +138,6 @@ def _normalize_memory_update_fact(fact: Any) -> dict[str, Any] | None:
         if normalized_source_error:
             normalized_fact["sourceError"] = normalized_source_error
 
-    # Fact lifetime (expected_valid_days): optional LLM-assigned review window.
-    # Accept int/float (reject bool which subclasses int), coerce to int, keep
-    # only positive values; the creation-time cap is applied in _apply_updates.
     raw_evd = fact.get("expected_valid_days")
     if isinstance(raw_evd, (int, float)) and not isinstance(raw_evd, bool):
         evd = int(raw_evd)
@@ -197,9 +148,7 @@ def _normalize_memory_update_fact(fact: Any) -> dict[str, Any] | None:
 
 
 def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]:
-    """执行 _normalize_memory_update_data 的明确职责，并返回与调用约定一致的结果。
-
-    Coerce parsed memory update data into the shape consumed by _apply_updates."""
+    '''统一更新对象的字段结构，并拒绝包含危险的部分删除方案。'''
     user = update_data.get("user")
     history = update_data.get("history")
     new_facts = update_data.get("newFacts")
@@ -222,7 +171,6 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
             0,
         )
 
-    # ── Normalize staleness review removals ──
     stale_removals_raw = update_data.get("staleFactsToRemove")
     normalized_stale_removals: list[dict[str, str]] = []
     if isinstance(stale_removals_raw, list):
@@ -240,7 +188,6 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
                 }
             )
 
-    # ── Normalize staleness review lifetime extensions ──
     stale_extensions_raw = update_data.get("staleFactsToExtend")
     normalized_stale_extensions: list[dict[str, Any]] = []
     if isinstance(stale_extensions_raw, list):
@@ -250,9 +197,6 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
             fact_id = entry.get("id")
             if not isinstance(fact_id, str) or not fact_id:
                 continue
-            # extend_by_days: accept int/float (reject bool), coerce to int, keep > 0.
-            # A fractional value in (0, 1) coerces to 0 and is dropped here so the
-            # apply path never silently writes a zero-delta extension.
             raw_extend = entry.get("extend_by_days")
             if isinstance(raw_extend, (int, float)) and not isinstance(raw_extend, bool):
                 extend_by = int(raw_extend)
@@ -266,7 +210,6 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
                         }
                     )
 
-    # ── Normalize consolidation decisions ──
     consolidation_raw = update_data.get("factsToConsolidate")
     normalized_consolidation: list[dict[str, Any]] = []
     if isinstance(consolidation_raw, list):
@@ -276,8 +219,6 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
             source_ids = entry.get("sourceIds")
             if not isinstance(source_ids, list) or not source_ids:
                 continue
-            # dict.fromkeys preserves order while deduplicating so ["f1","f1"]
-            # collapses to ["f1"] and is correctly rejected as a single-source merge.
             clean_ids = list(dict.fromkeys(sid for sid in source_ids if isinstance(sid, str) and sid))
             if len(clean_ids) < 2:
                 continue
@@ -287,9 +228,6 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
             content = consolidated.get("content")
             if not isinstance(content, str) or not content.strip():
                 continue
-            # Normalize confidence: reject booleans (bool subclasses int, so the
-            # isinstance check alone would silently accept True/False), coerce to float,
-            # and reject non-finite values - matching _normalize_memory_update_fact.
             _raw_conf = consolidated.get("confidence", 0.9)
             if isinstance(_raw_conf, bool) or not isinstance(_raw_conf, (int, float)):
                 _norm_conf = 0.9
@@ -321,14 +259,7 @@ def _normalize_memory_update_data(update_data: dict[str, Any]) -> dict[str, Any]
 
 
 def _parse_memory_update_response(response_content: Any) -> dict[str, Any]:
-    """执行 _parse_memory_update_response 的明确职责，并返回与调用约定一致的结果。
-
-    Parse the first valid memory-update JSON object from an LLM response.
-
-        Some providers may wrap JSON in thinking traces, prose, or markdown fences
-        even when prompted to return JSON only. This parser accepts safely
-        extractable JSON objects but does not repair truncated or malformed JSON.
-    """
+    '''从模型响应中定位首个字段齐全且可解析的 JSON 更新对象；不尝试修补无效内容。'''
     response_text = _extract_text(response_content).strip()
     decoder = json.JSONDecoder()
 
@@ -343,9 +274,6 @@ def _parse_memory_update_response(response_content: Any) -> dict[str, Any]:
     raise json.JSONDecodeError("No valid memory update JSON object found", response_text, 0)
 
 
-# Matches sentences that describe a file-upload *event* rather than general
-# file-related work.  Deliberately narrow to avoid removing legitimate facts
-# such as "User works with CSV files" or "prefers PDF export".
 _UPLOAD_SENTENCE_RE = re.compile(
     r"[^.!?]*\b(?:"
     r"upload(?:ed|ing)?(?:\s+\w+){0,3}\s+(?:file|files?|document|documents?|attachment|attachments?)"
@@ -358,14 +286,7 @@ _UPLOAD_SENTENCE_RE = re.compile(
 
 
 def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str, Any]:
-    """执行 _strip_upload_mentions_from_memory 的明确职责，并返回与调用约定一致的结果。
-
-    Remove sentences about file uploads from all memory summaries and facts.
-
-        Uploaded files are session-scoped; persisting upload events in long-term
-        memory causes the agent to search for non-existent files in future sessions.
-    """
-    # Scrub summaries in user/history sections
+    '''从摘要和事实中移除上传事件描述，避免把仅在当前会话有效的文件写入长期记忆。'''
     for section in ("user", "history"):
         section_data = memory_data.get(section, {})
         for _key, val in section_data.items():
@@ -374,7 +295,6 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
                 cleaned = re.sub(r"  +", " ", cleaned)
                 val["summary"] = cleaned
 
-    # Also remove any facts that describe upload events
     facts = memory_data.get("facts", [])
     if facts:
         memory_data["facts"] = [f for f in facts if not _UPLOAD_SENTENCE_RE.search(f.get("content", ""))]
@@ -383,7 +303,7 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
 
 
 def _fact_content_key(content: Any) -> str | None:
-    "执行 _fact_content_key 的明确职责，并返回与调用约定一致的结果"
+    '''将非空事实内容规范为不区分大小写的去重键。'''
     if not isinstance(content, str):
         return None
     stripped = content.strip()
@@ -392,22 +312,14 @@ def _fact_content_key(content: Any) -> str | None:
     return stripped.casefold()
 
 
-# ── Staleness review helpers ──────────────────────────────────────────────
 
 
 def _parse_fact_datetime(raw: str) -> datetime | None:
-    """执行 _parse_fact_datetime 的明确职责，并返回与调用约定一致的结果。
-
-    Parse an ISO-8601 datetime string from a fact's createdAt field.
-
-        Returns ``None`` on any parse failure so callers can safely skip malformed facts.
-    """
+    '''解析事实的创建时间；无时区的值按 UTC 处理，格式错误时返回 None。'''
     if not raw:
         return None
     try:
         result = datetime.fromisoformat(raw)
-        # Naive datetimes (no tzinfo) would cause TypeError when compared
-        # with the timezone-aware cutoff.  Assume UTC for safety.
         if result.tzinfo is None:
             result = result.replace(tzinfo=UTC)
         return result
@@ -416,19 +328,7 @@ def _parse_fact_datetime(raw: str) -> datetime | None:
 
 
 def _effective_fact_staleness_age(fact: dict[str, Any], config: Any) -> int:
-    """执行 _effective_fact_staleness_age 的明确职责，并返回与调用约定一致的结果。
-
-    Return the effective staleness review age in days for *fact*.
-
-        Returns the stored ``expected_valid_days`` value directly when present and
-        valid.  The ``staleness_max_lifetime_multiplier`` cap is applied once at
-        *write time* (when a fact is first created) so the review window is bounded
-        from the start.  Re-applying it here would prevent lifetime-extension
-        operations from ever moving the review window beyond that initial cap,
-        defeating the purpose of ``staleFactsToExtend``.  Falls back to the global
-        ``staleness_age_days`` for facts that pre-date this feature or where the
-        LLM did not provide an estimate.
-    """
+    '''优先采用事实自身的有效复核周期；缺失或无效时回退到全局默认天数。'''
     raw = fact.get("expected_valid_days")
     if isinstance(raw, (int, float)) and not isinstance(raw, bool) and raw > 0:
         return int(raw)
@@ -439,17 +339,7 @@ def _select_stale_candidates(
     current_memory: dict[str, Any],
     config: Any,
 ) -> list[dict[str, Any]]:
-    """执行 _select_stale_candidates 的明确职责，并返回与调用约定一致的结果。
-
-    Return facts that have exceeded their individual review window.
-
-        Each fact's effective review age is determined by
-        ``_effective_fact_staleness_age``: facts with an LLM-assigned
-        ``expected_valid_days`` use that value directly; facts without it fall back
-        to the global ``staleness_age_days``.  Protected categories (default:
-        ``correction``) are excluded because they represent explicit user feedback
-        that should not be auto-pruned by age.
-    """
+    '''筛出创建时间已超过各自复核周期的事实，并保留受保护类别以免自动清理用户纠正。'''
     now = datetime.now(UTC)
     protected = frozenset(config.staleness_protected_categories)
     candidates: list[dict[str, Any]] = []
@@ -472,15 +362,7 @@ def _build_staleness_section(
     stale_candidates: list[dict[str, Any]],
     config: Any,
 ) -> str:
-    """执行 _build_staleness_section 的明确职责，并返回与调用约定一致的结果。
-
-    Format the staleness review prompt section from candidate facts.
-
-        Each fact line includes a ``valid:Nd`` annotation - the effective review
-        window for that fact - so the LLM can calibrate its conservatism: a fact
-        reviewed after 30 days was considered volatile at creation; one reviewed
-        after 365 days was considered stable.
-    """
+    '''将待复核事实及其有效周期格式化为模型可处理的提示区段。'''
     if not stale_candidates:
         return ""
     lines: list[str] = []
@@ -490,31 +372,19 @@ def _build_staleness_section(
         conf = _coerce_source_confidence(fact)
         created_raw = fact.get("createdAt", "")
         created_short = created_raw[:10] if isinstance(created_raw, str) and len(created_raw) >= 10 else created_raw
-        # quote=False: content is in element-text position (inside <stale_facts>
-        # tags, never an attribute value), so only <, >, & can break structure -
-        # leave ' and " untouched. Mirrors the convention in prompt.py #4028.
         content = html.escape(str(fact.get("content", "")), quote=False)
         effective_age = _effective_fact_staleness_age(fact, config)
         lines.append(f'- [{fid} | {cat} | {conf:.2f} | {created_short} | valid:{effective_age}d] "{content}"')
     return STALENESS_REVIEW_PROMPT.format(stale_facts="\n".join(lines))
 
 
-# ── Consolidation helpers ───────────────────────────────────────────────
 
 
 def _select_consolidation_candidates(
     current_memory: dict[str, Any],
     config: Any,
 ) -> dict[str, list[dict[str, Any]]]:
-    """执行 _select_consolidation_candidates 的明确职责，并返回与调用约定一致的结果。
-
-    Return fact categories that exceed the fragmentation threshold.
-
-        Groups facts by category; only categories with at least
-        ``consolidation_min_facts`` entries are returned.  Categories in
-        ``staleness_protected_categories`` are exempt, mirroring the staleness
-        contract so explicit user feedback is never surfaced for merging.
-    """
+    '''按类别分组并筛出数量达到合并阈值的事实组，同时排除受保护类别。'''
     facts = current_memory.get("facts", [])
     if not facts:
         return {}
@@ -535,17 +405,9 @@ def _build_consolidation_section(
     max_groups: int = 3,
     max_sources: int = 8,
 ) -> str:
-    """执行 _build_consolidation_section 的明确职责，并返回与调用约定一致的结果。
-
-    Format consolidation candidate groups into the prompt section.
-
-        Surfaces at most ``max_groups`` categories (largest fragmented groups first)
-        and at most ``max_sources`` facts per group, matching the caps enforced at
-        apply time so the LLM is never shown groups it cannot act on.
-    """
+    '''按碎片数量排序并限制组数和每组事实数，生成与后续可执行范围一致的合并提示。'''
     if not candidates:
         return ""
-    # Prioritise the most fragmented categories; alphabetical tiebreak for stability.
     sorted_candidates = sorted(candidates.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     parts: list[str] = []
     for cat, group in sorted_candidates[:max_groups]:
@@ -561,26 +423,7 @@ def _build_consolidation_section(
 
 
 def _escape_memory_for_prompt(memory: Any) -> Any:
-    """执行 _escape_memory_for_prompt 的明确职责，并返回与调用约定一致的结果。
-
-    Return a copy of ``memory`` with every string leaf HTML-escaped.
-
-        ``MEMORY_UPDATE_PROMPT`` embeds the full memory state as a ``json.dumps``
-        blob inside a ``<current_memory>...</current_memory>`` block. ``json.dumps``
-        escapes ``"`` and ``\\`` but leaves ``<``, ``>`` and ``&`` intact, so a
-        user-influenced field - e.g. a fact ``content`` of
-        ``</current_memory><evil>...`` - would otherwise reach the model verbatim
-        and break out of the block (prompt injection, #4044).
-
-        Escaping each string *value* before serialization (rather than the
-        serialized blob) cannot corrupt the JSON structure, because ``json.dumps``
-        re-quotes the already-safe values. Escaping every leaf - not just known
-        fields - guarantees no current or future user-influenced field can carry a
-        raw ``<``/``>``/``&``; controlled fields such as ids and timestamps contain
-        none of those characters, so escaping them is a harmless no-op. This mirrors
-        the ``html.escape`` treatment already applied to the staleness and
-        consolidation sections (#4028).
-    """
+    '''复制记忆数据并转义所有字符串字段，防止用户内容突破提示词中的结构边界。'''
     if isinstance(memory, str):
         return html.escape(memory)
     if isinstance(memory, dict):
@@ -591,80 +434,42 @@ def _escape_memory_for_prompt(memory: Any) -> Any:
 
 
 class MemoryUpdater:
-    """封装 MemoryUpdater 的状态、协作关系与公开操作。
-
-    Updates memory using LLM based on conversation context."""
+    '''协调记忆存储与模型更新流程，提供事实数据访问、校验、合并和复核能力。'''
 
     def __init__(self, config: DeerMemConfig, storage: MemoryStorage, llm: Any = None):
-        """实现 __init__ 协议方法，保持对象交互语义一致。
-
-        Initialize the memory updater with injected config + storage + llm (DI).
-
-                Args:
-                    config: DeerMem private configuration.
-                    storage: Memory storage instance (owned by DeerMem, injected here).
-                    llm: The chat model for memory extraction (owned by DeerMem, injected
-                        here). None when no LLM is configured; an update raises in that case.
-        """
+        '''接收配置、存储和模型依赖；模型缺失时仍可执行非模型类记忆操作。'''
         self._config = config
         self._storage = storage
         self._llm = llm
 
-    # ── Data access + fact CRUD (formerly module-level functions; use self._storage) ──
 
     def _save_memory_to_file(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> bool:
-        """执行 _save_memory_to_file 的明确职责，并返回与调用约定一致的结果。
-
-        Persist memory data via the injected storage."""
+        '''通过注入的存储实现持久化，并返回存储层的保存结果。'''
         return self._storage.save(memory_data, agent_name, user_id=user_id)
 
     def get_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        """读取并返回，并遵守 get_memory_data 所表达的接口约束。
-
-        Get the current memory data via the injected storage."""
+        '''通过存储层读取当前记忆数据，并复用其缓存策略。'''
         return self._storage.load(agent_name, user_id=user_id)
 
     def reload_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        """执行 reload_memory_data 的明确职责，并返回与调用约定一致的结果。
-
-        Reload memory data via the injected storage."""
+        '''要求存储层绕过缓存重新读取当前记忆数据。'''
         return self._storage.reload(agent_name, user_id=user_id)
 
     def import_memory_data(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        """执行 import_memory_data 的明确职责，并返回与调用约定一致的结果。
-
-        Persist imported memory data via the injected storage."""
+        '''保存导入的记忆文档；持久化失败时抛出错误，成功后返回存储中的版本。'''
         if not self._storage.save(memory_data, agent_name, user_id=user_id):
             raise OSError("Failed to save imported memory data")
         return self._storage.load(agent_name, user_id=user_id)
 
     def clear_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        """执行 clear_memory_data 的明确职责，并返回与调用约定一致的结果。
-
-        Clear all stored memory data and persist an empty structure."""
+        '''创建空白记忆文档并持久化；保存失败时抛出错误。'''
         cleared_memory = create_empty_memory()
         if not self._save_memory_to_file(cleared_memory, agent_name, user_id=user_id):
             raise OSError("Failed to save cleared memory data")
         return cleared_memory
 
     def create_memory_fact(self, content: str, category: str = "context", confidence: float = 0.5, agent_name: str | None = None, *, user_id: str | None = None) -> tuple[dict[str, Any], str | None]:
-        """创建并返回，并遵守 create_memory_fact 所表达的接口约束。
-
-        Create a new fact, persist it, and return ``(updated_memory, fact_id)``.
-
-                The fact_id is returned directly so callers (e.g. the memory_add tool)
-                don't have to re-derive it from the memory data by content matching --
-                which would couple them to the backend's content normalization and could
-                misreport a storage cap on backends that normalize differently.
-
-                The new fact is then trimmed by :func:`_trim_facts_to_max` (highest-
-                confidence wins, confidence coerced). If the cap evicts the just-added
-                (lower-confidence) fact, ``fact_id`` is ``None`` so callers report
-                "not stored - cap reached" instead of a dangling id with a false
-                "added" status. This restores both the max_facts cap and the post-trim
-                existence check (upstream's ``create_memory_fact_with_created_fact``),
-                which the vendored copy had dropped together to avoid the dangling id.
-        """
+        '''校验并添加手工事实，按置信度执行数量上限；若新事实被淘汰则返回空编号。'''
         normalized_content = content.strip()
         if not normalized_content:
             raise ValueError("content")
@@ -688,15 +493,11 @@ class MemoryUpdater:
         updated_memory["facts"] = _trim_facts_to_max(facts, self._config.max_facts)
         if not self._save_memory_to_file(updated_memory, agent_name, user_id=user_id):
             raise OSError("Failed to save memory data after creating fact")
-        # If the cap evicted the just-added (lower-confidence) fact, signal via
-        # None so callers don't report a dangling id as "added".
         stored = any(f.get("id") == fact_id for f in updated_memory["facts"])
         return updated_memory, (fact_id if stored else None)
 
     def delete_memory_fact(self, fact_id: str, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        """删除目标资源并返回操作结果，并遵守 delete_memory_fact 所表达的接口约束。
-
-        Delete a fact by its id and persist the updated memory data."""
+        '''按事实编号删除记录并持久化；找不到目标或保存失败时报告错误。'''
         memory_data = self.get_memory_data(agent_name, user_id=user_id)
         facts = memory_data.get("facts", [])
         updated_facts = [fact for fact in facts if fact.get("id") != fact_id]
@@ -709,7 +510,7 @@ class MemoryUpdater:
         return updated_memory
 
     def update_memory_fact(self, fact_id: str, content: str | None = None, category: str | None = None, confidence: float | None = None, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        """按事实 ID 更新指定字段，并将变更后的记忆数据写回存储。"""
+        '''按事实 ID 更新指定字段，并将变更后的记忆数据写回存储。'''
         memory_data = self.get_memory_data(agent_name, user_id=user_id)
         updated_memory = dict(memory_data)
         updated_facts: list[dict[str, Any]] = []
@@ -742,9 +543,7 @@ class MemoryUpdater:
         correction_detected: bool,
         reinforcement_detected: bool,
     ) -> str:
-        """执行 _build_correction_hint 的明确职责，并返回与调用约定一致的结果。
-
-        Build optional prompt hints for correction and reinforcement signals."""
+        '''把对话中检测到的纠正和肯定信号转换为模型更新事实时的指导文本。'''
         correction_hint = ""
         if correction_detected:
             correction_hint = (
@@ -772,9 +571,7 @@ class MemoryUpdater:
         reinforcement_detected: bool,
         user_id: str | None = None,
     ) -> tuple[dict[str, Any], str] | None:
-        """执行 _prepare_update_prompt 的明确职责，并返回与调用约定一致的结果。
-
-        Load memory and build the update prompt for a conversation."""
+        '''读取当前记忆，生成对话文本，并按配置加入纠正、过期复核和事实合并提示。'''
         config = self._config
         if not messages:
             return None
@@ -789,14 +586,12 @@ class MemoryUpdater:
             reinforcement_detected=reinforcement_detected,
         )
 
-        # ── Build staleness review section ──
         staleness_section = ""
         if config.staleness_review_enabled:
             stale_candidates = _select_stale_candidates(current_memory, config)
             if len(stale_candidates) >= config.staleness_min_candidates:
                 staleness_section = _build_staleness_section(stale_candidates, config)
 
-        # ── Build consolidation section ──
         consolidation_section = ""
         if config.consolidation_enabled:
             consolidation_candidates = _select_consolidation_candidates(current_memory, config)
@@ -824,12 +619,8 @@ class MemoryUpdater:
         agent_name: str | None,
         user_id: str | None = None,
     ) -> bool:
-        """执行 _finalize_update 的明确职责，并返回与调用约定一致的结果。
-
-        Parse the model response, apply updates, and persist memory."""
+        '''解析模型更新、在副本上应用变更并清理上传事件描述，最后保存结果。'''
         update_data = _parse_memory_update_response(response_content)
-        # Deep-copy before in-place mutation so a subsequent save() failure
-        # cannot corrupt the still-cached original object reference.
         updated_memory = self._apply_updates(copy.deepcopy(current_memory), update_data, thread_id)
         updated_memory = _strip_upload_mentions_from_memory(updated_memory)
         return self._storage.save(updated_memory, agent_name, user_id=user_id)
@@ -844,16 +635,7 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        """执行 aupdate_memory 的明确职责，并返回与调用约定一致的结果。
-
-        Update memory asynchronously by delegating to the sync path.
-
-                Uses ``asyncio.to_thread`` to run the *sync* ``model.invoke()`` path
-                in a worker thread so no second event loop is created and the
-                langchain async httpx client pool (shared with the lead agent) is
-                never touched.  This eliminates the cross-loop connection-reuse bug
-                described in issue #2615.
-        """
+        '''将同步模型更新流程交给工作线程执行，避免在异步调用方内阻塞事件循环。'''
         return await asyncio.to_thread(
             self._do_update_memory_sync,
             messages=messages,
@@ -875,19 +657,7 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        """执行 _do_update_memory_sync 的明确职责，并返回与调用约定一致的结果。
-
-        Pure-sync memory update; bind ``trace_id`` into the request-trace
-                ContextVar for the worker thread, then delegate to the impl.
-
-                The update runs on a Timer / executor thread with no request ContextVar
-                inheritance, so log records emitted here would otherwise lose the
-                request trace id (it only reached ``tracing_callback`` before). The
-                host-injected ``trace_context_manager`` hook (``None`` when DeerMem runs
-                standalone, outside the deer-flow factory) binds ``trace_id`` for the
-                duration of the call and restores the prior binding on exit. A ``None``
-                trace_id leaves the ContextVar untouched (no fabricated id).
-        """
+        '''在线程上下文中临时绑定请求追踪编号，再委托同步更新实现并恢复原上下文。'''
         cm = self._config.trace_context_manager
         if cm is not None and trace_id is not None:
             with cm(trace_id):
@@ -920,16 +690,7 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        """执行 _do_update_memory_sync_impl 的明确职责，并返回与调用约定一致的结果。
-
-        Pure-sync memory update using ``model.invoke()``.
-
-                Uses the *sync* LLM call path so no event loop is created.  This
-                guarantees that the langchain provider's globally cached async
-                httpx ``AsyncClient`` / connection pool (the one shared with the
-                lead agent) is never touched — no cross-loop connection reuse is
-                possible.
-        """
+        '''准备提示、调用同步模型生成记忆更新，并处理解析、追踪及持久化失败。'''
         try:
             prepared = self._prepare_update_prompt(
                 messages=messages,
@@ -947,9 +708,6 @@ class MemoryUpdater:
             if model is None:
                 raise RuntimeError("DeerMem memory update requested but no LLM is configured (set memory.backend_config.model in config).")
             invoke_config: dict[str, Any] = {"run_name": "memory_agent"}
-            # Optional observability callback (e.g. langfuse), injected via
-            # backend_config.tracing_callback. None = no tracing (langfuse is not
-            # hard-required); the host may pass a wrapper around its own tracer.
             if self._config.tracing_callback is not None:
                 self._config.tracing_callback(
                     invoke_config,
@@ -984,30 +742,7 @@ class MemoryUpdater:
         user_id: str | None = None,
         trace_id: str | None = None,
     ) -> bool:
-        """更新目标状态并返回最新结果，并遵守 update_memory 所表达的接口约束。
-
-        Synchronously update memory using the sync LLM path.
-
-                Uses ``model.invoke()`` (sync HTTP) which operates on a completely
-                separate connection pool from the async ``AsyncClient`` shared by
-                the lead agent.  This eliminates the cross-loop connection-reuse
-                bug described in issue #2615.
-
-                When called from within a running event loop (e.g. from a LangGraph
-                node), the blocking sync call is offloaded to a thread pool so the
-                caller's loop is not blocked.
-
-                Args:
-                    messages: List of conversation messages.
-                    thread_id: Optional thread ID for tracking source.
-                    agent_name: If provided, updates per-agent memory. If None, updates global memory.
-                    correction_detected: Whether recent turns include an explicit correction signal.
-                    reinforcement_detected: Whether recent turns include a positive reinforcement signal.
-                    user_id: If provided, scopes memory to a specific user.
-
-                Returns:
-                    True if update was successful, False otherwise.
-        """
+        '''同步更新记忆；若调用方已有运行中的事件循环，则将阻塞模型请求移至线程池。'''
         try:
             loop = asyncio.get_running_loop()
         except RuntimeError:
@@ -1046,22 +781,10 @@ class MemoryUpdater:
         update_data: dict[str, Any],
         thread_id: str | None = None,
     ) -> dict[str, Any]:
-        """执行 _apply_updates 的明确职责，并返回与调用约定一致的结果。
-
-        Apply LLM-generated updates to memory.
-
-                Args:
-                    current_memory: Current memory data.
-                    update_data: Updates from LLM.
-                    thread_id: Optional thread ID for tracking.
-
-                Returns:
-                    Updated memory data.
-        """
+        '''按模型方案更新摘要和事实，处理删除、过期复核、有效期延长及事实合并。'''
         config = self._config
         now = utc_now_iso_z()
 
-        # Update user sections
         user_updates = update_data.get("user", {})
         for section in ["workContext", "personalContext", "topOfMind"]:
             section_data = user_updates.get(section, {})
@@ -1071,7 +794,6 @@ class MemoryUpdater:
                     "updatedAt": now,
                 }
 
-        # Update history sections
         history_updates = update_data.get("history", {})
         for section in ["recentMonths", "earlierContext", "longTermBackground"]:
             section_data = history_updates.get(section, {})
@@ -1081,32 +803,16 @@ class MemoryUpdater:
                     "updatedAt": now,
                 }
 
-        # Remove facts (contradiction-based)
         facts_to_remove = set(update_data.get("factsToRemove", []))
         if facts_to_remove:
             current_memory["facts"] = [f for f in current_memory.get("facts", []) if f.get("id") not in facts_to_remove]
 
-        # ── Staleness review: removals + lifetime extensions ──
-        # Both operations share one staleness-candidate guardrail pass and one
-        # candidate_ids set. proposed_remove_ids is hoisted out of the removals
-        # sub-block so it covers ALL LLM-proposed removals, not just the ones
-        # the per-cycle cap actually deleted: a fact the LLM wanted to remove
-        # must never be silently extended even when the cap spares it.
         stale_removals = update_data.get("staleFactsToRemove", [])
         stale_extensions = update_data.get("staleFactsToExtend", [])
         has_staleness_ops = (isinstance(stale_removals, list) and stale_removals) or (isinstance(stale_extensions, list) and stale_extensions)
         if has_staleness_ops:
-            # Deterministic guardrail: intersect with actual staleness candidates
-            # so an LLM slip that emits a protected-category or non-aged fact id
-            # is silently rejected.  Runs unconditionally so the apply-layer
-            # protection is independent of model behavior AND of the
-            # staleness_review_enabled flag.  Guard against legacy / hand-edited
-            # facts that predate the id field: an aged, non-protected fact with
-            # no "id" is a valid staleness candidate but has no id to intersect
-            # against, so skip it here instead of raising KeyError.
             candidate_ids = {f["id"] for f in _select_stale_candidates(current_memory, config) if f.get("id") is not None}
 
-            # ── Removals ──
             proposed_remove_ids: set[str] = set()
             if isinstance(stale_removals, list) and stale_removals:
                 proposed_remove_ids = {entry["id"] for entry in stale_removals if isinstance(entry, dict) and "id" in entry}
@@ -1115,10 +821,6 @@ class MemoryUpdater:
                 if not stale_ids_to_remove:
                     stale_removals = []
                 else:
-                    # Safety cap: limit max staleness removals per cycle.  When
-                    # the LLM returns more than the cap, keep only the
-                    # lowest-confidence entries up to the limit so the most
-                    # questionable facts are removed first.
                     max_stale = config.staleness_max_removals_per_cycle
                     if len(stale_ids_to_remove) > max_stale:
                         stale_facts = [f for f in current_memory.get("facts", []) if f.get("id") in stale_ids_to_remove]
@@ -1127,7 +829,6 @@ class MemoryUpdater:
 
                     current_memory["facts"] = [f for f in current_memory.get("facts", []) if f.get("id") not in stale_ids_to_remove]
 
-                # Log removals for observability
                 for entry in stale_removals:
                     if isinstance(entry, dict) and entry.get("id") in stale_ids_to_remove:
                         logger.info(
@@ -1136,19 +837,7 @@ class MemoryUpdater:
                             entry.get("reason", "no reason provided"),
                         )
 
-            # ── Lifetime extensions ──
-            # Recalibrate expected_valid_days for facts the LLM chose to keep.
-            # Eligible facts are stale candidates that the LLM did NOT propose
-            # for removal - including those that survived only because the
-            # per-cycle cap prevented their deletion.  The new window is
-            # min(days_since + extend_by_days, staleness_max_extension_days).
-            # Extensions use an absolute ceiling rather than the creation-time
-            # multiplier cap: they are deliberate review decisions and must be
-            # able to advance the window beyond the original creation cap, but
-            # an absolute bound prevents timedelta overflow and LLM misfire.
             if isinstance(stale_extensions, list) and stale_extensions:
-                # Exclude all LLM-proposed removals, not just the trimmed set,
-                # so a cap-surviving proposed-removal fact is never extended.
                 extendable_ids = candidate_ids - proposed_remove_ids
                 ext_by_id = {e["id"]: e for e in stale_extensions if isinstance(e, dict) and isinstance(e.get("id"), str) and e["id"] in extendable_ids}
                 if ext_by_id:
@@ -1161,12 +850,10 @@ class MemoryUpdater:
                         if ext is not None:
                             extend_by = ext.get("extend_by_days")
                             if isinstance(extend_by, (int, float)) and not isinstance(extend_by, bool):
-                                extend_by_int = int(extend_by)  # coerce before guard
+                                extend_by_int = int(extend_by)
                                 if extend_by_int > 0:
                                     created = _parse_fact_datetime(fact.get("createdAt", ""))
                                     if created is None:
-                                        # Unreachable: _select_stale_candidates already
-                                        # excludes facts with unparseable createdAt.
                                         updated_facts.append(fact)
                                         continue
                                     days_since = int((now_utc - created).total_seconds() // 86400)
@@ -1182,7 +869,6 @@ class MemoryUpdater:
                         updated_facts.append(fact)
                     current_memory["facts"] = updated_facts
 
-        # Add new facts
         existing_fact_keys = {fact_key for fact_key in (_fact_content_key(fact.get("content")) for fact in current_memory.get("facts", [])) if fact_key is not None}
         new_facts = update_data.get("newFacts", [])
         for fact in new_facts:
@@ -1194,9 +880,6 @@ class MemoryUpdater:
                 normalized_content = raw_content.strip()
                 fact_key = _fact_content_key(normalized_content)
                 if fact_key is None:
-                    # Empty / whitespace-only content: skip it the same way the
-                    # non-string guard above does, instead of appending a blank
-                    # fact that violates the non-empty-content invariant.
                     continue
                 if fact_key in existing_fact_keys:
                     continue
@@ -1216,31 +899,14 @@ class MemoryUpdater:
                         fact_entry["sourceError"] = normalized_source_error
                 evd = fact.get("expected_valid_days")
                 if isinstance(evd, int) and not isinstance(evd, bool) and evd > 0:
-                    # Apply the creation-time cap so the LLM cannot assign an
-                    # unbounded lifetime that defers staleness review indefinitely.
-                    # Extensions (staleFactsToExtend) bypass this cap via their own
-                    # staleness_max_extension_days ceiling because they represent a
-                    # deliberate review decision, not an unchecked initial assignment.
                     creation_cap = int(config.staleness_age_days * config.staleness_max_lifetime_multiplier)
                     fact_entry["expected_valid_days"] = min(evd, creation_cap)
                 current_memory["facts"].append(fact_entry)
                 if fact_key is not None:
                     existing_fact_keys.add(fact_key)
 
-        # Enforce max facts limit (coerced confidence -- see _trim_facts_to_max).
         current_memory["facts"] = _trim_facts_to_max(current_memory["facts"], config.max_facts)
 
-        # ── Memory consolidation ──
-        # Runs after the max_facts trim so source facts that were just evicted
-        # (low confidence, pushed out by high-confidence newFacts) are absent
-        # from fact_index and rejected by the existence guardrail - preventing
-        # the only real data-loss scenario where sources are deleted but the
-        # merged replacement is itself trimmed away.  Because consolidation
-        # always removes ≥2 facts and adds 1, running it after trim cannot push
-        # the total above max_facts.
-        # Gate on the feature flag at apply time so a config change that races
-        # with a debounced update does not silently merge facts the operator
-        # intended to keep separate.
         if config.consolidation_enabled:
             consolidation_decisions = update_data.get("factsToConsolidate", [])
             if isinstance(consolidation_decisions, list) and consolidation_decisions:
@@ -1251,18 +917,8 @@ class MemoryUpdater:
                 new_consolidated: list[dict[str, Any]] = []
                 merge_count = 0
 
-                # Mirror the staleness-pass guardrail: build the set of IDs the LLM
-                # was legitimately allowed to see as candidates (excludes protected
-                # categories and categories below the threshold).  Any LLM slip that
-                # proposes a protected or ineligible fact ID is rejected here regardless
-                # of model behaviour, matching how staleness intersects with
-                # _select_stale_candidates before applying removals.  Skip id-less
-                # legacy facts (they can never be targeted by the id-based source set).
                 allowed_source_ids = {f["id"] for group in _select_consolidation_candidates(current_memory, config).values() for f in group if f.get("id") is not None}
 
-                # Iterate all decisions and count successes rather than pre-slicing,
-                # so guard failures on early decisions cannot silently starve valid
-                # later ones from the configured merge budget.
                 for decision in consolidation_decisions:
                     if merge_count >= max_groups:
                         break
@@ -1270,16 +926,8 @@ class MemoryUpdater:
                     source_ids = decision.get("sourceIds", [])
                     consolidated = decision.get("consolidated", {})
 
-                    # Guardrail: all source IDs must exist in the post-trim index,
-                    # must not already be consumed by an earlier merge this cycle,
-                    # and must be in allowed_source_ids - the set built from
-                    # _select_consolidation_candidates, which excludes categories in
-                    # staleness_protected_categories (default: "correction").  This
-                    # mirrors the staleness apply-time check and ensures explicit user
-                    # feedback is never silently merged away regardless of model behaviour.
                     if any(sid in ids_consumed or sid not in fact_index or sid not in allowed_source_ids for sid in source_ids):
                         continue
-                    # Guardrail: 2..max_sources per group
                     if not (2 <= len(source_ids) <= max_sources):
                         continue
 
@@ -1288,33 +936,17 @@ class MemoryUpdater:
                         continue
 
                     source_confidences = [_coerce_source_confidence(fact_index[sid]) for sid in source_ids]
-                    # _coerce_source_confidence already clamps each value to [0, 1],
-                    # so max(source_confidences) ≤ 1.0 by contract.
                     max_source_conf = max(source_confidences)
 
-                    # Use the LLM's returned confidence, capped at the source maximum so
-                    # consolidation cannot inflate confidence.  Clamp to [0, 1] first so
-                    # out-of-range values (e.g. 1.5) never leak even if the cap is later
-                    # relaxed.  Falls back to max_source_conf when absent or malformed.
                     raw_llm_conf = consolidated.get("confidence")
                     if isinstance(raw_llm_conf, (int, float)) and not isinstance(raw_llm_conf, bool) and math.isfinite(float(raw_llm_conf)):
                         fact_confidence = min(max(0.0, min(float(raw_llm_conf), 1.0)), max_source_conf)
                     else:
                         fact_confidence = max_source_conf
 
-                    # Skip merges whose result would fall below the storage threshold -
-                    # same gate applied to newFacts, so consolidation never admits
-                    # facts that the normal ingestion path would reject.
                     if fact_confidence < config.fact_confidence_threshold:
                         continue
 
-                    # Carry the newest source's createdAt so the staleness clock
-                    # reflects the age of the underlying information, not when
-                    # synthesis happened.  consolidatedAt records the merge time
-                    # for audit without resetting staleness eligibility.
-                    # Use _parse_fact_datetime for crash-safe, timezone-aware comparison:
-                    # a numeric createdAt would make string max() raise TypeError, and
-                    # mixed Z/+00:00 formats sort wrong lexicographically.
                     _fallback_dt = _parse_fact_datetime(now) or datetime.now(UTC)
                     _source_dts = [_parse_fact_datetime(fact_index[sid].get("createdAt") or "") or _fallback_dt for sid in source_ids]
                     _newest_dt = max(_source_dts)
@@ -1329,8 +961,6 @@ class MemoryUpdater:
                         "source": "consolidation",
                         "consolidatedFrom": list(source_ids),
                     }
-                    # Propagate sourceError from any source fact so correction
-                    # context (what went wrong and why) is not silently lost.
                     source_errors = list(dict.fromkeys(e for sid in source_ids if isinstance((e := fact_index[sid].get("sourceError")), str) and e.strip()))
                     if source_errors:
                         new_fact["sourceError"] = "\n".join(source_errors)

@@ -1,4 +1,4 @@
-"""提供代理构建、功能配置和状态类型的延迟导出入口。"""
+'''提供代理构建、功能配置和状态类型的延迟导出入口。'''
 
 from .features import Next, Prev, RuntimeFeatures
 
@@ -14,11 +14,11 @@ __all__ = [
 
 
 def __getattr__(name: str):
-    """按需导入公开符号，避免包导入时初始化完整代理依赖图。
+    '''按需导入公开符号，避免包导入时初始化完整代理依赖图。
 
     访问主代理工厂时会预热已启用技能缓存；未知名称遵循模块属性协议抛出
     ``AttributeError``。
-    """
+    '''
     if name == "create_deerflow_agent":
         from .factory import create_deerflow_agent
 
@@ -28,10 +28,6 @@ def __getattr__(name: str):
         from .lead_agent import make_lead_agent
         from .lead_agent.prompt import prime_enabled_skills_cache
 
-        # LangGraph resolves deerflow.agents:make_lead_agent when registering
-        # the graph. Prime at that explicit entrypoint instead of at package
-        # import time so lightweight submodules can be imported without pulling
-        # in the whole tool/subagent graph.
         prime_enabled_skills_cache()
         globals()[name] = make_lead_agent
         return make_lead_agent

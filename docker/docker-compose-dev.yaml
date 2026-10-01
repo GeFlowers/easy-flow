@@ -1,17 +1,17 @@
-# DeerFlow Docker Compose Application
-# The supported entry point is `make docker-start` from the repository root.
+# DeerFlow Docker Compose 项目配置。
+# 唯一支持的启动入口是在仓库根目录执行 `make docker-start`。
 #
-# Services:
-#   - nginx: Reverse proxy (port 2026)
-#   - frontend: Frontend Next.js server (port 3000)
-#   - gateway: Backend Gateway API + agent runtime (port 8001)
-#   - postgres: PostgreSQL persistence for runs, checkpoints, and Store data
-#   - Redis Streams bridge: uses the host Redis configured in ../.env
+# 服务说明：
+#   - nginx：反向代理，端口 2026。
+#   - frontend：前端 Next.js 服务，端口 3000。
+#   - gateway：后端网关接口及智能体运行时，端口 8001。
+#   - postgres：保存运行记录、检查点和通用存储数据。
+#   - Redis Streams bridge：使用 ../.env 中配置的主机 Redis 服务。
 #
-# Access: http://localhost:2026
+# 访问地址：http://localhost:2026
 
 services:
-  # ── PostgreSQL Persistence ─────────────────────────────────────────────
+  # ── PostgreSQL 数据持久化 ──────────────────────────────────────────────
   postgres:
     image: postgres:17-alpine
     container_name: deer-flow-postgres
@@ -33,8 +33,8 @@ services:
       - deer-flow-dev
     restart: unless-stopped
 
-  # ── Reverse Proxy ──────────────────────────────────────────────────────
-  # Routes API traffic to the gateway and frontend.
+  # ── 反向代理 ────────────────────────────────────────────────────────────
+  # 将接口流量转发到网关，将页面请求转发到前端。
   nginx:
     build:
       context: ./
@@ -58,7 +58,7 @@ services:
       - deer-flow-dev
     restart: unless-stopped
 
-  # Frontend - image-backed server (no host source mounts or hot reload)
+  # 前端：由镜像提供服务，不挂载主机源码，也不启用热重载。
   frontend:
     build:
       context: ../
@@ -78,7 +78,7 @@ services:
       - deer-flow-dev
     restart: unless-stopped
 
-  # Backend - image-backed Gateway API (no host source mounts or hot reload)
+  # 后端：由镜像提供网关接口，不挂载主机源码，也不启用热重载。
   gateway:
     build:
       context: ../
@@ -100,14 +100,14 @@ services:
       - DEER_FLOW_CHANNELS_LANGGRAPH_URL=${DEER_FLOW_CHANNELS_LANGGRAPH_URL:-http://gateway:8001/api}
       - DEER_FLOW_CHANNELS_GATEWAY_URL=${DEER_FLOW_CHANNELS_GATEWAY_URL:-http://gateway:8001}
       - DEER_FLOW_INTERNAL_AUTH_TOKEN=${DEER_FLOW_INTERNAL_AUTH_TOKEN:-}
-      # Proxy values (HTTP_PROXY/HTTPS_PROXY/ALL_PROXY) are inherited from ../.env via env_file.
-      # Only NO_PROXY is declared here so internal service hostnames are always exempt from the proxy.
+      # HTTP_PROXY、HTTPS_PROXY 和 ALL_PROXY 通过 env_file 从 ../.env 继承。
+      # 此处单独声明 NO_PROXY，确保内部服务主机名始终绕过代理。
       - NO_PROXY=${NO_PROXY:-}${NO_PROXY:+,}localhost,127.0.0.1,::1,gateway,frontend,nginx,postgres,host.docker.internal
       - no_proxy=${no_proxy:-}${no_proxy:+,}localhost,127.0.0.1,::1,gateway,frontend,nginx,postgres,host.docker.internal
     env_file:
       - ../.env
     extra_hosts:
-      # For Linux: map host.docker.internal to host gateway
+      # Linux 环境下将 host.docker.internal 映射到主机网关。
       - "host.docker.internal:host-gateway"
     depends_on:
       postgres:

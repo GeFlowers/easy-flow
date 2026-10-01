@@ -1,8 +1,8 @@
-"""为 OIDC 登录配置用户。
+'''为 OIDC 登录配置用户。
 
 本模块查找已有用户、按规则自动创建用户并限制邮箱域名。已有本地账户绝不自动
 绑定 OIDC 身份；邮箱冲突会以 409 阻止 SSO 登录，避免 SSO 身份接管密码账户。
-"""
+'''
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ async def get_or_provision_oidc_user(
     identity: OIDCIdentity,
     local_provider: LocalAuthProvider,
 ) -> dict:
-    """将 OIDC 身份解析为 DeerFlow 用户，并保持本地账户与 SSO 身份隔离。"""
+    '''将 OIDC 身份解析为 DeerFlow 用户，并保持本地账户与 SSO 身份隔离。'''
     # 1. 已有关联的第三方登录身份
     existing = await local_provider.get_user_by_oauth(provider_id, identity.subject)
     if existing:
@@ -93,6 +93,6 @@ async def get_or_provision_oidc_user(
 
 
 def _resolve_role(email: str, admin_emails: list[str]) -> str:
-    """邮箱在管理员名单中时返回 ``admin``，否则返回 ``user``。"""
+    '''邮箱在管理员名单中时返回 ``admin``，否则返回 ``user``。'''
     email_lower = email.lower()
     return "admin" if any(e.lower() == email_lower for e in admin_emails) else "user"

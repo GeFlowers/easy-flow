@@ -1,4 +1,4 @@
-"""处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+'''在运行前后扫描线程工作区，并把安全过滤后的变化写入运行事件存储。'''
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 
 def build_thread_workspace_roots(thread_id: str, *, user_id: str | None = None) -> list[WorkspaceRoot]:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''为线程工作目录和生成产物建立待扫描根目录及虚拟路径映射。'''
     paths = get_paths()
     return [
         WorkspaceRoot(
@@ -48,7 +48,7 @@ async def capture_workspace_snapshot(
     limits: WorkspaceChangeLimits | None = None,
     include_text: bool = True,
 ) -> WorkspaceSnapshot:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''在线程任务执行期间异步扫描工作区，并为后续比较准备文本快照。'''
     roots = build_thread_workspace_roots(thread_id, user_id=user_id)
     text_cache_dir = Path(tempfile.mkdtemp(prefix="deerflow-workspace-changes-")) if include_text else None
     try:
@@ -74,7 +74,7 @@ async def record_workspace_changes(
     user_id: str | None = None,
     limits: WorkspaceChangeLimits | None = None,
 ) -> dict | None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''扫描执行后的变化，只读取发生变化的文本，并将摘要事件写入数据库。'''
     try:
         roots = build_thread_workspace_roots(thread_id, user_id=user_id)
         after_metadata = await asyncio.to_thread(
@@ -112,6 +112,6 @@ async def record_workspace_changes(
 
 
 def _cleanup_snapshot_text_cache(snapshot: WorkspaceSnapshot) -> None:
-    """处理本模块相关逻辑，并保持既有的安全、隔离和运行语义。"""
+    '''删除快照使用的临时文本缓存，避免运行结束后遗留文件。'''
     if snapshot.text_cache_dir:
         shutil.rmtree(snapshot.text_cache_dir, ignore_errors=True)
