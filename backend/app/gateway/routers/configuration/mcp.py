@@ -300,7 +300,7 @@ async def get_mcp_configuration(request: Request) -> McpConfigResponse:
         返回：
             包含所有服务器的当前 MCP 配置。
 
-        Example:
+        示例：
             ```json
             {
                 "mcp_servers": {
@@ -309,7 +309,7 @@ async def get_mcp_configuration(request: Request) -> McpConfigResponse:
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-github"],
                         "env": {"GITHUB_TOKEN": "***"},
-                        "description": "GitHub MCP server for repository operations"
+                        "description": "用于仓库操作的 GitHub 工具服务"
                     }
                 }
             }
@@ -425,7 +425,7 @@ async def update_mcp_configuration(request: Request, body: McpConfigUpdateReques
                         "command": "npx",
                         "args": ["-y", "@modelcontextprotocol/server-github"],
                         "env": {"GITHUB_TOKEN": "$GITHUB_TOKEN"},
-                        "description": "GitHub MCP server for repository operations"
+                        "description": "用于仓库操作的 GitHub 工具服务"
                     }
                 }
             }

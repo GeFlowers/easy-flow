@@ -897,7 +897,7 @@ async def list_run_messages(
 ) -> dict:
     '''按序号游标分页读取指定运行的对话消息。
 
-        Response: { data: [...], has_more: bool }
+        返回结构为 { data: [...], has_more: bool }，其中 has_more 表示是否还有下一页。
     '''
     event_store = get_run_event_store(request)
     rows = await event_store.list_messages_by_run(
@@ -941,8 +941,8 @@ async def list_run_events(
 ) -> list[dict]:
     '''读取指定运行的事件记录，供调试和审计使用。
 
-        ``task_id`` + ``after_seq`` let the subtask card page through one subagent
-        task's persisted steps without the run-wide ``limit`` truncating the tail (#3779).
+        联合使用 ``task_id`` 与 ``after_seq`` 分页读取单个子任务的步骤，
+        避免整轮运行的条数上限截断该子任务后续事件。
     '''
     event_store = get_run_event_store(request)
     types = event_types.split(",") if event_types else None

@@ -1,0 +1,240 @@
+'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+from pathlib import Path
+from typing import Any
+
+from alembic import command as alembic_command
+from alembic.config import Config as AlembicConfig
+from alembic.script import ScriptDirectory
+from sqlalchemy import inspect as sa_inspect
+from sqlalchemy import text
+from sqlalchemy.ext.asyncio import AsyncEngine
+
+logger = logging.getLogger(__name__)
+
+
+_MIGRATIONS_DIR = Path(__file__).resolve().parent / "migrations"
+
+_HEAD_REVISION: str | None = None
+
+_BASELINE_REVISION = "0001_baseline"
+
+_PG_LOCK_KEY = 0x0DEE_12F1_0BEE_3682
+
+
+_BASELINE_TABLE_NAMES: frozenset[str] = frozenset(
+    {
+        "channel_connections",
+        "channel_conversations",
+        "channel_credentials",
+        "channel_oauth_states",
+        "feedback",
+        "run_events",
+        "runs",
+        "threads_meta",
+        "users",
+    }
+)
+
+_BASELINE_INDEX_NAMES: frozenset[str] = frozenset(
+    {
+        "idx_channel_connections_event_lookup",
+        "ix_channel_connections_owner_user_id",
+        "ix_channel_connections_provider",
+        "uq_channel_connection_active_identity",
+        "ix_channel_conversations_connection_id",
+        "ix_channel_conversations_owner_user_id",
+        "ix_channel_conversations_provider",
+        "ix_channel_conversations_thread_id",
+        "ix_channel_oauth_states_owner_user_id",
+        "ix_channel_oauth_states_provider",
+        "ix_feedback_run_id",
+        "ix_feedback_thread_id",
+        "ix_feedback_user_id",
+        "ix_events_run",
+        "ix_events_thread_cat_seq",
+        "ix_run_events_user_id",
+        "ix_runs_thread_id",
+        "ix_runs_thread_status",
+        "ix_runs_user_id",
+        "ix_threads_meta_assistant_id",
+        "ix_threads_meta_user_id",
+        "idx_users_oauth_identity",
+        "ix_users_email",
+    }
+)
+
+
+def _escape_url_for_alembic(url: str) -> str:
+    '''转义 Alembic 配置语法中的百分号，避免把 DSN 当作插值模板。'''
+    return url.replace("%", "%%")
+
+
+def _alembic_safe_url(engine: AsyncEngine) -> str:
+    '''读取引擎 DSN 并转换成可安全写入 Alembic 配置的字符串。'''
+    rendered = engine.url.render_as_string(hide_password=False)
+    return _escape_url_for_alembic(rendered)
+
+
+def _get_alembic_config(engine: AsyncEngine) -> AlembicConfig:
+    '''构造指向本项目迁移目录并使用当前引擎 DSN 的 Alembic 配置。'''
+    cfg = AlembicConfig()
+    cfg.set_main_option("script_location", str(_MIGRATIONS_DIR))
+    cfg.set_main_option("sqlalchemy.url", _alembic_safe_url(engine))
+    return cfg
+
+
+def _get_head_revision() -> str:
+    '''读取并缓存迁移目录中的最新版本号。'''
+    global _HEAD_REVISION
+    if _HEAD_REVISION is None:
+        cfg = AlembicConfig()
+        cfg.set_main_option("script_location", str(_MIGRATIONS_DIR))
+        script = ScriptDirectory.from_config(cfg)
+        head = script.get_current_head()
+        if head is None:
+            raise RuntimeError("alembic has no head revision -- versions/ directory is empty")
+        _HEAD_REVISION = head
+    return _HEAD_REVISION
+
+
+def _reflect_state(sync_conn: Any) -> dict[str, bool]:
+    '''检查数据库是否已有 Alembic 版本表或 DeerFlow 自有表。'''
+    from deerflow.persistence.base import Base
+
+    try:
+        import deerflow.persistence.models  # noqa: F401
+    except ImportError:
+        logger.debug("deerflow.persistence.models not found; metadata may be incomplete")
+
+    insp = sa_inspect(sync_conn)
+    reflected = set(insp.get_table_names())
+    metadata_tables = set(Base.metadata.tables)
+    return {
+        "has_alembic_version": "alembic_version" in reflected,
+        "has_deerflow_tables": bool(reflected & metadata_tables),
+    }
+
+
+def _decide_state(state: dict[str, bool]) -> str:
+    '''根据已存在的表结构选择新库、旧库或已版本化数据库流程。'''
+    if state["has_alembic_version"]:
+        return "versioned"
+    if not state["has_deerflow_tables"]:
+        return "empty"
+    return "legacy"
+
+
+def _run_create_all_sync(sync_conn: Any) -> None:
+    '''使用 ORM 元数据创建当前版本缺失的全部业务表。'''
+    from deerflow.persistence.base import Base
+
+    try:
+        import deerflow.persistence.models  # noqa: F401
+    except ImportError:
+        logger.debug("deerflow.persistence.models not found; bootstrap will create empty schema")
+
+    Base.metadata.create_all(sync_conn)
+
+
+def _run_baseline_create_all_sync(sync_conn: Any) -> None:
+    '''仅补齐基线版本负责的表和索引，避免抢先创建后续迁移对象。'''
+    from deerflow.persistence.base import Base
+
+    try:
+        import deerflow.persistence.models  # noqa: F401
+    except ImportError:
+        logger.debug("deerflow.persistence.models not found; baseline backfill may be incomplete")
+
+    baseline_tables = [Base.metadata.tables[name] for name in _BASELINE_TABLE_NAMES if name in Base.metadata.tables]
+    Base.metadata.create_all(sync_conn, tables=baseline_tables, checkfirst=True)
+
+    for table in baseline_tables:
+        for idx in table.indexes:
+            if idx.name not in _BASELINE_INDEX_NAMES:
+                continue
+            try:
+                idx.create(sync_conn, checkfirst=True)
+            except Exception:
+                logger.warning(
+                    "bootstrap: failed to create baseline index %r on %r -- the DB may contain rows that violate the index constraint. Address the duplicate data, then re-run bootstrap.",
+                    idx.name,
+                    table.name,
+                )
+
+
+def _stamp(cfg: AlembicConfig, revision: str) -> None:
+    '''将数据库标记为指定迁移版本，但不执行该版本的迁移操作。'''
+    alembic_command.stamp(cfg, revision)
+
+
+def _upgrade(cfg: AlembicConfig, revision: str) -> None:
+    '''运行 Alembic 迁移，将数据库升级到指定版本。'''
+    alembic_command.upgrade(cfg, revision)
+
+
+
+
+@asynccontextmanager
+async def _postgres_lock(engine: AsyncEngine):
+    '''持有 PostgreSQL 会话级咨询锁，串行执行架构引导。'''
+    async with engine.connect() as conn:
+        await conn.execute(text("SET LOCAL idle_in_transaction_session_timeout = 0"))
+        await conn.execute(text("SELECT pg_advisory_lock(:k)"), {"k": _PG_LOCK_KEY})
+        try:
+            logger.info("bootstrap: acquired postgres advisory lock key=0x%x", _PG_LOCK_KEY)
+            yield
+        finally:
+            try:
+                await conn.execute(text("SELECT pg_advisory_unlock(:k)"), {"k": _PG_LOCK_KEY})
+            except Exception:  # noqa: BLE001
+                logger.warning("bootstrap: pg_advisory_unlock raised; session close will release", exc_info=True)
+
+
+def _bootstrap_lock(engine: AsyncEngine):
+    '''返回保护 PostgreSQL 架构修改的咨询锁上下文。'''
+    return _postgres_lock(engine)
+
+
+
+
+async def bootstrap_schema(engine: AsyncEngine) -> None:
+    '''将数据库架构引导或迁移到当前目标版本。'''
+    head = _get_head_revision()
+    cfg = _get_alembic_config(engine)
+
+    async with _bootstrap_lock(engine):
+        async with engine.connect() as conn:
+            state = await conn.run_sync(_reflect_state)
+        decision = _decide_state(state)
+
+        if decision == "empty":
+            logger.info("bootstrap: branch=empty -> create_all + stamp head (%s)", head)
+            async with engine.begin() as conn:
+                await conn.run_sync(_run_create_all_sync)
+            await asyncio.to_thread(_stamp, cfg, head)
+
+        elif decision == "legacy":
+            logger.info(
+                "bootstrap: branch=legacy -> create_all (backfill missing baseline tables) + stamp %s + upgrade head (%s)",
+                _BASELINE_REVISION,
+                head,
+            )
+            async with engine.begin() as conn:
+                await conn.run_sync(_run_baseline_create_all_sync)
+            await asyncio.to_thread(_stamp, cfg, _BASELINE_REVISION)
+            await asyncio.to_thread(_upgrade, cfg, "head")
+
+        elif decision == "versioned":
+            logger.info("bootstrap: branch=versioned -> upgrade head (%s)", head)
+            await asyncio.to_thread(_upgrade, cfg, "head")
+
+        else:  # pragma: no cover  # 防御性分支：拒绝未定义的引导状态。
+            raise RuntimeError(f"bootstrap: unhandled decision {decision!r}")
+
+    logger.info("bootstrap: complete (backend=postgres)")

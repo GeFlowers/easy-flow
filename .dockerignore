@@ -5,7 +5,7 @@ Dockerfile
 .gitignore
 docker/
 
-# Python
+# 后端缓存与构建产物
 __pycache__/
 *.py[cod]
 *$py.class
@@ -29,22 +29,22 @@ wheels/
 *.egg
 .venv/
 
-# Web
+# 前端依赖与构建产物
 node_modules
 npm-debug.log
 .next
 
-# IDE
+# 编辑器本地文件
 .idea/
 .vscode/
 *.swp
 *.swo
 
-# OS
+# 操作系统生成文件
 .DS_Store
 Thumbs.db
 
-# Project specific
+# 项目本地文件
 conf.yaml
 web/
 docs/
@@ -53,9 +53,7 @@ assets/
 tests/
 *.log
 
-# Exclude directories not needed in Docker context
-# Frontend build only needs frontend/
-# Backend build only needs backend/
+# 排除镜像构建不需要的脚本、日志和说明文件。
 scripts/
 logs/
 docker/
@@ -72,3 +70,5 @@ backend/.coverage
 !backend/README.md
 !skills/
 !skills/**
+/Note.docx
+.learning-cleanup.local/

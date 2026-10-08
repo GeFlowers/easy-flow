@@ -1,4 +1,4 @@
-# Python-generated files
+# 后端缓存与构建产物
 __pycache__/
 *.py[oc]
 build/
@@ -14,20 +14,18 @@ static/browser_history/*.gif
 log/
 log/*
 
-# Virtual environments
+# 本地虚拟环境
 .venv
 venv/
 
-# User config file
+# 本地用户配置
 config.yaml
 
-# Langgraph
+# 旧版独立图服务缓存
 .langgraph_api
 
-# Sandbox runtime working dir — pre-created and excluded from uvicorn reload
-# (Docker startup). Anchored so it does not match
-# the source package backend/packages/harness/deerflow/sandbox/.
+# 仅排除旧版根目录下的沙箱数据，不影响 deerflow/sandbox 源码目录。
 /sandbox/
 
-# Claude Code settings
+# 本地代理设置
 .claude/settings.local.json

@@ -14,7 +14,7 @@ endif
 help:
 	@echo "DeerFlow Commands:"
 	@echo "  make config-upgrade  - Merge new fields from config.example.yaml into config.yaml"
-	@echo "  make install         - Install all dependencies (frontend + backend + pre-commit hooks)"
+	@echo "  make install         - Install frontend and backend dependencies"
 	@echo ""
 	@echo "Docker Commands:"
 	@echo "  make docker-init     - Check the Docker environment"
@@ -28,15 +28,12 @@ help:
 config-upgrade:
 	@$(RUN_WITH_GIT_BASH) ./scripts/config-upgrade.sh
 
-# 安装全部依赖与 Git 钩子；不会启动服务。
+# 安装前后端依赖；不会启动服务。
 install:
 	@echo "Installing backend dependencies..."
 	@cd backend && uv sync
 	@echo "Installing frontend dependencies..."
 	@cd frontend && pnpm install
-	@echo "Installing pre-commit hooks..."
-	@uv tool install pre-commit
-	@pre-commit install --overwrite
 	@echo "✓ All dependencies installed"
 # ==========================================
 # Docker 命令：按 config.yaml 的沙箱模式选择服务和权限边界。

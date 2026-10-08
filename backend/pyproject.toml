@@ -1,11 +1,34 @@
 [project]
 name = "deer-flow"
-version = "2.1.0"
+version = "2.0.0+learning"
 description = "LangGraph-based AI agent system with sandbox execution capabilities"
-readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "deerflow-harness",
+    "agent-client-protocol>=0.4.0",
+    "croniter>=6.0.0",
+    "dotenv>=0.9.9",
+    "exa-py>=1.0.0",
+    "langchain>=1.2.15",
+    "langchain-anthropic>=1.4.1",
+    "langchain-deepseek>=1.0.1",
+    "langchain-mcp-adapters>=0.2.2",
+    "langchain-openai>=1.2.1",
+    "langfuse>=3.4.1",
+    "langgraph>=1.1.9",
+    "markdownify>=1.2.2",
+    "markitdown[all,xlsx]>=0.0.1a2",
+    "pydantic>=2.12.5",
+    "pyyaml>=6.0.3",
+    "readabilipy>=0.3.0",
+    "tavily-python>=0.7.17",
+    "firecrawl-py>=1.15.0",
+    "tiktoken>=0.8.0",
+    "ddgs>=9.10.0",
+    "duckdb>=1.4.4",
+    "langchain-google-genai>=4.2.1",
+    "sqlalchemy[asyncio]>=2.0,<3.0",
+    "alembic>=1.13",
+    "cryptography>=48.0.1",
     "fastapi>=0.115.0",
     "httpx>=0.28.0",
     "python-multipart>=0.0.31",
@@ -21,30 +44,36 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-postgres = ["deerflow-harness[postgres]"]
-redis = ["deerflow-harness[redis]"]
-monocle = ["deerflow-harness[monocle]"]
+groundroute = []
+ollama = ["langchain-ollama>=0.3.0"]
+postgres = [
+    "asyncpg>=0.29",
+    "langgraph-checkpoint-postgres>=3.0.5",
+    "psycopg[binary]>=3.3.3",
+    "psycopg-pool>=3.3.0",
+]
+redis = ["redis>=5.0.0"]
+pymupdf = ["pymupdf4llm>=0.0.17"]
+boxlite = ["boxlite>=0.9.7"]
+monocle = ["monocle_apptrace>=0.8.8"]
 
 [dependency-groups]
 dev = [
-    "prompt-toolkit>=3.0.0",
     "ruff>=0.14.11",
-    # Monocle 追踪器也属于 deerflow-harness[monocle] 可选依赖；放在开发依赖组中，
+    # 追踪组件也属于 monocle 可选依赖；放在开发依赖组中，
     # 供追踪测试导入，同时避免普通安装被强制带入。
     "monocle_apptrace>=0.8.8",
-    # Redis 是可选运行依赖（deerflow-harness[redis]）；在开发依赖组中固定版本，
+    # 流桥接组件属于 redis 可选依赖；在开发依赖组中固定版本，
     # 确保流桥接测试可以导入并验证 Redis 桥接，而生产安装无需强制携带。
     "redis>=5.0.0",
-    # 终端界面的运行依赖也属于 deerflow-harness[tui] 可选依赖；放在开发依赖组中，
-    # 供本地或持续集成环境运行和测试终端工作台。
-    "textual>=0.80",
 ]
 
 [tool.uv]
 index-url = "https://pypi.org/simple"
 
-[tool.uv.workspace]
-members = ["packages/harness"]
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
 
-[tool.uv.sources]
-deerflow-harness = { workspace = true }
+[tool.hatch.build.targets.wheel]
+packages = ["deerflow", "app"]

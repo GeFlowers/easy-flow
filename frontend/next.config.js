@@ -17,7 +17,9 @@ import nextra from "nextra";
 
 const withNextra = nextra({});
 
-/** @type {import("next").NextConfig} */
+/** 前端框架配置的类型提示。
+ * @type {import("next").NextConfig}
+ */
 const config = {
   i18n: {
     locales: ["en", "zh"],

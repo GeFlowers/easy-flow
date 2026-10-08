@@ -1,7 +1,5 @@
 /**
- * 界面展示的应用版本。优先采用构建期 `NEXT_PUBLIC_APP_VERSION`；夜间 CI 使用
- * `<base>-nightly.<YYYYMMDD>-<short_sha>`。本地开发和标签发布回退到
- * package.json，版本一致性由发布校验脚本保证。
+ * 界面展示的学习版版本号；构建时可覆盖，未指定时采用 package.json。
  */
 import pkg from "../package.json";
 

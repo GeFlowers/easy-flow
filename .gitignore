@@ -1,8 +1,8 @@
-# DeerFlow docker image cache
+# 容器镜像缓存
 docker/.cache/
-# oh-my-claudecode state
+# 本地代理状态
 .omc/
-# OS generated files
+# 操作系统生成文件
 .DS_Store
 *.local
 ._*
@@ -11,7 +11,7 @@ docker/.cache/
 ehthumbs.db
 Thumbs.db
 
-# Python cache
+# 后端缓存
 __pycache__/
 *.py[cod]
 *$py.class
@@ -20,29 +20,29 @@ __pycache__/
 .ruff_cache/
 .hypothesis/
 
-# Virtual environments
+# 本地虚拟环境
 .venv
 venv/
 
-# Benchmark outputs
+# 性能测试输出
 bench_results.jsonl
 bench_optimized.jsonl
 results.jsonl
 backend/scripts/benchmark/*.jsonl
 
-# Environment variables
+# 私有环境配置
 .env
 
-# Configuration files
+# 本地项目配置
 config.yaml
 mcp_config.json
 extensions_config.json
 
-# IDE
+# 编辑器配置
 .idea/
 .vscode/
 
-# Coverage report
+# 覆盖率报告与运行数据
 coverage.xml
 coverage/
 .deer-flow/
@@ -52,17 +52,17 @@ logs/
 log/
 debug.log
 
-# Local git hooks (keep only on this machine, do not push)
+# 仅供本机使用的提交钩子
 .githooks/
 
-# pnpm
+# 前端包管理器缓存
 .pnpm-store
 sandbox_image_cache.tar
 
-# ignore the legacy `web` folder
+# 旧版前端目录
 web/
 
-# Deployment artifacts
+# 本地部署产物
 backend/Dockerfile.langgraph
 config.yaml.bak
 .playwright-mcp
@@ -71,5 +71,7 @@ config.yaml.bak
 .gstack/
 .worktrees
 
-# Monocle agent-observability trace output (local file exporter)
+# 本地追踪文件
 .monocle/
+/Note.docx
+.learning-cleanup.local/

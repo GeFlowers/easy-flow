@@ -1,0 +1,468 @@
+'''扩展 LangChain 摘要中间件，为 DeerFlow 提供上下文压缩和压缩前回调。'''
+
+from __future__ import annotations
+
+import html
+import logging
+from dataclasses import dataclass
+from typing import Any, Protocol, override, runtime_checkable
+
+from langchain.agents import AgentState
+from langchain.agents.middleware import SummarizationMiddleware
+from langchain_core.messages import AnyMessage, HumanMessage, RemoveMessage, get_buffer_string, trim_messages
+from langgraph.config import get_config
+from langgraph.constants import TAG_NOSTREAM
+from langgraph.graph.message import REMOVE_ALL_MESSAGES
+from langgraph.runtime import Runtime
+
+from deerflow.agents.middlewares.dynamic_context_middleware import is_dynamic_context_reminder
+from deerflow.config.app_config import get_app_config
+from deerflow.models import create_chat_model
+
+logger = logging.getLogger(__name__)
+_SUMMARY_TRIGGER_MESSAGE_NAME = "summary"
+
+
+@dataclass(frozen=True)
+class SummarizationEvent:
+    '''描述即将压缩的消息、保留消息及其所属线程、智能体 和运行上下文。'''
+
+    messages_to_summarize: tuple[AnyMessage, ...]
+    preserved_messages: tuple[AnyMessage, ...]
+    thread_id: str | None
+    agent_name: str | None
+    runtime: Runtime
+
+
+@dataclass(frozen=True)
+class ContextCompactionResult:
+    '''返回摘要文本、被摘要消息、保留消息和压缩前 令牌 估算。'''
+
+    summary_text: str
+    messages_to_summarize: tuple[AnyMessage, ...]
+    preserved_messages: tuple[AnyMessage, ...]
+    total_tokens: int
+
+
+@runtime_checkable
+class BeforeSummarizationHook(Protocol):
+    '''定义摘要移除消息前调用的同步回调接口。'''
+
+    def __call__(self, event: SummarizationEvent) -> None:
+        '''接收压缩前事件；回调通常在此持久化或检查即将被裁剪的消息。'''
+        ...
+
+
+def _resolve_thread_id(runtime: Runtime) -> str | None:
+    '''优先从 Runtime 上下文读取线程 ID，再回退到 LangGraph configurable 配置。'''
+    thread_id = runtime.context.get("thread_id") if runtime.context else None
+    if thread_id is None:
+        try:
+            config_data = get_config()
+        except RuntimeError:
+            return None
+        thread_id = config_data.get("configurable", {}).get("thread_id")
+    return thread_id
+
+
+def _resolve_agent_name(runtime: Runtime) -> str | None:
+    '''优先从 Runtime 上下文读取 智能体 名称，再回退到 LangGraph configurable 配置。'''
+    agent_name = runtime.context.get("agent_name") if runtime.context else None
+    if agent_name is None:
+        try:
+            config_data = get_config()
+        except RuntimeError:
+            return None
+        agent_name = config_data.get("configurable", {}).get("agent_name")
+    return agent_name
+
+
+class DeerFlowSummarizationMiddleware(SummarizationMiddleware):
+    '''在上下文摘要前分发回调，并避免摘要模型输出混入用户消息流。'''
+
+    def __init__(
+        self,
+        *args,
+        before_summarization: list[BeforeSummarizationHook] | None = None,
+        **kwargs,
+    ) -> None:
+        '''保存压缩前钩子，并创建带不广播标签的摘要模型副本。'''
+        super().__init__(*args, **kwargs)
+        self._before_summarization_hooks = before_summarization or []
+        # 摘要调用属于内部工作：单独给其模型副本设置不广播标签，同时保留原模型的追踪标签。
+        existing_tags = list((getattr(self.model, "config", None) or {}).get("tags") or [])
+        merged_tags = [*existing_tags, TAG_NOSTREAM] if TAG_NOSTREAM not in existing_tags else existing_tags
+        self._summary_model = self.model.with_config(tags=merged_tags)
+
+    @override
+    def _create_summary(self, messages_to_summarize: list[AnyMessage]) -> str | None:
+        '''同步入口委托给摘要专用模型生成历史摘要。'''
+        return self._summarize_with(messages_to_summarize)
+
+    @override
+    async def _acreate_summary(self, messages_to_summarize: list[AnyMessage]) -> str | None:
+        '''异步入口委托给摘要专用模型生成历史摘要。'''
+        return await self._asummarize_with(messages_to_summarize)
+
+    def _summarize_with(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
+        '''构造摘要提示并同步调用不广播的模型副本；失败时跳过本轮压缩。'''
+        if not messages_to_summarize:
+            return "No previous conversation history."
+        prompt = self._build_summary_prompt(messages_to_summarize, previous_summary=previous_summary)
+        if prompt is None:
+            return "Previous conversation was too long to summarize."
+        try:
+            response = self._summary_model.invoke(
+                prompt,
+                config={"metadata": {"lc_source": "summarization"}},
+            )
+            return response.text.strip()
+        except Exception:
+            logger.exception("Summary generation failed; skipping compaction this turn")
+            return None
+
+    async def _asummarize_with(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
+        '''异步构造摘要提示并调用不广播的模型副本；失败时跳过本轮压缩。'''
+        if not messages_to_summarize:
+            return "No previous conversation history."
+        prompt = self._build_summary_prompt(messages_to_summarize, previous_summary=previous_summary)
+        if prompt is None:
+            return "Previous conversation was too long to summarize."
+        try:
+            response = await self._summary_model.ainvoke(
+                prompt,
+                config={"metadata": {"lc_source": "summarization"}},
+            )
+            return response.text.strip()
+        except Exception:
+            logger.exception("Summary generation failed; skipping compaction this turn")
+            return None
+
+    @staticmethod
+    def _summary_count_message(summary_text: str) -> HumanMessage:
+        '''将已有摘要包装为计数器识别的消息，参与下一次触发阈值估算。'''
+        return HumanMessage(content=summary_text, name=_SUMMARY_TRIGGER_MESSAGE_NAME)
+
+    def _messages_for_trigger_count(self, messages: list[AnyMessage], summary_text: str | None) -> list[AnyMessage]:
+        '''为摘要触发条件补入已有摘要消息，使 令牌 估算包含压缩上下文。'''
+        if not summary_text:
+            return messages
+        return [*messages, self._summary_count_message(summary_text)]
+
+    @staticmethod
+    def _bound_text(text: str, cap: int) -> str:
+        '''按字符上限保留文本首尾，并在中间标记省略内容。'''
+        if len(text) <= cap:
+            return text
+        if cap <= 0:
+            return ""
+        head = cap * 2 // 3
+        omitted_marker = "\n...\n"
+        if cap <= len(omitted_marker):
+            return text[:cap]
+        tail = max(0, cap - head - len(omitted_marker))
+        if tail == 0:
+            return text[:cap]
+        return f"{text[:head]}{omitted_marker}{text[-tail:]}"
+
+    def _trim_summary_section_text(self, text: str, max_tokens: int, *, strategy: str) -> str:
+        '''用模型 令牌 计数器裁剪摘要输入；计数失败时退回确定性的字符上限。'''
+        if not text.strip():
+            return ""
+        max_tokens = max(1, max_tokens)
+        try:
+            trimmed = trim_messages(
+                [HumanMessage(content=text)],
+                max_tokens=max_tokens,
+                token_counter=self.token_counter,
+                strategy=strategy,
+                allow_partial=True,
+                text_splitter=list,
+            )
+            if trimmed:
+                content = trimmed[-1].content
+                if isinstance(content, str) and content.strip():
+                    return content
+        except Exception:
+            logger.debug("Failed to trim summary prompt section with token counter; falling back to deterministic text cap", exc_info=True)
+        return self._bound_text(text, max_tokens)
+
+    def _build_summary_input_text(self, formatted_messages: str, previous_summary: str | None = None) -> str | None:
+        '''在总 令牌 上限内分配旧摘要和新消息，并转义 XML 区块内容。'''
+        if self.trim_tokens_to_summarize is None:
+            trimmed_new_messages = formatted_messages
+            trimmed_previous_summary = previous_summary.strip() if previous_summary else ""
+        else:
+            max_tokens = max(1, self.trim_tokens_to_summarize)
+            if previous_summary:
+                new_message_tokens = max(1, max_tokens // 2)
+                previous_summary_tokens = max(1, max_tokens - new_message_tokens)
+                trimmed_previous_summary = self._trim_summary_section_text(
+                    previous_summary.strip(),
+                    previous_summary_tokens,
+                    strategy="last",
+                )
+                trimmed_new_messages = self._trim_summary_section_text(
+                    formatted_messages,
+                    new_message_tokens,
+                    strategy="first",
+                )
+            else:
+                trimmed_previous_summary = ""
+                trimmed_new_messages = self._trim_summary_section_text(
+                    formatted_messages,
+                    max_tokens,
+                    strategy="first",
+                )
+
+        # 用户消息和旧摘要会被包进结构化标签；先裁剪再转义，防止文本伪造区块边界。
+        parts: list[str] = []
+        if trimmed_previous_summary:
+            parts.extend(
+                [
+                    "<existing_summary>",
+                    html.escape(trimmed_previous_summary, quote=False),
+                    "</existing_summary>",
+                    "",
+                ]
+            )
+        if trimmed_new_messages:
+            parts.extend(
+                [
+                    "<new_messages>",
+                    html.escape(trimmed_new_messages, quote=False),
+                    "</new_messages>",
+                ]
+            )
+        if not parts:
+            return None
+        return "\n".join(parts)
+
+    def _build_summary_prompt(self, messages_to_summarize: list[AnyMessage], previous_summary: str | None = None) -> str | None:
+        '''裁剪待摘要消息并填充摘要模板；无有效输入时返回 ``None``。'''
+        trimmed_messages = self._trim_messages_for_summary(messages_to_summarize)
+        if not trimmed_messages:
+            trimmed_messages = messages_to_summarize[-1:]
+        if not trimmed_messages:
+            return None
+        # 使用 LangChain 消息格式化器，避免直接转字符串时把元数据计入提示。
+        formatted_messages = get_buffer_string(trimmed_messages)
+        formatted_messages = self._build_summary_input_text(formatted_messages, previous_summary=previous_summary)
+        if not formatted_messages:
+            return None
+        return self.summary_prompt.format(messages=formatted_messages).rstrip()
+
+    def before_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''同步模型调用前检查是否达到摘要压缩条件。'''
+        return self._maybe_summarize(state, runtime)
+
+    async def abefore_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''异步模型调用前检查摘要条件并执行异步压缩。'''
+        return await self._amaybe_summarize(state, runtime)
+
+    def _prepare_compaction(
+        self,
+        state: AgentState,
+        *,
+        force: bool = False,
+    ) -> tuple[list[AnyMessage], list[AnyMessage], str | None, int] | None:
+        '''确保消息 ID 存在、评估触发条件并拆分待摘要与保留消息。'''
+        messages = state["messages"]
+        self._ensure_message_ids(messages)
+
+        previous_summary = state.get("summary_text") if isinstance(state.get("summary_text"), str) else None
+        trigger_messages = self._messages_for_trigger_count(messages, previous_summary)
+        total_tokens = self.token_counter(trigger_messages)
+        if not force and not self._should_summarize(trigger_messages, total_tokens):
+            return None
+
+        cutoff_index = self._determine_cutoff_index(messages)
+        if cutoff_index <= 0:
+            return None
+
+        messages_to_summarize, preserved_messages = self._partition_messages(messages, cutoff_index)
+        messages_to_summarize, preserved_messages = self._preserve_dynamic_context_reminders(messages_to_summarize, preserved_messages)
+        if not messages_to_summarize:
+            return None
+        return messages_to_summarize, preserved_messages, previous_summary, total_tokens
+
+    def compact_state(
+        self,
+        state: AgentState,
+        runtime: Runtime,
+        *,
+        force: bool = False,
+    ) -> ContextCompactionResult | None:
+        '''同步执行一次上下文压缩并返回摘要与消息分区，不满足条件则返回空。'''
+        prepared = self._prepare_compaction(state, force=force)
+        if prepared is None:
+            return None
+        messages_to_summarize, preserved_messages, previous_summary, total_tokens = prepared
+        self._fire_hooks(messages_to_summarize, preserved_messages, runtime)
+        summary = self._summarize_with(messages_to_summarize, previous_summary=previous_summary)
+        if summary is None:
+            return None
+        return ContextCompactionResult(
+            summary_text=summary,
+            messages_to_summarize=tuple(messages_to_summarize),
+            preserved_messages=tuple(preserved_messages),
+            total_tokens=total_tokens,
+        )
+
+    async def acompact_state(
+        self,
+        state: AgentState,
+        runtime: Runtime,
+        *,
+        force: bool = False,
+    ) -> ContextCompactionResult | None:
+        '''异步执行一次上下文压缩并返回摘要与消息分区。'''
+        prepared = self._prepare_compaction(state, force=force)
+        if prepared is None:
+            return None
+        messages_to_summarize, preserved_messages, previous_summary, total_tokens = prepared
+        self._fire_hooks(messages_to_summarize, preserved_messages, runtime)
+        summary = await self._asummarize_with(messages_to_summarize, previous_summary=previous_summary)
+        if summary is None:
+            return None
+        return ContextCompactionResult(
+            summary_text=summary,
+            messages_to_summarize=tuple(messages_to_summarize),
+            preserved_messages=tuple(preserved_messages),
+            total_tokens=total_tokens,
+        )
+
+    def _maybe_summarize(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''在达到触发条件时返回清空旧消息、保留尾部并写入摘要的状态更新。'''
+        result = self.compact_state(state, runtime, force=False)
+        if result is None:
+            return None
+        return {
+            "messages": [
+                RemoveMessage(id=REMOVE_ALL_MESSAGES),
+                *result.preserved_messages,
+            ],
+            "summary_text": result.summary_text,
+        }
+
+    async def _amaybe_summarize(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''异步摘要触发路径，返回与同步路径相同结构的状态更新。'''
+        result = await self.acompact_state(state, runtime, force=False)
+        if result is None:
+            return None
+        return {
+            "messages": [
+                RemoveMessage(id=REMOVE_ALL_MESSAGES),
+                *result.preserved_messages,
+            ],
+            "summary_text": result.summary_text,
+        }
+
+    def _preserve_dynamic_context_reminders(
+        self,
+        messages_to_summarize: list[AnyMessage],
+        preserved_messages: list[AnyMessage],
+    ) -> tuple[list[AnyMessage], list[AnyMessage]]:
+        '''将动态上下文提醒及其同组 ID 消息移入保留区，避免日期、记忆或原问题被摘要吞并。'''
+        reminders = [msg for msg in messages_to_summarize if is_dynamic_context_reminder(msg)]
+        if not reminders:
+            return messages_to_summarize, preserved_messages
+
+        # 仅去除消息 ID 约定的末尾后缀，保留稳定 ID 本身可能含有的双下划线。
+        reminder_base_ids: set[str] = set()
+        for msg in reminders:
+            if msg.id:
+                base = msg.id.removesuffix("__memory").removesuffix("__user")
+                reminder_base_ids.add(base)
+
+        # 单次顺序遍历保留提醒及同组消息的原始先后关系，避免多个消息组重排。
+        rescued: list[AnyMessage] = []
+        remaining: list[AnyMessage] = []
+        for msg in messages_to_summarize:
+            if is_dynamic_context_reminder(msg) or (msg.id and any(msg.id.startswith(b + "__") for b in reminder_base_ids)):
+                rescued.append(msg)
+            else:
+                remaining.append(msg)
+        return remaining, rescued + preserved_messages
+
+    def _fire_hooks(
+        self,
+        messages_to_summarize: list[AnyMessage],
+        preserved_messages: list[AnyMessage],
+        runtime: Runtime,
+    ) -> None:
+        '''构造压缩前事件并逐个调用钩子；单个钩子失败只记录错误，不阻断摘要。'''
+        if not self._before_summarization_hooks:
+            return
+
+        event = SummarizationEvent(
+            messages_to_summarize=tuple(messages_to_summarize),
+            preserved_messages=tuple(preserved_messages),
+            thread_id=_resolve_thread_id(runtime),
+            agent_name=_resolve_agent_name(runtime),
+            runtime=runtime,
+        )
+
+        for hook in self._before_summarization_hooks:
+            try:
+                hook(event)
+            except Exception:
+                hook_name = getattr(hook, "__name__", None) or type(hook).__name__
+                logger.exception("before_summarization hook %s failed", hook_name)
+
+
+def create_summarization_middleware(
+    *,
+    app_config: Any | None = None,
+    keep: tuple[str, int | float] | None = None,
+    skip_memory_flush: bool = False,
+) -> DeerFlowSummarizationMiddleware | None:
+    '''按应用配置构造摘要中间件，并为主 智能体 可选注册压缩前记忆刷新钩子。'''
+    resolved_app_config = app_config or get_app_config()
+    config = resolved_app_config.summarization
+
+    if not config.enabled:
+        return None
+
+    trigger = None
+    if config.trigger is not None:
+        if isinstance(config.trigger, list):
+            trigger = [item.to_tuple() for item in config.trigger]
+        else:
+            trigger = config.trigger.to_tuple()
+
+    if config.model_name:
+        model = create_chat_model(
+            name=config.model_name,
+            thinking_enabled=False,
+            app_config=resolved_app_config,
+            attach_tracing=False,
+        )
+    else:
+        model = create_chat_model(
+            thinking_enabled=False,
+            app_config=resolved_app_config,
+            attach_tracing=False,
+        )
+    model = model.with_config(tags=["middleware:summarize"])
+
+    kwargs: dict[str, Any] = {
+        "model": model,
+        "trigger": trigger,
+        "keep": keep or config.keep.to_tuple(),
+    }
+    if config.trim_tokens_to_summarize is not None:
+        kwargs["trim_tokens_to_summarize"] = config.trim_tokens_to_summarize
+    if config.summary_prompt is not None:
+        kwargs["summary_prompt"] = config.summary_prompt
+
+    hooks: list[BeforeSummarizationHook] = []
+    if resolved_app_config.memory.enabled and not skip_memory_flush:
+        from deerflow.agents.memory.summarization_hook import memory_flush_hook
+
+        hooks.append(memory_flush_hook)
+
+    return DeerFlowSummarizationMiddleware(
+        **kwargs,
+        before_summarization=hooks,
+    )

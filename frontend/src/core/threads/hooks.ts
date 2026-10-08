@@ -1218,7 +1218,12 @@ export function useThreadStream({
     },
     /** 通知调用方运行完成，并刷新线程、历史记录和用量相关缓存。 */
     onFinish(state) {
-      listeners.current.onFinish?.(state.values);
+      // 结束时读取的检查点可能缺少消息频道；保留已接收消息，避免通知等调用方访问空值。
+      listeners.current.onFinish?.({
+        ...EMPTY_THREAD_VALUES,
+        ...state.values,
+        messages: state.values.messages ?? messagesRef.current,
+      });
       pendingUsageBaselineMessageIdsRef.current = new Set(
         messagesRef.current
           .map(messageIdentity)

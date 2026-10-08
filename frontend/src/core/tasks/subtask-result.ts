@@ -25,7 +25,7 @@ export interface SubtaskResultUpdate {
 /**
  * 后端为每个 `task` 工具结果写入 `ToolMessage.additional_kwargs` 的结构化状态键。
  *
- * 取值与 Python 契约 `backend/packages/harness/deerflow/subagents/status_contract.py`
+ * 取值与 Python 契约 `backend/deerflow/subagents/status_contract.py`
  * 保持一致（`SUBAGENT_STATUS_KEY`、`SUBAGENT_ERROR_KEY`、`SUBAGENT_RESULT_BRIEF_KEY`、
  * `SUBAGENT_RESULT_SHA256_KEY`、`SUBAGENT_MODEL_NAME_KEY` 与 `SUBAGENT_TOKEN_USAGE_KEY`）。
  * 结果元数据字段均为可选且有界：`subagent_result_brief` 保存已完成任务的截断摘要，

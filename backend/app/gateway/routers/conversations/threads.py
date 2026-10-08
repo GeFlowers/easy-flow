@@ -202,11 +202,11 @@ async def _copy_branch_user_data(source_thread_id: str, target_thread_id: str) -
 
 
 def _default_branch_display_name(source_title: Any, *, source_is_branch: bool = False) -> str | None:
-    '''根据源线程标题生成默认分支显示名称。'''
+    '''复用源线程的非空标题；已有分支同样保持原名，空标题交给后续生成流程。'''
     if not isinstance(source_title, str):
         return None
 
-    return display_name or None
+    return source_title.strip() or None
 
 
 

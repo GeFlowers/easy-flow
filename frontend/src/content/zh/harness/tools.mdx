@@ -126,7 +126,7 @@ tools:
 ```
 高质量搜索，带结构化结果。需要 [Tavily](https://tavily.com) API Key。
 
-安装：`cd backend && uv add 'deerflow-harness[tavily]'`
+安装：`cd backend && uv sync`
 
   </Tabs.Tab>
   <Tabs.Tab>
@@ -148,7 +148,7 @@ tools:
 ```
 带神经检索的语义搜索。需要 [Exa](https://exa.ai) API Key。
 
-安装：`cd backend && uv add 'deerflow-harness[exa]'`
+安装：`cd backend && uv sync`
 
   </Tabs.Tab>
   <Tabs.Tab>
@@ -177,7 +177,7 @@ GroundRoute 是一个元搜索层：一个 API 接入六个搜索引擎（Serper
 
 需要 [GroundRoute](https://groundroute.ai) API Key。同时支持 `web_fetch`。
 
-安装：`cd backend && uv add 'deerflow-harness[groundroute]'`
+安装：`cd backend && uv sync --extra groundroute`
 
   </Tabs.Tab>
 </Tabs>

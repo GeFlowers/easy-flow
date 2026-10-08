@@ -147,13 +147,13 @@ async def get_agent(name: str) -> AgentResponse:
     '''按名称读取当前用户可访问的自定义 agent。
 
         Args:
-            name: The agent name.
+            name: 要读取的自定义代理名称。
 
         Returns:
-            Agent details including SOUL.md content.
+            代理配置及 SOUL.md 中的角色说明。
 
         Raises:
-            HTTPException: 404 if agent not found.
+            HTTPException: 代理不存在时返回 404。
     '''
     _require_agents_api_enabled()
     _validate_agent_name(name)
@@ -181,13 +181,13 @@ async def create_agent_endpoint(request: AgentCreateRequest) -> AgentResponse:
     '''校验配置并创建新的自定义 agent。
 
         Args:
-            request: The agent creation request.
+            request: 新代理的名称、角色说明和配置。
 
         Returns:
-            The created agent details.
+            已创建代理的配置详情。
 
         Raises:
-            HTTPException: 409 if agent already exists, 422 if name is invalid.
+            HTTPException: 名称已存在时返回 409，名称不合法时返回 422。
     '''
     _require_agents_api_enabled()
     _validate_agent_name(request.name)
@@ -422,7 +422,7 @@ async def delete_agent(name: str) -> None:
     '''删除指定的自定义 agent 及其关联配置。
 
         Args:
-            name: The agent name.
+            name: 要删除的自定义代理名称。
 
         异常：
             HTTPException：不存在用户专属副本时返回 404；仅存在旧版共享副本时返回 409，提示执行迁移脚本。

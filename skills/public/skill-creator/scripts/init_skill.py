@@ -156,16 +156,17 @@ def create_resource_dirs(
 
 def init_skill(skill_name, path, resources, include_examples, interface_overrides):
     '''
-    Initialize a new skill directory with template SKILL.md.
+    根据模板创建技能说明和指定资源目录，按需生成示例及界面元数据。
 
     Args:
-        skill_name: Name of the skill
-        path: Path where the skill directory should be created
-        resources: Resource directories to create
-        include_examples: Whether to create example files in resource directories
+        skill_name: 新技能的目录名称。
+        path: 用于存放新技能的父目录。
+        resources: 需要创建的资源子目录。
+        include_examples: 是否在资源目录中生成示例文件。
+        interface_overrides: 用于生成界面元数据的覆盖项。
 
     Returns:
-        Path to created skill directory, or None if error
+        创建成功时返回技能目录，失败时返回 None。
     '''
     skill_dir = Path(path).resolve() / skill_name
 

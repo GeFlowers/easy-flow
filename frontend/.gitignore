@@ -1,46 +1,45 @@
-# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
+# 排除本地依赖、缓存、密钥及构建产物。
 
-# dependencies
+# 依赖
 /node_modules
 /.pnp
 .pnp.js
 
-# testing
+# 测试产物
 /coverage
 
-# database
+# 本地数据库文件
 /prisma/db.sqlite
 /prisma/db.sqlite-journal
 db.sqlite
 
-# next.js
+# 前端构建产物
 /.next/
 /out/
 next-env.d.ts
 
-# production
+# 发布目录
 /build
 
-# misc
+# 系统文件与证书
 .DS_Store
 *.pem
 
-# debug
+# 调试日志
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# local env files
-# do not commit any .env files to git, except for the .env.example file. https://create.t3.gg/en/usage/env-variables#using-environment-variables
+# 私有环境文件；只有 .env.example 可以提交。
 .env
 .env*.local
 
-# vercel
+# 部署平台本地状态
 .vercel
 
-# typescript
+# 类型检查缓存
 *.tsbuildinfo
 
-# idea files
+# 编辑器配置
 .idea

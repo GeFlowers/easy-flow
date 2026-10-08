@@ -1,6 +1,6 @@
 '''提供向 LangGraph Assistants API 兼容转换的只读端点。
 
-接口由 ``langgraph.json`` 图注册表和 ``config.yaml`` 代理定义支撑，以最小化实现
+接口显式注册主代理，并读取当前用户的自定义代理，以最小化实现
 满足 ``useStream`` React 钩子的初始化请求（``assistants.search()`` 与
 ``assistants.get()``），而非提供完整的平台图检查能力。
 '''

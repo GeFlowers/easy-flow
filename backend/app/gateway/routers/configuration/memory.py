@@ -129,39 +129,7 @@ class MemoryStatusResponse(BaseModel):
     description="Retrieve the current global memory data including user context, history, and facts.",
 )
 async def get_memory(http_request: Request) -> MemoryResponse:
-    '''读取当前用户可访问的长期记忆数据。
-
-        Returns:
-            The current memory data with user context, history, and facts.
-
-        Example Response:
-            ```json
-            {
-                "version": "1.0",
-                "lastUpdated": "2024-01-15T10:30:00Z",
-                "user": {
-                    "workContext": {"summary": "Working on DeerFlow project", "updatedAt": "..."},
-                    "personalContext": {"summary": "Prefers concise responses", "updatedAt": "..."},
-                    "topOfMind": {"summary": "Building memory API", "updatedAt": "..."}
-                },
-                "history": {
-                    "recentMonths": {"summary": "Recent development activities", "updatedAt": "..."},
-                    "earlierContext": {"summary": "", "updatedAt": ""},
-                    "longTermBackground": {"summary": "", "updatedAt": ""}
-                },
-                "facts": [
-                    {
-                        "id": "fact_abc123",
-                        "content": "User prefers TypeScript over JavaScript",
-                        "category": "preference",
-                        "confidence": 0.9,
-                        "createdAt": "2024-01-15T10:30:00Z",
-                        "source": "thread_xyz"
-                    }
-                ]
-            }
-            ```
-    '''
+    '''读取当前用户的长期记忆，返回用户画像、历史摘要与独立事实。'''
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
     return MemoryResponse(**memory_data)
 
@@ -315,37 +283,10 @@ async def import_memory(request: MemoryResponse, http_request: Request) -> Memor
     description="Retrieve the current memory system configuration.",
 )
 async def get_memory_config_endpoint() -> MemoryConfigResponse:
-    '''读取当前生效的记忆系统配置。
+    '''读取记忆开关、注入策略及当前后端配置。
 
-        Returns:
-            The current memory configuration. The response is backend-agnostic:
-            ``enabled`` / ``injection_enabled`` / ``mode`` are mechanism-level
-            fields that apply to any backend (``mode`` selects middleware vs tool
-            operation), and ``backend_config`` is an opaque dict the active
-            backend (``manager_class``) self-interprets. DeerMem's knobs
-            (``storage_path``, ``max_facts``, ``debounce_seconds``, ...) live under
-            ``backend_config`` -- they are NOT top-level, because a non-DeerMem
-            backend has its own (different) knobs.
-
-        Example Response:
-            ```json
-            {
-                "enabled": true,
-                "injection_enabled": true,
-                "shutdown_flush_timeout_seconds": 30.0,
-                "mode": "middleware",
-                "manager_class": "deermem",
-                "backend_config": {
-                    "storage_path": "/.../.deer-flow",
-                    "debounce_seconds": 30,
-                    "max_facts": 100,
-                    "fact_confidence_threshold": 0.7,
-                    "max_injection_tokens": 2000,
-                    "token_counting": "tiktoken"
-                }
-            }
-            ```
-    '''
+    enabled、injection_enabled 和 mode 控制宿主行为；backend_config 保存
+    当前记忆后端自己的存储路径、事实上限和更新间隔等参数。'''
     config = get_memory_config()
     return MemoryConfigResponse(
         enabled=config.enabled,
@@ -365,11 +306,7 @@ async def get_memory_config_endpoint() -> MemoryConfigResponse:
     description="Retrieve both memory configuration and current data in a single request.",
 )
 async def get_memory_status(http_request: Request) -> MemoryStatusResponse:
-    '''读取记忆系统的运行状态、配置摘要和数据概况。
-
-        Returns:
-            Combined memory configuration and current data.
-    '''
+    '''汇总记忆系统配置和当前用户已保存的记忆，供设置页展示状态。'''
     config = get_memory_config()
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
 

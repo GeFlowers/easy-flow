@@ -1,12 +1,12 @@
-# Normalize line endings to LF for all text files
+# 文本文件统一使用换行符 LF。
 * text=auto eol=lf
 
-# Shell scripts and makefiles must always use LF
+# 命令脚本与构建命令文件必须使用 LF。
 *.sh text eol=lf
 Makefile text eol=lf
 **/Makefile text eol=lf
 
-# Common config/source files
+# 常见配置与源码文件
 *.yml text eol=lf
 *.yaml text eol=lf
 *.toml text eol=lf
@@ -22,11 +22,11 @@ Makefile text eol=lf
 *.html text eol=lf
 *.env text eol=lf
 
-# Windows scripts
+# Windows 脚本使用 CRLF。
 *.bat text eol=crlf
 *.cmd text eol=crlf
 
-# Binary assets
+# 二进制资源不转换换行符。
 *.png binary
 *.jpg binary
 *.jpeg binary
