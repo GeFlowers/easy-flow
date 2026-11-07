@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import { getBlogRoute, normalizeTagSlug, type BlogPost } from "@/core/blog";
+import { getBlogRoute, normalizeTagSlug, type BlogPost } from "@/features/blog";
 import { cn } from "@/lib/utils";
 
 type PostListProps = {

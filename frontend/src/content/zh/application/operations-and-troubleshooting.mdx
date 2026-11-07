@@ -1,171 +1,43 @@
 ---
 title: 运维与排障
-description: 本页面涵盖运行 DeerFlow 应用的操作信息：日志记录、常见问题和维护任务。
+description: 本机服务的日志、重启、连接检查和备份。
 ---
-
-import { Callout } from "nextra/components";
 
 # 运维与排障
 
-本页面涵盖运行 DeerFlow 应用的操作信息：日志记录、常见问题和维护任务。
+## 日志与状态
 
-## 日志
-
-使用以下 Docker Compose 命令查看服务日志：
-
-| 服务 | 命令 |
-| ---- | ---- |
-| 全部服务 | `make docker-logs` |
-| Gateway | `make docker-logs-gateway` |
-| 前端 | `make docker-logs-frontend` |
-
-**实时追踪日志**：
+前后端日志直接位于项目根目录的 `logs`，数据库日志可使用容器管理工具查看，Nginx 日志位于安装目录的 `logs`。
 
 ```bash
-make docker-logs-gateway     # 查看 API 请求和 Agent 活动
+Get-Content logs/gateway.err.log -Tail 50
+Get-Content logs/frontend.err.log -Tail 50
 ```
 
-**调整日志级别**：
-
-```yaml
-# config.yaml
-log_level: debug # debug | info | warning | error
-```
-
-## 健康检查
-
-DeerFlow 暴露健康检查端点：
-
-```bash
-# Gateway 健康状态
-curl http://localhost:8001/health
-
-# 通过 nginx 完整代理链验证
-curl http://localhost:2026/api/models
-```
-
-## 配置升级
-
-当 `config.yaml` schema 更新时（由 `config_version` 字段标识），运行：
-
-```bash
-make config-upgrade
-```
-
-这将 `config.example.yaml` 中的新字段合并到你现有的 `config.yaml` 中，而不覆盖你的自定义内容。
+查看或分享日志前先检查是否包含凭据，不要直接打印整个环境文件。
 
 ## 常见问题
 
-### 模型配置错误
+- 代理返回上游不可用：确认已执行 `bash scripts/start.sh`，查看前后端日志；代理自启不会自动启动前后端。
+- 数据库连接失败：检查数据库容器健康、原数据卷是否存在，以及环境文件中的地址和密码。迁移时不要创建空卷冒充原数据。
+- Redis 连接失败：确认本机服务正在运行，连接地址和认证配置一致。
+- 端口被占用：启动脚本会拒绝继续；先确认进程归属，不要批量结束同名进程。
+- 模型请求失败：检查模型配置、密钥是否已配置和网络是否可达，不要将真实密钥贴到日志或文档。
+- 构建失败：进入前端目录运行 `corepack pnpm build`；安装依赖请参照快速上手。
+- 工具或文件路径失败：检查本机目录是否存在、后端账户权限，以及命令执行是否允许。本机沙箱不再使用应用容器中的目录。
 
-**症状**：Agent 在响应第一条消息时报错，日志中有 API 认证错误。
-
-**诊断**：
-
-```bash
-# 检查 Gateway 容器日志中的模型错误
-docker compose -f docker/docker-compose-dev.yaml logs --tail=20 gateway
-```
-
-**解决**：
-
-1. 验证 `config.yaml` 中 API key 字段名称正确（例如 `$OPENAI_API_KEY`）。
-2. 确认对应的环境变量已设置（`echo $OPENAI_API_KEY`）。
-3. 检查 `base_url`（如有）是否与提供商的实际端点匹配。
-
----
-
-### 沙箱权限问题
-
-**症状**：工具报"文件未找到"或权限错误，即使 Agent 声称已创建文件。
-
-**诊断**：
+## 更新与重启
 
 ```bash
-# 检查线程用户数据目录是否存在且可写
-ls -la backend/.deer-flow/threads/
+bash scripts/stop.sh
+cd frontend && corepack pnpm build && cd ..
+bash scripts/start.sh
 ```
 
-**解决**：
+依赖变化时先重新安装依赖。修改环境文件后要重启前后端；只重载代理不会刷新后端环境变量。
 
-1. 确保 `backend/.deer-flow/` 对运行 DeerFlow 的进程可写。
-2. 在 Docker 部署中，验证卷挂载路径正确（`DEER_FLOW_ROOT` 设置为绝对路径）。
+## 备份
 
----
+分别备份 PostgreSQL 和完整的 `backend/.deer-flow`，以及私有配置。后端停止时会正常关闭运行时并刷新记忆队列；不要直接强制结束进程代替日常停止。
 
-### PostgreSQL 连接失败
-
-**症状**：Gateway 启动时报告数据库连接失败，或持久化相关 API 返回错误。
-
-**检查**：确认 `.env` 中的 `DATABASE_URL` 指向可访问的 PostgreSQL 服务，并且数据库用户有建表和迁移权限：
-
-```yaml
-database:
-  backend: postgres
-  postgres_url: $DATABASE_URL
-
-run_events:
-  backend: db
-```
-
----
-
-### 前端构建失败
-
-**症状**：`make install` 或前端构建步骤失败，提示 `BETTER_AUTH_SECRET` 错误。
-
-**解决**：
-
-```bash
-# 选项 1：设置环境变量（推荐）
-export BETTER_AUTH_SECRET=your-secret-here-at-least-32-chars
-cd frontend && pnpm build
-
-# 选项 2：跳过构建时验证（仅限开发）
-SKIP_ENV_VALIDATION=1 pnpm build
-```
-
----
-
-### MCP 服务器连接失败
-
-**症状**：MCP 工具未出现，`logs/gateway.log` 中有超时错误。
-
-**诊断**：
-
-```bash
-# 检查 MCP 相关错误
-docker compose -f docker/docker-compose-dev.yaml logs --tail=20 gateway
-```
-
-**解决**：
-
-1. 验证 `extensions_config.json` 中 MCP 服务器的 `command` 和 `args` 在服务器外部正常工作（手动运行命令）。
-2. 确认 MCP 服务器的依赖（如 `npx`、`uvx`）已安装并在 PATH 中。
-3. 检查 MCP 服务器是否需要网络访问或特定环境变量。
-
----
-
-## 数据备份
-
-根据你启用的存储后端备份：
-
-- `backend/.deer-flow/threads/`：线程工作目录、上传文件和产出物。
-- `backend/.deer-flow/memory.json` 和 `backend/.deer-flow/agents/`：全局和 Agent 记忆。
-- PostgreSQL 数据库：定期备份检查点、Store 数据和应用记录。
-- 旧的 `checkpointer.connection_string` 文件：如果你的部署仍配置独立 `checkpointer`。
-- `backend/agents/*/config.yaml`：自定义 Agent 配置。
-
-Docker 部署中，备份绑定挂载的宿主机路径，而不是容器内部文件系统。
-
-## 停止和重启服务
-
-```bash
-make docker-stop
-make docker-start
-```
-
-<Cards num={2}>
-  <Cards.Card title="部署指南" href="/docs/application/deployment-guide" />
-  <Cards.Card title="配置" href="/docs/application/configuration" />
-</Cards>
+[部署指南](/docs/application/deployment-guide)

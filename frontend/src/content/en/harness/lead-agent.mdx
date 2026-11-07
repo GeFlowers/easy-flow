@@ -77,7 +77,7 @@ The Lead Agent resolves which model to use at runtime using the following priori
 
 1. `model_name` (or `model`) from the per-request configuration, if provided and valid.
 2. The `model` field of the active custom agent's config, if an agent is specified.
-3. The first model in the `models:` list in `config.yaml` (the global default).
+3. The first model in the `models:` list in `config/config.yaml` (the global default).
 
 If the requested model name is not found in the config, the system falls back to the default model and logs a warning.
 

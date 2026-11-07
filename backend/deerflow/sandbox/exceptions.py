@@ -21,7 +21,7 @@ class SandboxError(Exception):
 class SandboxNotFoundError(SandboxError):
     '''表示请求的沙箱不存在。'''
 
-    def __init__(self, message: str = "Sandbox not found", sandbox_id: str | None = None):
+    def __init__(self, message: str = "找不到沙箱", sandbox_id: str | None = None):
         '''使用消息和可选沙箱标识初始化未找到错误。'''
         details = {"sandbox_id": sandbox_id} if sandbox_id else None
         super().__init__(message, details)

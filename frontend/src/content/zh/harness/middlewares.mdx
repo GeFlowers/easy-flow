@@ -66,7 +66,7 @@ Warning 介入会按 thread 和 run 排队，并在下一次模型调用时合�
 
 在每次对话开始时读取持久化记忆事实并将其注入到系统提示中。对话结束后，将后台更新排队，以将新信息纳入记忆存储。
 
-**配置**：参见[记忆系统](/docs/harness/memory)页面和 `config.yaml` 中的 `memory:` 部分。
+**配置**：参见[记忆系统](/docs/harness/memory)页面和 `config/config.yaml` 中的 `memory:` 部分。
 
 ```yaml
 memory:
@@ -82,7 +82,7 @@ memory:
 
 限制 Agent 在单次轮次中可以进行的并行子 Agent 任务调用数量，也限制一次 Lead Agent run 内的子 Agent 委派总数。这防止 Agent 在重复规划 checkpoint 中持续启动无边界批次。
 
-**配置**：每次请求配置中的 `subagent_enabled`、`max_concurrent_subagents`，以及可选的 `max_total_subagents`。总量上限默认使用 `config.yaml` 中的 `subagents.max_total_per_run`。
+**配置**：每次请求配置中的 `subagent_enabled`、`max_concurrent_subagents`，以及可选的 `max_total_subagents`。总量上限默认使用 `config/config.yaml` 中的 `subagents.max_total_per_run`。
 
 ---
 
@@ -90,7 +90,7 @@ memory:
 
 在第一次交互后自动为线程生成标题。默认从用户的第一条消息生成快速本地 fallback 标题；只有设置 `title.model_name` 时，才启用可选的 LLM 标题路径。
 
-**配置**：`config.yaml` 中的 `title:` 部分。
+**配置**：`config/config.yaml` 中的 `title:` 部分。
 
 ```yaml
 title:
@@ -106,7 +106,7 @@ title:
 
 当计划模式激活时，维护一个对用户可见的结构化任务列表。Agent 使用 `write_todos` 工具，随着完成复杂目标，将任务标记为 `pending`、`in_progress` 或 `completed`。
 
-**激活**：在请求配置中设置 `is_plan_mode: true` 时自动启用。不需要 `config.yaml` 条目。
+**激活**：在请求配置中设置 `is_plan_mode: true` 时自动启用。不需要 `config/config.yaml` 条目。
 
 ---
 
@@ -114,7 +114,7 @@ title:
 
 追踪每次模型调用的 LLM token 消耗，并以 `info` 级别记录。对于监控成本和了解长时序任务中 token 的使用位置很有帮助。
 
-**配置**：`config.yaml` 中的 `token_usage:` 部分。
+**配置**：`config/config.yaml` 中的 `token_usage:` 部分。
 
 ```yaml
 token_usage:
@@ -137,7 +137,7 @@ token_usage:
 
 当对话变长时，对旧消息进行摘要以减少上下文大小。生成的摘要存入线程状态，并在后续模型调用中作为隐藏的 durable context 数据投影进去，在不把旧消息继续留在活跃 transcript 中的情况下保留含义。
 
-**配置**：`config.yaml` 中的 `summarization:` 部分。详见下方详细配置。
+**配置**：`config/config.yaml` 中的 `summarization:` 部分。详见下方详细配置。
 
 ---
 
@@ -153,7 +153,7 @@ token_usage:
 
 当工具搜索启用时，此中间件从模型上下文中隐藏延迟工具 schema。工具通过 `tool_search` 工具按需发现，而不是预先全部列出，从而减少上下文使用。
 
-**配置**：`config.yaml` 中的 `tool_search.enabled: true`。
+**配置**：`config/config.yaml` 中的 `tool_search.enabled: true`。
 
 ## 摘要压缩配置详解
 

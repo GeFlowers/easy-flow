@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 _MISSING_TOOL_CALL_ID = "missing_tool_call_id"
 _TASK_TOOL_NAME = "task"
-_RECOVERY_HINT = "Continue with available context, or choose an alternative tool."
+_RECOVERY_HINT = "请基于现有上下文继续，或选择替代工具。"
 
 
 def _stamp_task_exception_status(message: ToolMessage, *, tool_name: str, error: str) -> ToolMessage:
@@ -74,7 +74,7 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         if len(detail) > 500:
             detail = detail[:497] + "..."
 
-        content = f"Error: Tool '{tool_name}' failed with {exc.__class__.__name__}: {detail}. {_RECOVERY_HINT}"
+        content = f"Error: 工具 '{tool_name}' 执行失败，异常为 {exc.__class__.__name__}： {detail}. {_RECOVERY_HINT}"
         message = ToolMessage(
             content=content,
             tool_call_id=tool_call_id,
@@ -231,7 +231,7 @@ def _build_runtime_middlewares(
         _progress_idx = next((i for i, m in enumerate(middlewares) if isinstance(m, _ToolProgressMiddleware)), None)
         _error_idx = next((i for i, m in enumerate(middlewares) if isinstance(m, ToolErrorHandlingMiddleware)), None)
         if _progress_idx is not None and _error_idx is not None and _progress_idx > _error_idx:
-            raise RuntimeError(f"ToolProgressMiddleware must be outer (index {_progress_idx}) of ToolErrorHandlingMiddleware (index {_error_idx}) — check middleware append order")
+            raise RuntimeError(f"ToolProgressMiddleware 必须位于外层（索引 {_progress_idx}），包裹 ToolErrorHandlingMiddleware（索引 {_error_idx}）；请检查中间件追加顺序")
 
     return middlewares
 

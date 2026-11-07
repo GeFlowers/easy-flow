@@ -139,4 +139,4 @@ def assert_mcp_routing_before_deferred_filter(middlewares: Sequence[AgentMiddlew
     routing_idx = next((idx for idx, middleware in enumerate(middlewares) if isinstance(middleware, McpRoutingMiddleware)), None)
     filter_idx = next((idx for idx, middleware in enumerate(middlewares) if isinstance(middleware, DeferredToolFilterMiddleware)), None)
     if routing_idx is not None and filter_idx is not None and routing_idx > filter_idx:
-        raise RuntimeError(f"McpRoutingMiddleware must be installed before DeferredToolFilterMiddleware (routing index {routing_idx}, deferred filter index {filter_idx})")
+        raise RuntimeError(f"McpRoutingMiddleware 必须安装在 DeferredToolFilterMiddleware 之前（路由索引 {routing_idx}，延迟过滤器索引 {filter_idx})")

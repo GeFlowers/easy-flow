@@ -4,13 +4,13 @@ import { ArrowUpRightIcon, FileDiffIcon } from "lucide-react";
 import { useState } from "react";
 
 import { Sheet } from "@/components/ui/sheet";
-import { useI18n } from "@/core/i18n/hooks";
-import { useWorkspaceChanges } from "@/core/workspace-changes/hooks";
+import { useI18n } from "@/features/i18n/hooks";
+import { useWorkspaceChanges } from "@/features/workspace-changes/hooks";
 import {
   getChangedFileCount,
   sortWorkspaceChanges,
-} from "@/core/workspace-changes/summary";
-import type { WorkspaceFileChange } from "@/core/workspace-changes/types";
+} from "@/features/workspace-changes/summary";
+import type { WorkspaceFileChange } from "@/features/workspace-changes/types";
 import { cn } from "@/lib/utils";
 
 import { WorkspaceChangePanel } from "./workspace-change-panel";

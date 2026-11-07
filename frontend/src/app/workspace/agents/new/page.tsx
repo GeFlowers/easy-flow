@@ -30,23 +30,23 @@ import { Input } from "@/components/ui/input";
 import { ArtifactsProvider } from "@/components/workspace/artifacts";
 import { MessageList } from "@/components/workspace/messages";
 import { ThreadContext } from "@/components/workspace/messages/context";
-import type { Agent } from "@/core/agents";
+import type { Agent } from "@/features/agents";
 import {
   AgentNameCheckError,
   AgentsApiDisabledError,
   checkAgentName,
   getAgent,
-} from "@/core/agents/api";
-import { useI18n } from "@/core/i18n/hooks";
+} from "@/features/agents/api";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   buildHumanInputResponseText,
   hasOpenHumanInputRequest,
   type HumanInputRequest,
   type HumanInputResponse,
-} from "@/core/messages/human-input";
-import { isHiddenFromUIMessage } from "@/core/messages/utils";
-import { useThreadStream } from "@/core/threads/hooks";
-import { uuid } from "@/core/utils/uuid";
+} from "@/features/messages/human-input";
+import { isHiddenFromUIMessage } from "@/features/messages/utils";
+import { useThreadStream } from "@/features/threads/hooks";
+import { uuid } from "@/features/utils/uuid";
 import { isIMEComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 

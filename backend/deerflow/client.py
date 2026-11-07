@@ -19,6 +19,7 @@ from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal
+from deerflow.utils.event_loop import run_async
 
 from langchain.agents import create_agent
 from langchain.agents.middleware import AgentMiddleware
@@ -67,8 +68,8 @@ def _run_async_from_sync(coro):
 
     if loop is not None and loop.is_running():
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            return executor.submit(asyncio.run, coro).result()
-    return asyncio.run(coro)
+            return executor.submit(run_async, coro).result()
+    return run_async(coro)
 
 
 StreamEventType = Literal["values", "messages-tuple", "custom", "end"]
@@ -1086,7 +1087,7 @@ class DeerFlowClient:
 
         def _convert_in_thread(path: Path):
             '''在转换工作线程中运行异步文档转标记文本协程。'''
-            return asyncio.run(convert_file_to_markdown(path))
+            return run_async(convert_file_to_markdown(path))
 
         try:
             for src_path, dest_name in resolved_files:
@@ -1108,7 +1109,7 @@ class DeerFlowClient:
                         if conversion_pool is not None:
                             md_path = conversion_pool.submit(_convert_in_thread, dest).result()
                         else:
-                            md_path = asyncio.run(convert_file_to_markdown(dest))
+                            md_path = run_async(convert_file_to_markdown(dest))
                     except Exception:
                         logger.warning(
                             "Failed to convert %s to markdown",

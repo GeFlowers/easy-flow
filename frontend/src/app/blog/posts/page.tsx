@@ -1,6 +1,6 @@
 import { PostList } from "@/components/landing/post-list";
-import { getAllPosts, getPreferredBlogLang } from "@/core/blog";
-import { getI18n } from "@/core/i18n/server";
+import { getAllPosts, getPreferredBlogLang } from "@/features/blog";
+import { getI18n } from "@/features/i18n/server";
 
 import { useMDXComponents as getMDXComponents } from "../../../mdx-components";
 

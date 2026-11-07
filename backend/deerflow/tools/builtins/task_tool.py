@@ -267,7 +267,7 @@ async def task_tool(
     config = get_subagent_config(subagent_type, app_config=runtime_app_config) if runtime_app_config is not None else get_subagent_config(subagent_type)
     if config is None:
         available = ", ".join(available_subagent_names)
-        error = f"Unknown subagent type '{subagent_type}'. Available: {available}"
+        error = f"未知子代理类型 '{subagent_type}'。可用类型：{available}"
         return _task_result_command(
             tool_call_id=tool_call_id,
             status="failed",
@@ -386,9 +386,9 @@ async def task_tool(
 
             if result is None:
                 logger.error(f"[trace={trace_id}] Task {task_id} not found in background tasks")
-                writer({"type": "task_failed", "task_id": task_id, "error": "Task disappeared from background tasks"})
+                writer({"type": "task_failed", "task_id": task_id, "error": "任务已从后台任务中消失"})
                 cleanup_background_task(task_id)
-                error = f"Task {task_id} disappeared from background tasks"
+                error = f"Task {task_id} 已从后台任务中消失"
                 return _task_result_command(
                     tool_call_id=tool_call_id,
                     status="failed",
@@ -526,7 +526,7 @@ async def task_tool(
                 )
                 request_cancel_background_task(task_id)
                 _schedule_deferred_subagent_cleanup(task_id, trace_id, max_poll_count)
-                message = f"Task polling timed out after {timeout_minutes} minutes. This may indicate the background task is stuck. Status: {result.status.value}"
+                message = f"任务轮询超时，已等待 {timeout_minutes} 分钟。这可能表示后台任务已卡住。状态： {result.status.value}"
                 return _task_result_command(
                     tool_call_id=tool_call_id,
                     status="polling_timed_out",

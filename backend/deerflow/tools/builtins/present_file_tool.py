@@ -38,16 +38,16 @@ def _normalize_presented_filepath(
 ) -> str:
     '''验证并规范化允许呈现给用户的文件路径。'''
     if runtime.state is None:
-        raise ValueError("Thread runtime state is not available")
+        raise ValueError("线程运行时状态不可用")
 
     thread_id = _get_thread_id(runtime)
     if not thread_id:
-        raise ValueError("Thread ID is not available in runtime context or runtime config")
+        raise ValueError("运行时上下文或配置中没有线程标识")
 
     thread_data = runtime.state.get("thread_data") or {}
     outputs_path = thread_data.get("outputs_path")
     if not outputs_path:
-        raise ValueError("Thread outputs path is not available in runtime state")
+        raise ValueError("运行时状态中没有线程输出路径")
 
     outputs_dir = Path(outputs_path).resolve()
     stripped = filepath.lstrip("/")
@@ -64,7 +64,7 @@ def _normalize_presented_filepath(
     try:
         relative_path = actual_path.relative_to(outputs_dir)
     except ValueError as exc:
-        raise ValueError(f"Only files in {OUTPUTS_VIRTUAL_PREFIX} can be presented: {filepath}") from exc
+        raise ValueError(f"只能展示 {OUTPUTS_VIRTUAL_PREFIX} 中的文件： {filepath}") from exc
 
     return f"{OUTPUTS_VIRTUAL_PREFIX}/{relative_path.as_posix()}"
 
@@ -96,6 +96,6 @@ def present_file_tool(
     return Command(
         update={
             "artifacts": normalized_paths,
-            "messages": [ToolMessage("Successfully presented files", tool_call_id=tool_call_id)],
+            "messages": [ToolMessage("已成功展示文件", tool_call_id=tool_call_id)],
         },
     )

@@ -13,9 +13,9 @@ Locale = Literal["en", "zh"]
 
 _READINESS_LABELS = {
     "en": {
-        "blocked": "Not ready",
-        "revise": "Needs revision",
-        "publish_candidate": "Publish candidate",
+        "blocked": "不可发布",
+        "revise": "需修订",
+        "publish_candidate": "可作为发布候选",
     },
     "zh": {
         "blocked": "不可发布",
@@ -26,10 +26,10 @@ _READINESS_LABELS = {
 
 _ASSURANCE_LABELS = {
     "en": {
-        "static_only": "Static review only",
-        "trigger_checked": "Trigger checked",
-        "behavior_verified": "Behavior verified",
-        "regression_verified": "Regression verified",
+        "static_only": "仅静态审查",
+        "trigger_checked": "触发已检查",
+        "behavior_verified": "行为已验证",
+        "regression_verified": "回归已验证",
     },
     "zh": {
         "static_only": "仅静态审查",
@@ -70,7 +70,7 @@ def build_static_report(
             "path": finding.get("path"),
             "line": finding.get("line"),
             "problem": finding.get("message"),
-            "impact": "Deterministic review finding affects package readiness or maintainability.",
+            "impact": "确定性审查发现项影响技能包的发布就绪度或可维护性。",
             "remediation": finding.get("remediation"),
             "suggested_replacement": None,
         }
@@ -80,11 +80,11 @@ def build_static_report(
     dimensions = _dimensions_from_facts(facts)
     limitations = []
     if facts.get("completeness", {}).get("truncated"):
-        limitations.append("Package content was truncated; omitted content was not assessed.")
+        limitations.append("技能包内容已截断；省略部分未进行评估。")
     for error in facts.get("reader_errors", []):
-        limitations.append(f"Reader error {error.get('code')}: {error.get('message')}")
+        limitations.append(f"读取器错误 {error.get('code')}: {error.get('message')}")
     for error in facts.get("analyzer_errors", []):
-        limitations.append(f"Analyzer error {error.get('code')}: {error.get('message')}")
+        limitations.append(f"分析器错误 {error.get('code')}: {error.get('message')}")
 
     return {
         "schema_version": REPORT_SCHEMA_VERSION,
@@ -120,50 +120,50 @@ def render_report_markdown(report: dict[str, Any], facts: dict[str, Any] | None 
     assurance_labels = _ASSURANCE_LABELS[locale]
     zh = locale == "zh"
     lines = [
-        "# Skill Review Report" if not zh else "# 技能审查报告",
+        "# 技能审查报告" if not zh else "# 技能审查报告",
         "",
-        "## Executive Summary" if not zh else "## 摘要",
-        f"- Subject: {report.get('subject', {}).get('display_ref')}",
-        f"- Digest: {report.get('subject', {}).get('package_digest')}",
-        f"- Readiness: {report.get('readiness')} ({labels.get(report.get('readiness'), report.get('readiness'))})",
-        f"- Assurance: {report.get('assurance')} ({assurance_labels.get(report.get('assurance'), report.get('assurance'))})",
+        "## 摘要" if not zh else "## 摘要",
+        f"- 对象： {report.get('subject', {}).get('display_ref')}",
+        f"- 摘要值： {report.get('subject', {}).get('package_digest')}",
+        f"- 发布就绪度： {report.get('readiness')} ({labels.get(report.get('readiness'), report.get('readiness'))})",
+        f"- 验证程度： {report.get('assurance')} ({assurance_labels.get(report.get('assurance'), report.get('assurance'))})",
         "",
-        "## Scope and Completeness" if not zh else "## 范围与完整性",
-        f"- Scope: {', '.join(report.get('review', {}).get('scope', []))}",
-        f"- Profile: {report.get('review', {}).get('profile')}",
+        "## 范围与完整性" if not zh else "## 范围与完整性",
+        f"- 范围： {', '.join(report.get('review', {}).get('scope', []))}",
+        f"- 配置： {report.get('review', {}).get('profile')}",
     ]
     if facts:
         completeness = facts.get("completeness", {})
         lines.extend(
             [
-                f"- Truncated: {completeness.get('truncated')}",
-                f"- Not assessed: {', '.join(completeness.get('not_assessed') or []) or '(none)'}",
+                f"- 是否截断： {completeness.get('truncated')}",
+                f"- 未评估： {', '.join(completeness.get('not_assessed') or []) or '(无)'}",
             ]
         )
-    lines.extend(["", "## Findings" if not zh else "## 问题"])
+    lines.extend(["", "## 问题" if not zh else "## 问题"])
     issues = report.get("issues", [])
     if not issues:
-        lines.append("- No deterministic or semantic issues were reported.")
+        lines.append("- 未报告确定性问题或语义问题。")
     else:
         for issue in issues:
             location = issue.get("path") or "<package>"
             if issue.get("line") is not None:
                 location = f"{location}:{issue['line']}"
-            lines.append(f"- {issue.get('severity')} {issue.get('id')} at {location}: {issue.get('problem')}")
-    lines.extend(["", "## Dimension Review" if not zh else "## 维度审查"])
+            lines.append(f"- {issue.get('severity')} {issue.get('id')}，位置 {location}：{issue.get('problem')}")
+    lines.extend(["", "## 维度审查" if not zh else "## 维度审查"])
     for dimension in report.get("dimensions", []):
         lines.append(f"- {dimension.get('id')}: {dimension.get('status')} - {dimension.get('summary')}")
-    lines.extend(["", "## Evidence" if not zh else "## 证据"])
+    lines.extend(["", "## 证据" if not zh else "## 证据"])
     evidence = report.get("evidence", {})
-    lines.append(f"- Facts complete: {evidence.get('facts_complete')}")
+    lines.append(f"- 事实是否完整： {evidence.get('facts_complete')}")
     limitations = evidence.get("limitations") or []
     if limitations:
         for limitation in limitations:
-            lines.append(f"- Limitation: {limitation}")
-    lines.extend(["", "## Recommended Actions" if not zh else "## 建议动作"])
+            lines.append(f"- 限制： {limitation}")
+    lines.extend(["", "## 建议动作" if not zh else "## 建议动作"])
     actions = report.get("recommended_actions") or []
     if not actions:
-        lines.append("- No required action within the assessed scope.")
+        lines.append("- 在已评估范围内无需采取动作。")
     else:
         for action in actions:
             lines.append(f"- {action}")
@@ -187,12 +187,12 @@ def _dimensions_from_facts(facts: dict[str, Any]) -> list[dict[str, Any]]:
         {
             "id": "structure",
             "status": status,
-            "summary": f"{summary.get('blockers', 0)} blocker(s), {summary.get('errors', 0)} error(s), {summary.get('warnings', 0)} warning(s)",
+            "summary": f"{summary.get('blockers', 0)} 个阻断项, {summary.get('errors', 0)} 个错误, {summary.get('warnings', 0)} 个警告",
         },
         {
             "id": "evidence_quality",
             "status": "concern" if facts.get("evals", {}).get("case_count", 0) == 0 else "pass",
-            "summary": f"{facts.get('evals', {}).get('case_count', 0)} eval case(s) detected",
+            "summary": f"{facts.get('evals', {}).get('case_count', 0)} 个评测用例",
         },
     ]
 

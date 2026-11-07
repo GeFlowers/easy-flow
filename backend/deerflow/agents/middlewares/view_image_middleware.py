@@ -153,9 +153,9 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
         '''读取工具已登记的图片并构造混合内容块，交给隐藏消息注入流程。'''
         viewed_images = state.get("viewed_images", {})
         if not viewed_images:
-            return [{"type": "text", "text": "No images have been viewed."}]
+            return [{"type": "text", "text": "尚未查看任何图像。"}]
 
-        content_blocks: list[str | dict] = [{"type": "text", "text": "Here are the images you've viewed:"}]
+        content_blocks: list[str | dict] = [{"type": "text", "text": "以下是你已查看的图像："}]
 
         for image_path, image_data in viewed_images.items():
             mime_type = image_data.get("mime_type", "unknown")
@@ -174,7 +174,7 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
                         }
                     )
                 else:
-                    content_blocks.append({"type": "text", "text": f"  (file unavailable or changed on disk: {actual_path})"})
+                    content_blocks.append({"type": "text", "text": f"  (文件不可用或磁盘上的内容已变化： {actual_path})"})
 
         return content_blocks
 
@@ -198,7 +198,7 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
         for msg in messages[assistant_idx + 1 :]:
             if isinstance(msg, HumanMessage):
                 content_str = str(msg.content)
-                if "Here are the images you've viewed" in content_str or "Here are the details of the images you've viewed" in content_str:
+                if "以下是你已查看的图像" in content_str or "以下是你已查看图像的详细信息" in content_str:
                     return False
 
         return True

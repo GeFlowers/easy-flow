@@ -17,12 +17,12 @@ DeerFlow's configuration system is designed around one goal: every meaningful be
 
 ## Config file location
 
-DeerFlow resolves `config.yaml` using the following priority order:
+DeerFlow resolves `config/config.yaml` using the following priority order:
 
 1. The path passed to `AppConfig.from_file(config_path)` explicitly.
 2. The `DEER_FLOW_CONFIG_PATH` environment variable.
 3. `backend/config.yaml` (relative to the backend directory).
-4. `config.yaml` in the repository root.
+4. `config/config.yaml` in the repository root.
 
 If none of these paths exist, the application raises an error at startup.
 
@@ -65,7 +65,7 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
 
 tools:
-  - use: deerflow.community.tavily.tools:web_search_tool
+  - use: deerflow.integrations.tavily.tools:web_search_tool
     api_key: $TAVILY_API_KEY
 ```
 
@@ -84,25 +84,9 @@ models:
     some_provider_specific_option: value # passed through to ChatOpenAI constructor
 ```
 
-## Configuration version
-
-`config.yaml` includes a `config_version` field that tracks the schema version:
-
-```yaml
-config_version: 6
-```
-
-When the schema changes (new fields, renamed sections), this number is bumped. If your local `config.yaml` is behind the current version, run:
-
-```bash
-make config-upgrade
-```
-
-This merges new fields from `config.example.yaml` into your existing `config.yaml` without overwriting your customizations.
-
 ## Module configuration reference
 
-The following table maps each top-level `config.yaml` section to its documentation page:
+The following table maps each top-level `config/config.yaml` section to its documentation page:
 
 | Section           | Description                                      | Documentation                                            |
 | ----------------- | ------------------------------------------------ | -------------------------------------------------------- |
@@ -128,11 +112,9 @@ The following table maps each top-level `config.yaml` section to its documentati
 
 ## Minimal config to get started
 
-The minimum valid `config.yaml` requires at least one model and a sandbox:
+The minimum valid `config/config.yaml` requires at least one model and a sandbox:
 
 ```yaml
-config_version: 6
-
 models:
   - name: gpt-4o
     use: langchain_openai:ChatOpenAI
@@ -146,15 +128,15 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
 
 tools:
-  - use: deerflow.community.ddg_search.tools:web_search_tool
-  - use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool
+  - use: deerflow.integrations.jina_ai.tools:web_fetch_tool
   - use: deerflow.sandbox.tools:ls_tool
   - use: deerflow.sandbox.tools:read_file_tool
   - use: deerflow.sandbox.tools:write_file_tool
   - use: deerflow.sandbox.tools:bash_tool
 ```
 
-Start from `config.example.yaml` in the repository root and uncomment the sections you need.
+Start from `config/config.example.yaml` in the repository root and uncomment the sections you need.
 
 <Cards num={2}>
   <Cards.Card

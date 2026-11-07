@@ -1,125 +1,125 @@
-# APA 7th Edition Citation Template
+# APA（American Psychological Association，美国心理学会）第 7 版引用模板
 
-Use this template when the user requests APA format, or when they do not specify a format. APA 7th is the default for social sciences and most CS journals outside of IEEE venues.
+用户要求该格式，或未指定引用格式时使用。采用作者—年份的文内引用形式。
 
-## Citation Format Rules
+## 引用规则
 
-### In-text citations
+### 文内引用
 
-- **Single author**: `(Vaswani, 2017)` or `Vaswani (2017) showed that...`
-- **Two authors**: `(Vaswani & Shazeer, 2017)` — use `&` inside parentheses, "and" in running text.
-- **Three or more authors**: `(Vaswani et al., 2017)` — use `et al.` from the first citation onward (APA 7th changed this from APA 6th).
-- **Multiple citations**: `(Vaswani et al., 2017; Devlin et al., 2018)` — alphabetical order, separated by semicolons.
+- 单作者：`(Smith, 2024)` 或 `Smith (2024)`。
+- 两位作者：括号内用 `(Smith & Jones, 2024)`，叙述式引用用 `Smith and Jones (2024)`。
+- 三位及以上作者：从首次引用开始使用 `(Vaswani et al., 2017)` 或 `Vaswani et al. (2017)`。
+- 同一括号内的多篇文献：按第一作者姓氏的字母顺序排列，以分号分隔，如 `(Devlin et al., 2018; Vaswani et al., 2017)`。
 
-### Reference list entry for arXiv preprints
+### arXiv 预印本的参考文献条目
 
-arXiv papers are preprints, not formally published articles. Cite them as preprints with the arXiv identifier:
+采用带 arXiv 标识的格式：
 
-```
+```text
 Author, A. A., Author, B. B., & Author, C. C. (Year). Title of the paper. arXiv. https://arxiv.org/abs/ARXIV_ID
 ```
 
-**Real example** (from paper metadata `{id: "1706.03762", title: "Attention Is All You Need", authors: ["Ashish Vaswani", "Noam Shazeer", "Niki Parmar", "Jakob Uszkoreit", "Llion Jones", "Aidan N. Gomez", "Łukasz Kaiser", "Illia Polosukhin"], published: "2017-06-12"}`):
+真实示例来自论文元数据（标识 1706.03762、题名 Attention Is All You Need、发布日期 2017-06-12）：
 
-```
+```text
 Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). Attention is all you need. arXiv. https://arxiv.org/abs/1706.03762
 ```
 
-Formatting rules:
+格式要求：
 
-- **Author names**: `LastName, FirstInitial.` (middle initial optional). Join with commas; last author gets an `&`.
-- **Year**: the `published` field's year, in parentheses.
-- **Title**: sentence case (only first word and proper nouns capitalized). Italicize titles in typeset output; in plain markdown, leave plain.
-- **Source**: the literal word `arXiv`, then the full abs URL.
-- **No DOI** unless the paper has also been published in a venue with a DOI. arXiv alone uses the URL.
+- 作者：`LastName, FirstInitial.`，中间名首字母可选。逗号分隔，最后一位前使用 `&`。
+- 年份：取 `published` 中的年份，放在括号内。
+- 标题：句首式大小写，仅首词和专有名词首字母大写。正式排版用斜体，纯 Markdown 中可用普通文本。
+- 来源：固定写 `arXiv`，后接完整摘要页链接。
+- 不添加数字对象标识符，除非论文已在有该标识的正式出版物发表；只有 arXiv 元数据时使用链接。
 
-### Special cases
+### 特殊情况
 
-- **Up to 20 authors**: list all of them separated by commas, with `&` before the last.
-- **21 or more authors**: list the first 19, then `...`, then the final author.
-- **No DOI and no URL**: not possible for arXiv papers; always use the `abs_url` from the paper metadata.
+- 不超过 20 位作者：全部列出，用逗号分隔，最后一位前加 `&`。
+- 至少 21 位作者：列出前 19 位、`...`，再列最后一位。
+- arXiv 论文不应缺少链接，始终使用元数据中的 `abs_url`。
 
-## Report Structure
+## 报告结构
 
-Follow this structure verbatim when writing the SLR report body. Fill in content from your Phase 3 extraction and Phase 4 synthesis.
+严格按以下结构写综述正文，填入阶段 3 的提取结果和阶段 4 的综合分析。
 
 ```markdown
-# Systematic Literature Review: <Topic>
+# 系统性文献综述：<主题>
 
-**Date**: <YYYY-MM-DD>
-**Papers surveyed**: <N>
-**Scope**: <arXiv search query, category, time window>
-**Citation format**: APA 7th edition
+**日期**：<YYYY-MM-DD>
+**论文数量**：<N>
+**范围**：<arXiv 查询、分类、时间窗口>
+**引用格式**：美国心理学会第 7 版
 
-## Executive Summary
+## 执行摘要
 
-<3-5 sentences summarizing the state of the literature on this topic. What do the surveyed papers collectively tell us? What is the shape of the field? Avoid listing papers — synthesize.>
+<3-5 句综合说明该主题文献的整体状态、共同发现和领域格局。不要逐篇罗列。>
 
-## Methodology
+## 研究方法
 
-This review surveyed <N> arXiv papers retrieved on <YYYY-MM-DD> using the query `<query>`<, filtered to category <cat>><, published between <start_date> and <end_date>>. Papers were sorted by <relevance | submission date> and the top <N> were included. Metadata extraction (research question, methodology, key findings, limitations) was performed by language-model agents, with cross-paper synthesis performed by the lead agent.
+本综述使用查询词 `<query>`，于 <YYYY-MM-DD> 检索了 <N> 篇 arXiv 论文<，限定分类 <cat>><，发表时间为 <start_date> 至 <end_date>>。按<相关性 | 提交日期>排序，纳入前 <N> 篇。由语言模型代理提取研究问题、方法、主要发现和局限，主代理完成跨论文综合分析。
 
-**Limitations of this review**: arXiv preprints are not peer-reviewed; some included papers may not reflect their final published form. Coverage is limited to arXiv — papers published directly in venues without arXiv preprints are not represented.
+**本综述的局限**：arXiv 预印本未经同行评审，部分论文可能与最终发表版本不同。覆盖范围限于 arXiv，未发布预印本的正式出版论文未被纳入。
 
-## Themes
+## 研究主题
 
-<3-6 thematic sections. Each theme is a recurring research direction, problem framing, or methodological approach across the surveyed papers.>
+<3-6 个主题章节。每个主题应体现多篇论文反复出现的研究方向、问题框架或方法。>
 
-### Theme 1: <Theme name>
+### 主题 1：<主题名称>
 
-<2-4 paragraphs describing this theme. Cite papers inline as you discuss them, e.g. "Vaswani et al. (2017) introduced X, while subsequent work (Devlin et al., 2018; Liu et al., 2019) extended it to Y." Do not just list papers — describe the intellectual thread that connects them.>
+<2-4 段说明主题，讨论时加入文内引用，例如“Vaswani et al. (2017) 提出 X，后续工作 (Devlin et al., 2018; Liu et al., 2019) 将其扩展到 Y”。描述论文之间的思想脉络，而非罗列论文。>
 
-### Theme 2: <Theme name>
+### 主题 2：<主题名称>
 
 <...>
 
-## Convergences and Disagreements
+## 共识与分歧
 
-**Convergences**: <findings that multiple papers agree on — e.g. "Most surveyed papers agree that X is necessary, citing evidence from Y and Z.">
+**共识**：<多篇论文一致支持的发现，例如“多数论文认为 X 必不可少，并提供 Y 和 Z 的证据”。>
 
-**Disagreements**: <where papers reach different conclusions — e.g. "Vaswani et al. (2017) argue that X, while Dai et al. (2019) find the opposite under condition Y.">
+**分歧**：<结论不一致之处，例如“Vaswani et al. (2017) 主张 X，而 Dai et al. (2019) 在条件 Y 下发现相反结果”。>
 
-## Gaps and Open Questions
+## 研究空白与待解问题
 
-<What the collective literature does not yet address. Pull from the "limitations" field of your Phase 3 extraction and identify patterns — if 5 papers all mention the same missing piece, that is a gap worth flagging.>
+<综合文献尚未解决的问题。从阶段 3 的 limitations 字段中识别重复模式；如五篇论文均提及同一缺失，应明确指出。>
 
-## Per-Paper Annotations
+## 逐篇注释
 
-<One subsection per paper, ordered by year then first author. Each subsection is a mini-summary of that paper's contribution.>
+<每篇一小节，先按年份，再按第一作者排序，简要说明贡献。>
 
 ### Vaswani et al. (2017)
 
-**Research question**: <1 sentence from Phase 3 metadata>
-**Methodology**: <1-2 sentences>
-**Key findings**:
-- <bullet>
-- <bullet>
-- <bullet>
-**Limitations**: <1-2 sentences>
+**研究问题**：<阶段 3 元数据中的 1 句描述>
+**研究方法**：<1-2 句>
+**主要发现**：
+- <要点>
+- <要点>
+- <要点>
+**局限**：<1-2 句>
 
-### <Next paper>
+### <下一篇论文>
 
 <...>
 
-## References
+## 参考文献
 
-<Alphabetical list by first author's last name, APA 7th format as described above.>
+<按第一作者姓氏字母顺序排列，采用上方规定格式。>
 
 Devlin, J., Chang, M.-W., Lee, K., & Toutanova, K. (2018). BERT: Pre-training of deep bidirectional transformers for language understanding. arXiv. https://arxiv.org/abs/1810.04805
 
 Vaswani, A., Shazeer, N., Parmar, N., Uszkoreit, J., Jones, L., Gomez, A. N., Kaiser, Ł., & Polosukhin, I. (2017). Attention is all you need. arXiv. https://arxiv.org/abs/1706.03762
 
-<... more entries, one per paper ...>
+<其余条目，每篇一条>
 ```
 
-## Quality checks before finalizing
+## 完成前的质量检查
 
-Before saving the report, verify:
+保存报告前确认：
 
-- [ ] Every paper in the surveyed set appears **both** in "Per-Paper Annotations" **and** in "References".
-- [ ] Every in-text citation matches a reference entry (no dangling citations).
-- [ ] Authors are formatted `LastName, FirstInitial.` — not `FirstName LastName`.
-- [ ] Years are in parentheses inline, and at the start of reference entries.
-- [ ] Titles are in sentence case in references (only first word + proper nouns capitalized).
-- [ ] arXiv URLs use the `abs_url` form (`https://arxiv.org/abs/...`), not `pdf_url`.
-- [ ] References are alphabetized by first author's last name.
+- [ ] 纳入的每篇论文同时出现在“逐篇注释”和“参考文献”中。
+- [ ] 每处文内引用均对应参考文献条目。
+- [ ] 作者采用 `LastName, FirstInitial.`，不采用 `FirstName LastName`。
+- [ ] 文内年份放在括号中，参考文献年份位于条目前部。
+- [ ] 参考文献标题采用句首式大小写，仅首词和专有名词大写。
+- [ ] arXiv 链接使用 `abs_url`（`https://arxiv.org/abs/...`），不使用 `pdf_url`。
+- [ ] 参考文献按第一作者姓氏字母顺序排列。

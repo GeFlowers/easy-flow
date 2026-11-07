@@ -10,6 +10,7 @@ from collections.abc import Callable
 from typing import Any, get_type_hints
 
 from langchain_core.runnables import RunnableConfig
+from deerflow.utils.event_loop import run_async
 
 logger = logging.getLogger(__name__)
 
@@ -53,9 +54,9 @@ def make_sync_tool_wrapper(coro: Callable[..., Any], tool_name: str) -> Callable
         try:
             if loop is not None and loop.is_running():
                 context = contextvars.copy_context()
-                future = _SYNC_TOOL_EXECUTOR.submit(context.run, lambda: asyncio.run(coro(*args, **kwargs)))
+                future = _SYNC_TOOL_EXECUTOR.submit(context.run, lambda: run_async(coro(*args, **kwargs)))
                 return future.result()
-            return asyncio.run(coro(*args, **kwargs))
+            return run_async(coro(*args, **kwargs))
         except Exception as e:
             logger.error("Error invoking tool %r via sync wrapper: %s", tool_name, e, exc_info=True)
             raise

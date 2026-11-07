@@ -1,39 +1,40 @@
 ---
 name: web-design-guidelines
-description: Review UI code for Web Interface Guidelines compliance. Use when asked to "review my UI", "check accessibility", "audit design", "review UX", or "check my site against best practices".
+description: 审查用户界面代码是否符合网页界面指南。用户要求“审查界面”、“检查无障碍”、“审核设计”、“审查用户体验”或“检查网站是否符合最佳实践”时使用。
 metadata:
   author: vercel
   version: "1.0.0"
   argument-hint: <file-or-pattern>
 ---
 
-# Web Interface Guidelines
+# 网页界面指南
 
-Review files for compliance with Web Interface Guidelines.
+检查文件是否符合网页界面指南。
 
-## How It Works
+## 工作方式
 
-1. Fetch the latest guidelines from the source URL below
-2. Read the specified files (or prompt user for files/pattern)
-3. Check against all rules in the fetched guidelines
-4. Output findings in the terse `file:line` format
+1. 从下方来源地址获取最新版指南。
+2. 阅读指定文件，或请用户提供文件／匹配模式。
+3. 对照获取的指南检查全部规则。
+4. 以简短的 `file:line` 格式输出发现。
 
-## Guidelines Source
+## 指南来源
 
-Fetch fresh guidelines before each review:
+每次审查前获取最新指南：
 
 ```
 https://raw.githubusercontent.com/vercel-labs/web-interface-guidelines/main/command.md
 ```
 
-Use WebFetch to retrieve the latest rules. The fetched content contains all the rules and output format instructions.
+使用 WebFetch 获取最新规则。返回内容包含所有规则和输出格式说明。
 
-## Usage
+## 用法
 
-When a user provides a file or pattern argument:
-1. Fetch guidelines from the source URL above
-2. Read the specified files
-3. Apply all rules from the fetched guidelines
-4. Output findings using the format specified in the guidelines
+用户提供文件或匹配模式参数时：
 
-If no files specified, ask the user which files to review.
+1. 从上述来源地址获取指南。
+2. 阅读指定文件。
+3. 应用获取的指南中的全部规则。
+4. 按指南指定的格式输出发现。
+
+如果没有指定文件，询问用户要审查哪些文件。

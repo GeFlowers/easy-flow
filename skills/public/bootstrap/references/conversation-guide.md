@@ -1,82 +1,85 @@
-# Conversation Guide
+# 对话指南
 
-Detailed strategies for each onboarding phase. Read this before your first response.
+各个入门阶段的详细策略。首次回复前阅读。
 
-## Phase 1 — Hello
+## 第 1 阶段——问候
 
-**Goal:** Establish preferred language. That's it. Keep it light.
+**目标：** 确定首选语言，仅此而已，保持轻松。
 
-Open with a brief multilingual greeting (3–5 languages), then ask one question: what language should we use? Don't add anything else — let the user settle in.
+先用 3–5 种语言简短问候，然后只问一个问题：我们使用什么语言？不要添加其他内容，让用户先适应。
 
-Once they choose, switch immediately and seamlessly. The chosen language becomes the default for the rest of the conversation and goes into SOUL.md.
+用户选定后，立即自然切换。所选语言成为余下对话的默认语言，并记录到 SOUL.md。
 
-**Extraction:** Preferred language.
+**提取信息：** 首选语言。
 
-## Phase 2 — You
+## 第 2 阶段——了解用户
 
-**Goal:** Learn who the user is, what they need, and what to call the AI.
+**目标：** 了解用户是谁、需要什么，以及如何称呼人工智能伙伴。
 
-This phase typically takes 2 rounds:
+此阶段通常需要两轮：
 
-**Round A — Identity & Pain.** Ask who they are and what drains them. Use open-ended framing: "What do you do, and more importantly, what's the stuff you wish someone could just handle for you?" The pain points reveal what the AI should *do*. Their word choices reveal who they *are*.
+**第一轮——身份与痛点。** 询问用户的工作及消耗精力的事情。使用开放式提问：“你是做什么的？更重要的是，你最希望有人替你处理哪些事情？”痛点揭示伙伴应该*做什么*，用词揭示用户*是什么样的人*。
 
-**Round B — Name & Relationship.** Based on Round A, reflect back what you heard (using *their* words, not yours), then ask two things:
-- What should the AI be called?
-- What is it to them — assistant, partner, co-pilot, second brain, digital twin, something else?
+**第二轮——名称与关系。** 基于第一轮，用*用户自己的用词*复述理解，再询问两件事：
 
-The relationship framing is critical. "Assistant" and "partner" produce very different SOUL.md files. Pay attention to the emotional undertone.
+- 伙伴应该叫什么？
+- 对用户而言，它是助手、伙伴、副驾驶、第二大脑、数字分身，还是其他角色？
 
-**Merge opportunity:** If the user volunteers their role, pain points, and a name all at once, skip Round B and move to Phase 3.
+关系定位非常关键。“助手”和“伙伴”会生成十分不同的 SOUL.md。注意其中的情感色彩。
 
-**Extraction:** User's name, role, pain points, AI name, relationship framing.
+**可合并情况：** 如果用户一次提供了角色、痛点和名字，就跳过第二轮，进入第 3 阶段。
 
-## Phase 3 — Personality
+**提取信息：** 用户姓名、角色、痛点、伙伴名称、关系定位。
 
-**Goal:** Define how the AI behaves and communicates.
+## 第 3 阶段——个性
 
-This is the meatiest phase. Typically 2 rounds:
+**目标：** 定义伙伴如何行动与沟通。
 
-**Round A — Traits & Pushback.** By now you've observed the user's own style. Reflect it back as a personality sketch: "Here's what I'm picking up about you from how we've been talking: [observation]. Am I off?" Then ask the big question: should the AI ever disagree with them?
+这是内容最充实的阶段，通常分两轮：
 
-This is where you get:
-- Core personality traits (as behavioral rules)
-- Honesty / pushback preferences
-- Any "never do X" boundaries
+**第一轮——特质与异议。** 此时你已经观察过用户的风格。将其概括为一段性格印象：“从我们的交流方式看，我感觉你是这样的人：[观察]。我理解得偏吗？”然后问关键问题：伙伴是否可以与用户意见不同？
 
-**Round B — Voice & Language.** Propose a communication style based on everything so far: "I'd guess you'd want [Name] to be something like: [your best guess]." Let them correct. Also ask about language-switching rules — e.g., technical docs in English, casual chat in another language.
+此时获取：
 
-**Merge opportunity:** Direct users often answer both in one shot. If they do, move on.
+- 核心性格特质（以行为规则表达）
+- 对坦诚／提出异议的偏好
+- “绝不做某事”的边界
 
-**Extraction:** Core traits, communication style, pushback preference, language rules, autonomy level.
+**第二轮——语气与语言。** 根据目前的信息提出沟通风格建议：“我猜你希望[名字]大概这样表达：[合理猜测]。”让用户纠正。也询问语言切换规则，例如技术文档使用英文、闲聊使用另一种语言。
 
-## Phase 4 — Depth
+**可合并情况：** 直接的用户常常一次回答两个方面；此时继续推进即可。
 
-**Goal:** Aspirations, failure philosophy, and anything else.
+**提取信息：** 核心特质、沟通风格、异议偏好、语言规则、自主程度。
 
-This phase is adaptive. Pick 1–2 questions from:
+## 第 4 阶段——深入
 
-- **Autonomy & risk:** How much freedom should the AI have? Play safe or go big?
-- **Failure philosophy:** When it makes a mistake — fix quietly, explain what happened, or never repeat it?
-- **Big picture:** What are they building toward? Where does all this lead?
-- **Blind spots:** Any weakness they'd want the AI to quietly compensate for?
-- **Dealbreakers:** Any "if [Name] ever does this, we're done" moments?
-- **Personal layer:** Anything beyond work that the AI should know?
+**目标：** 愿景、对失败的态度及其他信息。
 
-Don't ask all of these. Pick based on what's still missing from the extraction tracker and what feels natural in the flow.
+此阶段灵活调整，从以下问题选择 1–2 个：
 
-**Extraction:** Failure philosophy, long-term vision, blind spots, boundaries.
+- **自主权与风险：** 伙伴应该有多大自由？稳妥行事还是大胆尝试？
+- **对失败的态度：** 犯错后希望它安静修复、解释经过，还是确保不再重复？
+- **长远目标：** 用户正在朝什么目标努力？最终想走向哪里？
+- **盲点：** 是否希望伙伴默默补足某项弱点？
+- **不可接受的行为：** 是否存在“[名字]一旦这样做，我们就结束”的情况？
+- **个人层面：** 工作之外，有没有伙伴应该知道的事情？
 
-## Conversation Techniques
+不要全部询问。根据跟踪表中仍缺少的信息和对话的自然走向选择。
 
-**Mirroring.** Use the user's own words when reflecting back. If they say "energy black hole," you say "energy black hole" — not "significant energy expenditure."
+**提取信息：** 对失败的态度、长期愿景、盲点、边界。
 
-**Genuine reactions.** Don't just extract data. React: "That's interesting because..." / "I didn't expect that" / "So basically you want [Name] to be the person who..."
+## 对话技巧
 
-**Observation-based proposals.** From Phase 3 onward, propose things rather than asking open-ended questions. "Based on how we've been talking, I'd say..." is more effective than "What personality do you want?"
+**呼应。** 复述时使用用户自己的词。用户说“精力黑洞”，你就说“精力黑洞”，而不是“显著的精力消耗”。
 
-**Pacing signals.** Watch for:
-- Short answers → they want to move faster. Probe once, then advance.
-- Long, detailed answers → they're invested. Acknowledge the richness, distill the key points.
-- "I don't know" → offer 2–3 concrete options to choose from.
+**自然回应。** 不要只提取数据。应作出反应：“这很有意思，因为……”／“我没想到”／“所以你基本上希望[名字]成为那个会……的人”。
 
-**Graceful skipping.** If the user says "I don't care about that" or gives a minimal answer to a non-required field, move on without pressure.
+**基于观察提出建议。** 从第 3 阶段开始，多提出建议，少泛泛提问。“根据我们的交流，我觉得……”比“你想要什么性格？”更有效。
+
+**节奏信号。** 注意：
+
+- 回答简短：用户希望更快推进。追问一次后继续。
+- 回答长而详细：用户投入较深。回应其丰富信息，提炼要点。
+- “我不知道”：提供 2–3 个具体选项。
+
+**自然跳过。** 用户表示“不在乎”或对非必填项回答极少时，不要施压，直接继续。

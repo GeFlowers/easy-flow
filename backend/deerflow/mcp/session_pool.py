@@ -190,7 +190,7 @@ class MCPSessionPool:
                 self._entries[key] = (session, current_loop, task, close_evt)
         if not still_ours:
             await self._shutdown(close_evt, task)
-            raise asyncio.CancelledError("MCP session pool was closed while the session was being created")
+            raise asyncio.CancelledError("创建会话时，模型上下文协议会话池已关闭")
         logger.info("Created persistent MCP session for %s/%s", server_name, scope_key)
         return session
 

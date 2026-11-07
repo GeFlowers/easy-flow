@@ -2,8 +2,8 @@
 
 import { RefreshCwIcon, TargetIcon } from "lucide-react";
 
-import { useI18n } from "@/core/i18n/hooks";
-import type { GoalState } from "@/core/threads";
+import { useI18n } from "@/features/i18n/hooks";
+import type { GoalState } from "@/features/threads";
 import { cn } from "@/lib/utils";
 
 import { getGoalContinuationDisplay } from "./goal-status-helpers";

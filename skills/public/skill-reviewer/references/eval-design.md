@@ -1,39 +1,39 @@
-# Eval Design For Skills
+# 技能评估设计
 
-Use evals to prove routing and behavior claims. Static review can recommend evals, but it must not claim runtime verification without retained runs.
+用评估证明路由和行为方面的主张。静态审查可以建议评估，但没有留存运行记录时，不得声称已完成运行时验证。
 
-## Trigger Evals
+## 触发评估
 
-A trigger eval set should include:
+触发评估集应包含：
 
-- positive cases that should invoke the skill;
-- negative cases that should route elsewhere;
-- sibling collision cases when another skill has a similar boundary;
-- short rationales for each case.
+- 应调用技能的正例。
+- 应路由到其他地方的反例。
+- 其他技能边界相似时的相邻冲突用例。
+- 每个用例的简短理由。
 
-The existing trigger-eval list shape is supported:
+支持现有触发评估列表结构：
 
 ```json
 [
   {
-    "query": "Review this skill for publication readiness",
+    "query": "审查这个技能是否达到发布要求",
     "should_trigger": true,
-    "rationale": "Explicit skill review request"
+    "rationale": "明确请求技能审查"
   }
 ]
 ```
 
-## Behavior Evals
+## 行为评估
 
-Behavior evals should retain:
+应留存：
 
-- reviewed package digest;
-- model and runtime identity;
-- prompt and expected behavior;
-- tool trace;
-- output artifact;
-- assertion or grading result.
+- 被审查包摘要。
+- 模型与运行时身份。
+- 提示词与预期行为。
+- 工具调用轨迹。
+- 输出产物。
+- 断言或评分结果。
 
-## Baseline Comparisons
+## 基线比较
 
-To claim improvement, retain both the baseline and candidate package digests. The report can only use `regression_verified` when comparison artifacts and grading evidence are present.
+声称改进时，必须同时保留基线和候选包摘要。只有存在比较产物与评分证据，报告才可使用 `regression_verified`。

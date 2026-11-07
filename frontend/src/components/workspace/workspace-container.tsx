@@ -13,7 +13,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 import { GithubIcon } from "./github-icon";

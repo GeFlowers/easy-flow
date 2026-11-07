@@ -198,7 +198,7 @@ def render_skill_context(entries: list[SkillEntry]) -> str:
     if not entries:
         return ""
 
-    lines = ["## Active skills (loaded earlier - re-read the file before applying its instructions)"]
+    lines = ["## 当前技能（此前已加载；应用其指令前请重新读取文件）"]
     for entry in entries:
         name = _escape_context_text(entry["name"])
         path = _escape_context_text(entry["path"])

@@ -4,9 +4,9 @@ import { BellIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
-import { useI18n } from "@/core/i18n/hooks";
-import { useNotification } from "@/core/notification/hooks";
-import { useLocalSettings } from "@/core/settings";
+import { useI18n } from "@/features/i18n/hooks";
+import { useNotification } from "@/features/notification/hooks";
+import { useLocalSettings } from "@/features/settings";
 
 import { SettingsSection } from "./settings-section";
 

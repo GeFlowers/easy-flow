@@ -12,8 +12,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
-import { enUS, isLocale, zhCN, type Locale } from "@/core/i18n";
-import { useI18n } from "@/core/i18n/hooks";
+import { enUS, isLocale, zhCN, type Locale } from "@/features/i18n";
+import { useI18n } from "@/features/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 import { SettingsSection } from "./settings-section";

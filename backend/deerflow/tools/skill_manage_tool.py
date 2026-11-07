@@ -69,9 +69,9 @@ async def _scan_or_raise(content: str, *, executable: bool, location: str, stati
     '''扫描技能内容；安全扫描阻止时抛出异常。'''
     result = await scan_skill_content(content, executable=executable, location=location, static_findings=static_findings or [])
     if result.decision == "block":
-        raise ValueError(f"Security scan blocked the write: {result.reason}")
+        raise ValueError(f"安全扫描已阻止写入： {result.reason}")
     if executable and result.decision != "allow":
-        raise ValueError(f"Security scan rejected executable content: {result.reason}")
+        raise ValueError(f"安全扫描已拒绝可执行内容： {result.reason}")
     return {"decision": result.decision, "reason": result.reason}
 
 
@@ -81,12 +81,12 @@ def _raise_static_block(error: StaticScanBlockedError) -> NoReturn:
         "skill_name": error.skill_name,
         "findings": error.findings,
     }
-    raise ValueError(f"{error} Findings: {json.dumps(payload, ensure_ascii=False)}") from error
+    raise ValueError(f"{error} 发现项： {json.dumps(payload, ensure_ascii=False)}") from error
 
 
 def _raise_static_scan_failure(name: str, error: StaticScannerError) -> NoReturn:
     '''将静态扫描执行失败转换为调用方可见的异常。'''
-    raise ValueError(f"Static security scan failed for skill '{name}': {error}") from error
+    raise ValueError(f"技能 '{name}' 的静态安全扫描失败： {error}") from error
 
 
 async def _scan_static_candidate_or_raise(name: str, updates: dict[str, str], skill_storage: SkillStorage | None = None) -> list[StaticFinding]:
@@ -139,9 +139,9 @@ async def _skill_manage_impl(
     async with lock:
         if action == "create":
             if await _to_thread(skill_storage.custom_skill_exists, name):
-                raise ValueError(f"Custom skill '{name}' already exists.")
+                raise ValueError(f"自定义技能 '{name}' 已存在。")
             if content is None:
-                raise ValueError("content is required for create.")
+                raise ValueError("create 操作必须提供 content。")
             await _to_thread(skill_storage.validate_skill_markdown_content, name, content)
             static_findings = await _scan_static_candidate_or_raise(name, {SKILL_MD_FILE: content})
             scan = await _scan_or_raise(content, executable=False, location=f"{name}/{SKILL_MD_FILE}", static_findings=static_findings)
@@ -153,11 +153,11 @@ async def _skill_manage_impl(
                 _history_record(action="create", file_path=SKILL_MD_FILE, prev_content=None, new_content=content, thread_id=thread_id, scanner=scan),
             )
             await refresh_user_skills_system_prompt_cache_async(user_id)
-            return f"Created custom skill '{name}'."
+            return f"已创建自定义技能 '{name}'。"
         if action == "edit":
             await _to_thread(skill_storage.ensure_custom_skill_is_editable, name)
             if content is None:
-                raise ValueError("content is required for edit.")
+                raise ValueError("edit 操作必须提供 content。")
             await _to_thread(skill_storage.validate_skill_markdown_content, name, content)
             static_findings = await _scan_static_candidate_or_raise(name, {SKILL_MD_FILE: content})
             scan = await _scan_or_raise(content, executable=False, location=f"{name}/{SKILL_MD_FILE}", static_findings=static_findings)
@@ -171,19 +171,19 @@ async def _skill_manage_impl(
                 _history_record(action="edit", file_path=SKILL_MD_FILE, prev_content=prev_content, new_content=content, thread_id=thread_id, scanner=scan),
             )
             await refresh_user_skills_system_prompt_cache_async(user_id)
-            return f"Updated custom skill '{name}'."
+            return f"已更新自定义技能 '{name}'。"
 
         if action == "patch":
             await _to_thread(skill_storage.ensure_custom_skill_is_editable, name)
             if find is None or replace is None:
-                raise ValueError("find and replace are required for patch.")
+                raise ValueError("patch 操作必须提供 find 和 replace。")
             skill_file = skill_storage.get_custom_skill_file(name)
             prev_content = await _to_thread(skill_file.read_text, encoding="utf-8")
             occurrences = prev_content.count(find)
             if occurrences == 0:
-                raise ValueError("Patch target not found in SKILL.md.")
+                raise ValueError("在 SKILL.md 中找不到补丁目标。")
             if expected_count is not None and occurrences != expected_count:
-                raise ValueError(f"Expected {expected_count} replacements but found {occurrences}.")
+                raise ValueError(f"预期替换 {expected_count} 处，但找到 {occurrences} 处。")
             replacement_count = expected_count if expected_count is not None else 1
             new_content = prev_content.replace(find, replace, replacement_count)
             await _to_thread(skill_storage.validate_skill_markdown_content, name, new_content)
@@ -197,7 +197,7 @@ async def _skill_manage_impl(
                 _history_record(action="patch", file_path=SKILL_MD_FILE, prev_content=prev_content, new_content=new_content, thread_id=thread_id, scanner=scan),
             )
             await refresh_user_skills_system_prompt_cache_async(user_id)
-            return f"Patched custom skill '{name}' ({replacement_count} replacement(s) applied, {occurrences} match(es) found)."
+            return f"已对自定义技能 '{name}' 应用补丁（已替换 {replacement_count} 处，找到 {occurrences} 处匹配）。"
 
         if action == "delete":
             await _to_thread(
@@ -209,16 +209,16 @@ async def _skill_manage_impl(
                     prev_content=None,
                     new_content=None,
                     thread_id=thread_id,
-                    scanner={"decision": "allow", "reason": "Deletion requested."},
+                    scanner={"decision": "allow", "reason": "已请求删除。"},
                 ),
             )
             await refresh_user_skills_system_prompt_cache_async(user_id)
-            return f"Deleted custom skill '{name}'."
+            return f"已删除自定义技能 '{name}'。"
 
         if action == "write_file":
             await _to_thread(skill_storage.ensure_custom_skill_is_editable, name)
             if path is None or content is None:
-                raise ValueError("path and content are required for write_file.")
+                raise ValueError("write_file 操作必须提供 path 和 content。")
             target = await _to_thread(skill_storage.ensure_safe_support_path, name, path)
             exists = await _to_thread(target.exists)
             prev_content = await _to_thread(target.read_text, encoding="utf-8") if exists else None
@@ -233,28 +233,28 @@ async def _skill_manage_impl(
                 _history_record(action="write_file", file_path=path, prev_content=prev_content, new_content=content, thread_id=thread_id, scanner=scan),
             )
             await refresh_user_skills_system_prompt_cache_async(user_id)
-            return f"Wrote '{path}' for custom skill '{name}'."
+            return f"已为自定义技能 '{name}' 写入 '{path}'。"
 
         if action == "remove_file":
             await _to_thread(skill_storage.ensure_custom_skill_is_editable, name)
             if path is None:
-                raise ValueError("path is required for remove_file.")
+                raise ValueError("remove_file 操作必须提供 path。")
             target = await _to_thread(skill_storage.ensure_safe_support_path, name, path)
             if not await _to_thread(target.exists):
-                raise FileNotFoundError(f"Supporting file '{path}' not found for skill '{name}'.")
+                raise FileNotFoundError(f"找不到技能 '{name}' 的辅助文件 '{path}'。")
             prev_content = await _to_thread(target.read_text, encoding="utf-8")
             await _to_thread(target.unlink)
             await _to_thread(
                 skill_storage.append_history,
                 name,
-                _history_record(action="remove_file", file_path=path, prev_content=prev_content, new_content=None, thread_id=thread_id, scanner={"decision": "allow", "reason": "Deletion requested."}),
+                _history_record(action="remove_file", file_path=path, prev_content=prev_content, new_content=None, thread_id=thread_id, scanner={"decision": "allow", "reason": "已请求删除。"}),
             )
             await refresh_user_skills_system_prompt_cache_async(user_id)
-            return f"Removed '{path}' from custom skill '{name}'."
+            return f"已从自定义技能 '{name}' 中移除 '{path}'。"
 
         if await _to_thread(skill_storage.public_skill_exists, name):
-            raise ValueError(f"'{name}' is a read-only skill (built-in or legacy shared). To customise it, create your own version with the same name.")
-        raise ValueError(f"Unsupported action '{action}'.")
+            raise ValueError(f"'{name}' 为只读技能（内置或旧版共享）。如需自定义，请创建同名的个人版本。")
+        raise ValueError(f"不支持的操作 '{action}'。")
 
 
 @tool("skill_manage", parse_docstring=True)

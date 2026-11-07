@@ -61,7 +61,9 @@ def _sync_store_cm(config) -> Iterator[BaseStore]:
             raise ValueError(POSTGRES_CONN_REQUIRED)
 
         with PostgresStore.from_conn_string(config.connection_string) as store:
-            store.setup()
+            from deerflow.persistence.langgraph_schema import ensure_langgraph_schema
+
+            ensure_langgraph_schema(config.connection_string, 'store')
             logger.info("Store: using PostgresStore")
             yield store
         return

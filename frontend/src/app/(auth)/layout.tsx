@@ -2,9 +2,9 @@ import { redirect } from "next/navigation";
 import { type ReactNode } from "react";
 
 import { GatewayOfflineFallback } from "@/components/workspace/gateway-offline-fallback";
-import { AuthProvider } from "@/core/auth/AuthProvider";
-import { getServerSideUser } from "@/core/auth/server";
-import { assertNever } from "@/core/auth/types";
+import { AuthProvider } from "@/features/auth/AuthProvider";
+import { getServerSideUser } from "@/features/auth/server";
+import { assertNever } from "@/features/auth/types";
 
 /** 强制按请求解析认证状态，避免静态缓存用户会话。 */
 export const dynamic = "force-dynamic";

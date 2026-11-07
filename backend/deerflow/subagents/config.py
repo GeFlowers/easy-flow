@@ -25,7 +25,7 @@ class SubagentConfig:
 def _default_model_name(app_config: "AppConfig") -> str:
     '''在没有模型配置时明确报错，避免子代理以不确定模型启动。'''
     if not app_config.models:
-        raise ValueError("No chat models are configured. Please configure at least one model in config.yaml.")
+        raise ValueError("尚未配置聊天模型。请在 config.yaml 中至少配置一个模型。")
     return app_config.models[0].name
 
 

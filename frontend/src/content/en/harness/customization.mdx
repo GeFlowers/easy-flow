@@ -44,7 +44,7 @@ Custom middlewares are injected into the chain immediately before `Clarification
 
 ## Custom tools
 
-Add new tools to the agent by registering them in `config.yaml` under `tools:`:
+Add new tools to the agent by registering them in `config/config.yaml` under `tools:`:
 
 ```yaml
 tools:
@@ -88,7 +88,7 @@ class MyCustomSandboxProvider(SandboxProvider):
         ...
 ```
 
-Then reference it in `config.yaml`:
+Then reference it in `config/config.yaml`:
 
 ```yaml
 sandbox:
@@ -114,7 +114,7 @@ class RedisMemoryStorage(MemoryStorage):
         ...
 ```
 
-Configure it in `config.yaml`:
+Configure it in `config/config.yaml`:
 
 ```yaml
 memory:

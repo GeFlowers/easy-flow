@@ -3,7 +3,7 @@
 import { useParams, usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { uuid } from "@/core/utils/uuid";
+import { uuid } from "@/features/utils/uuid";
 
 /** 线程删除后广播本地聊天状态重置的浏览器事件名称。 */
 export const THREAD_CHAT_RESET_EVENT = "deer-flow:thread-chat-reset";

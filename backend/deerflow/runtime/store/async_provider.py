@@ -32,7 +32,9 @@ async def _async_store(config) -> AsyncIterator[BaseStore]:
             raise ValueError(POSTGRES_CONN_REQUIRED)
 
         async with AsyncPostgresStore.from_conn_string(config.connection_string) as store:
-            await store.setup()
+            from deerflow.persistence.langgraph_schema import ensure_langgraph_schema_async
+
+            await ensure_langgraph_schema_async(config.connection_string, 'store')
             logger.info("Store: using AsyncPostgresStore")
             yield store
         return

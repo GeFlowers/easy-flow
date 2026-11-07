@@ -14,18 +14,18 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   formatTokenCount,
   selectHeaderTokenUsage,
   type TokenUsage,
-} from "@/core/messages/usage";
+} from "@/features/messages/usage";
 import {
   getTokenUsageViewPreset,
   tokenUsagePreferencesFromPreset,
   type TokenUsagePreferences,
   type TokenUsageViewPreset,
-} from "@/core/messages/usage-model";
+} from "@/features/messages/usage-model";
 import { cn } from "@/lib/utils";
 
 interface TokenUsageIndicatorProps {

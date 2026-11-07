@@ -5,10 +5,10 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { fetch, getCsrfHeaders } from "@/core/api/fetcher";
-import { useAuth } from "@/core/auth/AuthProvider";
-import { parseAuthError } from "@/core/auth/types";
-import { useI18n } from "@/core/i18n/hooks";
+import { fetch, getCsrfHeaders } from "@/features/api/fetcher";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { parseAuthError } from "@/features/auth/types";
+import { useI18n } from "@/features/i18n/hooks";
 
 import { SettingsSection } from "./settings-section";
 

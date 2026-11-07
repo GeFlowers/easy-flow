@@ -29,29 +29,29 @@ import {
 } from "@/components/ui/select";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { CodeEditor } from "@/components/workspace/code-editor";
-import { useArtifactContent } from "@/core/artifacts/hooks";
+import { useArtifactContent } from "@/features/artifacts/hooks";
 import {
   appendHtmlPreviewBaseHref,
   appendHtmlPreviewScrollRestoration,
   createHtmlPreviewScrollKey,
   getArtifactViewState,
   HTML_PREVIEW_SCROLL_MESSAGE_SOURCE,
-} from "@/core/artifacts/preview";
-import { urlOfArtifact } from "@/core/artifacts/utils";
-import { useAuth } from "@/core/auth/AuthProvider";
-import { extractCitationSources } from "@/core/citations/sources";
-import { writeTextToClipboard } from "@/core/clipboard";
-import { useI18n } from "@/core/i18n/hooks";
-import { findToolCallResult } from "@/core/messages/utils";
-import { installSkill, SkillRequestError } from "@/core/skills/api";
-import { SafeStreamdown } from "@/core/streamdown/components";
+} from "@/features/artifacts/preview";
+import { urlOfArtifact } from "@/features/artifacts/utils";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { extractCitationSources } from "@/features/citations/sources";
+import { writeTextToClipboard } from "@/features/clipboard";
+import { useI18n } from "@/features/i18n/hooks";
+import { findToolCallResult } from "@/features/messages/utils";
+import { installSkill, SkillRequestError } from "@/features/skills/api";
+import { SafeStreamdown } from "@/features/streamdown/components";
 import {
   canBrowserPreviewFile,
   checkCodeFile,
   getFileExtensionDisplayName,
   getFileIcon,
   getFileName,
-} from "@/core/utils/files";
+} from "@/features/utils/files";
 import { cn } from "@/lib/utils";
 
 import { ArtifactLink } from "../citations/artifact-link";

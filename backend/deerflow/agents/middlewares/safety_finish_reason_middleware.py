@@ -24,11 +24,10 @@ logger = logging.getLogger(__name__)
 
 
 _USER_FACING_MESSAGE = (
-    "The model provider stopped this response with a safety-related signal "
-    "({reason_field}={reason_value!r}, detector={detector!r}). Any tool "
-    "calls produced in this turn were suppressed because their arguments "
-    "may be truncated and unsafe to execute. Please rephrase the request "
-    "or ask for a narrower output."
+    "模型服务提供方因安全相关信号停止了此响应"
+    "（{reason_field}={reason_value!r}, detector={detector!r}）。"
+    "本轮产生的工具调用均已阻止，因为其参数可能被截断，执行可能不安全。"
+    "请改写请求或缩小输出范围。"
 )
 
 
@@ -47,7 +46,7 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
             return cls()
 
         if not config.detectors:
-            raise ValueError("safety_finish_reason.detectors must be omitted (use built-ins) or contain at least one entry; use enabled=false to disable the middleware entirely.")
+            raise ValueError("safety_finish_reason.detectors 必须省略（使用内置检测器）或至少包含一个条目；若要完全禁用中间件，请使用 enabled=false。")
 
         from deerflow.reflection import resolve_variable
 
@@ -57,7 +56,7 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
             kwargs = dict(entry.config) if entry.config else {}
             detector = detector_cls(**kwargs)
             if not isinstance(detector, SafetyTerminationDetector):
-                raise TypeError(f"{entry.use} did not produce a SafetyTerminationDetector (got {type(detector).__name__}); ensure it has a `name` attribute and a `detect(message)` method")
+                raise TypeError(f"{entry.use} 未生成 SafetyTerminationDetector（实际得到 {type(detector).__name__}）；请确保它具有 `name` 属性和 `detect(message)` 方法")
             detectors.append(detector)
         return cls(detectors=detectors)
 

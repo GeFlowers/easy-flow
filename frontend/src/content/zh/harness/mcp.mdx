@@ -16,9 +16,9 @@ import { Callout, Steps } from "nextra/components";
 
 ## 配置
 
-MCP 服务器在 `extensions_config.json` 中配置，这个文件独立于 `config.yaml`。这种分离允许 MCP 和技能配置独立管理，并在运行时通过 Gateway API 更新。
+MCP 服务器在 `config/extensions_config.json` 中配置，这个文件独立于 `config/config.yaml`。这种分离允许 MCP 和技能配置独立管理，并在运行时通过 Gateway API 更新。
 
-默认位置是项目根目录（与 `config.yaml` 同一目录）。
+默认位置是项目根下的 `config/` 目录，与应用配置文件放在一起。
 
 ```json
 {
@@ -63,7 +63,7 @@ DeerFlow 服务器启动时调用 `initialize_mcp_tools()`。这连接到所有�
 
 ### 缓存失效
 
-MCP 工具缓存追踪 `extensions_config.json` 的修改时间（`mtime`）。当文件更改时——例如通过 Gateway API 启用或禁用服务器时——缓存被标记为过时，下次请求时重新加载工具。
+MCP 工具缓存追踪 `config/extensions_config.json` 的修改时间（`mtime`）。当文件更改时——例如通过 Gateway API 启用或禁用服务器时——缓存被标记为过时，下次请求时重新加载工具。
 
 这意味着 MCP 服务器更改无需重启 DeerFlow 服务器即可生效。
 
@@ -105,7 +105,7 @@ MCP 服务器可以通过多种方式管理：
 
 - **通过 DeerFlow 应用界面**：扩展面板显示已连接的 MCP 服务器，允许你启用/禁用它们。
 - **通过 Gateway API**：`POST /api/extensions/mcp/{name}/enable` 和 `/disable`。
-- **直接编辑 `extensions_config.json`**：适用于脚本化或程序化配置。
+- **直接编辑 `config/extensions_config.json`**：适用于脚本化或程序化配置。
 
 由于基于文件 mtime 的缓存失效机制，更改会自动被检测到。
 

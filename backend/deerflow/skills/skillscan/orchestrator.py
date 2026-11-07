@@ -38,43 +38,43 @@ _NESTED_ZIP_PEEK_MEMBER_LIMIT = 256
 _MAX_ARCHIVE_MEMBERS = 4096
 
 _SPECS = [
-    RuleSpec("package-path-traversal", "CRITICAL", "Archive member path traverses outside the skill root.", "Remove parent-directory traversal from the package path."),
-    RuleSpec("package-absolute-path", "CRITICAL", "Archive member path is absolute.", "Use relative paths inside the skill archive."),
-    RuleSpec("package-symlink", "HIGH", "Package contains a symlink entry.", "Remove symlinks from the skill package."),
-    RuleSpec("package-nested-skill-md", "CRITICAL", "Package contains a nested SKILL.md file.", "Keep exactly one SKILL.md at the skill root."),
-    RuleSpec("package-oversized-total", "CRITICAL", "Package total uncompressed size exceeds the limit.", "Remove large files or split assets out of the skill package."),
-    RuleSpec("package-too-many-members", "CRITICAL", "Package contains more members than the allowed limit.", "Reduce the number of files in the skill package."),
-    RuleSpec("package-oversized-file", "CRITICAL", "Package contains a file that exceeds the per-file size limit.", "Remove or shrink the oversized file."),
-    RuleSpec("package-executable-binary", "CRITICAL", "Package contains an executable binary.", "Remove binary executables from the skill package."),
-    RuleSpec("package-nested-archive", "HIGH", "Package contains a nested archive file.", "Unpack and review nested archives before packaging the skill."),
-    RuleSpec("package-hidden-sensitive-file", "HIGH", "Package contains a hidden sensitive file.", "Remove hidden credential or package-manager config files."),
-    RuleSpec("package-git-directory", "MEDIUM", "Package contains a .git directory.", "Package only source files needed by the skill, excluding repository metadata."),
-    RuleSpec("secret-private-key", "CRITICAL", "Private key material is embedded in skill content.", "Move private keys to a managed secret store and remove them from the skill."),
-    RuleSpec("secret-cloud-token", "CRITICAL", "High-confidence cloud or API token is embedded in skill content.", "Move tokens to environment variables or a secret store."),
-    RuleSpec("secret-env-assignment", "HIGH", "Secret-like assignment contains a non-placeholder value.", "Replace hardcoded credentials with documented runtime configuration."),
-    RuleSpec("declaration-prompt-override", "HIGH", "SKILL.md contains a prompt override phrase.", "Rephrase examples so they describe unsafe text instead of instructing the agent to follow it."),
-    RuleSpec("declaration-sensitive-capability", "HIGH", "SKILL.md declares a sensitive capability.", "Make the capability explicit, narrow, and justified, or remove it."),
-    RuleSpec("declaration-sensitive-path", "HIGH", "SKILL.md references sensitive host or credential paths.", "Remove references to sensitive host paths unless they are harmless documentation."),
-    RuleSpec("declaration-external-endpoint", "MEDIUM", "SKILL.md declares an external network endpoint.", "Document why the endpoint is needed and prefer HTTPS."),
-    RuleSpec("python-dynamic-exec", "CRITICAL", "Python dynamic code execution primitive is used in a skill file.", "Remove dynamic execution and replace it with explicit typed logic."),
-    RuleSpec("python-shell-exec", "CRITICAL", "Python shell execution primitive is used in a skill file.", "Use subprocess with a fixed argument list and shell=False, or remove shell execution."),
-    RuleSpec("python-sensitive-exfil", "CRITICAL", "Python code reads a sensitive path and uses an outbound network sink in the same file.", "Remove the sensitive read or network sink, and keep credential access outside skills."),
-    RuleSpec("python-env-dump-exfil", "CRITICAL", "Python code reads the process environment in bulk and uses an outbound network sink in the same file.", "Avoid bulk environment reads and never send environment data over the network."),
-    RuleSpec("python-reverse-shell", "CRITICAL", "Python code matches a reverse-shell shape.", "Remove reverse-shell behavior from the skill."),
-    RuleSpec("python-dynamic-import", "HIGH", "Python dynamically imports a non-literal module.", "Use explicit imports or a constrained allowlist."),
-    RuleSpec("python-subprocess", "HIGH", "Python invokes subprocess without shell=True.", "Review subprocess usage and keep arguments fixed and minimal."),
-    RuleSpec("python-sensitive-path-read", "HIGH", "Python reads a sensitive path.", "Remove sensitive host-path access from the skill."),
-    RuleSpec("python-unsafe-deserialization", "MEDIUM", "Python uses unsafe deserialization.", "Use safe loaders or trusted typed formats."),
-    RuleSpec("shell-reverse-shell", "CRITICAL", "Shell script contains a reverse-shell idiom.", "Remove reverse-shell behavior from the skill."),
-    RuleSpec("shell-reverse-shell-heuristic", "HIGH", "Shell script resembles a reverse-shell idiom.", "Confirm this is not reverse-shell behavior; unmistakable reverse-shell signals are blocked outright."),
-    RuleSpec("shell-sensitive-exfil", "CRITICAL", "Shell script reads sensitive paths and sends data over the network.", "Remove sensitive reads or outbound transfer commands."),
-    RuleSpec("shell-curl-pipe-shell", "HIGH", "Shell script pipes remote content into a shell.", "Download, verify, and execute reviewed code explicitly instead."),
-    RuleSpec("shell-destructive-command", "HIGH", "Shell script contains an unmistakably destructive command.", "Remove destructive commands from skill scripts."),
-    RuleSpec("shell-env-dump", "MEDIUM", "Shell script dumps the environment.", "Avoid bulk environment dumps in skills."),
-    RuleSpec("network-cloud-metadata", "CRITICAL", "Skill content references a cloud metadata service.", "Remove cloud metadata access from the skill."),
-    RuleSpec("resource-fork-bomb", "CRITICAL", "Skill content contains a fork-bomb pattern.", "Remove resource-exhaustion payloads."),
-    RuleSpec("network-cleartext-http", "MEDIUM", "Skill content references a non-local cleartext HTTP endpoint.", "Use HTTPS or document why cleartext local development is required."),
-    RuleSpec("network-local-http", "LOW", "Skill content references a local HTTP endpoint.", "Confirm the local endpoint is expected for this skill."),
+    RuleSpec("package-path-traversal", "CRITICAL", "归档成员路径遍历到了技能根目录之外。", "移除技能包路径中的父目录遍历。"),
+    RuleSpec("package-absolute-path", "CRITICAL", "归档成员使用了绝对路径。", "在技能归档内部使用相对路径。"),
+    RuleSpec("package-symlink", "HIGH", "技能包包含符号链接条目。", "移除技能包中的符号链接。"),
+    RuleSpec("package-nested-skill-md", "CRITICAL", "技能包包含嵌套的 SKILL.md 文件。", "在技能根目录保留且仅保留一个 SKILL.md。"),
+    RuleSpec("package-oversized-total", "CRITICAL", "技能包解压后的总大小超过限制。", "移除大文件，或将资源从技能包中拆分出来。"),
+    RuleSpec("package-too-many-members", "CRITICAL", "技能包成员数量超过允许上限。", "减少技能包中的文件数量。"),
+    RuleSpec("package-oversized-file", "CRITICAL", "技能包中的某个文件超过单文件大小限制。", "移除或缩小超限文件。"),
+    RuleSpec("package-executable-binary", "CRITICAL", "技能包包含可执行二进制文件。", "移除技能包中的二进制可执行文件。"),
+    RuleSpec("package-nested-archive", "HIGH", "技能包包含嵌套归档文件。", "打包技能前请解压并审查嵌套归档。"),
+    RuleSpec("package-hidden-sensitive-file", "HIGH", "技能包包含隐藏的敏感文件。", "移除隐藏的凭据文件或包管理器配置文件。"),
+    RuleSpec("package-git-directory", "MEDIUM", "技能包包含 .git 目录。", "仅打包技能所需的源文件，排除仓库元数据。"),
+    RuleSpec("secret-private-key", "CRITICAL", "技能内容中嵌入了私钥材料。", "将私钥移到托管密钥存储中，并从技能中移除。"),
+    RuleSpec("secret-cloud-token", "CRITICAL", "技能内容中嵌入了高度疑似云服务或应用程序接口令牌的值。", "将令牌移到环境变量或密钥存储中。"),
+    RuleSpec("secret-env-assignment", "HIGH", "疑似密钥的赋值包含非占位值。", "将硬编码凭据替换为有文档说明的运行时配置。"),
+    RuleSpec("declaration-prompt-override", "HIGH", "SKILL.md 包含覆盖提示的语句。", "改写示例，描述不安全文本，避免指示代理遵循这些文本。"),
+    RuleSpec("declaration-sensitive-capability", "HIGH", "SKILL.md 声明了敏感能力。", "明确并缩小能力范围，说明其必要性，或移除该能力。"),
+    RuleSpec("declaration-sensitive-path", "HIGH", "SKILL.md 引用了敏感宿主路径或凭据路径。", "移除对敏感宿主路径的引用，无害的文档说明除外。"),
+    RuleSpec("declaration-external-endpoint", "MEDIUM", "SKILL.md 声明了外部网络端点。", "说明端点的必要性，并优先使用安全超文本传输协议。"),
+    RuleSpec("python-dynamic-exec", "CRITICAL", "技能文件使用了 Python 动态代码执行机制。", "移除动态执行，改用明确且有类型约束的逻辑。"),
+    RuleSpec("python-shell-exec", "CRITICAL", "技能文件使用了 Python 命令解释器执行机制。", "使用固定参数列表并设置 shell=False 调用 subprocess，或移除命令解释器执行。"),
+    RuleSpec("python-sensitive-exfil", "CRITICAL", "同一 Python 文件中同时存在敏感路径读取和网络外发操作。", "移除敏感读取或网络外发操作，并将凭据访问置于技能之外。"),
+    RuleSpec("python-env-dump-exfil", "CRITICAL", "同一 Python 文件中同时存在批量读取进程环境和网络外发操作。", "避免批量读取环境变量，不要通过网络发送环境数据。"),
+    RuleSpec("python-reverse-shell", "CRITICAL", "Python 代码符合反向命令解释器的行为特征。", "移除技能中的反向命令解释器行为。"),
+    RuleSpec("python-dynamic-import", "HIGH", "Python 动态导入了非字面量指定的模块。", "使用显式导入或受限制的允许列表。"),
+    RuleSpec("python-subprocess", "HIGH", "Python 调用了 subprocess，且未设置 shell=True。", "审查 subprocess 的使用，确保参数固定且最少。"),
+    RuleSpec("python-sensitive-path-read", "HIGH", "Python 读取了敏感路径。", "移除技能对敏感宿主路径的访问。"),
+    RuleSpec("python-unsafe-deserialization", "MEDIUM", "Python 使用了不安全的反序列化。", "使用安全加载器或可信的类型化格式。"),
+    RuleSpec("shell-reverse-shell", "CRITICAL", "命令脚本包含反向命令解释器的典型写法。", "移除技能中的反向命令解释器行为。"),
+    RuleSpec("shell-reverse-shell-heuristic", "HIGH", "命令脚本疑似包含反向命令解释器写法。", "确认这不是反向命令解释器行为；明确的相关信号将直接被阻止。"),
+    RuleSpec("shell-sensitive-exfil", "CRITICAL", "命令脚本读取敏感路径并通过网络发送数据。", "移除敏感读取或向外传输的命令。"),
+    RuleSpec("shell-curl-pipe-shell", "HIGH", "命令脚本通过管道将远程内容传入命令解释器。", "请显式下载、验证并执行经过审查的代码。"),
+    RuleSpec("shell-destructive-command", "HIGH", "命令脚本包含明确的破坏性命令。", "移除技能脚本中的破坏性命令。"),
+    RuleSpec("shell-env-dump", "MEDIUM", "命令脚本导出了环境变量。", "避免在技能中批量导出环境变量。"),
+    RuleSpec("network-cloud-metadata", "CRITICAL", "技能内容引用了云元数据服务。", "移除技能中的云元数据访问。"),
+    RuleSpec("resource-fork-bomb", "CRITICAL", "技能内容包含进程炸弹模式。", "移除耗尽资源的载荷。"),
+    RuleSpec("network-cleartext-http", "MEDIUM", "技能内容引用了非本地的明文超文本传输协议端点。", "使用安全超文本传输协议，或说明本地开发为何需要明文通信。"),
+    RuleSpec("network-local-http", "LOW", "技能内容引用了本地超文本传输协议端点。", "确认该技能确实需要此本地端点。"),
 ]
 
 RULES: dict[str, RuleSpec] = {spec.rule_id: spec for spec in _SPECS}
@@ -155,7 +155,7 @@ def enforce_static_scan(
         raise StaticScanBlockedError(
             blocked,
             skill_name=skill_name,
-            message=f"Static security scan blocked skill '{skill_name}': {format_static_findings(blocked)}" if skill_name else f"Static security scan blocked skill content: {format_static_findings(blocked)}",
+            message=f"静态安全扫描已阻止 skill '{skill_name}': {format_static_findings(blocked)}" if skill_name else f"静态安全扫描已阻止 技能内容: {format_static_findings(blocked)}",
         )
     if result["scanner_errors"]:
         logger.warning("SkillScan analyzer errors for %s: %s", skill_name or skill_dir, "; ".join(result["scanner_errors"]))
@@ -195,7 +195,7 @@ def scan_archive_preflight(archive_path: Path) -> ScanResult:
                     with zf.open(info) as member:
                         prefix = member.read(8)
                 except Exception as e:
-                    scanner_errors.append(f"{normalized}: failed to read archive member prefix: {e}")
+                    scanner_errors.append(f"{normalized}: 读取归档成员前缀失败： {e}")
                     continue
                 if _is_executable_binary(prefix):
                     findings.append(_finding("package-executable-binary", file=normalized, evidence=_binary_magic_evidence(prefix)))
@@ -204,7 +204,7 @@ def scan_archive_preflight(archive_path: Path) -> ScanResult:
             if total_size > MAX_TOTAL_ARCHIVE_BYTES:
                 findings.append(_finding("package-oversized-total", file=None, evidence=f"{total_size} bytes"))
     except (zipfile.BadZipFile, OSError) as e:
-        raise StaticScannerError(f"failed to read skill archive: {e}") from e
+        raise StaticScannerError(f"读取技能归档失败： {e}") from e
 
     return _scan_result(_dedupe(findings), scanner_errors)
 
@@ -213,7 +213,7 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
     '''遍历技能目录，检查包结构属性并将可解码文本交给对应分析器。'''
     root = Path(skill_dir)
     if not root.is_dir():
-        raise StaticScannerError(f"skill_dir is not a directory: {root}")
+        raise StaticScannerError(f"skill_dir 不是目录： {root}")
 
     findings: list[SecurityFinding] = []
     scanner_errors: list[str] = []
@@ -222,7 +222,7 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
         try:
             file_bytes = path.read_bytes()
         except OSError as e:
-            scanner_errors.append(f"{rel_path}: failed to read file: {e}")
+            scanner_errors.append(f"{rel_path}: 读取文件失败： {e}")
             continue
 
         findings.extend(_scan_file_package_properties(rel_path, file_bytes, path.stat().st_size))
@@ -233,7 +233,7 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
         try:
             findings.extend(_scan_text_file(rel_path, text))
         except Exception as e:
-            scanner_errors.append(f"{rel_path}: analyzer failed: {e}")
+            scanner_errors.append(f"{rel_path}: 分析器失败： {e}")
             logger.warning("SkillScan analyzer failed for %s", rel_path, exc_info=True)
 
     return _scan_result(_dedupe(findings), scanner_errors)
@@ -401,11 +401,11 @@ def _scan_python(rel_path: str, text: str) -> list[SecurityFinding]:
         findings.append(_finding_for_node("python-reverse-shell", rel_path, reverse_shell_node, "socket + dup2 + subprocess"))
 
     if has_sensitive_read and has_network_sink:
-        findings.append(_finding_for_node("python-sensitive-exfil", rel_path, sensitive_node or network_node, "sensitive read + network sink"))
+        findings.append(_finding_for_node("python-sensitive-exfil", rel_path, sensitive_node or network_node, "敏感读取与网络外发"))
     elif has_sensitive_read:
-        findings.append(_finding_for_node("python-sensitive-path-read", rel_path, sensitive_node, "sensitive path read"))
+        findings.append(_finding_for_node("python-sensitive-path-read", rel_path, sensitive_node, "敏感路径读取"))
     if has_env_dump and has_network_sink:
-        findings.append(_finding_for_node("python-env-dump-exfil", rel_path, env_node or network_node, "environment dump + network sink"))
+        findings.append(_finding_for_node("python-env-dump-exfil", rel_path, env_node or network_node, "环境导出与网络外发"))
     return findings
 
 
@@ -484,10 +484,10 @@ def _nested_archive_finding(rel_path: str, prefix: bytes, read_data, scanner_err
         try:
             data = read_data()
         except Exception as e:
-            scanner_errors.append(f"{rel_path}: failed to read nested archive for inspection: {e}")
+            scanner_errors.append(f"{rel_path}: 读取嵌套归档以进行检查时失败： {e}")
         else:
             if data is not None and _nested_zip_contains_executable(data):
-                return _finding("package-nested-archive", file=rel_path, evidence=f"{name}: contains an executable binary member", severity="CRITICAL")
+                return _finding("package-nested-archive", file=rel_path, evidence=f"{name}: 包含可执行二进制成员", severity="CRITICAL")
     return _finding("package-nested-archive", file=rel_path, evidence=name)
 
 

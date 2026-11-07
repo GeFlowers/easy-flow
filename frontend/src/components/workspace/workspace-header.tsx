@@ -11,7 +11,7 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 /** 渲染工作区顶部操作栏，集中放置导航与全局快捷入口。 */

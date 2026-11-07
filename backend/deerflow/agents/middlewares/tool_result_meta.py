@@ -21,6 +21,15 @@ _PARTIAL_MARKERS = (
     "no results found",
     "no content found",
     "no images found",
+    "结果已截断",
+    "内容已截断",
+    "输出已截断",
+    "未找到匹配文件",
+    "未找到匹配项",
+    "未找到结果",
+    "未找到内容",
+    "未找到图片",
+    "未找到安全的图片地址",
 )
 
 
@@ -37,35 +46,35 @@ class ToolResultMeta:
 
 _ERROR_RULES: list[tuple[list[str], dict[str, object]]] = [
     (
-        ["401", "403", "unauthorized", "authentication", "invalid api key"],
+        ["401", "403", "unauthorized", "authentication", "invalid api key", "身份验证", "认证失败"],
         {"error_type": "auth", "recoverable_by_model": False, "recommended_next_action": "stop"},
     ),
     (
-        ["rate limit", "rate limited", "rate_limit"],
+        ["rate limit", "rate limited", "rate_limit", "频率限制", "限流"],
         {"error_type": "rate_limited", "recoverable_by_model": False, "recommended_next_action": "summarize"},
     ),
     (
-        ["timeout", "timed out", "connection", "network error", "temporarily unavailable"],
+        ["timeout", "timed out", "connection", "network error", "temporarily unavailable", "超时", "连接", "网络错误", "暂时不可用"],
         {"error_type": "transient", "recoverable_by_model": False, "recommended_next_action": "try_alternative"},
     ),
     (
-        ["not configured", "not installed", "missing required", "disabled", "no api key"],
+        ["not configured", "not installed", "missing required", "disabled", "no api key", "尚未配置", "尚未安装", "未安装", "已禁用"],
         {"error_type": "config", "recoverable_by_model": False, "recommended_next_action": "stop"},
     ),
     (
-        ["permission denied", "access denied", "path traversal", "forbidden"],
+        ["permission denied", "access denied", "path traversal", "forbidden", "权限不足", "无权", "拒绝访问", "路径遍历", "不允许写入"],
         {"error_type": "permission", "recoverable_by_model": True, "recommended_next_action": "try_alternative"},
     ),
     (
-        ["no results found", "no content found", "no images found", "no results"],
+        ["no results found", "no content found", "no images found", "no results", "未找到匹配文件", "未找到匹配项", "没有结果", "未找到结果", "未找到内容", "未找到图片", "未找到安全的图片地址"],
         {"error_type": "no_results", "recoverable_by_model": True, "recommended_next_action": "rewrite_query"},
     ),
     (
-        ["not found", "no such file", "does not exist", "404"],
+        ["not found", "no such file", "does not exist", "404", "找不到", "不存在", "未找到"],
         {"error_type": "not_found", "recoverable_by_model": True, "recommended_next_action": "rewrite_query"},
     ),
     (
-        ["unexpected error", "internal error", "500"],
+        ["unexpected error", "internal error", "500", "意外错误", "内部错误"],
         {"error_type": "internal", "recoverable_by_model": False, "recommended_next_action": "stop"},
     ),
 ]

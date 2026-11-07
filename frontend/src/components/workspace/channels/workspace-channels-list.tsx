@@ -17,23 +17,24 @@ import {
   useConfigureChannelProvider,
   useChannelProviders,
   useConnectChannelProvider,
-} from "@/core/channels/hooks";
+} from "@/features/channels/hooks";
 import {
   closeConnectWindow,
   openConnectUrl,
   prepareConnectWindow,
-} from "@/core/channels/open-connect-url";
+} from "@/features/channels/open-connect-url";
 import {
   providerCanConnect,
   providerCanEditRuntimeConfig,
   providerNeedsRuntimeConfig,
-} from "@/core/channels/provider-state";
-import type { ChannelProvider } from "@/core/channels/types";
-import { useI18n } from "@/core/i18n/hooks";
+} from "@/features/channels/provider-state";
+import type { ChannelProvider } from "@/features/channels/types";
+import { useI18n } from "@/features/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 import { ChannelProviderIcon } from "./channel-provider-icon";
 import { ChannelRuntimeConfigDialog } from "./channel-runtime-config-dialog";
+import { WechatConnectDialog } from "./wechat-connect-dialog";
 
 /** 按服务端原因、启用状态和配置状态生成通道不可用提示。 */
 function getProviderUnavailableReason(
@@ -60,6 +61,9 @@ export function WorkspaceChannelsList() {
   const connectMutation = useConnectChannelProvider();
   const configureMutation = useConfigureChannelProvider();
   const [setupProvider, setSetupProvider] = useState<ChannelProvider | null>(
+    null,
+  );
+  const [wechatProvider, setWechatProvider] = useState<ChannelProvider | null>(
     null,
   );
   const visibleProviders = providers.filter((provider) => provider.enabled);
@@ -152,6 +156,10 @@ export function WorkspaceChannelsList() {
                   disabled={isPending}
                   title={unavailableReason}
                   onClick={() => {
+                    if (provider.provider === "wechat") {
+                      setWechatProvider(provider);
+                      return;
+                    }
                     if (
                       providerNeedsRuntimeConfig(provider) ||
                       (isConnected && canEditRuntimeConfig)
@@ -182,6 +190,19 @@ export function WorkspaceChannelsList() {
           );
         })}
       </SidebarMenu>
+      {wechatProvider ? (
+        <WechatConnectDialog
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setWechatProvider(null);
+          }}
+          initiallyAuthenticated={
+            wechatProvider.configured &&
+            !wechatProvider.unavailable_reason &&
+            wechatProvider.connection_status !== "connected"
+          }
+        />
+      ) : null}
       <ChannelRuntimeConfigDialog
         provider={setupProvider}
         open={setupProvider !== null}

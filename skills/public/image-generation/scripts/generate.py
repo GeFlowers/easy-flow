@@ -26,7 +26,7 @@ def validate_image(image_path: str) -> bool:
             image.load()
         return True
     except Exception as exc:
-        print(f"Warning: Image '{image_path}' is invalid or corrupted: {exc}")
+        print(f"警告：图像 '{image_path}' 无效或损坏：{exc}")
         return False
 
 
@@ -44,8 +44,8 @@ def _resolve_provider(override_env: str, existing_provider: str, has_existing_cr
     if os.getenv("MINIMAX_API_KEY"):
         return "minimax"
     raise ValueError(
-        f"No credentials found. Set GEMINI_API_KEY for {existing_provider}, "
-        f"or MINIMAX_API_KEY for minimax (optionally force with {override_env})."
+        f"未找到凭据。请为 {existing_provider} 设置 GEMINI_API_KEY，"
+        f"或为 minimax 设置 MINIMAX_API_KEY（可通过 {override_env} 强制指定）。"
     )
 
 
@@ -59,7 +59,7 @@ def _check_base_resp(payload: dict) -> None:
     base = payload.get("base_resp") or {}
     if base.get("status_code", 0) != 0:
         raise Exception(
-            f"MiniMax error {base.get('status_code')}: {base.get('status_msg')}"
+            f"MiniMax 错误 {base.get('status_code')}：{base.get('status_msg')}"
         )
 
 
@@ -121,13 +121,13 @@ def _generate_image_minimax(
     '''
     api_key = os.getenv("MINIMAX_API_KEY")
     if not api_key:
-        return "MINIMAX_API_KEY is not set"
+        return "尚未设置 MINIMAX_API_KEY"
     prompt = _minimax_prompt(prompt)
     if len(prompt) > MINIMAX_PROMPT_MAX_CHARS:
         return (
-            f"Prompt is {len(prompt)} characters but MiniMax image-01 accepts at most "
-            f"{MINIMAX_PROMPT_MAX_CHARS}. Shorten the prompt to stay within the limit; "
-            f"reference images plus a tighter description usually recover the detail."
+            f"提示词共 {len(prompt)} 字符，但 MiniMax image-01 最多接受 "
+            f"{MINIMAX_PROMPT_MAX_CHARS} 字符。请缩短提示词以满足限制；"
+            f"参考图配合更紧凑的描述，通常能补足细节。"
         )
     body = {
         "model": os.getenv("MINIMAX_IMAGE_MODEL", "image-01"),
@@ -153,11 +153,11 @@ def _generate_image_minimax(
     _check_base_resp(payload)
     images = (payload.get("data") or {}).get("image_base64") or []
     if not images:
-        raise Exception("MiniMax returned no image data")
+        raise Exception("MiniMax 未返回图像数据")
     _ensure_output_dir(output_file)
     with open(output_file, "wb") as f:
         f.write(base64.b64decode(images[0]))
-    return f"Successfully generated image to {output_file}"
+    return f"已成功生成图像：{output_file}"
 
 
 def _generate_image_gemini(
@@ -174,10 +174,10 @@ def _generate_image_gemini(
         if validate_image(ref_img):
             valid_reference_images.append(ref_img)
         else:
-            print(f"Skipping invalid reference image: {ref_img}")
+            print(f"跳过无效参考图：{ref_img}")
     if len(valid_reference_images) < len(reference_images):
         skipped = len(reference_images) - len(valid_reference_images)
-        print(f"Note: {skipped} reference image(s) were skipped due to validation failure.")
+        print(f"提示：{skipped} 张参考图因验证失败被跳过。")
 
     for reference_image in valid_reference_images:
         with open(reference_image, "rb") as f:
@@ -186,7 +186,7 @@ def _generate_image_gemini(
 
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return "GEMINI_API_KEY is not set"
+        return "尚未设置 GEMINI_API_KEY"
     response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/models/gemini-3-pro-image-preview:generateContent",
         headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
@@ -204,8 +204,8 @@ def _generate_image_gemini(
         _ensure_output_dir(output_file)
         with open(output_file, "wb") as f:
             f.write(base64.b64decode(base64_image))
-        return f"Successfully generated image to {output_file}"
-    raise Exception("Failed to generate image")
+        return f"已成功生成图像：{output_file}"
+    raise Exception("图像生成失败")
 
 
 def generate_image(
@@ -228,23 +228,23 @@ def generate_image(
         return _generate_image_minimax(prompt, reference_images, output_file, aspect_ratio)
     if provider in ("gemini", "google"):
         return _generate_image_gemini(prompt, reference_images, output_file, aspect_ratio)
-    raise ValueError(f"Unknown image provider: {provider!r} (use 'gemini' or 'minimax')")
+    raise ValueError(f"未知图像提供方：{provider!r}（请使用 'gemini' 或 'minimax'）")
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate images using Gemini or MiniMax API")
-    parser.add_argument("--prompt-file", required=True, help="Absolute path to JSON prompt file")
+    parser = argparse.ArgumentParser(description="通过 Gemini 或 MiniMax 接口生成图像")
+    parser.add_argument("--prompt-file", required=True, help="JSON（JavaScript Object Notation，JavaScript 对象表示法）提示词文件绝对路径")
     parser.add_argument("--reference-images", nargs="*", default=[],
-                        help="Absolute paths to reference images (space-separated)")
-    parser.add_argument("--output-file", required=True, help="Output path for generated image")
+                        help="参考图绝对路径，以空格分隔")
+    parser.add_argument("--output-file", required=True, help="生成图像的输出路径")
     parser.add_argument("--aspect-ratio", required=False, default="16:9",
-                        help="Aspect ratio of the generated image")
+                        help="生成图像的宽高比")
     args = parser.parse_args()
 
     try:
         print(generate_image(args.prompt_file, args.reference_images,
                              args.output_file, args.aspect_ratio))
     except Exception as e:
-        print(f"Error while generating image: {e}")
+        print(f"生成图像时出错：{e}")

@@ -30,25 +30,25 @@ import { TodoList } from "@/components/workspace/todo-list";
 import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
 import { Tooltip } from "@/components/workspace/tooltip";
 import { useActiveGoal } from "@/components/workspace/use-active-goal";
-import { useAgent } from "@/core/agents";
-import { useI18n } from "@/core/i18n/hooks";
+import { useAgent } from "@/features/agents";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   buildHumanInputResponseText,
   hasOpenHumanInputRequest,
   type HumanInputRequest,
   type HumanInputResponse,
-} from "@/core/messages/human-input";
-import { isHiddenFromUIMessage } from "@/core/messages/utils";
-import { useModels } from "@/core/models/hooks";
-import { useNotification } from "@/core/notification/hooks";
-import { useLocalSettings, useThreadSettings } from "@/core/settings";
+} from "@/features/messages/human-input";
+import { isHiddenFromUIMessage } from "@/features/messages/utils";
+import { useModels } from "@/features/models/hooks";
+import { useNotification } from "@/features/notification/hooks";
+import { useLocalSettings, useThreadSettings } from "@/features/settings";
 import {
   useThreadMetadata,
   useThreadStream,
   useThreadTokenUsage,
-} from "@/core/threads/hooks";
-import { threadTokenUsageToTokenUsage } from "@/core/threads/token-usage";
-import { textOfMessage } from "@/core/threads/utils";
+} from "@/features/threads/hooks";
+import { threadTokenUsageToTokenUsage } from "@/features/threads/token-usage";
+import { textOfMessage } from "@/features/threads/utils";
 import { cn } from "@/lib/utils";
 
 /** 管理绑定自定义代理的流式会话及其专属上下文。 */

@@ -19,20 +19,20 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { resolveArtifactURL } from "@/core/artifacts/utils";
-import { useI18n } from "@/core/i18n/hooks";
-import { useWorkspaceChanges } from "@/core/workspace-changes/hooks";
+import { resolveArtifactURL } from "@/features/artifacts/utils";
+import { useI18n } from "@/features/i18n/hooks";
+import { useWorkspaceChanges } from "@/features/workspace-changes/hooks";
 import {
   getChangedFileCount,
   getWorkspaceChangeLineClass,
   sortWorkspaceChanges,
-} from "@/core/workspace-changes/summary";
+} from "@/features/workspace-changes/summary";
 import type {
   DiffUnavailableReason,
   WorkspaceChangeStatus,
   WorkspaceChangeSummary,
   WorkspaceFileChange,
-} from "@/core/workspace-changes/types";
+} from "@/features/workspace-changes/types";
 import { cn } from "@/lib/utils";
 
 /** 展开线程工作区变更摘要，并在需要时加载文件差异详情。 */

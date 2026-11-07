@@ -5,8 +5,8 @@ import {
   formatTagName,
   getBlogIndexData,
   getPreferredBlogLang,
-} from "@/core/blog";
-import { getI18n } from "@/core/i18n/server";
+} from "@/features/blog";
+import { getI18n } from "@/features/i18n/server";
 
 import { useMDXComponents as getMDXComponents } from "../../../../mdx-components";
 

@@ -17,20 +17,20 @@ import {
 import { Shimmer } from "@/components/ai-elements/shimmer";
 import { Button } from "@/components/ui/button";
 import { ShineBorder } from "@/components/ui/shine-border";
-import { useI18n } from "@/core/i18n/hooks";
-import { hasToolCalls } from "@/core/messages/utils";
-import { useModels } from "@/core/models/hooks";
-import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
-import { streamdownPluginsWithWordAnimation } from "@/core/streamdown";
-import { SafeStreamdown } from "@/core/streamdown/components";
-import { fetchSubtaskSteps } from "@/core/tasks/api";
-import { useSubtask, useUpdateSubtask } from "@/core/tasks/context";
+import { useI18n } from "@/features/i18n/hooks";
+import { hasToolCalls } from "@/features/messages/utils";
+import { useModels } from "@/features/models/hooks";
+import { useRehypeSplitWordsIntoSpans } from "@/features/rehype";
+import { streamdownPluginsWithWordAnimation } from "@/features/streamdown";
+import { SafeStreamdown } from "@/features/streamdown/components";
+import { fetchSubtaskSteps } from "@/features/tasks/api";
+import { useSubtask, useUpdateSubtask } from "@/features/tasks/context";
 import {
   formatSubtaskTokenUsage,
   resolveSubtaskModelLabel,
-} from "@/core/tasks/presentation";
-import { stepsForDisplay } from "@/core/tasks/steps";
-import { explainLastToolCall } from "@/core/tools/utils";
+} from "@/features/tasks/presentation";
+import { stepsForDisplay } from "@/features/tasks/steps";
+import { explainLastToolCall } from "@/features/tools/utils";
 import { cn } from "@/lib/utils";
 
 import { CitationLink } from "../citations/citation-link";

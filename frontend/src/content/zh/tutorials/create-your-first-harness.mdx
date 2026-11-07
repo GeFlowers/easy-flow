@@ -22,11 +22,9 @@ uv sync
 
 ## 创建配置
 
-创建一个最小的 `config.yaml`：
+创建一个最小的 `config/config.yaml`：
 
 ```yaml
-config_version: 6
-
 models:
   - name: gpt-4o
     use: langchain_openai:ChatOpenAI
@@ -37,7 +35,7 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
 
 tools:
-  - use: deerflow.community.ddg_search.tools:web_search_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool
   - use: deerflow.sandbox.tools:read_file_tool
   - use: deerflow.sandbox.tools:write_file_tool
 ```

@@ -52,8 +52,8 @@ def build_resource_graph(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list
                 "resource.missing",
                 severity="warning",
                 path=source,
-                message=f"Referenced resource does not exist: {target}",
-                remediation="Add the referenced file, correct the path, or remove the stale reference.",
+                message=f"引用的资源不存在： {target}",
+                remediation="添加引用的文件、修正路径，或移除失效引用。",
                 evidence=target,
             )
         )
@@ -63,8 +63,8 @@ def build_resource_graph(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list
                 "resource.escaping-link",
                 severity="warning",
                 path=source,
-                message=f"Reference escapes the package boundary: {raw_ref}",
-                remediation="Keep skill references package-relative and inside the skill directory.",
+                message=f"引用超出技能包边界： {raw_ref}",
+                remediation="技能引用应使用相对于技能包的路径，并位于技能目录内部。",
                 evidence=raw_ref,
             )
         )
@@ -74,8 +74,8 @@ def build_resource_graph(snapshot: dict[str, Any]) -> tuple[dict[str, Any], list
                 "resource.unreferenced",
                 severity="warning",
                 path=orphan,
-                message="Resource is not reachable from SKILL.md or another referenced resource.",
-                remediation="Reference the file with read-when guidance or remove it from the package.",
+                message="无法从 SKILL.md 或其他已引用资源到达该资源。",
+                remediation="引用该文件并说明何时读取，或将其从技能包中移除。",
             )
         )
 

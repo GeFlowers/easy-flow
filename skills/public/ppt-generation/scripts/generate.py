@@ -49,7 +49,7 @@ def generate_ppt(
 
     for i, image_path in enumerate(slide_images):
         if not os.path.exists(image_path):
-            return f"Error: Slide image not found: {image_path}"
+            return f"错误：未找到幻灯片图片：{image_path}"
 
         # 新建空白页。
         slide = prs.slides.add_slide(blank_layout)
@@ -98,13 +98,13 @@ def generate_ppt(
             notes = []
 
             if slide_info.get("title"):
-                notes.append(f"Title: {slide_info['title']}")
+                notes.append(f"标题：{slide_info['title']}")
 
             if slide_info.get("subtitle"):
-                notes.append(f"Subtitle: {slide_info['subtitle']}")
+                notes.append(f"副标题：{slide_info['subtitle']}")
 
             if slide_info.get("key_points"):
-                notes.append("Key Points:")
+                notes.append("关键要点：")
                 for point in slide_info["key_points"]:
                     notes.append(f"  • {point}")
 
@@ -117,30 +117,30 @@ def generate_ppt(
     # 保存最终演示文稿。
     prs.save(output_file)
 
-    return f"Successfully generated presentation with {len(slide_images)} slides to {output_file}"
+    return f"已成功生成包含 {len(slide_images)} 页的演示文稿：{output_file}"
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(
-        description="Generate PowerPoint presentation from slide images"
+        description="根据幻灯片图片生成 PowerPoint 演示文稿"
     )
     parser.add_argument(
         "--plan-file",
         required=True,
-        help="Absolute path to JSON presentation plan file",
+        help="演示计划文件的绝对路径",
     )
     parser.add_argument(
         "--slide-images",
         nargs="+",
         required=True,
-        help="Absolute paths to slide images in order (space-separated)",
+        help="按页序排列的幻灯片图片绝对路径，以空格分隔",
     )
     parser.add_argument(
         "--output-file",
         required=True,
-        help="Output path for generated PPTX file",
+        help="生成的演示文稿输出路径",
     )
 
     args = parser.parse_args()
@@ -154,4 +154,4 @@ if __name__ == "__main__":
             )
         )
     except Exception as e:
-        print(f"Error while generating presentation: {e}")
+        print(f"生成演示文稿时出错：{e}")

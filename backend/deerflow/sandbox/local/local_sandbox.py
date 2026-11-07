@@ -60,7 +60,7 @@ class _BoundedPipeCapture:
 
         output = data.decode("utf-8", errors="replace")
         if truncated:
-            notice = f"\n... [output truncated after {kept_bytes} of {total_bytes} bytes; remaining output discarded] ..."
+            notice = f"\n... [输出已截断，保留前 {kept_bytes} of {total_bytes} 字节；其余输出已丢弃] ..."
             output += notice
         return output
 
@@ -136,9 +136,9 @@ class LocalSandbox(Sandbox):
     def _format_timeout_notice(timeout: float) -> str:
         '''构造命令超时及后台运行长生命周期进程的提示文本。'''
         return (
-            f"Command timed out after {LocalSandbox._format_timeout_duration(timeout)} and was terminated. "
-            "To run a long-lived process such as a web server, start it in the background "
-            "and redirect its output, e.g. `your-command > /mnt/user-data/workspace/server.log 2>&1 &`."
+            f"命令执行超时，已等待 {LocalSandbox._format_timeout_duration(timeout)} ，已终止。"
+            "若要运行网页服务器等长期进程，请在后台启动"
+            "并重定向输出，例如 `your-command > /mnt/user-data/workspace/server.log 2>&1 &`。"
         )
 
     @staticmethod
@@ -294,7 +294,7 @@ class LocalSandbox(Sandbox):
         try:
             resolved_path.relative_to(local_root)
         except ValueError as exc:
-            raise PermissionError(errno.EACCES, "Access denied: path escapes mounted directory", path_str) from exc
+            raise PermissionError(errno.EACCES, "拒绝访问：路径超出挂载目录", path_str) from exc
 
         return ResolvedPath(str(resolved_path), mapping)
 
@@ -399,9 +399,9 @@ class LocalSandbox(Sandbox):
             if shell is not None:
                 return shell
 
-            raise RuntimeError("No suitable shell executable found. Tried /bin/zsh, /bin/bash, /bin/sh, `sh` on PATH, then PowerShell and cmd.exe fallbacks for Windows.")
+            raise RuntimeError("找不到合适的命令解释器。已尝试 /bin/zsh、/bin/bash、/bin/sh、PATH 中的 `sh`，以及 Windows 的 PowerShell 和 cmd.exe。")
 
-        raise RuntimeError("No suitable shell executable found. Tried /bin/zsh, /bin/bash, /bin/sh, and `sh` on PATH.")
+        raise RuntimeError("找不到合适的命令解释器。已尝试 /bin/zsh、/bin/bash、/bin/sh 和 PATH 中的 `sh`。")
 
     def execute_command(
         self,
@@ -453,14 +453,14 @@ class LocalSandbox(Sandbox):
 
         output = stdout
         if stderr:
-            output += f"\nStd Error:\n{stderr}" if output else stderr
+            output += f"\nStd 错误：\n{stderr}" if output else stderr
         if timed_out:
             notice = self._format_timeout_notice(timeout)
             output += f"\n{notice}" if output else notice
         elif returncode != 0:
-            output += f"\nExit Code: {returncode}"
+            output += f"\n退出码： {returncode}"
 
-        final_output = output if output else "(no output)"
+        final_output = output if output else "(无输出)"
         return self._reverse_resolve_paths_in_output(final_output)
 
     @staticmethod
@@ -589,14 +589,14 @@ class LocalSandbox(Sandbox):
         allowed_prefix = VIRTUAL_PATH_PREFIX.lstrip("/")
         if stripped_path != allowed_prefix and not stripped_path.startswith(f"{allowed_prefix}/"):
             logger.error("Refused download outside allowed directory: path=%s, allowed_prefix=%s", path, VIRTUAL_PATH_PREFIX)
-            raise PermissionError(errno.EACCES, f"Access denied: path must be under '{VIRTUAL_PATH_PREFIX}'", path)
+            raise PermissionError(errno.EACCES, f"拒绝访问：路径必须位于 '{VIRTUAL_PATH_PREFIX}' 下", path)
 
         resolved_path = self._resolve_path(path)
         max_download_size = 100 * 1024 * 1024
         try:
             file_size = os.path.getsize(resolved_path)
             if file_size > max_download_size:
-                raise OSError(errno.EFBIG, f"File exceeds maximum download size of {max_download_size} bytes", path)
+                raise OSError(errno.EFBIG, f"文件超过最大下载大小 {max_download_size} 字节", path)
             with open(resolved_path, "rb") as f:
                 return f.read()
         except OSError as e:
@@ -607,7 +607,7 @@ class LocalSandbox(Sandbox):
         resolved = self._resolve_path_with_mapping(path)
         resolved_path = resolved.path
         if self._is_resolved_path_read_only(resolved):
-            raise OSError(errno.EROFS, "Read-only file system", path)
+            raise OSError(errno.EROFS, "只读文件系统", path)
         try:
             dir_path = os.path.dirname(resolved_path)
             if dir_path:
@@ -660,7 +660,7 @@ class LocalSandbox(Sandbox):
         resolved = self._resolve_path_with_mapping(path)
         resolved_path = resolved.path
         if self._is_resolved_path_read_only(resolved):
-            raise OSError(errno.EROFS, "Read-only file system", path)
+            raise OSError(errno.EROFS, "只读文件系统", path)
         try:
             dir_path = os.path.dirname(resolved_path)
             if dir_path:

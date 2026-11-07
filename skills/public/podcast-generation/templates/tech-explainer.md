@@ -1,51 +1,51 @@
-# Tech Explainer Podcast Template
+# 技术讲解播客模板
 
-Use this template when converting technical documentation, API guides, or developer tutorials into podcasts.
+将技术文档、API（Application Programming Interface，应用程序编程接口）指南或开发者教程转换为播客时使用。
 
-## Input Preparation
+## 输入准备
 
-When the user wants to convert technical content to a podcast, help them structure the input:
+用户希望转换技术内容时，帮助组织输入：
 
-1. **Simplify Code Examples**: Replace code snippets with plain language descriptions
-   - Instead of showing actual code, describe what the code does
-   - Focus on concepts rather than syntax
+1. **简化代码示例：** 用通俗描述替代代码片段。
+   - 描述代码做什么，不直接展示代码。
+   - 聚焦概念而非语法。
+2. **移除复杂符号：**
+   - 用文字解释数学公式。
+   - 按功能描述接口端点，而非列出路径。
+   - 将配置示例概括为设置说明。
+3. **补充背景：**
+   - 解释技术为何重要。
+   - 包含真实用例。
+   - 为复杂概念加入类比。
 
-2. **Remove Complex Notation**:
-   - Mathematical formulas should be explained in words
-   - API endpoints described by function rather than URL paths
-   - Configuration examples summarized as settings descriptions
+## 转换示例
 
-3. **Add Context**:
-   - Explain why the technology matters
-   - Include real-world use cases
-   - Add analogies for complex concepts
+### 原始技术内容
 
-## Example Transformation
-
-### Original Technical Content:
 ```markdown
-# Using the API
+# 使用接口
 
 POST /api/v1/users
 {
-  "name": "John",
-  "email": "john@example.com"
+  "name": "张三",
+  "email": "zhangsan@example.com"
 }
 
-Response: 201 Created
+响应：201 Created
 ```
 
-### Podcast-Ready Content:
+### 适合播客的内容
+
 ```markdown
-# Creating Users with the API
+# 通过接口创建用户
 
-The user creation feature allows applications to register new users in the system.
-When you want to add a new user, you send their name and email address to the server.
-If everything goes well, the server confirms the user was created successfully.
-This is commonly used in signup flows, admin dashboards, or when importing users from other systems.
+用户创建功能允许应用在系统中注册新用户。
+需要新增用户时，将其姓名和邮箱发送给服务器。
+如果一切顺利，服务器会确认用户创建成功。
+此功能常见于注册流程、管理仪表盘或从其他系统导入用户。
 ```
 
-## Generation Command
+## 生成命令
 
 ```bash
 python /mnt/skills/public/podcast-generation/scripts/generate.py \
@@ -54,10 +54,10 @@ python /mnt/skills/public/podcast-generation/scripts/generate.py \
   --transcript-file /mnt/user-data/outputs/tech-explainer-transcript.md
 ```
 
-## Tips for Technical Podcasts
+## 技术播客建议
 
-- Keep episodes focused on one main concept
-- Use analogies to explain abstract concepts
-- Include practical "why this matters" context
-- Avoid jargon without explanation
-- Make the dialogue accessible to beginners
+- 每期聚焦一个主要概念。
+- 用类比解释抽象概念。
+- 加入“为什么重要”的实际背景。
+- 使用术语时提供解释。
+- 让初学者也能理解对话。

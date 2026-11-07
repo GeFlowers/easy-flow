@@ -30,7 +30,7 @@ export const env = createEnv({
     NEXT_PUBLIC_LANGGRAPH_BASE_URL: process.env.NEXT_PUBLIC_LANGGRAPH_BASE_URL,
   },
   /**
-   * Docker 等分阶段构建可通过 `SKIP_ENV_VALIDATION` 跳过当前阶段无法满足的校验。
+   * 临时构建可通过 `SKIP_ENV_VALIDATION` 跳过当前阶段无法满足的校验。
    */
   skipValidation: !!process.env.SKIP_ENV_VALIDATION,
   /**

@@ -15,19 +15,19 @@ def build_server_params(server_name: str, config: McpServerConfig) -> dict[str, 
 
     if transport_type == "stdio":
         if not config.command:
-            raise ValueError(f"MCP server '{server_name}' with stdio transport requires 'command' field")
+            raise ValueError(f"使用 stdio 传输的模型上下文协议服务器 '{server_name}' 必须提供 'command' 字段")
         params["command"] = config.command
         params["args"] = config.args
         if config.env:
             params["env"] = config.env
     elif transport_type in ("sse", "http"):
         if not config.url:
-            raise ValueError(f"MCP server '{server_name}' with {transport_type} transport requires 'url' field")
+            raise ValueError(f"使用 {transport_type} 传输的模型上下文协议服务器 '{server_name}' 必须提供 'url' 字段")
         params["url"] = config.url
         if config.headers:
             params["headers"] = config.headers
     else:
-        raise ValueError(f"MCP server '{server_name}' has unsupported transport type: {transport_type}")
+        raise ValueError(f"模型上下文协议服务器 '{server_name}' 使用了不支持的传输类型：{transport_type}")
 
     return params
 

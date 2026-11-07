@@ -120,7 +120,7 @@ def build_tool_search_tool(catalog: DeferredToolCatalog) -> BaseTool:
         '''
         matched = catalog.search(query)
         if not matched:
-            content, names = f"No tools found matching: {query}", []
+            content, names = f"未找到匹配的工具： {query}", []
         else:
             content = json.dumps([convert_to_openai_function(t) for t in matched], indent=2, ensure_ascii=False)
             names = [t.name for t in matched]
@@ -155,7 +155,7 @@ def assemble_deferred_tools(filtered_tools: list[BaseTool], *, enabled: bool) ->
     '''
     deferred_setup = build_deferred_tool_setup(filtered_tools, enabled=enabled)
     if enabled and not deferred_setup.deferred_names and any(is_mcp_tool(t) for t in filtered_tools):
-        raise RuntimeError("tool_search enabled and MCP tools survived policy filtering, but no deferred set was recovered - refusing to bind MCP schemas (fail-closed).")
+        raise RuntimeError("tool_search 已启用，且模型上下文协议工具已通过策略过滤，但未能恢复延迟工具集合，因此拒绝绑定工具模式（失败时拒绝访问）。")
     final_tools = list(filtered_tools)
     if deferred_setup.tool_search_tool:
         final_tools.append(deferred_setup.tool_search_tool)
@@ -233,7 +233,7 @@ def _format_keyword_list(keywords: list[str]) -> str:
     '''将关键字列表格式化为自然语言短语。'''
     if len(keywords) == 1:
         return keywords[0]
-    return f"{', '.join(keywords[:-1])}, or {keywords[-1]}"
+    return f"{', '.join(keywords[:-1])}，或 {keywords[-1]}"
 
 
 def get_mcp_routing_hints_prompt_section(tools: Iterable[BaseTool], *, deferred_names: frozenset[str] = frozenset()) -> str:
@@ -257,10 +257,10 @@ def get_mcp_routing_hints_prompt_section(tools: Iterable[BaseTool], *, deferred_
     lines = ["<mcp_routing_hints>"]
     for priority, tool_name, keywords in sorted(hints, key=lambda item: (-item[0], item[1])):
         esc_name = html.escape(tool_name, quote=False)
-        lines.append(f"When the user's request involves {_format_keyword_list(keywords)}:")
+        lines.append(f"当用户请求涉及 {_format_keyword_list(keywords)}:")
         if tool_name in deferred_names:
-            lines.append(f"  use `tool_search` to fetch `{esc_name}`, then prefer that MCP tool.")
+            lines.append(f"  先使用 `tool_search` 获取 `{esc_name}`，然后优先使用该模型上下文协议工具。")
         else:
-            lines.append(f"  prefer the `{esc_name}` tool.")
+            lines.append(f"  优先使用 `{esc_name}` 工具。")
     lines.append("</mcp_routing_hints>")
     return "\n".join(lines)

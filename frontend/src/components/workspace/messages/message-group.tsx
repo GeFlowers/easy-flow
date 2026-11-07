@@ -25,16 +25,16 @@ import {
 } from "@/components/ai-elements/chain-of-thought";
 import { CodeBlock } from "@/components/ai-elements/code-block";
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/core/i18n/hooks";
-import { formatTokenCount } from "@/core/messages/usage";
-import type { TokenDebugStep } from "@/core/messages/usage-model";
+import { useI18n } from "@/features/i18n/hooks";
+import { formatTokenCount } from "@/features/messages/usage";
+import type { TokenDebugStep } from "@/features/messages/usage-model";
 import {
   extractContentFromMessage,
   extractReasoningContentFromMessage,
   findToolCallResult,
-} from "@/core/messages/utils";
-import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
-import { extractTitleFromMarkdown } from "@/core/utils/markdown";
+} from "@/features/messages/utils";
+import { useRehypeSplitWordsIntoSpans } from "@/features/rehype";
+import { extractTitleFromMarkdown } from "@/features/utils/markdown";
 import { cn } from "@/lib/utils";
 
 import { useArtifacts } from "../artifacts";

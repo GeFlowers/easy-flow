@@ -1,4 +1,4 @@
-'''根据技能声明过滤智能体可调用的工具，同时保留框架必需工具。'''
+'''合并当前任务实际激活技能的工具白名单，供本轮权限检查使用。'''
 
 import logging
 from typing import Protocol
@@ -18,7 +18,7 @@ ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES = frozenset({"read_file", "review_skill_pack
 
 
 def allowed_tool_names_for_skills(skills: list[Skill]) -> set[str] | None:
-    '''合并已加载技能显式声明的工具白名单。
+    '''合并当前任务激活技能显式声明的工具白名单，不应传入仅供发现的完整技能目录。
 
         未有任何技能声明白名单时返回 ``None``，表示沿用旧版放行行为。
         一旦存在显式声明，未声明的技能不再扩大权限。

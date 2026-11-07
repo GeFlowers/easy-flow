@@ -42,7 +42,7 @@ class CurrentUser(Protocol):
     当前认证用户的结构化类型。
 
         任何具有 ``.id: str`` 属性的对象都满足此协议；具体实现位于
-        ``app.gateway.auth.models.User``。
+        ``server.gateway.auth.models.User``。
     '''
 
     id: str

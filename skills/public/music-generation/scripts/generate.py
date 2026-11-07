@@ -17,7 +17,7 @@ def _check_base_resp(payload: dict) -> None:
     '''校验 MiniMax ``base_resp`` 是否表示成功，非零状态时抛出含服务端信息的异常。'''
     base = payload.get("base_resp") or {}
     if base.get("status_code", 0) != 0:
-        raise Exception(f"MiniMax error {base.get('status_code')}: {base.get('status_msg')}")
+        raise Exception(f"MiniMax 错误 {base.get('status_code')}：{base.get('status_msg')}")
 
 
 def generate_music(prompt_file: str, output_file: str) -> str:
@@ -32,7 +32,7 @@ def generate_music(prompt_file: str, output_file: str) -> str:
 
     api_key = os.getenv("MINIMAX_API_KEY")
     if not api_key:
-        return "MINIMAX_API_KEY is not set"
+        return "尚未设置 MINIMAX_API_KEY"
 
     prompt = (spec.get("prompt") or "").strip()
     if not prompt:
@@ -65,24 +65,24 @@ def generate_music(prompt_file: str, output_file: str) -> str:
     _check_base_resp(payload)
     audio_hex = (payload.get("data") or {}).get("audio")
     if not audio_hex:
-        raise Exception("MiniMax returned no audio data")
+        raise Exception("MiniMax 未返回音频数据")
 
     output_dir = os.path.dirname(output_file)
     if output_dir:
         os.makedirs(output_dir, exist_ok=True)
     with open(output_file, "wb") as f:
         f.write(bytes.fromhex(audio_hex))
-    return f"Successfully generated music to {output_file}"
+    return f"已成功生成音乐：{output_file}"
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate music using MiniMax API")
+    parser = argparse.ArgumentParser(description="通过 MiniMax 接口生成音乐")
     parser.add_argument("--prompt-file", required=True,
-                        help="Absolute path to JSON spec file {title, prompt, lyrics?, is_instrumental?}")
-    parser.add_argument("--output-file", required=True, help="Output path for generated MP3")
+                        help="JSON（JavaScript Object Notation，JavaScript 对象表示法）规范文件绝对路径，字段为 {title, prompt, lyrics?, is_instrumental?}")
+    parser.add_argument("--output-file", required=True, help="生成 MP3（MPEG Audio Layer III，动态图像专家组音频第三层）音频的输出路径")
     args = parser.parse_args()
 
     try:
         print(generate_music(args.prompt_file, args.output_file))
     except Exception as e:
-        print(f"Error while generating music: {e}")
+        print(f"生成音乐时出错：{e}")

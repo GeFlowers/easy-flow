@@ -1,141 +1,41 @@
 ---
 title: Deployment Guide
-description: "This guide covers the supported Docker Compose deployment for DeerFlow App."
+description: Local application services, a database container and Nginx boot startup.
 ---
-
-import { Callout } from "nextra/components";
 
 # Deployment Guide
 
-This guide covers the supported Docker Compose deployment for DeerFlow App.
+This learning edition supports a Windows local deployment. The frontend listens on `127.0.0.1:3001`, the backend on `127.0.0.1:8001`, and Nginx exposes `http://localhost:2026`.
 
-## Supported deployment
+## Configuration
 
-This project supports one application startup workflow: Docker Compose through `make docker-start`.
+Keep credentials in the private root `.env`. Connect to PostgreSQL at `127.0.0.1:5432` and to local Redis. The `database.postgres_url: $DATABASE_URL` configuration references the environment file.
 
-## Docker Compose deployment
+Set `NGINX_HOME` to the directory containing `nginx.exe`. Back up its original configuration before copying the repository's `deploy/nginx/nginx.conf` to `conf/nginx.conf`. The proxy rewrites `/api/langgraph/*` to the backend's `/api/*` and keeps pages and requests on the same origin.
 
-Docker Compose runs all services in containers. Use this for a more production-like local setup or for team environments.
+## Application lifecycle
 
-### Prerequisites
-
-- Docker (or Docker Desktop / OrbStack on macOS)
-- A configured `config.yaml` at the repo root
-
-### Start the application
+After following [Quick Start](/docs/application/quick-start):
 
 ```bash
-make docker-start
+bash scripts/start.sh
+bash scripts/stop.sh
 ```
 
-Services: nginx, frontend, gateway, and PostgreSQL.
+The stop script stops the frontend, backend, and PostgreSQL container while preserving the database volume and Nginx.
 
-Access the app at **http://localhost:2026**.
+## Nginx at boot
 
-Stop the services with `make docker-stop`; view logs with `make docker-logs`.
+The proxy can be configured to start at system boot. No Windows login or personal password is required. The frontend and backend still start manually; until then, the proxy returns an unavailable-upstream response.
 
-### Environment variables
+Manage the proxy separately using its installation. Managing a system-account process may require administrator privileges. Do not run the backend as an administrator during normal use.
 
-Create a `.env` file in the repo root for secrets and runtime configuration:
+## Data and safety
 
-```bash
-# .env
-OPENAI_API_KEY=sk-...
-DEER_FLOW_ROOT=/absolute/path/to/deer-flow
-BETTER_AUTH_SECRET=your-secret-here-min-32-chars
-```
+- PostgreSQL reuses `deer-flow-dev_postgres-data`. A missing existing volume causes startup to fail rather than silently initialize an empty database.
+- Back up `backend/.deer-flow` separately: it contains attachments, artifacts, file-based memory and the generated login signing secret.
+- Authentication is handled by the backend, not the Better Auth settings in older tutorials.
+- Commands in the local sandbox run with the backend account's host permissions, without container isolation.
+- The default configuration is local-only. Public deployment needs a separate security design, encrypted transport, network boundaries and backups.
 
-The `docker-compose*.yaml` files include an `env_file: ../.env` directive that loads this automatically.
-
-<Callout type="warning">
-  Always set <code>BETTER_AUTH_SECRET</code> to a strong random string before
-  deploying. Without it, the frontend build uses a default that is publicly
-  known.
-</Callout>
-
-### Data persistence
-
-Thread data is stored in `backend/.deer-flow/threads/`. In Docker deployments, this directory is bind-mounted into the gateway container.
-
-To avoid data loss when containers are recreated:
-
-1. Set `DEER_FLOW_ROOT` to the absolute repo root path (or a stable host path).
-2. Verify the `threads/` and `skills/` directories are mounted correctly.
-
-For production, use a named volume or a Persistent Volume Claim (PVC) instead of a host bind-mount.
-
-## Production deployment considerations
-
-### Sandbox mode selection
-
-| Sandbox                                | Use case                                   |
-| -------------------------------------- | ------------------------------------------ |
-| `LocalSandboxProvider`                 | Single-user, trusted local workflows       |
-| `E2BSandboxProvider` (e2b cloud)       | Hosted/serverless, no Docker/K8s ops, instant Jupyter |
-
-The configured default is `LocalSandboxProvider`, intended for trusted single-user workflows. Choose a VM-backed provider when stronger execution isolation is required.
-
-### Database backend
-
-DeerFlow uses PostgreSQL for LangGraph checkpoints, LangGraph Store data, and application records:
-
-```bash
-# .env
-DATABASE_URL=postgresql://user:password@postgres:5432/deerflow
-UV_EXTRAS=postgres
-```
-
-```yaml
-# config.yaml
-database:
-  backend: postgres
-  postgres_url: $DATABASE_URL
-
-run_events:
-  backend: db
-```
-
-### nginx configuration
-
-nginx routes all traffic to the frontend or Gateway. `/api/langgraph/*` is rewritten to Gateway's LangGraph-compatible `/api/*` routes, so no separate LangGraph upstream is required.
-
-### Authentication
-
-DeerFlow App uses [Better Auth](https://www.better-auth.com/) for session management. In production:
-
-1. Set `BETTER_AUTH_SECRET` to a strong random string (minimum 32 characters).
-2. Set `BETTER_AUTH_URL` to your public-facing URL (e.g., `https://your-domain.com`).
-
-```bash
-# Generate a secret
-openssl rand -base64 32
-```
-
-### Resource recommendations
-
-| Service                         | Minimum          | Recommended      |
-| ------------------------------- | ---------------- | ---------------- |
-| Gateway + agent runtime         | 2 vCPU, 4 GB RAM | 4 vCPU, 8 GB RAM |
-| Frontend                        | 0.5 vCPU, 512 MB | 1 vCPU, 1 GB     |
-
-## Deployment verification
-
-After starting, verify the deployment:
-
-```bash
-# Check Gateway health
-curl http://localhost:8001/health
-
-# List configured models (through nginx)
-curl http://localhost:2026/api/models
-```
-
-A working deployment returns a `200` response from each endpoint. The `/api/models` call returns the list of models from your `config.yaml`.
-
-<Cards num={2}>
-  <Cards.Card title="Configuration" href="/docs/application/configuration" />
-  <Cards.Card
-    title="Operations & Troubleshooting"
-    href="/docs/application/operations-and-troubleshooting"
-  />
-</Cards>
+[Operations and Troubleshooting](/docs/application/operations-and-troubleshooting)

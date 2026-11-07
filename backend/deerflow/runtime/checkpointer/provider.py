@@ -95,7 +95,9 @@ def _sync_checkpointer_cm(config: CheckpointerConfig) -> Iterator[Checkpointer]:
             raise ValueError(POSTGRES_CONN_REQUIRED)
 
         with PostgresSaver.from_conn_string(config.connection_string) as saver:
-            saver.setup()
+            from deerflow.persistence.langgraph_schema import ensure_langgraph_schema
+
+            ensure_langgraph_schema(config.connection_string, 'checkpoint')
             logger.info("Checkpointer: using PostgresSaver")
             yield saver
         return

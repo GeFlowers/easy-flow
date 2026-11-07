@@ -27,31 +27,30 @@ import {
   SidecarProvider,
   SidecarTrigger,
 } from "@/components/workspace/sidecar";
-import { ThreadScheduledTasksLink } from "@/components/workspace/thread-scheduled-tasks-link";
 import { ThreadTitle } from "@/components/workspace/thread-title";
 import { TodoList } from "@/components/workspace/todo-list";
 import { TokenUsageIndicator } from "@/components/workspace/token-usage-indicator";
 import { useActiveGoal } from "@/components/workspace/use-active-goal";
 import { Welcome } from "@/components/workspace/welcome";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   buildHumanInputResponseText,
   hasOpenHumanInputRequest,
   type HumanInputRequest,
   type HumanInputResponse,
-} from "@/core/messages/human-input";
-import { isHiddenFromUIMessage } from "@/core/messages/utils";
-import { useModels } from "@/core/models/hooks";
-import { useNotification } from "@/core/notification/hooks";
-import { useLocalSettings, useThreadSettings } from "@/core/settings";
+} from "@/features/messages/human-input";
+import { isHiddenFromUIMessage } from "@/features/messages/utils";
+import { useModels } from "@/features/models/hooks";
+import { useNotification } from "@/features/notification/hooks";
+import { useLocalSettings, useThreadSettings } from "@/features/settings";
 import {
   useBranchThread,
   useThreadMetadata,
   useThreadStream,
   useThreadTokenUsage,
-} from "@/core/threads/hooks";
-import { threadTokenUsageToTokenUsage } from "@/core/threads/token-usage";
-import { textOfMessage } from "@/core/threads/utils";
+} from "@/features/threads/hooks";
+import { threadTokenUsageToTokenUsage } from "@/features/threads/token-usage";
+import { textOfMessage } from "@/features/threads/utils";
 import { cn } from "@/lib/utils";
 
 /** 管理普通会话的流式消息、历史恢复、分支与输入交互。 */
@@ -259,9 +258,6 @@ export default function ChatPage() {
                 <ThreadTitle threadId={threadId} thread={thread} />
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                {!isNewThread && (
-                  <ThreadScheduledTasksLink threadId={threadId} />
-                )}
                 <TokenUsageIndicator
                   threadId={isNewThread ? undefined : threadId}
                   backendUsage={backendTokenUsage}

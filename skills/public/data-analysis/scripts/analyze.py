@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 try:
     import duckdb
 except ImportError:
-    logger.error("duckdb is not installed. Installing...")
+    logger.error("尚未安装 duckdb，正在安装……")
     subprocess.run([sys.executable, "-m", "pip", "install", "duckdb", "openpyxl", "-q"], check=True)
     import duckdb
 
@@ -89,7 +89,7 @@ def load_files(con: duckdb.DuckDBPyConnection, files: list[str]) -> dict[str, st
 
     for file_path in files:
         if not os.path.exists(file_path):
-            logger.error(f"File not found: {file_path}")
+            logger.error(f"找不到文件：{file_path}")
             continue
 
         ext = os.path.splitext(file_path)[1].lower()
@@ -99,7 +99,7 @@ def load_files(con: duckdb.DuckDBPyConnection, files: list[str]) -> dict[str, st
         elif ext == ".csv":
             _load_csv(con, file_path, table_map)
         else:
-            logger.warning(f"Unsupported file format: {ext} ({file_path})")
+            logger.warning(f"不支持的文件格式：{ext}（{file_path}）")
 
     return table_map
 
@@ -140,10 +140,10 @@ def _load_excel(
                 0
             ]
             logger.info(
-                f"  Loaded sheet '{sheet_name}' -> table '{table_name}' ({row_count} rows)"
+                f"  已加载工作表 '{sheet_name}' → 表 '{table_name}'（{row_count} 行）"
             )
         except Exception as e:
-            logger.warning(f"  Failed to load sheet '{sheet_name}': {e}")
+            logger.warning(f"  加载工作表 '{sheet_name}' 失败：{e}")
 
 
 def _load_csv(
@@ -170,10 +170,10 @@ def _load_csv(
         table_map[base_name] = table_name
         row_count = con.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
         logger.info(
-            f"  Loaded CSV '{base_name}' -> table '{table_name}' ({row_count} rows)"
+            f"  已加载逗号分隔值文件 '{base_name}' → 表 '{table_name}'（{row_count} 行）"
         )
     except Exception as e:
-        logger.warning(f"  Failed to load CSV '{base_name}': {e}")
+        logger.warning(f"  加载逗号分隔值文件 '{base_name}' 失败：{e}")
 
 
 def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) -> str:
@@ -182,17 +182,17 @@ def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) ->
 
     for original_name, table_name in table_map.items():
         output_parts.append(f"\n{'=' * 60}")
-        output_parts.append(f'Table: {original_name} (SQL name: "{table_name}")')
+        output_parts.append(f'表：{original_name}（查询名称："{table_name}"）')
         output_parts.append(f"{'=' * 60}")
 
         # 获取行数。
         row_count = con.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
-        output_parts.append(f"Rows: {row_count}")
+        output_parts.append(f"行数：{row_count}")
 
         # 获取列信息。
         columns = con.execute(f'DESCRIBE "{table_name}"').fetchall()
-        output_parts.append(f"\nColumns ({len(columns)}):")
-        output_parts.append(f"{'Name':<30} {'Type':<15} {'Nullable'}")
+        output_parts.append(f"\n列（{len(columns)}）：")
+        output_parts.append(f"{'名称':<30} {'类型':<15} {'可为空'}")
         output_parts.append(f"{'-' * 30} {'-' * 15} {'-' * 8}")
         for col in columns:
             col_name, col_type, nullable = col[0], col[1], col[2]
@@ -206,14 +206,14 @@ def action_inspect(con: duckdb.DuckDBPyConnection, table_map: dict[str, str]) ->
         non_null_sql = f'SELECT {", ".join(non_null_parts)} FROM "{table_name}"'
         try:
             non_null_counts = con.execute(non_null_sql).fetchone()
-            output_parts.append("\nNon-null counts:")
+            output_parts.append("\n非空数量：")
             for i, c in enumerate(col_names):
                 output_parts.append(f"  {c}: {non_null_counts[i]} / {row_count}")
         except Exception:
             pass
 
         # 读取前五行作为样本。
-        output_parts.append("\nSample data (first 5 rows):")
+        output_parts.append("\n样本数据（前 5 行）：")
         try:
             sample = con.execute(f'SELECT * FROM "{table_name}" LIMIT 5').fetchdf()
             output_parts.append(sample.to_string(index=False))
@@ -254,7 +254,7 @@ def action_query(
         columns = [desc[0] for desc in result.description]
         rows = result.fetchall()
     except Exception as e:
-        error_msg = f"SQL Error: {e}\n\nAvailable tables:\n"
+        error_msg = f"查询错误：{e}\n\n可用表：\n"
         for orig, tbl in table_map.items():
             cols = con.execute(f'DESCRIBE "{tbl}"').fetchall()
             col_names = [c[0] for c in cols]
@@ -273,7 +273,7 @@ def action_query(
 def _format_table(columns: list[str], rows: list[tuple]) -> str:
     '''将查询列和行转换为限宽的终端可读表格。'''
     if not rows:
-        msg = "Query returned 0 rows."
+        msg = "查询返回 0 行。"
         print(msg)
         return msg
 
@@ -299,7 +299,7 @@ def _format_table(columns: list[str], rows: list[tuple]) -> str:
         )
         parts.append(row_str)
 
-    parts.append(f"\n({len(rows)} rows)")
+    parts.append(f"\n（{len(rows)} 行）")
     result = "\n".join(parts)
     print(result)
     return result
@@ -345,11 +345,11 @@ def _export_results(columns: list[str], rows: list[tuple], output_file: str) -> 
                     "| " + " | ".join(str(v).replace("|", "\\|") for v in row) + " |\n"
                 )
     else:
-        msg = f"Unsupported output format: {ext}. Use .csv, .json, or .md"
+        msg = f"不支持的输出格式：{ext}。请使用 .csv、.json 或 .md"
         print(msg)
         return msg
 
-    msg = f"Results exported to {output_file} ({len(rows)} rows)"
+    msg = f"结果已导出到 {output_file}（{len(rows)} 行）"
     print(msg)
     return msg
 
@@ -367,15 +367,15 @@ def action_summary(
         columns = con.execute(f'DESCRIBE "{resolved}"').fetchall()
     except Exception:
         available = ", ".join(f'"{t}" ({o})' for o, t in table_map.items())
-        msg = f"Table '{table_name}' not found. Available tables: {available}"
+        msg = f"找不到表 '{table_name}'。可用表：{available}"
         print(msg)
         return msg
 
     row_count = con.execute(f'SELECT COUNT(*) FROM "{resolved}"').fetchone()[0]
 
     output_parts = []
-    output_parts.append(f"\nStatistical Summary: {table_name}")
-    output_parts.append(f"Total rows: {row_count}")
+    output_parts.append(f"\n统计摘要：{table_name}")
+    output_parts.append(f"总行数：{row_count}")
     output_parts.append(f"{'=' * 70}")
 
     numeric_types = {
@@ -414,15 +414,15 @@ def action_summary(
                     FROM "{resolved}"
                 """).fetchone()
                 labels = [
-                    "count",
-                    "mean",
-                    "std",
-                    "min",
+                    "数量",
+                    "均值",
+                    "标准差",
+                    "最小值",
                     "25%",
                     "50%",
                     "75%",
-                    "max",
-                    "nulls",
+                    "最大值",
+                    "空值数",
                 ]
                 for label, val in zip(labels, stats):
                     if isinstance(val, float):
@@ -430,7 +430,7 @@ def action_summary(
                     else:
                         output_parts.append(f"  {label:<8}: {val}")
             except Exception as e:
-                output_parts.append(f"  Error computing stats: {e}")
+                output_parts.append(f"  计算统计量出错：{e}")
         else:
             try:
                 stats = con.execute(f"""
@@ -441,10 +441,10 @@ def action_summary(
                         COUNT(*) - COUNT("{col_name}") as null_count
                     FROM "{resolved}"
                 """).fetchone()
-                output_parts.append(f"  count   : {stats[0]}")
-                output_parts.append(f"  unique  : {stats[1]}")
-                output_parts.append(f"  top     : {stats[2]}")
-                output_parts.append(f"  nulls   : {stats[3]}")
+                output_parts.append(f"  数量    ：{stats[0]}")
+                output_parts.append(f"  唯一值数：{stats[1]}")
+                output_parts.append(f"  最常见值：{stats[2]}")
+                output_parts.append(f"  空值数  ：{stats[3]}")
 
                 # 展示出现频率最高的五个值。
                 top_vals = con.execute(f"""
@@ -456,12 +456,12 @@ def action_summary(
                     LIMIT 5
                 """).fetchall()
                 if top_vals:
-                    output_parts.append("  top values:")
+                    output_parts.append("  高频值：")
                     for val, freq in top_vals:
                         pct = (freq / row_count * 100) if row_count > 0 else 0
                         output_parts.append(f"    {val}: {freq} ({pct:.1f}%)")
             except Exception as e:
-                output_parts.append(f"  Error computing stats: {e}")
+                output_parts.append(f"  计算统计量出错：{e}")
 
     result = "\n".join(output_parts)
     print(result)
@@ -470,44 +470,44 @@ def action_summary(
 
 def main():
     '''解析命令行参数，复用或创建缓存数据库，并执行选定的数据分析操作。'''
-    parser = argparse.ArgumentParser(description="Analyze Excel/CSV files using DuckDB")
+    parser = argparse.ArgumentParser(description="使用 DuckDB 分析 Excel／CSV（Comma-Separated Values，逗号分隔值）文件")
     parser.add_argument(
         "--files",
         nargs="+",
         required=True,
-        help="Paths to Excel (.xlsx/.xls) or CSV files",
+        help="Excel（.xlsx／.xls）或逗号分隔值文件路径",
     )
     parser.add_argument(
         "--action",
         required=True,
         choices=["inspect", "query", "summary"],
-        help="Action to perform: inspect, query, or summary",
+        help="执行操作：inspect（检查）、query（查询）或 summary（汇总）",
     )
     parser.add_argument(
         "--sql",
         type=str,
         default=None,
-        help="SQL query to execute (required for 'query' action)",
+        help="待执行的 SQL（Structured Query Language，结构化查询语言），query 操作必填",
     )
     parser.add_argument(
         "--table",
         type=str,
         default=None,
-        help="Table name for summary (required for 'summary' action)",
+        help="汇总表名，summary 操作必填",
     )
     parser.add_argument(
         "--output-file",
         type=str,
         default=None,
-        help="Path to export results (CSV/JSON/MD)",
+        help="结果导出路径（.csv／.json／.md）",
     )
     args = parser.parse_args()
 
     # 校验参数之间的依赖关系。
     if args.action == "query" and not args.sql:
-        parser.error("--sql is required for 'query' action")
+        parser.error("query 操作必须提供 --sql")
     if args.action == "summary" and not args.table:
-        parser.error("--table is required for 'summary' action")
+        parser.error("summary 操作必须提供 --table")
 
     # 计算文件内容哈希，用于查找缓存。
     files_hash = compute_files_hash(args.files)
@@ -516,20 +516,20 @@ def main():
 
     if cached_table_map and os.path.exists(db_path):
         # 命中缓存：以只读方式连接已有数据库。
-        logger.info(f"Cache hit! Using cached database: {db_path}")
+        logger.info(f"命中缓存，使用缓存数据库：{db_path}")
         con = duckdb.connect(db_path, read_only=True)
         table_map = cached_table_map
         logger.info(
-            f"Loaded {len(table_map)} table(s) from cache: {', '.join(table_map.keys())}"
+            f"已从缓存加载 {len(table_map)} 张表：{', '.join(table_map.keys())}"
         )
     else:
         # 未命中缓存：载入文件并将结果保存到数据库。
-        logger.info("Loading files (first time, will cache for future use)...")
+        logger.info("首次加载文件，之后将使用缓存……")
         con = duckdb.connect(db_path)
         table_map = load_files(con, args.files)
 
         if not table_map:
-            logger.error("No tables were loaded. Check file paths and formats.")
+            logger.error("未加载任何表，请检查文件路径与格式。")
             # 删除未能载入任何数据的空数据库文件。
             con.close()
             if os.path.exists(db_path):
@@ -539,9 +539,9 @@ def main():
         # 保存表名映射，供后续缓存查询使用。
         save_table_map(files_hash, table_map)
         logger.info(
-            f"\nLoaded {len(table_map)} table(s): {', '.join(table_map.keys())}"
+            f"\n已加载 {len(table_map)} 张表：{', '.join(table_map.keys())}"
         )
-        logger.info(f"Cached database saved to: {db_path}")
+        logger.info(f"缓存数据库已保存到：{db_path}")
 
     # 执行所选分析操作。
     if args.action == "inspect":

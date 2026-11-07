@@ -59,16 +59,16 @@ def normalize_relative_path(path: str) -> str:
     '''规范包内相对路径并拒绝空路径、绝对路径和目录向上跳转。'''
     raw = path.replace("\\", "/").strip()
     if not raw:
-        raise ValueError("path must not be empty")
+        raise ValueError("path 不能为空")
     pure = PurePosixPath(raw)
     if pure.is_absolute():
-        raise ValueError("absolute paths are not allowed")
+        raise ValueError("不允许使用绝对路径")
     normalized = posixpath.normpath(raw)
     if normalized in {"", "."}:
-        raise ValueError("path must not resolve to package root")
+        raise ValueError("path 不能解析为技能包根目录")
     parts = PurePosixPath(normalized).parts
     if any(part in {"..", ""} for part in parts):
-        raise ValueError("path must not contain parent-directory traversal")
+        raise ValueError("path 不能包含父目录遍历")
     return normalized
 
 

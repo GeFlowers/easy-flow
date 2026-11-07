@@ -57,5 +57,5 @@ class StaticScanBlockedError(ValueError):
         '''复制扫描发现并保存技能名，供路由和工具展示拦截原因。'''
         self.findings = [dict(finding) for finding in findings]  # type: ignore[list-item]
         self.skill_name = skill_name
-        subject = f"skill '{skill_name}'" if skill_name else "skill content"
-        super().__init__(message or f"Static security scan blocked {subject}")
+        subject = f"skill '{skill_name}'" if skill_name else "技能内容"
+        super().__init__(message or f"静态安全扫描已阻止 {subject}")

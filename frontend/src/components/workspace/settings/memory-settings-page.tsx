@@ -23,8 +23,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { useI18n } from "@/core/i18n/hooks";
-import { exportMemory } from "@/core/memory/api";
+import { useI18n } from "@/features/i18n/hooks";
+import { exportMemory } from "@/features/memory/api";
 import {
   useClearMemory,
   useCreateMemoryFact,
@@ -32,16 +32,17 @@ import {
   useImportMemory,
   useMemory,
   useUpdateMemoryFact,
-} from "@/core/memory/hooks";
+} from "@/features/memory/hooks";
+import { parseMemoryImport } from "@/features/memory/schema";
 import type {
   MemoryFactInput,
   MemoryFactPatchInput,
   UserMemory,
-} from "@/core/memory/types";
-import { SafeStreamdown } from "@/core/streamdown/components";
-import { streamdownPlugins } from "@/core/streamdown/plugins";
-import { pathOfThread } from "@/core/threads/utils";
-import { formatTimeAgo } from "@/core/utils/datetime";
+} from "@/features/memory/types";
+import { SafeStreamdown } from "@/features/streamdown/components";
+import { streamdownPlugins } from "@/features/streamdown/plugins";
+import { pathOfThread } from "@/features/threads/utils";
+import { formatTimeAgo } from "@/features/utils/datetime";
 
 import { SettingsSection } from "./settings-section";
 
@@ -54,73 +55,10 @@ type MemorySection = {
   updatedAt?: string;
 };
 
-type MemorySectionGroup = {
-  title: string;
-  sections: MemorySection[];
-};
-
 type PendingImport = {
   fileName: string;
   memory: UserMemory;
 };
-
-/** 收窄未知输入为非空对象，作为记忆导入结构校验的基础判断。 */
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-/** 校验记忆摘要分区所需的文本和更新时间字段。 */
-function isMemorySection(value: unknown): value is {
-  summary: string;
-  updatedAt: string;
-} {
-  return (
-    isRecord(value) &&
-    typeof value.summary === "string" &&
-    typeof value.updatedAt === "string"
-  );
-}
-
-/** 校验单条记忆事实的字段类型，拒绝不完整或非有限置信度数据。 */
-function isMemoryFact(value: unknown): value is UserMemory["facts"][number] {
-  return (
-    isRecord(value) &&
-    typeof value.id === "string" &&
-    typeof value.content === "string" &&
-    typeof value.category === "string" &&
-    typeof value.confidence === "number" &&
-    Number.isFinite(value.confidence) &&
-    typeof value.createdAt === "string" &&
-    typeof value.source === "string"
-  );
-}
-
-/** 验证导入文件是否符合当前记忆数据结构，再允许交由导入操作处理。 */
-function isImportedMemory(value: unknown): value is UserMemory {
-  if (!isRecord(value)) {
-    return false;
-  }
-
-  if (
-    typeof value.version !== "string" ||
-    typeof value.lastUpdated !== "string" ||
-    !isRecord(value.user) ||
-    !isRecord(value.history) ||
-    !Array.isArray(value.facts)
-  ) {
-    return false;
-  }
-
-  return (
-    isMemorySection(value.user.workContext) &&
-    isMemorySection(value.user.personalContext) &&
-    isMemorySection(value.user.topOfMind) &&
-    isMemorySection(value.history.recentMonths) &&
-    isMemorySection(value.history.earlierContext) &&
-    isMemorySection(value.history.longTermBackground) &&
-    value.facts.every(isMemoryFact)
-  );
-}
 
 type FactFormState = {
   content: string;
@@ -158,7 +96,7 @@ function formatMemorySection(
     section.summary.trim() ||
     `<span class="text-muted-foreground">${t.settings.memory.markdown.empty}</span>`;
   return [
-    `### ${section.title}`,
+    `## ${section.title}`,
     content,
     "",
     section.updatedAt &&
@@ -168,51 +106,21 @@ function formatMemorySection(
     .join("\n");
 }
 
-/** 按用户背景和历史背景组织记忆分区，供导出预览复用。 */
-function buildMemorySectionGroups(
+/** 将用户上下文和历史背景各整理为一个可搜索、可展示的摘要区。 */
+function buildMemorySections(
   memory: UserMemory,
   t: ReturnType<typeof useI18n>["t"],
-): MemorySectionGroup[] {
+): MemorySection[] {
   return [
     {
       title: t.settings.memory.markdown.userContext,
-      sections: [
-        {
-          title: t.settings.memory.markdown.work,
-          summary: memory.user.workContext.summary,
-          updatedAt: memory.user.workContext.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.personal,
-          summary: memory.user.personalContext.summary,
-          updatedAt: memory.user.personalContext.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.topOfMind,
-          summary: memory.user.topOfMind.summary,
-          updatedAt: memory.user.topOfMind.updatedAt,
-        },
-      ],
+      summary: memory.user.summary,
+      updatedAt: memory.user.updatedAt,
     },
     {
       title: t.settings.memory.markdown.historyBackground,
-      sections: [
-        {
-          title: t.settings.memory.markdown.recentMonths,
-          summary: memory.history.recentMonths.summary,
-          updatedAt: memory.history.recentMonths.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.earlierContext,
-          summary: memory.history.earlierContext.summary,
-          updatedAt: memory.history.earlierContext.updatedAt,
-        },
-        {
-          title: t.settings.memory.markdown.longTermBackground,
-          summary: memory.history.longTermBackground.summary,
-          updatedAt: memory.history.longTermBackground.updatedAt,
-        },
-      ],
+      summary: memory.history.summary,
+      updatedAt: memory.history.updatedAt,
     },
   ];
 }
@@ -220,7 +128,7 @@ function buildMemorySectionGroups(
 /** 汇总记忆摘要和更新时间，并在不同主题分区之间插入分隔线。 */
 function summariesToMarkdown(
   memory: UserMemory,
-  sectionGroups: MemorySectionGroup[],
+  sections: MemorySection[],
   t: ReturnType<typeof useI18n>["t"],
 ) {
   const parts: string[] = [];
@@ -230,11 +138,8 @@ function summariesToMarkdown(
     `- **${t.common.lastUpdated}**: \`${formatTimeAgo(memory.lastUpdated)}\``,
   );
 
-  for (const group of sectionGroups) {
-    parts.push(`\n## ${group.title}`);
-    for (const section of group.sections) {
-      parts.push(formatMemorySection(section, t));
-    }
+  for (const section of sections) {
+    parts.push(formatMemorySection(section, t));
   }
 
   const markdown = parts.join("\n\n");
@@ -254,15 +159,10 @@ function summariesToMarkdown(
   return out.join("\n");
 }
 
-/** 判断六个摘要分区是否都为空，用于区分空记忆与有内容状态。 */
+/** 判断用户上下文和历史背景是否均为空。 */
 function isMemorySummaryEmpty(memory: UserMemory) {
   return (
-    memory.user.workContext.summary.trim() === "" &&
-    memory.user.personalContext.summary.trim() === "" &&
-    memory.user.topOfMind.summary.trim() === "" &&
-    memory.history.recentMonths.summary.trim() === "" &&
-    memory.history.earlierContext.summary.trim() === "" &&
-    memory.history.longTermBackground.summary.trim() === ""
+    memory.user.summary.trim() === "" && memory.history.summary.trim() === ""
   );
 }
 
@@ -361,19 +261,14 @@ export function MemorySettingsPage() {
   const importButton = t.settings.memory.importButton ?? t.common.import;
   const importSuccess = t.settings.memory.importSuccess ?? "Memory imported";
 
-  const sectionGroups = memory ? buildMemorySectionGroups(memory, t) : [];
-  const filteredSectionGroups = sectionGroups
-    .map((group) => ({
-      ...group,
-      sections: group.sections.filter((section) =>
-        normalizedQuery
-          ? `${section.title} ${section.summary}`
-              .toLowerCase()
-              .includes(normalizedQuery)
-          : true,
-      ),
-    }))
-    .filter((group) => group.sections.length > 0);
+  const sections = memory ? buildMemorySections(memory, t) : [];
+  const filteredSections = sections.filter((section) =>
+    normalizedQuery
+      ? `${section.title} ${section.summary}`
+          .toLowerCase()
+          .includes(normalizedQuery)
+      : true,
+  );
 
   const filteredFacts = memory
     ? memory.facts.filter((fact) =>
@@ -388,13 +283,13 @@ export function MemorySettingsPage() {
   const showSummaries = filter !== "facts";
   const showFacts = filter !== "summaries";
   const shouldRenderSummariesBlock =
-    showSummaries && (filteredSectionGroups.length > 0 || !normalizedQuery);
+    showSummaries && (filteredSections.length > 0 || !normalizedQuery);
   const shouldRenderFactsBlock =
     showFacts &&
     (filteredFacts.length > 0 || !normalizedQuery || filter === "facts");
   const hasMatchingVisibleContent =
     !memory ||
-    (showSummaries && filteredSectionGroups.length > 0) ||
+    (showSummaries && filteredSections.length > 0) ||
     (showFacts && filteredFacts.length > 0);
 
   /** 获取完整记忆数据并下载为带时间标识的 JSON 文件。 */
@@ -434,13 +329,14 @@ export function MemorySettingsPage() {
 
     try {
       const parsed: unknown = JSON.parse(await file.text());
-      if (!isImportedMemory(parsed)) {
+      const imported = parseMemoryImport(parsed);
+      if (!imported) {
         toast.error(t.settings.memory.importInvalidFile);
         return;
       }
       setPendingImport({
         fileName: file.name,
-        memory: parsed,
+        memory: imported,
       });
     } catch {
       toast.error(t.settings.memory.importInvalidFile);
@@ -663,7 +559,7 @@ export function MemorySettingsPage() {
                   className="size-full min-w-0 [overflow-wrap:anywhere] [&>*:first-child]:mt-0 [&>*:last-child]:mb-0"
                   {...streamdownPlugins}
                 >
-                  {summariesToMarkdown(memory, filteredSectionGroups, t)}
+                  {summariesToMarkdown(memory, filteredSections, t)}
                 </SafeStreamdown>
               </div>
             ) : null}

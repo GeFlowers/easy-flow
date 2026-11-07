@@ -7,9 +7,9 @@ _LOCAL_SANDBOX_PROVIDER_MARKERS = (
     "deerflow.sandbox.local.local_sandbox_provider:LocalSandboxProvider",
 )
 
-LOCAL_HOST_BASH_DISABLED_MESSAGE = "Host bash execution is disabled for LocalSandboxProvider because it is not a secure sandbox boundary. Set sandbox.allow_host_bash: true only in a fully trusted local environment."
+LOCAL_HOST_BASH_DISABLED_MESSAGE = "LocalSandboxProvider 已禁用宿主 bash 执行，因为它不构成安全的沙箱边界。仅可在完全可信的本地环境中设置 sandbox.allow_host_bash: true。"
 
-LOCAL_BASH_SUBAGENT_DISABLED_MESSAGE = "Bash subagent is disabled for LocalSandboxProvider because host bash execution is not a secure sandbox boundary. Set sandbox.allow_host_bash: true only in a fully trusted local environment."
+LOCAL_BASH_SUBAGENT_DISABLED_MESSAGE = "LocalSandboxProvider 已禁用 bash 子代理，因为宿主 bash 执行不构成安全的沙箱边界。仅可在完全可信的本地环境中设置 sandbox.allow_host_bash: true。"
 
 
 def uses_local_sandbox_provider(config=None) -> bool:

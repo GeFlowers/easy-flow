@@ -87,7 +87,9 @@ async def _async_checkpointer(config) -> AsyncIterator[Checkpointer]:
         pool = _build_postgres_pool(config.connection_string)
         async with pool:
             saver = AsyncPostgresSaver(conn=pool)
-            await saver.setup()
+            from deerflow.persistence.langgraph_schema import ensure_langgraph_schema_async
+
+            await ensure_langgraph_schema_async(config.connection_string, 'checkpoint')
             yield saver
         return
 
@@ -109,7 +111,9 @@ async def _async_checkpointer_from_database(db_config) -> AsyncIterator[Checkpoi
         pool = _build_postgres_pool(db_config.postgres_url)
         async with pool:
             saver = AsyncPostgresSaver(conn=pool)
-            await saver.setup()
+            from deerflow.persistence.langgraph_schema import ensure_langgraph_schema_async
+
+            await ensure_langgraph_schema_async(db_config.postgres_url, 'checkpoint')
             yield saver
         return
 

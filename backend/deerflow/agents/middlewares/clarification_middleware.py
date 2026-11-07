@@ -143,10 +143,8 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
         return ToolMessage(
             id=self._stable_message_id(tool_call_id, "proceed-without-clarification"),
             content=(
-                "Clarification is disabled in this context — the human is not present "
-                "to answer synchronously. Do not ask for confirmation. Proceed with your "
-                "best judgment, carry out the requested action, and state any assumptions "
-                "you made in your final response."
+                "当前上下文已禁用澄清，因为用户不在场，无法同步回答。不要请求确认。"
+                "请依据最佳判断继续执行请求的操作，并在最终答复中说明所作假设。"
             ),
             tool_call_id=tool_call_id,
             name="ask_clarification",

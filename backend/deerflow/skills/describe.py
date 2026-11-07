@@ -46,7 +46,7 @@ def build_describe_skill_tool(
         '''根据代理提供的技能名搜索目录并返回匹配项的安全转义元数据。'''
         matched = catalog.search(name)
         if not matched:
-            content = f"No skills matched: {name}"
+            content = f"未找到匹配的技能： {name}"
         else:
             content = _render_skill_metadata(matched, container_base_path)
 
@@ -91,14 +91,14 @@ def _render_skill_metadata(skills: list, container_base_path: str) -> str:
     '''将匹配技能的名称、描述、可用工具和容器路径整理为代理可读取的文本。'''
     blocks: list[str] = []
     for s in skills:
-        mutability = "[custom, editable]" if s.category == SkillCategory.CUSTOM else "[built-in]"
-        tools_line = ", ".join(s.allowed_tools) if s.allowed_tools else "(all)"
+        mutability = "[自定义，可编辑]" if s.category == SkillCategory.CUSTOM else "[内置]"
+        tools_line = ", ".join(s.allowed_tools) if s.allowed_tools else "(全部)"
         location = s.get_container_file_path(container_base_path)
         name = html.escape(s.name, quote=False)
         description = html.escape(s.description, quote=False)
         tools = html.escape(tools_line, quote=False)
         loc = html.escape(location, quote=False)
-        blocks.append(f"## Skill: {name}\n- Description: {description} {mutability}\n- Allowed tools: {tools}\n- Location: {loc}")
+        blocks.append(f"## 技能： {name}\n- 描述： {description} {mutability}\n- 允许的工具： {tools}\n- 位置： {loc}")
     return "\n\n".join(blocks)
 
 
@@ -118,21 +118,21 @@ def get_skill_index_prompt_section(
     evolution = f"\n{skill_evolution_section}" if skill_evolution_section else ""
 
     return f"""<skill_system>
-You have access to skills that provide optimized workflows for specific tasks.
+你可以使用技能，为特定任务获得优化的工作流程。
 
-**Skill Discovery:**
-1. Check <skill_index> for a skill name that matches your task
-2. Call describe_skill(name) to fetch its description and capabilities
-3. If the skill matches, call read_file on the returned location to load full instructions
-4. Follow the skill's instructions precisely
+**发现技能：**
+1. 在 <skill_index> 中查找与任务匹配的技能名称
+2. 调用 describe_skill(name) 获取技能描述和能力说明
+3. 若技能适合任务，对返回的位置调用 read_file 以加载完整说明
+4. 严格遵循技能说明
 
-**Explicit Slash Skill Activation:**
-- If the user starts a request with `/<skill-name>`, that skill was explicitly requested.
-- The runtime injects the activated skill content; do not call `read_file` for that SKILL.md again unless the injected skill references supporting resources you need.
+**显式斜杠技能激活：**
+- 若用户以 `/<skill-name>` 开始请求，表示用户显式指定了该技能。
+- 运行时会注入已激活的技能内容；除非注入内容引用了你需要的辅助资源，否则不要再次对该 SKILL.md 调用 `read_file`。
 {evolution}
 <skill_index>
 {names}
 </skill_index>
 
-Skills are located at: {container_base_path}
+技能所在位置： {container_base_path}
 </skill_system>"""

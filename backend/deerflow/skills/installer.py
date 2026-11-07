@@ -8,6 +8,7 @@ import shutil
 import stat
 import zipfile
 from pathlib import Path, PurePosixPath, PureWindowsPath
+from deerflow.utils.event_loop import run_async
 
 from deerflow.skills.permissions import make_skill_tree_sandbox_readable
 from deerflow.skills.security_scanner import scan_skill_content
@@ -94,7 +95,7 @@ def resolve_skill_dir_from_archive(temp_path: Path) -> Path:
     '''定位压缩包中的技能根目录；若归档只有一个有效顶层目录则使用该目录。'''
     items = [p for p in temp_path.iterdir() if not should_ignore_archive_entry(p)]
     if not items:
-        raise ValueError("Skill archive is empty")
+        raise ValueError("技能归档为空")
     if len(items) == 1 and items[0].is_dir():
         return items[0]
     return temp_path
@@ -111,7 +112,7 @@ def safe_extract_skill_archive(
 
     for info in zip_ref.infolist():
         if is_unsafe_zip_member(info):
-            raise ValueError(f"Archive contains unsafe member path: {info.filename!r}")
+            raise ValueError(f"归档包含不安全的成员路径： {info.filename!r}")
 
         if is_symlink_member(info):
             logger.warning("Skipping symlink entry in skill archive: %s", info.filename)
@@ -120,7 +121,7 @@ def safe_extract_skill_archive(
         normalized_name = posixpath.normpath(info.filename.replace("\\", "/"))
         member_path = dest_root.joinpath(*PurePosixPath(normalized_name).parts)
         if not member_path.resolve().is_relative_to(dest_root):
-            raise ValueError(f"Zip entry escapes destination: {info.filename!r}")
+            raise ValueError(f"压缩包条目超出目标目录： {info.filename!r}")
         member_path.parent.mkdir(parents=True, exist_ok=True)
 
         if info.is_dir():
@@ -131,11 +132,11 @@ def safe_extract_skill_archive(
             first_chunk = True
             while chunk := src.read(65536):
                 if first_chunk and is_executable_binary_prefix(chunk):
-                    raise ValueError(f"Archive contains executable binary member: {info.filename!r}")
+                    raise ValueError(f"归档包含可执行二进制成员： {info.filename!r}")
                 first_chunk = False
                 total_written += len(chunk)
                 if total_written > max_total_size:
-                    raise ValueError("Skill archive is too large or appears highly compressed.")
+                    raise ValueError("技能归档过大或压缩率异常。")
                 dst.write(chunk)
 
 
@@ -186,7 +187,7 @@ def _move_staged_skill_into_reserved_target(staging_target: Path, target: Path) 
         make_skill_tree_sandbox_readable(target)
         installed = True
     except FileExistsError as e:
-        raise SkillAlreadyExistsError(f"Skill '{target.name}' already exists") from e
+        raise SkillAlreadyExistsError(f"技能 '{target.name}' 已存在") from e
     finally:
         if reserved and not installed and target.exists():
             shutil.rmtree(target)
@@ -204,23 +205,23 @@ async def _scan_skill_file_or_raise(skill_dir: Path, path: Path, skill_name: str
     try:
         content = await asyncio.to_thread(path.read_text, encoding="utf-8")
     except UnicodeDecodeError as e:
-        raise SkillSecurityScanError(f"Security scan failed for skill '{skill_name}': {location} must be valid UTF-8") from e
+        raise SkillSecurityScanError(f"技能安全扫描失败，技能 '{skill_name}': {location} 必须为有效的统一码转换格式八位文本") from e
 
     try:
         result = await scan_skill_content(content, executable=executable, location=location, static_findings=static_findings or [])
     except Exception as e:
-        raise SkillSecurityScanError(f"Security scan failed for {location}: {e}") from e
+        raise SkillSecurityScanError(f"安全扫描失败，目标： {location}: {e}") from e
 
     decision = getattr(result, "decision", None)
-    reason = str(getattr(result, "reason", "") or "No reason provided.")
+    reason = str(getattr(result, "reason", "") or "未提供原因。")
     if decision == "block":
         if rel_path == "SKILL.md":
-            raise SkillSecurityScanError(f"Security scan blocked skill '{skill_name}': {reason}")
-        raise SkillSecurityScanError(f"Security scan blocked {location}: {reason}")
+            raise SkillSecurityScanError(f"安全扫描已阻止技能 '{skill_name}': {reason}")
+        raise SkillSecurityScanError(f"安全扫描已阻止 {location}: {reason}")
     if executable and decision != "allow":
-        raise SkillSecurityScanError(f"Security scan rejected executable {location}: {reason}")
+        raise SkillSecurityScanError(f"安全扫描已拒绝可执行内容 {location}: {reason}")
     if decision not in {"allow", "warn"}:
-        raise SkillSecurityScanError(f"Security scan failed for {location}: invalid scanner decision {decision!r}")
+        raise SkillSecurityScanError(f"安全扫描失败，目标： {location}：扫描器决定无效 {decision!r}")
 
 
 def scan_archive_preflight_or_raise(archive_path: Path, *, app_config=None) -> None:
@@ -231,7 +232,7 @@ def scan_archive_preflight_or_raise(archive_path: Path, *, app_config=None) -> N
     if result["blocked"]:
         critical = [finding for finding in result["findings"] if finding["severity"] == "CRITICAL"]
         raise SkillSecurityScanError(
-            f"Static security scan blocked unsafe skill archive: {format_static_archive_findings(critical)}",
+            f"静态安全扫描已阻止不安全的技能归档： {format_static_archive_findings(critical)}",
             findings=critical,
             skill_name=None,
         )
@@ -249,7 +250,7 @@ async def _scan_static_skill_archive_or_raise(skill_dir: Path, skill_name: str, 
     except StaticScanBlockedError as e:
         raise SkillSecurityScanError(str(e), findings=e.findings, skill_name=e.skill_name) from e
     except StaticScannerError as e:
-        raise SkillSecurityScanError(f"Static security scan failed for skill '{skill_name}': {e}", skill_name=skill_name) from e
+        raise SkillSecurityScanError(f"技能静态安全扫描失败，技能 '{skill_name}': {e}", skill_name=skill_name) from e
 
 
 def _collect_scannable_files(skill_dir: Path) -> list[Path]:
@@ -269,7 +270,7 @@ async def _scan_skill_archive_contents_or_raise(skill_dir: Path, skill_name: str
         if rel_path == Path("SKILL.md"):
             continue
         if path.name == "SKILL.md":
-            raise SkillSecurityScanError(f"Security scan failed for skill '{skill_name}': nested SKILL.md is not allowed at {skill_name}/{rel_path.as_posix()}")
+            raise SkillSecurityScanError(f"技能安全扫描失败，技能 '{skill_name}'：不允许嵌套 SKILL.md，位置： {skill_name}/{rel_path.as_posix()}")
         rel_path_posix = rel_path.as_posix()
         if await _is_code_file(path, rel_path):
             await _scan_skill_file_or_raise(
@@ -299,5 +300,5 @@ def _run_async_install(coro):
 
     if loop is not None and loop.is_running():
         with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-            return executor.submit(asyncio.run, coro).result()
-    return asyncio.run(coro)
+            return executor.submit(run_async, coro).result()
+    return run_async(coro)

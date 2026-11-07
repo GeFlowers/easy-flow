@@ -9,15 +9,67 @@ from __future__ import annotations
 
 import threading
 from collections.abc import Awaitable, Callable
+from functools import wraps
 from typing import Any, override
 
 from langchain.agents.middleware import TodoListMiddleware
-from langchain.agents.middleware.todo import Todo
+from langchain.agents.middleware.todo import Todo, WriteTodosInput
 from langchain.agents.middleware.types import ModelCallResult, ModelRequest, ModelResponse, hook_config
-from langchain_core.messages import AIMessage, HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from langgraph.runtime import Runtime
+from langgraph.types import Command
 
 from deerflow.agents.thread_state import ThreadState
+
+_DEFAULT_TODO_SYSTEM_PROMPT_ZH = """使用 write_todos 为复杂的多步骤工作创建和维护结构化待办列表。
+适用于至少三个步骤、需要规划或多次操作的任务，以及用户明确要求待办列表或同时提出多个任务的情况。
+简单、少量步骤的任务应直接完成，避免不必要的待办开销。
+开始工作时将待处理事项标为 pending，正在处理的事项标为 in_progress，完成后立即标为 completed。
+根据新信息及时调整列表：新增必要事项，移除不再相关的事项；通常只保留一项 in_progress。
+未完成、受阻或失败的任务不能标为 completed。每次模型调用最多调用一次 write_todos，不能并行调用。"""
+
+_DEFAULT_TODO_TOOL_DESCRIPTION_ZH = """创建或更新当前工作会话的结构化待办列表，以跟踪复杂任务的进度。
+适用于多步骤工作、需要规划的任务、用户明确要求列表或同时提出多个任务的情况；简单请求应直接完成。
+每次传入完整列表。状态仅可使用 pending、in_progress 或 completed；完成事项后应及时更新。
+不能并行多次调用本工具，每次模型调用最多调用一次。可根据工作结果修订列表。"""
+
+
+class _ChineseWriteTodosInput(WriteTodosInput):
+    '''write_todos 工具的输入模式；保持框架字段和验证规则，仅覆盖固定说明。'''
+
+    model_config = {**WriteTodosInput.model_config, "title": "WriteTodosInput"}
+
+    @classmethod
+    def __get_pydantic_json_schema__(cls, core_schema: Any, handler: Any) -> dict[str, Any]:
+        '''沿用框架的输入模式，并本地化模式及待办项的说明。'''
+        schema = handler(core_schema)
+        schema["description"] = "write_todos 工具的输入模式。"
+        schema["properties"]["todos"]["title"] = "待办列表"
+        item_schema = handler.resolve_ref_schema(schema["properties"]["todos"]["items"])
+        item_schema["title"] = "待办事项"
+        item_schema["description"] = "包含内容和状态的单个待办事项。"
+        item_schema["properties"]["content"]["title"] = "内容"
+        item_schema["properties"]["status"]["title"] = "状态"
+        return schema
+
+
+def _localize_todo_result(result: Any) -> Any:
+    '''仅转换框架生成的固定待办说明，保留状态、事项内容和消息元数据。'''
+    update = result.update if isinstance(result, Command) else result
+    if not isinstance(update, dict):
+        return result
+    for message in update.get("messages", []):
+        if not isinstance(message, ToolMessage) or not isinstance(message.content, str):
+            continue
+        if message.content.startswith("Updated todo list to "):
+            message.content = "已更新待办列表：" + message.content.removeprefix("Updated todo list to ")
+        elif message.content == (
+            "Error: The `write_todos` tool should never be called multiple times "
+            "in parallel. Please call it only once per model invocation to update "
+            "the todo list."
+        ):
+            message.content = "Error: 不能并行调用多次 `write_todos`。每次模型调用只能调用一次该工具来更新待办列表。"
+    return result
 
 
 def _todos_in_messages(messages: list[Any]) -> bool:
@@ -54,10 +106,10 @@ def _format_completion_reminder(todos: list[Todo]) -> str:
     incomplete_text = "\n".join(f"- [{t.get('status', 'pending')}] {t.get('content', '')}" for t in incomplete)
     return (
         "<system_reminder>\n"
-        "You have incomplete todo items that must be finished before giving your final response:\n\n"
+        "你仍有未完成的待办事项，请先完成后再给出最终答复：\n\n"
         f"{incomplete_text}\n\n"
-        "Please continue working on these tasks. Call `write_todos` to mark items as completed "
-        "as you finish them, and only respond when all items are done.\n"
+        "请继续处理这些任务。完成事项后调用 `write_todos` 标记为已完成，"
+        "所有事项完成后再答复。\n"
         "</system_reminder>"
     )
 
@@ -114,11 +166,11 @@ class TodoMiddleware(TodoListMiddleware):
             additional_kwargs={"hide_from_ui": True},
             content=(
                 "<system_reminder>\n"
-                "Your todo list from earlier is no longer visible in the current context window, "
-                "but it is still active. Here is the current state:\n\n"
+                "先前的待办列表已不在当前上下文窗口中，"
+                "但它仍然有效。当前状态如下：\n\n"
                 f"{formatted}\n\n"
-                "Continue tracking and updating this todo list as you work. "
-                "Call `write_todos` whenever the status of any item changes.\n"
+                "工作过程中请持续跟踪并更新此待办列表。"
+                "任何事项状态变化时，都请调用 `write_todos`。\n"
                 "</system_reminder>"
             ),
         )
@@ -140,7 +192,30 @@ class TodoMiddleware(TodoListMiddleware):
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         '''初始化父类待办工具，并创建按线程和运行隔离的提醒及计数状态。'''
+        kwargs.setdefault("system_prompt", _DEFAULT_TODO_SYSTEM_PROMPT_ZH)
+        kwargs.setdefault("tool_description", _DEFAULT_TODO_TOOL_DESCRIPTION_ZH)
         super().__init__(*args, **kwargs)
+        for todo_tool in self.tools:
+            original_func = todo_tool.func
+            original_coroutine = todo_tool.coroutine
+
+            if original_func is not None:
+
+                @wraps(original_func)
+                def localized_func(*args: Any, _original: Any = original_func, **kwargs: Any) -> Any:
+                    '''执行框架的同步待办操作，并转换固定返回说明。'''
+                    return _localize_todo_result(_original(*args, **kwargs))
+
+                todo_tool.func = localized_func
+            if original_coroutine is not None:
+
+                @wraps(original_coroutine)
+                async def localized_coroutine(*args: Any, _original: Any = original_coroutine, **kwargs: Any) -> Any:
+                    '''执行框架的异步待办操作，并转换固定返回说明。'''
+                    return _localize_todo_result(await _original(*args, **kwargs))
+
+                todo_tool.coroutine = localized_coroutine
+            todo_tool.args_schema = _ChineseWriteTodosInput
         self._lock = threading.Lock()
         self._pending_completion_reminders: dict[tuple[str, str], list[str]] = {}
         self._completion_reminder_counts: dict[tuple[str, str], int] = {}
@@ -254,7 +329,7 @@ class TodoMiddleware(TodoListMiddleware):
     ) -> dict[str, Any] | None:
         '''保留父类并行待办校验；模型提前结束时有限次跳回模型继续处理未完成项。'''
         # 先执行父类对并行 write_todos 调用的既有检查。
-        base_result = super().after_model(state, runtime)
+        base_result = _localize_todo_result(super().after_model(state, runtime))
         if base_result is not None:
             return base_result
 

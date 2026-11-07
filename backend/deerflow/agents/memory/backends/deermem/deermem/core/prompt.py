@@ -10,6 +10,8 @@ import threading
 import time
 from typing import Any, cast
 
+from deerflow.agents.memory.schema import normalize_memory
+
 logger = logging.getLogger(__name__)
 
 try:
@@ -19,233 +21,202 @@ try:
 except ImportError:
     TIKTOKEN_AVAILABLE = False
 
-MEMORY_UPDATE_PROMPT = """You are a memory management system. Your task is to analyze a conversation and update the user's memory profile.
+MEMORY_UPDATE_PROMPT = """你是记忆管理系统，负责分析对话并更新用户的记忆档案。
 
-Current Memory State:
+当前记忆状态：
 <current_memory>
 {current_memory}
 </current_memory>
 
-New Conversation to Process:
+待处理的新对话：
 <conversation>
 {conversation}
 </conversation>
 
-Instructions:
-1. Analyze the conversation for important information about the user
-2. Extract relevant facts, preferences, and context with specific details (numbers, names, technologies)
-3. Update the memory sections as needed following the detailed length guidelines below
+操作要求：
+1. 分析对话，识别与用户有关的重要信息。
+2. 提取相关事实、偏好和背景，保留具体细节（数字、名称、技术）。
+3. 根据需要更新各记忆部分，遵循下方详细的长度要求。
 
-Before extracting facts, perform a structured reflection on the conversation:
-1. Error/Retry Detection: Did the agent encounter errors, require retries, or produce incorrect results?
-   If yes, record the root cause and correct approach as a high-confidence fact with category "correction".
-2. User Correction Detection: Did the user correct the agent's direction, understanding, or output?
-   If yes, record the correct interpretation or approach as a high-confidence fact with category "correction".
-   Include what went wrong in "sourceError" only when category is "correction" and the mistake is explicit in the conversation.
-3. Project Constraint Discovery: Were any project-specific constraints discovered during the conversation?
-   If yes, record them as facts with the most appropriate category and confidence.
+提取事实前，先对对话进行结构化反思：
+1. 错误与重试检测：代理是否遇到错误、需要重试或产生了不正确的结果？
+   如果是，将根本原因和正确做法记录为高置信度事实，类别为 "correction"。
+2. 用户纠正检测：用户是否纠正了代理的方向、理解或输出？
+   如果是，将正确理解或做法记录为高置信度事实，类别为 "correction"。
+   仅当类别为 "correction" 且对话明确指出错误时，才在 "sourceError" 中记录错误内容。
+3. 项目约束发现：对话是否揭示了项目特有的约束？
+   如果是，以最合适的类别和置信度将其记录为事实。
 
 {correction_hint}
 
-Memory Section Guidelines:
+记忆各部分要求：
 
-**User Context** (Current state - concise summaries):
-- workContext: Professional role, company, key projects, main technologies (2-3 sentences)
-  Example: Core contributor, project names with metrics (16k+ stars), technical stack
-- personalContext: Languages, communication preferences, key interests (1-2 sentences)
-  Example: Bilingual capabilities, specific interest areas, expertise domains
-- topOfMind: Multiple ongoing focus areas and priorities (3-5 sentences, detailed paragraph)
-  Example: Primary project work, parallel technical investigations, ongoing learning/tracking
-  Include: Active implementation work, troubleshooting issues, market/research interests
-  Note: This captures SEVERAL concurrent focus areas, not just one task
+**用户上下文 user**：仅维护一个 summary，不再划分子类别。
+- 综合描述用户当前的工作、主要项目、语言和沟通偏好、兴趣及近期重点。
+- 用一段自然文字概括，通常 4-8 句；保留具体且仍有效的重要信息，不为凑句数添加内容。
 
-**History** (Temporal context - rich paragraphs):
-- recentMonths: Detailed summary of recent activities (4-6 sentences or 1-2 paragraphs)
-  Timeline: Last 1-3 months of interactions
-  Include: Technologies explored, projects worked on, problems solved, interests demonstrated
-- earlierContext: Important historical patterns (3-5 sentences or 1 paragraph)
-  Timeline: 3-12 months ago
-  Include: Past projects, learning journeys, established patterns
-- longTermBackground: Persistent background and foundational context (2-4 sentences)
-  Timeline: Overall/foundational information
-  Include: Core expertise, longstanding interests, fundamental working style
+**历史背景 history**：仅维护一个 summary，不再按时间段或背景类别拆分。
+- 综合描述过去的重要经历、项目变化、学习历程和长期背景。
+- 用一段自然文字概括，通常 4-8 句；已知时间关系可以写进正文，不得编造时间。
 
-**Facts Extraction**:
-- Extract specific, quantifiable details (e.g., "16k+ GitHub stars", "200+ datasets")
-- Include proper nouns (company names, project names, technology names)
-- Preserve technical terminology and version numbers
-- Categories:
-  * preference: Tools, styles, approaches user prefers/dislikes
-  * knowledge: Specific expertise, technologies mastered, domain knowledge
-  * context: Background facts (job title, projects, locations, languages)
-  * behavior: Working patterns, communication habits, problem-solving approaches
-  * goal: Stated objectives, learning targets, project ambitions
-  * correction: Explicit agent mistakes or user corrections, including the correct approach
-- Fact lifetime (``expected_valid_days``, optional integer):
-  How many days before this fact should be reviewed for possible removal.
-  The system schedules review automatically; omit when uncertain.
-  * <= 14: highly transient - active bugs, immediate tasks, today's focus
-  * 15-60: short-term - current experiments, in-progress side projects, near-term goals
-  * 60-180: medium-term - current role, active tech stack, ongoing preferences
-  * 180-365: stable - professional background, established working patterns
-  * > 365: very stable - core skills, native language, personality traits
-  Assign the value that semantically fits; values above the server-configured
-  ceiling are silently reduced on storage.
-- Confidence levels:
-  * 0.9-1.0: Explicitly stated facts ("I work on X", "My role is Y")
-  * 0.7-0.8: Strongly implied from actions/discussions
-  * 0.5-0.6: Inferred patterns (use sparingly, only for clear patterns)
+**事实提取**：
+- 提取具体、可量化的细节（如“超过 1.6 万 GitHub 星标”“超过 200 个数据集”）。
+- 包含专有名词（公司名、项目名、技术名）。
+- 保留技术术语和版本号。
+- 类别：
+  * preference：用户喜欢或不喜欢的工具、风格和方法。
+  * knowledge：具体专长、已掌握的技术和领域知识。
+  * context：背景事实（职位、项目、地点、语言）。
+  * behavior：工作习惯、沟通习惯和解决问题的方法。
+  * goal：明确表达的目标、学习目标和项目愿景。
+  * correction：明确的代理错误或用户纠正，包含正确做法。
+- 事实有效期（``expected_valid_days``，可选整数）：
+  经过多少天后应复核此事实，判断是否需要移除。
+  系统会自动安排复核；无法确定时省略。
+  * <= 14：高度短暂，例如当前缺陷、即时任务、当天重点。
+  * 15-60：短期，例如当前实验、正在进行的支线项目、近期目标。
+  * 60-180：中期，例如当前职务、正在使用的技术栈、持续偏好。
+  * 180-365：稳定，例如职业背景、已形成的工作习惯。
+  * > 365：非常稳定，例如核心技能、母语、性格特征。
+  按语义选择合适的值；超过服务器配置上限的值会在存储时自动下调。
+- 置信度：
+  * 0.9-1.0：明确陈述的事实（“我从事 X”“我的职务是 Y”）。
+  * 0.7-0.8：行动或讨论中强烈暗示的信息。
+  * 0.5-0.6：推断出的模式（谨慎使用，仅限模式明确时）。
 
-**What Goes Where**:
-- workContext: Current job, active projects, primary tech stack
-- personalContext: Languages, personality, interests outside direct work tasks
-- topOfMind: Multiple ongoing priorities and focus areas user cares about recently (gets updated most frequently)
-  Should capture 3-5 concurrent themes: main work, side explorations, learning/tracking interests
-- recentMonths: Detailed account of recent technical explorations and work
-- earlierContext: Patterns from slightly older interactions still relevant
-- longTermBackground: Unchanging foundational facts about the user
+**摘要更新规则**：
+- user 关注当前用户画像，history 关注经历与背景；避免在两者中机械重复相同段落。
+- 结合已有摘要和新对话进行语义融合；新摘要是整个分区的完整替代文本，不是新增片段。
+- 保留仍有效的旧信息，修正已被明确否定的内容，移除已完成或放弃的即时关注事项。
+- 没有相关变化时返回 shouldUpdate=false，不得用空摘要删除旧内容。
 
-**Multilingual Content**:
-- Preserve original language for proper nouns and company names
-- Keep technical terms in their original form (DeepSeek, LangGraph, etc.)
-- Note language capabilities in personalContext
+**多语言内容**：
+- 专有名词和公司名保留原始语言。
+- 技术术语保留原始形式（如 DeepSeek、LangGraph）。
+- 在 user 摘要中记录语言能力。
 
-Output Format (JSON):
+输出格式（JSON（JavaScript Object Notation，JavaScript 对象表示法））：
 {{
-  "user": {{
-    "workContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "personalContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "topOfMind": {{ "summary": "...", "shouldUpdate": true/false }}
-  }},
-  "history": {{
-    "recentMonths": {{ "summary": "...", "shouldUpdate": true/false }},
-    "earlierContext": {{ "summary": "...", "shouldUpdate": true/false }},
-    "longTermBackground": {{ "summary": "...", "shouldUpdate": true/false }}
-  }},
+  "user": {{ "summary": "完整的用户上下文摘要", "shouldUpdate": true/false }},
+  "history": {{ "summary": "完整的历史背景摘要", "shouldUpdate": true/false }},
   "newFacts": [
     {{ "content": "...", "category": "preference|knowledge|context|behavior|goal|correction", "confidence": 0.0-1.0, "expected_valid_days": 90 }}
   ],
   "factsToRemove": ["fact_id_1", "fact_id_2"],
-  "staleFactsToRemove": [{{ "id": "fact_id", "reason": "brief explanation" }}],
-  "staleFactsToExtend": [{{ "id": "fact_id", "extend_by_days": 365, "reason": "brief explanation" }}],
+  "staleFactsToRemove": [{{ "id": "fact_id", "reason": "简要说明" }}],
+  "staleFactsToExtend": [{{ "id": "fact_id", "extend_by_days": 365, "reason": "简要说明" }}],
   "factsToConsolidate": [
     {{
       "sourceIds": ["fact_id_1", "fact_id_2"],
-      "consolidated": {{ "content": "synthesized fact", "category": "knowledge", "confidence": 0.9 }}
+      "consolidated": {{ "content": "综合后的事实", "category": "knowledge", "confidence": 0.9 }}
     }}
   ]
 }}
 
-Important Rules:
-- Only set shouldUpdate=true if there's meaningful new information
-- Follow length guidelines: workContext/personalContext are concise (1-3 sentences), topOfMind and history sections are detailed (paragraphs)
-- Include specific metrics, version numbers, and proper nouns in facts
-- Only add facts that are clearly stated (0.9+) or strongly implied (0.7+)
-- Use category "correction" for explicit agent mistakes or user corrections; assign confidence >= 0.95 when the correction is explicit
-- Include "sourceError" only for explicit correction facts when the prior mistake or wrong approach is clearly stated; omit it otherwise
-- Remove facts that are contradicted by new information
-- When updating topOfMind, integrate new focus areas while removing completed/abandoned ones
-  Keep 3-5 concurrent focus themes that are still active and relevant
-- For history sections, integrate new information chronologically into appropriate time period
-- Preserve technical accuracy - keep exact names of technologies, companies, projects
-- Focus on information useful for future interactions and personalization
-- IMPORTANT: Do NOT record file upload events in memory. Uploaded files are
-  session-specific and ephemeral — they will not be accessible in future sessions.
-  Recording upload events causes confusion in subsequent conversations.
+重要规则：
+- 只有出现有意义的新信息时才设置 shouldUpdate=true。
+- 用户上下文和历史背景各只输出一份完整摘要，不再输出嵌套子类别。
+- 事实中包含具体指标、版本号和专有名词。
+- 只添加明确陈述（0.9+）或强烈暗示（0.7+）的事实。
+- 对明确的代理错误或用户纠正使用 "correction" 类别；明确纠正的置信度应 >= 0.95。
+- 仅当先前错误或错误做法被明确陈述时，才在明确的纠正事实中包含 "sourceError"；否则省略。
+- 移除被新信息否定的事实。
+- 更新用户上下文时纳入新的关注领域，并移除已完成或放弃的事项。
+  仅保留有对话依据且仍然活跃的关注主题，不强行凑数。
+- 历史背景中的新信息应与旧经历自然融合，必要时在同一摘要内说明时间关系。
+- 保持技术准确性，保留技术、公司和项目的准确名称。
+- 重点记录有助于未来交互和个性化的信息。
+- 重要：不要将文件上传事件记录到记忆中。上传文件仅属于当前会话，且是临时的，
+  未来会话无法访问。记录上传事件会导致后续对话混淆。
 
 {staleness_review_section}
 
 {consolidation_section}
 
-Return ONLY valid JSON, no explanation or markdown."""
+仅返回有效的 JSON（JavaScript Object Notation，JavaScript 对象表示法），不要解释或添加 Markdown 标记。"""
 
 
-STALENESS_REVIEW_PROMPT = """## Staleness Review
+STALENESS_REVIEW_PROMPT = """## 过期事实复核
 
-The following facts have reached their individual review window and may no longer
-accurately reflect the user's current situation. Each entry shows a ``valid:Nd``
-annotation - the number of days this fact was expected to remain valid before
-re-evaluation. Use it to calibrate conservatism: a ``valid:30d`` fact was
-considered volatile at creation; a ``valid:365d`` fact was considered stable.
+以下事实已到达各自的复核时间，可能不再准确反映用户现状。
+每条记录带有 ``valid:Nd`` 标记，表示预期保持有效、之后需要重新评估的天数。
+请据此决定谨慎程度：``valid:30d`` 表示创建时认为容易变化，
+``valid:365d`` 表示创建时认为较稳定。
 
 <stale_facts>
 {stale_facts}
 </stale_facts>
 
-For each fact, decide KEEP, REMOVE, or EXTEND:
-- KEEP: Still likely valid - even if not mentioned in this conversation.
-  Stable attributes (native language, core expertise, personality traits) often
-  remain true indefinitely.
-- REMOVE: Outdated, contradicted by recent context, or no longer relevant.
-  Examples: tech-stack migrations, job changes, relocated offices, abandoned projects.
-- EXTEND: Keep but recalibrate the review window (see below).
+对每条事实选择 KEEP、REMOVE 或 EXTEND：
+- KEEP：很可能仍有效，即使本次对话未提及。
+  稳定属性（母语、核心专长、性格特征）通常会长期保持不变。
+- REMOVE：已过时、与近期背景矛盾或已不再相关。
+  例如：技术栈迁移、换工作、办公室搬迁、放弃项目。
+- EXTEND：保留，但重新校准复核周期（见下文）。
 
-Add REMOVE decisions to "staleFactsToRemove" in your output JSON.
-Each entry must be {{"id": "fact_id", "reason": "brief explanation"}}.
-The reason should cite what signal in the conversation (or absence thereof)
-supports the removal.
+将 REMOVE 决定添加到输出的 "staleFactsToRemove" 中。
+每条记录必须为 {{"id": "fact_id", "reason": "简要说明"}}。
+原因应说明对话中的哪些信号（或信号缺失）支持移除。
 
-Optionally, for facts you KEEP and wish to recalibrate, add them to
-"staleFactsToExtend" with the number of days from now before the next review:
-{{"id": "fact_id", "extend_by_days": 365, "reason": "brief explanation"}}
-Use this when the current window seems miscalibrated - e.g. a core skill marked
-``valid:30d`` that is clearly stable, or a goal nearing completion whose window
-should shrink. Omit facts whose current window already seems appropriate.
+对于选择 KEEP 且希望重新校准的事实，可将其加入 "staleFactsToExtend"，
+注明从现在到下次复核的天数：
+{{"id": "fact_id", "extend_by_days": 365, "reason": "简要说明"}}
+当当前周期不合适时使用，例如明显稳定却被标记为 ``valid:30d`` 的核心技能，
+或接近完成、应缩短复核周期的目标。当前周期已合适的事实应省略。
 
-Be conservative - when in doubt, KEEP. Removing a valid fact is worse than
-keeping a slightly stale one, because the next review cycle will re-evaluate it."""
+请保持谨慎：不确定时选择 KEEP。移除有效事实的损失大于保留略过时的事实，
+因为下个复核周期还会重新评估。"""
 
 
-CONSOLIDATION_PROMPT = """## Memory Consolidation
+CONSOLIDATION_PROMPT = """## 记忆整合
 
-The following fact categories have accumulated many individual entries.
-Review each group and identify facts that can be synthesized into a single,
-richer consolidated fact that preserves all key information.
+以下事实类别积累了较多独立条目。请检查每组，识别可以综合成一条更充实事实的条目，
+并保留所有关键信息。
 
 {consolidation_groups}
 
-For each group, decide:
-- CONSOLIDATE: Multiple facts can be merged into one richer fact.
-  Specify the source fact IDs and the consolidated content.
-- SKIP: Facts are distinct enough to remain separate.
+对每组做出决定：
+- CONSOLIDATE：多条事实可以合并为一条更充实的事实。
+  指定来源事实标识和整合内容。
+- SKIP：各事实具有足够区别，应独立保留。
 
-Add consolidation decisions to "factsToConsolidate" in your output JSON.
-Each entry: {{"sourceIds": ["fact_id_1", "fact_id_2"], "consolidated": {{"content": "...", "category": "...", "confidence": 0.9}}}}
+将整合决定添加到输出的 "factsToConsolidate" 中。
+每条记录：{{"sourceIds": ["fact_id_1", "fact_id_2"], "consolidated": {{"content": "...", "category": "...", "confidence": 0.9}}}}
 
-Rules:
-- The consolidated fact must preserve ALL key details from source facts
-- Only consolidate facts that describe the same aspect of the user
-- Confidence of consolidated fact = max of source confidences
-- Be conservative - when in doubt, keep facts separate
-- Maximum {max_groups} consolidation groups per cycle"""
+规则：
+- 整合后的事实必须保留来源事实的所有关键细节。
+- 只整合描述用户同一方面的事实。
+- 整合后的置信度等于来源置信度的最大值。
+- 保持谨慎，不确定时独立保留各事实。
+- 每个周期最多整合 {max_groups} 组。"""
 
 
-FACT_EXTRACTION_PROMPT = """Extract factual information about the user from this message.
+FACT_EXTRACTION_PROMPT = """从这条消息中提取有关用户的事实信息。
 
-Message:
+消息：
 {message}
 
-Extract facts in this JSON format:
+按以下 JSON（JavaScript Object Notation，JavaScript 对象表示法）格式提取事实：
 {{
   "facts": [
     {{ "content": "...", "category": "preference|knowledge|context|behavior|goal|correction", "confidence": 0.0-1.0 }}
   ]
 }}
 
-Categories:
-- preference: User preferences (likes/dislikes, styles, tools)
-- knowledge: User's expertise or knowledge areas
-- context: Background context (location, job, projects)
-- behavior: Behavioral patterns
-- goal: User's goals or objectives
-- correction: Explicit corrections or mistakes to avoid repeating
+类别：
+- preference：用户偏好（喜好、风格、工具）。
+- knowledge：用户专长或知识领域。
+- context：背景信息（地点、工作、项目）。
+- behavior：行为模式。
+- goal：用户目标。
+- correction：明确的纠正或需要避免重复的错误。
 
-Rules:
-- Only extract clear, specific facts
-- Confidence should reflect certainty (explicit statement = 0.9+, implied = 0.6-0.8)
-- Skip vague or temporary information
+规则：
+- 仅提取明确、具体的事实。
+- 置信度应反映确定程度（明确陈述 = 0.9+，暗示 = 0.6-0.8）。
+- 跳过模糊或临时信息。
 
-Return ONLY valid JSON."""
+仅返回有效的 JSON（JavaScript Object Notation，JavaScript 对象表示法）。"""
 
 
 _TIKTOKEN_ENCODING_MISSING = object()
@@ -344,7 +315,7 @@ def _format_fact_line(fact: dict[str, Any]) -> str | None:
     category = html.escape(category, quote=False)
     if category == "correction" and isinstance(source_error, str) and source_error.strip():
         source_error = html.escape(source_error.strip(), quote=False)
-        return f"- [{category} | {confidence:.2f}] {content} (avoid: {source_error})"
+        return f"- [{category} | {confidence:.2f}] {content}（应避免：{source_error}）"
     return f"- [{category} | {confidence:.2f}] {content}"
 
 
@@ -385,7 +356,7 @@ def _fallback_format_facts(
     '''主格式化流程出错时改按置信度排序事实，并在剩余预算内返回备用区段。'''
     ranked = sorted(valid_facts, key=lambda f: _coerce_confidence(f.get("confidence"), default=0.0), reverse=True)
 
-    header = "Facts:\n"
+    header = "事实：\n"
     overhead = _count_tokens(header, use_tiktoken=use_tiktoken)
     line_budget = max_tokens - preceding_section_cost - overhead
     if line_budget <= 0:
@@ -414,48 +385,15 @@ def format_memory_for_injection(
     effective_guaranteed: frozenset[str] = frozenset(c.strip() for c in guaranteed_categories if isinstance(c, str) and c.strip()) if guaranteed_categories else frozenset()
 
     sections: list[str] = []
-
-    user_data = memory_data.get("user", {})
-    if user_data:
-        user_sections = []
-
-        work_ctx = user_data.get("workContext", {})
-        if work_ctx.get("summary"):
-            user_sections.append(f"Work: {_escape_summary(work_ctx['summary'])}")
-
-        personal_ctx = user_data.get("personalContext", {})
-        if personal_ctx.get("summary"):
-            user_sections.append(f"Personal: {_escape_summary(personal_ctx['summary'])}")
-
-        top_of_mind = user_data.get("topOfMind", {})
-        if top_of_mind.get("summary"):
-            user_sections.append(f"Current Focus: {_escape_summary(top_of_mind['summary'])}")
-
-        if user_sections:
-            sections.append("User Context:\n" + "\n".join(f"- {s}" for s in user_sections))
-
-    history_data = memory_data.get("history", {})
-    if history_data:
-        history_sections = []
-
-        recent = history_data.get("recentMonths", {})
-        if recent.get("summary"):
-            history_sections.append(f"Recent: {_escape_summary(recent['summary'])}")
-
-        earlier = history_data.get("earlierContext", {})
-        if earlier.get("summary"):
-            history_sections.append(f"Earlier: {_escape_summary(earlier['summary'])}")
-
-        background = history_data.get("longTermBackground", {})
-        if background.get("summary"):
-            history_sections.append(f"Background: {_escape_summary(background['summary'])}")
-
-        if history_sections:
-            sections.append("History:\n" + "\n".join(f"- {s}" for s in history_sections))
+    memory_data = normalize_memory(memory_data)
+    for key, label in (("user", "用户上下文"), ("history", "历史背景")):
+        summary = memory_data[key]["summary"]
+        if summary:
+            sections.append(f"{label}：\n{_escape_summary(summary)}")
 
     facts_data = memory_data.get("facts", [])
     guaranteed_line_tokens = 0
-    facts_header = "Facts:\n"
+    facts_header = "事实：\n"
     all_fact_lines: list[str] = []
     if isinstance(facts_data, list) and facts_data:
         base_text = "\n\n".join(sections)
@@ -596,8 +534,8 @@ def format_conversation_for_update(messages: list[Any]) -> str:
         content = html.escape(str(content), quote=False)
 
         if role == "human":
-            lines.append(f"User: {content}")
+            lines.append(f"用户：{content}")
         elif role == "ai":
-            lines.append(f"Assistant: {content}")
+            lines.append(f"助手：{content}")
 
     return "\n\n".join(lines)

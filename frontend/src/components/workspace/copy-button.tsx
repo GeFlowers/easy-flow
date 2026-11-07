@@ -3,8 +3,8 @@ import { useCallback, useState, type ComponentProps } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import { writeTextToClipboard } from "@/core/clipboard";
-import { useI18n } from "@/core/i18n/hooks";
+import { writeTextToClipboard } from "@/features/clipboard";
+import { useI18n } from "@/features/i18n/hooks";
 
 import { Tooltip } from "./tooltip";
 

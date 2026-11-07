@@ -37,16 +37,16 @@ def split_skill_markdown(content: str) -> tuple[SkillMarkdownParts | None, str |
     '''拆分技能说明中的头部元数据与正文；格式、解析或顶层类型错误时返回原因。'''
     match = _FRONTMATTER_RE.match(content)
     if not match:
-        return None, "No YAML frontmatter found"
+        return None, "未找到前置元数据"
 
     frontmatter_text = match.group(1)
     try:
         metadata = yaml.safe_load(frontmatter_text)
     except yaml.YAMLError as exc:
-        return None, f"Invalid YAML in frontmatter: {exc}"
+        return None, f"前置元数据的序列化格式无效： {exc}"
 
     if not isinstance(metadata, dict):
-        return None, "Frontmatter must be a YAML dictionary"
+        return None, "前置元数据必须为字典"
 
     return (
         SkillMarkdownParts(

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { GoalState } from "@/core/threads/types";
+import type { GoalState } from "@/features/threads/types";
 
 import { goalReconciliationKey } from "./goal-status-helpers";
 

@@ -10,15 +10,15 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { urlOfArtifact } from "@/core/artifacts/utils";
-import { useAuth } from "@/core/auth/AuthProvider";
-import { useI18n } from "@/core/i18n/hooks";
-import { installSkill, SkillRequestError } from "@/core/skills/api";
+import { urlOfArtifact } from "@/features/artifacts/utils";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { useI18n } from "@/features/i18n/hooks";
+import { installSkill, SkillRequestError } from "@/features/skills/api";
 import {
   getFileExtensionDisplayName,
   getFileIcon,
   getFileName,
-} from "@/core/utils/files";
+} from "@/features/utils/files";
 import { cn } from "@/lib/utils";
 
 import { useArtifacts } from "./context";

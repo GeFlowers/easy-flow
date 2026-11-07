@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import logging
 from logging.config import fileConfig
 
@@ -10,6 +9,7 @@ from alembic import context
 from sqlalchemy.ext.asyncio import create_async_engine
 
 from deerflow.persistence.base import Base
+from deerflow.utils.event_loop import run_async
 from deerflow.persistence.migrations._env_filters import (
     LANGGRAPH_OWNED_TABLES,
     include_object,
@@ -67,4 +67,4 @@ async def run_migrations_online() -> None:
 if context.is_offline_mode():
     run_migrations_offline()
 else:
-    asyncio.run(run_migrations_online())
+    run_async(run_migrations_online())

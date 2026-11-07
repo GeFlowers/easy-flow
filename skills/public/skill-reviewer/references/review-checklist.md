@@ -1,51 +1,51 @@
-# Skill Review Checklist
+# 技能审查清单
 
-Use this checklist to keep reviews concrete and repeatable.
+使用清单保证审查具体且可重复。
 
-## Deterministic Facts
+## 确定性事实
 
-- Root `SKILL.md` exists, is UTF-8 text, and has valid YAML frontmatter.
-- `name` and `description` are non-empty and valid for the selected profile.
-- `allowed-tools`, `required-secrets`, and `secrets-autonomous` are structurally valid.
-- Package digest is present.
-- `SkillScan` findings are visible and severity is preserved.
-- Reader errors, truncation, and analyzer errors are reported as limitations.
+- 根目录 `SKILL.md` 存在，使用 UTF-8（Unicode Transformation Format, 8-bit，八位统一码转换格式）文本和有效 YAML（YAML Ain't Markup Language，YAML 不是标记语言）前置元数据。
+- `name` 和 `description` 非空，符合选定规范配置。
+- `allowed-tools`、`required-secrets`、`secrets-autonomous` 结构有效。
+- 存在技能包摘要。
+- 展示 `SkillScan` 发现并保留严重程度。
+- 读取错误、截断、分析器错误列入局限。
 
-## Trigger Boundary
+## 触发边界
 
-- Description says what the skill does.
-- Description says when to invoke it.
-- Description does not claim broad ownership over adjacent tasks.
-- Sibling collision cases are named when relevant.
-- Suggested replacement text is concise enough for catalog display.
+- 说明描述技能用途。
+- 说明描述调用时机。
+- 不对相邻任务宣称宽泛管辖权。
+- 相关时列出相邻技能冲突用例。
+- 建议替换文本足够简练，适合目录展示。
 
-## Instructions
+## 指令
 
-- Inputs are named.
-- Ordered actions are explicit.
-- Branches and fallback behavior are clear.
-- Stop conditions are clear.
-- The skill tells the agent what not to do when that matters.
+- 明确输入。
+- 明确有序操作。
+- 分支和替代行为清楚。
+- 停止条件清楚。
+- 必要时说明智能体不应做什么。
 
-## Resources And Scripts
+## 资源与脚本
 
-- Required references are reachable from `SKILL.md`.
-- Unreferenced files are either intentional or removed.
-- Scripts have documented inputs and outputs.
-- Scripts are not required unless the instructions say when to run them.
-- Templates and assets have read-when guidance.
+- 必需参考资料可从 `SKILL.md` 访问。
+- 未引用文件有保留理由，或已移除。
+- 脚本输入输出有文档。
+- 只有指令明确说明何时运行，脚本才是必需项。
+- 模板和资源说明何时阅读。
 
-## Safety
+## 安全
 
-- Side effects are named.
-- Destructive or externally visible actions require confirmation.
-- Secrets are declared rather than hardcoded.
-- Network access is justified.
-- Retry and idempotency behavior is bounded where relevant.
+- 明确副作用。
+- 破坏性或外部可见操作需要确认。
+- 声明秘密，不硬编码。
+- 说明网络访问的合理理由。
+- 相关时限制重试和幂等行为。
 
-## Evidence
+## 证据
 
-- Trigger evals include positive and negative cases when routing is fuzzy.
-- Behavior evals tie outputs to the reviewed digest.
-- Baselines are frozen before claiming improvement.
-- Runtime, model, prompts, outputs, and graders are retained for verified claims.
+- 路由模糊时，触发评估包含正反用例。
+- 行为评估将输出关联到被审查摘要。
+- 声称改进前冻结基线。
+- 已验证主张保留运行时、模型、提示词、输出与评分器。

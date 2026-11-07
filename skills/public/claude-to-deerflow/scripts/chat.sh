@@ -16,15 +16,15 @@ set -euo pipefail
 DEERFLOW_URL="${DEERFLOW_URL:-http://localhost:2026}"
 GATEWAY_URL="${DEERFLOW_GATEWAY_URL:-$DEERFLOW_URL}"
 LANGGRAPH_URL="${DEERFLOW_LANGGRAPH_URL:-$DEERFLOW_URL/api/langgraph}"
-MESSAGE="${1:?Usage: chat.sh <message> [thread_id] [mode]}"
+MESSAGE="${1:?用法：chat.sh <message> [thread_id] [mode]}"
 THREAD_ID="${2:-}"
 MODE="${3:-pro}"
 
 # --- 健康检查：请求前快速失败，避免创建无效会话 ---
 HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${GATEWAY_URL}/health" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" -ge 400 ]; then
-  echo "ERROR: DeerFlow is not reachable at ${GATEWAY_URL} (HTTP ${HTTP_CODE})" >&2
-  echo "Make sure DeerFlow is running. Start it with: cd <deerflow-dir> && make docker-start" >&2
+  echo "错误：无法连接 ${GATEWAY_URL} 的 DeerFlow（网络状态 ${HTTP_CODE}）" >&2
+  echo "请确认 DeerFlow 已运行。启动命令：cd <deerflow-dir> && bash scripts/start.sh" >&2
   exit 1
 fi
 
@@ -35,10 +35,10 @@ if [ -z "$THREAD_ID" ]; then
     -d '{}')
   THREAD_ID=$(echo "$THREAD_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['thread_id'])" 2>/dev/null)
   if [ -z "$THREAD_ID" ]; then
-    echo "ERROR: Failed to create thread. Response: ${THREAD_RESP}" >&2
+    echo "错误：创建对话失败。响应：${THREAD_RESP}" >&2
     exit 1
   fi
-  echo "Thread: ${THREAD_ID}" >&2
+  echo "对话：${THREAD_ID}" >&2
 fi
 
 # --- 按模式构建上下文 ---
@@ -56,7 +56,7 @@ case "$MODE" in
     CONTEXT='{"thinking_enabled":true,"is_plan_mode":true,"subagent_enabled":true,"thread_id":"'"$THREAD_ID"'"}'
     ;;
   *)
-    echo "ERROR: Unknown mode '${MODE}'. Use: flash, standard, pro, ultra" >&2
+    echo "错误：未知模式 '${MODE}'。请使用 flash、standard、pro、ultra" >&2
     exit 1
     ;;
 esac
@@ -187,8 +187,8 @@ def artifact_url(virtual_path):
 def format_artifact_text(artifacts):
     urls = [artifact_url(p) for p in artifacts]
     if len(urls) == 1:
-        return f"Created File: {urls[0]}"
-    return "Created Files:\n" + "\n".join(urls)
+        return f"已创建文件：{urls[0]}"
+    return "已创建文件：\n" + "\n".join(urls)
 
 # 查找最后一个包含消息的 "values" 事件。
 result_messages = None
@@ -212,20 +212,20 @@ if result_messages is not None:
     if response_text:
         print(response_text)
     else:
-        print("(No response from agent)", file=sys.stderr)
+        print("（智能体未响应）", file=sys.stderr)
         sys.exit(1)
 else:
     # 检查是否存在错误事件。
     for event_type, data_str in events:
         if event_type == "error":
-            print(f"ERROR from DeerFlow: {data_str}", file=sys.stderr)
+            print(f"DeerFlow 返回错误：{data_str}", file=sys.stderr)
             sys.exit(1)
-    print("No AI response found in the stream.", file=sys.stderr)
+    print("流中未找到智能体响应。", file=sys.stderr)
     if len(raw) < 2000:
-        print(f"Raw SSE output:\n{raw}", file=sys.stderr)
+        print(f"原始事件流输出：\n{raw}", file=sys.stderr)
     sys.exit(1)
 PYEOF
 
 echo ""
 echo "---"
-echo "Thread ID: ${THREAD_ID}" >&2
+echo "对话标识：${THREAD_ID}" >&2

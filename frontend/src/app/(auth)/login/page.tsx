@@ -8,14 +8,14 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Input } from "@/components/ui/input";
-import { useAuth } from "@/core/auth/AuthProvider";
+import { useAuth } from "@/features/auth/AuthProvider";
 import {
   canCreateRegularAccount,
   fetchSetupStatus,
   type SetupStatusResponse,
-} from "@/core/auth/setup";
-import { parseAuthError } from "@/core/auth/types";
-import { useI18n } from "@/core/i18n/hooks";
+} from "@/features/auth/setup";
+import { parseAuthError } from "@/features/auth/types";
+import { useI18n } from "@/features/i18n/hooks";
 
 /** 仅接受站内相对跳转地址，防止登录完成后发生开放重定向。 */
 function validateNextParam(next: string | null): string | null {

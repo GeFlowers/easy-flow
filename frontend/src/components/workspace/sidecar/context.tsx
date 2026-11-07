@@ -18,9 +18,9 @@ import {
   getNextSidecarOpenState,
   type SidecarContext,
   type SidecarReferenceStateItem,
-} from "@/core/sidecar";
-import { findLatestSidecarThread } from "@/core/sidecar/api";
-import type { ThreadStreamOptions } from "@/core/threads/hooks";
+} from "@/features/sidecar";
+import { findLatestSidecarThread } from "@/features/sidecar/api";
+import type { ThreadStreamOptions } from "@/features/threads/hooks";
 
 export type SidecarReference = SidecarReferenceStateItem;
 

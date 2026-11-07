@@ -28,19 +28,19 @@ import {
   ReasoningTrigger,
 } from "@/components/ai-elements/reasoning";
 import { Button } from "@/components/ui/button";
-import { extractArtifactsFromThread } from "@/core/artifacts/utils";
-import { useI18n } from "@/core/i18n/hooks";
+import { extractArtifactsFromThread } from "@/features/artifacts/utils";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   deriveHumanInputThreadState,
   extractHumanInputRequest,
   shouldClearPendingHumanInputOnThreadError,
   type HumanInputRequest,
   type HumanInputResponse,
-} from "@/core/messages/human-input";
+} from "@/features/messages/human-input";
 import {
   buildTokenDebugSteps,
   type TokenUsageInlineMode,
-} from "@/core/messages/usage-model";
+} from "@/features/messages/usage-model";
 import {
   extractContentFromMessage,
   extractPresentFilesFromMessage,
@@ -55,19 +55,19 @@ import {
   hasReasoning,
   isAssistantMessageGroupStreaming,
   isHiddenFromUIMessage,
-} from "@/core/messages/utils";
-import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
+} from "@/features/messages/utils";
+import { useRehypeSplitWordsIntoSpans } from "@/features/rehype";
 import {
   buildMessageSidecarContext,
   type SidecarContext,
-} from "@/core/sidecar";
-import type { Subtask } from "@/core/tasks";
-import { useUpdateSubtask } from "@/core/tasks/context";
+} from "@/features/sidecar";
+import type { Subtask } from "@/features/tasks";
+import { useUpdateSubtask } from "@/features/tasks/context";
 import {
   derivePendingSubtaskStatus,
   parseSubtaskResult,
-} from "@/core/tasks/subtask-result";
-import type { AgentThreadState } from "@/core/threads";
+} from "@/features/tasks/subtask-result";
+import type { AgentThreadState } from "@/features/threads";
 import { cn } from "@/lib/utils";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";

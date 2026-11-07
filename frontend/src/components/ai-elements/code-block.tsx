@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { writeTextToClipboard } from "@/core/clipboard";
+import { writeTextToClipboard } from "@/features/clipboard";
 import { cn } from "@/lib/utils";
 import { CheckIcon, CopyIcon } from "lucide-react";
 import {

@@ -1,45 +1,45 @@
 ---
 name: video-generation
-description: Use this skill when the user requests to generate, create, or imagine videos. Supports structured prompts and reference image for guided generation.
+description: 用户要求生成、创作或构想视频时使用。支持结构化提示词和参考图引导生成。
 ---
 
-# Video Generation Skill
+# 视频生成技能
 
-## Overview
+## 概述
 
-This skill generates high-quality videos using structured prompts and a Python script. The workflow includes creating JSON-formatted prompts and executing video generation with optional reference image.
+此技能使用结构化提示词和 Python 脚本生成高质量视频，流程包括创建 JSON（JavaScript Object Notation，JavaScript 对象表示法）提示词并执行生成，可选提供参考图。
 
-## Core Capabilities
+## 核心能力
 
-- Create structured JSON prompts for AIGC video generation
-- Support reference image as guidance or the first/last frame of the video
-- Generate videos through automated Python script execution
+- 创建结构化提示词，用于人工智能视频生成。
+- 支持用参考图引导，或作为视频的首帧／末帧。
+- 自动执行 Python 脚本生成视频。
 
-## Workflow
+## 工作流程
 
-### Step 1: Understand Requirements
+### 第 1 步：理解需求
 
-When a user requests video generation, identify:
+用户请求生成视频时，识别：
 
-- Subject/content: What should be in the image
-- Style preferences: Art style, mood, color palette
-- Technical specs: Aspect ratio, composition, lighting
-- Reference image: Any image to guide generation
-- You don't need to check the folder under `/mnt/user-data`
+- 主体／内容：画面中应包含什么。
+- 风格偏好：艺术风格、情绪、配色。
+- 技术规格：宽高比、构图、光照。
+- 参考图：引导生成的图像。
+- 无需检查 `/mnt/user-data` 下的文件夹。
 
-### Step 2: Create Structured Prompt
+### 第 2 步：创建结构化提示词
 
-Generate a structured JSON file in `/mnt/user-data/workspace/` with naming pattern: `{descriptive-name}.json`
+在 `/mnt/user-data/workspace/` 创建结构化文件，命名格式为 `{descriptive-name}.json`。
 
-### Step 3: Create Reference Image (Optional when image-generation skill is available)
+### 第 3 步：创建参考图（有 image-generation 技能时可选）
 
-Generate reference image for the video generation.
+为视频生成创建参考图。
 
-- If only 1 image is provided, use it as the guided frame of the video
+- 如果只提供一张图，就将其作为视频引导帧。
 
-### Step 3: Execute Generation
+### 第 3 步：执行生成
 
-Call the Python script:
+调用 Python 脚本：
 ```bash
 python /mnt/skills/public/video-generation/scripts/generate.py \
   --prompt-file /mnt/user-data/workspace/prompt-file.json \
@@ -48,71 +48,71 @@ python /mnt/skills/public/video-generation/scripts/generate.py \
   --aspect-ratio 16:9
 ```
 
-Parameters:
+参数：
 
-- `--prompt-file`: Absolute path to JSON prompt file (required)
-- `--reference-images`: Absolute paths to reference image (optional)
-- `--output-file`: Absolute path to output image file (required)
-- `--aspect-ratio`: Aspect ratio of the generated image (optional, default: 16:9)
+- `--prompt-file`: 提示词文件绝对路径（必填）
+- `--reference-images`: 参考图绝对路径（可选）
+- `--output-file`: 输出图像文件绝对路径（必填）
+- `--aspect-ratio`: 生成图像宽高比（可选，默认 16:9）
 
 [!NOTE]
-Do NOT read the python file, instead just call it with the parameters.
+不要阅读 Python 文件，直接传入参数调用。
 
-## Video Generation Example
+## 视频生成示例
 
-User request: "Generate a short video clip depicting the opening scene from "The Chronicles of Narnia: The Lion, the Witch and the Wardrobe"
+用户请求：“生成一段短片，呈现《纳尼亚传奇：狮子、女巫和魔衣橱》的开场场景。”
 
-Step 1: Search for the opening scene of "The Chronicles of Narnia: The Lion, the Witch and the Wardrobe" online
+第 1 步：在线搜索《纳尼亚传奇：狮子、女巫和魔衣橱》的开场场景。
 
-Step 2: Create a JSON prompt file with the following content:
+第 2 步：创建以下提示词文件：
 
 ```json
 {
-  "title": "The Chronicles of Narnia - Train Station Farewell",
+  "title": "纳尼亚传奇——火车站告别",
   "background": {
-    "description": "World War II evacuation scene at a crowded London train station. Steam and smoke fill the air as children are being sent to the countryside to escape the Blitz.",
-    "era": "1940s wartime Britain",
-    "location": "London railway station platform"
+    "description": "第二次世界大战期间，拥挤的伦敦火车站正在疏散人群。蒸汽和烟雾弥漫，孩子们被送往乡村躲避伦敦大轰炸。",
+    "era": "二十世纪四十年代，战时英国",
+    "location": "伦敦火车站站台"
   },
-  "characters": ["Mrs. Pevensie", "Lucy Pevensie"],
+  "characters": ["佩文西太太", "露西·佩文西"],
   "camera": {
-    "type": "Close-up two-shot",
-    "movement": "Static with subtle handheld movement",
-    "angle": "Profile view, intimate framing",
-    "focus": "Both faces in focus, background soft bokeh"
+    "type": "双人近景",
+    "movement": "固定机位，带轻微手持晃动",
+    "angle": "侧面视角，亲密构图",
+    "focus": "两张面孔均合焦，背景柔和虚化"
   },
   "dialogue": [
     {
-      "character": "Mrs. Pevensie",
-      "text": "You must be brave for me, darling. I'll come for you... I promise."
+      "character": "佩文西太太",
+      "text": "亲爱的，为了我你要勇敢。我会来接你……我保证。"
     },
     {
-      "character": "Lucy Pevensie",
-      "text": "I will be, mother. I promise."
+      "character": "露西·佩文西",
+      "text": "我会勇敢的，妈妈。我保证。"
     }
   ],
   "audio": [
     {
-      "type": "Train whistle blows (signaling departure)",
+      "type": "汽笛响起，示意发车",
       "volume": 1
     },
     {
-      "type": "Strings swell emotionally, then fade",
+      "type": "弦乐情绪渐强，然后淡出",
       "volume": 0.5
     },
     {
-      "type": "Ambient sound of the train station",
+      "type": "火车站环境声",
       "volume": 0.5
     }
   ]
 }
 ```
 
-Step 3: Use the image-generation skill to generate the reference image
+第 3 步：使用 image-generation 技能生成参考图。
 
-Load the image-generation skill and generate a single reference image `narnia-farewell-scene-01.jpg` according to the skill.
+加载 image-generation 技能，按其说明生成单张参考图 `narnia-farewell-scene-01.jpg`。
 
-Step 4: Use the generate.py script to generate the video
+第 4 步：使用 generate.py 脚本生成视频。
 ```bash
 python /mnt/skills/public/video-generation/scripts/generate.py \
   --prompt-file /mnt/user-data/workspace/narnia-farewell-scene.json \
@@ -120,32 +120,30 @@ python /mnt/skills/public/video-generation/scripts/generate.py \
   --output-file /mnt/user-data/outputs/narnia-farewell-scene-01.mp4 \
   --aspect-ratio 16:9
 ```
-> Do NOT read the python file, just call it with the parameters.
+> 不要阅读 Python 文件，直接传入参数调用。
 
-## Output Handling
+## 输出处理
 
-After generation:
+生成后：
 
-- Videos are typically saved in `/mnt/user-data/outputs/`
-- Share generated videos (come first) with user as well as generated image if applicable, using `present_files` tool
-- Provide brief description of the generation result
-- Offer to iterate if adjustments needed
+- 视频通常保存在 `/mnt/user-data/outputs/`。
+- 使用 `present_files` 向用户展示生成视频（视频优先），如有生成图像也一并展示。
+- 简要描述生成结果。
+- 如需调整，继续迭代。
 
-## Notes
+## 注意事项
 
-- Always use English for prompts regardless of user's language
-- JSON format ensures structured, parsable prompts
-- Reference image enhance generation quality significantly
-- Iterative refinement is normal for optimal results
+- 提示词默认使用中文；用户明确指定其他语言时遵循其要求。
+- 数据格式保证提示词结构清晰且可解析。
+- 参考图可显著提高生成质量。
+- 为取得最佳结果，迭代优化属于正常过程。
 
-## Providers (Gemini / MiniMax)
+## 服务提供方（Gemini／MiniMax）
 
-Auto-selected by environment variables (CLI unchanged):
+通过环境变量自动选择，命令行用法不变：
 
-- `GEMINI_API_KEY` set → Gemini Veo (default, unchanged).
-- Only `MINIMAX_API_KEY` set → MiniMax video (`/v1/video_generation`, async 3-step poll/download).
-- Force with `VIDEO_GENERATION_PROVIDER=gemini|minimax`.
+- 设置 `GEMINI_API_KEY`：使用 Gemini Veo，为原有默认行为。
+- 只设置 `MINIMAX_API_KEY`：使用 MiniMax 视频（`/v1/video_generation`，异步提交、轮询、下载三步流程）。
+- 使用 `VIDEO_GENERATION_PROVIDER=gemini|minimax` 强制指定。
 
-MiniMax overrides: `MINIMAX_API_HOST` (default `https://api.minimaxi.com`),
-`MINIMAX_VIDEO_MODEL` (default `MiniMax-Hailuo-2.3`). The first reference image is used
-as MiniMax `first_frame_image`. MiniMax ignores `--aspect-ratio` (it uses resolution/duration).
+MiniMax 覆盖项：`MINIMAX_API_HOST`（默认 `https://api.minimaxi.com`）和 `MINIMAX_VIDEO_MODEL`（默认 `MiniMax-Hailuo-2.3`）。首张参考图用作 MiniMax 的 `first_frame_image`。MiniMax 忽略 `--aspect-ratio`，改用分辨率和时长。

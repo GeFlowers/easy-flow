@@ -130,13 +130,13 @@ cleanup() {
 }
 trap cleanup EXIT
 
-echo "Preparing deployment..." >&2
+echo "正在准备部署……" >&2
 
 # 识别输入是现有 .tgz 还是目录，只有目录才打包并可识别框架。
 FRAMEWORK="null"
 
 if [ -f "$INPUT_PATH" ] && [[ "$INPUT_PATH" == *.tgz ]]; then
-    echo "Using provided tarball..." >&2
+    echo "正在使用提供的归档文件……" >&2
     TARBALL="$INPUT_PATH"
     CLEANUP_TEMP=false
 elif [ -d "$INPUT_PATH" ]; then
@@ -152,29 +152,29 @@ elif [ -d "$INPUT_PATH" ]; then
             HTML_FILE=$(echo "$HTML_FILES" | head -1)
             BASENAME=$(basename "$HTML_FILE")
             if [ "$BASENAME" != "index.html" ]; then
-                echo "Renaming $BASENAME to index.html..." >&2
+                echo "正在将 $BASENAME 重命名为 index.html……" >&2
                 mv "$HTML_FILE" "$PROJECT_PATH/index.html"
             fi
         fi
     fi
 
-    echo "Creating deployment package..." >&2
+    echo "正在创建部署包……" >&2
     tar -czf "$TARBALL" -C "$PROJECT_PATH" --exclude='node_modules' --exclude='.git' .
 else
-    echo "Error: Input must be a directory or a .tgz file" >&2
+    echo "错误：输入必须是目录或 .tgz 文件" >&2
     exit 1
 fi
 
 if [ "$FRAMEWORK" != "null" ]; then
-    echo "Detected framework: $FRAMEWORK" >&2
+    echo "检测到框架：$FRAMEWORK" >&2
 fi
 
-echo "Deploying..." >&2
+echo "正在部署……" >&2
 RESPONSE=$(curl -s -X POST "$DEPLOY_ENDPOINT" -F "file=@$TARBALL" -F "framework=$FRAMEWORK")
 
 if echo "$RESPONSE" | grep -q '"error"'; then
     ERROR_MSG=$(echo "$RESPONSE" | grep -o '"error":"[^"]*"' | cut -d'"' -f4)
-    echo "Error: $ERROR_MSG" >&2
+    echo "错误：$ERROR_MSG" >&2
     exit 1
 fi
 
@@ -182,16 +182,16 @@ PREVIEW_URL=$(echo "$RESPONSE" | grep -o '"previewUrl":"[^"]*"' | cut -d'"' -f4)
 CLAIM_URL=$(echo "$RESPONSE" | grep -o '"claimUrl":"[^"]*"' | cut -d'"' -f4)
 
 if [ -z "$PREVIEW_URL" ]; then
-    echo "Error: Could not extract preview URL from response" >&2
+    echo "错误：无法从响应提取预览地址" >&2
     echo "$RESPONSE" >&2
     exit 1
 fi
 
 echo "" >&2
-echo "Deployment successful!" >&2
+echo "部署成功！" >&2
 echo "" >&2
-echo "Preview URL: $PREVIEW_URL" >&2
-echo "Claim URL:   $CLAIM_URL" >&2
+echo "预览地址：$PREVIEW_URL" >&2
+echo "认领地址：$CLAIM_URL" >&2
 echo "" >&2
 
 echo "$RESPONSE"

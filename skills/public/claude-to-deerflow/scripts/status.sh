@@ -23,16 +23,16 @@ ARG="${2:-}"
 
 case "$CMD" in
   health)
-    echo "Checking DeerFlow at ${GATEWAY_URL}..."
+    echo "正在检查 ${GATEWAY_URL} 的 DeerFlow……"
     HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${GATEWAY_URL}/health" 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "000" ]; then
-      echo "UNREACHABLE — DeerFlow is not running at ${GATEWAY_URL}"
+      echo "无法连接：${GATEWAY_URL} 未运行 DeerFlow"
       exit 1
     elif [ "$HTTP_CODE" -ge 400 ]; then
-      echo "ERROR — Health check returned HTTP ${HTTP_CODE}"
+      echo "错误：健康检查返回网络状态 ${HTTP_CODE}"
       exit 1
     else
-      echo "OK — DeerFlow is running (HTTP ${HTTP_CODE})"
+      echo "正常：DeerFlow 正在运行（网络状态 ${HTTP_CODE}）"
     fi
     ;;
   models)
@@ -52,12 +52,12 @@ case "$CMD" in
 import json, sys
 threads = json.load(sys.stdin)
 if not threads:
-    print('No threads found.')
+    print('没有找到对话。')
     sys.exit(0)
 for t in threads:
     tid = t.get('thread_id', '?')
     updated = t.get('updated_at', '?')
-    title = (t.get('values') or {}).get('title', '(untitled)')
+    title = (t.get('values') or {}).get('title', '（无标题）')
     print(f'{tid}  {updated}  {title}')
 "
     ;;
@@ -66,7 +66,7 @@ for t in threads:
     ;;
   thread)
     if [ -z "$ARG" ]; then
-      echo "Usage: status.sh thread <thread_id>" >&2
+      echo "用法：status.sh thread <thread_id>" >&2
       exit 1
     fi
     curl -s "${LANGGRAPH_URL}/threads/${ARG}/history" | python3 -c "
@@ -81,7 +81,7 @@ if isinstance(data, list):
             content = m.get('content', '')
             if isinstance(content, list):
                 content = ' '.join(p.get('text','') for p in content if isinstance(p, dict))
-            preview = content[:200] if content else '(empty)'
+            preview = content[:200] if content else '（空）'
             print(f'[{role}] {preview}')
         print('---')
 else:
@@ -89,8 +89,8 @@ else:
 "
     ;;
   *)
-    echo "Unknown command: ${CMD}" >&2
-    echo "Usage: status.sh [health|models|skills|agents|threads|memory|thread <id>]" >&2
+    echo "未知命令：${CMD}" >&2
+    echo "用法：status.sh [health|models|skills|agents|threads|memory|thread <id>]" >&2
     exit 1
     ;;
 esac

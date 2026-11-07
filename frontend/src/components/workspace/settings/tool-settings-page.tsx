@@ -8,10 +8,10 @@ import {
   ItemTitle,
 } from "@/components/ui/item";
 import { Switch } from "@/components/ui/switch";
-import { useI18n } from "@/core/i18n/hooks";
-import { MCPConfigRequestError } from "@/core/mcp/api";
-import { useMCPConfig, useEnableMCPServer } from "@/core/mcp/hooks";
-import type { MCPServerConfig } from "@/core/mcp/types";
+import { useI18n } from "@/features/i18n/hooks";
+import { MCPConfigRequestError } from "@/features/mcp/api";
+import { useMCPConfig, useEnableMCPServer } from "@/features/mcp/hooks";
+import type { MCPServerConfig } from "@/features/mcp/types";
 
 import { SettingsSection } from "./settings-section";
 

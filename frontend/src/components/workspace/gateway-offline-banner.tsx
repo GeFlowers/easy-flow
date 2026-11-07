@@ -2,9 +2,9 @@
 
 import { useEffect, useRef } from "react";
 
-import { useAuth } from "@/core/auth/AuthProvider";
-import { userSchema, type User } from "@/core/auth/types";
-import { useI18n } from "@/core/i18n/hooks";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { userSchema, type User } from "@/features/auth/types";
+import { useI18n } from "@/features/i18n/hooks";
 
 import {
   OFFLINE_BANNER_RETRY_INTERVAL_MS,

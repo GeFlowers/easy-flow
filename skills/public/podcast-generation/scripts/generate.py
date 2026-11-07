@@ -76,9 +76,9 @@ def _resolve_provider(override_env: str, existing_provider: str, has_existing_cr
     if os.getenv("MINIMAX_API_KEY"):
         return "minimax"
     raise ValueError(
-        f"No credentials found. Set VOLCENGINE_TTS_APPID + VOLCENGINE_TTS_ACCESS_TOKEN "
-        f"for {existing_provider}, or MINIMAX_API_KEY for minimax "
-        f"(optionally force with {override_env})."
+        f"未找到凭据。请设置 VOLCENGINE_TTS_APPID 和 VOLCENGINE_TTS_ACCESS_TOKEN，"
+        f"用于 {existing_provider}，或设置 MINIMAX_API_KEY 用于 minimax，"
+        f"（可通过 {override_env} 强制指定）。"
     )
 
 
@@ -93,7 +93,7 @@ def _resolve_tts_provider() -> str:
     provider = _resolve_provider("PODCAST_GENERATION_PROVIDER", "volcengine", has_volc)
     if provider not in ("volcengine", "minimax"):
         raise ValueError(
-            f"Unknown podcast provider: {provider!r} (use 'volcengine' or 'minimax')"
+            f"未知播客提供方：{provider!r}（请使用 'volcengine' 或 'minimax'）"
         )
     return provider
 
@@ -161,26 +161,26 @@ def text_to_speech_volcengine(
         try:
             response = requests.post(url, json=payload, headers=headers, timeout=60)
         except Exception as e:
-            logger.error(f"TTS error: {e}")
+            logger.error(f"语音合成错误： {e}")
             if attempt < max_retries:
                 _backoff_sleep(attempt, None)
                 continue
             return None
         if response.status_code == 429 or response.status_code >= 500:
             logger.warning(
-                f"Volcengine TTS transient HTTP {response.status_code} "
-                f"(attempt {attempt + 1}/{max_retries + 1})"
+                f"火山引擎语音合成暂时性网络状态 {response.status_code} "
+                f"（尝试 {attempt + 1}/{max_retries + 1}）"
             )
             if attempt < max_retries:
                 _backoff_sleep(attempt, _parse_retry_after(response))
                 continue
             return None
         if response.status_code != 200:
-            logger.error(f"TTS API error: {response.status_code} - {response.text}")
+            logger.error(f"语音合成接口错误： {response.status_code} - {response.text}")
             return None
         result = response.json()
         if result.get("code") != 3000:
-            logger.error(f"TTS error: {result.get('message')} (code: {result.get('code')})")
+            logger.error(f"语音合成错误： {result.get('message')} （代码：{result.get('code')}）")
             return None
         audio_data = result.get("data")
         if audio_data:
@@ -218,37 +218,37 @@ def text_to_speech_minimax(
                 timeout=60,
             )
         except Exception as e:
-            logger.error(f"MiniMax TTS error: {e}")
+            logger.error(f"MiniMax 语音合成错误： {e}")
             if attempt < max_retries:
                 _backoff_sleep(attempt, None)
                 continue
             return None
         if response.status_code == 429 or response.status_code >= 500:
             logger.warning(
-                f"MiniMax TTS rate-limited HTTP {response.status_code} "
-                f"(attempt {attempt + 1}/{max_retries + 1})"
+                f"MiniMax 语音合成遭遇限流，网络状态 {response.status_code} "
+                f"（尝试 {attempt + 1}/{max_retries + 1}）"
             )
             if attempt < max_retries:
                 _backoff_sleep(attempt, _parse_retry_after(response))
                 continue
             return None
         if response.status_code != 200:
-            logger.error(f"MiniMax TTS error: {response.status_code} - {response.text}")
+            logger.error(f"MiniMax 语音合成错误： {response.status_code} - {response.text}")
             return None
         result = response.json()
         base = result.get("base_resp") or {}
         code = base.get("status_code", 0)
         if code in MINIMAX_RETRYABLE_CODES:
             logger.warning(
-                f"MiniMax TTS retryable error {code}: {base.get('status_msg')} "
-                f"(attempt {attempt + 1}/{max_retries + 1})"
+                f"MiniMax 语音合成可重试错误 {code}： {base.get('status_msg')} "
+                f"（尝试 {attempt + 1}/{max_retries + 1}）"
             )
             if attempt < max_retries:
                 _backoff_sleep(attempt, None)
                 continue
             return None
         if code != 0:
-            logger.error(f"MiniMax TTS error {code}: {base.get('status_msg')}")
+            logger.error(f"MiniMax 语音合成错误 {code}： {base.get('status_msg')}")
             return None
         audio_hex = (result.get("data") or {}).get("audio")
         if audio_hex:
@@ -264,7 +264,7 @@ def _process_line(args: tuple[int, ScriptLine, int, str]) -> tuple[int, Optional
     由上层统一判定是否中止整个播客。
     '''
     i, line, total, provider = args
-    logger.info(f"Processing line {i + 1}/{total} ({line.speaker}) via {provider}")
+    logger.info(f"正在处理第 {i + 1}/{total} 条（{line.speaker}），提供方：{provider}")
     if provider == "minimax":
         if line.speaker == "male":
             voice = os.getenv("MINIMAX_TTS_VOICE_MALE", "male-qn-qingse")
@@ -278,7 +278,7 @@ def _process_line(args: tuple[int, ScriptLine, int, str]) -> tuple[int, Optional
             voice = "zh_female_sajiaonvyou_moon_bigtts"
         audio = text_to_speech_volcengine(line.paragraph, voice)
     if not audio:
-        logger.warning(f"Failed to generate audio for line {i + 1}")
+        logger.warning(f"第 {i + 1} 条音频生成失败")
     return (i, audio)
 
 
@@ -290,7 +290,7 @@ def tts_node(script: Script) -> list[bytes]:
     '''
     total = len(script.lines)
     if total == 0:
-        raise ValueError("Script contains no lines to process")
+        raise ValueError("脚本没有可处理的台词")
 
     provider = _resolve_tts_provider()
     max_workers = _default_max_workers(provider)
@@ -298,12 +298,12 @@ def tts_node(script: Script) -> list[bytes]:
         os.getenv("VOLCENGINE_TTS_APPID") and os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
     ):
         raise ValueError(
-            "Volcengine TTS selected but VOLCENGINE_TTS_APPID / "
-            "VOLCENGINE_TTS_ACCESS_TOKEN are not set"
+            "已选择火山引擎语音合成，但 VOLCENGINE_TTS_APPID / "
+            "VOLCENGINE_TTS_ACCESS_TOKEN 尚未设置"
         )
     if provider == "minimax" and not os.getenv("MINIMAX_API_KEY"):
-        raise ValueError("MiniMax TTS selected but MINIMAX_API_KEY is not set")
-    logger.info(f"Converting script to audio using {max_workers} workers (provider={provider})...")
+        raise ValueError("已选择 MiniMax 语音合成，但尚未设置 MINIMAX_API_KEY")
+    logger.info(f"正在使用 {max_workers} 个工作线程将脚本转换为音频（提供方={provider}）……")
     tasks = [(i, line, total, provider) for i, line in enumerate(script.lines)]
 
     results: dict[int, Optional[bytes]] = {}
@@ -318,13 +318,13 @@ def tts_node(script: Script) -> list[bytes]:
 
     if failed_indices:
         raise ValueError(
-            f"TTS failed for {len(failed_indices)}/{total} lines after retries: "
-            f"line numbers {sorted(i + 1 for i in failed_indices)}. "
-            f"This is usually transient API rate limiting — wait a moment and retry."
+            f"重试后仍有 {len(failed_indices)}/{total} 条台词语音合成失败："
+            f"行号 {sorted(i + 1 for i in failed_indices)}。"
+            f"通常由短暂接口限流造成，请稍候重试。"
         )
 
     audio_chunks = [results[i] for i in range(total)]
-    logger.info(f"Generated {len(audio_chunks)}/{total} audio chunks successfully")
+    logger.info(f"已成功生成 {len(audio_chunks)}/{total} 个音频片段")
     return audio_chunks
 
 
@@ -334,19 +334,19 @@ def mix_audio(audio_chunks: list[bytes]) -> bytes:
     空列表或拼接后为空时抛出 ``ValueError``，以避免将无效输出写入播客路径。
     '''
     if not audio_chunks:
-        raise ValueError("No audio chunks to mix - TTS generation may have failed")
+        raise ValueError("没有可合并音频，语音合成可能失败")
     output = b"".join(audio_chunks)
     if len(output) == 0:
-        raise ValueError("Mixed audio is empty - TTS generation may have failed")
-    logger.info(f"Audio mixing complete: {len(output)} bytes")
+        raise ValueError("合并音频为空，语音合成可能失败")
+    logger.info(f"音频合并完成：{len(output)} 字节")
     return output
 
 
-def generate_markdown(script: Script, title: str = "Podcast Script") -> str:
+def generate_markdown(script: Script, title: str = "播客脚本") -> str:
     '''将脚本按说话人名称渲染为 Markdown 逐字稿，并保留台词顺序和段落分隔。'''
     lines = [f"# {title}", ""]
     for line in script.lines:
-        speaker_name = "**Host (Male)**" if line.speaker == "male" else "**Host (Female)**"
+        speaker_name = "**男主持人**" if line.speaker == "male" else "**女主持人**"
         lines.append(f"{speaker_name}: {line.paragraph}")
         lines.append("")
     return "\n".join(lines)
@@ -364,24 +364,24 @@ def generate_podcast(script_file: str, output_file: str,
         script_json = json.load(f)
     if "lines" not in script_json:
         raise ValueError(
-            f"Invalid script format: missing 'lines' key. Got keys: {list(script_json.keys())}"
+            f"脚本格式无效：缺少 'lines' 键，现有键：{list(script_json.keys())}"
         )
     script = Script.from_dict(script_json)
-    logger.info(f"Loaded script with {len(script.lines)} lines")
+    logger.info(f"已加载包含 {len(script.lines)} 条台词的脚本")
 
     if transcript_file:
-        title = script_json.get("title", "Podcast Script")
+        title = script_json.get("title", "播客脚本")
         markdown_content = generate_markdown(script, title)
         transcript_dir = os.path.dirname(transcript_file)
         if transcript_dir:
             os.makedirs(transcript_dir, exist_ok=True)
         with open(transcript_file, "w", encoding="utf-8") as f:
             f.write(markdown_content)
-        logger.info(f"Generated transcript to {transcript_file}")
+        logger.info(f"已生成逐字稿：{transcript_file}")
 
     audio_chunks = tts_node(script)
     if not audio_chunks:
-        raise Exception("Failed to generate any audio")
+        raise Exception("未能生成任何音频")
     output_audio = mix_audio(audio_chunks)
 
     output_dir = os.path.dirname(output_file)
@@ -390,18 +390,18 @@ def generate_podcast(script_file: str, output_file: str,
     with open(output_file, "wb") as f:
         f.write(output_audio)
 
-    result = f"Successfully generated podcast to {output_file}"
+    result = f"已成功生成播客：{output_file}"
     if transcript_file:
-        result += f" and transcript to {transcript_file}"
+        result += f"，逐字稿：{transcript_file}"
     return result
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Generate podcast from script JSON file")
-    parser.add_argument("--script-file", required=True, help="Absolute path to script JSON file")
-    parser.add_argument("--output-file", required=True, help="Output path for generated podcast MP3")
+    parser = argparse.ArgumentParser(description="根据 JSON（JavaScript Object Notation，JavaScript 对象表示法）脚本生成播客")
+    parser.add_argument("--script-file", required=True, help="脚本文件绝对路径")
+    parser.add_argument("--output-file", required=True, help="生成播客音频的输出路径")
     parser.add_argument("--transcript-file", required=False,
-                        help="Output path for transcript markdown file (optional)")
+                        help="Markdown 逐字稿输出路径，可选")
     args = parser.parse_args()
 
     try:
@@ -410,5 +410,5 @@ if __name__ == "__main__":
         print(result)
     except Exception as e:
         import traceback
-        print(f"Error generating podcast: {e}")
+        print(f"生成播客时出错：{e}")
         traceback.print_exc()

@@ -85,7 +85,7 @@ def review_skill_package(
             update={
                 "messages": [
                     ToolMessage(
-                        content=f"Error: failed to review skill package: {type(exc).__name__}: {exc}",
+                        content=f"Error: 审查技能包失败： {type(exc).__name__}: {exc}",
                         tool_call_id=tool_call_id,
                         name="review_skill_package",
                         status="error",
@@ -99,7 +99,7 @@ def _snapshot_for_target(target: str, *, runtime: Runtime, inline_content: str |
     '''按内联内容、已安装技能引用或允许的本地路径选择对应读取器。'''
     if target.startswith("inline://"):
         if inline_content is None:
-            raise ValueError("inline_content is required for inline:// targets")
+            raise ValueError("inline:// 目标必须提供 inline_content")
         return build_inline_snapshot(inline_content, name_hint=target)
 
     if target.startswith("skill://"):
@@ -131,7 +131,7 @@ def _ensure_local_target_allowed(path: Path) -> None:
             continue
         _ensure_local_target_is_package_or_archive(resolved)
         return
-    raise ValueError("Local review targets must be under the current workspace, /tmp, or the configured skills root")
+    raise ValueError("本地审查目标必须位于当前工作区、/tmp 或配置的技能根目录中")
 
 
 def _ensure_local_target_is_package_or_archive(path: Path) -> None:
@@ -140,7 +140,7 @@ def _ensure_local_target_is_package_or_archive(path: Path) -> None:
         return
     if path.is_dir() and (path / "SKILL.md").is_file():
         return
-    raise ValueError("Local review targets must be .skill archives or directories containing a root SKILL.md")
+    raise ValueError("本地审查目标必须是 .skill 归档文件，或根目录包含 SKILL.md 的目录")
 
 
 def _tool_message_content_payload(payload: dict) -> dict:

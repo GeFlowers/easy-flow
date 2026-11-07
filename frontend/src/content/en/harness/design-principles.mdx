@@ -95,7 +95,7 @@ This is one of the most important ideas in DeerFlow. Good agent behavior is not 
 
 ## Configuration drives behavior
 
-All meaningful behaviors in DeerFlow are controlled through `config.yaml`. The system is designed so that operators can change how the agent behaves — which models to use, whether summarization is active, how subagents are limited, what tools are available — without touching code.
+All meaningful behaviors in DeerFlow are controlled through `config/config.yaml`. The system is designed so that operators can change how the agent behaves — which models to use, whether summarization is active, how subagents are limited, what tools are available — without touching code.
 
 This design principle has three implications:
 
@@ -115,7 +115,7 @@ Environment variable interpolation (`api_key: $OPENAI_API_KEY`) keeps secrets ou
 | Skills for specialization   | Domain capability injected on demand, keeping the base clean   |
 | Sandbox for execution       | Isolated workspace for real file and command work              |
 | Context engineering         | Active management of what the agent sees to stay effective     |
-| Config-driven               | All key behaviors are controlled through `config.yaml`         |
+| Config-driven               | All key behaviors are controlled through `config/config.yaml`         |
 
 <Cards num={2}>
   <Cards.Card title="Lead Agent" href="/docs/harness/lead-agent" />

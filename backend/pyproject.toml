@@ -29,6 +29,7 @@ dependencies = [
     "sqlalchemy[asyncio]>=2.0,<3.0",
     "alembic>=1.13",
     "cryptography>=48.0.1",
+    "qrcode>=8.2",
     "fastapi>=0.115.0",
     "httpx>=0.28.0",
     "python-multipart>=0.0.31",
@@ -59,7 +60,6 @@ monocle = ["monocle_apptrace>=0.8.8"]
 
 [dependency-groups]
 dev = [
-    "ruff>=0.14.11",
     # 追踪组件也属于 monocle 可选依赖；放在开发依赖组中，
     # 供追踪测试导入，同时避免普通安装被强制带入。
     "monocle_apptrace>=0.8.8",
@@ -76,4 +76,4 @@ requires = ["hatchling"]
 build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
-packages = ["deerflow", "app"]
+packages = ["deerflow", "server"]

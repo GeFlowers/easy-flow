@@ -1,6 +1,6 @@
 /**
  * 导入环境变量模式，使构建和开发启动在加载 Next.js 配置时即完成校验。
- * Docker 构建可通过 `SKIP_ENV_VALIDATION` 显式跳过该步骤。
+ * 临时构建可通过 `SKIP_ENV_VALIDATION` 显式跳过该步骤。
  */
 import "./src/env.js";
 
@@ -26,6 +26,8 @@ const config = {
     defaultLocale: "en",
   },
   devIndicators: false,
+  // 本机同时运行数据库和后端时限制构建并发，避免一次生成大量构建进程。
+  experimental: { cpus: 2 },
   /**
    * 在未指定浏览器直连地址时建立同源代理，统一 Cookie、CSRF 与流式请求边界。
    */

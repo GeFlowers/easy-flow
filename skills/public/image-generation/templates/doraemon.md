@@ -1,36 +1,36 @@
-# Doraemon 8-Panel Comic Generator
+# 哆啦A梦八格漫画生成器
 
-## Workflow
+## 工作流程
 
-1. Extract story context (theme, gadget, conflict, punchline)
-2. Map to 8 narrative beats
-3. Use the provided prompt template to generate the JSON prompt file
+1. 提取故事背景：主题、道具、冲突、笑点。
+2. 映射为八个叙事节拍。
+3. 使用下方模板生成 JSON（JavaScript Object Notation，JavaScript 对象表示法）提示词文件。
 
-## Panel Layout
+## 分格布局
 
 ```
 ┌─────────┬─────────┐
-│ Panel 1 │ Panel 2 │  Row 1: y=200, height=380
+│ 第 1 格 │ 第 2 格 │  第 1 行：y=200，height=380
 ├─────────┼─────────┤
-│ Panel 3 │ Panel 4 │  Row 2: y=600, height=380
+│ 第 3 格 │ 第 4 格 │  第 2 行：y=600，height=380
 ├─────────┼─────────┤
-│ Panel 5 │ Panel 6 │  Row 3: y=1000, height=380
+│ 第 5 格 │ 第 6 格 │  第 3 行：y=1000，height=380
 ├─────────┼─────────┤
-│ Panel 7 │ Panel 8 │  Row 4: y=1400, height=380
+│ 第 7 格 │ 第 8 格 │  第 4 行：y=1400，height=380
 └─────────┴─────────┘
-Left column: x=90, width=450
-Right column: x=540, width=450
+左列：x=90，width=450
+右列：x=540，width=450
 ```
 
-## Characters
+## 角色
 
-* Doraemon
-* Nobita
-* Shizuka
-* Giant
-* Suneo
+* 哆啦A梦
+* 大雄
+* 静香
+* 胖虎
+* 小夫
 
-## Prompt Template
+## 提示词模板
 
 ```json
 {
@@ -41,7 +41,7 @@ Right column: x=540, width=450
   },
   "header": {
     "title": {
-      "text": "[Story Title]",
+      "text": "[故事标题]",
       "position": { "x": 540, "y": 100 },
       "style": {
         "font_family": "Doraemon, sans-serif",
@@ -63,19 +63,19 @@ Right column: x=540, width=450
       "border": { "width": 4, "color": "#000000", "radius": 12 },
       "background": "#FFFFFF",
       "scene": {
-        "location": "[Location name]",
+        "location": "[地点名称]",
         "characters": [
           {
-            "name": "[Character]",
+            "name": "[角色]",
             "position": { "x": 0, "y": 0 },
-            "expression": "[Expression]",
-            "pose": "[Pose description]"
+            "expression": "[表情]",
+            "pose": "[姿态描述]"
           }
         ],
         "dialogues": [
           {
-            "speaker": "[Character]",
-            "text": "[Dialogue text]",
+            "speaker": "[角色]",
+            "text": "[对话文本]",
             "position": { "x": 0, "y": 0 },
             "style": {
               "bubble_type": "speech",
@@ -91,7 +91,7 @@ Right column: x=540, width=450
     }
   ],
   "footer": {
-    "text": "[Closing note] - Doraemon",
+    "text": "[结束语]——哆啦A梦",
     "position": { "x": 540, "y": 1860 },
     "style": {
       "font_family": "Doraemon, sans-serif",
@@ -103,10 +103,10 @@ Right column: x=540, width=450
 }
 ```
 
-## Story Pattern
+## 故事模式
 
-Setup → Problem → Gadget → Misuse → Backfire → Chaos → Consequence → Ironic Punchline
+铺垫 → 问题 → 道具 → 误用 → 反噬 → 混乱 → 后果 → 反讽笑点
 
-## Aspect Ratio
+## 宽高比
 
 9:16

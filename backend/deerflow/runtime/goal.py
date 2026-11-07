@@ -225,7 +225,7 @@ def format_visible_conversation(messages: list[Any]) -> str:
         text = message_to_text(message).strip()
         if not text:
             continue
-        role = "User" if _message_type(message) == "human" else "Assistant"
+        role = "用户" if _message_type(message) == "human" else "助手"
         lines.append(f"{role}: {text}")
     conversation = "\n\n".join(lines)
     if len(conversation) > MAX_GOAL_CONVERSATION_CHARS:
@@ -269,21 +269,21 @@ async def evaluate_goal_completion(
         return GoalEvaluation(
             satisfied=False,
             blocker="missing_evidence",
-            reason="No visible assistant evidence is available yet.",
+            reason="尚无可见的助手执行证据。",
             evidence_summary="",
         )
 
     system_instruction = (
-        "You are a strict completion evaluator for an AI coding assistant.\n"
-        "Decide whether the active goal is fully satisfied using ONLY the visible conversation evidence.\n"
-        "Do not assume files, commands, tests, or external state changed unless the conversation explicitly shows it.\n"
-        "If the visible evidence is too weak to prove progress, fail closed with blocker missing_evidence.\n"
-        "Use blocker needs_user_input when the assistant is waiting on the user, run_failed when the turn failed, "
-        "external_wait when work is waiting on an outside system, goal_not_met_yet when useful autonomous work can continue, "
-        "and none only when satisfied is true.\n"
-        'Output exactly one JSON object: {"satisfied": boolean, "blocker": string, "reason": string, "evidence_summary": string}.'
+        "你是编程助手的严格完成度评估器。\n"
+        "只根据可见对话中的证据判断当前目标是否完全达成。\n"
+        "除非对话明确展示，否则不得假设文件、命令、测试或外部状态发生了变化。\n"
+        "可见证据不足以证明进展时，保守判定未完成，blocker 使用 missing_evidence。\n"
+        "等待用户时 blocker 使用 needs_user_input，本轮失败时使用 run_failed，"
+        "等待外部系统时使用 external_wait，仍可自主推进时使用 goal_not_met_yet，"
+        "仅在 satisfied 为 true 时使用 none。\n"
+        '只输出一个 JSON 对象：{"satisfied": 布尔值, "blocker": 字符串, "reason": 字符串, "evidence_summary": 字符串}。'
     )
-    user_content = f"Active goal:\n{goal['objective']}\n\nVisible conversation evidence:\n{conversation}\n\nIs the active goal fully satisfied?"
+    user_content = f"当前目标：\n{goal['objective']}\n\n可见对话证据：\n{conversation}\n\n当前目标是否完全达成？"
 
     if model is None:
         model = create_goal_evaluator_model(model_name=model_name, app_config=app_config)
@@ -356,11 +356,11 @@ def make_goal_continuation_message(goal: GoalState, evaluation: GoalEvaluation) 
     '''构造仅供模型读取的续跑提示，并标记为不展示给用户的内部消息。'''
     content = (
         "<goal_continuation>\n"
-        f"Active goal: {goal['objective']}\n"
-        f"Evaluator result: not satisfied. Blocker: {evaluation['blocker']}. Reason: {evaluation['reason'] or 'No reason provided.'}\n"
-        f"Visible evidence: {evaluation.get('evidence_summary') or 'No evidence summary provided.'}\n"
-        "Continue working toward the active goal. Use the available tools and conversation context. "
-        "Do not ask the user to continue unless you are genuinely blocked.\n"
+        f"当前目标：{goal['objective']}\n"
+        f"评估结果：尚未达成。阻塞类型：{evaluation['blocker']}。原因：{evaluation['reason'] or '未提供原因。'}\n"
+        f"可见证据：{evaluation.get('evidence_summary') or '未提供证据摘要。'}\n"
+        "请结合可用工具和对话上下文继续完成当前目标。"
+        "除非确实遇到阻碍，否则不要要求用户确认继续。\n"
         "</goal_continuation>"
     )
     return HumanMessage(

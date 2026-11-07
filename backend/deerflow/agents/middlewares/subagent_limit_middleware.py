@@ -28,9 +28,9 @@ MIN_SUBAGENT_TOTAL_LIMIT = MIN_TOTAL_SUBAGENTS_PER_RUN
 MAX_SUBAGENT_TOTAL_LIMIT = MAX_TOTAL_SUBAGENTS_PER_RUN
 
 _TOTAL_LIMIT_STOP_MSG = (
-    "[SUBAGENT LIMIT REACHED] The subagent delegation limit for this run has been reached. "
-    "Continue using the subagent results already collected, execute remaining simple work "
-    "directly, or summarize the remaining work instead of launching more subagents."
+    "[已达到子代理上限] 本轮运行已达到子代理委派上限。"
+    "请继续使用已收集的子代理结果，直接执行剩余的简单工作，"
+    "或总结尚未完成的工作，不要再启动子代理。"
 )
 
 

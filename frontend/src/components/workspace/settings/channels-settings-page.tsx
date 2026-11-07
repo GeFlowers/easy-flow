@@ -26,23 +26,24 @@ import {
   useChannelProviders,
   useConnectChannelProvider,
   useDisconnectChannelProvider,
-} from "@/core/channels/hooks";
+} from "@/features/channels/hooks";
 import {
   closeConnectWindow,
   openConnectUrl,
   prepareConnectWindow,
-} from "@/core/channels/open-connect-url";
+} from "@/features/channels/open-connect-url";
 import {
   providerCanConnect,
   providerCanEditRuntimeConfig,
   providerNeedsRuntimeConfig,
-} from "@/core/channels/provider-state";
-import type { ChannelConnection, ChannelProvider } from "@/core/channels/types";
-import { useI18n } from "@/core/i18n/hooks";
+} from "@/features/channels/provider-state";
+import type { ChannelConnection, ChannelProvider } from "@/features/channels/types";
+import { useI18n } from "@/features/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 import { ChannelProviderIcon } from "../channels/channel-provider-icon";
 import { ChannelRuntimeConfigDialog } from "../channels/channel-runtime-config-dialog";
+import { WechatConnectDialog } from "../channels/wechat-connect-dialog";
 
 import { SettingsSection } from "./settings-section";
 
@@ -122,6 +123,7 @@ function ChannelProviderItem({
   const configureMutation = useConfigureChannelProvider();
   const disconnectProviderMutation = useDisconnectChannelProvider();
   const [setupOpen, setSetupOpen] = useState(false);
+  const [wechatOpen, setWechatOpen] = useState(false);
   const runtimeAvailable = provider.configured && !provider.unavailable_reason;
   const isConnected =
     runtimeAvailable &&
@@ -211,14 +213,20 @@ function ChannelProviderItem({
                   variant="outline"
                   size="sm"
                   disabled={isConnecting || isDisconnecting}
-                  onClick={() => setSetupOpen(true)}
+                  onClick={() =>
+                    provider.provider === "wechat"
+                      ? setWechatOpen(true)
+                      : setSetupOpen(true)
+                  }
                 >
                   {isConnecting ? (
                     <LoaderCircleIcon className="animate-spin" />
                   ) : (
                     <PlugIcon />
                   )}
-                  {t.channels.modify}
+                  {provider.provider === "wechat"
+                    ? "重新扫码"
+                    : t.channels.modify}
                 </Button>
               ) : null}
               <Button
@@ -268,6 +276,10 @@ function ChannelProviderItem({
                 disabled={isConnecting}
                 title={unavailableReason}
                 onClick={() => {
+                  if (provider.provider === "wechat") {
+                    setWechatOpen(true);
+                    return;
+                  }
                   if (providerNeedsRuntimeConfig(provider)) {
                     setSetupOpen(true);
                     return;
@@ -288,12 +300,21 @@ function ChannelProviderItem({
                 )}
                 {connection?.status === "revoked"
                   ? t.channels.reconnect
-                  : t.channels.connect}
+                  : provider.provider === "wechat"
+                    ? "连接微信"
+                    : t.channels.connect}
               </Button>
             </>
           )}
         </ItemActions>
       </Item>
+      {provider.provider === "wechat" && wechatOpen ? (
+        <WechatConnectDialog
+          open={wechatOpen}
+          onOpenChange={setWechatOpen}
+          initiallyAuthenticated={runtimeAvailable && !isConnected}
+        />
+      ) : null}
       <ChannelRuntimeConfigDialog
         provider={provider}
         open={setupOpen}

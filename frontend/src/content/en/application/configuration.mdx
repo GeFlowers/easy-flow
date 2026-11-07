@@ -13,8 +13,8 @@ DeerFlow App is configured through two files and a set of environment variables.
 
 | File                     | Purpose                                                                                 |
 | ------------------------ | --------------------------------------------------------------------------------------- |
-| `config.yaml`            | Backend configuration: models, sandbox, tools, skills, memory, and all Harness settings |
-| `extensions_config.json` | MCP servers and skill enable/disable state (managed by the App UI and Gateway API)      |
+| `config/config.yaml`            | Backend configuration: models, sandbox, tools, skills, memory, and all Harness settings |
+| `config/extensions_config.json` | MCP servers and skill enable/disable state (managed by the App UI and Gateway API)      |
 
 Frontend environment variables control the Next.js build and runtime behavior.
 
@@ -23,7 +23,7 @@ Frontend environment variables control the Next.js build and runtime behavior.
 Start by copying the example:
 
 ```bash
-cp config.example.yaml config.yaml
+cp config/config.example.yaml config/config.yaml
 ```
 
 The most important sections for application configuration are:
@@ -139,15 +139,15 @@ Configure which tools the agent has access to. The defaults use DuckDuckGo (no A
 ```yaml
 tools:
   # Web search (choose one)
-  - use: deerflow.community.ddg_search.tools:web_search_tool # default, no key required
-  # - use: deerflow.community.tavily.tools:web_search_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool # default, no key required
+  # - use: deerflow.integrations.tavily.tools:web_search_tool
   #   api_key: $TAVILY_API_KEY
 
   # Web fetch (choose one)
-  - use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - use: deerflow.integrations.jina_ai.tools:web_fetch_tool
 
   # Image search
-  - use: deerflow.community.image_search.tools:image_search_tool
+  - use: deerflow.integrations.image_search.tools:image_search_tool
 
   # File operations
   - use: deerflow.sandbox.tools:ls_tool
@@ -242,14 +242,6 @@ Manual example:
     "data-analysis": { "enabled": true }
   }
 }
-```
-
-## Config upgrade
-
-When the config schema changes, `config_version` is bumped. To merge new fields into your existing config without losing customizations:
-
-```bash
-make config-upgrade
 ```
 
 <Cards num={2}>

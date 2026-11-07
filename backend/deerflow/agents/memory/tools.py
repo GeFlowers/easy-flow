@@ -99,16 +99,16 @@ def memory_add_tool(
     try:
         normalized_content = content.strip()
         if not normalized_content:
-            return json.dumps({"error": "empty content"})
+            return json.dumps({"error": "内容为空"}, ensure_ascii=False)
         content_key = _memory_content_key(normalized_content)
         manager = get_memory_manager()
         existing_facts = manager.get_memory(agent_name=agent_name, user_id=user_id).get("facts", [])
         if any(_memory_content_key(str(fact.get("content", ""))) == content_key for fact in existing_facts):
-            return json.dumps({"error": "Duplicate fact"})
+            return json.dumps({"error": "事实重复"}, ensure_ascii=False)
 
         create = getattr(manager, "create_fact", None)
         if not callable(create):
-            return json.dumps({"error": f"memory backend {type(manager).__name__} does not support create_fact"})
+            return json.dumps({"error": f"记忆后端 {type(manager).__name__} 不支持 create_fact"}, ensure_ascii=False)
         _memory_data, fact_id = create(
             normalized_content,
             category=category,
@@ -117,7 +117,7 @@ def memory_add_tool(
             user_id=user_id,
         )
         if fact_id is None:
-            return json.dumps({"error": "Fact was not stored because memory.max_facts kept higher-confidence facts"})
+            return json.dumps({"error": "事实未保存，因为 memory.max_facts 限制优先保留了置信度更高的事实"}, ensure_ascii=False)
         return json.dumps({"fact_id": fact_id, "status": "added"})
     except ValueError as exc:
         return json.dumps({"error": str(exc)})
@@ -156,7 +156,7 @@ def memory_update_tool(
         manager = get_memory_manager()
         update = getattr(manager, "update_fact", None)
         if not callable(update):
-            return json.dumps({"error": f"memory backend {type(manager).__name__} does not support update_fact"})
+            return json.dumps({"error": f"记忆后端 {type(manager).__name__} 不支持 update_fact"}, ensure_ascii=False)
         update(
             fact_id,
             content=content,
@@ -167,7 +167,7 @@ def memory_update_tool(
         )
         return json.dumps({"fact_id": fact_id, "status": "updated"})
     except KeyError:
-        return json.dumps({"error": f"Fact not found: {fact_id}"})
+        return json.dumps({"error": f"未找到事实：{fact_id}"}, ensure_ascii=False)
     except ValueError as exc:
         return json.dumps({"error": str(exc)})
     except Exception as exc:
@@ -193,11 +193,11 @@ def memory_delete_tool(runtime: Runtime, fact_id: str) -> str:
         manager = get_memory_manager()
         delete = getattr(manager, "delete_fact", None)
         if not callable(delete):
-            return json.dumps({"error": f"memory backend {type(manager).__name__} does not support delete_fact"})
+            return json.dumps({"error": f"记忆后端 {type(manager).__name__} 不支持 delete_fact"}, ensure_ascii=False)
         delete(fact_id, agent_name=agent_name, user_id=user_id)
         return json.dumps({"fact_id": fact_id, "status": "deleted"})
     except KeyError:
-        return json.dumps({"error": f"Fact not found: {fact_id}"})
+        return json.dumps({"error": f"未找到事实：{fact_id}"}, ensure_ascii=False)
     except ValueError as exc:
         return json.dumps({"error": str(exc)})
     except Exception as exc:

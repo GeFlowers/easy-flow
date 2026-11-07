@@ -2,7 +2,7 @@ import { Layout } from "nextra-theme-docs";
 
 import { Footer } from "@/components/landing/footer";
 import { Header } from "@/components/landing/header";
-import { getBlogIndexData } from "@/core/blog";
+import { getBlogIndexData } from "@/features/blog";
 import "nextra-theme-docs/style.css";
 
 /** 使用博客索引数据装配 Nextra 博客布局。 */

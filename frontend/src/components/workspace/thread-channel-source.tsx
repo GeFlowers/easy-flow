@@ -1,7 +1,7 @@
 "use client";
 
 import { ChannelProviderIcon } from "@/components/workspace/channels/channel-provider-icon";
-import type { ChannelThreadSource } from "@/core/threads/utils";
+import type { ChannelThreadSource } from "@/features/threads/utils";
 import { cn } from "@/lib/utils";
 
 type ThreadChannelIconProps = {

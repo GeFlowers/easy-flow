@@ -3,7 +3,7 @@
 import { MessageSquareQuoteIcon, XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 import { Tooltip } from "../tooltip";

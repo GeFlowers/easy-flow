@@ -1,104 +1,35 @@
 ---
 title: 快速上手
-description: 使用项目支持的 Docker Compose 工作流启动 DeerFlow。
+description: 在 Windows 本机运行应用，仅数据库使用容器。
 ---
-
-import { Callout, Steps } from "nextra/components";
 
 # 快速上手
 
-<Callout type="info" emoji="⚡">
-  大约 10 分钟即可通过 Docker 运行 DeerFlow。你需要 Docker Compose 和至少一个 LLM API Key。
-</Callout>
+当前学习版在 Windows 本机运行前端、后端和 Nginx，只有 PostgreSQL 使用容器，Redis 在本机单独运行。
 
-本指南介绍如何使用项目的 Docker Compose 配置启动 DeerFlow。Gateway、前端、PostgreSQL 和 nginx 都在容器中运行，并通过同一个地址访问。
-
-## 前置条件
-
-检查 Docker 是否可用：
+1. 安装 Python 3.12 或以上、uv、Node.js 22 或以上、Corepack、Nginx、Docker 和 Make。
+2. 复制根目录及前端目录的环境示例文件，准备 `config/config.yaml` 和 `config/extensions_config.json`，填写模型凭据及数据库连接。
+3. 在根目录环境文件设置 `NGINX_HOME`，将仓库的 `deploy/nginx/nginx.conf` 复制到安装目录的 `conf/nginx.conf`。
+4. 启动本机 Redis，安装依赖并构建前端：
 
 ```bash
-make docker-init
+cd backend
+uv sync --frozen --no-dev --extra postgres --extra redis --extra pymupdf
+cd ../frontend
+corepack pnpm install --frozen-lockfile
+corepack pnpm build
+cd ..
 ```
 
-必需工具：
-
-| 工具   | 要求 |
-| ------ | ---- |
-| Docker | Docker Engine/Desktop，且支持 Compose |
-
-## 步骤
-
-<Steps>
-
-### 克隆仓库
+全新部署需要先创建 `deer-flow-dev_postgres-data` 卷；迁移已有数据库时应先检查原卷，不要以空卷替代。
 
 ```bash
-git clone https://github.com/bytedance/deer-flow.git
-cd deer-flow
+docker volume create deer-flow-dev_postgres-data
+bash scripts/start.sh
 ```
 
-### 配置模型
+打开 [http://localhost:2026](http://localhost:2026)，没有管理员时先完成初始化。
 
-首次运行 `make docker-start` 时，如果 `config.yaml` 不存在，会从示例文件创建。然后在 `models:` 下至少添加一个模型：
+日常使用 `bash scripts/stop.sh` 停止前后端及数据库容器，数据库卷和 Nginx 会保留。
 
-```yaml
-models:
-  - name: gpt-4o
-    use: langchain_openai:ChatOpenAI
-    model: gpt-4o
-    api_key: $OPENAI_API_KEY
-    request_timeout: 600.0
-    max_retries: 2
-    supports_vision: true
-```
-
-将对应的 API Key 写入项目根目录的 `.env` 文件：
-
-```bash
-OPENAI_API_KEY=sk-...
-```
-
-查看[配置](/docs/application/configuration)页面了解其他模型提供商的示例。
-
-### 启动 DeerFlow
-
-```bash
-make docker-start
-```
-
-这会启动：
-
-- Gateway API、前端、PostgreSQL 和 nginx 容器
-
-在浏览器中打开 [http://localhost:2026](http://localhost:2026)。
-
-### 停止所有服务
-
-```bash
-make docker-stop
-```
-
-</Steps>
-
-## `make docker-start` 做了什么
-
-- 构建前后端镜像，并在后台启动应用服务。
-- nginx 通过端口 `2026` 代理所有流量，所以你只需要一个 URL。
-
-日志文件：
-
-| 服务    | 命令 |
-| ------- | ---- |
-| 全部服务 | `make docker-logs` |
-| Gateway | `make docker-logs-gateway` |
-| 前端    | `make docker-logs-frontend` |
-
-<Callout type="tip">
-  如果有问题，先检查 Gateway 容器日志。大多数启动错误（缺失 API Key、配置解析失败）会出现在其中。
-</Callout>
-
-<Cards num={2}>
-  <Cards.Card title="部署指南" href="/docs/application/deployment-guide" />
-  <Cards.Card title="配置" href="/docs/application/configuration" />
-</Cards>
+[部署指南](/docs/application/deployment-guide)说明自启动和数据位置，[运维与排障](/docs/application/operations-and-troubleshooting)说明日志及常见故障。

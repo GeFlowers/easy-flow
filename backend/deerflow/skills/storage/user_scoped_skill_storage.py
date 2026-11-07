@@ -165,10 +165,10 @@ class UserScopedSkillStorage(LocalSkillStorage):
         is_global_public = (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists()
         is_global_custom_fallback = (self._global_custom_root / normalized_name / SKILL_MD_FILE).exists()
         if is_global_public:
-            raise ValueError(f"'{name}' is a built-in skill. Use the skill_manage tool to create your own version — it will shadow the built-in one.")
+            raise ValueError(f"'{name}' 是内置技能。请使用 skill_manage 工具创建个人版本，它将覆盖内置版本。")
         if is_global_custom_fallback:
-            raise ValueError(f"'{name}' is a legacy shared skill (not editable). To customise it, create your own version with the same name — it will shadow the shared one.")
-        raise FileNotFoundError(f"Custom skill '{name}' not found.")
+            raise ValueError(f"'{name}' 是旧版共享技能（不可编辑）。若要自定义，请创建同名个人版本，它将覆盖共享版本。")
+        raise FileNotFoundError(f"找不到自定义技能 '{name}'。")
 
     def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
         '''枚举全局公共技能、用户自定义技能及条件成立时的全局旧技能。'''
@@ -224,7 +224,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
         return {
             "success": True,
             "skill_name": skill_name,
-            "message": f"Skill '{skill_name}' installed successfully for user '{self._user_id}'",
+            "message": f"已为用户 '{self._user_id}' 成功安装技能 '{skill_name}'",
         }
 
 
@@ -265,4 +265,4 @@ class UserScopedSkillStorage(LocalSkillStorage):
                 return resolved_file
             except ValueError:
                 continue
-        raise ValueError(f"Resolved skill file {resolved_file} must stay within either the global skills root ({self._host_root.resolve()}) or the per-user custom root ({self._user_custom_root.resolve()}).")
+        raise ValueError(f"解析后的技能文件 {resolved_file} 必须位于全局技能根目录（{self._host_root.resolve()}）或用户自定义根目录（{self._user_custom_root.resolve()}）内部。")

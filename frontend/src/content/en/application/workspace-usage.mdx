@@ -21,7 +21,7 @@ To start a new thread, click **New Thread** in the sidebar or use the keyboard s
 
 ## Selecting a model
 
-Use the model picker in the input bar to choose which configured model to use for the current request. Models listed here correspond to the `models:` entries in your `config.yaml`.
+Use the model picker in the input bar to choose which configured model to use for the current request. Models listed here correspond to the `models:` entries in your `config/config.yaml`.
 
 The selected model applies to the next message only. You can switch models between messages in the same thread.
 
@@ -47,7 +47,7 @@ Plan mode is most useful for complex tasks with 3 or more distinct steps.
 
 Click the attachment icon in the input bar to upload files. Supported file types include PDFs, text files, spreadsheets, and images.
 
-Uploaded files are stored under the thread's working directory (`/mnt/user-data/uploads/`) and are accessible to the agent during the conversation. PDFs are automatically converted to Markdown for better model comprehension (the converter can be configured via `uploads.pdf_converter` in `config.yaml`).
+Uploaded files are stored under the thread's working directory (`/mnt/user-data/uploads/`) and are accessible to the agent during the conversation. PDFs are automatically converted to Markdown for better model comprehension (the converter can be configured via `uploads.pdf_converter` in `config/config.yaml`).
 
 ## Viewing artifacts
 

@@ -69,7 +69,7 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
             thread_id = config.get("configurable", {}).get("thread_id")
 
         if thread_id is None:
-            raise ValueError("Thread ID is required in runtime context or config.configurable")
+            raise ValueError("运行时上下文或 config.configurable 中必须提供线程标识")
 
         user_id = get_effective_user_id()
 

@@ -15,14 +15,14 @@ import {
   WorkspaceContainer,
   WorkspaceHeader,
 } from "@/components/workspace/workspace-container";
-import { useI18n } from "@/core/i18n/hooks";
-import { useInfiniteThreads } from "@/core/threads/hooks";
+import { useI18n } from "@/features/i18n/hooks";
+import { useInfiniteThreads } from "@/features/threads/hooks";
 import {
   channelSourceOfThread,
   pathOfThread,
   titleOfThread,
-} from "@/core/threads/utils";
-import { formatTimeAgo } from "@/core/utils/datetime";
+} from "@/features/threads/utils";
+import { formatTimeAgo } from "@/features/utils/datetime";
 
 /** 展示可搜索的会话列表，并按模式安全地触发分页加载。 */
 export default function ChatsPage() {

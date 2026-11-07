@@ -40,7 +40,7 @@ sandbox:
 
 ```yaml
 sandbox:
-  use: deerflow.community.e2b_sandbox:E2BSandboxProvider
+  use: deerflow.integrations.e2b_sandbox:E2BSandboxProvider
 
   # 必填：e2b API Key。若不写则回退读取环境变量 E2B_API_KEY。
   api_key: $E2B_API_KEY
@@ -75,9 +75,9 @@ sandbox:
     OPENAI_API_KEY: $OPENAI_API_KEY
 ```
 
-安装：`e2b-code-interpreter` 已经是 `deer-flow` 的核心依赖，无需额外安装 —— 只需配置 API Key，并在 `config.yaml` 中切换 provider 即可。
+安装：`e2b-code-interpreter` 已经是 `deer-flow` 的核心依赖，无需额外安装 —— 只需配置 API Key，并在 `config/config.yaml` 中切换 provider 即可。
 
-在 [e2b.dev/dashboard](https://e2b.dev/dashboard) 申请 API Key，然后在 `config.yaml` 中直接配置 `sandbox.api_key`，或在 `.env` 中导出 `E2B_API_KEY`。
+在 [e2b.dev/dashboard](https://e2b.dev/dashboard) 申请 API Key，然后在 `config/config.yaml` 中直接配置 `sandbox.api_key`，或在 `.env` 中导出 `E2B_API_KEY`。
 
 <Callout type="info">
   因为 e2b 是远程沙箱，DeerFlow 的虚拟前缀 `/mnt/user-data`
@@ -115,29 +115,18 @@ sandbox:
   <code>/mnt/user-data</code>。
 </Callout>
 
-当 `LocalSandboxProvider` 运行在 Docker 开发环境（`make docker-start`）中时，它实际运行在
-`deer-flow-gateway` 容器里。此时 `host_path` 是从 gateway
-容器的文件系统解析，而不是直接从 Docker 宿主机解析。需要先把宿主机目录 bind
-mount 到 gateway 服务，再在 `config.yaml` 中使用容器内路径：
-
-```yaml
-# docker/docker-compose-dev.yaml
-services:
-  gateway:
-    volumes:
-      - ${DEER_FLOW_REPO_ROOT}/.deer-flow/knowledge:/app/.deer-flow/knowledge:ro
-```
+当前后端在 Windows 本机运行，`host_path` 直接从本机文件系统解析，不需要应用容器挂载。例如：
 
 ```yaml
 sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
   mounts:
-    - host_path: /app/.deer-flow/knowledge
+    - host_path: D:/Knowledge
       container_path: /mnt/knowledge
       read_only: true
 ```
 
-如果配置的 `host_path` 对 gateway 进程不可见，DeerFlow 会记录错误日志并忽略该挂载。
+这里的 `container_path` 是工具使用的虚拟路径，不表示启动了 Docker 沙箱。如果目录不存在或后端账户无法读取，应先检查本机路径与权限。任意命令执行以该账户权限作用于本机，不能把路径映射当作强隔离。
 
 ## 输出截断
 

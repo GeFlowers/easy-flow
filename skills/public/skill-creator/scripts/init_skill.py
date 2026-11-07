@@ -10,7 +10,7 @@
     init_skill.py my-new-skill --path skills/public --resources scripts,references
     init_skill.py my-api-helper --path skills/private --resources scripts --examples
     init_skill.py custom-skill --path /custom/location
-    init_skill.py my-skill --path skills/public --interface short_description="Short UI label"
+    init_skill.py my-skill --path skills/public --interface short_description="用于界面展示的简短技能说明"
 '''
 
 import argparse
@@ -25,11 +25,11 @@ ALLOWED_RESOURCES = {"scripts", "references", "assets"}
 
 SKILL_TEMPLATE = """---
 name: {skill_name}
-description: "[TODO: Briefly describe what this skill does and when it applies.]"
+description: "[TODO: 简要描述技能的用途和适用情况。]"
 ---
 
 
-[TODO: Add the task-specific guidance Codex needs. Reference supporting files only when they are relevant.]
+[TODO: 添加 Codex 完成该任务所需的专用指导，只在相关时引用配套文件。]
 """
 
 EXAMPLE_SCRIPT = """#!/usr/bin/env python3
@@ -44,7 +44,7 @@ EXAMPLE_SCRIPT = """#!/usr/bin/env python3
 
 def main():
     '''输出示例脚本提示，供新技能作者替换为实际逻辑。'''
-    print("This is an example script for {skill_name}")
+    print("这是 {skill_name} 技能的示例脚本")
     # TODO：在此添加实际脚本逻辑。
     # 可在此实现数据处理、文件转换或接口调用等工作。
 
@@ -52,38 +52,34 @@ if __name__ == "__main__":
     main()
 """
 
-EXAMPLE_REFERENCE = """# Reference for {skill_title}
+EXAMPLE_REFERENCE = """# {skill_title} 参考说明
 
-Replace this placeholder with maintained, task-specific details that Codex
-would not reliably know, such as operational constraints, local schemas, or
-fragile integration behavior.
+用需维护的任务专属细节替换本占位内容，例如操作约束、本地数据结构或容易出错的集成行为。
+只保留 Codex 无法可靠自行推断的信息。
 
-Delete this file if no supported workflow needs it.
+没有工作流程需要时删除本文件。
 """
 
-EXAMPLE_ASSET = """# Example Asset File
+EXAMPLE_ASSET = """# 示例资源文件
 
-This placeholder represents where asset files would be stored.
-Replace with actual asset files (templates, images, fonts, etc.) or delete if not needed.
+这里是资源文件的存放位置。替换为真实模板、图片、字体等，不需要时删除。
+资源用于 Codex 生成的结果，不应直接作为指令加载进上下文。
 
-Asset files are NOT intended to be loaded into context, but rather used within
-the output Codex produces.
+其他技能的资源示例：
+- 品牌规范：logo.png、slides_template.pptx。
+- 前端构建：hello-world/ 目录中的 HTML/React 起始项目。
+- 排版：custom-font.ttf、font-family.woff2。
+- 数据：sample_data.csv、test_dataset.json。
 
-Example asset files from other skills:
-- Brand guidelines: logo.png, slides_template.pptx
-- Frontend builder: hello-world/ directory with HTML/React boilerplate
-- Typography: custom-font.ttf, font-family.woff2
-- Data: sample_data.csv, test_dataset.json
+常见类型：
+- 模板：.pptx、.docx、基础项目目录。
+- 图片：.png、.jpg、.svg、.gif。
+- 字体：.ttf、.otf、.woff、.woff2。
+- 基础代码：项目目录、起始文件。
+- 图标：.ico、.svg。
+- 数据文件：.csv、.json、.xml、.yaml。
 
-
-- Templates: .pptx, .docx, boilerplate directories
-- Images: .png, .jpg, .svg, .gif
-- Fonts: .ttf, .otf, .woff, .woff2
-- Boilerplate code: Project directories, starter files
-- Icons: .ico, .svg
-- Data files: .csv, .json, .xml, .yaml
-
-Note: This is a text placeholder. Actual assets can be any file type.
+本文件只是文字占位，真实资源可以是任意文件类型。
 """
 
 
@@ -109,8 +105,8 @@ def parse_resources(raw_resources):
     invalid = sorted({item for item in resources if item not in ALLOWED_RESOURCES})
     if invalid:
         allowed = ", ".join(sorted(ALLOWED_RESOURCES))
-        print(f"[ERROR] Unknown resource type(s): {', '.join(invalid)}")
-        print(f"   Allowed: {allowed}")
+        print(f"[ERROR] 未知资源类型： {', '.join(invalid)}")
+        print(f"   允许值： {allowed}")
         sys.exit(1)
     deduped = []
     seen = set()
@@ -131,27 +127,27 @@ def create_resource_dirs(
         if resource == "scripts":
             if include_examples:
                 example_script = resource_dir / "example.py"
-                example_script.write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name))
+                example_script.write_text(EXAMPLE_SCRIPT.format(skill_name=skill_name), encoding="utf-8")
                 example_script.chmod(0o755)
-                print("[OK] Created scripts/example.py")
+                print("[OK] 已创建 scripts/example.py")
             else:
-                print("[OK] Created scripts/")
+                print("[OK] 已创建 scripts/")
         elif resource == "references":
             if include_examples:
                 example_reference = resource_dir / "api_reference.md"
                 example_reference.write_text(
-                    EXAMPLE_REFERENCE.format(skill_title=skill_title)
+                    EXAMPLE_REFERENCE.format(skill_title=skill_title), encoding="utf-8"
                 )
-                print("[OK] Created references/api_reference.md")
+                print("[OK] 已创建 references/api_reference.md")
             else:
-                print("[OK] Created references/")
+                print("[OK] 已创建 references/")
         elif resource == "assets":
             if include_examples:
                 example_asset = resource_dir / "example_asset.txt"
-                example_asset.write_text(EXAMPLE_ASSET)
-                print("[OK] Created assets/example_asset.txt")
+                example_asset.write_text(EXAMPLE_ASSET, encoding="utf-8")
+                print("[OK] 已创建 assets/example_asset.txt")
             else:
-                print("[OK] Created assets/")
+                print("[OK] 已创建 assets/")
 
 
 def init_skill(skill_name, path, resources, include_examples, interface_overrides):
@@ -171,14 +167,14 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
     skill_dir = Path(path).resolve() / skill_name
 
     if skill_dir.exists():
-        print(f"[ERROR] Skill directory already exists: {skill_dir}")
+        print(f"[ERROR] 技能目录已存在： {skill_dir}")
         return None
 
     try:
         skill_dir.mkdir(parents=True, exist_ok=False)
-        print(f"[OK] Created skill directory: {skill_dir}")
+        print(f"[OK] 已创建技能目录： {skill_dir}")
     except Exception as e:
-        print(f"[ERROR] Error creating directory: {e}")
+        print(f"[ERROR] 创建目录失败： {e}")
         return None
 
     # 根据模板生成 SKILL.md。
@@ -189,10 +185,10 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
 
     skill_md_path = skill_dir / "SKILL.md"
     try:
-        skill_md_path.write_text(skill_content)
-        print("[OK] Created SKILL.md")
+        skill_md_path.write_text(skill_content, encoding="utf-8")
+        print("[OK] 已创建 SKILL.md")
     except Exception as e:
-        print(f"[ERROR] Error creating SKILL.md: {e}")
+        print(f"[ERROR] 创建 SKILL.md 失败： {e}")
         return None
 
     try:
@@ -200,7 +196,7 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
         if not result:
             return None
     except Exception as e:
-        print(f"[ERROR] Error creating agents/openai.yaml: {e}")
+        print(f"[ERROR] 创建 agents/openai.yaml 失败： {e}")
         return None
 
     if resources:
@@ -209,27 +205,27 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
                 skill_dir, skill_name, skill_title, resources, include_examples
             )
         except Exception as e:
-            print(f"[ERROR] Error creating resource directories: {e}")
+            print(f"[ERROR] 创建资源目录失败： {e}")
             return None
 
-    print(f"\n[OK] Skill '{skill_name}' initialized successfully at {skill_dir}")
-    print("\nNext steps:")
-    print("1. Edit SKILL.md to complete the TODO items and update the description")
+    print(f"\n[OK] 技能 '{skill_name}' 已初始化到 {skill_dir}")
+    print("\n后续步骤：")
+    print("1. 编辑 SKILL.md，完成 TODO 待办并更新描述")
     if resources:
         if include_examples:
             print(
-                "2. Customize or delete the example files in scripts/, references/, and assets/"
+                "2. 按需修改或删除 scripts/、references/、assets/ 中的示例"
             )
         else:
-            print("2. Add resources to scripts/, references/, and assets/ as needed")
+            print("2. 按需向 scripts/、references/、assets/ 添加资源")
     else:
         print(
-            "2. Create resource directories only if needed (scripts/, references/, assets/)"
+            "2. 只在需要时创建 scripts/、references/、assets/ 资源目录"
         )
-    print("3. Update agents/openai.yaml if the UI metadata should differ")
-    print("4. Run the validator when ready to check the skill structure")
+    print("3. 需要不同界面元数据时更新 agents/openai.yaml")
+    print("4. 完成后运行验证器，检查技能结构")
     print(
-        "5. Consider independent forward-testing only when complexity or risk warrants it"
+        "5. 只有复杂度或风险确有需要时才进行独立前向验证"
     )
 
     return skill_dir
@@ -238,57 +234,57 @@ def init_skill(skill_name, path, resources, include_examples, interface_override
 def main():
     '''解析初始化选项、规范化技能名称，并执行目录和模板文件的创建。'''
     parser = argparse.ArgumentParser(
-        description="Create a new skill directory with a SKILL.md template.",
+        description="创建包含 SKILL.md 模板的新技能目录。",
     )
-    parser.add_argument("skill_name", help="Skill name (normalized to hyphen-case)")
-    parser.add_argument("--path", required=True, help="Output directory for the skill")
+    parser.add_argument("skill_name", help="技能名，将规范化为小写连字符格式")
+    parser.add_argument("--path", required=True, help="技能输出目录")
     parser.add_argument(
         "--resources",
         default="",
-        help="Comma-separated list: scripts,references,assets",
+        help="用逗号分隔的资源列表：scripts,references,assets",
     )
     parser.add_argument(
         "--examples",
         action="store_true",
-        help="Create example files inside the selected resource directories",
+        help="在所选资源目录内创建示例文件",
     )
     parser.add_argument(
         "--interface",
         action="append",
         default=[],
-        help="Interface override in key=value format (repeatable)",
+        help="以 key=value 覆盖界面字段，可重复传入",
     )
     args = parser.parse_args()
 
     raw_skill_name = args.skill_name
     skill_name = normalize_skill_name(raw_skill_name)
     if not skill_name:
-        print("[ERROR] Skill name must include at least one letter or digit.")
+        print("[ERROR] 技能名必须至少包含一个字母或数字。")
         sys.exit(1)
     if len(skill_name) > MAX_SKILL_NAME_LENGTH:
         print(
             f"[ERROR] Skill name '{skill_name}' is too long ({len(skill_name)} characters). "
-            f"Maximum is {MAX_SKILL_NAME_LENGTH} characters."
+            f"最多允许 {MAX_SKILL_NAME_LENGTH} 个字符。"
         )
         sys.exit(1)
     if skill_name != raw_skill_name:
-        print(f"Note: Normalized skill name from '{raw_skill_name}' to '{skill_name}'.")
+        print(f"提示：已将技能名从 '{raw_skill_name}' 规范化为 '{skill_name}'。")
 
     resources = parse_resources(args.resources)
     if args.examples and not resources:
-        print("[ERROR] --examples requires --resources to be set.")
+        print("[ERROR] 使用 --examples 时必须指定 --resources。")
         sys.exit(1)
 
     path = args.path
 
-    print(f"Initializing skill: {skill_name}")
-    print(f"   Location: {path}")
+    print(f"正在初始化技能： {skill_name}")
+    print(f"   位置： {path}")
     if resources:
-        print(f"   Resources: {', '.join(resources)}")
+        print(f"   资源： {', '.join(resources)}")
         if args.examples:
-            print("   Examples: enabled")
+            print("   示例：启用")
     else:
-        print("   Resources: none (create as needed)")
+        print("   资源：无，可按需创建")
     print()
 
     result = init_skill(skill_name, path, resources, args.examples, args.interface)

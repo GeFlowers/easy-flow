@@ -44,7 +44,7 @@ class AuditMiddleware(AgentMiddleware):
 
 ## 自定义工具
 
-在 `config.yaml` 的 `tools:` 下注册新工具，将其添加到 Agent：
+在 `config/config.yaml` 的 `tools:` 下注册新工具，将其添加到 Agent：
 
 ```yaml
 tools:
@@ -85,7 +85,7 @@ class MyCustomSandboxProvider(SandboxProvider):
         ...
 ```
 
-然后在 `config.yaml` 中引用：
+然后在 `config/config.yaml` 中引用：
 
 ```yaml
 sandbox:
@@ -111,7 +111,7 @@ class RedisMemoryStorage(MemoryStorage):
         ...
 ```
 
-在 `config.yaml` 中配置：
+在 `config/config.yaml` 中配置：
 
 ```yaml
 memory:

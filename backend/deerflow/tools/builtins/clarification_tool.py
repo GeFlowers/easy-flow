@@ -41,4 +41,4 @@ def ask_clarification_tool(
         context: 可选背景，说明为什么需要澄清，帮助用户理解当前情况。
         options: 可选选项列表，适用于 approach_choice 或 suggestion；选项应清楚易选。
     '''
-    return "Clarification request processed by middleware"
+    return "澄清请求已由中间件处理"

@@ -1,293 +1,289 @@
 ---
 name: code-documentation
-description: Use this skill when the user requests to generate, create, or improve documentation for code, APIs, libraries, repositories, or software projects. Supports README generation, API reference documentation, inline code comments, architecture documentation, changelog generation, and developer guides. Trigger on requests like "document this code", "create a README", "generate API docs", "write developer guide", or when analyzing codebases for documentation purposes.
+description: 用户要求为代码、接口、库、仓库或软件项目生成、创建或改进文档时使用。支持项目说明、接口参考、行内注释、架构文档、更新日志和开发者指南。“为这段代码写文档”、“创建项目说明”、“生成接口文档”、“写开发者指南”，或为文档分析代码库时触发。
 ---
 
-# Code Documentation Skill
+# 代码文档技能
 
-## Overview
+## 概述
 
-This skill generates professional, comprehensive documentation for software projects, codebases, libraries, and APIs. It follows industry best practices from projects like React, Django, Stripe, and Kubernetes to produce documentation that is accurate, well-structured, and useful for both new contributors and experienced developers.
+为软件项目、代码库、库和 API（Application Programming Interface，应用程序编程接口）生成专业、全面的文档。遵循 React、Django、Stripe 和 Kubernetes 等项目的行业实践，确保准确、结构清晰，对新贡献者与资深开发者都有帮助。
 
-The output ranges from single-file READMEs to multi-document developer guides, always matched to the project's complexity and the user's needs.
+输出从单文件 README（Read Me，项目自述文件）到多文档开发者指南不等，始终匹配项目复杂度和用户需求。
 
-## Core Capabilities
+## 核心能力
 
-- Generate comprehensive README.md files with badges, installation, usage, and API reference
-- Create API reference documentation from source code analysis
-- Produce architecture and design documentation with diagrams
-- Write developer onboarding and contribution guides
-- Generate changelogs from commit history or release notes
-- Create inline code documentation following language-specific conventions
-- Support JSDoc, docstrings, GoDoc, Javadoc, and Rustdoc formats
-- Adapt documentation style to the project's language and ecosystem
+- 生成完整 README.md，包括徽章、安装、用法和接口参考。
+- 根据源代码分析创建接口参考。
+- 生成带图的架构与设计文档。
+- 编写开发者入门与贡献指南。
+- 根据提交历史或发布说明生成更新日志。
+- 按语言约定生成行内文档。
+- 支持 JSDoc、文档字符串、GoDoc、Javadoc 和 Rustdoc。
+- 适配项目语言与生态的文档风格。
 
-## When to Use This Skill
+## 使用时机
 
-**Always load this skill when:**
+以下情况**始终加载**：
 
-- User asks to "document", "create docs", or "write documentation" for any code
-- User requests a README, API reference, or developer guide
-- User shares a codebase or repository and wants documentation generated
-- User asks to improve or update existing documentation
-- User needs architecture documentation, including diagrams
-- User requests a changelog or migration guide
+- 用户要求为任何代码“写文档”、“创建文档”。
+- 用户要求项目自述、接口参考或开发者指南。
+- 用户提供代码库或仓库，希望生成文档。
+- 用户要求改进或更新现有文档。
+- 用户需要包含图示的架构文档。
+- 用户要求更新日志或迁移指南。
 
-## Documentation Workflow
+## 文档流程
 
-### Phase 1: Codebase Analysis
+### 第 1 阶段：分析代码库
 
-Before writing any documentation, thoroughly understand the codebase.
+编写任何文档前，充分理解代码库。
 
-#### Step 1.1: Project Discovery
+#### 第 1.1 步：了解项目
 
-Identify the project fundamentals:
+| 信息 | 判断方式 |
+| --- | --- |
+| **语言** | 文件扩展名、`package.json`、`pyproject.toml`、`go.mod`、`Cargo.toml` 等 |
+| **框架** | 检查 React、Django、Express、Spring 等依赖 |
+| **构建系统** | 检查 `Makefile`、`CMakeLists.txt`、`webpack.config.js`、`build.gradle` 等 |
+| **包管理器** | npm／yarn／pnpm、pip／uv／poetry、cargo、Go 模块等 |
+| **项目结构** | 梳理目录树，理解架构 |
+| **入口** | 主文件、命令行入口、导出模块 |
+| **现有文档** | 自述文件、docs/、知识库或行内文档 |
 
-| Field | How to Determine |
-|-------|-----------------|
-| **Language(s)** | Check file extensions, `package.json`, `pyproject.toml`, `go.mod`, `Cargo.toml`, etc. |
-| **Framework** | Look at dependencies for known frameworks (React, Django, Express, Spring, etc.) |
-| **Build System** | Check for `Makefile`, `CMakeLists.txt`, `webpack.config.js`, `build.gradle`, etc. |
-| **Package Manager** | npm/yarn/pnpm, pip/uv/poetry, cargo, go modules, etc. |
-| **Project Structure** | Map out the directory tree to understand the architecture |
-| **Entry Points** | Find main files, CLI entry points, exported modules |
-| **Existing Docs** | Check for existing README, docs/, wiki, or inline documentation |
+#### 第 1.2 步：分析代码结构
 
-#### Step 1.2: Code Structure Analysis
-
-Use sandbox tools to explore the codebase:
+使用沙箱工具探索：
 
 ```bash
-# Get directory structure
+# 获取目录结构
 ls /mnt/user-data/uploads/project-dir/
 
-# Read key files
+# 阅读关键文件
 read_file /mnt/user-data/uploads/project-dir/package.json
 read_file /mnt/user-data/uploads/project-dir/pyproject.toml
 
-# Search for public API surfaces
+# 搜索公开接口
 grep -r "export " /mnt/user-data/uploads/project-dir/src/
 grep -r "def " /mnt/user-data/uploads/project-dir/src/ --include="*.py"
 grep -r "func " /mnt/user-data/uploads/project-dir/ --include="*.go"
 ```
 
-#### Step 1.3: Identify Documentation Scope
+#### 第 1.3 步：识别文档范围
 
-Based on analysis, determine what documentation to produce:
+| 项目规模 | 推荐文档 |
+| --- | --- |
+| **单文件／脚本** | 行内注释和用法抬头 |
+| **小型库** | 自述文件和接口参考 |
+| **中型项目** | 自述文件、接口文档、示例 |
+| **大型项目** | 自述、架构、接口、贡献指南、更新日志 |
 
-| Project Size | Recommended Documentation |
-|-------------|--------------------------|
-| **Single file / script** | Inline comments + usage header |
-| **Small library** | README with API reference |
-| **Medium project** | README + API docs + examples |
-| **Large project** | README + Architecture + API + Contributing + Changelog |
+### 第 2 阶段：生成文档
 
-### Phase 2: Documentation Generation
+#### 第 2.1 步：生成项目自述
 
-#### Step 2.1: README Generation
-
-Every project needs a README. Follow this structure:
+每个项目都需要 README，遵循：
 
 ```markdown
-# Project Name
+# 项目名称
 
-[One-line project description — what it does and why it matters]
+[一句话说明用途及价值]
 
-[![Badge](link)](#) [![Badge](link)](#)
+[![徽章](link)](#) [![徽章](link)](#)
 
-## Features
+## 功能
 
-- [Key feature 1 — brief description]
-- [Key feature 2 — brief description]
-- [Key feature 3 — brief description]
+- [关键功能一：简述]
+- [关键功能二：简述]
+- [关键功能三：简述]
 
-## Quick Start
+## 快速开始
 
-### Prerequisites
+### 前置条件
 
-- [Prerequisite 1 with version requirement]
-- [Prerequisite 2 with version requirement]
+- [条件一与版本要求]
+- [条件二与版本要求]
 
-### Installation
+### 安装
 
-[Installation commands with copy-paste-ready code blocks]
+[可直接复制粘贴的安装命令代码块]
 
-### Basic Usage
+### 基本用法
 
-[Minimal working example that demonstrates core functionality]
+[展示核心功能的最小可用示例]
 
-## Documentation
+## 文档
 
-- [Link to full API reference if separate]
-- [Link to architecture docs if separate]
-- [Link to examples directory if applicable]
+- [独立接口参考链接（如有）]
+- [独立架构文档链接（如有）]
+- [示例目录链接（如适用）]
 
-## API Reference
+## 接口参考
 
-[Inline API reference for smaller projects OR link to generated docs]
+[小项目直接写参考，或链接生成文档]
 
-## Configuration
+## 配置
 
-[Environment variables, config files, or runtime options]
+[环境变量、配置文件或运行选项]
 
-## Examples
+## 示例
 
-[2-3 practical examples covering common use cases]
+[2–3 个覆盖常见用途的实例]
 
-## Development
+## 开发
 
-### Setup
+### 设置
 
-[How to set up a development environment]
+[如何配置开发环境]
 
-### Testing
+### 测试
 
-[How to run tests]
+[如何运行测试]
 
-### Building
+### 构建
 
-[How to build the project]
+[如何构建项目]
 
-## Contributing
+## 贡献
 
-[Contribution guidelines or link to CONTRIBUTING.md]
+[贡献指南或 CONTRIBUTING.md 链接]
 
-## License
+## 许可证
 
-[License information]
+[许可证信息]
 ```
 
-#### Step 2.2: API Reference Generation
+#### 第 2.2 步：生成接口参考
 
-For each public API surface, document:
+为每个公开接口编写文档。
 
-**Function / Method Documentation**:
+**函数／方法：**
 
 ```markdown
 ### `functionName(param1, param2, options?)`
 
-Brief description of what this function does.
+简述函数用途。
 
-**Parameters:**
+**参数：**
 
-| Parameter | Type | Required | Default | Description |
-|-----------|------|----------|---------|-------------|
-| `param1` | `string` | Yes | — | Description of param1 |
-| `param2` | `number` | Yes | — | Description of param2 |
-| `options` | `Object` | No | `{}` | Configuration options |
-| `options.timeout` | `number` | No | `5000` | Timeout in milliseconds |
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+| --- | --- | --- | --- | --- |
+| `param1` | `string` | 是 | — | 参数一说明 |
+| `param2` | `number` | 是 | — | 参数二说明 |
+| `options` | `Object` | 否 | `{}` | 配置选项 |
+| `options.timeout` | `number` | 否 | `5000` | 超时毫秒数 |
 
-**Returns:** `Promise<Result>` — Description of return value
+**返回：** `Promise<Result>`——返回值说明
 
-**Throws:**
-- `ValidationError` — When param1 is empty
-- `TimeoutError` — When the operation exceeds the timeout
+**异常：**
+- `ValidationError`：param1 为空时。
+- `TimeoutError`：操作超过超时时间。
 
-**Example:**
+**示例：**
 
 \`\`\`javascript
-const result = await functionName("hello", 42, { timeout: 10000 });
+const result = await functionName("你好", 42, { timeout: 10000 });
 console.log(result.data);
 \`\`\`
 ```
 
-**Class Documentation**:
+**类：**
 
 ```markdown
 ### `ClassName`
 
-Brief description of the class and its purpose.
+简述类及其用途。
 
-**Constructor:**
+**构造函数：**
 
 \`\`\`javascript
 new ClassName(config)
 \`\`\`
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `config.option1` | `string` | Description |
-| `config.option2` | `boolean` | Description |
+| 参数 | 类型 | 说明 |
+| --- | --- | --- |
+| `config.option1` | `string` | 说明 |
+| `config.option2` | `boolean` | 说明 |
 
-**Methods:**
+**方法：**
 
-- [`method1()`](#method1) — Brief description
-- [`method2(param)`](#method2) — Brief description
+- [`method1()`](#method1)：简述
+- [`method2(param)`](#method2)：简述
 
-**Properties:**
+**属性：**
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `property1` | `string` | Description |
-| `property2` | `number` | Read-only. Description |
+| 属性 | 类型 | 说明 |
+| --- | --- | --- |
+| `property1` | `string` | 说明 |
+| `property2` | `number` | 只读。说明 |
 ```
 
-#### Step 2.3: Architecture Documentation
+#### 第 2.3 步：架构文档
 
-For medium-to-large projects, include architecture documentation:
+中大型项目包含：
 
 ```markdown
-# Architecture Overview
+# 架构概览
 
-## System Diagram
+## 系统图
 
-[Include a Mermaid diagram showing the high-level architecture]
+[使用 Mermaid 展示高层架构]
 
 \`\`\`mermaid
 graph TD
-    A[Client] --> B[API Gateway]
-    B --> C[Service A]
-    B --> D[Service B]
-    C --> E[(Database)]
+    A[客户端] --> B[接口网关]
+    B --> C[服务甲]
+    B --> D[服务乙]
+    C --> E[(数据库)]
     D --> E
 \`\`\`
 
-## Component Overview
+## 组件概览
 
-### Component Name
-- **Purpose**: What this component does
-- **Location**: `src/components/name/`
-- **Dependencies**: What it depends on
-- **Public API**: Key exports or interfaces
+### 组件名称
+- **用途：** 组件做什么
+- **位置：** `src/components/name/`
+- **依赖：** 依赖什么
+- **公开接口：** 主要导出或接口
 
-## Data Flow
+## 数据流
 
-[Describe how data flows through the system for key operations]
+[描述关键操作中数据如何流经系统]
 
-## Design Decisions
+## 设计决策
 
-### Decision Title
-- **Context**: What situation led to this decision
-- **Decision**: What was decided
-- **Rationale**: Why this approach was chosen
-- **Trade-offs**: What was sacrificed
+### 决策标题
+- **背景：** 什么情况促成决策
+- **决策：** 决定了什么
+- **理由：** 为什么选择此方法
+- **权衡：** 牺牲了什么
 ```
 
-#### Step 2.4: Inline Code Documentation
+#### 第 2.4 步：行内文档
 
-Generate language-appropriate inline documentation:
+按语言习惯生成。
 
-**Python (Docstrings — Google style)**:
+**Python（Google 风格文档字符串）：**
+
 ```python
 def process_data(input_path: str, options: dict | None = None) -> ProcessResult:
-    """Process data from the given file path.
+    """处理给定路径的数据。
 
-    Reads the input file, applies transformations based on the provided
-    options, and returns a structured result object.
+    读取输入文件，按选项转换，并返回结构化结果。
 
     Args:
-        input_path: Absolute path to the input data file.
-            Supports CSV, JSON, and Parquet formats.
-        options: Optional configuration dictionary.
-            - "validate" (bool): Enable input validation. Defaults to True.
-            - "format" (str): Output format ("json" or "csv"). Defaults to "json".
+        input_path: 输入文件绝对路径。
+            支持 CSV、JSON 和 Parquet 格式。
+        options: 可选配置字典。
+            - "validate" (bool): 启用输入验证，默认 True。
+            - "format" (str): 输出格式（"json" 或 "csv"），默认 "json"。
 
     Returns:
-        A ProcessResult containing the transformed data and metadata.
+        包含转换数据和元数据的 ProcessResult。
 
     Raises:
-        FileNotFoundError: If input_path does not exist.
-        ValidationError: If validation is enabled and data is malformed.
+        FileNotFoundError: input_path 不存在。
+        ValidationError: 启用验证且数据格式错误。
 
     Example:
         >>> result = process_data("/data/input.csv", {"validate": True})
@@ -296,18 +292,19 @@ def process_data(input_path: str, options: dict | None = None) -> ProcessResult:
     """
 ```
 
-**TypeScript (JSDoc / TSDoc)**:
+**TypeScript（JSDoc／TSDoc）：**
+
 ```typescript
 /**
- * Fetches user data from the API and transforms it for display.
+ * 从接口获取用户数据并转换为展示格式。
  *
- * @param userId - The unique identifier of the user
- * @param options - Configuration options for the fetch operation
- * @param options.includeProfile - Whether to include the full profile. Defaults to `false`.
- * @param options.cache - Cache duration in seconds. Set to `0` to disable.
- * @returns The transformed user data ready for rendering
- * @throws {NotFoundError} When the user ID does not exist
- * @throws {NetworkError} When the API is unreachable
+ * @param userId - 用户唯一标识
+ * @param options - 获取操作配置
+ * @param options.includeProfile - 是否包含完整资料，默认 false
+ * @param options.cache - 缓存秒数，0 表示禁用
+ * @returns 转换后可供渲染的用户数据
+ * @throws {NotFoundError} 用户标识不存在
+ * @throws {NetworkError} 接口不可达
  *
  * @example
  * ```ts
@@ -317,99 +314,100 @@ def process_data(input_path: str, options: dict | None = None) -> ProcessResult:
  */
 ```
 
-**Go (GoDoc)**:
+**Go（GoDoc）：**
+
 ```go
-// ProcessData reads the input file at the given path, applies the specified
-// transformations, and returns the processed result.
+// ProcessData 读取给定路径的输入文件，执行指定转换，返回处理结果。
 //
-// The input path must be an absolute path to a CSV or JSON file.
-// If options is nil, default options are used.
+// 输入必须是 CSV 或 JSON 文件的绝对路径。
+// options 为 nil 时使用默认选项。
 //
-// ProcessData returns an error if the file does not exist or cannot be parsed.
+// 文件不存在或无法解析时，ProcessData 返回错误。
 func ProcessData(inputPath string, options *ProcessOptions) (*Result, error) {
 ```
 
-### Phase 3: Quality Assurance
+### 第 3 阶段：质量保障
 
-#### Step 3.1: Documentation Completeness Check
+#### 第 3.1 步：完整性检查
 
-Verify the documentation covers:
+确认覆盖：
 
-- [ ] **What it is** — Clear project description that a newcomer can understand
-- [ ] **Why it exists** — Problem it solves and value proposition
-- [ ] **How to install** — Copy-paste-ready installation commands
-- [ ] **How to use** — At least one minimal working example
-- [ ] **API surface** — All public functions, classes, and types documented
-- [ ] **Configuration** — All environment variables, config files, and options
-- [ ] **Error handling** — Common errors and how to resolve them
-- [ ] **Contributing** — How to set up dev environment and submit changes
+- [ ] **是什么：** 新手可理解的项目说明。
+- [ ] **为何存在：** 解决的问题和价值。
+- [ ] **如何安装：** 可直接复制的安装命令。
+- [ ] **如何使用：** 至少一个最小可用示例。
+- [ ] **公开接口：** 所有公开函数、类和类型有文档。
+- [ ] **配置：** 全部环境变量、配置文件、选项。
+- [ ] **错误处理：** 常见错误和解决方式。
+- [ ] **贡献：** 开发环境设置和提交修改方式。
 
-#### Step 3.2: Quality Standards
+#### 第 3.2 步：质量标准
 
-| Standard | Check |
-|----------|-------|
-| **Accuracy** | Every code example must actually work with the described API |
-| **Completeness** | No public API surface left undocumented |
-| **Consistency** | Same formatting and structure throughout |
-| **Freshness** | Documentation matches the current code, not an older version |
-| **Accessibility** | No jargon without explanation, acronyms defined on first use |
-| **Examples** | Every complex concept has at least one practical example |
+| 标准 | 检查 |
+| --- | --- |
+| **准确** | 所有代码示例均可用于描述的接口 |
+| **完整** | 没有遗漏公开接口 |
+| **一致** | 全文格式和结构统一 |
+| **及时** | 对应当前代码，而非旧版本 |
+| **易懂** | 术语有解释，缩写首次出现定义 |
+| **示例** | 每个复杂概念至少一个实用示例 |
 
-#### Step 3.3: Cross-reference Validation
+#### 第 3.3 步：交叉引用验证
 
-Ensure:
-- All mentioned file paths exist in the project
-- All referenced functions and classes exist in the code
-- All code examples use the correct function signatures
-- Version numbers match the project's actual version
-- All links (internal and external) are valid
+确保：
 
-## Documentation Style Guide
+- 提到的文件路径确实存在。
+- 引用的函数和类确实存在。
+- 示例使用正确函数签名。
+- 版本号符合项目实际版本。
+- 内外链接均有效。
 
-### Writing Principles
+## 文档风格指南
 
-1. **Lead with the "why"** — Before explaining how something works, explain why it exists
-2. **Progressive disclosure** — Start simple, add complexity gradually
-3. **Show, don't tell** — Prefer code examples over lengthy explanations
-4. **Active voice** — "The function returns X" not "X is returned by the function"
-5. **Present tense** — "The server starts on port 8080" not "The server will start on port 8080"
-6. **Second person** — "You can configure..." not "Users can configure..."
+### 写作原则
 
-### Formatting Rules
+1. **先说明原因：** 解释如何工作前，说明为何存在。
+2. **渐进展示：** 从简单开始，逐步增加复杂度。
+3. **用示例展示：** 优先代码示例，少写冗长解释。
+4. **主动语态：** 写“函数返回某值”，不要写“某值被函数返回”。
+5. **现在时：** 写“服务器在 8080 端口启动”，不要写“将会启动”。
+6. **面向读者：** 写“你可以配置”，不要写“用户可以配置”。
 
-- Use ATX-style headers (`#`, `##`, `###`)
-- Use fenced code blocks with language specification (` ```python `, ` ```bash `)
-- Use tables for structured information (parameters, options, configuration)
-- Use admonitions for important notes, warnings, and tips
-- Keep line length readable (wrap prose at ~80-100 characters in source)
-- Use `code formatting` for function names, file paths, variable names, and CLI commands
+### 格式规则
 
-### Language-Specific Conventions
+- 使用井号式标题（`#`、`##`、`###`）。
+- 使用带语言标记的围栏代码块，例如 `python`、`bash`。
+- 参数、选项、配置等结构化信息使用表格。
+- 重要说明、警告和建议使用提示块。
+- 源文件中自然语言行约 80–100 字符，保证易读。
+- 函数名、路径、变量和命令行命令使用 `代码格式`。
 
-| Language | Doc Format | Style Guide |
-|----------|-----------|-------------|
-| Python | Google-style docstrings | PEP 257 |
-| TypeScript/JavaScript | TSDoc / JSDoc | TypeDoc conventions |
-| Go | GoDoc comments | Effective Go |
-| Rust | Rustdoc (`///`) | Rust API Guidelines |
-| Java | Javadoc | Oracle Javadoc Guide |
-| C/C++ | Doxygen | Doxygen manual |
+### 各语言约定
 
-## Output Handling
+| 语言 | 文档格式 | 风格指南 |
+| --- | --- | --- |
+| Python | Google 风格文档字符串 | PEP 257（Python Enhancement Proposal 257，Python 增强提案第 257 号） |
+| TypeScript／JavaScript | TSDoc／JSDoc | TypeDoc 约定 |
+| Go | GoDoc 注释 | Effective Go |
+| Rust | Rustdoc（`///`） | Rust 接口指南 |
+| Java | Javadoc | Oracle Javadoc 指南 |
+| C／C++ | Doxygen | Doxygen 手册 |
 
-After generation:
+## 输出处理
 
-- Save documentation files to `/mnt/user-data/outputs/`
-- For multi-file documentation, maintain the project directory structure
-- Present generated files to the user using the `present_files` tool
-- Offer to iterate on specific sections or adjust the level of detail
-- Suggest additional documentation that might be valuable
+生成后：
 
-## Notes
+- 文档保存到 `/mnt/user-data/outputs/`。
+- 多文件文档保留项目目录结构。
+- 使用 `present_files` 展示生成文件。
+- 可继续调整具体章节或详细程度。
+- 建议可能有价值的补充文档。
 
-- Always analyze the actual code before writing documentation — never guess at API signatures or behavior
-- When existing documentation exists, preserve its structure unless the user explicitly asks for a rewrite
-- For large codebases, prioritize documenting the public API surface and key abstractions first
-- Documentation should be written in the same language as the project's existing docs; default to English if none exist
-- When generating changelogs, use the [Keep a Changelog](https://keepachangelog.com/) format
-- This skill works well in combination with the `deep-research` skill for documenting third-party integrations or dependencies
+## 注意事项
+
+- 始终先分析真实代码，再写文档，不猜测接口签名或行为。
+- 有既有文档时保留结构，除非用户明确要求重写。
+- 大代码库优先记录公开接口和关键抽象。
+- 文档语言遵循项目既有文档；没有既有文档时默认中文。
+- 更新日志采用 [Keep a Changelog](https://keepachangelog.com/) 格式。
+- 记录第三方集成或依赖时，可结合 `deep-research`。

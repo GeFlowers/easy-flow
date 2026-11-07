@@ -1,289 +1,291 @@
 ---
 name: academic-paper-review
-description: Use this skill when the user requests to review, analyze, critique, or summarize academic papers, research articles, preprints, or scientific publications. Supports comprehensive structured reviews covering methodology assessment, contribution evaluation, literature positioning, and constructive feedback generation. Trigger on queries involving paper URLs, uploaded PDFs, arXiv links, or requests like "review this paper", "analyze this research", "summarize this study", or "write a peer review".
+description: 用户要求评审、分析、批判或总结学术论文、研究文章、预印本或科学出版物时使用。提供完整结构化评审，包括方法评估、贡献评价、文献定位和建设性反馈。用户提供论文地址、上传文档、arXiv 链接，或说“评审这篇论文”、“分析这项研究”、“总结研究”、“写同行评审”时触发。
 ---
 
-# Academic Paper Review Skill
+# 学术论文评审技能
 
-## Overview
+## 概述
 
-This skill produces structured, peer-review-quality analyses of academic papers and research publications. It follows established academic review standards used by top-tier venues (NeurIPS, ICML, ACL, Nature, IEEE) to provide rigorous, constructive, and balanced assessments.
+生成达到同行评审质量的结构化论文分析，遵循顶级学术会议和期刊的评审标准，包括 NeurIPS（Neural Information Processing Systems，神经信息处理系统大会）、ICML（International Conference on Machine Learning，国际机器学习大会）、ACL（Association for Computational Linguistics，计算语言学协会年会）、Nature（自然）和 IEEE（Institute of Electrical and Electronics Engineers，电气电子工程师学会），提供严谨、建设性且平衡的评估。
 
-The review covers **summary, strengths, weaknesses, methodology assessment, contribution evaluation, literature positioning, and actionable recommendations** — all grounded in evidence from the paper itself.
+评审涵盖**摘要、优点、缺点、方法评估、贡献评价、文献定位和可执行建议**，全部以论文本身的证据为依据。
 
-## Core Capabilities
+## 核心能力
 
-- Parse and comprehend academic papers from uploaded PDFs or fetched URLs
-- Generate structured reviews following top-venue review templates
-- Assess methodology rigor (experimental design, statistical validity, reproducibility)
-- Evaluate novelty and significance of contributions
-- Position the work within the broader research landscape via targeted literature search
-- Identify limitations, gaps, and potential improvements
-- Produce both detailed review and concise executive summary formats
-- Support papers in any scientific domain (CS, biology, physics, social sciences, etc.)
+- 解析并理解上传的 PDF（Portable Document Format，便携式文档格式）或网络论文。
+- 按顶级学术场所的评审模板生成结构化评审。
+- 评估方法严谨性，包括实验设计、统计有效性与可复现性。
+- 评估贡献的新颖性与重要性。
+- 通过定向文献搜索，将研究放在更广阔的领域中定位。
+- 发现局限、缺口和改进空间。
+- 同时支持详细评审和简短执行摘要。
+- 支持计算机科学、生物、物理、社会科学等各科学领域。
 
-## When to Use This Skill
+## 使用时机
 
-**Always load this skill when:**
+以下情况**始终加载**：
 
-- User provides a paper URL (arXiv, DOI, conference proceedings, journal link)
-- User uploads a PDF of a research paper or preprint
-- User asks to "review", "analyze", "critique", "assess", or "summarize" a research paper
-- User wants to understand the strengths and weaknesses of a study
-- User requests a peer-review-style evaluation of academic work
-- User asks for help preparing a review for a conference or journal submission
+- 用户提供论文地址，例如 arXiv、DOI（Digital Object Identifier，数字对象标识符）、会议论文集或期刊链接。
+- 用户上传研究论文或预印本。
+- 用户要求“评审”、“分析”、“批判”、“评估”或“总结”研究论文。
+- 用户希望了解研究优缺点。
+- 用户要求同行评审风格的学术评价。
+- 用户需要为会议或期刊投稿准备评审。
 
-## Review Methodology
+## 评审方法
 
-### Phase 1: Paper Comprehension
+### 第 1 阶段：理解论文
 
-Thoroughly read and understand the paper before forming any judgments.
+形成判断前，彻底阅读并理解论文。
 
-#### Step 1.1: Identify Paper Metadata
+#### 第 1.1 步：识别论文元数据
 
-Extract and record:
+提取并记录：
 
-| Field | Description |
-|-------|-------------|
-| **Title** | Full paper title |
-| **Authors** | Author list and affiliations |
-| **Venue / Status** | Publication venue, preprint server, or submission status |
-| **Year** | Publication or submission year |
-| **Domain** | Research field and subfield |
-| **Paper Type** | Empirical, theoretical, survey, position paper, systems paper, etc. |
+| 字段 | 说明 |
+| --- | --- |
+| **标题** | 完整论文标题 |
+| **作者** | 作者名单与机构 |
+| **发表场所／状态** | 会议或期刊、预印本平台、投稿状态 |
+| **年份** | 发表或投稿年份 |
+| **领域** | 研究领域与子领域 |
+| **论文类型** | 实证、理论、综述、观点、系统等 |
 
-#### Step 1.2: Deep Reading Pass
+#### 第 1.2 步：深入阅读
 
-Read the paper systematically:
+系统阅读：
 
-1. **Abstract & Introduction** — Identify the claimed contributions and motivation
-2. **Related Work** — Note how authors position their work relative to prior art
-3. **Methodology** — Understand the proposed approach, model, or framework in detail
-4. **Experiments / Results** — Examine datasets, baselines, metrics, and reported outcomes
-5. **Discussion & Limitations** — Note any self-identified limitations
-6. **Conclusion** — Compare concluded claims against actual evidence presented
+1. **摘要与引言：** 识别所宣称的贡献和动机。
+2. **相关工作：** 记录作者如何相对已有研究定位。
+3. **方法：** 详细理解提出的方法、模型或框架。
+4. **实验／结果：** 检查数据集、基线、指标与报告结果。
+5. **讨论与局限：** 记录作者主动说明的局限。
+6. **结论：** 对照实际证据检查最终主张。
 
-#### Step 1.3: Key Claims Extraction
+#### 第 1.3 步：提取关键主张
 
-List the paper's main claims explicitly:
-
-```
-Claim 1: [Specific claim about contribution or finding]
-Evidence: [What evidence supports this claim in the paper]
-Strength: [Strong / Moderate / Weak]
-
-Claim 2: [...]
-...
-```
-
-### Phase 2: Critical Analysis
-
-#### Step 2.1: Literature Context Search
-
-Use web search to understand the research landscape:
+明确列出主要主张：
 
 ```
-Search queries:
-- "[paper topic] state of the art [current year]"
-- "[key method name] comparison benchmark"
-- "[authors] previous work [topic]"
-- "[specific technique] limitations criticism"
-- "survey [research area] recent advances"
+主张 1：[关于贡献或发现的具体主张]
+证据：[论文中支持此主张的证据]
+强度：[强／中等／弱]
+
+主张 2：[…]
+……
 ```
 
-Use `web_fetch` on key related papers or surveys to understand where this work fits.
+### 第 2 阶段：批判性分析
 
-#### Step 2.2: Methodology Assessment
+#### 第 2.1 步：检索文献背景
 
-Evaluate the methodology using the following framework:
+通过网页搜索了解研究格局：
 
-| Criterion | Questions to Ask | Rating |
-|-----------|-----------------|--------|
-| **Soundness** | Is the approach technically correct? Are there logical flaws? | 1-5 |
-| **Novelty** | What is genuinely new vs. incremental improvement? | 1-5 |
-| **Reproducibility** | Are details sufficient to reproduce? Code/data available? | 1-5 |
-| **Experimental Design** | Are baselines fair? Are ablations adequate? Are datasets appropriate? | 1-5 |
-| **Statistical Rigor** | Are results statistically significant? Error bars reported? Multiple runs? | 1-5 |
-| **Scalability** | Does the approach scale? Are computational costs discussed? | 1-5 |
+```
+搜索查询：
+- “[论文主题] 最新水平 [当前年份]”
+- “[关键方法名称] 比较 基准”
+- “[作者] 既有研究 [主题]”
+- “[具体技术] 局限 批评”
+- “综述 [研究领域] 最新进展”
+```
 
-#### Step 2.3: Contribution Significance Assessment
+使用 `web_fetch` 阅读关键相关论文或综述，判断研究的位置。
 
-Evaluate the significance level:
+#### 第 2.2 步：评估方法
 
-| Level | Description | Criteria |
-|-------|-------------|----------|
-| **Landmark** | Fundamentally changes the field | New paradigm, widely applicable breakthrough |
-| **Significant** | Strong contribution advancing the state of the art | Clear improvement with solid evidence |
-| **Moderate** | Useful contribution with some limitations | Incremental but valid improvement |
-| **Marginal** | Minimal advance over existing work | Small gains, narrow applicability |
-| **Below threshold** | Does not meet publication standards | Fundamental flaws, insufficient evidence |
+使用以下框架：
 
-#### Step 2.4: Strengths and Weaknesses Analysis
+| 标准 | 需要回答的问题 | 评分 |
+| --- | --- | --- |
+| **正确性** | 技术是否正确？是否存在逻辑缺陷？ | 1–5 |
+| **新颖性** | 真正的新内容是什么？哪些只是增量改进？ | 1–5 |
+| **可复现性** | 细节是否充分？代码和数据是否可用？ | 1–5 |
+| **实验设计** | 基线公平吗？消融充分吗？数据集合适吗？ | 1–5 |
+| **统计严谨性** | 结果显著吗？有误差条吗？是否多次运行？ | 1–5 |
+| **可扩展性** | 方法是否可扩展？是否讨论计算成本？ | 1–5 |
 
-For each strength or weakness, provide:
-- **What**: Specific observation
-- **Where**: Section/figure/table reference
-- **Why it matters**: Impact on the paper's claims or utility
+#### 第 2.3 步：评估贡献重要性
 
-### Phase 3: Review Synthesis
+| 等级 | 说明 | 标准 |
+| --- | --- | --- |
+| **里程碑** | 从根本改变领域 | 新范式、广泛适用的突破 |
+| **显著** | 有力推进前沿 | 清晰改进，证据扎实 |
+| **中等** | 有用但有局限 | 增量但有效 |
+| **有限** | 相对已有工作进步很小 | 收益小、适用面窄 |
+| **低于门槛** | 不符合发表要求 | 根本缺陷、证据不足 |
 
-#### Step 3.1: Assemble the Structured Review
+#### 第 2.4 步：分析优缺点
 
-Produce the final review using the template below.
+对每个优点或缺点提供：
 
-## Review Output Template
+- **是什么：** 具体观察。
+- **在哪里：** 对应章节、图或表。
+- **为何重要：** 对主张或实用性的影响。
+
+### 第 3 阶段：综合评审
+
+#### 第 3.1 步：组织结构化评审
+
+使用以下模板生成最终评审。
+
+## 评审输出模板
 
 ```markdown
-# Paper Review: [Paper Title]
+# 论文评审：[论文标题]
 
-## Paper Metadata
-- **Authors**: [Author list]
-- **Venue**: [Publication venue or preprint server]
-- **Year**: [Year]
-- **Domain**: [Research field]
-- **Paper Type**: [Empirical / Theoretical / Survey / Systems / Position]
+## 论文元数据
+- **作者：** [作者名单]
+- **发表场所：** [会议、期刊或预印本平台]
+- **年份：** [年份]
+- **领域：** [研究领域]
+- **论文类型：** [实证／理论／综述／系统／观点]
 
-## Executive Summary
+## 执行摘要
 
-[2-3 paragraph summary of the paper's core contribution, approach, and main findings.
-State your overall assessment upfront: what the paper does well, where it falls short,
-and whether the contribution is sufficient for the claimed venue/impact level.]
+[用 2–3 段概括核心贡献、方法和主要发现。
+先给出总体评价：论文做得好的地方、欠缺之处，
+以及贡献是否足以匹配声称的发表场所或影响级别。]
 
-## Summary of Contributions
+## 贡献摘要
 
-1. [First claimed contribution — one sentence]
-2. [Second claimed contribution — one sentence]
-3. [Additional contributions if any]
+1. [第一项贡献，用一句话描述]
+2. [第二项贡献，用一句话描述]
+3. [其他贡献（如有）]
 
-## Strengths
+## 优点
 
-### S1: [Concise strength title]
-[Detailed explanation with specific references to sections, figures, or tables in the paper.
-Explain WHY this is a strength and its significance.]
+### S1：[简短优点标题]
+[详细解释，引用具体章节、图或表。
+说明为何构成优点及其重要性。]
 
-### S2: [Concise strength title]
-[...]
+### S2：[简短优点标题]
+[…]
 
-### S3: [Concise strength title]
-[...]
+### S3：[简短优点标题]
+[…]
 
-## Weaknesses
+## 缺点
 
-### W1: [Concise weakness title]
-[Detailed explanation with specific references. Explain the impact of this weakness on
-the paper's claims. Suggest how it could be addressed.]
+### W1：[简短缺点标题]
+[详细解释并给出具体引用。说明缺点如何影响论文主张，
+建议解决方式。]
 
-### W2: [Concise weakness title]
-[...]
+### W2：[简短缺点标题]
+[…]
 
-### W3: [Concise weakness title]
-[...]
+### W3：[简短缺点标题]
+[…]
 
-## Methodology Assessment
+## 方法评估
 
-| Criterion | Rating (1-5) | Assessment |
-|-----------|:---:|------------|
-| Soundness | X | [Brief justification] |
-| Novelty | X | [Brief justification] |
-| Reproducibility | X | [Brief justification] |
-| Experimental Design | X | [Brief justification] |
-| Statistical Rigor | X | [Brief justification] |
-| Scalability | X | [Brief justification] |
+| 标准 | 评分（1–5） | 评价 |
+| --- | :---: | --- |
+| 正确性 | X | [简短理由] |
+| 新颖性 | X | [简短理由] |
+| 可复现性 | X | [简短理由] |
+| 实验设计 | X | [简短理由] |
+| 统计严谨性 | X | [简短理由] |
+| 可扩展性 | X | [简短理由] |
 
-## Questions for the Authors
+## 向作者提问
 
-1. [Specific question that would clarify a concern or ambiguity]
-2. [Question about methodology choices or alternative approaches]
-3. [Question about generalizability or practical applicability]
+1. [能澄清疑虑或歧义的具体问题]
+2. [关于方法选择或替代方案的问题]
+3. [关于泛化能力或实际适用性的问题]
 
-## Minor Issues
+## 次要问题
 
-- [Typos, formatting issues, unclear figures, notation inconsistencies]
-- [Missing references that should be cited]
-- [Suggestions for improved clarity]
+- [错别字、排版、不清楚的图、符号不一致]
+- [应引用但缺少的文献]
+- [提高清晰度的建议]
 
-## Literature Positioning
+## 文献定位
 
-[How does this work relate to the current state of the art?
-Are key related works cited? Are comparisons fair and comprehensive?
-What important related work is missing?]
+[研究与当前前沿有何关系？
+是否引用关键相关工作？比较是否公平全面？
+遗漏了哪些重要相关工作？]
 
-## Recommendations
+## 建议
 
-**Overall Assessment**: [Accept / Weak Accept / Borderline / Weak Reject / Reject]
+**总体评价：** [接收／弱接收／边缘／弱拒绝／拒绝]
 
-**Confidence**: [High / Medium / Low] — [Justification for confidence level]
+**置信程度：** [高／中／低]——[理由]
 
-**Contribution Level**: [Landmark / Significant / Moderate / Marginal / Below threshold]
+**贡献等级：** [里程碑／显著／中等／有限／低于门槛]
 
-### Actionable Suggestions for Improvement
-1. [Specific, constructive suggestion]
-2. [Specific, constructive suggestion]
-3. [Specific, constructive suggestion]
+### 可执行的改进建议
+1. [具体且建设性的建议]
+2. [具体且建设性的建议]
+3. [具体且建设性的建议]
 ```
 
-## Review Principles
+## 评审原则
 
-### Constructive Criticism
-- **Always suggest how to fix it** — Don't just point out problems; propose solutions
-- **Give credit where due** — Acknowledge genuine contributions even in flawed papers
-- **Be specific** — Reference exact sections, equations, figures, and tables
-- **Separate minor from major** — Distinguish fatal flaws from fixable issues
+### 建设性批评
 
-### Objectivity Standards
-- ❌ "This paper is poorly written" (vague, unhelpful)
-- ✅ "Section 3.2 introduces notation X without formal definition, making the proof in Theorem 1 difficult to follow. Consider adding a notation table after the problem formulation." (specific, actionable)
+- **始终建议如何修复：** 不只指出问题，也提出方案。
+- **认可应得贡献：** 即使论文有缺陷，也承认真实贡献。
+- **具体：** 引用准确章节、公式、图和表。
+- **区分主次：** 区分致命缺陷与可修复问题。
 
-### Ethical Review Practices
-- Do NOT dismiss work based on author reputation or affiliation
-- Evaluate the work on its own merits
-- Flag potential ethical concerns (bias in datasets, dual-use implications) constructively
-- Maintain confidentiality of unpublished work
+### 客观性标准
 
-## Adaptation by Paper Type
+- ❌ “论文写得很差。”模糊且无帮助。
+- ✅ “第 3.2 节引入符号 X 却未正式定义，导致定理 1 的证明难以理解。建议在问题形式化后加入符号表。”具体且可执行。
 
-| Paper Type | Focus Areas |
-|------------|-------------|
-| **Empirical** | Experimental design, baselines, statistical significance, ablations, reproducibility |
-| **Theoretical** | Proof correctness, assumption reasonableness, tightness of bounds, connection to practice |
-| **Survey** | Comprehensiveness, taxonomy quality, coverage of recent work, synthesis insights |
-| **Systems** | Architecture decisions, scalability evidence, real-world deployment, engineering contributions |
-| **Position** | Argument coherence, evidence for claims, impact potential, fairness of characterizations |
+### 评审伦理
 
-## Common Pitfalls to Avoid
+- 不因作者声誉或机构否定研究。
+- 以研究本身的价值评价。
+- 建设性指出数据偏见、双重用途等伦理疑虑。
+- 对未发表工作保密。
 
-- ❌ Reviewing the paper you wish was written instead of the paper that was submitted
-- ❌ Demanding additional experiments that are unreasonable in scope
-- ❌ Penalizing the paper for not solving a different problem
-- ❌ Being overly influenced by writing quality versus technical contribution
-- ❌ Treating absence of comparison to your own work as a weakness
-- ❌ Providing only a summary without critical analysis
+## 按论文类型调整
 
-## Quality Checklist
+| 类型 | 重点 |
+| --- | --- |
+| **实证** | 实验设计、基线、显著性、消融、可复现性 |
+| **理论** | 证明正确性、假设合理性、界限紧致性、实践联系 |
+| **综述** | 全面性、分类质量、近期研究覆盖、综合洞察 |
+| **系统** | 架构决策、扩展性证据、实际部署、工程贡献 |
+| **观点** | 论证连贯性、证据、潜在影响、描述公平性 |
 
-Before finalizing the review, verify:
+## 避免常见问题
 
-- [ ] Paper was read completely (not just abstract and introduction)
-- [ ] All major claims are identified and evaluated against evidence
-- [ ] At least 3 strengths and 3 weaknesses are provided with specific references
-- [ ] The methodology assessment table is complete with ratings and justifications
-- [ ] Questions for authors target genuine ambiguities, not rhetorical critiques
-- [ ] Literature search was conducted to contextualize the contribution
-- [ ] Recommendations are actionable and constructive
-- [ ] The overall assessment is consistent with the identified strengths and weaknesses
-- [ ] The review tone is professional and respectful
-- [ ] Minor issues are separated from major concerns
+- ❌ 评审自己希望作者写的论文，而非实际提交的论文。
+- ❌ 要求范围不合理的额外实验。
+- ❌ 因论文没有解决另一个问题而扣分。
+- ❌ 让写作质量过度压过技术贡献。
+- ❌ 将未比较自己的研究视为缺点。
+- ❌ 只总结，没有批判性分析。
 
-## Output Format
+## 质量清单
 
-- Output the complete review in **Markdown** format
-- Save the review to `/mnt/user-data/outputs/review-{paper-topic}.md` when working in sandbox
-- Present the review to the user using the `present_files` tool
+定稿前检查：
 
-## Notes
+- [ ] 已完整阅读，而不只看摘要与引言。
+- [ ] 所有主要主张都已识别并对照证据评估。
+- [ ] 至少 3 项优点和 3 项缺点，均有具体引用。
+- [ ] 方法评估表完整，含评分与理由。
+- [ ] 向作者的问题针对真实歧义，而不是反问式批评。
+- [ ] 已检索文献以定位贡献。
+- [ ] 建议具体且建设性。
+- [ ] 总体评价与优缺点一致。
+- [ ] 语气专业、尊重。
+- [ ] 次要问题与重大疑虑分开。
 
-- This skill complements the `deep-research` skill — load both when the user wants the paper reviewed in the context of the broader field
-- For papers behind paywalls, work with whatever content is accessible (abstract, publicly available versions, preprint mirrors)
-- Adapt the review depth to the user's needs: a brief assessment for quick triage versus a full review for submission preparation
-- When reviewing multiple papers comparatively, maintain consistent criteria across all reviews
-- Always disclose limitations of your review (e.g., "I could not verify the proofs in Appendix B in detail")
+## 输出格式
+
+- 以 **Markdown** 输出完整评审。
+- 在沙箱中工作时，保存到 `/mnt/user-data/outputs/review-{paper-topic}.md`。
+- 使用 `present_files` 向用户展示。
+
+## 注意事项
+
+- 与 `deep-research` 技能互补；用户需要在领域背景中评审时同时加载。
+- 对付费论文，使用能访问的内容，例如摘要、公开版本和预印本镜像。
+- 深度匹配用户需求：快速筛选可简评，投稿准备可全面评审。
+- 比较多篇论文时保持一致标准。
+- 始终披露评审局限，例如“未能详细验证附录乙的证明”。

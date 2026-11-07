@@ -30,13 +30,13 @@ import {
   deleteFeedback,
   upsertFeedback,
   type FeedbackData,
-} from "@/core/api/feedback";
+} from "@/features/api/feedback";
 import {
   resolveArtifactURL,
   resolveMessageImageURL,
-} from "@/core/artifacts/utils";
-import { extractCitationSources } from "@/core/citations/sources";
-import { useI18n } from "@/core/i18n/hooks";
+} from "@/features/artifacts/utils";
+import { extractCitationSources } from "@/features/citations/sources";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   extractContentFromMessage,
   extractReasoningContentFromMessage,
@@ -44,15 +44,15 @@ import {
   parseUploadedFiles,
   stripUploadedFilesTag,
   type FileInMessage,
-} from "@/core/messages/utils";
-import { useRehypeSplitWordsIntoSpans } from "@/core/rehype";
-import { readReferenceMessageContexts } from "@/core/sidecar";
+} from "@/features/messages/utils";
+import { useRehypeSplitWordsIntoSpans } from "@/features/rehype";
+import { readReferenceMessageContexts } from "@/features/sidecar";
 import {
   parseSlashSkillReference,
   resolveSlashSkillDisplay,
-} from "@/core/skills";
-import { useSkills } from "@/core/skills/hooks";
-import { SafeReasoningContent } from "@/core/streamdown/components";
+} from "@/features/skills";
+import { useSkills } from "@/features/skills/hooks";
+import { SafeReasoningContent } from "@/features/streamdown/components";
 import { cn } from "@/lib/utils";
 
 import { WorkspaceChangeBadge } from "../changes";

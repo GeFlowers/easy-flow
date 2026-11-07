@@ -228,7 +228,7 @@ def _resolve_skills_path(path: str) -> str:
     skills_container = _get_skills_container_path()
     skills_host = _get_skills_host_path()
     if skills_host is None:
-        raise FileNotFoundError(f"Skills directory not available for path: {path}")
+        raise FileNotFoundError(f"技能目录不可用，路径： {path}")
 
     if path == skills_container:
         return skills_host
@@ -350,7 +350,7 @@ def _resolve_acp_workspace_path(path: str, thread_id: str | None = None) -> str:
 
     host_path = _get_acp_workspace_host_path(thread_id)
     if host_path is None:
-        raise FileNotFoundError(f"ACP workspace directory not available for path: {path}")
+        raise FileNotFoundError(f"外部代理工作区目录不可用，路径： {path}")
 
     if path == _ACP_WORKSPACE_VIRTUAL_PATH:
         return host_path
@@ -363,16 +363,16 @@ def _resolve_acp_workspace_path(path: str, thread_id: str | None = None) -> str:
         candidate_path = posixpath.normpath(resolved)
         try:
             if posixpath.commonpath([base_path, candidate_path]) != base_path:
-                raise PermissionError("Access denied: path traversal detected")
+                raise PermissionError("拒绝访问：检测到路径遍历")
         except ValueError:
-            raise PermissionError("Access denied: path traversal detected") from None
+            raise PermissionError("拒绝访问：检测到路径遍历") from None
         return resolved
 
     resolved_path = Path(resolved).resolve()
     try:
         resolved_path.relative_to(Path(host_path).resolve())
     except ValueError:
-        raise PermissionError("Access denied: path traversal detected")
+        raise PermissionError("拒绝访问：检测到路径遍历")
 
     return str(resolved_path)
 
@@ -445,28 +445,28 @@ def _resolve_local_read_path(path: str, thread_data: ThreadDataState) -> str:
 def _format_glob_results(root_path: str, matches: list[str], truncated: bool) -> str:
     '''将通配搜索结果格式化为面向工具调用者的文本。'''
     if not matches:
-        return f"No files matched under {root_path}"
+        return f"未找到匹配文件，搜索目录： {root_path}"
 
-    lines = [f"Found {len(matches)} paths under {root_path}"]
+    lines = [f"在 {root_path} 下找到 {len(matches)} 个路径"]
     if truncated:
-        lines[0] += f" (showing first {len(matches)})"
+        lines[0] += f"（显示前 {len(matches)} 项）"
     lines.extend(f"{index}. {path}" for index, path in enumerate(matches, start=1))
     if truncated:
-        lines.append("Results truncated. Narrow the path or pattern to see fewer matches.")
+        lines.append("结果已截断。请缩小路径或模式范围以减少匹配项。")
     return "\n".join(lines)
 
 
 def _format_grep_results(root_path: str, matches: list[GrepMatch], truncated: bool) -> str:
     '''将文本搜索结果格式化为面向工具调用者的文本。'''
     if not matches:
-        return f"No matches found under {root_path}"
+        return f"未找到匹配项，搜索目录： {root_path}"
 
-    lines = [f"Found {len(matches)} matches under {root_path}"]
+    lines = [f"在 {root_path} 下找到 {len(matches)} 个匹配项"]
     if truncated:
-        lines[0] += f" (showing first {len(matches)})"
+        lines[0] += f"（显示前 {len(matches)} 项）"
     lines.extend(f"{match.path}:{match.line_number}: {match.line}" for match in matches)
     if truncated:
-        lines.append("Results truncated. Narrow the path or add a glob filter.")
+        lines.append("结果已截断。请缩小路径范围或添加通配符过滤条件。")
     return "\n".join(lines)
 
 
@@ -506,14 +506,14 @@ def _truncate_write_file_error_detail(detail: str, max_chars: int) -> str:
     if len(detail) <= max_chars:
         return detail
     total = len(detail)
-    marker_max_len = len(f"\n... [write_file error truncated: {total} chars skipped] ...\n")
+    marker_max_len = len(f"\n... [write_file 错误已截断：跳过 {total} 个字符] ...\n")
     kept = max(0, max_chars - marker_max_len)
     if kept == 0:
         return detail[:max_chars]
     head_len = kept // 2
     tail_len = kept - head_len
     skipped = total - kept
-    marker = f"\n... [write_file error truncated: {skipped} chars skipped] ...\n"
+    marker = f"\n... [write_file 错误已截断： {skipped} 个字符已跳过] ...\n"
     return f"{detail[:head_len]}{marker}{detail[-tail_len:] if tail_len > 0 else ''}"
 
 
@@ -525,7 +525,7 @@ def _format_write_file_error(
     max_chars: int = _DEFAULT_WRITE_FILE_ERROR_MAX_CHARS,
 ) -> str:
     '''返回长度受限且已脱敏的写文件失败错误文本。'''
-    header = f"Error: Failed to write file '{requested_path}'"
+    header = f"Error: 写入文件失败 '{requested_path}'"
     detail = _sanitize_error(error, runtime)
     if max_chars == 0:
         return f"{header}: {detail}"
@@ -654,7 +654,7 @@ def _reject_path_traversal(path: str) -> None:
     normalised = path.replace("\\", "/")
     for segment in normalised.split("/"):
         if segment == "..":
-            raise PermissionError("Access denied: path traversal detected")
+            raise PermissionError("拒绝访问：检测到路径遍历")
 
 
 def validate_local_tool_path(path: str, thread_data: ThreadDataState | None, *, read_only: bool = False) -> None:
@@ -664,18 +664,18 @@ def validate_local_tool_path(path: str, thread_data: ThreadDataState | None, *, 
     工作区只允许只读访问；自定义挂载遵循自身只读设置。线程数据缺失或路径越界时抛出异常。
     '''
     if thread_data is None:
-        raise SandboxRuntimeError("Thread data not available for local sandbox")
+        raise SandboxRuntimeError("本地沙箱缺少线程数据")
 
     _reject_path_traversal(path)
 
     if _is_skills_path(path):
         if not read_only:
-            raise PermissionError(f"Write access to skills path is not allowed: {path}")
+            raise PermissionError(f"不允许写入技能路径： {path}")
         return
 
     if _is_acp_workspace_path(path):
         if not read_only:
-            raise PermissionError(f"Write access to ACP workspace is not allowed: {path}")
+            raise PermissionError(f"不允许写入外部代理工作区： {path}")
         return
 
     if path.startswith(f"{VIRTUAL_PATH_PREFIX}/"):
@@ -684,10 +684,10 @@ def validate_local_tool_path(path: str, thread_data: ThreadDataState | None, *, 
     if _is_custom_mount_path(path):
         mount = _get_custom_mount_for_path(path)
         if mount and mount.read_only and not read_only:
-            raise PermissionError(f"Write access to read-only mount is not allowed: {path}")
+            raise PermissionError(f"不允许写入只读挂载： {path}")
         return
 
-    raise PermissionError(f"Only paths under {VIRTUAL_PATH_PREFIX}/, {_get_skills_container_path()}/, {_ACP_WORKSPACE_VIRTUAL_PATH}/, or configured mount paths are allowed")
+    raise PermissionError(f"仅允许访问 {VIRTUAL_PATH_PREFIX}/、{_get_skills_container_path()}/、{_ACP_WORKSPACE_VIRTUAL_PATH}/ 或已配置挂载下的路径")
 
 
 def _validate_resolved_user_data_path(resolved: Path, thread_data: ThreadDataState) -> None:
@@ -703,7 +703,7 @@ def _validate_resolved_user_data_path(resolved: Path, thread_data: ThreadDataSta
     ]
 
     if not allowed_roots:
-        raise SandboxRuntimeError("No allowed local sandbox directories configured")
+        raise SandboxRuntimeError("尚未配置允许访问的本地沙箱目录")
 
     for root in allowed_roots:
         try:
@@ -712,7 +712,7 @@ def _validate_resolved_user_data_path(resolved: Path, thread_data: ThreadDataSta
         except ValueError:
             continue
 
-    raise PermissionError("Access denied: path traversal detected")
+    raise PermissionError("拒绝访问：检测到路径遍历")
 
 
 def _resolve_and_validate_user_data_path(path: str, thread_data: ThreadDataState) -> str:
@@ -841,15 +841,15 @@ def _next_cd_target(tokens: list[str], start_index: int) -> tuple[str | None, in
 def _validate_local_bash_cwd_target(command_name: str, target: str | None, allowed_paths: list[str]) -> None:
     '''校验本地命令解释器改变工作目录的目标路径是否安全。'''
     if target is None or target == "-":
-        raise PermissionError(f"Unsafe working directory change in command: {command_name}. Use paths under {VIRTUAL_PATH_PREFIX}")
+        raise PermissionError(f"命令中的工作目录切换不安全： {command_name}. 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
     if target.startswith(("$", "`")):
-        raise PermissionError(f"Unsafe working directory change in command: {command_name} {target}. Use paths under {VIRTUAL_PATH_PREFIX}")
+        raise PermissionError(f"命令中的工作目录切换不安全： {command_name} {target}. 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
     if target.startswith("~"):
-        raise PermissionError(f"Unsafe working directory change in command: {command_name} {target}. Use paths under {VIRTUAL_PATH_PREFIX}")
+        raise PermissionError(f"命令中的工作目录切换不安全： {command_name} {target}. 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
     if target.startswith("/"):
         _reject_path_traversal(target)
         if not _is_allowed_local_bash_absolute_path(target, allowed_paths, allow_system_paths=False):
-            raise PermissionError(f"Unsafe working directory change in command: {command_name} {target}. Use paths under {VIRTUAL_PATH_PREFIX}")
+            raise PermissionError(f"命令中的工作目录切换不安全： {command_name} {target}. 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
 
 
 def _validate_local_bash_root_path_args(command_name: str, tokens: list[str], start_index: int) -> None:
@@ -866,14 +866,14 @@ def _validate_local_bash_root_path_args(command_name: str, tokens: list[str], st
             index += 2
             continue
         if token == "/" and not _is_non_file_url_token(token):
-            raise PermissionError(f"Unsafe absolute paths in command: /. Use paths under {VIRTUAL_PATH_PREFIX}")
+            raise PermissionError(f"命令包含不安全的绝对路径： /. 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
         index += 1
 
 
 def _validate_local_bash_shell_tokens(command: str, allowed_paths: list[str]) -> None:
     '''保守地拒绝绝对路径扫描未捕获的相对路径逃逸。'''
     if re.search(r"\$\([^)]*\b(?:cd|pushd)\b", command):
-        raise PermissionError(f"Unsafe working directory change in command substitution. Use paths under {VIRTUAL_PATH_PREFIX}")
+        raise PermissionError(f"命令替换中的工作目录切换不安全。 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
 
     tokens = _split_shell_tokens(command)
 
@@ -881,7 +881,7 @@ def _validate_local_bash_shell_tokens(command: str, allowed_paths: list[str]) ->
         if _is_shell_command_separator(token) or _is_shell_redirection_operator(token):
             continue
         if _has_dotdot_path_segment(token):
-            raise PermissionError("Access denied: path traversal detected")
+            raise PermissionError("拒绝访问：检测到路径遍历")
 
     at_command_start = True
     index = 0
@@ -970,11 +970,11 @@ def validate_local_bash_command_paths(command: str, thread_data: ThreadDataState
     使用较小的白名单。
     '''
     if thread_data is None:
-        raise SandboxRuntimeError("Thread data not available for local sandbox")
+        raise SandboxRuntimeError("本地沙箱缺少线程数据")
 
     file_url_match = _FILE_URL_PATTERN.search(command)
     if file_url_match:
-        raise PermissionError(f"Unsafe file:// URL in command: {file_url_match.group()}. Use paths under {VIRTUAL_PATH_PREFIX}")
+        raise PermissionError(f"命令包含不安全的 file:// 地址： {file_url_match.group()}. 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
 
     unsafe_paths: list[str] = []
     allowed_paths = _get_mcp_allowed_paths()
@@ -994,7 +994,7 @@ def validate_local_bash_command_paths(command: str, thread_data: ThreadDataState
 
     if unsafe_paths:
         unsafe = ", ".join(sorted(dict.fromkeys(unsafe_paths)))
-        raise PermissionError(f"Unsafe absolute paths in command: {unsafe}. Use paths under {VIRTUAL_PATH_PREFIX}")
+        raise PermissionError(f"命令包含不安全的绝对路径： {unsafe}. 请使用 {VIRTUAL_PATH_PREFIX} 下的路径")
 
 
 def replace_virtual_paths_in_command(command: str, thread_data: ThreadDataState | None) -> str:
@@ -1052,18 +1052,18 @@ def is_local_sandbox(runtime: Runtime | None) -> bool:
 def sandbox_from_runtime(runtime: Runtime | None = None) -> Sandbox:
     '''从工具运行时取得已初始化的沙箱实例；缺失时抛出相应异常。'''
     if runtime is None:
-        raise SandboxRuntimeError("Tool runtime not available")
+        raise SandboxRuntimeError("工具运行时不可用")
     if runtime.state is None:
-        raise SandboxRuntimeError("Tool runtime state not available")
+        raise SandboxRuntimeError("工具运行时状态不可用")
     sandbox_state = runtime.state.get("sandbox")
     if sandbox_state is None:
-        raise SandboxRuntimeError("Sandbox state not initialized in runtime")
+        raise SandboxRuntimeError("运行时中的沙箱状态尚未初始化")
     sandbox_id = sandbox_state.get("sandbox_id")
     if sandbox_id is None:
-        raise SandboxRuntimeError("Sandbox ID not found in state")
+        raise SandboxRuntimeError("状态中未找到沙箱标识")
     sandbox = get_sandbox_provider().get(sandbox_id)
     if sandbox is None:
-        raise SandboxNotFoundError(f"Sandbox with ID '{sandbox_id}' not found", sandbox_id=sandbox_id)
+        raise SandboxNotFoundError(f"找不到标识为 '{sandbox_id}' 的沙箱", sandbox_id=sandbox_id)
 
     if runtime.context is not None:
         runtime.context["sandbox_id"] = sandbox_id
@@ -1073,10 +1073,10 @@ def sandbox_from_runtime(runtime: Runtime | None = None) -> Sandbox:
 def ensure_sandbox_initialized(runtime: Runtime | None = None) -> Sandbox:
     '''确保沙箱已初始化；首次调用时按线程延迟获取并写入运行时状态。'''
     if runtime is None:
-        raise SandboxRuntimeError("Tool runtime not available")
+        raise SandboxRuntimeError("工具运行时不可用")
 
     if runtime.state is None:
-        raise SandboxRuntimeError("Tool runtime state not available")
+        raise SandboxRuntimeError("工具运行时状态不可用")
 
     sandbox_state = runtime.state.get("sandbox")
     if sandbox_state is not None:
@@ -1092,7 +1092,7 @@ def ensure_sandbox_initialized(runtime: Runtime | None = None) -> Sandbox:
     if thread_id is None:
         thread_id = runtime.config.get("configurable", {}).get("thread_id") if runtime.config else None
     if thread_id is None:
-        raise SandboxRuntimeError("Thread ID not available in runtime context")
+        raise SandboxRuntimeError("运行时上下文中没有线程标识")
 
     provider = get_sandbox_provider()
     sandbox_id = provider.acquire(thread_id, user_id=resolve_runtime_user_id(runtime))
@@ -1101,7 +1101,7 @@ def ensure_sandbox_initialized(runtime: Runtime | None = None) -> Sandbox:
 
     sandbox = provider.get(sandbox_id)
     if sandbox is None:
-        raise SandboxNotFoundError("Sandbox not found after acquisition", sandbox_id=sandbox_id)
+        raise SandboxNotFoundError("获取后仍找不到沙箱", sandbox_id=sandbox_id)
 
     if runtime.context is not None:
         runtime.context["sandbox_id"] = sandbox_id
@@ -1111,10 +1111,10 @@ def ensure_sandbox_initialized(runtime: Runtime | None = None) -> Sandbox:
 async def ensure_sandbox_initialized_async(runtime: Runtime | None = None) -> Sandbox:
     '''异步运行时的延迟沙箱初始化入口，使用提供者异步获取钩子。'''
     if runtime is None:
-        raise SandboxRuntimeError("Tool runtime not available")
+        raise SandboxRuntimeError("工具运行时不可用")
 
     if runtime.state is None:
-        raise SandboxRuntimeError("Tool runtime state not available")
+        raise SandboxRuntimeError("工具运行时状态不可用")
 
     sandbox_state = runtime.state.get("sandbox")
     if sandbox_state is not None:
@@ -1130,7 +1130,7 @@ async def ensure_sandbox_initialized_async(runtime: Runtime | None = None) -> Sa
     if thread_id is None:
         thread_id = runtime.config.get("configurable", {}).get("thread_id") if runtime.config else None
     if thread_id is None:
-        raise SandboxRuntimeError("Thread ID not available in runtime context")
+        raise SandboxRuntimeError("运行时上下文中没有线程标识")
 
     provider = get_sandbox_provider()
     sandbox_id = await provider.acquire_async(thread_id, user_id=resolve_runtime_user_id(runtime))
@@ -1139,7 +1139,7 @@ async def ensure_sandbox_initialized_async(runtime: Runtime | None = None) -> Sa
 
     sandbox = provider.get(sandbox_id)
     if sandbox is None:
-        raise SandboxNotFoundError("Sandbox not found after acquisition", sandbox_id=sandbox_id)
+        raise SandboxNotFoundError("获取后仍找不到沙箱", sandbox_id=sandbox_id)
 
     if runtime.context is not None:
         runtime.context["sandbox_id"] = sandbox_id
@@ -1157,10 +1157,10 @@ async def _run_sync_tool_after_async_sandbox_init(
     except SandboxError as e:
         return f"Error: {e}"
     except Exception as e:
-        return f"Error: Unexpected error initializing sandbox: {_sanitize_error(e, runtime)}"
+        return f"Error: 初始化沙箱时发生意外错误： {_sanitize_error(e, runtime)}"
 
     if func is None:
-        return "Error: Tool implementation not available"
+        return "Error: 工具实现不可用"
 
     return await asyncio.to_thread(func, runtime, *args)
 
@@ -1215,14 +1215,14 @@ def _truncate_bash_output(output: str, max_chars: int) -> str:
     if len(output) <= max_chars:
         return output
     total_len = len(output)
-    marker_max_len = len(f"\n... [middle truncated: {total_len} chars skipped] ...\n")
+    marker_max_len = len(f"\n... [中间内容已截断： {total_len} 个字符已跳过] ...\n")
     kept = max(0, max_chars - marker_max_len)
     if kept == 0:
         return output[:max_chars]
     head_len = kept // 2
     tail_len = kept - head_len
     skipped = total_len - kept
-    marker = f"\n... [middle truncated: {skipped} chars skipped] ...\n"
+    marker = f"\n... [中间内容已截断： {skipped} 个字符已跳过] ...\n"
     return f"{output[:head_len]}{marker}{output[-tail_len:] if tail_len > 0 else ''}"
 
 
@@ -1233,11 +1233,11 @@ def _truncate_read_file_output(output: str, max_chars: int) -> str:
     if len(output) <= max_chars:
         return output
     total = len(output)
-    marker_max_len = len(f"\n... [truncated: showing first {total} of {total} chars. Use start_line/end_line to read a specific range] ...")
+    marker_max_len = len(f"\n... [内容已截断，仅显示前 {total} of {total} 个字符。请使用 start_line/end_line 读取指定范围] ...")
     kept = max(0, max_chars - marker_max_len)
     if kept == 0:
         return output[:max_chars]
-    marker = f"\n... [truncated: showing first {kept} of {total} chars. Use start_line/end_line to read a specific range] ..."
+    marker = f"\n... [内容已截断，仅显示前 {kept} of {total} 个字符。请使用 start_line/end_line 读取指定范围] ..."
     return f"{output[:kept]}{marker}"
 
 
@@ -1248,11 +1248,11 @@ def _truncate_ls_output(output: str, max_chars: int) -> str:
     if len(output) <= max_chars:
         return output
     total = len(output)
-    marker_max_len = len(f"\n... [truncated: showing first {total} of {total} chars. Use a more specific path to see fewer results] ...")
+    marker_max_len = len(f"\n... [内容已截断，仅显示前 {total} of {total} 个字符。请使用更具体的路径以减少结果] ...")
     kept = max(0, max_chars - marker_max_len)
     if kept == 0:
         return output[:max_chars]
-    marker = f"\n... [truncated: showing first {kept} of {total} chars. Use a more specific path to see fewer results] ..."
+    marker = f"\n... [内容已截断，仅显示前 {kept} of {total} 个字符。请使用更具体的路径以减少结果] ..."
     return f"{output[:kept]}{marker}"
 
 
@@ -1343,7 +1343,7 @@ def bash_tool(runtime: Runtime, description: str, command: str) -> str:
     except PermissionError as e:
         return f"Error: {e}"
     except Exception as e:
-        return f"Error: Unexpected error executing command: {_sanitize_error(e, runtime)}"
+        return f"Error: 执行命令时发生意外错误： {_sanitize_error(e, runtime)}"
 
 
 async def _bash_tool_async(runtime: Runtime, description: str, command: str) -> str:
@@ -1366,7 +1366,7 @@ def ls_tool(runtime: Runtime, description: str, path: str) -> str:
         user_id = resolve_runtime_user_id(runtime)
         if _is_disabled_skill_path(path, user_id=user_id):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
-            return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
+            return f"Error: 技能 '{skill_name}' 已禁用，无法访问其文件。请先在设置中启用该技能。"
         sandbox = ensure_sandbox_initialized(runtime)
         ensure_thread_directories_exist(runtime)
         requested_path = path
@@ -1380,13 +1380,13 @@ def ls_tool(runtime: Runtime, description: str, path: str) -> str:
                 path = _resolve_and_validate_user_data_path(path, thread_data)
         children = sandbox.list_dir(path)
         if not children:
-            return "(empty)"
+            return "(空)"
         output = "\n".join(children)
         if thread_data is not None:
             output = mask_local_paths_in_output(output, thread_data)
         entries = _drop_disabled_skill_paths(output.splitlines(), user_id=user_id)
         if not entries:
-            return "(empty)"
+            return "(空)"
         output = "\n".join(entries)
         try:
             from deerflow.config.app_config import get_app_config
@@ -1399,11 +1399,11 @@ def ls_tool(runtime: Runtime, description: str, path: str) -> str:
     except SandboxError as e:
         return f"Error: {e}"
     except FileNotFoundError:
-        return f"Error: Directory not found: {requested_path}"
+        return f"Error: 找不到目录： {requested_path}"
     except PermissionError:
-        return f"Error: Permission denied: {requested_path}"
+        return f"Error: 权限不足： {requested_path}"
     except Exception as e:
-        return f"Error: Unexpected error listing directory: {_sanitize_error(e, runtime)}"
+        return f"Error: 列出目录时发生意外错误： {_sanitize_error(e, runtime)}"
 
 
 async def _ls_tool_async(runtime: Runtime, description: str, path: str) -> str:
@@ -1436,7 +1436,7 @@ def glob_tool(
         user_id = resolve_runtime_user_id(runtime)
         if _is_disabled_skill_path(path, user_id=user_id):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
-            return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
+            return f"Error: 技能 '{skill_name}' 已禁用，无法访问其文件。请先在设置中启用该技能。"
         sandbox = ensure_sandbox_initialized(runtime)
         ensure_thread_directories_exist(runtime)
         requested_path = path
@@ -1450,7 +1450,7 @@ def glob_tool(
         if is_local_sandbox(runtime):
             thread_data = get_thread_data(runtime)
             if thread_data is None:
-                raise SandboxRuntimeError("Thread data not available for local sandbox")
+                raise SandboxRuntimeError("本地沙箱缺少线程数据")
             path = _resolve_local_read_path(path, thread_data)
         matches, truncated = sandbox.glob(path, pattern, include_dirs=include_dirs, max_results=effective_max_results)
         if thread_data is not None:
@@ -1460,13 +1460,13 @@ def glob_tool(
     except SandboxError as e:
         return f"Error: {e}"
     except FileNotFoundError:
-        return f"Error: Directory not found: {requested_path}"
+        return f"Error: 找不到目录： {requested_path}"
     except NotADirectoryError:
-        return f"Error: Path is not a directory: {requested_path}"
+        return f"Error: 路径不是目录： {requested_path}"
     except PermissionError:
-        return f"Error: Permission denied: {requested_path}"
+        return f"Error: 权限不足： {requested_path}"
     except Exception as e:
-        return f"Error: Unexpected error searching paths: {_sanitize_error(e, runtime)}"
+        return f"Error: 搜索路径时发生意外错误： {_sanitize_error(e, runtime)}"
 
 
 async def _glob_tool_async(
@@ -1518,7 +1518,7 @@ def grep_tool(
         user_id = resolve_runtime_user_id(runtime)
         if _is_disabled_skill_path(path, user_id=user_id):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
-            return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
+            return f"Error: 技能 '{skill_name}' 已禁用，无法访问其文件。请先在设置中启用该技能。"
         sandbox = ensure_sandbox_initialized(runtime)
         ensure_thread_directories_exist(runtime)
         requested_path = path
@@ -1532,7 +1532,7 @@ def grep_tool(
         if is_local_sandbox(runtime):
             thread_data = get_thread_data(runtime)
             if thread_data is None:
-                raise SandboxRuntimeError("Thread data not available for local sandbox")
+                raise SandboxRuntimeError("本地沙箱缺少线程数据")
             path = _resolve_local_read_path(path, thread_data)
         matches, truncated = sandbox.grep(
             path,
@@ -1557,15 +1557,15 @@ def grep_tool(
     except SandboxError as e:
         return f"Error: {e}"
     except FileNotFoundError:
-        return f"Error: Directory not found: {requested_path}"
+        return f"Error: 找不到目录： {requested_path}"
     except NotADirectoryError:
-        return f"Error: Path is not a directory: {requested_path}"
+        return f"Error: 路径不是目录： {requested_path}"
     except re.error as e:
-        return f"Error: Invalid regex pattern: {e}"
+        return f"Error: 正则表达式无效： {e}"
     except PermissionError:
-        return f"Error: Permission denied: {requested_path}"
+        return f"Error: 权限不足： {requested_path}"
     except Exception as e:
-        return f"Error: Unexpected error searching file contents: {_sanitize_error(e, runtime)}"
+        return f"Error: 搜索文件内容时发生意外错误： {_sanitize_error(e, runtime)}"
 
 
 async def _grep_tool_async(
@@ -1630,21 +1630,21 @@ def read_file_tool(
     try:
         if _is_disabled_skill_path(path, user_id=resolve_runtime_user_id(runtime)):
             skill_name = _extract_skill_name_from_skills_path(path) or "unknown"
-            return f"Error: Skill '{skill_name}' is disabled. Access to its files is blocked. Enable the skill in settings before using it."
+            return f"Error: 技能 '{skill_name}' 已禁用，无法访问其文件。请先在设置中启用该技能。"
         requested_path = path
         content = read_current_file_content(runtime, path)
         if not content:
-            return "(empty)"
+            return "(空)"
         if start_line is not None or end_line is not None:
             lines = content.splitlines()
             s = max(start_line, 1) if start_line is not None else 1
             e = end_line if end_line is not None else len(lines)
             if e < 1:
-                return "(end_line must be >= 1)"
+                return "(end_line 必须 >= 1)"
             if s > len(lines):
-                return "(start_line exceeds file length)"
+                return "(start_line 超出文件行数)"
             if s > e:
-                return "(start_line > end_line — no lines in range)"
+                return "(start_line > end_line，范围内没有行)"
             content = "\n".join(lines[s - 1 : e])
         try:
             from deerflow.config.app_config import get_app_config
@@ -1657,19 +1657,19 @@ def read_file_tool(
     except SandboxError as e:
         return f"Error: {e}"
     except FileNotFoundError:
-        return f"Error: File not found: {requested_path}"
+        return f"Error: 找不到文件： {requested_path}"
     except PermissionError:
-        return f"Error: Permission denied reading file: {requested_path}"
+        return f"Error: 无权读取文件： {requested_path}"
     except IsADirectoryError:
-        return f"Error: Path is a directory, not a file: {requested_path}"
+        return f"Error: 路径是目录而不是文件： {requested_path}"
     except UnicodeDecodeError:
         return (
-            f"Error: cannot read '{requested_path}' as text — it appears to be a binary file "
-            "(e.g. .xlsx, .pdf, or an image). read_file only supports UTF-8 text. Use bash with a "
-            "suitable library instead (pandas/openpyxl for spreadsheets), or view_image for images."
+            f"Error: 无法将 '{requested_path}' 作为文本读取，它可能是二进制文件"
+            "（例如 .xlsx、.pdf 或图像）。read_file 仅支持统一码转换格式八位文本。请通过 bash 使用"
+            "合适的库读取（电子表格可使用 pandas/openpyxl），图像可使用 view_image。"
         )
     except Exception as e:
-        return f"Error: Unexpected error reading file: {_sanitize_error(e, runtime)}"
+        return f"Error: 读取文件时发生意外错误： {_sanitize_error(e, runtime)}"
 
 
 async def _read_file_tool_async(
@@ -1738,12 +1738,12 @@ def write_file_tool(
             content_bytes = len(content.encode("utf-8"))
             if content_bytes > max_bytes:
                 return (
-                    f"Error: write_file content ({content_bytes} bytes) exceeds the "
-                    f"{max_bytes}-byte single-call limit. Split the content into smaller "
-                    "pieces: either (a) write the first section now, then use `str_replace` "
-                    "for further edits, or (b) call write_file again with append=True "
-                    "carrying the next section. See SIZE POLICY in the tool docstring "
-                    "or issue #3189 for the rationale."
+                    f"Error: write_file 内容（{content_bytes} 字节）超出"
+                    f"单次调用 {max_bytes} 字节的限制。请将内容拆成较小片段："
+                    "可以先写入第一部分，再使用 `str_replace` "
+                    "继续编辑；也可以再次调用 write_file，设置 append=True "
+                    "并传入下一部分。原因请参阅工具文档中的大小限制说明"
+                    "或问题 #3189。"
                 )
     try:
         requested_path = path
@@ -1761,12 +1761,12 @@ def write_file_tool(
         return _format_write_file_error(requested_path, e, runtime)
     except PermissionError:
         return _truncate_write_file_error_detail(
-            f"Error: Permission denied writing to file: {requested_path}",
+            f"Error: 无权写入文件： {requested_path}",
             _DEFAULT_WRITE_FILE_ERROR_MAX_CHARS,
         )
     except IsADirectoryError:
         return _truncate_write_file_error_detail(
-            f"Error: Path is a directory, not a file: {requested_path}",
+            f"Error: 路径是目录而不是文件： {requested_path}",
             _DEFAULT_WRITE_FILE_ERROR_MAX_CHARS,
         )
     except OSError as e:
@@ -1826,9 +1826,9 @@ def str_replace_tool(
             if not content:
                 if not old_str:
                     return "OK"
-                return f"Error: String to replace not found in file: {requested_path}"
+                return f"Error: 文件中未找到待替换的字符串： {requested_path}"
             if old_str not in content:
-                return f"Error: String to replace not found in file: {requested_path}"
+                return f"Error: 文件中未找到待替换的字符串： {requested_path}"
             if replace_all:
                 content = content.replace(old_str, new_str)
             else:
@@ -1838,11 +1838,11 @@ def str_replace_tool(
     except SandboxError as e:
         return f"Error: {e}"
     except FileNotFoundError:
-        return f"Error: File not found: {requested_path}"
+        return f"Error: 找不到文件： {requested_path}"
     except PermissionError:
-        return f"Error: Permission denied accessing file: {requested_path}"
+        return f"Error: 无权访问文件： {requested_path}"
     except Exception as e:
-        return f"Error: Unexpected error replacing string: {_sanitize_error(e, runtime)}"
+        return f"Error: 替换字符串时发生意外错误： {_sanitize_error(e, runtime)}"
 
 
 async def _str_replace_tool_async(

@@ -1,50 +1,50 @@
 ---
 name: systematic-literature-review
-description: Use this skill when the user wants a systematic literature review, survey, or synthesis across multiple academic papers on a topic. Also covers annotated bibliographies and cross-paper comparisons. Searches arXiv and outputs reports in APA, IEEE, or BibTeX format. Not for single-paper tasks — use academic-paper-review for reviewing one paper.
+description: 当用户需要针对某一主题跨多篇学术论文开展系统性文献综述、调查或综合分析时使用，也适用于带注释的参考文献列表和跨论文比较。检索 arXiv，并按 APA（American Psychological Association，美国心理学会）、IEEE（Institute of Electrical and Electronics Engineers，电气与电子工程师协会）或 BibTeX 格式输出报告。单篇论文评审请使用 academic-paper-review。
 ---
 
-# Systematic Literature Review Skill
+# 系统性文献综述技能
 
-## Overview
+## 概述
 
-This skill produces a structured **systematic literature review (SLR)** across multiple academic papers on a research topic. Given a topic query, it searches arXiv, extracts structured metadata (research question, methodology, key findings, limitations) from each paper in parallel, synthesizes themes across the full set, and emits a final report with consistent citations.
+本技能针对研究主题，跨多篇学术论文生成结构化的系统性文献综述。根据主题查询检索 arXiv，并行提取各篇论文的结构化元数据（研究问题、方法、主要发现、局限），归纳论文集合中的共同主题，最后输出引用格式统一的报告。
 
-**Distinct from `academic-paper-review`:** that skill does deep peer review of a single paper. This skill does breadth-first synthesis across many papers. If the user hands you one paper URL and asks "review this paper", route to `academic-paper-review` instead.
+与 `academic-paper-review` 的区别：该技能深入评审单篇论文，本技能对多篇论文进行广度优先的综合分析。如果用户只提供一篇论文的链接并要求“评审这篇论文”，请转用 `academic-paper-review`。
 
-## When to Use This Skill
+## 适用情况
 
-Use this skill when the user wants any of the following:
+用户有以下需求时使用：
 
-- A literature survey on a topic ("survey transformer attention variants", "review the literature on diffusion models")
-- A synthesis across multiple papers ("what do recent papers say about X", "compare methodologies across papers on Y")
-- A systematic review with consistent citation format ("do an SLR on Z in APA format")
-- An annotated bibliography on a topic
-- An overview of research trends in a field over a time window
+- 某一主题的文献调查，例如“调查 Transformer 注意力变体”“综述扩散模型文献”。
+- 跨多篇论文的综合分析，例如“近期论文对 X 有什么结论”“比较 Y 领域论文的方法”。
+- 引用格式统一的系统性综述，例如“按美国心理学会格式综述 Z”。
+- 某一主题的带注释参考文献列表。
+- 指定时间窗口内某领域的研究趋势概览。
 
-Do **not** use this skill when:
+以下情况不使用：
 
-- The user provides exactly one paper and asks to review it (use `academic-paper-review`)
-- The user asks a factual question that does not require synthesizing multiple sources (answer directly)
-- The user wants general web research without academic rigor (use standard web search)
+- 用户只提供一篇论文并请求评审，使用 `academic-paper-review`。
+- 事实性问题无需综合多个来源，直接回答。
+- 普通网页研究无需学术严谨性，使用常规网页搜索。
 
-## Workflow
+## 工作流程
 
-The workflow has five phases. Follow them in order.
+共五个阶段，按顺序执行。
 
-### Phase 1: Plan
+### 阶段 1：规划
 
-Before doing any retrieval, confirm the following with the user. If any of these are unclear, ask **one** clarifying question that covers the missing pieces. Do not ask one question at a time.
+开始检索前，确认以下信息。若有不明确之处，用一个澄清问题涵盖缺失信息，不要逐项询问。
 
-- **Topic**: the research area in plain English (e.g. "transformer attention variants").
-- **Scope**: how many papers (default 20, hard upper bound 50), optional time window (e.g. "last 2 years"), optional arXiv category (e.g. `cs.CL`, `cs.CV`).
-- **Citation format**: APA, IEEE, or BibTeX (default APA if the user does not specify and does not seem to be writing for a specific venue).
-- **Output location**: where to save the final report (default `/mnt/user-data/outputs/`).
+- 主题：用通俗语言描述研究领域，例如“Transformer 注意力变体”。
+- 范围：论文数量默认 20 篇，上限 50 篇；可选时间窗口（如“最近两年”）和 arXiv 分类（如 `cs.CL`、`cs.CV`）。
+- 引用格式：APA（American Psychological Association，美国心理学会）、IEEE（Institute of Electrical and Electronics Engineers，电气与电子工程师协会）或 BibTeX。用户未指定且没有明确投稿目标时，默认采用美国心理学会格式。
+- 输出位置：最终报告保存位置，默认 `/mnt/user-data/outputs/`。
 
-If the user says "50+ papers", politely cap it at 50 and explain that synthesis quality degrades quickly past that — for larger surveys they should split by sub-topic.
+如果用户要求“超过 50 篇”，礼貌地将数量限制为 50，并说明超过此规模后综合分析质量会迅速下降；更大规模的调查应按子主题拆分。
 
-### Phase 2: Search arXiv
+### 阶段 2：检索 arXiv
 
-Call the bundled search script. Do **not** try to scrape arXiv by other means and do **not** write your own HTTP client — this script handles URL encoding, Atom XML parsing, and id normalization correctly.
+调用附带的检索脚本。不要通过其他方式抓取 arXiv，也不要自行编写网络客户端；脚本已正确处理链接编码、Atom 解析和标识规范化。
 
 ```bash
 python /mnt/skills/public/systematic-literature-review/scripts/arxiv_search.py \
@@ -56,180 +56,177 @@ python /mnt/skills/public/systematic-literature-review/scripts/arxiv_search.py \
   [--end-date YYYY-MM-DD]
 ```
 
-**IMPORTANT — extract 2-3 core keywords before searching.** Do not pass the user's full topic description as the query. Before calling the script, mentally reduce the topic to its 2-3 most essential terms. Drop qualifiers like "in computer vision", "for NLP", "variants", "recent" — those belong in `--category` or `--start-date`, not in the query string.
+重要：检索前先提炼 2-3 个核心关键词。不要把用户的完整主题描述作为查询。调用脚本前，将主题缩减为最关键的 2-3 个词；“在计算机视觉中”“用于自然语言处理”“变体”“近期”等限定信息应放入 `--category` 或 `--start-date`，不要塞入查询字符串。
 
-**Query phrasing — keep it short.** The script wraps multi-word queries in double quotes for phrase matching on arXiv. This means:
+查询应简短。脚本会用双引号包裹多词查询，在 arXiv 上进行短语匹配：
 
-- `"diffusion models"` → searches for the exact phrase → good, returns relevant papers.
-- `"diffusion models in computer vision"` → searches for that exact 5-word phrase → **too specific, likely returns 0 results** because few papers contain that exact string.
+- `"diffusion models"`：精确匹配该短语，通常能返回相关论文。
+- `"diffusion models in computer vision"`：精确匹配整个五词短语，过于具体，可能返回零结果，因为很少有论文包含完全相同的字符串。
 
-Use **2-3 core keywords** as the query, and use `--category` to narrow the field instead of stuffing field names into the query. Examples:
+用 2-3 个核心关键词查询，通过分类参数缩小领域：
 
-| User says | Good query | Bad query |
+| 用户描述 | 合适的查询 | 不合适的查询 |
 |---|---|---|
-| "diffusion models in computer vision" | `"diffusion models" --category cs.CV` | `"diffusion models in computer vision"` |
-| "transformer attention variants" | `"transformer attention"` | `"transformer attention variants in NLP"` |
-| "graph neural networks for molecules" | `"graph neural networks" --category cs.LG` | `"graph neural networks for molecular property prediction"` |
+| “计算机视觉中的扩散模型” | `"diffusion models" --category cs.CV` | `"diffusion models in computer vision"` |
+| “Transformer 注意力变体” | `"transformer attention"` | `"transformer attention variants in NLP"` |
+| “用于分子的图神经网络” | `"graph neural networks" --category cs.LG` | `"graph neural networks for molecular property prediction"` |
 
-The script prints a JSON array to stdout. Each paper has: `id`, `title`, `authors`, `abstract`, `published`, `updated`, `categories`, `pdf_url`, `abs_url`.
+脚本向标准输出打印 JSON（JavaScript Object Notation，JavaScript 对象表示法）数组，每篇论文包含 `id`、`title`、`authors`、`abstract`、`published`、`updated`、`categories`、`pdf_url`、`abs_url`。
 
-**Sort strategy**:
+排序策略：
 
-- **Always use `relevance` sorting** — arXiv's BM25-style scoring ensures results are actually about the user's topic. `submittedDate` sorting returns the most recently submitted papers in the category regardless of topic relevance, which produces mostly off-topic results.
-- When the user asks for "recent" papers or gives a time window, use `--sort-by relevance` **combined with `--start-date`** to constrain the time range while keeping results on-topic. For example, "recent diffusion model papers" → `--sort-by relevance --start-date 2024-01-01`, not `--sort-by submittedDate`.
-- `submittedDate` sorting is only appropriate when the user explicitly asks for chronological order (e.g. "show me papers in the order they were published"). This is rare.
-- `lastUpdatedDate` is rarely useful; ignore it unless the user asks.
+- 始终使用 `relevance` 排序：arXiv 的相关性评分可确保结果确实围绕主题。`submittedDate` 会优先返回分类中最近提交的论文，可能大多偏离主题。
+- 用户要求“近期”论文或指定时间窗口时，将 `--sort-by relevance` 与 `--start-date` 结合。例如“近期扩散模型论文”使用 `--sort-by relevance --start-date 2024-01-01`。
+- 仅当用户明确要求按时间排列（如“按发表顺序展示论文”）时，使用 `submittedDate`。这种情况很少见。
+- `lastUpdatedDate` 通常无用，除非用户要求，否则忽略。
 
-**Run the search exactly once.** Do not retry with modified queries if the results seem imperfect — arXiv's relevance ranking is what it is. Retrying with different query phrasings wastes tool calls and risks hitting the recursion limit. If the results are genuinely empty (0 papers), tell the user and suggest they broaden their topic or remove the category filter.
+只执行一次检索。结果不够理想时，不要改写查询重试；反复更换措辞会浪费工具调用，并可能触发递归上限。若结果确实为零，告知用户，并建议扩大主题或取消分类过滤。
 
-**If the script returns fewer papers than requested**, that is the real size of the arXiv result set for the query. Do not pad the list — report the actual count to the user and proceed.
+若返回论文少于请求数量，这就是该查询在 arXiv 上的实际结果规模。不要凑数；报告实际数量后继续。
 
-**If the script fails** (network error, non-200 from arXiv), tell the user which error and stop. Do not try to fabricate paper metadata.
+脚本失败（网络错误或平台返回非成功状态）时，告知具体错误并停止，不要编造论文元数据。
 
-**Do not save the search results to a file** — the JSON stays in your context for Phase 3. The only file saved during the entire workflow is the final report in Phase 5.
+不要将检索结果保存到文件。结果保留在上下文中供阶段 3 使用；整个流程只在阶段 5 保存最终报告。
 
-### Phase 3: Extract metadata in parallel
+### 阶段 3：并行提取元数据
 
-**You MUST delegate extraction to subagents via the `task` tool — do not extract metadata yourself.** This is non-negotiable. Specifically, do NOT do any of the following:
+必须通过 `task` 工具将提取任务委派给子代理，不要自行提取。这是明确要求。禁止：
 
-- ❌ Write `python -c "papers = [...]"` or any Python/bash script to process papers
-- ❌ Extract metadata inline in your own context by reading abstracts one by one
-- ❌ Use any tool other than `task` for this phase
+- 编写 `python -c "papers = [...]"` 或其他脚本处理论文。
+- 在自己的上下文中逐篇读取摘要并提取元数据。
+- 在本阶段使用 `task` 以外的工具。
 
-Instead, you MUST call the `task` tool to spawn subagents. The reason: extracting 10-50 papers in your own context consumes too many tokens and degrades synthesis quality in Phase 4. Each subagent runs in an isolated context with only its batch of papers, producing cleaner extractions.
+调用 `task` 启动子代理。自行提取 10-50 篇论文会占用过多上下文，降低阶段 4 的综合分析质量；每个子代理只接收自己的论文批次，在独立上下文中提取，结果更清晰。
 
-Split papers into batches of ~5, then for each batch, call the `task` tool with `subagent_type: "general-purpose"`. Each subagent receives the paper abstracts as text and returns structured JSON.
+按每批约 5 篇拆分，对每批调用 `task`，指定 `subagent_type: "general-purpose"`。子代理接收纯文本摘要，返回结构化结果。
 
-**Concurrency limit: at most 3 subagents per turn.** The DeerFlow runtime enforces `MAX_CONCURRENT_SUBAGENTS = 3` and will silently drop any extra dispatches in the same turn — the LLM will not be told this happened, so strictly follow the round strategy below.
+并发上限：每轮最多 3 个子代理。DeerFlow 运行时强制 `MAX_CONCURRENT_SUBAGENTS = 3`，同轮多余派遣可能被静默丢弃，且不会通知模型。因此必须采用下表：
 
-**Round strategy — use this decision table, do not compute the split yourself**:
-
-| Paper count | Batches of ~5 papers | Rounds | Per-round subagent count |
+| 论文数 | 每批约 5 篇的批次数 | 轮数 | 各轮子代理数 |
 |---|---|---|---|
-| 1–5 | 1 batch | 1 round | 1 subagent |
-| 6–10 | 2 batches | 1 round | 2 subagents |
-| 11–15 | 3 batches | 1 round | 3 subagents |
-| 16–20 | 4 batches | 2 rounds | 3 + 1 |
-| 21–25 | 5 batches | 2 rounds | 3 + 2 |
-| 26–30 | 6 batches | 2 rounds | 3 + 3 |
-| 31–35 | 7 batches | 3 rounds | 3 + 3 + 1 |
-| 36–40 | 8 batches | 3 rounds | 3 + 3 + 2 |
-| 41–45 | 9 batches | 3 rounds | 3 + 3 + 3 |
-| 46–50 | 10 batches | 4 rounds | 3 + 3 + 3 + 1 |
+| 1–5 | 1 批 | 1 轮 | 1 |
+| 6–10 | 2 批 | 1 轮 | 2 |
+| 11–15 | 3 批 | 1 轮 | 3 |
+| 16–20 | 4 批 | 2 轮 | 3 + 1 |
+| 21–25 | 5 批 | 2 轮 | 3 + 2 |
+| 26–30 | 6 批 | 2 轮 | 3 + 3 |
+| 31–35 | 7 批 | 3 轮 | 3 + 3 + 1 |
+| 36–40 | 8 批 | 3 轮 | 3 + 3 + 2 |
+| 41–45 | 9 批 | 3 轮 | 3 + 3 + 3 |
+| 46–50 | 10 批 | 4 轮 | 3 + 3 + 3 + 1 |
 
-**Never dispatch more than 3 subagents in the same turn.** When a row says "2 rounds (3 + 1)", that means: first turn dispatches 3 subagents in parallel, wait for all 3 to complete, then second turn dispatches 1 subagent. Rounds are strictly sequential at the main-agent level.
+同一轮绝不能派出超过 3 个子代理。例如“2 轮（3 + 1）”表示先并行派出 3 个，全部完成后再在下一轮派出 1 个。主代理层面各轮严格串行。
 
-If the paper count lands between rows (e.g. 23 papers), round up to the next row's layout but only dispatch as many batches as you actually need — the decision table gives you the shape, not a rigid prescription.
+数量落在区间中时（如 23 篇），使用对应的向上取整布局，但只派出实际需要的批次。表格规定布局，不要求补齐不存在的论文。
 
-**Do the batching at the main-agent level**: you already have every paper's abstract from Phase 2, so each subagent receives pure text input. Subagents should not need to access the network or the sandbox — their only job is to read text and return JSON. Do not ask subagents to re-run `arxiv_search.py`; that would waste tokens and risk rate-limiting.
+由主代理分批：阶段 2 已获得每篇摘要，子代理只需接收文本，无需访问网络或沙箱，只负责阅读并返回结构化结果。不要让子代理重新运行 `arxiv_search.py`，以免浪费令牌和触发限流。
 
-**What each subagent receives**, as a structured prompt:
+向每个子代理发送以下结构化提示：
 
-```
-Execute this task: extract structured metadata and key findings from the
-following arXiv papers.
+```text
+执行此任务：从以下 arXiv 论文提取结构化元数据和主要发现。
 
-Papers:
-[Paper 1]
+论文：
+[论文 1]
 arxiv_id: 1706.03762
 title: Attention Is All You Need
 authors: Ashish Vaswani, Noam Shazeer, ...
 published: 2017-06-12
-abstract: <full abstract text>
+abstract: <完整摘要原文>
 
-[Paper 2]
+[论文 2]
 arxiv_id: ...
 ...
 
-For each paper, return a JSON object with these fields:
-- arxiv_id (string)
-- title (string)
-- authors (list of strings)
-- published_date (string, YYYY-MM-DD)
-- research_question (1 sentence, what problem the paper tackles)
-- methodology (1-2 sentences, how they tackle it)
-- key_findings (3-5 bullet points, what they actually found)
-- limitations (1-2 sentences, what they acknowledge or what is obviously missing)
+对每篇论文返回一个包含以下字段的对象：
+- arxiv_id（字符串）
+- title（字符串）
+- authors（字符串列表）
+- published_date（字符串，YYYY-MM-DD）
+- research_question（1 句，论文解决什么问题）
+- methodology（1-2 句，如何解决）
+- key_findings（3-5 个要点，实际发现了什么）
+- limitations（1-2 句，作者承认的局限或明显缺失之处）
 
-Return the result as a JSON array, one object per paper, in the same
-order as the input. Do not include any text outside the JSON — no
-preamble, no markdown fences, just the array.
+返回 JSON（JavaScript Object Notation，JavaScript 对象表示法）数组，
+每篇论文对应一个对象，顺序与输入相同。数组之外不要添加任何文字：
+不要开场白，不要代码围栏，只返回数组。
 ```
 
-**Parsing subagent results**: the task tool returns strings with a fixed prefix like `Task Succeeded. Result: [...JSON...]`. Strip the `Task Succeeded. Result: ` prefix (or `Task failed.` / `Task timed out.` prefixes) before trying to parse JSON. If a batch fails or returns unparseable JSON, log it, note which papers were affected, and continue with the remaining batches — do not fail the whole synthesis on one bad batch.
+解析子代理结果：`task` 返回带固定前缀的字符串，例如 `任务成功。结果：[...JSON...]`。解析前应剥离 `任务成功。结果：`、`任务失败。`、`任务已超时。` 等前缀。若某批失败或返回内容不可解析，记录问题和受影响论文，继续处理其余批次，不要因一个批次失败而放弃整体综合分析。
 
-After all rounds complete, flatten the per-batch arrays into a single list of paper metadata objects, preserving order.
+所有轮次完成后，将各批数组合并为一份论文元数据列表，并保持原顺序。
 
-### Phase 4: Synthesize and format
+### 阶段 4：综合分析与格式化
 
-Now produce the final SLR report. Two things happen here: cross-paper synthesis (thematic analysis) and citation formatting.
+生成最终综述，包含跨论文的主题分析和引用格式化。
 
-**Cross-paper synthesis**: the report must do more than list papers. At minimum, identify:
+跨论文综合分析必须超越逐篇罗列，至少识别：
 
-- **Themes**: 3-6 recurring research directions, approaches, or problem framings across the set.
-- **Convergences**: findings that multiple papers agree on.
-- **Disagreements**: where papers reach different conclusions or use incompatible methodologies.
-- **Gaps**: what the collective literature does not yet address (often stated explicitly in the "limitations" fields).
+- 主题：整组文献中重复出现的 3-6 个研究方向、方法或问题框架。
+- 共识：多篇论文一致支持的发现。
+- 分歧：不同结论或不可兼容的方法。
+- 空白：整个文献集合仍未解决的问题，通常可从 `limitations` 中识别。
 
-If the paper set is too small or too heterogeneous to support thematic synthesis (e.g. 5 papers on wildly different sub-topics), say so explicitly in the report — do not force themes that are not there.
+论文过少或差异过大、无法支持主题综合时（如 5 篇论文分属完全不同子主题），在报告中明确说明，不要强行归纳不存在的主题。
 
-**Citation formatting**: the exact format depends on user preference. Read **only** the template file that matches the user's requested format, not all three:
+引用格式依用户偏好决定，只读取对应模板，不要一次读取全部三个：
 
-- [templates/apa.md](templates/apa.md) — APA 7th edition. Default for social sciences and most CS journals. Use when the user requests APA or does not specify a format.
-- [templates/ieee.md](templates/ieee.md) — IEEE numeric citations. Use when the user targets an IEEE conference or journal, or explicitly asks for IEEE.
-- [templates/bibtex.md](templates/bibtex.md) — BibTeX entries. Use when the user mentions BibTeX, LaTeX, or wants machine-readable references. **Important**: arXiv papers are cited as `@misc`, not `@article` — the BibTeX template covers this explicitly.
+- [templates/apa.md](templates/apa.md)：APA（American Psychological Association，美国心理学会）第 7 版。适合社会科学和多数计算机科学期刊；用户指定该格式或未指定时使用。
+- [templates/ieee.md](templates/ieee.md)：IEEE（Institute of Electrical and Electronics Engineers，电气与电子工程师协会）数字引用。面向该协会会议、期刊或用户明确要求时使用。
+- [templates/bibtex.md](templates/bibtex.md)：BibTeX 条目。用户提及 BibTeX、LaTeX 或需要机器可读参考文献时使用。重要：arXiv 预印本使用 `@misc`，不是 `@article`，模板对此有明确规定。
 
-Each template contains both the citation rules and a full report structure (executive summary, themes, per-paper annotations, references, methodology section). Follow the template's structure verbatim for the report body, then fill in content from your Phase 3 metadata.
+模板同时包含引用规则和完整报告结构（执行摘要、主题、逐篇注释、参考文献、方法部分）。严格按模板结构填入阶段 3 的元数据。
 
-### Phase 5: Save and present
+### 阶段 5：保存并展示
 
-Save the full report to `/mnt/user-data/outputs/slr-<topic-slug>-<YYYYMMDD>.md` where `<topic-slug>` is a lowercased hyphenated version of the topic (e.g. `transformer-attention`). Then call the `present_files` tool with that path so the user can download it.
+将完整报告保存到 `/mnt/user-data/outputs/slr-<topic-slug>-<YYYYMMDD>.md`，其中 `<topic-slug>` 为主题的小写连字符形式，例如 `transformer-attention`。然后调用 `present_files`，传入路径供用户下载。
 
-**In the chat message**, show a short preview so the user immediately sees value without opening the file:
+聊天回复中展示简短预览：
 
-1. **Executive summary** — the 3–5 sentence paragraph from the top of the report, verbatim.
-2. **Themes list** — bullet list of the themes you identified in Phase 4 synthesis (just the theme names + one-line gloss, not the full theme sections).
-3. **Paper count + a pointer to the file** — e.g. "Full report with 20 papers, per-paper annotations, and formatted references saved to `slr-transformer-attention-20260409.md`."
+1. 执行摘要：原样展示报告开头的 3-5 句段落。
+2. 主题列表：仅列主题名及一句解释，不复制完整主题章节。
+3. 论文数量和文件指引，例如“包含 20 篇论文、逐篇注释和规范参考文献的完整报告已保存为 `slr-transformer-attention-20260409.md`”。
 
-Do **not** dump the full 2000+ word report inline — per-paper annotations, references, and methodology belong in the file. The preview is there to let the user judge the report at a glance and decide whether to open it.
+不要把超过 2000 词的完整报告直接贴进聊天。逐篇注释、参考文献和方法留在文件中；预览用于让用户快速判断是否打开文件。
 
-## Examples
+## 示例
 
-**Example 1: Typical SLR request**
+### 示例 1：典型的系统性文献综述
 
-User: "Do a systematic literature review of recent transformer attention variants, 20 papers, APA format."
+用户：“综述近期 Transformer 注意力变体，20 篇，采用美国心理学会引用格式。”
 
-Your flow:
-1. Phase 1: confirm topic (transformer attention variants), scope (20 papers, default time window), format (APA). Ask **one** clarification only if something is missing (e.g. "Any particular time window, or should I default to the last 3 years?").
-2. Phase 2: `arxiv_search.py "transformer attention" --max-results 20 --sort-by relevance --start-date 2023-01-01`.
-3. Phase 3: 20 papers → round 1 = 3 subagents × 5 papers = 15 covered, round 2 = 1 subagent × 5 papers = 5 covered. Aggregate.
-4. Phase 4: read `templates/apa.md`, write the report using its structure, fill in themes + per-paper annotations from Phase 3 metadata.
-5. Phase 5: save to `slr-transformer-attention-20260409.md`, call `present_files`.
+流程：
+1. 阶段 1：确认主题、20 篇范围和引用格式。仅有信息缺失时问一个问题，例如“有特定时间窗口吗，还是默认最近三年？”
+2. 阶段 2：`arxiv_search.py "transformer attention" --max-results 20 --sort-by relevance --start-date 2023-01-01`。
+3. 阶段 3：20 篇分两轮，先 3 个子代理各 5 篇，再 1 个子代理 5 篇，最后汇总。
+4. 阶段 4：读取 `templates/apa.md`，按结构写报告，填入主题和逐篇注释。
+5. 阶段 5：保存为 `slr-transformer-attention-20260409.md`，调用 `present_files`。
 
-**Example 2: Small-set request with ambiguity**
+### 示例 2：有歧义的小规模请求
 
-User: "Survey a few papers on diffusion models for me."
+用户：“帮我调查几篇扩散模型论文。”
 
-Your flow:
-1. Phase 1: "a few" is ambiguous. Ask one question: "How many papers would you like — 10, 20, or 30? And any citation format preference (APA is the default)?"
-2. User responds "10, BibTeX".
-3. Phase 2: `arxiv_search.py "diffusion models" --max-results 10 --category cs.CV`.
-4. Phase 3: 10 papers → single round, 2 subagents × 5 papers.
-5. Phase 4: read `templates/bibtex.md`, format with `@misc` entries (not `@article`).
-6. Phase 5: save and present.
+流程：
+1. 阶段 1：“几篇”含糊，合并询问数量（10、20 或 30）和引用格式偏好，说明默认格式。
+2. 用户回复“10 篇，BibTeX”。
+3. 阶段 2：`arxiv_search.py "diffusion models" --max-results 10 --category cs.CV`。
+4. 阶段 3：一轮，2 个子代理各 5 篇。
+5. 阶段 4：读取 `templates/bibtex.md`，输出 `@misc` 条目，不用 `@article`。
+6. 阶段 5：保存并展示。
 
-**Example 3: Out-of-scope request**
+### 示例 3：不适用的请求
 
-User: "Here's one paper (https://arxiv.org/abs/1706.03762). Can you review it?"
+用户：“这篇论文 https://arxiv.org/abs/1706.03762 能帮我评审吗？”
 
-This is a single-paper peer review, not a literature survey. Do not use this skill. Route to `academic-paper-review` instead.
+这是单篇论文评审，应转用 `academic-paper-review`。
 
-## Notes
+## 注意事项
 
-- **Prerequisite: `subagent_enabled` must be `true`**. Phase 3 requires the `task` tool for parallel metadata extraction. This tool is only loaded when `subagent_enabled` is set to `true` in the runtime config (`config.configurable.subagent_enabled`). Without it, the `task` tool will not appear in the available tools and Phase 3 cannot execute as designed.
-- **arXiv only, by design**. This skill does not query Semantic Scholar, PubMed, or Google Scholar. arXiv covers the bulk of CS/ML/physics/math preprints, which is what DeerFlow users most often want to survey. Multi-source academic search belongs in a dedicated MCP server, not inside this skill.
-- **Hard upper bound of 50 papers**. This is tied to the Phase 3 concurrency strategy (max 3 subagents per round, ~5 papers each, at most ~3 rounds). Surveys larger than 50 papers degrade in synthesis quality and are better done by splitting into sub-topics.
-- **Phase 3 requires subagents to be enabled**. This skill's parallel extraction step hard-requires the `task` tool, which is only available when `subagent_enabled=true` at runtime. If subagents are unavailable, do not claim to execute the Phase 3 parallel plan; instead, tell the user that subagents must be enabled for the full workflow, or offer to narrow/split the request into a smaller manual review.
-- **Subagent results are strings, not objects**. Always strip the `Task Succeeded. Result: ` / `Task failed.` / `Task timed out.` prefixes before parsing the JSON payload.
-- **The `id` field is a bare arXiv id** (e.g. `1706.03762`), not a URL and not with a version suffix. `abs_url` / `pdf_url` hold the full URLs if you need them.
-- **Synthesis, not listing**. The final report must identify themes and compare findings across papers. A report that only lists papers one after another is a failure mode — if you cannot find themes, say so explicitly instead of faking them.
+- 前提：`subagent_enabled` 必须为 `true`。阶段 3 依赖 `task` 并行提取；只有运行时配置 `config.configurable.subagent_enabled` 开启时才会加载该工具，否则无法按设计执行。
+- 按设计只检索 arXiv，不查询 Semantic Scholar、PubMed 或 Google Scholar。arXiv 涵盖计算机科学、机器学习、物理和数学的大量预印本，是 DeerFlow 用户常见需求；多来源学术检索应由专用的模型上下文协议服务提供，不放在本技能内部。
+- 论文硬上限为 50 篇，与阶段 3 每轮最多 3 个子代理、每批约 5 篇的策略相关。超过 50 篇会降低综合分析质量，应按子主题拆分。
+- 若子代理未启用，不要声称执行了阶段 3 的并行计划；告知用户完整流程需要启用子代理，或建议缩小、拆分为较小规模的人工式评述。
+- 子代理结果是字符串。解析载荷前先剥离 `任务成功。结果：`、`任务失败。`、`任务已超时。` 等前缀。
+- `id` 是裸 arXiv 标识（如 `1706.03762`），不是链接，也不带版本后缀。完整链接位于 `abs_url`、`pdf_url`。
+- 目标是综合分析。最终报告必须识别主题并比较结论；只逐篇罗列属于失败。无法发现主题时明确说明，不要伪造。

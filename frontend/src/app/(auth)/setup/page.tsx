@@ -7,13 +7,13 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Input } from "@/components/ui/input";
-import { getCsrfHeaders } from "@/core/api/fetcher";
-import { useAuth } from "@/core/auth/AuthProvider";
+import { getCsrfHeaders } from "@/features/api/fetcher";
+import { useAuth } from "@/features/auth/AuthProvider";
 import {
   fetchSetupStatus,
   isSystemAlreadyInitializedError,
-} from "@/core/auth/setup";
-import { parseAuthError } from "@/core/auth/types";
+} from "@/features/auth/setup";
+import { parseAuthError } from "@/features/auth/types";
 
 type SetupMode = "loading" | "init_admin" | "change_password";
 

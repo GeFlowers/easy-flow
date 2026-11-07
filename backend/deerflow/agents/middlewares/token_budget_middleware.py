@@ -25,9 +25,9 @@ from deerflow.config.token_budget_config import TokenBudgetConfig
 logger = logging.getLogger(__name__)
 
 _BUDGET_WARNING_MSG = (
-    "[TOKEN BUDGET WARNING] You have used {used:,} of your {budget:,} {reason} token budget ({percent:.0f}%). Wrap up your current work and produce a final answer. Avoid starting new tool calls unless absolutely necessary."
+    "[令牌预算警告] {reason}令牌预算为 {budget:,}，已使用 {used:,}（{percent:.0f}%）。请收尾当前工作并给出最终答复。除非确有必要，否则不要发起新的工具调用。"
 )
-_BUDGET_EXCEEDED_MSG = "[TOKEN BUDGET EXCEEDED] The {reason} token usage ({used:,}) has exceeded the safety limit ({budget:,}). Producing final answer with results collected so far."
+_BUDGET_EXCEEDED_MSG = "[已超出令牌预算] {reason}令牌用量（{used:,}）已超过安全限制（{budget:,}）。请根据目前收集的结果给出最终答复。"
 
 
 @dataclass
@@ -233,13 +233,13 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
                 ctx = getattr(runtime, "context", None)
                 if isinstance(ctx, dict):
                     ctx["stop_reason"] = "token_capped"
-                stop_text = _BUDGET_EXCEEDED_MSG.format(reason=trigger_reason, used=trigger_used, budget=trigger_budget)
+                stop_text = _BUDGET_EXCEEDED_MSG.format(reason={"input": "输入", "output": "输出", "total": "总"}.get(trigger_reason, trigger_reason), used=trigger_used, budget=trigger_budget)
                 return self._build_hard_stop_update(last_msg, stop_text)
 
             if highest_fraction >= self._config.warn_threshold and not self._warned.get(run_id, False):
                 self._warned[run_id] = True
                 percent = highest_fraction * 100
-                warn_text = _BUDGET_WARNING_MSG.format(reason=trigger_reason, used=trigger_used, budget=trigger_budget, percent=percent)
+                warn_text = _BUDGET_WARNING_MSG.format(reason={"input": "输入", "output": "输出", "total": "总"}.get(trigger_reason, trigger_reason), used=trigger_used, budget=trigger_budget, percent=percent)
                 logger.info("Token budget warning triggered for run %s: %s limit at %.1f%%", run_id, trigger_reason, percent)
                 # 等待模型调用包装器追加提示，避免改变当前图状态。
                 warnings = self._pending_warnings.setdefault(run_id, [])

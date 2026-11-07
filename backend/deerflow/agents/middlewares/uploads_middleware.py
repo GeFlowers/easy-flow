@@ -29,7 +29,7 @@ _QUERY_TOKEN_RE = re.compile(r"[a-z0-9]+")
 def _extension_label(file: dict) -> str:
     '''从文件元数据或文件名取得统一的小写扩展名。'''
     extension = str(file.get("extension") or Path(str(file.get("filename") or "")).suffix).lower()
-    return extension or "(no extension)"
+    return extension or "(无扩展名)"
 
 
 def _format_omitted_file_types(files: list[dict]) -> str:
@@ -113,7 +113,7 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         '''配置线程文件路径解析器和每个上下文区段可列出的文件上限。'''
         super().__init__()
         if max_files_per_context_section < 1:
-            raise ValueError("max_files_per_context_section must be at least 1")
+            raise ValueError("max_files_per_context_section 必须至少为 1")
         self._paths = Paths(base_dir) if base_dir else get_paths()
         self._max_files_per_context_section = max_files_per_context_section
 
@@ -122,25 +122,25 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         size_kb = file["size"] / 1024
         size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
         lines.append(f"- {file['filename']} ({size_str})")
-        lines.append(f"  Path: {file['path']}")
+        lines.append(f"  路径： {file['path']}")
         if file.get("selection_reason") == "query_match":
-            lines.append("  Selected because: matched the current query.")
+            lines.append("  选择原因：匹配当前查询。")
         outline = file.get("outline") or []
         if outline:
             truncated = outline[-1].get("truncated", False)
             visible = [e for e in outline if not e.get("truncated")]
-            lines.append("  Document outline (use `read_file` with line ranges to read sections):")
+            lines.append("  文档大纲（使用 `read_file` 按行范围读取各节）：")
             for entry in visible:
                 lines.append(f"    L{entry['line']}: {entry['title']}")
             if truncated:
-                lines.append(f"    ... (showing first {len(visible)} headings; use `read_file` to explore further)")
+                lines.append(f"    ...（仅显示前 {len(visible)} 个标题；使用 `read_file` 继续查看）")
         else:
             preview = file.get("outline_preview") or []
             if preview:
-                lines.append("  No structural headings detected. Document begins with:")
+                lines.append("  未检测到结构化标题。文档开头如下：")
                 for text in preview:
                     lines.append(f"    > {text}")
-            lines.append("  Use `grep` to search for keywords (e.g. `grep(pattern='keyword', path='/mnt/user-data/uploads/')`).")
+            lines.append("  使用 `grep` 搜索关键词，例如 `grep(pattern='keyword', path='/mnt/user-data/uploads/')`。")
         lines.append("")
 
     def _select_files_for_context(
@@ -181,40 +181,40 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
         '''生成带有新上传、历史文件、大纲和省略统计的结构化提示文本。'''
         lines = ["<uploaded_files>"]
 
-        lines.append("The following files were uploaded in this message:")
+        lines.append("本条消息上传了以下文件：")
         lines.append("")
         if new_files:
             for file in new_files:
                 self._format_file_entry(file, lines)
             if omitted_new_files:
-                lines.append(f"... ({len(omitted_new_files)} more file(s) from this message omitted from this context.)")
-                lines.append(f"  Omitted file types: {_format_omitted_file_types(omitted_new_files)}")
-                lines.append("  Use `glob(pattern='**/*', path='/mnt/user-data/uploads/')` to list all uploads.")
-                lines.append("  Use `grep(pattern='keyword', path='/mnt/user-data/uploads/')` to search across uploads.")
+                lines.append(f"... ({len(omitted_new_files)} 个本条消息的文件已从当前上下文中省略。）")
+                lines.append(f"  省略的文件类型： {_format_omitted_file_types(omitted_new_files)}")
+                lines.append("  使用 `glob(pattern='**/*', path='/mnt/user-data/uploads/')` 列出全部上传文件。")
+                lines.append("  使用 `grep(pattern='keyword', path='/mnt/user-data/uploads/')` 搜索上传文件。")
                 lines.append("")
         else:
-            lines.append("(empty)")
+            lines.append("(空)")
             lines.append("")
 
         if historical_files:
-            lines.append("The following files were uploaded in previous messages and are still available:")
+            lines.append("以下文件在先前消息中上传，目前仍可使用：")
             lines.append("")
             for file in historical_files:
                 self._format_file_entry(file, lines)
             if omitted_historical_files:
-                lines.append(f"... ({len(omitted_historical_files)} more historical file(s) omitted from this context.)")
-                lines.append(f"  Omitted file types: {_format_omitted_file_types(omitted_historical_files)}")
-                lines.append("  Use `glob(pattern='**/*', path='/mnt/user-data/uploads/')` to list all uploads.")
-                lines.append("  Use `grep(pattern='keyword', path='/mnt/user-data/uploads/')` to search across uploads.")
+                lines.append(f"... ({len(omitted_historical_files)} 个历史文件已从当前上下文中省略。）")
+                lines.append(f"  省略的文件类型： {_format_omitted_file_types(omitted_historical_files)}")
+                lines.append("  使用 `glob(pattern='**/*', path='/mnt/user-data/uploads/')` 列出全部上传文件。")
+                lines.append("  使用 `grep(pattern='keyword', path='/mnt/user-data/uploads/')` 搜索上传文件。")
                 lines.append("")
 
-        lines.append("To work with these files:")
-        lines.append("- Read from the file first — use the outline line numbers and `read_file` to locate relevant sections.")
-        lines.append("- Use `grep` to search for keywords when you are not sure which section to look at")
-        lines.append("  (e.g. `grep(pattern='revenue', path='/mnt/user-data/uploads/')`).")
-        lines.append("- Use `glob` to find files by name pattern")
-        lines.append("  (e.g. `glob(pattern='**/*.md', path='/mnt/user-data/uploads/')`).")
-        lines.append("- Only fall back to web search if the file content is clearly insufficient to answer the question.")
+        lines.append("处理这些文件时：")
+        lines.append("- 先读取文件，结合大纲行号与 `read_file` 定位相关部分。")
+        lines.append("- 不确定应查看哪一节时，使用 `grep` 搜索关键词")
+        lines.append("  （例如 `grep(pattern='revenue', path='/mnt/user-data/uploads/')`).")
+        lines.append("- 使用 `glob` 按文件名模式查找文件")
+        lines.append("  （例如 `glob(pattern='**/*.md', path='/mnt/user-data/uploads/')`).")
+        lines.append("- 仅在文件内容明显不足以回答问题时，才使用网页搜索。")
         lines.append("</uploaded_files>")
 
         return "\n".join(lines)

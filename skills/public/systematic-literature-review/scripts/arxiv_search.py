@@ -210,42 +210,42 @@ def search(
 def _build_parser() -> argparse.ArgumentParser:
     '''创建文献检索命令行参数解析器，不执行检索请求。'''
     parser = argparse.ArgumentParser(
-        description="Query the arXiv API and emit structured paper metadata as JSON.",
+        description="查询 arXiv 接口并以结构化格式输出论文元数据。",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
-            "Examples:\n"
+            "示例：\n"
             '  python arxiv_search.py "transformer attention" --max-results 10\n'
             '  python arxiv_search.py "diffusion models" --category cs.CV --sort-by submittedDate\n'
             '  python arxiv_search.py "graph neural networks" --start-date 2023-01-01\n'
         ),
     )
-    parser.add_argument("query", help="free-text search topic")
+    parser.add_argument("query", help="自由文本检索主题")
     parser.add_argument(
         "--max-results",
         type=int,
         default=20,
-        help=f"number of papers to return (default: 20, max: {MAX_RESULTS_UPPER_BOUND})",
+        help=f"返回论文数量（默认 20，上限 {MAX_RESULTS_UPPER_BOUND}）",
     )
     parser.add_argument(
         "--category",
         default=None,
-        help="optional arXiv category filter, e.g. cs.CL, cs.CV, stat.ML",
+        help="可选 arXiv 分类过滤条件，例如 cs.CL、cs.CV、stat.ML",
     )
     parser.add_argument(
         "--sort-by",
         default="relevance",
         choices=["relevance", "submittedDate", "lastUpdatedDate"],
-        help="sort order (default: relevance)",
+        help="排序方式（默认 relevance）",
     )
     parser.add_argument(
         "--start-date",
         default=None,
-        help="earliest submission date, YYYY-MM-DD (inclusive)",
+        help="最早提交日期，YYYY-MM-DD（含当日）",
     )
     parser.add_argument(
         "--end-date",
         default=None,
-        help="latest submission date, YYYY-MM-DD (inclusive)",
+        help="最晚提交日期，YYYY-MM-DD（含当日）",
     )
     return parser
 

@@ -1,198 +1,207 @@
 ---
 name: deep-research
-description: Use this skill instead of WebSearch for ANY question requiring web research. Trigger on queries like "what is X", "explain X", "compare X and Y", "research X", or before content generation tasks. Provides systematic multi-angle research methodology instead of single superficial searches. Use this proactively when the user's question needs online information.
+description: 任何需要网络研究的问题都应使用此技能，而不是直接进行单次网页搜索。触发示例包括“什么是某事物”、“解释某事物”、“比较两者”、“研究某主题”，以及内容生成任务之前。它提供系统的多角度研究方法，避免一次浅层搜索。用户问题需要在线信息时主动使用。
 ---
 
-# Deep Research Skill
+# 深度研究技能
 
-## Overview
+## 概述
 
-This skill provides a systematic methodology for conducting thorough web research. **Load this skill BEFORE starting any content generation task** to ensure you gather sufficient information from multiple angles, depths, and sources.
+此技能提供开展深入网络研究的系统方法。**开始任何内容生成任务前加载此技能**，确保从多个角度、不同深度和多个来源收集充分信息。
 
-## When to Use This Skill
+## 使用时机
 
-**Always load this skill when:**
+**以下情况始终加载此技能：**
 
-### Research Questions
-- User asks "what is X", "explain X", "research X", "investigate X"
-- User wants to understand a concept, technology, or topic in depth
-- The question requires current, comprehensive information from multiple sources
-- A single web search would be insufficient to answer properly
+### 研究问题
 
-### Content Generation (Pre-research)
-- Creating presentations (PPT/slides)
-- Creating frontend designs or UI mockups
-- Writing articles, reports, or documentation
-- Producing videos or multimedia content
-- Any content that requires real-world information, examples, or current data
+- 用户询问“什么是”、“解释”、“研究”或“调查”某主题。
+- 用户希望深入理解概念、技术或主题。
+- 问题需要来自多个来源的最新、全面信息。
+- 单次网页搜索不足以妥善回答。
 
-## Core Principle
+### 内容生成前的研究
 
-**Never generate content based solely on general knowledge.** The quality of your output directly depends on the quality and quantity of research conducted beforehand. A single search query is NEVER enough.
+- 制作演示文稿或幻灯片。
+- 创建前端设计或界面模型。
+- 撰写文章、报告或文档。
+- 制作视频或多媒体内容。
+- 任何需要现实信息、实例或最新数据的内容。
 
-## Research Methodology
+## 核心原则
 
-### Phase 1: Broad Exploration
+**绝不能只凭常识生成内容。** 输出质量直接取决于事前研究的质量和数量。单次查询永远不够。
 
-Start with broad searches to understand the landscape:
+## 研究方法
 
-1. **Initial Survey**: Search for the main topic to understand the overall context
-2. **Identify Dimensions**: From initial results, identify key subtopics, themes, angles, or aspects that need deeper exploration
-3. **Map the Territory**: Note different perspectives, stakeholders, or viewpoints that exist
+### 第 1 阶段：广泛探索
 
-Example:
-```
-Topic: "AI in healthcare"
-Initial searches:
-- "AI healthcare applications 2024"
-- "artificial intelligence medical diagnosis"
-- "healthcare AI market trends"
+从广泛搜索开始，了解全貌：
 
-Identified dimensions:
-- Diagnostic AI (radiology, pathology)
-- Treatment recommendation systems
-- Administrative automation
-- Patient monitoring
-- Regulatory landscape
-- Ethical considerations
-```
+1. **初步调查：** 搜索主要主题，理解整体背景。
+2. **识别维度：** 从初步结果中找出需要深入的子主题、议题、角度和方面。
+3. **描绘领域：** 记录已有的不同观点、利益相关方和视角。
 
-### Phase 2: Deep Dive
-
-For each important dimension identified, conduct targeted research:
-
-1. **Specific Queries**: Search with precise keywords for each subtopic
-2. **Multiple Phrasings**: Try different keyword combinations and phrasings
-3. **Fetch Full Content**: Use `web_fetch` to read important sources in full, not just snippets
-4. **Follow References**: When sources mention other important resources, search for those too
-
-Example:
-```
-Dimension: "Diagnostic AI in radiology"
-Targeted searches:
-- "AI radiology FDA approved systems"
-- "chest X-ray AI detection accuracy"
-- "radiology AI clinical trials results"
-
-Then fetch and read:
-- Key research papers or summaries
-- Industry reports
-- Real-world case studies
-```
-
-### Phase 3: Diversity & Validation
-
-Ensure comprehensive coverage by seeking diverse information types:
-
-| Information Type | Purpose | Example Searches |
-|-----------------|---------|------------------|
-| **Facts & Data** | Concrete evidence | "statistics", "data", "numbers", "market size" |
-| **Examples & Cases** | Real-world applications | "case study", "example", "implementation" |
-| **Expert Opinions** | Authority perspectives | "expert analysis", "interview", "commentary" |
-| **Trends & Predictions** | Future direction | "trends 2024", "forecast", "future of" |
-| **Comparisons** | Context and alternatives | "vs", "comparison", "alternatives" |
-| **Challenges & Criticisms** | Balanced view | "challenges", "limitations", "criticism" |
-
-### Phase 4: Synthesis Check
-
-Before proceeding to content generation, verify:
-
-- [ ] Have I searched from at least 3-5 different angles?
-- [ ] Have I fetched and read the most important sources in full?
-- [ ] Do I have concrete data, examples, and expert perspectives?
-- [ ] Have I explored both positive aspects and challenges/limitations?
-- [ ] Is my information current and from authoritative sources?
-
-**If any answer is NO, continue researching before generating content.**
-
-## Search Strategy Tips
-
-### Effective Query Patterns
+示例：
 
 ```
-# Be specific with context
-❌ "AI trends"
-✅ "enterprise AI adoption trends 2024"
+主题：“医疗中的人工智能”
+初始搜索：
+- “人工智能 医疗 应用 2024”
+- “人工智能 医学诊断”
+- “医疗 人工智能 市场趋势”
 
-# Include authoritative source hints
-"[topic] research paper"
-"[topic] McKinsey report"
-"[topic] industry analysis"
-
-# Search for specific content types
-"[topic] case study"
-"[topic] statistics"
-"[topic] expert interview"
-
-# Use temporal qualifiers — always use the ACTUAL current year from <current_date>
-"[topic] 2026"   # ← replace with real current year, never hardcode a past year
-"[topic] latest"
-"[topic] recent developments"
+识别出的维度：
+- 诊断人工智能（放射、病理）
+- 治疗推荐系统
+- 行政自动化
+- 患者监测
+- 监管环境
+- 伦理考量
 ```
 
-### Temporal Awareness
+### 第 2 阶段：深入研究
 
-**Always check `<current_date>` in your context before forming ANY search query.**
+对每个重要维度开展定向研究：
 
-`<current_date>` gives you the full date: year, month, day, and weekday (e.g. `2026-02-28, Saturday`). Use the right level of precision depending on what the user is asking:
+1. **具体查询：** 针对子主题使用精确关键词。
+2. **多种表述：** 尝试不同关键词组合和说法。
+3. **获取全文：** 使用 `web_fetch` 完整阅读重要来源，不要只读摘要片段。
+4. **追踪引用：** 来源提到其他重要资料时，也继续搜索。
 
-| User intent | Temporal precision needed | Example query |
-|---|---|---|
-| "today / this morning / just released" | **Month + Day** | `"tech news February 28 2026"` |
-| "this week" | **Week range** | `"technology releases week of Feb 24 2026"` |
-| "recently / latest / new" | **Month** | `"AI breakthroughs February 2026"` |
-| "this year / trends" | **Year** | `"software trends 2026"` |
+示例：
 
-**Rules:**
-- When the user asks about "today" or "just released", use **month + day + year** in your search queries to get same-day results
-- Never drop to year-only when day-level precision is needed — `"tech news 2026"` will NOT surface today's news
-- Try multiple phrasings: numeric form (`2026-02-28`), written form (`February 28 2026`), and relative terms (`today`, `this week`) across different queries
+```
+维度：“放射领域的人工智能诊断”
+定向搜索：
+- “放射 人工智能 获批系统”
+- “胸片 人工智能 检测准确率”
+- “放射 人工智能 临床试验结果”
 
-❌ User asks "what's new in tech today" → searching `"new technology 2026"` → misses today's news
-✅ User asks "what's new in tech today" → searching `"new technology February 28 2026"` + `"tech news today Feb 28"` → gets today's results
+然后获取并阅读：
+- 关键论文或摘要
+- 行业报告
+- 现实案例研究
+```
 
-### When to Use web_fetch
+### 第 3 阶段：多样性与验证
 
-Use `web_fetch` to read full content when:
-- A search result looks highly relevant and authoritative
-- You need detailed information beyond the snippet
-- The source contains data, case studies, or expert analysis
-- You want to understand the full context of a finding
+通过不同信息类型确保全面覆盖：
 
-### Iterative Refinement
+| 信息类型 | 用途 | 查询示例 |
+| --- | --- | --- |
+| **事实与数据** | 具体证据 | “统计”、“数据”、“数字”、“市场规模” |
+| **实例与案例** | 现实应用 | “案例研究”、“实例”、“实施” |
+| **专家意见** | 权威视角 | “专家分析”、“访谈”、“评论” |
+| **趋势与预测** | 未来方向 | “2024 趋势”、“预测”、“未来” |
+| **比较** | 背景和替代方案 | “对比”、“比较”、“替代方案” |
+| **挑战与批评** | 平衡观点 | “挑战”、“局限”、“批评” |
 
-Research is iterative. After initial searches:
-1. Review what you've learned
-2. Identify gaps in your understanding
-3. Formulate new, more targeted queries
-4. Repeat until you have comprehensive coverage
+### 第 4 阶段：综合检查
 
-## Quality Bar
+进入内容生成前，确认：
 
-Your research is sufficient when you can confidently answer:
-- What are the key facts and data points?
-- What are 2-3 concrete real-world examples?
-- What do experts say about this topic?
-- What are the current trends and future directions?
-- What are the challenges or limitations?
-- What makes this topic relevant or important now?
+- [ ] 是否至少从 3–5 个不同角度搜索？
+- [ ] 是否获取并完整阅读最重要的来源？
+- [ ] 是否具备具体数据、实例和专家观点？
+- [ ] 是否探索了正面价值以及挑战／局限？
+- [ ] 信息是否最新且来源权威？
 
-## Common Mistakes to Avoid
+**只要有一项回答为否，就继续研究，再生成内容。**
 
-- ❌ Stopping after 1-2 searches
-- ❌ Relying on search snippets without reading full sources
-- ❌ Searching only one aspect of a multi-faceted topic
-- ❌ Ignoring contradicting viewpoints or challenges
-- ❌ Using outdated information when current data exists
-- ❌ Starting content generation before research is complete
+## 搜索策略建议
 
-## Output
+### 有效查询模式
 
-After completing research, you should have:
-1. A comprehensive understanding of the topic from multiple angles
-2. Specific facts, data points, and statistics
-3. Real-world examples and case studies
-4. Expert perspectives and authoritative sources
-5. Current trends and relevant context
+```
+# 根据背景具体化
+❌ “人工智能趋势”
+✅ “企业人工智能采用趋势 2024”
 
-**Only then proceed to content generation**, using the gathered information to create high-quality, well-informed content.
+# 加入权威来源提示
+“[主题] 研究论文”
+“[主题] 麦肯锡报告”
+“[主题] 行业分析”
+
+# 搜索具体内容类型
+“[主题] 案例研究”
+“[主题] 统计”
+“[主题] 专家访谈”
+
+# 使用时间限定，始终使用 <current_date> 中的实际当前年份
+“[主题] 2026”   # 替换为实际当前年份，绝不写死过去的年份
+“[主题] 最新”
+“[主题] 近期进展”
+```
+
+### 时间意识
+
+**构造任何查询前，始终检查上下文中的 `<current_date>`。**
+
+它给出完整日期：年、月、日和星期，例如 `2026-02-28, Saturday`。按用户需求选择精度：
+
+| 用户意图 | 所需时间精度 | 查询示例 |
+| --- | --- | --- |
+| “今天／今早／刚发布” | **月＋日** | `“科技新闻 2026年2月28日”` |
+| “本周” | **周范围** | `“技术发布 2026年2月24日 当周”` |
+| “近期／最新／新” | **月** | `“人工智能突破 2026年2月”` |
+| “今年／趋势” | **年** | `“软件趋势 2026”` |
+
+**规则：**
+
+- 用户询问“今天”或“刚发布”时，查询应包含**年＋月＋日**，以获取当天结果。
+- 需要日级精度时，不能只保留年份；“科技新闻 2026”无法找出今天的新闻。
+- 在不同查询中尝试数字形式（`2026-02-28`）、文字形式（`2026年2月28日`）和相对词（`今天`、`本周`）。
+
+❌ 用户问“今天有什么科技新动态”，搜索“新技术 2026”，会错过当天消息。
+✅ 搜索“新技术 2026年2月28日”及“科技新闻 今天 2月28日”，更能找到当天结果。
+
+### 何时使用 web_fetch
+
+以下情况使用 `web_fetch` 阅读全文：
+
+- 搜索结果高度相关且权威。
+- 需要超出片段的细节。
+- 来源包含数据、案例或专家分析。
+- 需要理解结论的完整背景。
+
+### 迭代改进
+
+研究需要迭代。初步搜索后：
+
+1. 回顾已知信息。
+2. 找出理解中的缺口。
+3. 构造新的、更有针对性的查询。
+4. 重复直到覆盖全面。
+
+## 质量门槛
+
+当你可以自信回答以下问题时，研究才足够：
+
+- 关键事实与数据是什么？
+- 有哪 2–3 个具体的现实实例？
+- 专家如何评价？
+- 当前趋势和未来方向是什么？
+- 存在哪些挑战或局限？
+- 为什么此主题现在相关或重要？
+
+## 常见错误
+
+- ❌ 搜索 1–2 次就停止。
+- ❌ 依赖结果片段而不阅读完整来源。
+- ❌ 只搜索多面主题中的一面。
+- ❌ 忽略相反观点或挑战。
+- ❌ 已有最新数据却使用过时信息。
+- ❌ 研究尚未完成就开始生成内容。
+
+## 输出
+
+完成研究后应具备：
+
+1. 从多个角度全面理解主题。
+2. 具体事实、数据和统计。
+3. 现实实例和案例研究。
+4. 专家视角与权威来源。
+5. 当前趋势和相关背景。
+
+**只有此时才能开始生成内容**，用收集的信息创作高质量、依据充分的内容。

@@ -48,35 +48,35 @@ import {
   DropdownMenuGroup,
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   buildHumanInputResponseText,
   hasOpenHumanInputRequest,
   type HumanInputRequest,
   type HumanInputResponse,
-} from "@/core/messages/human-input";
-import { isHiddenFromUIMessage } from "@/core/messages/utils";
-import { useModels } from "@/core/models/hooks";
-import type { Model } from "@/core/models/types";
-import { useLocalSettings } from "@/core/settings";
+} from "@/features/messages/human-input";
+import { isHiddenFromUIMessage } from "@/features/messages/utils";
+import { useModels } from "@/features/models/hooks";
+import type { Model } from "@/features/models/types";
+import { useLocalSettings } from "@/features/settings";
 import {
   buildParentConversationContext,
   buildReferenceMessageMetadata,
   buildSidecarContextPrompt,
-} from "@/core/sidecar";
-import { createSidecarThread } from "@/core/sidecar/api";
+} from "@/features/sidecar";
+import { createSidecarThread } from "@/features/sidecar/api";
 import {
   useDeleteThread,
   useThreadStream,
   type ThreadStreamOptions,
-} from "@/core/threads/hooks";
+} from "@/features/threads/hooks";
 import {
   formatUploadSize,
   useUploadLimits,
   validateUploadLimits,
   type UploadLimits,
   type UploadLimitViolation,
-} from "@/core/uploads";
+} from "@/features/uploads";
 import { cn } from "@/lib/utils";
 
 import {

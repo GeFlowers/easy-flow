@@ -6,6 +6,7 @@ import logging
 from pathlib import Path
 
 from langchain_core.tools import BaseTool
+from deerflow.utils.event_loop import run_async
 
 logger = logging.getLogger(__name__)
 
@@ -99,21 +100,18 @@ def get_cached_mcp_tools() -> list[BaseTool]:
     if not _cache_initialized:
         logger.info("MCP tools not initialized, performing lazy initialization...")
         try:
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
+            try:
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
+            if loop is not None:
                 import concurrent.futures
 
                 with concurrent.futures.ThreadPoolExecutor() as executor:
-                    future = executor.submit(asyncio.run, initialize_mcp_tools())
+                    future = executor.submit(run_async, initialize_mcp_tools())
                     future.result()
             else:
-                loop.run_until_complete(initialize_mcp_tools())
-        except RuntimeError:
-            try:
-                asyncio.run(initialize_mcp_tools())
-            except Exception:
-                logger.exception("Failed to lazy-initialize MCP tools")
-                return []
+                run_async(initialize_mcp_tools())
         except Exception:
             logger.exception("Failed to lazy-initialize MCP tools")
             return []

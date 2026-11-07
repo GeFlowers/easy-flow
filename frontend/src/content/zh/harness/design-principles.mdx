@@ -90,7 +90,7 @@ DeerFlow 通过**上下文工程**来解决这个问题——有意识地控制 
 
 ## 配置驱动行为
 
-DeerFlow 中所有有意义的行为都通过 `config.yaml` 控制。系统的设计使运维人员无需触碰代码就能改变 Agent 的行为——使用哪些模型、是否启用摘要压缩、如何限制子 Agent、哪些工具可用。
+DeerFlow 中所有有意义的行为都通过 `config/config.yaml` 控制。系统的设计使运维人员无需触碰代码就能改变 Agent 的行为——使用哪些模型、是否启用摘要压缩、如何限制子 Agent、哪些工具可用。
 
 这个设计原则有三个含义：
 
@@ -110,7 +110,7 @@ DeerFlow 中所有有意义的行为都通过 `config.yaml` 控制。系统的�
 | 技能提供专业化         | 领域能力按需注入，保持基础干净           |
 | 沙箱用于执行           | 真实文件和命令操作的隔离工作区           |
 | 上下文工程             | 主动管理 Agent 所见内容以保持有效性      |
-| 配置驱动               | 所有关键行为通过 `config.yaml` 控制      |
+| 配置驱动               | 所有关键行为通过 `config/config.yaml` 控制      |
 
 <Cards num={2}>
   <Cards.Card title="Lead Agent" href="/docs/harness/lead-agent" />

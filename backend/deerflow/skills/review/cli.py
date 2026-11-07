@@ -14,20 +14,20 @@ from deerflow.skills.review.readers import ArchivePackageReader, LocalDirectoryR
 
 def main(argv: list[str] | None = None) -> int:
     '''解析命令行选项，选择目录或归档读取器，运行技能审查并输出结果。'''
-    parser = argparse.ArgumentParser(description="Analyze a skill package without executing it.")
-    parser.add_argument("target", help="Skill directory or .skill archive to review")
+    parser = argparse.ArgumentParser(description="分析技能包而不执行其中内容。")
+    parser.add_argument("target", help="要审查的技能目录或 .skill 归档")
     parser.add_argument("--profile", choices=["deerflow", "agentskills"], default="deerflow")
     parser.add_argument("--format", choices=["json", "text"], default="json")
     parser.add_argument(
         "--fail-on",
         choices=["never", "warning", "error", "blocker"],
         default="never",
-        help="Exit non-zero when findings are at this severity or worse.",
+        help="发现项达到此严重等级或更严重时，以非零状态退出。",
     )
     parser.add_argument(
         "--fail-on-incomplete",
         action="store_true",
-        help="Exit non-zero when package completeness indicates content was not assessed.",
+        help="技能包完整性信息表明有内容未评估时，以非零状态退出。",
     )
     parser.add_argument("--max-files", type=int, default=DEFAULT_PACKAGE_LIMITS.max_files)
     parser.add_argument("--max-file-bytes", type=int, default=DEFAULT_PACKAGE_LIMITS.max_file_bytes)
@@ -54,8 +54,8 @@ def _print_text(facts: dict[str, Any]) -> None:
     completeness = facts.get("completeness", {})
     print(f"Subject: {subject.get('display_ref')}")
     print(f"Digest: {subject.get('package_digest')}")
-    print(f"Summary: {summary.get('blockers')} blocker(s), {summary.get('errors')} error(s), {summary.get('warnings')} warning(s), {summary.get('infos')} info(s)")
-    print(f"Completeness: truncated={completeness.get('truncated')}, not_assessed={','.join(completeness.get('not_assessed') or []) or '(none)'}")
+    print(f"Summary: {summary.get('blockers')} 个阻断项, {summary.get('errors')} 个错误, {summary.get('warnings')} 个警告, {summary.get('infos')} info(s)")
+    print(f"Completeness: truncated={completeness.get('truncated')}, not_assessed={','.join(completeness.get('not_assessed') or []) or '(无)'}")
     for finding in facts.get("findings", []):
         location = finding.get("path") or "<package>"
         if finding.get("line") is not None:

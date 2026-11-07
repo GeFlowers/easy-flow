@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from deerflow.config.runtime_paths import existing_project_file
+from deerflow.config.runtime_paths import existing_project_file, project_root
 
 logger = logging.getLogger(__name__)
 
@@ -153,10 +153,15 @@ class ExtensionsConfig(BaseModel):
             project_config = existing_project_file(("extensions_config.json", "mcp_config.json"))
             if project_config is not None:
                 return project_config
+            # 显式项目根是配置边界，不能误读源码仓库内其他项目的私有配置。
+            if os.getenv("DEER_FLOW_PROJECT_ROOT"):
+                return None
 
             backend_dir = Path(__file__).resolve().parents[2]
             repo_root = backend_dir.parent
             for path in (
+                repo_root / "config" / "extensions_config.json",
+                repo_root / "config" / "mcp_config.json",
                 backend_dir / "extensions_config.json",
                 repo_root / "extensions_config.json",
                 backend_dir / "mcp_config.json",
@@ -165,6 +170,19 @@ class ExtensionsConfig(BaseModel):
                 if path.exists():
                     return path
             return None
+
+    @classmethod
+    def resolve_write_path(cls) -> Path:
+        '''复用已有配置位置；首次写入时创建项目集中配置目录。'''
+        path = cls.resolve_config_path()
+        if path is None:
+            root = project_root()
+            backend_dir = Path(__file__).resolve().parents[2]
+            if not os.getenv("DEER_FLOW_PROJECT_ROOT") and root == backend_dir:
+                root = backend_dir.parent
+            path = root / "config" / "extensions_config.json"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        return path
 
     @classmethod
     def from_file(cls, config_path: str | None = None) -> "ExtensionsConfig":

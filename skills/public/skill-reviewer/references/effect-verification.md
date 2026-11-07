@@ -1,36 +1,36 @@
-# Effect Verification
+# 效果验证
 
-Readiness and assurance are separate.
+就绪程度和保障程度相互独立。
 
-## Assurance Levels
+## 保障等级
 
-- `static_only`: The package was inspected statically. No runtime evidence was retained.
-- `trigger_checked`: Positive and negative routing cases were executed against a stated model/runtime and retained.
-- `behavior_verified`: Behavior assertions passed for the reviewed package digest.
-- `regression_verified`: A frozen baseline and reviewed package were compared with retained outputs and grading evidence.
+- `static_only`：已静态检查技能包，未留存运行证据。
+- `trigger_checked`：在已说明的模型／运行时中执行并留存正反路由用例。
+- `behavior_verified`：针对被审查包摘要的行为断言通过。
+- `regression_verified`：比较冻结基线与被审查包，并留存输出和评分证据。
 
-## Evidence That Raises Assurance
+## 提高保障程度所需的证据
 
-To move beyond `static_only`, evidence must include:
+超过 `static_only` 时，证据必须包括：
 
-- subject digest;
-- model ID;
-- runtime or DeerFlow version;
-- prompt inputs;
-- tool trace;
-- outputs;
-- assertions or grading result;
-- timestamp.
+- 对象摘要。
+- 模型标识。
+- 运行时或 DeerFlow 版本。
+- 输入提示词。
+- 工具调用轨迹。
+- 输出。
+- 断言或评分结果。
+- 时间戳。
 
-If any of those are missing, stale, contradictory, or attached to a different digest, name the limitation and keep the lower assurance level.
+任何一项缺失、过时、矛盾或属于不同摘要，都应指出局限并保持较低保障等级。
 
-## Risk-Based Evidence
+## 基于风险的证据
 
-Missing evals become material when a skill:
+技能具有以下情况时，缺少评估会构成实质问题：
 
-- performs destructive or externally visible actions;
-- handles secrets or sensitive data;
-- has known sibling-routing collision risk;
-- claims measurable improvement over a baseline;
-- produces high-stakes output;
-- has a history of regressions.
+- 执行破坏性或外部可见操作。
+- 处理秘密或敏感数据。
+- 已知存在相邻技能路由冲突风险。
+- 声称相对基线有可量化提升。
+- 生成高风险输出。
+- 曾出现回归。

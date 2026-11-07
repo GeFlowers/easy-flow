@@ -1,7 +1,7 @@
 "use client";
 
-import { useI18n } from "@/core/i18n/hooks";
-import type { Translations } from "@/core/i18n/locales/types";
+import { useI18n } from "@/features/i18n/hooks";
+import type { Translations } from "@/features/i18n/locales/types";
 
 import { Tooltip } from "./tooltip";
 

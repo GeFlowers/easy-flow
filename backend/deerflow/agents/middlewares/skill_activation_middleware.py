@@ -112,7 +112,7 @@ class SkillActivationMiddleware(AgentMiddleware):
             try:
                 resolved_file.relative_to(resolved_root)
             except ValueError as exc:
-                raise ValueError("Resolved skill file must stay within the configured skills root.") from exc
+                raise ValueError("解析后的技能文件必须位于配置的技能根目录内部。") from exc
         if not resolved_file.is_file():
             raise FileNotFoundError(resolved_file)
         return resolved_file.read_text(encoding="utf-8")
@@ -127,11 +127,11 @@ class SkillActivationMiddleware(AgentMiddleware):
         skills = storage.load_skills(enabled_only=False)
         skill = next((candidate for candidate in skills if candidate.name == reference.name), None)
         if skill is None:
-            return _ActivationResolution(failure_message=f"Skill `/{reference.name}` is not installed.")
+            return _ActivationResolution(failure_message=f"技能 `/{reference.name}` 尚未安装。")
         if not skill.enabled:
-            return _ActivationResolution(failure_message=f"Skill `/{reference.name}` is installed but disabled. Enable it before using slash activation.")
+            return _ActivationResolution(failure_message=f"技能 `/{reference.name}` 已安装但已禁用。使用斜杠激活前请先启用。")
         if self._available_skills is not None and reference.name not in self._available_skills:
-            return _ActivationResolution(failure_message=f"Skill `/{reference.name}` is not available for this agent.")
+            return _ActivationResolution(failure_message=f"技能 `/{reference.name}` 不适用于此代理。")
 
         resolved = resolve_slash_skill(
             text,
@@ -140,13 +140,13 @@ class SkillActivationMiddleware(AgentMiddleware):
             container_base_path=storage.get_container_root(),
         )
         if resolved is None:
-            return _ActivationResolution(failure_message=f"Skill `/{reference.name}` could not be resolved.")
+            return _ActivationResolution(failure_message=f"技能 `/{reference.name}` 无法解析。")
 
         try:
             skill_content = self._read_skill_content(resolved.skill.skill_file, storage.get_skills_root_path(), storage=storage)
         except (OSError, ValueError):
             logger.exception("Failed to read slash-activated skill %s", resolved.skill.name)
-            return _ActivationResolution(failure_message=f"Skill `/{reference.name}` could not be loaded safely. Please check the skill installation.")
+            return _ActivationResolution(failure_message=f"技能 `/{reference.name}` 无法安全加载。请检查技能安装情况。")
 
         content_hash = hashlib.sha256(skill_content.encode("utf-8")).hexdigest()
         # 只有用户自定义技能允许被编辑。
@@ -176,13 +176,13 @@ class SkillActivationMiddleware(AgentMiddleware):
         escaped_content_hash = html.escape(activation.content_hash, quote=True)
         editable_str = "true" if activation.editable else "false"
         return f"""<slash_skill_activation>
-The user explicitly activated the `{escaped_skill_name}` skill for this turn.
-Treat the task text as:
+用户为本轮显式激活了 `{escaped_skill_name}` 技能。
+将任务文本视为：
 <user_request>
 {escaped_user_request}
 </user_request>
 
-Follow this skill before choosing a general workflow. Load supporting resources from the same skill directory only when needed.
+在选择通用工作流程之前，请先遵循此技能。仅在需要时从同一技能目录加载辅助资源。
 
 <skill name="{escaped_skill_name}" category="{escaped_category}" path="{escaped_path}" sha256="{escaped_content_hash}" editable="{editable_str}">
 <skill_content encoding="xml-escaped">

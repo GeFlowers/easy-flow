@@ -9,15 +9,15 @@ description: 本教程介绍如何在 DeerFlow 中配置和使用工具（Tools�
 
 ## 配置工具
 
-在 `config.yaml` 中添加工具：
+在 `config/config.yaml` 中添加工具：
 
 ```yaml
 tools:
   # 网络搜索
-  - use: deerflow.community.ddg_search.tools:web_search_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool
 
   # 网页内容抓取
-  - use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - use: deerflow.integrations.jina_ai.tools:web_fetch_tool
 
   # 沙箱文件操作
   - use: deerflow.sandbox.tools:ls_tool
@@ -28,7 +28,7 @@ tools:
 
 ## 启用技能
 
-通过 DeerFlow 应用界面的技能面板启用技能，或直接编辑 `extensions_config.json`。
+通过 DeerFlow 应用界面的技能面板启用技能，或直接编辑 `config/extensions_config.json`。
 
 示例：启用深度研究技能
 

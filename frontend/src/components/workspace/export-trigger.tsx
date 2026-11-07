@@ -11,12 +11,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   exportThreadAsJSON,
   exportThreadAsMarkdown,
-} from "@/core/threads/export";
-import type { AgentThread } from "@/core/threads/types";
+} from "@/features/threads/export";
+import type { AgentThread } from "@/features/threads/types";
 
 import { useThread } from "./messages/context";
 import { Tooltip } from "./tooltip";

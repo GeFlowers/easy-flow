@@ -99,7 +99,7 @@ class GitHubAPI:
                 f"/repos/{owner}/{repo}/readme", accept="application/vnd.github.raw"
             )
         except Exception as e:
-            return f"[README not found: {e}]"
+            return f"[找不到项目自述文件：{e}]"
 
     def get_tree(
         self, owner: str, repo: str, branch: str = "main", recursive: bool = True
@@ -122,7 +122,7 @@ class GitHubAPI:
                 accept="application/vnd.github.raw",
             )
         except Exception as e:
-            return f"[File not found: {e}]"
+            return f"[找不到文件：{e}]"
 
     def get_languages(self, owner: str, repo: str) -> Dict[str, int]:
         '''获取仓库语言及各语言对应的代码字节数。'''
@@ -194,7 +194,7 @@ class GitHubAPI:
     def format_tree(self, tree_data: Dict, max_depth: int = 3) -> str:
         '''将目录树响应格式化为不超过指定深度的文本结构。'''
         if "tree" not in tree_data:
-            return "[Unable to parse tree]"
+            return "[无法解析目录树]"
 
         lines = []
         for item in tree_data["tree"]:
@@ -266,8 +266,8 @@ class GitHubAPI:
 def main():
     '''提供用于手动验证仓库读取功能的命令行入口。'''
     if len(sys.argv) < 3:
-        print("Usage: python github_api.py <owner> <repo> [command]")
-        print("Commands: info, readme, tree, languages, contributors,")
+        print("用法：python github_api.py <owner> <repo> [command]")
+        print("命令：info, readme, tree, languages, contributors,")
         print("          commits, issues, prs, releases, summary")
         sys.exit(1)
 
@@ -291,7 +291,7 @@ def main():
     }
 
     if command not in commands:
-        print(f"Unknown command: {command}")
+        print(f"未知命令：{command}")
         sys.exit(1)
 
     try:
@@ -301,7 +301,7 @@ def main():
         else:
             print(json.dumps(result, indent=2, default=str))
     except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
+        print(f"错误：{e}", file=sys.stderr)
         sys.exit(1)
 
 

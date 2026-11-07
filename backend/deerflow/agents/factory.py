@@ -29,17 +29,17 @@ logger = logging.getLogger(__name__)
 
 _TODO_SYSTEM_PROMPT = """
 <todo_list_system>
-You have access to the `write_todos` tool to help you manage and track complex multi-step objectives.
+可以使用 `write_todos` 工具管理并跟踪复杂的多步骤目标。
 
-**CRITICAL RULES:**
-- Mark todos as completed IMMEDIATELY after finishing each step - do NOT batch completions
-- Keep EXACTLY ONE task as `in_progress` at any time (unless tasks can run in parallel)
-- Update the todo list in REAL-TIME as you work - this gives users visibility into your progress
-- DO NOT use this tool for simple tasks (< 3 steps) - just complete them directly
+**必须遵守：**
+- 每完成一步立即标记完成，不得集中补记。
+- 除可并行任务外，任何时候都恰好只有一项处于 `in_progress`。
+- 工作中实时更新待办，让用户看到进度。
+- 少于三步的简单任务直接完成，不使用此工具。
 </todo_list_system>
 """
 
-_TODO_TOOL_DESCRIPTION = "Use this tool to create and manage a structured task list for complex work sessions.  Only use for complex tasks (3+ steps)."
+_TODO_TOOL_DESCRIPTION = "为复杂工作创建并管理结构化任务列表。仅用于至少三个步骤的复杂任务。"
 
 
 

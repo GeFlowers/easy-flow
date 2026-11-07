@@ -1,7 +1,7 @@
 import type { BaseStream } from "@langchain/langgraph-sdk/react";
 import { createContext, useContext } from "react";
 
-import type { AgentThreadState } from "@/core/threads";
+import type { AgentThreadState } from "@/features/threads";
 
 /** 定义消息子树读取当前线程数据所需的最小上下文契约。 */
 export interface ThreadContextType {

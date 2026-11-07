@@ -56,7 +56,6 @@ IGNORE_PATTERNS = [
     "htmlcov",
     ".pytest_cache",
     ".mypy_cache",
-    ".ruff_cache",
 ]
 
 DEFAULT_MAX_FILE_SIZE_BYTES = 1_000_000

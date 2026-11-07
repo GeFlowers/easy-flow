@@ -28,7 +28,7 @@ class Article:
             markdown += f"# {self.title}\n\n"
 
         if self.html_content is None or not str(self.html_content).strip():
-            markdown += "*No content available*\n"
+            markdown += "*暂无可用内容*\n"
         else:
             markdown += md(self.html_content)
 
@@ -42,7 +42,7 @@ class Article:
         markdown = self.to_markdown()
 
         if not markdown or not markdown.strip():
-            return [{"type": "text", "text": "No content available"}]
+            return [{"type": "text", "text": "暂无可用内容"}]
 
         parts = re.split(image_pattern, markdown)
 
@@ -57,7 +57,7 @@ class Article:
 
                 # 普通 Markdown 片段以文本块保留，图片 URL 则在上方单独转换。
         if not content:
-            content = [{"type": "text", "text": "No content available"}]
+            content = [{"type": "text", "text": "暂无可用内容"}]
 
         return content
 
@@ -84,10 +84,10 @@ class ReadabilityExtractor:
 
         html_content = article.get("content")
         if not html_content or not str(html_content).strip():
-            html_content = "No content could be extracted from this page"
+            html_content = "未能从此页面提取内容"
 
         title = article.get("title")
         if not title or not str(title).strip():
-            title = "Untitled"
+            title = "无标题"
 
         return Article(title=title, html_content=html_content)

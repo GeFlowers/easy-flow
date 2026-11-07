@@ -1,0 +1,36 @@
+# 本项目仅将数据库放在容器中，应用由本机启动脚本管理。
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: deer-flow-postgres
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-deerflow}
+      POSTGRES_USER: ${POSTGRES_USER:-deerflow}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?请在根目录私有环境文件中设置数据库密码}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - deer-flow-dev
+
+volumes:
+  postgres-data:
+    # 固定现有卷名，改变编排文件位置也不会创建空数据库。
+    name: deer-flow-dev_postgres-data
+    external: true
+
+networks:
+  deer-flow-dev:
+    name: deer-flow-dev_deer-flow-dev
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.200.0/24

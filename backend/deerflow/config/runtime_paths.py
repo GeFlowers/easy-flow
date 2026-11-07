@@ -32,10 +32,11 @@ def resolve_path(value: str | os.PathLike[str], *, base: Path | None = None) -> 
 
 
 def existing_project_file(names: tuple[str, ...]) -> Path | None:
-    '''按候选名称顺序查找项目根目录中的第一个现存文件。'''
+    '''优先查找集中配置目录，并兼容显式项目根下的旧配置位置。'''
     root = project_root()
-    for name in names:
-        candidate = root / name
-        if candidate.is_file():
-            return candidate
+    for directory in (root / 'config', root):
+        for name in names:
+            candidate = directory / name
+            if candidate.is_file():
+                return candidate
     return None

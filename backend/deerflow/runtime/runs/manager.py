@@ -1290,7 +1290,7 @@ class RunManager:
                 刷新最终检查点。只有未能自行结束的运行才标记为 ``interrupted``；若运行在排空期间完成
                 （例如变为 ``success``），则保留真实终态，而不被统一覆盖。整个排空过程（包括最后的状态持久化）
                 都受 ``timeout`` 限制，避免清理卡住或数据库压力导致存储缓慢时工作器无法关闭。这也是防止
-                ``app.gateway.app._SHUTDOWN_HOOK_TIMEOUT_SECONDS`` 所保护的信号重入死锁的前提。
+                ``server.gateway.app._SHUTDOWN_HOOK_TIMEOUT_SECONDS`` 所保护的信号重入死锁的前提。
                 超时后仍活动的运行会被记录，关闭资源时仍可能与其竞争。
         '''
         await self.stop_heartbeat()

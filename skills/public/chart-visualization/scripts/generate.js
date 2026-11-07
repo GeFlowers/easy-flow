@@ -70,7 +70,7 @@ async function generateChartUrl(chartType, options) {
   const data = await httpPost(url, payload);
 
   if (!data.success) {
-    throw new Error(data.errorMessage || "Unknown error");
+    throw new Error(data.errorMessage || "未知错误");
   }
 
   return data.resultObj;
@@ -88,7 +88,7 @@ async function generateMap(tool, inputData) {
   const data = await httpPost(url, payload);
 
   if (!data.success) {
-    throw new Error(data.errorMessage || "Unknown error");
+    throw new Error(data.errorMessage || "未知错误");
   }
 
   return data.resultObj;
@@ -96,7 +96,7 @@ async function generateMap(tool, inputData) {
 
 async function main() {
   if (process.argv.length < 3) {
-    console.error("Usage: node generate.js <spec_json_or_file>");
+    console.error("用法：node generate.js <spec_json_or_file>");
     process.exit(1);
   }
 
@@ -111,7 +111,7 @@ async function main() {
       spec = JSON.parse(specArg);
     }
   } catch (e) {
-    console.error(`Error parsing spec: ${e.message}`);
+    console.error(`解析规范出错： ${e.message}`);
     process.exit(1);
   }
 
@@ -123,14 +123,14 @@ async function main() {
 
     if (!tool) {
       console.error(
-        `Error: 'tool' field missing in spec: ${JSON.stringify(item)}`,
+        `错误：规范缺少 'tool' 字段： ${JSON.stringify(item)}`,
       );
       continue;
     }
 
     const chartType = CHART_TYPE_MAP[tool];
     if (!chartType) {
-      console.error(`Error: Unknown tool '${tool}'`);
+      console.error(`错误：未知工具 '${tool}'`);
       continue;
     }
 
@@ -157,7 +157,7 @@ async function main() {
         console.log(url);
       }
     } catch (e) {
-      console.error(`Error generating chart for ${tool}: ${e.message}`);
+      console.error(`为 ${tool} 生成图表时出错： ${e.message}`);
     }
   }
 }

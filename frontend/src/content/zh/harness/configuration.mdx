@@ -16,12 +16,12 @@ DeerFlow 的配置系统围绕一个目标设计：每一个有意义的行为�
 
 ## 配置文件位置
 
-DeerFlow 使用以下优先级顺序解析 `config.yaml`：
+DeerFlow 使用以下优先级顺序解析 `config/config.yaml`：
 
 1. 显式传递给 `AppConfig.from_file(config_path)` 的路径。
 2. `DEER_FLOW_CONFIG_PATH` 环境变量。
 3. `backend/config.yaml`（相对于后端目录）。
-4. 仓库根目录中的 `config.yaml`。
+4. 仓库根目录中的 `config/config.yaml`。
 
 如果这些路径都不存在，应用程序在启动时会报错。
 
@@ -64,7 +64,7 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
 
 tools:
-  - use: deerflow.community.tavily.tools:web_search_tool
+  - use: deerflow.integrations.tavily.tools:web_search_tool
     api_key: $TAVILY_API_KEY
 ```
 
@@ -83,25 +83,9 @@ models:
     some_provider_specific_option: value # 传递给 ChatOpenAI 构造函数
 ```
 
-## 配置版本
-
-`config.yaml` 包含追踪 schema 版本的 `config_version` 字段：
-
-```yaml
-config_version: 6
-```
-
-当 schema 更改（新字段、重命名章节）时，此数字增加。如果你本地的 `config.yaml` 落后于当前版本，运行：
-
-```bash
-make config-upgrade
-```
-
-这将 `config.example.yaml` 中的新字段合并到你现有的 `config.yaml` 中，而不覆盖你的自定义内容。
-
 ## 模块配置速查表
 
-下表将 `config.yaml` 中的每个顶层章节映射到其文档页面：
+下表将 `config/config.yaml` 中的每个顶层章节映射到其文档页面：
 
 | 章节              | 描述                                         | 文档                                                 |
 | ----------------- | -------------------------------------------- | ---------------------------------------------------- |
@@ -126,11 +110,9 @@ make config-upgrade
 
 ## 最小配置示例
 
-最小有效的 `config.yaml` 至少需要一个模型和一个沙箱：
+最小有效的 `config/config.yaml` 至少需要一个模型和一个沙箱：
 
 ```yaml
-config_version: 6
-
 models:
   - name: gpt-4o
     use: langchain_openai:ChatOpenAI
@@ -144,15 +126,15 @@ sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
 
 tools:
-  - use: deerflow.community.ddg_search.tools:web_search_tool
-  - use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool
+  - use: deerflow.integrations.jina_ai.tools:web_fetch_tool
   - use: deerflow.sandbox.tools:ls_tool
   - use: deerflow.sandbox.tools:read_file_tool
   - use: deerflow.sandbox.tools:write_file_tool
   - use: deerflow.sandbox.tools:bash_tool
 ```
 
-从仓库根目录的 `config.example.yaml` 开始，取消注释你需要的章节。
+从仓库根目录的 `config/config.example.yaml` 开始，取消注释你需要的章节。
 
 <Cards num={2}>
   <Cards.Card title="部署指南" href="/docs/application/deployment-guide" />

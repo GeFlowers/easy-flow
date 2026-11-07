@@ -1,159 +1,43 @@
 ---
 title: Operations and Troubleshooting
-description: This page covers day-to-day operational tasks and solutions to common problems when running DeerFlow App.
+description: Local service logs, restarts, connectivity checks and backups.
 ---
-
-import { Callout } from "nextra/components";
 
 # Operations and Troubleshooting
 
-This page covers day-to-day operational tasks and solutions to common problems when running DeerFlow App.
+## Logs and status
 
-## Log files
-
-View service logs with the Docker Compose commands:
-
-| Service | Command |
-| ------- | ------- |
-| All services | `make docker-logs` |
-| Gateway | `make docker-logs-gateway` |
-| Frontend | `make docker-logs-frontend` |
-
-Tail logs in real time:
+Application logs are in the project `logs` directory. Inspect database logs with your container manager; Nginx logs are in its installation directory.
 
 ```bash
-make docker-logs-gateway
+Get-Content logs/gateway.err.log -Tail 50
+Get-Content logs/frontend.err.log -Tail 50
 ```
 
-Adjust the runtime log level in `config.yaml`:
-
-```yaml
-log_level: debug # debug | info | warning | error
-```
-
-## Health checks
-
-Verify each service is responding:
-
-```bash
-# Gateway health
-curl http://localhost:8001/health
-
-# Through nginx (verifies full proxy chain)
-curl http://localhost:2026/api/models
-```
-
-## Config upgrade
-
-When you pull a new version of DeerFlow, the `config_version` in `config.example.yaml` may be higher than your `config.yaml`. To merge new fields without losing your customizations:
-
-```bash
-make config-upgrade
-```
-
-Check the current version in your config:
-
-```bash
-grep config_version config.yaml
-```
+Check for credentials before sharing logs. Do not print the entire environment file.
 
 ## Common problems
 
-### The app loads but the agent doesn't respond
+- Unavailable upstream: start the application with `bash scripts/start.sh` and inspect its logs. Nginx boot startup does not start the frontend or backend.
+- Database connection failure: verify the container, original volume, local address and credentials. Do not replace a missing migration source with an empty volume.
+- Redis connection failure: check the local service, connection address and authentication settings.
+- Port conflict: the launcher refuses to start; identify the owner instead of terminating all processes with the same name.
+- Model request failure: check model configuration, credential availability and connectivity without exposing credentials.
+- Build failure: run `corepack pnpm build` in the frontend directory; see the quick start for dependency installation.
+- Tool or file failure: check host paths and account permissions. The sandbox no longer resolves paths inside an application container.
 
-1. Check the Gateway logs with `make docker-logs-gateway`.
-2. Verify your model is correctly configured in `config.yaml` with a valid API key.
-3. Confirm the API key is set in the project-root `.env` file.
-4. Test the model endpoint directly with `curl` to rule out network issues.
-
----
-
-### Model API errors in the agent response
-
-The agent reports an error like `"No chat models are configured"` or `"model not found"`:
-
-- Check that the `models:` section in `config.yaml` has at least one entry.
-- Verify the `name:` field matches what you are requesting in the UI.
-- Check that `api_key:` is referencing the correct environment variable and that the variable is set.
-
----
-
-### Frontend build fails with `BETTER_AUTH_SECRET`
-
-```
-Error: BETTER_AUTH_SECRET is required
-```
-
-Set the environment variable before building:
+## Updating and restarting
 
 ```bash
-export BETTER_AUTH_SECRET=$(openssl rand -base64 32)
-pnpm build
+bash scripts/stop.sh
+cd frontend && corepack pnpm build && cd ..
+bash scripts/start.sh
 ```
 
-Or set it in your `.env` file at the repo root.
+Reinstall dependencies after they change. Restart the frontend and backend after environment changes; reloading Nginx alone does not reload their environment.
 
----
+## Backups
 
-### Sandbox-related tool failures
+Back up PostgreSQL, the complete `backend/.deer-flow` directory and private configuration separately. Normal backend shutdown flushes queued memory updates; do not replace it with forcibly terminating the process.
 
-If file tools (`read_file`, `ls`, `bash`) fail with permission or path errors:
-
-1. For `LocalSandboxProvider`: check that `allow_host_bash` is set correctly and that the agent has read/write access to the thread data directory.
-
----
-
-### PostgreSQL connection failures
-
-If Gateway cannot connect during startup or persistence API calls fail, verify that `.env` contains a reachable `DATABASE_URL` and that its database user can create tables and apply migrations:
-
-```yaml
-database:
-  backend: postgres
-  postgres_url: $DATABASE_URL
-
-run_events:
-  backend: db
-```
-
----
-
-### MCP tools not loading
-
-If MCP tools appear in `extensions_config.json` but are not available in the agent:
-
-1. Check Gateway logs with `make docker-logs-gateway` for MCP initialization errors.
-2. Verify the MCP server command is installed (`npx`, `uvx`, or the relevant binary).
-3. Test the server command manually to confirm it starts without errors.
-4. Set `log_level: debug` to see detailed MCP loading output.
-
----
-
-### Memory not persisting across sessions
-
-- Verify `memory.enabled: true` in `config.yaml`.
-- Check that the storage path is writable: `ls -la backend/.deer-flow/`.
-- Look for memory update errors in the Gateway logs (search for "memory").
-
-## Data backup
-
-Back up the storage backends you use:
-
-- `backend/.deer-flow/threads/` for thread working directories, uploads, and artifacts.
-- `backend/.deer-flow/memory.json` and `backend/.deer-flow/agents/` for learned memory.
-- Regular PostgreSQL database dumps for checkpoints, Store data, and application records.
-- The legacy `checkpointer.connection_string` file if your deployment still configures a standalone `checkpointer`.
-
-In Docker deployments, back up the bind-mounted host paths rather than the container filesystem.
-
-## Restarting services
-
-Use `make docker-stop` to stop the stack and `make docker-start` to build and start it again.
-
-<Cards num={2}>
-  <Cards.Card
-    title="Deployment Guide"
-    href="/docs/application/deployment-guide"
-  />
-  <Cards.Card title="Configuration" href="/docs/application/configuration" />
-</Cards>
+[Deployment Guide](/docs/application/deployment-guide)

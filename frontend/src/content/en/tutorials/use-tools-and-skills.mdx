@@ -11,15 +11,15 @@ This tutorial shows you how to configure and use tools and skills in DeerFlow to
 
 ## Configuring tools
 
-Add tools to `config.yaml`:
+Add tools to `config/config.yaml`:
 
 ```yaml
 tools:
   # Web search
-  - use: deerflow.community.ddg_search.tools:web_search_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool
 
   # Web content fetching
-  - use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - use: deerflow.integrations.jina_ai.tools:web_fetch_tool
 
   # Sandbox file operations
   - use: deerflow.sandbox.tools:ls_tool
@@ -30,7 +30,7 @@ tools:
 
 ## Enabling skills
 
-Enable skills through the DeerFlow app's extensions panel, or edit `extensions_config.json` directly.
+Enable skills through the DeerFlow app's extensions panel, or edit `config/extensions_config.json` directly.
 
 **Via the app UI:**
 

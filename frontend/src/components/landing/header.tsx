@@ -2,8 +2,8 @@ import { GitHubLogoIcon } from "@radix-ui/react-icons";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import type { Locale } from "@/core/i18n/locale";
-import { getI18n } from "@/core/i18n/server";
+import type { Locale } from "@/features/i18n/locale";
+import { getI18n } from "@/features/i18n/server";
 import { cn } from "@/lib/utils";
 
 import { MobileNav } from "./mobile-nav";

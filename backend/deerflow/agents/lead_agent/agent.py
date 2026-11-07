@@ -33,7 +33,6 @@ from deerflow.config.app_config import AppConfig, get_app_config
 from deerflow.config.memory_config import should_use_memory_tools
 from deerflow.config.subagents_config import DEFAULT_MAX_TOTAL_SUBAGENTS_PER_RUN
 from deerflow.models import create_chat_model
-from deerflow.skills.tool_policy import ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES, filter_tools_by_skill_allowed_tools
 from deerflow.skills.types import Skill
 from deerflow.tracing import build_tracing_callbacks
 
@@ -105,95 +104,89 @@ def _create_todo_list_middleware(is_plan_mode: bool) -> TodoMiddleware | None:
     # 与 DeerFlow 风格一致的自定义提示词。
     system_prompt = """
 <todo_list_system>
-You have access to the `write_todos` tool to help you manage and track complex multi-step objectives.
+可以使用 `write_todos` 管理并跟踪复杂的多步骤目标。
 
-**CRITICAL RULES:**
-- Mark todos as completed IMMEDIATELY after finishing each step - do NOT batch completions
-- Keep EXACTLY ONE task as `in_progress` at any time (unless tasks can run in parallel)
-- Update the todo list in REAL-TIME as you work - this gives users visibility into your progress
-- DO NOT use this tool for simple tasks (< 3 steps) - just complete them directly
+**必须遵守：**
+- 每完成一步立即标记为 completed，不得集中补记。
+- 除可并行任务外，任何时候都恰好只有一项处于 `in_progress`。
+- 工作中实时更新待办，让用户看到实际进度。
+- 少于三步的简单任务直接完成，不使用此工具。
 
-**When to Use:**
-This tool is designed for complex objectives that require systematic tracking:
-- Complex multi-step tasks requiring 3+ distinct steps
-- Non-trivial tasks needing careful planning and execution
-- User explicitly requests a todo list
-- User provides multiple tasks (numbered or comma-separated list)
-- The plan may need revisions based on intermediate results
+**适用情况：**
+本工具用于需要系统跟踪的复杂目标：
+- 至少三个明确步骤的复杂任务。
+- 需要认真规划和执行的非简单任务。
+- 用户明确要求待办列表。
+- 用户列出多项任务，无论编号还是逗号分隔。
+- 可能需要根据中间结果调整计划。
 
-**When NOT to Use:**
-- Single, straightforward tasks
-- Trivial tasks (< 3 steps)
-- Purely conversational or informational requests
-- Simple tool calls where the approach is obvious
+**不适用情况：**
+- 单项且直接的任务。
+- 少于三步的简单工作。
+- 纯聊天或信息问答。
+- 做法明确的简单工具调用。
 
-**Best Practices:**
-- Break down complex tasks into smaller, actionable steps
-- Use clear, descriptive task names
-- Remove tasks that become irrelevant
-- Add new tasks discovered during implementation
-- Don't be afraid to revise the todo list as you learn more
+**建议做法：**
+- 将复杂任务拆为较小、可执行的步骤。
+- 使用清楚、能说明内容的任务名称。
+- 移除已不相关的事项。
+- 补充执行中发现的新事项。
+- 随着了解深入及时修订待办。
 
-**Task Management:**
-Writing todos takes time and tokens - use it when helpful for managing complex problems, not for simple requests.
+**任务管理：**
+编写待办会消耗时间和令牌，应在有助于管理复杂问题时使用，不用于简单请求。
 </todo_list_system>
 """
 
-    tool_description = """Use this tool to create and manage a structured task list for complex work sessions.
+    tool_description = """为复杂工作创建并管理结构化任务列表。
 
-**IMPORTANT: Only use this tool for complex tasks (3+ steps). For simple requests, just do the work directly.**
+**重要：仅用于至少三步的复杂任务。简单请求直接执行。**
 
+适用情况：
+1. **复杂多步骤任务**：至少需要三个明确步骤或操作。
+2. **非简单任务**：需要认真规划或多次操作。
+3. **用户明确要求待办**：用户直接要求跟踪任务。
+4. **多项任务**：用户给出了待处理事项列表。
+5. **动态规划**：需要根据中间结果更新计划。
 
-Use this tool in these scenarios:
-1. **Complex multi-step tasks**: When a task requires 3 or more distinct steps or actions
-2. **Non-trivial tasks**: Tasks requiring careful planning or multiple operations
-3. **User explicitly requests todo list**: When the user directly asks you to track tasks
-4. **Multiple tasks**: When users provide a list of things to be done
-5. **Dynamic planning**: When the plan may need updates based on intermediate results
+以下情况不使用：
+1. 做法直接且少于三步。
+2. 任务简单，跟踪没有收益。
+3. 纯聊天或信息问答。
+4. 目标明确，可以直接完成。
 
+1. **开始任务**：开工前标记 `in_progress`。
+2. **完成任务**：结束后立即标记 `completed`。
+3. **更新列表**：按需新增、移除或修订描述。
+4. **多项更新**：可一次完成多项状态调整，例如结束一项并开始下一项。
 
-Skip this tool when:
-1. The task is straightforward and takes less than 3 steps
-2. The task is trivial and tracking provides no benefit
-3. The task is purely conversational or informational
-4. It's clear what needs to be done and you can just do it
+- `pending`：尚未开始。
+- `in_progress`：正在处理；可并行的事项允许同时处于此状态。
+- `completed`：已成功完成。
 
+**重要：只有完全完成的任务才能标记 completed。**
 
-1. **Starting a task**: Mark it as `in_progress` BEFORE beginning work
-2. **Completing a task**: Mark it as `completed` IMMEDIATELY after finishing
-3. **Updating the list**: Add new tasks, remove irrelevant ones, or update descriptions as needed
-4. **Multiple updates**: You can make several updates at once (e.g., complete one task and start the next)
+以下情况不得标记完成：
+- 仍有未解决的问题或错误。
+- 工作只完成一部分。
+- 遇到阻碍，无法完成。
+- 缺少必要资源或依赖。
+- 尚未达到质量要求。
 
+遇阻时保留 `in_progress`，另建事项说明需要解决的问题。
 
-- `pending`: Task not yet started
-- `in_progress`: Currently working on (can have multiple if tasks run in parallel)
-- `completed`: Task finished successfully
+- 创建具体且可执行的事项。
+- 将复杂任务拆成较小、便于管理的步骤。
+- 使用清楚、能说明内容的任务名。
+- 实时更新状态。
+- 完成后立即标记，不要集中补记。
+- 移除不再相关的事项。
+- **重要**：首次写入列表时，立即把首项或首批标记为 `in_progress`。
+- **重要**：除非全部完成，否则至少有一项处于 `in_progress`，以反映实际进度。
 
+主动管理任务有助于完整覆盖需求并确认完成情况。
 
-**CRITICAL: Only mark a task as completed when you have FULLY accomplished it.**
-
-Never mark a task as completed if:
-- There are unresolved issues or errors
-- Work is partial or incomplete
-- You encountered blockers preventing completion
-- You couldn't find necessary resources or dependencies
-- Quality standards haven't been met
-
-If blocked, keep the task as `in_progress` and create a new task describing what needs to be resolved.
-
-
-- Create specific, actionable items
-- Break complex tasks into smaller, manageable steps
-- Use clear, descriptive task names
-- Update task status in real-time as you work
-- Mark tasks complete IMMEDIATELY after finishing (don't batch completions)
-- Remove tasks that are no longer relevant
-- **IMPORTANT**: When you write the todo list, mark your first task(s) as `in_progress` immediately
-- **IMPORTANT**: Unless all tasks are completed, always have at least one task `in_progress` to show progress
-
-Being proactive with task management demonstrates thoroughness and ensures all requirements are completed successfully.
-
-**Remember**: If you only need a few tool calls to complete a task and it's clear what to do, it's better to just do the task directly and NOT use this tool at all.
+**提醒**：如果做法明确且只需少量工具调用，直接执行，不使用待办工具。
 """
 
     return TodoMiddleware(system_prompt=system_prompt, tool_description=tool_description)
@@ -236,6 +229,16 @@ def build_middlewares(
     from deerflow.agents.middlewares.skill_activation_middleware import SkillActivationMiddleware
 
     middlewares.append(SkillActivationMiddleware(available_skills=available_skills, app_config=resolved_app_config, user_id=user_id))
+
+    from deerflow.agents.middlewares.skill_tool_policy_middleware import SkillToolPolicyMiddleware
+
+    middlewares.append(
+        SkillToolPolicyMiddleware(
+            skills=_load_enabled_skills_for_tool_policy(available_skills, app_config=resolved_app_config, user_id=user_id),
+            skills_root=resolved_app_config.skills.container_path,
+            read_tool_names=resolved_app_config.summarization.skill_file_read_tool_names,
+        )
+    )
 
     # 在摘要压缩前捕获已完成的任务委派和已加载的技能文件，再把持久上下文通道
     # （摘要、台账和技能）注入模型调用。
@@ -475,7 +478,8 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
             container_base_path=container_base_path,
         )
         raw_tools = get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled, app_config=resolved_app_config) + [setup_agent]
-        filtered = filter_tools_by_skill_allowed_tools(raw_tools, skills_for_tool_policy, always_allowed_tool_names=ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES)
+        # 技能目录用于发现，不参与全局工具授权；本轮激活后的限制由中间件执行。
+        filtered = list(raw_tools)
         if non_interactive:
             filtered = [tool for tool in filtered if tool.name not in _NON_INTERACTIVE_DISABLED_TOOL_NAMES]
         final_tools, setup = assemble_deferred_tools(filtered, enabled=resolved_app_config.tool_search.enabled)
@@ -532,7 +536,7 @@ def _make_lead_agent(config: RunnableConfig, *, app_config: AppConfig):
     extra_tools = [update_agent] if agent_name and not is_webhook_channel else []
     # 默认主代理，保持既有行为。
     raw_tools = get_available_tools(model_name=model_name, groups=agent_config.tool_groups if agent_config else None, subagent_enabled=subagent_enabled, app_config=resolved_app_config)
-    filtered = filter_tools_by_skill_allowed_tools(raw_tools + extra_tools, skills_for_tool_policy, always_allowed_tool_names=ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES)
+    filtered = raw_tools + extra_tools
     if non_interactive:
         filtered = [tool for tool in filtered if tool.name not in _NON_INTERACTIVE_DISABLED_TOOL_NAMES]
     final_tools, setup = assemble_deferred_tools(filtered, enabled=resolved_app_config.tool_search.enabled)

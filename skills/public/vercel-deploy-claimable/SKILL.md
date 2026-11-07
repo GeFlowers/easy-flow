@@ -1,58 +1,59 @@
 ---
 name: vercel-deploy
-description: Deploy applications and websites to Vercel. Use this skill when the user requests deployment actions such as "Deploy my app", "Deploy this to production", "Create a preview deployment", "Deploy and give me the link", or "Push this live". No authentication required - returns preview URL and claimable deployment link.
+description: 将应用和网站部署到 Vercel。用户要求“部署我的应用”、“部署到生产环境”、“创建预览部署”、“部署并给我链接”或“上线”时使用。无需身份验证，返回预览地址和可认领的部署链接。
 metadata:
   author: vercel
   version: "1.0.0"
 ---
 
-# Vercel Deploy
+# Vercel 部署
 
-Deploy any project to Vercel instantly. No authentication required.
+立即将任意项目部署到 Vercel，无需身份验证。
 
-## How It Works
+## 工作方式
 
-1. Packages your project into a tarball (excludes `node_modules` and `.git`)
-2. Auto-detects framework from `package.json`
-3. Uploads to deployment service
-4. Returns **Preview URL** (live site) and **Claim URL** (transfer to your Vercel account)
+1. 将项目打包为归档文件，排除 `node_modules` 和 `.git`。
+2. 根据 `package.json` 自动识别框架。
+3. 上传至部署服务。
+4. 返回**预览地址**（在线网站）与**认领地址**（转移到你的 Vercel 账户）。
 
-## Usage
+## 用法
 
 ```bash
 bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh [path]
 ```
 
-**Arguments:**
-- `path` - Directory to deploy, or a `.tgz` file (defaults to current directory)
+**参数：**
 
-**Examples:**
+- `path`：待部署目录或 `.tgz` 文件，默认当前目录。
+
+**示例：**
 
 ```bash
-# Deploy current directory
+# 部署当前目录
 bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh
 
-# Deploy specific project
+# 部署指定项目
 bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh /path/to/project
 
-# Deploy existing tarball
+# 部署已有归档文件
 bash /mnt/skills/user/vercel-deploy/scripts/deploy.sh /path/to/project.tgz
 ```
 
-## Output
+## 输出
 
 ```
-Preparing deployment...
-Detected framework: nextjs
-Creating deployment package...
-Deploying...
-✓ Deployment successful!
+正在准备部署……
+检测到框架：nextjs
+正在创建部署包……
+正在部署……
+✓ 部署成功！
 
-Preview URL: https://skill-deploy-abc123.vercel.app
-Claim URL:   https://vercel.com/claim-deployment?code=...
+预览地址：https://skill-deploy-abc123.vercel.app
+认领地址：https://vercel.com/claim-deployment?code=...
 ```
 
-The script also outputs JSON to stdout for programmatic use:
+脚本也会向标准输出写出 JSON（JavaScript Object Notation，JavaScript 对象表示法），供程序使用：
 
 ```json
 {
@@ -63,50 +64,51 @@ The script also outputs JSON to stdout for programmatic use:
 }
 ```
 
-## Framework Detection
+## 框架检测
 
-The script auto-detects frameworks from `package.json`. Supported frameworks include:
+脚本根据 `package.json` 自动识别框架，支持：
 
-- **React**: Next.js, Gatsby, Create React App, Remix, React Router
-- **Vue**: Nuxt, Vitepress, Vuepress, Gridsome
-- **Svelte**: SvelteKit, Svelte, Sapper
-- **Other Frontend**: Astro, Solid Start, Angular, Ember, Preact, Docusaurus
-- **Backend**: Express, Hono, Fastify, NestJS, Elysia, h3, Nitro
-- **Build Tools**: Vite, Parcel
-- **And more**: Blitz, Hydrogen, RedwoodJS, Storybook, Sanity, etc.
+- **React：** Next.js、Gatsby、Create React App、Remix、React Router。
+- **Vue：** Nuxt、Vitepress、Vuepress、Gridsome。
+- **Svelte：** SvelteKit、Svelte、Sapper。
+- **其他前端：** Astro、Solid Start、Angular、Ember、Preact、Docusaurus。
+- **后端：** Express、Hono、Fastify、NestJS、Elysia、h3、Nitro。
+- **构建工具：** Vite、Parcel。
+- **更多：** Blitz、Hydrogen、RedwoodJS、Storybook、Sanity 等。
 
-For static HTML projects (no `package.json`), framework is set to `null`.
+静态 HTML（HyperText Markup Language，超文本标记语言）项目没有 `package.json`，框架设置为 `null`。
 
-## Static HTML Projects
+## 静态网页项目
 
-For projects without a `package.json`:
-- If there's a single `.html` file not named `index.html`, it gets renamed automatically
-- This ensures the page is served at the root URL (`/`)
+对于没有 `package.json` 的项目：
 
-## Present Results to User
+- 如果只有一个 `.html` 文件且不叫 `index.html`，自动将其重命名。
+- 这样页面即可通过根路径 `/` 访问。
 
-Always show both URLs:
+## 向用户展示结果
 
-```
-✓ Deployment successful!
-
-- [Preview URL](https://skill-deploy-abc123.vercel.app)
-- [Claim URL](https://vercel.com/claim-deployment?code=...)
-
-View your site at the Preview URL.
-To transfer this deployment to your Vercel account, visit the Claim URL.
-```
-
-## Troubleshooting
-
-### Network Egress Error
-
-If deployment fails due to network restrictions (common on claude.ai), tell the user:
+始终展示两个地址：
 
 ```
-Deployment failed due to network restrictions. To fix this:
+✓ 部署成功！
 
-1. Go to https://claude.ai/settings/capabilities
-2. Add *.vercel.com to the allowed domains
-3. Try deploying again
+- [预览地址](https://skill-deploy-abc123.vercel.app)
+- [认领地址](https://vercel.com/claim-deployment?code=...)
+
+访问预览地址查看网站。
+如需将此次部署转移到你的 Vercel 账户，请访问认领地址。
+```
+
+## 排错
+
+### 网络出站错误
+
+如果因为网络限制部署失败（claude.ai 上较常见），告知用户：
+
+```
+由于网络限制，部署失败。请按以下方式处理：
+
+1. 访问 https://claude.ai/settings/capabilities
+2. 将 *.vercel.com 添加到允许的域名
+3. 再次尝试部署
 ```

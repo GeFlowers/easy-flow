@@ -41,7 +41,7 @@ Commands run in an [E2B](https://e2b.dev) cloud micro-VM. Each thread is bound t
 
 ```yaml
 sandbox:
-  use: deerflow.community.e2b_sandbox:E2BSandboxProvider
+  use: deerflow.integrations.e2b_sandbox:E2BSandboxProvider
 
   # Required: e2b API key. Falls back to the E2B_API_KEY environment variable.
   api_key: $E2B_API_KEY
@@ -77,9 +77,9 @@ sandbox:
     OPENAI_API_KEY: $OPENAI_API_KEY
 ```
 
-Install: `e2b-code-interpreter` is already a core dependency of `deer-flow`, so no extra install step is needed — just provide your API key and switch the provider in `config.yaml`.
+Install: `e2b-code-interpreter` is already a core dependency of `deer-flow`, so no extra install step is needed — just provide your API key and switch the provider in `config/config.yaml`.
 
-Get an API key at [e2b.dev/dashboard](https://e2b.dev/dashboard) and either set `sandbox.api_key` directly in `config.yaml` or export `E2B_API_KEY` in your `.env`.
+Get an API key at [e2b.dev/dashboard](https://e2b.dev/dashboard) and either set `sandbox.api_key` directly in `config/config.yaml` or export `E2B_API_KEY` in your `.env`.
 
 <Callout type="info">
   Because e2b is a remote sandbox, DeerFlow's `/mnt/user-data` virtual prefix is
@@ -116,31 +116,18 @@ sandbox:
   `/mnt/skills`, `/mnt/acp-workspace`, or `/mnt/user-data`.
 </Callout>
 
-When `LocalSandboxProvider` runs under Docker development (`make docker-start`), the
-provider runs inside the `deer-flow-gateway` container. In that mode,
-`host_path` is resolved from the gateway container's filesystem, not directly
-from your Docker host. Bind the host directory into the gateway service first,
-then use the in-container path in `config.yaml`:
-
-```yaml
-# docker/docker-compose-dev.yaml
-services:
-  gateway:
-    volumes:
-      - ${DEER_FLOW_REPO_ROOT}/.deer-flow/knowledge:/app/.deer-flow/knowledge:ro
-```
+The backend now runs directly on Windows. `host_path` resolves against the host filesystem, without an application-container bind mount. For example:
 
 ```yaml
 sandbox:
   use: deerflow.sandbox.local:LocalSandboxProvider
   mounts:
-    - host_path: /app/.deer-flow/knowledge
+    - host_path: D:/Knowledge
       container_path: /mnt/knowledge
       read_only: true
 ```
 
-If the configured `host_path` is not visible to the gateway process, DeerFlow
-logs an error and ignores that mount.
+The `container_path` is a virtual tool path; it does not start a Docker sandbox. Check the host path and backend account permissions if files are unavailable. Arbitrary commands execute with that account's host permissions, so path mapping is not strong process isolation.
 
 ## Output truncation
 

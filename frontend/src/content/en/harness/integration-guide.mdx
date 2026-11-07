@@ -117,7 +117,7 @@ load_config()
 app = FastAPI()
 
 # Mount the DeerFlow gateway router
-from deerflow.app.gateway.main import app as gateway_app
+from server.gateway.app import app as gateway_app
 app.mount("/deerflow", gateway_app)
 ```
 

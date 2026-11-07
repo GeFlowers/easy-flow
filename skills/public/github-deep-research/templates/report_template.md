@@ -1,55 +1,55 @@
-[!NOTE] Generate this report in user's own language.
+[!NOTE] 使用用户自己的语言生成本报告。
 
 # {TITLE}
 
-- **Research Date:** {DATE}
-- **Timestamp:** {TIMESTAMP}
-- **Confidence Level:** {CONFIDENCE_LEVEL}
-- **Subject:** {SUBJECT_DESCRIPTION}
+- **研究日期：** {DATE}
+- **时间戳：** {TIMESTAMP}
+- **置信程度：** {CONFIDENCE_LEVEL}
+- **研究对象：** {SUBJECT_DESCRIPTION}
 
 ---
 
-## Repository Information
+## 仓库信息
 
-- **Name:** {REPOSITORY_NAME}
-- **Description:** {REPOSITORY_DESCRIPTION}
-- **URL:** {REPOSITORY_URL}
-- **Stars:** {REPOSITORY_STARS}
-- **Forks:** {REPOSITORY_FORKS}
-- **Open Issues:** {REPOSITORY_OPEN_ISSUES}
-- **Language(s):** {REPOSITORY_LANGUAGES}
-- **License:** {REPOSITORY_LICENSE}
-- **Created At:** {REPOSITORY_CREATED_AT}
-- **Updated At:** {REPOSITORY_UPDATED_AT}
-- **Pushed At:** {REPOSITORY_PUSHED_AT}
-- **Topics:** {REPOSITORY_TOPICS}
+- **名称：** {REPOSITORY_NAME}
+- **说明：** {REPOSITORY_DESCRIPTION}
+- **地址：** {REPOSITORY_URL}
+- **星标数：** {REPOSITORY_STARS}
+- **派生数：** {REPOSITORY_FORKS}
+- **未解决问题：** {REPOSITORY_OPEN_ISSUES}
+- **语言：** {REPOSITORY_LANGUAGES}
+- **许可证：** {REPOSITORY_LICENSE}
+- **创建时间：** {REPOSITORY_CREATED_AT}
+- **更新时间：** {REPOSITORY_UPDATED_AT}
+- **推送时间：** {REPOSITORY_PUSHED_AT}
+- **主题：** {REPOSITORY_TOPICS}
 
 ---
 
-## Executive Summary
+## 执行摘要
 
 {EXECUTIVE_SUMMARY}
 
-**IMPORTANT**: Include inline citations using `[citation:Title](URL)` format after each claim. Example:
-"The project gained 10k stars in 3 months [citation:GitHub Stats](https://github.com/owner/repo)."
+**重要：** 每个论断后使用 `[citation:标题](URL)` 格式加入行内引用。例如：
+“项目三个月内获得一万个星标 [citation:GitHub 统计](https://github.com/owner/repo)。”
 
 ---
 
-## Complete Chronological Timeline
+## 完整时间线
 
-### PHASE 1: {PHASE_1_NAME}
+### 第 1 阶段： {PHASE_1_NAME}
 
 #### {PHASE_1_PERIOD}
 
 {PHASE_1_CONTENT}
 
-### PHASE 2: {PHASE_2_NAME}
+### 第 2 阶段： {PHASE_2_NAME}
 
 #### {PHASE_2_PERIOD}
 
 {PHASE_2_CONTENT}
 
-### PHASE 3: {PHASE_3_NAME}
+### 第 3 阶段： {PHASE_3_NAME}
 
 #### {PHASE_3_PERIOD}
 
@@ -57,9 +57,9 @@
 
 ---
 
-## Key Analysis
+## 核心分析
 
-**IMPORTANT**: Support each analysis point with inline citations `[citation:Title](URL)`.
+**重要：** 每个分析观点都应有 `[citation:标题](URL)` 行内引用支持。
 
 ### {ANALYSIS_SECTION_1_TITLE}
 
@@ -71,30 +71,30 @@
 
 ---
 
-## Architecture / System Overview
+## 架构／系统概览
 
 ```mermaid
 flowchart TD
-    A[Component A] --> B[Component B]
-    B --> C[Component C]
-    C --> D[Component D]
+    A[组件甲] --> B[组件乙]
+    B --> C[组件丙]
+    C --> D[组件丁]
 ```
 
 {ARCHITECTURE_DESCRIPTION}
 
 ---
 
-## Metrics & Impact Analysis
+## 指标与影响分析
 
-### Growth Trajectory
+### 增长轨迹
 
 ```
 {METRICS_TIMELINE}
 ```
 
-### Key Metrics
+### 关键指标
 
-| Metric | Value | Assessment |
+| 指标 | 数值 | 评估 |
 |--------|-------|------------|
 | {METRIC_1} | {VALUE_1} | {ASSESSMENT_1} |
 | {METRIC_2} | {VALUE_2} | {ASSESSMENT_2} |
@@ -102,91 +102,91 @@ flowchart TD
 
 ---
 
-## Comparative Analysis
+## 比较分析
 
-### Feature Comparison
+### 功能比较
 
-| Feature | {SUBJECT} | {COMPETITOR_1} | {COMPETITOR_2} |
+| 功能 | {SUBJECT} | {COMPETITOR_1} | {COMPETITOR_2} |
 |---------|-----------|----------------|----------------|
 | {FEATURE_1} | {SUBJ_F1} | {COMP1_F1} | {COMP2_F1} |
 | {FEATURE_2} | {SUBJ_F2} | {COMP1_F2} | {COMP2_F2} |
 | {FEATURE_3} | {SUBJ_F3} | {COMP1_F3} | {COMP2_F3} |
 
-### Market Positioning
+### 市场定位
 
 {MARKET_POSITIONING}
 
 ---
 
-## Strengths & Weaknesses
+## 优势与劣势
 
-### Strengths
+### 优势
 
 {STRENGTHS}
 
-### Areas for Improvement
+### 待改进方面
 
 {WEAKNESSES}
 
 ---
 
-## Key Success Factors
+## 关键成功因素
 
 {SUCCESS_FACTORS}
 
 ---
 
-## Sources
+## 来源
 
-### Primary Sources
+### 一手来源
 
 {PRIMARY_SOURCES}
 
-### Media Coverage
+### 媒体报道
 
 {MEDIA_SOURCES}
 
-### Academic / Technical Sources
+### 学术／技术来源
 
 {ACADEMIC_SOURCES}
 
-### Community Sources
+### 社区来源
 
 {COMMUNITY_SOURCES}
 
 ---
 
-## Confidence Assessment
+## 置信度评估
 
-**High Confidence (90%+) Claims:**
+**高置信度（90%以上）论断：**
 {HIGH_CONFIDENCE_CLAIMS}
 
-**Medium Confidence (70-89%) Claims:**
+**中等置信度（70–89%）论断：**
 {MEDIUM_CONFIDENCE_CLAIMS}
 
-**Lower Confidence (50-69%) Claims:**
+**较低置信度（50–69%）论断：**
 {LOW_CONFIDENCE_CLAIMS}
 
 ---
 
-## Research Methodology
+## 研究方法
 
-This report was compiled using:
+本报告采用以下方法：
 
-1. **Multi-source web search** - Broad discovery and targeted queries
-2. **GitHub repository analysis** - Commits, issues, PRs, activity metrics
-3. **Content extraction** - Official docs, technical articles, media coverage
-4. **Cross-referencing** - Verification across independent sources
-5. **Chronological reconstruction** - Timeline from timestamped data
-6. **Confidence scoring** - Claims weighted by source reliability
+1. **多来源网页搜索：** 广泛发现和定向查询
+2. **GitHub 仓库分析：** 提交、问题、合并请求与活动指标
+3. **内容提取：** 官方文档、技术文章、媒体报道
+4. **交叉引用：** 通过独立来源验证
+5. **时间线重建：** 根据带时间戳的数据梳理
+6. **置信度评分：** 按来源可靠性为论断赋权
 
-**Research Depth:** {RESEARCH_DEPTH}
-**Time Scope:** {TIME_SCOPE}
-**Geographic Scope:** {GEOGRAPHIC_SCOPE}
+**研究深度：** {RESEARCH_DEPTH}
+**时间范围：** {TIME_SCOPE}
+**地域范围：** {GEOGRAPHIC_SCOPE}
 
 ---
 
-**Report Prepared By:** Github Deep Research by DeerFlow
-**Date:** {REPORT_DATE}
-**Report Version:** 1.0
-**Status:** Complete
+**报告编制：** DeerFlow 的 GitHub 深度研究
+**日期：** {REPORT_DATE}
+**报告版本：** 1.0
+**状态：** 完成

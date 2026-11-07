@@ -6,7 +6,7 @@
 状态字典转换为可用 JSON 序列化的普通 Python 数据结构。
 
 调用方：``deerflow.runtime.runs.worker``（发布服务端推送事件）及
-``app.gateway.routers.conversations.threads``（返回接口响应）。
+``server.gateway.routers.conversations.threads``（返回接口响应）。
 '''
 
 from __future__ import annotations

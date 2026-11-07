@@ -205,12 +205,12 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
     def _build_retry_message(self, attempt: int, wait_ms: int, reason: str) -> str:
         '''构造包含次数、原因和等待时间的重试进度消息。'''
         seconds = max(1, round(wait_ms / 1000))
-        reason_text = "provider is busy" if reason == "busy" else "provider request failed temporarily"
-        return f"LLM request retry {attempt}/{self.retry_max_attempts}: {reason_text}. Retrying in {seconds}s."
+        reason_text = "服务提供方繁忙" if reason == "busy" else "服务提供方请求暂时失败"
+        return f"大语言模型请求重试 {attempt}/{self.retry_max_attempts}: {reason_text}。将在以下等待时间后重试： {seconds}s."
 
     def _build_circuit_breaker_message(self) -> str:
         '''构造熔断器打开时返回给用户的说明。'''
-        return "The configured LLM provider is currently unavailable due to continuous failures. Circuit breaker is engaged to protect the system. Please wait a moment before trying again."
+        return "配置的大语言模型服务提供方持续失败，目前不可用。已启用熔断保护系统。请稍后重试。"
 
     def _build_error_fallback_message(
         self,
@@ -235,19 +235,17 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         '''按错误类别生成可执行的用户提示文本。'''
         detail = _extract_error_detail(exc)
         if reason == "quota":
-            return "The configured LLM provider rejected the request because the account is out of quota, billing is unavailable, or usage is restricted. Please fix the provider account and try again."
+            return "配置的大语言模型服务提供方拒绝了请求，原因可能是账户配额耗尽、计费不可用或使用受限。请处理服务账户问题后重试。"
         if reason == "auth":
-            return "The configured LLM provider rejected the request because authentication or access is invalid. Please check the provider credentials and try again."
+            return "配置的大语言模型服务提供方因身份验证或访问权限无效而拒绝了请求。请检查服务凭据后重试。"
         if reason in {"busy", "transient"}:
             if type(exc).__name__ in _STREAM_DROP_EXCEPTIONS:
                 return (
-                    "The model's streaming response was interrupted before it could "
-                    "finish. This usually happens when a single response or tool call "
-                    "is very large — please ask the assistant to split the work into "
-                    "smaller steps, or shorten the requested output, and try again."
+                    "模型的流式响应在完成前中断。这通常发生在单次响应或工具调用过大时。"
+                    "请让助手将工作拆分为更小的步骤，或缩短请求的输出后重试。"
                 )
-            return "The configured LLM provider is temporarily unavailable after multiple retries. Please wait a moment and continue the conversation."
-        return f"LLM request failed: {detail}"
+            return "配置的大语言模型服务提供方在多次重试后仍暂时不可用。请稍后继续对话。"
+        return f"大语言模型请求失败： {detail}"
 
     def _build_user_fallback_message(self, exc: BaseException, reason: str) -> AIMessage:
         '''构造包含分类信息的用户可见降级 AI 消息。'''
@@ -289,7 +287,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 self._build_circuit_breaker_message(),
                 error_type="CircuitBreakerOpen",
                 reason="circuit_open",
-                detail="LLM circuit breaker is open",
+                detail="大语言模型熔断器已开启",
             )
 
         attempt = 1
@@ -341,7 +339,7 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 self._build_circuit_breaker_message(),
                 error_type="CircuitBreakerOpen",
                 reason="circuit_open",
-                detail="LLM circuit breaker is open",
+                detail="大语言模型熔断器已开启",
             )
 
         attempt = 1

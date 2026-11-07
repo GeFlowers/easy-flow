@@ -1,51 +1,53 @@
 ---
 name: podcast-generation
-description: Use this skill when the user requests to generate, create, or produce podcasts from text content. Converts written content into a two-host conversational podcast audio format with natural dialogue.
+description: 用户要求从文本生成、创作或制作播客时使用。把书面内容转换为两位主持人的自然对话播客音频。
 ---
 
-# Podcast Generation Skill
+# 播客生成技能
 
-## Overview
+## 概述
 
-This skill generates high-quality podcast audio from text content. The workflow includes creating a structured JSON script (conversational dialogue) and executing audio generation through text-to-speech synthesis.
+根据文本生成高质量播客音频。流程包括创建结构化 JSON（JavaScript Object Notation，JavaScript 对象表示法）对话脚本，并通过语音合成生成音频。
 
-## Core Capabilities
+## 核心能力
 
-- Convert any text content (articles, reports, documentation) into podcast scripts
-- Generate natural two-host conversational dialogue (male and female hosts)
-- Synthesize speech audio using text-to-speech
-- Mix audio chunks into a final podcast MP3 file
-- Support both English and Chinese content
+- 将文章、报告、文档等文本转换为播客脚本。
+- 生成男、女两位主持人的自然对话。
+- 使用 TTS（Text-to-Speech，文本转语音）合成语音。
+- 混合音频片段，生成最终 MP3（MPEG Audio Layer III，动态图像专家组音频第三层）文件。
+- 支持英语和中文。
 
-## Workflow
+## 工作流程
 
-### Step 1: Understand Requirements
+### 第 1 步：理解需求
 
-When a user requests podcast generation, identify:
+用户要求生成播客时，识别：
 
-- Source content: The text/article/report to convert into a podcast
-- Language: English or Chinese (based on content)
-- Output location: Where to save the generated podcast
-- You don't need to check the folder under `/mnt/user-data`
+- 来源内容：需要转换的文本、文章或报告。
+- 语言：根据内容选择英语或中文。
+- 输出位置：播客保存路径。
+- 无需检查 `/mnt/user-data` 下的文件夹。
 
-### Step 2: Create Structured Script JSON
+### 第 2 步：创建结构化脚本
 
-Generate a structured JSON script file in `/mnt/user-data/workspace/` with naming pattern: `{descriptive-name}-script.json`
+在 `/mnt/user-data/workspace/` 创建 `{descriptive-name}-script.json` 文件。
 
-The JSON structure:
+结构：
+
 ```json
 {
-  "locale": "en",
+  "locale": "zh",
   "lines": [
-    {"speaker": "male", "paragraph": "dialogue text"},
-    {"speaker": "female", "paragraph": "dialogue text"}
+    {"speaker": "male", "paragraph": "对话文本"},
+    {"speaker": "female", "paragraph": "对话文本"}
   ]
 }
 ```
 
-### Step 3: Execute Generation
+### 第 3 步：执行生成
 
-Call the Python script:
+调用 Python 脚本：
+
 ```bash
 python /mnt/skills/public/podcast-generation/scripts/generate.py \
   --script-file /mnt/user-data/workspace/script-file.json \
@@ -53,88 +55,94 @@ python /mnt/skills/public/podcast-generation/scripts/generate.py \
   --transcript-file /mnt/user-data/outputs/generated-podcast-transcript.md
 ```
 
-Parameters:
+参数：
 
-- `--script-file`: Absolute path to JSON script file (required)
-- `--output-file`: Absolute path to output MP3 file (required)
-- `--transcript-file`: Absolute path to output transcript markdown file (optional, but recommended)
+- `--script-file`：脚本文件绝对路径，必填。
+- `--output-file`：输出音频绝对路径，必填。
+- `--transcript-file`：输出 Markdown 逐字稿绝对路径，可选但推荐。
 
 > [!IMPORTANT]
-> - Execute the script in one complete call. Do NOT split the workflow into separate steps.
-> - The script handles all TTS API calls and audio generation internally.
-> - Do NOT read the Python file, just call it with the parameters.
-> - Always include `--transcript-file` to generate a readable transcript for the user.
-> - The TTS provider and its concurrency are selected automatically from environment variables — you do not choose or tune them.
+> - 一次完整调用脚本，不要将流程拆成独立步骤。
+> - 脚本内部处理所有语音合成接口调用与音频生成。
+> - 不要阅读 Python 文件，直接传入参数调用。
+> - 始终包含 `--transcript-file`，为用户生成可读逐字稿。
+> - 提供方和并发数由环境变量自动决定，无需选择或调节。
 
-## Script JSON Format
+## 脚本格式
 
-The script JSON file must follow this structure:
+必须遵循：
 
 ```json
 {
-  "title": "The History of Artificial Intelligence",
-  "locale": "en",
+  "title": "人工智能的历史",
+  "locale": "zh",
   "lines": [
-    {"speaker": "male", "paragraph": "Hello Deer! Welcome back to another episode."},
-    {"speaker": "female", "paragraph": "Hey everyone! Today we have an exciting topic to discuss."},
-    {"speaker": "male", "paragraph": "That's right! We're going to talk about..."}
+    {"speaker": "male", "paragraph": "Hello Deer！欢迎回来，收听新一期节目。"},
+    {"speaker": "female", "paragraph": "大家好！今天有个很有意思的话题。"},
+    {"speaker": "male", "paragraph": "没错！我们要聊的是……"}
   ]
 }
 ```
 
-Fields:
-- `title`: Title of the podcast episode (optional, used as heading in transcript)
-- `locale`: Language code - "en" for English or "zh" for Chinese
-- `lines`: Array of dialogue lines
-  - `speaker`: Either "male" or "female"
-  - `paragraph`: The dialogue text for this speaker
+字段：
 
-## Script Writing Guidelines
+- `title`：节目标题，可选，作为逐字稿标题。
+- `locale`：语言代码，英语为 `en`，中文为 `zh`。
+- `lines`：对话数组。
+  - `speaker`：`male` 或 `female`。
+  - `paragraph`：该主持人的对话文本。
 
-When creating the script JSON, follow these guidelines:
+## 脚本写作指南
 
-### Format Requirements
-- Only two hosts: male and female, alternating naturally
-- Target runtime: approximately 10 minutes of dialogue (around 40-60 lines)
-- Start with the male host saying a greeting that includes "Hello Deer"
+创建脚本时遵循：
 
-### Tone & Style
-- Natural, conversational dialogue - like two friends chatting
-- Use casual expressions and conversational transitions
-- Avoid overly formal language or academic tone
-- Include reactions, follow-up questions, and natural interjections
+### 格式要求
 
-### Content Guidelines
-- Frequent back-and-forth between hosts
-- Keep sentences short and easy to follow when spoken
-- Plain text only - no markdown formatting in the output
-- Translate technical concepts into accessible language
-- No mathematical formulas, code, or complex notation
-- Make content engaging and accessible for audio-only listeners
-- Exclude meta information like dates, author names, or document structure
+- 只有男、女两位主持人，自然交替发言。
+- 目标时长约 10 分钟，约 40–60 条发言。
+- 由男主持人以包含“Hello Deer”的问候开场。
 
-## Podcast Generation Example
+### 语气与风格
 
-User request: "Generate a podcast about the history of artificial intelligence"
+- 自然口语，像两个朋友聊天。
+- 使用轻松表达与自然过渡。
+- 避免过度正式或学术化语言。
+- 加入反应、追问和自然插话。
 
-Step 1: Create script file `/mnt/user-data/workspace/ai-history-script.json`:
+### 内容指南
+
+- 主持人频繁来回互动。
+- 句子简短，便于听懂。
+- 仅使用纯文本，不在输出中加入 Markdown 格式。
+- 将技术概念转化为易懂语言。
+- 不含数学公式、代码或复杂符号。
+- 对只听音频的听众也有吸引力、容易理解。
+- 排除日期、作者姓名或文档结构等元信息。
+
+## 播客生成示例
+
+用户请求：“生成一期关于人工智能历史的播客。”
+
+第 1 步：创建 `/mnt/user-data/workspace/ai-history-script.json`：
+
 ```json
 {
-  "title": "The History of Artificial Intelligence",
-  "locale": "en",
+  "title": "人工智能的历史",
+  "locale": "zh",
   "lines": [
-    {"speaker": "male", "paragraph": "Hello Deer! Welcome back to another fascinating episode. Today we're diving into something that's literally shaping our future - the history of artificial intelligence."},
-    {"speaker": "female", "paragraph": "Oh, I love this topic! You know, AI feels so modern, but it actually has roots going back over seventy years."},
-    {"speaker": "male", "paragraph": "Exactly! It all started back in the 1950s. The term artificial intelligence was actually coined by John McCarthy in 1956 at a famous conference at Dartmouth."},
-    {"speaker": "female", "paragraph": "Wait, so they were already thinking about machines that could think back then? That's incredible!"},
-    {"speaker": "male", "paragraph": "Right? The early pioneers were so optimistic. They thought we'd have human-level AI within a generation."},
-    {"speaker": "female", "paragraph": "But things didn't quite work out that way, did they?"},
-    {"speaker": "male", "paragraph": "No, not at all. The 1970s brought what's called the first AI winter..."}
+    {"speaker": "male", "paragraph": "Hello Deer！欢迎回来。今天聊一个正在塑造未来的话题：人工智能的历史。"},
+    {"speaker": "female", "paragraph": "我很喜欢这个话题！人工智能看起来很现代，但它的根源其实可以追溯到七十多年前。"},
+    {"speaker": "male", "paragraph": "没错，一切始于二十世纪五十年代。约翰·麦卡锡在一九五六年著名的达特茅斯会议上提出了人工智能这个术语。"},
+    {"speaker": "female", "paragraph": "等等，那时人们就已经开始思考会思考的机器了？真不可思议！"},
+    {"speaker": "male", "paragraph": "是啊，早期先驱非常乐观，认为一代人之内就能实现人类水平的人工智能。"},
+    {"speaker": "female", "paragraph": "但后来的发展并没有完全按照他们的预期，对吧？"},
+    {"speaker": "male", "paragraph": "确实如此。二十世纪七十年代迎来了第一次人工智能寒冬……"}
   ]
 }
 ```
 
-Step 2: Execute generation:
+第 2 步：执行生成：
+
 ```bash
 python /mnt/skills/public/podcast-generation/scripts/generate.py \
   --script-file /mnt/user-data/workspace/ai-history-script.json \
@@ -142,62 +150,65 @@ python /mnt/skills/public/podcast-generation/scripts/generate.py \
   --transcript-file /mnt/user-data/outputs/ai-history-transcript.md
 ```
 
-This will generate:
-- `ai-history-podcast.mp3`: The audio podcast file
-- `ai-history-transcript.md`: A readable markdown transcript of the podcast
+生成：
 
-## Specific Templates
+- `ai-history-podcast.mp3`：播客音频。
+- `ai-history-transcript.md`：可读 Markdown 逐字稿。
 
-Read the following template file only when matching the user request.
+## 专用模板
 
-- [Tech Explainer](templates/tech-explainer.md) - For converting technical documentation and tutorials
+仅当用户请求匹配时阅读：
 
-## Output Format
+- [技术讲解](templates/tech-explainer.md)：将技术文档和教程转为播客。
 
-The generated podcast follows the "Hello Deer" format:
-- Two hosts: one male, one female
-- Natural conversational dialogue
-- Starts with "Hello Deer" greeting
-- Target duration: approximately 10 minutes
-- Alternating speakers for engaging flow
+## 输出格式
 
-## Output Handling
+生成播客遵循“Hello Deer”格式：
 
-After generation:
+- 一男一女两位主持人。
+- 自然对话。
+- 用“Hello Deer”问候开场。
+- 目标时长约 10 分钟。
+- 主持人轮流发言，使交流流畅。
 
-- Podcasts and transcripts are saved in `/mnt/user-data/outputs/`
-- Share both the podcast MP3 and transcript MD with user using `present_files` tool
-- Provide brief description of the generation result (topic, duration, hosts)
-- Offer to regenerate if adjustments needed
+## 输出处理
 
-## Requirements
+生成后：
 
-The following environment variables must be set:
-- For Volcengine: `VOLCENGINE_TTS_APPID` and `VOLCENGINE_TTS_ACCESS_TOKEN`
-- For MiniMax: `MINIMAX_API_KEY`
-- `VOLCENGINE_TTS_CLUSTER`: Volcengine TTS cluster (optional, defaults to "volcano_tts")
+- 播客和逐字稿保存在 `/mnt/user-data/outputs/`。
+- 用 `present_files` 同时分享音频和逐字稿。
+- 简要说明主题、时长和主持人。
+- 如需调整，可重新生成。
 
-## Notes
+## 环境要求
 
-- **Always execute the full pipeline in one call** - no need to test individual steps or worry about timeouts
-- The script JSON should match the content language (en or zh)
-- Technical content should be simplified for audio accessibility in the script
-- Complex notations (formulas, code) should be translated to plain language in the script
-- Long content may result in longer podcasts
+必须设置相应环境变量：
 
-## Providers (Volcengine / MiniMax)
+- 火山引擎：`VOLCENGINE_TTS_APPID` 和 `VOLCENGINE_TTS_ACCESS_TOKEN`。
+- MiniMax：`MINIMAX_API_KEY`。
+- `VOLCENGINE_TTS_CLUSTER`：火山引擎语音合成集群，可选，默认 `volcano_tts`。
 
-Auto-selected by environment variables:
+## 注意事项
 
-- `VOLCENGINE_TTS_APPID` + `VOLCENGINE_TTS_ACCESS_TOKEN` set → Volcengine TTS (default).
-- Only `MINIMAX_API_KEY` set → MiniMax TTS (`/v1/t2a_v2`).
-- Force with `PODCAST_GENERATION_PROVIDER=volcengine|minimax`.
+- **始终一次调用完整流程**，无需单独测试步骤或担心超时。
+- 脚本语言代码应匹配内容语言，`en` 或 `zh`。
+- 在脚本中简化技术内容，便于音频理解。
+- 将公式、代码等复杂符号转述为通俗语言。
+- 长内容可能生成更长播客。
 
-MiniMax overrides: `MINIMAX_API_HOST` (default `https://api.minimaxi.com`),
-`MINIMAX_TTS_MODEL` (default `speech-2.6-hd`), `MINIMAX_TTS_VOICE_MALE`
-(default `male-qn-qingse`), `MINIMAX_TTS_VOICE_FEMALE` (default `female-tianmei`).
+## 提供方（火山引擎／MiniMax）
 
-Concurrency is owned by each provider internally — MiniMax runs single-threaded
-to reduce rate-limit failures, Volcengine uses 4 workers. There is no
-caller-facing concurrency knob; transient rate limits are handled by automatic
-retry with backoff.
+通过环境变量自动选择：
+
+- 设置 `VOLCENGINE_TTS_APPID` 和 `VOLCENGINE_TTS_ACCESS_TOKEN`：使用默认火山引擎。
+- 只设置 `MINIMAX_API_KEY`：使用 MiniMax（`/v1/t2a_v2`）。
+- 用 `PODCAST_GENERATION_PROVIDER=volcengine|minimax` 强制指定。
+
+MiniMax 覆盖项：
+
+- `MINIMAX_API_HOST`，默认 `https://api.minimaxi.com`。
+- `MINIMAX_TTS_MODEL`，默认 `speech-2.6-hd`。
+- `MINIMAX_TTS_VOICE_MALE`，默认 `male-qn-qingse`。
+- `MINIMAX_TTS_VOICE_FEMALE`，默认 `female-tianmei`。
+
+并发由各提供方内部管理：MiniMax 单线程运行以减少限流失败，火山引擎使用 4 个工作线程。调用方没有并发调节参数；短期限流由自动退避重试处理。

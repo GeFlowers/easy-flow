@@ -22,11 +22,11 @@ import {
 } from "@/components/ui/item";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useAuth } from "@/core/auth/AuthProvider";
-import { useI18n } from "@/core/i18n/hooks";
-import { SkillRequestError } from "@/core/skills/api";
-import { useEnableSkill, useSkills } from "@/core/skills/hooks";
-import type { Skill } from "@/core/skills/type";
+import { useAuth } from "@/features/auth/AuthProvider";
+import { useI18n } from "@/features/i18n/hooks";
+import { SkillRequestError } from "@/features/skills/api";
+import { useEnableSkill, useSkills } from "@/features/skills/hooks";
+import type { Skill } from "@/features/skills/type";
 
 import { SettingsSection } from "./settings-section";
 

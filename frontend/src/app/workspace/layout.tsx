@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { GatewayOfflineFallback } from "@/components/workspace/gateway-offline-fallback";
-import { AuthProvider } from "@/core/auth/AuthProvider";
-import { getServerSideUser } from "@/core/auth/server";
-import { assertNever } from "@/core/auth/types";
+import { AuthProvider } from "@/features/auth/AuthProvider";
+import { getServerSideUser } from "@/features/auth/server";
+import { assertNever } from "@/features/auth/types";
 
 import { WorkspaceContent } from "./workspace-content";
 

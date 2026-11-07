@@ -77,7 +77,7 @@ def view_image_tool(
             update={
                 "messages": [
                     ToolMessage(
-                        f"Error: Only image paths under {_ALLOWED_IMAGE_VIRTUAL_ROOTS_TEXT} are allowed",
+                        f"Error: 仅允许使用 {_ALLOWED_IMAGE_VIRTUAL_ROOTS_TEXT} 下的图像路径",
                         tool_call_id=tool_call_id,
                     )
                 ]
@@ -96,18 +96,18 @@ def view_image_tool(
 
     if not path.exists():
         return Command(
-            update={"messages": [ToolMessage(f"Error: Image file not found: {image_path}", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage(f"Error: 找不到图像文件： {image_path}", tool_call_id=tool_call_id)]},
         )
 
     if not path.is_file():
         return Command(
-            update={"messages": [ToolMessage(f"Error: Path is not a file: {image_path}", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage(f"Error: 路径不是文件： {image_path}", tool_call_id=tool_call_id)]},
         )
 
     expected_mime_type = _EXTENSION_TO_MIME.get(path.suffix.lower())
     if expected_mime_type is None:
         return Command(
-            update={"messages": [ToolMessage(f"Error: Unsupported image format: {path.suffix}. Supported formats: {', '.join(_EXTENSION_TO_MIME)}", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage(f"Error: 不支持的图像格式： {path.suffix}. 支持的格式： {', '.join(_EXTENSION_TO_MIME)}", tool_call_id=tool_call_id)]},
         )
 
     mime_type, _ = mimetypes.guess_type(actual_path)
@@ -118,11 +118,11 @@ def view_image_tool(
         image_size = path.stat().st_size
     except OSError as e:
         return Command(
-            update={"messages": [ToolMessage(f"Error reading image metadata: {_sanitize_image_error(e, thread_data)}", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage(f"读取图像元数据时出错： {_sanitize_image_error(e, thread_data)}", tool_call_id=tool_call_id)]},
         )
     if image_size > _MAX_IMAGE_BYTES:
         return Command(
-            update={"messages": [ToolMessage(f"Error: Image file is too large: {image_size} bytes. Maximum supported size is {_MAX_IMAGE_BYTES} bytes", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage(f"Error: 图像文件过大：{image_size} 字节。最大支持 {_MAX_IMAGE_BYTES} 字节", tool_call_id=tool_call_id)]},
         )
 
     try:
@@ -130,22 +130,22 @@ def view_image_tool(
             image_data = f.read()
     except Exception as e:
         return Command(
-            update={"messages": [ToolMessage(f"Error reading image file: {_sanitize_image_error(e, thread_data)}", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage(f"读取图像文件时出错： {_sanitize_image_error(e, thread_data)}", tool_call_id=tool_call_id)]},
         )
 
     if len(image_data) != image_size:
         return Command(
-            update={"messages": [ToolMessage("Error: Image file changed during read", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage("Error: 图像文件在读取过程中发生变化", tool_call_id=tool_call_id)]},
         )
 
     detected_mime_type = _detect_image_mime(image_data)
     if detected_mime_type is None:
         return Command(
-            update={"messages": [ToolMessage("Error: File contents do not match a supported image format", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage("Error: 文件内容不符合任何支持的图像格式", tool_call_id=tool_call_id)]},
         )
     if detected_mime_type != expected_mime_type:
         return Command(
-            update={"messages": [ToolMessage(f"Error: Image contents are {detected_mime_type}, but file extension indicates {expected_mime_type}", tool_call_id=tool_call_id)]},
+            update={"messages": [ToolMessage(f"Error: 图像内容类型为 {detected_mime_type}，但文件扩展名表示 {expected_mime_type}", tool_call_id=tool_call_id)]},
         )
     mime_type = detected_mime_type
 
@@ -158,5 +158,5 @@ def view_image_tool(
     }
 
     return Command(
-        update={"viewed_images": new_viewed_images, "messages": [ToolMessage("Successfully read image", tool_call_id=tool_call_id)]},
+        update={"viewed_images": new_viewed_images, "messages": [ToolMessage("已成功读取图像", tool_call_id=tool_call_id)]},
     )

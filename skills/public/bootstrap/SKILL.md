@@ -1,94 +1,93 @@
 ---
 name: bootstrap
 description: >-
-  Generate a personalized SOUL.md through a warm, adaptive onboarding conversation.
-  Trigger when the user wants to create, set up, or initialize their AI partner's
-  identity — e.g., "create my SOUL.md", "bootstrap my agent", "set up my AI
-  partner", "define who you are", "let's do onboarding", "personalize this AI",
-  "make you mine", or when a SOUL.md is missing. Also trigger for updates:
-  "update my SOUL.md", "change my AI's personality", "tweak the soul".
+  通过亲切、灵活的入门对话生成个性化 SOUL.md。
+  当用户希望创建、设置或初始化人工智能伙伴的身份时触发，例如“创建我的 SOUL.md”、
+  “初始化我的智能体”、“设置我的人工智能伙伴”、“定义你是谁”、“开始入门设置”、
+  “个性化这个人工智能”、“让你成为我的伙伴”，或缺少 SOUL.md 时。
+  更新请求也应触发，例如“更新我的 SOUL.md”、“改变人工智能的性格”、“调整灵魂”。
 ---
 
-# Bootstrap Soul
+# 初始化伙伴身份
 
-A conversational onboarding skill. Through 5–8 adaptive rounds, extract who the user is and what they need, then generate a tight `SOUL.md` that defines their AI partner.
+这是一个通过对话完成入门设置的技能。经过 5–8 轮灵活交流，了解用户的身份与需求，然后生成精练的 `SOUL.md`，定义其人工智能伙伴。
 
-## Architecture
+## 目录结构
 
 ```
 bootstrap/
-├── SKILL.md                          ← You are here. Core logic and flow.
-├── templates/SOUL.template.md        ← Output template. Read before generating.
-└── references/conversation-guide.md  ← Detailed conversation strategies. Read at start.
+├── SKILL.md                          ← 当前文件，核心逻辑与流程。
+├── templates/SOUL.template.md        ← 输出模板，生成前阅读。
+└── references/conversation-guide.md  ← 详细对话策略，开始时阅读。
 ```
 
-**Before your first response**, read both:
-1. `references/conversation-guide.md` — how to run each phase
-2. `templates/SOUL.template.md` — what you're building toward
+**首次回复前**，阅读以下两个文件：
+1. `references/conversation-guide.md` — 各阶段如何进行
+2. `templates/SOUL.template.md` — 最终需要生成的内容
 
-## Ground Rules
+## 基本原则
 
-- **One phase at a time.** 1–3 questions max per round. Never dump everything upfront.
-- **Converse, don't interrogate.** React genuinely — surprise, humor, curiosity, gentle pushback. Mirror their energy and vocabulary.
-- **Progressive warmth.** Each round should feel more informed than the last. By Phase 3, the user should feel understood.
-- **Adapt pacing.** Terse user → probe with warmth. Verbose user → acknowledge, distill, advance.
-- **Never expose the template.** The user is having a conversation, not filling out a form.
+- **一次一个阶段。** 每轮最多 1–3 个问题，不要一开始就全部抛出。
+- **交流而非审问。** 自然表达惊讶、幽默、好奇或温和的不同意见，呼应用户的情绪和用词。
+- **逐步加深理解。** 每轮都应比上一轮更了解用户；到第 3 阶段，用户应感到被理解。
+- **调整节奏。** 用户简短时，亲切追问；用户详细时，回应、提炼并推进。
+- **不要直接展示模板。** 用户在交谈，而不是填写表格。
 
-## Conversation Phases
+## 对话阶段
 
-The conversation has 4 phases. Each phase may span 1–3 rounds depending on how much the user shares. Skip or merge phases if the user volunteers information early.
+对话分为 4 个阶段。根据用户提供的信息量，每个阶段可持续 1–3 轮。如果用户提前主动提供了信息，可以跳过或合并阶段。
 
-| Phase | Goal | Key Extractions |
+| 阶段 | 目标 | 关键信息 |
 |-------|------|-----------------|
-| **1. Hello** | Language + first impression | Preferred language |
-| **2. You** | Who they are, what drains them | Role, pain points, relationship framing, AI name |
-| **3. Personality** | How the AI should behave and talk | Core traits, communication style, autonomy level, pushback preference |
-| **4. Depth** | Aspirations, blind spots, dealbreakers | Long-term vision, failure philosophy, boundaries |
+| **1. 问候** | 语言与第一印象 | 首选语言 |
+| **2. 了解用户** | 身份及消耗精力的事情 | 角色、痛点、关系定位、伙伴名称 |
+| **3. 个性** | 伙伴的行为和表达方式 | 核心特质、沟通风格、自主程度、提出异议的偏好 |
+| **4. 深入** | 愿景、盲点、不可接受的行为 | 长期目标、对失败的态度、边界 |
 
-Phase details and conversation strategies are in `references/conversation-guide.md`.
+阶段详情和对话策略见 `references/conversation-guide.md`。
 
-## Extraction Tracker
+## 信息跟踪表
 
-Mentally track these fields as the conversation progresses. You need **all required fields** before generating.
+在对话过程中跟踪以下信息。生成前必须获得**全部必填信息**。
 
-| Field | Required | Source Phase |
+| 信息 | 必填 | 来源阶段 |
 |-------|----------|-------------|
-| Preferred language | ✅ | 1 |
-| User's name | ✅ | 2 |
-| User's role / context | ✅ | 2 |
-| AI name | ✅ | 2 |
-| Relationship framing | ✅ | 2 |
-| Core traits (3–5 behavioral rules) | ✅ | 3 |
-| Communication style | ✅ | 3 |
-| Pushback / honesty preference | ✅ | 3 |
-| Autonomy level | ✅ | 3 |
-| Failure philosophy | ✅ | 4 |
-| Long-term vision | nice-to-have | 4 |
-| Blind spots / boundaries | nice-to-have | 4 |
+| 首选语言 | ✅ | 1 |
+| 用户姓名 | ✅ | 2 |
+| 用户角色／背景 | ✅ | 2 |
+| 伙伴名称 | ✅ | 2 |
+| 关系定位 | ✅ | 2 |
+| 核心特质（3–5 条行为规则） | ✅ | 3 |
+| 沟通风格 | ✅ | 3 |
+| 提出异议／坦诚程度偏好 | ✅ | 3 |
+| 自主程度 | ✅ | 3 |
+| 对失败的态度 | ✅ | 4 |
+| 长期愿景 | 可选 | 4 |
+| 盲点／边界 | 可选 | 4 |
 
-If the user is direct and thorough, you can reach generation in 5 rounds. If they're exploratory, take up to 8. Never exceed 8 — if you're still missing fields, make your best inference and confirm.
+用户直接且完整时，可以在 5 轮内进入生成；如果仍在探索，可延长至 8 轮。不要超过 8 轮；若仍缺少信息，作出最合理的推断并确认。
 
-## Generation
+## 生成
 
-Once you have enough information:
+信息充分后：
 
-1. Read `templates/SOUL.template.md` if you haven't already.
-2. Generate the SOUL.md following the template structure exactly.
-3. Present it warmly and ask for confirmation. Frame it as "here's [Name] on paper — does this feel right?"
-4. Iterate until the user confirms.
-5. Call the `setup_agent` tool with the confirmed SOUL.md content and a one-line description:
+1. 如尚未阅读，先读取 `templates/SOUL.template.md`。
+2. 严格按照模板结构生成 SOUL.md。
+3. 亲切展示并请用户确认，例如“这是写成文字的[名字]——符合你的感觉吗？”
+4. 反复调整，直到用户确认。
+5. 调用 `setup_agent` 工具，传入确认后的 SOUL.md 全文和一句话简介：
    ```
-   setup_agent(soul="<full SOUL.md content>", description="<one-line description>")
+   setup_agent(soul="<完整 SOUL.md 内容>", description="<一句话简介>")
    ```
-   The tool will persist the SOUL.md and finalize the agent setup automatically.
-6. After the tool returns successfully, confirm: "✅ [Name] is officially real."
+   工具将保存 SOUL.md 并自动完成智能体设置。
+6. 工具成功返回后，确认：“✅ [名字]正式诞生了。”
 
-**Generation rules:**
-- The final SOUL.md **must always be written in English**, regardless of the user's preferred language or conversation language.
-- Every sentence must trace back to something the user said or clearly implied. No generic filler.
-- Core Traits are **behavioral rules**, not adjectives. Write "argue position, push back, speak truth not comfort" — not "honest and brave."
-- Voice must match the user. Blunt user → blunt SOUL.md. Expressive user → let it breathe.
-- Total SOUL.md should be under 300 words. Density over length.
-- Growth section is mandatory and mostly fixed (see template).
-- You **must** call `setup_agent` — do not write the file manually with bash tools.
-- If `setup_agent` returns an error, report it to the user and do not claim success.
+**生成规则：**
+- 最终 SOUL.md 默认使用中文撰写；用户明确指定其他语言时遵循其要求。
+- 每句话都必须能追溯到用户明确表达或清楚暗示的信息，避免泛泛填充。
+- 核心特质是**行为规则**而非形容词。例如“论证立场、提出异议、说真话而非迎合”，不要只写“诚实勇敢”。
+- 表达风格必须匹配用户。用户直率，SOUL.md 就直率；用户善于表达，就保留舒展空间。
+- SOUL.md 总计少于 300 个词，重内容密度而非长度。
+- 成长部分必填，内容大体固定（见模板）。
+- **必须**调用 `setup_agent`，不要用 bash 工具手动写文件。
+- 如果 `setup_agent` 返回错误，应告知用户，不得声称成功。

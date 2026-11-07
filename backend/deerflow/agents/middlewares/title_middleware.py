@@ -167,7 +167,7 @@ class TitleMiddleware(AgentMiddleware[TitleMiddlewareState]):
             ellipsis = "..."
             body = min(fallback_chars, config.max_chars - len(ellipsis))
             return user_msg[:body].rstrip() + ellipsis
-        return user_msg if user_msg else "New Conversation"
+        return user_msg if user_msg else "新对话"
 
     def _get_runnable_config(self) -> dict[str, Any]:
         '''继承当前 RunnableConfig 并标记标题模型调用，便于追踪归属且不重复打点。'''

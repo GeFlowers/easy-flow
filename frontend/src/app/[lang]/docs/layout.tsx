@@ -4,7 +4,7 @@ import { Layout } from "nextra-theme-docs";
 
 import { Footer } from "@/components/landing/footer";
 import { Header } from "@/components/landing/header";
-import { getLocaleByLang } from "@/core/i18n/locale";
+import { getLocaleByLang } from "@/features/i18n/locale";
 import "nextra-theme-docs/style.css";
 
 const i18n = [

@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
-import { reasoningPlugins } from "@/core/streamdown/plugins";
+import { reasoningPlugins } from "@/features/streamdown/plugins";
 import { Shimmer } from "./shimmer";
 import { ClipboardSafeStreamdown } from "./streamdown";
 

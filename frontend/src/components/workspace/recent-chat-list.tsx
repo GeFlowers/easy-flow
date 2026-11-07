@@ -43,24 +43,24 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import { resetThreadChatAfterDelete } from "@/components/workspace/chats/use-thread-chat";
-import { getAPIClient } from "@/core/api";
-import { writeTextToClipboard } from "@/core/clipboard";
-import { useI18n } from "@/core/i18n/hooks";
+import { getAPIClient } from "@/features/api";
+import { writeTextToClipboard } from "@/features/clipboard";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   exportThreadAsJSON,
   exportThreadAsMarkdown,
-} from "@/core/threads/export";
+} from "@/features/threads/export";
 import {
   useDeleteThread,
   useInfiniteThreads,
   useRenameThread,
-} from "@/core/threads/hooks";
-import type { AgentThread, AgentThreadState } from "@/core/threads/types";
+} from "@/features/threads/hooks";
+import type { AgentThread, AgentThreadState } from "@/features/threads/types";
 import {
   channelSourceOfThread,
   pathOfThread,
   titleOfThread,
-} from "@/core/threads/utils";
+} from "@/features/threads/utils";
 import { isIMEComposing } from "@/lib/ime";
 
 import { ThreadChannelIcon } from "./thread-channel-source";

@@ -1,8 +1,8 @@
-import type { Skill } from "@/core/skills";
+import type { Skill } from "@/features/skills";
 export {
   SUGGESTION_TEMPLATE_PLACEHOLDER_PATTERN,
   findSuggestionTemplatePlaceholder,
-} from "@/core/suggestions/placeholders";
+} from "@/features/suggestions/placeholders";
 
 export const MAX_SKILL_SUGGESTIONS = 6;
 

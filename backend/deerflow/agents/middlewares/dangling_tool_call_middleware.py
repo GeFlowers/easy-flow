@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 _MAX_RECOVERY_ERROR_DETAIL_LEN = 500
 _UNKNOWN_TOOL_NAME = "unknown_tool"
-_EMPTY_TOOL_NAME_ERROR = "Tool call could not be executed because its name was missing or empty."
+_EMPTY_TOOL_NAME_ERROR = "工具调用缺少名称或名称为空，无法执行。"
 
 
 def _valid_tool_name(name: object) -> bool:
@@ -120,26 +120,25 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
     def _synthetic_tool_message_content(tool_call: dict) -> str:
         '''为未执行的工具调用构造简短且可恢复的合成错误内容。'''
         if tool_call.get("invalid_tool_name"):
-            return f"[{_EMPTY_TOOL_NAME_ERROR} Use one of the available tool names when retrying.]"
+            return f"[{_EMPTY_TOOL_NAME_ERROR} 重试时请使用可用工具名称之一。]"
         if tool_call.get("invalid"):
             name = tool_call.get("name")
             error = tool_call.get("error")
             error_text = error[:_MAX_RECOVERY_ERROR_DETAIL_LEN] if isinstance(error, str) and error else ""
             if name == "write_file":
-                details = f" Parser error: {error_text}" if error_text else ""
+                details = f" 解析错误： {error_text}" if error_text else ""
                 return (
-                    "[write_file failed before execution: the tool-call arguments were not valid JSON, "
-                    "so no file was written. This often happens when the model tries to write a very "
-                    "large Markdown file in a single tool call, especially when `content` contains "
-                    "unescaped quotes, inline JSON, backslashes, or code fences. Do not retry the same "
-                    "large `write_file` payload for this artifact; provide the report/content directly "
-                    "as normal assistant text in your next response. If a file write is still needed "
-                    f"later, split the file into smaller sections instead of one large payload.{details}]"
+                    "[write_file 在执行前失败：工具调用参数不是有效的 JavaScript 对象表示法文本，"
+                    "因此未写入文件。这通常发生在模型试图通过单次调用写入非常大的 Markdown 文件时，"
+                    "尤其是 `content` 包含未转义的引号、内联对象表示法、反斜杠或代码围栏时。"
+                    "不要为此文件重试相同的大型 `write_file` 载荷；请在下一次响应中以普通助手文本"
+                    "直接提供报告或内容。若之后仍需写入文件，请将文件拆分为较小部分，"
+                    f"避免一次提交整个大载荷。{details}]"
                 )
             if error_text:
-                return f"[Tool call could not be executed because its arguments were invalid: {error_text}]"
-            return "[Tool call could not be executed because its arguments were invalid.]"
-        return "[Tool call was interrupted and did not return a result.]"
+                return f"[工具调用的参数无效，无法执行： {error_text}]"
+            return "[工具调用的参数无效，无法执行。]"
+        return "[工具调用已中断，未返回结果。]"
 
     @staticmethod
     def _sanitize_ai_message_tool_calls(msg):

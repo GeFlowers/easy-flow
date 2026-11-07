@@ -19,10 +19,10 @@ _DESCRIPTION_CAP = 200
 _LEDGER_RENDER_CHAR_BUDGET = 6000
 _LEDGER_ENTRY_RESULT_RENDER_CAP = 120
 _STATUS_ONLY_RESULT_BRIEFS = {
-    "failed": "Task failed.",
-    "cancelled": "Task cancelled by user.",
-    "timed_out": "Task timed out.",
-    "polling_timed_out": "Task polling timed out.",
+    "failed": "任务失败。",
+    "cancelled": "任务已被用户取消。",
+    "timed_out": "任务超时。",
+    "polling_timed_out": "任务轮询超时。",
 }
 
 
@@ -57,21 +57,21 @@ def _status_guidance(status: str, stop_reason: str | None = None) -> str:
     if stop_reason:
         # 守卫预算可能提前结束运行；状态仍描述运行结果，stop_reason 单独说明触发的预算上限。
         if status == "completed":
-            return "hit a guardrail cap with a partial result; reuse the partial result, retry with a tighter scope, or raise the per-agent budget (max_turns / token_budget)"
-        return "hit a guardrail cap with no usable result; retry with a tighter scope or raise the per-agent budget (max_turns / token_budget)"
+            return "达到安全限制并返回部分结果；请复用部分结果、缩小范围后重试，或提高单个代理的预算（max_turns / token_budget）"
+        return "达到安全限制且没有可用结果；请缩小范围后重试，或提高单个代理的预算（max_turns / token_budget）"
     if status == "in_progress":
-        return "already delegated; do NOT delegate again; wait for or build on the result"
+        return "已委派；不要重复委派；请等待结果或基于结果继续工作"
     if status == "completed":
-        return "completed result; do NOT delegate again; reuse this result"
+        return "结果已完成；不要重复委派；请复用此结果"
     if status == "failed":
-        return "failed attempt; may retry with a changed plan"
+        return "此前尝试失败；可以调整计划后重试"
     if status == "cancelled":
-        return "cancelled attempt; may retry with a changed plan"
+        return "此前尝试已取消；可以调整计划后重试"
     if status == "timed_out":
-        return "timed-out attempt; may retry with a changed plan"
+        return "此前尝试超时；可以调整计划后重试"
     if status == "polling_timed_out":
-        return "polling timed-out attempt; may retry with a changed plan"
-    return "prior attempt; inspect status before retrying"
+        return "polling 此前尝试超时；可以调整计划后重试"
+    return "此前已有尝试；重试前请检查状态"
 
 
 def _tool_call_name(tool_call: dict[str, Any]) -> str:
@@ -161,7 +161,7 @@ def _render_entry_line(entry: DelegationEntry) -> str:
     description = _escape_context_text(entry["description"])
     subagent_type = _escape_context_text(entry["subagent_type"])
     guidance = _status_guidance(entry["status"], entry.get("stop_reason"))
-    line = f"- [{status}] {description} (via {subagent_type}; {guidance})"
+    line = f"- [{status}] {description}（由 {subagent_type} 执行；{guidance}）"
     result_brief = entry.get("result_brief")
     if result_brief:
         line += f" -> {_escape_context_text(_bound_text(result_brief, _LEDGER_ENTRY_RESULT_RENDER_CAP))}"
@@ -174,8 +174,8 @@ def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int =
         return ""
 
     lines = [
-        "## Work already delegated",
-        "Newest entries are shown first. In-progress entries are already delegated. Completed entries are reusable results. Failed, cancelled, or timed-out entries are prior attempts.",
+        "## 已委派的工作",
+        "最新条目排在前面。进行中的条目已完成委派。已完成的条目包含可复用结果。失败、取消或超时的条目代表此前的尝试。",
     ]
     omitted = 0
     for index, entry in enumerate(reversed(entries)):
@@ -187,11 +187,11 @@ def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int =
         break
 
     if omitted:
-        omitted_line = f"- ... {omitted} older delegation entries omitted from this model view because of context budget"
+        omitted_line = f"- ... {omitted} 条较早的委派记录因上下文预算限制而从当前模型视图中省略"
         while len(lines) > 1 and not _fits_budget(lines, omitted_line, max_chars):
             lines.pop()
             omitted += 1
-            omitted_line = f"- ... {omitted} older delegation entries omitted from this model view because of context budget"
+            omitted_line = f"- ... {omitted} 条较早的委派记录因上下文预算限制而从当前模型视图中省略"
         if _fits_budget(lines, omitted_line, max_chars):
             lines.append(omitted_line)
 

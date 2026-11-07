@@ -2,7 +2,7 @@ import { FilesIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip } from "@/components/workspace/tooltip";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 
 import { useMaybeSidecar } from "../sidecar/context";
 

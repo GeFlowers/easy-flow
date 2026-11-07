@@ -1,6 +1,6 @@
 "use client";
 
-import { SafeStreamdown } from "@/core/streamdown/components";
+import { SafeStreamdown } from "@/features/streamdown/components";
 
 import { aboutMarkdown } from "./about-content";
 

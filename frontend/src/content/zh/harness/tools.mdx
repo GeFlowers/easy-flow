@@ -63,19 +63,19 @@ task(agent="general-purpose", task="...", context="...")
 
 ### update_agent
 
-将更新持久化到当前自定义 Agent 的 `SOUL.md` 和 `config.yaml`。仅当激活了自定义 Agent（运行时上下文中存在 `agent_name`）时，才会绑定到 lead agent。当用户在 Agent 内开启 chat 并要求该 Agent 调整自身的描述、人格、技能白名单、工具组白名单或默认模型时使用——它会直接写入按用户隔离的 `{base_dir}/users/{user_id}/agents/{agent_name}/` 下的真实配置文件，下一轮对话即可生效。仅显式传入的字段会被更新；省略某个字段以保留其现有值。传入 `skills=[]` 可禁用全部技能，省略 `skills` 则保留现有白名单。
+将更新持久化到当前自定义 Agent 的 `SOUL.md` 和 `config/config.yaml`。仅当激活了自定义 Agent（运行时上下文中存在 `agent_name`）时，才会绑定到 lead agent。当用户在 Agent 内开启 chat 并要求该 Agent 调整自身的描述、人格、技能白名单、工具组白名单或默认模型时使用——它会直接写入按用户隔离的 `{base_dir}/users/{user_id}/agents/{agent_name}/` 下的真实配置文件，下一轮对话即可生效。仅显式传入的字段会被更新；省略某个字段以保留其现有值。传入 `skills=[]` 可禁用全部技能，省略 `skills` 则保留现有白名单。
 
 ---
 
 ### invoke_acp_agent
 
-使用 [Agent Connect Protocol (ACP)](https://agentconnectprotocol.org/) 调用外部 Agent。需要在 `config.yaml` 中配置 `acp_agents:`。参见[子 Agent](/docs/harness/subagents)页面了解 ACP 配置。
+使用 [Agent Connect Protocol (ACP)](https://agentconnectprotocol.org/) 调用外部 Agent。需要在 `config/config.yaml` 中配置 `acp_agents:`。参见[子 Agent](/docs/harness/subagents)页面了解 ACP 配置。
 
 ---
 
 ### tool_search
 
-按名称或描述搜索工具，并按需将其加载到 Agent 上下文中。仅当 `config.yaml` 中 `tool_search.enabled: true` 时激活。当 MCP 或其他工具集暴露大量工具且你希望减少上下文使用时很有用。
+按名称或描述搜索工具，并按需将其加载到 Agent 上下文中。仅当 `config/config.yaml` 中 `tool_search.enabled: true` 时激活。当 MCP 或其他工具集暴露大量工具且你希望减少上下文使用时很有用。
 
 ## 沙箱文件工具
 
@@ -91,7 +91,7 @@ task(agent="general-purpose", task="...", context="...")
 | `str_replace` | 替换文件中的字符串                                         |
 | `bash`        | 执行 Shell 命令（本地沙箱需要设置 `allow_host_bash: true`） |
 
-在 `config.yaml` 的 `tools:` 下配置：
+在 `config/config.yaml` 的 `tools:` 下配置：
 
 ```yaml
 tools:
@@ -106,7 +106,7 @@ tools:
 
 ## 社区工具
 
-社区工具将 Agent 连接到外部服务。在 `config.yaml` 的 `tools:` 下使用 `use:` 字段指定实现来配置。
+社区工具将 Agent 连接到外部服务。在 `config/config.yaml` 的 `tools:` 下使用 `use:` 字段指定实现来配置。
 
 ### 网络搜索
 
@@ -114,14 +114,14 @@ tools:
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.ddg_search.tools:web_search_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool
 ```
 无需 API Key。默认配置，适合开发和通用用途。
   </Tabs.Tab>
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.tavily.tools:web_search_tool
+  - use: deerflow.integrations.tavily.tools:web_search_tool
     api_key: $TAVILY_API_KEY
 ```
 高质量搜索，带结构化结果。需要 [Tavily](https://tavily.com) API Key。
@@ -132,7 +132,7 @@ tools:
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.brave.tools:web_search_tool
+  - use: deerflow.integrations.brave.tools:web_search_tool
     api_key: $BRAVE_SEARCH_API_KEY
 ```
 通过官方 [Brave Search API](https://brave.com/search/api/) 返回 Brave 独立索引的结果。需要 API Key，`max_results` 上限为 20。
@@ -143,7 +143,7 @@ tools:
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.exa.tools:web_search_tool
+  - use: deerflow.integrations.exa.tools:web_search_tool
     api_key: $EXA_API_KEY
 ```
 带神经检索的语义搜索。需要 [Exa](https://exa.ai) API Key。
@@ -154,7 +154,7 @@ tools:
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.infoquest.tools:web_search_tool
+  - use: deerflow.integrations.infoquest.tools:web_search_tool
     api_key: $INFOQUEST_API_KEY
 ```
 InfoQuest 搜索集成。
@@ -162,7 +162,7 @@ InfoQuest 搜索集成。
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.firecrawl.tools:web_search_tool
+  - use: deerflow.integrations.firecrawl.tools:web_search_tool
     api_key: $FIRECRAWL_API_KEY
 ```
 Firecrawl 驱动的搜索和爬取。需要 [Firecrawl](https://firecrawl.dev) API Key。
@@ -170,7 +170,7 @@ Firecrawl 驱动的搜索和爬取。需要 [Firecrawl](https://firecrawl.dev) A
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.groundroute.tools:web_search_tool
+  - use: deerflow.integrations.groundroute.tools:web_search_tool
     api_key: $GROUNDROUTE_API_KEY
 ```
 GroundRoute 是一个元搜索层：一个 API 接入六个搜索引擎（Serper、Brave、Exa、Tavily、Firecrawl、Perplexity）。为每个查询路由到满足质量门槛的最低成本引擎，并在引擎故障时自动切换。定价采用收益分成模式，您可保留约一半的缓存节省。
@@ -188,7 +188,7 @@ GroundRoute 是一个元搜索层：一个 API 接入六个搜索引擎（Serper
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - use: deerflow.integrations.jina_ai.tools:web_fetch_tool
     api_key: $JINA_API_KEY # 可选；匿名使用有速率限制
 ```
 将网页转换为干净的 Markdown。无 API Key 也可使用，但有更严格的速率限制。
@@ -198,7 +198,7 @@ tools:
 tools:
   - name: web_fetch
     group: web
-    use: deerflow.community.browserless.tools:web_fetch_tool
+    use: deerflow.integrations.browserless.tools:web_fetch_tool
     base_url: http://localhost:3032
     # token: $BROWSERLESS_TOKEN # Browserless Cloud 必需；自托管请删除此行（未设置的 $VAR 会导致启动失败）
 ```
@@ -207,14 +207,14 @@ tools:
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.exa.tools:web_fetch_tool
+  - use: deerflow.integrations.exa.tools:web_fetch_tool
     api_key: $EXA_API_KEY
 ```
   </Tabs.Tab>
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.groundroute.tools:web_fetch_tool
+  - use: deerflow.integrations.groundroute.tools:web_fetch_tool
     api_key: $GROUNDROUTE_API_KEY
 ```
   </Tabs.Tab>
@@ -226,7 +226,7 @@ tools:
 tools:
   - name: web_capture
     group: web
-    use: deerflow.community.browserless.tools:web_capture_tool
+    use: deerflow.integrations.browserless.tools:web_capture_tool
     base_url: http://localhost:3032
     # token: $BROWSERLESS_TOKEN # Browserless Cloud 必需；自托管请删除此行（未设置的 $VAR 会导致启动失败）
     output_format: png
@@ -247,14 +247,14 @@ JavaScript 页面。默认会拒绝解析到私网、回环或云元数据地址
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.image_search.tools:image_search_tool
+  - use: deerflow.integrations.image_search.tools:image_search_tool
 ```
 无需 API Key。默认配置，适合开发和通用用途。
   </Tabs.Tab>
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.infoquest.tools:image_search_tool
+  - use: deerflow.integrations.infoquest.tools:image_search_tool
     api_key: $INFOQUEST_API_KEY
 ```
 需要 InfoQuest API Key。
@@ -262,7 +262,7 @@ tools:
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.serper.tools:image_search_tool
+  - use: deerflow.integrations.serper.tools:image_search_tool
     api_key: $SERPER_API_KEY
 ```
 通过 Serper 获取 Google 图片结果。需要 [Serper](https://serper.dev) API Key，与 Serper `web_search` 工具复用同一个 `SERPER_API_KEY`。
@@ -270,7 +270,7 @@ tools:
   <Tabs.Tab>
 ```yaml
 tools:
-  - use: deerflow.community.brave.tools:image_search_tool
+  - use: deerflow.integrations.brave.tools:image_search_tool
     api_key: $BRAVE_SEARCH_API_KEY
 ```
 通过 Brave Image Search 获取独立图片结果。需要 [Brave Search API](https://brave.com/search/api/) Key，与 Brave `web_search` 工具复用同一个 `BRAVE_SEARCH_API_KEY`。

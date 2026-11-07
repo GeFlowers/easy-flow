@@ -1,6 +1,6 @@
 import type { AnchorHTMLAttributes } from "react";
 
-import { resolveArtifactURL } from "@/core/artifacts/utils";
+import { resolveArtifactURL } from "@/features/artifacts/utils";
 import { cn } from "@/lib/utils";
 
 import { CitationLink } from "../citations/citation-link";

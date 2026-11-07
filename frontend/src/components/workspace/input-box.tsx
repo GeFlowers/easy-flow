@@ -66,23 +66,23 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import { fetch } from "@/core/api/fetcher";
-import { getBackendBaseURL } from "@/core/config";
-import { useI18n } from "@/core/i18n/hooks";
-import { polishInputDraft } from "@/core/input-polish/api";
-import { hasOpenHumanInputRequest } from "@/core/messages/human-input";
-import { isHiddenFromUIMessage } from "@/core/messages/utils";
-import { useModels } from "@/core/models/hooks";
+import { fetch } from "@/features/api/fetcher";
+import { getBackendBaseURL } from "@/features/config";
+import { useI18n } from "@/features/i18n/hooks";
+import { polishInputDraft } from "@/features/input-polish/api";
+import { hasOpenHumanInputRequest } from "@/features/messages/human-input";
+import { isHiddenFromUIMessage } from "@/features/messages/utils";
+import { useModels } from "@/features/models/hooks";
 import {
   buildReferenceMessageMetadata,
   type SidecarContext,
-} from "@/core/sidecar";
-import { useSkills } from "@/core/skills/hooks";
-import { useSuggestionsConfig } from "@/core/suggestions/hooks";
-import type { AgentThreadContext, GoalState } from "@/core/threads";
-import { compactThreadContext } from "@/core/threads/api";
-import { threadTokenUsageQueryKey } from "@/core/threads/token-usage";
-import { textOfMessage } from "@/core/threads/utils";
+} from "@/features/sidecar";
+import { useSkills } from "@/features/skills/hooks";
+import { useSuggestionsConfig } from "@/features/suggestions/hooks";
+import type { AgentThreadContext, GoalState } from "@/features/threads";
+import { compactThreadContext } from "@/features/threads/api";
+import { threadTokenUsageQueryKey } from "@/features/threads/token-usage";
+import { textOfMessage } from "@/features/threads/utils";
 import {
   formatUploadSize,
   splitUnsupportedUploadFiles,
@@ -90,7 +90,7 @@ import {
   validateUploadLimits,
   type UploadLimits,
   type UploadLimitViolation,
-} from "@/core/uploads";
+} from "@/features/uploads";
 import {
   appendSpeechTranscript,
   getSpeechRecognitionConstructor,
@@ -100,7 +100,7 @@ import {
   shouldRestartSpeechRecognition,
   type BrowserSpeechRecognition,
   type SpeechRecognitionErrorKind,
-} from "@/core/voice-input/speech-recognition";
+} from "@/features/voice-input/speech-recognition";
 import { isIMEComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 
@@ -233,17 +233,17 @@ function buildHiddenConversationQuoteMessage({
         type: "text",
         text: [
           contexts.length === 1
-            ? "The user added the following quoted context to this conversation."
-            : `The user added the following ${contexts.length} quoted contexts to this conversation.`,
-          "Use the referenced_message blocks as reference material for the user's next message.",
+            ? "用户在此对话中添加了以下引用内容。"
+            : `用户在此对话中添加了以下 ${contexts.length} 段引用内容。`,
+          "请将 referenced_message 块作为回答用户下一条消息时的参考材料。",
           "",
           ...contexts.flatMap((context, index) =>
             [
               `<referenced_message index="${index + 1}" label="${escapeXmlAttribute(
                 context.label,
               )}">`,
-              `Role: ${context.role === "user" ? "User" : "Assistant"}`,
-              context.messageId ? `Message ID: ${context.messageId}` : null,
+              `角色：${context.role === "user" ? "用户" : "助手"}`,
+              context.messageId ? `消息编号：${context.messageId}` : null,
               "",
               context.content,
               "</referenced_message>",

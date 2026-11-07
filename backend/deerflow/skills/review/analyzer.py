@@ -41,8 +41,8 @@ def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "d
             make_finding(
                 "structure.missing-skill-md",
                 severity="blocker",
-                message="Package root does not contain SKILL.md.",
-                remediation="Add exactly one SKILL.md at the package root.",
+                message="技能包根目录不包含 SKILL.md。",
+                remediation="在技能包根目录添加且仅添加一个 SKILL.md。",
             )
         )
     elif root_skill.get("kind") != "text":
@@ -51,8 +51,8 @@ def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "d
                 "structure.skill-md-not-text",
                 severity="blocker",
                 path="SKILL.md",
-                message="Root SKILL.md is not readable UTF-8 text.",
-                remediation="Store SKILL.md as UTF-8 Markdown with YAML frontmatter.",
+                message="根目录的 SKILL.md 不是可读取的统一码转换格式八位文本。",
+                remediation="将 SKILL.md 保存为统一码转换格式八位的 Markdown 文本，并包含前置元数据。",
             )
         )
     else:
@@ -64,8 +64,8 @@ def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "d
                 "structure.nested-skill-md",
                 severity="blocker",
                 path=nested,
-                message="Nested SKILL.md files are not allowed in a single skill package.",
-                remediation="Keep exactly one SKILL.md at the package root.",
+                message="单个技能包中不允许嵌套 SKILL.md 文件。",
+                remediation="在技能包根目录保留且仅保留一个 SKILL.md。",
             )
         )
 
@@ -76,8 +76,8 @@ def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "d
                     "package.symlink",
                     severity="warning",
                     path=path,
-                    message="Package contains a symlink entry.",
-                    remediation="Replace symlinks with ordinary files inside the skill package.",
+                    message="技能包包含符号链接条目。",
+                    remediation="将符号链接替换为技能包内部的普通文件。",
                     evidence=entry.get("target"),
                 )
             )
@@ -87,8 +87,8 @@ def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "d
                     "package.nested-archive",
                     severity="warning",
                     path=path,
-                    message="Package contains a nested archive.",
-                    remediation="Unpack and review nested archives before packaging the skill.",
+                    message="技能包包含嵌套归档。",
+                    remediation="打包技能前请解压并审查嵌套归档。",
                 )
             )
         if _is_hidden_sensitive_path(path):
@@ -97,8 +97,8 @@ def analyze_skill_package(snapshot: dict[str, Any], *, profile: ProfileName = "d
                     "package.hidden-sensitive-file",
                     severity="warning",
                     path=path,
-                    message="Package contains a hidden sensitive file.",
-                    remediation="Remove hidden credential or package-manager config files.",
+                    message="技能包包含隐藏的敏感文件。",
+                    remediation="移除隐藏的凭据文件或包管理器配置文件。",
                 )
             )
 
@@ -154,8 +154,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.invalid-frontmatter",
                 severity="blocker",
                 path="SKILL.md",
-                message=error or "Invalid frontmatter format.",
-                remediation="Use YAML frontmatter bounded by --- fences with name and description fields.",
+                message=error or "前置元数据格式无效.",
+                remediation="使用以 --- 分隔的前置元数据，并包含 name 和 description 字段。",
             )
         )
         return None
@@ -168,8 +168,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.unknown-frontmatter-field",
                 severity="warning",
                 path="SKILL.md",
-                message=f"Unknown frontmatter field(s): {', '.join(unexpected)}",
-                remediation="Remove unsupported fields or add them to the shared DeerFlow frontmatter schema.",
+                message=f"未知的前置元数据字段： {', '.join(unexpected)}",
+                remediation="移除不支持的字段，或将其添加到共享的 DeerFlow 前置元数据模式中。",
                 evidence=unexpected,
             )
         )
@@ -182,8 +182,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.missing-name",
                 severity="blocker",
                 path="SKILL.md",
-                message="Frontmatter is missing a non-empty name.",
-                remediation="Add a hyphen-case skill name.",
+                message="前置元数据缺少非空的 name。",
+                remediation="添加使用连字符命名的技能名称。",
             )
         )
     elif not _valid_skill_name(declared_name):
@@ -192,8 +192,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.invalid-name",
                 severity="error",
                 path="SKILL.md",
-                message="Skill name must be hyphen-case using lowercase letters, digits, and hyphens.",
-                remediation="Rename the skill using lowercase hyphen-case.",
+                message="技能名称必须采用连字符命名，仅使用小写字母、数字和连字符。",
+                remediation="使用小写字母和连字符重新命名技能。",
                 evidence=declared_name,
             )
         )
@@ -205,8 +205,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.missing-description",
                 severity="blocker",
                 path="SKILL.md",
-                message="Frontmatter is missing a non-empty description.",
-                remediation="Add a concise description that states what the skill does and when to invoke it.",
+                message="前置元数据缺少非空的 description。",
+                remediation="添加简明描述，说明技能的用途和调用时机。",
             )
         )
     elif len(description.strip()) > 1024:
@@ -215,8 +215,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.description-too-long",
                 severity="error",
                 path="SKILL.md",
-                message="Description exceeds DeerFlow's 1024 character limit.",
-                remediation="Shorten the description and move detailed guidance into the body.",
+                message="描述超过 DeerFlow 的 1024 字符限制。",
+                remediation="缩短描述，将详细指导移到正文中。",
             )
         )
 
@@ -227,8 +227,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.empty-body",
                 severity="error",
                 path="SKILL.md",
-                message="SKILL.md has no instruction body after frontmatter.",
-                remediation="Add executable workflow instructions after the frontmatter.",
+                message="SKILL.md 的前置元数据后没有指令正文。",
+                remediation="在前置元数据后添加可执行的工作流程说明。",
             )
         )
 
@@ -241,7 +241,7 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 severity="error",
                 path="SKILL.md",
                 message=str(exc),
-                remediation="Declare allowed-tools as a YAML list of non-empty strings.",
+                remediation="将 allowed-tools 声明为非空字符串列表。",
             )
         )
 
@@ -254,7 +254,7 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 severity="error",
                 path="SKILL.md",
                 message=str(exc),
-                remediation="Declare required-secrets as a YAML list.",
+                remediation="将 required-secrets 声明为列表。",
             )
         )
 
@@ -264,8 +264,8 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
                 "structure.invalid-secrets-autonomous",
                 severity="error",
                 path="SKILL.md",
-                message="secrets-autonomous must be a boolean.",
-                remediation="Use true or false for secrets-autonomous.",
+                message="secrets-autonomous 必须为布尔值.",
+                remediation="为 secrets-autonomous 使用 true 或 false。",
             )
         )
 
@@ -286,8 +286,8 @@ def _add_agentskills_findings(metadata: dict[str, Any], declared_name: str | Non
                 source="review-core",
                 profile="agentskills",
                 path="SKILL.md",
-                message="Description is longer than the Agent Skills recommended display length.",
-                remediation="Keep the description concise and move detail into the body.",
+                message="描述超过代理技能规范建议的显示长度。",
+                remediation="保持描述简明，将详细内容移到正文。",
             )
         )
     if declared_name and len(declared_name) > 64:
@@ -298,8 +298,8 @@ def _add_agentskills_findings(metadata: dict[str, Any], declared_name: str | Non
                 source="review-core",
                 profile="agentskills",
                 path="SKILL.md",
-                message="Skill name is longer than the portability profile recommends.",
-                remediation="Use a shorter package name for cross-client portability.",
+                message="技能名称超过可移植性配置建议的长度。",
+                remediation="使用更短的包名以便跨客户端使用。",
             )
         )
 
@@ -340,8 +340,8 @@ def _scan_with_skillscan(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
                 "skillscan.scanner-error",
                 source="skillscan",
                 severity="warning",
-                message="SkillScan reported an analyzer error.",
-                remediation="Inspect the referenced file and rerun the review.",
+                message="技能扫描报告了分析器错误。",
+                remediation="检查所引用的文件，并重新运行审查。",
                 evidence=str(error),
             )
         )

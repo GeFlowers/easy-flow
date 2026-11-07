@@ -195,7 +195,7 @@ def _build_preview(
     tail = content[tail_start:] if tail_start < total else ""
 
     omitted = total - len(head) - len(tail)
-    ref = f"\n\n[Full {tool_name} output saved to {virtual_path} ({total} chars, ~{total // 4} tokens). Use read_file with start_line and end_line to access specific sections. {omitted} chars omitted from this preview.]\n\n"
+    ref = f"\n\n[{tool_name} 的完整输出已保存到 {virtual_path}（{total} 个字符，约 {total // 4} 个令牌）。请使用 read_file 的 start_line 和 end_line 读取指定部分。{omitted} 个字符已从此预览中省略。]\n\n"
 
     parts = [head, ref]
     if tail:
@@ -216,7 +216,7 @@ def _build_fallback(
     if max_chars <= 0 or total <= max_chars:
         return content
 
-    marker_template = "\n\n[... {n} chars omitted from {tn} output. Persistent storage unavailable. Consider narrowing the query or using more specific parameters.]\n\n"
+    marker_template = "\n\n[... 已从 {tn} 输出中省略 {n} 个字符。持久存储不可用。请考虑缩小查询范围或使用更具体的参数。]\n\n"
     marker_overhead = len(marker_template.format(n=total, tn=tool_name))
 
     if marker_overhead >= max_chars:

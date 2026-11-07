@@ -1,7 +1,7 @@
 import rehypeSlug from "rehype-slug";
 
 import { type ClipboardSafeStreamdownProps } from "@/components/ai-elements/streamdown";
-import { streamdownPlugins } from "@/core/streamdown";
+import { streamdownPlugins } from "@/features/streamdown";
 
 const baseRehypePlugins = streamdownPlugins.rehypePlugins ?? [];
 

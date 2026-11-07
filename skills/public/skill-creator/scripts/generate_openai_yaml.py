@@ -74,22 +74,22 @@ def format_display_name(skill_name):
 
 
 def generate_short_description(display_name):
-    '''根据展示名称生成符合界面长度限制的英文技能简介。'''
-    description = f"Help with {display_name} tasks"
+    '''根据展示名称生成符合界面长度限制的中文技能简介。'''
+    description = f"协助完成 {display_name} 相关任务"
 
     if len(description) < 25:
-        description = f"Help with {display_name} tasks and workflows"
+        description = f"协助完成 {display_name} 相关任务并组织工作流程"
     if len(description) < 25:
-        description = f"Help with {display_name} tasks with guidance"
+        description = f"协助完成 {display_name} 相关任务，并提供清晰可靠的步骤指导"
 
     if len(description) > 64:
-        description = f"Help with {display_name}"
+        description = f"协助完成 {display_name}"
     if len(description) > 64:
-        description = f"{display_name} helper"
+        description = f"{display_name} 助手"
     if len(description) > 64:
-        description = f"{display_name} tools"
+        description = f"{display_name} 工具"
     if len(description) > 64:
-        suffix = " helper"
+        suffix = " 助手"
         max_name_length = 64 - len(suffix)
         trimmed = display_name[:max_name_length].rstrip()
         description = f"{trimmed}{suffix}"
@@ -97,7 +97,7 @@ def generate_short_description(display_name):
         description = description[:64].rstrip()
 
     if len(description) < 25:
-        description = f"{description} workflows"
+        description = f"{description}，提供清晰可靠的操作指导与工作流程支持"
         if len(description) > 64:
             description = description[:64].rstrip()
 
@@ -108,12 +108,12 @@ def read_frontmatter_name(skill_dir):
     '''读取技能说明文件的 YAML 元数据，校验并返回其中的技能名称。'''
     skill_md = Path(skill_dir) / "SKILL.md"
     if not skill_md.exists():
-        print(f"[ERROR] SKILL.md not found in {skill_dir}")
+        print(f"[ERROR] 在 {skill_dir} 中未找到 SKILL.md")
         return None
-    content = skill_md.read_text()
+    content = skill_md.read_text(encoding="utf-8")
     match = re.match(r"^---\n(.*?)\n---", content, re.DOTALL)
     if not match:
-        print("[ERROR] Invalid SKILL.md frontmatter format.")
+        print("[ERROR] SKILL.md 前置信息格式无效。")
         return None
     frontmatter_text = match.group(1)
 
@@ -122,14 +122,14 @@ def read_frontmatter_name(skill_dir):
     try:
         frontmatter = yaml.safe_load(frontmatter_text)
     except yaml.YAMLError as exc:
-        print(f"[ERROR] Invalid YAML frontmatter: {exc}")
+        print(f"[ERROR] YAML 前置信息无效： {exc}")
         return None
     if not isinstance(frontmatter, dict):
-        print("[ERROR] Frontmatter must be a YAML dictionary.")
+        print("[ERROR] 前置信息必须是 YAML 字典。")
         return None
     name = frontmatter.get("name", "")
     if not isinstance(name, str) or not name.strip():
-        print("[ERROR] Frontmatter 'name' is missing or invalid.")
+        print("[ERROR] 前置信息缺少有效的 name。")
         return None
     return name.strip()
 
@@ -140,17 +140,17 @@ def parse_interface_overrides(raw_overrides):
     optional_order = []
     for item in raw_overrides:
         if "=" not in item:
-            print(f"[ERROR] Invalid interface override '{item}'. Use key=value.")
+            print(f"[ERROR] 界面覆盖项 '{item}' 无效，请使用 key=value。")
             return None, None
         key, value = item.split("=", 1)
         key = key.strip()
         value = value.strip()
         if not key:
-            print(f"[ERROR] Invalid interface override '{item}'. Key is empty.")
+            print(f"[ERROR] 界面覆盖项 '{item}' 无效，字段名为空。")
             return None, None
         if key not in ALLOWED_INTERFACE_KEYS:
             allowed = ", ".join(sorted(ALLOWED_INTERFACE_KEYS))
-            print(f"[ERROR] Unknown interface field '{key}'. Allowed: {allowed}")
+            print(f"[ERROR] 未知界面字段 '{key}'，允许：{allowed}")
             return None, None
         overrides[key] = value
         if (
@@ -174,8 +174,8 @@ def write_openai_yaml(skill_dir, skill_name, raw_overrides):
 
     if not (25 <= len(short_description) <= 64):
         print(
-            "[ERROR] short_description must be 25-64 characters "
-            f"(got {len(short_description)})."
+            "[ERROR] short_description 必须为 25–64 个字符"
+            f"（实际 {len(short_description)} 个）。"
         )
         return None
 
@@ -193,35 +193,35 @@ def write_openai_yaml(skill_dir, skill_name, raw_overrides):
     agents_dir = Path(skill_dir) / "agents"
     agents_dir.mkdir(parents=True, exist_ok=True)
     output_path = agents_dir / "openai.yaml"
-    output_path.write_text("\n".join(interface_lines) + "\n")
-    print("[OK] Created agents/openai.yaml")
+    output_path.write_text("\n".join(interface_lines) + "\n", encoding="utf-8")
+    print("[OK] 已创建 agents/openai.yaml")
     return output_path
 
 
 def main():
     '''解析命令行参数，确定技能名称并调用元数据文件生成流程。'''
     parser = argparse.ArgumentParser(
-        description="Create agents/openai.yaml for a skill directory.",
+        description="为技能目录创建 agents/openai.yaml。",
     )
-    parser.add_argument("skill_dir", help="Path to the skill directory")
+    parser.add_argument("skill_dir", help="技能目录路径")
     parser.add_argument(
         "--name",
-        help="Skill name override (defaults to SKILL.md frontmatter)",
+        help="覆盖技能名称，默认读取 SKILL.md 前置信息",
     )
     parser.add_argument(
         "--interface",
         action="append",
         default=[],
-        help="Interface override in key=value format (repeatable)",
+        help="以 key=value 覆盖界面字段，可重复传入",
     )
     args = parser.parse_args()
 
     skill_dir = Path(args.skill_dir).resolve()
     if not skill_dir.exists():
-        print(f"[ERROR] Skill directory not found: {skill_dir}")
+        print(f"[ERROR] 未找到技能目录： {skill_dir}")
         sys.exit(1)
     if not skill_dir.is_dir():
-        print(f"[ERROR] Path is not a directory: {skill_dir}")
+        print(f"[ERROR] 路径不是目录： {skill_dir}")
         sys.exit(1)
 
     skill_name = args.name or read_frontmatter_name(skill_dir)

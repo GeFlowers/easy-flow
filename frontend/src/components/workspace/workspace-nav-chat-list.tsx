@@ -15,8 +15,8 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAgentsApiEnabled } from "@/core/agents";
-import { useI18n } from "@/core/i18n/hooks";
+import { useAgentsApiEnabled } from "@/features/agents";
+import { useI18n } from "@/features/i18n/hooks";
 
 /** 在侧栏渲染聊天导航列表，并为禁用入口保留可访问的原因说明。 */
 export function WorkspaceNavChatList() {

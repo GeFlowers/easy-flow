@@ -116,10 +116,10 @@ def update_agent(
         return Command(update={"messages": [ToolMessage(content=f"Error: {message}", tool_call_id=tool_call_id, status="error")]})
 
     if channel_name in _UNTRUSTED_CHANNELS:
-        return _err(f"update_agent is disabled on the {channel_name!r} channel. Self-mutation requests must come from an operator-trusted surface (chat UI or the HTTP API), not a webhook fan-out.")
+        return _err(f"通道 {channel_name!r} 已禁用 update_agent。自我修改请求必须来自操作者信任的入口（聊天界面或超文本传输协议应用程序接口），不能来自网络钩子的转发。")
 
     if soul is None and description is None and skills is None and tool_groups is None and model is None:
-        return _err('No fields provided. Pass at least one of: soul, description, skills, tool_groups, model. Omit unchanged fields instead of passing null-like strings such as "null", "none", or "undefined".')
+        return _err('未提供任何字段。请至少传入 soul、description、skills、tool_groups、model 中的一项。未修改的字段应省略，不要传入 "null"、"none" 或 "undefined" 等表示空值的字符串。')
 
     try:
         agent_name = validate_agent_name(agent_name_raw)
@@ -127,28 +127,28 @@ def update_agent(
         return _err(str(e))
 
     if not agent_name:
-        return _err("update_agent is only available inside a custom agent's chat. There is no agent_name in the current runtime context, so there is nothing to update. If you are inside the bootstrap flow, use setup_agent instead.")
+        return _err("update_agent 只能在自定义代理的聊天中使用。当前运行时上下文没有 agent_name，因此没有可更新的目标。若正在进行初始设置，请使用 setup_agent。")
 
     user_id = resolve_runtime_user_id(runtime)
 
     if model is not None and get_app_config().get_model_config(model) is None:
-        return _err(f"Unknown model '{model}'. Pass a model name that exists in config.yaml's models section.")
+        return _err(f"未知模型 '{model}'。请使用 config.yaml 的 models 部分中已有的模型名称。")
 
     paths = get_paths()
     agent_dir = paths.user_agent_dir(user_id, agent_name)
     legacy_dir = paths.agent_dir(agent_name)
     if not (agent_dir / "config.yaml").exists() and (legacy_dir / "config.yaml").exists():
-        return _err(f"Agent '{agent_name}' only exists in the legacy shared layout and is not scoped to a user; legacy agents are read-only and cannot be updated through this tool.")
+        return _err(f"代理 '{agent_name}' 仅存在于旧版共享布局中，没有归属具体用户；旧版代理只读，不能通过此工具更新。")
 
     try:
         existing_cfg = load_agent_config(agent_name, user_id=user_id)
     except FileNotFoundError:
-        return _err(f"Agent '{agent_name}' does not exist for the current user. Use setup_agent to create a new agent first.")
+        return _err(f"当前用户没有代理 '{agent_name}'。请先使用 setup_agent 创建新代理。")
     except ValueError as e:
-        return _err(f"Agent '{agent_name}' has an unreadable config: {e}")
+        return _err(f"无法读取代理 '{agent_name}' 的配置： {e}")
 
     if existing_cfg is None:
-        return _err(f"Agent '{agent_name}' could not be loaded.")
+        return _err(f"无法加载代理 '{agent_name}'。")
 
     updated_fields: list[str] = []
 
@@ -218,23 +218,23 @@ def update_agent(
                     e,
                     exc_info=True,
                 )
-                return _err(f"Partial update for agent '{agent_name}': {[p.name for p in committed]} were updated, but the rest failed ({e}). Re-run update_agent to retry the remaining fields.")
+                return _err(f"代理 '{agent_name}' 已部分更新：已更新 {[p.name for p in committed]}，其余字段更新失败（{e}）。请重新运行 update_agent 重试剩余字段。")
             raise
 
     except Exception as e:
         _cleanup_temps(staged_temps)
         logger.error("[update_agent] Failed to update agent '%s' (user=%s): %s", agent_name, user_id, e, exc_info=True)
-        return _err(f"Failed to update agent '{agent_name}': {e}")
+        return _err(f"更新代理 '{agent_name}' 失败： {e}")
 
     if not updated_fields:
-        return Command(update={"messages": [ToolMessage(content=f"No changes applied to agent '{agent_name}'. The provided values matched the existing config.", tool_call_id=tool_call_id)]})
+        return Command(update={"messages": [ToolMessage(content=f"代理 '{agent_name}' 未发生变化。提供的值与现有配置一致。", tool_call_id=tool_call_id)]})
 
     logger.info("[update_agent] Updated agent '%s' (user=%s) fields: %s", agent_name, user_id, updated_fields)
     return Command(
         update={
             "messages": [
                 ToolMessage(
-                    content=(f"Agent '{agent_name}' updated successfully. Changed: {', '.join(updated_fields)}. The new configuration takes effect on the next user turn."),
+                    content=(f"代理 '{agent_name}' 已成功更新。已修改： {', '.join(updated_fields)}。新配置将在用户下一轮对话时生效。"),
                     tool_call_id=tool_call_id,
                 )
             ]

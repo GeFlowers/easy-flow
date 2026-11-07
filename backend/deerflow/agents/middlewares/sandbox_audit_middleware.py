@@ -190,7 +190,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
         '''构造工具错误结果，说明命令被拦截并允许智能体继续处理。'''
         tool_call_id = str(request.tool_call.get("id") or "missing_id")
         return ToolMessage(
-            content=f"Command blocked: {reason}. Please use a safer alternative approach.",
+            content=f"命令已阻止： {reason}。请采用更安全的替代方案。",
             tool_call_id=tool_call_id,
             name="bash",
             status="error",
@@ -200,7 +200,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
         '''仅对普通工具结果追加中风险提示；其他类型的控制结果保持不变。'''
         if not isinstance(result, ToolMessage):
             return result
-        warning = f"\n\n⚠️ Warning: `{command}` is a medium-risk command that may modify the runtime environment."
+        warning = f"\n\n⚠️ Warning: `{command}` 是中等风险命令，可能修改运行环境。"
         if isinstance(result.content, list):
             new_content = list(result.content) + [{"type": "text", "text": warning}]
         else:
@@ -218,11 +218,11 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
     def _validate_input(self, command: str) -> str | None:
         '''拒绝空命令、超长命令和含空字节的输入，并返回对应原因。'''
         if not command.strip():
-            return "empty command"
+            return "命令为空"
         if len(command) > self._MAX_COMMAND_LENGTH:
-            return "command too long"
+            return "命令过长"
         if "\x00" in command:
-            return "null byte detected"
+            return "检测到空字节"
         return None
 
 
@@ -263,7 +263,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
 
         command, _, verdict, reject_reason = self._pre_process(request)
         if verdict == "block":
-            reason = reject_reason or "security violation detected"
+            reason = reject_reason or "检测到安全违规"
             return self._build_block_message(request, reason)
         result = handler(request)
         if verdict == "warn":
@@ -282,7 +282,7 @@ class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
 
         command, _, verdict, reject_reason = self._pre_process(request)
         if verdict == "block":
-            reason = reject_reason or "security violation detected"
+            reason = reject_reason or "检测到安全违规"
             return self._build_block_message(request, reason)
         result = await handler(request)
         if verdict == "warn":

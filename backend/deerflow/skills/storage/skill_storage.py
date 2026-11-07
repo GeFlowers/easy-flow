@@ -30,22 +30,22 @@ class SkillStorage(ABC):
         '''校验技能名格式与长度，并返回去除首尾空白后的名称。'''
         normalized = name.strip()
         if not _SKILL_NAME_PATTERN.fullmatch(normalized):
-            raise ValueError("Skill name must be hyphen-case using lowercase letters, digits, and hyphens only.")
+            raise ValueError("技能名称必须使用连字符命名，只能包含小写字母、数字和连字符。")
         if len(normalized) > 64:
-            raise ValueError("Skill name must be 64 characters or fewer.")
+            raise ValueError("技能名称不得超过 64 个字符。")
         return normalized
 
     @staticmethod
     def validate_relative_path(relative_path: str, base_dir: Path) -> Path:
         '''解析技能相对路径并校验最终目标仍位于技能根目录内。'''
         if not relative_path:
-            raise ValueError("relative_path must not be empty.")
+            raise ValueError("relative_path 不能为空.")
         resolved_base = base_dir.resolve()
         target = (resolved_base / relative_path).resolve()
         try:
             target.relative_to(resolved_base)
         except ValueError as exc:
-            raise ValueError("relative_path must resolve within the skill directory.") from exc
+            raise ValueError("relative_path 必须解析到技能目录内部。") from exc
         return target
 
     @staticmethod
@@ -63,28 +63,28 @@ class SkillStorage(ABC):
             if not is_valid:
                 raise ValueError(message)
             if parsed_name != name:
-                raise ValueError(f"Frontmatter name '{parsed_name}' must match requested skill name '{name}'.")
+                raise ValueError(f"前置元数据中的 name '{parsed_name}' 必须与请求的技能名称 '{name}' 一致。")
 
     def ensure_safe_support_path(self, name: str, relative_path: str) -> Path:
         '''校验技能附件只能位于允许的支持目录，并返回解析后的绝对路径。'''
         _ALLOWED_SUPPORT_SUBDIRS = {"references", "templates", "scripts", "assets"}
         skill_dir = self.get_custom_skill_dir(self.validate_skill_name(name)).resolve()
         if not relative_path or relative_path.endswith("/"):
-            raise ValueError("Supporting file path must include a filename.")
+            raise ValueError("辅助文件路径必须包含文件名。")
         relative = Path(relative_path)
         if relative.is_absolute():
-            raise ValueError("Supporting file path must be relative.")
+            raise ValueError("辅助文件路径必须是相对路径。")
         if any(part in {"..", ""} for part in relative.parts):
-            raise ValueError("Supporting file path must not contain parent-directory traversal.")
+            raise ValueError("辅助文件路径不能包含父目录遍历。")
         top_level = relative.parts[0] if relative.parts else ""
         if top_level not in _ALLOWED_SUPPORT_SUBDIRS:
-            raise ValueError(f"Supporting files must live under one of: {', '.join(sorted(_ALLOWED_SUPPORT_SUBDIRS))}.")
+            raise ValueError(f"辅助文件必须位于以下目录之一： {', '.join(sorted(_ALLOWED_SUPPORT_SUBDIRS))}.")
         target = (skill_dir / relative).resolve()
         allowed_root = (skill_dir / top_level).resolve()
         try:
             target.relative_to(allowed_root)
         except ValueError as exc:
-            raise ValueError("Supporting file path must stay within the selected support directory.") from exc
+            raise ValueError("辅助文件路径必须位于选定的辅助目录内部。") from exc
         return target
 
 
@@ -99,7 +99,7 @@ class SkillStorage(ABC):
         try:
             resolved_file.relative_to(resolved_root)
         except ValueError as exc:
-            raise ValueError("Resolved skill file must stay within the configured skills root.") from exc
+            raise ValueError("解析后的技能文件必须位于配置的技能根目录内部。") from exc
         return resolved_file
 
     @abstractmethod
@@ -205,5 +205,5 @@ class SkillStorage(ABC):
         if self.custom_skill_exists(name):
             return
         if self.public_skill_exists(name):
-            raise ValueError(f"'{name}' is a built-in skill. To customise it, create a new skill with the same name under skills/custom/.")
-        raise FileNotFoundError(f"Custom skill '{name}' not found.")
+            raise ValueError(f"'{name}' 是内置技能。若要自定义，请在 skills/custom/ 下创建同名新技能。")
+        raise FileNotFoundError(f"找不到自定义技能 '{name}'。")

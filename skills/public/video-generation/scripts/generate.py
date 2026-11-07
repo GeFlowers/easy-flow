@@ -28,8 +28,8 @@ def _resolve_provider(override_env: str, existing_provider: str, has_existing_cr
     if os.getenv("MINIMAX_API_KEY"):
         return "minimax"
     raise ValueError(
-        f"No credentials found. Set GEMINI_API_KEY for {existing_provider}, "
-        f"or MINIMAX_API_KEY for minimax (optionally force with {override_env})."
+        f"未找到凭据。请为 {existing_provider} 设置 GEMINI_API_KEY，"
+        f"或为 minimax 设置 MINIMAX_API_KEY（可通过 {override_env} 强制指定）。"
     )
 
 
@@ -49,7 +49,7 @@ def _check_base_resp(payload: dict) -> None:
     '''校验 MiniMax 响应的 ``base_resp``，并把协议错误转换为异常。'''
     base = payload.get("base_resp") or {}
     if base.get("status_code", 0) != 0:
-        raise Exception(f"MiniMax error {base.get('status_code')}: {base.get('status_msg')}")
+        raise Exception(f"MiniMax 错误 {base.get('status_code')}：{base.get('status_msg')}")
 
 
 def _guess_mime(image_path: str) -> str:
@@ -93,13 +93,13 @@ def _poll_video_task(host: str, auth: str, task_id: str,
         if status == "Fail":
             base = payload.get("base_resp") or {}
             raise Exception(
-                f"MiniMax video task {task_id} failed: "
+                f"MiniMax 视频任务 {task_id} 失败："
                 f"{base.get('status_code')} {base.get('status_msg')}"
             )
         # 查询接口可能在未给出终态时返回认证或任务 ID 错误，须先向调用方暴露该错误。
         _check_base_resp(payload)
         time.sleep(interval)
-    raise Exception(f"MiniMax video task {task_id} timed out after {max_attempts} polls")
+    raise Exception(f"MiniMax 视频任务 {task_id} 在轮询 {max_attempts} 次后超时")
 
 
 def _retrieve_file_url(host: str, auth: str, file_id: str) -> str:
@@ -141,7 +141,7 @@ def _generate_video_minimax(
     '''
     api_key = os.getenv("MINIMAX_API_KEY")
     if not api_key:
-        return "MINIMAX_API_KEY is not set"
+        return "尚未设置 MINIMAX_API_KEY"
     host = _minimax_host()
     auth = f"Bearer {api_key}"
     body = {"model": os.getenv("MINIMAX_VIDEO_MODEL", "MiniMax-Hailuo-2.3"), "prompt": prompt}
@@ -160,7 +160,7 @@ def _generate_video_minimax(
     file_id = _poll_video_task(host, auth, task_id)
     download_url = _retrieve_file_url(host, auth, file_id)
     _download(download_url, output_file)
-    return f"The video has been generated successfully to {output_file}"
+    return f"已成功生成视频：{output_file}"
 
 
 def download(url: str, output_file: str) -> None:
@@ -170,7 +170,7 @@ def download(url: str, output_file: str) -> None:
     '''
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        raise ValueError("GEMINI_API_KEY is not set")
+        raise ValueError("尚未设置 GEMINI_API_KEY")
     response = requests.get(url, headers={"x-goog-api-key": api_key}, timeout=300)
     response.raise_for_status()
     _ensure_output_dir(output_file)
@@ -199,7 +199,7 @@ def _generate_video_gemini(
         request_json["instances"][0]["referenceImages"] = reference_payload
     api_key = os.getenv("GEMINI_API_KEY")
     if not api_key:
-        return "GEMINI_API_KEY is not set"
+        return "尚未设置 GEMINI_API_KEY"
     response = requests.post(
         "https://generativelanguage.googleapis.com/v1beta/models/veo-3.1-generate-preview:predictLongRunning",
         headers={"x-goog-api-key": api_key, "Content-Type": "application/json"},
@@ -222,7 +222,7 @@ def _generate_video_gemini(
             download(sample["video"]["uri"], output_file)
             break
         time.sleep(3)
-    return f"The video has been generated successfully to {output_file}"
+    return f"已成功生成视频：{output_file}"
 
 
 def generate_video(
@@ -246,23 +246,23 @@ def generate_video(
         return _generate_video_minimax(prompt, reference_images, output_file)
     if provider in ("gemini", "google"):
         return _generate_video_gemini(prompt, reference_images, output_file)
-    raise ValueError(f"Unknown video provider: {provider!r} (use 'gemini' or 'minimax')")
+    raise ValueError(f"未知视频提供方：{provider!r}（请使用 'gemini' 或 'minimax'）")
 
 
 if __name__ == "__main__":
     import argparse
 
-    parser = argparse.ArgumentParser(description="Generate videos using Gemini or MiniMax API")
-    parser.add_argument("--prompt-file", required=True, help="Absolute path to JSON prompt file")
+    parser = argparse.ArgumentParser(description="通过 Gemini 或 MiniMax 接口生成视频")
+    parser.add_argument("--prompt-file", required=True, help="JSON（JavaScript Object Notation，JavaScript 对象表示法）提示词文件绝对路径")
     parser.add_argument("--reference-images", nargs="*", default=[],
-                        help="Absolute paths to reference images (space-separated)")
-    parser.add_argument("--output-file", required=True, help="Output path for generated video")
+                        help="参考图绝对路径，以空格分隔")
+    parser.add_argument("--output-file", required=True, help="生成视频的输出路径")
     parser.add_argument("--aspect-ratio", required=False, default="16:9",
-                        help="Aspect ratio of the generated video (Gemini only)")
+                        help="生成视频宽高比，仅适用于 Gemini")
     args = parser.parse_args()
 
     try:
         print(generate_video(args.prompt_file, args.reference_images,
                              args.output_file, args.aspect_ratio))
     except Exception as e:
-        print(f"Error while generating video: {e}")
+        print(f"生成视频时出错：{e}")

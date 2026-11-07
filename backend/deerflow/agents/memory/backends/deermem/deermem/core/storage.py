@@ -9,6 +9,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from deerflow.agents.memory.schema import MEMORY_SCHEMA_VERSION, normalize_memory
+
 from ..config import DeerMemConfig
 from .paths import memory_file_path
 
@@ -23,18 +25,10 @@ def utc_now_iso_z() -> str:
 def create_empty_memory() -> dict[str, Any]:
     '''返回包含用户摘要、历史摘要和事实列表的初始记忆文档。'''
     return {
-        "version": "1.0",
+        "version": MEMORY_SCHEMA_VERSION,
         "lastUpdated": utc_now_iso_z(),
-        "user": {
-            "workContext": {"summary": "", "updatedAt": ""},
-            "personalContext": {"summary": "", "updatedAt": ""},
-            "topOfMind": {"summary": "", "updatedAt": ""},
-        },
-        "history": {
-            "recentMonths": {"summary": "", "updatedAt": ""},
-            "earlierContext": {"summary": "", "updatedAt": ""},
-            "longTermBackground": {"summary": "", "updatedAt": ""},
-        },
+        "user": {"summary": "", "updatedAt": ""},
+        "history": {"summary": "", "updatedAt": ""},
         "facts": [],
     }
 
@@ -81,8 +75,8 @@ class FileMemoryStorage(MemoryStorage):
         try:
             with open(file_path, encoding="utf-8") as f:
                 data = json.load(f)
-            return data
-        except (json.JSONDecodeError, OSError) as e:
+            return normalize_memory(data)
+        except (ValueError, OSError) as e:
             logger.warning("Failed to load memory file: %s", e)
             return create_empty_memory()
 
@@ -135,7 +129,7 @@ class FileMemoryStorage(MemoryStorage):
 
         try:
             file_path.parent.mkdir(parents=True, exist_ok=True)
-            memory_data = {**memory_data, "lastUpdated": utc_now_iso_z()}
+            memory_data = {**normalize_memory(memory_data), "lastUpdated": utc_now_iso_z()}
 
             temp_path = file_path.with_suffix(f".{uuid.uuid4().hex}.tmp")
             with open(temp_path, "w", encoding="utf-8") as f:

@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   describeSchedule,
   pad2,
@@ -24,7 +24,7 @@ import {
   type CronPreset,
   type ScheduleLocale,
   type Weekday,
-} from "@/core/scheduled-tasks/cron";
+} from "@/features/scheduled-tasks/cron";
 
 export type ScheduleValue = {
   schedule_type: "once" | "cron";

@@ -16,7 +16,7 @@ _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> str:
     '''把 YAML 解析错误整理为包含文件行号和常见未加引号冒号提示的诊断信息。'''
 
-    lines = [f"Invalid YAML front-matter in {skill_file}: {exc}"]
+    lines = [f"前置元数据格式无效，位置： {skill_file}: {exc}"]
 
     mark = getattr(exc, "problem_mark", None)
     source_lines = source.splitlines()
@@ -31,7 +31,7 @@ def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> st
             value = value.strip()
             if value and value[0] not in {'"', "'", "|", ">", "[", "{"}:
                 escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-                lines.append(f'  hint: values containing ":" must be quoted, e.g. {key}: "{escaped}"')
+                lines.append(f'  提示：包含 ":" 的值必须加引号，例如 {key}: "{escaped}"')
 
     return "\n".join(lines)
 
@@ -41,15 +41,15 @@ def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None
     if raw is None:
         return None
     if not isinstance(raw, list):
-        raise ValueError(f"allowed-tools in {skill_file} must be a list of strings")
+        raise ValueError(f"allowed-tools 所在文件 {skill_file} 必须为字符串列表")
 
     allowed_tools: list[str] = []
     for item in raw:
         if not isinstance(item, str):
-            raise ValueError(f"allowed-tools in {skill_file} must contain only strings")
+            raise ValueError(f"allowed-tools 所在文件 {skill_file} 只能包含字符串")
         tool_name = item.strip()
         if not tool_name:
-            raise ValueError(f"allowed-tools in {skill_file} cannot contain empty tool names")
+            raise ValueError(f"allowed-tools 所在文件 {skill_file} 不能包含空工具名")
         allowed_tools.append(tool_name)
     return tuple(allowed_tools)
 
@@ -59,7 +59,7 @@ def parse_required_secrets(raw: object, skill_file: Path) -> tuple[SecretRequire
     if raw is None:
         return ()
     if not isinstance(raw, list):
-        raise ValueError(f"required-secrets in {skill_file} must be a list")
+        raise ValueError(f"required-secrets 所在文件 {skill_file} 必须为列表")
 
     secrets: list[SecretRequirement] = []
     seen: set[str] = set()

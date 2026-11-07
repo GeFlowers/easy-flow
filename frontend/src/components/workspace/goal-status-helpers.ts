@@ -1,4 +1,4 @@
-import type { GoalState } from "@/core/threads";
+import type { GoalState } from "@/features/threads";
 
 export type GoalContinuationDisplay = {
   count: number;

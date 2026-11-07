@@ -1,0 +1,470 @@
+'''集中访问存储于 ``app.state`` 的单例对象。
+
+供路由使用的获取器在必需依赖缺失时返回 503，唯有 ``get_store`` 可返回 ``None``。
+``AppConfig`` 刻意不缓存于 ``app.state``，路由和运行路径经由支持 mtime 热重载的
+``get_app_config`` 解析，使 config.yaml 修改在下一请求生效。``langgraph_runtime`` 创建的
+流桥、持久化、检查点、存储及运行事件存储使用启动快照，按设计必须重启后才更新，以确保
+正在运行的进程内部一致。初始化由 app.py 通过 ``AsyncExitStack`` 直接完成。
+'''
+
+from __future__ import annotations
+
+import asyncio
+import logging
+import os
+from collections.abc import AsyncGenerator, Callable
+from contextlib import AsyncExitStack, asynccontextmanager
+from typing import TYPE_CHECKING, TypeVar, cast
+
+from fastapi import FastAPI, HTTPException, Request
+from langgraph.types import Checkpointer
+
+from deerflow.config.app_config import AppConfig, get_app_config
+from deerflow.persistence.feedback import FeedbackRepository
+from deerflow.runtime import RunContext, RunManager, StreamBridge
+from deerflow.runtime.events.store.base import RunEventStore
+from deerflow.runtime.runs.store import RunStore
+
+logger = logging.getLogger(__name__)
+
+# 在 AsyncExitStack 销毁检查点及连接池前，关闭期间排空在途运行的最长秒数。将它保留在
+# 本模块可避免 app → deps → app 的导入环。它与 app.py 的频道服务停止时限独立，两者均计入
+# 生命周期关闭窗口；若总和必须受服务器优雅关闭时限约束，应一并调整。
+_RUN_DRAIN_TIMEOUT_SECONDS = 5.0
+
+
+def _enforce_multi_worker_run_ownership(config: AppConfig) -> None:
+    '''多进程运行时未启用租约心跳时拒绝启动。'''
+    try:
+        workers = int(os.environ.get("GATEWAY_WORKERS", "1"))
+    except (TypeError, ValueError):
+        workers = 1
+
+    if workers <= 1:
+        return
+
+    run_ownership = getattr(config, "run_ownership", None)
+    if run_ownership is None or not run_ownership.heartbeat_enabled:
+        raise SystemExit(
+            f"GATEWAY_WORKERS={workers} requires run_ownership.heartbeat_enabled=true. "
+            "Without heartbeat, every run has a NULL lease, so reconciliation "
+            "treats all inflight runs as orphans — Worker B would kill Worker A's "
+            "live runs on every rolling update or scale-up. "
+            "Set run_ownership.heartbeat_enabled=true in config.yaml."
+        )
+
+
+async def _drain_inflight_runs(run_manager: RunManager) -> None:
+    '''在销毁检查点前排空在途运行，避免运行任务仍写入检查点时关闭其连接池。
+
+    对有内部时限的排空操作做屏蔽；即使生命周期协程在关闭中因第二个 SIGINT 或服务器
+    优雅关闭超时而被取消，也允许已启动的排空在 ``RunManager.shutdown`` 的时限内完成，
+    随后再传播取消。
+    '''
+    drain = asyncio.create_task(run_manager.shutdown(timeout=_RUN_DRAIN_TIMEOUT_SECONDS))
+    try:
+        await asyncio.shield(drain)
+    except asyncio.CancelledError:
+        # 再次屏蔽，避免第二次等待放弃在途排空；它有时限，不会卡死，随后重新抛出以遵循关闭。
+        try:
+            await asyncio.shield(drain)
+        except Exception:
+            logger.exception("In-flight run drain failed after shutdown cancellation")
+        raise
+    except Exception:
+        logger.exception("Failed to drain in-flight runs during shutdown")
+
+
+async def _publish_recovered_run_stream_end(
+    bridge: StreamBridge,
+    recovered_runs: list[RunRecord],
+    *,
+    cleanup_delay: float = 60.0,
+) -> None:
+    '''为启动时恢复为无主状态的运行终止保留事件流。'''
+    for record in recovered_runs:
+        stream_exists = getattr(bridge, "stream_exists", None)
+        if stream_exists is not None:
+            try:
+                if not await stream_exists(record.run_id):
+                    logger.debug("Skipping recovered stream end for %s: stream already expired", record.run_id)
+                    continue
+            except Exception:
+                logger.debug("Failed to check recovered stream existence for %s", record.run_id, exc_info=True)
+        try:
+            await bridge.publish_end(record.run_id)
+        except Exception:
+            logger.warning(
+                "Failed to publish recovered run stream end for %s",
+                record.run_id,
+                exc_info=True,
+            )
+            continue
+        task = asyncio.create_task(bridge.cleanup(record.run_id, delay=cleanup_delay))
+        task.add_done_callback(lambda task, run_id=record.run_id: _log_recovered_stream_cleanup_result(task, run_id))
+
+
+def _log_recovered_stream_cleanup_result(task: asyncio.Task[None], run_id: str) -> None:
+    '''记录恢复运行的延迟事件流清理任务异常，取消任务无需额外处理。'''
+    if task.cancelled():
+        return
+    try:
+        task.result()
+    except Exception:
+        logger.warning("Failed to clean up recovered run stream for %s", run_id, exc_info=True)
+
+
+if TYPE_CHECKING:
+    from server.gateway.auth.local_provider import LocalAuthProvider
+    from server.gateway.auth.repositories.sql import SQLUserRepository
+    from deerflow.persistence.thread_meta.base import ThreadMetaStore
+    from deerflow.runtime import RunRecord
+
+
+T = TypeVar("T")
+
+
+async def _mark_latest_recovered_threads_error(
+    run_manager: RunManager,
+    thread_store: ThreadMetaStore,
+    recovered_runs: list[RunRecord],
+) -> None:
+    '''仅当线程最新运行被恢复时才将其状态标记为错误。'''
+    recovered_by_thread: dict[str, set[str]] = {}
+    for record in recovered_runs:
+        recovered_by_thread.setdefault(record.thread_id, set()).add(record.run_id)
+
+    for thread_id, recovered_run_ids in recovered_by_thread.items():
+        try:
+            latest_runs = await run_manager.list_by_thread(thread_id, user_id=None, limit=1)
+        except Exception:
+            logger.warning("Failed to find latest run for thread %s during run reconciliation", thread_id, exc_info=True)
+            continue
+        if not latest_runs or latest_runs[0].run_id not in recovered_run_ids:
+            continue
+        try:
+            await thread_store.update_status(thread_id, "error", user_id=None)
+        except Exception:
+            logger.warning("Failed to mark thread %s as error during run reconciliation", thread_id, exc_info=True)
+
+
+def get_config() -> AppConfig:
+    '''返回当前请求的最新 ``AppConfig``。
+
+    通过 :func:`deerflow.config.app_config.get_app_config` 获取配置，以支持运行时
+    ``ContextVar`` 覆盖，并在 ``config.yaml`` 的修改时间变化时从磁盘重载。这里不把
+    ``AppConfig`` 缓存在 ``app.state``；启动阶段的配置快照仅保存在 ``lifespan()`` 的
+    ``startup_config`` 局部变量中，并显式传给 :func:`langgraph_runtime`，供必须重启才能
+    生效的引擎使用。每个请求都调用 :func:`get_app_config`，以修复 bytedance/deer-flow
+    问题 #3107 BUG-001 中工作器与主智能体线程仍读取旧启动配置的情况。
+
+    热重载边界：由启动阶段单例支撑的字段（引擎、沙箱提供者、即时通信渠道、日志处理器）
+    需要重启进程才能变更。权威清单位于 :mod:`deerflow.config.reload_boundary`；
+    :class:`AppConfig` 中对应字段的 ``Field(description=...)`` 使用统一的
+    ``"startup-only:"`` 前缀标注，方便在集成开发环境中查看限制。
+
+    配置读取或构建失败（文件缺失、权限不足、YAML 解析错误、校验错误）时返回 503，表示
+    网关缺少可用配置，无法处理请求；同时记录原始异常，便于排查。
+    '''
+    try:
+        return get_app_config()
+    except Exception as exc:  # noqa: BLE001 - 请求边界：记录日志并优雅降级。
+        logger.exception("Failed to load AppConfig at request time")
+        raise HTTPException(status_code=503, detail="Configuration not available") from exc
+
+
+@asynccontextmanager
+async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGenerator[None, None]:
+    '''引导并销毁所有 LangGraph 运行时单例。
+
+    ``startup_config`` 是 ``lifespan()`` 启动时为基础设施初始化读取的一次性 ``AppConfig`` 快照。
+    此处创建的引擎和存储（流桥接器、持久化引擎、检查点保存器、通用存储和运行事件存储）
+    持有活动连接、文件句柄或单例提供者，设计上需要重启才能更改，因此始终使用此快照。
+    请求处理期间需要读取可热重载字段的代码仍须调用 :func:`get_config`。
+    可热重载。
+
+    对应的 ``run_events_config`` 固定保存在 ``app.state`` 中，使 :func:`get_run_context` 将
+    最新读取的 ``AppConfig`` 与底层 ``event_store`` 创建时使用的启动配置配对；否则运行时可能把
+    新的 ``run_events_config`` 与仍绑定旧后端的事件存储混用。
+
+    在 ``app.py`` 中的用法：
+
+        async with langgraph_runtime(app, startup_config):
+            yield
+    '''
+    from deerflow.persistence.engine import close_engine, get_session_factory, init_engine_from_config
+    from deerflow.runtime import make_store, make_stream_bridge
+    from deerflow.runtime.checkpointer.async_provider import make_checkpointer
+    from deerflow.runtime.events.store import make_run_event_store
+
+    # 多进程运行必须启用租约心跳，以免工作进程互相回收仍在执行的任务。
+    _enforce_multi_worker_run_ownership(startup_config)
+
+    async with AsyncExitStack() as stack:
+        config = startup_config
+
+        app.state.stream_bridge = await stack.enter_async_context(make_stream_bridge(config))
+
+        # 在检查点前初始化持久化引擎，使数据库自动创建逻辑优先运行（Postgres 后端）。
+        await init_engine_from_config(config.database)
+
+        app.state.checkpointer = await stack.enter_async_context(make_checkpointer(config))
+        app.state.store = await stack.enter_async_context(make_store(config))
+
+        # 初始化仓库，所有仓库共用一次 get_session_factory() 调用。
+        sf = get_session_factory()
+        if sf is None:
+            raise RuntimeError("PostgreSQL persistence is unavailable; check database.postgres_url and the database service.")
+
+        from deerflow.persistence.feedback import FeedbackRepository
+        from deerflow.persistence.run import RunRepository
+
+        app.state.run_store = RunRepository(sf)
+        app.state.feedback_repo = FeedbackRepository(sf)
+
+        from deerflow.persistence.thread_meta import make_thread_store
+
+        app.state.thread_store = make_thread_store(sf)
+        from deerflow.persistence.scheduled_task_runs import ScheduledTaskRunRepository
+        from deerflow.persistence.scheduled_tasks import ScheduledTaskRepository
+
+        app.state.scheduled_task_repo = ScheduledTaskRepository(sf)
+        app.state.scheduled_task_run_repo = ScheduledTaskRunRepository(sf)
+
+        # 运行事件存储及配套 ``run_events_config`` 都在启动时冻结，避免 get_run_context
+        # 将刚重载的 AppConfig.run_events 与仍绑定旧后端的存储组合。
+        run_events_config = getattr(config, "run_events", None)
+        app.state.run_events_config = run_events_config
+        app.state.run_event_store = make_run_event_store(run_events_config)
+
+        # 使用存储作为持久化后端的 RunManager。
+        run_ownership_config = getattr(config, "run_ownership", None)
+        app.state.run_manager = RunManager(
+            store=app.state.run_store,
+            run_ownership_config=run_ownership_config,
+        )
+        # 启动时仅回收租约已过期的运行，仍持有有效租约的其他工作进程任务继续执行。
+        from deerflow.utils.time import now_iso
+
+        recovered_runs = await app.state.run_manager.reconcile_orphaned_inflight_runs(
+            error="Gateway restarted before this run reached a durable final state.",
+            before=now_iso(),
+        )
+        sb_config = getattr(config, "stream_bridge", None)
+        cleanup_delay = getattr(sb_config, "recovered_stream_cleanup_delay_seconds", 60.0) if sb_config else 60.0
+        await _publish_recovered_run_stream_end(app.state.stream_bridge, recovered_runs, cleanup_delay=cleanup_delay)
+        await _mark_latest_recovered_threads_error(app.state.run_manager, app.state.thread_store, recovered_runs)
+
+        # 多工作进程部署中若启用则启动租约心跳。
+        await app.state.run_manager.start_heartbeat()
+
+        try:
+            yield
+        finally:
+            # 在 AsyncExitStack 销毁检查点及连接池前排空在途运行任务；否则尚在图中执行的
+            # 运行会泄漏至 asyncio.run() 关闭阶段，与已关闭连接池竞争并引发 PoolClosed。
+            run_manager = getattr(app.state, "run_manager", None)
+            if run_manager is not None:
+                await _drain_inflight_runs(run_manager)
+            await close_engine()
+
+
+# 供路由按请求调用的获取器。
+
+
+def _require(attr: str, label: str) -> Callable[[Request], T]:
+    '''创建返回 ``app.state.<attr>`` 的 FastAPI 依赖；缺失时返回 503。'''
+
+    def dep(request: Request) -> T:
+        '''从应用状态读取已初始化依赖；缺失时向当前请求返回 503。'''
+        val = getattr(request.app.state, attr, None)
+        if val is None:
+            raise HTTPException(status_code=503, detail=f"{label} not available")
+        return cast(T, val)
+
+    dep.__name__ = dep.__qualname__ = f"get_{attr}"
+    return dep
+
+
+get_stream_bridge: Callable[[Request], StreamBridge] = _require("stream_bridge", "Stream bridge")
+get_run_manager: Callable[[Request], RunManager] = _require("run_manager", "Run manager")
+get_checkpointer: Callable[[Request], Checkpointer] = _require("checkpointer", "Checkpointer")
+get_run_event_store: Callable[[Request], RunEventStore] = _require("run_event_store", "Run event store")
+get_feedback_repo: Callable[[Request], FeedbackRepository] = _require("feedback_repo", "Feedback")
+get_run_store: Callable[[Request], RunStore] = _require("run_store", "Run store")
+
+
+def get_store(request: Request):
+    '''返回全局存储；未配置时可能为 ``None``。'''
+    return getattr(request.app.state, "store", None)
+
+
+def get_thread_store(request: Request) -> ThreadMetaStore:
+    '''返回线程元数据存储，可由 SQL 或内存后端支撑。'''
+    val = getattr(request.app.state, "thread_store", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Thread metadata store not available")
+    return val
+
+
+def get_scheduled_task_repo(request: Request):
+    '''返回调度任务持久化仓库，供路由在当前应用生命周期内访问。'''
+    val = getattr(request.app.state, "scheduled_task_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Scheduled task repo not available")
+    return val
+
+
+def get_scheduled_task_run_repo(request: Request):
+    '''返回调度任务运行记录仓库，保留执行历史的持久化边界。'''
+    val = getattr(request.app.state, "scheduled_task_run_repo", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Scheduled task run repo not available")
+    return val
+
+
+def get_scheduled_task_service(request: Request):
+    '''返回已初始化的调度服务，用于创建、变更和触发后台任务。'''
+    val = getattr(request.app.state, "scheduled_task_service", None)
+    if val is None:
+        raise HTTPException(status_code=503, detail="Scheduled task service not available")
+    return val
+
+
+def get_run_context(request: Request) -> RunContext:
+    '''从 ``app.state`` 单例构建 :class:`RunContext`。
+
+    返回包含基础设施依赖的基础上下文。``app_config`` 每次实时解析，使每轮运行使用的
+    ``models[*].max_tokens`` 等字段能够跟随 ``config.yaml`` 更新；``event_store`` 与
+    ``run_events_config`` 则固定使用 :func:`langgraph_runtime` 捕获的启动快照，避免存储
+    绑定的后端与配置指定的后端不一致。
+    '''
+    return RunContext(
+        checkpointer=get_checkpointer(request),
+        store=get_store(request),
+        event_store=get_run_event_store(request),
+        run_events_config=getattr(request.app.state, "run_events_config", None),
+        thread_store=get_thread_store(request),
+        app_config=get_config(),
+        on_run_completed=getattr(request.app.state, "scheduled_task_service", None).handle_run_completion if getattr(request.app.state, "scheduled_task_service", None) is not None else None,
+    )
+
+
+# 认证辅助函数，供 authz.py 与认证中间件使用。
+
+# 缓存单例，避免每个请求重复实例化。
+_cached_local_provider: LocalAuthProvider | None = None
+_cached_repo: SQLUserRepository | None = None
+
+
+def get_local_provider() -> LocalAuthProvider:
+    '''获取或创建缓存的 LocalAuthProvider 单例。
+
+    必须在 ``init_engine_from_config()`` 之后调用，因为创建用户仓储需要共享会话工厂。
+    '''
+    global _cached_local_provider, _cached_repo
+    if _cached_repo is None:
+        from server.gateway.auth.repositories.sql import SQLUserRepository
+        from deerflow.persistence.engine import get_session_factory
+
+        sf = get_session_factory()
+        if sf is None:
+            raise RuntimeError("get_local_provider() called before init_engine_from_config(); cannot access users table")
+        _cached_repo = SQLUserRepository(sf)
+    if _cached_local_provider is None:
+        from server.gateway.auth.local_provider import LocalAuthProvider
+
+        _cached_local_provider = LocalAuthProvider(repository=_cached_repo)
+    return _cached_local_provider
+
+
+async def get_current_user_from_request(request: Request):
+    '''从请求 Cookie 获取当前已认证用户。
+
+    未通过认证时抛出状态码为 401 的 HTTPException。
+    '''
+    state = getattr(request, "state", None)
+    state_user = getattr(state, "user", None)
+    from server.gateway.auth_disabled import AUTH_SOURCE_AUTH_DISABLED, AUTH_SOURCE_INTERNAL, AUTH_SOURCE_SESSION
+
+    if state_user is not None and getattr(state, "auth_source", None) in {
+        AUTH_SOURCE_SESSION,
+        AUTH_SOURCE_AUTH_DISABLED,
+        AUTH_SOURCE_INTERNAL,
+    }:
+        return state_user
+
+    from server.gateway.auth import decode_token
+    from server.gateway.auth.errors import AuthErrorCode, AuthErrorResponse, TokenError, token_error_to_code
+
+    access_token = request.cookies.get("access_token")
+    if not access_token:
+        raise HTTPException(
+            status_code=401,
+            detail=AuthErrorResponse(code=AuthErrorCode.NOT_AUTHENTICATED, message="Not authenticated").model_dump(),
+        )
+
+    payload = decode_token(access_token)
+    if isinstance(payload, TokenError):
+        raise HTTPException(
+            status_code=401,
+            detail=AuthErrorResponse(code=token_error_to_code(payload), message=f"Token error: {payload.value}").model_dump(),
+        )
+
+    provider = get_local_provider()
+    user = await provider.get_user(payload.sub)
+    if user is None:
+        raise HTTPException(
+            status_code=401,
+            detail=AuthErrorResponse(code=AuthErrorCode.USER_NOT_FOUND, message="User not found").model_dump(),
+        )
+
+    # 令牌版本不匹配表示密码已变更，令牌已过期。
+    if user.token_version != payload.ver:
+        raise HTTPException(
+            status_code=401,
+            detail=AuthErrorResponse(code=AuthErrorCode.TOKEN_INVALID, message="Token revoked (password changed)").model_dump(),
+        )
+
+    return user
+
+
+async def require_admin_user(request: Request, *, detail: str) -> None:
+    '''要求已认证调用方为管理员用户。
+
+    通常 ``AuthMiddleware`` 会在请求进入路由前写入 ``request.state.user``。在测试或其他
+    未挂载全局中间件的 ASGI 组合中，此处回退到严格的依赖项进行认证，确保路由仍然安全。
+    ``detail`` 是此路由专用的 403 错误信息。
+
+    将检查集中在此处，后续若调整管理员定义（例如允许内部系统角色、增加审计日志或改为权限
+    检查），只需修改一处，避免逻辑分散在 ``mcp``、``channel_connections`` 和 ``channels``
+    等路由各自维护的副本中。
+    '''
+    user = getattr(request.state, "user", None)
+    if user is None:
+        user = await get_current_user_from_request(request)
+
+    if getattr(user, "system_role", None) != "admin":
+        raise HTTPException(status_code=403, detail=detail)
+
+
+async def get_optional_user_from_request(request: Request):
+    '''从请求获取可选的已认证用户。
+
+    未通过认证时返回 None。
+    '''
+    try:
+        return await get_current_user_from_request(request)
+    except HTTPException:
+        return None
+
+
+async def get_current_user(request: Request) -> str | None:
+    '''从请求 Cookie 提取 user_id；未认证时返回 None。
+
+    为只需要用户标识的调用方（例如 ``feedback.py``）提供轻量适配，返回字符串形式的编号。
+    需要完整用户对象的调用方应使用 ``get_current_user_from_request`` 或
+    ``get_optional_user_from_request``。
+    '''
+    user = await get_optional_user_from_request(request)
+    return str(user.id) if user else None

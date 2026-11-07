@@ -97,7 +97,7 @@ def _legacy_config_candidates() -> tuple[Path, ...]:
     '''返回为兼容单体仓库而保留的源码树 config.yaml 位置。'''
     backend_dir = Path(__file__).resolve().parents[2]
     repo_root = backend_dir.parent
-    return (backend_dir / "config.yaml", repo_root / "config.yaml")
+    return (repo_root / "config" / "config.yaml", backend_dir / "config.yaml", repo_root / "config.yaml")
 
 
 def logging_level_from_config(name: str | None) -> int:
@@ -114,7 +114,7 @@ def apply_logging_level(name: str | None) -> None:
     消息能够向上传播且不被过滤，同时保留可能有意限制第三方日志输出的处理器阈值。
     '''
     level = logging_level_from_config(name)
-    for logger_name in ("deerflow", "app"):
+    for logger_name in ("deerflow", "server"):
         logging.getLogger(logger_name).setLevel(level)
     for handler in logging.root.handlers:
         if level < handler.level:
@@ -299,8 +299,6 @@ class AppConfig(BaseModel):
         with open(resolved_path, encoding="utf-8") as f:
             config_data = yaml.safe_load(f) or {}
 
-        cls._check_config_version(config_data, resolved_path)
-
         config_data = cls.resolve_env_variables(config_data)
         cls._apply_database_defaults(config_data)
 
@@ -367,50 +365,6 @@ class AppConfig(BaseModel):
             return
         for key, value in CONFIG_FILE_DATABASE_DEFAULTS.items():
             database_config.setdefault(key, value)
-
-    @classmethod
-    def _check_config_version(cls, config_data: dict, config_path: Path) -> None:
-        '''检查用户的 config.yaml 是否比 config.example.yaml 过时。
-
-        当用户的 config_version 低于示例版本时发出警告。缺失的 config_version
-        视为版本 0（版本控制引入之前）。
-        '''
-        try:
-            user_version = int(config_data.get("config_version", 0))
-        except (TypeError, ValueError):
-            user_version = 0
-
-        example_path = None
-        search_dir = config_path.parent
-        for _ in range(5):
-            candidate = search_dir / "config.example.yaml"
-            if candidate.exists():
-                example_path = candidate
-                break
-            parent = search_dir.parent
-            if parent == search_dir:
-                break
-            search_dir = parent
-        if example_path is None:
-            return
-
-        try:
-            with open(example_path, encoding="utf-8") as f:
-                example_data = yaml.safe_load(f)
-            raw = example_data.get("config_version", 0) if example_data else 0
-            try:
-                example_version = int(raw)
-            except (TypeError, ValueError):
-                example_version = 0
-        except Exception:
-            return
-
-        if user_version < example_version:
-            logger.warning(
-                "Your config.yaml (version %d) is outdated — the latest version is %d. Run `make config-upgrade` to merge new fields into your config.",
-                user_version,
-                example_version,
-            )
 
     @classmethod
     def resolve_env_variables(cls, config: Any) -> Any:

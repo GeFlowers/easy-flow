@@ -1,79 +1,22 @@
 ---
 title: Deploy Your Own DeerFlow
-description: This tutorial guides you through deploying DeerFlow to a production environment using Docker Compose for multi-user access.
+description: Run the learning edition on Windows rather than containerizing the entire application.
 ---
-
-import { Callout, Steps } from "nextra/components";
 
 # Deploy Your Own DeerFlow
 
-This tutorial guides you through deploying DeerFlow to a production environment using Docker Compose for multi-user access.
+This learning edition runs the frontend, backend and Nginx on Windows, with PostgreSQL in Docker and Redis maintained locally.
 
-## Prerequisites
-
-- Docker and Docker Compose installed
-- A server or VM (Linux recommended)
-- LLM API key
-
-## Steps
-
-<Steps>
-
-### Clone the repository
+Follow [Quick Start](/docs/application/quick-start) to prepare private configuration, dependencies and Nginx, then run:
 
 ```bash
-git clone https://github.com/bytedance/deer-flow.git
-cd deer-flow
+cd backend && uv sync --frozen --no-dev --extra postgres --extra redis --extra pymupdf && cd ../frontend
+corepack pnpm install && corepack pnpm build && cd ..
+bash scripts/start.sh
 ```
 
-### Create the configuration file
+Creating a database for the first time differs from migrating an existing one. See [Deployment Guide](/docs/application/deployment-guide), then open [http://localhost:2026](http://localhost:2026).
 
-```bash
-cp config.example.yaml config.yaml
-```
+The defaults are local-only. Public deployment needs a separate review of network isolation, encrypted transport, authentication, backups and host command execution. This learning configuration is not a production security design.
 
-Edit `config.yaml` to add your model configuration.
-
-### Create the environment variables file
-
-```bash
-cat > .env << EOF
-OPENAI_API_KEY=sk-your-key-here
-DEER_FLOW_ROOT=$(pwd)
-BETTER_AUTH_SECRET=$(openssl rand -base64 32)
-BETTER_AUTH_URL=https://your-domain.com
-EOF
-```
-
-### Start the services
-
-```bash
-make docker-start
-```
-
-### Verify the deployment
-
-```bash
-# Check all services are healthy
-curl http://localhost:2026/api/models
-
-# Follow logs
-make docker-logs
-```
-
-Open `http://your-server:2026` in your browser.
-
-</Steps>
-
-## Production checklist
-
-- Configure HTTPS/TLS for nginx
-- Set `BETTER_AUTH_SECRET` to a strong random string (minimum 32 characters)
-- Configure firewall rules to allow only necessary ports
-- Back up `backend/.deer-flow/` directory regularly
-- Keep `allow_host_bash` disabled unless the environment and users are fully trusted
-
-## Next steps
-
-- [Full Deployment Guide](/docs/application/deployment-guide)
-- [Operations and Troubleshooting](/docs/application/operations-and-troubleshooting)
+[Operations and Troubleshooting](/docs/application/operations-and-troubleshooting)

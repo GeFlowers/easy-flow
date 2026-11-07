@@ -17,9 +17,9 @@ The **Model Context Protocol (MCP)** is an open standard for connecting language
 
 ## Configuration
 
-MCP servers are configured in `extensions_config.json`, a file separate from `config.yaml`. This separation allows MCP and skill configurations to be managed independently and updated at runtime through the Gateway API.
+MCP servers are configured in `config/extensions_config.json`, a file separate from `config/config.yaml`. This separation allows MCP and skill configurations to be managed independently and updated at runtime through the Gateway API.
 
-The default location is the project root (same directory as `config.yaml`). The path is determined by `ExtensionsConfig.resolve_config_path()`.
+The default location is the `config/` directory under the project root, alongside the application configuration. The path is determined by `ExtensionsConfig.resolve_config_path()`.
 
 ```json
 {
@@ -69,7 +69,7 @@ If the server starts before MCP tools are initialized (e.g., in LangGraph Studio
 
 ### Cache invalidation
 
-The MCP tools cache tracks the modification time (`mtime`) of `extensions_config.json`. When the file changes — for example, when a server is enabled or disabled through the Gateway API — the cache is marked stale and tools are reloaded on the next request.
+The MCP tools cache tracks the modification time (`mtime`) of `config/extensions_config.json`. When the file changes — for example, when a server is enabled or disabled through the Gateway API — the cache is marked stale and tools are reloaded on the next request.
 
 This means MCP server changes take effect without restarting the DeerFlow server.
 
@@ -111,7 +111,7 @@ MCP servers can be managed in several ways:
 
 - **Through the DeerFlow App UI**: the extensions panel shows connected MCP servers and lets you enable/disable them.
 - **Through the Gateway API**: `POST /api/extensions/mcp/{name}/enable` and `/disable`.
-- **By editing `extensions_config.json` directly**: useful for scripted or programmatic configuration.
+- **By editing `config/extensions_config.json` directly**: useful for scripted or programmatic configuration.
 
 Changes are picked up automatically due to the file mtime-based cache invalidation.
 

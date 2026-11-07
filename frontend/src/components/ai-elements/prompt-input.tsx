@@ -34,8 +34,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import type { PromptInputFilePart } from "@/core/uploads";
-import { splitUnsupportedUploadFiles } from "@/core/uploads";
+import type { PromptInputFilePart } from "@/features/uploads";
+import { splitUnsupportedUploadFiles } from "@/features/uploads";
 import { isIMEComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 import type { ChatStatus } from "ai";

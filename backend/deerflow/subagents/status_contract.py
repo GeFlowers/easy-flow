@@ -48,9 +48,9 @@ SUBAGENT_STOP_REASON_VALUES: tuple[SubagentStopReasonValue, ...] = (
 
 #: 将机器可读的停止原因映射为可合并到主代理结果文本中的简短说明。
 _STOP_REASON_LABELS: dict[SubagentStopReasonValue, str] = {
-    "token_capped": "token budget",
-    "turn_capped": "turn budget",
-    "loop_capped": "repeated tool-call loop",
+    "token_capped": "令牌预算",
+    "turn_capped": "轮数预算",
+    "loop_capped": "重复工具调用循环",
 }
 
 #: 只有 completed 状态携带可恢复结果；达到上限但留下部分成果的运行也沿用该状态，
@@ -147,34 +147,34 @@ def format_subagent_result_message(
 
     if status == "completed":
         if capped:
-            return f"Task Succeeded (capped: {capped}). Result: {result_text}", None
-        return f"Task Succeeded. Result: {result_text}", None
+            return f"任务成功（已达上限：{capped}）。结果：{result_text}", None
+        return f"任务成功。结果：{result_text}", None
 
     if status == "cancelled":
-        detail = error_text or "Task cancelled by user."
-        if detail == "Task cancelled by user.":
+        detail = error_text or "任务已被用户取消。"
+        if detail == "任务已被用户取消。":
             return detail, detail
-        return f"Task cancelled by user. Error: {detail}", detail
+        return f"任务已被用户取消。错误：{detail}", detail
 
     if status == "timed_out":
-        detail = error_text or "Task timed out."
-        if detail == "Task timed out.":
+        detail = error_text or "任务已超时。"
+        if detail == "任务已超时。":
             return detail, detail
-        return f"Task timed out. Error: {detail}", detail
+        return f"任务已超时。错误：{detail}", detail
 
     if status == "polling_timed_out":
-        detail = error_text or "Task polling timed out."
+        detail = error_text or "任务轮询已超时。"
         return detail, detail
 
     # 无可用结果的失败（包括轮数上限）会在消息中注明停止原因，便于主代理区分故障与限额。
-    detail = error_text or "Task failed."
+    detail = error_text or "任务失败。"
     if capped:
-        if detail == "Task failed.":
-            return f"Task failed (capped: {capped}).", detail
-        return f"Task failed (capped: {capped}). Error: {detail}", detail
-    if detail == "Task failed.":
+        if detail == "任务失败。":
+            return f"任务失败（已达上限：{capped}）。", detail
+        return f"任务失败（已达上限：{capped}）。错误：{detail}", detail
+    if detail == "任务失败。":
         return detail, detail
-    return f"Task failed. Error: {detail}", detail
+    return f"任务失败。错误：{detail}", detail
 
 
 def read_subagent_result_metadata(

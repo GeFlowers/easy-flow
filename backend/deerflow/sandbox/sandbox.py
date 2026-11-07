@@ -14,7 +14,7 @@ def _validate_extra_env(extra_env: dict[str, str] | None) -> None:
         return
     for key in extra_env:
         if not isinstance(key, str) or not _ENV_NAME_PATTERN.fullmatch(key):
-            raise ValueError(f"extra_env key {key!r} is not a valid POSIX environment variable name (must match ^[A-Za-z_][A-Za-z0-9_]*$). This protects shell-using sandbox implementations from command injection via the key.")
+            raise ValueError(f"extra_env 键 {key!r} 不是有效的可移植操作系统接口环境变量名（必须匹配 ^[A-Za-z_][A-Za-z0-9_]*$）。此限制用于防止使用命令解释器的沙箱通过键名遭受命令注入。")
 
 
 class Sandbox(ABC):

@@ -4,7 +4,7 @@ export const OFFLINE_BANNER_RETRY_INTERVAL_MS = 10_000;
 /** 连续收到此数量的 401 后视为会话过期，并交由 AuthProvider.refreshUser() 重定向 `/login`；大于 1 可吸收网关刚恢复时的短暂 401，同时不会永久掩盖真正失效的 cookie。 */
 export const OFFLINE_BANNER_AUTH_FAILURE_THRESHOLD = 3;
 
-import type { User } from "@/core/auth/types";
+import type { User } from "@/features/auth/types";
 
 /** 判断服务端探测结果是否需要进入网关离线横幅降级流程。 */
 export function shouldShowOfflineBanner(

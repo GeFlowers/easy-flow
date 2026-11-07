@@ -73,7 +73,7 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
             return None
         tool_call_id = str(request.tool_call.get("id") or "missing_tool_call_id")
         return ToolMessage(
-            content=(f"Error: Tool '{name}' is deferred and has not been promoted yet. Call tool_search first to expose and promote this tool's schema, then retry."),
+            content=(f"Error: 工具 '{name}' 已延迟加载且尚未启用。请先调用 tool_search 获取并启用工具模式，然后重试。"),
             tool_call_id=tool_call_id,
             name=name,
             status="error",

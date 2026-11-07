@@ -1,17 +1,17 @@
 ---
 title: 配置
-description: 本页面涵盖 DeerFlow 应用的所有配置层——`config.yaml`、前端环境变量、`extensions_config.json` 和运行时环境变量。
+description: 本页面涵盖 DeerFlow 应用的所有配置层——`config/config.yaml`、前端环境变量、`config/extensions_config.json` 和运行时环境变量。
 ---
 
 import { Callout, Tabs } from "nextra/components";
 
 # 配置
 
-本页面涵盖 DeerFlow 应用的所有配置层——`config.yaml`、前端环境变量、`extensions_config.json` 和运行时环境变量。
+本页面涵盖 DeerFlow 应用的所有配置层——`config/config.yaml`、前端环境变量、`config/extensions_config.json` 和运行时环境变量。
 
 ## config.yaml
 
-`config.yaml` 是 DeerFlow 的主要配置文件。所有 Agent 行为、模型选择、工具加载和运行时功能都由它控制。
+`config/config.yaml` 是 DeerFlow 的主要配置文件。所有 Agent 行为、模型选择、工具加载和运行时功能都由它控制。
 
 参见[配置](/docs/harness/configuration)参考页面了解文件格式和每个章节的详细说明。
 
@@ -124,8 +124,8 @@ sandbox:
 
 ```yaml
 tools:
-  - use: deerflow.community.ddg_search.tools:web_search_tool
-  - use: deerflow.community.jina_ai.tools:web_fetch_tool
+  - use: deerflow.integrations.ddg_search.tools:web_search_tool
+  - use: deerflow.integrations.jina_ai.tools:web_fetch_tool
   - use: deerflow.sandbox.tools:ls_tool
   - use: deerflow.sandbox.tools:read_file_tool
   - use: deerflow.sandbox.tools:write_file_tool
@@ -140,7 +140,7 @@ skills:
   # path: /custom/path/to/skills  # 可选；默认为仓库 skills/ 目录
 ```
 
-技能可用性在 `extensions_config.json` 中管理（参见下方）。
+技能可用性在 `config/extensions_config.json` 中管理（参见下方）。
 
 ### 数据库后端
 
@@ -192,9 +192,9 @@ BETTER_AUTH_SECRET=local-dev-secret-at-least-32-chars
 
 ## extensions_config.json
 
-`extensions_config.json` 控制 MCP 服务器和技能的运行时启用状态，独立于 `config.yaml`。
+`config/extensions_config.json` 控制 MCP 服务器和技能的运行时启用状态，独立于 `config/config.yaml`。
 
-默认位置：项目根目录（与 `config.yaml` 同一目录）。
+默认位置：项目根下的 `config/` 目录，与应用配置文件放在一起。
 
 ### MCP 服务器
 
@@ -220,7 +220,7 @@ BETTER_AUTH_SECRET=local-dev-secret-at-least-32-chars
 
 ### 技能启用状态
 
-技能启用状态会反映在 `extensions_config.json` 中。你可以直接编辑它，或通过 DeerFlow 应用界面进行管理。
+技能启用状态会反映在 `config/extensions_config.json` 中。你可以直接编辑它，或通过 DeerFlow 应用界面进行管理。
 
 ## 运行时环境变量
 
@@ -228,7 +228,7 @@ BETTER_AUTH_SECRET=local-dev-secret-at-least-32-chars
 
 | 变量                    | 默认值           | 描述                                             |
 | ----------------------- | ---------------- | ------------------------------------------------ |
-| `DEER_FLOW_CONFIG_PATH` | 自动发现         | `config.yaml` 的绝对路径                         |
+| `DEER_FLOW_CONFIG_PATH` | 自动发现         | `config/config.yaml` 的绝对路径                         |
 | `LOG_LEVEL`             | `info`           | 日志详细程度（`debug`/`info`/`warning`/`error`） |
 | `DEER_FLOW_ROOT`        | 仓库根目录       | 用于 Docker 中的技能和线程挂载                   |
 

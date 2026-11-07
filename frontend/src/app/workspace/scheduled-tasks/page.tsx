@@ -23,7 +23,7 @@ import {
   WorkspaceContainer,
   WorkspaceHeader,
 } from "@/components/workspace/workspace-container";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   useCreateScheduledTask,
   useUpdateScheduledTask,
@@ -34,12 +34,12 @@ import {
   useScheduledTasks,
   useTriggerScheduledTask,
   useThreadScheduledTasks,
-} from "@/core/scheduled-tasks/hooks";
-import { RECIPES, type Recipe } from "@/core/scheduled-tasks/recipes";
+} from "@/features/scheduled-tasks/hooks";
+import { RECIPES, type Recipe } from "@/features/scheduled-tasks/recipes";
 import type {
   ScheduledTask,
   ScheduledTaskRun,
-} from "@/core/scheduled-tasks/types";
+} from "@/features/scheduled-tasks/types";
 import { cn } from "@/lib/utils";
 
 const NONE = "—";

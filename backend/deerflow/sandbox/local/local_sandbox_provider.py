@@ -114,11 +114,8 @@ class LocalSandboxProvider(SandboxProvider):
                         )
                     else:
                         logger.error(
-                            "sandbox.mounts entry %s -> %s ignored: host_path %s does not exist from the "
-                            "perspective of the gateway process. In Docker deployments, "
-                            "this path must also be bind-mounted into the gateway container — add a matching "
-                            "volume entry under services.gateway.volumes in docker/docker-compose-dev.yaml (and use "
-                            "the in-container path here).",
+                            "忽略沙箱路径映射 %s -> %s：本机后端无法访问目录 %s。"
+                            "请检查 config.yaml 中的主机路径是否存在，以及后端账户是否有读取权限。",
                             mount.host_path,
                             mount.container_path,
                             mount.host_path,

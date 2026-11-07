@@ -35,7 +35,7 @@ def setup_agent(
             update={
                 "messages": [
                     ToolMessage(
-                        content="Error: soul content is empty; refusing to create agent with an empty SOUL.md",
+                        content="Error: soul 内容为空；不能使用空的 SOUL.md 创建代理",
                         tool_call_id=runtime.tool_call_id,
                     )
                 ]
@@ -75,7 +75,7 @@ def setup_agent(
         return Command(
             update={
                 "created_agent_name": agent_name,
-                "messages": [ToolMessage(content=f"Agent '{agent_name}' created successfully!", tool_call_id=runtime.tool_call_id)],
+                "messages": [ToolMessage(content=f"代理 '{agent_name}' 已成功创建！", tool_call_id=runtime.tool_call_id)],
             }
         )
 

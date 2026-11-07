@@ -27,10 +27,10 @@ _GATED_WRITE_TOOLS = frozenset({"write_file", "str_replace"})
 _UNINSPECTABLE_CONTENT_PREFIX = "Error:"
 
 _BLOCK_MESSAGE = (
-    "Error: {tool_name} blocked — {path} already exists and you have not read its current version. "
-    "Any write invalidates earlier reads, so re-read before every modification. "
-    "Call read_file on it (a ranged read of the relevant section is enough, e.g. the last ~30 lines "
-    "before an append), check what is already there, then retry."
+    "Error: {tool_name} 已被阻止：{path} 已存在，但你尚未读取当前版本。"
+    "任何写入都会使先前读取失效，因此每次修改前都须重新读取。"
+    "请对该文件调用 read_file（读取相关范围即可，例如追加前的最后约 30 行），"
+    "检查已有内容后重试。"
 )
 
 _GATE_LOCKS: weakref.WeakValueDictionary[tuple[str, str], threading.Lock] = weakref.WeakValueDictionary()

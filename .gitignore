@@ -1,7 +1,9 @@
 # 容器镜像缓存
-docker/.cache/
+deploy/postgres/.cache/
+
 # 本地代理状态
 .omc/
+
 # 操作系统生成文件
 .DS_Store
 *.local
@@ -17,7 +19,6 @@ __pycache__/
 *$py.class
 .pytest_cache/
 .mypy_cache/
-.ruff_cache/
 .hypothesis/
 
 # 本地虚拟环境
@@ -75,3 +76,34 @@ config.yaml.bak
 .monocle/
 /Note.docx
 .learning-cleanup.local/
+
+# 后端工程内的构建、覆盖率与工具产物
+/backend/**/build/
+/backend/**/dist/
+/backend/**/wheels/
+/backend/**/*.egg-info
+/backend/**/.coverage
+/backend/**/.coverage.*
+/backend/**/agent_history.gif
+/backend/static/browser_history/*.gif
+/backend/**/.langgraph_api
+# 只忽略旧版后端根目录沙箱，不忽略 deerflow/sandbox 源码。
+/backend/sandbox/
+
+# 前端工程内的依赖、构建与部署状态
+/frontend/node_modules/
+/frontend/.pnp
+/frontend/**/.pnp.js
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+/frontend/**/next-env.d.ts
+/frontend/**/*.tsbuildinfo
+/frontend/**/*.pem
+/frontend/**/.vercel
+/frontend/**/db.sqlite
+/frontend/prisma/db.sqlite-journal
+/frontend/**/npm-debug.log*
+/frontend/**/yarn-debug.log*
+/frontend/**/yarn-error.log*
+/frontend/**/.pnpm-debug.log*

@@ -1,127 +1,125 @@
-# IEEE Citation Template
+# IEEE（Institute of Electrical and Electronics Engineers，电气与电子工程师协会）引用模板
 
-Use this template when the user targets an IEEE conference or journal, or explicitly asks for IEEE format. IEEE uses **numeric citations** — references are numbered in the order they first appear in the text, and in-text citations use bracketed numbers.
+用户面向该协会会议、期刊，或明确要求该格式时使用。采用数字引用：按首次出现顺序编号，文内使用方括号数字。
 
-## Citation Format Rules
+## 引用规则
 
-### In-text citations
+### 文内引用
 
-- **Single reference**: `[1]` — use the number assigned in the References section.
-- **Multiple references**: `[1], [3], [5]` or `[1]–[3]` for consecutive ranges.
-- **Citation as a noun**: "As shown in [1], ..." or "Reference [1] demonstrated...".
-- **Author attribution**: "Vaswani et al. [1] introduced..." — author names are optional in IEEE; use them when it improves readability, always followed by the bracketed number.
+- 单篇文献：`[1]`，对应参考文献编号。
+- 多篇文献：`[1], [3], [5]`，连续范围可写 `[1]–[3]`。
+- 作为名词使用：“如文献 [1] 所示……”或“文献 [1] 证明……”。
+- 作者归属：“Vaswani et al. [1] 提出……”。作者名可选，有助于阅读时使用，并在后面加方括号编号。
 
-Numbers are assigned in **order of first appearance in the text**, not alphabetically. The first reference you cite is `[1]`, the second new reference is `[2]`, and so on.
+编号按正文首次出现顺序分配，而非作者字母顺序。首次引用的文献为 `[1]`，下一篇新文献为 `[2]`，依此类推。
 
-### Reference list entry for arXiv preprints
+### arXiv 预印本条目
 
-IEEE format for arXiv preprints:
-
-```
+```text
 [N] A. A. Author, B. B. Author, and C. C. Author, "Title of the paper," arXiv:ARXIV_ID, Year.
 ```
 
-**Real example**:
+真实示例：
 
-```
+```text
 [1] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin, "Attention is all you need," arXiv:1706.03762, 2017.
 ```
 
-Formatting rules:
+格式要求：
 
-- **Author names**: `FirstInitial. LastName` — initials before the last name, opposite of APA. Join with commas; last author gets `and` (no Oxford comma before it in strict IEEE, but accepted).
-- **Title**: in double quotes, sentence case. No italics.
-- **Source**: `arXiv:<id>` — the literal prefix `arXiv:` followed by the bare id (e.g. `arXiv:1706.03762`, not the full URL).
-- **Year**: at the end, after a comma.
-- **URL**: optional in IEEE. Include if the publication venue requires it; otherwise the `arXiv:<id>` identifier is sufficient and is the IEEE-preferred form.
+- 作者：`FirstInitial. LastName`，首字母在姓氏前，与美国心理学会格式相反。逗号分隔，最后一位前用 `and`；严格格式在其前不加牛津逗号，但加上也通常被接受。
+- 标题：双引号，句首式大小写，不用斜体。
+- 来源：固定前缀 `arXiv:` 后接裸标识，例如 `arXiv:1706.03762`，不写完整链接。
+- 年份：置于末尾，前加逗号。
+- 链接可选，投稿要求时加入；否则 `arXiv:<id>` 已足够，也是该格式偏好的形式。
 
-### Special cases
+### 特殊情况
 
-- **More than 6 authors**: IEEE allows listing the first author followed by `et al.`: `A. Vaswani et al., "Attention is all you need," arXiv:1706.03762, 2017.` Use this for papers with many authors to keep reference entries readable.
-- **If the paper has also been published at a venue**: prefer the venue citation format over arXiv. In this workflow we only have arXiv metadata, so always use the arXiv form.
+- 超过 6 位作者：可只列第一作者再加 `et al.`，例如 `A. Vaswani et al., "Attention is all you need," arXiv:1706.03762, 2017.`，避免作者列表过长。
+- 已在正式出版物发表的论文，通常优先正式出版引用；本流程只有 arXiv 元数据，因此始终使用预印本形式。
 
-## Report Structure
+## 报告结构
 
-Follow this structure verbatim. Note that IEEE reports use **numeric citations throughout**, so you need to assign a number to each paper **in order of first appearance** in the Themes section, then use those numbers consistently in per-paper annotations and the reference list.
+严格遵循以下结构。整篇使用数字引用，在主题部分按论文首次出现顺序分配编号，随后在逐篇注释和参考文献中一致使用。如果执行摘要先引用了论文，同样遵循全文首次出现顺序。
 
 ```markdown
-# Systematic Literature Review: <Topic>
+# 系统性文献综述：<主题>
 
-**Date**: <YYYY-MM-DD>
-**Papers surveyed**: <N>
-**Scope**: <arXiv search query, category, time window>
-**Citation format**: IEEE
+**日期**：<YYYY-MM-DD>
+**论文数量**：<N>
+**范围**：<arXiv 查询、分类、时间窗口>
+**引用格式**：电气与电子工程师协会数字引用
 
-## Executive Summary
+## 执行摘要
 
-<3-5 sentences summarizing the state of the literature. Cite papers with bracketed numbers as you first introduce them, e.g. "Transformer architectures [1] have become the dominant approach, with extensions focusing on efficiency [2], [3] and long-context handling [4].">
+<3-5 句综合说明文献状态。首次介绍论文时使用方括号数字，例如“Transformer 架构 [1] 已成为主流，后续扩展主要关注效率 [2], [3] 和长上下文处理 [4]”。>
 
-## Methodology
+## 研究方法
 
-This review surveyed <N> arXiv papers retrieved on <YYYY-MM-DD> using the query `<query>`<, filtered to category <cat>><, published between <start_date> and <end_date>>. Papers were sorted by <relevance | submission date> and the top <N> were included. Metadata extraction was performed by language-model agents, with cross-paper synthesis performed by the lead agent.
+本综述使用查询词 `<query>`，于 <YYYY-MM-DD> 检索 <N> 篇 arXiv 论文<，限定分类 <cat>><，发表时间为 <start_date> 至 <end_date>>。按<相关性 | 提交日期>排序，纳入前 <N> 篇。语言模型代理提取元数据，主代理完成跨论文综合分析。
 
-**Limitations of this review**: arXiv preprints are not peer-reviewed; coverage is limited to arXiv.
+**本综述的局限**：arXiv 预印本未经同行评审，覆盖范围限于 arXiv。
 
-## Themes
+## 研究主题
 
-<3-6 thematic sections. First appearance of each paper gets a bracketed number; subsequent mentions reuse the same number. The number assignment order is: first paper mentioned in Theme 1 gets [1], next new paper gets [2], etc.>
+<3-6 个主题章节。每篇论文首次出现时获得编号，后续重复引用沿用该编号。主题 1 中首次提到的论文为 [1]，下一篇新论文为 [2]，依此类推。>
 
-### Theme 1: <Theme name>
+### 主题 1：<主题名称>
 
-<Paragraphs describing the theme. Cite with bracketed numbers: "The original transformer architecture [1] introduced self-attention, which was later extended in [2] and [3]. Comparative analyses [4] show that...">
+<用段落说明主题并使用数字引用，例如“原始 Transformer 架构 [1] 引入自注意力，随后在 [2] 和 [3] 中扩展。比较研究 [4] 表明……”。>
 
-### Theme 2: <Theme name>
+### 主题 2：<主题名称>
 
 <...>
 
-## Convergences and Disagreements
+## 共识与分歧
 
-**Convergences**: <e.g. "Multiple papers [1], [3], [5] agree that X is necessary.">
+**共识**：<例如“多篇论文 [1], [3], [5] 一致认为 X 必不可少”。>
 
-**Disagreements**: <e.g. "While [1] argues X, [2] finds the opposite under condition Y.">
+**分歧**：<例如“[1] 主张 X，而 [2] 在条件 Y 下发现相反结论”。>
 
-## Gaps and Open Questions
+## 研究空白与待解问题
 
-<What the collective literature does not yet address, with citations to papers that explicitly mention these gaps.>
+<综合文献仍未解决的问题，引用明确指出这些空白的论文。>
 
-## Per-Paper Annotations
+## 逐篇注释
 
-<One subsection per paper, ordered by their assigned reference number.>
+<每篇一小节，按参考文献编号排序。>
 
 ### [1] Vaswani et al., "Attention is all you need" (2017)
 
-**Research question**: <1 sentence>
-**Methodology**: <1-2 sentences>
-**Key findings**:
-- <bullet>
-- <bullet>
-- <bullet>
-**Limitations**: <1-2 sentences>
+**研究问题**：<1 句>
+**研究方法**：<1-2 句>
+**主要发现**：
+- <要点>
+- <要点>
+- <要点>
+**局限**：<1-2 句>
 
-### [2] <Next paper>
+### [2] <下一篇论文>
 
 <...>
 
-## References
+## 参考文献
 
-<Numbered list in order of first appearance in the text. The number must match the in-text citations above.>
+<按全文首次出现顺序排列，编号与文内引用一致。>
 
 [1] A. Vaswani, N. Shazeer, N. Parmar, J. Uszkoreit, L. Jones, A. N. Gomez, Ł. Kaiser, and I. Polosukhin, "Attention is all you need," arXiv:1706.03762, 2017.
 
 [2] J. Devlin, M.-W. Chang, K. Lee, and K. Toutanova, "BERT: Pre-training of deep bidirectional transformers for language understanding," arXiv:1810.04805, 2018.
 
-<... more entries ...>
+<其余条目>
 ```
 
-## Quality checks before finalizing
+## 完成前的质量检查
 
-Before saving the report, verify:
+保存报告前确认：
 
-- [ ] Every paper in the surveyed set has a unique reference number.
-- [ ] Reference numbers are assigned in order of **first appearance in the text**, not alphabetically.
-- [ ] Every bracketed number in the text has a matching entry in the References section.
-- [ ] Every entry in References is cited at least once in the text.
-- [ ] Author names use `FirstInitial. LastName` format (initials before last name).
-- [ ] Titles are in double quotes and sentence case.
-- [ ] arXiv identifiers use the `arXiv:<bare_id>` form, not the full URL.
-- [ ] Per-paper annotations are ordered by reference number, matching the References section order.
+- [ ] 每篇论文有唯一参考文献编号。
+- [ ] 编号按全文首次出现顺序分配，不按字母顺序。
+- [ ] 正文每个引用编号均有对应参考文献条目。
+- [ ] 每个参考文献条目在正文中至少引用一次。
+- [ ] 作者名采用 `FirstInitial. LastName`，首字母位于姓氏前。
+- [ ] 标题使用双引号和句首式大小写。
+- [ ] arXiv 标识采用 `arXiv:<bare_id>`，不写完整链接。
+- [ ] 逐篇注释和参考文献均按编号排序。

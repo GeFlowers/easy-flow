@@ -34,8 +34,8 @@ def analyze_eval_manifests(snapshot: dict[str, Any]) -> tuple[dict[str, Any], li
                     "eval.binary-manifest",
                     severity="warning",
                     path=path,
-                    message="Eval manifest is not UTF-8 JSON text.",
-                    remediation="Store eval manifests as UTF-8 JSON.",
+                    message="评测清单不是采用统一码转换格式八位编码的 JavaScript 对象表示法文本。",
+                    remediation="以统一码转换格式八位编码保存使用 JavaScript 对象表示法的评测清单。",
                 )
             )
             valid = False
@@ -49,8 +49,8 @@ def analyze_eval_manifests(snapshot: dict[str, Any]) -> tuple[dict[str, Any], li
                     severity="warning",
                     path=path,
                     line=exc.lineno,
-                    message="Eval manifest is not valid JSON.",
-                    remediation="Fix the JSON syntax or remove the manifest.",
+                    message="评测清单不是有效的 JavaScript 对象表示法文本。",
+                    remediation="修复对象表示法语法，或移除该清单。",
                     evidence=exc.msg,
                 )
             )

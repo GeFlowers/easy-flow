@@ -86,7 +86,7 @@ DeerFlow 内置以下公共技能：
 
 ## 配置
 
-技能系统在 `config.yaml` 的 `skills:` 下配置：
+技能系统在 `config/config.yaml` 的 `skills:` 下配置：
 
 ```yaml
 skills:
@@ -103,11 +103,11 @@ skills:
 
 ## 启用和禁用技能
 
-技能可用性在 `extensions_config.json` 中跟踪（独立于 `config.yaml`）。你可以管理技能状态：
+技能可用性在 `config/extensions_config.json` 中跟踪（独立于 `config/config.yaml`）。你可以管理技能状态：
 
 - **通过 DeerFlow 应用界面**：技能面板允许你切换技能的启用/禁用状态。
 - **通过 Gateway API**：`POST /api/extensions/skills/{name}/enable` 和 `/disable`。
-- **直接编辑 `extensions_config.json`**。
+- **直接编辑 `config/extensions_config.json`**。
 
 由于 `load_skills()` 每次调用都重新读取扩展配置，更改立即生效——无需重启服务器。
 

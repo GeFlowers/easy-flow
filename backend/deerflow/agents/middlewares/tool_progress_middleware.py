@@ -138,24 +138,24 @@ def _parse_tool_meta(meta_dict: object) -> ToolResultMeta | None:
 def _format_hint(meta: ToolResultMeta) -> str:
     '''根据结果类型和建议动作生成供模型调整策略的提示。'''
     action_map = {
-        "rewrite_query": "Try rephrasing your search query with different keywords or approach.",
-        "try_alternative": "Consider using a different tool or strategy.",
-        "summarize": "Consider summarizing your current findings and moving forward.",
-        "stop": "Do not retry this operation — it is not recoverable.",
+        "rewrite_query": "请使用不同的关键词或思路改写搜索查询。",
+        "try_alternative": "请考虑使用不同工具或策略。",
+        "summarize": "请考虑总结当前发现后继续推进。",
+        "stop": "此操作不可恢复，请勿重试。",
         # 结果虽成功但内容近似重复，仍需建议模型更换检索策略。
-        "continue": "Try rephrasing your query or using a different search term.",
+        "continue": "请尝试改写查询或使用不同搜索词。",
     }
     base = {
-        "no_results": "[PROGRESS HINT] Your search returned no results.",
-        "not_found": "[PROGRESS HINT] The resource was not found repeatedly.",
-        "rate_limited": "[PROGRESS HINT] The tool is being rate-limited.",
-        "transient": "[PROGRESS HINT] The tool encountered repeated transient failures.",
-        "partial_success": "[PROGRESS HINT] The tool has returned incomplete results multiple times.",
+        "no_results": "[进度提示] 搜索未返回结果。",
+        "not_found": "[进度提示] 多次未找到资源。",
+        "rate_limited": "[进度提示] 工具受到频率限制。",
+        "transient": "[进度提示] 工具反复发生临时故障。",
+        "partial_success": "[进度提示] 工具已多次返回不完整结果。",
         # 近似重复的成功结果表示工具反复返回相同内容。
-        "success": "[PROGRESS HINT] The tool is returning duplicate results.",
+        "success": "[进度提示] 工具正在返回重复结果。",
     }.get(
         meta.error_type or meta.status,
-        "[PROGRESS HINT] The tool is not producing new information.",
+        "[进度提示] 工具未提供新信息。",
     )
     suffix = action_map.get(meta.recommended_next_action, "")
     return f"{base} {suffix}".strip()
@@ -164,16 +164,16 @@ def _format_hint(meta: ToolResultMeta) -> str:
 def _block_reason(meta: ToolResultMeta) -> str:
     '''把错误类别转换为工具被屏蔽时返回给模型的原因。'''
     return {
-        "no_results": "Repeated no-results — rewrite your query or try a different tool.",
-        "not_found": "Repeated not-found — rewrite your query or try a different resource.",
-        "rate_limited": "Repeated rate-limiting — summarize current findings and proceed.",
-        "transient": "Repeated transient failures — try a different approach.",
-        "auth": "Authentication failure — this tool cannot be used.",
-        "config": "Tool is not configured — this tool cannot be used.",
-        "internal": "Repeated internal errors — this tool is unavailable.",
+        "no_results": "多次没有结果，请改写查询或尝试其他工具。",
+        "not_found": "多次未找到目标，请改写查询或尝试其他资源。",
+        "rate_limited": "多次受到频率限制，请总结当前发现后继续。",
+        "transient": "反复发生临时故障，请尝试其他方法。",
+        "auth": "身份验证失败，无法使用此工具。",
+        "config": "工具尚未配置，无法使用。",
+        "internal": "反复发生内部错误，此工具不可用。",
     }.get(
         meta.error_type or "",
-        "Tool has not produced new information after multiple attempts — summarize and move on.",
+        "工具在多次尝试后仍未提供新信息，请总结后继续推进。",
     )
 
 

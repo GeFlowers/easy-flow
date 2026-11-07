@@ -34,6 +34,7 @@ from deerflow.subagents.token_collector import SubagentTokenCollector
 from deerflow.trace_context import DEERFLOW_TRACE_METADATA_KEY
 from deerflow.tracing import build_tracing_callbacks, inject_langfuse_metadata
 from deerflow.utils.messages import message_content_to_text
+from deerflow.utils.event_loop import create_event_loop, run_async
 
 if TYPE_CHECKING:
     # 仅用于类型标注；运行时在 _build_initial_state 内延迟导入，避免工具包初始化时
@@ -137,7 +138,7 @@ def _extract_final_result(final_state: Any, *, trace_id: str, name: str) -> str:
     '''从最终状态中提取最后一条助手消息；缺少状态或消息时返回稳定的空响应文本。'''
     if final_state is None:
         logger.warning(f"[trace={trace_id}] Subagent {name} no final state")
-        return "No response generated"
+        return "未生成回复"
 
     messages = final_state.get("messages", [])
     logger.info(f"[trace={trace_id}] Subagent {name} final messages count: {len(messages)}")
@@ -150,17 +151,17 @@ def _extract_final_result(final_state: Any, *, trace_id: str, name: str) -> str:
 
     if last_ai_message is not None:
         text = message_content_to_text(last_ai_message.content)
-        return text if text else "No response generated"
+        return text if text else "未生成回复"
 
     if messages:
         last_message = messages[-1]
         logger.warning(f"[trace={trace_id}] Subagent {name} no AIMessage found, using last message: {type(last_message)}")
         raw_content = last_message.content if hasattr(last_message, "content") else str(last_message)
         text = message_content_to_text(raw_content)
-        return text if text else "No response generated"
+        return text if text else "未生成回复"
 
     logger.warning(f"[trace={trace_id}] Subagent {name} no messages in final state")
-    return "No response generated"
+    return "未生成回复"
 
 
 def _extract_llm_error_fallback(final_state: Any) -> str | None:
@@ -184,7 +185,7 @@ def _extract_llm_error_fallback(final_state: Any) -> str | None:
         detail = metadata.get("error_detail")
         if isinstance(detail, str) and detail.strip():
             return detail.strip()
-        return "LLM request failed"
+        return "语言模型请求失败"
 
     return None
 
@@ -262,7 +263,7 @@ def _get_isolated_subagent_loop() -> asyncio.AbstractEventLoop:
         loop_is_usable = _isolated_subagent_loop is not None and not _isolated_subagent_loop.is_closed() and _isolated_subagent_loop.is_running() and thread_is_alive
 
         if not loop_is_usable:
-            loop = asyncio.new_event_loop()
+            loop = create_event_loop()
             started_event = threading.Event()
             thread = threading.Thread(
                 target=_run_isolated_subagent_loop,
@@ -458,7 +459,9 @@ class SubagentExecutor:
         return all_skills
 
     def _apply_skill_allowed_tools(self, skills: list[Skill]) -> list[BaseTool]:
-        '''根据已加载技能声明的工具白名单进一步收窄基础工具集合。'''
+        '''只对显式指定技能的子代理任务应用白名单，默认技能目录不限制工具。'''
+        if self.config.skills is None:
+            return list(self._base_tools)
         return filter_tools_by_skill_allowed_tools(self._base_tools, skills)
 
     async def _load_skill_messages(self, skills: list[Skill]) -> list[SystemMessage]:
@@ -619,7 +622,7 @@ class SubagentExecutor:
                 logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} cancelled before streaming")
                 result.try_set_terminal(
                     SubagentStatus.CANCELLED,
-                    error="Cancelled by user",
+                    error="已被用户取消",
                     token_usage_records=collector.snapshot_records(),
                 )
                 return result
@@ -630,7 +633,7 @@ class SubagentExecutor:
                     logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} cancelled by parent")
                     result.try_set_terminal(
                         SubagentStatus.CANCELLED,
-                        error="Cancelled by user",
+                        error="已被用户取消",
                         token_usage_records=collector.snapshot_records(),
                     )
                     return result
@@ -704,7 +707,7 @@ class SubagentExecutor:
                 else:
                     result.try_set_terminal(
                         SubagentStatus.FAILED,
-                        error=f"Reached max_turns={max_turns}",
+                        error=f"已达轮数上限 max_turns={max_turns}",
                         stop_reason=stop_reason,
                         token_usage_records=records,
                     )
@@ -761,7 +764,7 @@ class SubagentExecutor:
                 return self._execute_in_isolated_loop(task, result_holder)
 
             # 当前线程没有运行中的事件循环时，直接通过 asyncio.run 执行。
-            return asyncio.run(self._aexecute(task, result_holder))
+            return run_async(self._aexecute(task, result_holder))
         except Exception as e:
             logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} execution failed")
             # 若调用方未提供共享结果对象，则创建一条可返回的失败结果。
@@ -819,7 +822,7 @@ class SubagentExecutor:
                     result_holder.cancel_event.set()
                     result_holder.try_set_terminal(
                         SubagentStatus.TIMED_OUT,
-                        error=f"Execution timed out after {self.config.timeout_seconds} seconds",
+                        error=f"执行超过 {self.config.timeout_seconds} 秒，已超时",
                     )
                     execution_future.cancel()
             except Exception as e:

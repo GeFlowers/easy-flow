@@ -2,9 +2,9 @@ import type { Message } from "@langchain/langgraph-sdk";
 import { CoinsIcon } from "lucide-react";
 
 import { Badge } from "@/components/ui/badge";
-import { useI18n } from "@/core/i18n/hooks";
-import { accumulateUsage, formatTokenCount } from "@/core/messages/usage";
-import type { TokenDebugStep } from "@/core/messages/usage-model";
+import { useI18n } from "@/features/i18n/hooks";
+import { accumulateUsage, formatTokenCount } from "@/features/messages/usage";
+import type { TokenDebugStep } from "@/features/messages/usage-model";
 import { cn } from "@/lib/utils";
 
 /** 以统一格式呈现输入、输出和总 token 数量，供消息统计视图复用。 */

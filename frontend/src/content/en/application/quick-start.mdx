@@ -1,109 +1,35 @@
 ---
 title: Quick Start
-description: Start DeerFlow with the supported Docker Compose workflow.
+description: Run the learning edition locally on Windows, with only PostgreSQL in Docker.
 ---
-
-import { Callout, Steps } from "nextra/components";
 
 # Quick Start
 
-<Callout type="info" emoji="⚡">
-  Start DeerFlow in Docker in about 10 minutes. You need Docker Compose and at
-  least one LLM API key.
-</Callout>
+This learning edition runs the frontend, backend and Nginx on Windows. Only PostgreSQL runs in Docker; Redis runs separately on the host.
 
-This guide walks you through starting DeerFlow with the project's Docker Compose configuration. Gateway, frontend, PostgreSQL, and nginx run in containers and are accessible through one URL.
-
-## Prerequisites
-
-Check that Docker is available:
+1. Install Python 3.12 or later, uv, Node.js 22 or later, Corepack, Nginx, Docker and Make.
+2. Copy the root and frontend environment examples, prepare `config/config.yaml` and `config/extensions_config.json`, and configure model credentials and the database connection.
+3. Set `NGINX_HOME` in the root environment file. Back up the original Nginx configuration before copying `deploy/nginx/nginx.conf` to its installation's `conf/nginx.conf`.
+4. Start local Redis, then install dependencies and build:
 
 ```bash
-make docker-init
+cd backend
+uv sync --frozen --no-dev --extra postgres --extra redis --extra pymupdf
+cd ../frontend
+corepack pnpm install --frozen-lockfile
+corepack pnpm build
+cd ..
 ```
 
-Required:
-
-| Tool   | Requirement |
-| ------ | ----------- |
-| Docker | Docker Engine/Desktop with Compose support |
-
-## Steps
-
-<Steps>
-
-### Clone the repository
+A new installation needs the `deer-flow-dev_postgres-data` volume. When migrating an existing database, verify the original volume instead of replacing it with an empty one.
 
 ```bash
-git clone https://github.com/bytedance/deer-flow.git
-cd deer-flow
+docker volume create deer-flow-dev_postgres-data
+bash scripts/start.sh
 ```
 
-### Configure a model
+Open [http://localhost:2026](http://localhost:2026). Initialize the administrator if the database has none.
 
-On first startup, `make docker-start` creates `config.yaml` from the example if needed. Add at least one model under the `models:` section:
+Run `bash scripts/stop.sh` to stop the frontend, backend, and database container. The database volume and Nginx remain.
 
-```yaml
-models:
-  - name: gpt-4o
-    use: langchain_openai:ChatOpenAI
-    model: gpt-4o
-    api_key: $OPENAI_API_KEY
-    request_timeout: 600.0
-    max_retries: 2
-    supports_vision: true
-```
-
-Put the corresponding API key in the project-root `.env` file:
-
-```bash
-OPENAI_API_KEY=sk-...
-```
-
-See the [Application Configuration](/docs/application/configuration) page for examples with other model providers.
-
-### Start DeerFlow
-
-```bash
-make docker-start
-```
-
-This starts:
-
-- Gateway API, frontend, PostgreSQL, and nginx in Docker containers
-
-Open [http://localhost:2026](http://localhost:2026) in your browser.
-
-### Stop all services
-
-```bash
-make docker-stop
-```
-
-</Steps>
-
-## What happens when you run `make docker-start`
-
-- Docker builds the frontend and backend images, then starts the application services in the background.
-- nginx proxies the application through port `2026`, so you only need one URL.
-
-Log files:
-
-| Service   | Command |
-| --------- | ------- |
-| All       | `make docker-logs` |
-| Gateway   | `make docker-logs-gateway` |
-| Frontend  | `make docker-logs-frontend` |
-
-<Callout type="tip">
-  If something is not working, check the Gateway container logs first. Most
-  startup errors (missing API keys, config parsing failures) appear there.
-</Callout>
-
-<Cards num={2}>
-  <Cards.Card
-    title="Deployment Guide"
-    href="/docs/application/deployment-guide"
-  />
-  <Cards.Card title="Configuration" href="/docs/application/configuration" />
-</Cards>
+See [Deployment Guide](/docs/application/deployment-guide) and [Operations and Troubleshooting](/docs/application/operations-and-troubleshooting).

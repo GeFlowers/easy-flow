@@ -1,343 +1,352 @@
 ---
 name: newsletter-generation
-description: Use this skill when the user requests to generate, create, write, or draft a newsletter, email digest, weekly roundup, industry briefing, or curated content summary. Supports topic-based research, content curation from multiple sources, and professional formatting for email or web distribution. Trigger on requests like "create a newsletter about X", "write a weekly digest", "generate a tech roundup", or "curate news about Y".
+description: 用户要求生成、创作、撰写或起草通讯、邮件摘要、每周综述、行业简报或精选内容摘要时使用。支持按主题研究、从多个来源策划内容，并以适合邮件或网页分发的专业格式呈现。“创建某主题通讯”、“写每周摘要”、“生成科技综述”、“策划相关新闻”等请求触发。
 ---
 
-# Newsletter Generation Skill
+# 通讯生成技能
 
-## Overview
+## 概述
 
-This skill generates professional, well-researched newsletters that combine curated content from multiple sources with original analysis and commentary. It follows modern newsletter best practices from publications like Morning Brew, The Hustle, TLDR, and Benedict Evans to produce content that is informative, engaging, and actionable.
+生成专业、研究充分的通讯，结合多来源精选内容与原创分析评论。遵循 Morning Brew、The Hustle、TLDR 和 Benedict Evans 等刊物的现代通讯实践，确保内容有信息量、吸引人且可执行。
 
-The output is a complete, ready-to-publish newsletter in Markdown format, suitable for email distribution platforms, web publishing, or conversion to HTML.
+输出是完整、可发布的 Markdown 通讯，适合邮件分发平台、网页发布，或转换为 HTML（HyperText Markup Language，超文本标记语言）。
 
-## Core Capabilities
+## 核心能力
 
-- Research and curate content from multiple web sources on specified topics
-- Generate topic-focused or multi-topic newsletters with consistent voice
-- Write engaging headlines, summaries, and original commentary
-- Structure content for optimal readability and scanning
-- Support multiple newsletter formats (daily digest, weekly roundup, deep-dive, industry briefing)
-- Include relevant links, sources, and attributions
-- Adapt tone and style to target audience (technical, executive, general)
-- Generate recurring newsletter series with consistent branding and structure
+- 针对指定主题研究并精选多个网络来源。
+- 以一致语气生成单主题或多主题通讯。
+- 撰写吸引人的标题、摘要与原创评论。
+- 组织内容，便于阅读和扫读。
+- 支持每日摘要、每周综述、深度专题与行业简报。
+- 包含相关链接、来源和署名。
+- 依据技术人员、高管或普通读者调整语气。
+- 以一致品牌和结构生成连续通讯系列。
 
-## When to Use This Skill
+## 使用时机
 
-**Always load this skill when:**
+以下情况**始终加载**：
 
-- User asks to generate a newsletter, email digest, or content roundup
-- User requests a curated summary of news or developments on a topic
-- User wants to create a recurring newsletter format
-- User asks to compile recent developments in a field into a briefing
-- User needs a formatted email-ready content piece with multiple curated items
-- User asks for a "weekly roundup", "monthly digest", or "morning briefing"
+- 用户要求生成通讯、邮件摘要或内容综述。
+- 用户需要某主题新闻或进展的精选摘要。
+- 用户希望建立周期性通讯格式。
+- 用户要求将领域近期进展整理为简报。
+- 用户需要一份包含多个精选条目、可直接用于邮件的内容。
+- 用户要求“每周综述”、“月度摘要”或“晨间简报”。
 
-## Newsletter Workflow
+## 通讯流程
 
-### Phase 1: Planning
+### 第 1 阶段：规划
 
-#### Step 1.1: Understand Newsletter Requirements
+#### 第 1.1 步：理解要求
 
-Identify the key parameters:
+识别关键参数：
 
-| Parameter | Description | Default |
-|-----------|-------------|---------|
-| **Topic(s)** | Primary subject area(s) to cover | Required |
-| **Format** | Daily digest, weekly roundup, deep-dive, or industry briefing | Weekly roundup |
-| **Target Audience** | Technical, executive, general, or niche community | General |
-| **Tone** | Professional, conversational, witty, or analytical | Conversational-professional |
-| **Length** | Short (5-min read), medium (10-min), long (15-min+) | Medium |
-| **Sections** | Number and type of content sections | 4-6 sections |
-| **Frequency Context** | One-time or part of a recurring series | One-time |
+| 参数 | 说明 | 默认值 |
+| --- | --- | --- |
+| **主题** | 主要覆盖领域 | 必填 |
+| **格式** | 每日摘要、每周综述、深度专题、行业简报 | 每周综述 |
+| **读者** | 技术、高管、普通或小众社群 | 普通 |
+| **语气** | 专业、口语、幽默或分析 | 口语而专业 |
+| **长度** | 短篇约 5 分钟、中篇约 10 分钟、长篇 15 分钟以上 | 中篇 |
+| **章节** | 内容章节数量和类型 | 4–6 节 |
+| **频率背景** | 单次或连续系列的一期 | 单次 |
 
-#### Step 1.2: Define Newsletter Structure
+#### 第 1.2 步：定义结构
 
-Based on the format, select the appropriate structure:
+按格式选择合适结构。
 
-**Daily Digest Structure**:
-```
-1. Top Story (1 item, detailed)
-2. Quick Hits (3-5 items, brief)
-3. One Stat / Quote of the Day
-4. What to Watch
-```
-
-**Weekly Roundup Structure**:
-```
-1. Editor's Note / Intro
-2. Top Stories (2-3 items, detailed)
-3. Trends & Analysis (1-2 items, original commentary)
-4. Quick Bites (4-6 items, brief summaries)
-5. Tools & Resources (2-3 items)
-6. One More Thing / Closing
-```
-
-**Deep-Dive Structure**:
-```
-1. Introduction & Context
-2. Background / Why It Matters
-3. Key Developments (detailed analysis)
-4. Expert Perspectives
-5. What's Next / Implications
-6. Further Reading
-```
-
-**Industry Briefing Structure**:
-```
-1. Executive Summary
-2. Market Developments
-3. Company News & Moves
-4. Product & Technology Updates
-5. Regulatory & Policy Changes
-6. Data & Metrics
-7. Outlook
-```
-
-### Phase 2: Research & Curation
-
-#### Step 2.1: Multi-Source Research
-
-Conduct thorough research using web search. **The quality of the newsletter depends directly on the quality and recency of research.**
-
-**Search Strategy**:
+**每日摘要：**
 
 ```
-# Current news and developments
-"[topic] news [current month] [current year]"
-"[topic] latest developments"
-"[topic] announcement this week"
-
-# Trends and analysis
-"[topic] trends [current year]"
-"[topic] analysis expert opinion"
-"[topic] industry report"
-
-# Data and statistics
-"[topic] statistics [current year]"
-"[topic] market data latest"
-"[topic] growth metrics"
-
-# Tools and resources
-"[topic] new tools [current year]"
-"[topic] open source release"
-"best [topic] resources [current year]"
+1. 头条（1 条，详细）
+2. 快讯（3–5 条，简短）
+3. 今日数据或金句
+4. 值得关注
 ```
 
-> **IMPORTANT**: Always check `<current_date>` to ensure search queries use the correct temporal context. Never use hardcoded years.
+**每周综述：**
 
-#### Step 2.2: Source Evaluation and Selection
+```
+1. 编者按／引言
+2. 头条（2–3 条，详细）
+3. 趋势与分析（1–2 条，原创评论）
+4. 简讯（4–6 条，简短摘要）
+5. 工具与资源（2–3 条）
+6. 最后再聊一件事／结尾
+```
 
-Evaluate each source and curate the best content:
+**深度专题：**
 
-| Criterion | Priority |
-|-----------|----------|
-| **Recency** | Prefer content from the last 7-30 days |
-| **Authority** | Prioritize primary sources, official announcements, established publications |
-| **Uniqueness** | Select stories that offer fresh perspective or are underreported |
-| **Relevance** | Every item must clearly connect to the newsletter's stated topic(s) |
-| **Actionability** | Prefer content readers can act on (tools, insights, strategies) |
-| **Diversity** | Mix of news, analysis, data, and practical resources |
+```
+1. 引言与背景
+2. 背景／为何重要
+3. 关键进展（详细分析）
+4. 专家视角
+5. 下一步／影响
+6. 延伸阅读
+```
 
-#### Step 2.3: Deep Content Extraction
+**行业简报：**
 
-For key stories, use `web_fetch` to read full articles and extract:
+```
+1. 执行摘要
+2. 市场动态
+3. 公司新闻与行动
+4. 产品与技术更新
+5. 监管与政策变化
+6. 数据与指标
+7. 展望
+```
 
-1. **Core facts** — What happened, who is involved, when
-2. **Context** — Why this matters, background information
-3. **Data points** — Specific numbers, metrics, or statistics
-4. **Quotes** — Relevant expert quotes or official statements
-5. **Implications** — What this means for the reader
+### 第 2 阶段：研究与精选
 
-### Phase 3: Writing
+#### 第 2.1 步：多来源研究
 
-#### Step 3.1: Newsletter Header
+使用网页搜索开展充分研究。**通讯质量直接取决于研究的质量和时效性。**
 
-Every newsletter starts with a consistent header:
+**搜索策略：**
+
+```
+# 当前新闻与进展
+“[主题] 新闻 [当前月份] [当前年份]”
+“[主题] 最新进展”
+“[主题] 本周公告”
+
+# 趋势与分析
+“[主题] 趋势 [当前年份]”
+“[主题] 分析 专家观点”
+“[主题] 行业报告”
+
+# 数据与统计
+“[主题] 统计 [当前年份]”
+“[主题] 最新市场数据”
+“[主题] 增长指标”
+
+# 工具与资源
+“[主题] 新工具 [当前年份]”
+“[主题] 开源发布”
+“最佳 [主题] 资源 [当前年份]”
+```
+
+> **重要：** 始终检查 `<current_date>`，确保查询使用正确时间背景，绝不写死年份。
+
+#### 第 2.2 步：评估与选择来源
+
+| 标准 | 优先考虑 |
+| --- | --- |
+| **时效性** | 最近 7–30 天的内容 |
+| **权威性** | 一手来源、官方公告、成熟刊物 |
+| **独特性** | 新视角或报道不足的故事 |
+| **相关性** | 每项明确关联通讯主题 |
+| **可执行性** | 读者能采用的工具、洞察、策略 |
+| **多样性** | 混合新闻、分析、数据和实用资源 |
+
+#### 第 2.3 步：深入提取内容
+
+关键故事使用 `web_fetch` 阅读全文并提取：
+
+1. **核心事实：** 发生什么、涉及谁、何时。
+2. **背景：** 为什么重要、背景信息。
+3. **数据：** 具体数字、指标或统计。
+4. **引言：** 相关专家引用或官方声明。
+5. **影响：** 对读者意味着什么。
+
+### 第 3 阶段：写作
+
+#### 第 3.1 步：通讯抬头
+
+每期以一致抬头开场：
 
 ```markdown
-# [Newsletter Name]
+# [通讯名称]
 
-*[Tagline or description] — [Date]*
+*[标语或说明]——[日期]*
 
 ---
 
-[Optional: One-sentence preview of what's inside]
+[可选：一句话预告本期内容]
 ```
 
-#### Step 3.2: Section Writing Guidelines
+#### 第 3.2 步：章节写作指南
 
-**Top Stories / Featured Items**:
-- **Headline**: Compelling, clear, benefit-oriented (not clickbait)
-- **Hook**: Opening sentence that makes the reader care (1-2 sentences)
-- **Body**: Key facts and context (2-4 paragraphs)
-- **Why it matters**: Connect to the reader's world (1 paragraph)
-- **Source link**: Always attribute and link to the original source
+**头条／精选条目：**
 
-**Quick Bites / Brief Items**:
-- **Format**: Bold headline + 2-3 sentence summary + source link
-- **Focus**: One key takeaway per item
-- **Efficiency**: Readers should get the essential insight without clicking through
+- **标题：** 吸引人、清晰、突出价值，不做标题党。
+- **引子：** 1–2 句让读者关心。
+- **正文：** 2–4 段关键事实和背景。
+- **为何重要：** 1 段关联读者世界。
+- **来源链接：** 始终标明并链接原始来源。
 
-**Analysis / Commentary Sections**:
-- **Voice**: The newsletter's unique perspective on trends or developments
-- **Structure**: Observation → Context → Implication → (Optional) Actionable takeaway
-- **Evidence**: Every claim backed by data or sourced information
+**简讯：**
 
-#### Step 3.3: Writing Standards
+- **格式：** 加粗标题＋2–3 句摘要＋来源链接。
+- **重点：** 每项只有一个关键收获。
+- **效率：** 读者无需点击也能获得核心洞察。
 
-| Principle | Implementation |
-|-----------|---------------|
-| **Scannable** | Use headers, bold text, bullet points, and short paragraphs |
-| **Engaging** | Lead with the most interesting angle, not chronological order |
-| **Concise** | Every sentence earns its place — cut filler ruthlessly |
-| **Accurate** | Every fact is sourced, every number is verified |
-| **Attributive** | Always credit original sources with inline links |
-| **Human** | Write like a knowledgeable friend, not a press release |
+**分析／评论：**
 
-**Tone Calibration by Audience**:
+- **观点：** 对趋势和进展的独特理解。
+- **结构：** 观察 → 背景 → 影响 → 可选行动建议。
+- **证据：** 每个主张由数据或有来源的信息支持。
 
-| Audience | Tone | Example |
-|----------|------|---------|
-| **Technical** | Precise, no jargon explanations, assumed expertise | "The new API supports gRPC streaming with backpressure handling via flow control windows." |
-| **Executive** | Impact-focused, bottom-line, strategic | "This acquisition gives Company X a 40% market share in the enterprise segment, directly threatening Incumbent Y's pricing power." |
-| **General** | Accessible, analogies, explains concepts | "Think of it like a universal translator for data — it lets any app talk to any database without learning a new language." |
+#### 第 3.3 步：写作标准
 
-### Phase 4: Assembly & Polish
+| 原则 | 实施 |
+| --- | --- |
+| **便于扫读** | 使用标题、加粗、列表、短段落 |
+| **吸引人** | 从最有趣角度切入，不必按时间顺序 |
+| **简练** | 每句话都有价值，删去填充 |
+| **准确** | 每项事实有来源，每个数字经验证 |
+| **注明出处** | 用行内链接认可原始来源 |
+| **有人情味** | 像知识丰富的朋友，不像新闻通稿 |
 
-#### Step 4.1: Assemble the Newsletter
+**按受众调整语气：**
 
-Combine all sections into the final document following the chosen structure template.
+| 受众 | 语气 | 示例 |
+| --- | --- | --- |
+| **技术人员** | 精确，假设已有专业知识 | “新接口支持流式远程调用，通过流量控制窗口处理背压。” |
+| **高管** | 聚焦影响、结果和战略 | “此次收购让甲公司在企业市场拥有 40% 份额，直接威胁乙公司的定价权。” |
+| **普通读者** | 通俗、类比、解释概念 | “可以把它当成数据的通用翻译器，让任何应用与任何数据库交流，不必学习新语言。” |
 
-#### Step 4.2: Footer
+### 第 4 阶段：组装与打磨
 
-Every newsletter ends with:
+#### 第 4.1 步：组装
+
+按照选定结构模板，将所有章节组合成最终文档。
+
+#### 第 4.2 步：页尾
+
+每期以以下内容结束：
 
 ```markdown
 ---
 
-*[Newsletter Name] is [description of what it is].*
-*[How to subscribe/share/give feedback]*
+*[通讯名称]是[用途说明]。*
+*[如何订阅、分享或反馈]*
 
-*Sources: All links are provided inline. This newsletter curates and summarizes
-publicly available information with original commentary.*
+*来源：所有链接均在正文中提供。本通讯精选并总结公开信息，
+同时提供原创评论。*
 ```
 
-#### Step 4.3: Quality Checklist
+#### 第 4.3 步：质量清单
 
-Before finalizing, verify:
+定稿前检查：
 
-- [ ] **Every factual claim has a source link** — No unsourced assertions
-- [ ] **All links are functional** — Verified URLs from search results
-- [ ] **Date references use the actual current date** — No hardcoded or assumed dates
-- [ ] **Content is current** — All major items are from within the expected timeframe
-- [ ] **No duplicate stories** — Each item appears only once
-- [ ] **Consistent formatting** — Headers, bullets, links use the same style throughout
-- [ ] **Balanced coverage** — Not dominated by a single source or perspective
-- [ ] **Appropriate length** — Matches the specified length target
-- [ ] **Engaging opening** — The first 2 sentences make the reader want to continue
-- [ ] **Clear closing** — The newsletter ends with a memorable or actionable note
-- [ ] **Proofread** — No typos, broken formatting, or incomplete sentences
+- [ ] **每个事实主张都有来源链接**，没有无依据断言。
+- [ ] **链接有效**，来自搜索结果的已验证地址。
+- [ ] **日期引用符合真实当前日期**，不写死或猜测。
+- [ ] **内容及时**，主要条目均在预期时间范围内。
+- [ ] **没有重复故事**，每项只出现一次。
+- [ ] **格式一致**，标题、列表和链接风格统一。
+- [ ] **覆盖平衡**，不被单一来源或视角主导。
+- [ ] **长度合适**，符合目标。
+- [ ] **开头吸引人**，前两句让人愿意继续读。
+- [ ] **结尾清晰**，令人记得或可以行动。
+- [ ] **完成校对**，没有错字、格式错误或残句。
 
-## Newsletter Output Template
+## 输出模板
 
 ```markdown
-# [Newsletter Name]
+# [通讯名称]
 
-*[Tagline] — [Full date, e.g., April 4, 2026]*
-
----
-
-[Preview sentence: "This week: [topic 1], [topic 2], and [topic 3]."]
-
-## 🔥 Top Stories
-
-### [Headline 1]
-
-[Hook — why this matters in 1-2 sentences.]
-
-[Body — 2-4 paragraphs covering key facts, context, and implications.]
-
-**Why it matters:** [1 paragraph connecting to reader's interests or industry impact.]
-
-📎 [Source: Publication Name](URL)
-
-### [Headline 2]
-
-[Same structure as above]
-
-## 📊 Trends & Analysis
-
-### [Trend Title]
-
-[Original commentary on an emerging trend, backed by data from research.]
-
-[Key data points presented clearly — consider inline stats or a brief comparison.]
-
-**The bottom line:** [One-sentence takeaway.]
-
-## ⚡ Quick Bites
-
-- **[Headline]** — [2-3 sentence summary with key takeaway.] [Source](URL)
-- **[Headline]** — [2-3 sentence summary.] [Source](URL)
-- **[Headline]** — [2-3 sentence summary.] [Source](URL)
-- **[Headline]** — [2-3 sentence summary.] [Source](URL)
-
-## 🛠️ Tools & Resources
-
-- **[Tool/Resource Name]** — [What it does and why it's useful.] [Link](URL)
-- **[Tool/Resource Name]** — [Description.] [Link](URL)
-
-## 💬 One More Thing
-
-[Closing thought, insightful quote, or forward-looking statement.]
+*[标语]——[完整日期，例如 2026 年 4 月 4 日]*
 
 ---
 
-*[Newsletter Name] curates the most important [topic] news and analysis.*
-*Found this useful? Share it with a colleague.*
+[预告句：“本周：[主题一]、[主题二]和[主题三]。”]
 
-*All sources are linked inline. Views and commentary are original.*
+## 🔥 头条
+
+### [标题一]
+
+[引子：用 1–2 句说明为何重要。]
+
+[正文：2–4 段介绍关键事实、背景和影响。]
+
+**为何重要：** [1 段关联读者兴趣或行业影响。]
+
+📎 [来源：刊物名称](URL)
+
+### [标题二]
+
+[与上述相同结构]
+
+## 📊 趋势与分析
+
+### [趋势标题]
+
+[对新趋势的原创评论，由研究数据支持。]
+
+[清楚呈现关键数据，可用行内统计或简短比较。]
+
+**要点：** [一句话收获。]
+
+## ⚡ 简讯
+
+- **[标题]**——[2–3 句摘要及关键收获。] [来源](URL)
+- **[标题]**——[2–3 句摘要。] [来源](URL)
+- **[标题]**——[2–3 句摘要。] [来源](URL)
+- **[标题]**——[2–3 句摘要。] [来源](URL)
+
+## 🛠️ 工具与资源
+
+- **[工具／资源名称]**——[用途及价值。] [链接](URL)
+- **[工具／资源名称]**——[说明。] [链接](URL)
+
+## 💬 最后再聊一件事
+
+[结尾思考、有洞见的引言或前瞻性陈述。]
+
+---
+
+*[通讯名称]精选最重要的[主题]新闻与分析。*
+*觉得有帮助？分享给同事。*
+
+*来源均在文中链接，观点和评论为原创。*
 ```
 
-## Adaptation Examples
+## 调整示例
 
-### Technology Newsletter
-- Emoji usage: ✅ Moderate (section headers)
-- Sections: Top Stories, Deep Dive, Quick Bites, Open Source Spotlight, Dev Tools
-- Tone: Technical-conversational
+### 科技通讯
 
-### Business/Finance Newsletter
-- Emoji usage: ❌ Minimal to none
-- Sections: Market Overview, Deal Flow, Company News, Data Corner, Outlook
-- Tone: Professional-analytical
+- 表情符号：适量，用于章节标题。
+- 章节：头条、深度专题、简讯、开源聚焦、开发工具。
+- 语气：技术而口语。
 
-### Industry-Specific Newsletter
-- Emoji usage: Moderate
-- Sections: Regulatory Updates, Market Data, Innovation Watch, People Moves, Events
-- Tone: Expert-authoritative
+### 商业／金融通讯
 
-### Creative/Marketing Newsletter
-- Emoji usage: ✅ Liberal
-- Sections: Campaign Spotlight, Trend Watch, Viral This Week, Tools We Love, Inspiration
-- Tone: Enthusiastic-professional
+- 表情符号：极少或不用。
+- 章节：市场概览、交易动态、公司新闻、数据角、展望。
+- 语气：专业、分析。
 
-## Output Handling
+### 垂直行业通讯
 
-After generation:
+- 表情符号：适量。
+- 章节：监管更新、市场数据、创新观察、人事变动、活动。
+- 语气：专家、权威。
 
-- Save the newsletter to `/mnt/user-data/outputs/newsletter-{topic}-{date}.md`
-- Present the newsletter to the user using the `present_files` tool
-- Offer to adjust sections, tone, length, or focus areas
-- If the user wants HTML output, note that the Markdown can be converted using standard tools
+### 创意／营销通讯
 
-## Notes
+- 表情符号：可较多使用。
+- 章节：营销活动聚焦、趋势观察、本周爆款、喜爱的工具、灵感。
+- 语气：热情而专业。
 
-- This skill works best in combination with the `deep-research` skill for comprehensive topic coverage — load both for newsletters requiring deep analysis
-- Always use `<current_date>` for temporal context in searches and date references in the newsletter
-- For recurring newsletters, suggest maintaining a consistent structure so readers develop expectations
-- When curating, quality beats quantity — 5 excellent items beat 15 mediocre ones
-- Attribute all content properly — newsletters build trust through transparent sourcing
-- Avoid summarizing paywalled content that the reader cannot access
-- If the user provides specific URLs or articles to include, incorporate them alongside your curated findings
-- The newsletter should provide enough value in the summaries that readers benefit even without clicking through to every link
+## 输出处理
+
+生成后：
+
+- 保存到 `/mnt/user-data/outputs/newsletter-{topic}-{date}.md`。
+- 使用 `present_files` 向用户展示。
+- 可调整章节、语气、长度或关注领域。
+- 用户要求网页输出时，说明可使用标准工具转换 Markdown。
+
+## 注意事项
+
+- 与 `deep-research` 组合可更全面覆盖；需要深度分析时同时加载。
+- 搜索和通讯日期引用始终使用 `<current_date>`。
+- 周期性通讯保持一致结构，帮助读者形成预期。
+- 精选重质不重量，5 个优秀条目胜过 15 个普通条目。
+- 正确标注所有来源，通过透明出处建立信任。
+- 避免总结读者无法访问的付费内容。
+- 用户提供指定地址或文章时，与精选发现一并纳入。
+- 摘要自身应有足够价值，即使不逐一点击链接也有收获。

@@ -82,7 +82,7 @@ class LocalSkillStorage(SkillStorage):
     def read_custom_skill(self, name: str) -> str:
         '''读取自定义技能说明文件；技能不存在时抛出文件未找到错误。'''
         if not self.custom_skill_exists(name):
-            raise FileNotFoundError(f"Custom skill '{name}' not found.")
+            raise FileNotFoundError(f"找不到自定义技能 '{name}'。")
         return (self.get_custom_skill_dir(name) / SKILL_MD_FILE).read_text(encoding="utf-8")
 
     def write_custom_skill(self, name: str, relative_path: str, content: str) -> None:
@@ -129,7 +129,7 @@ class LocalSkillStorage(SkillStorage):
         return {
             "success": True,
             "skill_name": skill_name,
-            "message": f"Skill '{skill_name}' installed successfully",
+            "message": f"技能 '{skill_name}' 已成功安装",
         }
 
     @staticmethod
@@ -154,19 +154,19 @@ class LocalSkillStorage(SkillStorage):
 
         if not path.is_file():
             if not path.exists():
-                raise FileNotFoundError(f"Skill file not found: {archive_path}")
-            raise ValueError(f"Path is not a file: {archive_path}")
+                raise FileNotFoundError(f"找不到技能文件： {archive_path}")
+            raise ValueError(f"路径不是文件： {archive_path}")
         if path.suffix != ".skill":
-            raise ValueError("File must have .skill extension")
+            raise ValueError("文件扩展名必须为 .skill")
 
         custom_dir.mkdir(parents=True, exist_ok=True)
 
         try:
             zf = zipfile.ZipFile(path, "r")
         except FileNotFoundError:
-            raise FileNotFoundError(f"Skill file not found: {archive_path}") from None
+            raise FileNotFoundError(f"找不到技能文件： {archive_path}") from None
         except (zipfile.BadZipFile, IsADirectoryError):
-            raise ValueError("File is not a valid ZIP archive") from None
+            raise ValueError("文件不是有效的压缩归档") from None
 
         with zf:
             scan_archive_preflight_or_raise(path, app_config=self._app_config)
@@ -176,13 +176,13 @@ class LocalSkillStorage(SkillStorage):
 
         is_valid, message, skill_name = _validate_skill_frontmatter(skill_dir)
         if not is_valid:
-            raise ValueError(f"Invalid skill: {message}")
+            raise ValueError(f"技能无效： {message}")
         if not skill_name or "/" in skill_name or "\\" in skill_name or ".." in skill_name:
-            raise ValueError(f"Invalid skill name: {skill_name}")
+            raise ValueError(f"技能名称无效： {skill_name}")
 
         target = custom_dir / skill_name
         if target.exists():
-            raise SkillAlreadyExistsError(f"Skill '{skill_name}' already exists")
+            raise SkillAlreadyExistsError(f"技能 '{skill_name}' 已存在")
 
         return skill_dir, skill_name, target
 

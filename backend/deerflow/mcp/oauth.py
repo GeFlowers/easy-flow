@@ -91,19 +91,19 @@ class OAuthTokenManager:
 
         if oauth.grant_type == "client_credentials":
             if not oauth.client_id or not oauth.client_secret:
-                raise ValueError("OAuth client_credentials requires client_id and client_secret")
+                raise ValueError("开放授权的 client_credentials 模式必须提供 client_id 和 client_secret")
             data["client_id"] = oauth.client_id
             data["client_secret"] = oauth.client_secret
         elif oauth.grant_type == "refresh_token":
             if not oauth.refresh_token:
-                raise ValueError("OAuth refresh_token grant requires refresh_token")
+                raise ValueError("开放授权的 refresh_token 模式必须提供 refresh_token")
             data["refresh_token"] = oauth.refresh_token
             if oauth.client_id:
                 data["client_id"] = oauth.client_id
             if oauth.client_secret:
                 data["client_secret"] = oauth.client_secret
         else:
-            raise ValueError(f"Unsupported OAuth grant type: {oauth.grant_type}")
+            raise ValueError(f"不支持的开放授权类型： {oauth.grant_type}")
 
         async with httpx.AsyncClient(timeout=15.0) as client:
             response = await client.post(oauth.token_url, data=data)
@@ -112,7 +112,7 @@ class OAuthTokenManager:
 
         access_token = payload.get(oauth.token_field)
         if not access_token:
-            raise ValueError(f"OAuth token response missing '{oauth.token_field}'")
+            raise ValueError(f"开放授权令牌响应缺少 '{oauth.token_field}'")
         if oauth.grant_type == "refresh_token":
             rotated = payload.get("refresh_token")
             if isinstance(rotated, str) and rotated:

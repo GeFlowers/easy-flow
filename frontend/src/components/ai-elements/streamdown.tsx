@@ -3,7 +3,7 @@
 import { Component, type ComponentProps, type ReactNode } from "react";
 import { Streamdown } from "streamdown";
 
-import { installClipboardFallback } from "@/core/clipboard";
+import { installClipboardFallback } from "@/features/clipboard";
 
 export type ClipboardSafeStreamdownProps = ComponentProps<typeof Streamdown>;
 

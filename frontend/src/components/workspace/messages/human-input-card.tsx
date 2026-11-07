@@ -10,14 +10,14 @@ import { useId, useState, type KeyboardEvent } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 import {
   createHumanInputOptionResponse,
   createHumanInputTextResponse,
   type HumanInputOption,
   type HumanInputRequest,
   type HumanInputResponse,
-} from "@/core/messages/human-input";
+} from "@/features/messages/human-input";
 import { isIMEComposing } from "@/lib/ime";
 import { cn } from "@/lib/utils";
 

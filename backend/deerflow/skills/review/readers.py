@@ -105,7 +105,7 @@ def build_inline_snapshot(
             {
                 "code": "file_too_large",
                 "path": "SKILL.md",
-                "message": "Inline SKILL.md exceeds the per-file review limit",
+                "message": "内联 SKILL.md 超过单文件审查限制",
             }
         )
         content, data = _truncate_utf8_bytes(content, limits.max_file_bytes)
@@ -146,10 +146,10 @@ class LocalDirectoryReader:
         root = self.root
         snapshot = _empty_snapshot(self.subject, self.limits)
         if not root.exists():
-            snapshot["reader_errors"].append({"code": "root_not_found", "path": None, "message": "Package root does not exist"})
+            snapshot["reader_errors"].append({"code": "root_not_found", "path": None, "message": "技能包根目录不存在"})
             return snapshot
         if not root.is_dir():
-            snapshot["reader_errors"].append({"code": "root_not_directory", "path": None, "message": "Package root is not a directory"})
+            snapshot["reader_errors"].append({"code": "root_not_directory", "path": None, "message": "技能包根路径不是目录"})
             return snapshot
 
         root_resolved = root.resolve()
@@ -180,7 +180,7 @@ class LocalDirectoryReader:
                 file_count += 1
                 if file_count > self.limits.max_files:
                     snapshot["truncated"] = True
-                    snapshot["reader_errors"].append({"code": "too_many_files", "path": None, "message": "Package file count exceeds the review limit"})
+                    snapshot["reader_errors"].append({"code": "too_many_files", "path": None, "message": "技能包文件数量超过审查限制"})
                     return self._sort_snapshot(snapshot)
 
                 try:
@@ -192,13 +192,13 @@ class LocalDirectoryReader:
                 total_bytes += max(size, 0)
                 if total_bytes > self.limits.max_total_bytes:
                     snapshot["truncated"] = True
-                    snapshot["reader_errors"].append({"code": "total_size_exceeded", "path": rel_path, "message": "Package total size exceeds the review limit"})
+                    snapshot["reader_errors"].append({"code": "total_size_exceeded", "path": rel_path, "message": "技能包总大小超过审查限制"})
                     return self._sort_snapshot(snapshot)
 
                 if size > self.limits.max_file_bytes:
                     snapshot["truncated"] = True
                     snapshot["files"].append({"path": rel_path, "kind": "binary", "size": size, "sha256": "", "content": None})
-                    snapshot["reader_errors"].append({"code": "file_too_large", "path": rel_path, "message": "File exceeds the per-file review limit"})
+                    snapshot["reader_errors"].append({"code": "file_too_large", "path": rel_path, "message": "文件超过单文件审查限制"})
                     continue
 
                 try:
@@ -228,7 +228,7 @@ class LocalDirectoryReader:
         file_count += 1
         if file_count > self.limits.max_files:
             snapshot["truncated"] = True
-            snapshot["reader_errors"].append({"code": "too_many_files", "path": None, "message": "Package file count exceeds the review limit"})
+            snapshot["reader_errors"].append({"code": "too_many_files", "path": None, "message": "技能包文件数量超过审查限制"})
             return file_count
         try:
             target = os.readlink(path)
@@ -252,7 +252,7 @@ class LocalDirectoryReader:
             rel = path.relative_to(root).as_posix()
             return normalize_relative_path(rel)
         except ValueError:
-            snapshot["reader_errors"].append({"code": "path_escaped", "path": None, "message": "Package entry escapes the root"})
+            snapshot["reader_errors"].append({"code": "path_escaped", "path": None, "message": "技能包条目超出根目录"})
             return None
 
     @staticmethod
@@ -288,7 +288,7 @@ class ArchivePackageReader:
                 members = sorted(zf.infolist(), key=lambda info: info.filename)
                 if len(members) > self.limits.max_files:
                     snapshot["truncated"] = True
-                    snapshot["reader_errors"].append({"code": "too_many_files", "path": None, "message": "Archive member count exceeds the review limit"})
+                    snapshot["reader_errors"].append({"code": "too_many_files", "path": None, "message": "归档成员数量超过审查限制"})
                     members = members[: self.limits.max_files]
                 for info in members:
                     if info.is_dir():
@@ -301,13 +301,13 @@ class ArchivePackageReader:
                     if declared_size > self.limits.max_file_bytes:
                         snapshot["truncated"] = True
                         snapshot["files"].append({"path": rel_path, "kind": "binary", "size": declared_size, "sha256": "", "content": None})
-                        snapshot["reader_errors"].append({"code": "file_too_large", "path": rel_path, "message": "Archive member exceeds the per-file review limit"})
+                        snapshot["reader_errors"].append({"code": "file_too_large", "path": rel_path, "message": "归档成员超过单文件审查限制"})
                         continue
 
                     remaining_total_bytes = self.limits.max_total_bytes - total_bytes
                     if remaining_total_bytes <= 0:
                         snapshot["truncated"] = True
-                        snapshot["reader_errors"].append({"code": "total_size_exceeded", "path": rel_path, "message": "Archive total size exceeds the review limit"})
+                        snapshot["reader_errors"].append({"code": "total_size_exceeded", "path": rel_path, "message": "归档总大小超过审查限制"})
                         break
 
                     member_budget = min(self.limits.max_file_bytes, remaining_total_bytes)
@@ -321,9 +321,9 @@ class ArchivePackageReader:
                         snapshot["truncated"] = True
                         if actual_size > self.limits.max_file_bytes:
                             snapshot["files"].append({"path": rel_path, "kind": "binary", "size": actual_size, "sha256": "", "content": None})
-                            snapshot["reader_errors"].append({"code": "file_too_large", "path": rel_path, "message": "Archive member exceeds the per-file review limit"})
+                            snapshot["reader_errors"].append({"code": "file_too_large", "path": rel_path, "message": "归档成员超过单文件审查限制"})
                             continue
-                        snapshot["reader_errors"].append({"code": "total_size_exceeded", "path": rel_path, "message": "Archive total size exceeds the review limit"})
+                        snapshot["reader_errors"].append({"code": "total_size_exceeded", "path": rel_path, "message": "归档总大小超过审查限制"})
                         break
 
                     total_bytes += actual_size
@@ -411,11 +411,11 @@ class InstalledSkillReader(LocalDirectoryReader):
 def parse_skill_uri(target: str) -> tuple[str, str]:
     '''校验 skill://<category>/<path> 标识，并返回经规范化的类别与相对路径。'''
     if not target.startswith("skill://"):
-        raise ValueError("Installed skill targets must use skill://<category>/<relative-path>")
+        raise ValueError("已安装的技能目标必须使用 skill://<category>/<relative-path>")
     raw = target[len("skill://") :]
     category, sep, rel_path = raw.partition("/")
     if not sep or category not in {"public", "custom", "legacy"}:
-        raise ValueError("Skill target must include category: public, custom, or legacy")
+        raise ValueError("技能目标必须包含分类：public、custom 或 legacy")
     rel_path = normalize_relative_path(rel_path)
     return category, rel_path
 

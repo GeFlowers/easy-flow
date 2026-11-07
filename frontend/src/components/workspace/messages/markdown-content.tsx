@@ -13,8 +13,8 @@ import { type ClipboardSafeStreamdownProps } from "@/components/ai-elements/stre
 import {
   preprocessStreamdownMarkdown,
   streamdownPluginsWithoutRawHtml,
-} from "@/core/streamdown";
-import { SafeMessageResponse } from "@/core/streamdown/components";
+} from "@/features/streamdown";
+import { SafeMessageResponse } from "@/features/streamdown/components";
 import { cn } from "@/lib/utils";
 
 import { createMarkdownLinkComponent } from "./markdown-link";

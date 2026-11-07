@@ -1,6 +1,6 @@
 "use client";
 
-import { AuthProvider } from "@/core/auth/AuthProvider";
+import { AuthProvider } from "@/features/auth/AuthProvider";
 
 import { GatewayOfflineBanner } from "./gateway-offline-banner";
 

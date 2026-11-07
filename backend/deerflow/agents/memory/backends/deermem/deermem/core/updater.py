@@ -13,6 +13,8 @@ import uuid
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
+from deerflow.agents.memory.schema import normalize_memory
+
 from ..config import DeerMemConfig
 from .prompt import (
     CONSOLIDATION_PROMPT,
@@ -275,12 +277,15 @@ def _parse_memory_update_response(response_content: Any) -> dict[str, Any]:
 
 
 _UPLOAD_SENTENCE_RE = re.compile(
-    r"[^.!?]*\b(?:"
+    r"[^.!?。！？]*(?:"
+    r"\b(?:"
     r"upload(?:ed|ing)?(?:\s+\w+){0,3}\s+(?:file|files?|document|documents?|attachment|attachments?)"
     r"|file\s+upload"
+    r")"
+    r"|上传(?:了|过|的|中)?[^.!?。！？]{0,18}?(?:文件|附件|文档|图片|照片|图像)"
     r"|/mnt/user-data/uploads/"
     r"|<uploaded_files>"
-    r")[^.!?]*[.!?]?\s*",
+    r")[^.!?。！？]*[.!?。！？]?\s*",
     re.IGNORECASE,
 )
 
@@ -289,11 +294,9 @@ def _strip_upload_mentions_from_memory(memory_data: dict[str, Any]) -> dict[str,
     '''从摘要和事实中移除上传事件描述，避免把仅在当前会话有效的文件写入长期记忆。'''
     for section in ("user", "history"):
         section_data = memory_data.get(section, {})
-        for _key, val in section_data.items():
-            if isinstance(val, dict) and "summary" in val:
-                cleaned = _UPLOAD_SENTENCE_RE.sub("", val["summary"]).strip()
-                cleaned = re.sub(r"  +", " ", cleaned)
-                val["summary"] = cleaned
+        if isinstance(section_data, dict) and isinstance(section_data.get("summary"), str):
+            cleaned = _UPLOAD_SENTENCE_RE.sub("", section_data["summary"]).strip()
+            section_data["summary"] = re.sub(r"  +", " ", cleaned)
 
     facts = memory_data.get("facts", [])
     if facts:
@@ -449,15 +452,15 @@ class MemoryUpdater:
 
     def get_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
         '''通过存储层读取当前记忆数据，并复用其缓存策略。'''
-        return self._storage.load(agent_name, user_id=user_id)
+        return normalize_memory(self._storage.load(agent_name, user_id=user_id))
 
     def reload_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
         '''要求存储层绕过缓存重新读取当前记忆数据。'''
-        return self._storage.reload(agent_name, user_id=user_id)
+        return normalize_memory(self._storage.reload(agent_name, user_id=user_id))
 
     def import_memory_data(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
         '''保存导入的记忆文档；持久化失败时抛出错误，成功后返回存储中的版本。'''
-        if not self._storage.save(memory_data, agent_name, user_id=user_id):
+        if not self._storage.save(normalize_memory(memory_data), agent_name, user_id=user_id):
             raise OSError("Failed to save imported memory data")
         return self._storage.load(agent_name, user_id=user_id)
 
@@ -492,7 +495,7 @@ class MemoryUpdater:
         )
         updated_memory["facts"] = _trim_facts_to_max(facts, self._config.max_facts)
         if not self._save_memory_to_file(updated_memory, agent_name, user_id=user_id):
-            raise OSError("Failed to save memory data after creating fact")
+            raise OSError("创建事实后保存记忆数据失败")
         stored = any(f.get("id") == fact_id for f in updated_memory["facts"])
         return updated_memory, (fact_id if stored else None)
 
@@ -506,7 +509,7 @@ class MemoryUpdater:
         updated_memory = dict(memory_data)
         updated_memory["facts"] = updated_facts
         if not self._save_memory_to_file(updated_memory, agent_name, user_id=user_id):
-            raise OSError(f"Failed to save memory data after deleting fact '{fact_id}'")
+            raise OSError(f"删除事实 '{fact_id}' 后保存记忆数据失败")
         return updated_memory
 
     def update_memory_fact(self, fact_id: str, content: str | None = None, category: str | None = None, confidence: float | None = None, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
@@ -535,7 +538,7 @@ class MemoryUpdater:
             raise KeyError(fact_id)
         updated_memory["facts"] = updated_facts
         if not self._save_memory_to_file(updated_memory, agent_name, user_id=user_id):
-            raise OSError(f"Failed to save memory data after updating fact '{fact_id}'")
+            raise OSError(f"更新事实 '{fact_id}' 后保存记忆数据失败")
         return updated_memory
 
     def _build_correction_hint(
@@ -547,17 +550,17 @@ class MemoryUpdater:
         correction_hint = ""
         if correction_detected:
             correction_hint = (
-                "IMPORTANT: Explicit correction signals were detected in this conversation. "
-                "Pay special attention to what the agent got wrong, what the user corrected, "
-                "and record the correct approach as a fact with category "
-                '"correction" and confidence >= 0.95 when appropriate.'
+                "重要：本次对话检测到明确的纠正信号。"
+                "请特别关注代理哪里做错、用户纠正了什么，"
+                "并在适当情况下将正确做法记录为类别 "
+                '"correction"、置信度 >= 0.95 的事实。'
             )
         if reinforcement_detected:
             reinforcement_hint = (
-                "IMPORTANT: Positive reinforcement signals were detected in this conversation. "
-                "The user explicitly confirmed the agent's approach was correct or helpful. "
-                "Record the confirmed approach, style, or preference as a fact with category "
-                '"preference" or "behavior" and confidence >= 0.9 when appropriate.'
+                "重要：本次对话检测到正向肯定信号。"
+                "用户明确确认代理的做法正确或有帮助。"
+                "在适当情况下，将被确认的做法、风格或偏好记录为类别 "
+                '"preference" 或 "behavior"、置信度 >= 0.9 的事实。'
             )
             correction_hint = (correction_hint + "\n" + reinforcement_hint).strip() if correction_hint else reinforcement_hint
 
@@ -785,23 +788,12 @@ class MemoryUpdater:
         config = self._config
         now = utc_now_iso_z()
 
-        user_updates = update_data.get("user", {})
-        for section in ["workContext", "personalContext", "topOfMind"]:
-            section_data = user_updates.get(section, {})
-            if section_data.get("shouldUpdate") and section_data.get("summary"):
-                current_memory["user"][section] = {
-                    "summary": section_data["summary"],
-                    "updatedAt": now,
-                }
-
-        history_updates = update_data.get("history", {})
-        for section in ["recentMonths", "earlierContext", "longTermBackground"]:
-            section_data = history_updates.get(section, {})
-            if section_data.get("shouldUpdate") and section_data.get("summary"):
-                current_memory["history"][section] = {
-                    "summary": section_data["summary"],
-                    "updatedAt": now,
-                }
+        current_memory = normalize_memory(current_memory)
+        for section in ("user", "history"):
+            section_data = update_data.get(section, {})
+            summary = section_data.get("summary") if isinstance(section_data, dict) else None
+            if isinstance(section_data, dict) and section_data.get("shouldUpdate") is True and isinstance(summary, str) and summary.strip():
+                current_memory[section] = {"summary": summary.strip(), "updatedAt": now}
 
         facts_to_remove = set(update_data.get("factsToRemove", []))
         if facts_to_remove:

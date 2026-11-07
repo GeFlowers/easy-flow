@@ -16,13 +16,12 @@ from deerflow.agents.middlewares._bounded_dict import BoundedDict
 
 _RECOVERY_PROMPT = (
     "<system_reminder>\n"
-    "Your previous response after the tool execution was empty. Review the tool results "
-    "already present in the conversation and provide a concise, user-visible final response. "
-    "Do not call another tool unless it is strictly necessary.\n"
+    "你在工具执行后的上一次响应为空。请查看对话中已有的工具结果，"
+    "并给出简洁且用户可见的最终答复。除非确有必要，否则不要再次调用工具。\n"
     "</system_reminder>"
 )
 
-_FALLBACK_CONTENT = "The model completed the tool run but returned no final response, including after one automatic retry. Please try again or use a different model."
+_FALLBACK_CONTENT = "模型已完成工具运行，但在一次自动重试后仍未返回最终答复。请重试或更换模型。"
 
 _TOOL_CALL_FINISH_REASONS = {"tool_calls", "function_call"}
 
@@ -135,7 +134,7 @@ class TerminalResponseMiddleware(AgentMiddleware[AgentState]):
         additional_kwargs.update(
             {
                 "deerflow_error_fallback": True,
-                "error_reason": "Model returned an empty terminal response after one retry",
+                "error_reason": "模型在一次重试后仍返回空的最终响应",
             }
         )
         fallback = last.model_copy(

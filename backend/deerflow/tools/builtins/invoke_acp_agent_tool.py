@@ -15,8 +15,8 @@ logger = logging.getLogger(__name__)
 class _InvokeACPAgentInput(BaseModel):
     '''约束外部智能体调用只接受目标代理名和独立任务提示。'''
 
-    agent: str = Field(description="Name of the ACP agent to invoke")
-    prompt: str = Field(description="The concise task prompt to send to the agent")
+    agent: str = Field(description="要调用的智能体客户端协议代理名称")
+    prompt: str = Field(description="发送给代理的简明任务提示")
 
 
 def _get_work_dir(thread_id: str | None) -> str:
@@ -61,17 +61,17 @@ def _build_acp_mcp_servers() -> list[dict[str, Any]]:
 
         if transport_type == "stdio":
             if not server_config.command:
-                raise ValueError(f"MCP server '{name}' with stdio transport requires 'command' field")
+                raise ValueError(f"使用 stdio 传输的模型上下文协议服务器 '{name}' 必须提供 'command' 字段")
             payload["command"] = server_config.command
             payload["args"] = server_config.args
             payload["env"] = [{"name": key, "value": value} for key, value in server_config.env.items()]
         elif transport_type in ("http", "sse"):
             if not server_config.url:
-                raise ValueError(f"MCP server '{name}' with {transport_type} transport requires 'url' field")
+                raise ValueError(f"使用 {transport_type} 传输的模型上下文协议服务器 '{name}' 必须提供 'url' 字段")
             payload["url"] = server_config.url
             payload["headers"] = [{"name": key, "value": value} for key, value in server_config.headers.items()]
         else:
-            raise ValueError(f"MCP server '{name}' has unsupported transport type: {transport_type}")
+            raise ValueError(f"模型上下文协议服务器 '{name}' 使用了不支持的传输类型：{transport_type}")
 
         mcp_servers.append(payload)
 
@@ -105,26 +105,26 @@ def _build_permission_response(options: list[Any], *, auto_approve: bool) -> Any
 def _format_invocation_error(agent: str, cmd: str, exc: Exception) -> str:
     '''将启动失败转换为可操作的错误提示，特别说明 Codex 命令与 ACP 适配器区别。'''
     if not isinstance(exc, FileNotFoundError):
-        return f"Error invoking ACP agent '{agent}': {exc}"
+        return f"调用外部代理 '{agent}' 时出错： {exc}"
 
-    message = f"Error invoking ACP agent '{agent}': Command '{cmd}' was not found on PATH."
+    message = f"调用外部代理 '{agent}' 时出错： 在 PATH 环境变量中找不到命令 '{cmd}'。"
     if cmd == "codex-acp" and shutil.which("codex"):
-        return f"{message} The installed `codex` CLI does not speak ACP directly. Install a Codex ACP adapter (for example `npx @zed-industries/codex-acp`) or update `acp_agents.codex.command` and `args` in config.yaml."
+        return f"{message} 已安装的 `codex` 命令行工具不能直接使用智能体客户端协议。请安装 Codex 适配器（例如 `npx @zed-industries/codex-acp`），或更新 config.yaml 中的 `acp_agents.codex.command` 和 `args`。"
 
-    return f"{message} Install the agent binary or update `acp_agents.{agent}.command` in config.yaml."
+    return f"{message} 请安装代理程序，或更新 config.yaml 中的 `acp_agents.{agent}.command`。"
 
 
 def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
     '''构造可调用外部 ACP 代理的工具，并将会话输出汇总为文本返回。'''
     agent_lines = "\n".join(f"- {name}: {cfg.description}" for name, cfg in agents.items())
     description = (
-        "Invoke an external ACP-compatible agent and return its final response.\n\n"
-        "Available agents:\n"
+        "调用兼容智能体客户端协议的外部代理，并返回其最终响应。\n\n"
+        "可用代理：\n"
         f"{agent_lines}\n\n"
-        "IMPORTANT: ACP agents operate in their own independent workspace. "
-        "Do NOT include /mnt/user-data paths in the prompt. "
-        "Give the agent a self-contained task description — it will produce results in its own workspace. "
-        "After the agent completes, its output files are accessible at /mnt/acp-workspace/ (read-only)."
+        "重要：外部代理在各自独立的工作区中运行。"
+        "提示中不要包含 /mnt/user-data 路径。"
+        "请向代理提供完整独立的任务描述，它将在自己的工作区中生成结果。"
+        "代理完成后，可通过 /mnt/acp-workspace/ 只读访问其输出文件。"
     )
     _agents = dict(agents)
 
@@ -134,7 +134,7 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
         logger.debug("Invoking ACP agent %s with prompt: %.200s%s", agent, prompt, "..." if len(prompt) > 200 else "")
         if agent not in _agents:
             available = ", ".join(_agents.keys())
-            return f"Error: Unknown agent '{agent}'. Available: {available}"
+            return f"Error: 未知代理 '{agent}'。可用代理： {available}"
 
         agent_config = _agents[agent]
         thread_id: str | None = ((config or {}).get("configurable") or {}).get("thread_id")
@@ -143,7 +143,7 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
             from acp import PROTOCOL_VERSION, Client, text_block
             from acp.schema import ClientCapabilities, Implementation
         except ImportError:
-            return "Error: agent-client-protocol package is not installed. Run `uv sync` to install project dependencies."
+            return "Error: 尚未安装 agent-client-protocol 包。请运行 `uv sync` 安装项目依赖。"
 
         class _CollectingClient(Client):
             '''收集 ACP 会话响应，并依据代理配置处理权限请求。'''
@@ -215,7 +215,7 @@ def build_invoke_acp_agent_tool(agents: dict) -> BaseTool:
             result = client.collected_text
             logger.info("ACP agent '%s' returned %s", agent, result[:1000])
             logger.info("ACP agent '%s' returned %d characters", agent, len(result))
-            return result or "(no response)"
+            return result or "(无响应)"
         except Exception as e:
             logger.error("ACP agent '%s' invocation failed: %s", agent, e)
             return _format_invocation_error(agent, cmd, e)

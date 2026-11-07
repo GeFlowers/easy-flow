@@ -90,7 +90,7 @@ When the agent is invoked with a specific skill in scope, the skill's instructio
 
 ## Configuration
 
-The skills system is configured under `skills:` in `config.yaml`:
+The skills system is configured under `skills:` in `config/config.yaml`:
 
 ```yaml
 skills:
@@ -108,11 +108,11 @@ The `container_path` tells the agent where to find skill resources inside the sa
 
 ## Enabling and disabling skills
 
-Skill availability is tracked in `extensions_config.json` (separate from `config.yaml`). You can manage skill state:
+Skill availability is tracked in `config/extensions_config.json` (separate from `config/config.yaml`). You can manage skill state:
 
 - **Through the DeerFlow App UI**: the skills panel lets you toggle skills on and off.
 - **Through the Gateway API**: `POST /api/extensions/skills/{name}/enable` and `/disable`.
-- **By editing `extensions_config.json` directly**.
+- **By editing `config/extensions_config.json` directly**.
 
 Because `load_skills()` re-reads the extensions config on every call, changes take effect immediately — no server restart required.
 

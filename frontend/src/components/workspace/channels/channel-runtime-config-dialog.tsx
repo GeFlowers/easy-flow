@@ -22,8 +22,8 @@ import { Input } from "@/components/ui/input";
 import type {
   ChannelProvider,
   ChannelRuntimeConfigValues,
-} from "@/core/channels/types";
-import { useI18n } from "@/core/i18n/hooks";
+} from "@/features/channels/types";
+import { useI18n } from "@/features/i18n/hooks";
 
 type ChannelRuntimeConfigDialogProps = {
   provider: ChannelProvider | null;

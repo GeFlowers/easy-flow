@@ -1,0 +1,155 @@
+'''提供基于近期对话生成后续问题建议的受权限保护路由。'''
+
+import json
+import logging
+
+from fastapi import APIRouter, Depends, Request
+from pydantic import BaseModel, Field
+
+import deerflow.utils.llm_text as llm_text
+from server.gateway.authz import require_permission
+from server.gateway.deps import get_config
+from deerflow.config.app_config import AppConfig
+from deerflow.utils.oneshot_llm import run_oneshot_llm
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/api", tags=["suggestions"])
+
+
+class SuggestionMessage(BaseModel):
+    '''表示用于生成建议的一条纯文本用户或助手消息。'''
+
+    role: str = Field(..., description="Message role: user|assistant")
+    content: str = Field(..., description="Message content as plain text")
+
+
+class SuggestionsRequest(BaseModel):
+    '''定义后续问题建议生成的消息上下文和数量上限。'''
+
+    messages: list[SuggestionMessage] = Field(..., description="Recent conversation messages")
+    n: int = Field(default=3, ge=1, le=5, description="Number of suggestions to generate")
+    model_name: str | None = Field(default=None, description="Optional model override")
+
+
+class SuggestionsResponse(BaseModel):
+    '''返回清洗后的后续问题建议列表。'''
+
+    suggestions: list[str] = Field(default_factory=list, description="Suggested follow-up questions")
+
+
+class SuggestionsConfigResponse(BaseModel):
+    '''返回全局后续问题建议功能是否启用。'''
+
+    enabled: bool = Field(..., description="Whether follow-up suggestions are enabled globally")
+
+
+_strip_markdown_code_fence = llm_text.strip_markdown_code_fence
+_strip_think_blocks = llm_text.strip_think_blocks
+
+
+def _parse_json_string_list(text: str) -> list[str] | None:
+    '''从模型输出中解析 JSON 字符串列表，无法解析时返回 None。'''
+    candidate = _strip_think_blocks(text)
+    candidate = _strip_markdown_code_fence(candidate)
+    start = candidate.find("[")
+    end = candidate.rfind("]")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    candidate = candidate[start : end + 1]
+    try:
+        data = json.loads(candidate)
+    except Exception:
+        return None
+    if not isinstance(data, list):
+        return None
+    out: list[str] = []
+    for item in data:
+        if not isinstance(item, str):
+            continue
+        s = item.strip()
+        if not s:
+            continue
+        out.append(s)
+    return out
+
+
+def _format_conversation(messages: list[SuggestionMessage]) -> str:
+    '''将近期消息格式化为供建议模型理解的紧凑对话上下文。'''
+    parts: list[str] = []
+    for m in messages:
+        role = m.role.strip().lower()
+        if role in ("user", "human"):
+            parts.append(f"用户：{m.content.strip()}")
+        elif role in ("assistant", "ai"):
+            parts.append(f"助手：{m.content.strip()}")
+        else:
+            parts.append(f"{m.role}: {m.content.strip()}")
+    return "\n".join(parts).strip()
+
+
+@router.get(
+    "/suggestions/config",
+    response_model=SuggestionsConfigResponse,
+    summary="Get Suggestions Configuration",
+    description="Returns the global configuration for follow-up suggestions.",
+)
+async def get_suggestions_config(
+    config: AppConfig = Depends(get_config),
+) -> SuggestionsConfigResponse:
+    '''读取并返回当前应用配置中的后续建议开关。'''
+    return SuggestionsConfigResponse(enabled=config.suggestions.enabled)
+
+
+@router.post(
+    "/threads/{thread_id}/suggestions",
+    response_model=SuggestionsResponse,
+    summary="Generate Follow-up Questions",
+    description="Generate short follow-up questions a user might ask next, based on recent conversation context.",
+)
+@require_permission("threads", "read", owner_check=True)
+async def generate_suggestions(
+    thread_id: str,
+    body: SuggestionsRequest,
+    request: Request,
+    config: AppConfig = Depends(get_config),
+) -> SuggestionsResponse:
+    '''在通过线程读取权限校验后，根据近期对话生成后续问题建议。'''
+    if not config.suggestions.enabled:
+        return SuggestionsResponse(suggestions=[])
+    if not body.messages:
+        return SuggestionsResponse(suggestions=[])
+
+    n = body.n
+    conversation = _format_conversation(body.messages)
+    if not conversation:
+        return SuggestionsResponse(suggestions=[])
+
+    system_instruction = (
+        "你负责生成后续问题，帮助用户继续对话。\n"
+        f"根据以下对话，生成恰好 {n} 个用户接下来可能提出的简短问题。\n"
+        "要求：\n"
+        "- 问题必须与前文相关。\n"
+        "- 使用与用户相同的语言。\n"
+        "- 每个问题尽量不超过 20 个词或 40 个汉字。\n"
+        "- 不加编号、Markdown 或额外文字。\n"
+        "- 仅输出由字符串组成的 JSON 数组。\n"
+    )
+    user_content = f"对话上下文：\n{conversation}\n\n生成 {n} 个后续问题。"
+
+    try:
+        raw = await run_oneshot_llm(
+            system_instruction=system_instruction,
+            user_content=user_content,
+            run_name="suggest_agent",
+            app_config=config,
+            model_name=body.model_name,
+            thread_id=thread_id,
+        )
+        suggestions = _parse_json_string_list(raw) or []
+        cleaned = [s.replace("\n", " ").strip() for s in suggestions if s.strip()]
+        cleaned = cleaned[:n]
+        return SuggestionsResponse(suggestions=cleaned)
+    except Exception as exc:
+        logger.exception("Failed to generate suggestions: thread_id=%s err=%s", thread_id, exc)
+        return SuggestionsResponse(suggestions=[])

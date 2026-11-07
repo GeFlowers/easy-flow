@@ -28,9 +28,9 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useDeleteAgent } from "@/core/agents";
-import type { Agent } from "@/core/agents";
-import { useI18n } from "@/core/i18n/hooks";
+import { useDeleteAgent } from "@/features/agents";
+import type { Agent } from "@/features/agents";
+import { useI18n } from "@/features/i18n/hooks";
 import { cn } from "@/lib/utils";
 
 interface AgentCardProps {

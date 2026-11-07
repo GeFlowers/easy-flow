@@ -2,7 +2,7 @@ import { useParams, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef } from "react";
 
 import { usePromptInputController } from "@/components/ai-elements/prompt-input";
-import { useI18n } from "@/core/i18n/hooks";
+import { useI18n } from "@/features/i18n/hooks";
 
 /** 根据路由模式选择初始草稿，确保模式切换不会遗留上一页面的提示内容。 */
 export function useSpecificChatMode() {

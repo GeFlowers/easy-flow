@@ -7,8 +7,8 @@
 set -e
 
 if [[ -z "$1" ]]; then
-  echo "Usage: $0 <owner/repo@skill-name>"
-  echo "Example: $0 vercel-labs/agent-skills@vercel-react-best-practices"
+  echo "用法：$0 <owner/repo@skill-name>"
+  echo "示例：$0 vercel-labs/agent-skills@vercel-react-best-practices"
   exit 1
 fi
 
@@ -18,7 +18,7 @@ FULL_SKILL_NAME="$1"
 SKILL_NAME="${FULL_SKILL_NAME##*@}"
 
 if [[ -z "$SKILL_NAME" || "$SKILL_NAME" == "$FULL_SKILL_NAME" ]]; then
-  echo "Error: Invalid skill format. Expected: owner/repo@skill-name"
+  echo "错误：技能格式无效。应为 owner/repo@skill-name"
   exit 1
 fi
 
@@ -39,7 +39,7 @@ find_project_root() {
 PROJECT_ROOT=$(find_project_root)
 
 if [[ -z "$PROJECT_ROOT" ]]; then
-  echo "Error: Could not find project root (deer-flow.code-workspace not found)"
+  echo "错误：找不到项目根目录（缺少 deer-flow.code-workspace）"
   exit 1
 fi
 
@@ -51,7 +51,7 @@ npx skills add "$FULL_SKILL_NAME" -g -y > /dev/null 2>&1
 
 # 第 2 步：确认全局安装目录存在，避免建立悬空链接。
 if [[ ! -d "$SKILL_SOURCE" ]]; then
-  echo "Skill '$SKILL_NAME' installation failed"
+  echo "技能 '$SKILL_NAME' 安装失败"
   exit 1
 fi
 
@@ -59,4 +59,4 @@ fi
 mkdir -p "$SKILL_TARGET"
 ln -sf "$SKILL_SOURCE" "$SKILL_TARGET/"
 
-echo "Skill '$SKILL_NAME' installed successfully"
+echo "技能 '$SKILL_NAME' 安装成功"

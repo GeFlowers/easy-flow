@@ -4,8 +4,8 @@ import { BotIcon, PlusIcon } from "lucide-react";
 import { useRouter } from "next/navigation";
 
 import { Button } from "@/components/ui/button";
-import { useAgents } from "@/core/agents";
-import { useI18n } from "@/core/i18n/hooks";
+import { useAgents } from "@/features/agents";
+import { useI18n } from "@/features/i18n/hooks";
 
 import { AgentCard } from "./agent-card";
 

@@ -150,7 +150,7 @@ class CodexChatModel(BaseChatModel):
                     }
                 )
 
-        instructions = "\n\n".join(instructions_parts) or "You are a helpful assistant."
+        instructions = "\n\n".join(instructions_parts) or "你是一个乐于助人的助手。"
 
         return instructions, input_items
 

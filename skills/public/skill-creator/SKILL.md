@@ -1,124 +1,122 @@
 ---
 name: skill-creator
-description: Create or update a Codex skill with appropriately scoped instructions and any needed supporting resources.
+description: 创建或更新 Codex 技能，为其编写范围明确的说明，并提供实际需要的配套资源。
 metadata:
-  short-description: Create or update a skill
+  short-description: 创建或更新技能
 ---
 
-# Skill Creator
+# 技能创建器
 
-Create skills that give Codex useful, non-obvious guidance without constraining unrelated work.
+创建能为 Codex 提供实用、非显而易见指导的技能，不约束无关工作。
 
-## Core Principles
+## 核心原则
 
-**Assume Codex is already capable.** Include only information that changes its decisions or improves its work. Remove generic advice, repeated instructions, speculative edge cases, and examples that do not materially clarify the task.
+**默认 Codex 已具备通用能力。** 只保留能改变决策或改善工作的内容，移除泛泛建议、重复要求、臆测的边缘场景，以及不能实质澄清任务的示例。
 
-**Preserve user intent and scope.** A skill should support the requested task, not replace the user's chosen product, expand the assignment, modify unrelated configuration, or imply permission for additional external actions. Do not turn a particular example, past failure, or personal preference into a universal requirement.
+**尊重用户意图与范围。** 技能应支持用户要求的任务，不得替换其选择的产品、扩大任务、修改无关配置，或暗示已获准执行额外外部操作。不要把个别示例、过去失败或个人偏好变成通用要求。
 
-Approval to complete a task does not expand its scope or execution permissions. For retrying or externally mutating workflows, define a stopping condition proportional to the risk.
+获准完成任务不意味着扩大范围或执行权限。涉及重试或外部写入时，应设置与风险相称的停止条件。
 
-**Match specificity to the risk.** Give the model room to choose an appropriate approach when multiple approaches are reasonable. Use detailed steps, deterministic scripts, or absolute language only when correctness, safety, permissions, or a genuinely fragile workflow requires them.
+**根据风险决定细化程度。** 存在多种合理做法时，允许模型选择。仅在正确性、安全、权限或脆弱流程确有需要时，使用详细步骤、确定性脚本或绝对要求。
 
-For open-ended work, describe the outcome and relevant decision criteria. For workflows with a preferred shape, offer useful examples or configurable scripts. Reserve fixed sequences and narrow parameters for operations where deviation would cause a concrete problem. Preserve non-obvious operational invariants, distinguish actual requirements from optional recommendations or local conventions, and avoid restating policies already enforced elsewhere.
+开放式任务说明预期结果和决策标准；有偏好流程时提供示例或可配置脚本。仅对偏离会导致具体问题的操作规定固定顺序和严格参数。保留关键运行约束，区分硬性要求、可选建议和本地约定，不重复其他地方已强制执行的规则。
 
-**Keep discovery cheap and precise.** Skill names and descriptions are available before a skill is loaded. Describe the actual capability and when it applies, adding exclusions only when they prevent likely misrouting. Avoid exhaustive capability lists and catchalls that attract unrelated requests.
+**发现成本低、匹配准确。** 技能加载前已能看到名称和描述，因此应说明真实能力及适用情况，仅在防止常见误匹配时加入排除条件。避免穷举功能或使用吸引无关请求的宽泛描述。
 
-Keep skills self-contained; refer to another skill or tool only when the requested workflow genuinely requires it and it is available in the target environment. Specialized review, hardening, or audit workflows should apply when requested or genuinely needed, not merely because ordinary work touches the same subject.
+保持技能自包含。只有工作流程确实依赖、且目标环境可用时，才引用其他技能或工具。专门审查、加固和审计应在被要求或确有需要时执行，不能仅因普通工作触及同一主题就触发。
 
-**Disclose detail progressively.** Keep shared purpose, essential constraints, and useful routing in `SKILL.md`. Put substantial mode-specific guidance, schemas, examples, or procedures in supporting references and read only the references relevant to the current task. A simple self-contained skill does not need a router or extra files.
+**逐步披露细节。** 在 `SKILL.md` 保留共同目标、关键约束和资源选择规则。大量模式专属指导、数据结构、示例或步骤放入配套参考文档，当前任务只读取相关部分。简单的自包含技能不需要额外导航或文件。
 
-## Anatomy of a Skill
+## 技能组成
 
-Every skill is a folder containing a required `SKILL.md` file and any optional resources its actual workflow needs:
+每项技能是一个目录，必须包含 `SKILL.md`，可按实际流程提供配套资源：
 
 ```text
 skill-name/
-|-- SKILL.md                 Required skill instructions
-|   |-- YAML frontmatter     Required name and description
-|   `-- Markdown body        Instructions loaded when the skill is used
-|-- agents/                  Optional UI metadata and invocation policy
+|-- SKILL.md                 必需：技能说明
+|   |-- YAML 前置信息        必需：name 和 description
+|   `-- Markdown 正文        使用技能时加载的指令
+|-- agents/                  可选：界面元数据和调用策略
 |   `-- openai.yaml
-|-- scripts/                 Optional executable helpers
-|-- references/              Optional documentation loaded as needed
-`-- assets/                  Optional files used in generated output
+|-- scripts/                 可选：可执行辅助脚本
+|-- references/              可选：按需加载的参考文档
+`-- assets/                  可选：用于生成输出的资源
 ```
 
-Choose the structure that fits the actual task. Some skills are short and self-contained; others route among operating modes or delegate complex mechanics to scripts. Avoid creating directories, placeholders, examples, or ancillary documentation without a clear use.
+按任务选择结构。有些技能很短，有些需要区分工作模式或把复杂操作交给脚本。没有明确用途时，不创建目录、占位文件、示例或辅助说明。
 
 ### SKILL.md
 
-The YAML frontmatter identifies the skill and determines when it should be considered. Include the required `name` and `description`, and preserve supported optional fields such as existing `metadata` when appropriate.
+YAML 前置信息标识技能并决定何时考虑使用。保留必需的 `name`、`description`，适当保留已有 `metadata` 等受支持的可选字段。
 
-The Markdown body is loaded only when the skill is used. Put the purpose, essential workflow, real constraints, and useful links there. Keep detailed procedures and examples in supporting references when they are relevant only to particular modes.
+Markdown 正文仅在技能被使用时加载，放置目标、必要流程、实际约束和有用链接。仅适用于特定模式的详细步骤和示例放入对应参考文档。
 
-Skill information is disclosed in three stages:
+信息分三层披露：
 
-1. **Name and description:** Available during skill selection, so keep them concise and discriminating.
-2. **SKILL.md body:** Loaded when the skill applies, so keep its instructions relevant to that task.
-3. **Supporting resources:** Read or execute only when the current task actually needs them.
+1. **名称与描述**：选择技能时可见，应简洁并具有区分度。
+2. **主说明正文**：技能适用时加载，只写与任务相关的指令。
+3. **配套资源**：仅当前任务确实需要时读取或执行。
 
-The entrypoint should be as short as the task permits while retaining important constraints. A large upper bound is not a target: move conditional detail into references when doing so improves clarity or context use, rather than waiting for the file to become unwieldy.
+入口在保留关键约束的前提下尽可能短。长度上限不是目标：拆出条件性细节能改善清晰度和上下文使用时就应拆分，不必等文件过长。
 
-### Scripts
+### 脚本
 
-Use `scripts/` for executable code when the same logic would otherwise be rewritten repeatedly or deterministic execution materially improves reliability.
+同一逻辑会被反复重写，或确定性执行可显著提高可靠性时，使用 `scripts/`。
 
-- **Example:** `scripts/rotate_pdf.py` for a PDF operation that would otherwise require recreating the same code.
-- **Useful for:** Repeated transformations, reliable API operations, data processing, and other concrete automation.
-- **Validation:** Run new or changed scripts to verify their behavior. Scripts can usually be executed without loading their full implementation into context, although an agent may need to inspect them when patching or adapting them.
+- **示例**：用 `scripts/rotate_pdf.py` 完成反复使用的文档旋转操作。
+- **适用情况**：重复转换、可靠的接口操作、数据处理及其他明确自动化任务。
+- **验证**：运行新增或修改的脚本验证实际行为。通常无需把完整实现载入模型上下文；修补或适配时再检查源码。
 
-### References
+### 参考文档
 
-Use `references/` for documentation that is needed only in particular contexts.
+`references/` 存放仅在特定场景需要的说明。
 
-- **Examples:** `references/schema.md` for database tables, `references/policies.md` for domain rules, `references/api_docs.md` for an API, or separate writing guides for different deliverables.
-- **Useful for:** Schemas, API documentation, company policies, format-specific procedures, detailed workflows, and substantial examples.
-- **Routing:** Link each reference from `SKILL.md` or another relevant resource and explain when it should be read. Keep information in one place instead of duplicating it across the entrypoint and references.
+- **示例**：`references/schema.md` 说明数据库表，`references/policies.md` 说明领域规则，`references/api_docs.md` 说明接口；也可按交付物拆分写作指南。
+- **适用内容**：数据结构、接口文档、公司规则、格式专属流程、详细工作步骤和较长示例。
+- **引用方式**：从主说明或相关资源链接到参考文件，说明何时读取；信息只维护一份，不在入口重复。
 
-Keep references focused on maintained, task-specific information that changes the agent's decisions. Avoid copied manuals, exhaustive catalogs, and generic tutorials already available from authoritative sources. Before removing existing resources, inspect their callers and purpose.
+参考文档应聚焦能改变模型决策、需要维护的任务信息。避免复制整本手册、穷尽目录或重复权威资料已有的通用教程。删除已有资源前先检查调用方和用途。
 
-For large references, include useful search terms or a short contents section when that makes the needed material easier to find.
+长参考文档可提供搜索关键词或简短目录，帮助快速定位。
 
-### Assets
+### 输出资源
 
-Use `assets/` for files that belong in generated output rather than in the model's instructions.
+`assets/` 存放用于生成结果，而非供模型遵循的指令文件。
 
-- **Examples:** `assets/logo.png`, `assets/slides.pptx`, `assets/font.ttf`, or `assets/frontend-template/`.
-- **Useful for:** Templates, images, fonts, icons, boilerplate projects, and other files copied or adapted into the result.
-- **Context:** Do not load assets as instructions unless the task requires inspecting them.
+- **示例**：`assets/logo.png`、`assets/slides.pptx`、`assets/font.ttf`、`assets/frontend-template/`。
+- **适用内容**：模板、图片、字体、图标、基础项目及其他复制或适配进结果的文件。
+- **上下文**：任务不需要检查时，不把这些资源作为指令加载。
 
-### UI Metadata and Invocation Policy
+### 界面元数据与调用策略
 
-`agents/openai.yaml` can provide UI-facing metadata such as `display_name`, `short_description`, and `default_prompt`, along with invocation policy. When creating or updating those settings, read [references/openai_yaml.md](references/openai_yaml.md) and keep the values consistent with the skill.
+`agents/openai.yaml` 可设置 `display_name`、`short_description`、`default_prompt` 和调用策略。创建或更新时先阅读 [references/openai_yaml.md](references/openai_yaml.md)，保持与技能一致。
 
-Automatic skill selection is allowed by default. Change that default only when the user explicitly requests an explicit-only skill:
+默认允许自动选择技能。只有用户明确要求“仅显式调用”时才设置：
 
 ```yaml
 policy:
   allow_implicit_invocation: false
 ```
 
-This keeps the skill available when explicitly invoked as `$skill-name` without adding it to the model context automatically. Preserve unrelated existing UI, policy, and dependency fields when updating `agents/openai.yaml`.
+此时仍可通过 `$skill-name` 显式调用，但不会自动加入模型上下文。更新时保留无关界面、策略和依赖字段。
 
-The initializer creates this file automatically. For new or interface-only metadata, generate it with:
+初始化器会自动创建此文件。新文件或仅含界面字段的文件可用以下命令生成：
 
 ```bash
-scripts/generate_openai_yaml.py <path/to/skill-folder> --interface key=value
+python scripts/generate_openai_yaml.py <path/to/skill-folder> --interface key=value
 ```
 
-The generator replaces the entire file. If an existing file contains `policy` or `dependencies`, update only the intended fields in place instead of regenerating it.
+生成器会替换整个文件。已有 `policy` 或 `dependencies` 时只原地修改目标字段，不要重新生成。可选界面字段仅在用户提供或要求时加入。
 
-Include optional interface fields only when the user provides or requests them.
+### 不应包含的内容
 
-### What Not to Include
+只保留直接支持技能工作的文件。除非任务或打包要求明确需要，否则不要增加 `README.md`、安装说明、更新日志、重复速查表或其他辅助文档。
 
-Include files that directly support the skill's work. Avoid adding a `README.md`, installation guide, changelog, duplicated quick reference, or other auxiliary documentation unless a specific task or packaging requirement calls for it.
+## 渐进披露示例
 
-## Progressive Disclosure in Practice
+技能包含多个复杂模式时，主说明保留共同指导和模式选择标准，在相关位置链接参考文档。不默认加载所有参考，不在入口重复正文；没有值得区分的模式时不增加导航层。
 
-For a skill with multiple substantial modes, keep the shared guidance and mode-selection criteria in `SKILL.md`. Link each supporting reference where its use becomes relevant. Do not load every reference by default, duplicate reference content in the entrypoint, or add a routing layer when there is nothing meaningful to route.
-
-For example, a deployment skill can keep provider selection in `SKILL.md` and separate provider details:
+部署技能可在主说明选择云服务商，细节分开：
 
 ```text
 cloud-deploy/
@@ -129,101 +127,99 @@ cloud-deploy/
     `-- azure.md
 ```
 
-When the user chooses AWS, read `references/aws.md`; do not also load the GCP and Azure guides. The same pattern can separate business domains, deliverable types, or other genuinely distinct operating modes.
+用户选亚马逊云时只读取 `references/aws.md`，不同时加载谷歌云和微软云说明。同样可按业务领域、交付类型或真正不同的模式拆分。
 
-A short skill can instead route to details only when an advanced operation needs them:
+短技能可只在高级操作需要时引导到细节：
 
 ```markdown
-## Documents
+## 文档
 
-Handle ordinary edits directly.
+普通编辑直接处理。
 
-- For tracked changes, read [references/redlining.md](references/redlining.md).
-- For document internals, read [references/ooxml.md](references/ooxml.md).
+- 修订操作阅读 [references/redlining.md](references/redlining.md)。
+- 文档内部结构阅读 [references/ooxml.md](references/ooxml.md)。
 ```
 
-These examples illustrate options, not a required structure. Choose the organization that makes the skill easier to use without loading irrelevant material.
+这些只是可选组织方式，不是强制结构。选择最容易使用且不会加载无关内容的方式。
 
-## Create or Update a Skill
+## 创建或更新技能
 
-Adapt the work to the request. Creating a complex new skill may involve understanding realistic use cases, choosing supporting resources, initializing files, writing instructions, and validating the result. A narrow update to an existing skill may require only a focused edit and validation.
+根据请求调整工作。复杂新技能可能需要理解真实使用场景、选择资源、初始化文件、写说明并验证；小幅更新可能只需定点编辑和验证。
 
-Ask clarifying questions only when the missing information matters and cannot be reasonably inferred. Respect a user-specified location; otherwise create discoverable skills in `$CODEX_HOME/skills`, or `~/.codex/skills` when `CODEX_HOME` is unset.
+只有缺失信息会影响结果且无法合理推断时才提问。尊重用户指定位置；否则在 `$CODEX_HOME/skills` 创建，未设置 `CODEX_HOME` 时使用 `~/.codex/skills`。
 
-Keep automatic skill selection enabled unless the user explicitly requests an explicit-only skill. When the intended invocation mode is genuinely unclear and matters to the requested workflow, ask whether the user wants normal automatic discovery or explicit-only invocation; otherwise preserve the default. Do not infer explicit-only invocation from sensitive operations or required approvals: keep the skill discoverable and require authorization immediately before the actual mutation. Preserve an existing skill's invocation policy unless the user asks to change it.
+除非用户明确要求仅显式调用，否则保持自动选择开启。如果调用模式确实不清楚且影响工作，才询问自动发现或仅显式调用。不要从敏感操作或需审批推断技能不可自动发现：让技能可被发现，在实际写入前要求授权。用户未要求时保留已有调用策略。
 
-For a new or substantially revised skill, consider the actual requests it should handle and which reusable resources would improve those tasks:
+新建或大幅修改时，考虑真实请求和可复用资源：
 
-- A repeated PDF transformation may justify a `scripts/rotate_pdf.py` helper.
-- An application-building workflow may benefit from an `assets/frontend-template/` starter.
-- A data-analysis skill may need a `references/schema.md` guide to avoid rediscovering table relationships.
+- 重复文档转换可能需要 `scripts/rotate_pdf.py`。
+- 构建应用可能需要 `assets/frontend-template/` 起始项目。
+- 数据分析可能需要 `references/schema.md` 避免反复探索表关系。
 
-Create those resources only when their concrete benefit justifies them. If the user has already explained the task clearly, proceed without requesting additional examples.
+只有具体收益值得时才创建资源。用户已经解释清楚时，不额外索要示例。
 
-### Naming
+### 命名
 
-- Use lowercase letters, digits, and hyphens.
-- Keep names under 64 characters and prefer short action-oriented names.
-- Namespace by tool or domain when doing so improves discovery.
-- Name the skill folder after the skill.
+- 只用小写字母、数字和连字符。
+- 少于 64 个字符，优先简短、表达动作的名称。
+- 有助于发现时按工具或领域加前缀。
+- 目录名与技能名一致。
 
-### Initialize a New Skill
+### 初始化新技能
 
-For a new skill, use the bundled initializer when it helps create the required files consistently:
+新技能需要一致的必需文件时，使用配套初始化器：
 
 ```bash
-scripts/init_skill.py <skill-name> --path <output-directory> [--resources scripts,references,assets] [--examples]
+python scripts/init_skill.py <skill-name> --path <output-directory> [--resources scripts,references,assets] [--examples]
 ```
 
-For example:
+例如：
 
 ```bash
-scripts/init_skill.py my-skill --path "${CODEX_HOME:-$HOME/.codex}/skills"
-scripts/init_skill.py my-skill --path "${CODEX_HOME:-$HOME/.codex}/skills" --resources references
+python scripts/init_skill.py my-skill --path "${CODEX_HOME:-$HOME/.codex}/skills"
+python scripts/init_skill.py my-skill --path "${CODEX_HOME:-$HOME/.codex}/skills" --resources references
 ```
 
-Request only the resource directories the skill needs. Use `--examples` only when concrete placeholders would help, and replace or remove them before finishing. Do not initialize an existing skill again.
+只请求确实需要的资源目录。仅在具体占位示例有帮助时使用 `--examples`，完成前替换或移除占位内容。不要重新初始化已有技能。
 
-The initializer creates the skill directory, a concise `SKILL.md` starter, and `agents/openai.yaml`. It creates resource directories and example files only when requested. Pass generated UI values as `--interface key=value` when needed.
+初始化器创建技能目录、简洁的主说明和 `agents/openai.yaml`；只有被要求时才创建资源目录和示例。需要时通过 `--interface key=value` 设置界面值。
 
-### Write the Instructions
+### 编写说明
 
-The frontmatter `description` should briefly explain what the skill does and when it applies. Include a meaningful boundary when similar requests should not activate the skill.
+前置信息 `description` 简述能力和适用情况，相似但不应触发的请求需要明确边界。
 
-For example:
+例如：
 
 ```yaml
-description: Create or edit Word documents when formatting, tracked changes, or comments require document-specific handling.
+description: 在排版、修订或批注需要专门处理时，创建或编辑 Word 文档。
 ```
 
-Put detailed workflows, tool choices, examples, and operating modes in the body or relevant references rather than listing them all in the description. Preserve supported optional frontmatter, such as existing `metadata`, when appropriate.
+详细流程、工具选择、示例和模式放在正文或参考文档，不在描述中穷举。适当保留已有 `metadata` 等受支持可选字段。
 
-Write only the instructions needed for another Codex instance to perform the task well. State the desired outcome, non-obvious context, real constraints, and relevant references or tools. Preserve the user's explicit choices and existing authorization boundaries. Avoid prescribing a fixed structure, process, or number of steps when the task does not require one.
+只写另一个 Codex 完成任务所需的指导：目标、不明显的背景、真实约束、相关参考或工具。尊重用户明确选择与授权边界。任务不需要时，不规定固定结构、流程或步骤数量。
 
-### Validate and Iterate
+### 验证与迭代
 
-Validate the completed skill with:
+完成后运行：
 
 ```bash
-scripts/quick_validate.py <path/to/skill-folder>
+python scripts/quick_validate.py <path/to/skill-folder>
 ```
 
-The validator checks frontmatter, naming, and unfinished scaffold placeholders; it does not prove that the skill makes good decisions. Also check that descriptions remain discriminating, instructions preserve user intent, references are discoverable, and any added scripts actually work.
+验证器检查前置信息、命名和未完成的脚手架占位；不能证明模型决策正确。还须检查描述有区分度、指令尊重用户意图、参考可被发现、新脚本确实可用。
 
-When testing is warranted, verify observable behavior or meaningful invariants. Avoid tests that merely match generated wording, headings, or regex patterns.
+需要测试时验证可观察行为或有意义的不变条件，不只匹配输出措辞、标题或正则表达式。根据真实使用和已证实失败改进，优先局部修正，不为每次个例积累通用规则。
 
-Improve the skill based on real usage or demonstrated failures. Prefer a narrow correction to accumulating universal rules for every observed example.
+## 独立前向验证
 
-## Independent Forward-Testing
+技能复杂或风险高，且委派可用并已授权时，可独立验证真实行为。普通创建和小改动不自动要求子代理。
 
-Use an independent subagent pass when a skill is sufficiently complex or risky that realistic behavioral validation would add meaningful confidence, and when delegation is available and authorized. Ordinary creation or small edits do not automatically require subagents.
+向评估代理提供真实请求、技能和最少的原始材料，不提供预期答案、疑似问题、修复方案或既有结论，除非验证确实需要。
 
-Give the evaluating agent a realistic user request, the skill, and the minimum raw artifacts needed to perform the task. Do not provide the intended answer, suspected bug, proposed fix, or prior conclusions unless the evaluation genuinely requires them.
-
-For example:
+示例：
 
 ```text
-Use $skill-name at /path/to/skill-name to complete this realistic request.
+使用 /path/to/skill-name 处的 $skill-name 完成这个真实请求。
 ```
 
-Keep the evaluation scoped to permitted resources and side effects. Use an isolated temporary workspace for generated artifacts so they do not enter the working tree or contaminate later evaluations. Ask for approval when the proposed evaluation would require additional authorization, affect a live production system, or impose substantial time or cost. Review the actual outcome and artifacts, then make only changes supported by the observed behavior.
+验证仅使用已获准资源及副作用。生成文件放入隔离临时目录，不进入工作区或干扰后续验证。验证需新授权、影响生产或产生显著时间和费用时，先请求批准。检查实际结果和文件，只根据观察到的行为修改。
