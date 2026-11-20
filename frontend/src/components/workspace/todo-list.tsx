@@ -2,7 +2,6 @@ import { ChevronUpIcon, ListTodoIcon } from "lucide-react";
 import { useState } from "react";
 
 import type { Todo } from "@/features/todos";
-import { cn } from "@/lib/utils";
 
 import {
   QueueItem,
@@ -40,16 +39,18 @@ export function TodoList({
 
   return (
     <div
-      className={cn(
+      className={[
         "flex h-fit w-full origin-bottom translate-y-4 flex-col overflow-hidden rounded-t-xl border border-b-0 bg-white backdrop-blur-sm transition-all duration-200 ease-out",
         hidden ? "pointer-events-none translate-y-8 opacity-0" : "",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <header
-        className={cn(
-          "bg-accent flex min-h-8 shrink-0 cursor-pointer items-center justify-between px-4 text-sm transition-all duration-300 ease-out",
-        )}
+        className={
+          "bg-accent flex min-h-8 shrink-0 cursor-pointer items-center justify-between px-4 text-sm transition-all duration-300 ease-out"
+        }
         onClick={handleToggle}
       >
         <div className="text-muted-foreground">
@@ -60,18 +61,22 @@ export function TodoList({
         </div>
         <div>
           <ChevronUpIcon
-            className={cn(
+            className={[
               "text-muted-foreground size-4 transition-transform duration-300 ease-out",
               collapsed ? "" : "rotate-180",
-            )}
+            ]
+              .filter(Boolean)
+              .join(" ")}
           />
         </div>
       </header>
       <main
-        className={cn(
+        className={[
           "bg-accent flex grow px-2 transition-all duration-300 ease-out",
           collapsed ? "h-0 pb-3" : "h-28 pb-4",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         <QueueList className="bg-background mt-0 w-full rounded-t-xl">
           {todos.map((todo, i) => (

@@ -8,8 +8,6 @@ import React, {
   useState,
 } from "react";
 
-import { cn } from "@/lib/utils";
-
 interface FlickeringGridProps extends React.HTMLAttributes<HTMLDivElement> {
   squareSize?: number;
   gridGap?: number;
@@ -193,7 +191,9 @@ export const FlickeringGrid: React.FC<FlickeringGridProps> = ({
   return (
     <div
       ref={containerRef}
-      className={cn("h-full w-full overflow-hidden", className)}
+      className={["h-full w-full overflow-hidden", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       <canvas

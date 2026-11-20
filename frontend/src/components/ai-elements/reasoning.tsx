@@ -6,7 +6,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+
 import { BrainIcon, ChevronDownIcon } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
 import { createContext, memo, useContext, useEffect, useState } from "react";
@@ -114,7 +114,7 @@ export const Reasoning = memo(
         value={{ isStreaming, isOpen, setIsOpen, duration, startTime }}
       >
         <Collapsible
-          className={cn("not-prose mb-4", className)}
+          className={["not-prose mb-4", className].filter(Boolean).join(" ")}
           onOpenChange={handleOpenChange}
           open={isOpen}
           {...props}
@@ -192,11 +192,13 @@ export const ReasoningTrigger = memo(
 
     return (
       <CollapsibleTrigger
-        className={cn(
+        className={[
           "text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors",
           !hasContent && "cursor-default",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         {...props}
       >
         {children ?? (
@@ -205,10 +207,12 @@ export const ReasoningTrigger = memo(
             {getThinkingMessage(isStreaming, duration, startTime)}
             {hasContent && (
               <ChevronDownIcon
-                className={cn(
+                className={[
                   "size-4 transition-transform",
                   isOpen ? "rotate-180" : "rotate-0",
-                )}
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               />
             )}
           </>
@@ -228,11 +232,13 @@ export type ReasoningContentProps = ComponentProps<
 export const ReasoningContent = memo(
   ({ className, children, ...props }: ReasoningContentProps) => (
     <CollapsibleContent
-      className={cn(
+      className={[
         "mt-4 text-sm",
         "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-muted-foreground data-[state=closed]:animate-out data-[state=open]:animate-in outline-none",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       <ClipboardSafeStreamdown {...reasoningPlugins}>

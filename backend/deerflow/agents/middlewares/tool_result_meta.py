@@ -90,25 +90,13 @@ _NUMERIC_KW_RE: dict[str, re.Pattern[str]] = {kw: re.compile(rf"\b{kw}\b") for r
 _SEMANTIC_ZERO_ERROR_STRINGS: frozenset[str] = frozenset({"none", "null", "false", "no", "ok", "success", "n/a", ""})
 
 
-def _extract_json_error_text(content: str) -> str | None:
-    '''仅提取 JSON 对象中的 error 字段，并忽略通常表示成功的空值和哨兵文本。'''
-    try:
-        data = json.loads(content)
-    except (json.JSONDecodeError, ValueError):
-        return None
-    error = data.get("error") if isinstance(data, dict) else None
-    if not error:
-        return None
-    if isinstance(error, str) and error.lower().strip() in _SEMANTIC_ZERO_ERROR_STRINGS:
-        return None
-    return error if isinstance(error, str) else json.dumps(error)
-
-
-def _match_keyword(kw: str, lower: str) -> bool:
-    '''按规则匹配错误关键词；纯数字状态码使用单词边界，避免命中普通数值片段。'''
-    if kw.isdigit():
-        return bool(_NUMERIC_KW_RE[kw].search(lower))
-    return kw in lower
+def stamp_exception_meta(msg: ToolMessage, exc_info: str) -> ToolMessage:
+    '''根据异常详情分类并覆盖工具消息上的旧元数据，以异常处理结果作为最终判定。'''
+    attrs = _classify_error_text(exc_info)
+    updated_kwargs = dict(msg.additional_kwargs or {})
+    updated_kwargs[TOOL_META_KEY] = _make_meta(status="error", source="exception", **attrs)
+    msg.additional_kwargs = updated_kwargs
+    return msg
 
 
 def _classify_error_text(text: str) -> dict[str, object]:
@@ -120,6 +108,13 @@ def _classify_error_text(text: str) -> dict[str, object]:
     return {**_UNKNOWN_ERROR}
 
 
+def _match_keyword(kw: str, lower: str) -> bool:
+    '''按规则匹配错误关键词；纯数字状态码使用单词边界，避免命中普通数值片段。'''
+    if kw.isdigit():
+        return bool(_NUMERIC_KW_RE[kw].search(lower))
+    return kw in lower
+
+
 def _make_meta(*, status: str, source: str, error_type: str | None = None, recoverable_by_model: bool = True, recommended_next_action: str = "continue") -> dict[str, object]:
     '''构造统一的工具结果元数据字段，并允许调用方指定状态、错误来源和恢复建议。'''
     return {
@@ -129,15 +124,6 @@ def _make_meta(*, status: str, source: str, error_type: str | None = None, recov
         "recommended_next_action": recommended_next_action,
         "source": source,
     }
-
-
-def stamp_exception_meta(msg: ToolMessage, exc_info: str) -> ToolMessage:
-    '''根据异常详情分类并覆盖工具消息上的旧元数据，以异常处理结果作为最终判定。'''
-    attrs = _classify_error_text(exc_info)
-    updated_kwargs = dict(msg.additional_kwargs or {})
-    updated_kwargs[TOOL_META_KEY] = _make_meta(status="error", source="exception", **attrs)
-    msg.additional_kwargs = updated_kwargs
-    return msg
 
 
 def normalize_tool_message(msg: ToolMessage) -> ToolMessage:
@@ -179,6 +165,20 @@ def normalize_tool_message(msg: ToolMessage) -> ToolMessage:
     updated_kwargs[TOOL_META_KEY] = meta
     msg.additional_kwargs = updated_kwargs
     return msg
+
+
+def _extract_json_error_text(content: str) -> str | None:
+    '''仅提取 JSON 对象中的 error 字段，并忽略通常表示成功的空值和哨兵文本。'''
+    try:
+        data = json.loads(content)
+    except (json.JSONDecodeError, ValueError):
+        return None
+    error = data.get("error") if isinstance(data, dict) else None
+    if not error:
+        return None
+    if isinstance(error, str) and error.lower().strip() in _SEMANTIC_ZERO_ERROR_STRINGS:
+        return None
+    return error if isinstance(error, str) else json.dumps(error)
 
 
 def normalize_tool_result(result: ToolMessage | Command) -> ToolMessage | Command:

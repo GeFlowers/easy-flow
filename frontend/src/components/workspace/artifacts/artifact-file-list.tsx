@@ -19,7 +19,6 @@ import {
   getFileIcon,
   getFileName,
 } from "@/features/utils/files";
-import { cn } from "@/lib/utils";
 
 import { useArtifacts } from "./context";
 
@@ -82,7 +81,11 @@ export function ArtifactFileList({
   );
 
   return (
-    <ul className={cn("flex w-full flex-col gap-4", className)}>
+    <ul
+      className={["flex w-full flex-col gap-4", className]
+        .filter(Boolean)
+        .join(" ")}
+    >
       {files.map((file) => (
         <Card
           key={file}

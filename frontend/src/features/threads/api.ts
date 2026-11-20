@@ -18,7 +18,6 @@ export type ThreadCompactResponse = {
 /** 请求压缩线程上下文时可传入的选项。 */
 export type CompactThreadContextOptions = {
   signal?: AbortSignal;
-  agentName?: string | null;
 };
 
 /** 从消息轮次分叉线程接口返回的数据。 */
@@ -117,7 +116,6 @@ export async function compactThreadContext(
       },
       body: JSON.stringify({
         force: true,
-        ...(options.agentName ? { agent_name: options.agentName } : {}),
       }),
       signal: options.signal,
     },

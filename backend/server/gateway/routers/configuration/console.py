@@ -7,7 +7,6 @@
 表执行短生命周期的只读查询，而不扩展运行时 `RunStore` 的接口。报表查询使用 PostgreSQL。
 '''
 
-import asyncio
 import logging
 from datetime import UTC, datetime, time, timedelta
 from typing import NamedTuple
@@ -19,7 +18,6 @@ from sqlalchemy import func, select
 from server.gateway.authz import require_permission
 from server.gateway.deps import get_current_user
 from deerflow.config import get_app_config
-from deerflow.config.agents_config import list_custom_agents
 from deerflow.persistence.engine import get_session_factory
 from deerflow.persistence.run.model import RunRow
 from deerflow.persistence.thread_meta.model import ThreadMetaRow
@@ -44,7 +42,6 @@ class ConsoleStatsResponse(BaseModel):
     active_runs: int = Field(..., description="Runs currently pending or running")
     failed_runs: int = Field(..., description="Runs that ended in error or timeout")
     total_threads: int = Field(..., description="Conversation threads owned by the current user")
-    total_agents: int = Field(..., description="Custom agents owned by the current user")
     total_tokens: int = Field(..., description="Tokens consumed across all recorded runs")
     total_cost: float | None = Field(default=None, description="Estimated spend across priced runs; null when no models[*].pricing is configured")
     currency: str | None = Field(default=None, description="Display currency taken from the first configured pricing entry")
@@ -107,27 +104,6 @@ class ConsoleUsageResponse(BaseModel):
     currency: str | None = Field(default=None, description="Display currency taken from the first configured pricing entry")
 
 
-# 辅助函数
-
-
-def _session_factory_or_503():
-    '''返回 SQL 会话工厂；未配置 SQL 后端时返回 503。'''
-    sf = get_session_factory()
-    if sf is None:
-        raise HTTPException(
-            status_code=503,
-            detail="PostgreSQL persistence is unavailable; check database.postgres_url and the database service.",
-        )
-    return sf
-
-
-def _as_utc(dt: datetime | None) -> datetime | None:
-    '''为历史无时区时间戳补上 UTC，保证报表时间可以统一比较。'''
-    if dt is None:
-        return None
-    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
-
-
 # 定价：实际支出估算
 
 
@@ -140,6 +116,20 @@ class _ModelPricing(NamedTuple):
     # 提示词缓存命中输入 Token 的价格。为 `None` 时按完整输入价格计费，作为未提供
     # 缓存命中折扣或运营方未配置该价格时的保守上界。
     input_cache_hit_per_million: float | None = None
+
+
+# 辅助函数
+
+
+def _session_factory_or_503():
+    '''返回 SQL 会话工厂；未配置 SQL 后端时返回 503。'''
+    sf = get_session_factory()
+    if sf is None:
+        raise HTTPException(
+            status_code=503,
+            detail="PostgreSQL persistence is unavailable; check database.postgres_url and the database service.",
+        )
+    return sf
 
 
 def _build_pricing_map() -> dict[str, _ModelPricing]:
@@ -181,30 +171,6 @@ def _build_pricing_map() -> dict[str, _ModelPricing]:
     return pricing
 
 
-def _pricing_currency(pricing: dict[str, _ModelPricing]) -> str | None:
-    '''返回展示货币，即首个配置定价条目的货币（每个部署使用一种货币）。'''
-    return next(iter(pricing.values())).currency if pricing else None
-
-
-def _lookup_pricing(pricing: dict[str, _ModelPricing], model: str | None) -> _ModelPricing | None:
-    '''按模型名称查找定价，同时兼容大小写差异。'''
-    if not model:
-        return None
-    return pricing.get(model) or pricing.get(model.lower())
-
-
-def _token_cost(input_tokens: int, output_tokens: int, price: _ModelPricing, cache_read_tokens: int = 0) -> float:
-    '''计算缓存感知的支出：缓存命中输入 Token 按命中价格计费。
-
-    `cache_read_tokens` 会被限制在 `[0, input_tokens]` 区间内，其余输入按完整
-    （缓存未命中）输入价格计费。未配置命中价格时，所有输入均按未命中价格计费。
-    '''
-    cache_read = min(max(int(cache_read_tokens or 0), 0), max(int(input_tokens or 0), 0))
-    uncached = max(int(input_tokens or 0), 0) - cache_read
-    hit_price = price.input_cache_hit_per_million if price.input_cache_hit_per_million is not None else price.input_per_million
-    return (uncached / 1_000_000) * price.input_per_million + (cache_read / 1_000_000) * hit_price + (output_tokens / 1_000_000) * price.output_per_million
-
-
 def _run_cost(
     pricing: dict[str, _ModelPricing],
     *,
@@ -243,6 +209,30 @@ def _run_cost(
     if input_tokens == 0 and output_tokens == 0:
         return None
     return _token_cost(input_tokens, output_tokens, price)
+
+
+def _lookup_pricing(pricing: dict[str, _ModelPricing], model: str | None) -> _ModelPricing | None:
+    '''按模型名称查找定价，同时兼容大小写差异。'''
+    if not model:
+        return None
+    return pricing.get(model) or pricing.get(model.lower())
+
+
+def _token_cost(input_tokens: int, output_tokens: int, price: _ModelPricing, cache_read_tokens: int = 0) -> float:
+    '''计算缓存感知的支出：缓存命中输入 Token 按命中价格计费。
+
+    `cache_read_tokens` 会被限制在 `[0, input_tokens]` 区间内，其余输入按完整
+    （缓存未命中）输入价格计费。未配置命中价格时，所有输入均按未命中价格计费。
+    '''
+    cache_read = min(max(int(cache_read_tokens or 0), 0), max(int(input_tokens or 0), 0))
+    uncached = max(int(input_tokens or 0), 0) - cache_read
+    hit_price = price.input_cache_hit_per_million if price.input_cache_hit_per_million is not None else price.input_per_million
+    return (uncached / 1_000_000) * price.input_per_million + (cache_read / 1_000_000) * hit_price + (output_tokens / 1_000_000) * price.output_per_million
+
+
+def _pricing_currency(pricing: dict[str, _ModelPricing]) -> str | None:
+    '''返回展示货币，即首个配置定价条目的货币（每个部署使用一种货币）。'''
+    return next(iter(pricing.values())).currency if pricing else None
 
 
 # 端点
@@ -296,25 +286,22 @@ async def console_stats(request: Request) -> ConsoleStatsResponse:
                     cost_sum += cost
             total_cost = round(cost_sum, 6)
 
-    try:
-        # 文件系统扫描会在内部解析有效用户：真实请求由 `AuthMiddleware` 设置上下文，
-        # 认证禁用模式使用 `"default"`。
-        agents = await asyncio.to_thread(list_custom_agents)
-        total_agents = len(agents)
-    except Exception:  # pragma: no cover - 防御性处理：异常的智能体目录不得使统计接口返回 500。
-        logger.warning("console_stats: failed to list custom agents", exc_info=True)
-        total_agents = 0
-
     return ConsoleStatsResponse(
         total_runs=total_runs,
         active_runs=active_runs,
         failed_runs=failed_runs,
         total_threads=total_threads,
-        total_agents=total_agents,
         total_tokens=total_tokens,
         total_cost=total_cost,
         currency=_pricing_currency(pricing),
     )
+
+
+def _as_utc(dt: datetime | None) -> datetime | None:
+    '''为历史无时区时间戳补上 UTC，保证报表时间可以统一比较。'''
+    if dt is None:
+        return None
+    return dt.replace(tzinfo=UTC) if dt.tzinfo is None else dt
 
 
 @router.get(

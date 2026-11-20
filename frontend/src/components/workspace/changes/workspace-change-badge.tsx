@@ -11,7 +11,6 @@ import {
   sortWorkspaceChanges,
 } from "@/features/workspace-changes/summary";
 import type { WorkspaceFileChange } from "@/features/workspace-changes/types";
-import { cn } from "@/lib/utils";
 
 import { WorkspaceChangePanel } from "./workspace-change-panel";
 
@@ -71,7 +70,7 @@ export function WorkspaceChangeBadge({
           <SummaryDelta
             additions={data.summary.additions}
             deletions={data.summary.deletions}
-            className="hidden text-xs font-semibold sm:inline-flex"
+            className="inline-flex text-xs font-semibold"
           />
         </div>
 
@@ -135,10 +134,12 @@ function SummaryDelta({
 }) {
   return (
     <span
-      className={cn(
+      className={[
         "inline-flex shrink-0 items-center gap-1 tabular-nums",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <span className="text-emerald-500">+{additions}</span>
       <span className="text-red-500">-{deletions}</span>

@@ -135,7 +135,7 @@ function summariesToMarkdown(
 
   parts.push(`## ${t.settings.memory.markdown.overview}`);
   parts.push(
-    `- **${t.common.lastUpdated}**: \`${formatTimeAgo(memory.lastUpdated)}\``,
+    `> ${t.settings.memory.markdown.updatedAt}: \`${formatTimeAgo(memory.lastUpdated)}\``,
   );
 
   for (const section of sections) {
@@ -473,12 +473,12 @@ export function MemorySettingsPage() {
 
             <div className="flex flex-col gap-3">
               {/* 第一行：搜索与筛选标签 */}
-              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-col gap-3 @lg:flex-row @lg:items-center">
                 <Input
                   value={query}
                   onChange={(event) => setQuery(event.target.value)}
                   placeholder={searchPlaceholder}
-                  className="min-w-0 flex-1 sm:max-w-md"
+                  className="min-w-0 @lg:max-w-md @lg:flex-1"
                 />
                 <ToggleGroup
                   type="single"
@@ -487,7 +487,7 @@ export function MemorySettingsPage() {
                     if (value) setFilter(value as MemoryViewFilter);
                   }}
                   variant="outline"
-                  className="shrink-0 self-start sm:ml-auto sm:self-auto"
+                  className="max-w-full flex-wrap self-start @lg:ml-auto @lg:shrink-0 @lg:self-auto"
                 >
                   <ToggleGroupItem value="all" className="whitespace-nowrap">
                     {filterAll}
@@ -586,9 +586,9 @@ export function MemorySettingsPage() {
                       return (
                         <div
                           key={fact.id}
-                          className="flex flex-col gap-3 rounded-md border p-3 sm:flex-row sm:items-start sm:justify-between"
+                          className="flex flex-col gap-2 rounded-md border p-3 @lg:flex-row @lg:items-start @lg:gap-3"
                         >
-                          <div className="min-w-0 space-y-2 [overflow-wrap:anywhere]">
+                          <div className="min-w-0 flex-1 space-y-2 [overflow-wrap:anywhere]">
                             <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                               <span>
                                 <span className="text-muted-foreground">
@@ -629,7 +629,7 @@ export function MemorySettingsPage() {
                             </p>
                           </div>
 
-                          <div className="flex shrink-0 items-center gap-1 self-start sm:ml-3">
+                          <div className="flex shrink-0 items-center gap-1 self-end @lg:self-start">
                             <Button
                               variant="ghost"
                               size="icon"

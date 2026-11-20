@@ -2,9 +2,7 @@
  * 内联保存 DeerFlow 的介绍 Markdown，避免依赖 raw-loader；
  * Turbopack 无法解析针对 `.md` 导入的 raw-loader。
  */
-import { APP_VERSION } from "@/version";
-
-export const aboutMarkdown = `# 🦌 [About DeerFlow ${APP_VERSION}](https://github.com/bytedance/deer-flow)
+export const aboutMarkdown = `# 🦌 [About DeerFlow](https://github.com/bytedance/deer-flow)
 
 > **From Open Source, Back to Open Source**
 

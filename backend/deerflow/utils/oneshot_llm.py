@@ -13,11 +13,6 @@ from deerflow.tracing import inject_langfuse_metadata
 from deerflow.utils.llm_text import extract_response_text
 
 
-def _resolve_environment() -> str | None:
-    '''从部署环境变量解析运行环境名称，供追踪元数据标记使用。'''
-    return os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT")
-
-
 async def run_oneshot_llm(
     *,
     system_instruction: str,
@@ -46,3 +41,8 @@ async def run_oneshot_llm(
         config=invoke_config,
     )
     return extract_response_text(response.content)
+
+
+def _resolve_environment() -> str | None:
+    '''从部署环境变量解析运行环境名称，供追踪元数据标记使用。'''
+    return os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT")

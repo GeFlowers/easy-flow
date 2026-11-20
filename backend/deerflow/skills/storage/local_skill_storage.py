@@ -23,16 +23,6 @@ logger = logging.getLogger(__name__)
 _INSTALL_TMP_CLEANUP_TIMEOUT_SECONDS = 5.0
 
 
-def _iter_direct_skill_files(category_path: Path) -> Iterable[Path]:
-    '''仅枚举目标目录直属子文件夹中的 SKILL.md，不递归进入嵌套目录。'''
-    for skill_dir in sorted(category_path.iterdir(), key=lambda path: path.name):
-        if skill_dir.name.startswith(".") or not skill_dir.is_dir():
-            continue
-        skill_file = skill_dir / SKILL_MD_FILE
-        if skill_file.is_file():
-            yield skill_file
-
-
 class LocalSkillStorage(SkillStorage):
     '''本地文件系统技能仓储，公共技能只读、自定义技能可编辑并记录历史。'''
 
@@ -54,7 +44,6 @@ class LocalSkillStorage(SkillStorage):
             self._app_config = app_config
             self._host_root = resolve_path(host_path)
 
-
     def get_skills_root_path(self) -> Path:
         '''返回当前实例使用的宿主机技能根目录。'''
         return self._host_root
@@ -67,17 +56,6 @@ class LocalSkillStorage(SkillStorage):
         '''检查公共技能说明文件是否存在。'''
         normalized_name = self.validate_skill_name(name)
         return (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists()
-
-    def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
-        '''逐类别枚举直属技能目录中的说明文件，不递归扫描子目录。'''
-        if not self._host_root.exists():
-            return
-        for category in SkillCategory:
-            category_path = self._host_root / category.value
-            if not category_path.exists() or not category_path.is_dir():
-                continue
-            for skill_file in _iter_direct_skill_files(category_path):
-                yield category, category_path, skill_file
 
     def read_custom_skill(self, name: str) -> str:
         '''读取自定义技能说明文件；技能不存在时抛出文件未找到错误。'''
@@ -131,14 +109,6 @@ class LocalSkillStorage(SkillStorage):
             "skill_name": skill_name,
             "message": f"技能 '{skill_name}' 已成功安装",
         }
-
-    @staticmethod
-    def _cleanup_install_tmp(tmp: str) -> None:
-        '''尽力清理安装临时目录；清理失败只记日志，不覆盖安装结果。'''
-        try:
-            shutil.rmtree(tmp)
-        except OSError:
-            logger.warning("Failed to clean up skill install temp dir %s", tmp, exc_info=True)
 
     def _prepare_skill_archive(self, path: Path, tmp_path: Path, custom_dir: Path, archive_path: str | Path) -> tuple[Path, str, Path]:
         '''解压并校验技能归档，返回技能目录、名称及最终安装目标路径。'''
@@ -196,6 +166,14 @@ class LocalSkillStorage(SkillStorage):
             _move_staged_skill_into_reserved_target(staging_target, target)
         make_skill_written_path_sandbox_readable(custom_dir, target)
 
+    @staticmethod
+    def _cleanup_install_tmp(tmp: str) -> None:
+        '''尽力清理安装临时目录；清理失败只记日志，不覆盖安装结果。'''
+        try:
+            shutil.rmtree(tmp)
+        except OSError:
+            logger.warning("Failed to clean up skill install temp dir %s", tmp, exc_info=True)
+
     def delete_custom_skill(self, name: str, *, history_meta: dict | None = None) -> None:
         '''验证技能可编辑后删除其目录；若提供元数据，先尽力保存删除前内容。'''
         self.validate_skill_name(name)
@@ -238,3 +216,24 @@ class LocalSkillStorage(SkillStorage):
                 continue
             records.append(json.loads(line))
         return records
+
+    def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
+        '''逐类别枚举直属技能目录中的说明文件，不递归扫描子目录。'''
+        if not self._host_root.exists():
+            return
+        for category in SkillCategory:
+            category_path = self._host_root / category.value
+            if not category_path.exists() or not category_path.is_dir():
+                continue
+            for skill_file in _iter_direct_skill_files(category_path):
+                yield category, category_path, skill_file
+
+
+def _iter_direct_skill_files(category_path: Path) -> Iterable[Path]:
+    '''仅枚举目标目录直属子文件夹中的 SKILL.md，不递归进入嵌套目录。'''
+    for skill_dir in sorted(category_path.iterdir(), key=lambda path: path.name):
+        if skill_dir.name.startswith(".") or not skill_dir.is_dir():
+            continue
+        skill_file = skill_dir / SKILL_MD_FILE
+        if skill_file.is_file():
+            yield skill_file

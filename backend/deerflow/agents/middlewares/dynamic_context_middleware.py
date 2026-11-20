@@ -56,48 +56,10 @@ _REMINDER_DATE_KEY = "reminder_date"
 _SUMMARY_MESSAGE_NAME = "summary"
 
 
-def _extract_date(content: str) -> str | None:
-    '''提取内容中第一个 ``<current_date>`` 标签的日期值。'''
-    m = _DATE_RE.search(content)
-    return m.group(1) if m else None
-
-
 def is_dynamic_context_reminder(message: object) -> bool:
     '''判断消息是否带有动态上下文提醒的内部标记。'''
     # 兼容旧检查点中以 HumanMessage 保存的提醒；新消息使用 SystemMessage。
     return isinstance(message, (HumanMessage, SystemMessage)) and bool(message.additional_kwargs.get(_DYNAMIC_CONTEXT_REMINDER_KEY))
-
-
-def _last_injected_date(messages: list) -> str | None:
-    '''从消息末尾向前寻找最近注入的日期，优先读取结构化元数据并兼容旧检查点。'''
-    for msg in reversed(messages):
-        if not is_dynamic_context_reminder(msg):
-            continue
-        structured = msg.additional_kwargs.get(_REMINDER_DATE_KEY)
-        if isinstance(structured, str) and structured:
-            return structured
-        # 旧检查点把日期写在内容中；仅解析 SystemMessage，避免用户可影响的记忆文本伪造日期。
-        if isinstance(msg, SystemMessage):
-            content_str = msg.content if isinstance(msg.content, str) else str(msg.content)
-            date = _extract_date(content_str)
-            if date is not None:
-                return date
-    return None
-
-
-def _is_user_injection_target(message: object) -> bool:
-    '''判断人类消息是否适合插入动态提醒，排除摘要、已有提醒及已处理消息。'''
-    if not isinstance(message, HumanMessage):
-        return False
-    if is_dynamic_context_reminder(message):
-        return False
-    if message.name == _SUMMARY_MESSAGE_NAME:
-        return False
-    # 由拆分流程生成的用户消息带有 __user 后缀；再次处理会不断追加后缀并重复执行消息。
-    # 使用 endswith 可避免误排除仅在中间包含该字符串的其他 ID。
-    if message.id and str(message.id).endswith("__user"):
-        return False
-    return True
 
 
 class DynamicContextMiddleware(AgentMiddleware):
@@ -124,6 +86,52 @@ class DynamicContextMiddleware(AgentMiddleware):
         self._agent_name = agent_name
         self._app_config = app_config
 
+    @override
+    def before_agent(self, state, runtime: Runtime) -> dict | None:
+        '''在同步代理执行前注入本轮所需的动态上下文。'''
+        result = self._inject(state)
+        self._record_effective_memory(state, result, runtime)
+        return result
+
+    def _inject(self, state) -> dict | None:
+        '''为目标用户消息生成并注入当前日期及可选记忆提醒。'''
+        messages = list(state.get("messages", []))
+        if not messages:
+            return None
+
+        current_date = datetime.now().strftime("%Y-%m-%d, %A")
+        last_date = _last_injected_date(messages)
+        logger.debug(
+            "DynamicContextMiddleware._inject: msg_count=%d last_date=%r current_date=%r",
+            len(messages),
+            last_date,
+            current_date,
+        )
+
+        if last_date is None:
+            first_idx = next((i for i, m in enumerate(messages) if _is_user_injection_target(m)), None)
+            if first_idx is None:
+                return None
+            date_reminder, memory_block = self._build_full_reminder()
+            logger.info(
+                "DynamicContextMiddleware: injecting full reminder (has_memory=%s) into first HumanMessage id=%r",
+                memory_block is not None,
+                messages[first_idx].id,
+            )
+            result_msgs = self._make_reminder_and_user_messages(messages[first_idx], date_reminder, memory_block, reminder_date=current_date)
+            return {"messages": result_msgs}
+
+        if last_date == current_date:
+            return None
+
+        last_human_idx = next((i for i in reversed(range(len(messages))) if _is_user_injection_target(messages[i])), None)
+        if last_human_idx is None:
+            return None
+
+        result_msgs = self._make_reminder_and_user_messages(messages[last_human_idx], self._build_date_update_reminder(), reminder_date=current_date)
+        logger.info("DynamicContextMiddleware: midnight crossing detected — injected date update before current turn")
+        return {"messages": result_msgs}
+
     def _build_full_reminder(self) -> tuple[str, str | None]:
         '''生成仅含系统日期的提醒，并将用户可影响的记忆内容单独作为普通用户消息返回。'''
         from deerflow.agents.lead_agent.prompt import _get_memory_context
@@ -143,17 +151,6 @@ class DynamicContextMiddleware(AgentMiddleware):
         memory_block = memory_context.strip() if memory_context else None
 
         return date_reminder, memory_block
-
-    def _build_date_update_reminder(self) -> str:
-        '''构造仅包含当前日期的跨日更新提醒。'''
-        current_date = datetime.now().strftime("%Y-%m-%d, %A")
-        return "\n".join(
-            [
-                "<system-reminder>",
-                f"<current_date>{current_date}</current_date>",
-                "</system-reminder>",
-            ]
-        )
 
     @staticmethod
     def _make_reminder_and_user_messages(
@@ -197,69 +194,34 @@ class DynamicContextMiddleware(AgentMiddleware):
         )
         return messages
 
-    def _inject(self, state) -> dict | None:
-        '''为目标用户消息生成并注入当前日期及可选记忆提醒。'''
-        messages = list(state.get("messages", []))
-        if not messages:
-            return None
-
+    def _build_date_update_reminder(self) -> str:
+        '''构造仅包含当前日期的跨日更新提醒。'''
         current_date = datetime.now().strftime("%Y-%m-%d, %A")
-        last_date = _last_injected_date(messages)
-        logger.debug(
-            "DynamicContextMiddleware._inject: msg_count=%d last_date=%r current_date=%r",
-            len(messages),
-            last_date,
-            current_date,
+        return "\n".join(
+            [
+                "<system-reminder>",
+                f"<current_date>{current_date}</current_date>",
+                "</system-reminder>",
+            ]
         )
 
-        if last_date is None:
-            first_idx = next((i for i, m in enumerate(messages) if _is_user_injection_target(m)), None)
-            if first_idx is None:
-                return None
-            date_reminder, memory_block = self._build_full_reminder()
-            logger.info(
-                "DynamicContextMiddleware: injecting full reminder (has_memory=%s) into first HumanMessage id=%r",
-                memory_block is not None,
-                messages[first_idx].id,
-            )
-            result_msgs = self._make_reminder_and_user_messages(messages[first_idx], date_reminder, memory_block, reminder_date=current_date)
-            return {"messages": result_msgs}
+    def _record_effective_memory(self, state, update: dict | None, runtime: Runtime) -> None:
+        '''把实际影响本轮提示的记忆内容摘要写入运行日志，不保存原始记忆文本。'''
+        context = getattr(runtime, "context", None)
+        journal = context.get("__run_journal") if isinstance(context, dict) else None
+        if journal is None:
+            return
 
-        if last_date == current_date:
-            return None
+        message = self._effective_memory_message(state, update, runtime)
+        if message is None:
+            return
 
-        last_human_idx = next((i for i in reversed(range(len(messages))) if _is_user_injection_target(messages[i])), None)
-        if last_human_idx is None:
-            return None
-
-        result_msgs = self._make_reminder_and_user_messages(messages[last_human_idx], self._build_date_update_reminder(), reminder_date=current_date)
-        logger.info("DynamicContextMiddleware: midnight crossing detected — injected date update before current turn")
-        return {"messages": result_msgs}
-
-    @override
-    def before_agent(self, state, runtime: Runtime) -> dict | None:
-        '''在同步代理执行前注入本轮所需的动态上下文。'''
-        result = self._inject(state)
-        self._record_effective_memory(state, result, runtime)
-        return result
-
-    @override
-    async def abefore_agent(self, state, runtime: Runtime) -> dict | None:
-        '''在线程池中异步注入本轮所需的动态上下文。'''
         try:
-            result = await asyncio.wait_for(
-                asyncio.to_thread(self._inject, state),
-                timeout=_INJECT_TIMEOUT_SECONDS,
+            journal.record_memory_context(
+                content_sha256=hashlib.sha256(message.content.encode("utf-8")).hexdigest(),
             )
-        except TimeoutError:
-            logger.warning(
-                "DynamicContextMiddleware: injection timed out (%.1fs); skipping new memory/date injection for this turn",
-                _INJECT_TIMEOUT_SECONDS,
-            )
-            self._record_effective_memory(state, None, runtime)
-            return None
-        self._record_effective_memory(state, result, runtime)
-        return result
+        except Exception:
+            logger.debug("Failed to record effective memory context", exc_info=True)
 
     @staticmethod
     def _effective_memory_message(state, update: dict | None, runtime: Runtime) -> HumanMessage | None:
@@ -287,20 +249,58 @@ class DynamicContextMiddleware(AgentMiddleware):
                 return message
         return None
 
-    def _record_effective_memory(self, state, update: dict | None, runtime: Runtime) -> None:
-        '''把实际影响本轮提示的记忆内容摘要写入运行日志，不保存原始记忆文本。'''
-        context = getattr(runtime, "context", None)
-        journal = context.get("__run_journal") if isinstance(context, dict) else None
-        if journal is None:
-            return
-
-        message = self._effective_memory_message(state, update, runtime)
-        if message is None:
-            return
-
+    @override
+    async def abefore_agent(self, state, runtime: Runtime) -> dict | None:
+        '''在线程池中异步注入本轮所需的动态上下文。'''
         try:
-            journal.record_memory_context(
-                content_sha256=hashlib.sha256(message.content.encode("utf-8")).hexdigest(),
+            result = await asyncio.wait_for(
+                asyncio.to_thread(self._inject, state),
+                timeout=_INJECT_TIMEOUT_SECONDS,
             )
-        except Exception:
-            logger.debug("Failed to record effective memory context", exc_info=True)
+        except TimeoutError:
+            logger.warning(
+                "DynamicContextMiddleware: injection timed out (%.1fs); skipping new memory/date injection for this turn",
+                _INJECT_TIMEOUT_SECONDS,
+            )
+            self._record_effective_memory(state, None, runtime)
+            return None
+        self._record_effective_memory(state, result, runtime)
+        return result
+
+
+def _last_injected_date(messages: list) -> str | None:
+    '''从消息末尾向前寻找最近注入的日期，优先读取结构化元数据并兼容旧检查点。'''
+    for msg in reversed(messages):
+        if not is_dynamic_context_reminder(msg):
+            continue
+        structured = msg.additional_kwargs.get(_REMINDER_DATE_KEY)
+        if isinstance(structured, str) and structured:
+            return structured
+        # 旧检查点把日期写在内容中；仅解析 SystemMessage，避免用户可影响的记忆文本伪造日期。
+        if isinstance(msg, SystemMessage):
+            content_str = msg.content if isinstance(msg.content, str) else str(msg.content)
+            date = _extract_date(content_str)
+            if date is not None:
+                return date
+    return None
+
+
+def _extract_date(content: str) -> str | None:
+    '''提取内容中第一个 ``<current_date>`` 标签的日期值。'''
+    m = _DATE_RE.search(content)
+    return m.group(1) if m else None
+
+
+def _is_user_injection_target(message: object) -> bool:
+    '''判断人类消息是否适合插入动态提醒，排除摘要、已有提醒及已处理消息。'''
+    if not isinstance(message, HumanMessage):
+        return False
+    if is_dynamic_context_reminder(message):
+        return False
+    if message.name == _SUMMARY_MESSAGE_NAME:
+        return False
+    # 由拆分流程生成的用户消息带有 __user 后缀；再次处理会不断追加后缀并重复执行消息。
+    # 使用 endswith 可避免误排除仅在中间包含该字符串的其他 ID。
+    if message.id and str(message.id).endswith("__user"):
+        return False
+    return True

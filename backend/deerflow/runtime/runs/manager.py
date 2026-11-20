@@ -31,66 +31,6 @@ _UNIQUE_PGCODE = "23505"
 _RETRYABLE_POSTGRES_STATES = {"40001", "40P01"}
 
 
-def _generate_worker_id() -> str:
-    '''生成包含主机名和随机值的工作进程唯一标识。'''
-    return f"{socket.gethostname()}:{uuid.uuid4().hex}"
-
-
-def _is_unique_violation(exc: BaseException) -> bool:
-    '''检查异常及其包装原因，识别 PostgreSQL 唯一键冲突。'''
-    pending: list[BaseException] = [exc]
-    seen: set[int] = set()
-    while pending:
-        current = pending.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-
-        if getattr(current, "pgcode", None) == _UNIQUE_PGCODE:
-            return True
-        if getattr(current, "sqlcode", None) == _UNIQUE_PGCODE:
-            return True
-        if getattr(current, "sqlstate", None) == _UNIQUE_PGCODE:
-            return True
-        # 某些数据库驱动无法从异常链中取得原生错误码，因此同时检查错误消息作为兜底。
-        # 必须确认异常节点属于 IntegrityError，避免应用异常仅因文本包含 "duplicate key"、
-        # "unique" 和 "violat"（例如检查约束错误、校验错误或其他子系统消息）就被误判为唯一键冲突，
-        # 并错误地返回 HTTP 409 而不是 500。
-        if isinstance(current, SAIntegrityError):
-            message = str(current).lower()
-            if "unique" in message and "violat" in message:
-                return True
-            if "duplicate key" in message:
-                return True
-
-        for attr in ("orig", "__cause__", "__context__"):
-            inner = getattr(current, attr, None)
-            if isinstance(inner, BaseException):
-                pending.append(inner)
-    return False
-
-
-def _is_retryable_persistence_error(exc: BaseException) -> bool:
-    '''识别 PostgreSQL 可安全重试的事务序列化冲突和死锁。'''
-
-    pending: list[BaseException] = [exc]
-    seen: set[int] = set()
-    while pending:
-        current = pending.pop()
-        if id(current) in seen:
-            continue
-        seen.add(id(current))
-
-        if getattr(current, "sqlstate", None) in _RETRYABLE_POSTGRES_STATES:
-            return True
-        if getattr(current, "pgcode", None) in _RETRYABLE_POSTGRES_STATES:
-            return True
-        for chained in (getattr(current, "orig", None), current.__cause__, current.__context__):
-            if isinstance(chained, BaseException):
-                pending.append(chained)
-    return False
-
-
 @dataclass(frozen=True)
 class PersistenceRetryPolicy:
     '''限制短事务重试次数和退避时间，防止冲突让运行管理无限等待。'''
@@ -166,38 +106,44 @@ class RunManager:
         self._heartbeat_task: asyncio.Task | None = None
         self._heartbeat_stop: asyncio.Event | None = None
 
-    def _index_run_locked(self, record: RunRecord) -> None:
+    async def update_run_completion(self, run_id: str, **kwargs) -> None:
         '''
 
-        将运行记录加入线程索引；调用方需先持有实例锁。'''
-        self._runs_by_thread.setdefault(record.thread_id, {})[record.run_id] = None
-
-    def _unindex_run_locked(self, run_id: str, thread_id: str) -> None:
-        '''
-
-        从线程索引移除运行 ID；调用方需先持有实例锁。'''
-        bucket = self._runs_by_thread.get(thread_id)
-        if bucket is not None:
-            bucket.pop(run_id, None)
-            if not bucket:
-                self._runs_by_thread.pop(thread_id, None)
-
-    def _thread_records_locked(self, thread_id: str) -> list[RunRecord]:
-        '''
-
-        返回 *thread_id* 的内存运行记录；调用方必须持有 ``self._lock``。
-
-                使用 ``_runs_by_thread`` 索引，使查找开销与该线程的运行数成正比，
-                无需扫描全部内存记录。正确性依赖于在 ``self._lock`` 内同步修改
-                索引与 ``_runs``，两次写入之间不能 ``await``，使持锁者看到一致状态。
-                ``self._runs.get`` 过滤仅提供额外防护：可丢弃仍在索引中却已从
-                ``_runs`` 移除的过期标识，无法恢复存在于 ``_runs`` 但索引遗漏的记录。
-                若未来重构破坏同步更新约定，它只能防护前一种不一致。
-        '''
-        run_ids = self._runs_by_thread.get(thread_id)
-        if not run_ids:
-            return []
-        return [record for run_id in run_ids if (record := self._runs.get(run_id)) is not None]
+        将令牌用量及运行完成数据持久化到后端仓储。'''
+        row_recovery_payload: dict[str, Any] | None = None
+        async with self._lock:
+            record = self._runs.get(run_id)
+            if record is not None:
+                for key, value in kwargs.items():
+                    if key == "status":
+                        continue
+                    if hasattr(record, key) and value is not None:
+                        setattr(record, key, value)
+                record.updated_at = _now_iso()
+                row_recovery_payload = self._store_put_payload(record, error=kwargs.get("error"))
+        if self._store is None:
+            return
+        try:
+            updated = await self._call_store_with_retry(
+                "update_run_completion",
+                run_id,
+                lambda: self._store.update_run_completion(run_id, **kwargs),
+            )
+            if updated is False:
+                if row_recovery_payload is None:
+                    logger.warning("Failed to recreate missing run %s for completion persistence", run_id)
+                    return
+                if not await self._persist_snapshot_to_store(run_id, row_recovery_payload):
+                    return
+                recovered = await self._call_store_with_retry(
+                    "update_run_completion",
+                    run_id,
+                    lambda: self._store.update_run_completion(run_id, **kwargs),
+                )
+                if recovered is False:
+                    logger.warning("Run completion update for %s affected no rows after row recreation", run_id)
+        except Exception:
+            logger.warning("Failed to persist run completion for %s", run_id, exc_info=True)
 
     @staticmethod
     def _store_put_payload(record: RunRecord, *, error: str | None = None, stop_reason: str | None = None) -> dict[str, Any]:
@@ -268,152 +214,6 @@ class RunManager:
             logger.warning("Failed to persist run %s to store", run_id, exc_info=True)
             return False
 
-    async def _persist_new_run_to_store(self, record: RunRecord) -> None:
-        '''
-
-        将新创建的运行记录持久化到后端仓储。
-
-                首次创建决定运行何时对外可见：后端记录存在前，调用方不应看到
-                内存中的运行。与后续状态和模型更新不同，此处传播失败，
-                使调用方将创建视为失败；记录插入 ``_runs`` 后，回滚由调用方负责。
-        '''
-        if self._store is None:
-            return
-        await self._call_store_with_retry(
-            "put",
-            record.run_id,
-            lambda: self._store.put(record.run_id, **self._store_put_payload(record)),
-        )
-
-    async def _persist_to_store(self, record: RunRecord, *, error: str | None = None) -> bool:
-        '''
-
-        尝试把运行记录同步到 PostgreSQL 仓储。'''
-        return await self._persist_snapshot_to_store(
-            record.run_id,
-            self._store_put_payload(record, error=error),
-        )
-
-    async def _persist_status(self, record: RunRecord, status: RunStatus, *, error: str | None = None, stop_reason: str | None = None) -> bool:
-        '''
-
-        尝试持久化运行状态变更并处理短暂数据库冲突。'''
-        if self._store is None:
-            return True
-        row_recovery_payload = self._store_put_payload(record, error=error, stop_reason=stop_reason)
-        try:
-            updated = await self._call_store_with_retry(
-                "update_status",
-                record.run_id,
-                lambda: self._store.update_status(record.run_id, status.value, error=error, stop_reason=stop_reason),
-            )
-            if updated is False:
-                # ``update_status`` 现在只更新状态为 pending 或 running 的记录。返回 False 可能表示：
-                #   (a) 记录从未成功写入（首次 ``put()`` 失败）→ 重新创建。
-                #   (b) 记录已进入终态：可能被其他工作器接管并标记为 ``error``，也可能因本地取消与完成竞态
-                #       变为 ``interrupted`` 或 ``success``。下方会根据具体状态选择日志级别。
-                existing = await self._store.get(record.run_id)
-                if existing is not None:
-                    existing_status = existing.get("status")
-                    if existing_status == "error":
-                        logger.warning(
-                            "Run %s status update to %s skipped: store row already at error (peer takeover)",
-                            record.run_id,
-                            status.value,
-                        )
-                    else:
-                        logger.info(
-                            "Run %s status update to %s skipped: store row already at %s (local cancel/completion race)",
-                            record.run_id,
-                            status.value,
-                            existing_status,
-                        )
-                    return False
-                return await self._persist_snapshot_to_store(record.run_id, row_recovery_payload)
-            return True
-        except Exception:
-            logger.warning("Failed to persist status update for run %s", record.run_id, exc_info=True)
-            return False
-
-    @staticmethod
-    def _record_from_store(row: dict[str, Any]) -> RunRecord:
-        '''
-
-        从序列化仓储行构建仅用于读取的运行记录。
-
-                status／on_disconnect 列为空时（如添加列前写入的旧记录），
-                分别采用 ``pending`` 和 ``cancel`` 作为默认值。
-        '''
-        return RunRecord(
-            run_id=row["run_id"],
-            thread_id=row["thread_id"],
-            assistant_id=row.get("assistant_id"),
-            status=RunStatus(row.get("status") or RunStatus.pending.value),
-            on_disconnect=DisconnectMode(row.get("on_disconnect") or DisconnectMode.cancel.value),
-            multitask_strategy=row.get("multitask_strategy") or "reject",
-            metadata=row.get("metadata") or {},
-            kwargs=row.get("kwargs") or {},
-            created_at=row.get("created_at") or "",
-            updated_at=row.get("updated_at") or "",
-            user_id=row.get("user_id"),
-            error=row.get("error"),
-            model_name=row.get("model_name"),
-            store_only=True,
-            total_input_tokens=row.get("total_input_tokens") or 0,
-            total_output_tokens=row.get("total_output_tokens") or 0,
-            total_tokens=row.get("total_tokens") or 0,
-            llm_call_count=row.get("llm_call_count") or 0,
-            lead_agent_tokens=row.get("lead_agent_tokens") or 0,
-            subagent_tokens=row.get("subagent_tokens") or 0,
-            middleware_tokens=row.get("middleware_tokens") or 0,
-            token_usage_by_model=row.get("token_usage_by_model") or {},
-            message_count=row.get("message_count") or 0,
-            last_ai_message=row.get("last_ai_message"),
-            first_human_message=row.get("first_human_message"),
-            owner_worker_id=row.get("owner_worker_id"),
-            lease_expires_at=row.get("lease_expires_at"),
-            stop_reason=row.get("stop_reason"),
-        )
-
-    async def update_run_completion(self, run_id: str, **kwargs) -> None:
-        '''
-
-        将令牌用量及运行完成数据持久化到后端仓储。'''
-        row_recovery_payload: dict[str, Any] | None = None
-        async with self._lock:
-            record = self._runs.get(run_id)
-            if record is not None:
-                for key, value in kwargs.items():
-                    if key == "status":
-                        continue
-                    if hasattr(record, key) and value is not None:
-                        setattr(record, key, value)
-                record.updated_at = _now_iso()
-                row_recovery_payload = self._store_put_payload(record, error=kwargs.get("error"))
-        if self._store is None:
-            return
-        try:
-            updated = await self._call_store_with_retry(
-                "update_run_completion",
-                run_id,
-                lambda: self._store.update_run_completion(run_id, **kwargs),
-            )
-            if updated is False:
-                if row_recovery_payload is None:
-                    logger.warning("Failed to recreate missing run %s for completion persistence", run_id)
-                    return
-                if not await self._persist_snapshot_to_store(run_id, row_recovery_payload):
-                    return
-                recovered = await self._call_store_with_retry(
-                    "update_run_completion",
-                    run_id,
-                    lambda: self._store.update_run_completion(run_id, **kwargs),
-                )
-                if recovered is False:
-                    logger.warning("Run completion update for %s affected no rows after row recreation", run_id)
-        except Exception:
-            logger.warning("Failed to persist run completion for %s", run_id, exc_info=True)
-
     async def update_run_progress(self, run_id: str, **kwargs) -> None:
         '''
 
@@ -481,6 +281,54 @@ class RunManager:
         logger.info("Run created: run_id=%s thread_id=%s", run_id, thread_id)
         return record
 
+    def _compute_lease_expires_at(self) -> str | None:
+        '''
+
+        返回新建运行的租约到期时间，采用标准日期时间格式。
+
+                单工作器模式关闭心跳时返回 ``None``，使对账流程将崩溃运行视为租约为空的孤儿并立即回收，
+                保持引入所有权机制前的行为。多工作器部署启用心跳后才使用租约。
+        '''
+        if self._run_ownership_config is None:
+            return None
+        if not self._run_ownership_config.heartbeat_enabled:
+            return None
+        lease_seconds = self._run_ownership_config.lease_seconds
+        return (datetime.now(UTC) + timedelta(seconds=lease_seconds)).isoformat()
+
+    def _index_run_locked(self, record: RunRecord) -> None:
+        '''
+
+        将运行记录加入线程索引；调用方需先持有实例锁。'''
+        self._runs_by_thread.setdefault(record.thread_id, {})[record.run_id] = None
+
+    async def _persist_new_run_to_store(self, record: RunRecord) -> None:
+        '''
+
+        将新创建的运行记录持久化到后端仓储。
+
+                首次创建决定运行何时对外可见：后端记录存在前，调用方不应看到
+                内存中的运行。与后续状态和模型更新不同，此处传播失败，
+                使调用方将创建视为失败；记录插入 ``_runs`` 后，回滚由调用方负责。
+        '''
+        if self._store is None:
+            return
+        await self._call_store_with_retry(
+            "put",
+            record.run_id,
+            lambda: self._store.put(record.run_id, **self._store_put_payload(record)),
+        )
+
+    def _unindex_run_locked(self, run_id: str, thread_id: str) -> None:
+        '''
+
+        从线程索引移除运行 ID；调用方需先持有实例锁。'''
+        bucket = self._runs_by_thread.get(thread_id)
+        if bucket is not None:
+            bucket.pop(run_id, None)
+            if not bucket:
+                self._runs_by_thread.pop(thread_id, None)
+
     async def get(self, run_id: str, *, user_id: str | None = None) -> RunRecord | None:
         '''
 
@@ -513,6 +361,46 @@ class RunManager:
         except Exception:
             logger.warning("Failed to map store row for run %s", run_id, exc_info=True)
             return None
+
+    @staticmethod
+    def _record_from_store(row: dict[str, Any]) -> RunRecord:
+        '''
+
+        从序列化仓储行构建仅用于读取的运行记录。
+
+                status／on_disconnect 列为空时（如添加列前写入的旧记录），
+                分别采用 ``pending`` 和 ``cancel`` 作为默认值。
+        '''
+        return RunRecord(
+            run_id=row["run_id"],
+            thread_id=row["thread_id"],
+            assistant_id=row.get("assistant_id"),
+            status=RunStatus(row.get("status") or RunStatus.pending.value),
+            on_disconnect=DisconnectMode(row.get("on_disconnect") or DisconnectMode.cancel.value),
+            multitask_strategy=row.get("multitask_strategy") or "reject",
+            metadata=row.get("metadata") or {},
+            kwargs=row.get("kwargs") or {},
+            created_at=row.get("created_at") or "",
+            updated_at=row.get("updated_at") or "",
+            user_id=row.get("user_id"),
+            error=row.get("error"),
+            model_name=row.get("model_name"),
+            store_only=True,
+            total_input_tokens=row.get("total_input_tokens") or 0,
+            total_output_tokens=row.get("total_output_tokens") or 0,
+            total_tokens=row.get("total_tokens") or 0,
+            llm_call_count=row.get("llm_call_count") or 0,
+            lead_agent_tokens=row.get("lead_agent_tokens") or 0,
+            subagent_tokens=row.get("subagent_tokens") or 0,
+            middleware_tokens=row.get("middleware_tokens") or 0,
+            token_usage_by_model=row.get("token_usage_by_model") or {},
+            message_count=row.get("message_count") or 0,
+            last_ai_message=row.get("last_ai_message"),
+            first_human_message=row.get("first_human_message"),
+            owner_worker_id=row.get("owner_worker_id"),
+            lease_expires_at=row.get("lease_expires_at"),
+            stop_reason=row.get("stop_reason"),
+        )
 
     async def aget(self, run_id: str, *, user_id: str | None = None) -> RunRecord | None:
         '''
@@ -556,6 +444,23 @@ class RunManager:
                 except Exception:
                     logger.warning("Failed to map store row for run %s", run_id, exc_info=True)
         return sorted(records_by_id.values(), key=lambda record: record.created_at, reverse=True)[:limit]
+
+    def _thread_records_locked(self, thread_id: str) -> list[RunRecord]:
+        '''
+
+        返回 *thread_id* 的内存运行记录；调用方必须持有 ``self._lock``。
+
+                使用 ``_runs_by_thread`` 索引，使查找开销与该线程的运行数成正比，
+                无需扫描全部内存记录。正确性依赖于在 ``self._lock`` 内同步修改
+                索引与 ``_runs``，两次写入之间不能 ``await``，使持锁者看到一致状态。
+                ``self._runs.get`` 过滤仅提供额外防护：可丢弃仍在索引中却已从
+                ``_runs`` 移除的过期标识，无法恢复存在于 ``_runs`` 但索引遗漏的记录。
+                若未来重构破坏同步更新约定，它只能防护前一种不一致。
+        '''
+        run_ids = self._runs_by_thread.get(thread_id)
+        if not run_ids:
+            return []
+        return [record for run_id in run_ids if (record := self._runs.get(run_id)) is not None]
 
     async def list_successful_regenerate_sources(
         self,
@@ -641,6 +546,47 @@ class RunManager:
         await self._persist_status(record, status, error=error, stop_reason=stop_reason)
         logger.info("Run %s -> %s", run_id, status.value)
 
+    async def _persist_status(self, record: RunRecord, status: RunStatus, *, error: str | None = None, stop_reason: str | None = None) -> bool:
+        '''
+
+        尝试持久化运行状态变更并处理短暂数据库冲突。'''
+        if self._store is None:
+            return True
+        row_recovery_payload = self._store_put_payload(record, error=error, stop_reason=stop_reason)
+        try:
+            updated = await self._call_store_with_retry(
+                "update_status",
+                record.run_id,
+                lambda: self._store.update_status(record.run_id, status.value, error=error, stop_reason=stop_reason),
+            )
+            if updated is False:
+                # ``update_status`` 现在只更新状态为 pending 或 running 的记录。返回 False 可能表示：
+                #   (a) 记录从未成功写入（首次 ``put()`` 失败）→ 重新创建。
+                #   (b) 记录已进入终态：可能被其他工作器接管并标记为 ``error``，也可能因本地取消与完成竞态
+                #       变为 ``interrupted`` 或 ``success``。下方会根据具体状态选择日志级别。
+                existing = await self._store.get(record.run_id)
+                if existing is not None:
+                    existing_status = existing.get("status")
+                    if existing_status == "error":
+                        logger.warning(
+                            "Run %s status update to %s skipped: store row already at error (peer takeover)",
+                            record.run_id,
+                            status.value,
+                        )
+                    else:
+                        logger.info(
+                            "Run %s status update to %s skipped: store row already at %s (local cancel/completion race)",
+                            record.run_id,
+                            status.value,
+                            existing_status,
+                        )
+                    return False
+                return await self._persist_snapshot_to_store(record.run_id, row_recovery_payload)
+            return True
+        except Exception:
+            logger.warning("Failed to persist status update for run %s", record.run_id, exc_info=True)
+            return False
+
     async def set_finalizing(self, run_id: str, finalizing: bool) -> None:
         '''
 
@@ -703,6 +649,20 @@ class RunManager:
                     return True
         return False
 
+    async def update_model_name(self, run_id: str, model_name: str | None) -> None:
+        '''
+
+        更新运行所用的模型名称。'''
+        async with self._lock:
+            record = self._runs.get(run_id)
+            if record is None:
+                logger.warning("update_model_name called for unknown run %s", run_id)
+                return
+            record.model_name = model_name
+            record.updated_at = _now_iso()
+        await self._persist_model_name(run_id, model_name)
+        logger.info("Run %s model_name=%s", run_id, model_name)
+
     async def _persist_model_name(self, run_id: str, model_name: str | None) -> None:
         '''
 
@@ -717,20 +677,6 @@ class RunManager:
             )
         except Exception:
             logger.warning("Failed to persist model_name update for run %s", run_id, exc_info=True)
-
-    async def update_model_name(self, run_id: str, model_name: str | None) -> None:
-        '''
-
-        更新运行所用的模型名称。'''
-        async with self._lock:
-            record = self._runs.get(run_id)
-            if record is None:
-                logger.warning("update_model_name called for unknown run %s", run_id)
-                return
-            record.model_name = model_name
-            record.updated_at = _now_iso()
-        await self._persist_model_name(run_id, model_name)
-        logger.info("Run %s model_name=%s", run_id, model_name)
 
     async def cancel(self, run_id: str, *, action: str = "interrupt") -> CancelOutcome:
         '''
@@ -861,21 +807,6 @@ class RunManager:
             return CancelOutcome.not_cancellable
         # 记录仍处于活动状态，说明所有者已续租。
         return CancelOutcome.lease_valid_elsewhere
-
-    def _compute_lease_expires_at(self) -> str | None:
-        '''
-
-        返回新建运行的租约到期时间，采用标准日期时间格式。
-
-                单工作器模式关闭心跳时返回 ``None``，使对账流程将崩溃运行视为租约为空的孤儿并立即回收，
-                保持引入所有权机制前的行为。多工作器部署启用心跳后才使用租约。
-        '''
-        if self._run_ownership_config is None:
-            return None
-        if not self._run_ownership_config.heartbeat_enabled:
-            return None
-        lease_seconds = self._run_ownership_config.lease_seconds
-        return (datetime.now(UTC) + timedelta(seconds=lease_seconds)).isoformat()
 
     async def create_or_reject(
         self,
@@ -1099,7 +1030,6 @@ class RunManager:
                 self._unindex_run_locked(run_id, record.thread_id)
         logger.debug("Run record %s cleaned up", run_id)
 
-
     @property
     def worker_id(self) -> str:
         '''
@@ -1144,27 +1074,6 @@ class RunManager:
         task.set_name("deerflow-run-lease-heartbeat")
         self._heartbeat_task = task
         logger.info("Run lease heartbeat started for worker %s", self._worker_id)
-
-    async def stop_heartbeat(self) -> None:
-        '''
-
-        停止心跳任务并等待其完成。'''
-        if self._heartbeat_stop is not None:
-            self._heartbeat_stop.set()
-        if self._heartbeat_task is not None and not self._heartbeat_task.done():
-            try:
-                await asyncio.wait_for(self._heartbeat_task, timeout=5.0)
-            except TimeoutError:
-                self._heartbeat_task.cancel()
-                try:
-                    await self._heartbeat_task
-                except asyncio.CancelledError:
-                    pass
-            except asyncio.CancelledError:
-                pass
-        self._heartbeat_task = None
-        self._heartbeat_stop = None
-        logger.info("Run lease heartbeat stopped for worker %s", self._worker_id)
 
     async def _heartbeat_loop(self) -> None:
         '''
@@ -1271,6 +1180,27 @@ class RunManager:
                 len(recovered),
             )
 
+    async def stop_heartbeat(self) -> None:
+        '''
+
+        停止心跳任务并等待其完成。'''
+        if self._heartbeat_stop is not None:
+            self._heartbeat_stop.set()
+        if self._heartbeat_task is not None and not self._heartbeat_task.done():
+            try:
+                await asyncio.wait_for(self._heartbeat_task, timeout=5.0)
+            except TimeoutError:
+                self._heartbeat_task.cancel()
+                try:
+                    await self._heartbeat_task
+                except asyncio.CancelledError:
+                    pass
+            except asyncio.CancelledError:
+                pass
+        self._heartbeat_task = None
+        self._heartbeat_stop = None
+        logger.info("Run lease heartbeat stopped for worker %s", self._worker_id)
+
     async def shutdown(self, *, timeout: float = 5.0) -> None:
         '''
 
@@ -1352,6 +1282,75 @@ class RunManager:
         if pending:
             logger.warning("Run drain exceeded %.1fs on shutdown; %d run task(s) still active and may race checkpointer teardown", timeout, len(pending))
         logger.info("Drained %d in-flight run(s) on shutdown (%d settled within %.1fs)", len(inflight), len(inflight) - len(pending), timeout)
+
+    async def _persist_to_store(self, record: RunRecord, *, error: str | None = None) -> bool:
+        '''
+
+        尝试把运行记录同步到 PostgreSQL 仓储。'''
+        return await self._persist_snapshot_to_store(
+            record.run_id,
+            self._store_put_payload(record, error=error),
+        )
+
+
+def _generate_worker_id() -> str:
+    '''生成包含主机名和随机值的工作进程唯一标识。'''
+    return f"{socket.gethostname()}:{uuid.uuid4().hex}"
+
+
+def _is_retryable_persistence_error(exc: BaseException) -> bool:
+    '''识别 PostgreSQL 可安全重试的事务序列化冲突和死锁。'''
+
+    pending: list[BaseException] = [exc]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+
+        if getattr(current, "sqlstate", None) in _RETRYABLE_POSTGRES_STATES:
+            return True
+        if getattr(current, "pgcode", None) in _RETRYABLE_POSTGRES_STATES:
+            return True
+        for chained in (getattr(current, "orig", None), current.__cause__, current.__context__):
+            if isinstance(chained, BaseException):
+                pending.append(chained)
+    return False
+
+
+def _is_unique_violation(exc: BaseException) -> bool:
+    '''检查异常及其包装原因，识别 PostgreSQL 唯一键冲突。'''
+    pending: list[BaseException] = [exc]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        if id(current) in seen:
+            continue
+        seen.add(id(current))
+
+        if getattr(current, "pgcode", None) == _UNIQUE_PGCODE:
+            return True
+        if getattr(current, "sqlcode", None) == _UNIQUE_PGCODE:
+            return True
+        if getattr(current, "sqlstate", None) == _UNIQUE_PGCODE:
+            return True
+        # 某些数据库驱动无法从异常链中取得原生错误码，因此同时检查错误消息作为兜底。
+        # 必须确认异常节点属于 IntegrityError，避免应用异常仅因文本包含 "duplicate key"、
+        # "unique" 和 "violat"（例如检查约束错误、校验错误或其他子系统消息）就被误判为唯一键冲突，
+        # 并错误地返回 HTTP 409 而不是 500。
+        if isinstance(current, SAIntegrityError):
+            message = str(current).lower()
+            if "unique" in message and "violat" in message:
+                return True
+            if "duplicate key" in message:
+                return True
+
+        for attr in ("orig", "__cause__", "__context__"):
+            inner = getattr(current, attr, None)
+            if isinstance(inner, BaseException):
+                pending.append(inner)
+    return False
 
 
 class CancelOutcome(StrEnum):

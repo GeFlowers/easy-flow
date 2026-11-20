@@ -52,7 +52,6 @@ import {
   getFileIcon,
   getFileName,
 } from "@/features/utils/files";
-import { cn } from "@/lib/utils";
 
 import { ArtifactLink } from "../citations/artifact-link";
 import { CitationSourcesPanel } from "../citations/citation-sources-panel";
@@ -210,7 +209,7 @@ export function ArtifactFileDetail({
     }
   }, [threadId, filepath, isInstalling, t]);
   return (
-    <Artifact className={cn(className)}>
+    <Artifact className={[className].filter(Boolean).join(" ")}>
       <ArtifactHeader className="px-2">
         <div className="flex items-center gap-2">
           <ArtifactTitle>

@@ -270,41 +270,6 @@ def action_query(
     return _format_table(columns, rows)
 
 
-def _format_table(columns: list[str], rows: list[tuple]) -> str:
-    '''将查询列和行转换为限宽的终端可读表格。'''
-    if not rows:
-        msg = "查询返回 0 行。"
-        print(msg)
-        return msg
-
-    # 计算各列宽度。
-    col_widths = [len(str(c)) for c in columns]
-    for row in rows:
-        for i, val in enumerate(row):
-            col_widths[i] = max(col_widths[i], len(str(val)))
-
-    # 限制最大列宽。
-    max_width = 40
-    col_widths = [min(w, max_width) for w in col_widths]
-
-    # 组装表格内容。
-    parts = []
-    header = " | ".join(str(c).ljust(col_widths[i]) for i, c in enumerate(columns))
-    separator = "-+-".join("-" * col_widths[i] for i in range(len(columns)))
-    parts.append(header)
-    parts.append(separator)
-    for row in rows:
-        row_str = " | ".join(
-            str(v)[:max_width].ljust(col_widths[i]) for i, v in enumerate(row)
-        )
-        parts.append(row_str)
-
-    parts.append(f"\n（{len(rows)} 行）")
-    result = "\n".join(parts)
-    print(result)
-    return result
-
-
 def _export_results(columns: list[str], rows: list[tuple], output_file: str) -> str:
     '''将结果导出为 CSV、JSON 或 Markdown；不支持的格式会报错。'''
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -352,6 +317,41 @@ def _export_results(columns: list[str], rows: list[tuple], output_file: str) -> 
     msg = f"结果已导出到 {output_file}（{len(rows)} 行）"
     print(msg)
     return msg
+
+
+def _format_table(columns: list[str], rows: list[tuple]) -> str:
+    '''将查询列和行转换为限宽的终端可读表格。'''
+    if not rows:
+        msg = "查询返回 0 行。"
+        print(msg)
+        return msg
+
+    # 计算各列宽度。
+    col_widths = [len(str(c)) for c in columns]
+    for row in rows:
+        for i, val in enumerate(row):
+            col_widths[i] = max(col_widths[i], len(str(val)))
+
+    # 限制最大列宽。
+    max_width = 40
+    col_widths = [min(w, max_width) for w in col_widths]
+
+    # 组装表格内容。
+    parts = []
+    header = " | ".join(str(c).ljust(col_widths[i]) for i, c in enumerate(columns))
+    separator = "-+-".join("-" * col_widths[i] for i in range(len(columns)))
+    parts.append(header)
+    parts.append(separator)
+    for row in rows:
+        row_str = " | ".join(
+            str(v)[:max_width].ljust(col_widths[i]) for i, v in enumerate(row)
+        )
+        parts.append(row_str)
+
+    parts.append(f"\n（{len(rows)} 行）")
+    result = "\n".join(parts)
+    print(result)
+    return result
 
 
 def action_summary(

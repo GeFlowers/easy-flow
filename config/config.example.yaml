@@ -75,7 +75,6 @@ memory:
   enabled: true
   injection_enabled: true
   manager_class: deermem
-  mode: middleware
   backend_config:
     max_facts: 100
     fact_confidence_threshold: 0.7

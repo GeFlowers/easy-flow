@@ -75,23 +75,6 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         with self._lock:
             return self._stop_reason.pop(run_id, None)
 
-    @staticmethod
-    def _get_run_id(runtime: Runtime) -> str:
-        '''从运行上下文获取 ID；缺失时使用 Runtime 对象身份隔离嵌入式并发调用。'''
-        ctx = getattr(runtime, "context", None)
-        if isinstance(ctx, dict) and "run_id" in ctx:
-            return ctx["run_id"]
-        # 嵌入式调用未必有运行 ID，使用 Runtime 身份避免不同调用共用状态。
-        return str(id(runtime))
-
-    def _clear_run_state(self, run_id: str) -> None:
-        '''清除指定运行的告警和用量状态，但保留供调用方读取的停止原因。'''
-        with self._lock:
-            self._warned.pop(run_id, None)
-            self._pending_warnings.pop(run_id, None)
-            self._seen_messages.pop(run_id, None)
-            self._cumulative_usage.pop(run_id, None)
-
     @override
     def before_agent(self, state: AgentState, runtime: Runtime) -> None:
         '''初始化本轮累计器，并将已有消息用量记为基线，不计入新运行预算。'''
@@ -115,6 +98,15 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
                     output_tokens = usage.get("output_tokens", 0)
                     seen[msg.id] = (input_tokens, output_tokens)
 
+    @staticmethod
+    def _get_run_id(runtime: Runtime) -> str:
+        '''从运行上下文获取 ID；缺失时使用 Runtime 对象身份隔离嵌入式并发调用。'''
+        ctx = getattr(runtime, "context", None)
+        if isinstance(ctx, dict) and "run_id" in ctx:
+            return ctx["run_id"]
+        # 嵌入式调用未必有运行 ID，使用 Runtime 身份避免不同调用共用状态。
+        return str(id(runtime))
+
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> None:
         '''异步启动钩子复用同步逻辑登记历史用量基线。'''
@@ -127,42 +119,23 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
             return
         self._clear_run_state(self._get_run_id(runtime))
 
+    def _clear_run_state(self, run_id: str) -> None:
+        '''清除指定运行的告警和用量状态，但保留供调用方读取的停止原因。'''
+        with self._lock:
+            self._warned.pop(run_id, None)
+            self._pending_warnings.pop(run_id, None)
+            self._seen_messages.pop(run_id, None)
+            self._cumulative_usage.pop(run_id, None)
+
     @override
     async def aafter_agent(self, state: AgentState, runtime: Runtime) -> None:
         '''异步结束钩子复用同步清理逻辑。'''
         self.after_agent(state, runtime)
 
-    @staticmethod
-    def _append_text(content: str | list[dict | None] | None, stop_msg: str) -> str | list[dict | str]:
-        '''按内容字段类型追加预算停止说明，兼容文本块列表和空内容。'''
-        if content is None:
-            return stop_msg
-        if isinstance(content, str):
-            if content:
-                return f"{content}\n\n{stop_msg}"
-            return f"\n\n{stop_msg}"
-        if isinstance(content, list):
-            new_content = list(content)
-            new_content.append({"type": "text", "text": f"\n\n{stop_msg}"})
-            return new_content
-        return f"{content}\n\n{stop_msg}"
-
-    def _build_hard_stop_update(self, msg: AIMessage, stop_msg: str) -> dict[str, Any]:
-        '''创建硬停止状态更新，移除工具调用数据并规范化结束原因。'''
-        updated_content = self._append_text(msg.content, stop_msg)
-        kwargs = dict(msg.additional_kwargs) if msg.additional_kwargs else {}
-        if "tool_calls" in kwargs:
-            del kwargs["tool_calls"]
-        if "function_call" in kwargs:
-            del kwargs["function_call"]
-
-        response_metadata = dict(getattr(msg, "response_metadata", {}) or {})
-
-        if response_metadata.get("finish_reason") == "tool_calls":
-            response_metadata["finish_reason"] = "stop"
-
-        stopped_msg = msg.model_copy(update={"content": updated_content, "tool_calls": [], "additional_kwargs": kwargs, "response_metadata": response_metadata})
-        return {"messages": [stopped_msg]}
+    @override
+    def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''模型返回后更新 令牌 用量并检查预算阈值。'''
+        return self._apply(state, runtime)
 
     def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
         '''汇总尚未计入的消息用量，选择最先达到的预算维度并生成警告或硬停止。'''
@@ -248,15 +221,50 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
 
             return None
 
-    @override
-    def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '''模型返回后更新 令牌 用量并检查预算阈值。'''
-        return self._apply(state, runtime)
+    def _build_hard_stop_update(self, msg: AIMessage, stop_msg: str) -> dict[str, Any]:
+        '''创建硬停止状态更新，移除工具调用数据并规范化结束原因。'''
+        updated_content = self._append_text(msg.content, stop_msg)
+        kwargs = dict(msg.additional_kwargs) if msg.additional_kwargs else {}
+        if "tool_calls" in kwargs:
+            del kwargs["tool_calls"]
+        if "function_call" in kwargs:
+            del kwargs["function_call"]
+
+        response_metadata = dict(getattr(msg, "response_metadata", {}) or {})
+
+        if response_metadata.get("finish_reason") == "tool_calls":
+            response_metadata["finish_reason"] = "stop"
+
+        stopped_msg = msg.model_copy(update={"content": updated_content, "tool_calls": [], "additional_kwargs": kwargs, "response_metadata": response_metadata})
+        return {"messages": [stopped_msg]}
+
+    @staticmethod
+    def _append_text(content: str | list[dict | None] | None, stop_msg: str) -> str | list[dict | str]:
+        '''按内容字段类型追加预算停止说明，兼容文本块列表和空内容。'''
+        if content is None:
+            return stop_msg
+        if isinstance(content, str):
+            if content:
+                return f"{content}\n\n{stop_msg}"
+            return f"\n\n{stop_msg}"
+        if isinstance(content, list):
+            new_content = list(content)
+            new_content.append({"type": "text", "text": f"\n\n{stop_msg}"})
+            return new_content
+        return f"{content}\n\n{stop_msg}"
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
         '''异步模型返回后执行相同的用量统计与阈值检查。'''
         return self._apply(state, runtime)
+
+    @override
+    def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
+        '''同步模型调用前注入暂存提醒，再调用下游模型处理器。'''
+        warnings = self._drain_pending_warnings(request.runtime)
+        request = self._inject_warnings(request, warnings)
+
+        return handler(request)
 
     def _drain_pending_warnings(self, runtime: Runtime) -> list[str]:
         '''取出并删除本轮待注入的预算提醒；预算功能关闭时返回空列表。'''
@@ -279,14 +287,6 @@ class TokenBudgetMiddleware(AgentMiddleware[AgentState]):
         messages = getattr(request, "messages", [])
         new_messages = list(messages) + [warning_msg]
         return request.override(messages=new_messages)
-
-    @override
-    def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
-        '''同步模型调用前注入暂存提醒，再调用下游模型处理器。'''
-        warnings = self._drain_pending_warnings(request.runtime)
-        request = self._inject_warnings(request, warnings)
-
-        return handler(request)
 
     @override
     async def awrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]) -> ModelCallResult:

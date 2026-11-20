@@ -13,6 +13,16 @@ class PortAllocator:
         self._lock = threading.Lock()
         self._reserved_ports: set[int] = set()
 
+    def allocate(self, start_port: int = 8080, max_range: int = 100) -> int:
+        '''在给定范围内选择并预留第一个可绑定端口，找不到时抛出错误。'''
+        with self._lock:
+            for port in range(start_port, start_port + max_range):
+                if self._is_port_available(port):
+                    self._reserved_ports.add(port)
+                    return port
+
+            raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_range}")
+
     def _is_port_available(self, port: int) -> bool:
         '''尝试绑定通配地址判断端口是否空闲，并排除本分配器已预留端口。'''
         if port in self._reserved_ports:
@@ -26,16 +36,6 @@ class PortAllocator:
                 return True
             except OSError:
                 return False
-
-    def allocate(self, start_port: int = 8080, max_range: int = 100) -> int:
-        '''在给定范围内选择并预留第一个可绑定端口，找不到时抛出错误。'''
-        with self._lock:
-            for port in range(start_port, start_port + max_range):
-                if self._is_port_available(port):
-                    self._reserved_ports.add(port)
-                    return port
-
-            raise RuntimeError(f"No available port found in range {start_port}-{start_port + max_range}")
 
     def release(self, port: int) -> None:
         '''释放进程内的端口预留标记，使后续调用可以再次分配该端口。'''

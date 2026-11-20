@@ -56,41 +56,6 @@ class TraceTextFormatter(logging.Formatter):
     _deerflow_trace_formatter = True
 
 
-def _ensure_root_handler() -> None:
-    '''在根日志器尚无处理器时安装默认文本处理器。'''
-    if logging.root.handlers:
-        return
-    logging.basicConfig(level=logging.INFO, format=DEFAULT_LOG_FORMAT, datefmt=DEFAULT_LOG_DATE_FORMAT)
-
-
-def _has_trace_filter(handler: logging.Handler) -> bool:
-    '''判断指定处理器是否已经安装鹿流追踪过滤器。'''
-    return any(getattr(f, "name", None) == _TRACE_FILTER_NAME or isinstance(f, TraceContextFilter) for f in handler.filters)
-
-
-def _install_trace_filter(handler: logging.Handler) -> None:
-    '''为处理器按需安装唯一的追踪过滤器。'''
-    if not _has_trace_filter(handler):
-        handler.addFilter(TraceContextFilter())
-
-
-def _remove_trace_filter(handler: logging.Handler) -> None:
-    '''移除处理器中由鹿流安装的全部追踪过滤器。'''
-    handler.filters = [f for f in handler.filters if not (getattr(f, "name", None) == _TRACE_FILTER_NAME or isinstance(f, TraceContextFilter))]
-
-
-def _default_formatter() -> logging.Formatter:
-    '''创建未增强追踪信息时使用的默认文本格式化器。'''
-    return logging.Formatter(DEFAULT_LOG_FORMAT, datefmt=DEFAULT_LOG_DATE_FORMAT)
-
-
-def _trace_formatter(format_name: str | None) -> logging.Formatter:
-    '''按配置名称返回结构化或文本追踪格式化器。'''
-    if (format_name or "text").strip().lower() == "json":
-        return JsonTraceFormatter()
-    return TraceTextFormatter(TRACE_TEXT_LOG_FORMAT, datefmt=DEFAULT_LOG_DATE_FORMAT)
-
-
 def configure_logging(config: object) -> None:
     '''依据应用配置设置根日志器的级别、追踪过滤器和输出格式。
 
@@ -113,3 +78,38 @@ def configure_logging(config: object) -> None:
                 handler.setFormatter(_default_formatter())
 
     apply_logging_level(getattr(config, "log_level", None))
+
+
+def _ensure_root_handler() -> None:
+    '''在根日志器尚无处理器时安装默认文本处理器。'''
+    if logging.root.handlers:
+        return
+    logging.basicConfig(level=logging.INFO, format=DEFAULT_LOG_FORMAT, datefmt=DEFAULT_LOG_DATE_FORMAT)
+
+
+def _install_trace_filter(handler: logging.Handler) -> None:
+    '''为处理器按需安装唯一的追踪过滤器。'''
+    if not _has_trace_filter(handler):
+        handler.addFilter(TraceContextFilter())
+
+
+def _has_trace_filter(handler: logging.Handler) -> bool:
+    '''判断指定处理器是否已经安装鹿流追踪过滤器。'''
+    return any(getattr(f, "name", None) == _TRACE_FILTER_NAME or isinstance(f, TraceContextFilter) for f in handler.filters)
+
+
+def _trace_formatter(format_name: str | None) -> logging.Formatter:
+    '''按配置名称返回结构化或文本追踪格式化器。'''
+    if (format_name or "text").strip().lower() == "json":
+        return JsonTraceFormatter()
+    return TraceTextFormatter(TRACE_TEXT_LOG_FORMAT, datefmt=DEFAULT_LOG_DATE_FORMAT)
+
+
+def _remove_trace_filter(handler: logging.Handler) -> None:
+    '''移除处理器中由鹿流安装的全部追踪过滤器。'''
+    handler.filters = [f for f in handler.filters if not (getattr(f, "name", None) == _TRACE_FILTER_NAME or isinstance(f, TraceContextFilter))]
+
+
+def _default_formatter() -> logging.Formatter:
+    '''创建未增强追踪信息时使用的默认文本格式化器。'''
+    return logging.Formatter(DEFAULT_LOG_FORMAT, datefmt=DEFAULT_LOG_DATE_FORMAT)

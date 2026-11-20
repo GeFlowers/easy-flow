@@ -18,44 +18,83 @@ _UNKNOWN_TOOL_NAME = "unknown_tool"
 _EMPTY_TOOL_NAME_ERROR = "工具调用缺少名称或名称为空，无法执行。"
 
 
-def _valid_tool_name(name: object) -> bool:
-    '''判断工具名称是否为非空白字符串。'''
-    return isinstance(name, str) and bool(name.strip())
-
-
-def _normalize_tool_name(name: object) -> str:
-    '''返回去除首尾空白的有效名称，或统一的未知工具名称。'''
-    return name.strip() if _valid_tool_name(name) else _UNKNOWN_TOOL_NAME
-
-
-def _has_invalid_tool_name(name: object) -> bool:
-    '''判断工具名称是否无效。'''
-    return not _valid_tool_name(name)
-
-
-def _parse_json_object(value: object) -> dict | None:
-    '''将字符串解析为 JSON 对象；输入不是对象或解析失败时返回 ``None``。'''
-    if not isinstance(value, str):
-        return None
-    try:
-        parsed = json.loads(value)
-    except ValueError:
-        return None
-    return parsed if isinstance(parsed, dict) else None
-
-
-def _normalize_tool_arguments(arguments: object) -> str:
-    '''将工具参数规范为可回放的 JSON 对象字符串，无法安全序列化时使用空对象。'''
-    if isinstance(arguments, dict):
-        try:
-            return json.dumps(arguments, ensure_ascii=False, allow_nan=False)
-        except (TypeError, ValueError):
-            return "{}"
-    return arguments if _parse_json_object(arguments) is not None else "{}"
-
-
 class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
     '''修复消息历史中未配对的工具调用，并删除找不到原调用的孤立工具结果。'''
+
+    @override
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelCallResult:
+        '''在同步模型调用前修补工具消息顺序并交由后续处理器执行。'''
+        patched = self._build_patched_messages(request.messages)
+        if patched is not None:
+            request = request.override(messages=patched)
+        return handler(request)
+
+    def _build_patched_messages(self, messages: list) -> list | None:
+        '''按工具调用顺序配对工具结果，为缺失结果补充错误消息，并移除失去原调用的孤立结果。'''
+        tool_messages_by_id: dict[str, deque[ToolMessage]] = defaultdict(deque)
+        for msg in messages:
+            if isinstance(msg, ToolMessage):
+                tool_messages_by_id[msg.tool_call_id].append(msg)
+
+        tool_call_ids: set[str] = set()
+        for msg in messages:
+            if getattr(msg, "type", None) != "ai":
+                continue
+            for tc in self._message_tool_calls(msg):
+                tc_id = tc.get("id")
+                if tc_id:
+                    tool_call_ids.add(tc_id)
+
+        patched: list = []
+        patch_count = 0
+        drop_count = 0
+        for msg in messages:
+            if isinstance(msg, ToolMessage):
+                if msg.tool_call_id in tool_call_ids:
+                    continue
+                drop_count += 1
+                continue
+
+            sanitized_msg = self._sanitize_ai_message_tool_calls(msg)
+            patched.append(sanitized_msg)
+            if getattr(msg, "type", None) != "ai":
+                continue
+
+            for tc in self._message_tool_calls(msg):
+                tc_id = tc.get("id")
+                if not tc_id:
+                    continue
+
+                tool_msg_queue = tool_messages_by_id.get(tc_id)
+                existing_tool_msg = tool_msg_queue.popleft() if tool_msg_queue else None
+                if existing_tool_msg is not None:
+                    if tc.get("invalid_tool_name") and _has_invalid_tool_name(existing_tool_msg.name):
+                        existing_tool_msg = existing_tool_msg.model_copy(update={"name": tc["name"]})
+                    patched.append(existing_tool_msg)
+                else:
+                    patched.append(
+                        ToolMessage(
+                            content=self._synthetic_tool_message_content(tc),
+                            tool_call_id=tc_id,
+                            name=tc.get("name", "unknown"),
+                            status="error",
+                        )
+                    )
+                    patch_count += 1
+
+        if patched == messages and not drop_count:
+            return None
+        if drop_count or patch_count:
+            logger.warning(
+                "DanglingToolCallMiddleware: %d orphan(s) dropped, %d placeholder(s) injected",
+                drop_count,
+                patch_count,
+            )
+        return patched
 
     @staticmethod
     def _message_tool_calls(msg) -> list[dict]:
@@ -115,30 +154,6 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
             normalized.append(normalized_call)
 
         return normalized
-
-    @staticmethod
-    def _synthetic_tool_message_content(tool_call: dict) -> str:
-        '''为未执行的工具调用构造简短且可恢复的合成错误内容。'''
-        if tool_call.get("invalid_tool_name"):
-            return f"[{_EMPTY_TOOL_NAME_ERROR} 重试时请使用可用工具名称之一。]"
-        if tool_call.get("invalid"):
-            name = tool_call.get("name")
-            error = tool_call.get("error")
-            error_text = error[:_MAX_RECOVERY_ERROR_DETAIL_LEN] if isinstance(error, str) and error else ""
-            if name == "write_file":
-                details = f" 解析错误： {error_text}" if error_text else ""
-                return (
-                    "[write_file 在执行前失败：工具调用参数不是有效的 JavaScript 对象表示法文本，"
-                    "因此未写入文件。这通常发生在模型试图通过单次调用写入非常大的 Markdown 文件时，"
-                    "尤其是 `content` 包含未转义的引号、内联对象表示法、反斜杠或代码围栏时。"
-                    "不要为此文件重试相同的大型 `write_file` 载荷；请在下一次响应中以普通助手文本"
-                    "直接提供报告或内容。若之后仍需写入文件，请将文件拆分为较小部分，"
-                    f"避免一次提交整个大载荷。{details}]"
-                )
-            if error_text:
-                return f"[工具调用的参数无效，无法执行： {error_text}]"
-            return "[工具调用的参数无效，无法执行。]"
-        return "[工具调用已中断，未返回结果。]"
 
     @staticmethod
     def _sanitize_ai_message_tool_calls(msg):
@@ -230,80 +245,29 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
             return msg
         return msg.model_copy(update=update)
 
-    def _build_patched_messages(self, messages: list) -> list | None:
-        '''按工具调用顺序配对工具结果，为缺失结果补充错误消息，并移除失去原调用的孤立结果。'''
-        tool_messages_by_id: dict[str, deque[ToolMessage]] = defaultdict(deque)
-        for msg in messages:
-            if isinstance(msg, ToolMessage):
-                tool_messages_by_id[msg.tool_call_id].append(msg)
-
-        tool_call_ids: set[str] = set()
-        for msg in messages:
-            if getattr(msg, "type", None) != "ai":
-                continue
-            for tc in self._message_tool_calls(msg):
-                tc_id = tc.get("id")
-                if tc_id:
-                    tool_call_ids.add(tc_id)
-
-        patched: list = []
-        patch_count = 0
-        drop_count = 0
-        for msg in messages:
-            if isinstance(msg, ToolMessage):
-                if msg.tool_call_id in tool_call_ids:
-                    continue
-                drop_count += 1
-                continue
-
-            sanitized_msg = self._sanitize_ai_message_tool_calls(msg)
-            patched.append(sanitized_msg)
-            if getattr(msg, "type", None) != "ai":
-                continue
-
-            for tc in self._message_tool_calls(msg):
-                tc_id = tc.get("id")
-                if not tc_id:
-                    continue
-
-                tool_msg_queue = tool_messages_by_id.get(tc_id)
-                existing_tool_msg = tool_msg_queue.popleft() if tool_msg_queue else None
-                if existing_tool_msg is not None:
-                    if tc.get("invalid_tool_name") and _has_invalid_tool_name(existing_tool_msg.name):
-                        existing_tool_msg = existing_tool_msg.model_copy(update={"name": tc["name"]})
-                    patched.append(existing_tool_msg)
-                else:
-                    patched.append(
-                        ToolMessage(
-                            content=self._synthetic_tool_message_content(tc),
-                            tool_call_id=tc_id,
-                            name=tc.get("name", "unknown"),
-                            status="error",
-                        )
-                    )
-                    patch_count += 1
-
-        if patched == messages and not drop_count:
-            return None
-        if drop_count or patch_count:
-            logger.warning(
-                "DanglingToolCallMiddleware: %d orphan(s) dropped, %d placeholder(s) injected",
-                drop_count,
-                patch_count,
-            )
-        return patched
-
-    @override
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelCallResult:
-        '''在同步模型调用前修补工具消息顺序并交由后续处理器执行。'''
-        patched = self._build_patched_messages(request.messages)
-        if patched is not None:
-            request = request.override(messages=patched)
-        return handler(request)
+    @staticmethod
+    def _synthetic_tool_message_content(tool_call: dict) -> str:
+        '''为未执行的工具调用构造简短且可恢复的合成错误内容。'''
+        if tool_call.get("invalid_tool_name"):
+            return f"[{_EMPTY_TOOL_NAME_ERROR} 重试时请使用可用工具名称之一。]"
+        if tool_call.get("invalid"):
+            name = tool_call.get("name")
+            error = tool_call.get("error")
+            error_text = error[:_MAX_RECOVERY_ERROR_DETAIL_LEN] if isinstance(error, str) and error else ""
+            if name == "write_file":
+                details = f" 解析错误： {error_text}" if error_text else ""
+                return (
+                    "[write_file 在执行前失败：工具调用参数不是有效的 JavaScript 对象表示法文本，"
+                    "因此未写入文件。这通常发生在模型试图通过单次调用写入非常大的 Markdown 文件时，"
+                    "尤其是 `content` 包含未转义的引号、内联对象表示法、反斜杠或代码围栏时。"
+                    "不要为此文件重试相同的大型 `write_file` 载荷；请在下一次响应中以普通助手文本"
+                    "直接提供报告或内容。若之后仍需写入文件，请将文件拆分为较小部分，"
+                    f"避免一次提交整个大载荷。{details}]"
+                )
+            if error_text:
+                return f"[工具调用的参数无效，无法执行： {error_text}]"
+            return "[工具调用的参数无效，无法执行。]"
+        return "[工具调用已中断，未返回结果。]"
 
     @override
     async def awrap_model_call(
@@ -316,3 +280,39 @@ class DanglingToolCallMiddleware(AgentMiddleware[AgentState]):
         if patched is not None:
             request = request.override(messages=patched)
         return await handler(request)
+
+
+def _has_invalid_tool_name(name: object) -> bool:
+    '''判断工具名称是否无效。'''
+    return not _valid_tool_name(name)
+
+
+def _valid_tool_name(name: object) -> bool:
+    '''判断工具名称是否为非空白字符串。'''
+    return isinstance(name, str) and bool(name.strip())
+
+
+def _normalize_tool_name(name: object) -> str:
+    '''返回去除首尾空白的有效名称，或统一的未知工具名称。'''
+    return name.strip() if _valid_tool_name(name) else _UNKNOWN_TOOL_NAME
+
+
+def _parse_json_object(value: object) -> dict | None:
+    '''将字符串解析为 JSON 对象；输入不是对象或解析失败时返回 ``None``。'''
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = json.loads(value)
+    except ValueError:
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _normalize_tool_arguments(arguments: object) -> str:
+    '''将工具参数规范为可回放的 JSON 对象字符串，无法安全序列化时使用空对象。'''
+    if isinstance(arguments, dict):
+        try:
+            return json.dumps(arguments, ensure_ascii=False, allow_nan=False)
+        except (TypeError, ValueError):
+            return "{}"
+    return arguments if _parse_json_object(arguments) is not None else "{}"

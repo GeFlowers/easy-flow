@@ -77,7 +77,6 @@ import {
   type UploadLimits,
   type UploadLimitViolation,
 } from "@/features/uploads";
-import { cn } from "@/lib/utils";
 
 import {
   ModelSelector,
@@ -545,7 +544,9 @@ export function SidecarPanel({ className }: { className?: string }) {
 
   return (
     <div
-      className={cn("flex size-full min-h-0 flex-col", className)}
+      className={["flex size-full min-h-0 flex-col", className]
+        .filter(Boolean)
+        .join(" ")}
       data-testid="sidecar-panel"
     >
       <header className="border-border/70 flex h-12 shrink-0 items-center gap-2 border-b px-3">
@@ -617,7 +618,7 @@ export function SidecarPanel({ className }: { className?: string }) {
         )}
       </div>
 
-      <div className="bg-background/95 shrink-0 px-3 pt-3 pb-4 sm:px-4">
+      <div className="bg-background/95 shrink-0 px-4 pt-3 pb-4">
         <PromptInputProvider key={sidecar.parentThreadId}>
           <PromptInput
             className="bg-background/85 rounded-2xl backdrop-blur-sm *:data-[slot='input-group']:rounded-2xl"
@@ -648,7 +649,7 @@ export function SidecarPanel({ className }: { className?: string }) {
                 placeholder={t.sidecar.placeholder}
               />
             </PromptInputBody>
-            <PromptInputFooter className="@container flex flex-nowrap gap-2">
+            <PromptInputFooter className="flex flex-nowrap gap-2">
               <PromptInputTools className="min-w-0 flex-1 flex-nowrap overflow-hidden">
                 <SidecarAddAttachmentsButton uploadLimits={uploadLimits} />
                 <SidecarModeMenu
@@ -659,7 +660,7 @@ export function SidecarPanel({ className }: { className?: string }) {
               </PromptInputTools>
               <PromptInputTools className="min-w-0 justify-end">
                 <SidecarModelSelector
-                  className="max-w-40 min-w-0 sm:max-w-56 @max-[240px]:hidden"
+                  className="max-w-56 min-w-0"
                   context={sidecar.context}
                   models={models}
                   open={modelDialogOpen}
@@ -792,10 +793,12 @@ function SidecarModeMenu({
             )}
           </div>
           <div
-            className={cn(
+            className={[
               "truncate text-xs font-normal",
               mode === "ultra" && "golden-text",
-            )}
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {(mode === "flash" && t.inputBox.flashMode) ||
               (mode === "thinking" && t.inputBox.reasoningMode) ||
@@ -810,20 +813,24 @@ function SidecarModeMenu({
             {t.inputBox.mode}
           </DropdownMenuLabel>
           <PromptInputActionMenuItem
-            className={cn(
+            className={[
               mode === "flash"
                 ? "text-accent-foreground"
                 : "text-muted-foreground/65",
-            )}
+            ]
+              .filter(Boolean)
+              .join(" ")}
             onSelect={() => onModeSelect("flash")}
           >
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1 font-bold">
                 <ZapIcon
-                  className={cn(
+                  className={[
                     "mr-2 size-4",
                     mode === "flash" && "text-accent-foreground",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 />
                 {t.inputBox.flashMode}
               </div>
@@ -839,20 +846,24 @@ function SidecarModeMenu({
           </PromptInputActionMenuItem>
           {supportThinking && (
             <PromptInputActionMenuItem
-              className={cn(
+              className={[
                 mode === "thinking"
                   ? "text-accent-foreground"
                   : "text-muted-foreground/65",
-              )}
+              ]
+                .filter(Boolean)
+                .join(" ")}
               onSelect={() => onModeSelect("thinking")}
             >
               <div className="flex flex-col gap-2">
                 <div className="flex items-center gap-1 font-bold">
                   <LightbulbIcon
-                    className={cn(
+                    className={[
                       "mr-2 size-4",
                       mode === "thinking" && "text-accent-foreground",
-                    )}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   />
                   {t.inputBox.reasoningMode}
                 </div>
@@ -868,20 +879,24 @@ function SidecarModeMenu({
             </PromptInputActionMenuItem>
           )}
           <PromptInputActionMenuItem
-            className={cn(
+            className={[
               mode === "pro"
                 ? "text-accent-foreground"
                 : "text-muted-foreground/65",
-            )}
+            ]
+              .filter(Boolean)
+              .join(" ")}
             onSelect={() => onModeSelect("pro")}
           >
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1 font-bold">
                 <GraduationCapIcon
-                  className={cn(
+                  className={[
                     "mr-2 size-4",
                     mode === "pro" && "text-accent-foreground",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 />
                 {t.inputBox.proMode}
               </div>
@@ -896,22 +911,30 @@ function SidecarModeMenu({
             )}
           </PromptInputActionMenuItem>
           <PromptInputActionMenuItem
-            className={cn(
+            className={[
               mode === "ultra"
                 ? "text-accent-foreground"
                 : "text-muted-foreground/65",
-            )}
+            ]
+              .filter(Boolean)
+              .join(" ")}
             onSelect={() => onModeSelect("ultra")}
           >
             <div className="flex flex-col gap-2">
               <div className="flex items-center gap-1 font-bold">
                 <RocketIcon
-                  className={cn(
+                  className={[
                     "mr-2 size-4",
                     mode === "ultra" && "text-[#dabb5e]",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 />
-                <div className={cn(mode === "ultra" && "golden-text")}>
+                <div
+                  className={[mode === "ultra" && "golden-text"]
+                    .filter(Boolean)
+                    .join(" ")}
+                >
                   {t.inputBox.ultraMode}
                 </div>
               </div>
@@ -958,7 +981,9 @@ function SidecarModelSelector({
   return (
     <ModelSelector open={open} onOpenChange={onOpenChange}>
       <ModelSelectorTrigger asChild>
-        <PromptInputButton className={cn("min-w-0 px-2!", className)}>
+        <PromptInputButton
+          className={["min-w-0 px-2!", className].filter(Boolean).join(" ")}
+        >
           <div className="flex min-w-0 flex-col items-start text-left">
             <ModelSelectorName className="truncate text-xs font-normal">
               {selectedModel.display_name}

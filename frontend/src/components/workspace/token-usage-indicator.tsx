@@ -26,7 +26,6 @@ import {
   type TokenUsagePreferences,
   type TokenUsageViewPreset,
 } from "@/features/messages/usage-model";
-import { cn } from "@/lib/utils";
 
 interface TokenUsageIndicatorProps {
   threadId?: string;
@@ -73,10 +72,12 @@ export function TokenUsageIndicator({
         <Button
           type="button"
           variant="ghost"
-          className={cn(
+          className={[
             "text-muted-foreground bg-background/70 hover:bg-background/90 flex h-auto items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-normal",
             className,
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <CoinsIcon size={14} />
           <span>{t.tokenUsage.label}</span>

@@ -15,7 +15,6 @@ import {
 } from "@/features/citations/sources";
 import { writeTextToClipboard } from "@/features/clipboard";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 /** 汇总并展示内容引用来源，保持来源链接与原文上下文可追溯。 */
 export function CitationSourcesPanel({
@@ -33,10 +32,12 @@ export function CitationSourcesPanel({
 
   return (
     <details
-      className={cn(
+      className={[
         "not-prose border-border/60 bg-muted/20 mt-2 rounded-md border text-xs",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <summary className="text-muted-foreground hover:text-foreground flex cursor-pointer list-none items-center gap-2 px-3 py-2 transition-colors [&::-webkit-details-marker]:hidden">
         <BookOpenTextIcon className="size-3.5 shrink-0" />

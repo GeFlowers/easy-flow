@@ -12,7 +12,6 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 /** 渲染工作区顶部操作栏，集中放置导航与全局快捷入口。 */
 export function WorkspaceHeader({ className }: { className?: string }) {
@@ -22,10 +21,12 @@ export function WorkspaceHeader({ className }: { className?: string }) {
   return (
     <>
       <div
-        className={cn(
+        className={[
           "group/workspace-header flex h-12 flex-col justify-center",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         {state === "collapsed" ? (
           <div className="group-has-data-[collapsible=icon]/sidebar-wrapper:-translate-y flex w-full cursor-pointer items-center justify-center">

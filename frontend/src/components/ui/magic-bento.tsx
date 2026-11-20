@@ -29,7 +29,6 @@ export interface BentoProps {
 const DEFAULT_PARTICLE_COUNT = 12;
 const DEFAULT_SPOTLIGHT_RADIUS = 300;
 const DEFAULT_GLOW_COLOR = "132, 0, 255";
-const MOBILE_BREAKPOINT = 768;
 
 /** 创建用于卡片交互效果的粒子节点，并设置其初始坐标与发光样式。 */
 const createParticleElement = (
@@ -513,25 +512,7 @@ const BentoCardGrid: React.FC<{
   </div>
 );
 
-/** 监听视口宽度并报告当前是否低于 Bento 布局的移动端断点。 */
-const useMobileDetection = () => {
-  const [isMobile, setIsMobile] = useState(false);
-
-  useEffect(() => {
-    /** 根据视口宽度更新移动端标记，供调整动画策略使用。 */
-    const checkMobile = () =>
-      setIsMobile(window.innerWidth <= MOBILE_BREAKPOINT);
-
-    checkMobile();
-    window.addEventListener("resize", checkMobile);
-
-    return () => window.removeEventListener("resize", checkMobile);
-  }, []);
-
-  return isMobile;
-};
-
-/** 组合卡片网格与全局交互效果，并根据设备能力控制动画。 */
+/** 组合卡片网格与全局交互效果。 */
 const MagicBento: React.FC<BentoProps> = ({
   textAutoHide = true,
   enableStars = true,
@@ -547,15 +528,13 @@ const MagicBento: React.FC<BentoProps> = ({
   data: cardData,
 }) => {
   const gridRef = useRef<HTMLDivElement>(null);
-  const isMobile = useMobileDetection();
-  const shouldDisableAnimations = disableAnimations || isMobile;
 
   return (
     <>
       {enableSpotlight && (
         <GlobalSpotlight
           gridRef={gridRef}
-          disableAnimations={shouldDisableAnimations}
+          disableAnimations={disableAnimations}
           enabled={enableSpotlight}
           spotlightRadius={spotlightRadius}
           glowColor={glowColor}
@@ -578,7 +557,7 @@ const MagicBento: React.FC<BentoProps> = ({
               <ParticleCard
                 key={index}
                 {...cardProps}
-                disableAnimations={shouldDisableAnimations}
+                disableAnimations={disableAnimations}
                 particleCount={particleCount}
                 glowColor={glowColor}
                 enableTilt={enableTilt}
@@ -607,7 +586,7 @@ const MagicBento: React.FC<BentoProps> = ({
 
                 /** 更新当前卡片的聚光坐标和强度。 */
                 const handleMouseMove = (e: MouseEvent) => {
-                  if (shouldDisableAnimations) return;
+                  if (disableAnimations) return;
 
                   const rect = el.getBoundingClientRect();
                   const x = e.clientX - rect.left;
@@ -641,7 +620,7 @@ const MagicBento: React.FC<BentoProps> = ({
 
                 /** 清除鼠标离开当前卡片后的发光强度。 */
                 const handleMouseLeave = () => {
-                  if (shouldDisableAnimations) return;
+                  if (disableAnimations) return;
 
                   if (enableTilt) {
                     gsap.to(el, {
@@ -664,7 +643,7 @@ const MagicBento: React.FC<BentoProps> = ({
 
                 /** 在卡片点击位置触发交互反馈。 */
                 const handleClick = (e: MouseEvent) => {
-                  if (!clickEffect || shouldDisableAnimations) return;
+                  if (!clickEffect || disableAnimations) return;
 
                   const rect = el.getBoundingClientRect();
                   const x = e.clientX - rect.left;

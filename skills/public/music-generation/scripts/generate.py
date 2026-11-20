@@ -13,13 +13,6 @@ import requests
 MINIMAX_DEFAULT_HOST = "https://api.minimaxi.com"
 
 
-def _check_base_resp(payload: dict) -> None:
-    '''校验 MiniMax ``base_resp`` 是否表示成功，非零状态时抛出含服务端信息的异常。'''
-    base = payload.get("base_resp") or {}
-    if base.get("status_code", 0) != 0:
-        raise Exception(f"MiniMax 错误 {base.get('status_code')}：{base.get('status_msg')}")
-
-
 def generate_music(prompt_file: str, output_file: str) -> str:
     '''通过 MiniMax ``/v1/music_generation`` 依据 JSON 规格生成 MP3。
 
@@ -73,6 +66,13 @@ def generate_music(prompt_file: str, output_file: str) -> str:
     with open(output_file, "wb") as f:
         f.write(bytes.fromhex(audio_hex))
     return f"已成功生成音乐：{output_file}"
+
+
+def _check_base_resp(payload: dict) -> None:
+    '''校验 MiniMax ``base_resp`` 是否表示成功，非零状态时抛出含服务端信息的异常。'''
+    base = payload.get("base_resp") or {}
+    if base.get("status_code", 0) != 0:
+        raise Exception(f"MiniMax 错误 {base.get('status_code')}：{base.get('status_msg')}")
 
 
 if __name__ == "__main__":

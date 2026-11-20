@@ -79,23 +79,6 @@ _ALL_PERMISSIONS: list[str] = [
 ]
 
 
-def _make_test_request_stub() -> Any:
-    '''为直接单元调用创建最小请求对象，包含认证辅助函数访问的字段。'''
-    return SimpleNamespace(state=SimpleNamespace(), cookies={}, _deerflow_test_bypass_auth=True)
-
-
-async def _authenticate(request: Request) -> AuthContext:
-    '''认证请求并返回认证上下文；匿名请求的 ``user`` 为 ``None``。'''
-    from server.gateway.deps import get_optional_user_from_request
-
-    user = await get_optional_user_from_request(request)
-    if user is None:
-        return AuthContext(user=None, permissions=[])
-
-    # 未来可将权限存储在用户记录中。
-    return AuthContext(user=user, permissions=_ALL_PERMISSIONS)
-
-
 def require_auth[**P, T](func: Callable[P, T]) -> Callable[P, T]:
     '''认证请求并强制要求已认证，与 ASGI 栈是否安装认证中间件无关。
 
@@ -129,6 +112,23 @@ def require_auth[**P, T](func: Callable[P, T]) -> Callable[P, T]:
         return await func(*args, **kwargs)
 
     return wrapper
+
+
+def _make_test_request_stub() -> Any:
+    '''为直接单元调用创建最小请求对象，包含认证辅助函数访问的字段。'''
+    return SimpleNamespace(state=SimpleNamespace(), cookies={}, _deerflow_test_bypass_auth=True)
+
+
+async def _authenticate(request: Request) -> AuthContext:
+    '''认证请求并返回认证上下文；匿名请求的 ``user`` 为 ``None``。'''
+    from server.gateway.deps import get_optional_user_from_request
+
+    user = await get_optional_user_from_request(request)
+    if user is None:
+        return AuthContext(user=None, permissions=[])
+
+    # 未来可将权限存储在用户记录中。
+    return AuthContext(user=user, permissions=_ALL_PERMISSIONS)
 
 
 def require_permission(

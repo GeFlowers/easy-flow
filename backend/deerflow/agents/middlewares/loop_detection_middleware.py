@@ -191,6 +191,29 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
             tool_freq_overrides={name: (o.warn, o.hard_limit) for name, o in config.tool_freq_overrides.items()},
         )
 
+    def consume_stop_reason(self, run_id: str | None) -> str | None:
+        '''取出并删除本轮硬停止原因，供执行器区分正常完成与循环上限截断。'''
+        with self._lock:
+            return self._stop_reason.pop(run_id, None)
+
+    @override
+    def before_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''运行开始时清理同线程其他运行残留的警告。'''
+        self._clear_other_run_pending_warnings(runtime)
+        return None
+
+    def _clear_other_run_pending_warnings(self, runtime: Runtime) -> None:
+        '''清理同一线程中其他运行遗留的警告，防止跨运行污染模型上下文。'''
+        thread_id, current_run_id = self._pending_key(runtime)
+        with self._lock:
+            for key in list(self._pending_warnings):
+                if key[0] == thread_id and key[1] != current_run_id:
+                    self._drop_pending_warning_key_locked(key)
+
+    def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
+        '''组合线程 ID 与运行 ID，作为待注入警告队列的隔离键。'''
+        return self._get_thread_id(runtime), self._get_run_id(runtime)
+
     def _get_thread_id(self, runtime: Runtime) -> str:
         '''读取运行上下文中的线程 ID；上下文缺少该值时使用默认分组。'''
         thread_id = runtime.context.get("thread_id") if runtime.context else None
@@ -206,58 +229,48 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         # 无显式运行 ID 时用 Runtime 对象区分并发的嵌入式调用。
         return str(id(runtime))
 
-    def consume_stop_reason(self, run_id: str | None) -> str | None:
-        '''取出并删除本轮硬停止原因，供执行器区分正常完成与循环上限截断。'''
-        with self._lock:
-            return self._stop_reason.pop(run_id, None)
-
-    def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
-        '''组合线程 ID 与运行 ID，作为待注入警告队列的隔离键。'''
-        return self._get_thread_id(runtime), self._get_run_id(runtime)
-
-    def _evict_if_needed(self) -> None:
-        '''超出线程跟踪上限时淘汰最久未访问的状态，并清理该线程的警告。'''
-        while len(self._history) > self.max_tracked_threads:
-            evicted_id, _ = self._history.popitem(last=False)
-            self._warned.pop(evicted_id, None)
-            self._tool_name_history.pop(evicted_id, None)
-            self._tool_freq_warned.pop(evicted_id, None)
-            for key in list(self._pending_warnings):
-                if key[0] == evicted_id:
-                    self._drop_pending_warning_key_locked(key)
-            logger.debug("Evicted loop tracking for thread %s (LRU)", evicted_id)
-
     def _drop_pending_warning_key_locked(self, key: tuple[str, str]) -> None:
         '''删除指定线程和运行对应的警告内容及其 LRU 访问记录。调用方须持锁。'''
         self._pending_warnings.pop(key, None)
         self._pending_warning_touch_order.pop(key, None)
 
-    def _touch_pending_warning_key_locked(self, key: tuple[str, str]) -> None:
-        '''将警告队列标记为最近使用，供容量回收按 LRU 顺序淘汰。调用方须持锁。'''
-        self._pending_warning_touch_order[key] = None
-        self._pending_warning_touch_order.move_to_end(key)
+    @override
+    async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''异步运行开始时执行与同步钩子相同的跨运行警告清理。'''
+        self._clear_other_run_pending_warnings(runtime)
+        return None
 
-    def _prune_pending_warning_state_locked(self, protected_key: tuple[str, str]) -> None:
-        '''限制并发运行产生的警告队列总量，同时保护当前正在写入的键。调用方须持锁。'''
-        overflow = len(self._pending_warning_touch_order) - self._max_pending_warning_keys
-        if overflow <= 0:
-            return
+    @override
+    def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''模型返回后检查工具调用是否重复，并决定暂存警告或强制结束。'''
+        return self._apply(state, runtime)
 
-        candidates = [key for key in self._pending_warning_touch_order if key != protected_key]
-        for key in candidates[:overflow]:
-            self._drop_pending_warning_key_locked(key)
+    def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''根据检测结果暂存警告，或移除工具调用并写入 loop_capped 停止原因。'''
+        warning, hard_stop = self._track_and_check(state, runtime)
 
-    def _queue_pending_warning(self, runtime: Runtime, warning: str) -> None:
-        '''为当前运行暂存去重后的警告，并限制单次和全局队列容量。'''
-        pending_key = self._pending_key(runtime)
-        with self._lock:
-            warnings = self._pending_warnings[pending_key]
-            if warning not in warnings:
-                warnings.append(warning)
-            if len(warnings) > _MAX_PENDING_WARNINGS_PER_RUN:
-                del warnings[: len(warnings) - _MAX_PENDING_WARNINGS_PER_RUN]
-            self._touch_pending_warning_key_locked(pending_key)
-            self._prune_pending_warning_state_locked(protected_key=pending_key)
+        if hard_stop:
+            # 记录停止原因供调用方读取；中间件实例会被并发运行共享，因此写入时持锁。
+            run_id = self._get_run_id(runtime)
+            with self._lock:
+                self._stop_reason[run_id] = "loop_capped"
+        # 同时写入运行上下文，便于工作进程无需持有中间件引用也能读取。
+            ctx = getattr(runtime, "context", None)
+            if isinstance(ctx, dict):
+                ctx["stop_reason"] = "loop_capped"
+            # 移除工具调用后，该消息不再要求配套 ToolMessage，可安全作为普通文本结束。
+            messages = state.get("messages", [])
+            last_msg = messages[-1]
+            content = self._append_text(last_msg.content, warning or _HARD_STOP_MSG)
+            stripped_msg = last_msg.model_copy(update=self._build_hard_stop_update(last_msg, content))
+            return {"messages": [stripped_msg]}
+
+        if warning:
+            # 等工具响应进入历史后再注入，避免篡改模型消息或破坏工具调用配对。
+            self._queue_pending_warning(runtime, warning)
+            return None
+
+        return None
 
     def _track_and_check(self, state: AgentState, runtime: Runtime) -> tuple[str | None, bool]:
         '''更新线程调用窗口，按调用集合重复次数和单工具频次返回警告或硬停止结果。'''
@@ -380,6 +393,18 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
 
         return None, False
 
+    def _evict_if_needed(self) -> None:
+        '''超出线程跟踪上限时淘汰最久未访问的状态，并清理该线程的警告。'''
+        while len(self._history) > self.max_tracked_threads:
+            evicted_id, _ = self._history.popitem(last=False)
+            self._warned.pop(evicted_id, None)
+            self._tool_name_history.pop(evicted_id, None)
+            self._tool_freq_warned.pop(evicted_id, None)
+            for key in list(self._pending_warnings):
+                if key[0] == evicted_id:
+                    self._drop_pending_warning_key_locked(key)
+            logger.debug("Evicted loop tracking for thread %s (LRU)", evicted_id)
+
     @staticmethod
     def _append_text(content: str | list | None, text: str) -> str | list:
         '''按消息内容类型追加文本，列表内容会新增文本块而不是与字符串拼接。'''
@@ -412,69 +437,32 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
 
         return update
 
-    def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '''根据检测结果暂存警告，或移除工具调用并写入 loop_capped 停止原因。'''
-        warning, hard_stop = self._track_and_check(state, runtime)
-
-        if hard_stop:
-            # 记录停止原因供调用方读取；中间件实例会被并发运行共享，因此写入时持锁。
-            run_id = self._get_run_id(runtime)
-            with self._lock:
-                self._stop_reason[run_id] = "loop_capped"
-        # 同时写入运行上下文，便于工作进程无需持有中间件引用也能读取。
-            ctx = getattr(runtime, "context", None)
-            if isinstance(ctx, dict):
-                ctx["stop_reason"] = "loop_capped"
-            # 移除工具调用后，该消息不再要求配套 ToolMessage，可安全作为普通文本结束。
-            messages = state.get("messages", [])
-            last_msg = messages[-1]
-            content = self._append_text(last_msg.content, warning or _HARD_STOP_MSG)
-            stripped_msg = last_msg.model_copy(update=self._build_hard_stop_update(last_msg, content))
-            return {"messages": [stripped_msg]}
-
-        if warning:
-            # 等工具响应进入历史后再注入，避免篡改模型消息或破坏工具调用配对。
-            self._queue_pending_warning(runtime, warning)
-            return None
-
-        return None
-
-    def _clear_other_run_pending_warnings(self, runtime: Runtime) -> None:
-        '''清理同一线程中其他运行遗留的警告，防止跨运行污染模型上下文。'''
-        thread_id, current_run_id = self._pending_key(runtime)
-        with self._lock:
-            for key in list(self._pending_warnings):
-                if key[0] == thread_id and key[1] != current_run_id:
-                    self._drop_pending_warning_key_locked(key)
-
-    def _clear_current_run_pending_warnings(self, runtime: Runtime) -> None:
-        '''删除当前线程和运行尚未注入的警告及其队列索引。'''
+    def _queue_pending_warning(self, runtime: Runtime, warning: str) -> None:
+        '''为当前运行暂存去重后的警告，并限制单次和全局队列容量。'''
         pending_key = self._pending_key(runtime)
         with self._lock:
-            self._drop_pending_warning_key_locked(pending_key)
+            warnings = self._pending_warnings[pending_key]
+            if warning not in warnings:
+                warnings.append(warning)
+            if len(warnings) > _MAX_PENDING_WARNINGS_PER_RUN:
+                del warnings[: len(warnings) - _MAX_PENDING_WARNINGS_PER_RUN]
+            self._touch_pending_warning_key_locked(pending_key)
+            self._prune_pending_warning_state_locked(protected_key=pending_key)
 
-    @staticmethod
-    def _format_warning_message(warnings: list[str]) -> str:
-        '''去除重复警告并合并为一段提示文本。'''
-        deduped = list(dict.fromkeys(warnings))
-        return "\n\n".join(deduped)
+    def _touch_pending_warning_key_locked(self, key: tuple[str, str]) -> None:
+        '''将警告队列标记为最近使用，供容量回收按 LRU 顺序淘汰。调用方须持锁。'''
+        self._pending_warning_touch_order[key] = None
+        self._pending_warning_touch_order.move_to_end(key)
 
-    @override
-    def before_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '''运行开始时清理同线程其他运行残留的警告。'''
-        self._clear_other_run_pending_warnings(runtime)
-        return None
+    def _prune_pending_warning_state_locked(self, protected_key: tuple[str, str]) -> None:
+        '''限制并发运行产生的警告队列总量，同时保护当前正在写入的键。调用方须持锁。'''
+        overflow = len(self._pending_warning_touch_order) - self._max_pending_warning_keys
+        if overflow <= 0:
+            return
 
-    @override
-    async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '''异步运行开始时执行与同步钩子相同的跨运行警告清理。'''
-        self._clear_other_run_pending_warnings(runtime)
-        return None
-
-    @override
-    def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '''模型返回后检查工具调用是否重复，并决定暂存警告或强制结束。'''
-        return self._apply(state, runtime)
+        candidates = [key for key in self._pending_warning_touch_order if key != protected_key]
+        for key in candidates[:overflow]:
+            self._drop_pending_warning_key_locked(key)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:
@@ -487,19 +475,26 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         self._clear_current_run_pending_warnings(runtime)
         return None
 
+    def _clear_current_run_pending_warnings(self, runtime: Runtime) -> None:
+        '''删除当前线程和运行尚未注入的警告及其队列索引。'''
+        pending_key = self._pending_key(runtime)
+        with self._lock:
+            self._drop_pending_warning_key_locked(pending_key)
+
     @override
     async def aafter_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
         '''异步运行结束时清除本轮遗留警告。'''
         self._clear_current_run_pending_warnings(runtime)
         return None
 
-    def _drain_pending_warnings(self, runtime: Runtime) -> list[str]:
-        '''取出并删除当前运行的所有待注入警告及其 LRU 记录。'''
-        pending_key = self._pending_key(runtime)
-        with self._lock:
-            warnings = self._pending_warnings.pop(pending_key, [])
-            self._pending_warning_touch_order.pop(pending_key, None)
-        return warnings
+    @override
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelCallResult:
+        '''同步模型调用前注入循环警告，并将增强后的请求传给后续处理器。'''
+        return handler(self._augment_request(request))
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
         '''将本轮警告追加到请求消息末尾，保留工具响应配对且不改写已有消息。'''
@@ -512,14 +507,19 @@ class LoopDetectionMiddleware(AgentMiddleware[AgentState]):
         ]
         return request.override(messages=new_messages)
 
-    @override
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelCallResult:
-        '''同步模型调用前注入循环警告，并将增强后的请求传给后续处理器。'''
-        return handler(self._augment_request(request))
+    def _drain_pending_warnings(self, runtime: Runtime) -> list[str]:
+        '''取出并删除当前运行的所有待注入警告及其 LRU 记录。'''
+        pending_key = self._pending_key(runtime)
+        with self._lock:
+            warnings = self._pending_warnings.pop(pending_key, [])
+            self._pending_warning_touch_order.pop(pending_key, None)
+        return warnings
+
+    @staticmethod
+    def _format_warning_message(warnings: list[str]) -> str:
+        '''去除重复警告并合并为一段提示文本。'''
+        deduped = list(dict.fromkeys(warnings))
+        return "\n\n".join(deduped)
 
     @override
     async def awrap_model_call(

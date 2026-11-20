@@ -44,6 +44,23 @@ class ChannelRuntimeConfigStore:
                 return {str(name): dict(value) for name, value in raw.items() if isinstance(value, dict)}
         return {}
 
+    def load_all(self) -> dict[str, dict[str, Any]]:
+        '''返回全部配置的浅拷贝，防止调用方绕过锁修改内部状态。'''
+        with self._lock:
+            return {name: dict(config) for name, config in self._data.items()}
+
+    def get_provider_config(self, provider: str) -> dict[str, Any] | None:
+        '''返回单个提供商配置的副本，不存在时返回 ``None``。'''
+        with self._lock:
+            config = self._data.get(provider)
+            return dict(config) if isinstance(config, dict) else None
+
+    def set_provider_config(self, provider: str, config: dict[str, Any]) -> None:
+        '''替换提供商配置并在同一临界区内持久化。'''
+        with self._lock:
+            self._data[provider] = dict(config)
+            self._save()
+
     def _save(self) -> None:
         '''通过同目录临时文件原子替换配置，并尽量收紧凭据文件权限。'''
         fd = tempfile.NamedTemporaryFile(
@@ -70,23 +87,6 @@ class ChannelRuntimeConfigStore:
             Path(fd.name).unlink(missing_ok=True)
             raise
 
-    def load_all(self) -> dict[str, dict[str, Any]]:
-        '''返回全部配置的浅拷贝，防止调用方绕过锁修改内部状态。'''
-        with self._lock:
-            return {name: dict(config) for name, config in self._data.items()}
-
-    def get_provider_config(self, provider: str) -> dict[str, Any] | None:
-        '''返回单个提供商配置的副本，不存在时返回 ``None``。'''
-        with self._lock:
-            config = self._data.get(provider)
-            return dict(config) if isinstance(config, dict) else None
-
-    def set_provider_config(self, provider: str, config: dict[str, Any]) -> None:
-        '''替换提供商配置并在同一临界区内持久化。'''
-        with self._lock:
-            self._data[provider] = dict(config)
-            self._save()
-
     def set_provider_disconnected(self, provider: str) -> None:
         '''记录用户主动断开状态，使静态配置也不会在重启后重新启用通道。'''
         with self._lock:
@@ -104,17 +104,6 @@ class ChannelRuntimeConfigStore:
             del self._data[provider]
             self._save()
             return True
-
-
-def _provider_enabled(channel_connections_config: Any, provider: str) -> bool:
-    '''判断全局连接配置是否允许对应提供商使用运行时覆盖。'''
-    provider_config = getattr(channel_connections_config, provider, None)
-    return bool(getattr(provider_config, "enabled", False))
-
-
-def _runtime_channel_disconnected(runtime_config: dict[str, Any]) -> bool:
-    '''识别用户显式断开而非普通的暂时禁用配置。'''
-    return runtime_config.get(RUNTIME_CHANNEL_DISABLED_FLAG) is True and runtime_config.get("enabled") is False
 
 
 def merge_runtime_channel_configs(
@@ -142,6 +131,17 @@ def merge_runtime_channel_configs(
         merged = dict(existing) if isinstance(existing, dict) else {}
         merged.update(runtime_config)
         channels_config[provider] = merged
+
+
+def _provider_enabled(channel_connections_config: Any, provider: str) -> bool:
+    '''判断全局连接配置是否允许对应提供商使用运行时覆盖。'''
+    provider_config = getattr(channel_connections_config, provider, None)
+    return bool(getattr(provider_config, "enabled", False))
+
+
+def _runtime_channel_disconnected(runtime_config: dict[str, Any]) -> bool:
+    '''识别用户显式断开而非普通的暂时禁用配置。'''
+    return runtime_config.get(RUNTIME_CHANNEL_DISABLED_FLAG) is True and runtime_config.get("enabled") is False
 
 
 def apply_runtime_connection_config(

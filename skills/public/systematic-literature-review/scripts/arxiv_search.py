@@ -76,6 +76,43 @@ except ImportError:
 
 
 
+def search(
+    query: str,
+    max_results: int = 20,
+    category: str | None = None,
+    sort_by: str = "relevance",
+    start_date: str | None = None,
+    end_date: str | None = None,
+) -> list[dict]:
+    '''检索预印本平台并返回论文词典列表。
+
+    主题可为自由文本；结果数会限制为 50，分类、排序字段与起止日期均为可选过滤条件。
+    每个结果词典遵循该技能 ``SKILL.md`` 中定义的论文元数据结构。
+    '''
+    import xml.etree.ElementTree as ET
+
+    if max_results <= 0:
+        return []
+    max_results = min(max_results, MAX_RESULTS_UPPER_BOUND)
+
+    search_query = _build_search_query(query, category, start_date, end_date)
+    params = {
+        "search_query": search_query,
+        "start": 0,
+        "max_results": max_results,
+        "sortBy": sort_by,
+        "sortOrder": "descending",
+    }
+
+    resp = requests.get(ARXIV_ENDPOINT, params=params, timeout=DEFAULT_TIMEOUT_SECONDS)
+    resp.raise_for_status()
+
+    # arXiv 返回 Atom XML，而不是 JSON。
+    root = ET.fromstring(resp.text)
+    entries = root.findall("atom:entry", NS_MAP)
+    return [_parse_entry(e) for e in entries]
+
+
 def _build_search_query(
     query: str,
     category: str | None,
@@ -101,21 +138,6 @@ def _build_search_query(
         hi = (end_date or "29991231").replace("-", "") + "2359"
         parts.append(f"submittedDate:[{lo} TO {hi}]")
     return " AND ".join(parts)
-
-
-def _normalise_arxiv_id(raw_id: str) -> str:
-    '''将完整 arXiv 链接转换为无版本号的裸标识，兼容新旧编号格式。'''
-    # 提取 /abs/ 后的全部内容，以保留旧版存档编号前缀。
-    if "/abs/" in raw_id:
-        tail = raw_id.split("/abs/", 1)[1]
-    else:
-        tail = raw_id.rsplit("/", 1)[-1]
-    # 移除版本后缀，例如将 "1706.03762v5" 转为 "1706.03762"。
-    if "v" in tail:
-        base, _, suffix = tail.rpartition("v")
-        if suffix.isdigit():
-            return base
-    return tail
 
 
 def _parse_entry(entry: Any) -> dict:
@@ -168,43 +190,40 @@ def _parse_entry(entry: Any) -> dict:
     }
 
 
-def search(
-    query: str,
-    max_results: int = 20,
-    category: str | None = None,
-    sort_by: str = "relevance",
-    start_date: str | None = None,
-    end_date: str | None = None,
-) -> list[dict]:
-    '''检索预印本平台并返回论文词典列表。
-
-    主题可为自由文本；结果数会限制为 50，分类、排序字段与起止日期均为可选过滤条件。
-    每个结果词典遵循该技能 ``SKILL.md`` 中定义的论文元数据结构。
-    '''
-    import xml.etree.ElementTree as ET
-
-    if max_results <= 0:
-        return []
-    max_results = min(max_results, MAX_RESULTS_UPPER_BOUND)
-
-    search_query = _build_search_query(query, category, start_date, end_date)
-    params = {
-        "search_query": search_query,
-        "start": 0,
-        "max_results": max_results,
-        "sortBy": sort_by,
-        "sortOrder": "descending",
-    }
-
-    resp = requests.get(ARXIV_ENDPOINT, params=params, timeout=DEFAULT_TIMEOUT_SECONDS)
-    resp.raise_for_status()
-
-    # arXiv 返回 Atom XML，而不是 JSON。
-    root = ET.fromstring(resp.text)
-    entries = root.findall("atom:entry", NS_MAP)
-    return [_parse_entry(e) for e in entries]
+def _normalise_arxiv_id(raw_id: str) -> str:
+    '''将完整 arXiv 链接转换为无版本号的裸标识，兼容新旧编号格式。'''
+    # 提取 /abs/ 后的全部内容，以保留旧版存档编号前缀。
+    if "/abs/" in raw_id:
+        tail = raw_id.split("/abs/", 1)[1]
+    else:
+        tail = raw_id.rsplit("/", 1)[-1]
+    # 移除版本后缀，例如将 "1706.03762v5" 转为 "1706.03762"。
+    if "v" in tail:
+        base, _, suffix = tail.rpartition("v")
+        if suffix.isdigit():
+            return base
+    return tail
 
 
+def main() -> int:
+    '''执行命令行文献检索，将结果以 UTF-8 JSON 写入标准输出。'''
+    args = _build_parser().parse_args()
+    try:
+        papers = search(
+            query=args.query,
+            max_results=args.max_results,
+            category=args.category,
+            sort_by=args.sort_by,
+            start_date=args.start_date,
+            end_date=args.end_date,
+        )
+    except Exception as exc:
+        print(f"arxiv_search.py: {exc}", file=sys.stderr)
+        return 1
+
+    json.dump(papers, sys.stdout, ensure_ascii=False, indent=2)
+    sys.stdout.write("\n")
+    return 0
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -248,27 +267,6 @@ def _build_parser() -> argparse.ArgumentParser:
         help="最晚提交日期，YYYY-MM-DD（含当日）",
     )
     return parser
-
-
-def main() -> int:
-    '''执行命令行文献检索，将结果以 UTF-8 JSON 写入标准输出。'''
-    args = _build_parser().parse_args()
-    try:
-        papers = search(
-            query=args.query,
-            max_results=args.max_results,
-            category=args.category,
-            sort_by=args.sort_by,
-            start_date=args.start_date,
-            end_date=args.end_date,
-        )
-    except Exception as exc:
-        print(f"arxiv_search.py: {exc}", file=sys.stderr)
-        return 1
-
-    json.dump(papers, sys.stdout, ensure_ascii=False, indent=2)
-    sys.stdout.write("\n")
-    return 0
 
 
 if __name__ == "__main__":

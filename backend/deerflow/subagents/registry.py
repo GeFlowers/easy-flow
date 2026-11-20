@@ -11,35 +11,6 @@ from deerflow.subagents.config import SubagentConfig
 logger = logging.getLogger(__name__)
 
 
-def _resolve_subagents_app_config(app_config: Any | None = None):
-    '''允许调用方注入完整配置或子代理配置；未传时读取进程级配置。'''
-    if app_config is None:
-        from deerflow.config.subagents_config import get_subagents_app_config
-
-        return get_subagents_app_config()
-    return getattr(app_config, "subagents", app_config)
-
-
-def _build_custom_subagent_config(name: str, *, app_config: Any | None = None) -> SubagentConfig | None:
-    '''把应用配置中的自定义子代理字段转换为执行器使用的数据类。'''
-    subagents_config = _resolve_subagents_app_config(app_config)
-    custom = subagents_config.custom_agents.get(name)
-    if custom is None:
-        return None
-
-    return SubagentConfig(
-        name=name,
-        description=custom.description,
-        system_prompt=custom.system_prompt,
-        tools=custom.tools,
-        disallowed_tools=custom.disallowed_tools,
-        skills=custom.skills,
-        model=custom.model,
-        max_turns=custom.max_turns,
-        timeout_seconds=custom.timeout_seconds,
-    )
-
-
 def get_subagent_config(name: str, *, app_config: Any | None = None) -> SubagentConfig | None:
     '''查找指定子代理，并仅将适用的全局默认值和逐代理覆盖合并到配置中。'''
     # 先查内置定义，未命中时再查配置文件中的自定义代理。
@@ -91,6 +62,35 @@ def get_subagent_config(name: str, *, app_config: Any | None = None) -> Subagent
         config = replace(config, **overrides)
 
     return config
+
+
+def _build_custom_subagent_config(name: str, *, app_config: Any | None = None) -> SubagentConfig | None:
+    '''把应用配置中的自定义子代理字段转换为执行器使用的数据类。'''
+    subagents_config = _resolve_subagents_app_config(app_config)
+    custom = subagents_config.custom_agents.get(name)
+    if custom is None:
+        return None
+
+    return SubagentConfig(
+        name=name,
+        description=custom.description,
+        system_prompt=custom.system_prompt,
+        tools=custom.tools,
+        disallowed_tools=custom.disallowed_tools,
+        skills=custom.skills,
+        model=custom.model,
+        max_turns=custom.max_turns,
+        timeout_seconds=custom.timeout_seconds,
+    )
+
+
+def _resolve_subagents_app_config(app_config: Any | None = None):
+    '''允许调用方注入完整配置或子代理配置；未传时读取进程级配置。'''
+    if app_config is None:
+        from deerflow.config.subagents_config import get_subagents_app_config
+
+        return get_subagents_app_config()
+    return getattr(app_config, "subagents", app_config)
 
 
 def list_subagents(*, app_config: Any | None = None) -> list[SubagentConfig]:

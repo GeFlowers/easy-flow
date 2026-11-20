@@ -1,4 +1,4 @@
-'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
+'''提供持久化层的模型、仓储与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -15,69 +15,12 @@ from deerflow.runtime.user_context import AUTO, _AutoSentinel, resolve_user_id
 from deerflow.utils.time import coerce_iso
 
 
-def _lease_expired_or_null(lease_col, cutoff: datetime):
-    '''处理运行记录的租约查询、更新或接管操作。'''
-    return or_(lease_col.is_(None), lease_col < cutoff)
-
-
 class RunRepository(RunStore):
     '''定义负责持久化读写及事务边界管理的仓储组件。'''
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         '''初始化当前持久化组件所需的依赖与内部状态。'''
         self._sf = session_factory
-
-    @staticmethod
-    def _normalize_model_name(model_name: str | None) -> str | None:
-        '''将空白模型名转换为 None，避免保存无效标识。'''
-        if model_name is None:
-            return None
-        if not isinstance(model_name, str):
-            model_name = str(model_name)
-        normalized = model_name.strip()
-        if len(normalized) > 128:
-            normalized = normalized[:128]
-        return normalized
-
-    @staticmethod
-    def _safe_json(obj: Any) -> Any:
-        '''处理持久化层使用的结构化数据校验、绑定或比较。'''
-        if obj is None:
-            return None
-        if isinstance(obj, (str, int, float, bool)):
-            return obj
-        if isinstance(obj, dict):
-            return {k: RunRepository._safe_json(v) for k, v in obj.items()}
-        if isinstance(obj, (list, tuple)):
-            return [RunRepository._safe_json(v) for v in obj]
-        if hasattr(obj, "model_dump"):
-            try:
-                return obj.model_dump()
-            except Exception:
-                pass
-        if hasattr(obj, "dict"):
-            try:
-                return obj.dict()
-            except Exception:
-                pass
-        try:
-            json.dumps(obj)
-            return obj
-        except (TypeError, ValueError):
-            return str(obj)
-
-    @staticmethod
-    def _row_to_dict(row: RunRow) -> dict[str, Any]:
-        '''将持久化记录转换为对外使用的字典表示。'''
-        d = row.to_dict()
-        d["metadata"] = d.pop("metadata_json", {})
-        d["kwargs"] = d.pop("kwargs_json", {})
-        # 转成 ISO 字符串以统一仓储接口，并兼容历史无时区记录。
-        for key in ("created_at", "updated_at", "lease_expires_at"):
-            val = d.get(key)
-            if isinstance(val, datetime):
-                d[key] = coerce_iso(val)
-        return d
 
     async def put(
         self,
@@ -128,6 +71,45 @@ class RunRepository(RunStore):
                     setattr(row, key, value)
             await session.commit()
 
+    @staticmethod
+    def _normalize_model_name(model_name: str | None) -> str | None:
+        '''将空白模型名转换为 None，避免保存无效标识。'''
+        if model_name is None:
+            return None
+        if not isinstance(model_name, str):
+            model_name = str(model_name)
+        normalized = model_name.strip()
+        if len(normalized) > 128:
+            normalized = normalized[:128]
+        return normalized
+
+    @staticmethod
+    def _safe_json(obj: Any) -> Any:
+        '''处理持久化层使用的结构化数据校验、绑定或比较。'''
+        if obj is None:
+            return None
+        if isinstance(obj, (str, int, float, bool)):
+            return obj
+        if isinstance(obj, dict):
+            return {k: RunRepository._safe_json(v) for k, v in obj.items()}
+        if isinstance(obj, (list, tuple)):
+            return [RunRepository._safe_json(v) for v in obj]
+        if hasattr(obj, "model_dump"):
+            try:
+                return obj.model_dump()
+            except Exception:
+                pass
+        if hasattr(obj, "dict"):
+            try:
+                return obj.dict()
+            except Exception:
+                pass
+        try:
+            json.dumps(obj)
+            return obj
+        except (TypeError, ValueError):
+            return str(obj)
+
     async def get(
         self,
         run_id,
@@ -143,6 +125,19 @@ class RunRepository(RunStore):
             if resolved_user_id is not None and row.user_id != resolved_user_id:
                 return None
             return self._row_to_dict(row)
+
+    @staticmethod
+    def _row_to_dict(row: RunRow) -> dict[str, Any]:
+        '''将持久化记录转换为对外使用的字典表示。'''
+        d = row.to_dict()
+        d["metadata"] = d.pop("metadata_json", {})
+        d["kwargs"] = d.pop("kwargs_json", {})
+        # 转成 ISO 字符串以统一仓储接口，并兼容历史无时区记录。
+        for key in ("created_at", "updated_at", "lease_expires_at"):
+            val = d.get(key)
+            if isinstance(val, datetime):
+                d[key] = coerce_iso(val)
+        return d
 
     async def list_by_thread(
         self,
@@ -409,7 +404,6 @@ class RunRepository(RunStore):
             },
         }
 
-
     async def update_lease(
         self,
         run_id: str,
@@ -550,3 +544,8 @@ class RunRepository(RunStore):
 
             new_row = await session.get(RunRow, run_id)
             return self._row_to_dict(new_row), claimed
+
+
+def _lease_expired_or_null(lease_col, cutoff: datetime):
+    '''处理运行记录的租约查询、更新或接管操作。'''
+    return or_(lease_col.is_(None), lease_col < cutoff)

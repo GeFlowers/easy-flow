@@ -13,29 +13,6 @@ logger = logging.getLogger(__name__)
 _ENV_VAR_NAME_RE = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> str:
-    '''把 YAML 解析错误整理为包含文件行号和常见未加引号冒号提示的诊断信息。'''
-
-    lines = [f"前置元数据格式无效，位置： {skill_file}: {exc}"]
-
-    mark = getattr(exc, "problem_mark", None)
-    source_lines = source.splitlines()
-    if mark is not None and 0 <= mark.line < len(source_lines):
-        offending = source_lines[mark.line]
-
-        file_line_number = mark.line + 2
-        lines.append(f"  line {file_line_number}: {offending}")
-
-        if getattr(exc, "problem", "") == "mapping values are not allowed here" and ":" in offending:
-            key, _, value = offending.partition(":")
-            value = value.strip()
-            if value and value[0] not in {'"', "'", "|", ">", "[", "{"}:
-                escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-                lines.append(f'  提示：包含 ":" 的值必须加引号，例如 {key}: "{escaped}"')
-
-    return "\n".join(lines)
-
-
 def parse_allowed_tools(raw: object, skill_file: Path) -> tuple[str, ...] | None:
     '''解析允许工具字段；缺省返回 None，格式错误或空工具名则拒绝该技能。'''
     if raw is None:
@@ -163,3 +140,26 @@ def parse_skill_file(skill_file: Path, category: SkillCategory, relative_path: P
     except Exception:
         logger.exception("Unexpected error parsing skill file %s", skill_file)
         return None
+
+
+def _format_yaml_error(skill_file: Path, exc: yaml.YAMLError, source: str) -> str:
+    '''把 YAML 解析错误整理为包含文件行号和常见未加引号冒号提示的诊断信息。'''
+
+    lines = [f"前置元数据格式无效，位置： {skill_file}: {exc}"]
+
+    mark = getattr(exc, "problem_mark", None)
+    source_lines = source.splitlines()
+    if mark is not None and 0 <= mark.line < len(source_lines):
+        offending = source_lines[mark.line]
+
+        file_line_number = mark.line + 2
+        lines.append(f"  line {file_line_number}: {offending}")
+
+        if getattr(exc, "problem", "") == "mapping values are not allowed here" and ":" in offending:
+            key, _, value = offending.partition(":")
+            value = value.strip()
+            if value and value[0] not in {'"', "'", "|", ">", "[", "{"}:
+                escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+                lines.append(f'  提示：包含 ":" 的值必须加引号，例如 {key}: "{escaped}"')
+
+    return "\n".join(lines)

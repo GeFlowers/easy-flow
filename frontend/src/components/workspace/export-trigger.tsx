@@ -65,7 +65,7 @@ export function ExportTrigger({ threadId }: { threadId: string }) {
             variant="ghost"
           >
             <Download />
-            <span className="hidden sm:inline">{t.common.export}</span>
+            <span className="inline">{t.common.export}</span>
           </Button>
         </DropdownMenuTrigger>
       </Tooltip>

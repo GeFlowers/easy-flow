@@ -60,6 +60,54 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
             detectors.append(detector)
         return cls(detectors=detectors)
 
+    @override
+    def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''在同步模型返回后应用工具调用抑制逻辑。'''
+        return self._apply(state, runtime)
+
+    def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
+        '''仅在最后一条模型消息包含工具调用且检测到安全终止时清理调用并发出审计事件。'''
+        messages = state.get("messages", [])
+        if not messages:
+            return None
+
+        last = messages[-1]
+        if not isinstance(last, AIMessage):
+            return None
+
+        tool_calls = last.tool_calls
+        if not tool_calls:
+            return None
+
+        termination = self._detect(last)
+        if termination is None:
+            return None
+
+        ctx = getattr(runtime, "context", None)
+        if isinstance(ctx, dict):
+            ctx["stop_reason"] = "safety_capped"
+        patched = self._build_suppressed_message(last, termination)
+
+        thread_id = None
+        if runtime is not None and getattr(runtime, "context", None):
+            thread_id = runtime.context.get("thread_id") if isinstance(runtime.context, dict) else None
+
+        logger.warning(
+            "Provider safety termination detected — suppressed %d tool call(s)",
+            len(tool_calls),
+            extra={
+                "thread_id": thread_id,
+                "detector": termination.detector,
+                "reason_field": termination.reason_field,
+                "reason_value": termination.reason_value,
+                "suppressed_tool_call_names": [tc.get("name") for tc in tool_calls],
+            },
+        )
+
+        self._emit_event(termination, [tc.get("name") or "unknown" for tc in tool_calls], runtime)
+        self._record_audit_event(termination, last, list(tool_calls), runtime)
+
+        return {"messages": [patched]}
 
     def _detect(self, message: AIMessage) -> SafetyTermination | None:
         '''依次调用检测器，跳过发生异常的实现，并返回首个识别到的终止信号。'''
@@ -72,18 +120,6 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
             if hit is not None:
                 return hit
         return None
-
-
-    @staticmethod
-    def _append_user_message(content: object, text: str) -> str | list:
-        '''按消息内容类型追加面向用户的说明，保留分块消息的原始结构。'''
-        if content is None or content == "":
-            return text
-        if isinstance(content, list):
-            return [*content, {"type": "text", "text": f"\n\n{text}"}]
-        if isinstance(content, str):
-            return content + f"\n\n{text}"
-        return str(content) + f"\n\n{text}"
 
     def _build_suppressed_message(
         self,
@@ -112,6 +148,16 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
         }
         return cleared.model_copy(update={"additional_kwargs": kwargs})
 
+    @staticmethod
+    def _append_user_message(content: object, text: str) -> str | list:
+        '''按消息内容类型追加面向用户的说明，保留分块消息的原始结构。'''
+        if content is None or content == "":
+            return text
+        if isinstance(content, list):
+            return [*content, {"type": "text", "text": f"\n\n{text}"}]
+        if isinstance(content, str):
+            return content + f"\n\n{text}"
+        return str(content) + f"\n\n{text}"
 
     def _emit_event(
         self,
@@ -187,57 +233,6 @@ class SafetyFinishReasonMiddleware(AgentMiddleware[AgentState]):
             )
         except Exception:  # noqa: BLE001
             logger.debug("Failed to record middleware:safety_termination event", exc_info=True)
-
-
-    def _apply(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '''仅在最后一条模型消息包含工具调用且检测到安全终止时清理调用并发出审计事件。'''
-        messages = state.get("messages", [])
-        if not messages:
-            return None
-
-        last = messages[-1]
-        if not isinstance(last, AIMessage):
-            return None
-
-        tool_calls = last.tool_calls
-        if not tool_calls:
-            return None
-
-        termination = self._detect(last)
-        if termination is None:
-            return None
-
-        ctx = getattr(runtime, "context", None)
-        if isinstance(ctx, dict):
-            ctx["stop_reason"] = "safety_capped"
-        patched = self._build_suppressed_message(last, termination)
-
-        thread_id = None
-        if runtime is not None and getattr(runtime, "context", None):
-            thread_id = runtime.context.get("thread_id") if isinstance(runtime.context, dict) else None
-
-        logger.warning(
-            "Provider safety termination detected — suppressed %d tool call(s)",
-            len(tool_calls),
-            extra={
-                "thread_id": thread_id,
-                "detector": termination.detector,
-                "reason_field": termination.reason_field,
-                "reason_value": termination.reason_value,
-                "suppressed_tool_call_names": [tc.get("name") for tc in tool_calls],
-            },
-        )
-
-        self._emit_event(termination, [tc.get("name") or "unknown" for tc in tool_calls], runtime)
-        self._record_audit_event(termination, last, list(tool_calls), runtime)
-
-        return {"messages": [patched]}
-
-
-    @override
-    def after_model(self, state: AgentState, runtime: Runtime) -> dict | None:
-        '''在同步模型返回后应用工具调用抑制逻辑。'''
-        return self._apply(state, runtime)
 
     @override
     async def aafter_model(self, state: AgentState, runtime: Runtime) -> dict | None:

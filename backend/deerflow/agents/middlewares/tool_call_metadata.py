@@ -7,15 +7,6 @@ from typing import Any
 from langchain_core.messages import AIMessage
 
 
-def _raw_tool_call_id(raw_tool_call: Any) -> str | None:
-    '''从原始工具调用结构中提取有效的字符串标识。'''
-    if not isinstance(raw_tool_call, dict):
-        return None
-
-    raw_id = raw_tool_call.get("id")
-    return raw_id if isinstance(raw_id, str) and raw_id else None
-
-
 def clone_ai_message_with_tool_calls(
     message: AIMessage,
     tool_calls: list[dict[str, Any]],
@@ -49,3 +40,12 @@ def clone_ai_message_with_tool_calls(
     update["response_metadata"] = response_metadata
 
     return message.model_copy(update=update)
+
+
+def _raw_tool_call_id(raw_tool_call: Any) -> str | None:
+    '''从原始工具调用结构中提取有效的字符串标识。'''
+    if not isinstance(raw_tool_call, dict):
+        return None
+
+    raw_id = raw_tool_call.get("id")
+    return raw_id if isinstance(raw_id, str) and raw_id else None

@@ -5,6 +5,7 @@ import {
   CableIcon,
   InfoIcon,
   BrainIcon,
+  FileTextIcon,
   PaletteIcon,
   SparklesIcon,
   UserIcon,
@@ -18,23 +19,23 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { AboutSettingsPage } from "@/components/workspace/settings/about-settings-page";
 import { AccountSettingsPage } from "@/components/workspace/settings/account-settings-page";
 import { AppearanceSettingsPage } from "@/components/workspace/settings/appearance-settings-page";
 import { ChannelsSettingsPage } from "@/components/workspace/settings/channels-settings-page";
+import { InstructionsSettingsPage } from "@/components/workspace/settings/instructions-settings-page";
 import { MemorySettingsPage } from "@/components/workspace/settings/memory-settings-page";
 import { NotificationSettingsPage } from "@/components/workspace/settings/notification-settings-page";
 import { SkillSettingsPage } from "@/components/workspace/settings/skill-settings-page";
 import { ToolSettingsPage } from "@/components/workspace/settings/tool-settings-page";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 type SettingsSection =
   | "account"
   | "appearance"
   | "channels"
   | "memory"
+  | "instructions"
   | "tools"
   | "skills"
   | "notification"
@@ -81,6 +82,11 @@ export function SettingsDialog(props: SettingsDialogProps) {
         icon: CableIcon,
       },
       {
+        id: "instructions",
+        label: t.settings.sections.instructions,
+        icon: FileTextIcon,
+      },
+      {
         id: "memory",
         label: t.settings.sections.memory,
         icon: BrainIcon,
@@ -93,6 +99,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       t.settings.sections.account,
       t.settings.sections.appearance,
       t.settings.sections.channels,
+      t.settings.sections.instructions,
       t.settings.sections.memory,
       t.settings.sections.tools,
       t.settings.sections.skills,
@@ -106,7 +113,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
       onOpenChange={(open) => props.onOpenChange?.(open)}
     >
       <DialogContent
-        className="flex h-[75vh] max-h-[calc(100vh-2rem)] flex-col sm:max-w-5xl md:max-w-6xl"
+        className="flex! h-[85dvh] max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)]! max-w-6xl! flex-col p-4! md:h-[75dvh] md:p-6!"
         aria-describedby={undefined}
       >
         <DialogHeader className="gap-1">
@@ -115,9 +122,9 @@ export function SettingsDialog(props: SettingsDialogProps) {
             {t.settings.description}
           </p>
         </DialogHeader>
-        <div className="grid min-h-0 flex-1 gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
-          <nav className="bg-sidebar min-h-0 overflow-y-auto rounded-lg border p-2">
-            <ul className="space-y-1 pr-1">
+        <div className="grid min-h-0 flex-1 grid-cols-[minmax(0,1fr)] grid-rows-[auto_minmax(0,1fr)] gap-3 md:grid-cols-[180px_minmax(0,1fr)] md:grid-rows-1 md:gap-4">
+          <nav className="bg-sidebar max-h-[32dvh] min-h-0 overflow-y-auto rounded-lg border p-2 md:max-h-none">
+            <ul className="grid grid-cols-4 gap-1 md:grid-cols-1">
               {sections.map(({ id, label, icon: Icon }) => {
                 const active = activeSection === id;
                 return (
@@ -125,26 +132,31 @@ export function SettingsDialog(props: SettingsDialogProps) {
                     <button
                       type="button"
                       onClick={() => setActiveSection(id as SettingsSection)}
-                      className={cn(
-                        "flex w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors",
+                      className={[
+                        "flex h-full w-full items-center justify-center rounded-md px-1 py-2 text-xs font-medium transition-colors md:justify-start md:gap-3 md:px-3 md:text-sm",
                         active
                           ? "bg-primary text-primary-foreground shadow-sm"
                           : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                      )}
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     >
-                      <Icon className="size-4" />
-                      <span>{label}</span>
+                      <Icon className="hidden size-4 shrink-0 md:block" />
+                      <span className="min-w-0 [overflow-wrap:anywhere]">
+                        {label}
+                      </span>
                     </button>
                   </li>
                 );
               })}
             </ul>
           </nav>
-          <ScrollArea className="h-full min-h-0 rounded-lg border">
-            <div className="space-y-8 p-6">
+          <div className="@container min-h-0 min-w-0 overflow-y-auto rounded-lg border">
+            <div className="min-w-0 space-y-8 p-3 @lg:p-6">
               {activeSection === "account" && <AccountSettingsPage />}
               {activeSection === "appearance" && <AppearanceSettingsPage />}
               {activeSection === "memory" && <MemorySettingsPage />}
+              {activeSection === "instructions" && <InstructionsSettingsPage />}
               {activeSection === "tools" && <ToolSettingsPage />}
               {activeSection === "skills" && (
                 <SkillSettingsPage
@@ -155,7 +167,7 @@ export function SettingsDialog(props: SettingsDialogProps) {
               {activeSection === "channels" && <ChannelsSettingsPage />}
               {activeSection === "about" && <AboutSettingsPage />}
             </div>
-          </ScrollArea>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

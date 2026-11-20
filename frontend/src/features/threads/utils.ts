@@ -1,6 +1,6 @@
 import type { Message } from "@langchain/langgraph-sdk";
 
-import type { AgentThread, AgentThreadContext } from "./types";
+import type { AgentThread } from "./types";
 
 /** 线程来源渠道的展示信息。 */
 export type ChannelThreadSource = {
@@ -13,32 +13,13 @@ type ThreadRouteTarget =
   | string
   | {
       thread_id: string;
-      context?: Pick<AgentThreadContext, "agent_name"> | null;
       metadata?: Record<string, unknown> | null;
     };
 
-/** 构建线程在当前语言与代理上下文中的页面路径。 */
-export function pathOfThread(
-  thread: ThreadRouteTarget,
-  context?: Pick<AgentThreadContext, "agent_name"> | null,
-) {
+/** 构建普通聊天的页面路径。 */
+export function pathOfThread(thread: ThreadRouteTarget) {
   const threadId = typeof thread === "string" ? thread : thread.thread_id;
-  let agentName: string | undefined;
-  if (typeof thread === "string") {
-    agentName = context?.agent_name;
-  } else {
-    agentName = thread.context?.agent_name;
-    if (!agentName) {
-      const metaAgent = thread.metadata?.agent_name;
-      if (typeof metaAgent === "string") {
-        agentName = metaAgent;
-      }
-    }
-  }
-
-  return agentName
-    ? `/workspace/agents/${encodeURIComponent(agentName)}/chats/${threadId}`
-    : `/workspace/chats/${threadId}`;
+  return `/workspace/chats/${threadId}`;
 }
 
 /** 提取消息内容中的紧凑纯文本。 */

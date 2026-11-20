@@ -1,4 +1,3 @@
-import { cn } from "@/lib/utils";
 import type { HTMLAttributes } from "react";
 
 type LoaderIconProps = {
@@ -87,10 +86,12 @@ export type LoaderProps = HTMLAttributes<HTMLDivElement> & {
 /** 将加载标志包装为持续旋转的内联状态指示器。 */
 export const Loader = ({ className, size = 16, ...props }: LoaderProps) => (
   <div
-    className={cn(
+    className={[
       "inline-flex animate-spin items-center justify-center",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   >
     <LoaderIcon size={size} />

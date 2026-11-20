@@ -4,13 +4,12 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo } from "react";
 
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 import { AuroraText } from "../ui/aurora-text";
 
 let waved = false;
 
-/** 保留欢迎说明中的换行，同时允许较长文本在窄屏中折行。 */
+/** 保留欢迎说明中的换行，并允许较长文本折行。 */
 function WelcomeDescription({ children }: { children: string }) {
   return (
     <p className="max-w-full text-wrap break-words whitespace-pre-line">
@@ -41,17 +40,23 @@ export function Welcome({
   }, []);
   return (
     <div
-      className={cn(
-        "mx-auto flex w-full max-w-full flex-col items-center justify-center gap-2 px-4 py-4 text-center sm:px-8",
+      className={[
+        "mx-auto flex w-full max-w-full flex-col items-center justify-center gap-2 px-8 py-4 text-center",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div className="max-w-full text-2xl font-bold">
         {searchParams.get("mode") === "skill" ? (
           `✨ ${t.welcome.createYourOwnSkill} ✨`
         ) : (
           <div className="flex max-w-full flex-wrap items-center justify-center gap-2">
-            <div className={cn("inline-block", !waved ? "animate-wave" : "")}>
+            <div
+              className={["inline-block", !waved ? "animate-wave" : ""]
+                .filter(Boolean)
+                .join(" ")}
+            >
               {isUltra ? "🚀" : "👋"}
             </div>
             <AuroraText colors={colors}>{t.welcome.greeting}</AuroraText>

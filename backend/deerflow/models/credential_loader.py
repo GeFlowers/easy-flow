@@ -44,103 +44,6 @@ class CodexCliCredential:
     source: str = ""
 
 
-def _resolve_credential_path(env_var: str, default_relative_path: str) -> Path:
-    '''优先采用环境变量指定的凭据文件，否则将默认相对路径拼接到用户目录。'''
-    configured_path = os.getenv(env_var)
-    if configured_path:
-        return Path(configured_path).expanduser()
-    return _home_dir() / default_relative_path
-
-
-def _home_dir() -> Path:
-    '''解析用户主目录，优先使用显式设置的 HOME 环境变量。'''
-    home = os.getenv("HOME")
-    if home:
-        return Path(home).expanduser()
-    return Path.home()
-
-
-def _load_json_file(path: Path, label: str) -> dict[str, Any] | None:
-    '''读取凭据 JSON 文件；路径缺失、指向目录或内容无法解析时记录日志并返回 None。'''
-    if not path.exists():
-        logger.debug(f"{label} not found: {path}")
-        return None
-    if path.is_dir():
-        logger.warning(f"{label} path is a directory, expected a file: {path}")
-        return None
-
-    try:
-        return json.loads(path.read_text())
-    except (json.JSONDecodeError, OSError) as e:
-        logger.warning(f"Failed to read {label}: {e}")
-        return None
-
-
-def _read_secret_from_file_descriptor(env_var: str) -> str | None:
-    '''从环境变量指定的文件描述符读取凭据，校验描述符并将空内容视为未提供。'''
-    fd_value = os.getenv(env_var)
-    if not fd_value:
-        return None
-
-    try:
-        fd = int(fd_value)
-    except ValueError:
-        logger.warning(f"{env_var} must be an integer file descriptor, got: {fd_value}")
-        return None
-
-    try:
-        secret = os.read(fd, 1024 * 1024).decode().strip()
-    except OSError as e:
-        logger.warning(f"Failed to read {env_var}: {e}")
-        return None
-
-    return secret or None
-
-
-def _credential_from_direct_token(access_token: str, source: str) -> ClaudeCodeCredential | None:
-    '''清理直接提供的令牌文本，并在非空时构造 Claude Code 凭据对象。'''
-    token = access_token.strip()
-    if not token:
-        return None
-    return ClaudeCodeCredential(access_token=token, source=source)
-
-
-def _iter_claude_code_credential_paths() -> list[Path]:
-    '''按优先顺序返回用户指定的凭据路径和 Claude Code 默认凭据路径，且不重复。'''
-    paths: list[Path] = []
-    override_path = os.getenv("CLAUDE_CODE_CREDENTIALS_PATH")
-    if override_path:
-        paths.append(Path(override_path).expanduser())
-
-    default_path = _home_dir() / ".claude/.credentials.json"
-    if not paths or paths[-1] != default_path:
-        paths.append(default_path)
-
-    return paths
-
-
-def _extract_claude_code_credential(data: dict[str, Any], source: str) -> ClaudeCodeCredential | None:
-    '''从凭据文件的 OAuth 对象提取访问与刷新令牌，并拒绝已过期的令牌。'''
-    oauth = data.get("claudeAiOauth", {})
-    access_token = oauth.get("accessToken", "")
-    if not access_token:
-        logger.debug("Claude Code credentials container exists but no accessToken found")
-        return None
-
-    cred = ClaudeCodeCredential(
-        access_token=access_token,
-        refresh_token=oauth.get("refreshToken", ""),
-        expires_at=oauth.get("expiresAt", 0),
-        source=source,
-    )
-
-    if cred.is_expired:
-        logger.warning("Claude Code OAuth token is expired. Run 'claude' to refresh.")
-        return None
-
-    return cred
-
-
 def load_claude_code_credential() -> ClaudeCodeCredential | None:
     '''按环境变量、文件描述符、指定文件和默认文件的顺序查找 Claude Code 凭据。'''
     direct_token = os.getenv("CLAUDE_CODE_OAUTH_TOKEN") or os.getenv("ANTHROPIC_AUTH_TOKEN")
@@ -172,6 +75,95 @@ def load_claude_code_credential() -> ClaudeCodeCredential | None:
     return None
 
 
+def _credential_from_direct_token(access_token: str, source: str) -> ClaudeCodeCredential | None:
+    '''清理直接提供的令牌文本，并在非空时构造 Claude Code 凭据对象。'''
+    token = access_token.strip()
+    if not token:
+        return None
+    return ClaudeCodeCredential(access_token=token, source=source)
+
+
+def _read_secret_from_file_descriptor(env_var: str) -> str | None:
+    '''从环境变量指定的文件描述符读取凭据，校验描述符并将空内容视为未提供。'''
+    fd_value = os.getenv(env_var)
+    if not fd_value:
+        return None
+
+    try:
+        fd = int(fd_value)
+    except ValueError:
+        logger.warning(f"{env_var} must be an integer file descriptor, got: {fd_value}")
+        return None
+
+    try:
+        secret = os.read(fd, 1024 * 1024).decode().strip()
+    except OSError as e:
+        logger.warning(f"Failed to read {env_var}: {e}")
+        return None
+
+    return secret or None
+
+
+def _iter_claude_code_credential_paths() -> list[Path]:
+    '''按优先顺序返回用户指定的凭据路径和 Claude Code 默认凭据路径，且不重复。'''
+    paths: list[Path] = []
+    override_path = os.getenv("CLAUDE_CODE_CREDENTIALS_PATH")
+    if override_path:
+        paths.append(Path(override_path).expanduser())
+
+    default_path = _home_dir() / ".claude/.credentials.json"
+    if not paths or paths[-1] != default_path:
+        paths.append(default_path)
+
+    return paths
+
+
+def _home_dir() -> Path:
+    '''解析用户主目录，优先使用显式设置的 HOME 环境变量。'''
+    home = os.getenv("HOME")
+    if home:
+        return Path(home).expanduser()
+    return Path.home()
+
+
+def _load_json_file(path: Path, label: str) -> dict[str, Any] | None:
+    '''读取凭据 JSON 文件；路径缺失、指向目录或内容无法解析时记录日志并返回 None。'''
+    if not path.exists():
+        logger.debug(f"{label} not found: {path}")
+        return None
+    if path.is_dir():
+        logger.warning(f"{label} path is a directory, expected a file: {path}")
+        return None
+
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        logger.warning(f"Failed to read {label}: {e}")
+        return None
+
+
+def _extract_claude_code_credential(data: dict[str, Any], source: str) -> ClaudeCodeCredential | None:
+    '''从凭据文件的 OAuth 对象提取访问与刷新令牌，并拒绝已过期的令牌。'''
+    oauth = data.get("claudeAiOauth", {})
+    access_token = oauth.get("accessToken", "")
+    if not access_token:
+        logger.debug("Claude Code credentials container exists but no accessToken found")
+        return None
+
+    cred = ClaudeCodeCredential(
+        access_token=access_token,
+        refresh_token=oauth.get("refreshToken", ""),
+        expires_at=oauth.get("expiresAt", 0),
+        source=source,
+    )
+
+    if cred.is_expired:
+        logger.warning("Claude Code OAuth token is expired. Run 'claude' to refresh.")
+        return None
+
+    return cred
+
+
 def load_codex_cli_credential() -> CodexCliCredential | None:
     '''从指定或默认的 Codex 凭据文件读取新旧两种令牌结构，并返回账户信息。'''
     cred_path = _resolve_credential_path("CODEX_AUTH_PATH", ".codex/auth.json")
@@ -194,3 +186,11 @@ def load_codex_cli_credential() -> CodexCliCredential | None:
         account_id=account_id,
         source="codex-cli",
     )
+
+
+def _resolve_credential_path(env_var: str, default_relative_path: str) -> Path:
+    '''优先采用环境变量指定的凭据文件，否则将默认相对路径拼接到用户目录。'''
+    configured_path = os.getenv(env_var)
+    if configured_path:
+        return Path(configured_path).expanduser()
+    return _home_dir() / default_relative_path

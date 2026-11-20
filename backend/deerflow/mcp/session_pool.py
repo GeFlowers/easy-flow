@@ -64,43 +64,6 @@ class MCPSessionPool:
         ] = {}
         self._lock = threading.Lock()
 
-
-    async def _run_session(
-        self,
-        connection: dict[str, Any],
-        ready: asyncio.Future[ClientSession],
-        close_evt: asyncio.Event,
-    ) -> None:
-        '''在整个生命周期内由当前任务独占一个 MCP 会话。
-
-        此方法进入并初始化会话上下文管理器，通过 ``ready`` 发布活动会话，随后等待
-        ``close_evt`` 被设置。上下文管理器始终由当前任务退出，以满足 anyio 对取消
-        作用域“同一任务退出”的要求。
-        '''
-        from langchain_mcp_adapters.sessions import create_session
-
-        cm = create_session(connection)
-        try:
-            session = await cm.__aenter__()
-        except BaseException as e:
-            if not ready.done():
-                ready.set_exception(e)
-            return
-
-        try:
-            await session.initialize()
-            if not ready.done():
-                ready.set_result(session)
-            await close_evt.wait()
-        except BaseException as e:
-            if not ready.done():
-                ready.set_exception(e)
-        finally:
-            try:
-                await cm.__aexit__(None, None, None)
-            except Exception:
-                logger.warning("Error closing MCP session", exc_info=True)
-
     async def get_session(
         self,
         server_name: str,
@@ -194,20 +157,41 @@ class MCPSessionPool:
         logger.info("Created persistent MCP session for %s/%s", server_name, scope_key)
         return session
 
+    async def _run_session(
+        self,
+        connection: dict[str, Any],
+        ready: asyncio.Future[ClientSession],
+        close_evt: asyncio.Event,
+    ) -> None:
+        '''在整个生命周期内由当前任务独占一个 MCP 会话。
 
-    @staticmethod
-    def _signal_close(loop: asyncio.AbstractEventLoop, close_evt: asyncio.Event) -> None:
-        '''请求所有者任务关闭，但不等待其完成。
-
-        ``asyncio.Event.set`` 不是线程安全操作，因此需调度到所有者事件循环。事件循环
-        已关闭则表示所有者任务已经结束。
+        此方法进入并初始化会话上下文管理器，通过 ``ready`` 发布活动会话，随后等待
+        ``close_evt`` 被设置。上下文管理器始终由当前任务退出，以满足 anyio 对取消
+        作用域“同一任务退出”的要求。
         '''
-        if loop.is_closed():
-            return
+        from langchain_mcp_adapters.sessions import create_session
+
+        cm = create_session(connection)
         try:
-            loop.call_soon_threadsafe(close_evt.set)
-        except RuntimeError:
-            pass
+            session = await cm.__aenter__()
+        except BaseException as e:
+            if not ready.done():
+                ready.set_exception(e)
+            return
+
+        try:
+            await session.initialize()
+            if not ready.done():
+                ready.set_result(session)
+            await close_evt.wait()
+        except BaseException as e:
+            if not ready.done():
+                ready.set_exception(e)
+        finally:
+            try:
+                await cm.__aexit__(None, None, None)
+            except Exception:
+                logger.warning("Error closing MCP session", exc_info=True)
 
     async def _shutdown(
         self,
@@ -256,6 +240,20 @@ class MCPSessionPool:
                     loop.call_soon_threadsafe(task.cancel)
                 except RuntimeError:
                     pass
+
+    @staticmethod
+    def _signal_close(loop: asyncio.AbstractEventLoop, close_evt: asyncio.Event) -> None:
+        '''请求所有者任务关闭，但不等待其完成。
+
+        ``asyncio.Event.set`` 不是线程安全操作，因此需调度到所有者事件循环。事件循环
+        已关闭则表示所有者任务已经结束。
+        '''
+        if loop.is_closed():
+            return
+        try:
+            loop.call_soon_threadsafe(close_evt.set)
+        except RuntimeError:
+            pass
 
     async def close_scope(self, scope_key: str) -> None:
         '''关闭指定作用域（例如 thread_id）的全部会话。'''

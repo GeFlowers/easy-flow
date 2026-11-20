@@ -1,4 +1,4 @@
-'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
+'''提供持久化层的模型、仓储与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -10,7 +10,6 @@ from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from deerflow.persistence.json_compat import json_match
-from deerflow.persistence.thread_meta.base import InvalidMetadataFilterError, ThreadMetaStore
 from deerflow.persistence.thread_meta.model import ThreadMetaRow
 from deerflow.runtime.user_context import AUTO, _AutoSentinel, resolve_user_id
 from deerflow.utils.time import coerce_iso
@@ -18,24 +17,16 @@ from deerflow.utils.time import coerce_iso
 logger = logging.getLogger(__name__)
 
 
-class ThreadMetaRepository(ThreadMetaStore):
+class InvalidMetadataFilterError(ValueError):
+    '''元数据筛选条件被拒绝时抛出。'''
+
+
+class ThreadMetaRepository:
     '''定义负责持久化读写及事务边界管理的仓储组件。'''
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         '''初始化当前持久化组件所需的依赖与内部状态。'''
         self._sf = session_factory
-
-    @staticmethod
-    def _row_to_dict(row: ThreadMetaRow) -> dict[str, Any]:
-        '''将持久化记录转换为对外使用的字典表示。'''
-        d = row.to_dict()
-        d["metadata"] = d.pop("metadata_json", None) or {}
-        for key in ("created_at", "updated_at"):
-            val = d.get(key)
-            if isinstance(val, datetime):
-                # 历史记录可能是无时区时间；统一转成带 UTC 偏移的 ISO 字符串。
-                d[key] = coerce_iso(val)
-        return d
 
     async def create(
         self,
@@ -63,6 +54,18 @@ class ThreadMetaRepository(ThreadMetaStore):
             await session.commit()
             await session.refresh(row)
             return self._row_to_dict(row)
+
+    @staticmethod
+    def _row_to_dict(row: ThreadMetaRow) -> dict[str, Any]:
+        '''将持久化记录转换为对外使用的字典表示。'''
+        d = row.to_dict()
+        d["metadata"] = d.pop("metadata_json", None) or {}
+        for key in ("created_at", "updated_at"):
+            val = d.get(key)
+            if isinstance(val, datetime):
+                # 历史记录可能是无时区时间；统一转成带 UTC 偏移的 ISO 字符串。
+                d[key] = coerce_iso(val)
+        return d
 
     async def get(
         self,
@@ -124,13 +127,6 @@ class ThreadMetaRepository(ThreadMetaStore):
             result = await session.execute(stmt)
             return [self._row_to_dict(r) for r in result.scalars()]
 
-    async def _check_ownership(self, session: AsyncSession, thread_id: str, resolved_user_id: str | None) -> bool:
-        '''在当前会话中验证线程归属；None 表示显式跳过所有者过滤。'''
-        if resolved_user_id is None:
-            return True
-        row = await session.get(ThreadMetaRow, thread_id)
-        return row is not None and row.user_id == resolved_user_id
-
     async def update_display_name(
         self,
         thread_id: str,
@@ -145,6 +141,13 @@ class ThreadMetaRepository(ThreadMetaStore):
                 return
             await session.execute(update(ThreadMetaRow).where(ThreadMetaRow.thread_id == thread_id).values(display_name=display_name, updated_at=datetime.now(UTC)))
             await session.commit()
+
+    async def _check_ownership(self, session: AsyncSession, thread_id: str, resolved_user_id: str | None) -> bool:
+        '''在当前会话中验证线程归属；None 表示显式跳过所有者过滤。'''
+        if resolved_user_id is None:
+            return True
+        row = await session.get(ThreadMetaRow, thread_id)
+        return row is not None and row.user_id == resolved_user_id
 
     async def update_status(
         self,

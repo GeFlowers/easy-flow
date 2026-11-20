@@ -54,12 +54,6 @@ export const enUS: Translations = {
     showArtifacts: "Show artifacts of this conversation",
   },
 
-  // 首页
-  home: {
-    docs: "Docs",
-    blog: "Blog",
-  },
-
   // 欢迎
   welcome: {
     greeting: "Hello, again!",
@@ -246,9 +240,7 @@ export const enUS: Translations = {
     chats: "Chats",
     channels: "Channels",
     recentChats: "Recent chats",
-    agents: "Agents",
     scheduledTasks: "Scheduled tasks",
-    agentsDisabledTooltip: "Feature not enabled",
   },
 
   // 定时任务
@@ -383,59 +375,6 @@ export const enUS: Translations = {
         desc: "Compile a weekly summary, every Monday",
       },
     },
-  },
-
-  // 智能体
-  agents: {
-    title: "Agents",
-    description:
-      "Create and manage custom agents with specialized prompts and capabilities.",
-    newAgent: "New Agent",
-    emptyTitle: "No custom agents yet",
-    emptyDescription:
-      "Create your first custom agent with a specialized system prompt.",
-    featureDisabledTitle: "Agents feature is not enabled",
-    featureDisabledDescription:
-      "This feature is not enabled on this server. Please contact your administrator.",
-    chat: "Chat",
-    delete: "Delete",
-    deleteConfirm:
-      "Are you sure you want to delete this agent? This action cannot be undone.",
-    deleteSuccess: "Agent deleted",
-    newChat: "New chat",
-    createPageTitle: "Design your Agent",
-    createPageSubtitle:
-      "Describe the agent you want — I'll help you create it through conversation.",
-    nameStepTitle: "Name your new Agent",
-    nameStepHint:
-      "Letters, digits, and hyphens only — stored lowercase (e.g. code-reviewer)",
-    nameStepPlaceholder: "e.g. code-reviewer",
-    nameStepContinue: "Continue",
-    nameStepInvalidError:
-      "Invalid name — use only letters, digits, and hyphens",
-    nameStepAlreadyExistsError: "An agent with this name already exists",
-    nameStepNetworkError:
-      "Network request failed — check your network or backend connection",
-    nameStepCheckError: "Could not verify name availability — please try again",
-    nameStepCheckErrorWithDetail: "Name check failed: {detail}",
-    nameStepApiDisabledError:
-      "Custom agent management is not enabled on this server. Please contact your administrator.",
-    nameStepBootstrapMessage:
-      "新自定义智能体的名称是 {name}。请先帮我设计它的用途、行为方式和 SOUL.md，再保存它。",
-    save: "Save agent",
-    saving: "Saving agent...",
-    saveRequested:
-      "Save requested. DeerFlow is generating and saving an initial version now.",
-    saveHint:
-      "You can save this agent at any time from the top-right menu, even if this is only a first draft.",
-    saveCommandMessage:
-      "请根据目前的全部讨论保存这个自定义智能体。这是我明确的保存确认。如果仍有少量细节缺失，请根据上下文合理补全，生成一份简洁的中文初始 SOUL.md，并立即调用 setup_agent，无须再次向我确认。",
-    agentCreatedPendingRefresh:
-      "The agent was created, but DeerFlow could not load it yet. Please refresh this page in a moment.",
-    more: "More actions",
-    agentCreated: "Agent created!",
-    startChatting: "Start chatting",
-    backToGallery: "Back to Gallery",
   },
 
   // 面包屑导航
@@ -630,18 +569,6 @@ export const enUS: Translations = {
     removeTodo: (content: string) => `Remove To-do: ${content}`,
   },
 
-  // 快捷键
-  shortcuts: {
-    searchActions: "Search actions...",
-    noResults: "No results found.",
-    actions: "Actions",
-    keyboardShortcuts: "Keyboard Shortcuts",
-    keyboardShortcutsDescription:
-      "Navigate DeerFlow faster with keyboard shortcuts.",
-    openCommandPalette: "Open Command Palette",
-    toggleSidebar: "Toggle Sidebar",
-  },
-
   // 设置
   settings: {
     title: "Settings",
@@ -651,10 +578,24 @@ export const enUS: Translations = {
       appearance: "Appearance",
       channels: "Channels",
       memory: "Memory",
+      instructions: "Instructions",
       tools: "Tools",
       skills: "Skills",
       notification: "Notification",
       about: "About",
+    },
+    instructions: {
+      title: "Global instructions",
+      description: "Set instructions shared by all agents. Changes apply to subsequent runs.",
+      label: "Global instructions",
+      placeholder: "For example: Always respond in Chinese.",
+      saved: "Global instructions saved",
+      saving: "Saving...",
+      loadError: "Could not load global instructions",
+      saveError: "Could not save global instructions",
+      conflict: "The instructions changed elsewhere. Copy your edits before reloading.",
+      reload: "Reload",
+      adminOnly: "Only administrators can manage global instructions.",
     },
     memory: {
       title: "Memory",
@@ -785,12 +726,8 @@ export const enUS: Translations = {
       profileTitle: "Profile",
       email: "Email",
       role: "Role",
-      ssoProvider: "SSO",
       changePasswordTitle: "Change Password",
       changePasswordDescription: "Update your account password.",
-      ssoPasswordDescription: "Password is managed by your SSO provider.",
-      ssoPasswordMessage:
-        "This account signs in with {provider}, so DeerFlow cannot manage or change its password here. Use your SSO provider's account settings instead.",
       currentPassword: "Current password",
       newPassword: "New password",
       confirmNewPassword: "Confirm new password",
@@ -821,21 +758,8 @@ export const enUS: Translations = {
     adminSetupRequiredTitle: "Administrator setup is required",
     adminSetupRequiredDescription:
       "DeerFlow needs an administrator account before new regular accounts can be created.",
-    orContinueWith: "Or continue with",
-    ssoHint:
-      "If your account uses single sign-on, sign in with the option below instead.",
-    continueWith: (provider: string) => `Continue with ${provider}`,
     noAccountSignUp: "Don't have an account? Sign up",
     haveAccountSignIn: "Already have an account? Sign in",
     networkError: "Network error. Please try again.",
-    authFailed: "Authentication failed.",
-    errors: {
-      sso_failed: "SSO login failed. Please try again or use email login.",
-      sso_cancelled: "SSO login was cancelled.",
-      sso_account_exists:
-        "An account with this email already exists. Please sign in with your password or contact your administrator.",
-      sso_not_allowed:
-        "SSO login is not allowed for your account. Contact your administrator.",
-    },
   },
 };

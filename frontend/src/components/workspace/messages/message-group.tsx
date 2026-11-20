@@ -35,7 +35,6 @@ import {
 } from "@/features/messages/utils";
 import { useRehypeSplitWordsIntoSpans } from "@/features/rehype";
 import { extractTitleFromMarkdown } from "@/features/utils/markdown";
-import { cn } from "@/lib/utils";
 
 import { useArtifacts } from "../artifacts";
 import { FlipDisplay } from "../flip-display";
@@ -278,7 +277,9 @@ export function MessageGroup({
 
   return (
     <ChainOfThought
-      className={cn("w-full gap-2 rounded-lg border p-0.5", className)}
+      className={["w-full gap-2 rounded-lg border p-0.5", className]
+        .filter(Boolean)
+        .join(" ")}
       open={true}
     >
       {collapsibleAboveLastToolCallSteps.length > 0 && (
@@ -300,10 +301,12 @@ export function MessageGroup({
             }
             icon={
               <ChevronUp
-                className={cn(
+                className={[
                   "size-4 opacity-60 transition-transform duration-200",
                   showAbove ? "rotate-180" : "",
-                )}
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               />
             }
           ></ChainOfThoughtStep>
@@ -363,10 +366,12 @@ export function MessageGroup({
               ></ChainOfThoughtStep>
               <div>
                 <ChevronUp
-                  className={cn(
+                  className={[
                     "text-muted-foreground size-4",
                     showLastThinking ? "" : "rotate-180",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 />
               </div>
             </div>

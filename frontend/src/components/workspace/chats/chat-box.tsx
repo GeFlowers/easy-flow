@@ -4,15 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import { ConversationEmptyState } from "@/components/ai-elements/conversation";
 import { Button } from "@/components/ui/button";
-import {
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
-import { useIsMobile } from "@/hooks/use-mobile";
-import { cn } from "@/lib/utils";
 
 import {
   ArtifactFileDetail,
@@ -26,13 +17,12 @@ const RIGHT_PANEL_ANIMATION_MS = 280;
 
 type RightPanelKind = "sidecar" | "artifacts";
 
-/** 组织聊天页右侧的侧边对话和产物面板，并协调移动端呈现方式。 */
+/** 组织聊天页右侧的侧边对话和产物面板。 */
 const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
   children,
   threadId,
 }) => {
   const { thread } = useThread();
-  const isMobile = useIsMobile();
   const pathname = usePathname();
   const threadIdRef = useRef(threadId);
 
@@ -161,52 +151,17 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
     setArtifactsOpen,
   ]);
 
-  if (isMobile) {
-    return (
-      <>
-        <div className="relative size-full min-w-0">{children}</div>
-        <Sheet
-          open={rightPanelOpen}
-          onOpenChange={(open) => {
-            if (open) {
-              return;
-            }
-            if (sidecarOpen) {
-              sidecar?.close();
-            }
-            if (artifactsOpen) {
-              setArtifactsOpen(false);
-            }
-          }}
-        >
-          <SheetContent
-            className="w-[calc(100vw-1rem)] max-w-none gap-0 p-0 sm:max-w-md [&>button]:hidden"
-            side="right"
-          >
-            <SheetHeader className="sr-only">
-              <SheetTitle>
-                {renderedRightPanel === "sidecar" ? "Sidecar" : "Artifacts"}
-              </SheetTitle>
-              <SheetDescription>
-                Browse the side panel for this conversation.
-              </SheetDescription>
-            </SheetHeader>
-            <div className="min-h-0 flex-1 p-3 pt-10">{rightPanelContent}</div>
-          </SheetContent>
-        </Sheet>
-      </>
-    );
-  }
-
   return (
     <div
       id={`${resizableIdBase}-panels`}
-      className={cn(
+      className={[
         "[container-type:inline-size] grid size-full min-h-0 transition-[grid-template-columns] duration-[280ms] ease-out motion-reduce:transition-none",
         rightPanelOpen
           ? "grid-cols-[minmax(0,1fr)_1px_minmax(0,40%)]"
           : "grid-cols-[minmax(0,1fr)_0px_0px]",
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div className="relative min-h-0 min-w-0" id="chat">
         {children}
@@ -214,25 +169,31 @@ const ChatBox: React.FC<{ children: React.ReactNode; threadId: string }> = ({
       <div
         id={`${resizableIdBase}-separator`}
         aria-hidden="true"
-        className={cn(
+        className={[
           "bg-border opacity-33 transition-opacity duration-200 ease-out motion-reduce:transition-none",
           !rightPanelOpen && "pointer-events-none opacity-0",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
       />
       <aside
         aria-hidden={!rightPanelOpen}
-        className={cn(
+        className={[
           "min-h-0 min-w-0 overflow-hidden transition-opacity duration-[280ms] ease-out motion-reduce:transition-none",
           !rightPanelOpen && "pointer-events-none opacity-0",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         id="artifacts"
       >
         <div
-          className={cn(
+          className={[
             "ml-auto h-full w-[40cqw] transition-opacity duration-[280ms] ease-out motion-reduce:transition-none",
             renderedRightPanel === "sidecar" ? "p-0" : "p-4",
             rightPanelOpen ? "opacity-100" : "opacity-0",
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           {rightPanelContent}
         </div>

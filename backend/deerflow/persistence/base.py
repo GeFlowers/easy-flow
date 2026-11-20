@@ -1,4 +1,4 @@
-'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
+'''提供持久化层的模型、仓储与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -6,12 +6,6 @@ from functools import cache
 
 from sqlalchemy import inspect as sa_inspect
 from sqlalchemy.orm import DeclarativeBase
-
-
-@cache
-def _column_keys(cls: type) -> tuple[str, ...]:
-    '''缓存并返回 ORM 模型映射的列属性名称。'''
-    return tuple(c.key for c in sa_inspect(cls).mapper.column_attrs)
 
 
 class Base(DeclarativeBase):
@@ -28,3 +22,9 @@ class Base(DeclarativeBase):
         '''返回便于调试的对象文本表示。'''
         cols = ", ".join(f"{k}={getattr(self, k)!r}" for k in _column_keys(type(self)))
         return f"{type(self).__name__}({cols})"
+
+
+@cache
+def _column_keys(cls: type) -> tuple[str, ...]:
+    '''缓存并返回 ORM 模型映射的列属性名称。'''
+    return tuple(c.key for c in sa_inspect(cls).mapper.column_attrs)

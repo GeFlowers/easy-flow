@@ -4,8 +4,6 @@ import * as React from "react";
 import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { XIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
 /** 管理模态对话框的打开状态及其无障碍焦点行为。 */
 function Dialog({
   ...props
@@ -42,10 +40,12 @@ function DialogOverlay({
   return (
     <DialogPrimitive.Overlay
       data-slot="dialog-overlay"
-      className={cn(
+      className={[
         "data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 fixed inset-0 z-50 bg-black/50",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   );
@@ -65,10 +65,12 @@ function DialogContent({
       <DialogOverlay />
       <DialogPrimitive.Content
         data-slot="dialog-content"
-        className={cn(
-          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-[calc(100%-2rem)] translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none sm:max-w-lg",
+        className={[
+          "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 fixed top-[50%] left-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 rounded-lg border p-6 shadow-lg duration-200 outline-none",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         {...props}
       >
         {children}
@@ -91,21 +93,22 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-header"
-      className={cn("flex flex-col gap-2 text-center sm:text-left", className)}
+      className={["flex flex-col gap-2 text-left", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   );
 }
 
-/** 将确认与取消操作排列在对话框底部，窄屏下反转按钮顺序。 */
+/** 将确认与取消操作横向排列在对话框底部。 */
 function DialogFooter({ className, ...props }: React.ComponentProps<"div">) {
   return (
     <div
       data-slot="dialog-footer"
-      className={cn(
-        "flex flex-col-reverse gap-2 sm:flex-row sm:justify-end",
-        className,
-      )}
+      className={["flex flex-row justify-end gap-2", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   );
@@ -119,7 +122,9 @@ function DialogTitle({
   return (
     <DialogPrimitive.Title
       data-slot="dialog-title"
-      className={cn("text-lg leading-none font-semibold", className)}
+      className={["text-lg leading-none font-semibold", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   );
@@ -133,7 +138,9 @@ function DialogDescription({
   return (
     <DialogPrimitive.Description
       data-slot="dialog-description"
-      className={cn("text-muted-foreground text-sm", className)}
+      className={["text-muted-foreground text-sm", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   );

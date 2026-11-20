@@ -36,8 +36,7 @@ import {
 } from "@/components/ui/select";
 import type { PromptInputFilePart } from "@/features/uploads";
 import { splitUnsupportedUploadFiles } from "@/features/uploads";
-import { isIMEComposing } from "@/lib/ime";
-import { cn } from "@/lib/utils";
+
 import type { ChatStatus } from "ai";
 import {
   ArrowUpIcon,
@@ -319,10 +318,12 @@ export function PromptInputAttachment({
     <PromptInputHoverCard>
       <HoverCardTrigger asChild>
         <div
-          className={cn(
+          className={[
             "group border-border hover:bg-accent hover:text-accent-foreground dark:hover:bg-accent/50 relative flex h-8 cursor-pointer items-center gap-1.5 rounded-md border px-1.5 text-sm font-medium transition-all select-none",
             className,
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
           key={data.id}
           {...props}
         >
@@ -412,7 +413,9 @@ export function PromptInputAttachments({
 
   return (
     <div
-      className={cn("flex w-full flex-wrap items-center gap-2 p-3", className)}
+      className={["flex w-full flex-wrap items-center gap-2 p-3", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       {attachments.files.map((file) => (
@@ -733,7 +736,7 @@ export const PromptInput = ({
         }
       }
     },
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 仅在卸载时清理；filesRef 始终指向最新值。
+    // 仅在卸载时清理；filesRef 始终指向最新值。
     [usingProvider],
   );
 
@@ -873,7 +876,7 @@ export const PromptInput = ({
         type="file"
       />
       <form
-        className={cn("w-full", className)}
+        className={["w-full", className].filter(Boolean).join(" ")}
         onSubmit={handleSubmit}
         ref={formRef}
         {...props}
@@ -899,7 +902,10 @@ export const PromptInputBody = ({
   className,
   ...props
 }: PromptInputBodyProps) => (
-  <div className={cn("contents", className)} {...props} />
+  <div
+    className={["contents", className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type PromptInputTextareaProps = ComponentProps<
@@ -917,18 +923,14 @@ export const PromptInputTextarea = ({
   const controller = useOptionalPromptInputController();
   const attachments = usePromptInputAttachments();
   const sanitizeIncomingFiles = usePromptInputValidation();
-  const [isComposing, setIsComposing] = useState(false);
 
-  /** 按提交设置处理快捷键，并避免干扰输入法组合输入。 */
+  /** 按提交设置处理快捷键。 */
   const handleKeyDown: KeyboardEventHandler<HTMLTextAreaElement> = (e) => {
     onKeyDown?.(e);
     if (e.defaultPrevented) {
       return;
     }
     if (e.key === "Enter") {
-      if (isIMEComposing(e, isComposing)) {
-        return;
-      }
       if (e.shiftKey) {
         return;
       }
@@ -991,10 +993,10 @@ export const PromptInputTextarea = ({
 
   return (
     <InputGroupTextarea
-      className={cn("field-sizing-content max-h-48 min-h-16", className)}
+      className={["field-sizing-content max-h-48 min-h-16", className]
+        .filter(Boolean)
+        .join(" ")}
       name="message"
-      onCompositionEnd={() => setIsComposing(false)}
-      onCompositionStart={() => setIsComposing(true)}
       onKeyDown={handleKeyDown}
       onPaste={handlePaste}
       placeholder={placeholder}
@@ -1016,7 +1018,9 @@ export const PromptInputHeader = ({
 }: PromptInputHeaderProps) => (
   <InputGroupAddon
     align="block-end"
-    className={cn("order-first flex-wrap gap-1", className)}
+    className={["order-first flex-wrap gap-1", className]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -1033,7 +1037,7 @@ export const PromptInputFooter = ({
 }: PromptInputFooterProps) => (
   <InputGroupAddon
     align="block-end"
-    className={cn("justify-between gap-1", className)}
+    className={["justify-between gap-1", className].filter(Boolean).join(" ")}
     {...props}
   />
 );
@@ -1045,7 +1049,10 @@ export const PromptInputTools = ({
   className,
   ...props
 }: PromptInputToolsProps) => (
-  <div className={cn("flex items-center gap-1", className)} {...props} />
+  <div
+    className={["flex items-center gap-1", className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type PromptInputButtonProps = ComponentProps<typeof InputGroupButton>;
@@ -1059,7 +1066,7 @@ export const PromptInputButton = ({
 }: PromptInputButtonProps) => {
   return (
     <InputGroupButton
-      className={cn(className)}
+      className={[className].filter(Boolean).join(" ")}
       size="sm"
       type="button"
       variant={variant}
@@ -1097,7 +1104,11 @@ export const PromptInputActionMenuContent = ({
   className,
   ...props
 }: PromptInputActionMenuContentProps) => (
-  <DropdownMenuContent align="start" className={cn(className)} {...props} />
+  <DropdownMenuContent
+    align="start"
+    className={[className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type PromptInputActionMenuItemProps = ComponentProps<
@@ -1108,7 +1119,10 @@ export const PromptInputActionMenuItem = ({
   className,
   ...props
 }: PromptInputActionMenuItemProps) => (
-  <DropdownMenuItem className={cn(className)} {...props} />
+  <DropdownMenuItem
+    className={[className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 // 注意：打开文件对话框等具有副作用的操作由按需启用的模块提供（如 prompt-input-attachments）。
@@ -1139,7 +1153,7 @@ export const PromptInputSubmit = ({
   return (
     <InputGroupButton
       aria-label="Submit"
-      className={cn(className)}
+      className={[className].filter(Boolean).join(" ")}
       size={size}
       type="submit"
       variant={variant}
@@ -1304,11 +1318,13 @@ export const PromptInputSpeechButton = ({
 
   return (
     <PromptInputButton
-      className={cn(
+      className={[
         "relative transition-all duration-200",
         isListening && "bg-accent text-accent-foreground animate-pulse",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       disabled={!recognition}
       onClick={toggleListening}
       {...props}
@@ -1335,11 +1351,13 @@ export const PromptInputSelectTrigger = ({
   ...props
 }: PromptInputSelectTriggerProps) => (
   <SelectTrigger
-    className={cn(
+    className={[
       "text-muted-foreground border-none bg-transparent font-medium shadow-none transition-colors",
       "hover:bg-accent hover:text-foreground aria-expanded:bg-accent aria-expanded:text-foreground",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -1353,7 +1371,7 @@ export const PromptInputSelectContent = ({
   className,
   ...props
 }: PromptInputSelectContentProps) => (
-  <SelectContent className={cn(className)} {...props} />
+  <SelectContent className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputSelectItemProps = ComponentProps<typeof SelectItem>;
@@ -1363,7 +1381,7 @@ export const PromptInputSelectItem = ({
   className,
   ...props
 }: PromptInputSelectItemProps) => (
-  <SelectItem className={cn(className)} {...props} />
+  <SelectItem className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputSelectValueProps = ComponentProps<typeof SelectValue>;
@@ -1373,7 +1391,7 @@ export const PromptInputSelectValue = ({
   className,
   ...props
 }: PromptInputSelectValueProps) => (
-  <SelectValue className={cn(className)} {...props} />
+  <SelectValue className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputHoverCardProps = ComponentProps<typeof HoverCard>;
@@ -1414,7 +1432,9 @@ export type PromptInputTabsListProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInputTabsList = ({
   className,
   ...props
-}: PromptInputTabsListProps) => <div className={cn(className)} {...props} />;
+}: PromptInputTabsListProps) => (
+  <div className={[className].filter(Boolean).join(" ")} {...props} />
+);
 
 export type PromptInputTabProps = HTMLAttributes<HTMLDivElement>;
 
@@ -1422,7 +1442,9 @@ export type PromptInputTabProps = HTMLAttributes<HTMLDivElement>;
 export const PromptInputTab = ({
   className,
   ...props
-}: PromptInputTabProps) => <div className={cn(className)} {...props} />;
+}: PromptInputTabProps) => (
+  <div className={[className].filter(Boolean).join(" ")} {...props} />
+);
 
 export type PromptInputTabLabelProps = HTMLAttributes<HTMLHeadingElement>;
 
@@ -1432,10 +1454,12 @@ export const PromptInputTabLabel = ({
   ...props
 }: PromptInputTabLabelProps) => (
   <h3
-    className={cn(
+    className={[
       "text-muted-foreground mb-2 px-3 text-xs font-medium",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -1447,7 +1471,10 @@ export const PromptInputTabBody = ({
   className,
   ...props
 }: PromptInputTabBodyProps) => (
-  <div className={cn("space-y-1", className)} {...props} />
+  <div
+    className={["space-y-1", className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type PromptInputTabItemProps = HTMLAttributes<HTMLDivElement>;
@@ -1458,10 +1485,12 @@ export const PromptInputTabItem = ({
   ...props
 }: PromptInputTabItemProps) => (
   <div
-    className={cn(
+    className={[
       "hover:bg-accent flex items-center gap-2 px-3 py-2 text-xs",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -1472,7 +1501,9 @@ export type PromptInputCommandProps = ComponentProps<typeof Command>;
 export const PromptInputCommand = ({
   className,
   ...props
-}: PromptInputCommandProps) => <Command className={cn(className)} {...props} />;
+}: PromptInputCommandProps) => (
+  <Command className={[className].filter(Boolean).join(" ")} {...props} />
+);
 
 export type PromptInputCommandInputProps = ComponentProps<typeof CommandInput>;
 
@@ -1481,7 +1512,7 @@ export const PromptInputCommandInput = ({
   className,
   ...props
 }: PromptInputCommandInputProps) => (
-  <CommandInput className={cn(className)} {...props} />
+  <CommandInput className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputCommandListProps = ComponentProps<typeof CommandList>;
@@ -1491,7 +1522,7 @@ export const PromptInputCommandList = ({
   className,
   ...props
 }: PromptInputCommandListProps) => (
-  <CommandList className={cn(className)} {...props} />
+  <CommandList className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputCommandEmptyProps = ComponentProps<typeof CommandEmpty>;
@@ -1501,7 +1532,7 @@ export const PromptInputCommandEmpty = ({
   className,
   ...props
 }: PromptInputCommandEmptyProps) => (
-  <CommandEmpty className={cn(className)} {...props} />
+  <CommandEmpty className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputCommandGroupProps = ComponentProps<typeof CommandGroup>;
@@ -1511,7 +1542,7 @@ export const PromptInputCommandGroup = ({
   className,
   ...props
 }: PromptInputCommandGroupProps) => (
-  <CommandGroup className={cn(className)} {...props} />
+  <CommandGroup className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputCommandItemProps = ComponentProps<typeof CommandItem>;
@@ -1521,7 +1552,7 @@ export const PromptInputCommandItem = ({
   className,
   ...props
 }: PromptInputCommandItemProps) => (
-  <CommandItem className={cn(className)} {...props} />
+  <CommandItem className={[className].filter(Boolean).join(" ")} {...props} />
 );
 
 export type PromptInputCommandSeparatorProps = ComponentProps<
@@ -1533,5 +1564,8 @@ export const PromptInputCommandSeparator = ({
   className,
   ...props
 }: PromptInputCommandSeparatorProps) => (
-  <CommandSeparator className={cn(className)} {...props} />
+  <CommandSeparator
+    className={[className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );

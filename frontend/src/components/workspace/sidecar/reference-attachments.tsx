@@ -4,7 +4,6 @@ import { MessageSquareQuoteIcon, XIcon } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 import { Tooltip } from "../tooltip";
 
@@ -73,10 +72,12 @@ export function ReferenceAttachmentSummary({
 
   return (
     <div
-      className={cn(
+      className={[
         "border-border bg-muted/40 text-foreground inline-flex max-w-[min(18rem,100%)] items-center gap-1.5 rounded-full border px-2.5 py-1.5 shadow-sm",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       data-testid={testId}
     >
       <Tooltip content={<ReferencePreview references={references} />}>

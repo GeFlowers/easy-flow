@@ -43,11 +43,6 @@ export interface Translations {
     showArtifacts: string;
   };
 
-  home: {
-    docs: string;
-    blog: string;
-  };
-
   // 欢迎
   welcome: {
     greeting: string;
@@ -178,9 +173,7 @@ export interface Translations {
     recentChats: string;
     newChat: string;
     chats: string;
-    agents: string;
     scheduledTasks: string;
-    agentsDisabledTooltip: string;
     channels: string;
   };
 
@@ -300,45 +293,6 @@ export interface Translations {
       issues: { title: string; desc: string };
       weekly: { title: string; desc: string };
     };
-  };
-
-  // 智能体
-  agents: {
-    title: string;
-    description: string;
-    newAgent: string;
-    emptyTitle: string;
-    emptyDescription: string;
-    featureDisabledTitle: string;
-    featureDisabledDescription: string;
-    chat: string;
-    delete: string;
-    deleteConfirm: string;
-    deleteSuccess: string;
-    newChat: string;
-    createPageTitle: string;
-    createPageSubtitle: string;
-    nameStepTitle: string;
-    nameStepHint: string;
-    nameStepPlaceholder: string;
-    nameStepContinue: string;
-    nameStepInvalidError: string;
-    nameStepAlreadyExistsError: string;
-    nameStepNetworkError: string;
-    nameStepCheckError: string;
-    nameStepCheckErrorWithDetail: string;
-    nameStepApiDisabledError: string;
-    nameStepBootstrapMessage: string;
-    save: string;
-    saving: string;
-    saveRequested: string;
-    saveHint: string;
-    saveCommandMessage: string;
-    agentCreatedPendingRefresh: string;
-    more: string;
-    agentCreated: string;
-    startChatting: string;
-    backToGallery: string;
   };
 
   // 面包屑导航
@@ -524,17 +478,6 @@ export interface Translations {
     removeTodo: (content: string) => string;
   };
 
-  // 快捷键
-  shortcuts: {
-    searchActions: string;
-    noResults: string;
-    actions: string;
-    keyboardShortcuts: string;
-    keyboardShortcutsDescription: string;
-    openCommandPalette: string;
-    toggleSidebar: string;
-  };
-
   // 设置
   settings: {
     title: string;
@@ -544,10 +487,24 @@ export interface Translations {
       appearance: string;
       channels: string;
       memory: string;
+      instructions: string;
       tools: string;
       skills: string;
       notification: string;
       about: string;
+    };
+    instructions: {
+      title: string;
+      description: string;
+      label: string;
+      placeholder: string;
+      saved: string;
+      saving: string;
+      loadError: string;
+      saveError: string;
+      conflict: string;
+      reload: string;
+      adminOnly: string;
     };
     memory: {
       title: string;
@@ -666,9 +623,6 @@ export interface Translations {
       role: string;
       changePasswordTitle: string;
       changePasswordDescription: string;
-      ssoProvider: string;
-      ssoPasswordDescription: string;
-      ssoPasswordMessage: string;
       currentPassword: string;
       newPassword: string;
       confirmNewPassword: string;
@@ -700,18 +654,8 @@ export interface Translations {
     createAdminAccount: string;
     adminSetupRequiredTitle: string;
     adminSetupRequiredDescription: string;
-    orContinueWith: string;
-    ssoHint: string;
-    continueWith: (provider: string) => string;
     noAccountSignUp: string;
     haveAccountSignIn: string;
     networkError: string;
-    authFailed: string;
-    errors: {
-      sso_failed: string;
-      sso_cancelled: string;
-      sso_account_exists: string;
-      sso_not_allowed: string;
-    };
   };
 }

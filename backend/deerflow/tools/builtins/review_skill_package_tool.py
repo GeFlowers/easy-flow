@@ -143,23 +143,6 @@ def _ensure_local_target_is_package_or_archive(path: Path) -> None:
     raise ValueError("本地审查目标必须是 .skill 归档文件，或根目录包含 SKILL.md 的目录")
 
 
-def _tool_message_content_payload(payload: dict) -> dict:
-    '''构造发给模型的工具消息正文，避免重复携带仅供界面使用的报告字段。'''
-    return {
-        "untrusted_review_data": payload["untrusted_review_data"],
-        "facts": payload["facts"],
-        "artifacts": payload["artifacts"],
-        "static_report": payload["static_report"],
-    }
-
-
-def _neutralize_review_content(content: str) -> str:
-    '''转义审查内容中的不可信标签，防止包内文本伪装成系统指令。'''
-    from deerflow.agents.middlewares.input_sanitization_middleware import neutralize_untrusted_tags
-
-    return neutralize_untrusted_tags(content)
-
-
 def _semantic_artifacts(snapshot: dict, *, include_content: IncludeContent) -> list[dict]:
     '''按审查模式收集有限长度的说明文件和参考资料文本。'''
     if include_content in {"none", "facts-only"}:
@@ -189,3 +172,20 @@ def _is_semantic_artifact(path: str) -> bool:
     if path == "SKILL.md":
         return True
     return path.startswith(("references/", "templates/", "evals/")) and path.endswith((".md", ".json", ".txt", ".yaml", ".yml"))
+
+
+def _tool_message_content_payload(payload: dict) -> dict:
+    '''构造发给模型的工具消息正文，避免重复携带仅供界面使用的报告字段。'''
+    return {
+        "untrusted_review_data": payload["untrusted_review_data"],
+        "facts": payload["facts"],
+        "artifacts": payload["artifacts"],
+        "static_report": payload["static_report"],
+    }
+
+
+def _neutralize_review_content(content: str) -> str:
+    '''转义审查内容中的不可信标签，防止包内文本伪装成系统指令。'''
+    from deerflow.agents.middlewares.input_sanitization_middleware import neutralize_untrusted_tags
+
+    return neutralize_untrusted_tags(content)

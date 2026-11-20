@@ -53,7 +53,6 @@ import {
 } from "@/features/skills";
 import { useSkills } from "@/features/skills/hooks";
 import { SafeReasoningContent } from "@/features/streamdown/components";
-import { cn } from "@/lib/utils";
 
 import { WorkspaceChangeBadge } from "../changes";
 import { CitationSourcesPanel } from "../citations/citation-sources-panel";
@@ -105,28 +104,36 @@ function FeedbackButtons({
     <div className="flex gap-1">
       <button
         type="button"
-        className={cn(
+        className={[
           "text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors",
           feedback?.rating === 1 && "text-foreground",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={() => handleClick(1)}
         disabled={isSubmitting}
       >
         <ThumbsUpIcon
-          className={cn("size-4", feedback?.rating === 1 && "fill-current")}
+          className={["size-4", feedback?.rating === 1 && "fill-current"]
+            .filter(Boolean)
+            .join(" ")}
         />
       </button>
       <button
         type="button"
-        className={cn(
+        className={[
           "text-muted-foreground hover:text-foreground rounded-md p-1 transition-colors",
           feedback?.rating === -1 && "text-foreground",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={() => handleClick(-1)}
         disabled={isSubmitting}
       >
         <ThumbsDownIcon
-          className={cn("size-4", feedback?.rating === -1 && "fill-current")}
+          className={["size-4", feedback?.rating === -1 && "fill-current"]
+            .filter(Boolean)
+            .join(" ")}
         />
       </button>
     </div>
@@ -158,7 +165,9 @@ export function MessageListItem({
   const isHuman = message.type === "human";
   return (
     <AIElementMessage
-      className={cn("group/conversation-message relative w-full", className)}
+      className={["group/conversation-message relative w-full", className]
+        .filter(Boolean)
+        .join(" ")}
       from={isHuman ? "user" : "assistant"}
     >
       <MessageContent
@@ -172,12 +181,14 @@ export function MessageListItem({
       />
       {!isLoading && showCopyButton && (
         <MessageToolbar
-          className={cn(
+          className={[
             isHuman
               ? "absolute right-0 -bottom-9 left-0 justify-end"
               : "absolute right-0 bottom-0 left-0",
             "z-20 opacity-0 transition-opacity delay-200 duration-300 group-hover/conversation-message:opacity-100",
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
         >
           <div className="pointer-events-auto flex gap-1">
             <CopyButton clipboardData={getMessageCopyData(message)} />
@@ -210,7 +221,9 @@ function MessageImage({
 }) {
   if (!src) return null;
 
-  const imgClassName = cn("overflow-hidden rounded-lg", `max-w-[${maxWidth}]`);
+  const imgClassName = ["overflow-hidden rounded-lg", `max-w-[${maxWidth}]`]
+    .filter(Boolean)
+    .join(" ");
 
   if (typeof src !== "string") {
     return <img className={imgClassName} src={src} alt={alt} {...props} />;
@@ -421,10 +434,9 @@ function MessageContent_({
     // marked 的递归引用词法器导致页面崩溃，故直接按原文渲染。
     return (
       <div
-        className={cn(
-          "ml-auto flex max-w-full min-w-0 flex-col gap-2",
-          className,
-        )}
+        className={["ml-auto flex max-w-full min-w-0 flex-col gap-2", className]
+          .filter(Boolean)
+          .join(" ")}
       >
         {referenceAttachments.length > 0 && (
           <ReferenceAttachmentSummary

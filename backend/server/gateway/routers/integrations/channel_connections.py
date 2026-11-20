@@ -127,12 +127,44 @@ _RUNTIME_REQUIREMENTS: dict[str, tuple[str, ...]] = {
 }
 
 
-def _get_user_id(request: Request) -> str:
-    '''获取当前已认证用户的 ID。'''
-    user = getattr(request.state, "user", None)
-    if user is None:
-        raise HTTPException(status_code=401, detail="Authentication required")
-    return str(user.id)
+@router.get("/providers", response_model=ChannelProvidersResponse)
+async def get_channel_providers(request: Request) -> ChannelProvidersResponse:
+    '''返回当前用户可见的渠道提供商状态。'''
+    config = await _get_channel_connections_config(request)
+    channels_config = await _get_channels_config(request)
+    repo = None
+    if config.enabled:
+        try:
+            repo = _get_repository(request, config)
+        except HTTPException as exc:
+            if exc.status_code != 503:
+                raise
+    owner_user_id = _get_user_id(request)
+    connections = await repo.list_connections(owner_user_id) if repo is not None else []
+    by_provider = _newest_connection_by_provider(connections)
+
+    enabled_providers = [provider for provider in _PROVIDER_META if config.provider_status(provider)["enabled"]]
+    # 各提供商的就绪协调相互独立，并发执行可避免单个渠道重启缓慢而串行阻塞整个
+    # `/providers` 响应。
+    await asyncio.gather(
+        *(_ensure_runtime_channel_ready_if_available(provider, channels_config) for provider in enabled_providers if _runtime_channel_configured(provider, channels_config)),
+    )
+
+    providers: list[ChannelProviderResponse] = []
+    for provider in enabled_providers:
+        connection = by_provider.get(provider)
+        providers.append(_provider_response(config, channels_config, provider, _PROVIDER_META[provider], connection))
+    return ChannelProvidersResponse(enabled=config.enabled, providers=providers)
+
+
+async def _get_channel_connections_config(request: Request) -> ChannelConnectionsConfig:
+    '''获取并应用运行时覆盖后的渠道连接配置。'''
+    config = getattr(request.app.state, "channel_connections_config", None)
+    if not isinstance(config, ChannelConnectionsConfig):
+        config = _get_app_config().channel_connections
+    config = apply_runtime_connection_config(config, store=await _get_runtime_config_store(request))
+    request.app.state.channel_connections_config = config
+    return config
 
 
 def _get_app_config():
@@ -151,16 +183,6 @@ async def _get_runtime_config_store(request: Request) -> ChannelRuntimeConfigSto
     store = await asyncio.to_thread(ChannelRuntimeConfigStore)
     request.app.state.channel_runtime_config_store = store
     return store
-
-
-async def _get_channel_connections_config(request: Request) -> ChannelConnectionsConfig:
-    '''获取并应用运行时覆盖后的渠道连接配置。'''
-    config = getattr(request.app.state, "channel_connections_config", None)
-    if not isinstance(config, ChannelConnectionsConfig):
-        config = _get_app_config().channel_connections
-    config = apply_runtime_connection_config(config, store=await _get_runtime_config_store(request))
-    request.app.state.channel_connections_config = config
-    return config
 
 
 async def _get_channels_config(request: Request) -> dict[str, Any]:
@@ -203,66 +225,35 @@ def _get_repository(request: Request, config: ChannelConnectionsConfig) -> Chann
     return repo
 
 
-def _provider_config(config: ChannelConnectionsConfig, provider: str):
-    '''返回已知提供商的连接配置，不接受任意配置属性。'''
-    # 仅解析已知提供商。任意 `getattr` 会让请求提供的名称命中其他配置属性（如
-    # `enabled` / `require_bound_identity` 布尔值），绕过 404 并返回非提供商对象；
-    # 调用方随后按提供商配置解引用时会触发 `AttributeError`，最终变为 HTTP 500。
-    if provider not in _PROVIDER_META:
-        raise HTTPException(status_code=404, detail="Unknown channel provider")
-    provider_config = getattr(config, provider, None)
-    if provider_config is None:
-        raise HTTPException(status_code=404, detail="Unknown channel provider")
-    return provider_config
+def _get_user_id(request: Request) -> str:
+    '''获取当前已认证用户的 ID。'''
+    user = getattr(request.state, "user", None)
+    if user is None:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    return str(user.id)
 
 
-def _runtime_channel_configured(provider: str, channels_config: dict[str, Any]) -> bool:
-    '''判断渠道运行时配置是否已启用且具备全部必填凭据。'''
-    runtime_config = channels_config.get(provider)
-    if not isinstance(runtime_config, dict) or not runtime_config.get("enabled", False):
-        return False
-    return all(str(runtime_config.get(key) or "").strip() for key in _RUNTIME_REQUIREMENTS[provider])
+def _newest_connection_by_provider(connections: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    '''按提供商保留最新的连接记录。'''
+    by_provider: dict[str, dict[str, Any]] = {}
+    for item in connections:
+        existing = by_provider.get(item["provider"])
+        if existing is None or _connection_updated_at(item) > _connection_updated_at(existing):
+            by_provider[item["provider"]] = item
+    return by_provider
 
 
-def _runtime_unavailable_reason(provider: str) -> str:
-    '''生成渠道运行时配置不可用的提示文本。'''
-    if provider == "wechat":
-        return "请先扫码登录微信，再绑定当前项目账号。"
-    meta = _PROVIDER_META.get(provider)
-    display_name = meta["display_name"] if meta else provider
-    return f"Enter the required {display_name} credentials to connect this channel."
-
-
-def _runtime_not_running_reason(provider: str) -> str:
-    '''生成渠道已配置但未运行的提示文本。'''
-    meta = _PROVIDER_META.get(provider)
-    display_name = meta["display_name"] if meta else provider
-    return f"{display_name} channel is configured but is not running. Check the credentials and service logs."
-
-
-def _runtime_channel_running(provider: str) -> bool | None:
-    '''查询渠道运行状态；无法确定时返回 `None`。'''
-    try:
-        from server.channels.service import get_channel_service
-    except Exception:
-        logger.debug("Unable to inspect channel service status", exc_info=True)
-        return None
-
-    service = get_channel_service()
-    if service is None:
-        return None
-    try:
-        status = service.get_status()
-    except Exception:
-        logger.debug("Unable to read channel service status", exc_info=True)
-        return None
-
-    if not status.get("service_running"):
-        return False
-    channel_status = status.get("channels", {}).get(provider)
-    if not isinstance(channel_status, dict):
-        return None
-    return bool(channel_status.get("running"))
+def _connection_updated_at(connection: dict[str, Any]) -> datetime:
+    '''将连接记录的 `updated_at` 规范化为带时区的时间。'''
+    value = connection.get("updated_at")
+    if isinstance(value, datetime):
+        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    if isinstance(value, str) and value:
+        try:
+            return datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            pass
+    return datetime.min.replace(tzinfo=UTC)
 
 
 async def _ensure_runtime_channel_ready_if_available(
@@ -295,127 +286,12 @@ async def _ensure_runtime_channel_ready_if_available(
         return False
 
 
-def _provider_unavailable_reason(
-    config: ChannelConnectionsConfig,
-    channels_config: dict[str, Any],
-    provider: str,
-) -> str | None:
-    '''返回提供商当前不可用的原因；可用时返回 `None`。'''
-    provider_config = _provider_config(config, provider)
-    if not provider_config.enabled:
-        return None
-    if not provider_config.configured:
-        return _runtime_unavailable_reason(provider)
-    if not _runtime_channel_configured(provider, channels_config):
-        return _runtime_unavailable_reason(provider)
-    if _runtime_channel_running(provider) is False:
-        return _runtime_not_running_reason(provider)
-    return None
-
-
-def _provider_status(
-    config: ChannelConnectionsConfig,
-    channels_config: dict[str, Any],
-    provider: str,
-) -> tuple[dict[str, bool], str | None]:
-    '''汇总提供商的启用、配置和可用状态。'''
-    declared = config.provider_status(provider)
-    unavailable_reason = _provider_unavailable_reason(config, channels_config, provider)
-    configured = declared["configured"] and _runtime_channel_configured(provider, channels_config)
-    return {"enabled": declared["enabled"], "configured": configured}, unavailable_reason
-
-
-def _new_binding_code() -> str:
-    '''生成一次性渠道绑定码。'''
-    return secrets.token_urlsafe(16)
-
-
-async def _create_state(
-    repo: ChannelConnectionRepository,
-    *,
-    owner_user_id: str,
-    provider: str,
-) -> str:
-    '''在每个提供商的待绑定数量上限内创建绑定状态。'''
-    now = datetime.now(UTC)
-    state = _new_binding_code()
-    # 原子执行过期清理、计数和插入，避免同一用户并发发起连接时都看到数量未达上限，
-    # 从而共同插入并突破上限。
-    inserted = await repo.create_oauth_state_within_cap(
-        owner_user_id=owner_user_id,
-        provider=provider,
-        state=state,
-        expires_at=now + timedelta(seconds=_STATE_TTL_SECONDS),
-        max_pending=_MAX_PENDING_CONNECT_CODES_PER_PROVIDER,
-        now=now,
-    )
-    if not inserted:
-        raise HTTPException(
-            status_code=429,
-            detail="Too many pending channel connection codes. Wait for existing codes to expire or use one of them.",
-        )
-    return state
-
-
-def _connect_instruction(provider: str, code: str) -> str:
-    '''生成用户在渠道机器人中完成绑定的操作说明。'''
-    meta = _PROVIDER_META.get(provider)
-    if meta is None:
-        raise HTTPException(status_code=404, detail="Unknown channel provider")
-    return f"请向 DeerFlow {meta['display_name']} 机器人发送 /connect {code}，完成账号绑定。"
-
-
-def _connect_url(config: ChannelConnectionsConfig, provider: str, code: str) -> str | None:
-    '''生成支持深链接的渠道绑定 URL。'''
-    if _PROVIDER_META.get(provider, {}).get("auth_mode") == "binding_code":
-        return None
-    raise HTTPException(status_code=404, detail="Unknown channel provider")
-
-
-def _connection_updated_at(connection: dict[str, Any]) -> datetime:
-    '''将连接记录的 `updated_at` 规范化为带时区的时间。'''
-    value = connection.get("updated_at")
-    if isinstance(value, datetime):
-        return value if value.tzinfo is not None else value.replace(tzinfo=UTC)
-    if isinstance(value, str) and value:
-        try:
-            return datetime.fromisoformat(value.replace("Z", "+00:00"))
-        except ValueError:
-            pass
-    return datetime.min.replace(tzinfo=UTC)
-
-
-def _newest_connection_by_provider(connections: list[dict[str, Any]]) -> dict[str, dict[str, Any]]:
-    '''按提供商保留最新的连接记录。'''
-    by_provider: dict[str, dict[str, Any]] = {}
-    for item in connections:
-        existing = by_provider.get(item["provider"])
-        if existing is None or _connection_updated_at(item) > _connection_updated_at(existing):
-            by_provider[item["provider"]] = item
-    return by_provider
-
-
-def _credential_fields(provider: str) -> list[ChannelCredentialFieldResponse]:
-    '''返回提供商所需凭据字段的响应模型列表。'''
-    fields = _CREDENTIAL_FIELDS.get(provider)
-    if fields is None:
-        raise HTTPException(status_code=404, detail="Unknown channel provider")
-    return [ChannelCredentialFieldResponse(**field) for field in fields]
-
-
-def _credential_values(provider: str, channels_config: dict[str, Any]) -> dict[str, str]:
-    '''读取提供商的已配置凭据，并掩码敏感字段。'''
+def _runtime_channel_configured(provider: str, channels_config: dict[str, Any]) -> bool:
+    '''判断渠道运行时配置是否已启用且具备全部必填凭据。'''
     runtime_config = channels_config.get(provider)
-    if not isinstance(runtime_config, dict):
-        return {}
-
-    values: dict[str, str] = {}
-    for field in _credential_fields(provider):
-        value = str(runtime_config.get(field.name) or "").strip()
-        if not value:
-            continue
-        values[field.name] = _MASKED_CREDENTIAL_VALUE if field.type == "password" else value
-    return values
+    if not isinstance(runtime_config, dict) or not runtime_config.get("enabled", False):
+        return False
+    return all(str(runtime_config.get(key) or "").strip() for key in _RUNTIME_REQUIREMENTS[provider])
 
 
 def _provider_response(
@@ -459,92 +335,111 @@ def _provider_response(
     )
 
 
-def _required_runtime_values(
+def _provider_status(
+    config: ChannelConnectionsConfig,
+    channels_config: dict[str, Any],
     provider: str,
-    values: dict[str, str],
-    existing_config: dict[str, Any] | None = None,
-) -> dict[str, str]:
-    '''校验并清洗渠道运行时配置所需的凭据值。'''
-    fields = _credential_fields(provider)
-    cleaned: dict[str, str] = {}
-    missing: list[str] = []
-    existing_config = existing_config or {}
-    for field in fields:
-        raw_value = values.get(field.name, "")
-        if field.type == "password" and raw_value == _MASKED_CREDENTIAL_VALUE:
-            existing_value = str(existing_config.get(field.name) or "").strip()
-            if existing_value:
-                cleaned[field.name] = existing_value
-                continue
-        value = raw_value.strip() if isinstance(raw_value, str) else str(raw_value or "").strip()
-        if field.required and not value:
-            missing.append(field.label)
-        cleaned[field.name] = value
-    if missing:
-        raise HTTPException(status_code=400, detail=f"Missing required channel configuration: {', '.join(missing)}")
-    return cleaned
+) -> tuple[dict[str, bool], str | None]:
+    '''汇总提供商的启用、配置和可用状态。'''
+    declared = config.provider_status(provider)
+    unavailable_reason = _provider_unavailable_reason(config, channels_config, provider)
+    configured = declared["configured"] and _runtime_channel_configured(provider, channels_config)
+    return {"enabled": declared["enabled"], "configured": configured}, unavailable_reason
 
 
-async def _restart_runtime_channel_if_available(provider: str, runtime_config: dict[str, Any]) -> bool | None:
-    '''在渠道服务可用时应用配置并重启指定渠道。'''
+def _provider_unavailable_reason(
+    config: ChannelConnectionsConfig,
+    channels_config: dict[str, Any],
+    provider: str,
+) -> str | None:
+    '''返回提供商当前不可用的原因；可用时返回 `None`。'''
+    provider_config = _provider_config(config, provider)
+    if not provider_config.enabled:
+        return None
+    if not provider_config.configured:
+        return _runtime_unavailable_reason(provider)
+    if not _runtime_channel_configured(provider, channels_config):
+        return _runtime_unavailable_reason(provider)
+    if _runtime_channel_running(provider) is False:
+        return _runtime_not_running_reason(provider)
+    return None
+
+
+def _provider_config(config: ChannelConnectionsConfig, provider: str):
+    '''返回已知提供商的连接配置，不接受任意配置属性。'''
+    # 仅解析已知提供商。任意 `getattr` 会让请求提供的名称命中其他配置属性（如
+    # `enabled` / `require_bound_identity` 布尔值），绕过 404 并返回非提供商对象；
+    # 调用方随后按提供商配置解引用时会触发 `AttributeError`，最终变为 HTTP 500。
+    if provider not in _PROVIDER_META:
+        raise HTTPException(status_code=404, detail="Unknown channel provider")
+    provider_config = getattr(config, provider, None)
+    if provider_config is None:
+        raise HTTPException(status_code=404, detail="Unknown channel provider")
+    return provider_config
+
+
+def _runtime_unavailable_reason(provider: str) -> str:
+    '''生成渠道运行时配置不可用的提示文本。'''
+    if provider == "wechat":
+        return "请先扫码登录微信，再绑定当前项目账号。"
+    meta = _PROVIDER_META.get(provider)
+    display_name = meta["display_name"] if meta else provider
+    return f"Enter the required {display_name} credentials to connect this channel."
+
+
+def _runtime_channel_running(provider: str) -> bool | None:
+    '''查询渠道运行状态；无法确定时返回 `None`。'''
     try:
         from server.channels.service import get_channel_service
     except Exception:
-        logger.exception("Failed to import channel service while configuring a runtime channel")
+        logger.debug("Unable to inspect channel service status", exc_info=True)
         return None
 
     service = get_channel_service()
     if service is None:
         return None
-    return await service.configure_channel(provider, runtime_config)
-
-
-async def _sync_runtime_channel_after_removal(provider: str, channels_config: dict[str, Any]) -> bool | None:
-    '''在移除配置后同步指定渠道的运行时状态。'''
     try:
-        from server.channels.service import get_channel_service
+        status = service.get_status()
     except Exception:
-        logger.exception("Failed to import channel service while disconnecting a runtime channel")
+        logger.debug("Unable to read channel service status", exc_info=True)
         return None
 
-    service = get_channel_service()
-    if service is None:
+    if not status.get("service_running"):
+        return False
+    channel_status = status.get("channels", {}).get(provider)
+    if not isinstance(channel_status, dict):
         return None
+    return bool(channel_status.get("running"))
 
+
+def _runtime_not_running_reason(provider: str) -> str:
+    '''生成渠道已配置但未运行的提示文本。'''
+    meta = _PROVIDER_META.get(provider)
+    display_name = meta["display_name"] if meta else provider
+    return f"{display_name} channel is configured but is not running. Check the credentials and service logs."
+
+
+def _credential_values(provider: str, channels_config: dict[str, Any]) -> dict[str, str]:
+    '''读取提供商的已配置凭据，并掩码敏感字段。'''
     runtime_config = channels_config.get(provider)
-    if isinstance(runtime_config, dict) and runtime_config.get("enabled", False):
-        return await service.configure_channel(provider, runtime_config)
-    return await service.remove_channel(provider)
+    if not isinstance(runtime_config, dict):
+        return {}
+
+    values: dict[str, str] = {}
+    for field in _credential_fields(provider):
+        value = str(runtime_config.get(field.name) or "").strip()
+        if not value:
+            continue
+        values[field.name] = _MASKED_CREDENTIAL_VALUE if field.type == "password" else value
+    return values
 
 
-@router.get("/providers", response_model=ChannelProvidersResponse)
-async def get_channel_providers(request: Request) -> ChannelProvidersResponse:
-    '''返回当前用户可见的渠道提供商状态。'''
-    config = await _get_channel_connections_config(request)
-    channels_config = await _get_channels_config(request)
-    repo = None
-    if config.enabled:
-        try:
-            repo = _get_repository(request, config)
-        except HTTPException as exc:
-            if exc.status_code != 503:
-                raise
-    owner_user_id = _get_user_id(request)
-    connections = await repo.list_connections(owner_user_id) if repo is not None else []
-    by_provider = _newest_connection_by_provider(connections)
-
-    enabled_providers = [provider for provider in _PROVIDER_META if config.provider_status(provider)["enabled"]]
-    # 各提供商的就绪协调相互独立，并发执行可避免单个渠道重启缓慢而串行阻塞整个
-    # `/providers` 响应。
-    await asyncio.gather(
-        *(_ensure_runtime_channel_ready_if_available(provider, channels_config) for provider in enabled_providers if _runtime_channel_configured(provider, channels_config)),
-    )
-
-    providers: list[ChannelProviderResponse] = []
-    for provider in enabled_providers:
-        connection = by_provider.get(provider)
-        providers.append(_provider_response(config, channels_config, provider, _PROVIDER_META[provider], connection))
-    return ChannelProvidersResponse(enabled=config.enabled, providers=providers)
+def _credential_fields(provider: str) -> list[ChannelCredentialFieldResponse]:
+    '''返回提供商所需凭据字段的响应模型列表。'''
+    fields = _CREDENTIAL_FIELDS.get(provider)
+    if fields is None:
+        raise HTTPException(status_code=404, detail="Unknown channel provider")
+    return [ChannelCredentialFieldResponse(**field) for field in fields]
 
 
 @router.get("/connections", response_model=ChannelConnectionsResponse)
@@ -623,6 +518,24 @@ async def disconnect_channel_provider_runtime(provider: str, request: Request) -
     return _provider_response(config, live_channels_config, provider, _PROVIDER_META[provider])
 
 
+async def _sync_runtime_channel_after_removal(provider: str, channels_config: dict[str, Any]) -> bool | None:
+    '''在移除配置后同步指定渠道的运行时状态。'''
+    try:
+        from server.channels.service import get_channel_service
+    except Exception:
+        logger.exception("Failed to import channel service while disconnecting a runtime channel")
+        return None
+
+    service = get_channel_service()
+    if service is None:
+        return None
+
+    runtime_config = channels_config.get(provider)
+    if isinstance(runtime_config, dict) and runtime_config.get("enabled", False):
+        return await service.configure_channel(provider, runtime_config)
+    return await service.remove_channel(provider)
+
+
 @router.post("/{provider}/connect", response_model=ChannelConnectResponse)
 async def connect_channel_provider(provider: str, request: Request) -> ChannelConnectResponse:
     '''创建当前用户连接指定渠道所需的一次性绑定信息。'''
@@ -659,6 +572,53 @@ async def connect_channel_provider(provider: str, request: Request) -> ChannelCo
     )
 
 
+async def _create_state(
+    repo: ChannelConnectionRepository,
+    *,
+    owner_user_id: str,
+    provider: str,
+) -> str:
+    '''在每个提供商的待绑定数量上限内创建绑定状态。'''
+    now = datetime.now(UTC)
+    state = _new_binding_code()
+    # 原子执行过期清理、计数和插入，避免同一用户并发发起连接时都看到数量未达上限，
+    # 从而共同插入并突破上限。
+    inserted = await repo.create_oauth_state_within_cap(
+        owner_user_id=owner_user_id,
+        provider=provider,
+        state=state,
+        expires_at=now + timedelta(seconds=_STATE_TTL_SECONDS),
+        max_pending=_MAX_PENDING_CONNECT_CODES_PER_PROVIDER,
+        now=now,
+    )
+    if not inserted:
+        raise HTTPException(
+            status_code=429,
+            detail="Too many pending channel connection codes. Wait for existing codes to expire or use one of them.",
+        )
+    return state
+
+
+def _new_binding_code() -> str:
+    '''生成一次性渠道绑定码。'''
+    return secrets.token_urlsafe(16)
+
+
+def _connect_url(config: ChannelConnectionsConfig, provider: str, code: str) -> str | None:
+    '''生成支持深链接的渠道绑定 URL。'''
+    if _PROVIDER_META.get(provider, {}).get("auth_mode") == "binding_code":
+        return None
+    raise HTTPException(status_code=404, detail="Unknown channel provider")
+
+
+def _connect_instruction(provider: str, code: str) -> str:
+    '''生成用户在渠道机器人中完成绑定的操作说明。'''
+    meta = _PROVIDER_META.get(provider)
+    if meta is None:
+        raise HTTPException(status_code=404, detail="Unknown channel provider")
+    return f"请向 DeerFlow {meta['display_name']} 机器人发送 /connect {code}，完成账号绑定。"
+
+
 @router.post("/{provider}/runtime-config", response_model=ChannelProviderResponse)
 async def configure_channel_provider_runtime(
     provider: str,
@@ -688,6 +648,32 @@ async def configure_channel_provider_runtime(
     return _provider_response(config, await _get_channels_config(request), provider, _PROVIDER_META[provider])
 
 
+def _required_runtime_values(
+    provider: str,
+    values: dict[str, str],
+    existing_config: dict[str, Any] | None = None,
+) -> dict[str, str]:
+    '''校验并清洗渠道运行时配置所需的凭据值。'''
+    fields = _credential_fields(provider)
+    cleaned: dict[str, str] = {}
+    missing: list[str] = []
+    existing_config = existing_config or {}
+    for field in fields:
+        raw_value = values.get(field.name, "")
+        if field.type == "password" and raw_value == _MASKED_CREDENTIAL_VALUE:
+            existing_value = str(existing_config.get(field.name) or "").strip()
+            if existing_value:
+                cleaned[field.name] = existing_value
+                continue
+        value = raw_value.strip() if isinstance(raw_value, str) else str(raw_value or "").strip()
+        if field.required and not value:
+            missing.append(field.label)
+        cleaned[field.name] = value
+    if missing:
+        raise HTTPException(status_code=400, detail=f"Missing required channel configuration: {', '.join(missing)}")
+    return cleaned
+
+
 async def _commit_runtime_channel(provider: str, runtime_config: dict[str, Any], request: Request) -> None:
     '''启动通道并持久化凭据，供手动配置和微信扫码共用相同的提交路径。'''
     started = await _restart_runtime_channel_if_available(provider, runtime_config)
@@ -707,15 +693,18 @@ async def _commit_runtime_channel(provider: str, runtime_config: dict[str, Any],
     request.app.state.channels_config = live_channels_config
 
 
-def _wechat_login_flow(request: Request):
-    '''取得当前应用唯一的网页微信登录管理器。'''
-    from server.channels.wechat_login import WechatLoginFlow
+async def _restart_runtime_channel_if_available(provider: str, runtime_config: dict[str, Any]) -> bool | None:
+    '''在渠道服务可用时应用配置并重启指定渠道。'''
+    try:
+        from server.channels.service import get_channel_service
+    except Exception:
+        logger.exception("Failed to import channel service while configuring a runtime channel")
+        return None
 
-    flow = getattr(request.app.state, "wechat_login_flow", None)
-    if flow is None:
-        flow = WechatLoginFlow()
-        request.app.state.wechat_login_flow = flow
-    return flow
+    service = get_channel_service()
+    if service is None:
+        return None
+    return await service.configure_channel(provider, runtime_config)
 
 
 @router.post("/wechat/login", response_model=WechatLoginResponse)
@@ -749,6 +738,17 @@ async def start_wechat_login(request: Request) -> dict[str, Any]:
         return await _wechat_login_flow(request).start(_get_user_id(request), save_credentials)
     except PermissionError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from None
+
+
+def _wechat_login_flow(request: Request):
+    '''取得当前应用唯一的网页微信登录管理器。'''
+    from server.channels.wechat_login import WechatLoginFlow
+
+    flow = getattr(request.app.state, "wechat_login_flow", None)
+    if flow is None:
+        flow = WechatLoginFlow()
+        request.app.state.wechat_login_flow = flow
+    return flow
 
 
 @router.get("/wechat/login/{login_id}", response_model=WechatLoginResponse)

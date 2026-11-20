@@ -16,15 +16,15 @@ _PREFIX_V2 = "$dfv2$"
 _PREFIX_V1 = "$dfv1$"
 
 
-def _pre_hash_v2(password: str) -> bytes:
-    '''对密码预先计算 SHA-256 哈希，以绕过 bcrypt 的 72 字节限制。'''
-    return base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
-
-
 def hash_password(password: str) -> str:
     '''以当前 v2 格式（SHA-256 加 bcrypt）计算密码哈希。'''
     raw = bcrypt.hashpw(_pre_hash_v2(password), bcrypt.gensalt()).decode("utf-8")
     return f"{_PREFIX_V2}{raw}"
+
+
+def _pre_hash_v2(password: str) -> bytes:
+    '''对密码预先计算 SHA-256 哈希，以绕过 bcrypt 的 72 字节限制。'''
+    return base64.b64encode(hashlib.sha256(password.encode("utf-8")).digest())
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

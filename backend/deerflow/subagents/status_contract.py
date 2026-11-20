@@ -74,21 +74,6 @@ class StructuredSubagentResult(TypedDict):
     error: NotRequired[str]
 
 
-def _bound_metadata_text(text: str, cap: int = SUBAGENT_METADATA_TEXT_MAX_CHARS) -> str:
-    '''裁剪过长结果文本，同时保留开头和结尾以供主代理恢复关键信息。'''
-    cleaned = text.strip()
-    if len(cleaned) <= cap:
-        return cleaned
-    marker = "\n...\n"
-    if cap <= len(marker):
-        return cleaned[:cap]
-    head = cap * 2 // 3
-    tail = cap - head - len(marker)
-    if tail <= 0:
-        return cleaned[:cap]
-    return f"{cleaned[:head]}{marker}{cleaned[-tail:]}"
-
-
 def make_subagent_additional_kwargs(
     status: SubagentStatusValue,
     *,
@@ -118,6 +103,21 @@ def make_subagent_additional_kwargs(
     if normalized_usage is not None:
         payload[SUBAGENT_TOKEN_USAGE_KEY] = normalized_usage
     return payload
+
+
+def _bound_metadata_text(text: str, cap: int = SUBAGENT_METADATA_TEXT_MAX_CHARS) -> str:
+    '''裁剪过长结果文本，同时保留开头和结尾以供主代理恢复关键信息。'''
+    cleaned = text.strip()
+    if len(cleaned) <= cap:
+        return cleaned
+    marker = "\n...\n"
+    if cap <= len(marker):
+        return cleaned[:cap]
+    head = cap * 2 // 3
+    tail = cap - head - len(marker)
+    if tail <= 0:
+        return cleaned[:cap]
+    return f"{cleaned[:head]}{marker}{cleaned[-tail:]}"
 
 
 def normalize_token_usage(value: Any) -> dict[str, int] | None:

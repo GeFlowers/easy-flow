@@ -8,13 +8,10 @@ export const userSchema = z.object({
   email: z.string().email(),
   system_role: z.enum(["admin", "user"]),
   needs_setup: z.boolean().optional().default(false),
-  oauth_provider: z.string().nullable().optional().default(null),
 });
 
-/** 前端使用的已认证用户数据，其中 OAuth 提供方字段可选。 */
-export type User = Omit<z.infer<typeof userSchema>, "oauth_provider"> & {
-  oauth_provider?: string | null;
-};
+/** 前端使用的本地账号数据。 */
+export type User = z.infer<typeof userSchema>;
 
 // ── SSR 认证结果（带标签联合）──────────────────────────────────────
 
@@ -45,7 +42,6 @@ const AUTH_ERROR_CODES = [
   "token_invalid",
   "user_not_found",
   "email_already_exists",
-  "provider_not_found",
   "not_authenticated",
   "system_already_initialized",
 ] as const;

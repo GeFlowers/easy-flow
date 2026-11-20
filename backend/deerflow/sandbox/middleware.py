@@ -37,24 +37,6 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
         super().__init__()
         self._lazy_init = lazy_init
 
-    def _acquire_sandbox(self, thread_id: str, *, user_id: str) -> str:
-        '''同步获取指定线程和用户范围内的沙箱标识。'''
-        provider = get_sandbox_provider()
-        sandbox_id = provider.acquire(thread_id, user_id=user_id)
-        logger.info(f"Acquiring sandbox {sandbox_id}")
-        return sandbox_id
-
-    async def _acquire_sandbox_async(self, thread_id: str, *, user_id: str) -> str:
-        '''异步获取指定线程和用户范围内的沙箱标识。'''
-        provider = get_sandbox_provider()
-        sandbox_id = await provider.acquire_async(thread_id, user_id=user_id)
-        logger.info(f"Acquiring sandbox {sandbox_id}")
-        return sandbox_id
-
-    async def _release_sandbox_async(self, sandbox_id: str) -> None:
-        '''在线程中异步释放指定沙箱，避免阻塞事件循环。'''
-        await asyncio.to_thread(get_sandbox_provider().release, sandbox_id)
-
     @override
     def before_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
         '''在同步智能体运行前按配置预先分配沙箱。'''
@@ -70,6 +52,13 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             return {"sandbox": {"sandbox_id": sandbox_id}}
         return super().before_agent(state, runtime)
 
+    def _acquire_sandbox(self, thread_id: str, *, user_id: str) -> str:
+        '''同步获取指定线程和用户范围内的沙箱标识。'''
+        provider = get_sandbox_provider()
+        sandbox_id = provider.acquire(thread_id, user_id=user_id)
+        logger.info(f"Acquiring sandbox {sandbox_id}")
+        return sandbox_id
+
     @override
     async def abefore_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
         '''在异步智能体运行前按配置预先分配沙箱。'''
@@ -84,6 +73,13 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             logger.info(f"Assigned sandbox {sandbox_id} to thread {thread_id}")
             return {"sandbox": {"sandbox_id": sandbox_id}}
         return await super().abefore_agent(state, runtime)
+
+    async def _acquire_sandbox_async(self, thread_id: str, *, user_id: str) -> str:
+        '''异步获取指定线程和用户范围内的沙箱标识。'''
+        provider = get_sandbox_provider()
+        sandbox_id = await provider.acquire_async(thread_id, user_id=user_id)
+        logger.info(f"Acquiring sandbox {sandbox_id}")
+        return sandbox_id
 
     @override
     def after_agent(self, state: SandboxMiddlewareState, runtime: Runtime) -> dict | None:
@@ -121,6 +117,33 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
 
         return await super().aafter_agent(state, runtime)
 
+    async def _release_sandbox_async(self, sandbox_id: str) -> None:
+        '''在线程中异步释放指定沙箱，避免阻塞事件循环。'''
+        await asyncio.to_thread(get_sandbox_provider().release, sandbox_id)
+
+    @override
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        '''执行同步工具调用，并把调用期间延迟初始化的沙箱写回结果。'''
+        prev_sandbox_id = self._read_sandbox_id_from_request(request)
+        result = handler(request)
+        if prev_sandbox_id is not None:
+            return result
+        curr_sandbox_id = self._read_sandbox_id_from_request(request)
+        if curr_sandbox_id is None:
+            return result
+        return self._attach_sandbox_update(result, curr_sandbox_id)
+
+    @staticmethod
+    def _read_sandbox_id_from_request(request: ToolCallRequest) -> str | None:
+        '''从工具调用请求的运行时状态中读取沙箱标识。'''
+        runtime = request.runtime
+        if runtime is None or runtime.state is None:
+            return None
+        return SandboxMiddleware._read_sandbox_id_from_state(runtime.state)
 
     @staticmethod
     def _read_sandbox_id_from_state(state: object) -> str | None:
@@ -146,30 +169,6 @@ class SandboxMiddleware(AgentMiddleware[SandboxMiddlewareState]):
             merged_update = {**existing_update, **sandbox_update}
             return dc_replace(result, update=merged_update)
         return result
-
-    @staticmethod
-    def _read_sandbox_id_from_request(request: ToolCallRequest) -> str | None:
-        '''从工具调用请求的运行时状态中读取沙箱标识。'''
-        runtime = request.runtime
-        if runtime is None or runtime.state is None:
-            return None
-        return SandboxMiddleware._read_sandbox_id_from_state(runtime.state)
-
-    @override
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        '''执行同步工具调用，并把调用期间延迟初始化的沙箱写回结果。'''
-        prev_sandbox_id = self._read_sandbox_id_from_request(request)
-        result = handler(request)
-        if prev_sandbox_id is not None:
-            return result
-        curr_sandbox_id = self._read_sandbox_id_from_request(request)
-        if curr_sandbox_id is None:
-            return result
-        return self._attach_sandbox_update(result, curr_sandbox_id)
 
     @override
     async def awrap_tool_call(

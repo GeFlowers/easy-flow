@@ -17,7 +17,6 @@ from sqlalchemy.exc import IntegrityError
 from server.gateway.authz import require_permission
 from server.gateway.deps import get_checkpointer, get_run_manager
 from server.gateway.internal_auth import get_trusted_internal_owner_user_id
-from server.gateway.utils import sanitize_log_param
 from deerflow.config.paths import Paths, get_paths
 from deerflow.config.summarization_config import ContextSize
 from deerflow.runtime import serialize_channel_values_for_api
@@ -54,163 +53,6 @@ _BRANCH_METADATA_KEY = "deerflow_branch"
 _BRANCH_HISTORY_SCAN_LIMIT = 200
 
 
-def _strip_reserved_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
-    '''复制线程元数据并移除只能由服务端写入的保留字段。'''
-    if not metadata:
-        return metadata or {}
-    return {k: v for k, v in metadata.items() if k not in _SERVER_RESERVED_METADATA_KEYS}
-
-
-def _message_id(message: Any) -> str | None:
-    '''读取消息对象或字典中的标识。'''
-    if isinstance(message, dict):
-        raw = message.get("id")
-    else:
-        raw = getattr(message, "id", None)
-    return raw if isinstance(raw, str) and raw else None
-
-
-def _message_type(message: Any) -> str | None:
-    '''读取消息对象或字典中的类型。'''
-    if isinstance(message, dict):
-        raw = message.get("type")
-    else:
-        raw = getattr(message, "type", None)
-    return raw if isinstance(raw, str) and raw else None
-
-
-def _message_additional_kwargs(message: Any) -> dict[str, Any]:
-    '''读取消息附加元数据；缺失时返回空字典。'''
-    if isinstance(message, dict):
-        raw = message.get("additional_kwargs")
-    else:
-        raw = getattr(message, "additional_kwargs", None)
-    return raw if isinstance(raw, dict) else {}
-
-
-def _is_branch_visible_message(message: Any) -> bool:
-    '''判断消息是否可在分支复制时展示。'''
-    if _message_additional_kwargs(message).get("hide_from_ui") is True:
-        return False
-    return _message_type(message) in {"human", "ai"}
-
-
-def _is_branch_assistant_message(message: Any) -> bool:
-    '''判断消息是否为助手消息。'''
-    return _message_type(message) == "ai"
-
-
-def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
-    '''从检查点元组提取消息通道值。'''
-    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
-    channel_values = checkpoint.get("channel_values", {}) or {}
-    messages = channel_values.get("messages") or []
-    return list(messages) if isinstance(messages, list) else []
-
-
-def _checkpoint_id(checkpoint_tuple: Any) -> str | None:
-    '''从检查点配置提取检查点标识。'''
-    config = getattr(checkpoint_tuple, "config", {}) or {}
-    raw = config.get("configurable", {}).get("checkpoint_id")
-    return raw if isinstance(raw, str) and raw else None
-
-
-def _matches_branch_target(messages: list[Any], target_message_ids: set[str]) -> bool:
-    '''判断检查点消息是否包含分支目标消息。'''
-    if not target_message_ids:
-        return False
-
-    index_by_id = {_message_id(message): index for index, message in enumerate(messages) if _message_id(message)}
-    if not target_message_ids.issubset(index_by_id.keys()):
-        return False
-    if any(not _is_branch_assistant_message(messages[index_by_id[message_id]]) for message_id in target_message_ids):
-        return False
-
-    target_end_index = max(index_by_id[message_id] for message_id in target_message_ids)
-    return not any(_is_branch_visible_message(message) for message in messages[target_end_index + 1 :])
-
-
-async def _find_branch_checkpoint(checkpointer: Any, thread_id: str, target_message_ids: set[str]) -> Any:
-    '''遍历线程检查点，定位包含目标消息的分支基点。'''
-    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
-    try:
-        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
-            if _matches_branch_target(_checkpoint_messages(checkpoint_tuple), target_message_ids):
-                return checkpoint_tuple
-    except Exception:
-        logger.exception("Failed to scan branch checkpoint history for thread %s", sanitize_log_param(thread_id))
-        raise HTTPException(status_code=500, detail="Failed to find branch checkpoint")
-    raise HTTPException(status_code=409, detail="This turn can no longer be branched from.")
-
-
-async def _branch_targets_latest_turn(checkpointer: Any, thread_id: str, target_message_ids: set[str]) -> bool:
-    '''判断目标是否为最新可见轮次；检查失败时按历史轮次处理以避免复制较新的工作区。'''
-    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
-    try:
-        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
-            messages = _checkpoint_messages(checkpoint_tuple)
-            if not messages:
-                continue
-            return _matches_branch_target(messages, target_message_ids)
-    except Exception:
-        logger.warning(
-            "Failed to resolve latest turn for thread %s; treating branch as historical",
-            sanitize_log_param(thread_id),
-            exc_info=True,
-        )
-    return False
-
-
-def _ignore_branch_user_data(directory: str, names: list[str]) -> set[str]:
-    '''筛除复制分支用户数据时不应继承的临时或运行文件。'''
-    ignored: set[str] = set()
-    base = Path(directory)
-    for name in names:
-        path = base / name
-        if name.startswith(".upload-") and name.endswith(".part"):
-            ignored.add(name)
-        elif path.is_symlink():
-            ignored.add(name)
-    return ignored
-
-
-def _copy_branch_user_data_sync(paths: Paths, source_thread_id: str, target_thread_id: str, *, user_id: str) -> str:
-    '''在工作线程中复制同一用户的分支沙箱数据目录。'''
-    source = paths.sandbox_user_data_dir(source_thread_id, user_id=user_id)
-    target = paths.sandbox_user_data_dir(target_thread_id, user_id=user_id)
-    if not source.exists():
-        return "not_found"
-
-    shutil.copytree(source, target, ignore=_ignore_branch_user_data, dirs_exist_ok=True)
-    return "current_thread_best_effort"
-
-
-async def _copy_branch_user_data(source_thread_id: str, target_thread_id: str) -> str:
-    '''异步调度当前用户的分支数据复制操作。'''
-    paths = get_paths()
-    user_id = get_effective_user_id()
-    try:
-        return await run_file_io(_copy_branch_user_data_sync, paths, source_thread_id, target_thread_id, user_id=user_id)
-    except Exception:
-        logger.warning(
-            "Failed to copy user-data for branch %s -> %s",
-            sanitize_log_param(source_thread_id),
-            sanitize_log_param(target_thread_id),
-            exc_info=True,
-        )
-        return "failed"
-
-
-def _default_branch_display_name(source_title: Any, *, source_is_branch: bool = False) -> str | None:
-    '''复用源线程的非空标题；已有分支同样保持原名，空标题交给后续生成流程。'''
-    if not isinstance(source_title, str):
-        return None
-
-    return source_title.strip() or None
-
-
-
-
 class ThreadDeleteResponse(BaseModel):
     '''返回线程清理是否成功及对应说明。'''
 
@@ -228,6 +70,13 @@ class ThreadResponse(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict, description="Thread metadata")
     values: dict[str, Any] = Field(default_factory=dict, description="Current state channel values")
     interrupts: dict[str, Any] = Field(default_factory=dict, description="Pending interrupts")
+
+
+def _strip_reserved_metadata(metadata: dict[str, Any] | None) -> dict[str, Any]:
+    '''复制线程元数据并移除只能由服务端写入的保留字段。'''
+    if not metadata:
+        return metadata or {}
+    return {k: v for k, v in metadata.items() if k not in _SERVER_RESERVED_METADATA_KEYS}
 
 
 class ThreadCreateRequest(BaseModel):
@@ -320,7 +169,6 @@ class ThreadCompactRequest(BaseModel):
 
     force: bool = Field(default=True, description="Run compaction even if automatic summarization thresholds are not met")
     keep: ContextSize | None = Field(default=None, description="Optional retention policy for this compaction only")
-    agent_name: str | None = Field(default=None, max_length=128, description="Optional custom agent name for memory attribution")
 
 
 class ThreadCompactResponse(BaseModel):
@@ -372,8 +220,6 @@ class ThreadBranchResponse(BaseModel):
     workspace_clone_mode: str
 
 
-
-
 def _delete_thread_data(thread_id: str, paths: Paths | None = None, *, user_id: str | None = None) -> ThreadDeleteResponse:
     '''删除线程在本地用户数据目录中的文件，并将缺失目录视为成功。'''
     path_manager = paths or get_paths()
@@ -383,65 +229,14 @@ def _delete_thread_data(thread_id: str, paths: Paths | None = None, *, user_id: 
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except FileNotFoundError:
         # 线程数据目录可能尚未创建，因此本地文件缺失不影响整体删除流程。
-        logger.debug("No local thread data to delete for %s", sanitize_log_param(thread_id))
+        logger.debug("No local thread data to delete for %s", thread_id)
         return ThreadDeleteResponse(success=True, message=f"No local data for {thread_id}")
     except Exception as exc:
-        logger.exception("Failed to delete thread data for %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to delete thread data for %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to delete local thread data.") from exc
 
-    logger.info("Deleted local thread data for %s", sanitize_log_param(thread_id))
+    logger.info("Deleted local thread data for %s", thread_id)
     return ThreadDeleteResponse(success=True, message=f"Deleted local thread data for {thread_id}")
-
-
-def _derive_thread_status(checkpoint_tuple) -> str:
-    '''根据检查点待写入错误和待执行任务推导线程错误、中断或空闲状态。'''
-    if checkpoint_tuple is None:
-        return "idle"
-    pending_writes = getattr(checkpoint_tuple, "pending_writes", None) or []
-
-    # 待写入记录包含错误时，线程处于错误状态。
-    for pw in pending_writes:
-        if len(pw) >= 2 and pw[1] == "__error__":
-            return "error"
-
-    # 仍有待执行任务通常表示运行被中断。
-    tasks = getattr(checkpoint_tuple, "tasks", None)
-    if tasks:
-        return "interrupted"
-
-    return "idle"
-
-
-async def _ensure_thread_for_goal(thread_id: str, request: Request) -> None:
-    '''为目标操作补齐线程元数据和根检查点，支持尚未运行过的新线程。'''
-    from server.gateway.deps import get_thread_store
-
-    thread_store = get_thread_store(request)
-    checkpointer = get_checkpointer(request)
-    thread_owner_user_id = get_trusted_internal_owner_user_id(request)
-    thread_owner_kwargs = {"user_id": thread_owner_user_id} if thread_owner_user_id else {}
-
-    record = await thread_store.get(thread_id, **thread_owner_kwargs)
-    if record is None and thread_owner_user_id:
-        unscoped_record = await thread_store.get(thread_id, user_id=None)
-        if unscoped_record is not None:
-            if unscoped_record.get("user_id") != thread_owner_user_id:
-                await thread_store.update_owner(thread_id, thread_owner_user_id, user_id=None)
-            record = await thread_store.get(thread_id, **thread_owner_kwargs)
-    if record is None:
-        try:
-            await thread_store.create(thread_id, metadata={}, **thread_owner_kwargs)
-        except Exception:
-            logger.exception("Failed to create thread_meta for goal thread %s", sanitize_log_param(thread_id))
-            raise HTTPException(status_code=500, detail="Failed to create thread") from None
-
-    try:
-        await ensure_thread_checkpoint(checkpointer, thread_id)
-    except Exception:
-        logger.exception("Failed to create goal checkpoint for thread %s", sanitize_log_param(thread_id))
-        raise HTTPException(status_code=500, detail="Failed to create thread checkpoint") from None
-
-
 
 
 @router.delete("/{thread_id}", response_model=ThreadDeleteResponse)
@@ -463,14 +258,14 @@ async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteRe
             if hasattr(checkpointer, "adelete_thread"):
                 await checkpointer.adelete_thread(thread_id)
         except Exception:
-            logger.debug("Could not delete checkpoints for thread %s (not critical)", sanitize_log_param(thread_id))
+            logger.debug("Could not delete checkpoints for thread %s (not critical)", thread_id)
 
     # 同步删除线程元数据，避免已删除线程继续出现在搜索结果中。
     try:
         thread_store = get_thread_store(request)
         await thread_store.delete(thread_id)
     except Exception:
-        logger.debug("Could not delete thread_meta for %s (not critical)", sanitize_log_param(thread_id))
+        logger.debug("Could not delete thread_meta for %s (not critical)", thread_id)
 
     return response
 
@@ -541,11 +336,11 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
         if existing_record is not None:
             return _existing_thread_response(thread_id, existing_record)
         # 若发生主键重复却无法读取已有记录，则属于真实故障。
-        logger.exception("Failed to write thread_meta for %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to write thread_meta for %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to create thread")
     except Exception:
         # 非并发竞态导致的故障必须向调用方报告，不能静默当作成功响应。
-        logger.exception("Failed to write thread_meta for %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to write thread_meta for %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to create thread")
 
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
@@ -560,10 +355,10 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
         }
         await checkpointer.aput(config, empty_checkpoint(), ckpt_metadata, {})
     except Exception:
-        logger.exception("Failed to create checkpoint for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to create checkpoint for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to create thread")
 
-    logger.info("Thread created: %s", sanitize_log_param(thread_id))
+    logger.info("Thread created: %s", thread_id)
     return ThreadResponse(
         thread_id=thread_id,
         status="idle",
@@ -571,6 +366,154 @@ async def create_thread(body: ThreadCreateRequest, request: Request) -> ThreadRe
         updated_at=now,
         metadata=body.metadata,
     )
+
+
+async def _find_branch_checkpoint(checkpointer: Any, thread_id: str, target_message_ids: set[str]) -> Any:
+    '''遍历线程检查点，定位包含目标消息的分支基点。'''
+    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+    try:
+        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
+            if _matches_branch_target(_checkpoint_messages(checkpoint_tuple), target_message_ids):
+                return checkpoint_tuple
+    except Exception:
+        logger.exception("Failed to scan branch checkpoint history for thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to find branch checkpoint")
+    raise HTTPException(status_code=409, detail="This turn can no longer be branched from.")
+
+
+def _matches_branch_target(messages: list[Any], target_message_ids: set[str]) -> bool:
+    '''判断检查点消息是否包含分支目标消息。'''
+    if not target_message_ids:
+        return False
+
+    index_by_id = {_message_id(message): index for index, message in enumerate(messages) if _message_id(message)}
+    if not target_message_ids.issubset(index_by_id.keys()):
+        return False
+    if any(not _is_branch_assistant_message(messages[index_by_id[message_id]]) for message_id in target_message_ids):
+        return False
+
+    target_end_index = max(index_by_id[message_id] for message_id in target_message_ids)
+    return not any(_is_branch_visible_message(message) for message in messages[target_end_index + 1 :])
+
+
+def _message_id(message: Any) -> str | None:
+    '''读取消息对象或字典中的标识。'''
+    if isinstance(message, dict):
+        raw = message.get("id")
+    else:
+        raw = getattr(message, "id", None)
+    return raw if isinstance(raw, str) and raw else None
+
+
+def _is_branch_assistant_message(message: Any) -> bool:
+    '''判断消息是否为助手消息。'''
+    return _message_type(message) == "ai"
+
+
+def _message_type(message: Any) -> str | None:
+    '''读取消息对象或字典中的类型。'''
+    if isinstance(message, dict):
+        raw = message.get("type")
+    else:
+        raw = getattr(message, "type", None)
+    return raw if isinstance(raw, str) and raw else None
+
+
+def _is_branch_visible_message(message: Any) -> bool:
+    '''判断消息是否可在分支复制时展示。'''
+    if _message_additional_kwargs(message).get("hide_from_ui") is True:
+        return False
+    return _message_type(message) in {"human", "ai"}
+
+
+def _message_additional_kwargs(message: Any) -> dict[str, Any]:
+    '''读取消息附加元数据；缺失时返回空字典。'''
+    if isinstance(message, dict):
+        raw = message.get("additional_kwargs")
+    else:
+        raw = getattr(message, "additional_kwargs", None)
+    return raw if isinstance(raw, dict) else {}
+
+
+def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
+    '''从检查点元组提取消息通道值。'''
+    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
+    channel_values = checkpoint.get("channel_values", {}) or {}
+    messages = channel_values.get("messages") or []
+    return list(messages) if isinstance(messages, list) else []
+
+
+def _checkpoint_id(checkpoint_tuple: Any) -> str | None:
+    '''从检查点配置提取检查点标识。'''
+    config = getattr(checkpoint_tuple, "config", {}) or {}
+    raw = config.get("configurable", {}).get("checkpoint_id")
+    return raw if isinstance(raw, str) and raw else None
+
+
+async def _branch_targets_latest_turn(checkpointer: Any, thread_id: str, target_message_ids: set[str]) -> bool:
+    '''判断目标是否为最新可见轮次；检查失败时按历史轮次处理以避免复制较新的工作区。'''
+    config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+    try:
+        async for checkpoint_tuple in checkpointer.alist(config, limit=_BRANCH_HISTORY_SCAN_LIMIT):
+            messages = _checkpoint_messages(checkpoint_tuple)
+            if not messages:
+                continue
+            return _matches_branch_target(messages, target_message_ids)
+    except Exception:
+        logger.warning(
+            "Failed to resolve latest turn for thread %s; treating branch as historical",
+            thread_id,
+            exc_info=True,
+        )
+    return False
+
+
+def _default_branch_display_name(source_title: Any, *, source_is_branch: bool = False) -> str | None:
+    '''复用源线程的非空标题；已有分支同样保持原名，空标题交给后续生成流程。'''
+    if not isinstance(source_title, str):
+        return None
+
+    return source_title.strip() or None
+
+
+async def _copy_branch_user_data(source_thread_id: str, target_thread_id: str) -> str:
+    '''异步调度当前用户的分支数据复制操作。'''
+    paths = get_paths()
+    user_id = get_effective_user_id()
+    try:
+        return await run_file_io(_copy_branch_user_data_sync, paths, source_thread_id, target_thread_id, user_id=user_id)
+    except Exception:
+        logger.warning(
+            "Failed to copy user-data for branch %s -> %s",
+            source_thread_id,
+            target_thread_id,
+            exc_info=True,
+        )
+        return "failed"
+
+
+def _copy_branch_user_data_sync(paths: Paths, source_thread_id: str, target_thread_id: str, *, user_id: str) -> str:
+    '''在工作线程中复制同一用户的分支沙箱数据目录。'''
+    source = paths.sandbox_user_data_dir(source_thread_id, user_id=user_id)
+    target = paths.sandbox_user_data_dir(target_thread_id, user_id=user_id)
+    if not source.exists():
+        return "not_found"
+
+    shutil.copytree(source, target, ignore=_ignore_branch_user_data, dirs_exist_ok=True)
+    return "current_thread_best_effort"
+
+
+def _ignore_branch_user_data(directory: str, names: list[str]) -> set[str]:
+    '''筛除复制分支用户数据时不应继承的临时或运行文件。'''
+    ignored: set[str] = set()
+    base = Path(directory)
+    for name in names:
+        path = base / name
+        if name.startswith(".upload-") and name.endswith(".part"):
+            ignored.add(name)
+        elif path.is_symlink():
+            ignored.add(name)
+    return ignored
 
 
 @router.post("/{thread_id}/branches", response_model=ThreadBranchResponse)
@@ -633,7 +576,7 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
     try:
         await checkpointer.aput(write_config, checkpoint, metadata, new_versions)
     except Exception:
-        logger.exception("Failed to write branch checkpoint for thread %s", sanitize_log_param(new_thread_id))
+        logger.exception("Failed to write branch checkpoint for thread %s", new_thread_id)
         raise HTTPException(status_code=500, detail="Failed to create branch") from None
 
     try:
@@ -645,7 +588,7 @@ async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Requ
             **thread_owner_kwargs,
         )
     except Exception:
-        logger.exception("Failed to write branch thread_meta for %s", sanitize_log_param(new_thread_id))
+        logger.exception("Failed to write branch thread_meta for %s", new_thread_id)
         raise HTTPException(status_code=500, detail="Failed to create branch") from None
 
     if branch_from_latest_turn:
@@ -707,7 +650,7 @@ async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Reques
     try:
         await thread_store.update_metadata(thread_id, body.metadata)
     except Exception:
-        logger.exception("Failed to patch thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to patch thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to update thread")
 
     # 重新读取合并后的元数据和更新时间。
@@ -721,13 +664,32 @@ async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Reques
     )
 
 
+def _derive_thread_status(checkpoint_tuple) -> str:
+    '''根据检查点待写入错误和待执行任务推导线程错误、中断或空闲状态。'''
+    if checkpoint_tuple is None:
+        return "idle"
+    pending_writes = getattr(checkpoint_tuple, "pending_writes", None) or []
+
+    # 待写入记录包含错误时，线程处于错误状态。
+    for pw in pending_writes:
+        if len(pw) >= 2 and pw[1] == "__error__":
+            return "error"
+
+    # 仍有待执行任务通常表示运行被中断。
+    tasks = getattr(checkpoint_tuple, "tasks", None)
+    if tasks:
+        return "interrupted"
+
+    return "idle"
+
+
 @router.get("/{thread_id}", response_model=ThreadResponse)
 @require_permission("threads", "read", owner_check=True)
 async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
     '''读取线程元数据及当前用户可见的状态信息。
 
-        从 ThreadMetaStore 读取元数据，并根据检查点保存器推导准确的运行状态。
-        对引入 ThreadMetaStore 之前创建的旧线程，回退为仅查询检查点保存器。
+        从线程元数据仓储读取元数据，并根据检查点保存器推导准确的运行状态。
+        对引入线程元数据仓储之前创建的旧线程，回退为仅查询检查点保存器。
     '''
     from server.gateway.deps import get_thread_store
 
@@ -741,7 +703,7 @@ async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
     try:
         checkpoint_tuple = await checkpointer.aget_tuple(config)
     except Exception:
-        logger.exception("Failed to get checkpoint for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to get checkpoint for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to get thread")
 
     if record is None and checkpoint_tuple is None:
@@ -783,9 +745,39 @@ async def get_thread_goal(thread_id: str, request: Request) -> ThreadGoalRespons
     try:
         goal = await read_thread_goal(checkpointer, thread_id)
     except Exception:
-        logger.exception("Failed to read goal for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to read goal for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to read thread goal") from None
     return ThreadGoalResponse(goal=goal)
+
+
+async def _ensure_thread_for_goal(thread_id: str, request: Request) -> None:
+    '''为目标操作补齐线程元数据和根检查点，支持尚未运行过的新线程。'''
+    from server.gateway.deps import get_thread_store
+
+    thread_store = get_thread_store(request)
+    checkpointer = get_checkpointer(request)
+    thread_owner_user_id = get_trusted_internal_owner_user_id(request)
+    thread_owner_kwargs = {"user_id": thread_owner_user_id} if thread_owner_user_id else {}
+
+    record = await thread_store.get(thread_id, **thread_owner_kwargs)
+    if record is None and thread_owner_user_id:
+        unscoped_record = await thread_store.get(thread_id, user_id=None)
+        if unscoped_record is not None:
+            if unscoped_record.get("user_id") != thread_owner_user_id:
+                await thread_store.update_owner(thread_id, thread_owner_user_id, user_id=None)
+            record = await thread_store.get(thread_id, **thread_owner_kwargs)
+    if record is None:
+        try:
+            await thread_store.create(thread_id, metadata={}, **thread_owner_kwargs)
+        except Exception:
+            logger.exception("Failed to create thread_meta for goal thread %s", thread_id)
+            raise HTTPException(status_code=500, detail="Failed to create thread") from None
+
+    try:
+        await ensure_thread_checkpoint(checkpointer, thread_id)
+    except Exception:
+        logger.exception("Failed to create goal checkpoint for thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to create thread checkpoint") from None
 
 
 @router.put("/{thread_id}/goal", response_model=ThreadGoalResponse)
@@ -801,7 +793,7 @@ async def set_thread_goal(thread_id: str, body: ThreadGoalRequest, request: Requ
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     except Exception:
-        logger.exception("Failed to set goal for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to set goal for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to set thread goal") from None
     return ThreadGoalResponse(goal=goal)
 
@@ -817,7 +809,7 @@ async def clear_thread_goal(thread_id: str, request: Request) -> ThreadGoalRespo
     except LookupError:
         return ThreadGoalResponse(goal=None)
     except Exception:
-        logger.exception("Failed to clear goal for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to clear goal for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to clear thread goal") from None
     return ThreadGoalResponse(goal=None)
 
@@ -853,7 +845,6 @@ async def compact_thread(thread_id: str, body: ThreadCompactRequest, request: Re
                 keep=keep,
                 force=body.force,
                 user_id=get_effective_user_id(),
-                agent_name=body.agent_name,
             )
     except ContextCompactionDisabled:
         raise HTTPException(status_code=409, detail="Context compaction is disabled.") from None
@@ -864,7 +855,7 @@ async def compact_thread(thread_id: str, body: ThreadCompactRequest, request: Re
     except HTTPException:
         raise
     except Exception:
-        logger.exception("Failed to compact thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to compact thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to compact thread context.") from None
     return _thread_compact_response(result)
 
@@ -882,7 +873,7 @@ async def get_thread_state(thread_id: str, request: Request) -> ThreadStateRespo
     try:
         checkpoint_tuple = await checkpointer.aget_tuple(config)
     except Exception:
-        logger.exception("Failed to get state for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to get state for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to get thread state")
 
     if checkpoint_tuple is None:
@@ -943,7 +934,7 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
     try:
         checkpoint_tuple = await checkpointer.aget_tuple(read_config)
     except Exception:
-        logger.exception("Failed to get state for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to get state for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to get thread state")
 
     if checkpoint_tuple is None:
@@ -983,7 +974,7 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
     try:
         new_config = await checkpointer.aput(write_config, checkpoint, metadata, {})
     except Exception:
-        logger.exception("Failed to update state for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to update state for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to update thread state")
 
     new_checkpoint_id: str | None = None
@@ -997,7 +988,7 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
             try:
                 await thread_store.update_display_name(thread_id, new_title)
             except Exception:
-                logger.debug("Failed to sync title to thread_meta for %s (non-fatal)", sanitize_log_param(thread_id))
+                logger.debug("Failed to sync title to thread_meta for %s (non-fatal)", thread_id)
 
     return ThreadStateResponse(
         values=serialize_channel_values_for_api(channel_values),
@@ -1006,12 +997,6 @@ async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, re
         checkpoint_id=new_checkpoint_id,
         created_at=coerce_iso(metadata.get("created_at", "")),
     )
-
-
-def _ai_message_lacks_duration(message: dict[str, Any]) -> bool:
-    '''判断助手消息是否尚未写入回合耗时。'''
-    additional_kwargs = message.get("additional_kwargs")
-    return message.get("type") == "ai" and (not isinstance(additional_kwargs, dict) or "turn_duration" not in additional_kwargs)
 
 
 def _checkpoint_run_durations(metadata: Any) -> dict[str, int]:
@@ -1031,6 +1016,12 @@ def _set_message_turn_duration(message: dict[str, Any], run_id: str, run_duratio
         additional_kwargs = {}
         message["additional_kwargs"] = additional_kwargs
     additional_kwargs.setdefault("turn_duration", run_durations[run_id])
+
+
+def _ai_message_lacks_duration(message: dict[str, Any]) -> bool:
+    '''判断助手消息是否尚未写入回合耗时。'''
+    additional_kwargs = message.get("additional_kwargs")
+    return message.get("type") == "ai" and (not isinstance(additional_kwargs, dict) or "turn_duration" not in additional_kwargs)
 
 
 @router.post("/{thread_id}/history", response_model=list[HistoryEntry])
@@ -1177,7 +1168,7 @@ async def get_thread_history(
                 )
             )
     except Exception:
-        logger.exception("Failed to get history for thread %s", sanitize_log_param(thread_id))
+        logger.exception("Failed to get history for thread %s", thread_id)
         raise HTTPException(status_code=500, detail="Failed to get thread history")
 
     return entries

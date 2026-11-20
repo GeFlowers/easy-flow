@@ -45,6 +45,159 @@ _MEDIUM_RISK_PATTERNS: list[re.Pattern[str]] = [
 ]
 
 
+class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
+    '''为 Bash 调用执行输入校验和风险分级；高风险命令被阻断，中风险命令执行后附加警告。'''
+
+    state_schema = ThreadState
+
+
+    def _get_thread_id(self, request: ToolCallRequest) -> str | None:
+        '''从工具运行上下文或可配置项中提取当前线程编号。'''
+        runtime = request.runtime
+        if runtime is None:
+            return None
+        ctx = getattr(runtime, "context", None) or {}
+        thread_id = ctx.get("thread_id") if isinstance(ctx, dict) else None
+        if thread_id is None:
+            cfg = getattr(runtime, "config", None) or {}
+            thread_id = cfg.get("configurable", {}).get("thread_id")
+        return thread_id
+
+    _AUDIT_COMMAND_LIMIT = 200
+
+    def _write_audit(self, thread_id: str | None, command: str, verdict: str, *, truncate: bool = False) -> None:
+        '''将命令、风险判定、时间和线程编号写入结构化审计日志。'''
+        audited_command = command
+        if truncate and len(command) > self._AUDIT_COMMAND_LIMIT:
+            audited_command = f"{command[: self._AUDIT_COMMAND_LIMIT]}... ({len(command)} chars)"
+        record = {
+            "timestamp": datetime.now(UTC).isoformat(),
+            "thread_id": thread_id or "unknown",
+            "command": audited_command,
+            "verdict": verdict,
+        }
+        logger.info("[SandboxAudit] %s", json.dumps(record, ensure_ascii=False))
+
+    def _build_block_message(self, request: ToolCallRequest, reason: str) -> ToolMessage:
+        '''构造工具错误结果，说明命令被拦截并允许智能体继续处理。'''
+        tool_call_id = str(request.tool_call.get("id") or "missing_id")
+        return ToolMessage(
+            content=f"命令已阻止： {reason}。请采用更安全的替代方案。",
+            tool_call_id=tool_call_id,
+            name="bash",
+            status="error",
+        )
+
+    def _append_warn_to_result(self, result: ToolMessage | Command, command: str) -> ToolMessage | Command:
+        '''仅对普通工具结果追加中风险提示；其他类型的控制结果保持不变。'''
+        if not isinstance(result, ToolMessage):
+            return result
+        warning = f"\n\n⚠️ Warning: `{command}` 是中等风险命令，可能修改运行环境。"
+        if isinstance(result.content, list):
+            new_content = list(result.content) + [{"type": "text", "text": warning}]
+        else:
+            new_content = str(result.content) + warning
+        return ToolMessage(
+            content=new_content,
+            tool_call_id=result.tool_call_id,
+            name=result.name,
+            status=result.status,
+        )
+
+
+    _MAX_COMMAND_LENGTH = 10_000
+
+    @override
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        '''同步包装工具调用：非 Bash 调用直接放行，其他调用按风险拦截或追加警告。'''
+        if request.tool_call.get("name") != "bash":
+            return handler(request)
+
+        command, _, verdict, reject_reason = self._pre_process(request)
+        if verdict == "block":
+            reason = reject_reason or "检测到安全违规"
+            return self._build_block_message(request, reason)
+        result = handler(request)
+        if verdict == "warn":
+            result = self._append_warn_to_result(result, command)
+        return result
+
+    def _pre_process(self, request: ToolCallRequest) -> tuple[str, str | None, str, str | None]:
+        '''提取命令和线程信息，完成输入校验、风险分类及审计，返回执行判定。'''
+        args = request.tool_call.get("args", {})
+        raw_command = args.get("command")
+        command = raw_command if isinstance(raw_command, str) else ""
+        thread_id = self._get_thread_id(request)
+
+        reject_reason = self._validate_input(command)
+        if reject_reason:
+            self._write_audit(thread_id, command, "block", truncate=True)
+            logger.warning("[SandboxAudit] INVALID INPUT thread=%s reason=%s", thread_id, reject_reason)
+            return command, thread_id, "block", reject_reason
+
+        verdict = _classify_command(command)
+
+        self._write_audit(thread_id, command, verdict)
+
+        if verdict == "block":
+            logger.warning("[SandboxAudit] BLOCKED thread=%s cmd=%r", thread_id, command)
+        elif verdict == "warn":
+            logger.warning("[SandboxAudit] WARN (medium-risk) thread=%s cmd=%r", thread_id, command)
+
+        return command, thread_id, verdict, None
+
+    def _validate_input(self, command: str) -> str | None:
+        '''拒绝空命令、超长命令和含空字节的输入，并返回对应原因。'''
+        if not command.strip():
+            return "命令为空"
+        if len(command) > self._MAX_COMMAND_LENGTH:
+            return "命令过长"
+        if "\x00" in command:
+            return "检测到空字节"
+        return None
+
+    @override
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        '''异步包装工具调用，并与同步路径采用相同的命令校验和风险处理规则。'''
+        if request.tool_call.get("name") != "bash":
+            return await handler(request)
+
+        command, _, verdict, reject_reason = self._pre_process(request)
+        if verdict == "block":
+            reason = reject_reason or "检测到安全违规"
+            return self._build_block_message(request, reason)
+        result = await handler(request)
+        if verdict == "warn":
+            result = self._append_warn_to_result(result, command)
+        return result
+
+
+def _classify_command(command: str) -> str:
+    '''先检查整段命令以识别跨语句攻击，再逐条评估子命令并采用最严格的风险判定。'''
+    normalized = " ".join(command.split())
+    for pattern in _HIGH_RISK_PATTERNS:
+        if pattern.search(normalized):
+            return "block"
+
+    sub_commands = _split_compound_command(command)
+    worst = "pass"
+    for sub in sub_commands:
+        verdict = _classify_single_command(sub)
+        if verdict == "block":
+            return "block"
+        if verdict == "warn":
+            worst = "warn"
+    return worst
+
+
 def _split_compound_command(command: str) -> list[str]:
     '''按未加引号的 Shell 控制符拆分复合命令；引号未闭合或转义残缺时保留原命令以失败关闭。'''
     parts: list[str] = []
@@ -131,160 +284,3 @@ def _classify_single_command(command: str) -> str:
             return "warn"
 
     return "pass"
-
-
-def _classify_command(command: str) -> str:
-    '''先检查整段命令以识别跨语句攻击，再逐条评估子命令并采用最严格的风险判定。'''
-    normalized = " ".join(command.split())
-    for pattern in _HIGH_RISK_PATTERNS:
-        if pattern.search(normalized):
-            return "block"
-
-    sub_commands = _split_compound_command(command)
-    worst = "pass"
-    for sub in sub_commands:
-        verdict = _classify_single_command(sub)
-        if verdict == "block":
-            return "block"
-        if verdict == "warn":
-            worst = "warn"
-    return worst
-
-
-
-
-class SandboxAuditMiddleware(AgentMiddleware[ThreadState]):
-    '''为 Bash 调用执行输入校验和风险分级；高风险命令被阻断，中风险命令执行后附加警告。'''
-
-    state_schema = ThreadState
-
-
-    def _get_thread_id(self, request: ToolCallRequest) -> str | None:
-        '''从工具运行上下文或可配置项中提取当前线程编号。'''
-        runtime = request.runtime
-        if runtime is None:
-            return None
-        ctx = getattr(runtime, "context", None) or {}
-        thread_id = ctx.get("thread_id") if isinstance(ctx, dict) else None
-        if thread_id is None:
-            cfg = getattr(runtime, "config", None) or {}
-            thread_id = cfg.get("configurable", {}).get("thread_id")
-        return thread_id
-
-    _AUDIT_COMMAND_LIMIT = 200
-
-    def _write_audit(self, thread_id: str | None, command: str, verdict: str, *, truncate: bool = False) -> None:
-        '''将命令、风险判定、时间和线程编号写入结构化审计日志。'''
-        audited_command = command
-        if truncate and len(command) > self._AUDIT_COMMAND_LIMIT:
-            audited_command = f"{command[: self._AUDIT_COMMAND_LIMIT]}... ({len(command)} chars)"
-        record = {
-            "timestamp": datetime.now(UTC).isoformat(),
-            "thread_id": thread_id or "unknown",
-            "command": audited_command,
-            "verdict": verdict,
-        }
-        logger.info("[SandboxAudit] %s", json.dumps(record, ensure_ascii=False))
-
-    def _build_block_message(self, request: ToolCallRequest, reason: str) -> ToolMessage:
-        '''构造工具错误结果，说明命令被拦截并允许智能体继续处理。'''
-        tool_call_id = str(request.tool_call.get("id") or "missing_id")
-        return ToolMessage(
-            content=f"命令已阻止： {reason}。请采用更安全的替代方案。",
-            tool_call_id=tool_call_id,
-            name="bash",
-            status="error",
-        )
-
-    def _append_warn_to_result(self, result: ToolMessage | Command, command: str) -> ToolMessage | Command:
-        '''仅对普通工具结果追加中风险提示；其他类型的控制结果保持不变。'''
-        if not isinstance(result, ToolMessage):
-            return result
-        warning = f"\n\n⚠️ Warning: `{command}` 是中等风险命令，可能修改运行环境。"
-        if isinstance(result.content, list):
-            new_content = list(result.content) + [{"type": "text", "text": warning}]
-        else:
-            new_content = str(result.content) + warning
-        return ToolMessage(
-            content=new_content,
-            tool_call_id=result.tool_call_id,
-            name=result.name,
-            status=result.status,
-        )
-
-
-    _MAX_COMMAND_LENGTH = 10_000
-
-    def _validate_input(self, command: str) -> str | None:
-        '''拒绝空命令、超长命令和含空字节的输入，并返回对应原因。'''
-        if not command.strip():
-            return "命令为空"
-        if len(command) > self._MAX_COMMAND_LENGTH:
-            return "命令过长"
-        if "\x00" in command:
-            return "检测到空字节"
-        return None
-
-
-    def _pre_process(self, request: ToolCallRequest) -> tuple[str, str | None, str, str | None]:
-        '''提取命令和线程信息，完成输入校验、风险分类及审计，返回执行判定。'''
-        args = request.tool_call.get("args", {})
-        raw_command = args.get("command")
-        command = raw_command if isinstance(raw_command, str) else ""
-        thread_id = self._get_thread_id(request)
-
-        reject_reason = self._validate_input(command)
-        if reject_reason:
-            self._write_audit(thread_id, command, "block", truncate=True)
-            logger.warning("[SandboxAudit] INVALID INPUT thread=%s reason=%s", thread_id, reject_reason)
-            return command, thread_id, "block", reject_reason
-
-        verdict = _classify_command(command)
-
-        self._write_audit(thread_id, command, verdict)
-
-        if verdict == "block":
-            logger.warning("[SandboxAudit] BLOCKED thread=%s cmd=%r", thread_id, command)
-        elif verdict == "warn":
-            logger.warning("[SandboxAudit] WARN (medium-risk) thread=%s cmd=%r", thread_id, command)
-
-        return command, thread_id, verdict, None
-
-
-    @override
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        '''同步包装工具调用：非 Bash 调用直接放行，其他调用按风险拦截或追加警告。'''
-        if request.tool_call.get("name") != "bash":
-            return handler(request)
-
-        command, _, verdict, reject_reason = self._pre_process(request)
-        if verdict == "block":
-            reason = reject_reason or "检测到安全违规"
-            return self._build_block_message(request, reason)
-        result = handler(request)
-        if verdict == "warn":
-            result = self._append_warn_to_result(result, command)
-        return result
-
-    @override
-    async def awrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
-        '''异步包装工具调用，并与同步路径采用相同的命令校验和风险处理规则。'''
-        if request.tool_call.get("name") != "bash":
-            return await handler(request)
-
-        command, _, verdict, reject_reason = self._pre_process(request)
-        if verdict == "block":
-            reason = reject_reason or "检测到安全违规"
-            return self._build_block_message(request, reason)
-        result = await handler(request)
-        if verdict == "warn":
-            result = self._append_warn_to_result(result, command)
-        return result

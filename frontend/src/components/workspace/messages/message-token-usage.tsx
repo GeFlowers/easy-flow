@@ -5,7 +5,6 @@ import { Badge } from "@/components/ui/badge";
 import { useI18n } from "@/features/i18n/hooks";
 import { accumulateUsage, formatTokenCount } from "@/features/messages/usage";
 import type { TokenDebugStep } from "@/features/messages/usage-model";
-import { cn } from "@/lib/utils";
 
 /** 以统一格式呈现输入、输出和总 token 数量，供消息统计视图复用。 */
 function TokenUsageSummary({
@@ -23,10 +22,12 @@ function TokenUsageSummary({
 
   return (
     <div
-      className={cn(
+      className={[
         "text-muted-foreground border-border/60 mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 border-t pt-2 text-[11px]",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <span className="inline-flex items-center gap-1 font-medium">
         <CoinsIcon className="size-3" />
@@ -106,7 +107,11 @@ export function MessageTokenUsageDebugList({
   }
 
   return (
-    <div className={cn("border-border/60 mt-1 border-t pt-2", className)}>
+    <div
+      className={["border-border/60 mt-1 border-t pt-2", className]
+        .filter(Boolean)
+        .join(" ")}
+    >
       <div className="space-y-2">
         {steps.map((step) => (
           <div

@@ -30,16 +30,6 @@ logger = logging.getLogger(__name__)
 MAX_RESULTS = 5
 
 
-def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
-    '''不区分大小写地编译模式；无效模式退化为字面量匹配而不抛出异常。'''
-    try:
-        return re.compile(pattern, re.IGNORECASE)
-    except re.error:
-        return re.compile(re.escape(pattern), re.IGNORECASE)
-
-
-
-
 @dataclass(frozen=True)
 class DeferredToolCatalog:
     '''不可变的延迟工具目录，仅提供无副作用的搜索。'''
@@ -94,6 +84,12 @@ def _catalog_regex_score(pattern: str, t: BaseTool) -> int:
     return len(regex.findall(f"{t.name} {t.description or ''}"))
 
 
+def _compile_catalog_regex(pattern: str) -> re.Pattern[str]:
+    '''不区分大小写地编译模式；无效模式退化为字面量匹配而不抛出异常。'''
+    try:
+        return re.compile(pattern, re.IGNORECASE)
+    except re.error:
+        return re.compile(re.escape(pattern), re.IGNORECASE)
 
 
 @dataclass(frozen=True)
@@ -162,21 +158,6 @@ def assemble_deferred_tools(filtered_tools: list[BaseTool], *, enabled: bool) ->
     return final_tools, deferred_setup
 
 
-def _routing_priority(value: Any) -> int:
-    '''将路由优先级安全转换为整数。'''
-    try:
-        return int(value)
-    except (TypeError, ValueError):
-        return 0
-
-
-def _routing_keywords(value: Any) -> list[str]:
-    '''将路由关键字安全规范化为字符串列表。'''
-    if not isinstance(value, list):
-        return []
-    return [keyword for keyword in (str(item).strip() for item in value) if keyword]
-
-
 def build_mcp_routing_middleware(
     tools: Iterable[BaseTool],
     deferred_setup: DeferredToolSetup,
@@ -216,6 +197,19 @@ def build_mcp_routing_middleware(
     return McpRoutingMiddleware(routing_index, deferred_setup.catalog_hash, top_k)
 
 
+def _routing_keywords(value: Any) -> list[str]:
+    '''将路由关键字安全规范化为字符串列表。'''
+    if not isinstance(value, list):
+        return []
+    return [keyword for keyword in (str(item).strip() for item in value) if keyword]
+
+
+def _routing_priority(value: Any) -> int:
+    '''将路由优先级安全转换为整数。'''
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return 0
 
 
 def get_deferred_tools_prompt_section(*, deferred_names: frozenset[str] = frozenset()) -> str:
@@ -227,13 +221,6 @@ def get_deferred_tools_prompt_section(*, deferred_names: frozenset[str] = frozen
         return ""
     names = "\n".join(html.escape(name, quote=False) for name in sorted(deferred_names))
     return f"<available-deferred-tools>\n{names}\n</available-deferred-tools>"
-
-
-def _format_keyword_list(keywords: list[str]) -> str:
-    '''将关键字列表格式化为自然语言短语。'''
-    if len(keywords) == 1:
-        return keywords[0]
-    return f"{', '.join(keywords[:-1])}，或 {keywords[-1]}"
 
 
 def get_mcp_routing_hints_prompt_section(tools: Iterable[BaseTool], *, deferred_names: frozenset[str] = frozenset()) -> str:
@@ -264,3 +251,10 @@ def get_mcp_routing_hints_prompt_section(tools: Iterable[BaseTool], *, deferred_
             lines.append(f"  优先使用 `{esc_name}` 工具。")
     lines.append("</mcp_routing_hints>")
     return "\n".join(lines)
+
+
+def _format_keyword_list(keywords: list[str]) -> str:
+    '''将关键字列表格式化为自然语言短语。'''
+    if len(keywords) == 1:
+        return keywords[0]
+    return f"{', '.join(keywords[:-1])}，或 {keywords[-1]}"

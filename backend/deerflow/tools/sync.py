@@ -20,22 +20,6 @@ _SYNC_TOOL_EXECUTOR = concurrent.futures.ThreadPoolExecutor(max_workers=10, thre
 atexit.register(lambda: _SYNC_TOOL_EXECUTOR.shutdown(wait=False))
 
 
-def _get_runnable_config_param(func: Callable[..., Any]) -> str | None:
-    '''返回协程中用于接收 LangChain ``RunnableConfig`` 的参数名。'''
-    if isinstance(func, functools.partial):
-        func = func.func
-
-    try:
-        type_hints = get_type_hints(func)
-    except Exception:
-        return None
-
-    for name, type_ in type_hints.items():
-        if type_ is RunnableConfig:
-            return name
-    return None
-
-
 def make_sync_tool_wrapper(coro: Callable[..., Any], tool_name: str) -> Callable[..., Any]:
     '''为异步工具协程构建可供 ``BaseTool.func`` 使用的同步包装器。
 
@@ -76,3 +60,19 @@ def make_sync_tool_wrapper(coro: Callable[..., Any], tool_name: str) -> Callable
         return run_coroutine(*args, **kwargs)
 
     return sync_wrapper
+
+
+def _get_runnable_config_param(func: Callable[..., Any]) -> str | None:
+    '''返回协程中用于接收 LangChain ``RunnableConfig`` 的参数名。'''
+    if isinstance(func, functools.partial):
+        func = func.func
+
+    try:
+        type_hints = get_type_hints(func)
+    except Exception:
+        return None
+
+    for name, type_ in type_hints.items():
+        if type_ is RunnableConfig:
+            return name
+    return None

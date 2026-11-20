@@ -1,7 +1,5 @@
 import { XIcon } from "lucide-react";
 
-import { cn } from "@/lib/utils";
-
 /** `/skill` 激活的共用视觉组件：编辑器中可移除，聊天记录中只读。集中维护可避免两处 Tailwind 类逐渐偏离。 */
 const CHIP_BASE_CLASS =
   "border-primary/20 bg-primary/10 text-primary inline-flex h-6 shrink-0 items-center rounded-md border px-1.5 font-mono text-xs leading-none font-medium shadow-xs";
@@ -23,11 +21,13 @@ export function SlashSkillChip({
     return (
       <button
         aria-label={removeLabel ?? `Remove /${name}`}
-        className={cn(
+        className={[
           CHIP_BASE_CLASS,
           "hover:bg-primary/20 cursor-pointer gap-1 transition-colors",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={onRemove}
         type="button"
       >
@@ -38,7 +38,11 @@ export function SlashSkillChip({
   }
 
   return (
-    <span className={cn(CHIP_BASE_CLASS, "max-w-full", className)}>
+    <span
+      className={[CHIP_BASE_CLASS, "max-w-full", className]
+        .filter(Boolean)
+        .join(" ")}
+    >
       /{name}
     </span>
   );

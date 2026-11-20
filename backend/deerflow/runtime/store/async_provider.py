@@ -20,6 +20,17 @@ logger = logging.getLogger(__name__)
 
 
 @contextlib.asynccontextmanager
+async def make_store(app_config: AppConfig | None = None) -> AsyncIterator[BaseStore]:
+    '''从传入或当前应用配置解析后端，创建异步存储器并在退出时释放连接。'''
+    if app_config is None:
+        app_config = get_app_config()
+
+    config = _resolve_store_config(app_config)
+    async with _async_store(config) as store:
+        yield store
+
+
+@contextlib.asynccontextmanager
 async def _async_store(config) -> AsyncIterator[BaseStore]:
     '''创建并初始化异步 PostgreSQL 存储器，离开上下文时关闭连接。'''
     if config.type == "postgres":
@@ -40,16 +51,3 @@ async def _async_store(config) -> AsyncIterator[BaseStore]:
         return
 
     raise ValueError(f"Unknown store backend type: {config.type!r}")
-
-
-
-
-@contextlib.asynccontextmanager
-async def make_store(app_config: AppConfig | None = None) -> AsyncIterator[BaseStore]:
-    '''从传入或当前应用配置解析后端，创建异步存储器并在退出时释放连接。'''
-    if app_config is None:
-        app_config = get_app_config()
-
-    config = _resolve_store_config(app_config)
-    async with _async_store(config) as store:
-        yield store

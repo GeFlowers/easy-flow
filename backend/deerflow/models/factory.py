@@ -98,16 +98,6 @@ def _warn_unknown_model_settings(model_class, model_name: str, model_settings_fr
 _DEFAULT_STREAM_CHUNK_TIMEOUT_SECONDS: float = 240.0
 
 
-def _apply_stream_chunk_timeout_default(model_class: type, model_settings_from_config: dict) -> None:
-    '''为 OpenAI 兼容模型补充流式分块超时，并从其他模型配置中移除不适用的参数。'''
-    if not issubclass(model_class, BaseChatOpenAI):
-        model_settings_from_config.pop("stream_chunk_timeout", None)
-        return
-    if "stream_chunk_timeout" in model_settings_from_config:
-        return
-    model_settings_from_config["stream_chunk_timeout"] = _DEFAULT_STREAM_CHUNK_TIMEOUT_SECONDS
-
-
 def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *, app_config: AppConfig | None = None, attach_tracing: bool = True, **kwargs) -> BaseChatModel:
     '''按模型配置创建聊天模型，并按调用场景控制思考模式和追踪回调。
 
@@ -210,3 +200,13 @@ def create_chat_model(name: str | None = None, thinking_enabled: bool = False, *
             model_instance.callbacks = [*existing_callbacks, *callbacks]
             logger.debug(f"Tracing attached to model '{name}' with providers={len(callbacks)}")
     return model_instance
+
+
+def _apply_stream_chunk_timeout_default(model_class: type, model_settings_from_config: dict) -> None:
+    '''为 OpenAI 兼容模型补充流式分块超时，并从其他模型配置中移除不适用的参数。'''
+    if not issubclass(model_class, BaseChatOpenAI):
+        model_settings_from_config.pop("stream_chunk_timeout", None)
+        return
+    if "stream_chunk_timeout" in model_settings_from_config:
+        return
+    model_settings_from_config["stream_chunk_timeout"] = _DEFAULT_STREAM_CHUNK_TIMEOUT_SECONDS

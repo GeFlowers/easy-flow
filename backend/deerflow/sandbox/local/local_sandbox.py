@@ -84,109 +84,6 @@ class ResolvedPath(NamedTuple):
 class LocalSandbox(Sandbox):
     '''本地文件系统沙箱实现。'''
 
-    @staticmethod
-    def _shell_name(shell: str) -> str:
-        '''返回命令解释器路径或命令对应的可执行文件名。'''
-        return shell.replace("\\", "/").rsplit("/", 1)[-1].lower()
-
-    @staticmethod
-    def _is_powershell(shell: str) -> bool:
-        '''判断选定的命令解释器是否为 PowerShell 可执行文件。'''
-        return LocalSandbox._shell_name(shell) in {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}
-
-    @staticmethod
-    def _is_cmd_shell(shell: str) -> bool:
-        '''判断选定的命令解释器是否为 cmd.exe。'''
-        return LocalSandbox._shell_name(shell) in {"cmd", "cmd.exe"}
-
-    @staticmethod
-    def _is_msys_shell(shell: str) -> bool:
-        '''判断选定的命令解释器是否为 Git Bash 或 MSYS 命令解释器。'''
-        normalized = shell.replace("\\", "/").lower()
-        shell_name = LocalSandbox._shell_name(shell)
-        return shell_name in {"sh.exe", "bash.exe"} and any(part in normalized for part in ("/git/", "/mingw", "/msys"))
-
-    @staticmethod
-    def _find_first_available_shell(candidates: tuple[str, ...]) -> str | None:
-        '''从候选项中返回第一个可执行的命令解释器路径或命令。'''
-        for shell in candidates:
-            if os.path.isabs(shell):
-                if os.path.isfile(shell) and os.access(shell, os.X_OK):
-                    return shell
-                continue
-
-            shell_from_path = shutil.which(shell)
-            if shell_from_path is not None:
-                return shell_from_path
-
-        return None
-
-    @staticmethod
-    def _format_timeout_duration(timeout: float) -> str:
-        '''将超时秒数格式化为面向用户的时长文本。'''
-        seconds = float(timeout)
-        if seconds.is_integer():
-            amount = str(int(seconds))
-        else:
-            amount = f"{seconds:g}"
-        unit = "second" if seconds == 1 else "seconds"
-        return f"{amount} {unit}"
-
-    @staticmethod
-    def _format_timeout_notice(timeout: float) -> str:
-        '''构造命令超时及后台运行长生命周期进程的提示文本。'''
-        return (
-            f"命令执行超时，已等待 {LocalSandbox._format_timeout_duration(timeout)} ，已终止。"
-            "若要运行网页服务器等长期进程，请在后台启动"
-            "并重定向输出，例如 `your-command > /mnt/user-data/workspace/server.log 2>&1 &`。"
-        )
-
-    @staticmethod
-    def _coerce_process_output(value: str | bytes | None) -> str:
-        '''将子进程的空值、字节或文本输出统一转换为文本。'''
-        if value is None:
-            return ""
-        if isinstance(value, bytes):
-            return value.decode("utf-8", errors="replace")
-        return value
-
-    @staticmethod
-    def _drain_pipe(fd: int, capture: _BoundedPipeCapture) -> None:
-        '''持续读取文件描述符并把数据交给受限输出捕获器。'''
-        try:
-            while chunk := os.read(fd, 8192):
-                capture.append(chunk)
-        except OSError:
-            logger.debug("Subprocess output pipe closed while draining", exc_info=True)
-        finally:
-            try:
-                os.close(fd)
-            except OSError:
-                pass
-
-    @staticmethod
-    def _start_pipe_drain(fd: int, name: str) -> tuple[_BoundedPipeCapture, threading.Thread]:
-        '''启动守护线程以读取管道，并返回捕获器和线程。'''
-        capture = _BoundedPipeCapture()
-        thread = threading.Thread(target=LocalSandbox._drain_pipe, args=(fd, capture), name=name, daemon=True)
-        thread.start()
-        return capture, thread
-
-    @staticmethod
-    def _process_group_exists(pgid: int | None) -> bool:
-        '''判断给定的进程组是否仍然存在。'''
-        if pgid is None:
-            return False
-        try:
-            os.killpg(pgid, 0)
-            return True
-        except ProcessLookupError:
-            return False
-        except PermissionError:
-            return True
-        except OSError:
-            return False
-
     def __init__(self, id: str, path_mappings: list[PathMapping] | None = None):
         '''
         使用可选路径映射初始化本地沙箱。
@@ -198,210 +95,6 @@ class LocalSandbox(Sandbox):
         super().__init__(id)
         self.path_mappings = path_mappings or []
         self._agent_written_paths: set[str] = set()
-
-
-    @cached_property
-    def _command_pattern(self) -> re.Pattern[str] | None:
-        '''返回命令中容器路径的已编译匹配器，并使用命令解释器边界。'''
-        mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
-        if not mappings:
-            return None
-        patterns = [re.escape(m.container_path) + r"(?=/|$|[\s\"';&|<>()])(?:/[^\s\"';&|<>()]*)?" for m in mappings]
-        return re.compile("|".join(f"({p})" for p in patterns))
-
-    @cached_property
-    def _content_pattern(self) -> re.Pattern[str] | None:
-        '''返回普通文件内容中容器路径的已编译匹配器，并使用文本边界。'''
-        mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
-        if not mappings:
-            return None
-        patterns = [re.escape(m.container_path) + r"(?=/|$|[^\w./-])(?:/[^\s\"';&|<>()]*)?" for m in mappings]
-        return re.compile("|".join(f"({p})" for p in patterns))
-
-    @cached_property
-    def _reverse_output_patterns(self) -> list[re.Pattern[str]]:
-        '''返回命令输出中本地路径的已编译匹配器，最长路径优先。'''
-        return [build_output_mask_pattern(self._resolved_local_paths[m]) for m in self._mappings_by_local_specificity]
-
-    @cached_property
-    def _resolved_local_paths(self) -> dict[PathMapping, str]:
-        '''返回每个映射解析后的本地根目录，并缓存结果以避免重复访问磁盘。'''
-        return {m: str(Path(m.local_path).resolve()) for m in self.path_mappings}
-
-    @cached_property
-    def _mappings_by_container_specificity(self) -> list[PathMapping]:
-        '''返回按容器路径具体程度降序排列的映射，用于正向解析。'''
-        return sorted(self.path_mappings, key=lambda m: len(m.container_path.rstrip("/") or "/"), reverse=True)
-
-    @cached_property
-    def _mappings_by_local_specificity(self) -> list[PathMapping]:
-        '''返回按本地路径长度降序排列的映射，用于反向解析。'''
-        return sorted(self.path_mappings, key=lambda m: len(m.local_path), reverse=True)
-
-    def _is_read_only_path(self, resolved_path: str) -> bool:
-        '''判断解析路径是否处于只读挂载下；嵌套映射时优先选择最具体的映射。'''
-        resolved = str(Path(resolved_path).resolve())
-
-        best_mapping: PathMapping | None = None
-        best_prefix_len = -1
-
-        for mapping in self.path_mappings:
-            local_resolved = self._resolved_local_paths[mapping]
-            if resolved == local_resolved or resolved.startswith(local_resolved + os.sep):
-                prefix_len = len(local_resolved)
-                if prefix_len > best_prefix_len:
-                    best_prefix_len = prefix_len
-                    best_mapping = mapping
-
-        if best_mapping is None:
-            return False
-
-        return best_mapping.read_only
-
-    def _find_path_mapping(self, path: str) -> tuple[PathMapping, str] | None:
-        '''查找覆盖给定容器路径的最具体路径映射及其相对路径。'''
-        path_str = str(path)
-
-        for mapping in self._mappings_by_container_specificity:
-            container_path = mapping.container_path.rstrip("/") or "/"
-            if container_path == "/":
-                if path_str.startswith("/"):
-                    return mapping, path_str.lstrip("/")
-                continue
-
-            if path_str == container_path or path_str.startswith(container_path + "/"):
-                relative = path_str[len(container_path) :].lstrip("/")
-                return mapping, relative
-
-        return None
-
-    def _resolve_path_with_mapping(self, path: str) -> ResolvedPath:
-        '''
-        使用映射将容器路径解析为实际本地路径。
-
-        返回解析后的本地路径及命中的映射（如有）。
-        '''
-        path_str = str(path)
-
-        mapping_match = self._find_path_mapping(path_str)
-        if mapping_match is None:
-            return ResolvedPath(path_str, None)
-
-        mapping, relative = mapping_match
-        local_root = Path(self._resolved_local_paths[mapping])
-        resolved_path = (local_root / relative).resolve() if relative else local_root
-
-        try:
-            resolved_path.relative_to(local_root)
-        except ValueError as exc:
-            raise PermissionError(errno.EACCES, "拒绝访问：路径超出挂载目录", path_str) from exc
-
-        return ResolvedPath(str(resolved_path), mapping)
-
-    def _resolve_path(self, path: str) -> str:
-        '''将容器路径解析为本地路径。'''
-        return self._resolve_path_with_mapping(path).path
-
-    def _is_resolved_path_read_only(self, resolved: ResolvedPath) -> bool:
-        '''判断解析结果是否命中只读映射或只读挂载。'''
-        return bool(resolved.mapping and resolved.mapping.read_only) or self._is_read_only_path(resolved.path)
-
-    def _reverse_resolve_path(self, path: str) -> str:
-        '''
-        使用映射将本地路径反向解析为容器路径。
-
-        若存在映射则返回容器路径，否则返回原路径。
-        '''
-        normalized_path = path.replace("\\", "/")
-        path_str = str(Path(normalized_path).resolve())
-
-        for mapping in self._mappings_by_local_specificity:
-            local_path_resolved = self._resolved_local_paths[mapping]
-            if path_str == local_path_resolved or path_str.startswith(local_path_resolved + os.sep):
-                relative = path_str[len(local_path_resolved) :].lstrip(os.sep).replace(os.sep, "/")
-                resolved = f"{mapping.container_path}/{relative}" if relative else mapping.container_path
-                return resolved
-
-        return path_str
-
-    def _reverse_resolve_paths_in_output(self, output: str) -> str:
-        '''
-        将输出文本中的本地路径反向解析为容器路径。
-
-        返回已将本地路径替换为容器路径的输出文本。
-        '''
-        result = output
-        for pattern in self._reverse_output_patterns:
-
-            def replace_match(match: re.Match) -> str:
-                '''将一个匹配到的本地路径替换为对应容器路径。'''
-                matched_path = match.group(0)
-                return self._reverse_resolve_path(matched_path)
-
-            result = pattern.sub(replace_match, result)
-
-        return result
-
-    def _resolve_paths_in_command(self, command: str) -> str:
-        '''
-        将命令字符串中的容器路径解析为本地路径。
-
-        返回已将容器路径解析为本地路径的命令字符串。
-        '''
-        pattern = self._command_pattern
-        if pattern is None:
-            return command
-
-        def replace_match(match: re.Match) -> str:
-            '''将一个匹配到的容器路径替换为本地路径。'''
-            matched_path = match.group(0)
-            return self._resolve_path(matched_path).replace("\\", "/")
-
-        return pattern.sub(replace_match, command)
-
-    def _resolve_paths_in_content(self, content: str) -> str:
-        '''将任意文件内容中的容器路径解析为使用正斜杠的本地路径。
-
-        本方法按普通文本处理每个容器路径前缀，不采用命令解析使用的命令解释器边界，
-        以避免 Windows 反斜杠在源文件中形成转义序列。
-        '''
-        pattern = self._content_pattern
-        if pattern is None:
-            return content
-
-        def replace_match(match: re.Match) -> str:
-            '''将一个内容中的容器路径替换为正斜杠形式的本地路径。'''
-            matched_path = match.group(0)
-            resolved = self._resolve_path(matched_path)
-            return resolved.replace("\\", "/")
-
-        return pattern.sub(replace_match, content)
-
-    @staticmethod
-    def _get_shell() -> str:
-        '''探测可用的命令解释器，并按平台使用回退项。'''
-        shell = LocalSandbox._find_first_available_shell(("/bin/zsh", "/bin/bash", "/bin/sh", "sh"))
-        if shell is not None:
-            return shell
-
-        if os.name == "nt":
-            system_root = os.environ.get("SystemRoot", r"C:\Windows")
-            shell = LocalSandbox._find_first_available_shell(
-                (
-                    "pwsh",
-                    "pwsh.exe",
-                    "powershell",
-                    "powershell.exe",
-                    ntpath.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
-                    "cmd.exe",
-                )
-            )
-            if shell is not None:
-                return shell
-
-            raise RuntimeError("找不到合适的命令解释器。已尝试 /bin/zsh、/bin/bash、/bin/sh、PATH 中的 `sh`，以及 Windows 的 PowerShell 和 cmd.exe。")
-
-        raise RuntimeError("找不到合适的命令解释器。已尝试 /bin/zsh、/bin/bash、/bin/sh 和 PATH 中的 `sh`。")
 
     def execute_command(
         self,
@@ -462,6 +155,158 @@ class LocalSandbox(Sandbox):
 
         final_output = output if output else "(无输出)"
         return self._reverse_resolve_paths_in_output(final_output)
+
+    def _resolve_paths_in_command(self, command: str) -> str:
+        '''
+        将命令字符串中的容器路径解析为本地路径。
+
+        返回已将容器路径解析为本地路径的命令字符串。
+        '''
+        pattern = self._command_pattern
+        if pattern is None:
+            return command
+
+        def replace_match(match: re.Match) -> str:
+            '''将一个匹配到的容器路径替换为本地路径。'''
+            matched_path = match.group(0)
+            return self._resolve_path(matched_path).replace("\\", "/")
+
+        return pattern.sub(replace_match, command)
+
+    @cached_property
+    def _command_pattern(self) -> re.Pattern[str] | None:
+        '''返回命令中容器路径的已编译匹配器，并使用命令解释器边界。'''
+        mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
+        if not mappings:
+            return None
+        patterns = [re.escape(m.container_path) + r"(?=/|$|[\s\"';&|<>()])(?:/[^\s\"';&|<>()]*)?" for m in mappings]
+        return re.compile("|".join(f"({p})" for p in patterns))
+
+    def _resolve_path(self, path: str) -> str:
+        '''将容器路径解析为本地路径。'''
+        return self._resolve_path_with_mapping(path).path
+
+    def _resolve_path_with_mapping(self, path: str) -> ResolvedPath:
+        '''
+        使用映射将容器路径解析为实际本地路径。
+
+        返回解析后的本地路径及命中的映射（如有）。
+        '''
+        path_str = str(path)
+
+        mapping_match = self._find_path_mapping(path_str)
+        if mapping_match is None:
+            return ResolvedPath(path_str, None)
+
+        mapping, relative = mapping_match
+        local_root = Path(self._resolved_local_paths[mapping])
+        resolved_path = (local_root / relative).resolve() if relative else local_root
+
+        try:
+            resolved_path.relative_to(local_root)
+        except ValueError as exc:
+            raise PermissionError(errno.EACCES, "拒绝访问：路径超出挂载目录", path_str) from exc
+
+        return ResolvedPath(str(resolved_path), mapping)
+
+    def _find_path_mapping(self, path: str) -> tuple[PathMapping, str] | None:
+        '''查找覆盖给定容器路径的最具体路径映射及其相对路径。'''
+        path_str = str(path)
+
+        for mapping in self._mappings_by_container_specificity:
+            container_path = mapping.container_path.rstrip("/") or "/"
+            if container_path == "/":
+                if path_str.startswith("/"):
+                    return mapping, path_str.lstrip("/")
+                continue
+
+            if path_str == container_path or path_str.startswith(container_path + "/"):
+                relative = path_str[len(container_path) :].lstrip("/")
+                return mapping, relative
+
+        return None
+
+    @cached_property
+    def _mappings_by_container_specificity(self) -> list[PathMapping]:
+        '''返回按容器路径具体程度降序排列的映射，用于正向解析。'''
+        return sorted(self.path_mappings, key=lambda m: len(m.container_path.rstrip("/") or "/"), reverse=True)
+
+    @cached_property
+    def _resolved_local_paths(self) -> dict[PathMapping, str]:
+        '''返回每个映射解析后的本地根目录，并缓存结果以避免重复访问磁盘。'''
+        return {m: str(Path(m.local_path).resolve()) for m in self.path_mappings}
+
+    @staticmethod
+    def _get_shell() -> str:
+        '''探测可用的命令解释器，并按平台使用回退项。'''
+        shell = LocalSandbox._find_first_available_shell(("/bin/zsh", "/bin/bash", "/bin/sh", "sh"))
+        if shell is not None:
+            return shell
+
+        if os.name == "nt":
+            system_root = os.environ.get("SystemRoot", r"C:\Windows")
+            shell = LocalSandbox._find_first_available_shell(
+                (
+                    "pwsh",
+                    "pwsh.exe",
+                    "powershell",
+                    "powershell.exe",
+                    ntpath.join(system_root, "System32", "WindowsPowerShell", "v1.0", "powershell.exe"),
+                    "cmd.exe",
+                )
+            )
+            if shell is not None:
+                return shell
+
+            raise RuntimeError("找不到合适的命令解释器。已尝试 /bin/zsh、/bin/bash、/bin/sh、PATH 中的 `sh`，以及 Windows 的 PowerShell 和 cmd.exe。")
+
+        raise RuntimeError("找不到合适的命令解释器。已尝试 /bin/zsh、/bin/bash、/bin/sh 和 PATH 中的 `sh`。")
+
+    @staticmethod
+    def _find_first_available_shell(candidates: tuple[str, ...]) -> str | None:
+        '''从候选项中返回第一个可执行的命令解释器路径或命令。'''
+        for shell in candidates:
+            if os.path.isabs(shell):
+                if os.path.isfile(shell) and os.access(shell, os.X_OK):
+                    return shell
+                continue
+
+            shell_from_path = shutil.which(shell)
+            if shell_from_path is not None:
+                return shell_from_path
+
+        return None
+
+    @staticmethod
+    def _is_powershell(shell: str) -> bool:
+        '''判断选定的命令解释器是否为 PowerShell 可执行文件。'''
+        return LocalSandbox._shell_name(shell) in {"powershell", "powershell.exe", "pwsh", "pwsh.exe"}
+
+    @staticmethod
+    def _shell_name(shell: str) -> str:
+        '''返回命令解释器路径或命令对应的可执行文件名。'''
+        return shell.replace("\\", "/").rsplit("/", 1)[-1].lower()
+
+    @staticmethod
+    def _is_cmd_shell(shell: str) -> bool:
+        '''判断选定的命令解释器是否为 cmd.exe。'''
+        return LocalSandbox._shell_name(shell) in {"cmd", "cmd.exe"}
+
+    @staticmethod
+    def _is_msys_shell(shell: str) -> bool:
+        '''判断选定的命令解释器是否为 Git Bash 或 MSYS 命令解释器。'''
+        normalized = shell.replace("\\", "/").lower()
+        shell_name = LocalSandbox._shell_name(shell)
+        return shell_name in {"sh.exe", "bash.exe"} and any(part in normalized for part in ("/git/", "/mingw", "/msys"))
+
+    @staticmethod
+    def _coerce_process_output(value: str | bytes | None) -> str:
+        '''将子进程的空值、字节或文本输出统一转换为文本。'''
+        if value is None:
+            return ""
+        if isinstance(value, bytes):
+            return value.decode("utf-8", errors="replace")
+        return value
 
     @staticmethod
     def _run_posix_command(
@@ -532,6 +377,28 @@ class LocalSandbox(Sandbox):
         return stdout, stderr, returncode, timed_out
 
     @staticmethod
+    def _start_pipe_drain(fd: int, name: str) -> tuple[_BoundedPipeCapture, threading.Thread]:
+        '''启动守护线程以读取管道，并返回捕获器和线程。'''
+        capture = _BoundedPipeCapture()
+        thread = threading.Thread(target=LocalSandbox._drain_pipe, args=(fd, capture), name=name, daemon=True)
+        thread.start()
+        return capture, thread
+
+    @staticmethod
+    def _drain_pipe(fd: int, capture: _BoundedPipeCapture) -> None:
+        '''持续读取文件描述符并把数据交给受限输出捕获器。'''
+        try:
+            while chunk := os.read(fd, 8192):
+                capture.append(chunk)
+        except OSError:
+            logger.debug("Subprocess output pipe closed while draining", exc_info=True)
+        finally:
+            try:
+                os.close(fd)
+            except OSError:
+                pass
+
+    @staticmethod
     def _terminate_process_group(process: subprocess.Popen) -> None:
         '''终止并回收命令的整个进程组；进程组已消失时回退为终止直接子进程。'''
         try:
@@ -545,6 +412,87 @@ class LocalSandbox(Sandbox):
             process.wait(timeout=10)
         except subprocess.TimeoutExpired:
             logger.warning("Process group for pid %s did not exit after SIGKILL", process.pid)
+
+    @staticmethod
+    def _process_group_exists(pgid: int | None) -> bool:
+        '''判断给定的进程组是否仍然存在。'''
+        if pgid is None:
+            return False
+        try:
+            os.killpg(pgid, 0)
+            return True
+        except ProcessLookupError:
+            return False
+        except PermissionError:
+            return True
+        except OSError:
+            return False
+
+    @staticmethod
+    def _format_timeout_notice(timeout: float) -> str:
+        '''构造命令超时及后台运行长生命周期进程的提示文本。'''
+        return (
+            f"命令执行超时，已等待 {LocalSandbox._format_timeout_duration(timeout)} ，已终止。"
+            "若要运行网页服务器等长期进程，请在后台启动"
+            "并重定向输出，例如 `your-command > /mnt/user-data/workspace/server.log 2>&1 &`。"
+        )
+
+    @staticmethod
+    def _format_timeout_duration(timeout: float) -> str:
+        '''将超时秒数格式化为面向用户的时长文本。'''
+        seconds = float(timeout)
+        if seconds.is_integer():
+            amount = str(int(seconds))
+        else:
+            amount = f"{seconds:g}"
+        unit = "second" if seconds == 1 else "seconds"
+        return f"{amount} {unit}"
+
+    def _reverse_resolve_paths_in_output(self, output: str) -> str:
+        '''
+        将输出文本中的本地路径反向解析为容器路径。
+
+        返回已将本地路径替换为容器路径的输出文本。
+        '''
+        result = output
+        for pattern in self._reverse_output_patterns:
+
+            def replace_match(match: re.Match) -> str:
+                '''将一个匹配到的本地路径替换为对应容器路径。'''
+                matched_path = match.group(0)
+                return self._reverse_resolve_path(matched_path)
+
+            result = pattern.sub(replace_match, result)
+
+        return result
+
+    @cached_property
+    def _reverse_output_patterns(self) -> list[re.Pattern[str]]:
+        '''返回命令输出中本地路径的已编译匹配器，最长路径优先。'''
+        return [build_output_mask_pattern(self._resolved_local_paths[m]) for m in self._mappings_by_local_specificity]
+
+    @cached_property
+    def _mappings_by_local_specificity(self) -> list[PathMapping]:
+        '''返回按本地路径长度降序排列的映射，用于反向解析。'''
+        return sorted(self.path_mappings, key=lambda m: len(m.local_path), reverse=True)
+
+    def _reverse_resolve_path(self, path: str) -> str:
+        '''
+        使用映射将本地路径反向解析为容器路径。
+
+        若存在映射则返回容器路径，否则返回原路径。
+        '''
+        normalized_path = path.replace("\\", "/")
+        path_str = str(Path(normalized_path).resolve())
+
+        for mapping in self._mappings_by_local_specificity:
+            local_path_resolved = self._resolved_local_paths[mapping]
+            if path_str == local_path_resolved or path_str.startswith(local_path_resolved + os.sep):
+                relative = path_str[len(local_path_resolved) :].lstrip(os.sep).replace(os.sep, "/")
+                resolved = f"{mapping.container_path}/{relative}" if relative else mapping.container_path
+                return resolved
+
+        return path_str
 
     def list_dir(self, path: str, max_depth=2) -> list[str]:
         '''列出路径内容，并将本地路径和虚拟挂载显示为容器路径。'''
@@ -619,6 +567,57 @@ class LocalSandbox(Sandbox):
             self._agent_written_paths.add(resolved_path)
         except OSError as e:
             raise type(e)(e.errno, e.strerror, path) from None
+
+    def _is_resolved_path_read_only(self, resolved: ResolvedPath) -> bool:
+        '''判断解析结果是否命中只读映射或只读挂载。'''
+        return bool(resolved.mapping and resolved.mapping.read_only) or self._is_read_only_path(resolved.path)
+
+    def _is_read_only_path(self, resolved_path: str) -> bool:
+        '''判断解析路径是否处于只读挂载下；嵌套映射时优先选择最具体的映射。'''
+        resolved = str(Path(resolved_path).resolve())
+
+        best_mapping: PathMapping | None = None
+        best_prefix_len = -1
+
+        for mapping in self.path_mappings:
+            local_resolved = self._resolved_local_paths[mapping]
+            if resolved == local_resolved or resolved.startswith(local_resolved + os.sep):
+                prefix_len = len(local_resolved)
+                if prefix_len > best_prefix_len:
+                    best_prefix_len = prefix_len
+                    best_mapping = mapping
+
+        if best_mapping is None:
+            return False
+
+        return best_mapping.read_only
+
+    def _resolve_paths_in_content(self, content: str) -> str:
+        '''将任意文件内容中的容器路径解析为使用正斜杠的本地路径。
+
+        本方法按普通文本处理每个容器路径前缀，不采用命令解析使用的命令解释器边界，
+        以避免 Windows 反斜杠在源文件中形成转义序列。
+        '''
+        pattern = self._content_pattern
+        if pattern is None:
+            return content
+
+        def replace_match(match: re.Match) -> str:
+            '''将一个内容中的容器路径替换为正斜杠形式的本地路径。'''
+            matched_path = match.group(0)
+            resolved = self._resolve_path(matched_path)
+            return resolved.replace("\\", "/")
+
+        return pattern.sub(replace_match, content)
+
+    @cached_property
+    def _content_pattern(self) -> re.Pattern[str] | None:
+        '''返回普通文件内容中容器路径的已编译匹配器，并使用文本边界。'''
+        mappings = sorted(self.path_mappings, key=lambda m: len(m.container_path), reverse=True)
+        if not mappings:
+            return None
+        patterns = [re.escape(m.container_path) + r"(?=/|$|[^\w./-])(?:/[^\s\"';&|<>()]*)?" for m in mappings]
+        return re.compile("|".join(f"({p})" for p in patterns))
 
     def glob(self, path: str, pattern: str, *, include_dirs: bool = False, max_results: int = 200) -> tuple[list[str], bool]:
         '''查找匹配通配模式的文件，并将结果转换回容器路径。'''

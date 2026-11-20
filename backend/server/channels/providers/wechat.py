@@ -50,101 +50,6 @@ class UploadMediaType(IntEnum):
     VOICE = 4
 
 
-def _build_ilink_client_version(version: str) -> str:
-    '''将点分版本号编码为 iLink 要求的 24 位整数文本。'''
-    parts = [part.strip() for part in version.split(".")]
-
-    def _part(index: int) -> int:
-        '''解析单个版本分段，并将其限制在无符号字节范围内。'''
-        if index >= len(parts):
-            return 0
-        try:
-            return max(0, min(int(parts[index] or 0), 0xFF))
-        except ValueError:
-            return 0
-
-    major = _part(0)
-    minor = _part(1)
-    patch = _part(2)
-    return str((major << 16) | (minor << 8) | patch)
-
-
-def _build_wechat_uin() -> str:
-    '''生成随机 32 位微信 UIN 并按协议编码为 Base64。'''
-    return base64.b64encode(str(secrets.randbits(32)).encode("utf-8")).decode("utf-8")
-
-
-def _md5_hex(content: bytes) -> str:
-    '''计算媒体内容的 MD5 十六进制摘要，用于 iLink 文件校验字段。'''
-    return hashlib.md5(content).hexdigest()
-
-
-def _encrypted_size_for_aes_128_ecb(plaintext_size: int) -> int:
-    '''计算 PKCS7 填充后 AES-128-ECB 密文的字节长度。'''
-    if plaintext_size < 0:
-        raise ValueError("plaintext_size must be non-negative")
-    return ((plaintext_size // 16) + 1) * 16
-
-
-def _validate_aes_128_key(key: bytes) -> None:
-    '''确保密钥长度符合 AES-128 算法要求。'''
-    if len(key) != 16:
-        raise ValueError("AES-128-ECB requires a 16-byte key")
-
-
-def _encrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
-    '''使用 PKCS7 填充和 AES-128-ECB 加密媒体密钥材料。'''
-    _validate_aes_128_key(key)
-    padder = padding.PKCS7(128).padder()
-    padded = padder.update(content) + padder.finalize()
-    cipher = Cipher(algorithms.AES(key), modes.ECB())
-    encryptor = cipher.encryptor()
-    return encryptor.update(padded) + encryptor.finalize()
-
-
-def _decrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
-    '''解密 AES-128-ECB 数据并移除 PKCS7 填充。'''
-    _validate_aes_128_key(key)
-    cipher = Cipher(algorithms.AES(key), modes.ECB())
-    decryptor = cipher.decryptor()
-    padded = decryptor.update(content) + decryptor.finalize()
-    unpadder = padding.PKCS7(128).unpadder()
-    return unpadder.update(padded) + unpadder.finalize()
-
-
-def _safe_media_filename(prefix: str, extension: str, message_id: str | None = None, index: int | None = None) -> str:
-    '''组合媒体文件名前缀、消息标识和序号，并清理路径分隔符。'''
-    safe_ext = extension if extension.startswith(".") else f".{extension}" if extension else ""
-    safe_msg = (message_id or "msg").replace("/", "_").replace("\\", "_")
-    suffix = f"-{index}" if index is not None else ""
-    return f"{prefix}-{safe_msg}{suffix}{safe_ext}"
-
-
-def _build_cdn_upload_url(cdn_base_url: str, upload_param: str, filekey: str) -> str:
-    '''对上传参数和文件键进行 URL 编码并构造 CDN 上传地址。'''
-    return f"{cdn_base_url.rstrip('/')}/upload?encrypted_query_param={quote(upload_param, safe='')}&filekey={quote(filekey, safe='')}"
-
-
-def _encode_outbound_media_aes_key(aes_key: bytes) -> str:
-    '''将媒体 AES 密钥转换为协议规定的十六进制文本再做 Base64 编码。'''
-    return base64.b64encode(aes_key.hex().encode("utf-8")).decode("utf-8")
-
-
-def _detect_image_extension_and_mime(content: bytes) -> tuple[str, str] | None:
-    '''根据文件头识别支持的图片扩展名和 MIME 类型，未知格式返回 None。'''
-    if content.startswith(b"\x89PNG\r\n\x1a\n"):
-        return ".png", "image/png"
-    if content.startswith(b"\xff\xd8\xff"):
-        return ".jpg", "image/jpeg"
-    if content.startswith((b"GIF87a", b"GIF89a")):
-        return ".gif", "image/gif"
-    if len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP":
-        return ".webp", "image/webp"
-    if content.startswith(b"BM"):
-        return ".bmp", "image/bmp"
-    return None
-
-
 class WechatChannel(Channel):
     '''微信 iLink 通道：长轮询接收消息，支持二维码登录及加密媒体收发。'''
 
@@ -263,6 +168,38 @@ class WechatChannel(Channel):
         self._state_dir = self._resolve_state_dir(config.get("state_dir"))
         self._cursor_path = self._state_dir / "wechat-getupdates.json" if self._state_dir else None
         self._auth_path = self._state_dir / "wechat-auth.json" if self._state_dir else None
+
+    @staticmethod
+    def _coerce_float(value: Any, default: float) -> float:
+        '''将配置值转换为浮点数，解析失败时使用默认值。'''
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _coerce_int(value: Any, default: int) -> int:
+        '''将配置值转换为整数，解析失败时使用默认值。'''
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return default
+
+    @staticmethod
+    def _coerce_str_set(value: Any, default: frozenset[str]) -> set[str]:
+        '''把字符串或字符串列表配置规范化为去空白的字符串集合。'''
+        if not isinstance(value, (list, tuple, set, frozenset)):
+            return set(default)
+        normalized = {str(item).strip().lower() if str(item).strip().startswith(".") else f".{str(item).strip().lower()}" for item in value if str(item).strip()}
+        return normalized or set(default)
+
+    @staticmethod
+    def _resolve_state_dir(raw_state_dir: Any) -> Path | None:
+        '''解析状态目录配置；空值表示不启用本地状态持久化。'''
+        if not isinstance(raw_state_dir, str) or not raw_state_dir.strip():
+            return None
+        return Path(raw_state_dir).expanduser()
+
         # 此处不读取认证令牌和轮询游标：通道构造发生在异步路径，文件 IO 会阻塞事件循环。
         # start() 中通过 asyncio.to_thread 加载状态。
 
@@ -287,6 +224,859 @@ class WechatChannel(Channel):
         self.bus.subscribe_outbound(self._on_outbound)
         self._poll_task = self._main_loop.create_task(self._poll_loop())
         logger.info("WeChat channel started")
+
+    def _load_state(self) -> None:
+        '''从状态文件恢复长轮询同步游标，忽略不存在或损坏的文件。'''
+        self._load_auth_state()
+        if not self._cursor_path or not self._cursor_path.exists():
+            return
+        try:
+            data = json.loads(self._cursor_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            logger.warning("[WeChat] failed to read cursor state from %s", self._cursor_path)
+            return
+        cursor = data.get("get_updates_buf")
+        if isinstance(cursor, str):
+            self._get_updates_buf = cursor
+
+    def _load_auth_state(self) -> None:
+        '''从本地认证状态恢复机器人令牌、上下文令牌和用户标识。'''
+        if not self._auth_path or not self._auth_path.exists():
+            return
+        try:
+            data = json.loads(self._auth_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            logger.warning("[WeChat] failed to read auth state from %s", self._auth_path)
+            return
+        if not isinstance(data, dict):
+            return
+        self._auth_state = dict(data)
+
+        if not self._bot_token:
+            token = data.get("bot_token")
+            if isinstance(token, str) and token.strip():
+                self._bot_token = token.strip()
+
+        if not self._ilink_bot_id:
+            ilink_bot_id = data.get("ilink_bot_id")
+            if isinstance(ilink_bot_id, str) and ilink_bot_id.strip():
+                self._ilink_bot_id = ilink_bot_id.strip()
+
+    async def _ensure_client(self) -> httpx.AsyncClient:
+        '''惰性创建并复用配置了连接限制和超时的异步 HTTP 客户端。'''
+        if self._client is None:
+            timeout = max(self._polling_timeout + 5.0, 10.0)
+            self._client = httpx.AsyncClient(timeout=timeout)
+        return self._client
+
+    async def _poll_loop(self) -> None:
+        '''持续轮询 iLink 更新，处理消息并在失败后按间隔重试。'''
+        while self._running:
+            try:
+                if not await self._ensure_authenticated():
+                    await asyncio.sleep(self._retry_delay)
+                    continue
+
+                data = await self._request_json(
+                    "/ilink/bot/getupdates",
+                    {
+                        "get_updates_buf": self._get_updates_buf,
+                        "base_info": self._base_info(),
+                    },
+                    timeout=max(self._current_longpoll_timeout_seconds() + 5.0, 10.0),
+                )
+
+                ret = data.get("ret", 0)
+                if ret not in (0, None):
+                    errcode = data.get("errcode")
+                    if errcode == -14:
+                        self._bot_token = ""
+                        self._get_updates_buf = ""
+                        await asyncio.to_thread(self._save_state)
+                        await asyncio.to_thread(self._save_auth_state, status="expired", bot_token="")
+                        logger.error("[WeChat] bot token expired; scan again or update bot_token and restart the channel")
+                        self._running = False
+                        break
+                    logger.warning(
+                        "[WeChat] getupdates returned ret=%s errcode=%s errmsg=%s",
+                        ret,
+                        errcode,
+                        data.get("errmsg"),
+                    )
+                    await asyncio.sleep(self._retry_delay)
+                    continue
+
+                self._update_longpoll_timeout(data)
+
+                next_buf = data.get("get_updates_buf")
+                if isinstance(next_buf, str) and next_buf != self._get_updates_buf:
+                    self._get_updates_buf = next_buf
+                    await asyncio.to_thread(self._save_state)
+
+                for raw_message in data.get("msgs", []):
+                    await self._handle_update(raw_message)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                logger.exception("[WeChat] polling loop failed")
+                await asyncio.sleep(self._retry_delay)
+
+    async def _ensure_authenticated(self) -> bool:
+        '''确认已有有效令牌，或在启用时通过二维码登录获取令牌。'''
+        async with self._auth_lock:
+            if self._bot_token:
+                return True
+
+            await asyncio.to_thread(self._load_auth_state)
+            if self._bot_token:
+                return True
+
+            if not self._qrcode_login_enabled:
+                return False
+
+            try:
+                auth_state = await self._bind_via_qrcode()
+            except Exception:
+                logger.exception("[WeChat] QR code binding failed")
+                return False
+            return bool(auth_state.get("bot_token"))
+
+    async def _bind_via_qrcode(self) -> dict[str, Any]:
+        '''执行 iLink 二维码登录轮询，并返回认证令牌和用户信息。'''
+        qrcode_data = await self._request_public_get_json(
+            "/ilink/bot/get_bot_qrcode",
+            params={"bot_type": self._qrcode_bot_type},
+        )
+        qrcode = str(qrcode_data.get("qrcode") or "").strip()
+        if not qrcode:
+            raise RuntimeError("iLink get_bot_qrcode did not return qrcode")
+
+        qrcode_img_content = str(qrcode_data.get("qrcode_img_content") or "").strip()
+        logger.info("微信登录二维码已生成，等待用户扫码确认")
+        if not qrcode_img_content:
+            raise RuntimeError("微信服务未返回可供扫描的二维码内容")
+
+        await asyncio.to_thread(
+            self._save_auth_state,
+            status="pending",
+            qrcode=qrcode,
+            qrcode_img_content=qrcode_img_content or None,
+        )
+
+        deadline = time.monotonic() + max(self._qrcode_poll_timeout, 1.0)
+        while time.monotonic() < deadline:
+            status_data = await self._request_public_get_json(
+                "/ilink/bot/get_qrcode_status",
+                params={"qrcode": qrcode},
+            )
+            status = str(status_data.get("status") or "").strip().lower()
+            if status in {"scaned", "scanned"}:
+                self._auth_state = {**self._auth_state, "status": "scanned"}
+            if status == "confirmed":
+                token = str(status_data.get("bot_token") or "").strip()
+                if not token:
+                    raise RuntimeError("iLink QR confirmation succeeded without bot_token")
+                self._bot_token = token
+                ilink_bot_id = str(status_data.get("ilink_bot_id") or "").strip() or None
+                if ilink_bot_id:
+                    self._ilink_bot_id = ilink_bot_id
+
+                base_url = status_data.get("baseurl")
+                if isinstance(base_url, str):
+                    from urllib.parse import urlparse
+
+                    parsed = urlparse(base_url)
+                    if parsed.scheme == "https" and (parsed.hostname or "").endswith(".weixin.qq.com"):
+                        self._base_url = base_url.rstrip("/")
+                return await asyncio.to_thread(
+                    self._save_auth_state,
+                    status="confirmed",
+                    bot_token=token,
+                    ilink_bot_id=self._ilink_bot_id,
+                    qrcode=qrcode,
+                    qrcode_img_content=qrcode_img_content or None,
+                )
+
+            if status in {"expired", "canceled", "cancelled", "invalid", "failed"}:
+                await asyncio.to_thread(
+                    self._save_auth_state,
+                    status=status,
+                    qrcode=qrcode,
+                    qrcode_img_content=qrcode_img_content or None,
+                )
+                raise RuntimeError(f"iLink QR code flow ended with status={status}")
+
+            await asyncio.sleep(max(self._qrcode_poll_interval, 0.1))
+
+        await asyncio.to_thread(
+            self._save_auth_state,
+            status="timeout",
+            qrcode=qrcode,
+            qrcode_img_content=qrcode_img_content or None,
+        )
+        raise TimeoutError("Timed out waiting for WeChat QR confirmation")
+
+    async def _request_public_get_json(
+        self,
+        path: str,
+        params: dict[str, Any] | None = None,
+        *,
+        timeout: float | None = None,
+    ) -> dict[str, Any]:
+        '''请求无需认证的 iLink 公共 GET 接口并解析 JSON 响应。'''
+        client = await self._ensure_client()
+        response = await client.get(
+            f"{self._base_url}{path}",
+            params=params,
+            headers=self._public_headers(),
+            timeout=timeout or self.DEFAULT_CONFIG_TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
+
+    def _public_headers(self) -> dict[str, str]:
+        '''生成二维码登录等未认证接口使用的请求头。'''
+        return {
+            "Content-Type": "application/json",
+            **self._common_headers(),
+        }
+
+    def _common_headers(self) -> dict[str, str]:
+        '''生成 iLink API 共用的 HTTP 请求头。'''
+        headers = {
+            "iLink-App-ClientVersion": _build_ilink_client_version(self._channel_version),
+            "X-WECHAT-UIN": _build_wechat_uin(),
+        }
+        if self._ilink_app_id:
+            headers["iLink-App-Id"] = self._ilink_app_id
+        if self._route_tag:
+            headers["SKRouteTag"] = self._route_tag
+        return headers
+
+    def _save_auth_state(
+        self,
+        *,
+        status: str,
+        bot_token: str | None = None,
+        ilink_bot_id: str | None = None,
+        qrcode: str | None = None,
+        qrcode_img_content: str | None = None,
+    ) -> dict[str, Any]:
+        '''将当前认证字段安全保存到本地状态文件。'''
+        data = dict(self._auth_state)
+        data["status"] = status
+        data["updated_at"] = int(time.time())
+        data["base_url"] = self._base_url
+
+        if bot_token is not None:
+            if bot_token:
+                data["bot_token"] = bot_token
+            else:
+                data.pop("bot_token", None)
+        elif self._bot_token:
+            data["bot_token"] = self._bot_token
+
+        resolved_ilink_bot_id = ilink_bot_id if ilink_bot_id is not None else self._ilink_bot_id
+        if resolved_ilink_bot_id:
+            data["ilink_bot_id"] = resolved_ilink_bot_id
+
+        if qrcode is not None:
+            data["qrcode"] = qrcode
+        if qrcode_img_content is not None:
+            data["qrcode_img_content"] = qrcode_img_content
+
+        self._auth_state = data
+        if self._auth_path:
+            try:
+                self._auth_path.parent.mkdir(parents=True, exist_ok=True)
+                # 通过权限为 0o600 的临时文件写入后原子替换，避免令牌短暂继承较宽松的默认权限。
+                # NamedTemporaryFile 使用 mkstemp，从创建时即应用该权限。
+                fd = tempfile.NamedTemporaryFile(mode="w", dir=self._auth_path.parent, suffix=".tmp", delete=False, encoding="utf-8")
+                try:
+                    json.dump(data, fd, ensure_ascii=False, indent=2)
+                    fd.close()
+                    Path(fd.name).replace(self._auth_path)
+                except BaseException:
+                    fd.close()
+                    Path(fd.name).unlink(missing_ok=True)
+                    raise
+            except OSError:
+                logger.warning("[WeChat] failed to persist auth state to %s", self._auth_path)
+            else:
+                # 目标文件已继承临时文件的 0o600 权限；此处仅做加固。
+                # 不支持 POSIX 权限的文件系统上 chmod 失败不应被误报为持久化失败。
+                try:
+                    self._auth_path.chmod(0o600)
+                except OSError:
+                    logger.debug("[WeChat] unable to chmod auth state at %s", self._auth_path, exc_info=True)
+        return data
+
+    async def _request_json(self, path: str, payload: dict[str, Any], *, timeout: float | None = None) -> dict[str, Any]:
+        '''向受认证的 iLink API 发送 JSON 请求并解析响应正文。'''
+        client = await self._ensure_client()
+        response = await client.post(
+            f"{self._base_url}{path}",
+            json=payload,
+            headers=self._auth_headers(),
+            timeout=timeout or self.DEFAULT_API_TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, dict) else {}
+
+    def _auth_headers(self) -> dict[str, str]:
+        '''在通用请求头中附加当前机器人认证令牌。'''
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self._bot_token}",
+            "AuthorizationType": "ilink_bot_token",
+            **self._common_headers(),
+        }
+        return headers
+
+    def _base_info(self) -> dict[str, str]:
+        '''组装请求中携带的 iLink 客户端版本和设备标识字段。'''
+        return {"channel_version": self._channel_version}
+
+    def _current_longpoll_timeout_seconds(self) -> float:
+        '''读取当前长轮询超时时间并应用协议允许的范围限制。'''
+        if self._respect_server_longpoll_timeout and self._server_longpoll_timeout_seconds is not None:
+            return self._server_longpoll_timeout_seconds
+        return self._polling_timeout
+
+    def _save_state(self) -> None:
+        '''将最新长轮询同步游标持久化到状态文件。'''
+        if not self._cursor_path:
+            return
+        try:
+            self._cursor_path.parent.mkdir(parents=True, exist_ok=True)
+            self._cursor_path.write_text(json.dumps({"get_updates_buf": self._get_updates_buf}, ensure_ascii=False, indent=2), encoding="utf-8")
+        except OSError:
+            logger.warning("[WeChat] failed to persist cursor state to %s", self._cursor_path)
+
+    def _update_longpoll_timeout(self, data: Mapping[str, Any]) -> None:
+        '''根据服务端响应中的建议更新后续长轮询超时。'''
+        if not self._respect_server_longpoll_timeout:
+            return
+        raw_timeout = data.get("longpolling_timeout_ms")
+        if raw_timeout is None:
+            return
+        try:
+            timeout_ms = float(raw_timeout)
+        except (TypeError, ValueError):
+            return
+        if timeout_ms <= 0:
+            return
+        self._server_longpoll_timeout_seconds = timeout_ms / 1000.0
+
+    async def _handle_update(self, raw_message: Any) -> None:
+        '''校验轮询返回的消息、过滤未授权用户并发布入站事件。'''
+        if not isinstance(raw_message, dict):
+            return
+        if raw_message.get("message_type") != 1:
+            return
+
+        chat_id = str(raw_message.get("from_user_id") or raw_message.get("ilink_user_id") or "").strip()
+        if not chat_id:
+            return
+
+        text = self._extract_text(raw_message)
+        context_token = str(raw_message.get("context_token") or "").strip()
+
+        # 先处理连接码，再校验 allowed_users，使浏览器发起的绑定能创建尚未加入白名单的身份。
+        connect_code = self._pending_connect_code(text)
+        if connect_code:
+            handled = await self._bind_connection_from_connect_code(
+                chat_id=chat_id,
+                context_token=context_token,
+                code=connect_code,
+            )
+            if handled:
+                return
+
+        if not self._check_user(chat_id):
+            return
+
+        files = await self._extract_inbound_files(raw_message)
+        if not text and not files:
+            return
+
+        thread_ts = context_token or str(raw_message.get("client_id") or raw_message.get("msg_id") or "").strip() or None
+
+        if context_token:
+            self._context_tokens_by_chat[chat_id] = context_token
+            if thread_ts:
+                self._context_tokens_by_thread[thread_ts] = context_token
+
+        inbound = self._make_inbound(
+            chat_id=chat_id,
+            user_id=chat_id,
+            text=text,
+            msg_type=InboundMessageType.COMMAND if is_known_channel_command(text) else InboundMessageType.CHAT,
+            thread_ts=thread_ts,
+            files=files,
+            metadata={
+                "context_token": context_token,
+                "ilink_user_id": chat_id,
+                "message_id": str(raw_message.get("message_id") or raw_message.get("msg_id") or "").strip(),
+                "ref_msg": self._extract_ref_message(raw_message),
+                "raw_message": raw_message,
+            },
+        )
+        inbound.topic_id = None
+        inbound = await self._attach_connection_identity(inbound)
+        await self.bus.publish_inbound(inbound)
+
+    @staticmethod
+    def _extract_text(raw_message: dict[str, Any]) -> str:
+        '''从微信消息的文本片段中拼接可见正文。'''
+        parts: list[str] = []
+        for item in raw_message.get("item_list", []):
+            if not isinstance(item, dict) or item.get("type") != int(MessageItemType.TEXT):
+                continue
+            text_item = item.get("text_item")
+            if not isinstance(text_item, dict):
+                continue
+            text = text_item.get("text")
+            if isinstance(text, str) and text.strip():
+                parts.append(text.strip())
+        return "\n".join(parts)
+
+    async def _bind_connection_from_connect_code(self, *, chat_id: str, context_token: str, code: str) -> bool:
+        '''消费一次性绑定码并保存微信用户与 DeerFlow 用户的连接关系。'''
+        if self._connection_repo is None or not code:
+            return False
+
+        state = await self._connection_repo.consume_oauth_state(provider="wechat", state=code)
+        if state is None:
+            await self._send_connection_reply(chat_id, context_token, "微信绑定码无效或已过期，请在项目设置中重新生成。")
+            return True
+
+        if not chat_id:
+            await self._send_connection_reply(chat_id, context_token, "无法从这条消息完成微信账号绑定。")
+            return True
+
+        await self._connection_repo.upsert_connection(
+            owner_user_id=state["owner_user_id"],
+            provider="wechat",
+            external_account_id=chat_id,
+            workspace_id=chat_id,
+            metadata={
+                "context_token": context_token,
+            },
+            status="connected",
+        )
+        await self._send_connection_reply(chat_id, context_token, "微信已绑定到 DeerFlow，现在可以直接发送问题。")
+        return True
+
+    async def _send_connection_reply(self, chat_id: str, context_token: str, text: str) -> None:
+        '''向指定微信会话发送连接授权结果文本。'''
+        if not context_token:
+            return
+        await self._send_text_message(
+            chat_id=chat_id,
+            context_token=context_token,
+            text=text,
+            client_id_prefix="deerflow-connect",
+            max_retries=1,
+        )
+
+    async def _send_text_message(
+        self,
+        *,
+        chat_id: str,
+        context_token: str,
+        text: str,
+        client_id_prefix: str,
+        max_retries: int,
+    ) -> None:
+        '''构造 iLink 文本消息请求，并在请求失败时按策略重试。'''
+        payload = {
+            "msg": {
+                "from_user_id": "",
+                "to_user_id": chat_id,
+                "client_id": f"{client_id_prefix}_{int(time.time() * 1000)}_{secrets.token_hex(2)}",
+                "message_type": 2,
+                "message_state": 2,
+                "context_token": context_token,
+                "item_list": [
+                    {
+                        "type": int(MessageItemType.TEXT),
+                        "text_item": {"text": text},
+                    }
+                ],
+            },
+            "base_info": self._base_info(),
+        }
+
+        async def send_message() -> None:
+            '''执行一次带超时控制的文本消息请求。'''
+            data = await self._request_json("/ilink/bot/sendmessage", payload)
+            self._ensure_success(data, "sendmessage")
+
+        await self._send_with_retry(
+            send_message,
+            max_retries=max_retries,
+            log_prefix="[WeChat]",
+        )
+
+    def _ensure_success(self, data: dict[str, Any], operation: str) -> None:
+        '''检查 iLink JSON 响应成功标志，失败时抛出带操作信息的异常。'''
+        ret = data.get("ret", 0)
+        if ret in (0, None):
+            return
+        errcode = data.get("errcode")
+        errmsg = data.get("errmsg") or data.get("msg") or "unknown error"
+        raise RuntimeError(f"iLink {operation} failed: ret={ret} errcode={errcode} errmsg={errmsg}")
+
+    def _check_user(self, user_id: str) -> bool:
+        '''按 allowed_users 配置检查发件人是否有权使用通道。'''
+        if not self._allowed_users:
+            return True
+        return user_id in self._allowed_users
+
+    async def _extract_inbound_files(self, raw_message: Mapping[str, Any]) -> list[dict[str, Any]]:
+        '''从 iLink 消息片段中解析图片和文件并下载到本地目录。'''
+        files: list[dict[str, Any]] = []
+        item_list = raw_message.get("item_list")
+        if not isinstance(item_list, list):
+            return files
+
+        message_id = str(raw_message.get("message_id") or raw_message.get("msg_id") or raw_message.get("client_id") or "msg")
+
+        for index, item in enumerate(item_list):
+            if not isinstance(item, Mapping):
+                continue
+            if item.get("type") == int(MessageItemType.IMAGE):
+                image_file = await self._extract_image_file(item, message_id=message_id, index=index)
+                if image_file:
+                    files.append(image_file)
+            elif item.get("type") == int(MessageItemType.FILE):
+                file_info = await self._extract_file_item(item, message_id=message_id, index=index)
+                if file_info:
+                    files.append(file_info)
+        return files
+
+    async def _extract_image_file(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
+        '''下载、解密并校验图片片段，返回供入站消息引用的文件元数据。'''
+        image_item = item.get("image_item")
+        if not isinstance(image_item, Mapping):
+            return None
+
+        media = image_item.get("media")
+        if not isinstance(media, Mapping):
+            return None
+
+        full_url = self._extract_cdn_full_url(media)
+        if not full_url:
+            logger.warning("[WeChat] inbound image missing full_url, skipping message_id=%s", message_id)
+            return None
+
+        aes_key = self._resolve_media_aes_key(item, image_item, media)
+        if not aes_key:
+            logger.warning(
+                "[WeChat] inbound image missing aes key, skipping message_id=%s diagnostics=%s",
+                message_id,
+                self._describe_media_key_state(item=item, item_payload=image_item, media=media),
+            )
+            return None
+
+        encrypted = await self._download_cdn_bytes(full_url)
+        decrypted = _decrypt_aes_128_ecb(encrypted, aes_key)
+        if self._max_inbound_image_bytes > 0 and len(decrypted) > self._max_inbound_image_bytes:
+            logger.warning("[WeChat] inbound image exceeds size limit (%d bytes), skipping message_id=%s", len(decrypted), message_id)
+            return None
+
+        detected_image = _detect_image_extension_and_mime(decrypted)
+        image_extension = detected_image[0] if detected_image else ".jpg"
+        filename = _safe_media_filename("wechat-image", image_extension, message_id=message_id, index=index)
+        stored_path = await asyncio.to_thread(self._stage_downloaded_file, filename, decrypted)
+        if stored_path is None:
+            return None
+
+        mime_type = detected_image[1] if detected_image else mimetypes.guess_type(filename)[0] or "image/jpeg"
+        return {
+            "type": "image",
+            "filename": stored_path.name,
+            "size": len(decrypted),
+            "path": str(stored_path),
+            "mime_type": mime_type,
+            "source": "wechat",
+            "message_item_type": int(MessageItemType.IMAGE),
+            "full_url": full_url,
+        }
+
+    @staticmethod
+    def _extract_cdn_full_url(media: Mapping[str, Any] | None) -> str | None:
+        '''从媒体描述中读取有效的 CDN 完整下载地址。'''
+        if not isinstance(media, Mapping):
+            return None
+        full_url = media.get("full_url")
+        return full_url.strip() if isinstance(full_url, str) and full_url.strip() else None
+
+    @classmethod
+    def _resolve_media_aes_key(cls, *payloads: Mapping[str, Any]) -> bytes | None:
+        '''从媒体响应及其嵌套字段中查找可用的 AES 密钥。'''
+        for payload in payloads:
+            if not isinstance(payload, Mapping):
+                continue
+            for key_name in ("aeskey", "aes_key_hex"):
+                key = cls._parse_aes_key_candidate(payload.get(key_name), prefer_hex=True)
+                if key:
+                    return key
+            for key_name in ("aes_key", "aesKey", "encrypt_key", "encryptKey"):
+                key = cls._parse_aes_key_candidate(payload.get(key_name), prefer_hex=False)
+                if key:
+                    return key
+            media = payload.get("media")
+            if isinstance(media, Mapping):
+                key = cls._resolve_media_aes_key(media)
+                if key:
+                    return key
+        return None
+
+    @classmethod
+    def _parse_aes_key_candidate(cls, value: Any, *, prefer_hex: bool) -> bytes | None:
+        '''按优先格式尝试解析密钥候选值，并验证 AES-128 长度。'''
+        if isinstance(value, bytes):
+            try:
+                _validate_aes_128_key(value)
+                return value
+            except ValueError:
+                return None
+
+        if isinstance(value, bytearray):
+            return cls._parse_aes_key_candidate(bytes(value), prefer_hex=prefer_hex)
+
+        if not isinstance(value, str) or not value.strip():
+            return None
+
+        raw = value.strip()
+        parsers = (
+            (lambda: bytes.fromhex(raw), lambda key: _validate_aes_128_key(key)),
+            (lambda: cls._decode_base64_aes_key(raw), None),
+        )
+        if not prefer_hex:
+            parsers = (parsers[1], parsers[0])
+
+        for decoder, validator in parsers:
+            try:
+                key = decoder()
+                if key is None:
+                    continue
+                if validator is not None:
+                    validator(key)
+                return key
+            except ValueError:
+                continue
+        return None
+
+    @staticmethod
+    def _decode_base64_aes_key(value: str) -> bytes | None:
+        '''解码 Base64 AES 密钥，并兼容协议中以十六进制文本再次编码的形式。'''
+        candidate = value.strip()
+        if not candidate:
+            return None
+
+        def _normalize_decoded(decoded: bytes) -> bytes | None:
+            '''将解码结果规范为 16 字节密钥，不合法时返回 None。'''
+            try:
+                _validate_aes_128_key(decoded)
+                return decoded
+            except ValueError:
+                pass
+
+            try:
+                decoded_text = decoded.decode("utf-8").strip().strip('"').strip("'")
+            except UnicodeDecodeError:
+                return None
+
+            if not decoded_text:
+                return None
+
+            try:
+                key = bytes.fromhex(decoded_text)
+                _validate_aes_128_key(key)
+                return key
+            except ValueError:
+                return None
+
+        padded = candidate + ("=" * (-len(candidate) % 4))
+        decoders = (
+            lambda: base64.b64decode(padded, validate=True),
+            lambda: base64.urlsafe_b64decode(padded),
+        )
+        for decoder in decoders:
+            try:
+                key = _normalize_decoded(decoder())
+                if key is not None:
+                    return key
+            except (ValueError, TypeError, binascii.Error):
+                continue
+        return None
+
+    @staticmethod
+    def _describe_media_key_state(
+        *,
+        item: Mapping[str, Any] | None,
+        item_payload: Mapping[str, Any] | None,
+        media: Mapping[str, Any] | None,
+    ) -> dict[str, Any]:
+        '''提取密钥相关字段用于诊断日志，并避免输出完整敏感密钥。'''
+
+        def _interesting(mapping: Mapping[str, Any] | None) -> dict[str, Any]:
+            '''筛选映射中与媒体密钥诊断相关的字段。'''
+            if not isinstance(mapping, Mapping):
+                return {}
+            details: dict[str, Any] = {}
+            for key in (
+                "aeskey",
+                "aes_key",
+                "aesKey",
+                "aes_key_hex",
+                "encrypt_key",
+                "encryptKey",
+                "encrypt_query_param",
+                "encrypt_type",
+                "full_url",
+                "file_name",
+            ):
+                if key not in mapping:
+                    continue
+                value = mapping.get(key)
+                if isinstance(value, str):
+                    details[key] = f"str(len={len(value.strip())})"
+                elif value is not None:
+                    details[key] = type(value).__name__
+                else:
+                    details[key] = None
+            return details
+
+        return {
+            "item": _interesting(item),
+            "item_payload": _interesting(item_payload),
+            "media": _interesting(media),
+        }
+
+    async def _download_cdn_bytes(self, url: str, *, timeout: float | None = None) -> bytes:
+        '''从 CDN 下载媒体字节，并在 HTTP 状态异常时抛出错误。'''
+        client = await self._ensure_client()
+        response = await client.get(url, timeout=timeout or self.DEFAULT_CDN_TIMEOUT)
+        response.raise_for_status()
+        return response.content
+
+    def _stage_downloaded_file(self, filename: str, content: bytes) -> Path | None:
+        '''将媒体字节写入下载目录的临时文件，再原子替换为目标文件。'''
+        download_dir = self._download_dir()
+        if download_dir is None:
+            return None
+        try:
+            download_dir.mkdir(parents=True, exist_ok=True)
+            path = download_dir / filename
+            path.write_bytes(content)
+            return path
+        except OSError:
+            logger.exception("[WeChat] failed to persist inbound media file %s", filename)
+            return None
+
+    def _download_dir(self) -> Path | None:
+        '''解析并创建配置的微信媒体下载目录；未配置时返回 None。'''
+        if not self._state_dir:
+            return None
+        return self._state_dir / self.DEFAULT_IMAGE_DOWNLOAD_DIRNAME
+
+    async def _extract_file_item(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
+        '''下载并解密普通文件片段，验证文件大小后返回本地文件元数据。'''
+        file_item = item.get("file_item")
+        if not isinstance(file_item, Mapping):
+            return None
+
+        media = file_item.get("media")
+        if not isinstance(media, Mapping):
+            return None
+
+        full_url = self._extract_cdn_full_url(media)
+        if not full_url:
+            logger.warning("[WeChat] inbound file missing full_url, skipping message_id=%s", message_id)
+            return None
+
+        aes_key = self._resolve_media_aes_key(item, file_item, media)
+        if not aes_key:
+            logger.warning(
+                "[WeChat] inbound file missing aes key, skipping message_id=%s diagnostics=%s",
+                message_id,
+                self._describe_media_key_state(item=item, item_payload=file_item, media=media),
+            )
+            return None
+
+        filename = self._normalize_inbound_filename(file_item.get("file_name"), default_prefix="wechat-file", message_id=message_id, index=index)
+        mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
+        if not self._is_allowed_file_type(filename, mime_type):
+            logger.warning("[WeChat] inbound file type blocked, skipping message_id=%s filename=%s", message_id, filename)
+            return None
+
+        encrypted = await self._download_cdn_bytes(full_url)
+        decrypted = _decrypt_aes_128_ecb(encrypted, aes_key)
+        if self._max_inbound_file_bytes > 0 and len(decrypted) > self._max_inbound_file_bytes:
+            logger.warning("[WeChat] inbound file exceeds size limit (%d bytes), skipping message_id=%s", len(decrypted), message_id)
+            return None
+
+        stored_path = await asyncio.to_thread(self._stage_downloaded_file, filename, decrypted)
+        if stored_path is None:
+            return None
+
+        return {
+            "type": "file",
+            "filename": stored_path.name,
+            "size": len(decrypted),
+            "path": str(stored_path),
+            "mime_type": mime_type,
+            "source": "wechat",
+            "message_item_type": int(MessageItemType.FILE),
+            "full_url": full_url,
+        }
+
+    @staticmethod
+    def _normalize_inbound_filename(raw_filename: Any, *, default_prefix: str, message_id: str, index: int) -> str:
+        '''清理入站文件名中的路径字符，并在缺少名称时生成安全默认名。'''
+        if isinstance(raw_filename, str) and raw_filename.strip():
+            candidate = Path(raw_filename.strip()).name
+            if candidate:
+                return candidate
+        return _safe_media_filename(default_prefix, ".bin", message_id=message_id, index=index)
+
+    def _is_allowed_file_type(self, filename: str, mime_type: str) -> bool:
+        '''根据扩展名白名单和 MIME 类型判断入站文件是否允许处理。'''
+        suffix = Path(filename).suffix.lower()
+        if self._allowed_file_extensions and suffix not in self._allowed_file_extensions:
+            return False
+        if mime_type.startswith("text/"):
+            return True
+        return mime_type in self.DEFAULT_ALLOWED_FILE_MIME_TYPES
+
+    @staticmethod
+    def _extract_ref_message(raw_message: Mapping[str, Any]) -> dict[str, Any] | None:
+        '''从入站消息中提取被引用消息的类型和内容。'''
+        item_list = raw_message.get("item_list")
+        if not isinstance(item_list, list):
+            return None
+        for item in item_list:
+            if not isinstance(item, Mapping):
+                continue
+            ref_msg = item.get("ref_msg")
+            if isinstance(ref_msg, Mapping):
+                return dict(ref_msg)
+        return None
+
+    async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
+        '''根据已绑定的微信连接记录补充 DeerFlow 所有者身份。'''
+        return await attach_connection_identity(
+            inbound,
+            repo=self._connection_repo,
+            provider="wechat",
+            workspace_id=inbound.chat_id,
+        )
 
     async def stop(self) -> None:
         '''停止长轮询并关闭 HTTP 客户端，避免遗留网络资源。'''
@@ -330,44 +1120,14 @@ class WechatChannel(Channel):
             max_retries=_max_retries,
         )
 
-    async def _send_text_message(
-        self,
-        *,
-        chat_id: str,
-        context_token: str,
-        text: str,
-        client_id_prefix: str,
-        max_retries: int,
-    ) -> None:
-        '''构造 iLink 文本消息请求，并在请求失败时按策略重试。'''
-        payload = {
-            "msg": {
-                "from_user_id": "",
-                "to_user_id": chat_id,
-                "client_id": f"{client_id_prefix}_{int(time.time() * 1000)}_{secrets.token_hex(2)}",
-                "message_type": 2,
-                "message_state": 2,
-                "context_token": context_token,
-                "item_list": [
-                    {
-                        "type": int(MessageItemType.TEXT),
-                        "text_item": {"text": text},
-                    }
-                ],
-            },
-            "base_info": self._base_info(),
-        }
-
-        async def send_message() -> None:
-            '''执行一次带超时控制的文本消息请求。'''
-            data = await self._request_json("/ilink/bot/sendmessage", payload)
-            self._ensure_success(data, "sendmessage")
-
-        await self._send_with_retry(
-            send_message,
-            max_retries=max_retries,
-            log_prefix="[WeChat]",
-        )
+    def _resolve_context_token(self, msg: OutboundMessage) -> str | None:
+        '''从消息元数据中解析发送微信消息所需的上下文令牌。'''
+        metadata_token = msg.metadata.get("context_token")
+        if isinstance(metadata_token, str) and metadata_token.strip():
+            return metadata_token.strip()
+        if msg.thread_ts and msg.thread_ts in self._context_tokens_by_thread:
+            return self._context_tokens_by_thread[msg.thread_ts]
+        return self._context_tokens_by_chat.get(msg.chat_id)
 
     async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
         '''按图片或普通文件类型上传附件并发送消息，返回是否成功。'''
@@ -462,6 +1222,101 @@ class WechatChannel(Channel):
             logger.exception("[WeChat] failed to send image attachment %s", attachment.filename)
             return False
 
+    def _build_upload_request(
+        self,
+        *,
+        filekey: str,
+        media_type: UploadMediaType,
+        to_user_id: str,
+        plaintext: bytes,
+        aes_key: bytes,
+        thumb_plaintext: bytes | None = None,
+        no_need_thumb: bool = False,
+    ) -> dict[str, Any]:
+        '''组装 iLink 媒体上传申请，包含摘要、大小、密钥和媒体类型。'''
+        _validate_aes_128_key(aes_key)
+        payload: dict[str, Any] = {
+            "filekey": filekey,
+            "media_type": int(media_type),
+            "to_user_id": to_user_id,
+            "rawsize": len(plaintext),
+            "rawfilemd5": _md5_hex(plaintext),
+            "filesize": _encrypted_size_for_aes_128_ecb(len(plaintext)),
+            "aeskey": aes_key.hex(),
+        }
+        if thumb_plaintext is not None:
+            payload.update(
+                {
+                    "thumb_rawsize": len(thumb_plaintext),
+                    "thumb_rawfilemd5": _md5_hex(thumb_plaintext),
+                    "thumb_filesize": _encrypted_size_for_aes_128_ecb(len(thumb_plaintext)),
+                }
+            )
+        elif no_need_thumb:
+            payload["no_need_thumb"] = True
+        return payload
+
+    @staticmethod
+    def _extract_upload_full_url(upload_data: Mapping[str, Any] | None) -> str | None:
+        '''从上传预签名响应中提取完整上传地址。'''
+        if not isinstance(upload_data, Mapping):
+            return None
+        upload_full_url = upload_data.get("upload_full_url")
+        return upload_full_url.strip() if isinstance(upload_full_url, str) and upload_full_url.strip() else None
+
+    @staticmethod
+    def _extract_upload_param(upload_data: Mapping[str, Any] | None) -> str | None:
+        '''从上传预签名响应中提取加密查询参数。'''
+        if not isinstance(upload_data, Mapping):
+            return None
+        upload_param = upload_data.get("upload_param")
+        return upload_param.strip() if isinstance(upload_param, str) and upload_param.strip() else None
+
+    async def _upload_cdn_bytes(
+        self,
+        url: str,
+        content: bytes,
+        *,
+        content_type: str = "application/octet-stream",
+        timeout: float | None = None,
+        method: str = "PUT",
+    ) -> str | None:
+        '''将媒体字节 PUT 到 CDN 上传地址，并检查服务端响应状态。'''
+        client = await self._ensure_client()
+        request_kwargs = {
+            "content": content,
+            "headers": {"Content-Type": content_type},
+            "timeout": timeout or self.DEFAULT_CDN_TIMEOUT,
+        }
+        if method.upper() == "POST":
+            response = await client.post(url, **request_kwargs)
+        else:
+            response = await client.put(url, **request_kwargs)
+        response.raise_for_status()
+        return response.headers.get("x-encrypted-param")
+
+    def _build_outbound_image_item(
+        self,
+        upload_data: Mapping[str, Any],
+        aes_key: bytes,
+        *,
+        ciphertext_size: int,
+    ) -> dict[str, Any]:
+        '''构造含 CDN 地址和 AES 密钥信息的 iLink 出站图片片段。'''
+        encoded_aes_key = _encode_outbound_media_aes_key(aes_key)
+        media: dict[str, Any] = {
+            "aes_key": encoded_aes_key,
+            "encrypt_type": 1,
+        }
+        upload_param = upload_data.get("upload_param")
+        if isinstance(upload_param, str) and upload_param.strip():
+            media["encrypt_query_param"] = upload_param.strip()
+
+        return {
+            "media": media,
+            "mid_size": ciphertext_size,
+        }
+
     async def _send_file_attachment(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
         '''计算文件摘要与密钥、上传加密文件并发送 iLink 文件消息。'''
         if not self._is_allowed_file_type(attachment.filename, attachment.mime_type):
@@ -553,489 +1408,6 @@ class WechatChannel(Channel):
             logger.exception("[WeChat] failed to send file attachment %s", attachment.filename)
             return False
 
-    async def _poll_loop(self) -> None:
-        '''持续轮询 iLink 更新，处理消息并在失败后按间隔重试。'''
-        while self._running:
-            try:
-                if not await self._ensure_authenticated():
-                    await asyncio.sleep(self._retry_delay)
-                    continue
-
-                data = await self._request_json(
-                    "/ilink/bot/getupdates",
-                    {
-                        "get_updates_buf": self._get_updates_buf,
-                        "base_info": self._base_info(),
-                    },
-                    timeout=max(self._current_longpoll_timeout_seconds() + 5.0, 10.0),
-                )
-
-                ret = data.get("ret", 0)
-                if ret not in (0, None):
-                    errcode = data.get("errcode")
-                    if errcode == -14:
-                        self._bot_token = ""
-                        self._get_updates_buf = ""
-                        await asyncio.to_thread(self._save_state)
-                        await asyncio.to_thread(self._save_auth_state, status="expired", bot_token="")
-                        logger.error("[WeChat] bot token expired; scan again or update bot_token and restart the channel")
-                        self._running = False
-                        break
-                    logger.warning(
-                        "[WeChat] getupdates returned ret=%s errcode=%s errmsg=%s",
-                        ret,
-                        errcode,
-                        data.get("errmsg"),
-                    )
-                    await asyncio.sleep(self._retry_delay)
-                    continue
-
-                self._update_longpoll_timeout(data)
-
-                next_buf = data.get("get_updates_buf")
-                if isinstance(next_buf, str) and next_buf != self._get_updates_buf:
-                    self._get_updates_buf = next_buf
-                    await asyncio.to_thread(self._save_state)
-
-                for raw_message in data.get("msgs", []):
-                    await self._handle_update(raw_message)
-            except asyncio.CancelledError:
-                raise
-            except Exception:
-                logger.exception("[WeChat] polling loop failed")
-                await asyncio.sleep(self._retry_delay)
-
-    async def _handle_update(self, raw_message: Any) -> None:
-        '''校验轮询返回的消息、过滤未授权用户并发布入站事件。'''
-        if not isinstance(raw_message, dict):
-            return
-        if raw_message.get("message_type") != 1:
-            return
-
-        chat_id = str(raw_message.get("from_user_id") or raw_message.get("ilink_user_id") or "").strip()
-        if not chat_id:
-            return
-
-        text = self._extract_text(raw_message)
-        context_token = str(raw_message.get("context_token") or "").strip()
-
-        # 先处理连接码，再校验 allowed_users，使浏览器发起的绑定能创建尚未加入白名单的身份。
-        connect_code = self._pending_connect_code(text)
-        if connect_code:
-            handled = await self._bind_connection_from_connect_code(
-                chat_id=chat_id,
-                context_token=context_token,
-                code=connect_code,
-            )
-            if handled:
-                return
-
-        if not self._check_user(chat_id):
-            return
-
-        files = await self._extract_inbound_files(raw_message)
-        if not text and not files:
-            return
-
-        thread_ts = context_token or str(raw_message.get("client_id") or raw_message.get("msg_id") or "").strip() or None
-
-        if context_token:
-            self._context_tokens_by_chat[chat_id] = context_token
-            if thread_ts:
-                self._context_tokens_by_thread[thread_ts] = context_token
-
-        inbound = self._make_inbound(
-            chat_id=chat_id,
-            user_id=chat_id,
-            text=text,
-            msg_type=InboundMessageType.COMMAND if is_known_channel_command(text) else InboundMessageType.CHAT,
-            thread_ts=thread_ts,
-            files=files,
-            metadata={
-                "context_token": context_token,
-                "ilink_user_id": chat_id,
-                "message_id": str(raw_message.get("message_id") or raw_message.get("msg_id") or "").strip(),
-                "ref_msg": self._extract_ref_message(raw_message),
-                "raw_message": raw_message,
-            },
-        )
-        inbound.topic_id = None
-        inbound = await self._attach_connection_identity(inbound)
-        await self.bus.publish_inbound(inbound)
-
-    async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
-        '''根据已绑定的微信连接记录补充 DeerFlow 所有者身份。'''
-        return await attach_connection_identity(
-            inbound,
-            repo=self._connection_repo,
-            provider="wechat",
-            workspace_id=inbound.chat_id,
-        )
-
-    async def _bind_connection_from_connect_code(self, *, chat_id: str, context_token: str, code: str) -> bool:
-        '''消费一次性绑定码并保存微信用户与 DeerFlow 用户的连接关系。'''
-        if self._connection_repo is None or not code:
-            return False
-
-        state = await self._connection_repo.consume_oauth_state(provider="wechat", state=code)
-        if state is None:
-            await self._send_connection_reply(chat_id, context_token, "微信绑定码无效或已过期，请在项目设置中重新生成。")
-            return True
-
-        if not chat_id:
-            await self._send_connection_reply(chat_id, context_token, "无法从这条消息完成微信账号绑定。")
-            return True
-
-        await self._connection_repo.upsert_connection(
-            owner_user_id=state["owner_user_id"],
-            provider="wechat",
-            external_account_id=chat_id,
-            workspace_id=chat_id,
-            metadata={
-                "context_token": context_token,
-            },
-            status="connected",
-        )
-        await self._send_connection_reply(chat_id, context_token, "微信已绑定到 DeerFlow，现在可以直接发送问题。")
-        return True
-
-    async def _send_connection_reply(self, chat_id: str, context_token: str, text: str) -> None:
-        '''向指定微信会话发送连接授权结果文本。'''
-        if not context_token:
-            return
-        await self._send_text_message(
-            chat_id=chat_id,
-            context_token=context_token,
-            text=text,
-            client_id_prefix="deerflow-connect",
-            max_retries=1,
-        )
-
-    async def _ensure_authenticated(self) -> bool:
-        '''确认已有有效令牌，或在启用时通过二维码登录获取令牌。'''
-        async with self._auth_lock:
-            if self._bot_token:
-                return True
-
-            await asyncio.to_thread(self._load_auth_state)
-            if self._bot_token:
-                return True
-
-            if not self._qrcode_login_enabled:
-                return False
-
-            try:
-                auth_state = await self._bind_via_qrcode()
-            except Exception:
-                logger.exception("[WeChat] QR code binding failed")
-                return False
-            return bool(auth_state.get("bot_token"))
-
-    async def login_with_qrcode(self) -> dict[str, Any]:
-        '''为网页发起一次二维码登录，登录成功后返回供服务端保存的认证信息。'''
-        async with self._auth_lock:
-            return await self._bind_via_qrcode()
-
-    def get_qrcode_login_status(self) -> dict[str, Any]:
-        '''仅返回网页需要的扫码状态及二维码内容，不返回机器人令牌。'''
-        return {
-            "status": self._auth_state.get("status", "starting"),
-            "qrcode_content": self._auth_state.get("qrcode_img_content"),
-        }
-
-    async def _bind_via_qrcode(self) -> dict[str, Any]:
-        '''执行 iLink 二维码登录轮询，并返回认证令牌和用户信息。'''
-        qrcode_data = await self._request_public_get_json(
-            "/ilink/bot/get_bot_qrcode",
-            params={"bot_type": self._qrcode_bot_type},
-        )
-        qrcode = str(qrcode_data.get("qrcode") or "").strip()
-        if not qrcode:
-            raise RuntimeError("iLink get_bot_qrcode did not return qrcode")
-
-        qrcode_img_content = str(qrcode_data.get("qrcode_img_content") or "").strip()
-        logger.info("微信登录二维码已生成，等待用户扫码确认")
-        if not qrcode_img_content:
-            raise RuntimeError("微信服务未返回可供扫描的二维码内容")
-
-        await asyncio.to_thread(
-            self._save_auth_state,
-            status="pending",
-            qrcode=qrcode,
-            qrcode_img_content=qrcode_img_content or None,
-        )
-
-        deadline = time.monotonic() + max(self._qrcode_poll_timeout, 1.0)
-        while time.monotonic() < deadline:
-            status_data = await self._request_public_get_json(
-                "/ilink/bot/get_qrcode_status",
-                params={"qrcode": qrcode},
-            )
-            status = str(status_data.get("status") or "").strip().lower()
-            if status in {"scaned", "scanned"}:
-                self._auth_state = {**self._auth_state, "status": "scanned"}
-            if status == "confirmed":
-                token = str(status_data.get("bot_token") or "").strip()
-                if not token:
-                    raise RuntimeError("iLink QR confirmation succeeded without bot_token")
-                self._bot_token = token
-                ilink_bot_id = str(status_data.get("ilink_bot_id") or "").strip() or None
-                if ilink_bot_id:
-                    self._ilink_bot_id = ilink_bot_id
-
-                base_url = status_data.get("baseurl")
-                if isinstance(base_url, str):
-                    from urllib.parse import urlparse
-
-                    parsed = urlparse(base_url)
-                    if parsed.scheme == "https" and (parsed.hostname or "").endswith(".weixin.qq.com"):
-                        self._base_url = base_url.rstrip("/")
-                return await asyncio.to_thread(
-                    self._save_auth_state,
-                    status="confirmed",
-                    bot_token=token,
-                    ilink_bot_id=self._ilink_bot_id,
-                    qrcode=qrcode,
-                    qrcode_img_content=qrcode_img_content or None,
-                )
-
-            if status in {"expired", "canceled", "cancelled", "invalid", "failed"}:
-                await asyncio.to_thread(
-                    self._save_auth_state,
-                    status=status,
-                    qrcode=qrcode,
-                    qrcode_img_content=qrcode_img_content or None,
-                )
-                raise RuntimeError(f"iLink QR code flow ended with status={status}")
-
-            await asyncio.sleep(max(self._qrcode_poll_interval, 0.1))
-
-        await asyncio.to_thread(
-            self._save_auth_state,
-            status="timeout",
-            qrcode=qrcode,
-            qrcode_img_content=qrcode_img_content or None,
-        )
-        raise TimeoutError("Timed out waiting for WeChat QR confirmation")
-
-    async def _request_json(self, path: str, payload: dict[str, Any], *, timeout: float | None = None) -> dict[str, Any]:
-        '''向受认证的 iLink API 发送 JSON 请求并解析响应正文。'''
-        client = await self._ensure_client()
-        response = await client.post(
-            f"{self._base_url}{path}",
-            json=payload,
-            headers=self._auth_headers(),
-            timeout=timeout or self.DEFAULT_API_TIMEOUT,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data if isinstance(data, dict) else {}
-
-    async def _request_public_get_json(
-        self,
-        path: str,
-        params: dict[str, Any] | None = None,
-        *,
-        timeout: float | None = None,
-    ) -> dict[str, Any]:
-        '''请求无需认证的 iLink 公共 GET 接口并解析 JSON 响应。'''
-        client = await self._ensure_client()
-        response = await client.get(
-            f"{self._base_url}{path}",
-            params=params,
-            headers=self._public_headers(),
-            timeout=timeout or self.DEFAULT_CONFIG_TIMEOUT,
-        )
-        response.raise_for_status()
-        data = response.json()
-        return data if isinstance(data, dict) else {}
-
-    async def _ensure_client(self) -> httpx.AsyncClient:
-        '''惰性创建并复用配置了连接限制和超时的异步 HTTP 客户端。'''
-        if self._client is None:
-            timeout = max(self._polling_timeout + 5.0, 10.0)
-            self._client = httpx.AsyncClient(timeout=timeout)
-        return self._client
-
-    def _resolve_context_token(self, msg: OutboundMessage) -> str | None:
-        '''从消息元数据中解析发送微信消息所需的上下文令牌。'''
-        metadata_token = msg.metadata.get("context_token")
-        if isinstance(metadata_token, str) and metadata_token.strip():
-            return metadata_token.strip()
-        if msg.thread_ts and msg.thread_ts in self._context_tokens_by_thread:
-            return self._context_tokens_by_thread[msg.thread_ts]
-        return self._context_tokens_by_chat.get(msg.chat_id)
-
-    def _check_user(self, user_id: str) -> bool:
-        '''按 allowed_users 配置检查发件人是否有权使用通道。'''
-        if not self._allowed_users:
-            return True
-        return user_id in self._allowed_users
-
-    def _current_longpoll_timeout_seconds(self) -> float:
-        '''读取当前长轮询超时时间并应用协议允许的范围限制。'''
-        if self._respect_server_longpoll_timeout and self._server_longpoll_timeout_seconds is not None:
-            return self._server_longpoll_timeout_seconds
-        return self._polling_timeout
-
-    def _update_longpoll_timeout(self, data: Mapping[str, Any]) -> None:
-        '''根据服务端响应中的建议更新后续长轮询超时。'''
-        if not self._respect_server_longpoll_timeout:
-            return
-        raw_timeout = data.get("longpolling_timeout_ms")
-        if raw_timeout is None:
-            return
-        try:
-            timeout_ms = float(raw_timeout)
-        except (TypeError, ValueError):
-            return
-        if timeout_ms <= 0:
-            return
-        self._server_longpoll_timeout_seconds = timeout_ms / 1000.0
-
-    def _base_info(self) -> dict[str, str]:
-        '''组装请求中携带的 iLink 客户端版本和设备标识字段。'''
-        return {"channel_version": self._channel_version}
-
-    def _common_headers(self) -> dict[str, str]:
-        '''生成 iLink API 共用的 HTTP 请求头。'''
-        headers = {
-            "iLink-App-ClientVersion": _build_ilink_client_version(self._channel_version),
-            "X-WECHAT-UIN": _build_wechat_uin(),
-        }
-        if self._ilink_app_id:
-            headers["iLink-App-Id"] = self._ilink_app_id
-        if self._route_tag:
-            headers["SKRouteTag"] = self._route_tag
-        return headers
-
-    def _public_headers(self) -> dict[str, str]:
-        '''生成二维码登录等未认证接口使用的请求头。'''
-        return {
-            "Content-Type": "application/json",
-            **self._common_headers(),
-        }
-
-    def _auth_headers(self) -> dict[str, str]:
-        '''在通用请求头中附加当前机器人认证令牌。'''
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {self._bot_token}",
-            "AuthorizationType": "ilink_bot_token",
-            **self._common_headers(),
-        }
-        return headers
-
-    @staticmethod
-    def _extract_cdn_full_url(media: Mapping[str, Any] | None) -> str | None:
-        '''从媒体描述中读取有效的 CDN 完整下载地址。'''
-        if not isinstance(media, Mapping):
-            return None
-        full_url = media.get("full_url")
-        return full_url.strip() if isinstance(full_url, str) and full_url.strip() else None
-
-    @staticmethod
-    def _extract_upload_full_url(upload_data: Mapping[str, Any] | None) -> str | None:
-        '''从上传预签名响应中提取完整上传地址。'''
-        if not isinstance(upload_data, Mapping):
-            return None
-        upload_full_url = upload_data.get("upload_full_url")
-        return upload_full_url.strip() if isinstance(upload_full_url, str) and upload_full_url.strip() else None
-
-    @staticmethod
-    def _extract_upload_param(upload_data: Mapping[str, Any] | None) -> str | None:
-        '''从上传预签名响应中提取加密查询参数。'''
-        if not isinstance(upload_data, Mapping):
-            return None
-        upload_param = upload_data.get("upload_param")
-        return upload_param.strip() if isinstance(upload_param, str) and upload_param.strip() else None
-
-    def _build_upload_request(
-        self,
-        *,
-        filekey: str,
-        media_type: UploadMediaType,
-        to_user_id: str,
-        plaintext: bytes,
-        aes_key: bytes,
-        thumb_plaintext: bytes | None = None,
-        no_need_thumb: bool = False,
-    ) -> dict[str, Any]:
-        '''组装 iLink 媒体上传申请，包含摘要、大小、密钥和媒体类型。'''
-        _validate_aes_128_key(aes_key)
-        payload: dict[str, Any] = {
-            "filekey": filekey,
-            "media_type": int(media_type),
-            "to_user_id": to_user_id,
-            "rawsize": len(plaintext),
-            "rawfilemd5": _md5_hex(plaintext),
-            "filesize": _encrypted_size_for_aes_128_ecb(len(plaintext)),
-            "aeskey": aes_key.hex(),
-        }
-        if thumb_plaintext is not None:
-            payload.update(
-                {
-                    "thumb_rawsize": len(thumb_plaintext),
-                    "thumb_rawfilemd5": _md5_hex(thumb_plaintext),
-                    "thumb_filesize": _encrypted_size_for_aes_128_ecb(len(thumb_plaintext)),
-                }
-            )
-        elif no_need_thumb:
-            payload["no_need_thumb"] = True
-        return payload
-
-    async def _download_cdn_bytes(self, url: str, *, timeout: float | None = None) -> bytes:
-        '''从 CDN 下载媒体字节，并在 HTTP 状态异常时抛出错误。'''
-        client = await self._ensure_client()
-        response = await client.get(url, timeout=timeout or self.DEFAULT_CDN_TIMEOUT)
-        response.raise_for_status()
-        return response.content
-
-    async def _upload_cdn_bytes(
-        self,
-        url: str,
-        content: bytes,
-        *,
-        content_type: str = "application/octet-stream",
-        timeout: float | None = None,
-        method: str = "PUT",
-    ) -> str | None:
-        '''将媒体字节 PUT 到 CDN 上传地址，并检查服务端响应状态。'''
-        client = await self._ensure_client()
-        request_kwargs = {
-            "content": content,
-            "headers": {"Content-Type": content_type},
-            "timeout": timeout or self.DEFAULT_CDN_TIMEOUT,
-        }
-        if method.upper() == "POST":
-            response = await client.post(url, **request_kwargs)
-        else:
-            response = await client.put(url, **request_kwargs)
-        response.raise_for_status()
-        return response.headers.get("x-encrypted-param")
-
-    def _build_outbound_image_item(
-        self,
-        upload_data: Mapping[str, Any],
-        aes_key: bytes,
-        *,
-        ciphertext_size: int,
-    ) -> dict[str, Any]:
-        '''构造含 CDN 地址和 AES 密钥信息的 iLink 出站图片片段。'''
-        encoded_aes_key = _encode_outbound_media_aes_key(aes_key)
-        media: dict[str, Any] = {
-            "aes_key": encoded_aes_key,
-            "encrypt_type": 1,
-        }
-        upload_param = upload_data.get("upload_param")
-        if isinstance(upload_param, str) and upload_param.strip():
-            media["encrypt_query_param"] = upload_param.strip()
-
-        return {
-            "media": media,
-            "mid_size": ciphertext_size,
-        }
-
     def _build_outbound_file_item(
         self,
         upload_data: Mapping[str, Any],
@@ -1058,480 +1430,109 @@ class WechatChannel(Channel):
             "len": str(len(plaintext)),
         }
 
-    def _download_dir(self) -> Path | None:
-        '''解析并创建配置的微信媒体下载目录；未配置时返回 None。'''
-        if not self._state_dir:
-            return None
-        return self._state_dir / self.DEFAULT_IMAGE_DOWNLOAD_DIRNAME
+    async def login_with_qrcode(self) -> dict[str, Any]:
+        '''为网页发起一次二维码登录，登录成功后返回供服务端保存的认证信息。'''
+        async with self._auth_lock:
+            return await self._bind_via_qrcode()
 
-    async def _extract_inbound_files(self, raw_message: Mapping[str, Any]) -> list[dict[str, Any]]:
-        '''从 iLink 消息片段中解析图片和文件并下载到本地目录。'''
-        files: list[dict[str, Any]] = []
-        item_list = raw_message.get("item_list")
-        if not isinstance(item_list, list):
-            return files
-
-        message_id = str(raw_message.get("message_id") or raw_message.get("msg_id") or raw_message.get("client_id") or "msg")
-
-        for index, item in enumerate(item_list):
-            if not isinstance(item, Mapping):
-                continue
-            if item.get("type") == int(MessageItemType.IMAGE):
-                image_file = await self._extract_image_file(item, message_id=message_id, index=index)
-                if image_file:
-                    files.append(image_file)
-            elif item.get("type") == int(MessageItemType.FILE):
-                file_info = await self._extract_file_item(item, message_id=message_id, index=index)
-                if file_info:
-                    files.append(file_info)
-        return files
-
-    async def _extract_image_file(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
-        '''下载、解密并校验图片片段，返回供入站消息引用的文件元数据。'''
-        image_item = item.get("image_item")
-        if not isinstance(image_item, Mapping):
-            return None
-
-        media = image_item.get("media")
-        if not isinstance(media, Mapping):
-            return None
-
-        full_url = self._extract_cdn_full_url(media)
-        if not full_url:
-            logger.warning("[WeChat] inbound image missing full_url, skipping message_id=%s", message_id)
-            return None
-
-        aes_key = self._resolve_media_aes_key(item, image_item, media)
-        if not aes_key:
-            logger.warning(
-                "[WeChat] inbound image missing aes key, skipping message_id=%s diagnostics=%s",
-                message_id,
-                self._describe_media_key_state(item=item, item_payload=image_item, media=media),
-            )
-            return None
-
-        encrypted = await self._download_cdn_bytes(full_url)
-        decrypted = _decrypt_aes_128_ecb(encrypted, aes_key)
-        if self._max_inbound_image_bytes > 0 and len(decrypted) > self._max_inbound_image_bytes:
-            logger.warning("[WeChat] inbound image exceeds size limit (%d bytes), skipping message_id=%s", len(decrypted), message_id)
-            return None
-
-        detected_image = _detect_image_extension_and_mime(decrypted)
-        image_extension = detected_image[0] if detected_image else ".jpg"
-        filename = _safe_media_filename("wechat-image", image_extension, message_id=message_id, index=index)
-        stored_path = await asyncio.to_thread(self._stage_downloaded_file, filename, decrypted)
-        if stored_path is None:
-            return None
-
-        mime_type = detected_image[1] if detected_image else mimetypes.guess_type(filename)[0] or "image/jpeg"
+    def get_qrcode_login_status(self) -> dict[str, Any]:
+        '''仅返回网页需要的扫码状态及二维码内容，不返回机器人令牌。'''
         return {
-            "type": "image",
-            "filename": stored_path.name,
-            "size": len(decrypted),
-            "path": str(stored_path),
-            "mime_type": mime_type,
-            "source": "wechat",
-            "message_item_type": int(MessageItemType.IMAGE),
-            "full_url": full_url,
+            "status": self._auth_state.get("status", "starting"),
+            "qrcode_content": self._auth_state.get("qrcode_img_content"),
         }
 
-    async def _extract_file_item(self, item: Mapping[str, Any], *, message_id: str, index: int) -> dict[str, Any] | None:
-        '''下载并解密普通文件片段，验证文件大小后返回本地文件元数据。'''
-        file_item = item.get("file_item")
-        if not isinstance(file_item, Mapping):
-            return None
 
-        media = file_item.get("media")
-        if not isinstance(media, Mapping):
-            return None
+def _build_ilink_client_version(version: str) -> str:
+    '''将点分版本号编码为 iLink 要求的 24 位整数文本。'''
+    parts = [part.strip() for part in version.split(".")]
 
-        full_url = self._extract_cdn_full_url(media)
-        if not full_url:
-            logger.warning("[WeChat] inbound file missing full_url, skipping message_id=%s", message_id)
-            return None
-
-        aes_key = self._resolve_media_aes_key(item, file_item, media)
-        if not aes_key:
-            logger.warning(
-                "[WeChat] inbound file missing aes key, skipping message_id=%s diagnostics=%s",
-                message_id,
-                self._describe_media_key_state(item=item, item_payload=file_item, media=media),
-            )
-            return None
-
-        filename = self._normalize_inbound_filename(file_item.get("file_name"), default_prefix="wechat-file", message_id=message_id, index=index)
-        mime_type = mimetypes.guess_type(filename)[0] or "application/octet-stream"
-        if not self._is_allowed_file_type(filename, mime_type):
-            logger.warning("[WeChat] inbound file type blocked, skipping message_id=%s filename=%s", message_id, filename)
-            return None
-
-        encrypted = await self._download_cdn_bytes(full_url)
-        decrypted = _decrypt_aes_128_ecb(encrypted, aes_key)
-        if self._max_inbound_file_bytes > 0 and len(decrypted) > self._max_inbound_file_bytes:
-            logger.warning("[WeChat] inbound file exceeds size limit (%d bytes), skipping message_id=%s", len(decrypted), message_id)
-            return None
-
-        stored_path = await asyncio.to_thread(self._stage_downloaded_file, filename, decrypted)
-        if stored_path is None:
-            return None
-
-        return {
-            "type": "file",
-            "filename": stored_path.name,
-            "size": len(decrypted),
-            "path": str(stored_path),
-            "mime_type": mime_type,
-            "source": "wechat",
-            "message_item_type": int(MessageItemType.FILE),
-            "full_url": full_url,
-        }
-
-    def _stage_downloaded_file(self, filename: str, content: bytes) -> Path | None:
-        '''将媒体字节写入下载目录的临时文件，再原子替换为目标文件。'''
-        download_dir = self._download_dir()
-        if download_dir is None:
-            return None
+    def _part(index: int) -> int:
+        '''解析单个版本分段，并将其限制在无符号字节范围内。'''
+        if index >= len(parts):
+            return 0
         try:
-            download_dir.mkdir(parents=True, exist_ok=True)
-            path = download_dir / filename
-            path.write_bytes(content)
-            return path
-        except OSError:
-            logger.exception("[WeChat] failed to persist inbound media file %s", filename)
-            return None
+            return max(0, min(int(parts[index] or 0), 0xFF))
+        except ValueError:
+            return 0
 
-    @staticmethod
-    def _decode_base64_aes_key(value: str) -> bytes | None:
-        '''解码 Base64 AES 密钥，并兼容协议中以十六进制文本再次编码的形式。'''
-        candidate = value.strip()
-        if not candidate:
-            return None
+    major = _part(0)
+    minor = _part(1)
+    patch = _part(2)
+    return str((major << 16) | (minor << 8) | patch)
 
-        def _normalize_decoded(decoded: bytes) -> bytes | None:
-            '''将解码结果规范为 16 字节密钥，不合法时返回 None。'''
-            try:
-                _validate_aes_128_key(decoded)
-                return decoded
-            except ValueError:
-                pass
 
-            try:
-                decoded_text = decoded.decode("utf-8").strip().strip('"').strip("'")
-            except UnicodeDecodeError:
-                return None
+def _build_wechat_uin() -> str:
+    '''生成随机 32 位微信 UIN 并按协议编码为 Base64。'''
+    return base64.b64encode(str(secrets.randbits(32)).encode("utf-8")).decode("utf-8")
 
-            if not decoded_text:
-                return None
 
-            try:
-                key = bytes.fromhex(decoded_text)
-                _validate_aes_128_key(key)
-                return key
-            except ValueError:
-                return None
+def _decrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
+    '''解密 AES-128-ECB 数据并移除 PKCS7 填充。'''
+    _validate_aes_128_key(key)
+    cipher = Cipher(algorithms.AES(key), modes.ECB())
+    decryptor = cipher.decryptor()
+    padded = decryptor.update(content) + decryptor.finalize()
+    unpadder = padding.PKCS7(128).unpadder()
+    return unpadder.update(padded) + unpadder.finalize()
 
-        padded = candidate + ("=" * (-len(candidate) % 4))
-        decoders = (
-            lambda: base64.b64decode(padded, validate=True),
-            lambda: base64.urlsafe_b64decode(padded),
-        )
-        for decoder in decoders:
-            try:
-                key = _normalize_decoded(decoder())
-                if key is not None:
-                    return key
-            except (ValueError, TypeError, binascii.Error):
-                continue
-        return None
 
-    @classmethod
-    def _parse_aes_key_candidate(cls, value: Any, *, prefer_hex: bool) -> bytes | None:
-        '''按优先格式尝试解析密钥候选值，并验证 AES-128 长度。'''
-        if isinstance(value, bytes):
-            try:
-                _validate_aes_128_key(value)
-                return value
-            except ValueError:
-                return None
+def _validate_aes_128_key(key: bytes) -> None:
+    '''确保密钥长度符合 AES-128 算法要求。'''
+    if len(key) != 16:
+        raise ValueError("AES-128-ECB requires a 16-byte key")
 
-        if isinstance(value, bytearray):
-            return cls._parse_aes_key_candidate(bytes(value), prefer_hex=prefer_hex)
 
-        if not isinstance(value, str) or not value.strip():
-            return None
+def _detect_image_extension_and_mime(content: bytes) -> tuple[str, str] | None:
+    '''根据文件头识别支持的图片扩展名和 MIME 类型，未知格式返回 None。'''
+    if content.startswith(b"\x89PNG\r\n\x1a\n"):
+        return ".png", "image/png"
+    if content.startswith(b"\xff\xd8\xff"):
+        return ".jpg", "image/jpeg"
+    if content.startswith((b"GIF87a", b"GIF89a")):
+        return ".gif", "image/gif"
+    if len(content) >= 12 and content.startswith(b"RIFF") and content[8:12] == b"WEBP":
+        return ".webp", "image/webp"
+    if content.startswith(b"BM"):
+        return ".bmp", "image/bmp"
+    return None
 
-        raw = value.strip()
-        parsers = (
-            (lambda: bytes.fromhex(raw), lambda key: _validate_aes_128_key(key)),
-            (lambda: cls._decode_base64_aes_key(raw), None),
-        )
-        if not prefer_hex:
-            parsers = (parsers[1], parsers[0])
 
-        for decoder, validator in parsers:
-            try:
-                key = decoder()
-                if key is None:
-                    continue
-                if validator is not None:
-                    validator(key)
-                return key
-            except ValueError:
-                continue
-        return None
+def _safe_media_filename(prefix: str, extension: str, message_id: str | None = None, index: int | None = None) -> str:
+    '''组合媒体文件名前缀、消息标识和序号，并清理路径分隔符。'''
+    safe_ext = extension if extension.startswith(".") else f".{extension}" if extension else ""
+    safe_msg = (message_id or "msg").replace("/", "_").replace("\\", "_")
+    suffix = f"-{index}" if index is not None else ""
+    return f"{prefix}-{safe_msg}{suffix}{safe_ext}"
 
-    @classmethod
-    def _resolve_media_aes_key(cls, *payloads: Mapping[str, Any]) -> bytes | None:
-        '''从媒体响应及其嵌套字段中查找可用的 AES 密钥。'''
-        for payload in payloads:
-            if not isinstance(payload, Mapping):
-                continue
-            for key_name in ("aeskey", "aes_key_hex"):
-                key = cls._parse_aes_key_candidate(payload.get(key_name), prefer_hex=True)
-                if key:
-                    return key
-            for key_name in ("aes_key", "aesKey", "encrypt_key", "encryptKey"):
-                key = cls._parse_aes_key_candidate(payload.get(key_name), prefer_hex=False)
-                if key:
-                    return key
-            media = payload.get("media")
-            if isinstance(media, Mapping):
-                key = cls._resolve_media_aes_key(media)
-                if key:
-                    return key
-        return None
 
-    @staticmethod
-    def _describe_media_key_state(
-        *,
-        item: Mapping[str, Any] | None,
-        item_payload: Mapping[str, Any] | None,
-        media: Mapping[str, Any] | None,
-    ) -> dict[str, Any]:
-        '''提取密钥相关字段用于诊断日志，并避免输出完整敏感密钥。'''
+def _build_cdn_upload_url(cdn_base_url: str, upload_param: str, filekey: str) -> str:
+    '''对上传参数和文件键进行 URL 编码并构造 CDN 上传地址。'''
+    return f"{cdn_base_url.rstrip('/')}/upload?encrypted_query_param={quote(upload_param, safe='')}&filekey={quote(filekey, safe='')}"
 
-        def _interesting(mapping: Mapping[str, Any] | None) -> dict[str, Any]:
-            '''筛选映射中与媒体密钥诊断相关的字段。'''
-            if not isinstance(mapping, Mapping):
-                return {}
-            details: dict[str, Any] = {}
-            for key in (
-                "aeskey",
-                "aes_key",
-                "aesKey",
-                "aes_key_hex",
-                "encrypt_key",
-                "encryptKey",
-                "encrypt_query_param",
-                "encrypt_type",
-                "full_url",
-                "file_name",
-            ):
-                if key not in mapping:
-                    continue
-                value = mapping.get(key)
-                if isinstance(value, str):
-                    details[key] = f"str(len={len(value.strip())})"
-                elif value is not None:
-                    details[key] = type(value).__name__
-                else:
-                    details[key] = None
-            return details
 
-        return {
-            "item": _interesting(item),
-            "item_payload": _interesting(item_payload),
-            "media": _interesting(media),
-        }
+def _encrypt_aes_128_ecb(content: bytes, key: bytes) -> bytes:
+    '''使用 PKCS7 填充和 AES-128-ECB 加密媒体密钥材料。'''
+    _validate_aes_128_key(key)
+    padder = padding.PKCS7(128).padder()
+    padded = padder.update(content) + padder.finalize()
+    cipher = Cipher(algorithms.AES(key), modes.ECB())
+    encryptor = cipher.encryptor()
+    return encryptor.update(padded) + encryptor.finalize()
 
-    @staticmethod
-    def _extract_ref_message(raw_message: Mapping[str, Any]) -> dict[str, Any] | None:
-        '''从入站消息中提取被引用消息的类型和内容。'''
-        item_list = raw_message.get("item_list")
-        if not isinstance(item_list, list):
-            return None
-        for item in item_list:
-            if not isinstance(item, Mapping):
-                continue
-            ref_msg = item.get("ref_msg")
-            if isinstance(ref_msg, Mapping):
-                return dict(ref_msg)
-        return None
 
-    def _is_allowed_file_type(self, filename: str, mime_type: str) -> bool:
-        '''根据扩展名白名单和 MIME 类型判断入站文件是否允许处理。'''
-        suffix = Path(filename).suffix.lower()
-        if self._allowed_file_extensions and suffix not in self._allowed_file_extensions:
-            return False
-        if mime_type.startswith("text/"):
-            return True
-        return mime_type in self.DEFAULT_ALLOWED_FILE_MIME_TYPES
+def _md5_hex(content: bytes) -> str:
+    '''计算媒体内容的 MD5 十六进制摘要，用于 iLink 文件校验字段。'''
+    return hashlib.md5(content).hexdigest()
 
-    @staticmethod
-    def _normalize_inbound_filename(raw_filename: Any, *, default_prefix: str, message_id: str, index: int) -> str:
-        '''清理入站文件名中的路径字符，并在缺少名称时生成安全默认名。'''
-        if isinstance(raw_filename, str) and raw_filename.strip():
-            candidate = Path(raw_filename.strip()).name
-            if candidate:
-                return candidate
-        return _safe_media_filename(default_prefix, ".bin", message_id=message_id, index=index)
 
-    def _ensure_success(self, data: dict[str, Any], operation: str) -> None:
-        '''检查 iLink JSON 响应成功标志，失败时抛出带操作信息的异常。'''
-        ret = data.get("ret", 0)
-        if ret in (0, None):
-            return
-        errcode = data.get("errcode")
-        errmsg = data.get("errmsg") or data.get("msg") or "unknown error"
-        raise RuntimeError(f"iLink {operation} failed: ret={ret} errcode={errcode} errmsg={errmsg}")
+def _encrypted_size_for_aes_128_ecb(plaintext_size: int) -> int:
+    '''计算 PKCS7 填充后 AES-128-ECB 密文的字节长度。'''
+    if plaintext_size < 0:
+        raise ValueError("plaintext_size must be non-negative")
+    return ((plaintext_size // 16) + 1) * 16
 
-    def _load_state(self) -> None:
-        '''从状态文件恢复长轮询同步游标，忽略不存在或损坏的文件。'''
-        self._load_auth_state()
-        if not self._cursor_path or not self._cursor_path.exists():
-            return
-        try:
-            data = json.loads(self._cursor_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            logger.warning("[WeChat] failed to read cursor state from %s", self._cursor_path)
-            return
-        cursor = data.get("get_updates_buf")
-        if isinstance(cursor, str):
-            self._get_updates_buf = cursor
 
-    def _save_state(self) -> None:
-        '''将最新长轮询同步游标持久化到状态文件。'''
-        if not self._cursor_path:
-            return
-        try:
-            self._cursor_path.parent.mkdir(parents=True, exist_ok=True)
-            self._cursor_path.write_text(json.dumps({"get_updates_buf": self._get_updates_buf}, ensure_ascii=False, indent=2), encoding="utf-8")
-        except OSError:
-            logger.warning("[WeChat] failed to persist cursor state to %s", self._cursor_path)
-
-    def _load_auth_state(self) -> None:
-        '''从本地认证状态恢复机器人令牌、上下文令牌和用户标识。'''
-        if not self._auth_path or not self._auth_path.exists():
-            return
-        try:
-            data = json.loads(self._auth_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError):
-            logger.warning("[WeChat] failed to read auth state from %s", self._auth_path)
-            return
-        if not isinstance(data, dict):
-            return
-        self._auth_state = dict(data)
-
-        if not self._bot_token:
-            token = data.get("bot_token")
-            if isinstance(token, str) and token.strip():
-                self._bot_token = token.strip()
-
-        if not self._ilink_bot_id:
-            ilink_bot_id = data.get("ilink_bot_id")
-            if isinstance(ilink_bot_id, str) and ilink_bot_id.strip():
-                self._ilink_bot_id = ilink_bot_id.strip()
-
-    def _save_auth_state(
-        self,
-        *,
-        status: str,
-        bot_token: str | None = None,
-        ilink_bot_id: str | None = None,
-        qrcode: str | None = None,
-        qrcode_img_content: str | None = None,
-    ) -> dict[str, Any]:
-        '''将当前认证字段安全保存到本地状态文件。'''
-        data = dict(self._auth_state)
-        data["status"] = status
-        data["updated_at"] = int(time.time())
-        data["base_url"] = self._base_url
-
-        if bot_token is not None:
-            if bot_token:
-                data["bot_token"] = bot_token
-            else:
-                data.pop("bot_token", None)
-        elif self._bot_token:
-            data["bot_token"] = self._bot_token
-
-        resolved_ilink_bot_id = ilink_bot_id if ilink_bot_id is not None else self._ilink_bot_id
-        if resolved_ilink_bot_id:
-            data["ilink_bot_id"] = resolved_ilink_bot_id
-
-        if qrcode is not None:
-            data["qrcode"] = qrcode
-        if qrcode_img_content is not None:
-            data["qrcode_img_content"] = qrcode_img_content
-
-        self._auth_state = data
-        if self._auth_path:
-            try:
-                self._auth_path.parent.mkdir(parents=True, exist_ok=True)
-                # 通过权限为 0o600 的临时文件写入后原子替换，避免令牌短暂继承较宽松的默认权限。
-                # NamedTemporaryFile 使用 mkstemp，从创建时即应用该权限。
-                fd = tempfile.NamedTemporaryFile(mode="w", dir=self._auth_path.parent, suffix=".tmp", delete=False, encoding="utf-8")
-                try:
-                    json.dump(data, fd, ensure_ascii=False, indent=2)
-                    fd.close()
-                    Path(fd.name).replace(self._auth_path)
-                except BaseException:
-                    fd.close()
-                    Path(fd.name).unlink(missing_ok=True)
-                    raise
-            except OSError:
-                logger.warning("[WeChat] failed to persist auth state to %s", self._auth_path)
-            else:
-                # 目标文件已继承临时文件的 0o600 权限；此处仅做加固。
-                # 不支持 POSIX 权限的文件系统上 chmod 失败不应被误报为持久化失败。
-                try:
-                    self._auth_path.chmod(0o600)
-                except OSError:
-                    logger.debug("[WeChat] unable to chmod auth state at %s", self._auth_path, exc_info=True)
-        return data
-
-    @staticmethod
-    def _extract_text(raw_message: dict[str, Any]) -> str:
-        '''从微信消息的文本片段中拼接可见正文。'''
-        parts: list[str] = []
-        for item in raw_message.get("item_list", []):
-            if not isinstance(item, dict) or item.get("type") != int(MessageItemType.TEXT):
-                continue
-            text_item = item.get("text_item")
-            if not isinstance(text_item, dict):
-                continue
-            text = text_item.get("text")
-            if isinstance(text, str) and text.strip():
-                parts.append(text.strip())
-        return "\n".join(parts)
-
-    @staticmethod
-    def _resolve_state_dir(raw_state_dir: Any) -> Path | None:
-        '''解析状态目录配置；空值表示不启用本地状态持久化。'''
-        if not isinstance(raw_state_dir, str) or not raw_state_dir.strip():
-            return None
-        return Path(raw_state_dir).expanduser()
-
-    @staticmethod
-    def _coerce_float(value: Any, default: float) -> float:
-        '''将配置值转换为浮点数，解析失败时使用默认值。'''
-        try:
-            return float(value)
-        except (TypeError, ValueError):
-            return default
-
-    @staticmethod
-    def _coerce_int(value: Any, default: int) -> int:
-        '''将配置值转换为整数，解析失败时使用默认值。'''
-        try:
-            return int(value)
-        except (TypeError, ValueError):
-            return default
-
-    @staticmethod
-    def _coerce_str_set(value: Any, default: frozenset[str]) -> set[str]:
-        '''把字符串或字符串列表配置规范化为去空白的字符串集合。'''
-        if not isinstance(value, (list, tuple, set, frozenset)):
-            return set(default)
-        normalized = {str(item).strip().lower() if str(item).strip().startswith(".") else f".{str(item).strip().lower()}" for item in value if str(item).strip()}
-        return normalized or set(default)
+def _encode_outbound_media_aes_key(aes_key: bytes) -> str:
+    '''将媒体 AES 密钥转换为协议规定的十六进制文本再做 Base64 编码。'''
+    return base64.b64encode(aes_key.hex().encode("utf-8")).decode("utf-8")

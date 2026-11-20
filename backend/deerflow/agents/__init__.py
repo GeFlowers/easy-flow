@@ -1,36 +1,13 @@
-'''提供代理构建、功能配置和状态类型的延迟导出入口。'''
-
-from .features import Next, Prev, RuntimeFeatures
+'''提供代理状态类型的延迟导出入口。'''
 
 __all__ = [
-    "create_deerflow_agent",
-    "RuntimeFeatures",
-    "Next",
-    "Prev",
-    "make_lead_agent",
     "SandboxState",
     "ThreadState",
 ]
 
 
 def __getattr__(name: str):
-    '''按需导入公开符号，避免包导入时初始化完整代理依赖图。
-
-    访问主代理工厂时会预热已启用技能缓存；未知名称遵循模块属性协议抛出
-    ``AttributeError``。
-    '''
-    if name == "create_deerflow_agent":
-        from .factory import create_deerflow_agent
-
-        globals()[name] = create_deerflow_agent
-        return create_deerflow_agent
-    if name == "make_lead_agent":
-        from .lead_agent import make_lead_agent
-        from .lead_agent.prompt import prime_enabled_skills_cache
-
-        prime_enabled_skills_cache()
-        globals()[name] = make_lead_agent
-        return make_lead_agent
+    '''按需导入公开符号，避免包导入时初始化完整代理依赖图。'''
     if name in {"SandboxState", "ThreadState"}:
         from .thread_state import SandboxState, ThreadState
 

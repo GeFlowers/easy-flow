@@ -68,7 +68,6 @@ import {
   parseSubtaskResult,
 } from "@/features/tasks/subtask-result";
 import type { AgentThreadState } from "@/features/threads";
-import { cn } from "@/lib/utils";
 
 import { ArtifactFileList } from "../artifacts/artifact-file-list";
 import { CopyButton } from "../copy-button";
@@ -597,10 +596,12 @@ export function MessageList({
                   }}
                 >
                   <GitBranchPlusIcon
-                    className={cn(
+                    className={[
                       "size-4",
                       branchingMessageId === actionTarget.id && "animate-pulse",
-                    )}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   />
                 </Button>
               </Tooltip>
@@ -631,11 +632,13 @@ export function MessageList({
                   }}
                 >
                   <RefreshCcwIcon
-                    className={cn(
+                    className={[
                       "size-3",
                       regeneratingMessageId === actionTarget.id &&
                         "animate-spin",
-                    )}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   />
                 </Button>
               </Tooltip>
@@ -711,7 +714,9 @@ export function MessageList({
   return (
     <>
       <Conversation
-        className={cn("flex size-full flex-col justify-center", className)}
+        className={["flex size-full flex-col justify-center", className]
+          .filter(Boolean)
+          .join(" ")}
         data-testid={testId}
         initial={initialScroll}
         resize={resizeScroll}
@@ -734,10 +739,12 @@ export function MessageList({
                   data-assistant-turn={
                     group.type === "assistant" ? "" : undefined
                   }
-                  className={cn(
+                  className={[
                     "w-full",
                     group.type === "assistant" && "group/assistant-turn",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
                   {group.messages.map((msg) => {
                     const item = (
@@ -1027,12 +1034,14 @@ export function MessageList({
       </Conversation>
       {selectionToolbar && sidecar && (
         <div
-          className={cn(
+          className={[
             "bg-popover text-popover-foreground border-border fixed z-50 flex -translate-x-1/2 items-center gap-1 rounded-full border p-1 shadow-lg",
             selectionToolbar.placement === "bottom"
               ? "translate-y-0"
               : "-translate-y-full",
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
           data-sidecar-selection-toolbar
           style={{ left: selectionToolbar.x, top: selectionToolbar.y }}
         >

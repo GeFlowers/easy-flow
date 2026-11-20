@@ -24,11 +24,30 @@ class AuthConfig(BaseModel):
         description="Secret key for JWT signing. MUST be set via AUTH_JWT_SECRET.",
     )
     token_expiry_days: int = Field(default=7, ge=1, le=30)
-    oauth_github_client_id: str | None = Field(default=None)
-    oauth_github_client_secret: str | None = Field(default=None)
 
 
 _auth_config: AuthConfig | None = None
+
+
+def get_auth_config() -> AuthConfig:
+    '''获取全局 ``AuthConfig`` 实例，首次调用时从环境变量解析。'''
+    global _auth_config
+    if _auth_config is None:
+        from dotenv import load_dotenv
+
+        load_dotenv()
+        jwt_secret = os.environ.get("AUTH_JWT_SECRET")
+        if not jwt_secret:
+            jwt_secret = _load_or_create_secret()
+            os.environ["AUTH_JWT_SECRET"] = jwt_secret
+            logger.warning(
+                "⚠ AUTH_JWT_SECRET is not set — using an auto-generated secret "
+                "persisted to .jwt_secret. Sessions will survive restarts. "
+                "For production, add AUTH_JWT_SECRET to your .env file: "
+                'python -c "import secrets; print(secrets.token_urlsafe(32))"'
+            )
+        _auth_config = AuthConfig(jwt_secret=jwt_secret)
+    return _auth_config
 
 
 def _load_or_create_secret() -> str:
@@ -55,27 +74,6 @@ def _load_or_create_secret() -> str:
     except OSError as exc:
         raise RuntimeError(f"Failed to persist JWT secret to {secret_file}. Set AUTH_JWT_SECRET explicitly or fix DEER_FLOW_HOME/base directory permissions so DeerFlow can store a stable auth secret.") from exc
     return secret
-
-
-def get_auth_config() -> AuthConfig:
-    '''获取全局 ``AuthConfig`` 实例，首次调用时从环境变量解析。'''
-    global _auth_config
-    if _auth_config is None:
-        from dotenv import load_dotenv
-
-        load_dotenv()
-        jwt_secret = os.environ.get("AUTH_JWT_SECRET")
-        if not jwt_secret:
-            jwt_secret = _load_or_create_secret()
-            os.environ["AUTH_JWT_SECRET"] = jwt_secret
-            logger.warning(
-                "⚠ AUTH_JWT_SECRET is not set — using an auto-generated secret "
-                "persisted to .jwt_secret. Sessions will survive restarts. "
-                "For production, add AUTH_JWT_SECRET to your .env file: "
-                'python -c "import secrets; print(secrets.token_urlsafe(32))"'
-            )
-        _auth_config = AuthConfig(jwt_secret=jwt_secret)
-    return _auth_config
 
 
 def set_auth_config(config: AuthConfig) -> None:

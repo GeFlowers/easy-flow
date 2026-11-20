@@ -23,8 +23,7 @@ const CSRF_COOKIE_PREFIX = "csrf_token=";
  * 对 SSR 安全：当 ``document`` 未定义时返回 ``null``，因此服务端组件可无需额外
  * 守卫地导入同一辅助函数。
  *
- * 使用 `String.split` 而非正则表达式，以避开 ESLint 的 `prefer-regexp-exec` 规则，
- * 并利用 Cookie 值可靠的 `; ` 分隔符（由 Gateway 而非浏览器设置，因此格式稳定）。
+ * 使用 `String.split` 按 Cookie 的 `; ` 分隔符拆分。
  */
 export function readCsrfCookie(): string | null {
   if (typeof document === "undefined") return null;

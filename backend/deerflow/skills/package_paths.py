@@ -5,11 +5,6 @@ from __future__ import annotations
 from pathlib import PurePosixPath
 
 
-def _parts(path: str | PurePosixPath) -> tuple[str, ...]:
-    '''把 Windows 或 POSIX 路径写法统一拆成 POSIX 路径组件。'''
-    return PurePosixPath(str(path).replace("\\", "/")).parts
-
-
 def is_eval_fixture_path(path: str | PurePosixPath) -> bool:
     '''判断路径是否位于 evals/fixtures 子树中。'''
     parts = _parts(path)
@@ -17,6 +12,11 @@ def is_eval_fixture_path(path: str | PurePosixPath) -> bool:
         if part == "evals" and len(parts) > index + 2:
             return parts[index + 1] == "fixtures"
     return False
+
+
+def _parts(path: str | PurePosixPath) -> tuple[str, ...]:
+    '''把 Windows 或 POSIX 路径写法统一拆成 POSIX 路径组件。'''
+    return PurePosixPath(str(path).replace("\\", "/")).parts
 
 
 def is_eval_fixture_skill_md(path: str | PurePosixPath) -> bool:

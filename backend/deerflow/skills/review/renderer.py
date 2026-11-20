@@ -114,6 +114,43 @@ def build_static_report(
     }
 
 
+def _semantic_severity(severity: Any) -> str:
+    '''将扫描严重等级映射为审查报告使用的等级。'''
+    if severity == "blocker":
+        return "blocker"
+    if severity == "error":
+        return "major"
+    return "minor"
+
+
+def _dimensions_from_facts(facts: dict[str, Any]) -> list[dict[str, Any]]:
+    '''根据发现数量和评测样例覆盖情况生成结构与证据质量维度。'''
+    summary = facts.get("summary", {})
+    status = "blocker" if summary.get("blockers") else "concern" if summary.get("errors") or summary.get("warnings") else "pass"
+    return [
+        {
+            "id": "structure",
+            "status": status,
+            "summary": f"{summary.get('blockers', 0)} 个阻断项, {summary.get('errors', 0)} 个错误, {summary.get('warnings', 0)} 个警告",
+        },
+        {
+            "id": "evidence_quality",
+            "status": "concern" if facts.get("evals", {}).get("case_count", 0) == 0 else "pass",
+            "summary": f"{facts.get('evals', {}).get('case_count', 0)} 个评测用例",
+        },
+    ]
+
+
+def _recommended_actions(facts: dict[str, Any], readiness: str) -> list[str]:
+    '''候选包无需补救动作；其他状态列出最前面的修复建议。'''
+    if readiness == "publish_candidate":
+        return []
+    actions: list[str] = []
+    for finding in facts.get("findings", [])[:5]:
+        actions.append(f"{finding.get('rule_id')}: {finding.get('remediation')}")
+    return actions
+
+
 def render_report_markdown(report: dict[str, Any], facts: dict[str, Any] | None = None, *, locale: Locale = "en") -> str:
     '''按指定语言将结构化审查报告渲染为 Markdown 文本。'''
     labels = _READINESS_LABELS[locale]
@@ -168,40 +205,3 @@ def render_report_markdown(report: dict[str, Any], facts: dict[str, Any] | None 
         for action in actions:
             lines.append(f"- {action}")
     return "\n".join(lines).rstrip() + "\n"
-
-
-def _semantic_severity(severity: Any) -> str:
-    '''将扫描严重等级映射为审查报告使用的等级。'''
-    if severity == "blocker":
-        return "blocker"
-    if severity == "error":
-        return "major"
-    return "minor"
-
-
-def _dimensions_from_facts(facts: dict[str, Any]) -> list[dict[str, Any]]:
-    '''根据发现数量和评测样例覆盖情况生成结构与证据质量维度。'''
-    summary = facts.get("summary", {})
-    status = "blocker" if summary.get("blockers") else "concern" if summary.get("errors") or summary.get("warnings") else "pass"
-    return [
-        {
-            "id": "structure",
-            "status": status,
-            "summary": f"{summary.get('blockers', 0)} 个阻断项, {summary.get('errors', 0)} 个错误, {summary.get('warnings', 0)} 个警告",
-        },
-        {
-            "id": "evidence_quality",
-            "status": "concern" if facts.get("evals", {}).get("case_count", 0) == 0 else "pass",
-            "summary": f"{facts.get('evals', {}).get('case_count', 0)} 个评测用例",
-        },
-    ]
-
-
-def _recommended_actions(facts: dict[str, Any], readiness: str) -> list[str]:
-    '''候选包无需补救动作；其他状态列出最前面的修复建议。'''
-    if readiness == "publish_candidate":
-        return []
-    actions: list[str] = []
-    for finding in facts.get("findings", [])[:5]:
-        actions.append(f"{finding.get('rule_id')}: {finding.get('remediation')}")
-    return actions

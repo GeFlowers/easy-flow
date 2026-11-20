@@ -11,8 +11,6 @@ import {
 } from "react";
 import { motion, type MotionProps, useInView } from "motion/react";
 
-import { cn } from "@/lib/utils";
-
 interface SequenceContextValue {
   completeItem: (index: number) => void;
   activeIndex: number;
@@ -69,7 +67,9 @@ export const AnimatedSpan = ({
       initial={{ opacity: 0, y: -5 }}
       animate={shouldAnimate ? { opacity: 1, y: 0 } : { opacity: 0, y: -5 }}
       transition={{ duration: 0.3, delay: sequence ? 0 : delay / 1000 }}
-      className={cn("grid text-sm font-normal tracking-tight", className)}
+      className={["grid text-sm font-normal tracking-tight", className]
+        .filter(Boolean)
+        .join(" ")}
       onAnimationComplete={() => {
         if (!sequence) return;
         if (itemIndex === null) return;
@@ -177,7 +177,9 @@ export const TypingAnimation = ({
   return (
     <MotionComponent
       ref={elementRef}
-      className={cn("text-sm font-normal tracking-tight", className)}
+      className={["text-sm font-normal tracking-tight", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       {displayedText}
@@ -234,10 +236,12 @@ export const Terminal = ({
   const content = (
     <div
       ref={containerRef}
-      className={cn(
+      className={[
         "border-border bg-background/25 z-0 h-full max-h-[400px] w-full max-w-lg rounded-xl border",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div className="border-border flex flex-col gap-y-2 border-b p-4">
         <div className="flex flex-row gap-x-2">

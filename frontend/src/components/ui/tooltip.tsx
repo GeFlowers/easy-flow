@@ -3,8 +3,6 @@
 import * as React from "react";
 import * as TooltipPrimitive from "@radix-ui/react-tooltip";
 
-import { cn } from "@/lib/utils";
-
 /** 配置同一交互区域内提示框的延迟和共享行为。 */
 function TooltipProvider({
   delayDuration = 0,
@@ -49,10 +47,12 @@ function TooltipContent({
       <TooltipPrimitive.Content
         data-slot="tooltip-content"
         sideOffset={sideOffset ?? 4}
-        className={cn(
+        className={[
           "animate-in fade-in-0 zoom-in-95 data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[side=bottom]:slide-in-from-top-2 data-[side=left]:slide-in-from-right-2 data-[side=right]:slide-in-from-left-2 data-[side=top]:slide-in-from-bottom-2 bg-foreground text-background dark:text-foreground z-50 w-fit origin-(--radix-tooltip-content-transform-origin) rounded-md border px-3 py-1.5 text-xs text-balance shadow-xs dark:border-white/18 dark:bg-[#050504]",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         {...props}
       >
         {children}

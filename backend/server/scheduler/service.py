@@ -58,32 +58,6 @@ class ScheduledTaskService:
         for task in claimed:
             await self.dispatch_task(task, now=now, trigger="scheduled")
 
-    @staticmethod
-    def _is_overlap_conflict(exc: Exception) -> bool:
-        '''判断异常是否表示同一执行线程已被占用的重叠冲突。'''
-        if isinstance(exc, ConflictError):
-            return True
-        return isinstance(exc, HTTPException) and exc.status_code == 409
-
-    @staticmethod
-    def _task_status_for_failure(task: dict[str, Any], *, trigger: str) -> str:
-        '''根据触发方式和调度类型确定启动失败后任务应保留的状态。'''
-        if trigger == "manual":
-            # 手动触发失败不能消耗任务未来的调度机会：若一次性任务的 run_at 仍未到达，
-            # 否则它会被改为“failed”，从而再也不会被抢占执行。
-            return task.get("status") or "enabled"
-        if task["schedule_type"] == "once":
-            return "failed"
-        return "enabled"
-
-    @staticmethod
-    def _task_status_for_skip(task: dict[str, Any]) -> str:
-        '''根据调度类型确定因重叠而跳过后任务应保留的状态。'''
-        if task["schedule_type"] == "once":
-            # 唯一一次执行已因重叠运行而错过；标为“completed”会错误地表示它执行过。
-            return "failed"
-        return "enabled"
-
     async def dispatch_task(
         self,
         task: dict[str, Any],
@@ -254,6 +228,32 @@ class ScheduledTaskService:
             "error": error,
         }
 
+    @staticmethod
+    def _task_status_for_skip(task: dict[str, Any]) -> str:
+        '''根据调度类型确定因重叠而跳过后任务应保留的状态。'''
+        if task["schedule_type"] == "once":
+            # 唯一一次执行已因重叠运行而错过；标为“completed”会错误地表示它执行过。
+            return "failed"
+        return "enabled"
+
+    @staticmethod
+    def _is_overlap_conflict(exc: Exception) -> bool:
+        '''判断异常是否表示同一执行线程已被占用的重叠冲突。'''
+        if isinstance(exc, ConflictError):
+            return True
+        return isinstance(exc, HTTPException) and exc.status_code == 409
+
+    @staticmethod
+    def _task_status_for_failure(task: dict[str, Any], *, trigger: str) -> str:
+        '''根据触发方式和调度类型确定启动失败后任务应保留的状态。'''
+        if trigger == "manual":
+            # 手动触发失败不能消耗任务未来的调度机会：若一次性任务的 run_at 仍未到达，
+            # 否则它会被改为“failed”，从而再也不会被抢占执行。
+            return task.get("status") or "enabled"
+        if task["schedule_type"] == "once":
+            return "failed"
+        return "enabled"
+
     async def handle_run_completion(self, record: RunRecord) -> None:
         '''接收运行完成回调，写入终态并收尾一次性任务的状态。'''
         metadata = record.metadata or {}
@@ -327,14 +327,6 @@ class ScheduledTaskService:
         self._stop.clear()
         self._task = asyncio.create_task(self._run_loop())
 
-    async def stop(self) -> None:
-        '''发出停止信号并等待后台轮询循环有序结束。'''
-        if self._task is None:
-            return
-        self._stop.set()
-        await self._task
-        self._task = None
-
     async def _run_loop(self) -> None:
         '''持续轮询到期任务；单次轮询失败时记录异常并在下个周期重试。'''
         while not self._stop.is_set():
@@ -350,3 +342,11 @@ class ScheduledTaskService:
                 )
             except TimeoutError:
                 continue
+
+    async def stop(self) -> None:
+        '''发出停止信号并等待后台轮询循环有序结束。'''
+        if self._task is None:
+            return
+        self._stop.set()
+        await self._task
+        self._task = None

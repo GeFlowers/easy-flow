@@ -18,6 +18,34 @@ _config_path: Path | None = None
 _config_signature: _ConfigSignature | None = None
 
 
+async def initialize_mcp_tools() -> list[BaseTool]:
+    '''初始化并缓存当前已启用 MCP 服务器提供的工具。'''
+    global _mcp_tools_cache, _cache_initialized, _config_path, _config_signature
+
+    async with _initialization_lock:
+        if _cache_initialized:
+            logger.info("MCP tools already initialized")
+            return _mcp_tools_cache or []
+
+        from deerflow.mcp.tools import get_mcp_tools
+
+        logger.info("Initializing MCP tools...")
+        _mcp_tools_cache = await get_mcp_tools()
+        _cache_initialized = True
+        _config_path, _config_signature = _current_config_state()
+        logger.info("MCP tools initialized: %d tool(s) loaded (config path: %s)", len(_mcp_tools_cache), _config_path)
+
+        return _mcp_tools_cache
+
+
+def _current_config_state() -> tuple[Path | None, _ConfigSignature | None]:
+    '''获取当前配置文件路径及其签名。'''
+    config_path = _resolve_config_path()
+    if config_path is None:
+        return None, None
+    return config_path, _get_config_signature(config_path)
+
+
 def _resolve_config_path() -> Path | None:
     '''解析当前扩展配置文件的路径。'''
     from deerflow.config.extensions_config import ExtensionsConfig
@@ -40,54 +68,6 @@ def _get_config_signature(config_path: Path) -> _ConfigSignature | None:
         return (stat_result.st_mtime, stat_result.st_size, None)
 
     return (stat_result.st_mtime, stat_result.st_size, digest.hexdigest())
-
-
-def _current_config_state() -> tuple[Path | None, _ConfigSignature | None]:
-    '''获取当前配置文件路径及其签名。'''
-    config_path = _resolve_config_path()
-    if config_path is None:
-        return None, None
-    return config_path, _get_config_signature(config_path)
-
-
-def _is_cache_stale() -> bool:
-    '''判断已初始化的 MCP 工具缓存是否因配置变化而过期。'''
-    if not _cache_initialized:
-        return False
-
-    current_path, current_signature = _current_config_state()
-    if _config_signature is None or current_signature is None:
-        return False
-
-    if current_path != _config_path:
-        logger.info("MCP config path changed (%s -> %s), cache is stale", _config_path, current_path)
-        return True
-
-    if current_signature != _config_signature:
-        logger.info("MCP config content changed (signature %s -> %s), cache is stale", _config_signature, current_signature)
-        return True
-
-    return False
-
-
-async def initialize_mcp_tools() -> list[BaseTool]:
-    '''初始化并缓存当前已启用 MCP 服务器提供的工具。'''
-    global _mcp_tools_cache, _cache_initialized, _config_path, _config_signature
-
-    async with _initialization_lock:
-        if _cache_initialized:
-            logger.info("MCP tools already initialized")
-            return _mcp_tools_cache or []
-
-        from deerflow.mcp.tools import get_mcp_tools
-
-        logger.info("Initializing MCP tools...")
-        _mcp_tools_cache = await get_mcp_tools()
-        _cache_initialized = True
-        _config_path, _config_signature = _current_config_state()
-        logger.info("MCP tools initialized: %d tool(s) loaded (config path: %s)", len(_mcp_tools_cache), _config_path)
-
-        return _mcp_tools_cache
 
 
 def get_cached_mcp_tools() -> list[BaseTool]:
@@ -117,6 +97,26 @@ def get_cached_mcp_tools() -> list[BaseTool]:
             return []
 
     return _mcp_tools_cache or []
+
+
+def _is_cache_stale() -> bool:
+    '''判断已初始化的 MCP 工具缓存是否因配置变化而过期。'''
+    if not _cache_initialized:
+        return False
+
+    current_path, current_signature = _current_config_state()
+    if _config_signature is None or current_signature is None:
+        return False
+
+    if current_path != _config_path:
+        logger.info("MCP config path changed (%s -> %s), cache is stale", _config_path, current_path)
+        return True
+
+    if current_signature != _config_signature:
+        logger.info("MCP config content changed (signature %s -> %s), cache is stale", _config_signature, current_signature)
+        return True
+
+    return False
 
 
 def reset_mcp_tools_cache() -> None:

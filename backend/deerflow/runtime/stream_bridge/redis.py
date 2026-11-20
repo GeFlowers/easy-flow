@@ -61,6 +61,19 @@ class RedisStreamBridge:
         self._redis = client if client is not None else Redis.from_url(redis_url, decode_responses=True, max_connections=max_connections)
         self._owns_client = client is None
 
+    async def publish(self, run_id: str, event: str, data: Any) -> None:
+        '''保存一条运行事件，并按配置限制可重放的事件数量。'''
+        key = self._stream_key(run_id)
+        await self._xadd_retained(
+            key,
+            {
+                "kind": _KIND_EVENT,
+                "event": event,
+                "data": self._encode_data(data),
+            },
+            maxlen=self._maxsize,
+        )
+
     def _stream_key(self, run_id: str) -> str:
         '''为运行 ID 拼出对应的 Redis Stream 键。'''
         return f"{self._key_prefix}:{run_id}"
@@ -87,57 +100,9 @@ class RedisStreamBridge:
             await pipe.execute()
 
     @staticmethod
-    def _decode(value: Any) -> str:
-        '''把 Redis 返回的字节或标量统一转换为字符串。'''
-        if isinstance(value, bytes):
-            return value.decode("utf-8")
-        return str(value)
-
-    @classmethod
-    def _normalise_fields(cls, fields: Mapping[Any, Any]) -> dict[str, str]:
-        '''规范化 Redis 哈希字段的键和值类型。'''
-        return {cls._decode(key): cls._decode(value) for key, value in fields.items()}
-
-    @staticmethod
     def _encode_data(data: Any) -> str:
         '''将事件数据编码为紧凑的 UTF-8 JSON 文本。'''
         return json.dumps(data, default=str, ensure_ascii=False, separators=(",", ":"))
-
-    @staticmethod
-    def _decode_data(raw: str | None) -> Any:
-        '''解析事件 JSON；遇到旧格式或损坏内容时保留原文。'''
-        if raw is None:
-            return None
-        try:
-            return json.loads(raw)
-        except json.JSONDecodeError:
-            logger.warning("Redis stream bridge received non-JSON event data")
-            return raw
-
-    def _entry_from_redis(self, event_id: str, fields: Mapping[Any, Any]) -> StreamEvent:
-        '''把 Redis Stream 条目转换为运行时事件或终止标记。'''
-        payload = self._normalise_fields(fields)
-        kind = payload.get("kind", _KIND_EVENT)
-        if kind == _KIND_END:
-            return END_SENTINEL
-        return StreamEvent(
-            id=event_id,
-            event=payload.get("event", "message"),
-            data=self._decode_data(payload.get("data")),
-        )
-
-    async def publish(self, run_id: str, event: str, data: Any) -> None:
-        '''保存一条运行事件，并按配置限制可重放的事件数量。'''
-        key = self._stream_key(run_id)
-        await self._xadd_retained(
-            key,
-            {
-                "kind": _KIND_EVENT,
-                "event": event,
-                "data": self._encode_data(data),
-            },
-            maxlen=self._maxsize,
-        )
 
     async def publish_end(self, run_id: str) -> None:
         '''追加运行终止标记，并额外为该标记预留一个保留位置。'''
@@ -151,21 +116,6 @@ class RedisStreamBridge:
     async def stream_exists(self, run_id: str) -> bool:
         '''检查 Redis 中是否仍保留该运行的事件流。'''
         return bool(await self._redis.exists(self._stream_key(run_id)))
-
-    async def _resolve_start_stream_id(self, key: str, last_event_id: str | None) -> str:
-        '''校验续读游标，并决定首次读取或非法游标的安全起点。'''
-        if last_event_id is None:
-            return "0-0"
-        if _REDIS_STREAM_ID_RE.fullmatch(last_event_id):
-            return last_event_id
-        entries = await self._redis.xrevrange(key, count=1)
-        if not entries:
-            return "0-0"
-        event_id, fields = entries[0]
-        payload = self._normalise_fields(fields)
-        if payload.get("kind") == _KIND_END:
-            return "0-0"
-        return self._decode(event_id)
 
     async def subscribe(
         self,
@@ -220,6 +170,56 @@ class RedisStreamBridge:
                         yield END_SENTINEL
                         return
                     yield entry
+
+    async def _resolve_start_stream_id(self, key: str, last_event_id: str | None) -> str:
+        '''校验续读游标，并决定首次读取或非法游标的安全起点。'''
+        if last_event_id is None:
+            return "0-0"
+        if _REDIS_STREAM_ID_RE.fullmatch(last_event_id):
+            return last_event_id
+        entries = await self._redis.xrevrange(key, count=1)
+        if not entries:
+            return "0-0"
+        event_id, fields = entries[0]
+        payload = self._normalise_fields(fields)
+        if payload.get("kind") == _KIND_END:
+            return "0-0"
+        return self._decode(event_id)
+
+    @classmethod
+    def _normalise_fields(cls, fields: Mapping[Any, Any]) -> dict[str, str]:
+        '''规范化 Redis 哈希字段的键和值类型。'''
+        return {cls._decode(key): cls._decode(value) for key, value in fields.items()}
+
+    @staticmethod
+    def _decode(value: Any) -> str:
+        '''把 Redis 返回的字节或标量统一转换为字符串。'''
+        if isinstance(value, bytes):
+            return value.decode("utf-8")
+        return str(value)
+
+    def _entry_from_redis(self, event_id: str, fields: Mapping[Any, Any]) -> StreamEvent:
+        '''把 Redis Stream 条目转换为运行时事件或终止标记。'''
+        payload = self._normalise_fields(fields)
+        kind = payload.get("kind", _KIND_EVENT)
+        if kind == _KIND_END:
+            return END_SENTINEL
+        return StreamEvent(
+            id=event_id,
+            event=payload.get("event", "message"),
+            data=self._decode_data(payload.get("data")),
+        )
+
+    @staticmethod
+    def _decode_data(raw: str | None) -> Any:
+        '''解析事件 JSON；遇到旧格式或损坏内容时保留原文。'''
+        if raw is None:
+            return None
+        try:
+            return json.loads(raw)
+        except json.JSONDecodeError:
+            logger.warning("Redis stream bridge received non-JSON event data")
+            return raw
 
     async def cleanup(self, run_id: str, *, delay: float = 0) -> None:
         '''可选等待订阅者读取终止标记后，删除该运行的 Redis Stream。'''

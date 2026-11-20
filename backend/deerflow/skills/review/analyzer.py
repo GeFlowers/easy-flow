@@ -275,6 +275,11 @@ def _analyze_skill_md(content: str, *, profile: ProfileName, findings: list[dict
     return declared_name
 
 
+def _valid_skill_name(name: str) -> bool:
+    '''判断技能名是否符合小写字母、数字和连字符组成的命名规则及长度上限。'''
+    return bool(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)) and len(name) <= 64
+
+
 def _add_agentskills_findings(metadata: dict[str, Any], declared_name: str | None, findings: list[dict[str, Any]]) -> None:
     '''补充技能可移植性检查中的名称和描述长度提示。'''
     description = metadata.get("description")
@@ -302,6 +307,18 @@ def _add_agentskills_findings(metadata: dict[str, Any], declared_name: str | Non
                 remediation="使用更短的包名以便跨客户端使用。",
             )
         )
+
+
+def _is_nested_archive(path: str) -> bool:
+    '''识别技能包内可能隐藏额外内容的压缩包或分发归档文件。'''
+    lowered = path.lower()
+    return lowered.endswith((".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".7z", ".rar", ".whl"))
+
+
+def _is_hidden_sensitive_path(path: str) -> bool:
+    '''检查路径各级是否包含常见凭据或包管理器配置文件。'''
+    parts = PurePosixPath(path).parts
+    return any(part in {".env", ".npmrc", ".pypirc", ".netrc"} for part in parts)
 
 
 def _scan_with_skillscan(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
@@ -346,20 +363,3 @@ def _scan_with_skillscan(snapshot: dict[str, Any]) -> list[dict[str, Any]]:
             )
         )
     return findings
-
-
-def _valid_skill_name(name: str) -> bool:
-    '''判断技能名是否符合小写字母、数字和连字符组成的命名规则及长度上限。'''
-    return bool(re.fullmatch(r"[a-z0-9]+(?:-[a-z0-9]+)*", name)) and len(name) <= 64
-
-
-def _is_nested_archive(path: str) -> bool:
-    '''识别技能包内可能隐藏额外内容的压缩包或分发归档文件。'''
-    lowered = path.lower()
-    return lowered.endswith((".zip", ".tar", ".tar.gz", ".tgz", ".tar.bz2", ".tbz2", ".tar.xz", ".txz", ".7z", ".rar", ".whl"))
-
-
-def _is_hidden_sensitive_path(path: str) -> bool:
-    '''检查路径各级是否包含常见凭据或包管理器配置文件。'''
-    parts = PurePosixPath(path).parts
-    return any(part in {".env", ".npmrc", ".pypirc", ".netrc"} for part in parts)

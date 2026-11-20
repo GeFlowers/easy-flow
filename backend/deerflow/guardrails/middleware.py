@@ -36,86 +36,6 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
         self.fail_closed = fail_closed
         self.passport = passport
 
-    @staticmethod
-    def _resolve_context(request: ToolCallRequest) -> dict:
-        '''从工具调用请求中安全提取运行时上下文字典。'''
-        runtime = getattr(request, "runtime", None)
-        context = getattr(runtime, "context", None) if runtime is not None else None
-        return context if isinstance(context, dict) else {}
-
-    def _build_request(self, request: ToolCallRequest, context: dict) -> GuardrailRequest:
-        '''把工具调用和运行上下文整理为防护策略统一使用的请求对象。'''
-        return GuardrailRequest(
-            tool_name=str(request.tool_call.get("name", "")),
-            tool_input=request.tool_call.get("args", {}),
-            agent_id=self.passport,
-            thread_id=context.get("thread_id"),
-            is_subagent=bool(context.get("is_subagent")),
-            timestamp=datetime.now(UTC).isoformat(),
-            user_id=context.get("user_id"),
-            user_role=context.get("user_role"),
-            oauth_provider=context.get("oauth_provider"),
-            oauth_id=context.get("oauth_id"),
-            run_id=context.get("run_id"),
-            tool_call_id=request.tool_call.get("id"),
-        )
-
-    def _build_denied_message(self, request: ToolCallRequest, decision: GuardrailDecision) -> ToolMessage:
-        '''将策略拒绝决定转换为带工具调用标识的错误消息。'''
-        tool_name = str(request.tool_call.get("name", "unknown_tool"))
-        tool_call_id = str(request.tool_call.get("id", "missing_id"))
-        reason_text = decision.reasons[0].message if decision.reasons else "blocked by guardrail policy"
-        reason_code = decision.reasons[0].code if decision.reasons else "oap.denied"
-        return ToolMessage(
-            content=f"Guardrail denied: tool '{tool_name}' was blocked ({reason_code}). Reason: {reason_text}. Choose an alternative approach.",
-            tool_call_id=tool_call_id,
-            name=tool_name,
-            status="error",
-        )
-
-    def _record_guardrail_event(
-        self,
-        context: dict,
-        guardrail_request: GuardrailRequest,
-        decision: GuardrailDecision,
-        *,
-        action: str,
-        provider_error: bool,
-    ) -> None:
-        '''尽力将防护判定写入运行日志；没有日志对象或写入失败均不改变工具执行结果。'''
-        journal = context.get("__run_journal")
-        if journal is None:
-            return
-
-        reason_codes = [reason.code for reason in decision.reasons if reason.code]
-        reason_messages = [reason.message[:_REASON_MESSAGE_LIMIT] for reason in decision.reasons if reason.message]
-
-        changes = {
-            "tool_name": guardrail_request.tool_name,
-            "tool_call_id": guardrail_request.tool_call_id,
-            "agent_id": guardrail_request.agent_id,
-            # 内置子智能体通常没有运行日志；自定义运行时仍可提供带子智能体标记的日志。
-            "is_subagent": guardrail_request.is_subagent,
-            "user_role": guardrail_request.user_role,
-            "allow": decision.allow,
-            "policy_id": decision.policy_id,
-            "reason_codes": reason_codes,
-            "reason_messages": reason_messages,
-            "fail_closed": self.fail_closed,
-            "provider_error": provider_error,
-        }
-
-        try:
-            journal.record_middleware(
-                tag="guardrail",
-                name=type(self).__name__,
-                hook="wrap_tool_call",
-                action=action,
-                changes=changes,
-            )
-        except Exception:  # noqa: BLE001
-            logger.debug("Failed to record middleware:guardrail event", exc_info=True)
-
     @override
     def wrap_tool_call(
         self,
@@ -163,6 +83,84 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
             )
             return self._build_denied_message(request, decision)
         return handler(request)
+
+    @staticmethod
+    def _resolve_context(request: ToolCallRequest) -> dict:
+        '''从工具调用请求中安全提取运行时上下文字典。'''
+        runtime = getattr(request, "runtime", None)
+        context = getattr(runtime, "context", None) if runtime is not None else None
+        return context if isinstance(context, dict) else {}
+
+    def _build_request(self, request: ToolCallRequest, context: dict) -> GuardrailRequest:
+        '''把工具调用和运行上下文整理为防护策略统一使用的请求对象。'''
+        return GuardrailRequest(
+            tool_name=str(request.tool_call.get("name", "")),
+            tool_input=request.tool_call.get("args", {}),
+            agent_id=self.passport,
+            thread_id=context.get("thread_id"),
+            is_subagent=bool(context.get("is_subagent")),
+            timestamp=datetime.now(UTC).isoformat(),
+            user_id=context.get("user_id"),
+            user_role=context.get("user_role"),
+            run_id=context.get("run_id"),
+            tool_call_id=request.tool_call.get("id"),
+        )
+
+    def _record_guardrail_event(
+        self,
+        context: dict,
+        guardrail_request: GuardrailRequest,
+        decision: GuardrailDecision,
+        *,
+        action: str,
+        provider_error: bool,
+    ) -> None:
+        '''尽力将防护判定写入运行日志；没有日志对象或写入失败均不改变工具执行结果。'''
+        journal = context.get("__run_journal")
+        if journal is None:
+            return
+
+        reason_codes = [reason.code for reason in decision.reasons if reason.code]
+        reason_messages = [reason.message[:_REASON_MESSAGE_LIMIT] for reason in decision.reasons if reason.message]
+
+        changes = {
+            "tool_name": guardrail_request.tool_name,
+            "tool_call_id": guardrail_request.tool_call_id,
+            "agent_id": guardrail_request.agent_id,
+            # 内置子智能体通常没有运行日志；自定义运行时仍可提供带子智能体标记的日志。
+            "is_subagent": guardrail_request.is_subagent,
+            "user_role": guardrail_request.user_role,
+            "allow": decision.allow,
+            "policy_id": decision.policy_id,
+            "reason_codes": reason_codes,
+            "reason_messages": reason_messages,
+            "fail_closed": self.fail_closed,
+            "provider_error": provider_error,
+        }
+
+        try:
+            journal.record_middleware(
+                tag="guardrail",
+                name=type(self).__name__,
+                hook="wrap_tool_call",
+                action=action,
+                changes=changes,
+            )
+        except Exception:  # noqa: BLE001
+            logger.debug("Failed to record middleware:guardrail event", exc_info=True)
+
+    def _build_denied_message(self, request: ToolCallRequest, decision: GuardrailDecision) -> ToolMessage:
+        '''将策略拒绝决定转换为带工具调用标识的错误消息。'''
+        tool_name = str(request.tool_call.get("name", "unknown_tool"))
+        tool_call_id = str(request.tool_call.get("id", "missing_id"))
+        reason_text = decision.reasons[0].message if decision.reasons else "blocked by guardrail policy"
+        reason_code = decision.reasons[0].code if decision.reasons else "oap.denied"
+        return ToolMessage(
+            content=f"Guardrail denied: tool '{tool_name}' was blocked ({reason_code}). Reason: {reason_text}. Choose an alternative approach.",
+            tool_call_id=tool_call_id,
+            name=tool_name,
+            status="error",
+        )
 
     @override
     async def awrap_tool_call(

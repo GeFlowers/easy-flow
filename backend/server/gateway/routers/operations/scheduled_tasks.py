@@ -29,15 +29,6 @@ from deerflow.scheduler.schedules import (
 router = APIRouter(prefix="/api", tags=["scheduled-tasks"])
 
 
-def _ensure_task_mutable(task: dict[str, Any]) -> None:
-    '''拒绝修改运行中的任务，防止调度执行与用户写入产生竞态。'''
-    if task.get("status") == "running":
-        raise HTTPException(
-            status_code=409,
-            detail="Scheduled task is currently running; retry after the active execution finishes",
-        )
-
-
 class ScheduledTaskCreateRequest(BaseModel):
     '''定义创建计划任务时的上下文模式、提示词和调度信息。'''
 
@@ -223,6 +214,15 @@ async def update_scheduled_task(task_id: str, request: Request, body: ScheduledT
         updates=updates,
     )
     return updated
+
+
+def _ensure_task_mutable(task: dict[str, Any]) -> None:
+    '''拒绝修改运行中的任务，防止调度执行与用户写入产生竞态。'''
+    if task.get("status") == "running":
+        raise HTTPException(
+            status_code=409,
+            detail="Scheduled task is currently running; retry after the active execution finishes",
+        )
 
 
 @router.post("/scheduled-tasks/{task_id}/pause")

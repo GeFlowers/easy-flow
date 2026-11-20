@@ -28,6 +28,60 @@ _REMOTE_CONTENT_TOOL_NAMES: frozenset[str] = frozenset(
 )
 
 
+class ToolResultSanitizationMiddleware(AgentMiddleware[AgentState]):
+    '''只净化白名单内网络工具的结果；其他工具输出保持不变。'''
+
+    @override
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        '''同步执行工具调用，并按白名单净化远程工具结果。'''
+        result = handler(request)
+        if not self._should_sanitize(request):
+            return result
+        return _sanitize_result(result)
+
+    def _should_sanitize(self, request: ToolCallRequest) -> bool:
+        '''根据工具名判断其结果是否来自需要净化的远程内容工具。'''
+        return request.tool_call.get("name") in _REMOTE_CONTENT_TOOL_NAMES
+
+    @override
+    async def awrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
+    ) -> ToolMessage | Command:
+        '''异步执行工具调用，并按白名单净化远程工具结果。'''
+        result = await handler(request)
+        if not self._should_sanitize(request):
+            return result
+        return _sanitize_result(result)
+
+
+def _sanitize_result(result: ToolMessage | Command) -> ToolMessage | Command:
+    '''净化工具消息，或命令更新中的工具消息，并保留其他结果字段。'''
+    if isinstance(result, ToolMessage):
+        return _sanitize_tool_message(result)
+    update = getattr(result, "update", None)
+    if isinstance(update, dict):
+        messages = update.get("messages")
+        if isinstance(messages, list) and any(isinstance(m, ToolMessage) for m in messages):
+            new_messages = [_sanitize_tool_message(m) if isinstance(m, ToolMessage) else m for m in messages]
+            if new_messages != messages:
+                return dc_replace(result, update={**update, "messages": new_messages})
+    return result
+
+
+def _sanitize_tool_message(message: ToolMessage) -> ToolMessage:
+    '''净化工具消息正文；内容未变化时返回原消息对象。'''
+    new_content = _neutralize_content(message.content)
+    if new_content == message.content:
+        return message
+    return message.model_copy(update={"content": new_content})
+
+
 def _neutralize_content(content: object) -> object:
     '''净化字符串或文本块并保持内容结构，图片等非文本块原样保留。'''
     # 延迟导入净化函数，避免模块初始化时形成不必要的依赖耦合。
@@ -46,57 +100,3 @@ def _neutralize_content(content: object) -> object:
                 rebuilt.append(block)
         return rebuilt
     return content
-
-
-def _sanitize_tool_message(message: ToolMessage) -> ToolMessage:
-    '''净化工具消息正文；内容未变化时返回原消息对象。'''
-    new_content = _neutralize_content(message.content)
-    if new_content == message.content:
-        return message
-    return message.model_copy(update={"content": new_content})
-
-
-def _sanitize_result(result: ToolMessage | Command) -> ToolMessage | Command:
-    '''净化工具消息，或命令更新中的工具消息，并保留其他结果字段。'''
-    if isinstance(result, ToolMessage):
-        return _sanitize_tool_message(result)
-    update = getattr(result, "update", None)
-    if isinstance(update, dict):
-        messages = update.get("messages")
-        if isinstance(messages, list) and any(isinstance(m, ToolMessage) for m in messages):
-            new_messages = [_sanitize_tool_message(m) if isinstance(m, ToolMessage) else m for m in messages]
-            if new_messages != messages:
-                return dc_replace(result, update={**update, "messages": new_messages})
-    return result
-
-
-class ToolResultSanitizationMiddleware(AgentMiddleware[AgentState]):
-    '''只净化白名单内网络工具的结果；其他工具输出保持不变。'''
-
-    def _should_sanitize(self, request: ToolCallRequest) -> bool:
-        '''根据工具名判断其结果是否来自需要净化的远程内容工具。'''
-        return request.tool_call.get("name") in _REMOTE_CONTENT_TOOL_NAMES
-
-    @override
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        '''同步执行工具调用，并按白名单净化远程工具结果。'''
-        result = handler(request)
-        if not self._should_sanitize(request):
-            return result
-        return _sanitize_result(result)
-
-    @override
-    async def awrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]],
-    ) -> ToolMessage | Command:
-        '''异步执行工具调用，并按白名单净化远程工具结果。'''
-        result = await handler(request)
-        if not self._should_sanitize(request):
-            return result
-        return _sanitize_result(result)

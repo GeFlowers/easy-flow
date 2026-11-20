@@ -61,15 +61,22 @@ def is_auth_endpoint(request: Request) -> bool:
     return request.url.path.rstrip("/") in _AUTH_EXEMPT_PATHS
 
 
-def _host_with_optional_port(hostname: str, port: int | None, scheme: str) -> str:
-    '''返回规范化的主机及可选端口，并省略协议默认端口。'''
-    host = hostname.lower()
-    if ":" in host and not host.startswith("["):
-        host = f"[{host}]"
+def get_configured_cors_origins() -> set[str]:
+    '''返回由环境变量配置并完成规范化的浏览器来源集合。'''
+    return _configured_cors_origins()
 
-    if port is None or (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
-        return host
-    return f"{host}:{port}"
+
+def _configured_cors_origins() -> set[str]:
+    '''返回配置中允许调用身份接口的显式浏览器来源。'''
+    origins = set()
+    for raw_origin in os.environ.get("GATEWAY_CORS_ORIGINS", "").split(","):
+        origin = raw_origin.strip()
+        if not origin or origin == "*":
+            continue
+        normalized = _normalize_origin(origin)
+        if normalized:
+            origins.add(normalized)
+    return origins
 
 
 def _normalize_origin(origin: str) -> str | None:
@@ -91,61 +98,15 @@ def _normalize_origin(origin: str) -> str | None:
     return f"{scheme}://{_host_with_optional_port(parsed.hostname, port, scheme)}"
 
 
-def _configured_cors_origins() -> set[str]:
-    '''返回配置中允许调用身份接口的显式浏览器来源。'''
-    origins = set()
-    for raw_origin in os.environ.get("GATEWAY_CORS_ORIGINS", "").split(","):
-        origin = raw_origin.strip()
-        if not origin or origin == "*":
-            continue
-        normalized = _normalize_origin(origin)
-        if normalized:
-            origins.add(normalized)
-    return origins
+def _host_with_optional_port(hostname: str, port: int | None, scheme: str) -> str:
+    '''返回规范化的主机及可选端口，并省略协议默认端口。'''
+    host = hostname.lower()
+    if ":" in host and not host.startswith("["):
+        host = f"[{host}]"
 
-
-def get_configured_cors_origins() -> set[str]:
-    '''返回由环境变量配置并完成规范化的浏览器来源集合。'''
-    return _configured_cors_origins()
-
-
-def _first_header_value(value: str | None) -> str | None:
-    '''从逗号分隔的代理头中取出第一个值。'''
-    if not value:
-        return None
-    first = value.split(",", 1)[0].strip()
-    return first or None
-
-
-def _forwarded_param(request: Request, name: str) -> str | None:
-    '''从第一个 Forwarded 代理头条目提取指定参数。'''
-    forwarded = _first_header_value(request.headers.get("forwarded"))
-    if not forwarded:
-        return None
-
-    for part in forwarded.split(";"):
-        key, sep, value = part.strip().partition("=")
-        if sep and key.lower() == name:
-            return value.strip().strip('"') or None
-    return None
-
-
-def _request_scheme(request: Request) -> str:
-    '''从可信代理头解析客户端原始请求协议。'''
-    scheme = _forwarded_param(request, "proto") or _first_header_value(request.headers.get("x-forwarded-proto")) or request.url.scheme
-    return scheme.lower()
-
-
-def _request_origin(request: Request) -> str | None:
-    '''构造浏览器当前访问目标的规范化来源。'''
-    scheme = _request_scheme(request)
-    host = _forwarded_param(request, "host") or _first_header_value(request.headers.get("x-forwarded-host")) or request.headers.get("host") or request.url.netloc
-
-    forwarded_port = _first_header_value(request.headers.get("x-forwarded-port"))
-    if forwarded_port and ":" not in host.rsplit("]", 1)[-1]:
-        host = f"{host}:{forwarded_port}"
-
-    return _normalize_origin(f"{scheme}://{host}")
+    if port is None or (scheme == "http" and port == 80) or (scheme == "https" and port == 443):
+        return host
+    return f"{host}:{port}"
 
 
 def is_allowed_auth_origin(request: Request) -> bool:
@@ -164,6 +125,45 @@ def is_allowed_auth_origin(request: Request) -> bool:
 
     request_origin = _request_origin(request)
     return normalized_origin in _configured_cors_origins() or (request_origin is not None and normalized_origin == request_origin)
+
+
+def _request_origin(request: Request) -> str | None:
+    '''构造浏览器当前访问目标的规范化来源。'''
+    scheme = _request_scheme(request)
+    host = _forwarded_param(request, "host") or _first_header_value(request.headers.get("x-forwarded-host")) or request.headers.get("host") or request.url.netloc
+
+    forwarded_port = _first_header_value(request.headers.get("x-forwarded-port"))
+    if forwarded_port and ":" not in host.rsplit("]", 1)[-1]:
+        host = f"{host}:{forwarded_port}"
+
+    return _normalize_origin(f"{scheme}://{host}")
+
+
+def _request_scheme(request: Request) -> str:
+    '''从可信代理头解析客户端原始请求协议。'''
+    scheme = _forwarded_param(request, "proto") or _first_header_value(request.headers.get("x-forwarded-proto")) or request.url.scheme
+    return scheme.lower()
+
+
+def _forwarded_param(request: Request, name: str) -> str | None:
+    '''从第一个 Forwarded 代理头条目提取指定参数。'''
+    forwarded = _first_header_value(request.headers.get("forwarded"))
+    if not forwarded:
+        return None
+
+    for part in forwarded.split(";"):
+        key, sep, value = part.strip().partition("=")
+        if sep and key.lower() == name:
+            return value.strip().strip('"') or None
+    return None
+
+
+def _first_header_value(value: str | None) -> str | None:
+    '''从逗号分隔的代理头中取出第一个值。'''
+    if not value:
+        return None
+    first = value.split(",", 1)[0].strip()
+    return first or None
 
 
 class CSRFMiddleware(BaseHTTPMiddleware):

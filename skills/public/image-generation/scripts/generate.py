@@ -30,6 +30,29 @@ def validate_image(image_path: str) -> bool:
         return False
 
 
+def generate_image(
+    prompt_file: str,
+    reference_images: list[str],
+    output_file: str,
+    aspect_ratio: str = "16:9",
+) -> str:
+    '''读取 UTF-8 提示文件，选择图像服务商并将生成结果写入 ``output_file``。
+
+    仅接受 ``gemini``、``google`` 和 ``minimax``；画幅参数传给两个服务商，参考图由
+    各自分支编码。提示文件读取、未知服务商及下游 API 或文件系统异常均不在此吞没。
+    '''
+    with open(prompt_file, "r", encoding="utf-8") as f:
+        prompt = f.read()
+    provider = _resolve_provider(
+        "IMAGE_GENERATION_PROVIDER", "gemini", bool(os.getenv("GEMINI_API_KEY"))
+    )
+    if provider == "minimax":
+        return _generate_image_minimax(prompt, reference_images, output_file, aspect_ratio)
+    if provider in ("gemini", "google"):
+        return _generate_image_gemini(prompt, reference_images, output_file, aspect_ratio)
+    raise ValueError(f"未知图像提供方：{provider!r}（请使用 'gemini' 或 'minimax'）")
+
+
 def _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:
     '''按显式环境变量、既有服务商凭据、MiniMax 凭据的优先级选择服务商。
 
@@ -47,67 +70,6 @@ def _resolve_provider(override_env: str, existing_provider: str, has_existing_cr
         f"未找到凭据。请为 {existing_provider} 设置 GEMINI_API_KEY，"
         f"或为 minimax 设置 MINIMAX_API_KEY（可通过 {override_env} 强制指定）。"
     )
-
-
-def _minimax_host() -> str:
-    '''返回去除尾部斜杠后的 MiniMax API 根地址，允许环境变量覆盖默认端点。'''
-    return os.getenv("MINIMAX_API_HOST", MINIMAX_DEFAULT_HOST).rstrip("/")
-
-
-def _check_base_resp(payload: dict) -> None:
-    '''检查 MiniMax ``base_resp`` 协议字段；非零状态转换为包含服务端信息的异常。'''
-    base = payload.get("base_resp") or {}
-    if base.get("status_code", 0) != 0:
-        raise Exception(
-            f"MiniMax 错误 {base.get('status_code')}：{base.get('status_msg')}"
-        )
-
-
-def _guess_mime(image_path: str) -> str:
-    '''依据扩展名推断数据 URL 的图像 MIME 类型，未知格式以 JPEG 兼容值处理。'''
-    ext = os.path.splitext(image_path)[1].lower()
-    return {
-        ".png": "image/png",
-        ".webp": "image/webp",
-        ".gif": "image/gif",
-        ".jpg": "image/jpeg",
-        ".jpeg": "image/jpeg",
-    }.get(ext, "image/jpeg")
-
-
-def _to_data_url(image_path: str) -> str:
-    '''读取本地图像并编码为 MiniMax ``subject_reference`` 所需的 Base64 数据 URL。
-
-    文件读取错误直接向调用方传播；MIME 类型由扩展名推断，不检查图像的实际内容。
-    '''
-    with open(image_path, "rb") as f:
-        b64 = base64.b64encode(f.read()).decode("utf-8")
-    return f"data:{_guess_mime(image_path)};base64,{b64}"
-
-
-def _ensure_output_dir(output_file: str) -> None:
-    '''创建输出文件的父目录，避免调用方提供嵌套路径时写入失败。'''
-    output_dir = os.path.dirname(output_file)
-    if output_dir:
-        os.makedirs(output_dir, exist_ok=True)
-
-
-def _minimax_prompt(raw: str) -> str:
-    '''提取 MiniMax image-01 所需的单段提示词。
-
-    共享提示文件可为含 ``prompt``、``style`` 等字段的 JSON，也可为纯文本；仅在
-    JSON 的 ``prompt`` 为非空字符串时取该字段，否则保留原文交给服务端优化器。
-    '''
-    text = raw.strip()
-    try:
-        data = json.loads(text)
-    except (ValueError, json.JSONDecodeError):
-        return text
-    if isinstance(data, dict):
-        core = data.get("prompt")
-        if isinstance(core, str) and core.strip():
-            return core.strip()
-    return text
 
 
 def _generate_image_minimax(
@@ -160,6 +122,67 @@ def _generate_image_minimax(
     return f"已成功生成图像：{output_file}"
 
 
+def _minimax_prompt(raw: str) -> str:
+    '''提取 MiniMax image-01 所需的单段提示词。
+
+    共享提示文件可为含 ``prompt``、``style`` 等字段的 JSON，也可为纯文本；仅在
+    JSON 的 ``prompt`` 为非空字符串时取该字段，否则保留原文交给服务端优化器。
+    '''
+    text = raw.strip()
+    try:
+        data = json.loads(text)
+    except (ValueError, json.JSONDecodeError):
+        return text
+    if isinstance(data, dict):
+        core = data.get("prompt")
+        if isinstance(core, str) and core.strip():
+            return core.strip()
+    return text
+
+
+def _to_data_url(image_path: str) -> str:
+    '''读取本地图像并编码为 MiniMax ``subject_reference`` 所需的 Base64 数据 URL。
+
+    文件读取错误直接向调用方传播；MIME 类型由扩展名推断，不检查图像的实际内容。
+    '''
+    with open(image_path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode("utf-8")
+    return f"data:{_guess_mime(image_path)};base64,{b64}"
+
+
+def _guess_mime(image_path: str) -> str:
+    '''依据扩展名推断数据 URL 的图像 MIME 类型，未知格式以 JPEG 兼容值处理。'''
+    ext = os.path.splitext(image_path)[1].lower()
+    return {
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".gif": "image/gif",
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+    }.get(ext, "image/jpeg")
+
+
+def _minimax_host() -> str:
+    '''返回去除尾部斜杠后的 MiniMax API 根地址，允许环境变量覆盖默认端点。'''
+    return os.getenv("MINIMAX_API_HOST", MINIMAX_DEFAULT_HOST).rstrip("/")
+
+
+def _check_base_resp(payload: dict) -> None:
+    '''检查 MiniMax ``base_resp`` 协议字段；非零状态转换为包含服务端信息的异常。'''
+    base = payload.get("base_resp") or {}
+    if base.get("status_code", 0) != 0:
+        raise Exception(
+            f"MiniMax 错误 {base.get('status_code')}：{base.get('status_msg')}"
+        )
+
+
+def _ensure_output_dir(output_file: str) -> None:
+    '''创建输出文件的父目录，避免调用方提供嵌套路径时写入失败。'''
+    output_dir = os.path.dirname(output_file)
+    if output_dir:
+        os.makedirs(output_dir, exist_ok=True)
+
+
 def _generate_image_gemini(
     prompt: str, reference_images: list[str], output_file: str, aspect_ratio: str
 ) -> str:
@@ -206,29 +229,6 @@ def _generate_image_gemini(
             f.write(base64.b64decode(base64_image))
         return f"已成功生成图像：{output_file}"
     raise Exception("图像生成失败")
-
-
-def generate_image(
-    prompt_file: str,
-    reference_images: list[str],
-    output_file: str,
-    aspect_ratio: str = "16:9",
-) -> str:
-    '''读取 UTF-8 提示文件，选择图像服务商并将生成结果写入 ``output_file``。
-
-    仅接受 ``gemini``、``google`` 和 ``minimax``；画幅参数传给两个服务商，参考图由
-    各自分支编码。提示文件读取、未知服务商及下游 API 或文件系统异常均不在此吞没。
-    '''
-    with open(prompt_file, "r", encoding="utf-8") as f:
-        prompt = f.read()
-    provider = _resolve_provider(
-        "IMAGE_GENERATION_PROVIDER", "gemini", bool(os.getenv("GEMINI_API_KEY"))
-    )
-    if provider == "minimax":
-        return _generate_image_minimax(prompt, reference_images, output_file, aspect_ratio)
-    if provider in ("gemini", "google"):
-        return _generate_image_gemini(prompt, reference_images, output_file, aspect_ratio)
-    raise ValueError(f"未知图像提供方：{provider!r}（请使用 'gemini' 或 'minimax'）")
 
 
 if __name__ == "__main__":

@@ -1,7 +1,7 @@
 import type { NextRequest } from "next/server";
+import { getGatewayConfig } from "@/features/auth/gateway-config";
 
-const BACKEND_BASE_URL =
-  process.env.NEXT_PUBLIC_BACKEND_BASE_URL ?? "http://127.0.0.1:8001";
+const BACKEND_BASE_URL = getGatewayConfig().internalGatewayUrl;
 
 /** 构造指向后端嵌套 Memory 资源的绝对地址。 */
 function buildBackendUrl(pathname: string) {

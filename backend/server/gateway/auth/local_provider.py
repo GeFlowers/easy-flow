@@ -5,7 +5,7 @@ import logging
 from server.gateway.auth.models import User
 from server.gateway.auth.password import hash_password_async, needs_rehash, verify_password_async
 from server.gateway.auth.providers import AuthProvider
-from server.gateway.auth.repositories.base import UserRepository
+from server.gateway.user_repository import SQLUserRepository
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +13,8 @@ logger = logging.getLogger(__name__)
 class LocalAuthProvider(AuthProvider):
     '''使用本地数据库验证邮箱和密码的认证提供者。'''
 
-    def __init__(self, repository: UserRepository):
-        '''使用指定的 ``UserRepository`` 初始化认证提供者。'''
+    def __init__(self, repository: SQLUserRepository):
+        '''使用指定的数据库用户仓储初始化认证提供者。'''
         self._repo = repository
 
     async def authenticate(self, credentials: dict) -> User | None:
@@ -30,7 +30,7 @@ class LocalAuthProvider(AuthProvider):
             return None
 
         if user.password_hash is None:
-            # 第三方登录用户没有本地密码，不能通过本地密码流程登录。
+            # 未设置本地密码的账户不能通过密码流程登录。
             return None
 
         if not await verify_password_async(password, user.password_hash):
@@ -61,10 +61,6 @@ class LocalAuthProvider(AuthProvider):
         )
         return await self._repo.create_user(user)
 
-    async def get_user_by_oauth(self, provider: str, oauth_id: str) -> User | None:
-        '''按 OAuth 提供者和其用户标识查询用户。'''
-        return await self._repo.get_user_by_oauth(provider, oauth_id)
-
     async def count_users(self) -> int:
         '''返回已注册用户总数。'''
         return await self._repo.count_users()
@@ -80,21 +76,3 @@ class LocalAuthProvider(AuthProvider):
     async def get_user_by_email(self, email: str) -> User | None:
         '''按邮箱查询用户。'''
         return await self._repo.get_user_by_email(email)
-
-    async def create_oauth_user(
-        self,
-        email: str,
-        oauth_provider: str,
-        oauth_id: str,
-        system_role: str = "user",
-    ) -> User:
-        '''根据 OAuth/OIDC 登录身份创建没有本地密码的新用户。'''
-        user = User(
-            email=email,
-            password_hash=None,
-            system_role=system_role,
-            needs_setup=False,
-            oauth_provider=oauth_provider,
-            oauth_id=oauth_id,
-        )
-        return await self._repo.create_user(user)

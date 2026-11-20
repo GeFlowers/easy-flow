@@ -30,25 +30,6 @@ logger = logging.getLogger(__name__)
 _ENV_REDIS_URL = "DEER_FLOW_STREAM_BRIDGE_REDIS_URL"
 
 
-def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
-    '''优先从显式应用配置读取桥接设置，并兼容只设置专用环境变量的启动方式。'''
-    if app_config is None:
-        config = get_stream_bridge_config()
-    else:
-        config = app_config.stream_bridge
-
-    if config is None:
-        redis_url = os.getenv(_ENV_REDIS_URL)
-        if redis_url:
-            return StreamBridgeConfig(redis_url=redis_url)
-    return config
-
-
-def _resolve_redis_url(config: StreamBridgeConfig) -> str:
-    '''按配置项、专用环境变量、通用环境变量的顺序解析 Redis 地址。'''
-    return config.redis_url or os.getenv(_ENV_REDIS_URL) or os.getenv("REDIS_URL") or "redis://localhost:6379/0"
-
-
 @contextlib.asynccontextmanager
 async def make_stream_bridge(app_config: AppConfig | None = None) -> AsyncIterator[StreamBridge]:
     '''创建 Redis 事件桥接器，并在上下文退出时关闭其连接。'''
@@ -73,3 +54,22 @@ async def make_stream_bridge(app_config: AppConfig | None = None) -> AsyncIterat
         yield bridge
     finally:
         await bridge.close()
+
+
+def _resolve_config(app_config: AppConfig | None) -> StreamBridgeConfig | None:
+    '''优先从显式应用配置读取桥接设置，并兼容只设置专用环境变量的启动方式。'''
+    if app_config is None:
+        config = get_stream_bridge_config()
+    else:
+        config = app_config.stream_bridge
+
+    if config is None:
+        redis_url = os.getenv(_ENV_REDIS_URL)
+        if redis_url:
+            return StreamBridgeConfig(redis_url=redis_url)
+    return config
+
+
+def _resolve_redis_url(config: StreamBridgeConfig) -> str:
+    '''按配置项、专用环境变量、通用环境变量的顺序解析 Redis 地址。'''
+    return config.redis_url or os.getenv(_ENV_REDIS_URL) or os.getenv("REDIS_URL") or "redis://localhost:6379/0"

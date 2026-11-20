@@ -12,6 +12,7 @@
 
 .card-grid {
   display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 0.5em;
   padding: 0.75em;
   max-width: 54em;
@@ -102,45 +103,19 @@
   line-clamp: var(--clamp-desc);
 }
 
-@media (max-width: 599px) {
-  .card-grid {
-    grid-template-columns: 1fr;
-    width: 90%;
-    margin: 0 auto;
-    padding: 0.5em;
-  }
-
-  .magic-bento-card {
-    width: 100%;
-    min-height: 180px;
-  }
+.magic-bento-card:nth-child(3) {
+  grid-column: span 2;
+  grid-row: span 2;
 }
 
-@media (min-width: 600px) {
-  .card-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
+.magic-bento-card:nth-child(4) {
+  grid-column: 1 / span 2;
+  grid-row: 2 / span 2;
 }
 
-@media (min-width: 1024px) {
-  .card-grid {
-    grid-template-columns: repeat(4, 1fr);
-  }
-
-  .magic-bento-card:nth-child(3) {
-    grid-column: span 2;
-    grid-row: span 2;
-  }
-
-  .magic-bento-card:nth-child(4) {
-    grid-column: 1 / span 2;
-    grid-row: 2 / span 2;
-  }
-
-  .magic-bento-card:nth-child(6) {
-    grid-column: 4;
-    grid-row: 3;
-  }
+.magic-bento-card:nth-child(6) {
+  grid-column: 4;
+  grid-row: 3;
 }
 
 /* 边框辉光效果 */

@@ -4,10 +4,8 @@ version = "2.0.0+learning"
 description = "LangGraph-based AI agent system with sandbox execution capabilities"
 requires-python = ">=3.12"
 dependencies = [
-    "agent-client-protocol>=0.4.0",
     "croniter>=6.0.0",
     "dotenv>=0.9.9",
-    "exa-py>=1.0.0",
     "langchain>=1.2.15",
     "langchain-anthropic>=1.4.1",
     "langchain-deepseek>=1.0.1",
@@ -20,14 +18,11 @@ dependencies = [
     "pydantic>=2.12.5",
     "pyyaml>=6.0.3",
     "readabilipy>=0.3.0",
-    "tavily-python>=0.7.17",
-    "firecrawl-py>=1.15.0",
     "tiktoken>=0.8.0",
     "ddgs>=9.10.0",
     "duckdb>=1.4.4",
     "langchain-google-genai>=4.2.1",
     "sqlalchemy[asyncio]>=2.0,<3.0",
-    "alembic>=1.13",
     "cryptography>=48.0.1",
     "qrcode>=8.2",
     "fastapi>=0.115.0",
@@ -41,11 +36,9 @@ dependencies = [
     "bcrypt>=4.0.0",
     "pyjwt>=2.13.0",
     "email-validator>=2.0.0",
-    "e2b-code-interpreter>=2.8.1",
 ]
 
 [project.optional-dependencies]
-groundroute = []
 ollama = ["langchain-ollama>=0.3.0"]
 postgres = [
     "asyncpg>=0.29",
@@ -55,14 +48,9 @@ postgres = [
 ]
 redis = ["redis>=5.0.0"]
 pymupdf = ["pymupdf4llm>=0.0.17"]
-boxlite = ["boxlite>=0.9.7"]
-monocle = ["monocle_apptrace>=0.8.8"]
 
 [dependency-groups]
 dev = [
-    # 追踪组件也属于 monocle 可选依赖；放在开发依赖组中，
-    # 供追踪测试导入，同时避免普通安装被强制带入。
-    "monocle_apptrace>=0.8.8",
     # 流桥接组件属于 redis 可选依赖；在开发依赖组中固定版本，
     # 确保流桥接测试可以导入并验证 Redis 桥接，而生产安装无需强制携带。
     "redis>=5.0.0",

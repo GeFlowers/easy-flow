@@ -70,13 +70,28 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
             normalized[name] = (priority, keywords)
         return normalized
 
-    @staticmethod
-    def _latest_user_message(messages: list[Any]) -> HumanMessage | None:
-        '''从消息列表末尾向前查找最近一条真实用户消息。'''
-        for message in reversed(messages):
-            if is_real_user_message(message):
-                return message
-        return None
+    @override
+    def before_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
+        '''在同步模型调用前更新符合关键词的延迟工具状态。'''
+        return self._state_update(state)
+
+    def _state_update(self, state: Mapping[str, Any] | None) -> dict[str, Any] | None:
+        '''将本轮自动匹配结果写入带目录版本标识的提升状态。'''
+        names = self._matched_names(state)
+        if not names:
+            return None
+        logger.debug(
+            "McpRoutingMiddleware auto-promoted %d deferred tool schema(s) catalog=%s names=%s",
+            len(names),
+            (self._catalog_hash or "")[:8],
+            names,
+        )
+        return {
+            "promoted": {
+                "catalog_hash": self._catalog_hash,
+                "names": names,
+            }
+        }
 
     def _matched_names(self, state: Mapping[str, Any] | None) -> list[str]:
         '''按用户消息关键词匹配工具，并依据优先级和名称稳定排序后截取前若干项。'''
@@ -103,28 +118,13 @@ class McpRoutingMiddleware(AgentMiddleware[AgentState]):
         matched.sort(key=lambda item: (-item[0], item[1]))
         return [name for _, name in matched[: self._top_k]]
 
-    def _state_update(self, state: Mapping[str, Any] | None) -> dict[str, Any] | None:
-        '''将本轮自动匹配结果写入带目录版本标识的提升状态。'''
-        names = self._matched_names(state)
-        if not names:
-            return None
-        logger.debug(
-            "McpRoutingMiddleware auto-promoted %d deferred tool schema(s) catalog=%s names=%s",
-            len(names),
-            (self._catalog_hash or "")[:8],
-            names,
-        )
-        return {
-            "promoted": {
-                "catalog_hash": self._catalog_hash,
-                "names": names,
-            }
-        }
-
-    @override
-    def before_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:
-        '''在同步模型调用前更新符合关键词的延迟工具状态。'''
-        return self._state_update(state)
+    @staticmethod
+    def _latest_user_message(messages: list[Any]) -> HumanMessage | None:
+        '''从消息列表末尾向前查找最近一条真实用户消息。'''
+        for message in reversed(messages):
+            if is_real_user_message(message):
+                return message
+        return None
 
     @override
     async def abefore_model(self, state: AgentState, runtime: Runtime) -> dict[str, Any] | None:

@@ -95,17 +95,13 @@ class UploadLimits(BaseModel):
     max_total_size: int
 
 
-def _uses_thread_data_mounts(sandbox_provider: SandboxProvider) -> bool:
-    '''判断沙箱提供方是否直接挂载线程数据而无需逐文件同步。'''
-    return bool(getattr(sandbox_provider, "uses_thread_data_mounts", False))
-
-
-def _get_uploads_config_value(app_config: AppConfig, key: str, default: object) -> object:
-    '''兼容字典和配置对象两种形式读取 uploads 子配置。'''
-    uploads_cfg = getattr(app_config, "uploads", None)
-    if isinstance(uploads_cfg, dict):
-        return uploads_cfg.get(key, default)
-    return getattr(uploads_cfg, key, default)
+def _get_upload_limits(app_config: AppConfig) -> UploadLimits:
+    '''从应用配置汇总每请求文件数、单文件和总大小限制。'''
+    return UploadLimits(
+        max_files=_get_upload_limit(app_config, "max_files", DEFAULT_MAX_FILES, legacy_key="max_file_count"),
+        max_file_size=_get_upload_limit(app_config, "max_file_size", DEFAULT_MAX_FILE_SIZE, legacy_key="max_single_file_size"),
+        max_total_size=_get_upload_limit(app_config, "max_total_size", DEFAULT_MAX_TOTAL_SIZE),
+    )
 
 
 def _get_upload_limit(app_config: AppConfig, key: str, default: int, *, legacy_key: str | None = None) -> int:
@@ -125,97 +121,28 @@ def _get_upload_limit(app_config: AppConfig, key: str, default: int, *, legacy_k
         return default
 
 
-def _get_upload_limits(app_config: AppConfig) -> UploadLimits:
-    '''从应用配置汇总每请求文件数、单文件和总大小限制。'''
-    return UploadLimits(
-        max_files=_get_upload_limit(app_config, "max_files", DEFAULT_MAX_FILES, legacy_key="max_file_count"),
-        max_file_size=_get_upload_limit(app_config, "max_file_size", DEFAULT_MAX_FILE_SIZE, legacy_key="max_single_file_size"),
-        max_total_size=_get_upload_limit(app_config, "max_total_size", DEFAULT_MAX_TOTAL_SIZE),
-    )
+def _get_uploads_config_value(app_config: AppConfig, key: str, default: object) -> object:
+    '''兼容字典和配置对象两种形式读取 uploads 子配置。'''
+    uploads_cfg = getattr(app_config, "uploads", None)
+    if isinstance(uploads_cfg, dict):
+        return uploads_cfg.get(key, default)
+    return getattr(uploads_cfg, key, default)
 
 
-def _cleanup_uploaded_paths(paths: list[os.PathLike[str] | str]) -> None:
-    '''按逆序尽力清理本次上传已落盘的路径，不覆盖原始异常。'''
-    for path in reversed(paths):
-        try:
-            os.unlink(path)
-        except FileNotFoundError:
-            pass
-        except Exception:
-            logger.warning("Failed to clean up upload path after rejected request: %s", path, exc_info=True)
+def _uses_thread_data_mounts(sandbox_provider: SandboxProvider) -> bool:
+    '''判断沙箱提供方是否直接挂载线程数据而无需逐文件同步。'''
+    return bool(getattr(sandbox_provider, "uses_thread_data_mounts", False))
 
 
-def _prepare_upload_destination(uploads_dir: os.PathLike[str] | str, display_filename: str) -> _UploadTempFile:
-    '''验证目标文件名后创建同目录临时文件，供原子上传提交使用。'''
-    uploads_dir_path = Path(uploads_dir)
-    file_path = validate_upload_destination(uploads_dir_path, display_filename)
-    temp_fd, temp_path_str = tempfile.mkstemp(prefix=UPLOAD_STAGING_PREFIX, suffix=UPLOAD_STAGING_SUFFIX, dir=uploads_dir_path)
-    temp_path = Path(temp_path_str)
+def _auto_convert_documents_enabled(app_config: AppConfig) -> bool:
+    '''读取文档自动转换开关；仅显式启用时执行，配置异常时默认关闭。'''
     try:
-        handle = os.fdopen(temp_fd, "wb")
+        raw = _get_uploads_config_value(app_config, "auto_convert_documents", False)
+        if isinstance(raw, str):
+            return raw.strip().lower() in {"1", "true", "yes", "on"}
+        return bool(raw)
     except Exception:
-        try:
-            os.close(temp_fd)
-        except OSError:
-            pass
-        try:
-            os.unlink(temp_path)
-        except FileNotFoundError:
-            pass
-        raise
-    return _UploadTempFile(file_path=file_path, temp_path=temp_path, handle=handle)
-
-
-def _write_upload_chunk(upload_temp: _UploadTempFile, chunk: bytes) -> None:
-    '''将一个上传数据块写入尚未提交的临时文件。'''
-    upload_temp.handle.write(chunk)
-
-
-def _abort_upload_temp(upload_temp: _UploadTempFile) -> None:
-    '''关闭并删除未提交的临时上传文件。'''
-    try:
-        upload_temp.handle.close()
-    finally:
-        try:
-            os.unlink(upload_temp.temp_path)
-        except FileNotFoundError:
-            pass
-
-
-def _commit_upload_temp(upload_temp: _UploadTempFile) -> None:
-    '''关闭临时文件并原子替换最终上传目标。'''
-    upload_temp.handle.close()
-    try:
-        os.replace(upload_temp.temp_path, upload_temp.file_path)
-    except Exception:
-        try:
-            os.unlink(upload_temp.temp_path)
-        except FileNotFoundError:
-            pass
-        raise
-
-
-def _sync_upload_to_sandbox(sandbox, file_path: os.PathLike[str] | str, virtual_path: str) -> None:
-    '''将本地上传文件同步至未挂载线程数据的沙箱虚拟路径。'''
-    sandbox.update_file(virtual_path, Path(file_path).read_bytes())
-
-
-def _list_uploaded_files_for_thread(thread_id: str, user_id: str) -> dict:
-    '''列出指定用户在线程隔离上传目录中的文件。'''
-    uploads_dir = get_uploads_dir(thread_id, user_id=user_id)
-    result = list_files_in_dir(uploads_dir)
-    enrich_file_listing(result, thread_id)
-
-    sandbox_uploads = get_paths().sandbox_uploads_dir(thread_id, user_id=user_id)
-    for f in result["files"]:
-        f["path"] = str(sandbox_uploads / f["filename"])
-    return result
-
-
-def _delete_uploaded_file_for_thread(thread_id: str, filename: str, user_id: str) -> dict:
-    '''从指定用户的线程上传目录安全删除一个已上传文件。'''
-    uploads_dir = get_uploads_dir(thread_id, user_id=user_id)
-    return delete_file_safe(uploads_dir, filename, convertible_extensions=CONVERTIBLE_EXTENSIONS)
+        return False
 
 
 async def _write_upload_file_with_limits(
@@ -251,15 +178,70 @@ async def _write_upload_file_with_limits(
     return file_path, file_size, total_size
 
 
-def _auto_convert_documents_enabled(app_config: AppConfig) -> bool:
-    '''读取文档自动转换开关；仅显式启用时执行，配置异常时默认关闭。'''
+def _prepare_upload_destination(uploads_dir: os.PathLike[str] | str, display_filename: str) -> _UploadTempFile:
+    '''验证目标文件名后创建同目录临时文件，供原子上传提交使用。'''
+    uploads_dir_path = Path(uploads_dir)
+    file_path = validate_upload_destination(uploads_dir_path, display_filename)
+    temp_fd, temp_path_str = tempfile.mkstemp(prefix=UPLOAD_STAGING_PREFIX, suffix=UPLOAD_STAGING_SUFFIX, dir=uploads_dir_path)
+    temp_path = Path(temp_path_str)
     try:
-        raw = _get_uploads_config_value(app_config, "auto_convert_documents", False)
-        if isinstance(raw, str):
-            return raw.strip().lower() in {"1", "true", "yes", "on"}
-        return bool(raw)
+        handle = os.fdopen(temp_fd, "wb")
     except Exception:
-        return False
+        try:
+            os.close(temp_fd)
+        except OSError:
+            pass
+        try:
+            os.unlink(temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+    return _UploadTempFile(file_path=file_path, temp_path=temp_path, handle=handle)
+
+
+def _write_upload_chunk(upload_temp: _UploadTempFile, chunk: bytes) -> None:
+    '''将一个上传数据块写入尚未提交的临时文件。'''
+    upload_temp.handle.write(chunk)
+
+
+def _commit_upload_temp(upload_temp: _UploadTempFile) -> None:
+    '''关闭临时文件并原子替换最终上传目标。'''
+    upload_temp.handle.close()
+    try:
+        os.replace(upload_temp.temp_path, upload_temp.file_path)
+    except Exception:
+        try:
+            os.unlink(upload_temp.temp_path)
+        except FileNotFoundError:
+            pass
+        raise
+
+
+def _abort_upload_temp(upload_temp: _UploadTempFile) -> None:
+    '''关闭并删除未提交的临时上传文件。'''
+    try:
+        upload_temp.handle.close()
+    finally:
+        try:
+            os.unlink(upload_temp.temp_path)
+        except FileNotFoundError:
+            pass
+
+
+def _cleanup_uploaded_paths(paths: list[os.PathLike[str] | str]) -> None:
+    '''按逆序尽力清理本次上传已落盘的路径，不覆盖原始异常。'''
+    for path in reversed(paths):
+        try:
+            os.unlink(path)
+        except FileNotFoundError:
+            pass
+        except Exception:
+            logger.warning("Failed to clean up upload path after rejected request: %s", path, exc_info=True)
+
+
+def _sync_upload_to_sandbox(sandbox, file_path: os.PathLike[str] | str, virtual_path: str) -> None:
+    '''将本地上传文件同步至未挂载线程数据的沙箱虚拟路径。'''
+    sandbox.update_file(virtual_path, Path(file_path).read_bytes())
 
 
 @router.post("", response_model=UploadResponse)
@@ -397,6 +379,18 @@ async def get_upload_limits(
     return _get_upload_limits(config)
 
 
+def _list_uploaded_files_for_thread(thread_id: str, user_id: str) -> dict:
+    '''列出指定用户在线程隔离上传目录中的文件。'''
+    uploads_dir = get_uploads_dir(thread_id, user_id=user_id)
+    result = list_files_in_dir(uploads_dir)
+    enrich_file_listing(result, thread_id)
+
+    sandbox_uploads = get_paths().sandbox_uploads_dir(thread_id, user_id=user_id)
+    for f in result["files"]:
+        f["path"] = str(sandbox_uploads / f["filename"])
+    return result
+
+
 @router.get("/list", response_model=UploadListResponse)
 @require_permission("threads", "read", owner_check=True)
 async def list_uploaded_files(thread_id: str, request: Request) -> UploadListResponse:
@@ -424,3 +418,9 @@ async def delete_uploaded_file(thread_id: str, filename: str, request: Request) 
     except Exception as e:
         logger.error(f"Failed to delete {filename}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete {filename}: {str(e)}")
+
+
+def _delete_uploaded_file_for_thread(thread_id: str, filename: str, user_id: str) -> dict:
+    '''从指定用户的线程上传目录安全删除一个已上传文件。'''
+    uploads_dir = get_uploads_dir(thread_id, user_id=user_id)
+    return delete_file_safe(uploads_dir, filename, convertible_extensions=CONVERTIBLE_EXTENSIONS)

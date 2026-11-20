@@ -2,8 +2,6 @@
 
 import * as React from "react";
 
-import { cn } from "@/lib/utils";
-
 interface ShineBorderProps extends React.HTMLAttributes<HTMLDivElement> {
   /**
    * 边框宽度（像素）。
@@ -52,10 +50,12 @@ export function ShineBorder({
           ...style,
         } as React.CSSProperties
       }
-      className={cn(
+      className={[
         "motion-safe:animate-shine pointer-events-none absolute inset-0 size-full rounded-[inherit] will-change-[background-position]",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   );

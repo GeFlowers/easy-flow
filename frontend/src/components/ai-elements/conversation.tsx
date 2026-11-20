@@ -1,7 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+
 import { ArrowDownIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 import { useCallback } from "react";
@@ -12,7 +12,9 @@ export type ConversationProps = ComponentProps<typeof StickToBottom>;
 /** 提供随内容和容器尺寸平滑滚动的对话日志容器。 */
 export const Conversation = ({ className, ...props }: ConversationProps) => (
   <StickToBottom
-    className={cn("relative flex-1 overflow-y-hidden", className)}
+    className={["relative flex-1 overflow-y-hidden", className]
+      .filter(Boolean)
+      .join(" ")}
     initial="smooth"
     resize="smooth"
     role="log"
@@ -30,7 +32,7 @@ export const ConversationContent = ({
   ...props
 }: ConversationContentProps) => (
   <StickToBottom.Content
-    className={cn("flex flex-col gap-8 p-4", className)}
+    className={["flex flex-col gap-8 p-4", className].filter(Boolean).join(" ")}
     {...props}
   />
 );
@@ -51,10 +53,12 @@ export const ConversationEmptyState = ({
   ...props
 }: ConversationEmptyStateProps) => (
   <div
-    className={cn(
+    className={[
       "flex size-full flex-col items-center justify-center gap-3 p-8 text-center",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   >
     {children ?? (
@@ -88,10 +92,12 @@ export const ConversationScrollButton = ({
   return (
     !isAtBottom && (
       <Button
-        className={cn(
+        className={[
           "absolute bottom-4 left-[50%] translate-x-[-50%] rounded-full",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         onClick={handleScrollToBottom}
         size="icon"
         type="button"

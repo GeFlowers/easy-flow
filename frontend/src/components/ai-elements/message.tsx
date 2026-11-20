@@ -8,7 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+
 import type { FileUIPart, UIMessage } from "ai";
 import {
   ChevronLeftIcon,
@@ -28,11 +28,13 @@ export type MessageProps = HTMLAttributes<HTMLDivElement> & {
 /** 按消息发送者标记用户或助手消息，为后代内容提供对应样式上下文。 */
 export const Message = ({ className, from, ...props }: MessageProps) => (
   <div
-    className={cn(
+    className={[
       "group flex w-full flex-col gap-2",
       from === "user" ? "is-user ml-auto justify-end" : "is-assistant",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -46,13 +48,15 @@ export const MessageContent = ({
   ...props
 }: MessageContentProps) => (
   <div
-    className={cn(
+    className={[
       "is-user:dark flex w-fit max-w-full min-w-0 flex-col gap-2 overflow-visible",
       "group-[.is-user]:overflow-hidden",
       "group-[.is-user]:bg-secondary group-[.is-user]:text-foreground group-[.is-user]:ml-auto group-[.is-user]:rounded-lg group-[.is-user]:px-4 group-[.is-user]:py-3",
       "group-[.is-assistant]:text-foreground",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   >
     {children}
@@ -67,7 +71,10 @@ export const MessageActions = ({
   children,
   ...props
 }: MessageActionsProps) => (
-  <div className={cn("flex items-center gap-1", className)} {...props}>
+  <div
+    className={["flex items-center gap-1", className].filter(Boolean).join(" ")}
+    {...props}
+  >
     {children}
   </div>
 );
@@ -182,7 +189,9 @@ export const MessageBranch = ({
   return (
     <MessageBranchContext.Provider value={contextValue}>
       <div
-        className={cn("grid w-full gap-2 [&>div]:pb-0", className)}
+        className={["grid w-full gap-2 [&>div]:pb-0", className]
+          .filter(Boolean)
+          .join(" ")}
         {...props}
       />
     </MessageBranchContext.Provider>
@@ -208,10 +217,12 @@ export const MessageBranchContent = ({
 
   return childrenArray.map((branch, index) => (
     <div
-      className={cn(
+      className={[
         "grid gap-2 overflow-hidden [&>div]:pb-0",
         index === currentBranch ? "block" : "hidden",
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       key={branch.key}
       {...props}
     >
@@ -306,10 +317,12 @@ export const MessageBranchPage = ({
 
   return (
     <ButtonGroupText
-      className={cn(
+      className={[
         "text-muted-foreground border-none bg-transparent shadow-none",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       {currentBranch + 1} of {totalBranches}
@@ -325,10 +338,12 @@ export type MessageResponseProps = ComponentProps<
 export const MessageResponse = memo(
   ({ className, ...props }: MessageResponseProps) => (
     <ClipboardSafeStreamdown
-      className={cn(
+      className={[
         "size-full [&>*:first-child]:mt-0 [&>*:last-child]:mb-0",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   ),
@@ -358,10 +373,12 @@ export function MessageAttachment({
 
   return (
     <div
-      className={cn(
+      className={[
         "group relative size-24 overflow-hidden rounded-lg",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       {isImage ? (
@@ -436,10 +453,9 @@ export function MessageAttachments({
 
   return (
     <div
-      className={cn(
-        "ml-auto flex w-fit flex-wrap items-start gap-2",
-        className,
-      )}
+      className={["ml-auto flex w-fit flex-wrap items-start gap-2", className]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       {children}
@@ -456,10 +472,12 @@ export const MessageToolbar = ({
   ...props
 }: MessageToolbarProps) => (
   <div
-    className={cn(
+    className={[
       "mt-4 flex w-full items-center justify-between gap-4",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   >
     {children}

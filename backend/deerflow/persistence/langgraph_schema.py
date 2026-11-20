@@ -87,6 +87,25 @@ def needs_column_change(operation: str, existing: tuple[str] | None) -> bool:
     raise ValueError(f'未知字段变更操作：{operation}')
 
 
+def ensure_langgraph_schema(connection_string: str, kind: SchemaKind) -> None:
+    '''同步补齐数据结构；整个初始化在同一事务和咨询锁内执行。'''
+    from psycopg import connect
+
+    _check_driver_compatibility()
+    statements = _statements(kind)
+    with connect(connection_string, connect_timeout=10) as connection:
+        with connection.cursor() as cursor:
+            cursor.execute("SET LOCAL lock_timeout = '5s'")
+            cursor.execute('SELECT pg_advisory_xact_lock(%s)', (_SCHEMA_LOCK_KEY,))
+            for statement in statements:
+                if change := _COLUMN_CHANGES.get(statement):
+                    table, column, operation = change
+                    cursor.execute(_COLUMN_QUERY, (table, column))
+                    if not needs_column_change(operation, cursor.fetchone()):
+                        continue
+                cursor.execute(statement)
+
+
 def _check_driver_compatibility() -> None:
     '''阻止未经验证的存储依赖升级静默使用旧结构，不写入数据库版本表。'''
     from importlib.metadata import version
@@ -106,25 +125,6 @@ def _statements(kind: SchemaKind) -> tuple[str, ...]:
     if kind == 'store':
         return STORE_STATEMENTS
     raise ValueError(f'不支持的数据库结构类型：{kind}')
-
-
-def ensure_langgraph_schema(connection_string: str, kind: SchemaKind) -> None:
-    '''同步补齐数据结构；整个初始化在同一事务和咨询锁内执行。'''
-    from psycopg import connect
-
-    _check_driver_compatibility()
-    statements = _statements(kind)
-    with connect(connection_string, connect_timeout=10) as connection:
-        with connection.cursor() as cursor:
-            cursor.execute("SET LOCAL lock_timeout = '5s'")
-            cursor.execute('SELECT pg_advisory_xact_lock(%s)', (_SCHEMA_LOCK_KEY,))
-            for statement in statements:
-                if change := _COLUMN_CHANGES.get(statement):
-                    table, column, operation = change
-                    cursor.execute(_COLUMN_QUERY, (table, column))
-                    if not needs_column_change(operation, cursor.fetchone()):
-                        continue
-                cursor.execute(statement)
 
 
 async def ensure_langgraph_schema_async(connection_string: str, kind: SchemaKind) -> None:

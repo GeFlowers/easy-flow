@@ -28,50 +28,25 @@ _ASYNC_THRESHOLD_BYTES = 1 * 1024 * 1024  # 1 MB
 _MIN_CHARS_PER_PAGE = 50
 
 
-def _pymupdf_output_too_sparse(text: str, file_path: Path) -> bool:
-    '''判断转换结果是否短得异常，区分解析失败与内容本来就很短的文档。'''
-    chars = len(text.strip())
-    doc = None
-    pages: int | None = None
+async def convert_file_to_markdown(file_path: Path) -> Path | None:
+    '''转换单个上传文件并写入同目录 Markdown 文件；失败时记录日志并返回空值。'''
     try:
-        import pymupdf
+        pdf_converter = _get_pdf_converter()
+        file_size = file_path.stat().st_size
 
-        doc = pymupdf.open(str(file_path))
-        pages = len(doc)
-    except Exception:
-        pass
-    finally:
-        if doc is not None:
-            try:
-                doc.close()
-            except Exception:
-                pass
-    if pages is not None and pages > 0:
-        return (chars / pages) < _MIN_CHARS_PER_PAGE
-    # 无法读取页数时，以绝对文本量阈值作为保守回退判断。
-    return chars < 200
+        if file_size > _ASYNC_THRESHOLD_BYTES:
+            text = await asyncio.to_thread(_do_convert, file_path, pdf_converter)
+        else:
+            text = _do_convert(file_path, pdf_converter)
 
+        md_path = file_path.with_suffix(".md")
+        md_path.write_text(text, encoding="utf-8")
 
-def _convert_pdf_with_pymupdf4llm(file_path: Path) -> str | None:
-    '''尝试用 pymupdf4llm 转换 PDF；依赖缺失或解析失败时返回空值交由回退处理。'''
-    try:
-        import pymupdf4llm
-    except ImportError:
+        logger.info("Converted %s to markdown: %s (%d chars)", file_path.name, md_path.name, len(text))
+        return md_path
+    except Exception as e:
+        logger.error("Failed to convert %s to markdown: %s", file_path.name, e)
         return None
-
-    try:
-        return pymupdf4llm.to_markdown(str(file_path))
-    except Exception:
-        logger.exception("pymupdf4llm failed to convert %s; falling back to MarkItDown", file_path.name)
-        return None
-
-
-def _convert_with_markitdown(file_path: Path) -> str:
-    '''使用 MarkItDown 转换器读取文档并返回 Markdown 文本。'''
-    from markitdown import MarkItDown
-
-    md = MarkItDown()
-    return md.convert(str(file_path)).text_content
 
 
 def _do_convert(file_path: Path, pdf_converter: str) -> str:
@@ -100,25 +75,50 @@ def _do_convert(file_path: Path, pdf_converter: str) -> str:
     return _convert_with_markitdown(file_path)
 
 
-async def convert_file_to_markdown(file_path: Path) -> Path | None:
-    '''转换单个上传文件并写入同目录 Markdown 文件；失败时记录日志并返回空值。'''
+def _convert_pdf_with_pymupdf4llm(file_path: Path) -> str | None:
+    '''尝试用 pymupdf4llm 转换 PDF；依赖缺失或解析失败时返回空值交由回退处理。'''
     try:
-        pdf_converter = _get_pdf_converter()
-        file_size = file_path.stat().st_size
-
-        if file_size > _ASYNC_THRESHOLD_BYTES:
-            text = await asyncio.to_thread(_do_convert, file_path, pdf_converter)
-        else:
-            text = _do_convert(file_path, pdf_converter)
-
-        md_path = file_path.with_suffix(".md")
-        md_path.write_text(text, encoding="utf-8")
-
-        logger.info("Converted %s to markdown: %s (%d chars)", file_path.name, md_path.name, len(text))
-        return md_path
-    except Exception as e:
-        logger.error("Failed to convert %s to markdown: %s", file_path.name, e)
+        import pymupdf4llm
+    except ImportError:
         return None
+
+    try:
+        return pymupdf4llm.to_markdown(str(file_path))
+    except Exception:
+        logger.exception("pymupdf4llm failed to convert %s; falling back to MarkItDown", file_path.name)
+        return None
+
+
+def _pymupdf_output_too_sparse(text: str, file_path: Path) -> bool:
+    '''判断转换结果是否短得异常，区分解析失败与内容本来就很短的文档。'''
+    chars = len(text.strip())
+    doc = None
+    pages: int | None = None
+    try:
+        import pymupdf
+
+        doc = pymupdf.open(str(file_path))
+        pages = len(doc)
+    except Exception:
+        pass
+    finally:
+        if doc is not None:
+            try:
+                doc.close()
+            except Exception:
+                pass
+    if pages is not None and pages > 0:
+        return (chars / pages) < _MIN_CHARS_PER_PAGE
+    # 无法读取页数时，以绝对文本量阈值作为保守回退判断。
+    return chars < 200
+
+
+def _convert_with_markitdown(file_path: Path) -> str:
+    '''使用 MarkItDown 转换器读取文档并返回 Markdown 文本。'''
+    from markitdown import MarkItDown
+
+    md = MarkItDown()
+    return md.convert(str(file_path)).text_content
 
 
 # 识别转换器未标成 Markdown 标题、但以粗体输出的证券文件结构标题。
@@ -133,16 +133,6 @@ _SPLIT_BOLD_HEADING_RE = re.compile(r"^\*\*[\dA-Z][\d\.]*\*\*\s+\*\*(?!\d[\d\s.,
 MAX_OUTLINE_ENTRIES = 50
 
 _ALLOWED_PDF_CONVERTERS = {"auto", "pymupdf4llm", "markitdown"}
-
-
-def _clean_bold_title(raw: str) -> str:
-    '''合并相邻粗体片段并移除整段包裹标记，得到可展示的标题文本。'''
-    # 相邻粗体区块通常来自 PDF 中被拆开的连续文本。
-    merged = re.sub(r"\*\*\s*\*\*", " ", raw).strip()
-    # 如果整行仍由粗体标记包围，则仅去掉最外层标记。
-    if m := re.fullmatch(r"\*\*(.+?)\*\*", merged, re.DOTALL):
-        return m.group(1).strip()
-    return merged
 
 
 def extract_outline(md_path: Path) -> list[dict]:
@@ -182,6 +172,16 @@ def extract_outline(md_path: Path) -> list[dict]:
         return []
 
     return outline
+
+
+def _clean_bold_title(raw: str) -> str:
+    '''合并相邻粗体片段并移除整段包裹标记，得到可展示的标题文本。'''
+    # 相邻粗体区块通常来自 PDF 中被拆开的连续文本。
+    merged = re.sub(r"\*\*\s*\*\*", " ", raw).strip()
+    # 如果整行仍由粗体标记包围，则仅去掉最外层标记。
+    if m := re.fullmatch(r"\*\*(.+?)\*\*", merged, re.DOTALL):
+        return m.group(1).strip()
+    return merged
 
 
 def _get_uploads_config_value(key: str, default: object) -> object:

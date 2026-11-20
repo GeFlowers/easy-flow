@@ -24,12 +24,27 @@ class MemoryRunEventStore(RunEventStore):
         self._messages_by_run: dict[str, dict[str, list[dict]]] = {}
         self._seq_counters: dict[str, int] = {}
 
-    def _next_seq(self, thread_id: str) -> int:
-        '''为线程内新事件递增分配序号。'''
-        current = self._seq_counters.get(thread_id, 0)
-        next_val = current + 1
-        self._seq_counters[thread_id] = next_val
-        return next_val
+    async def put(
+        self,
+        *,
+        thread_id,
+        run_id,
+        event_type,
+        category,
+        content="",
+        metadata=None,
+        created_at=None,
+    ):
+        '''将单条事件写入内存索引并返回记录。'''
+        return self._put_one(
+            thread_id=thread_id,
+            run_id=run_id,
+            event_type=event_type,
+            category=category,
+            content=content,
+            metadata=metadata,
+            created_at=created_at,
+        )
 
     def _put_one(
         self,
@@ -61,27 +76,12 @@ class MemoryRunEventStore(RunEventStore):
             self._messages_by_run.setdefault(thread_id, {}).setdefault(run_id, []).append(record)
         return record
 
-    async def put(
-        self,
-        *,
-        thread_id,
-        run_id,
-        event_type,
-        category,
-        content="",
-        metadata=None,
-        created_at=None,
-    ):
-        '''将单条事件写入内存索引并返回记录。'''
-        return self._put_one(
-            thread_id=thread_id,
-            run_id=run_id,
-            event_type=event_type,
-            category=category,
-            content=content,
-            metadata=metadata,
-            created_at=created_at,
-        )
+    def _next_seq(self, thread_id: str) -> int:
+        '''为线程内新事件递增分配序号。'''
+        current = self._seq_counters.get(thread_id, 0)
+        next_val = current + 1
+        self._seq_counters[thread_id] = next_val
+        return next_val
 
     async def put_batch(self, events):
         '''按输入顺序写入多条事件，并返回生成的记录列表。'''

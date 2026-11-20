@@ -13,42 +13,6 @@ _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
 
 
-def _json_serializer(value: object) -> str:
-    '''序列化 JSON 字段并保留其中的 Unicode 字符。'''
-    return json.dumps(value, ensure_ascii=False)
-
-
-async def _auto_create_postgres_db(url: str) -> None:
-    '''目标数据库不存在时，连接维护库并创建目标数据库。'''
-    from sqlalchemy import text
-    from sqlalchemy.engine.url import make_url
-
-    parsed_url = make_url(url)
-    database_name = parsed_url.database
-    if not database_name:
-        raise ValueError("Cannot auto-create database: no database name in URL")
-
-    maintenance_url = parsed_url.set(database="postgres")
-    maintenance_engine = create_async_engine(maintenance_url, isolation_level="AUTOCOMMIT")
-    try:
-        async with maintenance_engine.connect() as connection:
-            await connection.execute(text(f'CREATE DATABASE "{database_name}"'))
-        logger.info("Auto-created PostgreSQL database: %s", database_name)
-    finally:
-        await maintenance_engine.dispose()
-
-
-def _create_engine(url: str, *, echo: bool, pool_size: int) -> AsyncEngine:
-    '''创建供网关各个仓储共用的异步连接池。'''
-    return create_async_engine(
-        url,
-        echo=echo,
-        pool_size=pool_size,
-        pool_pre_ping=True,
-        json_serializer=_json_serializer,
-    )
-
-
 async def init_engine(
     backend: str,
     *,
@@ -56,7 +20,7 @@ async def init_engine(
     echo: bool = False,
     pool_size: int = 5,
 ) -> None:
-    '''建立 PostgreSQL 连接池并将数据库架构升级到当前版本。'''
+    '''建立 PostgreSQL 连接池并检查业务表结构。'''
     global _engine, _session_factory
 
     if backend != "postgres":
@@ -89,6 +53,42 @@ async def init_engine(
         await bootstrap_schema(_engine)
 
     logger.info("Persistence engine initialized: backend=postgres")
+
+
+def _create_engine(url: str, *, echo: bool, pool_size: int) -> AsyncEngine:
+    '''创建供网关各个仓储共用的异步连接池。'''
+    return create_async_engine(
+        url,
+        echo=echo,
+        pool_size=pool_size,
+        pool_pre_ping=True,
+        json_serializer=_json_serializer,
+    )
+
+
+def _json_serializer(value: object) -> str:
+    '''序列化 JSON 字段并保留其中的 Unicode 字符。'''
+    return json.dumps(value, ensure_ascii=False)
+
+
+async def _auto_create_postgres_db(url: str) -> None:
+    '''目标数据库不存在时，连接维护库并创建目标数据库。'''
+    from sqlalchemy import text
+    from sqlalchemy.engine.url import make_url
+
+    parsed_url = make_url(url)
+    database_name = parsed_url.database
+    if not database_name:
+        raise ValueError("Cannot auto-create database: no database name in URL")
+
+    maintenance_url = parsed_url.set(database="postgres")
+    maintenance_engine = create_async_engine(maintenance_url, isolation_level="AUTOCOMMIT")
+    try:
+        async with maintenance_engine.connect() as connection:
+            await connection.execute(text(f'CREATE DATABASE "{database_name}"'))
+        logger.info("Auto-created PostgreSQL database: %s", database_name)
+    finally:
+        await maintenance_engine.dispose()
 
 
 async def init_engine_from_config(config) -> None:

@@ -186,18 +186,6 @@ class SkillEntry(TypedDict):
     loaded_at: int
 
 
-def _normalize_skill_entry(entry: Mapping[str, object]) -> SkillEntry:
-    '''规范化技能引用，并在回写状态前丢弃旧载荷中的正文键。'''
-    description = entry.get("description")
-    loaded_at = entry.get("loaded_at")
-    return {
-        "name": str(entry.get("name") or ""),
-        "path": str(entry["path"]),
-        "description": " ".join(description.split())[:_SKILL_DESCRIPTION_MAX_CHARS] if isinstance(description, str) else "",
-        "loaded_at": loaded_at if isinstance(loaded_at, int) else 0,
-    }
-
-
 def merge_skill_context(existing: list[SkillEntry] | None, new: list[SkillEntry] | None) -> list[SkillEntry]:
     '''归约技能上下文通道，仅持久化轻量引用。
 
@@ -228,6 +216,18 @@ def merge_skill_context(existing: list[SkillEntry] | None, new: list[SkillEntry]
     if len(merged) > _SKILL_CONTEXT_MAX_ENTRIES:
         merged = merged[-_SKILL_CONTEXT_MAX_ENTRIES:]
     return merged
+
+
+def _normalize_skill_entry(entry: Mapping[str, object]) -> SkillEntry:
+    '''规范化技能引用，并在回写状态前丢弃旧载荷中的正文键。'''
+    description = entry.get("description")
+    loaded_at = entry.get("loaded_at")
+    return {
+        "name": str(entry.get("name") or ""),
+        "path": str(entry["path"]),
+        "description": " ".join(description.split())[:_SKILL_DESCRIPTION_MAX_CHARS] if isinstance(description, str) else "",
+        "loaded_at": loaded_at if isinstance(loaded_at, int) else 0,
+    }
 
 
 class ThreadState(AgentState):

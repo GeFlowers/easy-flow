@@ -27,12 +27,121 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
 
     state_schema = ClarificationMiddlewareState
 
+    @override
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        '''同步拦截澄清工具调用；其他工具仍交由原处理器执行。'''
+        if request.tool_call.get("name") != "ask_clarification":
+            # 非澄清工具保持原有执行路径。
+            return handler(request)
+
+        if self._is_disabled(request):
+            return self._handle_disabled_clarification(request)
+
+        return self._handle_clarification(request)
+
+    def _is_disabled(self, request: ToolCallRequest) -> bool:
+        '''检查当前运行上下文是否禁止交互式澄清。'''
+        runtime = getattr(request, "runtime", None)
+        context = getattr(runtime, "context", None)
+        if not context:
+            return False
+        return bool(context.get("disable_clarification"))
+
+    def _handle_disabled_clarification(self, request: ToolCallRequest) -> ToolMessage:
+        '''在非交互运行中不打断流程，而是要求 智能体 基于合理假设继续执行。'''
+        tool_call_id = request.tool_call.get("id", "")
+        logger.info("ask_clarification suppressed (disable_clarification set); instructing agent to proceed")
+        return ToolMessage(
+            id=self._stable_message_id(tool_call_id, "proceed-without-clarification"),
+            content=(
+                "当前上下文已禁用澄清，因为用户不在场，无法同步回答。不要请求确认。"
+                "请依据最佳判断继续执行请求的操作，并在最终答复中说明所作假设。"
+            ),
+            tool_call_id=tool_call_id,
+            name="ask_clarification",
+        )
+
     def _stable_message_id(self, tool_call_id: str, formatted_message: str) -> str:
         '''依据工具调用 ID 或消息摘要生成稳定 ID，避免重试重复追加问题。'''
         if tool_call_id:
             return f"clarification:{tool_call_id}"
         digest = sha256(formatted_message.encode("utf-8")).hexdigest()[:16]
         return f"clarification:{digest}"
+
+    def _handle_clarification(self, request: ToolCallRequest) -> Command:
+        '''构造带结构化 UI 数据的工具消息，并通过图命令结束当前运行。'''
+        # 读取模型传入的澄清问题和选项。
+        args = request.tool_call.get("args", {})
+        question = args.get("question", "")
+
+        logger.info("Intercepted clarification request")
+        logger.debug("Clarification question: %s", question)
+
+        # 生成用户可直接阅读的问题文本。
+        formatted_message = self._format_clarification_message(args)
+
+        # 读取工具调用标识。
+        tool_call_id = request.tool_call.get("id", "")
+
+        request_id = self._stable_message_id(tool_call_id, formatted_message)
+        human_input_payload = self._build_human_input_payload(args, tool_call_id=tool_call_id, request_id=request_id)
+
+        # 将澄清文本和前端结构化载荷写入消息历史。
+        tool_message = ToolMessage(
+            id=request_id,
+            content=formatted_message,
+            tool_call_id=tool_call_id,
+            name="ask_clarification",
+            artifact={"human_input": human_input_payload},
+        )
+
+        # 追加工具消息并结束当前图运行；前端会直接识别并展示该澄清消息。
+        return Command(
+            update={"messages": [tool_message]},
+            goto=END,
+        )
+
+    def _format_clarification_message(self, args: dict) -> str:
+        '''按澄清类型添加图标，并组合背景、问题和可选项供用户阅读。'''
+        question = args.get("question", "")
+        clarification_type = args.get("clarification_type", "missing_info")
+        context = args.get("context")
+        options = self._normalize_options(args.get("options", []))
+
+        # 按澄清类型选择提示图标。
+        type_icons = {
+            "missing_info": "❓",
+            "ambiguous_requirement": "🤔",
+            "approach_choice": "🔀",
+            "risk_confirmation": "⚠️",
+            "suggestion": "💡",
+        }
+
+        icon = type_icons.get(clarification_type, "❓")
+
+        # 组合成自然阅读顺序。
+        message_parts = []
+
+        # 有背景时先展示背景，再单独显示问题。
+        if context:
+            # 先呈现背景，再提出具体问题。
+            message_parts.append(f"{icon} {context}")
+            message_parts.append(f"\n{question}")
+        else:
+            # 没有背景时直接显示问题。
+            message_parts.append(f"{icon} {question}")
+
+        # 将选项按编号列出。
+        if options and len(options) > 0:
+            message_parts.append("")  # 空行用于分隔问题和选项。
+            for i, option in enumerate(options, 1):
+                message_parts.append(f"  {i}. {option}")
+
+        return "\n".join(message_parts)
 
     def _normalize_options(self, raw_options: Any) -> list[str]:
         '''把工具参数中的选项统一转换为字符串列表，兼容 JSON 字符串形式。'''
@@ -86,119 +195,6 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
 
         return payload
 
-    def _is_chinese(self, text: str) -> bool:
-        '''检查文本中是否包含中日韩统一表意文字区的汉字。'''
-        return any("\u4e00" <= char <= "\u9fff" for char in text)
-
-    def _format_clarification_message(self, args: dict) -> str:
-        '''按澄清类型添加图标，并组合背景、问题和可选项供用户阅读。'''
-        question = args.get("question", "")
-        clarification_type = args.get("clarification_type", "missing_info")
-        context = args.get("context")
-        options = self._normalize_options(args.get("options", []))
-
-        # 按澄清类型选择提示图标。
-        type_icons = {
-            "missing_info": "❓",
-            "ambiguous_requirement": "🤔",
-            "approach_choice": "🔀",
-            "risk_confirmation": "⚠️",
-            "suggestion": "💡",
-        }
-
-        icon = type_icons.get(clarification_type, "❓")
-
-        # 组合成自然阅读顺序。
-        message_parts = []
-
-        # 有背景时先展示背景，再单独显示问题。
-        if context:
-            # 先呈现背景，再提出具体问题。
-            message_parts.append(f"{icon} {context}")
-            message_parts.append(f"\n{question}")
-        else:
-            # 没有背景时直接显示问题。
-            message_parts.append(f"{icon} {question}")
-
-        # 将选项按编号列出。
-        if options and len(options) > 0:
-            message_parts.append("")  # 空行用于分隔问题和选项。
-            for i, option in enumerate(options, 1):
-                message_parts.append(f"  {i}. {option}")
-
-        return "\n".join(message_parts)
-
-    def _is_disabled(self, request: ToolCallRequest) -> bool:
-        '''检查当前运行上下文是否禁止交互式澄清。'''
-        runtime = getattr(request, "runtime", None)
-        context = getattr(runtime, "context", None)
-        if not context:
-            return False
-        return bool(context.get("disable_clarification"))
-
-    def _handle_disabled_clarification(self, request: ToolCallRequest) -> ToolMessage:
-        '''在非交互运行中不打断流程，而是要求 智能体 基于合理假设继续执行。'''
-        tool_call_id = request.tool_call.get("id", "")
-        logger.info("ask_clarification suppressed (disable_clarification set); instructing agent to proceed")
-        return ToolMessage(
-            id=self._stable_message_id(tool_call_id, "proceed-without-clarification"),
-            content=(
-                "当前上下文已禁用澄清，因为用户不在场，无法同步回答。不要请求确认。"
-                "请依据最佳判断继续执行请求的操作，并在最终答复中说明所作假设。"
-            ),
-            tool_call_id=tool_call_id,
-            name="ask_clarification",
-        )
-
-    def _handle_clarification(self, request: ToolCallRequest) -> Command:
-        '''构造带结构化 UI 数据的工具消息，并通过图命令结束当前运行。'''
-        # 读取模型传入的澄清问题和选项。
-        args = request.tool_call.get("args", {})
-        question = args.get("question", "")
-
-        logger.info("Intercepted clarification request")
-        logger.debug("Clarification question: %s", question)
-
-        # 生成用户可直接阅读的问题文本。
-        formatted_message = self._format_clarification_message(args)
-
-        # 读取工具调用标识。
-        tool_call_id = request.tool_call.get("id", "")
-
-        request_id = self._stable_message_id(tool_call_id, formatted_message)
-        human_input_payload = self._build_human_input_payload(args, tool_call_id=tool_call_id, request_id=request_id)
-
-        # 将澄清文本和前端结构化载荷写入消息历史。
-        tool_message = ToolMessage(
-            id=request_id,
-            content=formatted_message,
-            tool_call_id=tool_call_id,
-            name="ask_clarification",
-            artifact={"human_input": human_input_payload},
-        )
-
-        # 追加工具消息并结束当前图运行；前端会直接识别并展示该澄清消息。
-        return Command(
-            update={"messages": [tool_message]},
-            goto=END,
-        )
-
-    @override
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        '''同步拦截澄清工具调用；其他工具仍交由原处理器执行。'''
-        if request.tool_call.get("name") != "ask_clarification":
-            # 非澄清工具保持原有执行路径。
-            return handler(request)
-
-        if self._is_disabled(request):
-            return self._handle_disabled_clarification(request)
-
-        return self._handle_clarification(request)
-
     @override
     async def awrap_tool_call(
         self,
@@ -214,3 +210,7 @@ class ClarificationMiddleware(AgentMiddleware[ClarificationMiddlewareState]):
             return self._handle_disabled_clarification(request)
 
         return self._handle_clarification(request)
+
+    def _is_chinese(self, text: str) -> bool:
+        '''检查文本中是否包含中日韩统一表意文字区的汉字。'''
+        return any("\u4e00" <= char <= "\u9fff" for char in text)

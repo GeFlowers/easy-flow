@@ -22,13 +22,6 @@ class SubagentConfig:
     timeout_seconds: int = 900
 
 
-def _default_model_name(app_config: "AppConfig") -> str:
-    '''在没有模型配置时明确报错，避免子代理以不确定模型启动。'''
-    if not app_config.models:
-        raise ValueError("尚未配置聊天模型。请在 config.yaml 中至少配置一个模型。")
-    return app_config.models[0].name
-
-
 def resolve_subagent_model_name(config: SubagentConfig, parent_model: str | None, *, app_config: "AppConfig | None" = None) -> str:
     '''优先采用子代理显式模型，其次继承父代理模型，最后选用应用默认模型。'''
     if config.model != "inherit":
@@ -42,3 +35,10 @@ def resolve_subagent_model_name(config: SubagentConfig, parent_model: str | None
 
         app_config = get_app_config()
     return _default_model_name(app_config)
+
+
+def _default_model_name(app_config: "AppConfig") -> str:
+    '''在没有模型配置时明确报错，避免子代理以不确定模型启动。'''
+    if not app_config.models:
+        raise ValueError("尚未配置聊天模型。请在 config.yaml 中至少配置一个模型。")
+    return app_config.models[0].name

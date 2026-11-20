@@ -5,7 +5,6 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { type PromptInputMessage } from "@/components/ai-elements/prompt-input";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { ArtifactTrigger } from "@/components/workspace/artifacts";
 import {
   ChatBox,
@@ -51,7 +50,6 @@ import {
 } from "@/features/threads/hooks";
 import { threadTokenUsageToTokenUsage } from "@/features/threads/token-usage";
 import { textOfMessage } from "@/features/threads/utils";
-import { cn } from "@/lib/utils";
 
 /** 管理普通会话的流式消息、历史恢复、分支与输入交互。 */
 export default function ChatPage() {
@@ -246,14 +244,15 @@ export default function ChatPage() {
         <ChatBox threadId={threadId}>
           <div className="relative flex size-full min-h-0 justify-between">
             <header
-              className={cn(
-                "absolute top-0 right-0 left-0 z-30 flex h-12 shrink-0 items-center gap-2 px-2 sm:px-4",
+              className={[
+                "absolute top-0 right-0 left-0 z-30 flex h-12 shrink-0 items-center gap-2 px-4",
                 isWelcomeMode
                   ? "bg-background/0 backdrop-blur-none"
                   : "bg-background/80 shadow-xs backdrop-blur",
-              )}
+              ]
+                .filter(Boolean)
+                .join(" ")}
             >
-              <SidebarTrigger className="md:hidden" />
               <div className="flex min-w-0 flex-1 items-center text-sm font-medium">
                 <ThreadTitle threadId={threadId} thread={thread} />
               </div>
@@ -277,7 +276,9 @@ export default function ChatPage() {
             <main className="flex min-h-0 max-w-full grow flex-col">
               <div className="flex min-h-0 flex-1 justify-center">
                 <MessageList
-                  className={cn("size-full", !isWelcomeMode && "pt-10")}
+                  className={["size-full", !isWelcomeMode && "pt-10"]
+                    .filter(Boolean)
+                    .join(" ")}
                   testId="main-message-list"
                   threadId={threadId}
                   thread={thread}
@@ -301,33 +302,40 @@ export default function ChatPage() {
                 />
               </div>
               <div
-                className={cn(
-                  "right-0 bottom-0 left-0 z-30 flex justify-center px-3 sm:px-4",
+                className={[
+                  "right-0 bottom-0 left-0 z-30 flex justify-center px-4",
                   isWelcomeMode ? "absolute" : "relative shrink-0 pb-4",
-                )}
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
               >
                 <div
-                  className={cn(
+                  className={[
                     "relative w-full",
-                    isWelcomeMode &&
-                      "-translate-y-[calc(50vh-48px)] sm:-translate-y-[calc(50vh-96px)]",
+                    isWelcomeMode && "-translate-y-[calc(50vh-96px)]",
                     isWelcomeMode
                       ? "max-w-(--container-width-sm)"
                       : "max-w-(--container-width-md)",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 >
                   {(hasGoal || hasTodos) && (
                     <div
-                      className={cn(
+                      className={[
                         "right-0 left-0 z-0",
                         isWelcomeMode ? "absolute -top-4" : "relative",
-                      )}
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     >
                       <div
-                        className={cn(
+                        className={[
                           "right-0 bottom-0 left-0 flex flex-col",
                           isWelcomeMode ? "absolute" : "relative",
-                        )}
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                       >
                         {activeGoal && <GoalStatus goal={activeGoal} />}
                         {hasTodos && (
@@ -342,10 +350,12 @@ export default function ChatPage() {
                   )}
                   {mountedRef.current ? (
                     <InputBox
-                      className={cn(
+                      className={[
                         "bg-background/5 w-full",
-                        isWelcomeMode && "-translate-y-2 sm:-translate-y-4",
-                      )}
+                        isWelcomeMode && "-translate-y-4",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       isWelcomeMode={isWelcomeMode}
                       threadId={threadId}
                       autoFocus={isWelcomeMode}
@@ -377,10 +387,12 @@ export default function ChatPage() {
                   ) : (
                     <div
                       aria-hidden="true"
-                      className={cn(
+                      className={[
                         "bg-background/5 h-32 w-full rounded-2xl",
-                        isWelcomeMode && "-translate-y-2 sm:-translate-y-4",
-                      )}
+                        isWelcomeMode && "-translate-y-4",
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                     />
                   )}
                 </div>

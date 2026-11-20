@@ -15,14 +15,6 @@ from deerflow.runtime.user_context import get_effective_user_id
 router = APIRouter(prefix="/api", tags=["memory"])
 
 
-def _resolve_memory_user_id(request: Request) -> str:
-    '''解析当前请求的记忆所有者；可信内部通道请求使用其绑定用户并规范化 ID。'''
-    raw_owner = get_trusted_internal_owner_user_id(request)
-    if raw_owner:
-        return make_safe_user_id(raw_owner)
-    return get_effective_user_id()
-
-
 class ContextSection(BaseModel):
     '''表示带更新时间的单段记忆摘要。'''
 
@@ -54,29 +46,9 @@ class MemoryResponse(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def migrate_summary_sections(cls, value):
-        '''兼容旧备份和旧后端响应，统一输出用户与历史各一段摘要。'''
+    def normalize_summary_sections(cls, value):
+        '''校验并规范化用户与历史的单段摘要。'''
         return normalize_memory(value) if isinstance(value, dict) else value
-
-
-def _map_memory_fact_value_error(exc: ValueError) -> HTTPException:
-    '''将事实校验异常映射为稳定的 HTTP 400 错误说明。'''
-    if exc.args and exc.args[0] == "confidence":
-        detail = "Invalid confidence value; must be between 0 and 1."
-    else:
-        detail = "Memory fact content cannot be empty."
-    return HTTPException(status_code=400, detail=detail)
-
-
-def _require_capability(name: str, *, label: str):
-    '''从当前记忆后端获取可选操作能力；后端未实现时返回 HTTP 501。'''
-    manager = get_memory_manager()
-    if not hasattr(manager, name):
-        raise HTTPException(
-            status_code=501,
-            detail=f"Operation '{label}' not supported by memory backend '{type(manager).__name__}'.",
-        )
-    return getattr(manager, name)
 
 
 class FactCreateRequest(BaseModel):
@@ -111,6 +83,14 @@ class MemoryStatusResponse(BaseModel):
 
     config: MemoryConfigResponse
     data: MemoryResponse
+
+
+def _resolve_memory_user_id(request: Request) -> str:
+    '''解析当前请求的记忆所有者；可信内部通道请求使用其绑定用户并规范化 ID。'''
+    raw_owner = get_trusted_internal_owner_user_id(request)
+    if raw_owner:
+        return make_safe_user_id(raw_owner)
+    return get_effective_user_id()
 
 
 @router.get(
@@ -160,6 +140,26 @@ async def clear_memory(http_request: Request) -> MemoryResponse:
         raise HTTPException(status_code=500, detail="Failed to clear memory data.") from exc
 
     return MemoryResponse(**memory_data)
+
+
+def _require_capability(name: str, *, label: str):
+    '''从当前记忆后端获取可选操作能力；后端未实现时返回 HTTP 501。'''
+    manager = get_memory_manager()
+    if not hasattr(manager, name):
+        raise HTTPException(
+            status_code=501,
+            detail=f"Operation '{label}' not supported by memory backend '{type(manager).__name__}'.",
+        )
+    return getattr(manager, name)
+
+
+def _map_memory_fact_value_error(exc: ValueError) -> HTTPException:
+    '''将事实校验异常映射为稳定的 HTTP 400 错误说明。'''
+    if exc.args and exc.args[0] == "confidence":
+        detail = "Invalid confidence value; must be between 0 and 1."
+    else:
+        detail = "Memory fact content cannot be empty."
+    return HTTPException(status_code=400, detail=detail)
 
 
 @router.post(

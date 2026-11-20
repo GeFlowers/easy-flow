@@ -11,41 +11,6 @@ from deerflow.utils.readability import ReadabilityExtractor
 readability_extractor = ReadabilityExtractor()
 
 
-def _coerce_bool(value: object, default: bool) -> bool:
-    '''解析布尔值或常见真假字符串；无法识别时返回默认值。'''
-    if isinstance(value, bool):
-        return value
-    if isinstance(value, str):
-        normalized = value.strip().lower()
-        if normalized in {"1", "true", "yes", "on"}:
-            return True
-        if normalized in {"0", "false", "no", "off"}:
-            return False
-    return default
-
-
-def _coerce_timeout(value: object, default: int) -> int:
-    '''将超时配置转换为整数；布尔值、非法字符串和其他类型回退到默认值。'''
-    if isinstance(value, bool):
-        return default
-    if isinstance(value, int):
-        return value
-    if isinstance(value, str):
-        try:
-            return int(value)
-        except ValueError:
-            return default
-    return default
-
-
-def _coerce_proxy(value: object) -> str | None:
-    '''清理代理配置并返回非空地址；非字符串或空内容返回 ``None``。'''
-    if not isinstance(value, str):
-        return None
-    proxy = value.strip()
-    return proxy or None
-
-
 @tool("web_fetch", parse_docstring=True)
 async def web_fetch_tool(url: str) -> str:
     '''读取指定网页的正文内容并返回给 agent。
@@ -71,3 +36,38 @@ async def web_fetch_tool(url: str) -> str:
         return html_content
     article = await asyncio.to_thread(readability_extractor.extract_article, html_content)
     return article.to_markdown()[:4096]
+
+
+def _coerce_timeout(value: object, default: int) -> int:
+    '''将超时配置转换为整数；布尔值、非法字符串和其他类型回退到默认值。'''
+    if isinstance(value, bool):
+        return default
+    if isinstance(value, int):
+        return value
+    if isinstance(value, str):
+        try:
+            return int(value)
+        except ValueError:
+            return default
+    return default
+
+
+def _coerce_proxy(value: object) -> str | None:
+    '''清理代理配置并返回非空地址；非字符串或空内容返回 ``None``。'''
+    if not isinstance(value, str):
+        return None
+    proxy = value.strip()
+    return proxy or None
+
+
+def _coerce_bool(value: object, default: bool) -> bool:
+    '''解析布尔值或常见真假字符串；无法识别时返回默认值。'''
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"1", "true", "yes", "on"}:
+            return True
+        if normalized in {"0", "false", "no", "off"}:
+            return False
+    return default

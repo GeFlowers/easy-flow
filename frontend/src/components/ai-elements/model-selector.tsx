@@ -15,7 +15,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils";
+
 import type { ComponentProps, ReactNode } from "react";
 
 export type ModelSelectorProps = ComponentProps<typeof Dialog>;
@@ -43,7 +43,10 @@ export const ModelSelectorContent = ({
   title = "Model Selector",
   ...props
 }: ModelSelectorContentProps) => (
-  <DialogContent className={cn("p-0", className)} {...props}>
+  <DialogContent
+    className={["p-0", className].filter(Boolean).join(" ")}
+    {...props}
+  >
     <DialogTitle className="sr-only">{title}</DialogTitle>
     <Command className="**:data-[slot=command-input-wrapper]:h-auto">
       {children}
@@ -65,7 +68,10 @@ export const ModelSelectorInput = ({
   className,
   ...props
 }: ModelSelectorInputProps) => (
-  <CommandInput className={cn("h-auto py-3.5", className)} {...props} />
+  <CommandInput
+    className={["h-auto py-3.5", className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type ModelSelectorListProps = ComponentProps<typeof CommandList>;
@@ -185,7 +191,7 @@ export const ModelSelectorLogo = ({
   <img
     {...props}
     alt={`${provider} logo`}
-    className={cn("size-3 dark:invert", className)}
+    className={["size-3 dark:invert", className].filter(Boolean).join(" ")}
     height={12}
     src={`https://models.dev/logos/${provider}.svg`}
     width={12}
@@ -200,10 +206,12 @@ export const ModelSelectorLogoGroup = ({
   ...props
 }: ModelSelectorLogoGroupProps) => (
   <div
-    className={cn(
+    className={[
       "[&>img]:bg-background dark:[&>img]:bg-foreground flex shrink-0 items-center -space-x-1 [&>img]:rounded-full [&>img]:p-px [&>img]:ring-1",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -216,7 +224,9 @@ export const ModelSelectorName = ({
   ...props
 }: ModelSelectorNameProps) => (
   <span
-    className={cn("flex-1 truncate text-left text-xs", className)}
+    className={["flex-1 truncate text-left text-xs", className]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );

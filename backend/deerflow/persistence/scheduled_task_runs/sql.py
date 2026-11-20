@@ -1,4 +1,4 @@
-'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
+'''提供持久化层的模型、仓储与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -21,15 +21,6 @@ class ScheduledTaskRunRepository:
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         '''初始化当前持久化组件所需的依赖与内部状态。'''
         self._sf = session_factory
-
-    @staticmethod
-    def _row_to_dict(row: ScheduledTaskRunRow) -> dict[str, Any]:
-        '''将持久化记录转换为对外使用的字典表示。'''
-        data = row.to_dict()
-        for key in ("scheduled_for", "started_at", "finished_at", "created_at"):
-            if data.get(key) is not None:
-                data[key] = coerce_iso(data[key])
-        return data
 
     async def create(
         self,
@@ -56,6 +47,15 @@ class ScheduledTaskRunRepository:
             await session.commit()
             await session.refresh(row)
             return self._row_to_dict(row)
+
+    @staticmethod
+    def _row_to_dict(row: ScheduledTaskRunRow) -> dict[str, Any]:
+        '''将持久化记录转换为对外使用的字典表示。'''
+        data = row.to_dict()
+        for key in ("scheduled_for", "started_at", "finished_at", "created_at"):
+            if data.get(key) is not None:
+                data[key] = coerce_iso(data[key])
+        return data
 
     async def list_by_task(self, task_id: str, *, limit: int = 50, offset: int = 0) -> list[dict[str, Any]]:
         '''查询并返回满足给定条件的持久化记录集合。'''

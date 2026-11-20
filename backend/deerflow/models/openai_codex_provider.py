@@ -58,16 +58,6 @@ class CodexChatModel(BaseChatModel):
         '''允许 LangChain 将该自定义模型纳入序列化流程。'''
         return True
 
-    @property
-    def _llm_type(self) -> str:
-        '''返回 LangChain 用于标识该模型实现的类型名。'''
-        return "codex-responses"
-
-    def _validate_retry_config(self) -> None:
-        '''确保重试次数至少为一次，避免模型请求被静默跳过。'''
-        if self.retry_max_attempts < 1:
-            raise ValueError("retry_max_attempts must be >= 1")
-
     def model_post_init(self, __context: Any) -> None:
         '''校验重试配置并加载 Codex CLI 凭据；无凭据时拒绝创建模型。'''
         self._validate_retry_config()
@@ -82,9 +72,63 @@ class CodexChatModel(BaseChatModel):
 
         super().model_post_init(__context)
 
+    def _validate_retry_config(self) -> None:
+        '''确保重试次数至少为一次，避免模型请求被静默跳过。'''
+        if self.retry_max_attempts < 1:
+            raise ValueError("retry_max_attempts must be >= 1")
+
     def _load_codex_auth(self) -> CodexCliCredential | None:
         '''从 Codex CLI 凭据来源读取访问令牌和账号标识。'''
         return load_codex_cli_credential()
+
+    def bind_tools(self, tools: list, **kwargs: Any) -> Any:
+        '''把 LangChain 工具转换为函数调用定义，并绑定到后续模型请求。'''
+        from langchain_core.runnables import RunnableBinding
+        from langchain_core.tools import BaseTool
+        from langchain_core.utils.function_calling import convert_to_openai_function
+
+        formatted_tools = []
+        for tool in tools:
+            if isinstance(tool, BaseTool):
+                try:
+                    fn = convert_to_openai_function(tool)
+                    formatted_tools.append(
+                        {
+                            "type": "function",
+                            "name": fn["name"],
+                            "description": fn.get("description", ""),
+                            "parameters": fn.get("parameters", {}),
+                        }
+                    )
+                except Exception:
+                    formatted_tools.append(
+                        {
+                            "type": "function",
+                            "name": tool.name,
+                            "description": tool.description,
+                            "parameters": {"type": "object", "properties": {}},
+                        }
+                    )
+            elif isinstance(tool, dict):
+                if "function" in tool:
+                    fn = tool["function"]
+                    formatted_tools.append(
+                        {
+                            "type": "function",
+                            "name": fn["name"],
+                            "description": fn.get("description", ""),
+                            "parameters": fn.get("parameters", {}),
+                        }
+                    )
+                else:
+                    formatted_tools.append(tool)
+
+        return RunnableBinding(bound=self, kwargs={"tools": formatted_tools}, **kwargs)
+
+    @property
+    def _llm_type(self) -> str:
+        '''返回 LangChain 用于标识该模型实现的类型名。'''
+        return "codex-responses"
 
     @classmethod
     def _normalize_content(cls, content: Any) -> str:
@@ -390,47 +434,3 @@ class CodexChatModel(BaseChatModel):
         tools = kwargs.get("tools", None)
         response = self._call_codex_api(messages, tools=tools)
         return self._parse_response(response)
-
-    def bind_tools(self, tools: list, **kwargs: Any) -> Any:
-        '''把 LangChain 工具转换为函数调用定义，并绑定到后续模型请求。'''
-        from langchain_core.runnables import RunnableBinding
-        from langchain_core.tools import BaseTool
-        from langchain_core.utils.function_calling import convert_to_openai_function
-
-        formatted_tools = []
-        for tool in tools:
-            if isinstance(tool, BaseTool):
-                try:
-                    fn = convert_to_openai_function(tool)
-                    formatted_tools.append(
-                        {
-                            "type": "function",
-                            "name": fn["name"],
-                            "description": fn.get("description", ""),
-                            "parameters": fn.get("parameters", {}),
-                        }
-                    )
-                except Exception:
-                    formatted_tools.append(
-                        {
-                            "type": "function",
-                            "name": tool.name,
-                            "description": tool.description,
-                            "parameters": {"type": "object", "properties": {}},
-                        }
-                    )
-            elif isinstance(tool, dict):
-                if "function" in tool:
-                    fn = tool["function"]
-                    formatted_tools.append(
-                        {
-                            "type": "function",
-                            "name": fn["name"],
-                            "description": fn.get("description", ""),
-                            "parameters": fn.get("parameters", {}),
-                        }
-                    )
-                else:
-                    formatted_tools.append(tool)
-
-        return RunnableBinding(bound=self, kwargs={"tools": formatted_tools}, **kwargs)

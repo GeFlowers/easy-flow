@@ -18,8 +18,6 @@ class GuardrailRequest:
     timestamp: str = ""
     user_id: str | None = None
     user_role: str | None = None
-    oauth_provider: str | None = None
-    oauth_id: str | None = None
     run_id: str | None = None
     tool_call_id: str | None = None
 

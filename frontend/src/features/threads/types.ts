@@ -47,7 +47,6 @@ export interface AgentThreadContext extends Record<string, unknown> {
   is_plan_mode: boolean;
   subagent_enabled: boolean;
   reasoning_effort?: "minimal" | "low" | "medium" | "high";
-  agent_name?: string;
 }
 
 /** 带有 DeerFlow 状态和上下文的 LangGraph 线程。 */

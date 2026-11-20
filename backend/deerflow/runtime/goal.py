@@ -170,16 +170,16 @@ def _normalize_goal_blocker(value: object, *, satisfied: bool) -> GoalBlocker:
     return "missing_evidence"
 
 
-def _message_type(message: Any) -> str | None:
-    '''统一读取 LangChain 消息对象或字典消息的角色名称。'''
-    value = getattr(message, "type", None)
-    if value is None and isinstance(message, dict):
-        value = message.get("type") or message.get("role")
-    if value == "assistant":
-        return "ai"
-    if value == "user":
-        return "human"
-    return str(value) if value else None
+def has_visible_assistant_evidence(messages: list[Any]) -> bool:
+    '''检查可见对话中是否至少有一条非空的助手回复可供评估。'''
+    return any(_is_visible_message(message) and _message_type(message) == "ai" and bool(message_to_text(message).strip()) for message in messages)
+
+
+def _is_visible_message(message: Any) -> bool:
+    '''排除内部隐藏消息，只保留可作为目标证据的用户和助手消息。'''
+    if _additional_kwargs(message).get("hide_from_ui") is True:
+        return False
+    return _message_type(message) in {"human", "ai"}
 
 
 def _additional_kwargs(message: Any) -> dict[str, Any]:
@@ -190,16 +190,16 @@ def _additional_kwargs(message: Any) -> dict[str, Any]:
     return dict(value) if isinstance(value, dict) else {}
 
 
-def _is_visible_message(message: Any) -> bool:
-    '''排除内部隐藏消息，只保留可作为目标证据的用户和助手消息。'''
-    if _additional_kwargs(message).get("hide_from_ui") is True:
-        return False
-    return _message_type(message) in {"human", "ai"}
-
-
-def has_visible_assistant_evidence(messages: list[Any]) -> bool:
-    '''检查可见对话中是否至少有一条非空的助手回复可供评估。'''
-    return any(_is_visible_message(message) and _message_type(message) == "ai" and bool(message_to_text(message).strip()) for message in messages)
+def _message_type(message: Any) -> str | None:
+    '''统一读取 LangChain 消息对象或字典消息的角色名称。'''
+    value = getattr(message, "type", None)
+    if value is None and isinstance(message, dict):
+        value = message.get("type") or message.get("role")
+    if value == "assistant":
+        return "ai"
+    if value == "user":
+        return "human"
+    return str(value) if value else None
 
 
 def visible_conversation_signature(messages: list[Any]) -> str:
@@ -245,11 +245,6 @@ def create_goal_evaluator_model(
         app_config=app_config,
         attach_tracing=True,
     )
-
-
-def _resolve_environment() -> str | None:
-    '''按优先级读取追踪元数据使用的部署环境名称。'''
-    return os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT")
 
 
 async def evaluate_goal_completion(
@@ -302,6 +297,11 @@ async def evaluate_goal_completion(
         config=invoke_config,
     )
     return parse_goal_evaluation_response(_extract_response_text(response.content))
+
+
+def _resolve_environment() -> str | None:
+    '''按优先级读取追踪元数据使用的部署环境名称。'''
+    return os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT")
 
 
 def should_continue_goal(goal: GoalState, evaluation: GoalEvaluation, *, no_progress_count: int | None = None) -> bool:
@@ -372,29 +372,6 @@ def make_goal_continuation_message(goal: GoalState, evaluation: GoalEvaluation) 
     )
 
 
-async def _call_checkpointer_method(checkpointer: Any, async_name: str, sync_name: str, *args: Any, **kwargs: Any) -> Any:
-    '''优先调用检查点异步接口，并将同步接口转移到工作线程执行。'''
-    async_method = getattr(checkpointer, async_name, None)
-    if async_method is not None:
-        result = async_method(*args, **kwargs)
-        return await result if inspect.isawaitable(result) else result
-    sync_method = getattr(checkpointer, sync_name, None)
-    if sync_method is None:
-        raise AttributeError(f"Missing checkpointer method: {async_name}/{sync_name}")
-    result = await asyncio.to_thread(sync_method, *args, **kwargs)
-    return await result if inspect.isawaitable(result) else result
-
-
-def _next_channel_version(checkpointer: Any, current_version: Any) -> Any:
-    '''按检查点实现的版本策略递增频道版本，兼容整数版本回退。'''
-    get_next_version = getattr(checkpointer, "get_next_version", None)
-    if callable(get_next_version):
-        return get_next_version(current_version, None)
-    if isinstance(current_version, int):
-        return current_version + 1
-    return 1
-
-
 async def ensure_thread_checkpoint(checkpointer: Any, thread_id: str) -> None:
     '''在线程尚无根检查点时创建空检查点，已有检查点则保持不变。'''
     config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
@@ -411,17 +388,17 @@ async def ensure_thread_checkpoint(checkpointer: Any, thread_id: str) -> None:
     await _call_checkpointer_method(checkpointer, "aput", "put", config, empty_checkpoint(), metadata, {})
 
 
-def _checkpoint_id_from_tuple(checkpoint_tuple: Any) -> str | None:
-    '''从检查点配置或快照正文中解析检查点 ID。'''
-    config = getattr(checkpoint_tuple, "config", {}) or {}
-    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
-    checkpoint_id = configurable.get("checkpoint_id") if isinstance(configurable, dict) else None
-    if isinstance(checkpoint_id, str):
-        return checkpoint_id
-    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
-    if isinstance(checkpoint, dict) and isinstance(checkpoint.get("id"), str):
-        return checkpoint["id"]
-    return None
+async def _call_checkpointer_method(checkpointer: Any, async_name: str, sync_name: str, *args: Any, **kwargs: Any) -> Any:
+    '''优先调用检查点异步接口，并将同步接口转移到工作线程执行。'''
+    async_method = getattr(checkpointer, async_name, None)
+    if async_method is not None:
+        result = async_method(*args, **kwargs)
+        return await result if inspect.isawaitable(result) else result
+    sync_method = getattr(checkpointer, sync_name, None)
+    if sync_method is None:
+        raise AttributeError(f"Missing checkpointer method: {async_name}/{sync_name}")
+    result = await asyncio.to_thread(sync_method, *args, **kwargs)
+    return await result if inspect.isawaitable(result) else result
 
 
 async def read_thread_goal(checkpointer: Any, thread_id: str) -> GoalState | None:
@@ -491,6 +468,29 @@ async def write_thread_goal(
     }
     await _call_checkpointer_method(checkpointer, "aput", "put", write_config, checkpoint, metadata, {"goal": next_version})
     return channel_values
+
+
+def _checkpoint_id_from_tuple(checkpoint_tuple: Any) -> str | None:
+    '''从检查点配置或快照正文中解析检查点 ID。'''
+    config = getattr(checkpoint_tuple, "config", {}) or {}
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    checkpoint_id = configurable.get("checkpoint_id") if isinstance(configurable, dict) else None
+    if isinstance(checkpoint_id, str):
+        return checkpoint_id
+    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
+    if isinstance(checkpoint, dict) and isinstance(checkpoint.get("id"), str):
+        return checkpoint["id"]
+    return None
+
+
+def _next_channel_version(checkpointer: Any, current_version: Any) -> Any:
+    '''按检查点实现的版本策略递增频道版本，兼容整数版本回退。'''
+    get_next_version = getattr(checkpointer, "get_next_version", None)
+    if callable(get_next_version):
+        return get_next_version(current_version, None)
+    if isinstance(current_version, int):
+        return current_version + 1
+    return 1
 
 
 def attach_goal_evaluation(

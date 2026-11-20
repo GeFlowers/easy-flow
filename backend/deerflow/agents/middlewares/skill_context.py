@@ -27,33 +27,21 @@ class SkillEntryMetadata(TypedDict):
     description: str
 
 
-def _tool_call_name(tool_call: dict[str, Any]) -> str:
-    '''兼容标准和旧式工具调用结构，提取工具名称。'''
-    name = tool_call.get("name")
-    if isinstance(name, str):
-        return name
-    function = tool_call.get("function")
-    if isinstance(function, dict) and isinstance(function.get("name"), str):
-        return function["name"]
-    return ""
-
-
-def _tool_call_id(tool_call: dict[str, Any]) -> str | None:
-    '''从工具调用中提取可配对结果消息的调用标识。'''
-    tool_call_id = tool_call.get("id")
-    return str(tool_call_id) if tool_call_id else None
-
-
-def _tool_call_path(tool_call: dict[str, Any]) -> str | None:
-    '''从工具参数的常见路径字段中提取文件地址。'''
-    args = tool_call.get("args")
-    if not isinstance(args, dict):
+def build_skill_entry_metadata_from_read(
+    path: str,
+    content: str,
+    *,
+    skills_root: str,
+) -> SkillEntryMetadata | None:
+    '''验证读取路径和结果后构建技能元数据；非技能文件或错误结果返回 ``None``。'''
+    normalized_root = posixpath.normpath(skills_root.rstrip("/") or "/")
+    normalized_path = _normalize_under_root(path, normalized_root)
+    if normalized_path is None or not _is_skill_file(normalized_path) or _is_tool_error_text(content):
         return None
-    for key in ("path", "file_path", "filepath"):
-        value = args.get(key)
-        if isinstance(value, str) and value:
-            return value
-    return None
+    return {
+        "path": normalized_path,
+        "description": _parse_description(content),
+    }
 
 
 def _normalize_under_root(path: str, normalized_root: str) -> str | None:
@@ -69,9 +57,9 @@ def _is_skill_file(path: str) -> bool:
     return posixpath.basename(path) == _SKILL_FILE_NAME
 
 
-def _skill_name_from_path(skill_md_path: str) -> str:
-    '''从 ``SKILL.md`` 所在目录名称取得技能名。'''
-    return posixpath.basename(posixpath.dirname(skill_md_path))
+def _is_tool_error_text(content: str) -> bool:
+    '''识别以工具错误前缀开头的读取结果。'''
+    return content.lstrip().startswith("Error:")
 
 
 def _parse_description(content: str) -> str:
@@ -91,28 +79,6 @@ def _parse_description(content: str) -> str:
     return " ".join(description.split())[:_SKILL_DESCRIPTION_MAX_CHARS]
 
 
-def _is_tool_error_text(content: str) -> bool:
-    '''识别以工具错误前缀开头的读取结果。'''
-    return content.lstrip().startswith("Error:")
-
-
-def build_skill_entry_metadata_from_read(
-    path: str,
-    content: str,
-    *,
-    skills_root: str,
-) -> SkillEntryMetadata | None:
-    '''验证读取路径和结果后构建技能元数据；非技能文件或错误结果返回 ``None``。'''
-    normalized_root = posixpath.normpath(skills_root.rstrip("/") or "/")
-    normalized_path = _normalize_under_root(path, normalized_root)
-    if normalized_path is None or not _is_skill_file(normalized_path) or _is_tool_error_text(content):
-        return None
-    return {
-        "path": normalized_path,
-        "description": _parse_description(content),
-    }
-
-
 def read_skill_entry_metadata(additional_kwargs: Mapping[str, object] | None) -> SkillEntryMetadata | None:
     '''从工具结果附加字段中读取并规范化已验证的技能元数据。'''
     if not additional_kwargs:
@@ -128,11 +94,6 @@ def read_skill_entry_metadata(additional_kwargs: Mapping[str, object] | None) ->
         "path": path,
         "description": " ".join(description.split())[:_SKILL_DESCRIPTION_MAX_CHARS] if isinstance(description, str) else "",
     }
-
-
-def _escape_context_text(value: object) -> str:
-    '''转义上下文中的特殊字符，避免内容改变生成的标记结构。'''
-    return escape(str(value), quote=False)
 
 
 def extract_skills(
@@ -193,6 +154,40 @@ def extract_skills(
     return entries
 
 
+def _tool_call_name(tool_call: dict[str, Any]) -> str:
+    '''兼容标准和旧式工具调用结构，提取工具名称。'''
+    name = tool_call.get("name")
+    if isinstance(name, str):
+        return name
+    function = tool_call.get("function")
+    if isinstance(function, dict) and isinstance(function.get("name"), str):
+        return function["name"]
+    return ""
+
+
+def _tool_call_id(tool_call: dict[str, Any]) -> str | None:
+    '''从工具调用中提取可配对结果消息的调用标识。'''
+    tool_call_id = tool_call.get("id")
+    return str(tool_call_id) if tool_call_id else None
+
+
+def _tool_call_path(tool_call: dict[str, Any]) -> str | None:
+    '''从工具参数的常见路径字段中提取文件地址。'''
+    args = tool_call.get("args")
+    if not isinstance(args, dict):
+        return None
+    for key in ("path", "file_path", "filepath"):
+        value = args.get(key)
+        if isinstance(value, str) and value:
+            return value
+    return None
+
+
+def _skill_name_from_path(skill_md_path: str) -> str:
+    '''从 ``SKILL.md`` 所在目录名称取得技能名。'''
+    return posixpath.basename(posixpath.dirname(skill_md_path))
+
+
 def render_skill_context(entries: list[SkillEntry]) -> str:
     '''把已加载技能整理为名称、描述和路径清单，不重复插入技能正文。'''
     if not entries:
@@ -209,3 +204,8 @@ def render_skill_context(entries: list[SkillEntry]) -> str:
         suffix = f": {description}" if description else ""
         lines.append(f"- {name}{suffix} -> {path}")
     return "\n".join(lines)
+
+
+def _escape_context_text(value: object) -> str:
+    '''转义上下文中的特殊字符，避免内容改变生成的标记结构。'''
+    return escape(str(value), quote=False)

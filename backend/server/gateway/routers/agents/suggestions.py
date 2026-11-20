@@ -48,46 +48,6 @@ _strip_markdown_code_fence = llm_text.strip_markdown_code_fence
 _strip_think_blocks = llm_text.strip_think_blocks
 
 
-def _parse_json_string_list(text: str) -> list[str] | None:
-    '''从模型输出中解析 JSON 字符串列表，无法解析时返回 None。'''
-    candidate = _strip_think_blocks(text)
-    candidate = _strip_markdown_code_fence(candidate)
-    start = candidate.find("[")
-    end = candidate.rfind("]")
-    if start == -1 or end == -1 or end <= start:
-        return None
-    candidate = candidate[start : end + 1]
-    try:
-        data = json.loads(candidate)
-    except Exception:
-        return None
-    if not isinstance(data, list):
-        return None
-    out: list[str] = []
-    for item in data:
-        if not isinstance(item, str):
-            continue
-        s = item.strip()
-        if not s:
-            continue
-        out.append(s)
-    return out
-
-
-def _format_conversation(messages: list[SuggestionMessage]) -> str:
-    '''将近期消息格式化为供建议模型理解的紧凑对话上下文。'''
-    parts: list[str] = []
-    for m in messages:
-        role = m.role.strip().lower()
-        if role in ("user", "human"):
-            parts.append(f"用户：{m.content.strip()}")
-        elif role in ("assistant", "ai"):
-            parts.append(f"助手：{m.content.strip()}")
-        else:
-            parts.append(f"{m.role}: {m.content.strip()}")
-    return "\n".join(parts).strip()
-
-
 @router.get(
     "/suggestions/config",
     response_model=SuggestionsConfigResponse,
@@ -153,3 +113,43 @@ async def generate_suggestions(
     except Exception as exc:
         logger.exception("Failed to generate suggestions: thread_id=%s err=%s", thread_id, exc)
         return SuggestionsResponse(suggestions=[])
+
+
+def _format_conversation(messages: list[SuggestionMessage]) -> str:
+    '''将近期消息格式化为供建议模型理解的紧凑对话上下文。'''
+    parts: list[str] = []
+    for m in messages:
+        role = m.role.strip().lower()
+        if role in ("user", "human"):
+            parts.append(f"用户：{m.content.strip()}")
+        elif role in ("assistant", "ai"):
+            parts.append(f"助手：{m.content.strip()}")
+        else:
+            parts.append(f"{m.role}: {m.content.strip()}")
+    return "\n".join(parts).strip()
+
+
+def _parse_json_string_list(text: str) -> list[str] | None:
+    '''从模型输出中解析 JSON 字符串列表，无法解析时返回 None。'''
+    candidate = _strip_think_blocks(text)
+    candidate = _strip_markdown_code_fence(candidate)
+    start = candidate.find("[")
+    end = candidate.rfind("]")
+    if start == -1 or end == -1 or end <= start:
+        return None
+    candidate = candidate[start : end + 1]
+    try:
+        data = json.loads(candidate)
+    except Exception:
+        return None
+    if not isinstance(data, list):
+        return None
+    out: list[str] = []
+    for item in data:
+        if not isinstance(item, str):
+            continue
+        s = item.strip()
+        if not s:
+            continue
+        out.append(s)
+    return out

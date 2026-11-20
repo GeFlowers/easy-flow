@@ -41,16 +41,14 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         self._deferred = deferred_names
         self._catalog_hash = catalog_hash
 
-    def _promoted(self, state) -> set[str]:
-        '''从当前目录版本对应的状态中取得已提升工具名称。'''
-        promoted = (state or {}).get("promoted")
-        if promoted and promoted.get("catalog_hash") == self._catalog_hash:
-            return set(promoted.get("names") or [])
-        return set()
-
-    def _hidden(self, state) -> set[str]:
-        '''计算当前仍应对模型隐藏的延迟工具名称。'''
-        return set(self._deferred) - self._promoted(state)
+    @override
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelCallResult:
+        '''过滤同步模型调用可见的工具后执行后续处理器。'''
+        return handler(self._filter_tools(request))
 
     def _filter_tools(self, request: ModelRequest) -> ModelRequest:
         '''从模型请求中移除尚未提升的延迟工具参数结构。'''
@@ -63,6 +61,29 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
         if len(active) < len(request.tools):
             logger.debug("Filtered %d deferred tool schema(s) from model binding", len(request.tools) - len(active))
         return request.override(tools=active)
+
+    def _hidden(self, state) -> set[str]:
+        '''计算当前仍应对模型隐藏的延迟工具名称。'''
+        return set(self._deferred) - self._promoted(state)
+
+    def _promoted(self, state) -> set[str]:
+        '''从当前目录版本对应的状态中取得已提升工具名称。'''
+        promoted = (state or {}).get("promoted")
+        if promoted and promoted.get("catalog_hash") == self._catalog_hash:
+            return set(promoted.get("names") or [])
+        return set()
+
+    @override
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        '''阻止未提升的工具调用，其余调用交由后续处理器执行。'''
+        blocked = self._blocked_tool_message(request)
+        if blocked is not None:
+            return blocked
+        return handler(request)
 
     def _blocked_tool_message(self, request: ToolCallRequest) -> ToolMessage | None:
         '''为尚未提升的延迟工具调用生成阻止消息，或返回 None。'''
@@ -78,27 +99,6 @@ class DeferredToolFilterMiddleware(AgentMiddleware[AgentState]):
             name=name,
             status="error",
         )
-
-    @override
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelCallResult:
-        '''过滤同步模型调用可见的工具后执行后续处理器。'''
-        return handler(self._filter_tools(request))
-
-    @override
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        '''阻止未提升的工具调用，其余调用交由后续处理器执行。'''
-        blocked = self._blocked_tool_message(request)
-        if blocked is not None:
-            return blocked
-        return handler(request)
 
     @override
     async def awrap_model_call(

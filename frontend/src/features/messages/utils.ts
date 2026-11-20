@@ -641,7 +641,6 @@ export function stripInternalMarkers(content: string): string {
 export function parseUploadedFiles(content: string): FileInMessage[] {
   // 匹配 <uploaded_files>...</uploaded_files> 标签。
   const uploadedFilesRegex = /<uploaded_files>([\s\S]*?)<\/uploaded_files>/;
-  // eslint-disable-next-line @typescript-eslint/prefer-regexp-exec
   const match = content.match(uploadedFilesRegex);
 
   if (!match) {

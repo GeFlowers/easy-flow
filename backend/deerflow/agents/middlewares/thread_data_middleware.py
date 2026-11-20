@@ -46,19 +46,6 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
         self._paths = Paths(base_dir) if base_dir else get_paths()
         self._lazy_init = lazy_init
 
-    def _get_thread_paths(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
-        '''返回线程工作区、上传区和产物目录的路径，但不创建文件夹。'''
-        return {
-            "workspace_path": str(self._paths.sandbox_work_dir(thread_id, user_id=user_id)),
-            "uploads_path": str(self._paths.sandbox_uploads_dir(thread_id, user_id=user_id)),
-            "outputs_path": str(self._paths.sandbox_outputs_dir(thread_id, user_id=user_id)),
-        }
-
-    def _create_thread_directories(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
-        '''确保线程数据目录存在，并返回这些目录的路径。'''
-        self._paths.ensure_thread_dirs(thread_id, user_id=user_id)
-        return self._get_thread_paths(thread_id, user_id=user_id)
-
     @override
     def before_agent(self, state: ThreadDataMiddlewareState, runtime: Runtime) -> dict | None:
         '''在智能体运行前写入线程目录状态，并为最新用户消息附加运行标记。'''
@@ -98,3 +85,16 @@ class ThreadDataMiddleware(AgentMiddleware[ThreadDataMiddlewareState]):
             },
             "messages": messages,
         }
+
+    def _get_thread_paths(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
+        '''返回线程工作区、上传区和产物目录的路径，但不创建文件夹。'''
+        return {
+            "workspace_path": str(self._paths.sandbox_work_dir(thread_id, user_id=user_id)),
+            "uploads_path": str(self._paths.sandbox_uploads_dir(thread_id, user_id=user_id)),
+            "outputs_path": str(self._paths.sandbox_outputs_dir(thread_id, user_id=user_id)),
+        }
+
+    def _create_thread_directories(self, thread_id: str, user_id: str | None = None) -> dict[str, str]:
+        '''确保线程数据目录存在，并返回这些目录的路径。'''
+        self._paths.ensure_thread_dirs(thread_id, user_id=user_id)
+        return self._get_thread_paths(thread_id, user_id=user_id)

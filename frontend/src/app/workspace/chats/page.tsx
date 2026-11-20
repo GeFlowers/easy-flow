@@ -99,7 +99,7 @@ export default function ChatsPage() {
                           </div>
                           <ThreadChannelBadge
                             source={channelSource}
-                            className="hidden sm:inline-flex"
+                            className="inline-flex"
                           />
                         </div>
                         {thread.updated_at && (

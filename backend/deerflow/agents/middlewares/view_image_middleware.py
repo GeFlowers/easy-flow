@@ -29,61 +29,10 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
 
     state_schema = ViewImageMiddlewareState
 
-    def _get_last_assistant_message(self, messages: list) -> AIMessage | None:
-        '''从消息序列末尾向前查找最近一条模型消息；不存在时返回 None。'''
-        for msg in reversed(messages):
-            if isinstance(msg, AIMessage):
-                return msg
-        return None
-
-    def _has_view_image_tool(self, message: AIMessage) -> bool:
-        '''判断模型消息是否发起了图像查看工具调用。'''
-        if not hasattr(message, "tool_calls") or not message.tool_calls:
-            return False
-
-        return any(tool_call.get("name") == "view_image" for tool_call in message.tool_calls)
-
-    def _all_tools_completed(self, messages: list, assistant_msg: AIMessage) -> bool:
-        '''核对该模型消息中的每个工具调用编号是否都已出现在后续工具结果消息中。'''
-        if not hasattr(assistant_msg, "tool_calls") or not assistant_msg.tool_calls:
-            return False
-
-        tool_call_ids = {tool_call.get("id") for tool_call in assistant_msg.tool_calls if tool_call.get("id")}
-
-        try:
-            assistant_idx = messages.index(assistant_msg)
-        except ValueError:
-            return False
-
-        completed_tool_ids = set()
-        for msg in messages[assistant_idx + 1 :]:
-            if isinstance(msg, ToolMessage) and msg.tool_call_id:
-                completed_tool_ids.add(msg.tool_call_id)
-
-        return tool_call_ids.issubset(completed_tool_ids)
-
-    @staticmethod
-    def _read_image_as_data_url(actual_path: str, mime_type: str, expected_size: int) -> str | None:
-        '''复核图片文件仍存在且大小未变、未超限，再编码为数据 URL；读取失败时返回 None。'''
-        try:
-            file_path = Path(actual_path)
-            if not file_path.exists() or not file_path.is_file():
-                return None
-            current_size = file_path.stat().st_size
-            if current_size != expected_size:
-                return None
-            if current_size > _MAX_IMAGE_BYTES:
-                return None
-            with open(file_path, "rb") as f:
-                image_bytes = f.read(_MAX_IMAGE_BYTES + 1)
-            from deerflow.tools.builtins.view_image_tool import _detect_image_mime
-
-            if len(image_bytes) != expected_size or _detect_image_mime(image_bytes) != mime_type:
-                return None
-            base64_data = base64.b64encode(image_bytes).decode("utf-8")
-            return f"data:{mime_type};base64,{base64_data}"
-        except OSError:
-            return None
+    @override
+    def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
+        '''同步调用前附加本轮图片，仅修改请求副本，不把图片编码写入检查点。'''
+        return handler(self._attach_uploaded_images(request))
 
     def _attach_uploaded_images(self, request: ModelRequest) -> ModelRequest:
         '''仅在模型请求副本中附加最近用户上传的图片，复用线程路径校验并限制总大小。'''
@@ -138,16 +87,110 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
             return request.override(messages=messages)
         return request
 
-    @override
-    def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
-        '''同步调用前附加本轮图片，仅修改请求副本，不把图片编码写入检查点。'''
-        return handler(self._attach_uploaded_images(request))
+    @staticmethod
+    def _read_image_as_data_url(actual_path: str, mime_type: str, expected_size: int) -> str | None:
+        '''复核图片文件仍存在且大小未变、未超限，再编码为数据 URL；读取失败时返回 None。'''
+        try:
+            file_path = Path(actual_path)
+            if not file_path.exists() or not file_path.is_file():
+                return None
+            current_size = file_path.stat().st_size
+            if current_size != expected_size:
+                return None
+            if current_size > _MAX_IMAGE_BYTES:
+                return None
+            with open(file_path, "rb") as f:
+                image_bytes = f.read(_MAX_IMAGE_BYTES + 1)
+            from deerflow.tools.builtins.view_image_tool import _detect_image_mime
+
+            if len(image_bytes) != expected_size or _detect_image_mime(image_bytes) != mime_type:
+                return None
+            base64_data = base64.b64encode(image_bytes).decode("utf-8")
+            return f"data:{mime_type};base64,{base64_data}"
+        except OSError:
+            return None
 
     @override
     async def awrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]) -> ModelCallResult:
         '''在线程中校验和编码本轮图片，再将请求副本交给异步模型调用链。'''
         prepared = await asyncio.to_thread(self._attach_uploaded_images, request)
         return await handler(prepared)
+
+    @override
+    def before_model(self, state: ViewImageMiddlewareState, runtime: Runtime) -> dict | None:
+        '''同步模型调用钩子：必要时将已查看的图片内容加入下一次模型请求。'''
+        return self._inject_image_message(state)
+
+    def _inject_image_message(self, state: ViewImageMiddlewareState) -> dict | None:
+        '''满足注入条件时创建仅供模型使用的隐藏用户消息，并返回消息状态更新。'''
+        if not self._should_inject_image_message(state):
+            return None
+
+        image_content = self._create_image_details_message(state)
+
+        human_msg = HumanMessage(content=image_content, additional_kwargs={"hide_from_ui": True})
+
+        logger.debug("Injecting image details message with images before LLM call")
+
+        return {"messages": [human_msg]}
+
+    def _should_inject_image_message(self, state: ViewImageMiddlewareState) -> bool:
+        '''仅当最近的图片查看调用全部完成且尚未注入过图片说明消息时返回 True。'''
+        messages = state.get("messages", [])
+        if not messages:
+            return False
+
+        last_assistant_msg = self._get_last_assistant_message(messages)
+        if not last_assistant_msg:
+            return False
+
+        if not self._has_view_image_tool(last_assistant_msg):
+            return False
+
+        if not self._all_tools_completed(messages, last_assistant_msg):
+            return False
+
+        assistant_idx = messages.index(last_assistant_msg)
+        for msg in messages[assistant_idx + 1 :]:
+            if isinstance(msg, HumanMessage):
+                content_str = str(msg.content)
+                if "以下是你已查看的图像" in content_str or "以下是你已查看图像的详细信息" in content_str:
+                    return False
+
+        return True
+
+    def _get_last_assistant_message(self, messages: list) -> AIMessage | None:
+        '''从消息序列末尾向前查找最近一条模型消息；不存在时返回 None。'''
+        for msg in reversed(messages):
+            if isinstance(msg, AIMessage):
+                return msg
+        return None
+
+    def _has_view_image_tool(self, message: AIMessage) -> bool:
+        '''判断模型消息是否发起了图像查看工具调用。'''
+        if not hasattr(message, "tool_calls") or not message.tool_calls:
+            return False
+
+        return any(tool_call.get("name") == "view_image" for tool_call in message.tool_calls)
+
+    def _all_tools_completed(self, messages: list, assistant_msg: AIMessage) -> bool:
+        '''核对该模型消息中的每个工具调用编号是否都已出现在后续工具结果消息中。'''
+        if not hasattr(assistant_msg, "tool_calls") or not assistant_msg.tool_calls:
+            return False
+
+        tool_call_ids = {tool_call.get("id") for tool_call in assistant_msg.tool_calls if tool_call.get("id")}
+
+        try:
+            assistant_idx = messages.index(assistant_msg)
+        except ValueError:
+            return False
+
+        completed_tool_ids = set()
+        for msg in messages[assistant_idx + 1 :]:
+            if isinstance(msg, ToolMessage) and msg.tool_call_id:
+                completed_tool_ids.add(msg.tool_call_id)
+
+        return tool_call_ids.issubset(completed_tool_ids)
 
     def _create_image_details_message(self, state: ViewImageMiddlewareState) -> list[str | dict]:
         '''读取工具已登记的图片并构造混合内容块，交给隐藏消息注入流程。'''
@@ -177,49 +220,6 @@ class ViewImageMiddleware(AgentMiddleware[ViewImageMiddlewareState]):
                     content_blocks.append({"type": "text", "text": f"  (文件不可用或磁盘上的内容已变化： {actual_path})"})
 
         return content_blocks
-
-    def _should_inject_image_message(self, state: ViewImageMiddlewareState) -> bool:
-        '''仅当最近的图片查看调用全部完成且尚未注入过图片说明消息时返回 True。'''
-        messages = state.get("messages", [])
-        if not messages:
-            return False
-
-        last_assistant_msg = self._get_last_assistant_message(messages)
-        if not last_assistant_msg:
-            return False
-
-        if not self._has_view_image_tool(last_assistant_msg):
-            return False
-
-        if not self._all_tools_completed(messages, last_assistant_msg):
-            return False
-
-        assistant_idx = messages.index(last_assistant_msg)
-        for msg in messages[assistant_idx + 1 :]:
-            if isinstance(msg, HumanMessage):
-                content_str = str(msg.content)
-                if "以下是你已查看的图像" in content_str or "以下是你已查看图像的详细信息" in content_str:
-                    return False
-
-        return True
-
-    def _inject_image_message(self, state: ViewImageMiddlewareState) -> dict | None:
-        '''满足注入条件时创建仅供模型使用的隐藏用户消息，并返回消息状态更新。'''
-        if not self._should_inject_image_message(state):
-            return None
-
-        image_content = self._create_image_details_message(state)
-
-        human_msg = HumanMessage(content=image_content, additional_kwargs={"hide_from_ui": True})
-
-        logger.debug("Injecting image details message with images before LLM call")
-
-        return {"messages": [human_msg]}
-
-    @override
-    def before_model(self, state: ViewImageMiddlewareState, runtime: Runtime) -> dict | None:
-        '''同步模型调用钩子：必要时将已查看的图片内容加入下一次模型请求。'''
-        return self._inject_image_message(state)
 
     @override
     async def abefore_model(self, state: ViewImageMiddlewareState, runtime: Runtime) -> dict | None:

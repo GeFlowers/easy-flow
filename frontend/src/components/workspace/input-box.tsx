@@ -101,8 +101,6 @@ import {
   type BrowserSpeechRecognition,
   type SpeechRecognitionErrorKind,
 } from "@/features/voice-input/speech-recognition";
-import { isIMEComposing } from "@/lib/ime";
-import { cn } from "@/lib/utils";
 
 import {
   ModelSelector,
@@ -334,7 +332,6 @@ export function InputBox({
   const promptRootRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const inlineSkillTextRef = useRef<HTMLSpanElement | null>(null);
-  const inlineSkillComposingRef = useRef(false);
   const goalRequestStateRef = useRef(createGoalRequestState());
   const compactRequestStateRef = useRef(createGoalRequestState());
   const inputPolishRequestRef = useRef<{
@@ -803,8 +800,6 @@ export function InputBox({
     try {
       const result = await compactThreadContext(threadId, {
         signal,
-        agentName:
-          typeof context.agent_name === "string" ? context.agent_name : null,
       });
       if (
         !isCurrentGoalRequest(compactRequestStateRef.current, request, threadId)
@@ -842,7 +837,6 @@ export function InputBox({
       finishGoalRequest(compactRequestStateRef.current, request);
     }
   }, [
-    context.agent_name,
     queryClient,
     t.inputBox.compactFailed,
     t.inputBox.compactSkipped,
@@ -1486,7 +1480,6 @@ export function InputBox({
         event.ctrlKey ||
         event.metaKey ||
         event.shiftKey ||
-        isIMEComposing(event) ||
         selectedSlashSkill ||
         promptHistory.length === 0 ||
         (event.key !== "ArrowUp" && event.key !== "ArrowDown")
@@ -1540,8 +1533,7 @@ export function InputBox({
       if (
         event.key !== "Backspace" ||
         !selectedSlashSkill ||
-        textInput.value.length > 0 ||
-        isIMEComposing(event)
+        textInput.value.length > 0
       ) {
         return;
       }
@@ -1662,10 +1654,6 @@ export function InputBox({
       }
 
       if (event.key !== "Enter") {
-        return;
-      }
-
-      if (isIMEComposing(event, inlineSkillComposingRef.current)) {
         return;
       }
 
@@ -1816,10 +1804,12 @@ export function InputBox({
   return (
     <div
       ref={promptRootRef}
-      className={cn(
+      className={[
         "relative flex min-w-0 flex-col",
         isWelcomeMode ? "gap-4" : "gap-2",
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       {showFollowups && (
         <div className="flex items-center justify-center pb-1">
@@ -1865,12 +1855,14 @@ export function InputBox({
               return (
                 <button
                   aria-selected={selected}
-                  className={cn(
+                  className={[
                     "flex min-h-12 w-full min-w-0 cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
                     selected
                       ? "bg-accent text-accent-foreground"
                       : "text-popover-foreground hover:bg-accent/70 hover:text-accent-foreground",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                   key={`${suggestion.kind}:${suggestion.name}`}
                   onClick={() => applySkillSuggestion(suggestion)}
                   onMouseDown={(event) => event.preventDefault()}
@@ -1900,12 +1892,14 @@ export function InputBox({
         </div>
       )}
       <PromptInput
-        className={cn(
+        className={[
           "bg-background/85 relative z-10 rounded-2xl backdrop-blur-sm transition-all duration-300 ease-out *:data-[slot='input-group']:rounded-2xl",
           polishingInput &&
             "shadow-primary/10 ring-primary/25 shadow-lg ring-1",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         disabled={composerLocked}
         globalDrop
         multiple
@@ -1963,7 +1957,7 @@ export function InputBox({
         <div className="min-h-16 w-full min-w-0 px-3 py-3">
           {selectedSlashSkill ? (
             <div
-              className="max-h-48 min-h-6 w-full min-w-0 cursor-text overflow-y-auto text-base leading-6 break-all whitespace-pre-wrap md:text-sm"
+              className="max-h-48 min-h-6 w-full min-w-0 cursor-text overflow-y-auto text-sm break-all whitespace-pre-wrap"
               onClick={(event) => {
                 if (event.target === event.currentTarget) {
                   focusContentEditableEnd(inlineSkillTextRef.current);
@@ -1983,12 +1977,6 @@ export function InputBox({
                 data-placeholder={t.inputBox.placeholder}
                 data-slot="input-group-control"
                 onBlur={() => setTextareaFocused(false)}
-                onCompositionEnd={() => {
-                  inlineSkillComposingRef.current = false;
-                }}
-                onCompositionStart={() => {
-                  inlineSkillComposingRef.current = true;
-                }}
                 onFocus={() => setTextareaFocused(true)}
                 onInput={handleInlineSkillInput}
                 onKeyDown={handleInlineSkillKeyDown}
@@ -1997,12 +1985,14 @@ export function InputBox({
                 ref={inlineSkillTextRef}
                 role="textbox"
                 suppressContentEditableWarning
-                className={cn(
+                className={[
                   "outline-none",
                   "before:text-muted-foreground before:pointer-events-none",
                   "data-[empty=true]:before:content-[attr(data-placeholder)]",
                   composerLocked && "cursor-not-allowed opacity-50",
-                )}
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 tabIndex={composerLocked ? -1 : 0}
               />
             </div>
@@ -2021,7 +2011,7 @@ export function InputBox({
             />
           )}
         </div>
-        <PromptInputFooter className="flex flex-wrap gap-2 sm:flex-nowrap">
+        <PromptInputFooter className="flex flex-nowrap gap-2">
           <PromptInputTools className="min-w-0 flex-1 flex-wrap">
             {/* 待补充更多连接器。
           <PromptInputActionMenu>
@@ -2088,7 +2078,7 @@ export function InputBox({
                 }
               >
                 <PromptInputActionMenuTrigger
-                  className="max-w-28 gap-1! px-2! sm:max-w-none"
+                  className="max-w-none gap-1! px-2!"
                   disabled={composerLocked}
                 >
                   <div>
@@ -2104,10 +2094,12 @@ export function InputBox({
                     )}
                   </div>
                   <div
-                    className={cn(
+                    className={[
                       "truncate text-xs font-normal",
                       context.mode === "ultra" ? "golden-text" : "",
-                    )}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     {(context.mode === "flash" && t.inputBox.flashMode) ||
                       (context.mode === "thinking" &&
@@ -2124,21 +2116,25 @@ export function InputBox({
                   </DropdownMenuLabel>
                   <PromptInputActionMenu>
                     <PromptInputActionMenuItem
-                      className={cn(
+                      className={[
                         context.mode === "flash"
                           ? "text-accent-foreground"
                           : "text-muted-foreground/65",
-                      )}
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       onSelect={() => handleModeSelect("flash")}
                     >
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-1 font-bold">
                           <ZapIcon
-                            className={cn(
+                            className={[
                               "mr-2 size-4",
                               context.mode === "flash" &&
                                 "text-accent-foreground",
-                            )}
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
                           />
                           {t.inputBox.flashMode}
                         </div>
@@ -2154,21 +2150,25 @@ export function InputBox({
                     </PromptInputActionMenuItem>
                     {supportThinking && (
                       <PromptInputActionMenuItem
-                        className={cn(
+                        className={[
                           context.mode === "thinking"
                             ? "text-accent-foreground"
                             : "text-muted-foreground/65",
-                        )}
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         onSelect={() => handleModeSelect("thinking")}
                       >
                         <div className="flex flex-col gap-2">
                           <div className="flex items-center gap-1 font-bold">
                             <LightbulbIcon
-                              className={cn(
+                              className={[
                                 "mr-2 size-4",
                                 context.mode === "thinking" &&
                                   "text-accent-foreground",
-                              )}
+                              ]
+                                .filter(Boolean)
+                                .join(" ")}
                             />
                             {t.inputBox.reasoningMode}
                           </div>
@@ -2184,21 +2184,25 @@ export function InputBox({
                       </PromptInputActionMenuItem>
                     )}
                     <PromptInputActionMenuItem
-                      className={cn(
+                      className={[
                         context.mode === "pro"
                           ? "text-accent-foreground"
                           : "text-muted-foreground/65",
-                      )}
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       onSelect={() => handleModeSelect("pro")}
                     >
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-1 font-bold">
                           <GraduationCapIcon
-                            className={cn(
+                            className={[
                               "mr-2 size-4",
                               context.mode === "pro" &&
                                 "text-accent-foreground",
-                            )}
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
                           />
                           {t.inputBox.proMode}
                         </div>
@@ -2213,25 +2217,31 @@ export function InputBox({
                       )}
                     </PromptInputActionMenuItem>
                     <PromptInputActionMenuItem
-                      className={cn(
+                      className={[
                         context.mode === "ultra"
                           ? "text-accent-foreground"
                           : "text-muted-foreground/65",
-                      )}
+                      ]
+                        .filter(Boolean)
+                        .join(" ")}
                       onSelect={() => handleModeSelect("ultra")}
                     >
                       <div className="flex flex-col gap-2">
                         <div className="flex items-center gap-1 font-bold">
                           <RocketIcon
-                            className={cn(
+                            className={[
                               "mr-2 size-4",
                               context.mode === "ultra" && "text-[#dabb5e]",
-                            )}
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
                           />
                           <div
-                            className={cn(
+                            className={[
                               context.mode === "ultra" && "golden-text",
-                            )}
+                            ]
+                              .filter(Boolean)
+                              .join(" ")}
                           >
                             {t.inputBox.ultraMode}
                           </div>
@@ -2253,7 +2263,7 @@ export function InputBox({
             {supportReasoningEffort && context.mode !== "flash" && (
               <PromptInputActionMenu>
                 <PromptInputActionMenuTrigger
-                  className="hidden gap-1! px-2! sm:inline-flex"
+                  className="inline-flex gap-1! px-2!"
                   disabled={composerLocked}
                 >
                   <div className="text-xs font-normal">
@@ -2275,11 +2285,13 @@ export function InputBox({
                     </DropdownMenuLabel>
                     <PromptInputActionMenu>
                       <PromptInputActionMenuItem
-                        className={cn(
+                        className={[
                           context.reasoning_effort === "minimal"
                             ? "text-accent-foreground"
                             : "text-muted-foreground/65",
-                        )}
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         onSelect={() => handleReasoningEffortSelect("minimal")}
                       >
                         <div className="flex flex-col gap-2">
@@ -2297,11 +2309,13 @@ export function InputBox({
                         )}
                       </PromptInputActionMenuItem>
                       <PromptInputActionMenuItem
-                        className={cn(
+                        className={[
                           context.reasoning_effort === "low"
                             ? "text-accent-foreground"
                             : "text-muted-foreground/65",
-                        )}
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         onSelect={() => handleReasoningEffortSelect("low")}
                       >
                         <div className="flex flex-col gap-2">
@@ -2319,12 +2333,14 @@ export function InputBox({
                         )}
                       </PromptInputActionMenuItem>
                       <PromptInputActionMenuItem
-                        className={cn(
+                        className={[
                           context.reasoning_effort === "medium" ||
-                            !context.reasoning_effort
+                          !context.reasoning_effort
                             ? "text-accent-foreground"
                             : "text-muted-foreground/65",
-                        )}
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         onSelect={() => handleReasoningEffortSelect("medium")}
                       >
                         <div className="flex flex-col gap-2">
@@ -2343,11 +2359,13 @@ export function InputBox({
                         )}
                       </PromptInputActionMenuItem>
                       <PromptInputActionMenuItem
-                        className={cn(
+                        className={[
                           context.reasoning_effort === "high"
                             ? "text-accent-foreground"
                             : "text-muted-foreground/65",
-                        )}
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         onSelect={() => handleReasoningEffortSelect("high")}
                       >
                         <div className="flex flex-col gap-2">
@@ -2377,7 +2395,7 @@ export function InputBox({
             >
               <ModelSelectorTrigger asChild>
                 <PromptInputButton
-                  className="max-w-40 min-w-0 sm:max-w-56"
+                  className="max-w-56 min-w-0"
                   disabled={composerLocked}
                 >
                   <div className="flex min-w-0 flex-col items-start text-left">
@@ -2492,10 +2510,12 @@ function VoiceInputButton({
       <PromptInputButton
         aria-label={label}
         aria-pressed={listening}
-        className={cn(
+        className={[
           "px-2!",
           listening && "text-primary bg-primary/10 hover:bg-primary/15",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         data-testid="voice-input-button"
         disabled={(disabled ?? false) || !supported}
         onClick={onToggle}
@@ -2528,7 +2548,7 @@ function SuggestionList({
     [textInput, onSelectPlaceholder],
   );
   return (
-    <Suggestions className="min-h-16 w-full max-w-full justify-center px-4 sm:w-fit sm:px-0">
+    <Suggestions className="min-h-16 w-fit max-w-full justify-center px-0">
       <ConfettiButton
         className="text-muted-foreground cursor-pointer rounded-full px-4 text-xs font-normal"
         variant="outline"
@@ -2596,7 +2616,7 @@ function AddAttachmentsButton({
     <Tooltip content={<span className="block max-w-80">{tooltipContent}</span>}>
       <PromptInputButton
         aria-label={t.inputBox.addAttachments}
-        className={cn("px-2!", className)}
+        className={["px-2!", className].filter(Boolean).join(" ")}
         data-testid="add-attachments-button"
         disabled={disabled}
         onClick={() => attachments.openFileDialog()}

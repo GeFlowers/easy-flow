@@ -61,7 +61,6 @@ import {
   pathOfThread,
   titleOfThread,
 } from "@/features/threads/utils";
-import { isIMEComposing } from "@/lib/ime";
 
 import { ThreadChannelIcon } from "./thread-channel-source";
 
@@ -70,11 +69,7 @@ export function RecentChatList() {
   const { t } = useI18n();
   const router = useRouter();
   const pathname = usePathname();
-  const { thread_id: threadIdFromPath, agent_name: agentNameFromPath } =
-    useParams<{
-      thread_id: string;
-      agent_name?: string;
-    }>();
+  const { thread_id: threadIdFromPath } = useParams<{ thread_id: string }>();
   const {
     data: infiniteThreads,
     fetchNextPage,
@@ -118,9 +113,7 @@ export function RecentChatList() {
       const currentPathname =
         typeof window === "undefined" ? pathname : window.location.pathname;
       const threadPath = pathOfThread(thread);
-      const nextThreadPath = pathOfThread("new", {
-        agent_name: agentNameFromPath,
-      });
+      const nextThreadPath = pathOfThread("new");
       const isNewThreadPath = currentPathname === nextThreadPath;
       const isCurrentThread =
         thread.thread_id === threadIdFromPath ||
@@ -142,7 +135,6 @@ export function RecentChatList() {
       });
     },
     [
-      agentNameFromPath,
       deleteThread,
       pathname,
       router,
@@ -351,7 +343,7 @@ export function RecentChatList() {
 
       {/* 重命名对话框 */}
       <Dialog open={renameDialogOpen} onOpenChange={setRenameDialogOpen}>
-        <DialogContent className="sm:max-w-[425px]">
+        <DialogContent className="max-w-[425px]">
           <DialogHeader>
             <DialogTitle>{t.common.rename}</DialogTitle>
           </DialogHeader>
@@ -361,7 +353,7 @@ export function RecentChatList() {
               onChange={(e) => setRenameValue(e.target.value)}
               placeholder={t.common.rename}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !isIMEComposing(e)) {
+                if (e.key === "Enter") {
                   e.preventDefault();
                   handleRenameSubmit();
                 }

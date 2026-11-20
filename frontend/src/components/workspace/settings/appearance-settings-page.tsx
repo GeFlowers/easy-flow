@@ -14,7 +14,6 @@ import {
 import { Separator } from "@/components/ui/separator";
 import { enUS, isLocale, zhCN, type Locale } from "@/features/i18n";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 import { SettingsSection } from "./settings-section";
 
@@ -66,7 +65,7 @@ export function AppearanceSettingsPage() {
         title={t.settings.appearance.themeTitle}
         description={t.settings.appearance.themeDescription}
       >
-        <div className="grid gap-3 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 @lg:grid-cols-3">
           {themeOptions.map((option) => (
             <ThemePreviewCard
               key={option.id}
@@ -96,7 +95,7 @@ export function AppearanceSettingsPage() {
             }
           }}
         >
-          <SelectTrigger className="w-[220px]">
+          <SelectTrigger className="w-[220px] max-w-full">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
@@ -136,12 +135,14 @@ function ThemePreviewCard({
     <button
       type="button"
       onClick={() => onSelect(mode)}
-      className={cn(
+      className={[
         "group flex h-full flex-col gap-3 rounded-lg border p-4 text-left transition-all",
         active
           ? "border-primary ring-primary/30 shadow-sm ring-2"
           : "hover:border-border hover:shadow-sm",
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       <div className="flex items-start gap-3">
         <div className="bg-muted rounded-md p-2">
@@ -155,24 +156,28 @@ function ThemePreviewCard({
         </div>
       </div>
       <div
-        className={cn(
+        className={[
           "relative overflow-hidden rounded-md border text-xs transition-colors",
           previewMode === "dark"
             ? "border-neutral-800 bg-neutral-900 text-neutral-200"
             : "border-slate-200 bg-white text-slate-900",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
       >
         <div className="border-border/50 flex items-center gap-2 border-b px-3 py-2">
           <div
-            className={cn(
+            className={[
               "h-2 w-2 rounded-full",
               previewMode === "dark" ? "bg-emerald-400" : "bg-emerald-500",
-            )}
+            ]
+              .filter(Boolean)
+              .join(" ")}
           />
           <div className="h-2 w-10 rounded-full bg-current/20" />
           <div className="h-2 w-6 rounded-full bg-current/15" />
         </div>
-        <div className="grid grid-cols-[1fr_240px] gap-3 px-3 py-3">
+        <div className="grid grid-cols-[minmax(0,1fr)] gap-3 px-3 py-3">
           <div className="space-y-2">
             <div className="h-3 w-3/4 rounded-full bg-current/15" />
             <div className="h-3 w-1/2 rounded-full bg-current/10" />

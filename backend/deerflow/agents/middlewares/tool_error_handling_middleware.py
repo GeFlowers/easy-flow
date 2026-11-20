@@ -38,20 +38,6 @@ _TASK_TOOL_NAME = "task"
 _RECOVERY_HINT = "请基于现有上下文继续，或选择替代工具。"
 
 
-def _stamp_task_exception_status(message: ToolMessage, *, tool_name: str, error: str) -> ToolMessage:
-    '''将任务工具异常包装为标准失败状态及结构化元数据，便于上层识别子代理失败。'''
-    if tool_name != _TASK_TOOL_NAME:
-        return message
-    content, metadata_error = format_subagent_result_message("failed", error=error)
-    if not content.endswith((".", "!", "?")):
-        content += "."
-    message.content = f"{content} {_RECOVERY_HINT}"
-    existing = dict(message.additional_kwargs or {})
-    existing.update(make_subagent_additional_kwargs("failed", error=metadata_error))
-    message.additional_kwargs = existing
-    return message
-
-
 class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
     '''把工具执行异常转换为可恢复的错误消息，并补充技能读取及工具结果元数据。'''
 
@@ -65,6 +51,22 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         else:
             self._skill_read_tool_names = frozenset(app_config.summarization.skill_file_read_tool_names)
             self._skills_root = app_config.skills.container_path
+
+    @override
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        '''同步执行工具调用，将普通异常转换为错误消息，同时原样传播图控制信号。'''
+        try:
+            result = handler(request)
+        except GraphBubbleUp:
+            raise
+        except Exception as exc:
+            logger.exception("Tool execution failed (sync): name=%s id=%s", request.tool_call.get("name"), request.tool_call.get("id"))
+            return self._build_error_message(request, exc)
+        return normalize_tool_result(self._maybe_stamp(result, request))
 
     def _build_error_message(self, request: ToolCallRequest, exc: Exception) -> ToolMessage:
         '''截断异常详情并构造工具错误消息；任务工具还会附带子代理失败状态。'''
@@ -84,6 +86,13 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         structured_error = f"{exc.__class__.__name__}: {detail}"
         message = _stamp_task_exception_status(message, tool_name=tool_name, error=structured_error)
         return stamp_exception_meta(message, structured_error)
+
+    def _maybe_stamp(self, result: ToolMessage | Command, request: ToolCallRequest) -> ToolMessage | Command:
+        '''仅对工具消息应用与当前工具类型对应的补充元数据；控制流结果保持原样。'''
+        if not isinstance(result, ToolMessage):
+            return result
+        tool_name = str(request.tool_call.get("name") or "")
+        return self._stamp_skill_read_metadata(result, request, tool_name=tool_name)
 
     def _stamp_skill_read_metadata(
         self,
@@ -111,29 +120,6 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         message.additional_kwargs = existing
         return message
 
-    def _maybe_stamp(self, result: ToolMessage | Command, request: ToolCallRequest) -> ToolMessage | Command:
-        '''仅对工具消息应用与当前工具类型对应的补充元数据；控制流结果保持原样。'''
-        if not isinstance(result, ToolMessage):
-            return result
-        tool_name = str(request.tool_call.get("name") or "")
-        return self._stamp_skill_read_metadata(result, request, tool_name=tool_name)
-
-    @override
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        '''同步执行工具调用，将普通异常转换为错误消息，同时原样传播图控制信号。'''
-        try:
-            result = handler(request)
-        except GraphBubbleUp:
-            raise
-        except Exception as exc:
-            logger.exception("Tool execution failed (sync): name=%s id=%s", request.tool_call.get("name"), request.tool_call.get("id"))
-            return self._build_error_message(request, exc)
-        return normalize_tool_result(self._maybe_stamp(result, request))
-
     @override
     async def awrap_tool_call(
         self,
@@ -149,6 +135,30 @@ class ToolErrorHandlingMiddleware(AgentMiddleware[AgentState]):
             logger.exception("Tool execution failed (async): name=%s id=%s", request.tool_call.get("name"), request.tool_call.get("id"))
             return self._build_error_message(request, exc)
         return normalize_tool_result(self._maybe_stamp(result, request))
+
+
+def _stamp_task_exception_status(message: ToolMessage, *, tool_name: str, error: str) -> ToolMessage:
+    '''将任务工具异常包装为标准失败状态及结构化元数据，便于上层识别子代理失败。'''
+    if tool_name != _TASK_TOOL_NAME:
+        return message
+    content, metadata_error = format_subagent_result_message("failed", error=error)
+    if not content.endswith((".", "!", "?")):
+        content += "."
+    message.content = f"{content} {_RECOVERY_HINT}"
+    existing = dict(message.additional_kwargs or {})
+    existing.update(make_subagent_additional_kwargs("failed", error=metadata_error))
+    message.additional_kwargs = existing
+    return message
+
+
+def build_lead_runtime_middlewares(*, app_config: AppConfig, lazy_init: bool = True) -> list[AgentMiddleware]:
+    '''构造主代理共用中间件链，并启用上传文件处理和悬空工具调用修复。'''
+    return _build_runtime_middlewares(
+        app_config=app_config,
+        include_uploads=True,
+        include_dangling_tool_call_patch=True,
+        lazy_init=lazy_init,
+    )
 
 
 def _build_runtime_middlewares(
@@ -234,16 +244,6 @@ def _build_runtime_middlewares(
             raise RuntimeError(f"ToolProgressMiddleware 必须位于外层（索引 {_progress_idx}），包裹 ToolErrorHandlingMiddleware（索引 {_error_idx}）；请检查中间件追加顺序")
 
     return middlewares
-
-
-def build_lead_runtime_middlewares(*, app_config: AppConfig, lazy_init: bool = True) -> list[AgentMiddleware]:
-    '''构造主代理共用中间件链，并启用上传文件处理和悬空工具调用修复。'''
-    return _build_runtime_middlewares(
-        app_config=app_config,
-        include_uploads=True,
-        include_dangling_tool_call_patch=True,
-        lazy_init=lazy_init,
-    )
 
 
 def build_subagent_runtime_middlewares(

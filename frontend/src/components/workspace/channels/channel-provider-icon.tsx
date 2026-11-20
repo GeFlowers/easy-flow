@@ -3,8 +3,6 @@
 import { MessageCircleIcon } from "lucide-react";
 import type { SVGProps } from "react";
 
-import { cn } from "@/lib/utils";
-
 type ChannelProviderIconProps = SVGProps<SVGSVGElement> & {
   provider: string;
 };
@@ -16,6 +14,11 @@ export function ChannelProviderIcon({
   ...props
 }: ChannelProviderIconProps) {
   return (
-    <MessageCircleIcon data-provider={provider} aria-hidden="true" className={cn("size-5", className)} {...props} />
+    <MessageCircleIcon
+      data-provider={provider}
+      aria-hidden="true"
+      className={["size-5", className].filter(Boolean).join(" ")}
+      {...props}
+    />
   );
 }

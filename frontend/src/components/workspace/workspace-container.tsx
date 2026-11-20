@@ -12,27 +12,30 @@ import {
   BreadcrumbPage,
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
-import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 import { GithubIcon } from "./github-icon";
 import { Tooltip } from "./tooltip";
 
-/** 组装工作区的自适应外层容器，承载侧栏与主内容区域。 */
+/** 组装工作区外层容器，承载侧栏与主内容区域。 */
 export function WorkspaceContainer({
   className,
   children,
   ...props
 }: React.ComponentProps<"div">) {
   return (
-    <div className={cn("flex h-screen w-full flex-col", className)} {...props}>
+    <div
+      className={["flex h-screen w-full flex-col", className]
+        .filter(Boolean)
+        .join(" ")}
+      {...props}
+    >
       {children}
     </div>
   );
 }
 
-/** 渲染容器级标题栏，并在窄屏下维持主导航的可达性。 */
+/** 渲染容器级标题栏和路径导航。 */
 export function WorkspaceHeader({
   className,
   children,
@@ -48,18 +51,19 @@ export function WorkspaceHeader({
   }, [pathname]);
   return (
     <header
-      className={cn(
+      className={[
         "top-0 right-0 left-0 z-20 flex h-16 shrink-0 items-center justify-between gap-2 border-b backdrop-blur-sm transition-[width,height] ease-out group-has-data-[collapsible=icon]/sidebar-wrapper:h-12",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
-      <div className="flex min-w-0 items-center gap-2 px-2 sm:px-4">
-        <SidebarTrigger className="md:hidden" />
+      <div className="flex min-w-0 items-center gap-2 px-4">
         <Breadcrumb>
           <BreadcrumbList>
             {segments?.[0] && (
-              <BreadcrumbItem className="hidden md:block">
+              <BreadcrumbItem className="block">
                 <BreadcrumbLink asChild>
                   <Link href={`/${segments[0]}`}>
                     {nameOfSegment(segments[0], t)}
@@ -69,7 +73,7 @@ export function WorkspaceHeader({
             )}
             {segments?.[1] && (
               <>
-                <BreadcrumbSeparator className="hidden md:block" />
+                <BreadcrumbSeparator className="block" />
                 <BreadcrumbItem>
                   {segments.length >= 2 ? (
                     <BreadcrumbLink asChild>
@@ -118,10 +122,12 @@ export function WorkspaceBody({
 }: React.ComponentProps<"main">) {
   return (
     <main
-      className={cn(
+      className={[
         "relative flex min-h-0 w-full flex-1 flex-col items-center",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     >
       <div className="flex h-full w-full flex-col items-center">{children}</div>

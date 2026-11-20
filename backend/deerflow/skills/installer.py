@@ -140,6 +140,25 @@ def safe_extract_skill_archive(
                 dst.write(chunk)
 
 
+def scan_archive_preflight_or_raise(archive_path: Path, *, app_config=None) -> None:
+    '''在安全扫描启用时检查整个压缩包，并对严重问题立即中止安装。'''
+    if not skill_scan_enabled(app_config):
+        return
+    result = scan_archive_preflight(archive_path)
+    if result["blocked"]:
+        critical = [finding for finding in result["findings"] if finding["severity"] == "CRITICAL"]
+        raise SkillSecurityScanError(
+            f"静态安全扫描已阻止不安全的技能归档： {format_static_archive_findings(critical)}",
+            findings=critical,
+            skill_name=None,
+        )
+
+
+def format_static_archive_findings(findings: list[StaticFinding]) -> str:
+    '''把压缩包扫描发现整理为包含规则、等级、文件和原因的可读文本。'''
+    return "; ".join(f"{finding['rule_id']} ({finding['severity']}) at {finding.get('file') or '<archive>'}: {finding['message']}" for finding in findings)
+
+
 def _is_script_support_file(rel_path: Path) -> bool:
     '''判断文件是否位于技能的脚本支持目录中。'''
     return bool(rel_path.parts) and rel_path.parts[0] == "scripts"
@@ -222,25 +241,6 @@ async def _scan_skill_file_or_raise(skill_dir: Path, path: Path, skill_name: str
         raise SkillSecurityScanError(f"安全扫描已拒绝可执行内容 {location}: {reason}")
     if decision not in {"allow", "warn"}:
         raise SkillSecurityScanError(f"安全扫描失败，目标： {location}：扫描器决定无效 {decision!r}")
-
-
-def scan_archive_preflight_or_raise(archive_path: Path, *, app_config=None) -> None:
-    '''在安全扫描启用时检查整个压缩包，并对严重问题立即中止安装。'''
-    if not skill_scan_enabled(app_config):
-        return
-    result = scan_archive_preflight(archive_path)
-    if result["blocked"]:
-        critical = [finding for finding in result["findings"] if finding["severity"] == "CRITICAL"]
-        raise SkillSecurityScanError(
-            f"静态安全扫描已阻止不安全的技能归档： {format_static_archive_findings(critical)}",
-            findings=critical,
-            skill_name=None,
-        )
-
-
-def format_static_archive_findings(findings: list[StaticFinding]) -> str:
-    '''把压缩包扫描发现整理为包含规则、等级、文件和原因的可读文本。'''
-    return "; ".join(f"{finding['rule_id']} ({finding['severity']}) at {finding.get('file') or '<archive>'}: {finding['message']}" for finding in findings)
 
 
 async def _scan_static_skill_archive_or_raise(skill_dir: Path, skill_name: str, *, app_config=None) -> list[StaticFinding]:

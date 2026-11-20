@@ -5,46 +5,13 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-/** 校验单段摘要，供新格式及旧分区备份共同使用。 */
+/** 校验单段摘要。 */
 function isSummary(value: unknown): value is MemorySummary {
   return (
     isRecord(value) &&
     typeof value.summary === "string" &&
     typeof value.updatedAt === "string"
   );
-}
-
-/** 合并旧分区文字并去重，同时保留最新更新时间；拒绝不完整的旧备份。 */
-function parseSummary(
-  value: unknown,
-  legacyKeys: string[],
-): MemorySummary | null {
-  if (!isRecord(value)) return null;
-  const hasLegacy = legacyKeys.some((key) => key in value);
-  if (
-    !isSummary(value) &&
-    (!hasLegacy || !legacyKeys.every((key) => isSummary(value[key])))
-  )
-    return null;
-  const entries = [
-    ...(isSummary(value) ? [value] : []),
-    ...legacyKeys.flatMap((key) => (isSummary(value[key]) ? [value[key]] : [])),
-  ];
-  const summaries = [
-    ...new Set(entries.map((entry) => entry.summary.trim()).filter(Boolean)),
-  ];
-  const latest = entries.reduce<string>((previous, entry) => {
-    const nextTime = Date.parse(entry.updatedAt);
-    if (!Number.isFinite(nextTime)) return previous;
-    const previousTime = Date.parse(previous);
-    return !Number.isFinite(previousTime) || nextTime > previousTime
-      ? entry.updatedAt
-      : previous;
-  }, "");
-  return {
-    summary: summaries.join("\n\n"),
-    updatedAt: latest || (isSummary(value) ? value.updatedAt : ""),
-  };
 }
 
 /** 校验导入事实的必要字段及复核期限，保留其余原始事实信息。 */
@@ -68,7 +35,7 @@ function isFact(value: unknown): value is UserMemory["facts"][number] {
   );
 }
 
-/** 将新旧备份统一转换为两个单段摘要；格式错误时不允许覆盖现有记忆。 */
+/** 校验当前格式的记忆备份；格式错误时不允许覆盖现有记忆。 */
 export function parseMemoryImport(value: unknown): UserMemory | null {
   if (
     !isRecord(value) ||
@@ -78,17 +45,9 @@ export function parseMemoryImport(value: unknown): UserMemory | null {
     !value.facts.every(isFact)
   )
     return null;
-  const user = parseSummary(value.user, [
-    "workContext",
-    "personalContext",
-    "topOfMind",
-  ]);
-  const history = parseSummary(value.history, [
-    "recentMonths",
-    "earlierContext",
-    "longTermBackground",
-  ]);
-  if (!user || !history) return null;
+  if (!isSummary(value.user) || !isSummary(value.history)) return null;
+  const user = value.user;
+  const history = value.history;
   return {
     version: "2.0",
     lastUpdated: value.lastUpdated,

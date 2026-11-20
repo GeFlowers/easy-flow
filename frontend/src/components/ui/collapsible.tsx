@@ -2,8 +2,6 @@
 
 import * as CollapsiblePrimitive from "@radix-ui/react-collapsible";
 
-import { cn } from "@/lib/utils";
-
 /** 管理一组内容的受控或非受控展开状态。 */
 function Collapsible({
   ...props
@@ -19,7 +17,7 @@ function CollapsibleTrigger({
   return (
     <CollapsiblePrimitive.CollapsibleTrigger
       data-slot="collapsible-trigger"
-      className={cn("cursor-pointer", className)}
+      className={["cursor-pointer", className].filter(Boolean).join(" ")}
       {...props}
     />
   );

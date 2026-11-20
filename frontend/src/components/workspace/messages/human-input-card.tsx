@@ -18,8 +18,6 @@ import {
   type HumanInputRequest,
   type HumanInputResponse,
 } from "@/features/messages/human-input";
-import { isIMEComposing } from "@/lib/ime";
-import { cn } from "@/lib/utils";
 
 import { MarkdownContent } from "./markdown-content";
 
@@ -28,13 +26,8 @@ export type HumanInputSubmitResult = boolean | void;
 /** 判断键盘事件是否应提交文本型人工输入，保留多行输入能力。 */
 export function shouldSubmitHumanInputTextOnKeyDown(
   event: KeyboardEvent<HTMLTextAreaElement>,
-  isComposing = false,
 ) {
-  return (
-    event.key === "Enter" &&
-    !event.shiftKey &&
-    !isIMEComposing(event, isComposing)
-  );
+  return event.key === "Enter" && !event.shiftKey;
 }
 
 /** 渲染代理请求人工补充信息的卡片，并由父列表拥有回答与待处理状态。 */
@@ -56,7 +49,6 @@ export function HumanInputCard({
   const { t } = useI18n();
   const [text, setText] = useState("");
   const [error, setError] = useState("");
-  const [isComposing, setIsComposing] = useState(false);
   const titleId = useId();
   const textInputId = useId();
   const allowText =
@@ -102,9 +94,9 @@ export function HumanInputCard({
     void submitResponse(createHumanInputTextResponse(request, value));
   };
 
-  /** 在允许提交的快捷键触发时提交文本，并跳过输入法组合阶段。 */
+  /** 在允许提交的快捷键触发时提交文本。 */
   const handleTextKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (shouldSubmitHumanInputTextOnKeyDown(event, isComposing)) {
+    if (shouldSubmitHumanInputTextOnKeyDown(event)) {
       event.preventDefault();
       const value = text.trim();
       if (!value) {
@@ -142,12 +134,14 @@ export function HumanInputCard({
             </div>
             {statusLabel ? (
               <Badge
-                className={cn(
+                className={[
                   "h-6 rounded-md px-2",
                   pending && "gap-1.5",
                   answeredResponse &&
                     "border-primary/20 bg-primary/10 text-primary",
-                )}
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
                 variant={answeredResponse ? "outline" : "secondary"}
               >
                 {pending ? (
@@ -203,8 +197,6 @@ export function HumanInputCard({
                     setError("");
                   }
                 }}
-                onCompositionEnd={() => setIsComposing(false)}
-                onCompositionStart={() => setIsComposing(true)}
                 onKeyDown={handleTextKeyDown}
               />
               <div className="flex min-h-9 flex-wrap items-center justify-between gap-2">

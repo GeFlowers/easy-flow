@@ -46,7 +46,7 @@ function validateNextParam(next: string | null): string | null {
   return next;
 }
 
-/** 渲染本地账号与 SSO 登录入口，并在成功后跳转至经校验的站内地址。 */
+/** 渲染本地账号登录入口，并在成功后跳转至经校验的站内地址。 */
 export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -57,24 +57,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
-  const [ssoProviders, setSsoProviders] = useState<
-    { id: string; display_name: string; type: string }[]
-  >([]);
   const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(
     null,
   );
   const [setupStatusChecked, setSetupStatusChecked] = useState(false);
 
-  // 读取查询参数中的认证错误，例如 ?error=sso_failed。
-  const errorParam = searchParams.get("error");
-  const [error, setError] = useState(
-    errorParam
-      ? (t.login.errors[errorParam as keyof typeof t.login.errors] ??
-          t.login.authFailed)
-      : "",
-  );
-  // 配置 SSO 后本地登录失败时仅展示温和提示：不确认账号是否存在，避免账号枚举。
-  const [showSsoHint, setShowSsoHint] = useState(false);
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // 先校验回跳地址，再决定登录成功后的落点。
@@ -93,7 +81,7 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, redirectPath, router]);
 
-  // 并行加载系统初始化状态与可用 SSO 提供商。
+  // 加载系统初始化状态。
   useEffect(() => {
     let cancelled = false;
 
@@ -116,21 +104,6 @@ export default function LoginPage() {
         }
       });
 
-    void fetch("/api/v1/auth/providers")
-      .then((r) => r.json())
-      .then(
-        (data: {
-          providers: { id: string; display_name: string; type: string }[];
-        }) => {
-          if (!cancelled) {
-            setSsoProviders(data.providers ?? []);
-          }
-        },
-      )
-      .catch(() => {
-        // 忽略加载错误，页面仅不展示 SSO 入口。
-      });
-
     return () => {
       cancelled = true;
     };
@@ -140,7 +113,6 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
-    setShowSsoHint(false);
     setLoading(true);
 
     if (!isLogin && !regularSignupAllowed) {
@@ -172,10 +144,6 @@ export default function LoginPage() {
         const data = await res.json();
         const authError = parseAuthError(data);
         setError(authError.message);
-        // SSO 账号没有本地密码；仅在失败后引导至 SSO 按钮，不泄露账号归属。
-        if (isLogin && ssoProviders.length > 0) {
-          setShowSsoHint(true);
-        }
         return;
       }
 
@@ -193,7 +161,7 @@ export default function LoginPage() {
   return (
     <div className="bg-background relative flex min-h-screen items-center justify-center overflow-x-hidden overflow-y-auto">
       <FlickeringGrid
-        className="absolute inset-0 z-0 mask-[url(/deer.svg)] mask-size-[100vw] mask-center mask-no-repeat md:mask-size-[72vh]"
+        className="absolute inset-0 z-0 mask-[url(/deer.svg)] mask-size-[72vh] mask-center mask-no-repeat"
         squareSize={4}
         gridGap={4}
         color={actualTheme === "dark" ? "white" : "black"}
@@ -263,42 +231,6 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {ssoProviders.length > 0 && (
-          <div className="space-y-2">
-            {isLogin && (
-              <div className="relative my-4">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background text-muted-foreground px-2">
-                    {t.login.orContinueWith}
-                  </span>
-                </div>
-              </div>
-            )}
-            {showSsoHint && (
-              <p className="text-muted-foreground text-center text-sm">
-                {t.login.ssoHint}
-              </p>
-            )}
-            {ssoProviders.map((provider) => (
-              <Button
-                key={provider.id}
-                type="button"
-                variant="outline"
-                className="w-full"
-                disabled={loading}
-                onClick={() => {
-                  window.location.href = `/api/v1/auth/oauth/${provider.id}?next=${encodeURIComponent(redirectPath)}`;
-                }}
-              >
-                {t.login.continueWith(provider.display_name)}
-              </Button>
-            ))}
-          </div>
-        )}
-
         {regularSignupAllowed && (
           <div className="text-center text-sm">
             <button
@@ -306,7 +238,6 @@ export default function LoginPage() {
               onClick={() => {
                 setIsLogin(!isLogin);
                 setError("");
-                setShowSsoHint(false);
               }}
               className="text-blue-500 hover:underline"
             >

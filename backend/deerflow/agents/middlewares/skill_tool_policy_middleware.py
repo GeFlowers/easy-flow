@@ -30,6 +30,11 @@ class SkillToolPolicyMiddleware(AgentMiddleware):
         self._skills_root = skills_root
         self._read_tool_names = tuple(read_tool_names)
 
+    @override
+    def before_model(self, state, runtime) -> None:
+        '''在后续摘要中间件裁剪消息前记住本轮成功加载的技能权限。'''
+        self._allowed(state, runtime)
+
     def _allowed(self, state, runtime) -> set[str] | None:
         '''收集本轮实际激活的技能并缓存到运行上下文，使摘要压缩后仍能维持本轮限制。'''
         messages = list((state or {}).get("messages") or [])
@@ -55,6 +60,16 @@ class SkillToolPolicyMiddleware(AgentMiddleware):
         allowed = allowed_tool_names_for_skills([self._skills[path] for path in sorted(paths)])
         return allowed | set(ALWAYS_AVAILABLE_BUILTIN_TOOL_NAMES) if allowed is not None else None
 
+    @override
+    async def abefore_model(self, state, runtime) -> None:
+        '''异步模型调用前保存同一套本轮技能权限，避免摘要裁剪造成权限丢失。'''
+        self._allowed(state, runtime)
+
+    @override
+    def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
+        '''同步模型调用前应用本轮技能的工具可见范围。'''
+        return handler(self._filter(request))
+
     def _filter(self, request: ModelRequest) -> ModelRequest:
         '''在模型绑定前移除本轮技能不允许的工具；未激活限制技能时原样放行。'''
         allowed = self._allowed(request.state, request.runtime)
@@ -62,30 +77,6 @@ class SkillToolPolicyMiddleware(AgentMiddleware):
             return request
         tools = [tool for tool in request.tools if (tool.get("name") if isinstance(tool, dict) else tool.name) in allowed]
         return request.override(tools=tools)
-
-    @override
-    def before_model(self, state, runtime) -> None:
-        '''在后续摘要中间件裁剪消息前记住本轮成功加载的技能权限。'''
-        self._allowed(state, runtime)
-
-    @override
-    async def abefore_model(self, state, runtime) -> None:
-        '''异步模型调用前保存同一套本轮技能权限，避免摘要裁剪造成权限丢失。'''
-        self._allowed(state, runtime)
-
-    def _blocked(self, request: ToolCallRequest) -> ToolMessage | None:
-        '''拒绝模型绕过可见工具集合发出的越权调用，保留工具结果配对。'''
-        allowed = self._allowed(request.state, request.runtime)
-        name = request.tool_call.get("name", "")
-        if allowed is None or name in allowed:
-            return None
-        return ToolMessage(content=f"Error: 当前激活技能的工具白名单不允许调用 '{name}'。",
-                           tool_call_id=request.tool_call["id"], name=name, status="error")
-
-    @override
-    def wrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], ModelResponse]) -> ModelCallResult:
-        '''同步模型调用前应用本轮技能的工具可见范围。'''
-        return handler(self._filter(request))
 
     @override
     async def awrap_model_call(self, request: ModelRequest, handler: Callable[[ModelRequest], Awaitable[ModelResponse]]) -> ModelCallResult:
@@ -97,6 +88,15 @@ class SkillToolPolicyMiddleware(AgentMiddleware):
         '''同步工具执行前校验本轮技能权限。'''
         blocked = self._blocked(request)
         return blocked if blocked is not None else handler(request)
+
+    def _blocked(self, request: ToolCallRequest) -> ToolMessage | None:
+        '''拒绝模型绕过可见工具集合发出的越权调用，保留工具结果配对。'''
+        allowed = self._allowed(request.state, request.runtime)
+        name = request.tool_call.get("name", "")
+        if allowed is None or name in allowed:
+            return None
+        return ToolMessage(content=f"Error: 当前激活技能的工具白名单不允许调用 '{name}'。",
+                           tool_call_id=request.tool_call["id"], name=name, status="error")
 
     @override
     async def awrap_tool_call(self, request: ToolCallRequest, handler: Callable[[ToolCallRequest], Awaitable[ToolMessage | Command]]) -> ToolMessage | Command:

@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { writeTextToClipboard } from "@/features/clipboard";
-import { cn } from "@/lib/utils";
+
 import { CheckIcon, CopyIcon } from "lucide-react";
 import {
   type ComponentProps,
@@ -105,10 +105,12 @@ export const CodeBlock = ({
   return (
     <CodeBlockContext.Provider value={{ code }}>
       <div
-        className={cn(
+        className={[
           "group bg-background text-foreground relative size-full overflow-hidden rounded-md border",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         {...props}
       >
         <div className="relative size-full">
@@ -172,7 +174,7 @@ export const CodeBlockCopyButton = ({
 
   return (
     <Button
-      className={cn("shrink-0", className)}
+      className={["shrink-0", className].filter(Boolean).join(" ")}
       onClick={copyToClipboard}
       size="icon"
       variant="ghost"

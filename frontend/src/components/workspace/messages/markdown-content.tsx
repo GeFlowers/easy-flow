@@ -15,7 +15,6 @@ import {
   streamdownPluginsWithoutRawHtml,
 } from "@/features/streamdown";
 import { SafeMessageResponse } from "@/features/streamdown/components";
-import { cn } from "@/lib/utils";
 
 import { createMarkdownLinkComponent } from "./markdown-link";
 
@@ -76,10 +75,12 @@ function StreamingCode({
     return (
       <code
         {...props}
-        className={cn(
+        className={[
           "bg-muted rounded px-1.5 py-0.5 font-mono text-sm",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         data-streaming-inline-code="true"
       >
         {children}

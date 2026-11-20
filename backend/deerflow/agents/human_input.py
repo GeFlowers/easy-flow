@@ -34,11 +34,6 @@ class HumanInputOptionResponse(TypedDict):
 HumanInputResponse = HumanInputTextResponse | HumanInputOptionResponse
 
 
-def _non_empty_string(value: object) -> str | None:
-    '''仅在值为去除空白后仍非空的字符串时返回原字符串。'''
-    return value if isinstance(value, str) and value.strip() else None
-
-
 def read_human_input_response(additional_kwargs: Mapping[str, object] | None) -> HumanInputResponse | None:
     '''从附加元数据中解析并规范化有效的人类输入响应。
 
@@ -83,3 +78,8 @@ def read_human_input_response(additional_kwargs: Mapping[str, object] | None) ->
             "value": value,
         }
     return None
+
+
+def _non_empty_string(value: object) -> str | None:
+    '''仅在值为去除空白后仍非空的字符串时返回原字符串。'''
+    return value if isinstance(value, str) and value.strip() else None

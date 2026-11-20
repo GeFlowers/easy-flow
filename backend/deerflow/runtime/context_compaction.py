@@ -43,26 +43,6 @@ class ThreadCompactionResult:
     total_tokens: int = 0
 
 
-def _create_compaction_middleware(
-    *,
-    app_config: AppConfig,
-    keep: tuple[str, int | float] | None,
-) -> DeerFlowSummarizationMiddleware:
-    '''根据应用配置创建摘要中间件；摘要关闭时明确拒绝压缩请求。'''
-    middleware = create_summarization_middleware(app_config=app_config, keep=keep)
-    if middleware is None:
-        raise ContextCompactionDisabled("Context compaction is disabled.")
-    return middleware
-
-
-def _checkpoint_namespace(checkpoint_tuple: Any) -> str:
-    '''从检查点快照提取写回时必须沿用的命名空间。'''
-    config = getattr(checkpoint_tuple, "config", {}) or {}
-    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
-    checkpoint_ns = configurable.get("checkpoint_ns", "") if isinstance(configurable, dict) else ""
-    return checkpoint_ns if isinstance(checkpoint_ns, str) else ""
-
-
 async def compact_thread_context(
     checkpointer: Any,
     thread_id: str,
@@ -148,3 +128,23 @@ async def compact_thread_context(
         checkpoint_id=new_checkpoint_id,
         total_tokens=result.total_tokens,
     )
+
+
+def _create_compaction_middleware(
+    *,
+    app_config: AppConfig,
+    keep: tuple[str, int | float] | None,
+) -> DeerFlowSummarizationMiddleware:
+    '''根据应用配置创建摘要中间件；摘要关闭时明确拒绝压缩请求。'''
+    middleware = create_summarization_middleware(app_config=app_config, keep=keep)
+    if middleware is None:
+        raise ContextCompactionDisabled("Context compaction is disabled.")
+    return middleware
+
+
+def _checkpoint_namespace(checkpoint_tuple: Any) -> str:
+    '''从检查点快照提取写回时必须沿用的命名空间。'''
+    config = getattr(checkpoint_tuple, "config", {}) or {}
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    checkpoint_ns = configurable.get("checkpoint_ns", "") if isinstance(configurable, dict) else ""
+    return checkpoint_ns if isinstance(checkpoint_ns, str) else ""

@@ -1,4 +1,4 @@
-'''提供持久化层的模型、仓储、迁移与数据库辅助实现。'''
+'''提供持久化层的模型、仓储与数据库辅助实现。'''
 
 from __future__ import annotations
 
@@ -73,46 +73,6 @@ class ChannelConnectionRepository:
         from deerflow.persistence.engine import close_engine
 
         await close_engine()
-
-    @staticmethod
-    def _new_id() -> str:
-        '''生成连接相关记录使用的随机十六进制主键。'''
-        return uuid.uuid4().hex
-
-    @staticmethod
-    def _normalize_optional_identity(value: str | None) -> str:
-        '''将缺失的外部账号标识统一为空字符串以参与唯一键匹配。'''
-        return value or ""
-
-    @staticmethod
-    def _coerce_datetime(value: datetime | None) -> datetime | None:
-        '''为数据库读出的无时区时间补上 UTC 时区信息。'''
-        if value is None or value.tzinfo is not None:
-            return value
-        return value.replace(tzinfo=UTC)
-
-    def _encrypt_optional_secret(self, value: str | None) -> str | None:
-        '''加密可选凭据；未配置加密器时拒绝保存明文密钥。'''
-        if value is None:
-            return None
-        if self._cipher is None:
-            raise RuntimeError("channel connection encryption key is required")
-        return self._cipher.encrypt_text(value)
-
-    @staticmethod
-    def _connection_to_dict(row: ChannelConnectionRow) -> dict[str, Any]:
-        '''将持久化记录转换为对外使用的字典表示。'''
-        data = row.to_dict()
-        data["external_account_id"] = data["external_account_id"] or None
-        data["workspace_id"] = data["workspace_id"] or None
-        data["scopes"] = data.pop("scopes_json") or []
-        data["capabilities"] = data.pop("capabilities_json") or {}
-        data["metadata"] = data.pop("metadata_json") or {}
-        for key in ("created_at", "updated_at", "last_seen_at", "last_error_at"):
-            value = data.get(key)
-            if isinstance(value, datetime):
-                data[key] = coerce_iso(value)
-        return data
 
     async def upsert_connection(
         self,
@@ -193,6 +153,31 @@ class ChannelConnectionRepository:
                     last_error = exc
                     await session.rollback()
             raise last_error  # type: ignore[misc]  # 重试至少执行一次，因此这里一定已有异常。
+
+    @staticmethod
+    def _normalize_optional_identity(value: str | None) -> str:
+        '''将缺失的外部账号标识统一为空字符串以参与唯一键匹配。'''
+        return value or ""
+
+    @staticmethod
+    def _new_id() -> str:
+        '''生成连接相关记录使用的随机十六进制主键。'''
+        return uuid.uuid4().hex
+
+    @staticmethod
+    def _connection_to_dict(row: ChannelConnectionRow) -> dict[str, Any]:
+        '''将持久化记录转换为对外使用的字典表示。'''
+        data = row.to_dict()
+        data["external_account_id"] = data["external_account_id"] or None
+        data["workspace_id"] = data["workspace_id"] or None
+        data["scopes"] = data.pop("scopes_json") or []
+        data["capabilities"] = data.pop("capabilities_json") or {}
+        data["metadata"] = data.pop("metadata_json") or {}
+        for key in ("created_at", "updated_at", "last_seen_at", "last_error_at"):
+            value = data.get(key)
+            if isinstance(value, datetime):
+                data[key] = coerce_iso(value)
+        return data
 
     async def list_connections(self, owner_user_id: str) -> list[dict[str, Any]]:
         '''查询并返回满足给定条件的持久化记录集合。'''
@@ -287,6 +272,13 @@ class ChannelConnectionRepository:
                 return None
 
     @staticmethod
+    def _coerce_datetime(value: datetime | None) -> datetime | None:
+        '''为数据库读出的无时区时间补上 UTC 时区信息。'''
+        if value is None or value.tzinfo is not None:
+            return value
+        return value.replace(tzinfo=UTC)
+
+    @staticmethod
     def hash_state(state: str) -> str:
         '''计算可安全存储和比较的摘要值。'''
         return hashlib.sha256(state.encode("utf-8")).hexdigest()
@@ -319,6 +311,14 @@ class ChannelConnectionRepository:
         async with self.session_factory() as session:
             session.add(row)
             await session.commit()
+
+    def _encrypt_optional_secret(self, value: str | None) -> str | None:
+        '''加密可选凭据；未配置加密器时拒绝保存明文密钥。'''
+        if value is None:
+            return None
+        if self._cipher is None:
+            raise RuntimeError("channel connection encryption key is required")
+        return self._cipher.encrypt_text(value)
 
     async def create_oauth_state_within_cap(
         self,

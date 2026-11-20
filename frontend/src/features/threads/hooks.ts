@@ -1031,7 +1031,7 @@ export function useThreadStream({
     threadId: onStreamThreadId,
     reconnectOnMount: true,
     fetchStateHistory: { limit: 1 },
-    /** 新线程创建后立即补入两个线程列表缓存，并保存所选代理信息。 */
+    /** 新线程创建后立即补入两个线程列表缓存。 */
     onCreated(meta) {
       handleStreamStart(meta.thread_id, meta.run_id);
       const now = new Date().toISOString();
@@ -1039,7 +1039,7 @@ export function useThreadStream({
         thread_id: meta.thread_id,
         created_at: now,
         updated_at: now,
-        metadata: context.agent_name ? { agent_name: context.agent_name } : {},
+        metadata: {},
         status: "busy",
         values: {
           title: t.pages.newChat,
@@ -1052,7 +1052,7 @@ export function useThreadStream({
         thread_id: meta.thread_id,
         created_at: now,
         updated_at: now,
-        metadata: context.agent_name ? { agent_name: context.agent_name } : {},
+        metadata: {},
         status: "busy",
         values: {
           title: t.pages.newChat,
@@ -1061,13 +1061,6 @@ export function useThreadStream({
         },
         interrupts: {},
       });
-      if (context.agent_name) {
-        void getAPIClient()
-          .threads.update(meta.thread_id, {
-            metadata: { agent_name: context.agent_name },
-          })
-          .catch(() => ({}));
-      }
     },
     /** 转发工具调用结束事件，供聊天界面执行后续展示或联动。 */
     onLangChainEvent(event) {

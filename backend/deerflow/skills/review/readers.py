@@ -35,58 +35,6 @@ _TEXT_EXTENSIONS = {
 _ZIP_READ_CHUNK_BYTES = 1024 * 1024
 
 
-def _sha256(data: bytes) -> str:
-    '''计算字节内容的 SHA-256 摘要，供快照识别文件内容。'''
-    return hashlib.sha256(data).hexdigest()
-
-
-def _decode_text(data: bytes, path: str) -> str | None:
-    '''仅将可识别文本文件按 UTF-8 解码，避免把二进制内容误送入文本分析器。'''
-    suffix = PurePosixPath(path).suffix.lower()
-    if suffix not in _TEXT_EXTENSIONS and b"\0" in data:
-        return None
-    try:
-        return data.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-
-
-def _truncate_utf8_bytes(content: str, max_bytes: int) -> tuple[str, bytes]:
-    '''按字节上限截断 UTF-8 文本，并移除不完整的尾部字符序列。'''
-    data = content.encode("utf-8")
-    truncated = data[:max_bytes]
-    text = truncated.decode("utf-8", errors="ignore")
-    return text, text.encode("utf-8")
-
-
-def _subject(
-    *,
-    source: str,
-    display_ref: str,
-    name_hint: str | None = None,
-    category: str | None = None,
-) -> dict[str, Any]:
-    '''构造描述技能来源、分类及展示标识的快照主体信息。'''
-    return {
-        "source": source,
-        "category": category,
-        "name_hint": name_hint,
-        "display_ref": display_ref,
-    }
-
-
-def _empty_snapshot(subject: dict[str, Any], limits: PackageLimits) -> dict[str, Any]:
-    '''初始化统一快照结构，使不同读取器返回相同字段和限制信息。'''
-    return {
-        "schema_version": PACKAGE_SNAPSHOT_SCHEMA_VERSION,
-        "subject": subject,
-        "limits": limits.to_dict(),
-        "files": [],
-        "truncated": False,
-        "reader_errors": [],
-    }
-
-
 def build_inline_snapshot(
     content: str,
     *,
@@ -120,6 +68,47 @@ def build_inline_snapshot(
         }
     )
     return snapshot
+
+
+def _empty_snapshot(subject: dict[str, Any], limits: PackageLimits) -> dict[str, Any]:
+    '''初始化统一快照结构，使不同读取器返回相同字段和限制信息。'''
+    return {
+        "schema_version": PACKAGE_SNAPSHOT_SCHEMA_VERSION,
+        "subject": subject,
+        "limits": limits.to_dict(),
+        "files": [],
+        "truncated": False,
+        "reader_errors": [],
+    }
+
+
+def _subject(
+    *,
+    source: str,
+    display_ref: str,
+    name_hint: str | None = None,
+    category: str | None = None,
+) -> dict[str, Any]:
+    '''构造描述技能来源、分类及展示标识的快照主体信息。'''
+    return {
+        "source": source,
+        "category": category,
+        "name_hint": name_hint,
+        "display_ref": display_ref,
+    }
+
+
+def _truncate_utf8_bytes(content: str, max_bytes: int) -> tuple[str, bytes]:
+    '''按字节上限截断 UTF-8 文本，并移除不完整的尾部字符序列。'''
+    data = content.encode("utf-8")
+    truncated = data[:max_bytes]
+    text = truncated.decode("utf-8", errors="ignore")
+    return text, text.encode("utf-8")
+
+
+def _sha256(data: bytes) -> str:
+    '''计算字节内容的 SHA-256 摘要，供快照识别文件内容。'''
+    return hashlib.sha256(data).hexdigest()
 
 
 class LocalDirectoryReader:
@@ -263,6 +252,17 @@ class LocalDirectoryReader:
         return snapshot
 
 
+def _decode_text(data: bytes, path: str) -> str | None:
+    '''仅将可识别文本文件按 UTF-8 解码，避免把二进制内容误送入文本分析器。'''
+    suffix = PurePosixPath(path).suffix.lower()
+    if suffix not in _TEXT_EXTENSIONS and b"\0" in data:
+        return None
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
+
+
 class ArchivePackageReader:
     '''直接检查技能 ZIP 压缩包内容，不解压到磁盘，并限制成员数量和解压读取量。'''
 
@@ -358,12 +358,6 @@ class ArchivePackageReader:
             return None
 
 
-def _zip_member_is_symlink(info: zipfile.ZipInfo) -> bool:
-    '''根据 ZIP 成员的 Unix 文件模式判断其是否为符号链接。'''
-    mode = info.external_attr >> 16
-    return stat.S_ISLNK(mode)
-
-
 def _read_zip_member_bounded(zf: zipfile.ZipFile, info: zipfile.ZipInfo, *, max_bytes: int) -> tuple[bytes, int, bool]:
     '''分块读取 ZIP 成员，最多读取上限加一个字节以识别超限而避免无界解压。'''
     chunks: list[bytes] = []
@@ -380,6 +374,12 @@ def _read_zip_member_bounded(zf: zipfile.ZipFile, info: zipfile.ZipInfo, *, max_
             if actual_size > max_bytes:
                 return b"".join(chunks), actual_size, True
             chunks.append(chunk)
+
+
+def _zip_member_is_symlink(info: zipfile.ZipInfo) -> bool:
+    '''根据 ZIP 成员的 Unix 文件模式判断其是否为符号链接。'''
+    mode = info.external_attr >> 16
+    return stat.S_ISLNK(mode)
 
 
 class InstalledSkillReader(LocalDirectoryReader):
@@ -408,6 +408,15 @@ class InstalledSkillReader(LocalDirectoryReader):
         )
 
 
+def _installed_skill_root(storage: Any, category: str, rel_path: str) -> Path:
+    '''按 public、custom 或 legacy 类别使用存储接口解析已安装技能的磁盘位置。'''
+    if category == "custom" and hasattr(storage, "get_user_custom_root"):
+        return Path(storage.get_user_custom_root()) / rel_path
+    if category == "legacy":
+        return Path(storage.get_skills_root_path()) / "custom" / rel_path
+    return Path(storage.get_skills_root_path()) / category / rel_path
+
+
 def parse_skill_uri(target: str) -> tuple[str, str]:
     '''校验 skill://<category>/<path> 标识，并返回经规范化的类别与相对路径。'''
     if not target.startswith("skill://"):
@@ -418,12 +427,3 @@ def parse_skill_uri(target: str) -> tuple[str, str]:
         raise ValueError("技能目标必须包含分类：public、custom 或 legacy")
     rel_path = normalize_relative_path(rel_path)
     return category, rel_path
-
-
-def _installed_skill_root(storage: Any, category: str, rel_path: str) -> Path:
-    '''按 public、custom 或 legacy 类别使用存储接口解析已安装技能的磁盘位置。'''
-    if category == "custom" and hasattr(storage, "get_user_custom_root"):
-        return Path(storage.get_user_custom_root()) / rel_path
-    if category == "legacy":
-        return Path(storage.get_skills_root_path()) / "custom" / rel_path
-    return Path(storage.get_skills_root_path()) / category / rel_path

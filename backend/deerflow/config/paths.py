@@ -19,25 +19,6 @@ _SAFE_USER_ID_DIGEST_HEX_LEN = 16
 logger = logging.getLogger(__name__)
 
 
-def _default_local_base_dir() -> Path:
-    '''返回本地运行时目录；容器部署时该目录来自 ``DEER_FLOW_HOME`` 的默认策略。'''
-    return runtime_home()
-
-
-def _validate_thread_id(thread_id: str) -> str:
-    '''只允许安全字符组成的线程标识进入磁盘路径，避免路径穿越。'''
-    if not _SAFE_THREAD_ID_RE.match(thread_id):
-        raise ValueError(f"Invalid thread_id {thread_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
-    return thread_id
-
-
-def _validate_user_id(user_id: str) -> str:
-    '''校验已规范化的用户标识，防止其改变用户数据目录层级。'''
-    if not _SAFE_USER_ID_RE.match(user_id):
-        raise ValueError(f"Invalid user_id {user_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
-    return user_id
-
-
 def make_safe_user_id(raw: str) -> str:
     '''把外部用户标识转成文件系统安全名称，并以摘要区分规范化冲突。'''
     if not raw:
@@ -49,10 +30,9 @@ def make_safe_user_id(raw: str) -> str:
     return f"{sanitized}-{digest}"
 
 
-def _legacy_safe_user_id(raw: str, sanitized: str) -> str:
-    '''按旧版摘要规则生成目录名，以便升级时定位并迁移历史用户目录。'''
-    digest = hashlib.sha1(raw.encode("utf-8"), usedforsecurity=False).hexdigest()[:_SAFE_USER_ID_DIGEST_HEX_LEN]
-    return f"{sanitized}-{digest}"
+def join_host_path(base: str, *parts: str) -> str:
+    '''向外暴露主机路径拼接入口，供沙箱与宿主机文件映射共用。'''
+    return _join_host_path(base, *parts)
 
 
 def _join_host_path(base: str, *parts: str) -> str:
@@ -72,11 +52,6 @@ def _join_host_path(base: str, *parts: str) -> str:
     return str(result)
 
 
-def join_host_path(base: str, *parts: str) -> str:
-    '''向外暴露主机路径拼接入口，供沙箱与宿主机文件映射共用。'''
-    return _join_host_path(base, *parts)
-
-
 class Paths:
     '''根据可选根目录计算应用数据、用户空间、线程目录及其宿主机映射。'''
 
@@ -91,12 +66,6 @@ class Paths:
             return Path(env)
         return self.base_dir
 
-    def _host_base_dir_str(self) -> str:
-        '''以字符串形式返回宿主机数据根路径，保留跨操作系统拼接所需表示。'''
-        if env := os.getenv("DEER_FLOW_HOST_BASE_DIR"):
-            return env
-        return str(self.base_dir)
-
     @property
     def base_dir(self) -> Path:
         '''按显式参数、``DEER_FLOW_HOME``、本地默认目录的优先级确定数据根目录。'''
@@ -109,27 +78,18 @@ class Paths:
         return _default_local_base_dir()
 
     @property
+    def default_agent_dir(self) -> Path:
+        '''返回默认智能体专属配置目录。'''
+        return self.base_dir / "default-agent"
+
+    @property
     def memory_file(self) -> Path:
         '''返回兼容旧式全局记忆文件的路径。'''
         return self.base_dir / "memory.json"
 
-    @property
-    def user_md_file(self) -> Path:
-        '''返回共享 ``USER.md`` 配置文件路径，供旧式用户提示加载逻辑使用。'''
-        return self.base_dir / "USER.md"
 
-    @property
-    def agents_dir(self) -> Path:
-        '''返回旧式共享自定义智能体目录；新数据应使用按用户隔离的目录。'''
-        return self.base_dir / "agents"
 
-    def agent_dir(self, name: str) -> Path:
-        '''按智能体名称定位旧式共享智能体目录。'''
-        return self.agents_dir / name.lower()
 
-    def agent_memory_file(self, name: str) -> Path:
-        '''定位旧式共享智能体记忆文件。'''
-        return self.agent_dir(name) / "memory.json"
 
     def user_dir(self, user_id: str) -> Path:
         '''校验用户标识后返回该用户隔离目录。'''
@@ -158,17 +118,8 @@ class Paths:
         '''返回用户级记忆文件路径。'''
         return self.user_dir(user_id) / "memory.json"
 
-    def user_agents_dir(self, user_id: str) -> Path:
-        '''返回该用户专属的自定义智能体集合目录。'''
-        return self.user_dir(user_id) / "agents"
 
-    def user_agent_dir(self, user_id: str, agent_name: str) -> Path:
-        '''按用户和智能体名称定位隔离的智能体目录。'''
-        return self.user_agents_dir(user_id) / agent_name.lower()
 
-    def user_agent_memory_file(self, user_id: str, agent_name: str) -> Path:
-        '''返回指定用户智能体的记忆文件路径。'''
-        return self.user_agent_dir(user_id, agent_name) / "memory.json"
 
     def user_skills_dir(self, user_id: str) -> Path:
         '''返回该用户安装的技能目录。'''
@@ -196,9 +147,6 @@ class Paths:
         '''返回线程生成产物目录，供网关下载接口读取。'''
         return self.thread_dir(thread_id, user_id=user_id) / "user-data" / "outputs"
 
-    def acp_workspace_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
-        '''返回外部 ACP 智能体的独立工作目录，避免与普通沙箱文件混放。'''
-        return self.thread_dir(thread_id, user_id=user_id) / "acp-workspace"
 
     def sandbox_user_data_dir(self, thread_id: str, *, user_id: str | None = None) -> Path:
         '''返回线程下上传、工作区和产物共同使用的虚拟数据根目录。'''
@@ -209,6 +157,12 @@ class Paths:
         if user_id is not None:
             return _join_host_path(self._host_base_dir_str(), "users", _validate_user_id(user_id), "threads", _validate_thread_id(thread_id))
         return _join_host_path(self._host_base_dir_str(), "threads", _validate_thread_id(thread_id))
+
+    def _host_base_dir_str(self) -> str:
+        '''以字符串形式返回宿主机数据根路径，保留跨操作系统拼接所需表示。'''
+        if env := os.getenv("DEER_FLOW_HOST_BASE_DIR"):
+            return env
+        return str(self.base_dir)
 
     def host_sandbox_user_data_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
         '''生成宿主机侧线程用户数据根目录。'''
@@ -226,9 +180,6 @@ class Paths:
         '''生成宿主机侧运行产物路径。'''
         return _join_host_path(self.host_sandbox_user_data_dir(thread_id, user_id=user_id), "outputs")
 
-    def host_acp_workspace_dir(self, thread_id: str, *, user_id: str | None = None) -> str:
-        '''生成宿主机侧外部智能体工作区路径。'''
-        return _join_host_path(self.host_thread_dir(thread_id, user_id=user_id), "acp-workspace")
 
     def ensure_thread_dirs(self, thread_id: str, *, user_id: str | None = None) -> None:
         '''预先创建线程运行所需的各个目录，并设置沙箱可写权限。'''
@@ -236,7 +187,6 @@ class Paths:
             self.sandbox_work_dir(thread_id, user_id=user_id),
             self.sandbox_uploads_dir(thread_id, user_id=user_id),
             self.sandbox_outputs_dir(thread_id, user_id=user_id),
-            self.acp_workspace_dir(thread_id, user_id=user_id),
         ]:
             d.mkdir(parents=True, exist_ok=True)
             d.chmod(0o777)
@@ -264,6 +214,31 @@ class Paths:
             raise ValueError("Access denied: path traversal detected")
 
         return actual
+
+
+def _default_local_base_dir() -> Path:
+    '''返回本地运行时目录；容器部署时该目录来自 ``DEER_FLOW_HOME`` 的默认策略。'''
+    return runtime_home()
+
+
+def _validate_user_id(user_id: str) -> str:
+    '''校验已规范化的用户标识，防止其改变用户数据目录层级。'''
+    if not _SAFE_USER_ID_RE.match(user_id):
+        raise ValueError(f"Invalid user_id {user_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
+    return user_id
+
+
+def _legacy_safe_user_id(raw: str, sanitized: str) -> str:
+    '''按旧版摘要规则生成目录名，以便升级时定位并迁移历史用户目录。'''
+    digest = hashlib.sha1(raw.encode("utf-8"), usedforsecurity=False).hexdigest()[:_SAFE_USER_ID_DIGEST_HEX_LEN]
+    return f"{sanitized}-{digest}"
+
+
+def _validate_thread_id(thread_id: str) -> str:
+    '''只允许安全字符组成的线程标识进入磁盘路径，避免路径穿越。'''
+    if not _SAFE_THREAD_ID_RE.match(thread_id):
+        raise ValueError(f"Invalid thread_id {thread_id!r}: only alphanumeric characters, hyphens, and underscores are allowed.")
+    return thread_id
 
 _paths: Paths | None = None
 

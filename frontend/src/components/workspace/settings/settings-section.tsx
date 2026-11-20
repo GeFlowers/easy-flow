@@ -1,5 +1,3 @@
-import { cn } from "@/lib/utils";
-
 /** 提供设置页通用分区结构，统一标题、说明与内容的语义层级。 */
 export function SettingsSection({
   className,
@@ -13,7 +11,7 @@ export function SettingsSection({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn(className)}>
+    <section className={[className].filter(Boolean).join(" ")}>
       <header className="space-y-2">
         <div className="text-lg font-semibold">{title}</div>
         {description && (

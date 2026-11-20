@@ -29,7 +29,6 @@ from langchain_core.runnables import RunnableConfig
 from deerflow.agents.lead_agent.agent import build_middlewares
 from deerflow.agents.lead_agent.prompt import apply_prompt_template, get_enabled_skills_for_config
 from deerflow.agents.thread_state import ThreadState
-from deerflow.config.agents_config import AGENT_NAME_PATTERN
 from deerflow.config.app_config import get_app_config, is_trace_correlation_enabled, reload_app_config
 from deerflow.config.extensions_config import ExtensionsConfig, SkillStateConfig, get_extensions_config, reload_extensions_config
 from deerflow.config.paths import get_paths
@@ -104,7 +103,6 @@ class DeerFlowClient:
         thinking_enabled: bool = True,
         subagent_enabled: bool = False,
         plan_mode: bool = False,
-        agent_name: str | None = None,
         available_skills: set[str] | None = None,
         middlewares: Sequence[AgentMiddleware] | None = None,
         environment: str | None = None,
@@ -119,15 +117,11 @@ class DeerFlowClient:
             reload_app_config(config_path)
         self._app_config = get_app_config()
 
-        if agent_name is not None and not AGENT_NAME_PATTERN.match(agent_name):
-            raise ValueError(f"Invalid agent name '{agent_name}'. Must match pattern: {AGENT_NAME_PATTERN.pattern}")
-
         self._checkpointer = checkpointer
         self._model_name = model_name
         self._thinking_enabled = thinking_enabled
         self._subagent_enabled = subagent_enabled
         self._plan_mode = plan_mode
-        self._agent_name = agent_name
         self._available_skills = set(available_skills) if available_skills is not None else None
         self._middlewares = list(middlewares) if middlewares else []
         self._environment = environment
@@ -143,250 +137,11 @@ class DeerFlowClient:
         self._agent = None
         self._agent_config_key = None
 
-
-    @staticmethod
-    def _atomic_write_json(path: Path, data: dict) -> None:
-        '''将字典先写入同目录临时文件，再原子替换目标数据文件。'''
-        fd = tempfile.NamedTemporaryFile(
-            mode="w",
-            dir=path.parent,
-            suffix=".tmp",
-            delete=False,
-        )
-        try:
-            json.dump(data, fd, indent=2)
-            fd.close()
-            Path(fd.name).replace(path)
-        except BaseException:
-            fd.close()
-            Path(fd.name).unlink(missing_ok=True)
-            raise
-
-    def _get_runnable_config(self, thread_id: str, **overrides) -> RunnableConfig:
-        '''根据线程标识和单次覆盖参数构造智能体运行配置。'''
-        configurable = {
-            "thread_id": thread_id,
-            "model_name": overrides.get("model_name", self._model_name),
-            "thinking_enabled": overrides.get("thinking_enabled", self._thinking_enabled),
-            "is_plan_mode": overrides.get("plan_mode", self._plan_mode),
-            "subagent_enabled": overrides.get("subagent_enabled", self._subagent_enabled),
-        }
-        return RunnableConfig(
-            configurable=configurable,
-            recursion_limit=overrides.get("recursion_limit", 100),
-        )
-
-    def _ensure_agent(self, config: RunnableConfig):
-        '''在模型与功能配置变化时创建或重建缓存的智能体。'''
-        cfg = config.get("configurable", {})
-        key = (
-            cfg.get("model_name"),
-            cfg.get("thinking_enabled"),
-            cfg.get("is_plan_mode"),
-            cfg.get("subagent_enabled"),
-            cfg.get("max_concurrent_subagents"),
-            cfg.get("max_total_subagents"),
-            self._agent_name,
-            frozenset(self._available_skills) if self._available_skills is not None else None,
-        )
-
-        if self._agent is not None and self._agent_config_key == key:
-            return
-
-        thinking_enabled = cfg.get("thinking_enabled", True)
-        model_name = cfg.get("model_name")
-        subagent_enabled = cfg.get("subagent_enabled", False)
-        max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
-        max_total_subagents = cfg.get("max_total_subagents", self._app_config.subagents.max_total_per_run)
-
-        tools = self._get_tools(model_name=model_name, subagent_enabled=subagent_enabled)
-        final_tools, deferred_setup = assemble_deferred_tools(tools, enabled=self._app_config.tool_search.enabled)
-        mcp_routing_middleware = build_mcp_routing_middleware(
-            final_tools,
-            deferred_setup,
-            top_k=self._app_config.tool_search.auto_promote_top_k,
-        )
-        mcp_routing_hints_section = get_mcp_routing_hints_prompt_section(tools, deferred_names=deferred_setup.deferred_names)
-
-        skills_list = get_enabled_skills_for_config(self._app_config)
-        if self._available_skills is not None:
-            skills_list = [s for s in skills_list if s.name in self._available_skills]
-        skill_setup = build_skill_search_setup(
-            skills_list,
-            enabled=self._app_config.skills.deferred_discovery,
-            container_base_path=self._app_config.skills.container_path,
-        )
-        if skill_setup.describe_skill_tool:
-            final_tools.append(skill_setup.describe_skill_tool)
-
-        kwargs: dict[str, Any] = {
-            "model": create_chat_model(name=model_name, thinking_enabled=thinking_enabled, attach_tracing=False),
-            "tools": final_tools,
-            "middleware": build_middlewares(
-                config,
-                model_name=model_name,
-                agent_name=self._agent_name,
-                available_skills=self._available_skills,
-                custom_middlewares=self._middlewares,
-                app_config=self._app_config,
-                deferred_setup=deferred_setup,
-                mcp_routing_middleware=mcp_routing_middleware,
-                user_id=get_effective_user_id(),
-            ),
-            "system_prompt": apply_prompt_template(
-                subagent_enabled=subagent_enabled,
-                max_concurrent_subagents=max_concurrent_subagents,
-                max_total_subagents=max_total_subagents,
-                agent_name=self._agent_name,
-                available_skills=self._available_skills,
-                app_config=self._app_config,
-                deferred_names=deferred_setup.deferred_names,
-                mcp_routing_hints_section=mcp_routing_hints_section,
-                user_id=get_effective_user_id(),
-                skill_names=skill_setup.skill_names or None,
-            ),
-            "state_schema": ThreadState,
-        }
-        checkpointer = self._checkpointer
-        if checkpointer is None:
-            from deerflow.runtime.checkpointer import get_checkpointer
-
-            checkpointer = get_checkpointer()
-        if checkpointer is not None:
-            kwargs["checkpointer"] = checkpointer
-
-        self._agent = create_agent(**kwargs)
-        self._agent_config_key = key
-        logger.info("Agent created: agent_name=%s, model=%s, thinking=%s", self._agent_name, model_name, thinking_enabled)
-
-    @staticmethod
-    def _get_tools(*, model_name: str | None, subagent_enabled: bool):
-        '''延迟导入并返回当前模型和子智能体设置可用的工具，避免循环依赖。'''
-        from deerflow.tools import get_available_tools
-
-        return get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled)
-
-    @staticmethod
-    def _serialize_tool_calls(tool_calls) -> list[dict]:
-        '''将工具调用转换为流事件使用的名称、参数和标识字典。'''
-        return [{"name": tc["name"], "args": tc["args"], "id": tc.get("id")} for tc in tool_calls]
-
-    @staticmethod
-    def _serialize_additional_kwargs(msg) -> dict[str, Any] | None:
-        '''在消息携带附加参数时复制其字典，避免事件引用原始对象。'''
-        additional_kwargs = getattr(msg, "additional_kwargs", None)
-        if isinstance(additional_kwargs, dict) and additional_kwargs:
-            return dict(additional_kwargs)
-        return None
-
-    @staticmethod
-    def _ai_text_event(msg_id: str | None, text: str, usage: dict | None, additional_kwargs: dict[str, Any] | None = None) -> "StreamEvent":
-        '''构造包含文本增量、用量与附加参数的 AI 消息流事件。'''
-        data: dict[str, Any] = {"type": "ai", "content": text, "id": msg_id}
-        if usage:
-            data["usage_metadata"] = usage
-        if additional_kwargs:
-            data["additional_kwargs"] = additional_kwargs
-        return StreamEvent(type="messages-tuple", data=data)
-
-    @staticmethod
-    def _ai_tool_calls_event(msg_id: str | None, tool_calls, additional_kwargs: dict[str, Any] | None = None) -> "StreamEvent":
-        '''构造包含 AI 工具调用列表的消息流事件。'''
-        data: dict[str, Any] = {
-            "type": "ai",
-            "content": "",
-            "id": msg_id,
-            "tool_calls": DeerFlowClient._serialize_tool_calls(tool_calls),
-        }
-        if additional_kwargs:
-            data["additional_kwargs"] = additional_kwargs
-        return StreamEvent(type="messages-tuple", data=data)
-
-    @staticmethod
-    def _tool_message_event(msg: ToolMessage) -> "StreamEvent":
-        '''将工具结果消息转换为包含调用关联标识的流事件。'''
-        return StreamEvent(
-            type="messages-tuple",
-            data={
-                "type": "tool",
-                "content": DeerFlowClient._extract_text(msg.content),
-                "name": msg.name,
-                "tool_call_id": msg.tool_call_id,
-                "id": msg.id,
-            },
-        )
-
-    @staticmethod
-    def _serialize_message(msg) -> dict:
-        '''将各类框架消息序列化为状态快照中的普通字典。'''
-        if isinstance(msg, AIMessage):
-            d: dict[str, Any] = {"type": "ai", "content": msg.content, "id": getattr(msg, "id", None)}
-            if msg.tool_calls:
-                d["tool_calls"] = DeerFlowClient._serialize_tool_calls(msg.tool_calls)
-            if getattr(msg, "usage_metadata", None):
-                d["usage_metadata"] = msg.usage_metadata
-            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
-                d["additional_kwargs"] = additional_kwargs
-            return d
-        if isinstance(msg, ToolMessage):
-            d = {
-                "type": "tool",
-                "content": DeerFlowClient._extract_text(msg.content),
-                "name": getattr(msg, "name", None),
-                "tool_call_id": getattr(msg, "tool_call_id", None),
-                "id": getattr(msg, "id", None),
-            }
-            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
-                d["additional_kwargs"] = additional_kwargs
-            return d
-        if isinstance(msg, HumanMessage):
-            d = {"type": "human", "content": msg.content, "id": getattr(msg, "id", None)}
-            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
-                d["additional_kwargs"] = additional_kwargs
-            return d
-        if isinstance(msg, SystemMessage):
-            d = {"type": "system", "content": msg.content, "id": getattr(msg, "id", None)}
-            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
-                d["additional_kwargs"] = additional_kwargs
-            return d
-        return {"type": "unknown", "content": str(msg), "id": getattr(msg, "id", None)}
-
-    @staticmethod
-    def _extract_text(content) -> str:
-        '''从字符串或内容块列表中提取可展示的纯文本。
-
-        连续短字符串块会直接拼接，以保留令牌增量和分片结构化数据；字典文本块按换行
-        合并，以维持完整段落的可读性。
-        '''
-        if isinstance(content, str):
-            return content
-        if isinstance(content, list):
-            if content and all(isinstance(block, str) for block in content):
-                chunk_like = len(content) > 1 and all(isinstance(block, str) and len(block) <= 20 and any(ch in block for ch in '{}[]":,') for block in content)
-                return "".join(content) if chunk_like else "\n".join(content)
-
-            pieces: list[str] = []
-            pending_str_parts: list[str] = []
-
-            def flush_pending_str_parts() -> None:
-                '''将暂存的连续字符串块合并为一个文本片段。'''
-                if pending_str_parts:
-                    pieces.append("".join(pending_str_parts))
-                    pending_str_parts.clear()
-
-            for block in content:
-                if isinstance(block, str):
-                    pending_str_parts.append(block)
-                elif isinstance(block, dict):
-                    flush_pending_str_parts()
-                    text_val = block.get("text")
-                    if isinstance(text_val, str):
-                        pieces.append(text_val)
-
-            flush_pending_str_parts()
-            return "\n".join(pieces) if pieces else ""
-        return str(content)
-
+    def get_goal(self, thread_id: str) -> dict:
+        '''读取线程当前目标；目标不存在时返回空目标结果。'''
+        checkpointer = self._get_thread_checkpointer()
+        goal = _run_async_from_sync(read_thread_goal(checkpointer, thread_id))
+        return {"goal": goal}
 
     def _get_thread_checkpointer(self):
         '''返回显式注入或按当前配置解析出的线程检查点存储。'''
@@ -396,12 +151,6 @@ class DeerFlowClient:
 
             checkpointer = get_checkpointer()
         return checkpointer
-
-    def get_goal(self, thread_id: str) -> dict:
-        '''读取线程当前目标；目标不存在时返回空目标结果。'''
-        checkpointer = self._get_thread_checkpointer()
-        goal = _run_async_from_sync(read_thread_goal(checkpointer, thread_id))
-        return {"goal": goal}
 
     def set_goal(
         self,
@@ -515,6 +264,89 @@ class DeerFlowClient:
 
         return {"thread_id": thread_id, "checkpoints": checkpoints}
 
+    @staticmethod
+    def _serialize_message(msg) -> dict:
+        '''将各类框架消息序列化为状态快照中的普通字典。'''
+        if isinstance(msg, AIMessage):
+            d: dict[str, Any] = {"type": "ai", "content": msg.content, "id": getattr(msg, "id", None)}
+            if msg.tool_calls:
+                d["tool_calls"] = DeerFlowClient._serialize_tool_calls(msg.tool_calls)
+            if getattr(msg, "usage_metadata", None):
+                d["usage_metadata"] = msg.usage_metadata
+            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
+                d["additional_kwargs"] = additional_kwargs
+            return d
+        if isinstance(msg, ToolMessage):
+            d = {
+                "type": "tool",
+                "content": DeerFlowClient._extract_text(msg.content),
+                "name": getattr(msg, "name", None),
+                "tool_call_id": getattr(msg, "tool_call_id", None),
+                "id": getattr(msg, "id", None),
+            }
+            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
+                d["additional_kwargs"] = additional_kwargs
+            return d
+        if isinstance(msg, HumanMessage):
+            d = {"type": "human", "content": msg.content, "id": getattr(msg, "id", None)}
+            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
+                d["additional_kwargs"] = additional_kwargs
+            return d
+        if isinstance(msg, SystemMessage):
+            d = {"type": "system", "content": msg.content, "id": getattr(msg, "id", None)}
+            if additional_kwargs := DeerFlowClient._serialize_additional_kwargs(msg):
+                d["additional_kwargs"] = additional_kwargs
+            return d
+        return {"type": "unknown", "content": str(msg), "id": getattr(msg, "id", None)}
+
+    @staticmethod
+    def _serialize_tool_calls(tool_calls) -> list[dict]:
+        '''将工具调用转换为流事件使用的名称、参数和标识字典。'''
+        return [{"name": tc["name"], "args": tc["args"], "id": tc.get("id")} for tc in tool_calls]
+
+    @staticmethod
+    def _serialize_additional_kwargs(msg) -> dict[str, Any] | None:
+        '''在消息携带附加参数时复制其字典，避免事件引用原始对象。'''
+        additional_kwargs = getattr(msg, "additional_kwargs", None)
+        if isinstance(additional_kwargs, dict) and additional_kwargs:
+            return dict(additional_kwargs)
+        return None
+
+    @staticmethod
+    def _extract_text(content) -> str:
+        '''从字符串或内容块列表中提取可展示的纯文本。
+
+        连续短字符串块会直接拼接，以保留令牌增量和分片结构化数据；字典文本块按换行
+        合并，以维持完整段落的可读性。
+        '''
+        if isinstance(content, str):
+            return content
+        if isinstance(content, list):
+            if content and all(isinstance(block, str) for block in content):
+                chunk_like = len(content) > 1 and all(isinstance(block, str) and len(block) <= 20 and any(ch in block for ch in '{}[]":,') for block in content)
+                return "".join(content) if chunk_like else "\n".join(content)
+
+            pieces: list[str] = []
+            pending_str_parts: list[str] = []
+
+            def flush_pending_str_parts() -> None:
+                '''将暂存的连续字符串块合并为一个文本片段。'''
+                if pending_str_parts:
+                    pieces.append("".join(pending_str_parts))
+                    pending_str_parts.clear()
+
+            for block in content:
+                if isinstance(block, str):
+                    pending_str_parts.append(block)
+                elif isinstance(block, dict):
+                    flush_pending_str_parts()
+                    text_val = block.get("text")
+                    if isinstance(text_val, str):
+                        pieces.append(text_val)
+
+            flush_pending_str_parts()
+            return "\n".join(pieces) if pieces else ""
+        return str(content)
 
     def stream(
         self,
@@ -591,7 +423,7 @@ class DeerFlowClient:
             config,
             thread_id=thread_id,
             user_id=get_effective_user_id(),
-            assistant_id=self._agent_name or "lead-agent",
+            assistant_id="lead-agent",
             model_name=configurable.get("model_name") or self._model_name,
             environment=self._environment or os.environ.get("DEER_FLOW_ENV") or os.environ.get("ENVIRONMENT"),
             deerflow_trace_id=deerflow_trace_id,
@@ -604,8 +436,6 @@ class DeerFlowClient:
         context = {"thread_id": thread_id, "run_id": run_id}
         if deerflow_trace_id:
             context[DEERFLOW_TRACE_METADATA_KEY] = deerflow_trace_id
-        if self._agent_name:
-            context["agent_name"] = self._agent_name
 
         seen_ids: set[str] = set()
         streamed_ids: set[str] = set()
@@ -767,6 +597,144 @@ class DeerFlowClient:
 
         yield StreamEvent(type="end", data={"usage": cumulative_usage})
 
+    def _get_runnable_config(self, thread_id: str, **overrides) -> RunnableConfig:
+        '''根据线程标识和单次覆盖参数构造智能体运行配置。'''
+        configurable = {
+            "thread_id": thread_id,
+            "model_name": overrides.get("model_name", self._model_name),
+            "thinking_enabled": overrides.get("thinking_enabled", self._thinking_enabled),
+            "is_plan_mode": overrides.get("plan_mode", self._plan_mode),
+            "subagent_enabled": overrides.get("subagent_enabled", self._subagent_enabled),
+        }
+        return RunnableConfig(
+            configurable=configurable,
+            recursion_limit=overrides.get("recursion_limit", 100),
+        )
+
+    def _ensure_agent(self, config: RunnableConfig):
+        '''在模型与功能配置变化时创建或重建缓存的智能体。'''
+        cfg = config.get("configurable", {})
+        key = (
+            cfg.get("model_name"),
+            cfg.get("thinking_enabled"),
+            cfg.get("is_plan_mode"),
+            cfg.get("subagent_enabled"),
+            cfg.get("max_concurrent_subagents"),
+            cfg.get("max_total_subagents"),
+            frozenset(self._available_skills) if self._available_skills is not None else None,
+        )
+
+        if self._agent is not None and self._agent_config_key == key:
+            return
+
+        thinking_enabled = cfg.get("thinking_enabled", True)
+        model_name = cfg.get("model_name")
+        subagent_enabled = cfg.get("subagent_enabled", False)
+        max_concurrent_subagents = cfg.get("max_concurrent_subagents", 3)
+        max_total_subagents = cfg.get("max_total_subagents", self._app_config.subagents.max_total_per_run)
+
+        tools = self._get_tools(model_name=model_name, subagent_enabled=subagent_enabled)
+        final_tools, deferred_setup = assemble_deferred_tools(tools, enabled=self._app_config.tool_search.enabled)
+        mcp_routing_middleware = build_mcp_routing_middleware(
+            final_tools,
+            deferred_setup,
+            top_k=self._app_config.tool_search.auto_promote_top_k,
+        )
+        mcp_routing_hints_section = get_mcp_routing_hints_prompt_section(tools, deferred_names=deferred_setup.deferred_names)
+
+        skills_list = get_enabled_skills_for_config(self._app_config)
+        if self._available_skills is not None:
+            skills_list = [s for s in skills_list if s.name in self._available_skills]
+        skill_setup = build_skill_search_setup(
+            skills_list,
+            enabled=self._app_config.skills.deferred_discovery,
+            container_base_path=self._app_config.skills.container_path,
+        )
+        if skill_setup.describe_skill_tool:
+            final_tools.append(skill_setup.describe_skill_tool)
+
+        kwargs: dict[str, Any] = {
+            "model": create_chat_model(name=model_name, thinking_enabled=thinking_enabled, attach_tracing=False),
+            "tools": final_tools,
+            "middleware": build_middlewares(
+                config,
+                model_name=model_name,
+                available_skills=self._available_skills,
+                custom_middlewares=self._middlewares,
+                app_config=self._app_config,
+                deferred_setup=deferred_setup,
+                mcp_routing_middleware=mcp_routing_middleware,
+                user_id=get_effective_user_id(),
+            ),
+            "system_prompt": apply_prompt_template(
+                subagent_enabled=subagent_enabled,
+                max_concurrent_subagents=max_concurrent_subagents,
+                max_total_subagents=max_total_subagents,
+                available_skills=self._available_skills,
+                app_config=self._app_config,
+                deferred_names=deferred_setup.deferred_names,
+                mcp_routing_hints_section=mcp_routing_hints_section,
+                user_id=get_effective_user_id(),
+                skill_names=skill_setup.skill_names or None,
+            ),
+            "state_schema": ThreadState,
+        }
+        checkpointer = self._checkpointer
+        if checkpointer is None:
+            from deerflow.runtime.checkpointer import get_checkpointer
+
+            checkpointer = get_checkpointer()
+        if checkpointer is not None:
+            kwargs["checkpointer"] = checkpointer
+
+        self._agent = create_agent(**kwargs)
+        self._agent_config_key = key
+        logger.info("Agent created: model=%s, thinking=%s", model_name, thinking_enabled)
+
+    @staticmethod
+    def _get_tools(*, model_name: str | None, subagent_enabled: bool):
+        '''延迟导入并返回当前模型和子智能体设置可用的工具，避免循环依赖。'''
+        from deerflow.tools import get_available_tools
+
+        return get_available_tools(model_name=model_name, subagent_enabled=subagent_enabled)
+
+    @staticmethod
+    def _ai_text_event(msg_id: str | None, text: str, usage: dict | None, additional_kwargs: dict[str, Any] | None = None) -> "StreamEvent":
+        '''构造包含文本增量、用量与附加参数的 AI 消息流事件。'''
+        data: dict[str, Any] = {"type": "ai", "content": text, "id": msg_id}
+        if usage:
+            data["usage_metadata"] = usage
+        if additional_kwargs:
+            data["additional_kwargs"] = additional_kwargs
+        return StreamEvent(type="messages-tuple", data=data)
+
+    @staticmethod
+    def _ai_tool_calls_event(msg_id: str | None, tool_calls, additional_kwargs: dict[str, Any] | None = None) -> "StreamEvent":
+        '''构造包含 AI 工具调用列表的消息流事件。'''
+        data: dict[str, Any] = {
+            "type": "ai",
+            "content": "",
+            "id": msg_id,
+            "tool_calls": DeerFlowClient._serialize_tool_calls(tool_calls),
+        }
+        if additional_kwargs:
+            data["additional_kwargs"] = additional_kwargs
+        return StreamEvent(type="messages-tuple", data=data)
+
+    @staticmethod
+    def _tool_message_event(msg: ToolMessage) -> "StreamEvent":
+        '''将工具结果消息转换为包含调用关联标识的流事件。'''
+        return StreamEvent(
+            type="messages-tuple",
+            data={
+                "type": "tool",
+                "content": DeerFlowClient._extract_text(msg.content),
+                "name": msg.name,
+                "tool_call_id": msg.tool_call_id,
+                "id": msg.id,
+            },
+        )
+
     def chat(self, message: str, *, thread_id: str | None = None, **kwargs) -> str:
         '''发送消息并返回最后一个人工智能消息拼接后的完整文本。
 
@@ -783,7 +751,6 @@ class DeerFlowClient:
                     chunks.setdefault(msg_id, []).append(delta)
                     last_id = msg_id
         return "".join(chunks.get(last_id, ()))
-
 
     def list_models(self) -> dict:
         '''列出配置中的模型及其思考、推理能力和令牌统计开关。'''
@@ -854,7 +821,6 @@ class DeerFlowClient:
             "supports_reasoning_effort": getattr(model, "supports_reasoning_effort", False),
         }
 
-
     def get_mcp_config(self) -> dict:
         '''读取当前扩展配置中的 MCP 服务器定义。'''
         config = get_extensions_config()
@@ -880,6 +846,23 @@ class DeerFlowClient:
         reloaded = reload_extensions_config()
         return {"mcp_servers": {name: server.model_dump() for name, server in reloaded.mcp_servers.items()}}
 
+    @staticmethod
+    def _atomic_write_json(path: Path, data: dict) -> None:
+        '''将字典先写入同目录临时文件，再原子替换目标数据文件。'''
+        fd = tempfile.NamedTemporaryFile(
+            mode="w",
+            dir=path.parent,
+            suffix=".tmp",
+            delete=False,
+        )
+        try:
+            json.dump(data, fd, indent=2)
+            fd.close()
+            Path(fd.name).replace(path)
+        except BaseException:
+            fd.close()
+            Path(fd.name).unlink(missing_ok=True)
+            raise
 
     def get_skill(self, name: str) -> dict | None:
         '''按名称读取当前用户可见技能的元数据；不存在时返回空值。'''
@@ -969,7 +952,6 @@ class DeerFlowClient:
         '''从本地技能归档安装技能，并返回安装结果或相应路径、格式错误。'''
         return get_or_new_user_skill_storage(get_effective_user_id(), app_config=self._app_config).install_skill_from_archive(skill_path)
 
-
     def reload_memory(self) -> dict:
         '''从持久化介质重载当前用户记忆并使内存缓存失效。'''
         from deerflow.agents.memory import get_memory_manager
@@ -1047,7 +1029,6 @@ class DeerFlowClient:
             "config": self.get_memory_config(),
             "data": self.get_memory(),
         }
-
 
     def upload_files(self, thread_id: str, files: list[str | Path]) -> dict:
         '''将本地普通文件上传至线程隔离的上传目录。
@@ -1147,7 +1128,6 @@ class DeerFlowClient:
 
         uploads_dir = get_uploads_dir(thread_id)
         return delete_file_safe(uploads_dir, filename, convertible_extensions=CONVERTIBLE_EXTENSIONS)
-
 
     def get_artifact(self, thread_id: str, path: str) -> tuple[bytes, str]:
         '''按线程与虚拟路径读取智能体产物，返回字节内容和推断的媒体类型。

@@ -3,7 +3,6 @@ import { Toaster } from "sonner";
 
 import { QueryClientProvider } from "@/components/query-client-provider";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
-import { CommandPalette } from "@/components/workspace/command-palette";
 import { GatewayOfflineBanner } from "@/components/workspace/gateway-offline-banner";
 import { WorkspaceSidebar } from "@/components/workspace/workspace-sidebar";
 
@@ -16,7 +15,7 @@ function parseSidebarOpenCookie(
   return undefined;
 }
 
-/** 装配工作区共享的查询、侧栏、命令面板与通知上下文。 */
+/** 装配工作区共享的查询、侧栏与通知上下文。 */
 export async function WorkspaceContent({
   children,
   gatewayUnavailable = false,
@@ -38,7 +37,6 @@ export async function WorkspaceContent({
           {children}
         </SidebarInset>
       </SidebarProvider>
-      <CommandPalette />
       <Toaster position="top-center" />
     </QueryClientProvider>
   );

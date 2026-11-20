@@ -61,6 +61,13 @@ class UserScopedSkillStorage(LocalSkillStorage):
         self._global_custom_root: Path = self._host_root / SkillCategory.CUSTOM.value
         self._skill_states_file: Path = self._user_skills_root / "_skill_states.json"
 
+    def get_skill_enabled_state(self, skill_name: str) -> bool:
+        '''读取自定义或旧技能的用户级开关；尚无记录时默认启用。'''
+        states = self._read_skill_states()
+        entry = states.get(skill_name)
+        if entry is None:
+            return True
+        return entry.get("enabled", True)
 
     def _read_skill_states(self) -> dict[str, dict[str, bool]]:
         '''读取用户技能开关；文件不存在、损坏或不可读时返回空映射。'''
@@ -74,6 +81,12 @@ class UserScopedSkillStorage(LocalSkillStorage):
         except (json.JSONDecodeError, OSError):
             logger.warning("Failed to read skill states file %s", self._skill_states_file)
         return {}
+
+    def set_skill_enabled_state(self, skill_name: str, enabled: bool) -> None:
+        '''更新指定技能的用户级启用状态并持久化。'''
+        states = self._read_skill_states()
+        states[skill_name] = {"enabled": enabled}
+        self._write_skill_states(states)
 
     def _write_skill_states(self, states: dict[str, dict[str, bool]]) -> None:
         '''将用户技能开关写入同目录临时文件，再替换正式文件以避免写坏原状态。'''
@@ -96,21 +109,6 @@ class UserScopedSkillStorage(LocalSkillStorage):
                 pass
             raise
 
-    def get_skill_enabled_state(self, skill_name: str) -> bool:
-        '''读取自定义或旧技能的用户级开关；尚无记录时默认启用。'''
-        states = self._read_skill_states()
-        entry = states.get(skill_name)
-        if entry is None:
-            return True
-        return entry.get("enabled", True)
-
-    def set_skill_enabled_state(self, skill_name: str, enabled: bool) -> None:
-        '''更新指定技能的用户级启用状态并持久化。'''
-        states = self._read_skill_states()
-        states[skill_name] = {"enabled": enabled}
-        self._write_skill_states(states)
-
-
     def get_custom_skill_dir(self, name: str) -> Path:
         '''返回当前用户的自定义技能目录，不创建目录。'''
         normalized_name = self.validate_skill_name(name)
@@ -124,7 +122,6 @@ class UserScopedSkillStorage(LocalSkillStorage):
         '''返回当前用户该技能的 JSONL 历史文件路径。'''
         normalized_name = self.validate_skill_name(name)
         return self._user_custom_root / ".history" / f"{normalized_name}.jsonl"
-
 
     def load_skills(self, *, enabled_only: bool = False) -> list:
         '''发现技能后合并用户级开关；公共技能仍沿用全局启用配置。'''
@@ -147,7 +144,6 @@ class UserScopedSkillStorage(LocalSkillStorage):
 
         return skills
 
-
     def public_skill_exists(self, name: str) -> bool:
         '''检查公共技能或全局旧技能是否存在，以便编辑操作返回正确的只读提示。'''
         normalized_name = self.validate_skill_name(name)
@@ -169,28 +165,6 @@ class UserScopedSkillStorage(LocalSkillStorage):
         if is_global_custom_fallback:
             raise ValueError(f"'{name}' 是旧版共享技能（不可编辑）。若要自定义，请创建同名个人版本，它将覆盖共享版本。")
         raise FileNotFoundError(f"找不到自定义技能 '{name}'。")
-
-    def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
-        '''枚举全局公共技能、用户自定义技能及条件成立时的全局旧技能。'''
-        # 公共技能始终来自共享技能根目录。
-        public_path = self._host_root / SkillCategory.PUBLIC.value
-        if public_path.exists() and public_path.is_dir():
-            for skill_file in _iter_direct_skill_files(public_path):
-                yield SkillCategory.PUBLIC, public_path, skill_file
-
-        user_custom_exists = False
-        user_custom_path = self._user_custom_root
-        if user_custom_path.exists() and user_custom_path.is_dir():
-            for skill_file in _iter_direct_skill_files(user_custom_path):
-                user_custom_exists = True
-                yield SkillCategory.CUSTOM, user_custom_path, skill_file
-
-        if not user_custom_exists:
-            global_custom_path = self._global_custom_root
-            if global_custom_path.exists() and global_custom_path.is_dir():
-                for skill_file in _iter_direct_skill_files(global_custom_path):
-                    yield SkillCategory.LEGACY, global_custom_path, skill_file
-
 
     async def ainstall_skill_from_archive(self, archive_path: str | Path) -> dict:
         '''将技能包安装到当前用户目录，并在提交前执行异步安全扫描。'''
@@ -227,7 +201,6 @@ class UserScopedSkillStorage(LocalSkillStorage):
             "message": f"已为用户 '{self._user_id}' 成功安装技能 '{skill_name}'",
         }
 
-
     def write_custom_skill(self, name: str, relative_path: str, content: str) -> None:
         '''原子写入当前用户的技能文件，并设置沙箱可读取的文件权限。'''
         # 首次写入时创建用户技能目录。
@@ -245,7 +218,6 @@ class UserScopedSkillStorage(LocalSkillStorage):
         tmp_path.replace(target)
         make_skill_written_path_sandbox_readable(self.get_custom_skill_dir(name), target)
 
-
     @property
     def user_id(self) -> str:
         '''返回此技能仓储绑定的规范化用户标识。'''
@@ -254,7 +226,6 @@ class UserScopedSkillStorage(LocalSkillStorage):
     def get_user_custom_root(self) -> Path:
         '''返回当前用户自定义技能的宿主机根目录。'''
         return self._user_custom_root
-
 
     def validate_skill_file_path(self, skill_file: Path) -> Path:
         '''解析技能文件，并确认它位于全局根目录或当前用户技能根目录内。'''
@@ -266,3 +237,24 @@ class UserScopedSkillStorage(LocalSkillStorage):
             except ValueError:
                 continue
         raise ValueError(f"解析后的技能文件 {resolved_file} 必须位于全局技能根目录（{self._host_root.resolve()}）或用户自定义根目录（{self._user_custom_root.resolve()}）内部。")
+
+    def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
+        '''枚举全局公共技能、用户自定义技能及条件成立时的全局旧技能。'''
+        # 公共技能始终来自共享技能根目录。
+        public_path = self._host_root / SkillCategory.PUBLIC.value
+        if public_path.exists() and public_path.is_dir():
+            for skill_file in _iter_direct_skill_files(public_path):
+                yield SkillCategory.PUBLIC, public_path, skill_file
+
+        user_custom_exists = False
+        user_custom_path = self._user_custom_root
+        if user_custom_path.exists() and user_custom_path.is_dir():
+            for skill_file in _iter_direct_skill_files(user_custom_path):
+                user_custom_exists = True
+                yield SkillCategory.CUSTOM, user_custom_path, skill_file
+
+        if not user_custom_exists:
+            global_custom_path = self._global_custom_root
+            if global_custom_path.exists() and global_custom_path.is_dir():
+                for skill_file in _iter_direct_skill_files(global_custom_path):
+                    yield SkillCategory.LEGACY, global_custom_path, skill_file

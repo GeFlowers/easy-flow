@@ -14,9 +14,19 @@ from sqlalchemy import select
 
 from server.gateway.auth.credential_file import write_initial_credentials
 from server.gateway.auth.password import hash_password
-from server.gateway.auth.repositories.sql import SQLUserRepository
+from server.gateway.user_repository import SQLUserRepository
 from deerflow.persistence.user.model import UserRow
 from deerflow.utils.event_loop import run_async
+
+
+def main() -> None:
+    '''解析命令行参数、运行异步重置流程并退出。'''
+    parser = argparse.ArgumentParser(description="Reset admin password")
+    parser.add_argument("--email", help="Admin email (default: first admin found)")
+    args = parser.parse_args()
+
+    exit_code = run_async(_run(args.email))
+    sys.exit(exit_code)
 
 
 async def _run(email: str | None) -> int:
@@ -70,16 +80,6 @@ async def _run(email: str | None) -> int:
         return 0
     finally:
         await close_engine()
-
-
-def main() -> None:
-    '''解析命令行参数、运行异步重置流程并退出。'''
-    parser = argparse.ArgumentParser(description="Reset admin password")
-    parser.add_argument("--email", help="Admin email (default: first admin found)")
-    args = parser.parse_args()
-
-    exit_code = run_async(_run(args.email))
-    sys.exit(exit_code)
 
 
 if __name__ == "__main__":

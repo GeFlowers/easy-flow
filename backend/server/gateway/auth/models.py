@@ -19,13 +19,9 @@ class User(BaseModel):
 
     id: UUID = Field(default_factory=uuid4, description="Primary key")
     email: EmailStr = Field(..., description="Unique email address")
-    password_hash: str | None = Field(None, description="bcrypt hash, nullable for OAuth users")
+    password_hash: str | None = Field(None, description="bcrypt hash; absent until a local password is assigned")
     system_role: Literal["admin", "user"] = Field(default="user")
     created_at: datetime = Field(default_factory=_utc_now)
-
-    # 可选的第三方登录关联信息
-    oauth_provider: str | None = Field(None, description="e.g. 'github', 'google'")
-    oauth_id: str | None = Field(None, description="User ID from OAuth provider")
 
     # 认证生命周期状态
     needs_setup: bool = Field(default=False, description="True when a reset account must complete setup")
@@ -39,4 +35,3 @@ class UserResponse(BaseModel):
     email: str
     system_role: Literal["admin", "user"]
     needs_setup: bool = False
-    oauth_provider: str | None = Field(None, description="OAuth/SSO provider ID if the user logged in via SSO (e.g. 'keycloak')")

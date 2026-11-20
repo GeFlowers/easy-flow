@@ -145,7 +145,7 @@ export function WechatConnectDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>连接个人微信</DialogTitle>
           <DialogDescription>

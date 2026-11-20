@@ -30,7 +30,7 @@ export const ArtifactTrigger = () => {
         }}
       >
         <FilesIcon />
-        <span className="hidden sm:inline">{t.common.artifacts}</span>
+        <span className="inline">{t.common.artifacts}</span>
       </Button>
     </Tooltip>
   );

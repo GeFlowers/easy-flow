@@ -95,186 +95,6 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
         self._circuit_state = "closed"
         self._circuit_probe_in_flight = False
 
-    def _max_attempts_for(self, exc: BaseException) -> int:
-        '''按异常类型的专属限制计算尝试次数，并受中间件全局重试上限约束。'''
-        override = _RETRY_BUDGET_OVERRIDES.get(type(exc).__name__)
-        if override is None:
-            return self.retry_max_attempts
-
-        return min(override, self.retry_max_attempts)
-
-    def _check_circuit(self) -> bool:
-        '''推进熔断器状态；熔断期间或探测请求已占用时返回 True 以快速失败。'''
-        with self._circuit_lock:
-            now = time.time()
-
-            if self._circuit_state == "open":
-                if now < self._circuit_open_until:
-                    return True
-                self._circuit_state = "half_open"
-                self._circuit_probe_in_flight = False
-
-            if self._circuit_state == "half_open":
-                if self._circuit_probe_in_flight:
-                    return True
-                self._circuit_probe_in_flight = True
-                return False
-
-            return False
-
-    def _record_success(self) -> None:
-        '''记录一次成功调用并重置熔断器状态。'''
-        with self._circuit_lock:
-            if self._circuit_state != "closed" or self._circuit_failure_count > 0:
-                logger.info("Circuit breaker reset (Closed). LLM service recovered.")
-            self._circuit_failure_count = 0
-            self._circuit_open_until = 0.0
-            self._circuit_state = "closed"
-            self._circuit_probe_in_flight = False
-
-    def _record_failure(self) -> None:
-        '''记录可重试失败，并在达到阈值时打开熔断器。'''
-        with self._circuit_lock:
-            if self._circuit_state == "half_open":
-                self._circuit_open_until = time.time() + self.circuit_recovery_timeout_sec
-                self._circuit_state = "open"
-                self._circuit_probe_in_flight = False
-                logger.error(
-                    "Circuit breaker probe failed (Open). Will probe again after %ds.",
-                    self.circuit_recovery_timeout_sec,
-                )
-                return
-
-            self._circuit_failure_count += 1
-            if self._circuit_failure_count >= self.circuit_failure_threshold:
-                self._circuit_open_until = time.time() + self.circuit_recovery_timeout_sec
-                if self._circuit_state != "open":
-                    self._circuit_state = "open"
-                    self._circuit_probe_in_flight = False
-                    logger.error(
-                        "Circuit breaker tripped (Open). Threshold reached (%d). Will probe after %ds.",
-                        self.circuit_failure_threshold,
-                        self.circuit_recovery_timeout_sec,
-                    )
-
-    def _release_half_open_probe(self) -> None:
-        '''释放半开状态下占用的探测名额，但不把控制流中断或不可重试错误记作失败。'''
-        with self._circuit_lock:
-            if self._circuit_state == "half_open":
-                self._circuit_probe_in_flight = False
-
-    def _classify_error(self, exc: BaseException) -> tuple[bool, str]:
-        '''将异常分类为是否可重试及其面向用户的原因类别。'''
-        detail = _extract_error_detail(exc)
-        lowered = detail.lower()
-        error_code = _extract_error_code(exc)
-        status_code = _extract_status_code(exc)
-
-        if _matches_any(lowered, _QUOTA_PATTERNS) or _matches_any(str(error_code).lower(), _QUOTA_PATTERNS):
-            return False, "quota"
-        if _matches_any(lowered, _AUTH_PATTERNS):
-            return False, "auth"
-
-        exc_name = exc.__class__.__name__
-        if exc_name in {
-            "APITimeoutError",
-            "APIConnectionError",
-            "InternalServerError",
-            "ReadError",
-            "RemoteProtocolError",
-            "StreamChunkTimeoutError",
-        }:
-            return True, "transient"
-        if isinstance(exc, IndexError):
-            return True, "transient"
-        if status_code in _RETRIABLE_STATUS_CODES:
-            return True, "transient"
-        if _matches_any(lowered, _BUSY_PATTERNS):
-            return True, "busy"
-
-        return False, "generic"
-
-    def _build_retry_delay_ms(self, attempt: int, exc: BaseException) -> int:
-        '''根据重试响应头或指数退避计算下一次等待毫秒数。'''
-        retry_after = _extract_retry_after_ms(exc)
-        if retry_after is not None:
-            return retry_after
-        backoff = self.retry_base_delay_ms * (2 ** max(0, attempt - 1))
-        return min(backoff, self.retry_cap_delay_ms)
-
-    def _build_retry_message(self, attempt: int, wait_ms: int, reason: str) -> str:
-        '''构造包含次数、原因和等待时间的重试进度消息。'''
-        seconds = max(1, round(wait_ms / 1000))
-        reason_text = "服务提供方繁忙" if reason == "busy" else "服务提供方请求暂时失败"
-        return f"大语言模型请求重试 {attempt}/{self.retry_max_attempts}: {reason_text}。将在以下等待时间后重试： {seconds}s."
-
-    def _build_circuit_breaker_message(self) -> str:
-        '''构造熔断器打开时返回给用户的说明。'''
-        return "配置的大语言模型服务提供方持续失败，目前不可用。已启用熔断保护系统。请稍后重试。"
-
-    def _build_error_fallback_message(
-        self,
-        content: str,
-        *,
-        error_type: str,
-        reason: str,
-        detail: str,
-    ) -> AIMessage:
-        '''将错误详情封装为带 DeerFlow 元数据的 AI 降级消息。'''
-        return AIMessage(
-            content=content,
-            additional_kwargs={
-                "deerflow_error_fallback": True,
-                "error_type": error_type,
-                "error_reason": reason,
-                "error_detail": detail,
-            },
-        )
-
-    def _build_user_message(self, exc: BaseException, reason: str) -> str:
-        '''按错误类别生成可执行的用户提示文本。'''
-        detail = _extract_error_detail(exc)
-        if reason == "quota":
-            return "配置的大语言模型服务提供方拒绝了请求，原因可能是账户配额耗尽、计费不可用或使用受限。请处理服务账户问题后重试。"
-        if reason == "auth":
-            return "配置的大语言模型服务提供方因身份验证或访问权限无效而拒绝了请求。请检查服务凭据后重试。"
-        if reason in {"busy", "transient"}:
-            if type(exc).__name__ in _STREAM_DROP_EXCEPTIONS:
-                return (
-                    "模型的流式响应在完成前中断。这通常发生在单次响应或工具调用过大时。"
-                    "请让助手将工作拆分为更小的步骤，或缩短请求的输出后重试。"
-                )
-            return "配置的大语言模型服务提供方在多次重试后仍暂时不可用。请稍后继续对话。"
-        return f"大语言模型请求失败： {detail}"
-
-    def _build_user_fallback_message(self, exc: BaseException, reason: str) -> AIMessage:
-        '''构造包含分类信息的用户可见降级 AI 消息。'''
-        return self._build_error_fallback_message(
-            self._build_user_message(exc, reason),
-            error_type=type(exc).__name__,
-            reason=reason,
-            detail=_extract_error_detail(exc),
-        )
-
-    def _emit_retry_event(self, attempt: int, wait_ms: int, reason: str) -> None:
-        '''向当前流写入器发送一次 LLM 重试进度事件。'''
-        try:
-            from langgraph.config import get_stream_writer
-
-            writer = get_stream_writer()
-            writer(
-                {
-                    "type": "llm_retry",
-                    "attempt": attempt,
-                    "max_attempts": self.retry_max_attempts,
-                    "wait_ms": wait_ms,
-                    "reason": reason,
-                    "message": self._build_retry_message(attempt, wait_ms, reason),
-                }
-            )
-        except Exception:
-            logger.debug("Failed to emit llm_retry event", exc_info=True)
-
     @override
     def wrap_model_call(
         self,
@@ -326,6 +146,186 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 else:
                     self._release_half_open_probe()
                 return self._build_user_fallback_message(exc, reason)
+
+    def _check_circuit(self) -> bool:
+        '''推进熔断器状态；熔断期间或探测请求已占用时返回 True 以快速失败。'''
+        with self._circuit_lock:
+            now = time.time()
+
+            if self._circuit_state == "open":
+                if now < self._circuit_open_until:
+                    return True
+                self._circuit_state = "half_open"
+                self._circuit_probe_in_flight = False
+
+            if self._circuit_state == "half_open":
+                if self._circuit_probe_in_flight:
+                    return True
+                self._circuit_probe_in_flight = True
+                return False
+
+            return False
+
+    def _build_error_fallback_message(
+        self,
+        content: str,
+        *,
+        error_type: str,
+        reason: str,
+        detail: str,
+    ) -> AIMessage:
+        '''将错误详情封装为带 DeerFlow 元数据的 AI 降级消息。'''
+        return AIMessage(
+            content=content,
+            additional_kwargs={
+                "deerflow_error_fallback": True,
+                "error_type": error_type,
+                "error_reason": reason,
+                "error_detail": detail,
+            },
+        )
+
+    def _build_circuit_breaker_message(self) -> str:
+        '''构造熔断器打开时返回给用户的说明。'''
+        return "配置的大语言模型服务提供方持续失败，目前不可用。已启用熔断保护系统。请稍后重试。"
+
+    def _record_success(self) -> None:
+        '''记录一次成功调用并重置熔断器状态。'''
+        with self._circuit_lock:
+            if self._circuit_state != "closed" or self._circuit_failure_count > 0:
+                logger.info("Circuit breaker reset (Closed). LLM service recovered.")
+            self._circuit_failure_count = 0
+            self._circuit_open_until = 0.0
+            self._circuit_state = "closed"
+            self._circuit_probe_in_flight = False
+
+    def _release_half_open_probe(self) -> None:
+        '''释放半开状态下占用的探测名额，但不把控制流中断或不可重试错误记作失败。'''
+        with self._circuit_lock:
+            if self._circuit_state == "half_open":
+                self._circuit_probe_in_flight = False
+
+    def _classify_error(self, exc: BaseException) -> tuple[bool, str]:
+        '''将异常分类为是否可重试及其面向用户的原因类别。'''
+        detail = _extract_error_detail(exc)
+        lowered = detail.lower()
+        error_code = _extract_error_code(exc)
+        status_code = _extract_status_code(exc)
+
+        if _matches_any(lowered, _QUOTA_PATTERNS) or _matches_any(str(error_code).lower(), _QUOTA_PATTERNS):
+            return False, "quota"
+        if _matches_any(lowered, _AUTH_PATTERNS):
+            return False, "auth"
+
+        exc_name = exc.__class__.__name__
+        if exc_name in {
+            "APITimeoutError",
+            "APIConnectionError",
+            "InternalServerError",
+            "ReadError",
+            "RemoteProtocolError",
+            "StreamChunkTimeoutError",
+        }:
+            return True, "transient"
+        if isinstance(exc, IndexError):
+            return True, "transient"
+        if status_code in _RETRIABLE_STATUS_CODES:
+            return True, "transient"
+        if _matches_any(lowered, _BUSY_PATTERNS):
+            return True, "busy"
+
+        return False, "generic"
+
+    def _max_attempts_for(self, exc: BaseException) -> int:
+        '''按异常类型的专属限制计算尝试次数，并受中间件全局重试上限约束。'''
+        override = _RETRY_BUDGET_OVERRIDES.get(type(exc).__name__)
+        if override is None:
+            return self.retry_max_attempts
+
+        return min(override, self.retry_max_attempts)
+
+    def _build_retry_delay_ms(self, attempt: int, exc: BaseException) -> int:
+        '''根据重试响应头或指数退避计算下一次等待毫秒数。'''
+        retry_after = _extract_retry_after_ms(exc)
+        if retry_after is not None:
+            return retry_after
+        backoff = self.retry_base_delay_ms * (2 ** max(0, attempt - 1))
+        return min(backoff, self.retry_cap_delay_ms)
+
+    def _emit_retry_event(self, attempt: int, wait_ms: int, reason: str) -> None:
+        '''向当前流写入器发送一次 LLM 重试进度事件。'''
+        try:
+            from langgraph.config import get_stream_writer
+
+            writer = get_stream_writer()
+            writer(
+                {
+                    "type": "llm_retry",
+                    "attempt": attempt,
+                    "max_attempts": self.retry_max_attempts,
+                    "wait_ms": wait_ms,
+                    "reason": reason,
+                    "message": self._build_retry_message(attempt, wait_ms, reason),
+                }
+            )
+        except Exception:
+            logger.debug("Failed to emit llm_retry event", exc_info=True)
+
+    def _build_retry_message(self, attempt: int, wait_ms: int, reason: str) -> str:
+        '''构造包含次数、原因和等待时间的重试进度消息。'''
+        seconds = max(1, round(wait_ms / 1000))
+        reason_text = "服务提供方繁忙" if reason == "busy" else "服务提供方请求暂时失败"
+        return f"大语言模型请求重试 {attempt}/{self.retry_max_attempts}: {reason_text}。将在以下等待时间后重试： {seconds}s."
+
+    def _record_failure(self) -> None:
+        '''记录可重试失败，并在达到阈值时打开熔断器。'''
+        with self._circuit_lock:
+            if self._circuit_state == "half_open":
+                self._circuit_open_until = time.time() + self.circuit_recovery_timeout_sec
+                self._circuit_state = "open"
+                self._circuit_probe_in_flight = False
+                logger.error(
+                    "Circuit breaker probe failed (Open). Will probe again after %ds.",
+                    self.circuit_recovery_timeout_sec,
+                )
+                return
+
+            self._circuit_failure_count += 1
+            if self._circuit_failure_count >= self.circuit_failure_threshold:
+                self._circuit_open_until = time.time() + self.circuit_recovery_timeout_sec
+                if self._circuit_state != "open":
+                    self._circuit_state = "open"
+                    self._circuit_probe_in_flight = False
+                    logger.error(
+                        "Circuit breaker tripped (Open). Threshold reached (%d). Will probe after %ds.",
+                        self.circuit_failure_threshold,
+                        self.circuit_recovery_timeout_sec,
+                    )
+
+    def _build_user_fallback_message(self, exc: BaseException, reason: str) -> AIMessage:
+        '''构造包含分类信息的用户可见降级 AI 消息。'''
+        return self._build_error_fallback_message(
+            self._build_user_message(exc, reason),
+            error_type=type(exc).__name__,
+            reason=reason,
+            detail=_extract_error_detail(exc),
+        )
+
+    def _build_user_message(self, exc: BaseException, reason: str) -> str:
+        '''按错误类别生成可执行的用户提示文本。'''
+        detail = _extract_error_detail(exc)
+        if reason == "quota":
+            return "配置的大语言模型服务提供方拒绝了请求，原因可能是账户配额耗尽、计费不可用或使用受限。请处理服务账户问题后重试。"
+        if reason == "auth":
+            return "配置的大语言模型服务提供方因身份验证或访问权限无效而拒绝了请求。请检查服务凭据后重试。"
+        if reason in {"busy", "transient"}:
+            if type(exc).__name__ in _STREAM_DROP_EXCEPTIONS:
+                return (
+                    "模型的流式响应在完成前中断。这通常发生在单次响应或工具调用过大时。"
+                    "请让助手将工作拆分为更小的步骤，或缩短请求的输出后重试。"
+                )
+            return "配置的大语言模型服务提供方在多次重试后仍暂时不可用。请稍后继续对话。"
+        return f"大语言模型请求失败： {detail}"
 
     @override
     async def awrap_model_call(
@@ -380,9 +380,15 @@ class LLMErrorHandlingMiddleware(AgentMiddleware[AgentState]):
                 return self._build_user_fallback_message(exc, reason)
 
 
-def _matches_any(detail: str, patterns: tuple[str, ...]) -> bool:
-    '''判断错误详情是否包含任一给定模式。'''
-    return any(pattern in detail for pattern in patterns)
+def _extract_error_detail(exc: BaseException) -> str:
+    '''提取非空异常文本，必要时回退为异常类型名称。'''
+    detail = str(exc).strip()
+    if detail:
+        return detail
+    message = getattr(exc, "message", None)
+    if isinstance(message, str) and message.strip():
+        return message.strip()
+    return exc.__class__.__name__
 
 
 def _extract_error_code(exc: BaseException) -> Any:
@@ -414,6 +420,11 @@ def _extract_status_code(exc: BaseException) -> int | None:
     return status if isinstance(status, int) else None
 
 
+def _matches_any(detail: str, patterns: tuple[str, ...]) -> bool:
+    '''判断错误详情是否包含任一给定模式。'''
+    return any(pattern in detail for pattern in patterns)
+
+
 def _extract_retry_after_ms(exc: BaseException) -> int | None:
     '''解析异常响应中的 Retry-After 头并返回等待毫秒数。'''
     response = getattr(exc, "response", None)
@@ -442,14 +453,3 @@ def _extract_retry_after_ms(exc: BaseException) -> int | None:
             return max(0, int(delta * 1000))
         except (TypeError, ValueError, OverflowError):
             return None
-
-
-def _extract_error_detail(exc: BaseException) -> str:
-    '''提取非空异常文本，必要时回退为异常类型名称。'''
-    detail = str(exc).strip()
-    if detail:
-        return detail
-    message = getattr(exc, "message", None)
-    if isinstance(message, str) and message.strip():
-        return message.strip()
-    return exc.__class__.__name__

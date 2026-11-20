@@ -24,66 +24,6 @@ class ScanResult:
     reason: str
 
 
-def _extract_json_object(raw: str) -> dict | None:
-    '''从模型文本中解析 JSON 对象，兼容代码围栏和附带说明的响应。'''
-    raw = raw.strip()
-
-    # 去除模型可能添加的 JSON 代码围栏。
-    fence_match = re.match(r"^```(?:json)?\s*\n?(.*?)\n?\s*```$", raw, re.DOTALL)
-    if fence_match:
-        raw = fence_match.group(1).strip()
-
-    try:
-        return json.loads(raw)
-    except json.JSONDecodeError:
-        pass
-
-    # 按大括号平衡提取对象，并忽略字符串内部的大括号。
-    start = raw.find("{")
-    if start == -1:
-        return None
-
-    depth = 0
-    in_string = False
-    escape = False
-    for i in range(start, len(raw)):
-        c = raw[i]
-        if escape:
-            escape = False
-            continue
-        if c == "\\":
-            escape = True
-            continue
-        if c == '"':
-            in_string = not in_string
-            continue
-        if in_string:
-            continue
-        if c == "{":
-            depth += 1
-        elif c == "}":
-            depth -= 1
-            if depth == 0:
-                try:
-                    return json.loads(raw[start : i + 1])
-                except json.JSONDecodeError:
-                    return None
-    return None
-
-
-def _format_static_findings_context(static_findings: list[dict[str, Any]]) -> str:
-    '''将静态扫描发现格式化为提供给模型审查的上下文。'''
-    if not static_findings:
-        return "无。"
-    lines = []
-    for finding in static_findings:
-        finding_location = finding.get("file") or "<unknown>"
-        if finding.get("line") is not None:
-            finding_location = f"{finding_location}:{finding['line']}"
-        lines.append(f"- {finding.get('rule_id')} ({finding.get('severity')})：{finding.get('message')}，位置：{finding_location}。证据：{finding.get('evidence') or '<none>'}。修复建议：{finding.get('remediation')}")
-    return "\n".join(lines)
-
-
 async def scan_skill_content(
     content: str,
     *,
@@ -131,3 +71,63 @@ async def scan_skill_content(
     if executable:
         return ScanResult("block", "可执行内容的安全扫描不可用，需要人工审查。")
     return ScanResult("block", "技能内容的安全扫描不可用，需要人工审查。")
+
+
+def _format_static_findings_context(static_findings: list[dict[str, Any]]) -> str:
+    '''将静态扫描发现格式化为提供给模型审查的上下文。'''
+    if not static_findings:
+        return "无。"
+    lines = []
+    for finding in static_findings:
+        finding_location = finding.get("file") or "<unknown>"
+        if finding.get("line") is not None:
+            finding_location = f"{finding_location}:{finding['line']}"
+        lines.append(f"- {finding.get('rule_id')} ({finding.get('severity')})：{finding.get('message')}，位置：{finding_location}。证据：{finding.get('evidence') or '<none>'}。修复建议：{finding.get('remediation')}")
+    return "\n".join(lines)
+
+
+def _extract_json_object(raw: str) -> dict | None:
+    '''从模型文本中解析 JSON 对象，兼容代码围栏和附带说明的响应。'''
+    raw = raw.strip()
+
+    # 去除模型可能添加的 JSON 代码围栏。
+    fence_match = re.match(r"^```(?:json)?\s*\n?(.*?)\n?\s*```$", raw, re.DOTALL)
+    if fence_match:
+        raw = fence_match.group(1).strip()
+
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        pass
+
+    # 按大括号平衡提取对象，并忽略字符串内部的大括号。
+    start = raw.find("{")
+    if start == -1:
+        return None
+
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(raw)):
+        c = raw[i]
+        if escape:
+            escape = False
+            continue
+        if c == "\\":
+            escape = True
+            continue
+        if c == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == "{":
+            depth += 1
+        elif c == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(raw[start : i + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None

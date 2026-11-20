@@ -27,29 +27,6 @@ _EXTENSION_TO_MIME = {
 }
 
 
-def _is_allowed_image_virtual_path(image_path: str) -> bool:
-    '''仅接受工作区、上传和产物目录下的虚拟图像路径。'''
-    return any(image_path == root or image_path.startswith(f"{root}/") for root in _ALLOWED_IMAGE_VIRTUAL_ROOTS)
-
-
-def _detect_image_mime(image_data: bytes) -> str | None:
-    '''根据文件头识别支持的图像格式，避免仅信任扩展名。'''
-    if image_data.startswith(b"\xff\xd8\xff"):
-        return "image/jpeg"
-    if image_data.startswith(b"\x89PNG\r\n\x1a\n"):
-        return "image/png"
-    if len(image_data) >= 12 and image_data.startswith(b"RIFF") and image_data[8:12] == b"WEBP":
-        return "image/webp"
-    return None
-
-
-def _sanitize_image_error(error: Exception, thread_data: ThreadDataState | None) -> str:
-    '''屏蔽异常文本中的宿主机路径后再返回给模型。'''
-    from deerflow.sandbox.tools import mask_local_paths_in_output
-
-    return mask_local_paths_in_output(f"{type(error).__name__}: {error}", thread_data)
-
-
 @tool("view_image", parse_docstring=True)
 def view_image_tool(
     runtime: Runtime,
@@ -160,3 +137,26 @@ def view_image_tool(
     return Command(
         update={"viewed_images": new_viewed_images, "messages": [ToolMessage("已成功读取图像", tool_call_id=tool_call_id)]},
     )
+
+
+def _is_allowed_image_virtual_path(image_path: str) -> bool:
+    '''仅接受工作区、上传和产物目录下的虚拟图像路径。'''
+    return any(image_path == root or image_path.startswith(f"{root}/") for root in _ALLOWED_IMAGE_VIRTUAL_ROOTS)
+
+
+def _sanitize_image_error(error: Exception, thread_data: ThreadDataState | None) -> str:
+    '''屏蔽异常文本中的宿主机路径后再返回给模型。'''
+    from deerflow.sandbox.tools import mask_local_paths_in_output
+
+    return mask_local_paths_in_output(f"{type(error).__name__}: {error}", thread_data)
+
+
+def _detect_image_mime(image_data: bytes) -> str | None:
+    '''根据文件头识别支持的图像格式，避免仅信任扩展名。'''
+    if image_data.startswith(b"\xff\xd8\xff"):
+        return "image/jpeg"
+    if image_data.startswith(b"\x89PNG\r\n\x1a\n"):
+        return "image/png"
+    if len(image_data) >= 12 and image_data.startswith(b"RIFF") and image_data[8:12] == b"WEBP":
+        return "image/webp"
+    return None

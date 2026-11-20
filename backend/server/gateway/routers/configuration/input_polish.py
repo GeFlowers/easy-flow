@@ -31,16 +31,6 @@ class InputPolishResponse(BaseModel):
     changed: bool = Field(..., description="Whether the model changed the original draft")
 
 
-def _clean_rewritten_text(text: str) -> str:
-    '''移除完整思考块和 Markdown 围栏，同时保留合法的未闭合标签文本。'''
-    # 润色草稿可合法包含字面量 "<think>"，例如询问该标签的草稿；因此不能在未闭合
-    # 开始标签处截断，否则会悄然丢失有效改写的后半段并错误返回 503。完整的
-    # <think>...</think> 块仍会被移除。
-    candidate = llm_text.strip_think_blocks(text, truncate_unclosed=False)
-    candidate = llm_text.strip_markdown_code_fence(candidate)
-    return candidate.strip()
-
-
 def _build_system_instruction() -> str:
     '''构造约束润色模型保留用户意图且只输出改写结果的系统指令。'''
     return (
@@ -59,6 +49,16 @@ def _build_user_content(text: str, locale: str | None) -> str:
     '''将草稿及可选语言提示封装为单次模型调用的用户内容。'''
     locale_hint = locale.strip() if locale else "与草稿使用相同语言"
     return f"语言提示：{locale_hint}\n\n在保留意图的前提下改写以下草稿：\n<draft>\n{text}\n</draft>"
+
+
+def _clean_rewritten_text(text: str) -> str:
+    '''移除完整思考块和 Markdown 围栏，同时保留合法的未闭合标签文本。'''
+    # 润色草稿可合法包含字面量 "<think>"，例如询问该标签的草稿；因此不能在未闭合
+    # 开始标签处截断，否则会悄然丢失有效改写的后半段并错误返回 503。完整的
+    # <think>...</think> 块仍会被移除。
+    candidate = llm_text.strip_think_blocks(text, truncate_unclosed=False)
+    candidate = llm_text.strip_markdown_code_fence(candidate)
+    return candidate.strip()
 
 
 @router.post(

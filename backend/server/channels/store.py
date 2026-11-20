@@ -54,22 +54,12 @@ class ChannelStore:
                 logger.warning("Corrupt channel store at %s, starting fresh", self._path)
         return {}
 
-    def _save(self) -> None:
-        '''通过同目录临时文件替换目标文件，避免写入中断留下半份 JSON。'''
-        fd = tempfile.NamedTemporaryFile(
-            mode="w",
-            dir=self._path.parent,
-            suffix=".tmp",
-            delete=False,
-        )
-        try:
-            json.dump(self._data, fd, indent=2)
-            fd.close()
-            Path(fd.name).replace(self._path)
-        except BaseException:
-            fd.close()
-            Path(fd.name).unlink(missing_ok=True)
-            raise
+    # -- 公共接口 ----------------------------------------------------------
+
+    def get_thread_id(self, channel_name: str, chat_id: str, topic_id: str | None = None) -> str | None:
+        '''查询指定平台会话或话题所映射的 DeerFlow ``thread_id``。'''
+        entry = self._data.get(self._key(channel_name, chat_id, topic_id))
+        return entry["thread_id"] if entry else None
 
     # -- 映射键 ------------------------------------------------------------
 
@@ -79,13 +69,6 @@ class ChannelStore:
         if topic_id:
             return f"{channel_name}:{chat_id}:{topic_id}"
         return f"{channel_name}:{chat_id}"
-
-    # -- 公共接口 ----------------------------------------------------------
-
-    def get_thread_id(self, channel_name: str, chat_id: str, topic_id: str | None = None) -> str | None:
-        '''查询指定平台会话或话题所映射的 DeerFlow ``thread_id``。'''
-        entry = self._data.get(self._key(channel_name, chat_id, topic_id))
-        return entry["thread_id"] if entry else None
 
     def set_thread_id(
         self,
@@ -108,6 +91,23 @@ class ChannelStore:
                 "updated_at": now,
             }
             self._save()
+
+    def _save(self) -> None:
+        '''通过同目录临时文件替换目标文件，避免写入中断留下半份 JSON。'''
+        fd = tempfile.NamedTemporaryFile(
+            mode="w",
+            dir=self._path.parent,
+            suffix=".tmp",
+            delete=False,
+        )
+        try:
+            json.dump(self._data, fd, indent=2)
+            fd.close()
+            Path(fd.name).replace(self._path)
+        except BaseException:
+            fd.close()
+            Path(fd.name).unlink(missing_ok=True)
+            raise
 
     def remove(self, channel_name: str, chat_id: str, topic_id: str | None = None) -> bool:
         '''删除指定映射，返回是否存在实际删除。

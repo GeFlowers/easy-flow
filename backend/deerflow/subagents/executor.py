@@ -24,6 +24,7 @@ from langgraph.errors import GraphRecursionError
 
 from deerflow.agents.thread_state import SandboxState, ThreadDataState, ThreadState
 from deerflow.config import get_app_config
+from deerflow.config.agents_config import load_project_agent_instructions
 from deerflow.config.app_config import AppConfig
 from deerflow.models import create_chat_model
 from deerflow.skills.tool_policy import filter_tools_by_skill_allowed_tools
@@ -255,71 +256,6 @@ def _shutdown_isolated_subagent_loop() -> None:
 atexit.register(_shutdown_isolated_subagent_loop)
 
 
-def _get_isolated_subagent_loop() -> asyncio.AbstractEventLoop:
-    '''返回正在运行的隔离循环；若实例失效则创建线程并等待其就绪。'''
-    global _isolated_subagent_loop, _isolated_subagent_loop_thread, _isolated_subagent_loop_started
-    with _isolated_subagent_loop_lock:
-        thread_is_alive = _isolated_subagent_loop_thread is not None and _isolated_subagent_loop_thread.is_alive()
-        loop_is_usable = _isolated_subagent_loop is not None and not _isolated_subagent_loop.is_closed() and _isolated_subagent_loop.is_running() and thread_is_alive
-
-        if not loop_is_usable:
-            loop = create_event_loop()
-            started_event = threading.Event()
-            thread = threading.Thread(
-                target=_run_isolated_subagent_loop,
-                args=(loop, started_event),
-                name="subagent-persistent-loop",
-                daemon=True,
-            )
-            thread.start()
-            if not started_event.wait(timeout=5):
-                loop.call_soon_threadsafe(loop.stop)
-                thread.join(timeout=1)
-                loop.close()
-                raise RuntimeError("Timed out starting isolated subagent event loop")
-            _isolated_subagent_loop = loop
-            _isolated_subagent_loop_thread = thread
-            _isolated_subagent_loop_started = started_event
-
-        if _isolated_subagent_loop is None:
-            raise RuntimeError("Isolated subagent event loop is not initialized")
-        return _isolated_subagent_loop
-
-
-def _submit_to_isolated_loop_in_context(
-    context: Context,
-    coro_factory: Callable[[], Coroutine[Any, Any, SubagentResult]],
-) -> Future[SubagentResult]:
-    '''在父任务复制的上下文中向隔离循环提交协程，保留用户和追踪上下文。'''
-    return context.run(
-        lambda: asyncio.run_coroutine_threadsafe(
-            coro_factory(),
-            _get_isolated_subagent_loop(),
-        )
-    )
-
-
-def _filter_tools(
-    all_tools: list[BaseTool],
-    allowed: list[str] | None,
-    disallowed: list[str] | None,
-) -> list[BaseTool]:
-    '''先应用允许列表再应用拒绝列表，得到该子代理实际可调用的工具集合。'''
-    filtered = all_tools
-
-    # 配置了允许列表时，只保留名单中的工具。
-    if allowed is not None:
-        allowed_set = set(allowed)
-        filtered = [t for t in filtered if t.name in allowed_set]
-
-    # 拒绝列表在允许列表之后生效，显式拒绝优先。
-    if disallowed is not None:
-        disallowed_set = set(disallowed)
-        filtered = [t for t in filtered if t.name not in disallowed_set]
-
-    return filtered
-
-
 class SubagentExecutor:
     '''创建并执行一个子代理，同时管理工具策略、上下文继承和结果生命周期。'''
 
@@ -335,8 +271,6 @@ class SubagentExecutor:
         trace_id: str | None = None,
         user_id: str | None = None,
         user_role: str | None = None,
-        oauth_provider: str | None = None,
-        oauth_id: str | None = None,
         run_id: str | None = None,
         channel_user_id: str | None = None,
         deerflow_trace_id: str | None = None,
@@ -359,8 +293,6 @@ class SubagentExecutor:
         self.user_id = user_id
         # 将父运行的权限身份传给子代理及其工具调用。
         self.user_role = user_role
-        self.oauth_provider = oauth_provider
-        self.oauth_id = oauth_id
         self.run_id = run_id
         # 群聊线程由多人共享；子代理命令必须使用触发本次委派的发送者身份，
         # 不能因线程共享而丢失用户归属。
@@ -379,156 +311,62 @@ class SubagentExecutor:
 
         logger.info(f"[trace={self.trace_id}] SubagentExecutor initialized: {config.name} with {len(self.tools)} tools")
 
-    def _create_agent(self, tools: list[BaseTool] | None = None, *, deferred_setup: "DeferredToolSetup | None" = None):
-        '''依据当前模型和运行配置构建代理图及共享运行中间件。'''
-        app_config = self.app_config or get_app_config()
-        if self.model_name is None:
-            self.model_name = resolve_subagent_model_name(self.config, self.parent_model, app_config=app_config)
-        model = create_chat_model(name=self.model_name, thinking_enabled=False, app_config=app_config, attach_tracing=False)
-
-        from deerflow.agents.middlewares.tool_error_handling_middleware import build_subagent_runtime_middlewares
-
-        # 与主代理共用中间件装配逻辑，并用代理名读取专属令牌预算。
-        mcp_routing_middleware = None
-        if deferred_setup is not None and deferred_setup.deferred_names:
-            from deerflow.tools.builtins.tool_search import build_mcp_routing_middleware
-
-            mcp_routing_middleware = build_mcp_routing_middleware(
-                tools if tools is not None else self.tools,
-                deferred_setup,
-                top_k=app_config.tool_search.auto_promote_top_k,
-            )
-        middleware_kwargs = {
-            "app_config": app_config,
-            "model_name": self.model_name,
-            "lazy_init": True,
-            "deferred_setup": deferred_setup,
-            "agent_name": self.config.name,
-        }
-        if mcp_routing_middleware is not None:
-            middleware_kwargs["mcp_routing_middleware"] = mcp_routing_middleware
-        middlewares = build_subagent_runtime_middlewares(**middleware_kwargs)
-        # 通过能力探测收集报告停止原因的中间件，避免此模块依赖具体实现类，
-        # 并保留多个保护措施同时工作的可能性。
-        self._stop_reason_middlewares = [m for m in middlewares if hasattr(m, "consume_stop_reason")]
-
-        # 系统提示已在初始状态中与技能说明合并；避免某些模型不接受多个系统消息。
-        return create_agent(
-            model=model,
-            tools=tools if tools is not None else self.tools,
-            middleware=middlewares,
-            system_prompt=None,
-            state_schema=ThreadState,
-            checkpointer=False,
-        )
-
-    def _consume_guard_stop_reason(self) -> str | None:
-        '''读取首个中间件报告的停止原因，并消费该次运行的临时标记。'''
-        for mw in self._stop_reason_middlewares:
-            reason = mw.consume_stop_reason(self.run_id)
-            if reason is not None:
-                return reason
-        return None
-
-    async def _load_skills(self) -> list[Skill]:
-        '''按技能白名单加载已启用技能，并将磁盘读取移出事件循环。'''
-        if self.config.skills is not None and len(self.config.skills) == 0:
-            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} skills=[] — skipping skill loading")
-            return []
-
+    def execute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
+        '''根据调用线程是否已有事件循环选择安全执行路径，并把异常转换为失败结果。'''
         try:
-            from deerflow.skills.storage import get_or_new_skill_storage
-
-            storage_kwargs = {"app_config": self.app_config} if self.app_config is not None else {}
-            storage = await asyncio.to_thread(get_or_new_skill_storage, **storage_kwargs)
-            # 磁盘扫描可能阻塞，因此放入线程池，避免卡住网关异步请求循环。
-            all_skills = await asyncio.to_thread(storage.load_skills, enabled_only=True)
-            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} loaded {len(all_skills)} enabled skills from disk")
-        except Exception:
-            logger.exception(f"[trace={self.trace_id}] Failed to load skills for subagent {self.config.name}")
-            raise
-
-        if not all_skills:
-            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} no enabled skills found")
-            return []
-
-        # 若配置了技能白名单，仅向子代理提供名单中的技能。
-        if self.config.skills is not None:
-            allowed = set(self.config.skills)
-            return [s for s in all_skills if s.name in allowed]
-        return all_skills
-
-    def _apply_skill_allowed_tools(self, skills: list[Skill]) -> list[BaseTool]:
-        '''只对显式指定技能的子代理任务应用白名单，默认技能目录不限制工具。'''
-        if self.config.skills is None:
-            return list(self._base_tools)
-        return filter_tools_by_skill_allowed_tools(self._base_tools, skills)
-
-    async def _load_skill_messages(self, skills: list[Skill]) -> list[SystemMessage]:
-        '''读取技能说明文件并转义不可信内容，再合成为代理系统消息。'''
-        if not skills:
-            return []
-
-        # 每个技能说明都以独立片段读取，之后合并到代理系统提示中。
-        messages = []
-        for skill in skills:
             try:
-                content = await asyncio.to_thread(skill.skill_file.read_text, encoding="utf-8")
-                content = content.strip()
-                if content:
-                    # 可安装技能包是不可信输入；转义名称与正文，防止内容伪造外围技能标签。
-                    messages.append(SystemMessage(content=f'<skill name="{html.escape(skill.name, quote=True)}">\n{html.escape(content, quote=False)}\n</skill>'))
-                    logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} loaded skill: {skill.name}")
-            except Exception:
-                logger.debug(f"[trace={self.trace_id}] Failed to read skill {skill.name}", exc_info=True)
+                loop = asyncio.get_running_loop()
+            except RuntimeError:
+                loop = None
 
-        return messages
+            if loop is not None and loop.is_running():
+                logger.debug(f"[trace={self.trace_id}] Subagent {self.config.name} detected running event loop, using isolated loop")
+                return self._execute_in_isolated_loop(task, result_holder)
 
-    async def _build_initial_state(self, task: str) -> tuple[dict[str, Any], list[BaseTool], "DeferredToolSetup"]:
-        '''加载技能和延迟工具提示，合并系统消息，并继承父代理沙箱状态。'''
-        # 延迟导入以避免工具包初始化期间反向导入正在初始化的 subagents 包。
-        from deerflow.tools.builtins.tool_search import assemble_deferred_tools, get_deferred_tools_prompt_section, get_mcp_routing_hints_prompt_section
+            # 当前线程没有运行中的事件循环时，直接通过 asyncio.run 执行。
+            return run_async(self._aexecute(task, result_holder))
+        except Exception as e:
+            logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} execution failed")
+            # 若调用方未提供共享结果对象，则创建一条可返回的失败结果。
+            if result_holder is not None:
+                result = result_holder
+            else:
+                result = SubagentResult(
+                    task_id=str(uuid.uuid4())[:8],
+                    trace_id=self.trace_id,
+                    status=SubagentStatus.RUNNING,
+                )
+            result.try_set_terminal(SubagentStatus.FAILED, error=str(e))
+            return result
 
-        # 先加载技能，再据技能策略过滤可用工具。
-        skills = await self._load_skills()
-        filtered_tools = self._apply_skill_allowed_tools(skills)
-        # 先执行工具策略再构造延迟搜索目录；目录只含已许可工具，避免搜索绕过拒绝规则。
-        enabled = (self.app_config or get_app_config()).tool_search.enabled
-        final_tools, deferred_setup = assemble_deferred_tools(filtered_tools, enabled=enabled)
-        skill_messages = await self._load_skill_messages(skills)
-
-        # 将代理提示、技能说明和工具路由提示合并成一条系统消息，兼容只接受单条系统消息的模型。
-        system_parts: list[str] = []
-        if self.config.system_prompt:
-            system_parts.append(self.config.system_prompt)
-        for skill_msg in skill_messages:
-            system_parts.append(skill_msg.content)
-        # 只在提示中列出延迟工具名称，完整参数结构由后续工具搜索按需加载。
-        deferred_section = get_deferred_tools_prompt_section(deferred_names=deferred_setup.deferred_names)
-        if deferred_section:
-            system_parts.append(deferred_section)
-        mcp_routing_hints_section = get_mcp_routing_hints_prompt_section(filtered_tools, deferred_names=deferred_setup.deferred_names)
-        if mcp_routing_hints_section:
-            system_parts.append(mcp_routing_hints_section)
-
-        messages: list[Any] = []
-        if system_parts:
-            messages.append(SystemMessage(content="\n\n".join(system_parts)))
-
-        # 最后追加本次委派的实际任务内容。
-        messages.append(HumanMessage(content=task))
-
-        state: dict[str, Any] = {
-            "messages": messages,
-        }
-
-        # 继承父代理已解析的沙箱和线程数据，保持子代理访问同一工作区。
-        if self.sandbox_state is not None:
-            state["sandbox"] = self.sandbox_state
-        if self.thread_data is not None:
-            state["thread_data"] = self.thread_data
-
-        return state, final_tools, deferred_setup
+    def _execute_in_isolated_loop(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
+        '''将同步调用提交到常驻隔离事件循环，并按代理超时限制等待结果。'''
+        future: Future[SubagentResult] | None = None
+        parent_context = copy_context()
+        try:
+            future = _submit_to_isolated_loop_in_context(
+                parent_context,
+                lambda: self._aexecute(task, result_holder),
+            )
+            return future.result(timeout=self.config.timeout_seconds)
+        except FuturesTimeoutError:
+            if result_holder is not None:
+                result_holder.cancel_event.set()
+            if future is not None:
+                future.cancel()
+            raise
+        except Exception:
+            if future is None:
+                logger.debug(
+                    f"[trace={self.trace_id}] Failed to submit subagent {self.config.name} to the isolated event loop",
+                    exc_info=True,
+                )
+            else:
+                logger.debug(
+                    f"[trace={self.trace_id}] Subagent {self.config.name} failed while executing on the isolated event loop",
+                    exc_info=True,
+                )
+            raise
 
     async def _aexecute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
         '''运行代理并持续收集消息和令牌用量，统一处理取消、预算耗尽及异常终态。'''
@@ -603,8 +441,6 @@ class SubagentExecutor:
             # 透传父运行的用户和授权身份，让委派工具调用沿用同一权限判定与审计归属。
             context["user_id"] = self.user_id
             context["user_role"] = self.user_role
-            context["oauth_provider"] = self.oauth_provider
-            context["oauth_id"] = self.oauth_id
             context["run_id"] = self.run_id
             if self.channel_user_id:
                 context["channel_user_id"] = self.channel_user_id
@@ -722,62 +558,158 @@ class SubagentExecutor:
 
         return result
 
-    def _execute_in_isolated_loop(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
-        '''将同步调用提交到常驻隔离事件循环，并按代理超时限制等待结果。'''
-        future: Future[SubagentResult] | None = None
-        parent_context = copy_context()
+    async def _build_initial_state(self, task: str) -> tuple[dict[str, Any], list[BaseTool], "DeferredToolSetup"]:
+        '''加载技能和延迟工具提示，合并系统消息，并继承父代理沙箱状态。'''
+        # 延迟导入以避免工具包初始化期间反向导入正在初始化的 subagents 包。
+        from deerflow.tools.builtins.tool_search import assemble_deferred_tools, get_deferred_tools_prompt_section, get_mcp_routing_hints_prompt_section
+
+        # 先加载技能，再据技能策略过滤可用工具。
+        skills = await self._load_skills()
+        filtered_tools = self._apply_skill_allowed_tools(skills)
+        # 先执行工具策略再构造延迟搜索目录；目录只含已许可工具，避免搜索绕过拒绝规则。
+        enabled = (self.app_config or get_app_config()).tool_search.enabled
+        final_tools, deferred_setup = assemble_deferred_tools(filtered_tools, enabled=enabled)
+        skill_messages = await self._load_skill_messages(skills)
+
+        # 将代理提示、技能说明和工具路由提示合并成一条系统消息，兼容只接受单条系统消息的模型。
+        system_parts: list[str] = []
+        if self.config.system_prompt:
+            system_parts.append(self.config.system_prompt)
+        if project_instructions := load_project_agent_instructions():
+            system_parts.append(f"<project_instructions>\n{html.escape(project_instructions, quote=False)}\n</project_instructions>")
+        for skill_msg in skill_messages:
+            system_parts.append(skill_msg.content)
+        # 只在提示中列出延迟工具名称，完整参数结构由后续工具搜索按需加载。
+        deferred_section = get_deferred_tools_prompt_section(deferred_names=deferred_setup.deferred_names)
+        if deferred_section:
+            system_parts.append(deferred_section)
+        mcp_routing_hints_section = get_mcp_routing_hints_prompt_section(filtered_tools, deferred_names=deferred_setup.deferred_names)
+        if mcp_routing_hints_section:
+            system_parts.append(mcp_routing_hints_section)
+
+        messages: list[Any] = []
+        if system_parts:
+            messages.append(SystemMessage(content="\n\n".join(system_parts)))
+
+        # 最后追加本次委派的实际任务内容。
+        messages.append(HumanMessage(content=task))
+
+        state: dict[str, Any] = {
+            "messages": messages,
+        }
+
+        # 继承父代理已解析的沙箱和线程数据，保持子代理访问同一工作区。
+        if self.sandbox_state is not None:
+            state["sandbox"] = self.sandbox_state
+        if self.thread_data is not None:
+            state["thread_data"] = self.thread_data
+
+        return state, final_tools, deferred_setup
+
+    async def _load_skills(self) -> list[Skill]:
+        '''按技能白名单加载已启用技能，并将磁盘读取移出事件循环。'''
+        if self.config.skills is not None and len(self.config.skills) == 0:
+            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} skills=[] — skipping skill loading")
+            return []
+
         try:
-            future = _submit_to_isolated_loop_in_context(
-                parent_context,
-                lambda: self._aexecute(task, result_holder),
-            )
-            return future.result(timeout=self.config.timeout_seconds)
-        except FuturesTimeoutError:
-            if result_holder is not None:
-                result_holder.cancel_event.set()
-            if future is not None:
-                future.cancel()
-            raise
+            from deerflow.skills.storage import get_or_new_skill_storage
+
+            storage_kwargs = {"app_config": self.app_config} if self.app_config is not None else {}
+            storage = await asyncio.to_thread(get_or_new_skill_storage, **storage_kwargs)
+            # 磁盘扫描可能阻塞，因此放入线程池，避免卡住网关异步请求循环。
+            all_skills = await asyncio.to_thread(storage.load_skills, enabled_only=True)
+            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} loaded {len(all_skills)} enabled skills from disk")
         except Exception:
-            if future is None:
-                logger.debug(
-                    f"[trace={self.trace_id}] Failed to submit subagent {self.config.name} to the isolated event loop",
-                    exc_info=True,
-                )
-            else:
-                logger.debug(
-                    f"[trace={self.trace_id}] Subagent {self.config.name} failed while executing on the isolated event loop",
-                    exc_info=True,
-                )
+            logger.exception(f"[trace={self.trace_id}] Failed to load skills for subagent {self.config.name}")
             raise
 
-    def execute(self, task: str, result_holder: SubagentResult | None = None) -> SubagentResult:
-        '''根据调用线程是否已有事件循环选择安全执行路径，并把异常转换为失败结果。'''
-        try:
+        if not all_skills:
+            logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} no enabled skills found")
+            return []
+
+        # 若配置了技能白名单，仅向子代理提供名单中的技能。
+        if self.config.skills is not None:
+            allowed = set(self.config.skills)
+            return [s for s in all_skills if s.name in allowed]
+        return all_skills
+
+    def _apply_skill_allowed_tools(self, skills: list[Skill]) -> list[BaseTool]:
+        '''只对显式指定技能的子代理任务应用白名单，默认技能目录不限制工具。'''
+        if self.config.skills is None:
+            return list(self._base_tools)
+        return filter_tools_by_skill_allowed_tools(self._base_tools, skills)
+
+    async def _load_skill_messages(self, skills: list[Skill]) -> list[SystemMessage]:
+        '''读取技能说明文件并转义不可信内容，再合成为代理系统消息。'''
+        if not skills:
+            return []
+
+        # 每个技能说明都以独立片段读取，之后合并到代理系统提示中。
+        messages = []
+        for skill in skills:
             try:
-                loop = asyncio.get_running_loop()
-            except RuntimeError:
-                loop = None
+                content = await asyncio.to_thread(skill.skill_file.read_text, encoding="utf-8")
+                content = content.strip()
+                if content:
+                    # 可安装技能包是不可信输入；转义名称与正文，防止内容伪造外围技能标签。
+                    messages.append(SystemMessage(content=f'<skill name="{html.escape(skill.name, quote=True)}">\n{html.escape(content, quote=False)}\n</skill>'))
+                    logger.info(f"[trace={self.trace_id}] Subagent {self.config.name} loaded skill: {skill.name}")
+            except Exception:
+                logger.debug(f"[trace={self.trace_id}] Failed to read skill {skill.name}", exc_info=True)
 
-            if loop is not None and loop.is_running():
-                logger.debug(f"[trace={self.trace_id}] Subagent {self.config.name} detected running event loop, using isolated loop")
-                return self._execute_in_isolated_loop(task, result_holder)
+        return messages
 
-            # 当前线程没有运行中的事件循环时，直接通过 asyncio.run 执行。
-            return run_async(self._aexecute(task, result_holder))
-        except Exception as e:
-            logger.exception(f"[trace={self.trace_id}] Subagent {self.config.name} execution failed")
-            # 若调用方未提供共享结果对象，则创建一条可返回的失败结果。
-            if result_holder is not None:
-                result = result_holder
-            else:
-                result = SubagentResult(
-                    task_id=str(uuid.uuid4())[:8],
-                    trace_id=self.trace_id,
-                    status=SubagentStatus.RUNNING,
-                )
-            result.try_set_terminal(SubagentStatus.FAILED, error=str(e))
-            return result
+    def _create_agent(self, tools: list[BaseTool] | None = None, *, deferred_setup: "DeferredToolSetup | None" = None):
+        '''依据当前模型和运行配置构建代理图及共享运行中间件。'''
+        app_config = self.app_config or get_app_config()
+        if self.model_name is None:
+            self.model_name = resolve_subagent_model_name(self.config, self.parent_model, app_config=app_config)
+        model = create_chat_model(name=self.model_name, thinking_enabled=False, app_config=app_config, attach_tracing=False)
+
+        from deerflow.agents.middlewares.tool_error_handling_middleware import build_subagent_runtime_middlewares
+
+        # 与主代理共用中间件装配逻辑，并用代理名读取专属令牌预算。
+        mcp_routing_middleware = None
+        if deferred_setup is not None and deferred_setup.deferred_names:
+            from deerflow.tools.builtins.tool_search import build_mcp_routing_middleware
+
+            mcp_routing_middleware = build_mcp_routing_middleware(
+                tools if tools is not None else self.tools,
+                deferred_setup,
+                top_k=app_config.tool_search.auto_promote_top_k,
+            )
+        middleware_kwargs = {
+            "app_config": app_config,
+            "model_name": self.model_name,
+            "lazy_init": True,
+            "deferred_setup": deferred_setup,
+            "agent_name": self.config.name,
+        }
+        if mcp_routing_middleware is not None:
+            middleware_kwargs["mcp_routing_middleware"] = mcp_routing_middleware
+        middlewares = build_subagent_runtime_middlewares(**middleware_kwargs)
+        # 通过能力探测收集报告停止原因的中间件，避免此模块依赖具体实现类，
+        # 并保留多个保护措施同时工作的可能性。
+        self._stop_reason_middlewares = [m for m in middlewares if hasattr(m, "consume_stop_reason")]
+
+        # 系统提示已在初始状态中与技能说明合并；避免某些模型不接受多个系统消息。
+        return create_agent(
+            model=model,
+            tools=tools if tools is not None else self.tools,
+            middleware=middlewares,
+            system_prompt=None,
+            state_schema=ThreadState,
+            checkpointer=False,
+        )
+
+    def _consume_guard_stop_reason(self) -> str | None:
+        '''读取首个中间件报告的停止原因，并消费该次运行的临时标记。'''
+        for mw in self._stop_reason_middlewares:
+            reason = mw.consume_stop_reason(self.run_id)
+            if reason is not None:
+                return reason
+        return None
 
     def execute_async(self, task: str, task_id: str | None = None) -> str:
         '''登记待执行任务并在线程池后台启动子代理，立即返回任务标识供轮询。'''
@@ -833,6 +765,71 @@ class SubagentExecutor:
 
         _scheduler_pool.submit(run_task)
         return task_id
+
+
+def _filter_tools(
+    all_tools: list[BaseTool],
+    allowed: list[str] | None,
+    disallowed: list[str] | None,
+) -> list[BaseTool]:
+    '''先应用允许列表再应用拒绝列表，得到该子代理实际可调用的工具集合。'''
+    filtered = all_tools
+
+    # 配置了允许列表时，只保留名单中的工具。
+    if allowed is not None:
+        allowed_set = set(allowed)
+        filtered = [t for t in filtered if t.name in allowed_set]
+
+    # 拒绝列表在允许列表之后生效，显式拒绝优先。
+    if disallowed is not None:
+        disallowed_set = set(disallowed)
+        filtered = [t for t in filtered if t.name not in disallowed_set]
+
+    return filtered
+
+
+def _submit_to_isolated_loop_in_context(
+    context: Context,
+    coro_factory: Callable[[], Coroutine[Any, Any, SubagentResult]],
+) -> Future[SubagentResult]:
+    '''在父任务复制的上下文中向隔离循环提交协程，保留用户和追踪上下文。'''
+    return context.run(
+        lambda: asyncio.run_coroutine_threadsafe(
+            coro_factory(),
+            _get_isolated_subagent_loop(),
+        )
+    )
+
+
+def _get_isolated_subagent_loop() -> asyncio.AbstractEventLoop:
+    '''返回正在运行的隔离循环；若实例失效则创建线程并等待其就绪。'''
+    global _isolated_subagent_loop, _isolated_subagent_loop_thread, _isolated_subagent_loop_started
+    with _isolated_subagent_loop_lock:
+        thread_is_alive = _isolated_subagent_loop_thread is not None and _isolated_subagent_loop_thread.is_alive()
+        loop_is_usable = _isolated_subagent_loop is not None and not _isolated_subagent_loop.is_closed() and _isolated_subagent_loop.is_running() and thread_is_alive
+
+        if not loop_is_usable:
+            loop = create_event_loop()
+            started_event = threading.Event()
+            thread = threading.Thread(
+                target=_run_isolated_subagent_loop,
+                args=(loop, started_event),
+                name="subagent-persistent-loop",
+                daemon=True,
+            )
+            thread.start()
+            if not started_event.wait(timeout=5):
+                loop.call_soon_threadsafe(loop.stop)
+                thread.join(timeout=1)
+                loop.close()
+                raise RuntimeError("Timed out starting isolated subagent event loop")
+            _isolated_subagent_loop = loop
+            _isolated_subagent_loop_thread = thread
+            _isolated_subagent_loop_started = started_event
+
+        if _isolated_subagent_loop is None:
+            raise RuntimeError("Isolated subagent event loop is not initialized")
+        return _isolated_subagent_loop
 
 
 MAX_CONCURRENT_SUBAGENTS = 3

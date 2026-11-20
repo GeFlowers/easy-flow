@@ -25,24 +25,6 @@ SUBAGENT_TOOLS = [
 ]
 
 
-def _is_host_bash_tool(tool: object) -> bool:
-    '''判断工具配置是否表示宿主机 Bash 执行入口。'''
-    group = getattr(tool, "group", None)
-    use = getattr(tool, "use", None)
-    if group == "bash":
-        return True
-    if use == "deerflow.sandbox.tools:bash_tool":
-        return True
-    return False
-
-
-def _ensure_sync_invocable_tool(tool: BaseTool) -> BaseTool:
-    '''为同步代理调用方的纯异步工具附加同步包装器。'''
-    if getattr(tool, "func", None) is None and getattr(tool, "coroutine", None) is not None:
-        tool.func = make_sync_tool_wrapper(tool.coroutine, tool.name)
-    return tool
-
-
 def get_available_tools(
     groups: list[str] | None = None,
     include_mcp: bool = True,
@@ -100,24 +82,8 @@ def get_available_tools(
             logger.warning("MCP module not available. Install 'langchain-mcp-adapters' package to enable MCP tools.")
         except Exception as e:
             logger.error(f"Failed to get cached MCP tools: {e}")
-    acp_tools: list[BaseTool] = []
-    try:
-        from deerflow.tools.builtins.invoke_acp_agent_tool import build_invoke_acp_agent_tool
-
-        if app_config is None:
-            from deerflow.config.acp_config import get_acp_agents
-
-            acp_agents = get_acp_agents()
-        else:
-            acp_agents = getattr(config, "acp_agents", {}) or {}
-        if acp_agents:
-            acp_tools.append(build_invoke_acp_agent_tool(acp_agents))
-            logger.info(f"Including invoke_acp_agent tool ({len(acp_agents)} agent(s): {list(acp_agents.keys())})")
-    except Exception as e:
-        logger.warning(f"Failed to load ACP tool: {e}")
-
-    logger.info(f"Total tools loaded: {len(loaded_tools)}, built-in tools: {len(builtin_tools)}, MCP tools: {len(mcp_tools)}, ACP tools: {len(acp_tools)}")
-    all_tools = [_ensure_sync_invocable_tool(t) for t in loaded_tools + builtin_tools + mcp_tools + acp_tools]
+    logger.info(f"Total tools loaded: {len(loaded_tools)}, built-in tools: {len(builtin_tools)}, MCP tools: {len(mcp_tools)}")
+    all_tools = [_ensure_sync_invocable_tool(t) for t in loaded_tools + builtin_tools + mcp_tools]
     seen_names: set[str] = set()
     unique_tools: list[BaseTool] = []
     for t in all_tools:
@@ -130,3 +96,21 @@ def get_available_tools(
                 t.name,
             )
     return unique_tools
+
+
+def _is_host_bash_tool(tool: object) -> bool:
+    '''判断工具配置是否表示宿主机 Bash 执行入口。'''
+    group = getattr(tool, "group", None)
+    use = getattr(tool, "use", None)
+    if group == "bash":
+        return True
+    if use == "deerflow.sandbox.tools:bash_tool":
+        return True
+    return False
+
+
+def _ensure_sync_invocable_tool(tool: BaseTool) -> BaseTool:
+    '''为同步代理调用方的纯异步工具附加同步包装器。'''
+    if getattr(tool, "func", None) is None and getattr(tool, "coroutine", None) is not None:
+        tool.func = make_sync_tool_wrapper(tool.coroutine, tool.name)
+    return tool

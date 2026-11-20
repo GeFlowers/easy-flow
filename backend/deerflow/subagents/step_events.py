@@ -72,16 +72,6 @@ def truncate_step_text(text: str, max_chars: int) -> tuple[str, bool]:
     return text, False
 
 
-def _bounded_tool_call(call: dict[str, Any], max_chars: int) -> dict[str, Any]:
-    '''处理步骤事件提取与构造，并保持既有状态语义。'''
-    name = call.get("name")
-    args = call.get("args")
-    serialized = args if isinstance(args, str) else json.dumps(args, default=str, ensure_ascii=False)
-    if max_chars >= 0 and len(serialized) > max_chars:
-        return {"name": name, "args": serialized[:max_chars], "args_truncated": True}
-    return {"name": name, "args": args}
-
-
 def build_subagent_step(
     message: dict[str, Any],
     *,
@@ -107,6 +97,16 @@ def build_subagent_step(
         step["tool_calls"] = [_bounded_tool_call(call, max_chars) for call in (message.get("tool_calls") or [])]
 
     return step
+
+
+def _bounded_tool_call(call: dict[str, Any], max_chars: int) -> dict[str, Any]:
+    '''处理步骤事件提取与构造，并保持既有状态语义。'''
+    name = call.get("name")
+    args = call.get("args")
+    serialized = args if isinstance(args, str) else json.dumps(args, default=str, ensure_ascii=False)
+    if max_chars >= 0 and len(serialized) > max_chars:
+        return {"name": name, "args": serialized[:max_chars], "args_truncated": True}
+    return {"name": name, "args": args}
 
 
 def subagent_run_event(chunk: Any) -> dict[str, Any] | None:

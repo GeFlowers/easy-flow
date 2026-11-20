@@ -5,7 +5,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+
 import { ChevronDownIcon, SearchIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
@@ -18,10 +18,12 @@ export const TaskItemFile = ({
   ...props
 }: TaskItemFileProps) => (
   <div
-    className={cn(
+    className={[
       "bg-secondary text-foreground inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-xs",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   >
     {children}
@@ -32,7 +34,12 @@ export type TaskItemProps = ComponentProps<"div">;
 
 /** 以弱化文字样式呈现任务说明或执行结果。 */
 export const TaskItem = ({ children, className, ...props }: TaskItemProps) => (
-  <div className={cn("text-muted-foreground text-sm", className)} {...props}>
+  <div
+    className={["text-muted-foreground text-sm", className]
+      .filter(Boolean)
+      .join(" ")}
+    {...props}
+  >
     {children}
   </div>
 );
@@ -45,7 +52,11 @@ export const Task = ({
   className,
   ...props
 }: TaskProps) => (
-  <Collapsible className={cn(className)} defaultOpen={defaultOpen} {...props} />
+  <Collapsible
+    className={[className].filter(Boolean).join(" ")}
+    defaultOpen={defaultOpen}
+    {...props}
+  />
 );
 
 export type TaskTriggerProps = ComponentProps<typeof CollapsibleTrigger> & {
@@ -59,7 +70,11 @@ export const TaskTrigger = ({
   title,
   ...props
 }: TaskTriggerProps) => (
-  <CollapsibleTrigger asChild className={cn("group", className)} {...props}>
+  <CollapsibleTrigger
+    asChild
+    className={["group", className].filter(Boolean).join(" ")}
+    {...props}
+  >
     {children ?? (
       <div className="text-muted-foreground hover:text-foreground flex w-full cursor-pointer items-center gap-2 text-sm transition-colors">
         <SearchIcon className="size-4" />
@@ -79,10 +94,12 @@ export const TaskContent = ({
   ...props
 }: TaskContentProps) => (
   <CollapsibleContent
-    className={cn(
+    className={[
       "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground data-[state=closed]:animate-out data-[state=open]:animate-in outline-none",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   >
     <div className="border-muted mt-4 space-y-2 border-l-2 pl-4">

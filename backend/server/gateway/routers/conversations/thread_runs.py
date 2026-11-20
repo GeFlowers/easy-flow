@@ -30,13 +30,6 @@ REGENERATE_HISTORY_RAW_SCAN_LIMIT = REGENERATE_HISTORY_SCAN_LIMIT * 2
 THREAD_MESSAGE_PAGE_SCAN_BATCH = 201
 
 
-def _is_duration_only_checkpoint(checkpoint_tuple: Any) -> bool:
-    '''判断检查点是否只写入运行耗时补充信息。'''
-    metadata = getattr(checkpoint_tuple, "metadata", None)
-    writes = metadata.get("writes") if isinstance(metadata, dict) else None
-    return isinstance(writes, dict) and "runtime_run_duration" in writes
-
-
 def compute_run_durations(runs) -> dict[str, int]:
     '''根据运行记录的创建和更新时间计算持续秒数，忽略无法解析的时间戳。'''
     from datetime import datetime
@@ -52,8 +45,6 @@ def compute_run_durations(runs) -> dict[str, int]:
             except Exception:
                 logger.warning("Failed to parse timestamps for run %s", r.run_id, exc_info=True)
     return durations
-
-
 
 
 class RunCreateRequest(BaseModel):
@@ -78,7 +69,6 @@ class RunCreateRequest(BaseModel):
     multitask_strategy: Literal["reject", "rollback", "interrupt", "enqueue"] = Field(default="reject", description="Concurrency strategy")
     after_seconds: float | None = Field(default=None, description="Delayed execution")
     if_not_exists: Literal["reject", "create"] = Field(default="create", description="Thread creation policy")
-    feedback_keys: list[str] | None = Field(default=None, description="LangSmith feedback keys")
 
 
 class RegeneratePrepareRequest(BaseModel):
@@ -157,279 +147,6 @@ class ThreadTokenUsageResponse(BaseModel):
     by_caller: ThreadTokenUsageCallerBreakdown = Field(default_factory=ThreadTokenUsageCallerBreakdown)
 
 
-
-
-def _cancel_conflict_detail(run_id: str, record: RunRecord) -> str:
-    '''为无法取消的运行构造与其状态一致的冲突说明。'''
-    if record.status in (RunStatus.pending, RunStatus.running):
-        return f"Run {run_id} is not active on this worker and cannot be cancelled"
-    return f"Run {run_id} is not cancellable (status: {record.status.value})"
-
-
-def _compute_retry_after(lease_expires_at: str | None, grace_seconds: int) -> int | None:
-    '''计算租约到期并经过宽限期前的秒数，供冲突响应 Retry-After 使用。'''
-    if lease_expires_at is None:
-        return None
-    try:
-        dt = datetime.fromisoformat(lease_expires_at)
-        if dt.tzinfo is None:
-            dt = dt.replace(tzinfo=UTC)
-    except (ValueError, TypeError):
-        return None
-    remaining = (dt - datetime.now(UTC)).total_seconds() + grace_seconds
-    return max(1, int(remaining))
-
-
-async def _raise_lease_valid_elsewhere(
-    run_id: str,
-    run_mgr,  # 避免为了测试而提前导入运行管理器
-    record: RunRecord,
-) -> None:
-    '''重新读取其他工作进程的运行租约，并以 409 和可选 Retry-After 拒绝操作。'''
-    fresh = await run_mgr.get(run_id)
-    if fresh is not None:
-        record = fresh
-    retry_after = _compute_retry_after(record.lease_expires_at, run_mgr.grace_seconds)
-    headers: dict[str, str] = {}
-    if retry_after is not None:
-        headers["Retry-After"] = str(retry_after)
-    raise HTTPException(
-        status_code=409,
-        detail=f"Run {run_id} is active on another worker; retry after lease expiry.",
-        headers=headers,
-    )
-
-
-def _record_to_response(record: RunRecord) -> RunResponse:
-    '''将内部运行记录转换为兼容 API 响应模型。'''
-    return RunResponse(
-        run_id=record.run_id,
-        thread_id=record.thread_id,
-        assistant_id=record.assistant_id,
-        status=record.status.value,
-        metadata=record.metadata,
-        kwargs=record.kwargs,
-        multitask_strategy=record.multitask_strategy,
-        created_at=record.created_at,
-        updated_at=record.updated_at,
-        total_input_tokens=record.total_input_tokens,
-        total_output_tokens=record.total_output_tokens,
-        total_tokens=record.total_tokens,
-        llm_call_count=record.llm_call_count,
-        lead_agent_tokens=record.lead_agent_tokens,
-        subagent_tokens=record.subagent_tokens,
-        middleware_tokens=record.middleware_tokens,
-        message_count=record.message_count,
-        stop_reason=record.stop_reason,
-    )
-
-
-def _message_id(message: Any) -> str | None:
-    '''从消息对象或字典读取标识。'''
-    value = getattr(message, "id", None)
-    if value is None and isinstance(message, dict):
-        value = message.get("id")
-    return str(value) if value else None
-
-
-def _message_type(message: Any) -> str | None:
-    '''从消息对象或字典读取类型。'''
-    value = getattr(message, "type", None)
-    if value is None and isinstance(message, dict):
-        value = message.get("type") or message.get("role")
-    if value == "assistant":
-        return "ai"
-    return str(value) if value else None
-
-
-def _message_name(message: Any) -> str | None:
-    '''从消息对象或字典读取名称。'''
-    value = getattr(message, "name", None)
-    if value is None and isinstance(message, dict):
-        value = message.get("name")
-    return str(value) if value else None
-
-
-def _message_content(message: Any) -> Any:
-    '''从消息对象或字典读取内容字段。'''
-    if isinstance(message, dict):
-        return message.get("content")
-    return getattr(message, "content", None)
-
-
-def _message_text(message: Any) -> str:
-    '''将任意消息内容转换为用于比较的纯文本。'''
-    return message_to_text(message)
-
-
-def _message_additional_kwargs(message: Any) -> dict[str, Any]:
-    '''从消息对象或字典读取附加元数据。'''
-    value = getattr(message, "additional_kwargs", None)
-    if value is None and isinstance(message, dict):
-        value = message.get("additional_kwargs")
-    return dict(value or {}) if isinstance(value, dict) else {}
-
-
-def _is_hidden_or_control_message(message: Any) -> bool:
-    '''判断消息是否为不应向客户端展示的控制消息。'''
-    message_type = _message_type(message)
-    additional_kwargs = _message_additional_kwargs(message)
-    return message_type == "remove" or _message_name(message) == "summary" or additional_kwargs.get("hide_from_ui") is True
-
-
-def _is_visible_human_message(message: Any) -> bool:
-    '''判断消息是否为可展示的用户消息。'''
-    return _message_type(message) == "human" and not _is_hidden_or_control_message(message)
-
-
-def _is_visible_ai_message(message: Any) -> bool:
-    '''判断消息是否为可展示的助手消息。'''
-    return _message_type(message) == "ai" and not _is_hidden_or_control_message(message)
-
-
-def _is_middleware_message_row(row: dict[str, Any]) -> bool:
-    '''判断事件存储行是否由中间件写入。'''
-    return str((row.get("metadata") or {}).get("caller", "")).startswith("middleware:")
-
-
-def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
-    '''从检查点中读取消息通道内容。'''
-    checkpoint = getattr(checkpoint_tuple, "checkpoint", None) or {}
-    channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
-    messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
-    return messages if isinstance(messages, list) else []
-
-
-def _checkpoint_configurable(checkpoint_tuple: Any) -> dict[str, Any]:
-    '''从检查点配置提取 configurable 字典。'''
-    config = getattr(checkpoint_tuple, "config", None) or {}
-    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
-    return dict(configurable) if isinstance(configurable, dict) else {}
-
-
-def _checkpoint_response(checkpoint_tuple: Any) -> dict[str, Any]:
-    '''将检查点转换为兼容 API 的精简响应。'''
-    configurable = _checkpoint_configurable(checkpoint_tuple)
-    checkpoint_id = configurable.get("checkpoint_id")
-    if not checkpoint_id:
-        raise HTTPException(status_code=409, detail="Checkpoint is missing checkpoint_id")
-    return {
-        "checkpoint_ns": str(configurable.get("checkpoint_ns") or ""),
-        "checkpoint_id": str(checkpoint_id),
-        "checkpoint_map": configurable.get("checkpoint_map"),
-    }
-
-
-def _clean_human_message_for_regenerate(message: Any) -> dict[str, Any]:
-    '''清除用户消息中的运行控制信息，保留可重新执行的原始内容。'''
-    additional_kwargs = _message_additional_kwargs(message)
-    content = get_original_user_content_text(_message_content(message), additional_kwargs)
-    additional_kwargs.pop(ORIGINAL_USER_CONTENT_KEY, None)
-    additional_kwargs.pop("hide_from_ui", None)
-
-    clean_message: dict[str, Any] = {
-        "type": "human",
-        "content": [{"type": "text", "text": content}],
-        "additional_kwargs": additional_kwargs,
-    }
-    message_id = _message_id(message)
-    if message_id:
-        clean_message["id"] = message_id
-    name = _message_name(message)
-    if name:
-        clean_message["name"] = name
-    return clean_message
-
-
-def _event_message_id(row: dict[str, Any]) -> str | None:
-    '''从持久化事件行内容中提取消息标识。'''
-    content = row.get("content")
-    if isinstance(content, BaseMessage):
-        return _message_id(content)
-    if isinstance(content, dict):
-        return _message_id(content)
-    return None
-
-
-def _run_last_ai_matches_message(record: RunRecord, message: Any) -> bool:
-    '''判断运行末条助手文本是否对应目标消息。'''
-    last_ai_message = (record.last_ai_message or "").strip()
-    if not last_ai_message:
-        return False
-    target_text = _message_text(message).strip()
-    if not target_text:
-        return False
-    return last_ai_message == target_text[: len(last_ai_message)]
-
-
-async def _find_target_run_id(thread_id: str, message_id: str, target_message: Any, request: Request) -> str:
-    '''在受线程权限保护的事件历史中定位目标消息所属运行。'''
-    event_store = get_run_event_store(request)
-    rows = await event_store.list_messages(thread_id, limit=REGENERATE_HISTORY_SCAN_LIMIT)
-    for row in reversed(rows):
-        if row.get("event_type") not in {"ai_message", "llm.ai.response"}:
-            continue
-        if _event_message_id(row) == message_id:
-            run_id = row.get("run_id")
-            if isinstance(run_id, str) and run_id:
-                return run_id
-    run_mgr = get_run_manager(request)
-    user_id = await get_current_user(request)
-    records = await run_mgr.list_by_thread(thread_id, user_id=user_id, limit=10)
-    fallback_record = next(
-        (record for record in records if record.status == RunStatus.success and _run_last_ai_matches_message(record, target_message)),
-        None,
-    )
-    if fallback_record is not None:
-        return fallback_record.run_id
-    if len(rows) >= REGENERATE_HISTORY_SCAN_LIMIT:
-        logger.warning(
-            "Could not find source run for regenerate message %s in recent run events for thread %s (limit=%s)",
-            message_id,
-            thread_id,
-            REGENERATE_HISTORY_SCAN_LIMIT,
-        )
-    raise HTTPException(status_code=409, detail="Could not find source run for assistant message")
-
-
-async def _find_base_checkpoint_before_human(thread_id: str, human_message_id: str, request: Request) -> Any:
-    '''查找目标用户消息之前可用于重新生成的检查点。'''
-    checkpointer = get_checkpointer(request)
-    base_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
-    try:
-        raw_checkpoints = [item async for item in checkpointer.alist(base_config, limit=REGENERATE_HISTORY_RAW_SCAN_LIMIT)]
-        checkpoints = [item for item in raw_checkpoints if not _is_duration_only_checkpoint(item)]
-    except Exception as exc:
-        logger.exception("Failed to list checkpoints for regenerate thread %s", thread_id)
-        raise HTTPException(status_code=500, detail="Failed to inspect checkpoint history") from exc
-
-    previous_checkpoint = None
-    for checkpoint_tuple in reversed(checkpoints):
-        messages = _checkpoint_messages(checkpoint_tuple)
-        message_ids = {_message_id(message) for message in messages}
-        if human_message_id in message_ids:
-            if previous_checkpoint is None:
-                raise HTTPException(
-                    status_code=409,
-                    detail="Could not find an addressable checkpoint before the target user message",
-                )
-            return previous_checkpoint
-        if _checkpoint_configurable(checkpoint_tuple).get("checkpoint_id"):
-            previous_checkpoint = checkpoint_tuple
-
-    if len(checkpoints) >= REGENERATE_HISTORY_SCAN_LIMIT:
-        logger.warning(
-            "Could not locate target user message %s in recent checkpoint history for thread %s (limit=%s)",
-            human_message_id,
-            thread_id,
-            REGENERATE_HISTORY_SCAN_LIMIT,
-        )
-    raise HTTPException(
-        status_code=409,
-        detail=(f"Could not locate target user message in recent checkpoint history (limit={REGENERATE_HISTORY_SCAN_LIMIT})"),
-    )
-
-
 async def _prepare_regenerate_payload(thread_id: str, message_id: str, request: Request) -> RegeneratePrepareResponse:
     '''构造 LangGraph 兼容重新生成接口所需的输入和检查点载荷。'''
     checkpointer = get_checkpointer(request)
@@ -477,6 +194,212 @@ async def _prepare_regenerate_payload(thread_id: str, message_id: str, request: 
     )
 
 
+def _checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
+    '''从检查点中读取消息通道内容。'''
+    checkpoint = getattr(checkpoint_tuple, "checkpoint", None) or {}
+    channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
+    messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
+    return messages if isinstance(messages, list) else []
+
+
+def _message_id(message: Any) -> str | None:
+    '''从消息对象或字典读取标识。'''
+    value = getattr(message, "id", None)
+    if value is None and isinstance(message, dict):
+        value = message.get("id")
+    return str(value) if value else None
+
+
+def _is_visible_ai_message(message: Any) -> bool:
+    '''判断消息是否为可展示的助手消息。'''
+    return _message_type(message) == "ai" and not _is_hidden_or_control_message(message)
+
+
+def _message_type(message: Any) -> str | None:
+    '''从消息对象或字典读取类型。'''
+    value = getattr(message, "type", None)
+    if value is None and isinstance(message, dict):
+        value = message.get("type") or message.get("role")
+    if value == "assistant":
+        return "ai"
+    return str(value) if value else None
+
+
+def _is_hidden_or_control_message(message: Any) -> bool:
+    '''判断消息是否为不应向客户端展示的控制消息。'''
+    message_type = _message_type(message)
+    additional_kwargs = _message_additional_kwargs(message)
+    return message_type == "remove" or _message_name(message) == "summary" or additional_kwargs.get("hide_from_ui") is True
+
+
+def _message_additional_kwargs(message: Any) -> dict[str, Any]:
+    '''从消息对象或字典读取附加元数据。'''
+    value = getattr(message, "additional_kwargs", None)
+    if value is None and isinstance(message, dict):
+        value = message.get("additional_kwargs")
+    return dict(value or {}) if isinstance(value, dict) else {}
+
+
+def _message_name(message: Any) -> str | None:
+    '''从消息对象或字典读取名称。'''
+    value = getattr(message, "name", None)
+    if value is None and isinstance(message, dict):
+        value = message.get("name")
+    return str(value) if value else None
+
+
+def _is_visible_human_message(message: Any) -> bool:
+    '''判断消息是否为可展示的用户消息。'''
+    return _message_type(message) == "human" and not _is_hidden_or_control_message(message)
+
+
+async def _find_base_checkpoint_before_human(thread_id: str, human_message_id: str, request: Request) -> Any:
+    '''查找目标用户消息之前可用于重新生成的检查点。'''
+    checkpointer = get_checkpointer(request)
+    base_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+    try:
+        raw_checkpoints = [item async for item in checkpointer.alist(base_config, limit=REGENERATE_HISTORY_RAW_SCAN_LIMIT)]
+        checkpoints = [item for item in raw_checkpoints if not _is_duration_only_checkpoint(item)]
+    except Exception as exc:
+        logger.exception("Failed to list checkpoints for regenerate thread %s", thread_id)
+        raise HTTPException(status_code=500, detail="Failed to inspect checkpoint history") from exc
+
+    previous_checkpoint = None
+    for checkpoint_tuple in reversed(checkpoints):
+        messages = _checkpoint_messages(checkpoint_tuple)
+        message_ids = {_message_id(message) for message in messages}
+        if human_message_id in message_ids:
+            if previous_checkpoint is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail="Could not find an addressable checkpoint before the target user message",
+                )
+            return previous_checkpoint
+        if _checkpoint_configurable(checkpoint_tuple).get("checkpoint_id"):
+            previous_checkpoint = checkpoint_tuple
+
+    if len(checkpoints) >= REGENERATE_HISTORY_SCAN_LIMIT:
+        logger.warning(
+            "Could not locate target user message %s in recent checkpoint history for thread %s (limit=%s)",
+            human_message_id,
+            thread_id,
+            REGENERATE_HISTORY_SCAN_LIMIT,
+        )
+    raise HTTPException(
+        status_code=409,
+        detail=(f"Could not locate target user message in recent checkpoint history (limit={REGENERATE_HISTORY_SCAN_LIMIT})"),
+    )
+
+
+def _is_duration_only_checkpoint(checkpoint_tuple: Any) -> bool:
+    '''判断检查点是否只写入运行耗时补充信息。'''
+    metadata = getattr(checkpoint_tuple, "metadata", None)
+    writes = metadata.get("writes") if isinstance(metadata, dict) else None
+    return isinstance(writes, dict) and "runtime_run_duration" in writes
+
+
+def _checkpoint_configurable(checkpoint_tuple: Any) -> dict[str, Any]:
+    '''从检查点配置提取 configurable 字典。'''
+    config = getattr(checkpoint_tuple, "config", None) or {}
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    return dict(configurable) if isinstance(configurable, dict) else {}
+
+
+async def _find_target_run_id(thread_id: str, message_id: str, target_message: Any, request: Request) -> str:
+    '''在受线程权限保护的事件历史中定位目标消息所属运行。'''
+    event_store = get_run_event_store(request)
+    rows = await event_store.list_messages(thread_id, limit=REGENERATE_HISTORY_SCAN_LIMIT)
+    for row in reversed(rows):
+        if row.get("event_type") not in {"ai_message", "llm.ai.response"}:
+            continue
+        if _event_message_id(row) == message_id:
+            run_id = row.get("run_id")
+            if isinstance(run_id, str) and run_id:
+                return run_id
+    run_mgr = get_run_manager(request)
+    user_id = await get_current_user(request)
+    records = await run_mgr.list_by_thread(thread_id, user_id=user_id, limit=10)
+    fallback_record = next(
+        (record for record in records if record.status == RunStatus.success and _run_last_ai_matches_message(record, target_message)),
+        None,
+    )
+    if fallback_record is not None:
+        return fallback_record.run_id
+    if len(rows) >= REGENERATE_HISTORY_SCAN_LIMIT:
+        logger.warning(
+            "Could not find source run for regenerate message %s in recent run events for thread %s (limit=%s)",
+            message_id,
+            thread_id,
+            REGENERATE_HISTORY_SCAN_LIMIT,
+        )
+    raise HTTPException(status_code=409, detail="Could not find source run for assistant message")
+
+
+def _event_message_id(row: dict[str, Any]) -> str | None:
+    '''从持久化事件行内容中提取消息标识。'''
+    content = row.get("content")
+    if isinstance(content, BaseMessage):
+        return _message_id(content)
+    if isinstance(content, dict):
+        return _message_id(content)
+    return None
+
+
+def _run_last_ai_matches_message(record: RunRecord, message: Any) -> bool:
+    '''判断运行末条助手文本是否对应目标消息。'''
+    last_ai_message = (record.last_ai_message or "").strip()
+    if not last_ai_message:
+        return False
+    target_text = _message_text(message).strip()
+    if not target_text:
+        return False
+    return last_ai_message == target_text[: len(last_ai_message)]
+
+
+def _message_text(message: Any) -> str:
+    '''将任意消息内容转换为用于比较的纯文本。'''
+    return message_to_text(message)
+
+
+def _checkpoint_response(checkpoint_tuple: Any) -> dict[str, Any]:
+    '''将检查点转换为兼容 API 的精简响应。'''
+    configurable = _checkpoint_configurable(checkpoint_tuple)
+    checkpoint_id = configurable.get("checkpoint_id")
+    if not checkpoint_id:
+        raise HTTPException(status_code=409, detail="Checkpoint is missing checkpoint_id")
+    return {
+        "checkpoint_ns": str(configurable.get("checkpoint_ns") or ""),
+        "checkpoint_id": str(checkpoint_id),
+        "checkpoint_map": configurable.get("checkpoint_map"),
+    }
+
+
+def _clean_human_message_for_regenerate(message: Any) -> dict[str, Any]:
+    '''清除用户消息中的运行控制信息，保留可重新执行的原始内容。'''
+    additional_kwargs = _message_additional_kwargs(message)
+    content = get_original_user_content_text(_message_content(message), additional_kwargs)
+    additional_kwargs.pop(ORIGINAL_USER_CONTENT_KEY, None)
+    additional_kwargs.pop("hide_from_ui", None)
+
+    clean_message: dict[str, Any] = {
+        "type": "human",
+        "content": [{"type": "text", "text": content}],
+        "additional_kwargs": additional_kwargs,
+    }
+    message_id = _message_id(message)
+    if message_id:
+        clean_message["id"] = message_id
+    name = _message_name(message)
+    if name:
+        clean_message["name"] = name
+    return clean_message
+
+
+def _message_content(message: Any) -> Any:
+    '''从消息对象或字典读取内容字段。'''
+    if isinstance(message, dict):
+        return message.get("content")
+    return getattr(message, "content", None)
 
 
 @router.post("/{thread_id}/runs/regenerate/prepare", response_model=RegeneratePrepareResponse)
@@ -488,6 +411,30 @@ async def prepare_regenerate_run(
 ) -> RegeneratePrepareResponse:
     '''为指定助手消息准备重新生成所需的图输入、元数据和基准检查点。'''
     return await _prepare_regenerate_payload(thread_id, body.message_id, request)
+
+
+def _record_to_response(record: RunRecord) -> RunResponse:
+    '''将内部运行记录转换为兼容 API 响应模型。'''
+    return RunResponse(
+        run_id=record.run_id,
+        thread_id=record.thread_id,
+        assistant_id=record.assistant_id,
+        status=record.status.value,
+        metadata=record.metadata,
+        kwargs=record.kwargs,
+        multitask_strategy=record.multitask_strategy,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+        total_input_tokens=record.total_input_tokens,
+        total_output_tokens=record.total_output_tokens,
+        total_tokens=record.total_tokens,
+        llm_call_count=record.llm_call_count,
+        lead_agent_tokens=record.lead_agent_tokens,
+        subagent_tokens=record.subagent_tokens,
+        middleware_tokens=record.middleware_tokens,
+        message_count=record.message_count,
+        stop_reason=record.stop_reason,
+    )
 
 
 @router.post("/{thread_id}/runs", response_model=RunResponse)
@@ -606,6 +553,47 @@ async def cancel_run(
     raise HTTPException(status_code=409, detail=_cancel_conflict_detail(run_id, record))
 
 
+async def _raise_lease_valid_elsewhere(
+    run_id: str,
+    run_mgr,  # 避免为了测试而提前导入运行管理器
+    record: RunRecord,
+) -> None:
+    '''重新读取其他工作进程的运行租约，并以 409 和可选 Retry-After 拒绝操作。'''
+    fresh = await run_mgr.get(run_id)
+    if fresh is not None:
+        record = fresh
+    retry_after = _compute_retry_after(record.lease_expires_at, run_mgr.grace_seconds)
+    headers: dict[str, str] = {}
+    if retry_after is not None:
+        headers["Retry-After"] = str(retry_after)
+    raise HTTPException(
+        status_code=409,
+        detail=f"Run {run_id} is active on another worker; retry after lease expiry.",
+        headers=headers,
+    )
+
+
+def _compute_retry_after(lease_expires_at: str | None, grace_seconds: int) -> int | None:
+    '''计算租约到期并经过宽限期前的秒数，供冲突响应 Retry-After 使用。'''
+    if lease_expires_at is None:
+        return None
+    try:
+        dt = datetime.fromisoformat(lease_expires_at)
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+    except (ValueError, TypeError):
+        return None
+    remaining = (dt - datetime.now(UTC)).total_seconds() + grace_seconds
+    return max(1, int(remaining))
+
+
+def _cancel_conflict_detail(run_id: str, record: RunRecord) -> str:
+    '''为无法取消的运行构造与其状态一致的冲突说明。'''
+    if record.status in (RunStatus.pending, RunStatus.running):
+        return f"Run {run_id} is not active on this worker and cannot be cancelled"
+    return f"Run {run_id} is not cancellable (status: {record.status.value})"
+
+
 @router.get("/{thread_id}/runs/{run_id}/join")
 @require_permission("runs", "read", owner_check=True)
 async def join_run(thread_id: str, run_id: str, request: Request) -> StreamingResponse:
@@ -683,8 +671,6 @@ async def stream_existing_run(
             "X-Accel-Buffering": "no",
         },
     )
-
-
 
 
 @router.get("/{thread_id}/messages")
@@ -812,6 +798,11 @@ async def _scan_thread_message_page(
 
     has_more = len(visible_desc) > limit
     return list(reversed(visible_desc[:limit])), has_more
+
+
+def _is_middleware_message_row(row: dict[str, Any]) -> bool:
+    '''判断事件存储行是否由中间件写入。'''
+    return str((row.get("metadata") or {}).get("caller", "")).startswith("middleware:")
 
 
 async def _enrich_thread_message_page(

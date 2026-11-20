@@ -227,18 +227,31 @@ def _snapshot_file(
     )
 
 
-def _cache_text_file(text: str, virtual_path: str, cache_dir: Path) -> Path:
-    '''把文本写入以虚拟路径摘要命名的临时文件，减少快照常驻内存。'''
-    cache_name = hashlib.sha256(virtual_path.encode("utf-8")).hexdigest()
-    target = cache_dir / cache_name
-    target.write_text(text, encoding="utf-8")
-    return target
-
-
 def _read_sample(path: Path) -> bytes:
     '''仅读取文件开头的有限字节，用于检测编码和二进制内容。'''
     with path.open("rb") as file:
         return file.read(SAMPLE_BYTES)
+
+
+def _looks_binary(sample: bytes) -> bool:
+    '''通过文件扩展名、空字节和文本解码结果识别二进制文件。'''
+    if sample.startswith(_UTF16_BOMS) and _sample_decodes_as_text(sample, "utf-16"):
+        return False
+    if b"\x00" in sample:
+        return True
+    if _sample_decodes_as_text(sample, "utf-8"):
+        return False
+    return True
+
+
+def _sample_decodes_as_text(sample: bytes, encoding: str) -> bool:
+    '''用增量解码器判断样本是否符合指定文本编码。'''
+    try:
+        decoder = getincrementaldecoder(encoding)()
+        decoder.decode(sample, final=False)
+    except UnicodeDecodeError:
+        return False
+    return True
 
 
 def _sha256_file(path: Path) -> str:
@@ -267,22 +280,9 @@ def _decode_text_bytes(data: bytes) -> str | None:
     return None
 
 
-def _sample_decodes_as_text(sample: bytes, encoding: str) -> bool:
-    '''用增量解码器判断样本是否符合指定文本编码。'''
-    try:
-        decoder = getincrementaldecoder(encoding)()
-        decoder.decode(sample, final=False)
-    except UnicodeDecodeError:
-        return False
-    return True
-
-
-def _looks_binary(sample: bytes) -> bool:
-    '''通过文件扩展名、空字节和文本解码结果识别二进制文件。'''
-    if sample.startswith(_UTF16_BOMS) and _sample_decodes_as_text(sample, "utf-16"):
-        return False
-    if b"\x00" in sample:
-        return True
-    if _sample_decodes_as_text(sample, "utf-8"):
-        return False
-    return True
+def _cache_text_file(text: str, virtual_path: str, cache_dir: Path) -> Path:
+    '''把文本写入以虚拟路径摘要命名的临时文件，减少快照常驻内存。'''
+    cache_name = hashlib.sha256(virtual_path.encode("utf-8")).hexdigest()
+    target = cache_dir / cache_name
+    target.write_text(text, encoding="utf-8")
+    return target

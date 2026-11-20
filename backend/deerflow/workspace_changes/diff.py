@@ -95,16 +95,11 @@ def compare_snapshots(
     )
 
 
-def get_changed_paths(before: WorkspaceSnapshot, after: WorkspaceSnapshot) -> set[str]:
-    '''仅返回前后快照中内容或元数据发生变化的路径集合。'''
-    changed: set[str] = set()
-    for path in set(before.files) | set(after.files):
-        before_file = before.files.get(path)
-        after_file = after.files.get(path)
-        if before_file and after_file and _same_file(before_file, after_file):
-            continue
-        changed.add(path)
-    return changed
+def _same_file(before_file: FileSnapshot, after_file: FileSnapshot) -> bool:
+    '''优先比较内容摘要；缺少摘要时以大小和修改时间判断文件是否相同。'''
+    if before_file.sha256 is not None and after_file.sha256 is not None:
+        return before_file.sha256 == after_file.sha256
+    return before_file.size == after_file.size and before_file.mtime_ns == after_file.mtime_ns
 
 
 def _status(
@@ -117,13 +112,6 @@ def _status(
     if after_file is None:
         return "deleted"
     return "modified"
-
-
-def _same_file(before_file: FileSnapshot, after_file: FileSnapshot) -> bool:
-    '''优先比较内容摘要；缺少摘要时以大小和修改时间判断文件是否相同。'''
-    if before_file.sha256 is not None and after_file.sha256 is not None:
-        return before_file.sha256 == after_file.sha256
-    return before_file.size == after_file.size and before_file.mtime_ns == after_file.mtime_ns
 
 
 def _build_diff(
@@ -202,3 +190,15 @@ def _count_diff_lines(lines: list[str]) -> tuple[int, int]:
         elif line.startswith("-"):
             deletions += 1
     return additions, deletions
+
+
+def get_changed_paths(before: WorkspaceSnapshot, after: WorkspaceSnapshot) -> set[str]:
+    '''仅返回前后快照中内容或元数据发生变化的路径集合。'''
+    changed: set[str] = set()
+    for path in set(before.files) | set(after.files):
+        before_file = before.files.get(path)
+        after_file = after.files.get(path)
+        if before_file and after_file and _same_file(before_file, after_file):
+            continue
+        changed.add(path)
+    return changed

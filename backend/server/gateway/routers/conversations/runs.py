@@ -19,14 +19,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/runs", tags=["runs"])
 
 
-def _resolve_thread_id(body: RunCreateRequest) -> str:
-    '''复用运行配置中的线程 ID；未提供时生成新的临时线程标识。'''
-    thread_id = (body.config or {}).get("configurable", {}).get("thread_id")
-    if thread_id:
-        return str(thread_id)
-    return str(uuid.uuid4())
-
-
 @router.post("/stream")
 async def stateless_stream(body: RunCreateRequest, request: Request) -> StreamingResponse:
     '''启动无状态入口运行并通过 SSE 返回事件，可复用请求给出的线程历史。'''
@@ -45,6 +37,14 @@ async def stateless_stream(body: RunCreateRequest, request: Request) -> Streamin
             "Content-Location": f"/api/threads/{thread_id}/runs/{record.run_id}",
         },
     )
+
+
+def _resolve_thread_id(body: RunCreateRequest) -> str:
+    '''复用运行配置中的线程 ID；未提供时生成新的临时线程标识。'''
+    thread_id = (body.config or {}).get("configurable", {}).get("thread_id")
+    if thread_id:
+        return str(thread_id)
+    return str(uuid.uuid4())
 
 
 @router.post("/wait", response_model=dict)
@@ -74,17 +74,6 @@ async def stateless_wait(body: RunCreateRequest, request: Request) -> dict:
     return {"status": record.status.value, "error": record.error}
 
 
-
-
-async def _resolve_run(run_id: str, request: Request) -> dict:
-    '''按当前用户读取运行记录；记录不存在或不可见时返回 404。'''
-    run_store = get_run_store(request)
-    record = await run_store.get(run_id)  # AUTO 根据当前用户上下文执行所有权过滤。
-    if record is None:
-        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
-    return record
-
-
 @router.get("/{run_id}/messages")
 @require_permission("runs", "read")
 async def run_messages(
@@ -106,6 +95,15 @@ async def run_messages(
     )
     data, has_more = trim_run_message_page(rows, limit=limit, after_seq=after_seq)
     return {"data": data, "has_more": has_more}
+
+
+async def _resolve_run(run_id: str, request: Request) -> dict:
+    '''按当前用户读取运行记录；记录不存在或不可见时返回 404。'''
+    run_store = get_run_store(request)
+    record = await run_store.get(run_id)  # AUTO 根据当前用户上下文执行所有权过滤。
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Run {run_id} not found")
+    return record
 
 
 @router.get("/{run_id}/feedback")

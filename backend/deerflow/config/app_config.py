@@ -3,7 +3,6 @@
 import hashlib
 import logging
 import os
-from collections.abc import Mapping
 from contextvars import ContextVar
 from pathlib import Path
 from typing import Any, Literal, Self
@@ -12,10 +11,6 @@ import yaml
 from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
-from deerflow.config.acp_config import ACPAgentConfig, load_acp_config_from_dict
-from deerflow.config.agents_api_config import AgentsApiConfig, load_agents_api_config_from_dict
-from deerflow.config.auth_config import AuthAppConfig
-from deerflow.config.authorization_config import AuthorizationConfig, load_authorization_config_from_dict
 from deerflow.config.channel_connections_config import ChannelConnectionsConfig
 from deerflow.config.checkpointer_config import CheckpointerConfig, load_checkpointer_config_from_dict
 from deerflow.config.database_config import DatabaseConfig
@@ -93,13 +88,6 @@ def is_trace_correlation_enabled(config: Any) -> bool:
     return bool(getattr(enhance, "enabled", False))
 
 
-def _legacy_config_candidates() -> tuple[Path, ...]:
-    '''返回为兼容单体仓库而保留的源码树 config.yaml 位置。'''
-    backend_dir = Path(__file__).resolve().parents[2]
-    repo_root = backend_dir.parent
-    return (repo_root / "config" / "config.yaml", backend_dir / "config.yaml", repo_root / "config.yaml")
-
-
 def logging_level_from_config(name: str | None) -> int:
     '''将 ``config.yaml`` 的 ``log_level`` 字符串映射为 :mod:`logging` 级别常量。'''
     mapping = logging.getLevelNamesMapping()
@@ -163,11 +151,8 @@ class AppConfig(BaseModel):
     title: TitleConfig = Field(default_factory=TitleConfig, description="Automatic title generation configuration")
     summarization: SummarizationConfig = Field(default_factory=SummarizationConfig, description="Conversation summarization configuration")
     memory: MemoryConfig = Field(default_factory=MemoryConfig, description="Memory subsystem configuration")
-    agents_api: AgentsApiConfig = Field(default_factory=AgentsApiConfig, description="Custom-agent management API configuration")
-    acp_agents: dict[str, ACPAgentConfig] = Field(default_factory=dict, description="ACP-compatible agent configuration")
     subagents: SubagentsAppConfig = Field(default_factory=SubagentsAppConfig, description="Subagent runtime configuration")
     guardrails: GuardrailsConfig = Field(default_factory=GuardrailsConfig, description="Guardrail middleware configuration")
-    authorization: AuthorizationConfig = Field(default_factory=AuthorizationConfig, description="Fine-grained resource authorization configuration (RBAC and beyond)")
     input_polish: InputPolishConfig = Field(default_factory=InputPolishConfig, description="Pre-send input polishing configuration.")
     suggestions: SuggestionsConfig = Field(default_factory=SuggestionsConfig, description="Follow-up suggestions configuration.")
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig, description="LLM circuit breaker configuration")
@@ -182,7 +167,6 @@ class AppConfig(BaseModel):
     tool_progress: ToolProgressConfig = Field(default_factory=ToolProgressConfig, description="Tool progress state machine middleware configuration")
     read_before_write: ReadBeforeWriteConfig = Field(default_factory=ReadBeforeWriteConfig, description="Read-before-write file gate middleware configuration")
     safety_finish_reason: SafetyFinishReasonConfig = Field(default_factory=SafetyFinishReasonConfig, description="Provider safety-filter finish_reason interception middleware configuration")
-    auth: AuthAppConfig = Field(default_factory=AuthAppConfig, description="Authentication configuration (local + OIDC SSO)")
     model_config = ConfigDict(extra="allow")
     database: DatabaseConfig = Field(
         default_factory=DatabaseConfig,
@@ -314,45 +298,8 @@ class AppConfig(BaseModel):
                 "No models are configured in %s. Add at least one entry under `models:` (see the commented examples in config.example.yaml).",
                 resolved_path,
             )
-        acp_agents = cls._validate_acp_agents(config_data.get("acp_agents", {}))
-        cls._apply_singleton_configs(result, acp_agents)
+        cls._apply_singleton_configs(result)
         return result
-
-    @classmethod
-    def _validate_acp_agents(
-        cls,
-        config_data: Mapping[str, Mapping[str, object]] | None,
-    ) -> dict[str, ACPAgentConfig]:
-        '''验证并构建 ACP 智能体配置映射。'''
-        if config_data is None:
-            config_data = {}
-        return {name: ACPAgentConfig(**cfg) for name, cfg in config_data.items()}
-
-    @classmethod
-    def _apply_singleton_configs(cls, config: Self, acp_agents: dict[str, ACPAgentConfig]) -> None:
-        '''将应用配置同步到运行时单例配置。'''
-        from deerflow.config.checkpointer_config import get_checkpointer_config
-
-        previous_checkpointer_config = get_checkpointer_config()
-
-        load_title_config_from_dict(config.title.model_dump())
-        load_summarization_config_from_dict(config.summarization.model_dump())
-        load_memory_config_from_dict(config.memory.model_dump())
-        load_agents_api_config_from_dict(config.agents_api.model_dump())
-        load_subagents_config_from_dict(config.subagents.model_dump())
-        load_tool_search_config_from_dict(config.tool_search.model_dump())
-        load_guardrails_config_from_dict(config.guardrails.model_dump())
-        load_authorization_config_from_dict(config.authorization.model_dump())
-        load_checkpointer_config_from_dict(config.checkpointer.model_dump() if config.checkpointer is not None else None)
-        load_stream_bridge_config_from_dict(config.stream_bridge.model_dump() if config.stream_bridge is not None else None)
-        load_acp_config_from_dict({name: agent.model_dump() for name, agent in acp_agents.items()})
-
-        if previous_checkpointer_config != config.checkpointer:
-            from deerflow.runtime.checkpointer import reset_checkpointer
-            from deerflow.runtime.store import reset_store
-
-            reset_checkpointer()
-            reset_store()
 
     @classmethod
     def _apply_database_defaults(cls, config_data: dict[str, Any]) -> None:
@@ -365,6 +312,30 @@ class AppConfig(BaseModel):
             return
         for key, value in CONFIG_FILE_DATABASE_DEFAULTS.items():
             database_config.setdefault(key, value)
+
+
+    @classmethod
+    def _apply_singleton_configs(cls, config: Self) -> None:
+        '''将应用配置同步到运行时单例配置。'''
+        from deerflow.config.checkpointer_config import get_checkpointer_config
+
+        previous_checkpointer_config = get_checkpointer_config()
+
+        load_title_config_from_dict(config.title.model_dump())
+        load_summarization_config_from_dict(config.summarization.model_dump())
+        load_memory_config_from_dict(config.memory.model_dump())
+        load_subagents_config_from_dict(config.subagents.model_dump())
+        load_tool_search_config_from_dict(config.tool_search.model_dump())
+        load_guardrails_config_from_dict(config.guardrails.model_dump())
+        load_checkpointer_config_from_dict(config.checkpointer.model_dump() if config.checkpointer is not None else None)
+        load_stream_bridge_config_from_dict(config.stream_bridge.model_dump() if config.stream_bridge is not None else None)
+
+        if previous_checkpointer_config != config.checkpointer:
+            from deerflow.runtime.checkpointer import reset_checkpointer
+            from deerflow.runtime.store import reset_store
+
+            reset_checkpointer()
+            reset_store()
 
     @classmethod
     def resolve_env_variables(cls, config: Any) -> Any:
@@ -449,6 +420,13 @@ class AppConfig(BaseModel):
         return self._tool_groups_by_name.get(name)
 
 
+def _legacy_config_candidates() -> tuple[Path, ...]:
+    '''返回为兼容单体仓库而保留的源码树 config.yaml 位置。'''
+    backend_dir = Path(__file__).resolve().parents[2]
+    repo_root = backend_dir.parent
+    return (repo_root / "config" / "config.yaml", backend_dir / "config.yaml", repo_root / "config.yaml")
+
+
 _app_config: AppConfig | None = None
 _app_config_path: Path | None = None
 _app_config_mtime: float | None = None
@@ -457,6 +435,39 @@ _app_config_signature: _ConfigSignature | None = None
 _app_config_is_custom = False
 _current_app_config: ContextVar[AppConfig | None] = ContextVar("deerflow_current_app_config", default=None)
 _current_app_config_stack: ContextVar[tuple[AppConfig | None, ...]] = ContextVar("deerflow_current_app_config_stack", default=())
+
+
+def get_app_config() -> AppConfig:
+    '''获取 DeerFlow 配置实例。
+
+    返回缓存的单例实例；当底层配置文件路径或内容签名变化时会自动重载。可使用
+    ``reload_app_config()`` 强制重载，或使用 ``reset_app_config()`` 清除缓存。
+    '''
+    global _app_config, _app_config_path, _app_config_mtime, _app_config_signature
+
+    runtime_override = _current_app_config.get()
+    if runtime_override is not None:
+        return runtime_override
+
+    if _app_config is not None and _app_config_is_custom:
+        return _app_config
+
+    resolved_path = AppConfig.resolve_config_path()
+    current_mtime = _get_config_mtime(resolved_path)
+    current_signature = _get_config_signature(resolved_path)
+
+    should_reload = _app_config is None or _app_config_path != resolved_path or _app_config_signature != current_signature
+    if should_reload:
+        if _app_config_path == resolved_path and _app_config_mtime is not None and current_mtime is not None and _app_config_mtime != current_mtime:
+            logger.info(
+                "Config file has been modified (mtime: %s -> %s), reloading AppConfig",
+                _app_config_mtime,
+                current_mtime,
+            )
+        elif _app_config_path == resolved_path and _app_config_signature != current_signature:
+            logger.info("Config file content signature changed, reloading AppConfig")
+        _load_and_cache_app_config(str(resolved_path))
+    return _app_config
 
 
 def _get_config_mtime(config_path: Path) -> float | None:
@@ -495,39 +506,6 @@ def _load_and_cache_app_config(config_path: str | None = None) -> AppConfig:
     _app_config_mtime = _get_config_mtime(resolved_path)
     _app_config_signature = _get_config_signature(resolved_path)
     _app_config_is_custom = False
-    return _app_config
-
-
-def get_app_config() -> AppConfig:
-    '''获取 DeerFlow 配置实例。
-
-    返回缓存的单例实例；当底层配置文件路径或内容签名变化时会自动重载。可使用
-    ``reload_app_config()`` 强制重载，或使用 ``reset_app_config()`` 清除缓存。
-    '''
-    global _app_config, _app_config_path, _app_config_mtime, _app_config_signature
-
-    runtime_override = _current_app_config.get()
-    if runtime_override is not None:
-        return runtime_override
-
-    if _app_config is not None and _app_config_is_custom:
-        return _app_config
-
-    resolved_path = AppConfig.resolve_config_path()
-    current_mtime = _get_config_mtime(resolved_path)
-    current_signature = _get_config_signature(resolved_path)
-
-    should_reload = _app_config is None or _app_config_path != resolved_path or _app_config_signature != current_signature
-    if should_reload:
-        if _app_config_path == resolved_path and _app_config_mtime is not None and current_mtime is not None and _app_config_mtime != current_mtime:
-            logger.info(
-                "Config file has been modified (mtime: %s -> %s), reloading AppConfig",
-                _app_config_mtime,
-                current_mtime,
-            )
-        elif _app_config_path == resolved_path and _app_config_signature != current_signature:
-            logger.info("Config file content signature changed, reloading AppConfig")
-        _load_and_cache_app_config(str(resolved_path))
     return _app_config
 
 

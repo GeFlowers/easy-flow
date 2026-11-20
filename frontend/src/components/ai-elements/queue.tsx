@@ -7,7 +7,7 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { cn } from "@/lib/utils";
+
 import { ChevronDownIcon, PaperclipIcon } from "lucide-react";
 import type { ComponentProps } from "react";
 
@@ -36,10 +36,12 @@ export type QueueItemProps = ComponentProps<"li">;
 /** 用于排列单条待发送消息或待办内容的列表项容器。 */
 export const QueueItem = ({ className, ...props }: QueueItemProps) => (
   <li
-    className={cn(
+    className={[
       "group hover:bg-muted flex flex-col gap-1 rounded-md px-3 py-1 text-sm transition-colors",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -55,13 +57,15 @@ export const QueueItemIndicator = ({
   ...props
 }: QueueItemIndicatorProps) => (
   <span
-    className={cn(
+    className={[
       "mt-0.5 inline-block size-2.5 rounded-full border",
       completed
         ? "border-muted-foreground/20 bg-muted-foreground/10"
         : "border-muted-foreground/50",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -77,13 +81,15 @@ export const QueueItemContent = ({
   ...props
 }: QueueItemContentProps) => (
   <span
-    className={cn(
+    className={[
       "line-clamp-1 grow break-words",
       completed
         ? "text-muted-foreground/50 line-through"
         : "text-muted-foreground",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -99,13 +105,15 @@ export const QueueItemDescription = ({
   ...props
 }: QueueItemDescriptionProps) => (
   <div
-    className={cn(
+    className={[
       "ml-6 text-xs",
       completed
         ? "text-muted-foreground/40 line-through"
         : "text-muted-foreground",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -117,7 +125,10 @@ export const QueueItemActions = ({
   className,
   ...props
 }: QueueItemActionsProps) => (
-  <div className={cn("flex gap-1", className)} {...props} />
+  <div
+    className={["flex gap-1", className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type QueueItemActionProps = Omit<
@@ -131,10 +142,12 @@ export const QueueItemAction = ({
   ...props
 }: QueueItemActionProps) => (
   <Button
-    className={cn(
+    className={[
       "text-muted-foreground hover:bg-muted-foreground/10 hover:text-foreground size-auto rounded p-1 opacity-0 transition-opacity group-hover:opacity-100",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     size="icon"
     type="button"
     variant="ghost"
@@ -149,7 +162,12 @@ export const QueueItemAttachment = ({
   className,
   ...props
 }: QueueItemAttachmentProps) => (
-  <div className={cn("mt-1 flex flex-wrap gap-2", className)} {...props} />
+  <div
+    className={["mt-1 flex flex-wrap gap-2", className]
+      .filter(Boolean)
+      .join(" ")}
+    {...props}
+  />
 );
 
 export type QueueItemImageProps = ComponentProps<"img">;
@@ -161,7 +179,9 @@ export const QueueItemImage = ({
 }: QueueItemImageProps) => (
   <img
     alt=""
-    className={cn("h-8 w-8 rounded border object-cover", className)}
+    className={["h-8 w-8 rounded border object-cover", className]
+      .filter(Boolean)
+      .join(" ")}
     height={32}
     width={32}
     {...props}
@@ -177,10 +197,12 @@ export const QueueItemFile = ({
   ...props
 }: QueueItemFileProps) => (
   <span
-    className={cn(
+    className={[
       "bg-muted flex items-center gap-1 rounded border px-2 py-1 text-xs",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   >
     <PaperclipIcon size={12} />
@@ -196,7 +218,10 @@ export const QueueList = ({
   className,
   ...props
 }: QueueListProps) => (
-  <ScrollArea className={cn("mt-2 -mb-1", className)} {...props}>
+  <ScrollArea
+    className={["mt-2 -mb-1", className].filter(Boolean).join(" ")}
+    {...props}
+  >
     <div className="max-h-40 pr-4">
       <ul>{children}</ul>
     </div>
@@ -212,7 +237,11 @@ export const QueueSection = ({
   defaultOpen = true,
   ...props
 }: QueueSectionProps) => (
-  <Collapsible className={cn(className)} defaultOpen={defaultOpen} {...props} />
+  <Collapsible
+    className={[className].filter(Boolean).join(" ")}
+    defaultOpen={defaultOpen}
+    {...props}
+  />
 );
 
 // QueueSectionTrigger：分区标题与触发器。
@@ -226,10 +255,12 @@ export const QueueSectionTrigger = ({
 }: QueueSectionTriggerProps) => (
   <CollapsibleTrigger asChild>
     <button
-      className={cn(
+      className={[
         "group bg-muted/40 text-muted-foreground hover:bg-muted flex w-full items-center justify-between rounded-md px-3 py-2 text-left text-sm font-medium transition-colors",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       type="button"
       {...props}
     >
@@ -253,7 +284,10 @@ export const QueueSectionLabel = ({
   className,
   ...props
 }: QueueSectionLabelProps) => (
-  <span className={cn("flex items-center gap-2", className)} {...props}>
+  <span
+    className={["flex items-center gap-2", className].filter(Boolean).join(" ")}
+    {...props}
+  >
     <ChevronDownIcon className="size-4 transition-transform group-data-[state=closed]:-rotate-90" />
     {icon}
     <span>
@@ -272,7 +306,10 @@ export const QueueSectionContent = ({
   className,
   ...props
 }: QueueSectionContentProps) => (
-  <CollapsibleContent className={cn(className)} {...props} />
+  <CollapsibleContent
+    className={[className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type QueueProps = ComponentProps<"div">;
@@ -280,10 +317,12 @@ export type QueueProps = ComponentProps<"div">;
 /** 为消息队列或待办列表提供统一边框、间距和背景的外层容器。 */
 export const Queue = ({ className, ...props }: QueueProps) => (
   <div
-    className={cn(
+    className={[
       "border-border bg-background flex flex-col gap-2 rounded-xl border px-3 pt-2 pb-2 shadow-xs",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );

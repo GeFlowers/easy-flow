@@ -65,6 +65,21 @@ def build_describe_skill_tool(
     return describe_skill
 
 
+def _render_skill_metadata(skills: list, container_base_path: str) -> str:
+    '''将匹配技能的名称、描述、可用工具和容器路径整理为代理可读取的文本。'''
+    blocks: list[str] = []
+    for s in skills:
+        mutability = "[自定义，可编辑]" if s.category == SkillCategory.CUSTOM else "[内置]"
+        tools_line = ", ".join(s.allowed_tools) if s.allowed_tools else "(全部)"
+        location = s.get_container_file_path(container_base_path)
+        name = html.escape(s.name, quote=False)
+        description = html.escape(s.description, quote=False)
+        tools = html.escape(tools_line, quote=False)
+        loc = html.escape(location, quote=False)
+        blocks.append(f"## 技能： {name}\n- 描述： {description} {mutability}\n- 允许的工具： {tools}\n- 位置： {loc}")
+    return "\n\n".join(blocks)
+
+
 def build_skill_search_setup(
     skills: list,
     *,
@@ -83,25 +98,6 @@ def build_skill_search_setup(
         ),
         skill_names=catalog.names,
     )
-
-
-
-
-def _render_skill_metadata(skills: list, container_base_path: str) -> str:
-    '''将匹配技能的名称、描述、可用工具和容器路径整理为代理可读取的文本。'''
-    blocks: list[str] = []
-    for s in skills:
-        mutability = "[自定义，可编辑]" if s.category == SkillCategory.CUSTOM else "[内置]"
-        tools_line = ", ".join(s.allowed_tools) if s.allowed_tools else "(全部)"
-        location = s.get_container_file_path(container_base_path)
-        name = html.escape(s.name, quote=False)
-        description = html.escape(s.description, quote=False)
-        tools = html.escape(tools_line, quote=False)
-        loc = html.escape(location, quote=False)
-        blocks.append(f"## 技能： {name}\n- 描述： {description} {mutability}\n- 允许的工具： {tools}\n- 位置： {loc}")
-    return "\n\n".join(blocks)
-
-
 
 
 def get_skill_index_prompt_section(

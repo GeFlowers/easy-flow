@@ -33,7 +33,6 @@ import type {
   WorkspaceChangeSummary,
   WorkspaceFileChange,
 } from "@/features/workspace-changes/types";
-import { cn } from "@/lib/utils";
 
 /** 展开线程工作区变更摘要，并在需要时加载文件差异详情。 */
 export function WorkspaceChangePanel({
@@ -65,7 +64,7 @@ export function WorkspaceChangePanel({
   const files = sortWorkspaceChanges(changes.files);
 
   return (
-    <SheetContent className="w-[min(92vw,900px)] gap-0 p-0 sm:max-w-[900px]">
+    <SheetContent className="w-[min(92vw,900px)] max-w-[900px] gap-0 p-0">
       <SheetHeader className="border-border border-b px-5 py-4">
         <SheetTitle className="flex items-center gap-2 text-base">
           <FileDiffIcon className="text-muted-foreground size-4" />
@@ -176,10 +175,9 @@ function WorkspaceDiff({ diff }: { diff: string }) {
       {diff.split("\n").map((line, index) => (
         <div
           key={`${index}:${line}`}
-          className={cn(
-            "min-w-max px-3 whitespace-pre",
-            diffLineClassName(line),
-          )}
+          className={["min-w-max px-3 whitespace-pre", diffLineClassName(line)]
+            .filter(Boolean)
+            .join(" ")}
         >
           {line || " "}
         </div>
@@ -192,12 +190,24 @@ function WorkspaceDiff({ diff }: { diff: string }) {
 function StatusIcon({ status }: { status: WorkspaceChangeStatus }) {
   const className = "mt-0.5 size-4 shrink-0";
   if (status === "created") {
-    return <FilePlusIcon className={cn(className, "text-emerald-500")} />;
+    return (
+      <FilePlusIcon
+        className={[className, "text-emerald-500"].filter(Boolean).join(" ")}
+      />
+    );
   }
   if (status === "deleted") {
-    return <FileMinusIcon className={cn(className, "text-red-500")} />;
+    return (
+      <FileMinusIcon
+        className={[className, "text-red-500"].filter(Boolean).join(" ")}
+      />
+    );
   }
-  return <FilePenLineIcon className={cn(className, "text-sky-500")} />;
+  return (
+    <FilePenLineIcon
+      className={[className, "text-sky-500"].filter(Boolean).join(" ")}
+    />
+  );
 }
 
 /** 将新增、删除和修改状态映射到本地化文案。 */

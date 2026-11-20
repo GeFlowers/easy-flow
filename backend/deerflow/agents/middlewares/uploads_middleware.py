@@ -26,73 +26,6 @@ _MAX_FILES_PER_CONTEXT_SECTION = 10
 _QUERY_TOKEN_RE = re.compile(r"[a-z0-9]+")
 
 
-def _extension_label(file: dict) -> str:
-    '''从文件元数据或文件名取得统一的小写扩展名。'''
-    extension = str(file.get("extension") or Path(str(file.get("filename") or "")).suffix).lower()
-    return extension or "(无扩展名)"
-
-
-def _format_omitted_file_types(files: list[dict]) -> str:
-    '''统计被上下文截断的文件类型，生成简洁的数量摘要。'''
-    counts = Counter(_extension_label(file) for file in files)
-    parts = [f"{count} {extension}" for extension, count in sorted(counts.items())]
-    return ", ".join(parts)
-
-
-def _query_match_strength(file: dict, query_text: str) -> int:
-    '''按完整文件名、名称片段或扩展名评估文件与当前问题的相关程度。'''
-    query = query_text.lower()
-    if not query:
-        return 0
-
-    filename = str(file.get("filename") or "").lower()
-    stem = Path(filename).stem
-    extension_label = _extension_label(file)
-    extension = extension_label[1:] if extension_label.startswith(".") else ""
-
-    if filename and filename in query:
-        return 3
-    if len(stem) >= 3 and stem in query:
-        return 3
-
-    token_match = False
-    for token in _QUERY_TOKEN_RE.findall(stem):
-        if len(token) >= 3 and token in query:
-            token_match = True
-            break
-    if token_match:
-        return 2
-
-    if extension and re.search(rf"\b{re.escape(extension)}s?\b", query):
-        return 1
-    return 0
-
-
-def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
-    '''读取上传转换生成的同名 Markdown 文件，返回标题大纲或无标题时的开头摘要。'''
-    md_path = file_path.with_suffix(".md")
-    if not md_path.is_file():
-        return [], []
-
-    outline = extract_outline(md_path)
-    if outline:
-        logger.debug("Extracted %d outline entries from %s", len(outline), file_path.name)
-        return outline, []
-
-    preview: list[str] = []
-    try:
-        with md_path.open(encoding="utf-8") as f:
-            for line in f:
-                stripped = line.strip()
-                if stripped:
-                    preview.append(stripped)
-                if len(preview) >= _OUTLINE_PREVIEW_LINES:
-                    break
-    except Exception:
-        logger.debug("Failed to read preview lines from %s", md_path, exc_info=True)
-    return [], preview
-
-
 class UploadsMiddlewareState(AgentState):
     '''声明上传文件中间件写入智能体状态的文件元数据字段。'''
 
@@ -116,133 +49,6 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
             raise ValueError("max_files_per_context_section 必须至少为 1")
         self._paths = Paths(base_dir) if base_dir else get_paths()
         self._max_files_per_context_section = max_files_per_context_section
-
-    def _format_file_entry(self, file: dict, lines: list[str]) -> None:
-        '''将文件名、大小、虚拟路径及可用的大纲或预览追加到上下文文本。'''
-        size_kb = file["size"] / 1024
-        size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
-        lines.append(f"- {file['filename']} ({size_str})")
-        lines.append(f"  路径： {file['path']}")
-        if file.get("selection_reason") == "query_match":
-            lines.append("  选择原因：匹配当前查询。")
-        outline = file.get("outline") or []
-        if outline:
-            truncated = outline[-1].get("truncated", False)
-            visible = [e for e in outline if not e.get("truncated")]
-            lines.append("  文档大纲（使用 `read_file` 按行范围读取各节）：")
-            for entry in visible:
-                lines.append(f"    L{entry['line']}: {entry['title']}")
-            if truncated:
-                lines.append(f"    ...（仅显示前 {len(visible)} 个标题；使用 `read_file` 继续查看）")
-        else:
-            preview = file.get("outline_preview") or []
-            if preview:
-                lines.append("  未检测到结构化标题。文档开头如下：")
-                for text in preview:
-                    lines.append(f"    > {text}")
-            lines.append("  使用 `grep` 搜索关键词，例如 `grep(pattern='keyword', path='/mnt/user-data/uploads/')`。")
-        lines.append("")
-
-    def _select_files_for_context(
-        self,
-        files: list[dict],
-        query_text: str,
-        *,
-        recency_key: str | None = None,
-    ) -> tuple[list[dict], list[dict]]:
-        '''优先选择与问题匹配的文件；匹配度相同时按新近程度或原顺序排序并限制数量。'''
-        ranked: list[tuple[tuple, dict]] = []
-        for index, file in enumerate(files):
-            selected_file = dict(file)
-            match_strength = _query_match_strength(selected_file, query_text)
-            query_match = match_strength > 0
-            if query_match:
-                selected_file["selection_reason"] = "query_match"
-
-            if recency_key:
-                sort_key = (-match_strength, -float(selected_file.get(recency_key) or 0), selected_file["filename"])
-            else:
-                sort_key = (-match_strength, index)
-            ranked.append((sort_key, selected_file))
-
-        ranked.sort(key=lambda item: item[0])
-        selected = [file for _, file in ranked[: self._max_files_per_context_section]]
-        omitted = [file for _, file in ranked[self._max_files_per_context_section :]]
-        return selected, omitted
-
-    def _create_files_message(
-        self,
-        new_files: list[dict],
-        historical_files: list[dict],
-        *,
-        omitted_new_files: list[dict] | None = None,
-        omitted_historical_files: list[dict] | None = None,
-    ) -> str:
-        '''生成带有新上传、历史文件、大纲和省略统计的结构化提示文本。'''
-        lines = ["<uploaded_files>"]
-
-        lines.append("本条消息上传了以下文件：")
-        lines.append("")
-        if new_files:
-            for file in new_files:
-                self._format_file_entry(file, lines)
-            if omitted_new_files:
-                lines.append(f"... ({len(omitted_new_files)} 个本条消息的文件已从当前上下文中省略。）")
-                lines.append(f"  省略的文件类型： {_format_omitted_file_types(omitted_new_files)}")
-                lines.append("  使用 `glob(pattern='**/*', path='/mnt/user-data/uploads/')` 列出全部上传文件。")
-                lines.append("  使用 `grep(pattern='keyword', path='/mnt/user-data/uploads/')` 搜索上传文件。")
-                lines.append("")
-        else:
-            lines.append("(空)")
-            lines.append("")
-
-        if historical_files:
-            lines.append("以下文件在先前消息中上传，目前仍可使用：")
-            lines.append("")
-            for file in historical_files:
-                self._format_file_entry(file, lines)
-            if omitted_historical_files:
-                lines.append(f"... ({len(omitted_historical_files)} 个历史文件已从当前上下文中省略。）")
-                lines.append(f"  省略的文件类型： {_format_omitted_file_types(omitted_historical_files)}")
-                lines.append("  使用 `glob(pattern='**/*', path='/mnt/user-data/uploads/')` 列出全部上传文件。")
-                lines.append("  使用 `grep(pattern='keyword', path='/mnt/user-data/uploads/')` 搜索上传文件。")
-                lines.append("")
-
-        lines.append("处理这些文件时：")
-        lines.append("- 先读取文件，结合大纲行号与 `read_file` 定位相关部分。")
-        lines.append("- 不确定应查看哪一节时，使用 `grep` 搜索关键词")
-        lines.append("  （例如 `grep(pattern='revenue', path='/mnt/user-data/uploads/')`).")
-        lines.append("- 使用 `glob` 按文件名模式查找文件")
-        lines.append("  （例如 `glob(pattern='**/*.md', path='/mnt/user-data/uploads/')`).")
-        lines.append("- 仅在文件内容明显不足以回答问题时，才使用网页搜索。")
-        lines.append("</uploaded_files>")
-
-        return "\n".join(lines)
-
-    def _files_from_kwargs(self, message: HumanMessage, uploads_dir: Path | None = None) -> list[dict] | None:
-        '''读取消息附带的上传元数据，过滤非法名称、暂存文件及磁盘上已不存在的文件。'''
-        kwargs_files = (message.additional_kwargs or {}).get("files")
-        if not isinstance(kwargs_files, list) or not kwargs_files:
-            return None
-
-        files = []
-        for f in kwargs_files:
-            if not isinstance(f, dict):
-                continue
-            filename = f.get("filename") or ""
-            if not filename or Path(filename).name != filename or is_upload_staging_file(filename):
-                continue
-            if uploads_dir is not None and not (uploads_dir / filename).is_file():
-                continue
-            files.append(
-                {
-                    "filename": filename,
-                    "size": int(f.get("size") or 0),
-                    "path": f"/mnt/user-data/uploads/{filename}",
-                    "extension": Path(filename).suffix,
-                }
-            )
-        return files if files else None
 
     @override
     def before_agent(self, state: UploadsMiddlewareState, runtime: Runtime) -> dict | None:
@@ -359,7 +165,201 @@ class UploadsMiddleware(AgentMiddleware[UploadsMiddlewareState]):
             "messages": messages,
         }
 
+    def _files_from_kwargs(self, message: HumanMessage, uploads_dir: Path | None = None) -> list[dict] | None:
+        '''读取消息附带的上传元数据，过滤非法名称、暂存文件及磁盘上已不存在的文件。'''
+        kwargs_files = (message.additional_kwargs or {}).get("files")
+        if not isinstance(kwargs_files, list) or not kwargs_files:
+            return None
+
+        files = []
+        for f in kwargs_files:
+            if not isinstance(f, dict):
+                continue
+            filename = f.get("filename") or ""
+            if not filename or Path(filename).name != filename or is_upload_staging_file(filename):
+                continue
+            if uploads_dir is not None and not (uploads_dir / filename).is_file():
+                continue
+            files.append(
+                {
+                    "filename": filename,
+                    "size": int(f.get("size") or 0),
+                    "path": f"/mnt/user-data/uploads/{filename}",
+                    "extension": Path(filename).suffix,
+                }
+            )
+        return files if files else None
+
+    def _select_files_for_context(
+        self,
+        files: list[dict],
+        query_text: str,
+        *,
+        recency_key: str | None = None,
+    ) -> tuple[list[dict], list[dict]]:
+        '''优先选择与问题匹配的文件；匹配度相同时按新近程度或原顺序排序并限制数量。'''
+        ranked: list[tuple[tuple, dict]] = []
+        for index, file in enumerate(files):
+            selected_file = dict(file)
+            match_strength = _query_match_strength(selected_file, query_text)
+            query_match = match_strength > 0
+            if query_match:
+                selected_file["selection_reason"] = "query_match"
+
+            if recency_key:
+                sort_key = (-match_strength, -float(selected_file.get(recency_key) or 0), selected_file["filename"])
+            else:
+                sort_key = (-match_strength, index)
+            ranked.append((sort_key, selected_file))
+
+        ranked.sort(key=lambda item: item[0])
+        selected = [file for _, file in ranked[: self._max_files_per_context_section]]
+        omitted = [file for _, file in ranked[self._max_files_per_context_section :]]
+        return selected, omitted
+
+    def _create_files_message(
+        self,
+        new_files: list[dict],
+        historical_files: list[dict],
+        *,
+        omitted_new_files: list[dict] | None = None,
+        omitted_historical_files: list[dict] | None = None,
+    ) -> str:
+        '''生成带有新上传、历史文件、大纲和省略统计的结构化提示文本。'''
+        lines = ["<uploaded_files>"]
+
+        lines.append("本条消息上传了以下文件：")
+        lines.append("")
+        if new_files:
+            for file in new_files:
+                self._format_file_entry(file, lines)
+            if omitted_new_files:
+                lines.append(f"... ({len(omitted_new_files)} 个本条消息的文件已从当前上下文中省略。）")
+                lines.append(f"  省略的文件类型： {_format_omitted_file_types(omitted_new_files)}")
+                lines.append("  使用 `glob(pattern='**/*', path='/mnt/user-data/uploads/')` 列出全部上传文件。")
+                lines.append("  使用 `grep(pattern='keyword', path='/mnt/user-data/uploads/')` 搜索上传文件。")
+                lines.append("")
+        else:
+            lines.append("(空)")
+            lines.append("")
+
+        if historical_files:
+            lines.append("以下文件在先前消息中上传，目前仍可使用：")
+            lines.append("")
+            for file in historical_files:
+                self._format_file_entry(file, lines)
+            if omitted_historical_files:
+                lines.append(f"... ({len(omitted_historical_files)} 个历史文件已从当前上下文中省略。）")
+                lines.append(f"  省略的文件类型： {_format_omitted_file_types(omitted_historical_files)}")
+                lines.append("  使用 `glob(pattern='**/*', path='/mnt/user-data/uploads/')` 列出全部上传文件。")
+                lines.append("  使用 `grep(pattern='keyword', path='/mnt/user-data/uploads/')` 搜索上传文件。")
+                lines.append("")
+
+        lines.append("处理这些文件时：")
+        lines.append("- 先读取文件，结合大纲行号与 `read_file` 定位相关部分。")
+        lines.append("- 不确定应查看哪一节时，使用 `grep` 搜索关键词")
+        lines.append("  （例如 `grep(pattern='revenue', path='/mnt/user-data/uploads/')`).")
+        lines.append("- 使用 `glob` 按文件名模式查找文件")
+        lines.append("  （例如 `glob(pattern='**/*.md', path='/mnt/user-data/uploads/')`).")
+        lines.append("- 仅在文件内容明显不足以回答问题时，才使用网页搜索。")
+        lines.append("</uploaded_files>")
+
+        return "\n".join(lines)
+
+    def _format_file_entry(self, file: dict, lines: list[str]) -> None:
+        '''将文件名、大小、虚拟路径及可用的大纲或预览追加到上下文文本。'''
+        size_kb = file["size"] / 1024
+        size_str = f"{size_kb:.1f} KB" if size_kb < 1024 else f"{size_kb / 1024:.1f} MB"
+        lines.append(f"- {file['filename']} ({size_str})")
+        lines.append(f"  路径： {file['path']}")
+        if file.get("selection_reason") == "query_match":
+            lines.append("  选择原因：匹配当前查询。")
+        outline = file.get("outline") or []
+        if outline:
+            truncated = outline[-1].get("truncated", False)
+            visible = [e for e in outline if not e.get("truncated")]
+            lines.append("  文档大纲（使用 `read_file` 按行范围读取各节）：")
+            for entry in visible:
+                lines.append(f"    L{entry['line']}: {entry['title']}")
+            if truncated:
+                lines.append(f"    ...（仅显示前 {len(visible)} 个标题；使用 `read_file` 继续查看）")
+        else:
+            preview = file.get("outline_preview") or []
+            if preview:
+                lines.append("  未检测到结构化标题。文档开头如下：")
+                for text in preview:
+                    lines.append(f"    > {text}")
+            lines.append("  使用 `grep` 搜索关键词，例如 `grep(pattern='keyword', path='/mnt/user-data/uploads/')`。")
+        lines.append("")
+
     @override
     async def abefore_agent(self, state: UploadsMiddlewareState, runtime: Runtime) -> dict | None:
         '''把包含目录扫描和文件读取的同步准备流程移至工作线程，避免阻塞异步事件循环。'''
         return await run_in_executor(None, self.before_agent, state, runtime)
+
+
+def _extract_outline_for_file(file_path: Path) -> tuple[list[dict], list[str]]:
+    '''读取上传转换生成的同名 Markdown 文件，返回标题大纲或无标题时的开头摘要。'''
+    md_path = file_path.with_suffix(".md")
+    if not md_path.is_file():
+        return [], []
+
+    outline = extract_outline(md_path)
+    if outline:
+        logger.debug("Extracted %d outline entries from %s", len(outline), file_path.name)
+        return outline, []
+
+    preview: list[str] = []
+    try:
+        with md_path.open(encoding="utf-8") as f:
+            for line in f:
+                stripped = line.strip()
+                if stripped:
+                    preview.append(stripped)
+                if len(preview) >= _OUTLINE_PREVIEW_LINES:
+                    break
+    except Exception:
+        logger.debug("Failed to read preview lines from %s", md_path, exc_info=True)
+    return [], preview
+
+
+def _query_match_strength(file: dict, query_text: str) -> int:
+    '''按完整文件名、名称片段或扩展名评估文件与当前问题的相关程度。'''
+    query = query_text.lower()
+    if not query:
+        return 0
+
+    filename = str(file.get("filename") or "").lower()
+    stem = Path(filename).stem
+    extension_label = _extension_label(file)
+    extension = extension_label[1:] if extension_label.startswith(".") else ""
+
+    if filename and filename in query:
+        return 3
+    if len(stem) >= 3 and stem in query:
+        return 3
+
+    token_match = False
+    for token in _QUERY_TOKEN_RE.findall(stem):
+        if len(token) >= 3 and token in query:
+            token_match = True
+            break
+    if token_match:
+        return 2
+
+    if extension and re.search(rf"\b{re.escape(extension)}s?\b", query):
+        return 1
+    return 0
+
+
+def _extension_label(file: dict) -> str:
+    '''从文件元数据或文件名取得统一的小写扩展名。'''
+    extension = str(file.get("extension") or Path(str(file.get("filename") or "")).suffix).lower()
+    return extension or "(无扩展名)"
+
+
+def _format_omitted_file_types(files: list[dict]) -> str:
+    '''统计被上下文截断的文件类型，生成简洁的数量摘要。'''
+    counts = Counter(_extension_label(file) for file in files)
+    parts = [f"{count} {extension}" for extension, count in sorted(counts.items())]
+    return ", ".join(parts)

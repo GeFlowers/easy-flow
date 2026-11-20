@@ -31,7 +31,6 @@ import {
 } from "@/features/tasks/presentation";
 import { stepsForDisplay } from "@/features/tasks/steps";
 import { explainLastToolCall } from "@/features/tools/utils";
-import { cn } from "@/lib/utils";
 
 import { CitationLink } from "../citations/citation-link";
 import { FlipDisplay } from "../flip-display";
@@ -108,14 +107,18 @@ export function SubtaskCard({
   }, [task.status]);
   return (
     <ChainOfThought
-      className={cn("relative w-full gap-2 rounded-lg border py-0", className)}
+      className={["relative w-full gap-2 rounded-lg border py-0", className]
+        .filter(Boolean)
+        .join(" ")}
       open={!collapsed}
     >
       <div
-        className={cn(
+        className={[
           "ambilight z-[-1]",
           task.status === "in_progress" ? "enabled" : "",
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
       ></div>
       {task.status === "in_progress" && (
         <>
@@ -149,10 +152,12 @@ export function SubtaskCard({
               <div className="flex items-center gap-1">
                 {collapsed && (
                   <div
-                    className={cn(
+                    className={[
                       "text-muted-foreground flex items-center gap-1 text-xs font-normal",
                       task.status === "failed" ? "text-red-500 opacity-67" : "",
-                    )}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     {modelLabel && (
                       <span className="max-w-32 truncate" title={modelLabel}>
@@ -181,10 +186,12 @@ export function SubtaskCard({
                   </div>
                 )}
                 <ChevronUp
-                  className={cn(
+                  className={[
                     "text-muted-foreground size-4",
                     !collapsed ? "" : "rotate-180",
-                  )}
+                  ]
+                    .filter(Boolean)
+                    .join(" ")}
                 />
               </div>
             </div>

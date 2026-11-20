@@ -30,8 +30,6 @@ _PUBLIC_PATH_PREFIXES: tuple[str, ...] = (
     "/docs",
     "/redoc",
     "/openapi.json",
-    "/api/v1/auth/oauth/",
-    "/api/v1/auth/callback/",
     # 入站回调通过提供者专属签名认证，而非会话凭据。
     "/api/webhooks/",
 )
@@ -45,17 +43,8 @@ _PUBLIC_EXACT_PATHS: frozenset[str] = frozenset(
         "/api/v1/auth/logout",
         "/api/v1/auth/setup-status",
         "/api/v1/auth/initialize",
-        "/api/v1/auth/providers",
     }
 )
-
-
-def _is_public(path: str) -> bool:
-    '''判断请求路径是否属于无需认证的公开路径。'''
-    stripped = path.rstrip("/")
-    if stripped in _PUBLIC_EXACT_PATHS:
-        return True
-    return any(path.startswith(prefix) for prefix in _PUBLIC_PATH_PREFIXES)
 
 
 class AuthMiddleware(BaseHTTPMiddleware):
@@ -130,3 +119,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
             return await call_next(request)
         finally:
             reset_current_user(token)
+
+
+def _is_public(path: str) -> bool:
+    '''判断请求路径是否属于无需认证的公开路径。'''
+    stripped = path.rstrip("/")
+    if stripped in _PUBLIC_EXACT_PATHS:
+        return True
+    return any(path.startswith(prefix) for prefix in _PUBLIC_PATH_PREFIXES)

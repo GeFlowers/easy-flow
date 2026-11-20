@@ -109,12 +109,6 @@ def validate_upload_destination(base_dir: Path, filename: str) -> Path:
     return dest
 
 
-def _iter_upload_dirs(base_dir: Path):
-    '''枚举共享布局和按用户隔离布局下的线程上传目录。'''
-    yield from base_dir.glob("threads/*/user-data/uploads")
-    yield from base_dir.glob("users/*/threads/*/user-data/uploads")
-
-
 def cleanup_stale_upload_staging_files(base_dir: Path | str | None = None) -> int:
     '''清理进程异常退出后遗留的上传暂存文件，并返回删除数量。'''
     root = Path(base_dir) if base_dir is not None else get_paths().base_dir
@@ -139,6 +133,12 @@ def cleanup_stale_upload_staging_files(base_dir: Path | str | None = None) -> in
         except OSError:
             logger.warning("Failed to scan uploads directory for stale staging files: %s", uploads_dir, exc_info=True)
     return removed
+
+
+def _iter_upload_dirs(base_dir: Path):
+    '''枚举共享布局和按用户隔离布局下的线程上传目录。'''
+    yield from base_dir.glob("threads/*/user-data/uploads")
+    yield from base_dir.glob("users/*/threads/*/user-data/uploads")
 
 
 def open_upload_file_no_symlink(base_dir: Path, filename: str) -> tuple[Path, object]:

@@ -9,7 +9,6 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-import re
 from collections.abc import Mapping
 from types import SimpleNamespace
 from typing import Any
@@ -27,7 +26,6 @@ from server.gateway.internal_auth import (
     get_internal_user,
     get_trusted_internal_owner_user_id,
 )
-from server.gateway.utils import sanitize_log_param
 from deerflow.agents.middlewares.dynamic_context_middleware import _DYNAMIC_CONTEXT_REMINDER_KEY, _REMINDER_DATE_KEY
 from deerflow.config.app_config import get_app_config
 from deerflow.runtime import (
@@ -43,7 +41,6 @@ from deerflow.runtime import (
     run_agent,
 )
 from deerflow.runtime.goal import goal_thread_lock
-from deerflow.runtime.runs.naming import resolve_root_run_name
 from deerflow.runtime.secret_context import redact_config_secrets
 from deerflow.runtime.user_context import reset_current_user, set_current_user
 from deerflow.utils.messages import ORIGINAL_USER_CONTENT_KEY
@@ -83,29 +80,6 @@ def format_sse(event: str, data: Any, *, event_id: str | None = None) -> str:
     return "\n".join(parts)
 
 
-def _run_is_terminal(record: RunRecord) -> bool:
-    '''判断运行记录是否已进入不会继续产生事件的终态。'''
-    return record.status in _TERMINAL_RUN_STATUSES
-
-
-async def _terminal_record_stream_missing(bridge: StreamBridge, record: RunRecord) -> bool:
-    '''支持查询的桥接器中，终态运行无保留事件流时返回 ``True``。'''
-    if not _run_is_terminal(record):
-        return False
-    stream_exists = getattr(bridge, "stream_exists", None)
-    if stream_exists is None:
-        return False
-    try:
-        return not bool(await stream_exists(record.run_id))
-    except Exception:
-        logger.debug(
-            "Failed to probe stream existence for terminal run %s",
-            sanitize_log_param(record.run_id),
-            exc_info=True,
-        )
-        return False
-
-
 # 输入与配置辅助函数。
 
 
@@ -116,19 +90,6 @@ def normalize_stream_modes(raw: list[str] | str | None) -> list[str]:
     if isinstance(raw, str):
         return [raw]
     return raw if raw else ["values"]
-
-
-def _strip_external_message_metadata(message: Any) -> Any:
-    '''移除不受信任输入消息中由服务端持有的元数据。'''
-    if not isinstance(message, BaseMessage):
-        return message
-    additional_kwargs = dict(message.additional_kwargs)
-    additional_kwargs.pop(ORIGINAL_USER_CONTENT_KEY, None)
-    for key in _SERVER_OWNED_DYNAMIC_CONTEXT_KEYS:
-        additional_kwargs.pop(key, None)
-    if additional_kwargs == message.additional_kwargs:
-        return message
-    return message.model_copy(update={"additional_kwargs": additional_kwargs})
 
 
 def normalize_input(raw_input: dict[str, Any] | None, *, trusted_internal: bool = False) -> dict[str, Any]:
@@ -157,13 +118,46 @@ def normalize_input(raw_input: dict[str, Any] | None, *, trusted_internal: bool 
     return raw_input
 
 
-_DEFAULT_ASSISTANT_ID = "lead_agent"
+def _strip_external_message_metadata(message: Any) -> Any:
+    '''移除不受信任输入消息中由服务端持有的元数据。'''
+    if not isinstance(message, BaseMessage):
+        return message
+    additional_kwargs = dict(message.additional_kwargs)
+    additional_kwargs.pop(ORIGINAL_USER_CONTENT_KEY, None)
+    for key in _SERVER_OWNED_DYNAMIC_CONTEXT_KEYS:
+        additional_kwargs.pop(key, None)
+    if additional_kwargs == message.additional_kwargs:
+        return message
+    return message.model_copy(update={"additional_kwargs": additional_kwargs})
+
+
+def _run_is_terminal(record: RunRecord) -> bool:
+    '''判断运行记录是否已进入不会继续产生事件的终态。'''
+    return record.status in _TERMINAL_RUN_STATUSES
+
+
+async def _terminal_record_stream_missing(bridge: StreamBridge, record: RunRecord) -> bool:
+    '''支持查询的桥接器中，终态运行无保留事件流时返回 ``True``。'''
+    if not _run_is_terminal(record):
+        return False
+    stream_exists = getattr(bridge, "stream_exists", None)
+    if stream_exists is None:
+        return False
+    try:
+        return not bool(await stream_exists(record.run_id))
+    except Exception:
+        logger.debug(
+            "Failed to probe stream existence for terminal run %s",
+            record.run_id,
+            exc_info=True,
+        )
+        return False
 
 
 # langgraph 兼容层从 ``body.context`` 转发到运行配置的上下文字段白名单。
 # LangGraph 0.6 及以上支持 ``config["context"]``，但为兼容旧版
 # ``_get_runtime_config`` 调用方，这些值必须同时写入 ``configurable`` 和 ``context``；
-# LangGraph 1.1.9 及以上不再让 ``ToolRuntime.context`` 为 ``setup_agent`` 等调用方回退读取
+# LangGraph 1.1.9 及以上不再让 ``ToolRuntime.context`` 供调用方回退读取
 _CONTEXT_CONFIGURABLE_KEYS: frozenset[str] = frozenset(
     {
         "model_name",
@@ -174,8 +168,6 @@ _CONTEXT_CONFIGURABLE_KEYS: frozenset[str] = frozenset(
         "subagent_enabled",
         "max_concurrent_subagents",
         "max_total_subagents",
-        "agent_name",
-        "is_bootstrap",
     }
 )
 
@@ -241,7 +233,7 @@ async def resolve_trusted_internal_owner_for_attribution(request: Request, owner
     try:
         return await get_local_provider().get_user(owner_user_id)
     except Exception:
-        logger.exception("Failed to resolve trusted internal owner %s", sanitize_log_param(owner_user_id))
+        logger.exception("Failed to resolve trusted internal owner %s", owner_user_id)
         return None
 
 
@@ -264,27 +256,21 @@ def inject_authenticated_user_context(
             return
         if internal_owner_user is None:
             runtime_context.pop("user_role", None)
-            runtime_context.pop("oauth_provider", None)
-            runtime_context.pop("oauth_id", None)
             return
         owner_user_id = getattr(internal_owner_user, "id", None)
         if owner_user_id is not None:
             runtime_context["user_id"] = str(owner_user_id)
         runtime_context["user_role"] = getattr(internal_owner_user, "system_role", None)
-        runtime_context["oauth_provider"] = getattr(internal_owner_user, "oauth_provider", None)
-        runtime_context["oauth_id"] = getattr(internal_owner_user, "oauth_id", None)
         return
 
     runtime_context = config.setdefault("context", {})
     if isinstance(runtime_context, dict):
         runtime_context["user_id"] = str(user_id)
         runtime_context["user_role"] = getattr(user, "system_role", None)
-        runtime_context["oauth_provider"] = getattr(user, "oauth_provider", None)
-        runtime_context["oauth_id"] = getattr(user, "oauth_id", None)
 
 
 def resolve_agent_factory(assistant_id: str | None):
-    '''返回统一的 lead-agent 工厂；具体 Agent 由运行配置中的 agent_name 选择。'''
+    '''返回主代理工厂。'''
     from deerflow.agents.lead_agent.agent import make_lead_agent
 
     return make_lead_agent
@@ -298,21 +284,6 @@ _DEFAULT_RECURSION_LIMIT = 100
 _DEFAULT_MAX_RECURSION_LIMIT = 1000
 
 
-def _resolve_max_recursion_limit() -> int:
-    '''读取服务端递归上限；配置不可用时使用内置上限继续保护运行。'''
-    try:
-        return get_app_config().max_recursion_limit
-    except Exception:
-        return _DEFAULT_MAX_RECURSION_LIMIT
-
-
-def _clamp_recursion_limit(value: Any, max_limit: int) -> int:
-    '''校验客户端递归步数并限制在服务端上限内，无效值回退到默认值。'''
-    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
-        return _DEFAULT_RECURSION_LIMIT
-    return min(value, max_limit)
-
-
 def build_run_config(
     thread_id: str,
     request_config: dict[str, Any] | None,
@@ -320,7 +291,7 @@ def build_run_config(
     *,
     assistant_id: str | None = None,
 ) -> dict[str, Any]:
-    '''组装 Agent 运行配置，注入线程与自定义 Agent 名称，并限制递归步数。'''
+    '''组装代理运行配置，注入线程标识并限制递归步数。'''
     # 此递归预算只限制主图的 LangGraph 超步，与子智能体深度无关：一次 ``task()`` 调度在主图中
     # 只占一个工具节点步骤；子智能体通过 ``subagents.max_turns`` 单独限制轮数。不要把这里的
     # 100 步与通用子智能体的 max_turns 混为一谈。
@@ -378,28 +349,29 @@ def build_run_config(
     else:
         config["configurable"] = {"thread_id": thread_id}
 
-    # 调用方指定非默认 assistant 时注入自定义智能体名称；运行时任一选项容器中显式指定的
-    # agent_name 均优先保留。
-    if assistant_id and assistant_id != _DEFAULT_ASSISTANT_ID:
-        normalized = assistant_id.strip().lower().replace("_", "-")
-        if not normalized or not re.fullmatch(r"[a-z0-9-]+", normalized):
-            raise ValueError(f"Invalid assistant_id {assistant_id!r}: must contain only letters, digits, and hyphens after normalization.")
-        configurable = config.setdefault("configurable", {})
-        runtime_context = config.setdefault("context", {})
-        explicit_agent_name: str | None = None
-        if isinstance(configurable, dict) and isinstance(configurable.get("agent_name"), str):
-            explicit_agent_name = configurable["agent_name"]
-        elif isinstance(runtime_context, dict) and isinstance(runtime_context.get("agent_name"), str):
-            explicit_agent_name = runtime_context["agent_name"]
-        effective_agent_name = explicit_agent_name or normalized
-        if isinstance(configurable, dict):
-            configurable["agent_name"] = effective_agent_name
-        if isinstance(runtime_context, dict):
-            runtime_context["agent_name"] = effective_agent_name
-        config.setdefault("run_name", resolve_root_run_name(config, normalized))
+    # 历史自定义代理参数统一回退到默认主代理。
+    config.get("configurable", {}).pop("agent_name", None)
+    runtime_context = config.get("context")
+    if isinstance(runtime_context, dict):
+        runtime_context.pop("agent_name", None)
     if metadata:
         config.setdefault("metadata", {}).update(metadata)
     return config
+
+
+def _resolve_max_recursion_limit() -> int:
+    '''读取服务端递归上限；配置不可用时使用内置上限继续保护运行。'''
+    try:
+        return get_app_config().max_recursion_limit
+    except Exception:
+        return _DEFAULT_MAX_RECURSION_LIMIT
+
+
+def _clamp_recursion_limit(value: Any, max_limit: int) -> int:
+    '''校验客户端递归步数并限制在服务端上限内，无效值回退到默认值。'''
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        return _DEFAULT_RECURSION_LIMIT
+    return min(value, max_limit)
 
 
 async def apply_checkpoint_to_run_config(
@@ -446,7 +418,7 @@ async def apply_checkpoint_to_run_config(
     try:
         checkpoint_tuple = await checkpointer.aget_tuple(read_config)
     except Exception as exc:
-        logger.exception("Failed to validate checkpoint %s for thread %s", checkpoint_id, sanitize_log_param(thread_id))
+        logger.exception("Failed to validate checkpoint %s for thread %s", checkpoint_id, thread_id)
         raise HTTPException(status_code=500, detail="Failed to validate checkpoint") from exc
     if checkpoint_tuple is None:
         raise HTTPException(status_code=404, detail=f"Checkpoint {checkpoint_id} not found")
@@ -459,8 +431,6 @@ async def apply_checkpoint_to_run_config(
     configurable["checkpoint_id"] = str(checkpoint_id)
     if checkpoint_map is not None:
         configurable["checkpoint_map"] = checkpoint_map
-
-
 
 
 async def start_run(
@@ -549,7 +519,7 @@ async def start_run(
             else:
                 await run_ctx.thread_store.update_status(thread_id, "running")
         except Exception:
-            logger.warning("Failed to upsert thread_meta for %s (non-fatal)", sanitize_log_param(thread_id))
+            logger.warning("Failed to upsert thread_meta for %s (non-fatal)", thread_id)
 
         agent_factory = resolve_agent_factory(body.assistant_id)
         is_internal_caller = getattr(getattr(request, "state", None), "auth_source", None) == AUTH_SOURCE_INTERNAL
@@ -648,7 +618,6 @@ async def launch_scheduled_thread_run(
         multitask_strategy="reject",
         after_seconds=None,
         if_not_exists="reject",
-        feedback_keys=None,
     )
     record = await start_run(body, thread_id, request)
     return {"run_id": record.run_id, "thread_id": record.thread_id}

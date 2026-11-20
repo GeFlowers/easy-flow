@@ -30,7 +30,6 @@ import {
 } from "@/features/channels/provider-state";
 import type { ChannelProvider } from "@/features/channels/types";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 import { ChannelProviderIcon } from "./channel-provider-icon";
 import { ChannelRuntimeConfigDialog } from "./channel-runtime-config-dialog";
@@ -149,10 +148,9 @@ export function WorkspaceChannelsList() {
                   type="button"
                   size="sm"
                   variant={isConnected ? "outline" : "secondary"}
-                  className={cn(
-                    "h-8 w-24 px-2 text-xs",
-                    isConnected && "gap-1",
-                  )}
+                  className={["h-8 w-24 px-2 text-xs", isConnected && "gap-1"]
+                    .filter(Boolean)
+                    .join(" ")}
                   disabled={isPending}
                   title={unavailableReason}
                   onClick={() => {

@@ -72,6 +72,10 @@ class GitHubAPI:
         if token:
             self.headers["Authorization"] = f"token {token}"
 
+    def get_repo_info(self, owner: str, repo: str) -> Dict:
+        '''获取仓库的基础元数据。'''
+        return self._get(f"/repos/{owner}/{repo}")
+
     def _get(
         self, endpoint: str, params: Optional[Dict] = None, accept: Optional[str] = None
     ) -> Any:
@@ -87,10 +91,6 @@ class GitHubAPI:
         if "application/vnd.github.raw" in (accept or ""):
             return resp.text
         return resp.json()
-
-    def get_repo_info(self, owner: str, repo: str) -> Dict:
-        '''获取仓库的基础元数据。'''
-        return self._get(f"/repos/{owner}/{repo}")
 
     def get_readme(self, owner: str, repo: str) -> str:
         '''获取仓库 README 的原始 Markdown；不存在时返回说明文本。'''

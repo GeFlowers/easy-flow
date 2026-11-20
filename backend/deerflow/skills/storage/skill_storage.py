@@ -24,7 +24,6 @@ class SkillStorage(ABC):
         '''保存智能体可访问的技能虚拟目录路径。'''
         self._container_root = container_path
 
-
     @staticmethod
     def validate_skill_name(name: str) -> str:
         '''校验技能名格式与长度，并返回去除首尾空白后的名称。'''
@@ -87,7 +86,6 @@ class SkillStorage(ABC):
             raise ValueError("辅助文件路径必须位于选定的辅助目录内部。") from exc
         return target
 
-
     @abstractmethod
     def get_skills_root_path(self) -> Path:
         '''返回宿主机技能根目录，供发现技能和配置沙箱挂载使用。'''
@@ -101,10 +99,6 @@ class SkillStorage(ABC):
         except ValueError as exc:
             raise ValueError("解析后的技能文件必须位于配置的技能根目录内部。") from exc
         return resolved_file
-
-    @abstractmethod
-    def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
-        '''枚举技能类别、类别根目录及其直属技能的 `SKILL.md` 路径。'''
 
     @abstractmethod
     def read_custom_skill(self, name: str) -> str:
@@ -147,7 +141,6 @@ class SkillStorage(ABC):
     def read_history(self, name: str) -> list[dict]:
         '''按写入顺序读取指定技能的全部历史记录。'''
 
-
     def get_container_root(self) -> str:
         '''返回智能体可访问的技能虚拟目录根路径。'''
         return self._container_root
@@ -166,7 +159,6 @@ class SkillStorage(ABC):
         '''返回自定义技能历史文件路径；隔离用户目录的后端应覆盖此实现。'''
         normalized_name = self.validate_skill_name(name)
         return self.get_skills_root_path() / SkillCategory.CUSTOM.value / ".history" / f"{normalized_name}.jsonl"
-
 
     def load_skills(self, *, enabled_only: bool = False) -> list[Skill]:
         '''解析所有已发现技能，合并扩展配置中的启用状态并按名称排序。'''
@@ -199,6 +191,10 @@ class SkillStorage(ABC):
 
         skills.sort(key=lambda s: s.name)
         return skills
+
+    @abstractmethod
+    def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
+        '''枚举技能类别、类别根目录及其直属技能的 `SKILL.md` 路径。'''
 
     def ensure_custom_skill_is_editable(self, name: str) -> None:
         '''确认技能属于可编辑的自定义类别；公共技能只读且会给出另建技能的提示。'''

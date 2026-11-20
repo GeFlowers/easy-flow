@@ -33,32 +33,29 @@ class DbRunEventStore(RunEventStore):
         self._max_trace_content = max_trace_content
         self._write_locks: dict[str, asyncio.Lock] = {}
 
-    def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
-        '''获取或创建该线程分配事件序号时使用的协程锁。'''
-        lock = self._write_locks.get(thread_id)
-        if lock is None:
-            lock = asyncio.Lock()
-            self._write_locks[thread_id] = lock
-        return lock
-
-    @staticmethod
-    def _row_to_dict(row: RunEventRow) -> dict:
-        '''将数据库事件行还原为 API 格式，并恢复 JSON 内容及 UTC 时间。'''
-        d = row.to_dict()
-        d["metadata"] = d.pop("event_metadata", {})
-        val = d.get("created_at")
-        if isinstance(val, datetime):
-            # 兼容历史无时区时间，输出前统一补上 UTC 偏移。
-            d["created_at"] = coerce_iso(val)
-        d.pop("id", None)
-        raw = d.get("content", "")
-        metadata = d.get("metadata", {})
-        if isinstance(raw, str) and (metadata.get("content_is_json") or metadata.get("content_is_dict")):
-            try:
-                d["content"] = json.loads(raw)
-            except (json.JSONDecodeError, ValueError):
-                logger.debug("Failed to deserialize content as JSON for event seq=%s", d.get("seq"))
-        return d
+    async def put(self, *, thread_id, run_id, event_type, category, content="", metadata=None, created_at=None):  # noqa: D401
+        '''写入单条事件并在事务中分配线程级递增序号。'''
+        content, metadata = self._truncate_trace(category, content, metadata)
+        db_content, metadata = self._content_to_db(content, metadata)
+        user_id = self._user_id_from_context()
+        async with self._get_write_lock(thread_id):
+            async with self._sf() as session:
+                async with session.begin():
+                    max_seq = await self._max_seq_for_thread(session, thread_id)
+                    seq = (max_seq or 0) + 1
+                    row = RunEventRow(
+                        thread_id=thread_id,
+                        run_id=run_id,
+                        user_id=user_id,
+                        event_type=event_type,
+                        category=category,
+                        content=db_content,
+                        event_metadata=metadata,
+                        seq=seq,
+                        created_at=datetime.fromisoformat(created_at) if created_at else datetime.now(UTC),
+                    )
+                    session.add(row)
+                return self._row_to_dict(row)
 
     def _truncate_trace(self, category: str, content: Any, metadata: dict | None) -> tuple[Any, dict]:
         '''按字节上限截断 trace 正文，并在元数据中记录截断事实。'''
@@ -89,6 +86,14 @@ class DbRunEventStore(RunEventStore):
         user = get_current_user()
         return str(user.id) if user is not None else None
 
+    def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
+        '''获取或创建该线程分配事件序号时使用的协程锁。'''
+        lock = self._write_locks.get(thread_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._write_locks[thread_id] = lock
+        return lock
+
     @staticmethod
     async def _max_seq_for_thread(session: AsyncSession, thread_id: str) -> int | None:
         '''在事务锁保护下读取线程最大事件序号，供并发写入安全分配下一个序号。'''
@@ -105,29 +110,24 @@ class DbRunEventStore(RunEventStore):
 
         return await session.scalar(stmt.with_for_update())
 
-    async def put(self, *, thread_id, run_id, event_type, category, content="", metadata=None, created_at=None):  # noqa: D401
-        '''写入单条事件并在事务中分配线程级递增序号。'''
-        content, metadata = self._truncate_trace(category, content, metadata)
-        db_content, metadata = self._content_to_db(content, metadata)
-        user_id = self._user_id_from_context()
-        async with self._get_write_lock(thread_id):
-            async with self._sf() as session:
-                async with session.begin():
-                    max_seq = await self._max_seq_for_thread(session, thread_id)
-                    seq = (max_seq or 0) + 1
-                    row = RunEventRow(
-                        thread_id=thread_id,
-                        run_id=run_id,
-                        user_id=user_id,
-                        event_type=event_type,
-                        category=category,
-                        content=db_content,
-                        event_metadata=metadata,
-                        seq=seq,
-                        created_at=datetime.fromisoformat(created_at) if created_at else datetime.now(UTC),
-                    )
-                    session.add(row)
-                return self._row_to_dict(row)
+    @staticmethod
+    def _row_to_dict(row: RunEventRow) -> dict:
+        '''将数据库事件行还原为 API 格式，并恢复 JSON 内容及 UTC 时间。'''
+        d = row.to_dict()
+        d["metadata"] = d.pop("event_metadata", {})
+        val = d.get("created_at")
+        if isinstance(val, datetime):
+            # 兼容历史无时区时间，输出前统一补上 UTC 偏移。
+            d["created_at"] = coerce_iso(val)
+        d.pop("id", None)
+        raw = d.get("content", "")
+        metadata = d.get("metadata", {})
+        if isinstance(raw, str) and (metadata.get("content_is_json") or metadata.get("content_is_dict")):
+            try:
+                d["content"] = json.loads(raw)
+            except (json.JSONDecodeError, ValueError):
+                logger.debug("Failed to deserialize content as JSON for event seq=%s", d.get("seq"))
+        return d
 
     async def put_batch(self, events):
         '''将同一线程的一批事件写入数据库，并在一次事务中连续分配序号。'''

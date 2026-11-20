@@ -2,7 +2,6 @@
 
 import { ChannelProviderIcon } from "@/components/workspace/channels/channel-provider-icon";
 import type { ChannelThreadSource } from "@/features/threads/utils";
-import { cn } from "@/lib/utils";
 
 type ThreadChannelIconProps = {
   source: ChannelThreadSource | null;
@@ -22,7 +21,9 @@ export function ThreadChannelIcon({
     <span
       aria-label={`${source.label} channel`}
       title={`${source.label} channel`}
-      className={cn("inline-flex shrink-0 items-center", className)}
+      className={["inline-flex shrink-0 items-center", className]
+        .filter(Boolean)
+        .join(" ")}
     >
       <ChannelProviderIcon provider={source.provider} className="size-4" />
     </span>
@@ -45,10 +46,12 @@ export function ThreadChannelBadge({
 
   return (
     <span
-      className={cn(
+      className={[
         "bg-muted text-muted-foreground inline-flex h-6 max-w-32 items-center gap-1 rounded-md px-2 text-xs font-medium",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       title={`${source.label} channel`}
     >
       <ChannelProviderIcon provider={source.provider} className="size-3.5" />

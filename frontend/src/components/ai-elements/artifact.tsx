@@ -7,7 +7,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { cn } from "@/lib/utils";
+
 import { type LucideIcon, XIcon } from "lucide-react";
 import type { ComponentProps, HTMLAttributes } from "react";
 
@@ -16,10 +16,12 @@ export type ArtifactProps = HTMLAttributes<HTMLDivElement>;
 /** 产物预览面板的纵向容器，统一承载标题栏、操作区和可滚动内容。 */
 export const Artifact = ({ className, ...props }: ArtifactProps) => (
   <div
-    className={cn(
+    className={[
       "bg-background flex flex-col overflow-hidden rounded-lg border shadow-lg",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -32,10 +34,12 @@ export const ArtifactHeader = ({
   ...props
 }: ArtifactHeaderProps) => (
   <div
-    className={cn(
+    className={[
       "bg-muted/50 flex items-center justify-between border-b px-4 py-3",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -51,10 +55,12 @@ export const ArtifactClose = ({
   ...props
 }: ArtifactCloseProps) => (
   <Button
-    className={cn(
+    className={[
       "text-muted-foreground hover:text-foreground size-8 p-0",
       className,
-    )}
+    ]
+      .filter(Boolean)
+      .join(" ")}
     size={size}
     type="button"
     variant={variant}
@@ -70,7 +76,9 @@ export type ArtifactTitleProps = HTMLAttributes<HTMLParagraphElement>;
 /** 以紧凑强调样式显示当前产物名称。 */
 export const ArtifactTitle = ({ className, ...props }: ArtifactTitleProps) => (
   <div
-    className={cn("text-foreground text-sm font-medium", className)}
+    className={["text-foreground text-sm font-medium", className]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );
@@ -82,7 +90,12 @@ export const ArtifactDescription = ({
   className,
   ...props
 }: ArtifactDescriptionProps) => (
-  <p className={cn("text-muted-foreground text-sm", className)} {...props} />
+  <p
+    className={["text-muted-foreground text-sm", className]
+      .filter(Boolean)
+      .join(" ")}
+    {...props}
+  />
 );
 
 export type ArtifactActionsProps = HTMLAttributes<HTMLDivElement>;
@@ -92,7 +105,10 @@ export const ArtifactActions = ({
   className,
   ...props
 }: ArtifactActionsProps) => (
-  <div className={cn("flex items-center gap-1", className)} {...props} />
+  <div
+    className={["flex items-center gap-1", className].filter(Boolean).join(" ")}
+    {...props}
+  />
 );
 
 export type ArtifactActionProps = ComponentProps<typeof Button> & {
@@ -114,10 +130,12 @@ export const ArtifactAction = ({
 }: ArtifactActionProps) => {
   const button = (
     <Button
-      className={cn(
+      className={[
         "text-muted-foreground hover:text-foreground size-8 p-0",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       size={size}
       type="button"
       variant={variant}
@@ -152,7 +170,9 @@ export const ArtifactContent = ({
   ...props
 }: ArtifactContentProps) => (
   <div
-    className={cn("min-h-0 flex-1 overflow-auto p-4", className)}
+    className={["min-h-0 flex-1 overflow-auto p-4", className]
+      .filter(Boolean)
+      .join(" ")}
     {...props}
   />
 );

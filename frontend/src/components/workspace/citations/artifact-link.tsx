@@ -1,7 +1,5 @@
 import type { AnchorHTMLAttributes } from "react";
 
-import { cn } from "@/lib/utils";
-
 import { CitationLink } from "./citation-link";
 
 /** 判断链接是否指向 HTTP(S) 外部站点，以决定安全的新窗口属性。 */
@@ -23,10 +21,12 @@ export function ArtifactLink(props: AnchorHTMLAttributes<HTMLAnchorElement>) {
   return (
     <a
       {...rest}
-      className={cn(
+      className={[
         "text-primary decoration-primary/30 hover:decoration-primary/60 underline underline-offset-2 transition-colors",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       target={target ?? (external ? "_blank" : undefined)}
       rel={rel ?? (external ? "noopener noreferrer" : undefined)}
     />

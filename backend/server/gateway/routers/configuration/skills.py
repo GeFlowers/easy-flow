@@ -96,6 +96,11 @@ class SkillRollbackRequest(BaseModel):
     history_index: int = Field(default=-1, description="History entry index to restore from, defaulting to the latest change.")
 
 
+def _get_user_skill_storage(config: AppConfig) -> SkillStorage:
+    '''根据请求中的有效用户标识获取隔离的自定义技能存储。'''
+    return get_or_new_user_skill_storage(get_effective_user_id(), app_config=config)
+
+
 def _skill_to_response(skill: Skill) -> SkillResponse:
     '''将技能领域对象转换为路由返回模型，并标记其是否允许编辑。'''
     return SkillResponse(
@@ -106,39 +111,6 @@ def _skill_to_response(skill: Skill) -> SkillResponse:
         enabled=skill.enabled,
         editable=skill.category == SkillCategory.CUSTOM,
     )
-
-
-def _static_scan_http_detail(error: StaticScanBlockedError) -> dict:
-    '''将静态扫描拦截异常转换为可安全公开的 HTTP 详情。'''
-    return {
-        "message": str(error),
-        "skill_name": error.skill_name,
-        "findings": error.findings,
-    }
-
-
-async def _scan_static_skill_markdown_or_raise(skill_name: str, content: str, *, app_config: AppConfig) -> list[StaticFinding]:
-    '''在临时目录扫描技能 Markdown，命中安全规则时抛出 HTTP 异常。'''
-
-    def _scan_markdown() -> list[StaticFinding]:
-        '''在工作线程中落盘临时技能包并执行静态扫描。'''
-        with tempfile.TemporaryDirectory() as tmp:
-            skill_dir = Path(tmp) / skill_name
-            skill_dir.mkdir(parents=True)
-            (skill_dir / SKILL_MD_FILE).write_text(content, encoding="utf-8")
-            return enforce_static_scan(skill_dir, skill_name=skill_name, app_config=app_config)
-
-    try:
-        return await asyncio.to_thread(_scan_markdown)
-    except StaticScanBlockedError as e:
-        raise HTTPException(status_code=400, detail=_static_scan_http_detail(e)) from e
-    except StaticScannerError as e:
-        raise HTTPException(status_code=400, detail=f"Static security scan failed for skill '{skill_name}': {e}") from e
-
-
-def _get_user_skill_storage(config: AppConfig) -> SkillStorage:
-    '''根据请求中的有效用户标识获取隔离的自定义技能存储。'''
-    return get_or_new_user_skill_storage(get_effective_user_id(), app_config=config)
 
 
 @router.get(
@@ -229,6 +201,34 @@ async def _read_custom_skill_response(skill_name: str, config: AppConfig) -> Cus
     except Exception as e:
         logger.error("Failed to get custom skill %s: %s", skill_name, e, exc_info=True)
         raise HTTPException(status_code=500, detail=f"Failed to get custom skill: {str(e)}")
+
+
+async def _scan_static_skill_markdown_or_raise(skill_name: str, content: str, *, app_config: AppConfig) -> list[StaticFinding]:
+    '''在临时目录扫描技能 Markdown，命中安全规则时抛出 HTTP 异常。'''
+
+    def _scan_markdown() -> list[StaticFinding]:
+        '''在工作线程中落盘临时技能包并执行静态扫描。'''
+        with tempfile.TemporaryDirectory() as tmp:
+            skill_dir = Path(tmp) / skill_name
+            skill_dir.mkdir(parents=True)
+            (skill_dir / SKILL_MD_FILE).write_text(content, encoding="utf-8")
+            return enforce_static_scan(skill_dir, skill_name=skill_name, app_config=app_config)
+
+    try:
+        return await asyncio.to_thread(_scan_markdown)
+    except StaticScanBlockedError as e:
+        raise HTTPException(status_code=400, detail=_static_scan_http_detail(e)) from e
+    except StaticScannerError as e:
+        raise HTTPException(status_code=400, detail=f"Static security scan failed for skill '{skill_name}': {e}") from e
+
+
+def _static_scan_http_detail(error: StaticScanBlockedError) -> dict:
+    '''将静态扫描拦截异常转换为可安全公开的 HTTP 详情。'''
+    return {
+        "message": str(error),
+        "skill_name": error.skill_name,
+        "findings": error.findings,
+    }
 
 
 @router.put("/skills/custom/{skill_name}", response_model=CustomSkillContentResponse, summary="Edit Custom Skill")

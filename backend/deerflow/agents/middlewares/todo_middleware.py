@@ -117,23 +117,6 @@ def _format_completion_reminder(todos: list[Todo]) -> str:
 _TOOL_CALL_FINISH_REASONS = {"tool_calls", "function_call"}
 
 
-def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
-    '''识别结构化工具调用、解析错误和兼容字段，区分最终答复与工具响应。'''
-    if message.tool_calls:
-        return True
-
-    if getattr(message, "invalid_tool_calls", None):
-        return True
-
-    # 部分模型适配器只在兼容字段中保留工具意图；这里集中兼容，避免误把工具响应当最终答复。
-    additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
-    if additional_kwargs.get("tool_calls") or additional_kwargs.get("function_call"):
-        return True
-
-    response_metadata = getattr(message, "response_metadata", {}) or {}
-    return response_metadata.get("finish_reason") in _TOOL_CALL_FINISH_REASONS
-
-
 class TodoMiddleware(TodoListMiddleware):
     '''扩展 LangChain 待办中间件，处理历史裁剪恢复和未完成任务续跑。'''
 
@@ -222,6 +205,24 @@ class TodoMiddleware(TodoListMiddleware):
         self._completion_reminder_touch_order: dict[tuple[str, str], int] = {}
         self._completion_reminder_next_order = 0
 
+    @override
+    def before_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
+        '''智能体 启动时清理同线程其他运行遗留的续跑提醒。'''
+        self._clear_other_run_completion_reminders(runtime)
+        return None
+
+    def _clear_other_run_completion_reminders(self, runtime: Runtime) -> None:
+        '''开始新运行时，清除同一线程下其他运行遗留的提醒状态。'''
+        thread_id, current_run_id = self._pending_key(runtime)
+        with self._lock:
+            for key in self._completion_reminder_keys_locked():
+                if key[0] == thread_id and key[1] != current_run_id:
+                    self._drop_completion_reminder_key_locked(key)
+
+    def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
+        '''用线程 ID 和运行 ID 组成提醒状态的隔离键。'''
+        return self._get_thread_id(runtime), self._get_run_id(runtime)
+
     @staticmethod
     def _get_thread_id(runtime: Runtime) -> str:
         '''从运行上下文读取线程 ID；缺失时使用默认线程标识。'''
@@ -236,15 +237,6 @@ class TodoMiddleware(TodoListMiddleware):
         run_id = context.get("run_id") if context else None
         return str(run_id) if run_id else "default"
 
-    def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
-        '''用线程 ID 和运行 ID 组成提醒状态的隔离键。'''
-        return self._get_thread_id(runtime), self._get_run_id(runtime)
-
-    def _touch_completion_reminder_key_locked(self, key: tuple[str, str]) -> None:
-        '''更新时间序号，将提醒状态标记为最近使用。调用方须持锁。'''
-        self._completion_reminder_next_order += 1
-        self._completion_reminder_touch_order[key] = self._completion_reminder_next_order
-
     def _completion_reminder_keys_locked(self) -> set[tuple[str, str]]:
         '''合并待发送提醒、次数统计和访问时间中的键。调用方须持锁。'''
         keys = set(self._pending_completion_reminders)
@@ -257,62 +249,6 @@ class TodoMiddleware(TodoListMiddleware):
         self._pending_completion_reminders.pop(key, None)
         self._completion_reminder_counts.pop(key, None)
         self._completion_reminder_touch_order.pop(key, None)
-
-    def _prune_completion_reminder_state_locked(self, protected_key: tuple[str, str]) -> None:
-        '''超过状态容量时按最久未使用顺序淘汰记录，并保留当前运行。调用方须持锁。'''
-        keys = self._completion_reminder_keys_locked()
-        overflow = len(keys) - self._MAX_COMPLETION_REMINDER_KEYS
-        if overflow <= 0:
-            return
-
-        candidates = [key for key in keys if key != protected_key]
-        candidates.sort(key=lambda key: self._completion_reminder_touch_order.get(key, 0))
-        for key in candidates[:overflow]:
-            self._drop_completion_reminder_key_locked(key)
-
-    def _queue_completion_reminder(self, runtime: Runtime, reminder: str) -> None:
-        '''暂存续跑提示并递增本轮提醒次数，同时维护有界状态。'''
-        key = self._pending_key(runtime)
-        with self._lock:
-            self._pending_completion_reminders.setdefault(key, []).append(reminder)
-            self._completion_reminder_counts[key] = self._completion_reminder_counts.get(key, 0) + 1
-            self._touch_completion_reminder_key_locked(key)
-            self._prune_completion_reminder_state_locked(protected_key=key)
-
-    def _completion_reminder_count_for_runtime(self, runtime: Runtime) -> int:
-        '''返回当前运行已触发的待办续跑提醒次数。'''
-        key = self._pending_key(runtime)
-        with self._lock:
-            return self._completion_reminder_counts.get(key, 0)
-
-    def _drain_completion_reminders(self, runtime: Runtime) -> list[str]:
-        '''取出当前运行待注入的续跑提醒；保留重试计数直到本轮结束。'''
-        key = self._pending_key(runtime)
-        with self._lock:
-            reminders = self._pending_completion_reminders.pop(key, [])
-            if reminders or key in self._completion_reminder_counts:
-                self._touch_completion_reminder_key_locked(key)
-            return reminders
-
-    def _clear_other_run_completion_reminders(self, runtime: Runtime) -> None:
-        '''开始新运行时，清除同一线程下其他运行遗留的提醒状态。'''
-        thread_id, current_run_id = self._pending_key(runtime)
-        with self._lock:
-            for key in self._completion_reminder_keys_locked():
-                if key[0] == thread_id and key[1] != current_run_id:
-                    self._drop_completion_reminder_key_locked(key)
-
-    def _clear_current_run_completion_reminders(self, runtime: Runtime) -> None:
-        '''删除当前运行的提醒队列和次数记录。'''
-        key = self._pending_key(runtime)
-        with self._lock:
-            self._drop_completion_reminder_key_locked(key)
-
-    @override
-    def before_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
-        '''智能体 启动时清理同线程其他运行遗留的续跑提醒。'''
-        self._clear_other_run_completion_reminders(runtime)
-        return None
 
     @override
     async def abefore_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
@@ -352,6 +288,38 @@ class TodoMiddleware(TodoListMiddleware):
         self._queue_completion_reminder(runtime, _format_completion_reminder(todos))
         return {"jump_to": "model"}
 
+    def _completion_reminder_count_for_runtime(self, runtime: Runtime) -> int:
+        '''返回当前运行已触发的待办续跑提醒次数。'''
+        key = self._pending_key(runtime)
+        with self._lock:
+            return self._completion_reminder_counts.get(key, 0)
+
+    def _queue_completion_reminder(self, runtime: Runtime, reminder: str) -> None:
+        '''暂存续跑提示并递增本轮提醒次数，同时维护有界状态。'''
+        key = self._pending_key(runtime)
+        with self._lock:
+            self._pending_completion_reminders.setdefault(key, []).append(reminder)
+            self._completion_reminder_counts[key] = self._completion_reminder_counts.get(key, 0) + 1
+            self._touch_completion_reminder_key_locked(key)
+            self._prune_completion_reminder_state_locked(protected_key=key)
+
+    def _touch_completion_reminder_key_locked(self, key: tuple[str, str]) -> None:
+        '''更新时间序号，将提醒状态标记为最近使用。调用方须持锁。'''
+        self._completion_reminder_next_order += 1
+        self._completion_reminder_touch_order[key] = self._completion_reminder_next_order
+
+    def _prune_completion_reminder_state_locked(self, protected_key: tuple[str, str]) -> None:
+        '''超过状态容量时按最久未使用顺序淘汰记录，并保留当前运行。调用方须持锁。'''
+        keys = self._completion_reminder_keys_locked()
+        overflow = len(keys) - self._MAX_COMPLETION_REMINDER_KEYS
+        if overflow <= 0:
+            return
+
+        candidates = [key for key in keys if key != protected_key]
+        candidates.sort(key=lambda key: self._completion_reminder_touch_order.get(key, 0))
+        for key in candidates[:overflow]:
+            self._drop_completion_reminder_key_locked(key)
+
     @override
     @hook_config(can_jump_to=["model"])
     async def aafter_model(
@@ -362,10 +330,14 @@ class TodoMiddleware(TodoListMiddleware):
         '''异步模型返回后复用同步钩子的待办检查与有限续跑逻辑。'''
         return self.after_model(state, runtime)
 
-    @staticmethod
-    def _format_pending_completion_reminders(reminders: list[str]) -> str:
-        '''去重并合并本轮暂存的待办续跑提醒。'''
-        return "\n\n".join(dict.fromkeys(reminders))
+    @override
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelCallResult:
+        '''同步模型调用前注入隐藏续跑提示，再委派给后续处理器。'''
+        return handler(self._augment_request(request))
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
         '''把待办续跑提示作为隐藏 HumanMessage 追加到下一次模型请求。'''
@@ -382,14 +354,19 @@ class TodoMiddleware(TodoListMiddleware):
         ]
         return request.override(messages=new_messages)
 
-    @override
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelCallResult:
-        '''同步模型调用前注入隐藏续跑提示，再委派给后续处理器。'''
-        return handler(self._augment_request(request))
+    def _drain_completion_reminders(self, runtime: Runtime) -> list[str]:
+        '''取出当前运行待注入的续跑提醒；保留重试计数直到本轮结束。'''
+        key = self._pending_key(runtime)
+        with self._lock:
+            reminders = self._pending_completion_reminders.pop(key, [])
+            if reminders or key in self._completion_reminder_counts:
+                self._touch_completion_reminder_key_locked(key)
+            return reminders
+
+    @staticmethod
+    def _format_pending_completion_reminders(reminders: list[str]) -> str:
+        '''去重并合并本轮暂存的待办续跑提醒。'''
+        return "\n\n".join(dict.fromkeys(reminders))
 
     @override
     async def awrap_model_call(
@@ -406,8 +383,31 @@ class TodoMiddleware(TodoListMiddleware):
         self._clear_current_run_completion_reminders(runtime)
         return None
 
+    def _clear_current_run_completion_reminders(self, runtime: Runtime) -> None:
+        '''删除当前运行的提醒队列和次数记录。'''
+        key = self._pending_key(runtime)
+        with self._lock:
+            self._drop_completion_reminder_key_locked(key)
+
     @override
     async def aafter_agent(self, state: ThreadState, runtime: Runtime) -> dict[str, Any] | None:
         '''异步运行结束时清理本轮续跑提醒和计数。'''
         self._clear_current_run_completion_reminders(runtime)
         return None
+
+
+def _has_tool_call_intent_or_error(message: AIMessage) -> bool:
+    '''识别结构化工具调用、解析错误和兼容字段，区分最终答复与工具响应。'''
+    if message.tool_calls:
+        return True
+
+    if getattr(message, "invalid_tool_calls", None):
+        return True
+
+    # 部分模型适配器只在兼容字段中保留工具意图；这里集中兼容，避免误把工具响应当最终答复。
+    additional_kwargs = getattr(message, "additional_kwargs", {}) or {}
+    if additional_kwargs.get("tool_calls") or additional_kwargs.get("function_call"):
+        return True
+
+    response_metadata = getattr(message, "response_metadata", {}) or {}
+    return response_metadata.get("finish_reason") in _TOOL_CALL_FINISH_REASONS

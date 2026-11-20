@@ -14,7 +14,6 @@ import { useTheme } from "next-themes";
 import { useMemo } from "react";
 
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
 
 import { useThread } from "./messages/context";
 const customDarkTheme = monokaiInit({
@@ -73,18 +72,22 @@ export function CodeEditor({
 
   return (
     <div
-      className={cn(
+      className={[
         "flex cursor-text flex-col overflow-hidden rounded-md",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       {isLoading ? (
         <Textarea
-          className={cn(
+          className={[
             "h-full overflow-auto font-mono [&_.cm-editor]:h-full [&_.cm-focused]:outline-none!",
             "resize-none p-4! [&_.cm-line]:px-2! [&_.cm-line]:py-0!",
             "border-none",
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
           readOnly
           value={value}
         />
@@ -92,10 +95,12 @@ export function CodeEditor({
         <CodeMirror
           readOnly={readonly ?? disabled}
           placeholder={placeholder}
-          className={cn(
+          className={[
             "h-full overflow-auto font-mono [&_.cm-editor]:h-full [&_.cm-focused]:outline-none!",
             "px-2 py-0! [&_.cm-line]:px-2! [&_.cm-line]:py-0!",
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
           theme={resolvedTheme === "dark" ? customDarkTheme : customLightTheme}
           extensions={extensions}
           basicSetup={{

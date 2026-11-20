@@ -45,116 +45,6 @@ class JsonlRunEventStore(RunEventStore):
         self._seq_counters: dict[str, int] = {}
         self._write_locks: dict[str, asyncio.Lock] = {}
 
-    def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
-        '''获取该线程专用的异步写锁，避免同进程记录行交错。'''
-        return self._write_locks.setdefault(thread_id, asyncio.Lock())
-
-    @staticmethod
-    def _validate_id(value: str, label: str) -> str:
-        '''
-
-        校验标识是否可安全用于文件系统路径。'''
-        if not value or not _SAFE_ID_PATTERN.match(value):
-            raise ValueError(f"Invalid {label}: must be alphanumeric/dash/underscore, got {value!r}")
-        return value
-
-    def _thread_dir(self, thread_id: str) -> Path:
-        '''校验线程 ID 并返回其运行事件目录。'''
-        self._validate_id(thread_id, "thread_id")
-        return self._base_dir / "threads" / thread_id / "runs"
-
-    def _run_file(self, thread_id: str, run_id: str) -> Path:
-        '''校验运行 ID 并返回对应事件文件路径。'''
-        self._validate_id(run_id, "run_id")
-        return self._thread_dir(thread_id) / f"{run_id}.jsonl"
-
-    def _next_seq(self, thread_id: str) -> int:
-        '''为线程内新事件分配并缓存下一个递增序号。'''
-        self._seq_counters[thread_id] = self._seq_counters.get(thread_id, 0) + 1
-        return self._seq_counters[thread_id]
-
-    def _compute_max_seq(self, thread_id: str) -> int:
-        '''
-
-        扫描线程的全部运行文件并计算最大序号；本方法执行阻塞文件读写。'''
-        max_seq = 0
-        thread_dir = self._thread_dir(thread_id)
-        if thread_dir.exists():
-            for f in thread_dir.glob("*.jsonl"):
-                for line in f.read_text(encoding="utf-8").strip().splitlines():
-                    try:
-                        record = json.loads(line)
-                        max_seq = max(max_seq, record.get("seq", 0))
-                    except json.JSONDecodeError:
-                        logger.debug("Skipping malformed JSONL line in %s", f)
-        return max_seq
-
-    async def _ensure_seq_loaded(self, thread_id: str) -> None:
-        '''
-
-        将现有文件中的最大 seq 加载到内存计数器，避免阻塞事件循环。'''
-        if thread_id in self._seq_counters:
-            return
-        max_seq = await asyncio.to_thread(self._compute_max_seq, thread_id)
-        self._seq_counters[thread_id] = max_seq
-
-    def _write_record(self, record: dict) -> None:
-        '''将单条事件以 JSON 行追加到对应运行文件。'''
-        path = self._run_file(record["thread_id"], record["run_id"])
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with open(path, "a", encoding="utf-8") as f:
-            f.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
-
-    def _read_thread_events(self, thread_id: str) -> list[dict]:
-        '''
-
-        读取线程全部事件并按 seq 排序；本方法执行阻塞文件读写。'''
-        events = []
-        thread_dir = self._thread_dir(thread_id)
-        if not thread_dir.exists():
-            return events
-        for f in sorted(thread_dir.glob("*.jsonl")):
-            for line in f.read_text(encoding="utf-8").strip().splitlines():
-                if not line:
-                    continue
-                try:
-                    events.append(json.loads(line))
-                except json.JSONDecodeError:
-                    logger.debug("Skipping malformed JSONL line in %s", f)
-        events.sort(key=lambda e: e.get("seq", 0))
-        return events
-
-    def _read_run_events(self, thread_id: str, run_id: str) -> list[dict]:
-        '''
-
-        读取指定运行文件中的事件；本方法执行阻塞文件读写。'''
-        path = self._run_file(thread_id, run_id)
-        if not path.exists():
-            return []
-        events = []
-        for line in path.read_text(encoding="utf-8").strip().splitlines():
-            if not line:
-                continue
-            try:
-                events.append(json.loads(line))
-            except json.JSONDecodeError:
-                logger.debug("Skipping malformed JSONL line in %s", path)
-        events.sort(key=lambda e: e.get("seq", 0))
-        return events
-
-    def _delete_thread_files(self, thread_id: str) -> None:
-        '''删除线程目录下所有运行事件文件。'''
-        thread_dir = self._thread_dir(thread_id)
-        if thread_dir.exists():
-            for f in thread_dir.glob("*.jsonl"):
-                f.unlink()
-
-    def _delete_run_file(self, thread_id: str, run_id: str) -> None:
-        '''删除指定运行的 JSONL 事件文件（若存在）。'''
-        path = self._run_file(thread_id, run_id)
-        if path.exists():
-            path.unlink()
-
     async def put(self, *, thread_id, run_id, event_type, category, content="", metadata=None, created_at=None):
         '''为单条事件分配线程序号并异步追加到 JSONL 文件。'''
         async with self._get_write_lock(thread_id):
@@ -172,6 +62,66 @@ class JsonlRunEventStore(RunEventStore):
             }
             await asyncio.to_thread(self._write_record, record)
             return record
+
+    def _get_write_lock(self, thread_id: str) -> asyncio.Lock:
+        '''获取该线程专用的异步写锁，避免同进程记录行交错。'''
+        return self._write_locks.setdefault(thread_id, asyncio.Lock())
+
+    async def _ensure_seq_loaded(self, thread_id: str) -> None:
+        '''
+
+        将现有文件中的最大 seq 加载到内存计数器，避免阻塞事件循环。'''
+        if thread_id in self._seq_counters:
+            return
+        max_seq = await asyncio.to_thread(self._compute_max_seq, thread_id)
+        self._seq_counters[thread_id] = max_seq
+
+    def _compute_max_seq(self, thread_id: str) -> int:
+        '''
+
+        扫描线程的全部运行文件并计算最大序号；本方法执行阻塞文件读写。'''
+        max_seq = 0
+        thread_dir = self._thread_dir(thread_id)
+        if thread_dir.exists():
+            for f in thread_dir.glob("*.jsonl"):
+                for line in f.read_text(encoding="utf-8").strip().splitlines():
+                    try:
+                        record = json.loads(line)
+                        max_seq = max(max_seq, record.get("seq", 0))
+                    except json.JSONDecodeError:
+                        logger.debug("Skipping malformed JSONL line in %s", f)
+        return max_seq
+
+    def _thread_dir(self, thread_id: str) -> Path:
+        '''校验线程 ID 并返回其运行事件目录。'''
+        self._validate_id(thread_id, "thread_id")
+        return self._base_dir / "threads" / thread_id / "runs"
+
+    @staticmethod
+    def _validate_id(value: str, label: str) -> str:
+        '''
+
+        校验标识是否可安全用于文件系统路径。'''
+        if not value or not _SAFE_ID_PATTERN.match(value):
+            raise ValueError(f"Invalid {label}: must be alphanumeric/dash/underscore, got {value!r}")
+        return value
+
+    def _next_seq(self, thread_id: str) -> int:
+        '''为线程内新事件分配并缓存下一个递增序号。'''
+        self._seq_counters[thread_id] = self._seq_counters.get(thread_id, 0) + 1
+        return self._seq_counters[thread_id]
+
+    def _write_record(self, record: dict) -> None:
+        '''将单条事件以 JSON 行追加到对应运行文件。'''
+        path = self._run_file(record["thread_id"], record["run_id"])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, default=str, ensure_ascii=False) + "\n")
+
+    def _run_file(self, thread_id: str, run_id: str) -> Path:
+        '''校验运行 ID 并返回对应事件文件路径。'''
+        self._validate_id(run_id, "run_id")
+        return self._thread_dir(thread_id) / f"{run_id}.jsonl"
 
     async def put_batch(self, events):
         '''
@@ -238,6 +188,25 @@ class JsonlRunEventStore(RunEventStore):
         else:
             return messages[-limit:]
 
+    def _read_thread_events(self, thread_id: str) -> list[dict]:
+        '''
+
+        读取线程全部事件并按 seq 排序；本方法执行阻塞文件读写。'''
+        events = []
+        thread_dir = self._thread_dir(thread_id)
+        if not thread_dir.exists():
+            return events
+        for f in sorted(thread_dir.glob("*.jsonl")):
+            for line in f.read_text(encoding="utf-8").strip().splitlines():
+                if not line:
+                    continue
+                try:
+                    events.append(json.loads(line))
+                except json.JSONDecodeError:
+                    logger.debug("Skipping malformed JSONL line in %s", f)
+        events.sort(key=lambda e: e.get("seq", 0))
+        return events
+
     async def list_events(self, thread_id, run_id, *, event_types=None, task_id=None, limit=500, after_seq=None):
         '''读取指定运行的事件文件，并应用类型、子任务及游标筛选。'''
         events = await asyncio.to_thread(self._read_run_events, thread_id, run_id)
@@ -248,6 +217,24 @@ class JsonlRunEventStore(RunEventStore):
         if after_seq is not None:
             events = [e for e in events if e.get("seq", 0) > after_seq]
         return events[:limit]
+
+    def _read_run_events(self, thread_id: str, run_id: str) -> list[dict]:
+        '''
+
+        读取指定运行文件中的事件；本方法执行阻塞文件读写。'''
+        path = self._run_file(thread_id, run_id)
+        if not path.exists():
+            return []
+        events = []
+        for line in path.read_text(encoding="utf-8").strip().splitlines():
+            if not line:
+                continue
+            try:
+                events.append(json.loads(line))
+            except json.JSONDecodeError:
+                logger.debug("Skipping malformed JSONL line in %s", path)
+        events.sort(key=lambda e: e.get("seq", 0))
+        return events
 
     async def list_messages_by_run(self, thread_id, run_id, *, limit=50, before_seq=None, after_seq=None):
         '''从单个运行文件分页读取消息记录。'''
@@ -293,6 +280,13 @@ class JsonlRunEventStore(RunEventStore):
             self._write_locks.pop(thread_id, None)
             return count
 
+    def _delete_thread_files(self, thread_id: str) -> None:
+        '''删除线程目录下所有运行事件文件。'''
+        thread_dir = self._thread_dir(thread_id)
+        if thread_dir.exists():
+            for f in thread_dir.glob("*.jsonl"):
+                f.unlink()
+
     async def delete_by_run(self, thread_id, run_id):
         '''删除单个运行文件并返回其中原有事件数。'''
         async with self._get_write_lock(thread_id):
@@ -300,3 +294,9 @@ class JsonlRunEventStore(RunEventStore):
             count = len(events)
             await asyncio.to_thread(self._delete_run_file, thread_id, run_id)
             return count
+
+    def _delete_run_file(self, thread_id: str, run_id: str) -> None:
+        '''删除指定运行的 JSONL 事件文件（若存在）。'''
+        path = self._run_file(thread_id, run_id)
+        if path.exists():
+            path.unlink()

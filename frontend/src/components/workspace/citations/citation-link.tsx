@@ -7,7 +7,6 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@/components/ui/hover-card";
-import { cn } from "@/lib/utils";
 
 /** 渲染引用链接并优先保留传入文本，缺失文本时以域名提供可辨识的回退标签。 */
 export function CitationLink({
@@ -45,7 +44,11 @@ export function CitationLink({
           </Badge>
         </a>
       </HoverCardTrigger>
-      <HoverCardContent className={cn("relative w-80 p-0", props.className)}>
+      <HoverCardContent
+        className={["relative w-80 p-0", props.className]
+          .filter(Boolean)
+          .join(" ")}
+      >
         <div className="p-3">
           <div className="space-y-1">
             {displayText && (

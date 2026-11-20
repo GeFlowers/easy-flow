@@ -40,7 +40,6 @@ import type {
   ScheduledTask,
   ScheduledTaskRun,
 } from "@/features/scheduled-tasks/types";
-import { cn } from "@/lib/utils";
 
 const NONE = "—";
 
@@ -192,7 +191,6 @@ export default function ScheduledTasksPage() {
       timezone: selectedTask.timezone || "UTC",
     });
     // 仅依赖任务 ID，后台刷新产生的新对象引用不会抹去用户正在编辑的内容。
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedTask?.id]);
 
   return (
@@ -395,7 +393,7 @@ export default function ScheduledTasksPage() {
               {st.filters.once}
             </Button>
           </div>
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+          <div className="grid grid-cols-[minmax(0,1fr)_320px] gap-4">
             <div
               data-testid="scheduled-task-list"
               className="flex flex-col gap-3"
@@ -408,10 +406,12 @@ export default function ScheduledTasksPage() {
                     key={task.id}
                     onClick={() => setSelectedTaskId(task.id)}
                     data-testid={`scheduled-task-item-${task.id}`}
-                    className={cn(
+                    className={[
                       "rounded-lg border p-4 text-left",
                       isSelected ? "border-foreground" : "border-border",
-                    )}
+                    ]
+                      .filter(Boolean)
+                      .join(" ")}
                   >
                     <div className="font-medium">{task.title}</div>
                     <div className="text-muted-foreground text-sm">

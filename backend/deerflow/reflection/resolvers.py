@@ -10,19 +10,6 @@ MODULE_TO_PACKAGE_HINTS = {
 }
 
 
-def _build_missing_dependency_hint(module_path: str, err: ImportError) -> str:
-    '''根据缺失模块推断安装包名称，生成可执行的依赖安装提示。'''
-    module_root = module_path.split(".", 1)[0]
-    missing_module = getattr(err, "name", None) or module_root
-
-    # 对已知模型集成优先使用对应发行包名，即使报错来自其传递依赖。
-    package_name = MODULE_TO_PACKAGE_HINTS.get(module_root)
-    if package_name is None:
-        package_name = MODULE_TO_PACKAGE_HINTS.get(missing_module, missing_module.replace("_", "-"))
-
-    return f"Missing dependency '{missing_module}'. Install it with `uv add {package_name}` (or `pip install {package_name}`), then restart DeerFlow."
-
-
 def resolve_variable[T](
     variable_path: str,
     expected_type: type[T] | tuple[type, ...] | None = None,
@@ -68,6 +55,19 @@ def resolve_variable[T](
             raise ValueError(f"{variable_path} is not an instance of {type_name}, got {type(variable).__name__}")
 
     return variable
+
+
+def _build_missing_dependency_hint(module_path: str, err: ImportError) -> str:
+    '''根据缺失模块推断安装包名称，生成可执行的依赖安装提示。'''
+    module_root = module_path.split(".", 1)[0]
+    missing_module = getattr(err, "name", None) or module_root
+
+    # 对已知模型集成优先使用对应发行包名，即使报错来自其传递依赖。
+    package_name = MODULE_TO_PACKAGE_HINTS.get(module_root)
+    if package_name is None:
+        package_name = MODULE_TO_PACKAGE_HINTS.get(missing_module, missing_module.replace("_", "-"))
+
+    return f"Missing dependency '{missing_module}'. Install it with `uv add {package_name}` (or `pip install {package_name}`), then restart DeerFlow."
 
 
 def resolve_class[T](class_path: str, base_class: type[T] | None = None) -> type[T]:

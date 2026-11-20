@@ -62,79 +62,6 @@ class Script:
         return script
 
 
-def _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:
-    '''按显式环境变量、既有服务商凭据、MiniMax 凭据的优先级选择 TTS 服务商。
-
-    环境变量值会去空格并转小写；无可用凭据时抛出说明火山引擎和 MiniMax 凭据要求的
-    ``ValueError``，不在此处校验服务商名称是否合法。
-    '''
-    override = os.getenv(override_env)
-    if override:
-        return override.strip().lower()
-    if has_existing_creds:
-        return existing_provider
-    if os.getenv("MINIMAX_API_KEY"):
-        return "minimax"
-    raise ValueError(
-        f"未找到凭据。请设置 VOLCENGINE_TTS_APPID 和 VOLCENGINE_TTS_ACCESS_TOKEN，"
-        f"用于 {existing_provider}，或设置 MINIMAX_API_KEY 用于 minimax，"
-        f"（可通过 {override_env} 强制指定）。"
-    )
-
-
-def _resolve_tts_provider() -> str:
-    '''解析播客 TTS 服务商，并只允许 ``volcengine`` 或 ``minimax``。
-
-    火山引擎必须同时具备应用 ID 与访问令牌才算可用；未知服务商抛出 ``ValueError``。
-    '''
-    has_volc = bool(
-        os.getenv("VOLCENGINE_TTS_APPID") and os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
-    )
-    provider = _resolve_provider("PODCAST_GENERATION_PROVIDER", "volcengine", has_volc)
-    if provider not in ("volcengine", "minimax"):
-        raise ValueError(
-            f"未知播客提供方：{provider!r}（请使用 'volcengine' 或 'minimax'）"
-        )
-    return provider
-
-
-def _default_max_retries() -> int:
-    '''读取 MiniMax TTS 最大重试次数；环境变量不是整数时回退默认值。'''
-    try:
-        return int(os.getenv("MINIMAX_TTS_MAX_RETRIES", str(DEFAULT_TTS_MAX_RETRIES)))
-    except ValueError:
-        return DEFAULT_TTS_MAX_RETRIES
-
-
-def _default_max_workers(provider: str) -> int:
-    '''返回服务商拥有的并发数：MiniMax 保持较低以避免限流，火山引擎使用既有默认值。
-
-    并发数刻意不提供给调用方配置；未识别的服务商也按火山引擎默认值处理。
-    '''
-    if provider == "minimax":
-        return DEFAULT_MINIMAX_MAX_WORKERS
-    return DEFAULT_MAX_WORKERS
-
-
-def _parse_retry_after(response) -> Optional[float]:
-    '''解析响应头中的 ``Retry-After`` 秒数；缺失或不可转换时返回 ``None``。'''
-    headers = getattr(response, "headers", None) or {}
-    value = headers.get("Retry-After")
-    try:
-        return float(value) if value else None
-    except (TypeError, ValueError):
-        return None
-
-
-def _backoff_sleep(attempt: int, retry_after: Optional[float]) -> None:
-    '''按服务端 ``Retry-After`` 或指数退避加随机抖动后休眠。
-
-    随机抖动使同时被限流的并发工作线程错开重试，避免形成惊群式重试风暴。
-    '''
-    base = retry_after if retry_after else min(2 ** attempt, 30)
-    time.sleep(base + random.uniform(0, 1))
-
-
 def text_to_speech_volcengine(
     text: str, voice_type: str, max_retries: Optional[int] = None
 ) -> Optional[bytes]:
@@ -187,6 +114,33 @@ def text_to_speech_volcengine(
             return base64.b64decode(audio_data)
         return None
     return None
+
+
+def _default_max_retries() -> int:
+    '''读取 MiniMax TTS 最大重试次数；环境变量不是整数时回退默认值。'''
+    try:
+        return int(os.getenv("MINIMAX_TTS_MAX_RETRIES", str(DEFAULT_TTS_MAX_RETRIES)))
+    except ValueError:
+        return DEFAULT_TTS_MAX_RETRIES
+
+
+def _backoff_sleep(attempt: int, retry_after: Optional[float]) -> None:
+    '''按服务端 ``Retry-After`` 或指数退避加随机抖动后休眠。
+
+    随机抖动使同时被限流的并发工作线程错开重试，避免形成惊群式重试风暴。
+    '''
+    base = retry_after if retry_after else min(2 ** attempt, 30)
+    time.sleep(base + random.uniform(0, 1))
+
+
+def _parse_retry_after(response) -> Optional[float]:
+    '''解析响应头中的 ``Retry-After`` 秒数；缺失或不可转换时返回 ``None``。'''
+    headers = getattr(response, "headers", None) or {}
+    value = headers.get("Retry-After")
+    try:
+        return float(value) if value else None
+    except (TypeError, ValueError):
+        return None
 
 
 def text_to_speech_minimax(
@@ -257,31 +211,6 @@ def text_to_speech_minimax(
     return None
 
 
-def _process_line(args: tuple[int, ScriptLine, int, str]) -> tuple[int, Optional[bytes]]:
-    '''按服务商与说话人选择音色，合成单行台词并返回 ``(索引, 音频字节或 None)``。
-
-    MiniMax 音色可由环境变量覆盖，火山引擎使用固定男女音色；合成失败仅记录警告，
-    由上层统一判定是否中止整个播客。
-    '''
-    i, line, total, provider = args
-    logger.info(f"正在处理第 {i + 1}/{total} 条（{line.speaker}），提供方：{provider}")
-    if provider == "minimax":
-        if line.speaker == "male":
-            voice = os.getenv("MINIMAX_TTS_VOICE_MALE", "male-qn-qingse")
-        else:
-            voice = os.getenv("MINIMAX_TTS_VOICE_FEMALE", "female-tianmei")
-        audio = text_to_speech_minimax(line.paragraph, voice)
-    else:
-        if line.speaker == "male":
-            voice = "zh_male_yangguangqingnian_moon_bigtts"
-        else:
-            voice = "zh_female_sajiaonvyou_moon_bigtts"
-        audio = text_to_speech_volcengine(line.paragraph, voice)
-    if not audio:
-        logger.warning(f"第 {i + 1} 条音频生成失败")
-    return (i, audio)
-
-
 def tts_node(script: Script) -> list[bytes]:
     '''在服务商控制的线程池中将脚本台词合成为保持原始顺序的音频片段。
 
@@ -326,6 +255,77 @@ def tts_node(script: Script) -> list[bytes]:
     audio_chunks = [results[i] for i in range(total)]
     logger.info(f"已成功生成 {len(audio_chunks)}/{total} 个音频片段")
     return audio_chunks
+
+
+def _resolve_tts_provider() -> str:
+    '''解析播客 TTS 服务商，并只允许 ``volcengine`` 或 ``minimax``。
+
+    火山引擎必须同时具备应用 ID 与访问令牌才算可用；未知服务商抛出 ``ValueError``。
+    '''
+    has_volc = bool(
+        os.getenv("VOLCENGINE_TTS_APPID") and os.getenv("VOLCENGINE_TTS_ACCESS_TOKEN")
+    )
+    provider = _resolve_provider("PODCAST_GENERATION_PROVIDER", "volcengine", has_volc)
+    if provider not in ("volcengine", "minimax"):
+        raise ValueError(
+            f"未知播客提供方：{provider!r}（请使用 'volcengine' 或 'minimax'）"
+        )
+    return provider
+
+
+def _resolve_provider(override_env: str, existing_provider: str, has_existing_creds: bool) -> str:
+    '''按显式环境变量、既有服务商凭据、MiniMax 凭据的优先级选择 TTS 服务商。
+
+    环境变量值会去空格并转小写；无可用凭据时抛出说明火山引擎和 MiniMax 凭据要求的
+    ``ValueError``，不在此处校验服务商名称是否合法。
+    '''
+    override = os.getenv(override_env)
+    if override:
+        return override.strip().lower()
+    if has_existing_creds:
+        return existing_provider
+    if os.getenv("MINIMAX_API_KEY"):
+        return "minimax"
+    raise ValueError(
+        f"未找到凭据。请设置 VOLCENGINE_TTS_APPID 和 VOLCENGINE_TTS_ACCESS_TOKEN，"
+        f"用于 {existing_provider}，或设置 MINIMAX_API_KEY 用于 minimax，"
+        f"（可通过 {override_env} 强制指定）。"
+    )
+
+
+def _default_max_workers(provider: str) -> int:
+    '''返回服务商拥有的并发数：MiniMax 保持较低以避免限流，火山引擎使用既有默认值。
+
+    并发数刻意不提供给调用方配置；未识别的服务商也按火山引擎默认值处理。
+    '''
+    if provider == "minimax":
+        return DEFAULT_MINIMAX_MAX_WORKERS
+    return DEFAULT_MAX_WORKERS
+
+
+def _process_line(args: tuple[int, ScriptLine, int, str]) -> tuple[int, Optional[bytes]]:
+    '''按服务商与说话人选择音色，合成单行台词并返回 ``(索引, 音频字节或 None)``。
+
+    MiniMax 音色可由环境变量覆盖，火山引擎使用固定男女音色；合成失败仅记录警告，
+    由上层统一判定是否中止整个播客。
+    '''
+    i, line, total, provider = args
+    logger.info(f"正在处理第 {i + 1}/{total} 条（{line.speaker}），提供方：{provider}")
+    if provider == "minimax":
+        if line.speaker == "male":
+            voice = os.getenv("MINIMAX_TTS_VOICE_MALE", "male-qn-qingse")
+        else:
+            voice = os.getenv("MINIMAX_TTS_VOICE_FEMALE", "female-tianmei")
+        audio = text_to_speech_minimax(line.paragraph, voice)
+    else:
+        if line.speaker == "male":
+            voice = "zh_male_yangguangqingnian_moon_bigtts"
+        else:
+            voice = "zh_female_sajiaonvyou_moon_bigtts"
+        audio = text_to_speech_volcengine(line.paragraph, voice)
+    if not audio:
+        logger.warning(f"第 {i + 1} 条音频生成失败")
+    return (i, audio)
 
 
 def mix_audio(audio_chunks: list[bytes]) -> bytes:

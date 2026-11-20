@@ -54,12 +54,6 @@ export const zhCN: Translations = {
     showArtifacts: "查看此对话的文件",
   },
 
-  // 首页
-  home: {
-    docs: "文档",
-    blog: "博客",
-  },
-
   // 欢迎
   welcome: {
     greeting: "你好，欢迎回来！",
@@ -234,9 +228,7 @@ export const zhCN: Translations = {
     chats: "对话",
     channels: "渠道",
     recentChats: "最近的对话",
-    agents: "智能体",
     scheduledTasks: "定时任务",
-    agentsDisabledTooltip: "功能未启用",
   },
 
   // 定时任务
@@ -370,52 +362,6 @@ export const zhCN: Translations = {
         desc: "每周一汇总一周工作",
       },
     },
-  },
-
-  // 智能体
-  agents: {
-    title: "智能体",
-    description: "创建和管理具有专属 Prompt 与能力的自定义智能体。",
-    newAgent: "新建智能体",
-    emptyTitle: "还没有自定义智能体",
-    emptyDescription: "创建你的第一个自定义智能体，设置专属系统提示词。",
-    featureDisabledTitle: "智能体功能未启用",
-    featureDisabledDescription: "该功能未在此服务器上启用，请联系管理员。",
-    chat: "对话",
-    delete: "删除",
-    deleteConfirm: "确定要删除该智能体吗？此操作不可撤销。",
-    deleteSuccess: "智能体已删除",
-    newChat: "新对话",
-    createPageTitle: "设计你的智能体",
-    createPageSubtitle: "描述你想要的智能体，我来帮你通过对话创建。",
-    nameStepTitle: "给新智能体起个名字",
-    nameStepHint:
-      "只允许字母、数字和连字符，存储时自动转为小写（例如 code-reviewer）",
-    nameStepPlaceholder: "例如 code-reviewer",
-    nameStepContinue: "继续",
-    nameStepInvalidError: "名称无效，只允许字母、数字和连字符",
-    nameStepAlreadyExistsError: "已存在同名智能体",
-    nameStepNetworkError: "网络请求失败，请检查网络或后端连接",
-    nameStepCheckError: "无法验证名称可用性，请稍后重试",
-    nameStepCheckErrorWithDetail: "名称校验失败：{detail}",
-    nameStepApiDisabledError:
-      "服务器未开启自定义智能体管理功能，请联系管理员。",
-    nameStepBootstrapMessage:
-      "新智能体的名称是 {name}。请先帮我设计它的用途、行为方式和 SOUL.md，再保存它。",
-    save: "保存智能体",
-    saving: "正在保存智能体...",
-    saveRequested:
-      "已提交保存请求，DeerFlow 正在根据当前对话生成并保存初版智能体。",
-    saveHint:
-      "你可以在右上角的菜单里随时保存这个智能体，就算目前还只是初稿也可以。",
-    saveCommandMessage:
-      "请现在根据我们目前已经讨论的全部内容保存这个自定义智能体。这就是我明确的保存确认。如果仍有少量细节缺失，请根据上下文做出合理假设，生成一份简洁的中文初始 SOUL.md，并直接调用 setup_agent，不要再向我索要额外确认。",
-    agentCreatedPendingRefresh:
-      "智能体已创建，但 DeerFlow 暂时还无法读取到它。请稍后刷新当前页面。",
-    more: "更多操作",
-    agentCreated: "智能体已创建！",
-    startChatting: "开始对话",
-    backToGallery: "返回 Gallery",
   },
 
   // 面包屑导航
@@ -607,17 +553,6 @@ export const zhCN: Translations = {
     removeTodo: (content: string) => `移除 To-do：${content}`,
   },
 
-  // 快捷键
-  shortcuts: {
-    searchActions: "搜索操作...",
-    noResults: "未找到结果。",
-    actions: "操作",
-    keyboardShortcuts: "键盘快捷键",
-    keyboardShortcutsDescription: "使用键盘快捷键更快地操作 DeerFlow。",
-    openCommandPalette: "打开命令面板",
-    toggleSidebar: "切换侧边栏",
-  },
-
   // 设置
   settings: {
     title: "设置",
@@ -627,10 +562,24 @@ export const zhCN: Translations = {
       appearance: "外观",
       channels: "渠道",
       memory: "记忆",
+      instructions: "指示",
       tools: "工具",
       skills: "技能",
       notification: "通知",
       about: "关于",
+    },
+    instructions: {
+      title: "指示",
+      description: "为所有智能体设置共同遵循的指示，保存后将在后续运行中生效。",
+      label: "指示内容",
+      placeholder: "例如：请确保使用中文回答",
+      saved: "指示已保存",
+      saving: "保存中...",
+      loadError: "无法读取指示",
+      saveError: "无法保存指示",
+      conflict: "指示已在其他地方修改，请复制当前编辑内容，再重新加载。",
+      reload: "重新加载",
+      adminOnly: "仅管理员可以管理指示。",
     },
     memory: {
       title: "记忆",
@@ -755,12 +704,8 @@ export const zhCN: Translations = {
       profileTitle: "个人信息",
       email: "邮箱",
       role: "角色",
-      ssoProvider: "SSO",
       changePasswordTitle: "修改密码",
       changePasswordDescription: "更新你的账号密码。",
-      ssoPasswordDescription: "密码由你的 SSO 提供商管理。",
-      ssoPasswordMessage:
-        "此账号通过 {provider} 登录，DeerFlow 无法在此管理或修改密码。请前往你的 SSO 提供商账号设置中进行操作。",
       currentPassword: "当前密码",
       newPassword: "新密码",
       confirmNewPassword: "确认新密码",
@@ -791,19 +736,8 @@ export const zhCN: Translations = {
     adminSetupRequiredTitle: "需要先完成管理员初始化",
     adminSetupRequiredDescription:
       "DeerFlow 需要先创建管理员账号，然后才能创建新的普通账号。",
-    orContinueWith: "或使用以下方式登录",
-    ssoHint: "如果你的账号使用单点登录（SSO），请改用下方的选项登录。",
-    continueWith: (provider: string) => `使用 ${provider} 登录`,
     noAccountSignUp: "还没有账号？立即注册",
     haveAccountSignIn: "已有账号？立即登录",
     networkError: "网络错误，请重试。",
-    authFailed: "身份验证失败。",
-    errors: {
-      sso_failed: "SSO 登录失败，请重试或使用邮箱登录。",
-      sso_cancelled: "SSO 登录已取消。",
-      sso_account_exists:
-        "该邮箱对应的账号已存在。请使用密码登录或联系管理员。",
-      sso_not_allowed: "你的账号不允许使用 SSO 登录。请联系管理员。",
-    },
   },
 };

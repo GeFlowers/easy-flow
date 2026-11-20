@@ -126,8 +126,8 @@ def resolve_runtime_user_id(runtime: object | None) -> str:
           3. ``DEFAULT_USER_ID`` — 最终回退值，使未认证的命令行、迁移和测试路径
              仍能正常运行而不抛出异常。
 
-        保存用户范围状态的工具（自定义智能体、记忆、上传）必须调用本函数，
-        以使用 setup_agent 依赖的 runtime.context 通道。
+        保存用户范围状态的工具（记忆、上传）必须调用本函数，
+        以使用 runtime.context 通道。
     '''
     context = getattr(runtime, "context", None)
     if isinstance(context, dict):

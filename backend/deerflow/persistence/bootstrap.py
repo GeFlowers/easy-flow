@@ -11,6 +11,15 @@ logger = logging.getLogger(__name__)
 _PG_LOCK_KEY = 0x0DEE_12F1_0BEE_3682
 
 
+async def bootstrap_schema(engine: AsyncEngine) -> None:
+    '''在同一事务和咨询锁内初始化业务表，不读取或创建迁移版本表。'''
+    async with engine.begin() as connection:
+        await connection.execute(text("SET LOCAL lock_timeout = '5s'"))
+        await connection.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': _PG_LOCK_KEY})
+        await connection.run_sync(_ensure_business_schema)
+    logger.info('业务表初始化及结构检查完成，不记录结构版本')
+
+
 def _ensure_business_schema(connection) -> None:
     '''补齐缺少的业务表，拒绝缺失必要字段的旧结构，并确保索引存在。'''
     from deerflow.persistence.base import Base
@@ -28,12 +37,3 @@ def _ensure_business_schema(connection) -> None:
             )
         for index in table.indexes:
             index.create(connection, checkfirst=True)
-
-
-async def bootstrap_schema(engine: AsyncEngine) -> None:
-    '''在同一事务和咨询锁内初始化业务表，不读取或创建迁移版本表。'''
-    async with engine.begin() as connection:
-        await connection.execute(text("SET LOCAL lock_timeout = '5s'"))
-        await connection.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': _PG_LOCK_KEY})
-        await connection.run_sync(_ensure_business_schema)
-    logger.info('业务表初始化及结构检查完成，不记录结构版本')

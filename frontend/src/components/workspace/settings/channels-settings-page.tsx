@@ -37,9 +37,11 @@ import {
   providerCanEditRuntimeConfig,
   providerNeedsRuntimeConfig,
 } from "@/features/channels/provider-state";
-import type { ChannelConnection, ChannelProvider } from "@/features/channels/types";
+import type {
+  ChannelConnection,
+  ChannelProvider,
+} from "@/features/channels/types";
 import { useI18n } from "@/features/i18n/hooks";
-import { cn } from "@/lib/utils";
 
 import { ChannelProviderIcon } from "../channels/channel-provider-icon";
 import { ChannelRuntimeConfigDialog } from "../channels/channel-runtime-config-dialog";
@@ -188,7 +190,9 @@ function ChannelProviderItem({
             <span className="truncate">{provider.display_name}</span>
             <Badge
               variant={isConnected ? "default" : "outline"}
-              className={cn(!isConnected && "text-muted-foreground")}
+              className={[!isConnected && "text-muted-foreground"]
+                .filter(Boolean)
+                .join(" ")}
             >
               {isConnected ? <CheckCircle2Icon /> : <AlertCircleIcon />}
               {statusLabel}

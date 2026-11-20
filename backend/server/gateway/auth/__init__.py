@@ -10,7 +10,7 @@ from server.gateway.auth.local_provider import LocalAuthProvider
 from server.gateway.auth.models import User, UserResponse
 from server.gateway.auth.password import hash_password, verify_password
 from server.gateway.auth.providers import AuthProvider
-from server.gateway.auth.repositories.base import UserRepository
+from server.gateway.user_repository import SQLUserRepository, UserNotFoundError
 
 __all__ = [
     # 配置
@@ -34,6 +34,7 @@ __all__ = [
     # 认证提供者
     "AuthProvider",
     "LocalAuthProvider",
-    # 仓储接口
-    "UserRepository",
+    # 用户仓储
+    "SQLUserRepository",
+    "UserNotFoundError",
 ]

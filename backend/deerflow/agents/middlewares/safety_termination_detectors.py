@@ -29,18 +29,6 @@ class SafetyTerminationDetector(Protocol):
         ...
 
 
-def _get_metadata_value(message: AIMessage, field_name: str) -> str | None:
-    '''依次从响应元数据和扩展字段读取指定字符串值，忽略缺失或类型不符的数据。'''
-    for container_name in ("response_metadata", "additional_kwargs"):
-        container = getattr(message, container_name, None) or {}
-        if not isinstance(container, dict):
-            continue
-        value = container.get(field_name)
-        if isinstance(value, str) and value:
-            return value
-    return None
-
-
 class OpenAICompatibleContentFilterDetector:
     '''识别使用 OpenAI 兼容协议的模型在 finish_reason 字段中返回的内容过滤标记。'''
 
@@ -70,6 +58,18 @@ class OpenAICompatibleContentFilterDetector:
             reason_value=value,
             extras=extras,
         )
+
+
+def _get_metadata_value(message: AIMessage, field_name: str) -> str | None:
+    '''依次从响应元数据和扩展字段读取指定字符串值，忽略缺失或类型不符的数据。'''
+    for container_name in ("response_metadata", "additional_kwargs"):
+        container = getattr(message, container_name, None) or {}
+        if not isinstance(container, dict):
+            continue
+        value = container.get(field_name)
+        if isinstance(value, str) and value:
+            return value
+    return None
 
 
 class AnthropicRefusalDetector:

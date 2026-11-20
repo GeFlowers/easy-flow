@@ -1,12 +1,12 @@
-'''定义长期记忆开关、调用模式、后端选择及旧配置迁移规则。'''
+'''定义长期记忆开关、后端选择及旧配置迁移规则。'''
 
 import logging
-from typing import Any, Literal
+from typing import Any
 
 from pydantic import BaseModel, Field
 
 logger = logging.getLogger(__name__)
-_SHARED_FIELDS = frozenset({"enabled", "mode", "injection_enabled", "shutdown_flush_timeout_seconds", "manager_class", "backend_config"})
+_SHARED_FIELDS = frozenset({"enabled", "injection_enabled", "shutdown_flush_timeout_seconds", "manager_class", "backend_config"})
 _LEGACY_DEERMEM_FIELDS = frozenset(
     {
         "storage_path",
@@ -41,12 +41,6 @@ class MemoryConfig(BaseModel):
         default=True,
         description="Whether to enable the memory mechanism (call-site gate).",
     )
-    mode: Literal["middleware", "tool"] = Field(
-        default="middleware",
-        description=(
-            "Memory operation mode. 'middleware': passive LLM summarization after each turn (current behavior). 'tool': model calls memory tools (memory_search, memory_add, etc.) directly. Mutually exclusive — only one mode runs at a time."
-        ),
-    )
     injection_enabled: bool = Field(
         default=True,
         description="Whether to inject memory into the system prompt (call-site gate).",
@@ -72,8 +66,8 @@ class MemoryConfig(BaseModel):
         default="deermem",
         description=(
             "Memory backend selector. Either a registered backend name "
-            "(matching a `backends/<name>/` folder that exposes `MANAGER_CLASS`, "
-            "e.g. `deermem` / `noop`) or a dotted import path to a "
+            "(matching a `memory/<name>/` folder that exposes `MANAGER_CLASS`, "
+            "e.g. `deermem`) or a dotted import path to a "
             "`MemoryManager` subclass. The factory resolves this at "
             "`get_memory_manager()` time and raises `ValueError` on failure "
             "(fail-fast: memory is persistent state, so an unresolved "
@@ -93,9 +87,6 @@ class MemoryConfig(BaseModel):
     )
 
 
-def should_use_memory_tools(config: MemoryConfig) -> bool:
-    '''判断当前记忆配置是否应向智能体注册主动记忆工具。'''
-    return config.enabled and config.mode == "tool"
 _memory_config: MemoryConfig = MemoryConfig()
 
 

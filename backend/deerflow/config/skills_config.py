@@ -9,13 +9,6 @@ from deerflow.config.runtime_paths import project_root, resolve_path
 from deerflow.constants import DEFAULT_SKILLS_CONTAINER_PATH
 
 
-def _legacy_skills_candidates() -> tuple[Path, ...]:
-    '''返回仓库旧版布局中可回退读取的技能目录候选项。'''
-    backend_dir = Path(__file__).resolve().parents[2]
-    repo_root = backend_dir.parent
-    return (repo_root / "skills",)
-
-
 class SkillsConfig(BaseModel):
     '''配置技能存储实现、主机目录和沙箱内技能挂载路径。'''
 
@@ -56,3 +49,10 @@ class SkillsConfig(BaseModel):
     def get_skill_container_path(self, skill_name: str, category: str = "public") -> str:
         '''返回技能目录在沙箱命名空间中的规范绝对路径。'''
         return f"{self.container_path}/{category}/{skill_name}"
+
+
+def _legacy_skills_candidates() -> tuple[Path, ...]:
+    '''返回仓库旧版布局中可回退读取的技能目录候选项。'''
+    backend_dir = Path(__file__).resolve().parents[2]
+    repo_root = backend_dir.parent
+    return (repo_root / "skills",)

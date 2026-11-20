@@ -11,21 +11,34 @@ from langchain_core.messages import SystemMessage
 from deerflow.agents.middlewares.dynamic_context_middleware import is_dynamic_context_reminder
 
 
-def _flatten_content(content) -> str:
-    '''将字符串或多模态内容片段整理为纯文本，供系统消息合并使用。'''
-    if isinstance(content, str):
-        return content
-    if isinstance(content, list):
-        parts = []
-        for item in content:
-            if isinstance(item, str):
-                parts.append(item)
-            elif isinstance(item, dict) and "text" in item:
-                parts.append(item["text"])
-            else:
-                parts.append(str(item))
-        return "\n".join(parts)
-    return str(content)
+class SystemMessageCoalescingMiddleware(AgentMiddleware[AgentState]):
+    '''只修改发往模型的请求对象，不改写持久化消息历史中的系统消息。'''
+
+    @override
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelCallResult:
+        '''在同步模型处理器运行前合并系统消息。'''
+        return handler(self._maybe_coalesce(request))
+
+    @staticmethod
+    def _maybe_coalesce(request: ModelRequest) -> ModelRequest:
+        '''在存在分散系统消息时返回合并后的请求，否则保留原请求对象。'''
+        coalesced = _coalesce_request(request)
+        if coalesced is None:
+            return request
+        return coalesced
+
+    @override
+    async def awrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
+    ) -> ModelCallResult:
+        '''在异步模型处理器运行前合并系统消息。'''
+        return await handler(self._maybe_coalesce(request))
 
 
 def _coalesce_request(request: ModelRequest) -> ModelRequest | None:
@@ -58,31 +71,18 @@ def _coalesce_request(request: ModelRequest) -> ModelRequest | None:
     return request.override(system_message=merged, messages=non_system)
 
 
-class SystemMessageCoalescingMiddleware(AgentMiddleware[AgentState]):
-    '''只修改发往模型的请求对象，不改写持久化消息历史中的系统消息。'''
-
-    @staticmethod
-    def _maybe_coalesce(request: ModelRequest) -> ModelRequest:
-        '''在存在分散系统消息时返回合并后的请求，否则保留原请求对象。'''
-        coalesced = _coalesce_request(request)
-        if coalesced is None:
-            return request
-        return coalesced
-
-    @override
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelCallResult:
-        '''在同步模型处理器运行前合并系统消息。'''
-        return handler(self._maybe_coalesce(request))
-
-    @override
-    async def awrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], Awaitable[ModelResponse]],
-    ) -> ModelCallResult:
-        '''在异步模型处理器运行前合并系统消息。'''
-        return await handler(self._maybe_coalesce(request))
+def _flatten_content(content) -> str:
+    '''将字符串或多模态内容片段整理为纯文本，供系统消息合并使用。'''
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        parts = []
+        for item in content:
+            if isinstance(item, str):
+                parts.append(item)
+            elif isinstance(item, dict) and "text" in item:
+                parts.append(item["text"])
+            else:
+                parts.append(str(item))
+        return "\n".join(parts)
+    return str(content)

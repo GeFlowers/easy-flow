@@ -26,77 +26,6 @@ _STATUS_ONLY_RESULT_BRIEFS = {
 }
 
 
-def _utc_now_iso() -> str:
-    '''返回以 Z 结尾的当前 UTC ISO 8601 时间字符串。'''
-    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
-
-
-def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
-    '''按固定比例保留文本首尾，确定性截断结果摘要而不调用模型。'''
-    if len(text) <= cap:
-        return text
-    if cap <= 0:
-        return ""
-    head = cap * 2 // 3
-    omitted_marker = "\n...\n"
-    if cap <= len(omitted_marker):
-        return text[:cap]
-    tail = cap - head - len(omitted_marker)
-    if tail <= 0:
-        return text[:cap]
-    return f"{text[:head]}{omitted_marker}{text[-tail:]}"
-
-
-def _escape_context_text(value: object) -> str:
-    '''压缩空白并转义将注入模型上下文的文本。'''
-    return escape(" ".join(str(value).split()), quote=False)
-
-
-def _status_guidance(status: str, stop_reason: str | None = None) -> str:
-    '''根据委派状态和可选终止原因生成后续行动指引。'''
-    if stop_reason:
-        # 守卫预算可能提前结束运行；状态仍描述运行结果，stop_reason 单独说明触发的预算上限。
-        if status == "completed":
-            return "达到安全限制并返回部分结果；请复用部分结果、缩小范围后重试，或提高单个代理的预算（max_turns / token_budget）"
-        return "达到安全限制且没有可用结果；请缩小范围后重试，或提高单个代理的预算（max_turns / token_budget）"
-    if status == "in_progress":
-        return "已委派；不要重复委派；请等待结果或基于结果继续工作"
-    if status == "completed":
-        return "结果已完成；不要重复委派；请复用此结果"
-    if status == "failed":
-        return "此前尝试失败；可以调整计划后重试"
-    if status == "cancelled":
-        return "此前尝试已取消；可以调整计划后重试"
-    if status == "timed_out":
-        return "此前尝试超时；可以调整计划后重试"
-    if status == "polling_timed_out":
-        return "polling 此前尝试超时；可以调整计划后重试"
-    return "此前已有尝试；重试前请检查状态"
-
-
-def _tool_call_name(tool_call: dict[str, Any]) -> str:
-    '''从标准或嵌套 function 格式的工具调用中提取名称。'''
-    name = tool_call.get("name")
-    if isinstance(name, str):
-        return name
-    function = tool_call.get("function")
-    if isinstance(function, dict) and isinstance(function.get("name"), str):
-        return function["name"]
-    return ""
-
-
-def _tool_call_id(tool_call: dict[str, Any]) -> str | None:
-    '''提取工具调用 ID，并在缺失时返回 None。'''
-    tool_call_id = tool_call.get("id")
-    return str(tool_call_id) if tool_call_id else None
-
-
-def _tool_call_args(tool_call: dict[str, Any]) -> dict[str, Any]:
-    '''提取字典类型的工具调用参数，其他情况返回空字典。'''
-    args = tool_call.get("args")
-    return args if isinstance(args, dict) else {}
-
-
 def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
     '''配对历史中的 task 工具调用及其结果消息，生成按调用顺序排列的委派记录。'''
     entries_by_id: dict[str, DelegationEntry] = {}
@@ -150,22 +79,48 @@ def extract_delegations(messages: list[AnyMessage]) -> list[DelegationEntry]:
     return [entries_by_id[tool_call_id] for tool_call_id in order]
 
 
-def _fits_budget(lines: list[str], candidate: str, max_chars: int) -> bool:
-    '''判断追加候选行后是否仍满足总字符预算。'''
-    return len("\n".join([*lines, candidate])) <= max_chars
+def _utc_now_iso() -> str:
+    '''返回以 Z 结尾的当前 UTC ISO 8601 时间字符串。'''
+    return datetime.now(UTC).isoformat().replace("+00:00", "Z")
 
 
-def _render_entry_line(entry: DelegationEntry) -> str:
-    '''将单条委派记录渲染为安全的模型可见列表行。'''
-    status = _escape_context_text(entry["status"])
-    description = _escape_context_text(entry["description"])
-    subagent_type = _escape_context_text(entry["subagent_type"])
-    guidance = _status_guidance(entry["status"], entry.get("stop_reason"))
-    line = f"- [{status}] {description}（由 {subagent_type} 执行；{guidance}）"
-    result_brief = entry.get("result_brief")
-    if result_brief:
-        line += f" -> {_escape_context_text(_bound_text(result_brief, _LEDGER_ENTRY_RESULT_RENDER_CAP))}"
-    return line
+def _tool_call_name(tool_call: dict[str, Any]) -> str:
+    '''从标准或嵌套 function 格式的工具调用中提取名称。'''
+    name = tool_call.get("name")
+    if isinstance(name, str):
+        return name
+    function = tool_call.get("function")
+    if isinstance(function, dict) and isinstance(function.get("name"), str):
+        return function["name"]
+    return ""
+
+
+def _tool_call_id(tool_call: dict[str, Any]) -> str | None:
+    '''提取工具调用 ID，并在缺失时返回 None。'''
+    tool_call_id = tool_call.get("id")
+    return str(tool_call_id) if tool_call_id else None
+
+
+def _tool_call_args(tool_call: dict[str, Any]) -> dict[str, Any]:
+    '''提取字典类型的工具调用参数，其他情况返回空字典。'''
+    args = tool_call.get("args")
+    return args if isinstance(args, dict) else {}
+
+
+def _bound_text(text: str, cap: int = _RESULT_BRIEF_CAP) -> str:
+    '''按固定比例保留文本首尾，确定性截断结果摘要而不调用模型。'''
+    if len(text) <= cap:
+        return text
+    if cap <= 0:
+        return ""
+    head = cap * 2 // 3
+    omitted_marker = "\n...\n"
+    if cap <= len(omitted_marker):
+        return text[:cap]
+    tail = cap - head - len(omitted_marker)
+    if tail <= 0:
+        return text[:cap]
+    return f"{text[:head]}{omitted_marker}{text[-tail:]}"
 
 
 def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int = _LEDGER_RENDER_CHAR_BUDGET) -> str:
@@ -199,3 +154,48 @@ def render_delegation_ledger(entries: list[DelegationEntry], *, max_chars: int =
     if len(rendered) <= max_chars:
         return rendered
     return rendered[: max(0, max_chars - 4)] + "\n..."
+
+
+def _render_entry_line(entry: DelegationEntry) -> str:
+    '''将单条委派记录渲染为安全的模型可见列表行。'''
+    status = _escape_context_text(entry["status"])
+    description = _escape_context_text(entry["description"])
+    subagent_type = _escape_context_text(entry["subagent_type"])
+    guidance = _status_guidance(entry["status"], entry.get("stop_reason"))
+    line = f"- [{status}] {description}（由 {subagent_type} 执行；{guidance}）"
+    result_brief = entry.get("result_brief")
+    if result_brief:
+        line += f" -> {_escape_context_text(_bound_text(result_brief, _LEDGER_ENTRY_RESULT_RENDER_CAP))}"
+    return line
+
+
+def _escape_context_text(value: object) -> str:
+    '''压缩空白并转义将注入模型上下文的文本。'''
+    return escape(" ".join(str(value).split()), quote=False)
+
+
+def _status_guidance(status: str, stop_reason: str | None = None) -> str:
+    '''根据委派状态和可选终止原因生成后续行动指引。'''
+    if stop_reason:
+        # 守卫预算可能提前结束运行；状态仍描述运行结果，stop_reason 单独说明触发的预算上限。
+        if status == "completed":
+            return "达到安全限制并返回部分结果；请复用部分结果、缩小范围后重试，或提高单个代理的预算（max_turns / token_budget）"
+        return "达到安全限制且没有可用结果；请缩小范围后重试，或提高单个代理的预算（max_turns / token_budget）"
+    if status == "in_progress":
+        return "已委派；不要重复委派；请等待结果或基于结果继续工作"
+    if status == "completed":
+        return "结果已完成；不要重复委派；请复用此结果"
+    if status == "failed":
+        return "此前尝试失败；可以调整计划后重试"
+    if status == "cancelled":
+        return "此前尝试已取消；可以调整计划后重试"
+    if status == "timed_out":
+        return "此前尝试超时；可以调整计划后重试"
+    if status == "polling_timed_out":
+        return "polling 此前尝试超时；可以调整计划后重试"
+    return "此前已有尝试；重试前请检查状态"
+
+
+def _fits_budget(lines: list[str], candidate: str, max_chars: int) -> bool:
+    '''判断追加候选行后是否仍满足总字符预算。'''
+    return len("\n".join([*lines, candidate])) <= max_chars

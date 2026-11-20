@@ -71,25 +71,6 @@ def langchain_to_openai_message(message: Any) -> dict:
     return {"role": role, "content": content}
 
 
-def _infer_finish_reason(message: Any) -> str:
-    '''
-
-    从 AIMessage 推断 OpenAI 的 finish_reason。
-
-        存在 tool_calls 时返回 ``tool_calls``；否则读取
-        response_metadata.finish_reason，最终回退为 ``stop``。
-    '''
-    tool_calls = getattr(message, "tool_calls", None) or []
-    if tool_calls:
-        return "tool_calls"
-    resp_meta = getattr(message, "response_metadata", None) or {}
-    if isinstance(resp_meta, dict):
-        finish = resp_meta.get("finish_reason")
-        if finish:
-            return finish
-    return "stop"
-
-
 def langchain_to_openai_completion(message: Any) -> dict:
     '''
 
@@ -133,6 +114,25 @@ def langchain_to_openai_completion(message: Any) -> dict:
         ],
         "usage": usage,
     }
+
+
+def _infer_finish_reason(message: Any) -> str:
+    '''
+
+    从 AIMessage 推断 OpenAI 的 finish_reason。
+
+        存在 tool_calls 时返回 ``tool_calls``；否则读取
+        response_metadata.finish_reason，最终回退为 ``stop``。
+    '''
+    tool_calls = getattr(message, "tool_calls", None) or []
+    if tool_calls:
+        return "tool_calls"
+    resp_meta = getattr(message, "response_metadata", None) or {}
+    if isinstance(resp_meta, dict):
+        finish = resp_meta.get("finish_reason")
+        if finish:
+            return finish
+    return "stop"
 
 
 def langchain_messages_to_openai(messages: list) -> list[dict]:

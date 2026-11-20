@@ -35,48 +35,6 @@ _CHANNELS_LANGGRAPH_URL_ENV = "DEER_FLOW_CHANNELS_LANGGRAPH_URL"
 _CHANNELS_GATEWAY_URL_ENV = "DEER_FLOW_CHANNELS_GATEWAY_URL"
 
 
-def _channel_has_credentials(name: str, channel_config: dict[str, Any]) -> bool:
-    '''判断通道是否至少填写了一个非布尔凭据字段。'''
-    cred_keys = _CHANNEL_CREDENTIAL_KEYS.get(name, [])
-    return any(not isinstance(channel_config.get(key), bool) and channel_config.get(key) is not None and str(channel_config[key]).strip() for key in cred_keys)
-
-
-def _resolve_service_url(config: dict[str, Any], config_key: str, env_key: str, default: str) -> str:
-    '''按通道配置、环境变量、默认值的顺序解析服务地址。'''
-    value = config.pop(config_key, None)
-    if isinstance(value, str) and value.strip():
-        return value
-    env_value = os.getenv(env_key, "").strip()
-    if env_value:
-        return env_value
-    return default
-
-
-def _merge_channel_connection_runtime_config(channels_config: dict[str, Any], app_config: AppConfig) -> None:
-    '''把界面持久化的运行时连接覆盖合并到静态通道配置。'''
-    connection_config = getattr(app_config, "channel_connections", None)
-    merge_runtime_channel_configs(channels_config, connection_config)
-
-
-def _make_connection_repo(connection_config: ChannelConnectionsConfig | None):
-    '''在连接功能和数据库均可用时创建连接仓库。'''
-    if connection_config is None or not getattr(connection_config, "enabled", False):
-        return None
-
-    try:
-        from deerflow.persistence.channel_connections import ChannelConnectionRepository
-        from deerflow.persistence.engine import get_session_factory
-    except Exception:
-        logger.exception("Failed to import channel connection repository")
-        return None
-
-    session_factory = get_session_factory()
-    if session_factory is None:
-        logger.warning("Channel connections are enabled but database persistence is not available")
-        return None
-    return ChannelConnectionRepository(session_factory)
-
-
 class ChannelService:
     '''统一管理配置中的通道实例与共享 ``ChannelManager``。
 
@@ -211,89 +169,6 @@ class ChannelService:
                     return True
             return False
 
-    async def stop(self) -> None:
-        '''先停止所有平台通道，再停止共享管理器。'''
-        for name, channel in list(self._channels.items()):
-            try:
-                await channel.stop()
-                logger.info("Channel stopped")
-            except Exception:
-                logger.exception("Error stopping channel")
-        self._channels.clear()
-
-        await self.manager.stop()
-        self._running = False
-        logger.info("ChannelService stopped")
-
-    def _load_channel_config(self, name: str) -> dict[str, Any] | None:
-        '''从磁盘重新加载指定通道的最新有效配置。
-
-        ``get_app_config()`` 会根据配置签名识别 ``config.yaml`` 变化；随后必须重新
-        应用界面运行时覆盖，避免丢失浏览器录入凭据或重新启用已主动断开的通道。
-        加载失败时回退到内存快照。
-        '''
-        try:
-            from deerflow.config.app_config import get_app_config
-
-            app_config = get_app_config()
-            extra = app_config.model_extra or {}
-            channels_config = dict(extra.get("channels") or {})
-            _merge_channel_connection_runtime_config(channels_config, app_config)
-            channel_config = channels_config.get(name)
-            if isinstance(channel_config, dict):
-                # 同步内存快照，使状态查询与实际重启配置保持一致。
-                self._config[name] = channel_config
-                return channel_config
-        except Exception:
-            logger.exception("Failed to reload config for channel %s, using cached version", name)
-        return self._config.get(name)
-
-    async def restart_channel(self, name: str, *, reload_config: bool = True) -> bool:
-        '''停止并重新创建指定通道，成功时返回真。'''
-        if name in self._channels:
-            try:
-                await self._channels[name].stop()
-            except Exception:
-                logger.exception("Error stopping channel for restart")
-            del self._channels[name]
-
-        if reload_config:
-            # 读取 config.yaml 和运行时存储属于阻塞磁盘 IO，放到工作线程执行。
-            config = await asyncio.to_thread(self._load_channel_config, name)
-        else:
-            config = self._config.get(name)
-        if not config or not isinstance(config, dict):
-            logger.warning("No config for requested channel")
-            return False
-
-        if not config.get("enabled", False):
-            logger.info("Channel %s is disabled, skipping restart", name)
-            return True
-
-        return await self._start_channel(name, config)
-
-    async def configure_channel(self, name: str, config: dict[str, Any]) -> bool:
-        '''应用权威运行时配置，并在服务运行时立即重启通道。'''
-        self._config[name] = dict(config)
-        if not self._running:
-            return True
-        # 调用方刚提供的界面配置可能从未写入 config.yaml，重启时不能再用旧磁盘值覆盖。
-        return await self.restart_channel(name, reload_config=False)
-
-    async def remove_channel(self, name: str) -> bool:
-        '''删除运行时配置，并停止仍在运行的对应通道。'''
-        self._config.pop(name, None)
-        channel = self._channels.pop(name, None)
-        if channel is None:
-            return True
-        try:
-            await channel.stop()
-            logger.info("Channel stopped and removed")
-            return True
-        except Exception:
-            logger.exception("Error stopping channel for removal")
-            return False
-
     async def _start_channel(self, name: str, config: dict[str, Any]) -> bool:
         '''惰性解析通道类，注入共享依赖并验证其成功进入运行状态。'''
         import_path = _CHANNEL_REGISTRY.get(name)
@@ -326,6 +201,89 @@ class ChannelService:
         except Exception:
             self._channels.pop(name, None)
             logger.exception("Failed to start channel")
+            return False
+
+    async def stop(self) -> None:
+        '''先停止所有平台通道，再停止共享管理器。'''
+        for name, channel in list(self._channels.items()):
+            try:
+                await channel.stop()
+                logger.info("Channel stopped")
+            except Exception:
+                logger.exception("Error stopping channel")
+        self._channels.clear()
+
+        await self.manager.stop()
+        self._running = False
+        logger.info("ChannelService stopped")
+
+    async def restart_channel(self, name: str, *, reload_config: bool = True) -> bool:
+        '''停止并重新创建指定通道，成功时返回真。'''
+        if name in self._channels:
+            try:
+                await self._channels[name].stop()
+            except Exception:
+                logger.exception("Error stopping channel for restart")
+            del self._channels[name]
+
+        if reload_config:
+            # 读取 config.yaml 和运行时存储属于阻塞磁盘 IO，放到工作线程执行。
+            config = await asyncio.to_thread(self._load_channel_config, name)
+        else:
+            config = self._config.get(name)
+        if not config or not isinstance(config, dict):
+            logger.warning("No config for requested channel")
+            return False
+
+        if not config.get("enabled", False):
+            logger.info("Channel %s is disabled, skipping restart", name)
+            return True
+
+        return await self._start_channel(name, config)
+
+    def _load_channel_config(self, name: str) -> dict[str, Any] | None:
+        '''从磁盘重新加载指定通道的最新有效配置。
+
+        ``get_app_config()`` 会根据配置签名识别 ``config.yaml`` 变化；随后必须重新
+        应用界面运行时覆盖，避免丢失浏览器录入凭据或重新启用已主动断开的通道。
+        加载失败时回退到内存快照。
+        '''
+        try:
+            from deerflow.config.app_config import get_app_config
+
+            app_config = get_app_config()
+            extra = app_config.model_extra or {}
+            channels_config = dict(extra.get("channels") or {})
+            _merge_channel_connection_runtime_config(channels_config, app_config)
+            channel_config = channels_config.get(name)
+            if isinstance(channel_config, dict):
+                # 同步内存快照，使状态查询与实际重启配置保持一致。
+                self._config[name] = channel_config
+                return channel_config
+        except Exception:
+            logger.exception("Failed to reload config for channel %s, using cached version", name)
+        return self._config.get(name)
+
+    async def configure_channel(self, name: str, config: dict[str, Any]) -> bool:
+        '''应用权威运行时配置，并在服务运行时立即重启通道。'''
+        self._config[name] = dict(config)
+        if not self._running:
+            return True
+        # 调用方刚提供的界面配置可能从未写入 config.yaml，重启时不能再用旧磁盘值覆盖。
+        return await self.restart_channel(name, reload_config=False)
+
+    async def remove_channel(self, name: str) -> bool:
+        '''删除运行时配置，并停止仍在运行的对应通道。'''
+        self._config.pop(name, None)
+        channel = self._channels.pop(name, None)
+        if channel is None:
+            return True
+        try:
+            await channel.stop()
+            logger.info("Channel stopped and removed")
+            return True
+        except Exception:
+            logger.exception("Error stopping channel for removal")
             return False
 
     def get_status(self) -> dict[str, Any]:
@@ -368,6 +326,48 @@ class ChannelService:
         if not isinstance(config, dict):
             return None
         return dict(config)
+
+
+def _resolve_service_url(config: dict[str, Any], config_key: str, env_key: str, default: str) -> str:
+    '''按通道配置、环境变量、默认值的顺序解析服务地址。'''
+    value = config.pop(config_key, None)
+    if isinstance(value, str) and value.strip():
+        return value
+    env_value = os.getenv(env_key, "").strip()
+    if env_value:
+        return env_value
+    return default
+
+
+def _merge_channel_connection_runtime_config(channels_config: dict[str, Any], app_config: AppConfig) -> None:
+    '''把界面持久化的运行时连接覆盖合并到静态通道配置。'''
+    connection_config = getattr(app_config, "channel_connections", None)
+    merge_runtime_channel_configs(channels_config, connection_config)
+
+
+def _make_connection_repo(connection_config: ChannelConnectionsConfig | None):
+    '''在连接功能和数据库均可用时创建连接仓库。'''
+    if connection_config is None or not getattr(connection_config, "enabled", False):
+        return None
+
+    try:
+        from deerflow.persistence.channel_connections import ChannelConnectionRepository
+        from deerflow.persistence.engine import get_session_factory
+    except Exception:
+        logger.exception("Failed to import channel connection repository")
+        return None
+
+    session_factory = get_session_factory()
+    if session_factory is None:
+        logger.warning("Channel connections are enabled but database persistence is not available")
+        return None
+    return ChannelConnectionRepository(session_factory)
+
+
+def _channel_has_credentials(name: str, channel_config: dict[str, Any]) -> bool:
+    '''判断通道是否至少填写了一个非布尔凭据字段。'''
+    cred_keys = _CHANNEL_CREDENTIAL_KEYS.get(name, [])
+    return any(not isinstance(channel_config.get(key), bool) and channel_config.get(key) is not None and str(channel_config[key]).strip() for key in cred_keys)
 
 
 # -- 单例访问 --------------------------------------------------------------

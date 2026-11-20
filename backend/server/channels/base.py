@@ -71,6 +71,16 @@ class Channel(ABC):
         '''
         return False
 
+    async def receive_file(self, msg: InboundMessage, thread_id: str, *, user_id: str | None = None) -> InboundMessage:
+        '''按通道能力把入站附件实体化到对应用户和线程的存储空间。
+
+        默认实现保持消息不变。支持文件的子类可下载 ``msg.files`` 引用的远端内容，
+        并把沙箱路径写入消息文本，使后续模型能够读取。``thread_id`` 与 ``user_id``
+        共同限定存储边界，不能只依赖平台文件名定位目标。
+        '''
+        del user_id
+        return msg
+
     # -- 共享辅助逻辑 ------------------------------------------------------
 
     async def _send_with_retry(
@@ -175,13 +185,3 @@ class Channel(ABC):
                         logger.warning("[%s] file upload skipped for %s", self.name, attachment.filename)
                 except Exception:
                     logger.exception("[%s] failed to upload file %s", self.name, attachment.filename)
-
-    async def receive_file(self, msg: InboundMessage, thread_id: str, *, user_id: str | None = None) -> InboundMessage:
-        '''按通道能力把入站附件实体化到对应用户和线程的存储空间。
-
-        默认实现保持消息不变。支持文件的子类可下载 ``msg.files`` 引用的远端内容，
-        并把沙箱路径写入消息文本，使后续模型能够读取。``thread_id`` 与 ``user_id``
-        共同限定存储边界，不能只依赖平台文件名定位目标。
-        '''
-        del user_id
-        return msg

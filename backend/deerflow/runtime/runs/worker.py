@@ -96,37 +96,6 @@ async def _checkpoint_thread_lock(thread_id: str) -> AsyncIterator[None]:
 _VALID_LG_MODES = {"values", "updates", "checkpoints", "tasks", "debug", "messages", "custom"}
 
 
-def _build_runtime_context(
-    thread_id: str,
-    run_id: str,
-    caller_context: Any | None,
-    app_config: AppConfig | None = None,
-) -> dict[str, Any]:
-    '''
-
-    构建本次运行的 ``ToolRuntime.context`` 字典。
-
-        始终包含 ``thread_id`` 和 ``run_id``。合并调用方 ``config['context']``
-        中的额外键（例如初始化流程的 ``agent_name``，见问题 #2677），
-        但不覆盖 ``thread_id``／``run_id``。工作器加入已解析的 ``AppConfig``，
-        使工具无需查找全局配置即可使用它。
-
-        langgraph 1.1 及之后的版本通过保存在
-        ``config['configurable']['__pregel_runtime']`` 中的父运行时，
-        将此字典暴露为 ``runtime.context``；可参见 ``langgraph.pregel.main``
-        中对 ``parent_runtime.merge(...)`` 的调用。
-    '''
-    runtime_ctx: dict[str, Any] = {"thread_id": thread_id, "run_id": run_id}
-    if isinstance(caller_context, dict):
-        for key, value in caller_context.items():
-            if key == CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY:
-                continue
-            runtime_ctx.setdefault(key, value)
-    if app_config is not None:
-        runtime_ctx["app_config"] = app_config
-    return runtime_ctx
-
-
 @dataclass(frozen=True)
 class RunContext:
     '''
@@ -144,46 +113,6 @@ class RunContext:
     thread_store: Any | None = field(default=None)
     app_config: AppConfig | None = field(default=None)
     on_run_completed: Any | None = field(default=None)
-
-
-def _install_runtime_context(config: dict, runtime_context: dict[str, Any]) -> None:
-    '''把线程、运行、追踪和应用配置等受信任字段写入 LangGraph 上下文。'''
-    existing_context = config.get("context")
-    if isinstance(existing_context, dict):
-        existing_context.setdefault("thread_id", runtime_context["thread_id"])
-        existing_context.setdefault("run_id", runtime_context["run_id"])
-        if DEERFLOW_TRACE_METADATA_KEY in runtime_context:
-            existing_context.setdefault(DEERFLOW_TRACE_METADATA_KEY, runtime_context[DEERFLOW_TRACE_METADATA_KEY])
-        if "app_config" in runtime_context:
-            existing_context["app_config"] = runtime_context["app_config"]
-        if CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY in runtime_context:
-            existing_context[CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY] = runtime_context[CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY]
-        return
-
-    config["context"] = dict(runtime_context)
-
-
-def _compute_agent_factory_supports_app_config(agent_factory: Any) -> bool:
-    '''检查智能体工厂签名是否声明了 app_config 参数。'''
-    try:
-        return "app_config" in inspect.signature(agent_factory).parameters
-    except (TypeError, ValueError):
-        return False
-
-
-@lru_cache(maxsize=128)
-def _cached_agent_factory_supports_app_config(agent_factory: Any) -> bool:
-    '''缓存工厂参数能力检查，避免每次运行都重新解析签名。'''
-    return _compute_agent_factory_supports_app_config(agent_factory)
-
-
-def _agent_factory_supports_app_config(agent_factory: Any) -> bool:
-    '''读取缓存的工厂能力结果，并兼容不可哈希的可调用对象。'''
-    try:
-        return _cached_agent_factory_supports_app_config(agent_factory)
-    except TypeError:
-        # 某些可调用实例不可哈希，此时改用直接比较。
-        return _compute_agent_factory_supports_app_config(agent_factory)
 
 
 class _SubagentEventBuffer:
@@ -359,9 +288,8 @@ async def run_agent(
         from langchain_core.runnables import RunnableConfig
         from langgraph.runtime import Runtime
 
-        # 注入运行时上下文，使中间件和工具可通过 ToolRuntime.context 读取会话级数据。
-        # langgraph-cli 会自动完成此操作；这里直接调用 ``agent.astream(config=...)`` 驱动图，
-        # 没有传入官方 ``context=`` 参数，因此需要手动注入。
+        # 网关直接调用 agent.astream(config=...) 驱动图，需将会话级上下文注入
+        # 运行配置，供中间件和工具通过 ToolRuntime.context 读取。
         runtime_ctx = _build_runtime_context(thread_id, run_id, config.get("context"), ctx.app_config)
         runtime_ctx[CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY] = frozenset(pre_existing_message_ids)
         incoming_metadata = config.get("metadata") if isinstance(config.get("metadata"), dict) else {}
@@ -687,146 +615,253 @@ async def run_agent(
         asyncio.create_task(bridge.cleanup(run_id, delay=60))
 
 
-
-
-def _checkpoint_id(checkpoint_tuple: Any) -> str | None:
-    '''从检查点元组配置或正文中提取检查点 ID。'''
-    config = getattr(checkpoint_tuple, "config", {}) or {}
-    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
-    checkpoint_id = configurable.get("checkpoint_id") if isinstance(configurable, dict) else None
-    if isinstance(checkpoint_id, str):
-        return checkpoint_id
-    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
-    if isinstance(checkpoint, dict) and isinstance(checkpoint.get("id"), str):
-        return checkpoint["id"]
-    return None
-
-
-def _goal_instance_matches(left: GoalState | None, right: GoalState | None) -> bool:
-    '''确认两个目标仍代表同一条活动目标，防止并发写入覆盖新目标。'''
-    if not left or not right:
-        return False
-    same_status = left.get("status") == right.get("status") == "active"
-    same_objective = left.get("objective") == right.get("objective")
-    same_created_at = left.get("created_at") == right.get("created_at")
-    return same_status and same_objective and same_created_at
-
-
-def _read_checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
-    '''从检查点的 messages 频道读取消息列表，其他格式返回空列表。'''
-    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
-    channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
-    messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
-    return messages if isinstance(messages, list) else []
-
-
-def _read_checkpoint_goal(checkpoint_tuple: Any) -> GoalState | None:
-    '''从检查点读取目标状态副本，避免调用方意外修改原快照。'''
-    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
-    channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
-    raw_goal = channel_values.get("goal") if isinstance(channel_values, dict) else None
-    return copy.deepcopy(raw_goal) if isinstance(raw_goal, dict) else None
-
-
-def _has_durable_goal_turn_receipt(checkpoint_tuple: Any, messages: list[Any]) -> bool:
-    '''确认检查点已提交且最后一条可见消息是助手回复，作为完成回执。'''
-    if _checkpoint_id(checkpoint_tuple) is None:
-        return False
-    if getattr(checkpoint_tuple, "pending_writes", None):
-        return False
-    visible_messages = []
-    for message in messages:
-        if _is_visible_message(message) and message_to_text(message).strip():
-            visible_messages.append(message)
-    if not visible_messages:
-        return False
-    return _message_type(visible_messages[-1]) == "ai"
-
-
-def _stand_down_reason(goal: GoalState, evaluation: GoalEvaluation, no_progress_count: int) -> str | None:
-    '''根据阻塞类型、续跑上限和无进展次数决定是否停止自动续跑。'''
-    if evaluation["satisfied"]:
-        return None
-    if evaluation["blocker"] != "goal_not_met_yet":
-        return f"blocked:{evaluation['blocker']}"
-    # 默认限制与 should_continue_goal 保持一致，确保两个门控函数对缺少这些字段的目标字典采用相同处理。
-    if int(goal.get("continuation_count", 0)) >= int(goal.get("max_continuations", DEFAULT_MAX_GOAL_CONTINUATIONS)):
-        return "max_continuations_reached"
-    if no_progress_count >= int(goal.get("max_no_progress_continuations", DEFAULT_MAX_NO_PROGRESS_CONTINUATIONS)):
-        return "no_progress_detected"
-    return None
-
-
-async def _persist_goal_evaluation(
-    *,
-    bridge: StreamBridge,
-    checkpointer: Any,
-    thread_id: str,
-    run_id: str,
-    goal: GoalState,
-    evaluation: GoalEvaluation,
-    no_progress_count: int,
-    continuation_count: int | None = None,
-    stand_down_reason: str | None = None,
-    evidence_signature: str = "",
-) -> GoalState | None:
-    '''校验目标与检查点版本后保存评估结果，并向订阅端广播最新状态。'''
-    try:
-        async with goal_thread_lock(thread_id):
-            checkpoint_tuple = await _call_checkpointer_method(
-                checkpointer,
-                "aget_tuple",
-                "get_tuple",
-                {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
-            )
-            if checkpoint_tuple is None:
-                return None
-            current_goal = _read_checkpoint_goal(checkpoint_tuple)
-            if current_goal is None or not _goal_instance_matches(goal, current_goal):
-                return None
-            # 为避免并发竞态，在锁内根据最新 current_goal 重新计算 continuation_count。
-            # 调用方使用的目标快照可能已过期，另一个并发续接可能已经增加了计数。
-            if continuation_count is not None:
-                current_count = int(current_goal.get("continuation_count", 0))
-                continuation_count = max(continuation_count, current_count + 1)
-            expected_checkpoint_id = _checkpoint_id(checkpoint_tuple)
-            updated_goal = attach_goal_evaluation(
-                current_goal,
-                evaluation,
-                run_id=run_id,
-                continuation_count=continuation_count,
-                no_progress_count=no_progress_count,
-                stand_down_reason=stand_down_reason,
-                evidence_signature=evidence_signature,
-            )
-            values = await write_thread_goal(
-                checkpointer,
-                thread_id,
-                updated_goal,
-                as_node="goal_evaluator",
-                expected_checkpoint_id=expected_checkpoint_id,
-            )
-        await bridge.publish(run_id, "values", serialize(values, mode="values"))
-        return updated_goal
-    except GoalWriteConflict:
-        return None
-    except Exception:
-        logger.warning("Could not persist goal evaluation for thread %s", thread_id, exc_info=True)
-        return None
-
-
-async def _reread_goal_and_checkpoint(checkpointer: Any, thread_id: str) -> tuple[GoalState | None, Any]:
+def _collect_pre_existing_message_ids(snapshot: dict[str, Any] | None) -> set[str]:
     '''
 
-    重新读取目标和最新检查点，判断并发期间状态是否已发生变化。'''
-    goal = await read_thread_goal(checkpointer, thread_id)
-    checkpoint_tuple = await _call_checkpointer_method(
-        checkpointer,
-        "aget_tuple",
-        "get_tuple",
-        {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
-    )
-    return goal, checkpoint_tuple
+    从运行前检查点提取历史消息 ID，供本轮过滤旧错误标记。
+
+        :func:`run_agent` 据此屏蔽历史消息中的过期 ``deerflow_error_fallback``
+        标记，避免误触发当前运行的失败路径。快照缺失或格式错误时返回空集合；
+        本辅助函数采用尽力提取策略，不抛出异常。
+    '''
+    if not isinstance(snapshot, dict):
+        return set()
+    checkpoint = snapshot.get("checkpoint")
+    if not isinstance(checkpoint, dict):
+        return set()
+    channel_values = checkpoint.get("channel_values")
+    if not isinstance(channel_values, dict):
+        return set()
+    messages = channel_values.get("messages")
+    if not isinstance(messages, (list, tuple)):
+        return set()
+    ids: set[str] = set()
+    for msg in messages:
+        msg_id = _message_id(msg)
+        if msg_id is not None:
+            ids.add(msg_id)
+    return ids
+
+
+def _message_id(obj: Any) -> str | None:
+    '''
+
+    从消息对象或字典中提取非空字符串消息 ID。'''
+    msg_id = getattr(obj, "id", None)
+    if isinstance(msg_id, str) and msg_id:
+        return msg_id
+    if isinstance(obj, dict):
+        raw = obj.get("id")
+        if isinstance(raw, str) and raw:
+            return raw
+    return None
+
+
+def _build_runtime_context(
+    thread_id: str,
+    run_id: str,
+    caller_context: Any | None,
+    app_config: AppConfig | None = None,
+) -> dict[str, Any]:
+    '''
+
+    构建本次运行的 ``ToolRuntime.context`` 字典。
+
+        始终包含 ``thread_id`` 和 ``run_id``。合并调用方 ``config['context']``
+        中的额外键（例如初始化流程的 ``agent_name``，见问题 #2677），
+        但不覆盖 ``thread_id``／``run_id``。工作器加入已解析的 ``AppConfig``，
+        使工具无需查找全局配置即可使用它。
+
+        langgraph 1.1 及之后的版本通过保存在
+        ``config['configurable']['__pregel_runtime']`` 中的父运行时，
+        将此字典暴露为 ``runtime.context``；可参见 ``langgraph.pregel.main``
+        中对 ``parent_runtime.merge(...)`` 的调用。
+    '''
+    runtime_ctx: dict[str, Any] = {"thread_id": thread_id, "run_id": run_id}
+    if isinstance(caller_context, dict):
+        for key, value in caller_context.items():
+            if key == CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY:
+                continue
+            runtime_ctx.setdefault(key, value)
+    if app_config is not None:
+        runtime_ctx["app_config"] = app_config
+    return runtime_ctx
+
+
+def _install_runtime_context(config: dict, runtime_context: dict[str, Any]) -> None:
+    '''把线程、运行、追踪和应用配置等受信任字段写入 LangGraph 上下文。'''
+    existing_context = config.get("context")
+    if isinstance(existing_context, dict):
+        existing_context.setdefault("thread_id", runtime_context["thread_id"])
+        existing_context.setdefault("run_id", runtime_context["run_id"])
+        if DEERFLOW_TRACE_METADATA_KEY in runtime_context:
+            existing_context.setdefault(DEERFLOW_TRACE_METADATA_KEY, runtime_context[DEERFLOW_TRACE_METADATA_KEY])
+        if "app_config" in runtime_context:
+            existing_context["app_config"] = runtime_context["app_config"]
+        if CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY in runtime_context:
+            existing_context[CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY] = runtime_context[CURRENT_RUN_PRE_EXISTING_MESSAGE_IDS_KEY]
+        return
+
+    config["context"] = dict(runtime_context)
+
+
+def _agent_factory_supports_app_config(agent_factory: Any) -> bool:
+    '''读取缓存的工厂能力结果，并兼容不可哈希的可调用对象。'''
+    try:
+        return _cached_agent_factory_supports_app_config(agent_factory)
+    except TypeError:
+        # 某些可调用实例不可哈希，此时改用直接比较。
+        return _compute_agent_factory_supports_app_config(agent_factory)
+
+
+@lru_cache(maxsize=128)
+def _cached_agent_factory_supports_app_config(agent_factory: Any) -> bool:
+    '''缓存工厂参数能力检查，避免每次运行都重新解析签名。'''
+    return _compute_agent_factory_supports_app_config(agent_factory)
+
+
+def _compute_agent_factory_supports_app_config(agent_factory: Any) -> bool:
+    '''检查智能体工厂签名是否声明了 app_config 参数。'''
+    try:
+        return "app_config" in inspect.signature(agent_factory).parameters
+    except (TypeError, ValueError):
+        return False
+
+
+def _extract_llm_error_fallback_message(value: Any, pre_existing_ids: set[str] | None = None) -> str | None:
+    '''
+
+    在 LangGraph 流数据块中查找模型错误回退标记。
+
+        模型调用中间件返回的错误回退消息不一定经过模型结束回调，
+        但会出现在图状态数据块中。
+
+        忽略标识存在于 ``pre_existing_ids`` 中的消息，它们属于同一线程之前运行
+        的历史。LangGraph 在 ``stream_mode="values"`` 数据块中重放完整消息通道，
+        而历史中的错误回退已在所属运行完成时处理。
+    '''
+    # 快速路径：stream_mode="values" 产生的大型状态块在顶层包含 "messages" 列表。
+    # 只扫描该列表，避免递归遍历庞大的状态字典。
+    if isinstance(value, dict):
+        messages = value.get("messages")
+        if isinstance(messages, (list, tuple)):
+            for msg in messages:
+                result = _try_extract_from_message(msg, pre_existing_ids)
+                if result is not None:
+                    return result
+            # 回退标记附加在 messages 通道中的助手消息上，不会出现在 values 状态块的其他位置。
+            return None
+        # 没有顶层 "messages" 时，通常这是以节点名称为键的小型 "updates" 状态块；
+        # 继续执行深度遍历，这类数据的遍历成本较低。
+
+    # 对 updates、messages、tuple 和 list 模式执行深度遍历。这些数据块较小，完整递归的开销可以接受。
+    seen: set[int] = set()
+
+    def walk(obj: Any) -> str | None:
+        '''递归检查消息容器并避开循环引用，寻找本轮错误回退标记。'''
+        oid = id(obj)
+        if oid in seen:
+            return None
+        seen.add(oid)
+
+        result = _try_extract_from_message(obj, pre_existing_ids)
+        if result is not None:
+            return result
+
+        if isinstance(obj, dict):
+            for item in obj.values():
+                result = walk(item)
+                if result is not None:
+                    return result
+            return None
+
+        if isinstance(obj, (list, tuple, set)):
+            for item in obj:
+                result = walk(item)
+                if result is not None:
+                    return result
+        return None
+
+    return walk(value)
+
+
+def _try_extract_from_message(obj: Any, pre_existing_ids: set[str] | None = None) -> str | None:
+    '''
+
+    检查单条消息是否携带本轮模型错误回退标记。
+
+        跳过标识存在于 ``pre_existing_ids`` 中的消息：它们是同一线程之前运行
+        保存的历史，其回退标记已在该运行完成时处理。
+        若不筛除，LangGraph 通过 ``stream_mode="values"`` 重放完整历史时，
+        过去某次运行的回退标记会让同一线程之后的所有运行都被标为 ``error``。
+    '''
+    if pre_existing_ids:
+        msg_id = _message_id(obj)
+        if msg_id is not None and msg_id in pre_existing_ids:
+            return None
+
+    additional_kwargs = getattr(obj, "additional_kwargs", None)
+    if isinstance(additional_kwargs, dict) and additional_kwargs.get("deerflow_error_fallback"):
+        return _error_fallback_message_from_metadata(additional_kwargs, getattr(obj, "content", None))
+
+    if isinstance(obj, dict):
+        nested_kwargs = obj.get("additional_kwargs")
+        if isinstance(nested_kwargs, dict) and nested_kwargs.get("deerflow_error_fallback"):
+            return _error_fallback_message_from_metadata(nested_kwargs, obj.get("content"))
+    return None
+
+
+def _error_fallback_message_from_metadata(metadata: dict[str, Any], content: Any) -> str:
+    '''按错误详情、原因、消息正文的优先级生成可见的模型故障说明。'''
+    detail = metadata.get("error_detail")
+    if isinstance(detail, str) and detail.strip():
+        return detail.strip()
+    reason = metadata.get("error_reason")
+    if isinstance(reason, str) and reason.strip():
+        return reason.strip()
+    if isinstance(content, str) and content.strip():
+        return content.strip()[:2000]
+    return "LLM provider failed after retries"
+
+
+def _lg_mode_to_sse_event(mode: str) -> str:
+    '''
+
+    将 LangGraph 内部 stream_mode 名称映射为服务端推送事件名称。
+
+        LangGraph 的 ``astream(stream_mode="messages")`` 产生消息元组。
+        客户端可显式请求 ``messages-tuple`` 模式，
+        但 LangGraph Platform 默认使用 ``"messages"`` 作为事件名。
+    '''
+    return mode
+
+
+def _unpack_stream_item(
+    item: Any,
+    lg_modes: list[str],
+    stream_subgraphs: bool,
+) -> tuple[str | None, Any]:
+    '''
+
+    将多模式或子图流项目拆成事件模式、命名空间和数据块。
+
+        无法解析项目时返回 ``(None, None)``。
+    '''
+    if stream_subgraphs:
+        if isinstance(item, tuple) and len(item) == 3:
+            _ns, mode, chunk = item
+            return str(mode), chunk
+        if isinstance(item, tuple) and len(item) == 2:
+            mode, chunk = item
+            return str(mode), chunk
+        return None, None
+
+    if isinstance(item, tuple) and len(item) == 2:
+        mode, chunk = item
+        return str(mode), chunk
+
+    # 回退处理：取第一个模式产生的单元素输出。
+    return lg_modes[0] if lg_modes else None, item
 
 
 async def _prepare_goal_continuation_input(
@@ -1018,6 +1053,146 @@ async def _prepare_goal_continuation_input(
     return {"messages": [make_goal_continuation_message(updated_goal, evaluation)]}
 
 
+async def _persist_goal_evaluation(
+    *,
+    bridge: StreamBridge,
+    checkpointer: Any,
+    thread_id: str,
+    run_id: str,
+    goal: GoalState,
+    evaluation: GoalEvaluation,
+    no_progress_count: int,
+    continuation_count: int | None = None,
+    stand_down_reason: str | None = None,
+    evidence_signature: str = "",
+) -> GoalState | None:
+    '''校验目标与检查点版本后保存评估结果，并向订阅端广播最新状态。'''
+    try:
+        async with goal_thread_lock(thread_id):
+            checkpoint_tuple = await _call_checkpointer_method(
+                checkpointer,
+                "aget_tuple",
+                "get_tuple",
+                {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
+            )
+            if checkpoint_tuple is None:
+                return None
+            current_goal = _read_checkpoint_goal(checkpoint_tuple)
+            if current_goal is None or not _goal_instance_matches(goal, current_goal):
+                return None
+            # 为避免并发竞态，在锁内根据最新 current_goal 重新计算 continuation_count。
+            # 调用方使用的目标快照可能已过期，另一个并发续接可能已经增加了计数。
+            if continuation_count is not None:
+                current_count = int(current_goal.get("continuation_count", 0))
+                continuation_count = max(continuation_count, current_count + 1)
+            expected_checkpoint_id = _checkpoint_id(checkpoint_tuple)
+            updated_goal = attach_goal_evaluation(
+                current_goal,
+                evaluation,
+                run_id=run_id,
+                continuation_count=continuation_count,
+                no_progress_count=no_progress_count,
+                stand_down_reason=stand_down_reason,
+                evidence_signature=evidence_signature,
+            )
+            values = await write_thread_goal(
+                checkpointer,
+                thread_id,
+                updated_goal,
+                as_node="goal_evaluator",
+                expected_checkpoint_id=expected_checkpoint_id,
+            )
+        await bridge.publish(run_id, "values", serialize(values, mode="values"))
+        return updated_goal
+    except GoalWriteConflict:
+        return None
+    except Exception:
+        logger.warning("Could not persist goal evaluation for thread %s", thread_id, exc_info=True)
+        return None
+
+
+def _read_checkpoint_goal(checkpoint_tuple: Any) -> GoalState | None:
+    '''从检查点读取目标状态副本，避免调用方意外修改原快照。'''
+    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
+    channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
+    raw_goal = channel_values.get("goal") if isinstance(channel_values, dict) else None
+    return copy.deepcopy(raw_goal) if isinstance(raw_goal, dict) else None
+
+
+def _goal_instance_matches(left: GoalState | None, right: GoalState | None) -> bool:
+    '''确认两个目标仍代表同一条活动目标，防止并发写入覆盖新目标。'''
+    if not left or not right:
+        return False
+    same_status = left.get("status") == right.get("status") == "active"
+    same_objective = left.get("objective") == right.get("objective")
+    same_created_at = left.get("created_at") == right.get("created_at")
+    return same_status and same_objective and same_created_at
+
+
+def _checkpoint_id(checkpoint_tuple: Any) -> str | None:
+    '''从检查点元组配置或正文中提取检查点 ID。'''
+    config = getattr(checkpoint_tuple, "config", {}) or {}
+    configurable = config.get("configurable", {}) if isinstance(config, dict) else {}
+    checkpoint_id = configurable.get("checkpoint_id") if isinstance(configurable, dict) else None
+    if isinstance(checkpoint_id, str):
+        return checkpoint_id
+    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
+    if isinstance(checkpoint, dict) and isinstance(checkpoint.get("id"), str):
+        return checkpoint["id"]
+    return None
+
+
+def _read_checkpoint_messages(checkpoint_tuple: Any) -> list[Any]:
+    '''从检查点的 messages 频道读取消息列表，其他格式返回空列表。'''
+    checkpoint = getattr(checkpoint_tuple, "checkpoint", {}) or {}
+    channel_values = checkpoint.get("channel_values", {}) if isinstance(checkpoint, dict) else {}
+    messages = channel_values.get("messages", []) if isinstance(channel_values, dict) else []
+    return messages if isinstance(messages, list) else []
+
+
+def _has_durable_goal_turn_receipt(checkpoint_tuple: Any, messages: list[Any]) -> bool:
+    '''确认检查点已提交且最后一条可见消息是助手回复，作为完成回执。'''
+    if _checkpoint_id(checkpoint_tuple) is None:
+        return False
+    if getattr(checkpoint_tuple, "pending_writes", None):
+        return False
+    visible_messages = []
+    for message in messages:
+        if _is_visible_message(message) and message_to_text(message).strip():
+            visible_messages.append(message)
+    if not visible_messages:
+        return False
+    return _message_type(visible_messages[-1]) == "ai"
+
+
+async def _reread_goal_and_checkpoint(checkpointer: Any, thread_id: str) -> tuple[GoalState | None, Any]:
+    '''
+
+    重新读取目标和最新检查点，判断并发期间状态是否已发生变化。'''
+    goal = await read_thread_goal(checkpointer, thread_id)
+    checkpoint_tuple = await _call_checkpointer_method(
+        checkpointer,
+        "aget_tuple",
+        "get_tuple",
+        {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}},
+    )
+    return goal, checkpoint_tuple
+
+
+def _stand_down_reason(goal: GoalState, evaluation: GoalEvaluation, no_progress_count: int) -> str | None:
+    '''根据阻塞类型、续跑上限和无进展次数决定是否停止自动续跑。'''
+    if evaluation["satisfied"]:
+        return None
+    if evaluation["blocker"] != "goal_not_met_yet":
+        return f"blocked:{evaluation['blocker']}"
+    # 默认限制与 should_continue_goal 保持一致，确保两个门控函数对缺少这些字段的目标字典采用相同处理。
+    if int(goal.get("continuation_count", 0)) >= int(goal.get("max_continuations", DEFAULT_MAX_GOAL_CONTINUATIONS)):
+        return "max_continuations_reached"
+    if no_progress_count >= int(goal.get("max_no_progress_continuations", DEFAULT_MAX_NO_PROGRESS_CONTINUATIONS)):
+        return "no_progress_detected"
+    return None
+
+
 async def _rollback_to_pre_run_checkpoint(
     *,
     checkpointer: Any,
@@ -1119,177 +1294,6 @@ def _new_checkpoint_marker() -> dict[str, str]:
     return {"id": marker["id"], "ts": marker["ts"]}
 
 
-def _bump_channel_version(checkpointer: Any, current_version: Any) -> Any:
-    '''
-
-    返回与原值严格不同的检查点通道下一版本。
-
-        基于 PostgreSQL 的 LangGraph 保存器以 ``channel_versions[<channel>]``
-        为键持久化通道数据块，因此新值必须与旧值不同。
-        可用时调用检查点保存器的 ``get_next_version``，沿用其版本规则
-        （整数、单调浮点数或唯一标识形式的字符串）。未提供该方法，
-        或返回 ``None``／原值时，采用仍能保证不同于原值的递增回退策略。
-    '''
-    get_next_version = getattr(checkpointer, "get_next_version", None)
-    if callable(get_next_version):
-        try:
-            next_version = get_next_version(current_version, None)
-        except Exception:
-            next_version = None
-        if next_version is not None and next_version != current_version:
-            return next_version
-
-    if isinstance(current_version, bool):
-        # ``bool`` 是 ``int`` 的子类；将 True/False 当作 1/0 处理，避免直接对布尔值执行加法而让读者困惑。
-        return int(current_version) + 1
-    if isinstance(current_version, int):
-        return current_version + 1
-    if isinstance(current_version, float):
-        # 与 LangGraph 默认的浮点版本号策略一致，版本号单调递增。
-        return current_version + 1.0
-    if isinstance(current_version, str):
-        try:
-            return str(int(current_version) + 1)
-        except ValueError:
-            return f"{current_version}.1"
-    return 1
-
-
-def _checkpoint_identity(ckpt_tuple: Any | None, checkpoint: dict[str, Any]) -> str | None:
-    '''从检查点元组配置优先读取 ID，缺失时回退到检查点正文。'''
-    tuple_config = getattr(ckpt_tuple, "config", {}) or {}
-    tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
-    if isinstance(tuple_configurable, dict):
-        checkpoint_id = tuple_configurable.get("checkpoint_id")
-        if isinstance(checkpoint_id, str) and checkpoint_id:
-            return checkpoint_id
-    checkpoint_id = checkpoint.get("id")
-    return checkpoint_id if isinstance(checkpoint_id, str) and checkpoint_id else None
-
-
-def _checkpoint_namespace(ckpt_tuple: Any | None) -> str:
-    '''读取检查点元组的命名空间，供写入时定位相同子图状态。'''
-    tuple_config = getattr(ckpt_tuple, "config", {}) or {}
-    tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
-    checkpoint_ns = tuple_configurable.get("checkpoint_ns", "") if isinstance(tuple_configurable, dict) else ""
-    return checkpoint_ns if isinstance(checkpoint_ns, str) else ""
-
-
-def _graph_input_messages(graph_input: Any | None) -> list[Any]:
-    '''兼容字典输入中的列表或元组消息并统一返回列表。'''
-    if not isinstance(graph_input, dict):
-        return []
-    messages = graph_input.get("messages")
-    if isinstance(messages, list):
-        return messages
-    if isinstance(messages, tuple):
-        return list(messages)
-    return []
-
-
-def _title_generation_state(channel_values: dict[str, Any], graph_input: Any | None) -> dict[str, Any]:
-    '''构造标题生成所需状态；检查点消息为空时使用本轮图输入补齐。'''
-    state = dict(channel_values)
-    messages = state.get("messages")
-    if not messages:
-        fallback_messages = _graph_input_messages(graph_input)
-        if fallback_messages:
-            state["messages"] = fallback_messages
-    return state
-
-
-def valid_duration_entry(run_id: Any, duration_seconds: Any) -> bool:
-    '''
-
-    检查 (run_id, duration_seconds) 是否为格式正确的耗时记录。'''
-    return isinstance(run_id, str) and bool(run_id) and isinstance(duration_seconds, int) and not isinstance(duration_seconds, bool)
-
-
-async def persist_run_durations(
-    *,
-    checkpointer: Any,
-    thread_id: str,
-    durations: dict[str, int],
-) -> bool:
-    '''
-
-    将已校验的运行耗时合并进元数据检查点，不重写消息频道。
-
-        累积耗时后，历史查询的快速路径可从最新检查点读取所有已知轮次。
-        与每次图检查点写入的消息通道数据块相比，每条记录的额外开销
-        （每个 run_id 约 50 字节）很小，因此无需裁剪。
-    '''
-    updates = {run_id: max(0, duration_seconds) for run_id, duration_seconds in durations.items() if valid_duration_entry(run_id, duration_seconds)}
-    if not updates:
-        return False
-
-    ckpt_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
-    async with _checkpoint_thread_lock(thread_id):
-        for _attempt in range(3):
-            ckpt_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", ckpt_config)
-            if ckpt_tuple is None:
-                return False
-
-            checkpoint = dict(getattr(ckpt_tuple, "checkpoint", {}) or {})
-            metadata = dict(getattr(ckpt_tuple, "metadata", {}) or {})
-            raw_run_durations = metadata.get("run_durations")
-            run_durations = {key: value for key, value in raw_run_durations.items() if valid_duration_entry(key, value)} if isinstance(raw_run_durations, dict) else {}
-            changed_durations = {run_id: duration for run_id, duration in updates.items() if run_durations.get(run_id) != duration}
-            if not changed_durations:
-                return False
-
-            run_durations.update(changed_durations)
-            parent_checkpoint_id = _checkpoint_identity(ckpt_tuple, checkpoint)
-            latest_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", ckpt_config)
-            latest_checkpoint = dict(getattr(latest_tuple, "checkpoint", {}) or {}) if latest_tuple is not None else {}
-            if _checkpoint_identity(latest_tuple, latest_checkpoint) != parent_checkpoint_id:
-                continue
-
-            checkpoint.update(_new_checkpoint_marker())
-            metadata["source"] = "update"
-            prev_step = metadata.get("step")
-            metadata["step"] = (prev_step + 1) if isinstance(prev_step, int) else 1
-            metadata["run_durations"] = run_durations
-            metadata["writes"] = {"runtime_run_duration": {"run_ids": sorted(changed_durations)}}
-
-            checkpoint_ns = _checkpoint_namespace(ckpt_tuple)
-            write_config = {
-                "configurable": {
-                    "thread_id": thread_id,
-                    "checkpoint_ns": checkpoint_ns,
-                    "checkpoint_id": parent_checkpoint_id,
-                }
-            }
-            await _call_checkpointer_method(
-                checkpointer,
-                "aput",
-                "put",
-                write_config,
-                checkpoint,
-                metadata,
-                {},
-            )
-            return True
-    return False
-
-
-async def _persist_run_duration(
-    *,
-    checkpointer: Any,
-    thread_id: str,
-    run_id: str,
-    duration_seconds: int,
-) -> None:
-    '''
-
-    将单个已完成运行的耗时持久化到线程检查点元数据。'''
-    await persist_run_durations(
-        checkpointer=checkpointer,
-        thread_id=thread_id,
-        durations={run_id: duration_seconds},
-    )
-
-
 async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_config: AppConfig | None, graph_input: Any | None = None) -> str | None:
     '''
 
@@ -1368,179 +1372,172 @@ async def _ensure_interrupted_title(*, checkpointer: Any, thread_id: str, app_co
     return None
 
 
-def _lg_mode_to_sse_event(mode: str) -> str:
+def _title_generation_state(channel_values: dict[str, Any], graph_input: Any | None) -> dict[str, Any]:
+    '''构造标题生成所需状态；检查点消息为空时使用本轮图输入补齐。'''
+    state = dict(channel_values)
+    messages = state.get("messages")
+    if not messages:
+        fallback_messages = _graph_input_messages(graph_input)
+        if fallback_messages:
+            state["messages"] = fallback_messages
+    return state
+
+
+def _graph_input_messages(graph_input: Any | None) -> list[Any]:
+    '''兼容字典输入中的列表或元组消息并统一返回列表。'''
+    if not isinstance(graph_input, dict):
+        return []
+    messages = graph_input.get("messages")
+    if isinstance(messages, list):
+        return messages
+    if isinstance(messages, tuple):
+        return list(messages)
+    return []
+
+
+def _checkpoint_identity(ckpt_tuple: Any | None, checkpoint: dict[str, Any]) -> str | None:
+    '''从检查点元组配置优先读取 ID，缺失时回退到检查点正文。'''
+    tuple_config = getattr(ckpt_tuple, "config", {}) or {}
+    tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
+    if isinstance(tuple_configurable, dict):
+        checkpoint_id = tuple_configurable.get("checkpoint_id")
+        if isinstance(checkpoint_id, str) and checkpoint_id:
+            return checkpoint_id
+    checkpoint_id = checkpoint.get("id")
+    return checkpoint_id if isinstance(checkpoint_id, str) and checkpoint_id else None
+
+
+def _bump_channel_version(checkpointer: Any, current_version: Any) -> Any:
     '''
 
-    将 LangGraph 内部 stream_mode 名称映射为服务端推送事件名称。
+    返回与原值严格不同的检查点通道下一版本。
 
-        LangGraph 的 ``astream(stream_mode="messages")`` 产生消息元组。
-        客户端可显式请求 ``messages-tuple`` 模式，
-        但 LangGraph Platform 默认使用 ``"messages"`` 作为事件名。
+        基于 PostgreSQL 的 LangGraph 保存器以 ``channel_versions[<channel>]``
+        为键持久化通道数据块，因此新值必须与旧值不同。
+        可用时调用检查点保存器的 ``get_next_version``，沿用其版本规则
+        （整数、单调浮点数或唯一标识形式的字符串）。未提供该方法，
+        或返回 ``None``／原值时，采用仍能保证不同于原值的递增回退策略。
     '''
-    return mode
+    get_next_version = getattr(checkpointer, "get_next_version", None)
+    if callable(get_next_version):
+        try:
+            next_version = get_next_version(current_version, None)
+        except Exception:
+            next_version = None
+        if next_version is not None and next_version != current_version:
+            return next_version
+
+    if isinstance(current_version, bool):
+        # ``bool`` 是 ``int`` 的子类；将 True/False 当作 1/0 处理，避免直接对布尔值执行加法而让读者困惑。
+        return int(current_version) + 1
+    if isinstance(current_version, int):
+        return current_version + 1
+    if isinstance(current_version, float):
+        # 与 LangGraph 默认的浮点版本号策略一致，版本号单调递增。
+        return current_version + 1.0
+    if isinstance(current_version, str):
+        try:
+            return str(int(current_version) + 1)
+        except ValueError:
+            return f"{current_version}.1"
+    return 1
 
 
-def _error_fallback_message_from_metadata(metadata: dict[str, Any], content: Any) -> str:
-    '''按错误详情、原因、消息正文的优先级生成可见的模型故障说明。'''
-    detail = metadata.get("error_detail")
-    if isinstance(detail, str) and detail.strip():
-        return detail.strip()
-    reason = metadata.get("error_reason")
-    if isinstance(reason, str) and reason.strip():
-        return reason.strip()
-    if isinstance(content, str) and content.strip():
-        return content.strip()[:2000]
-    return "LLM provider failed after retries"
+def _checkpoint_namespace(ckpt_tuple: Any | None) -> str:
+    '''读取检查点元组的命名空间，供写入时定位相同子图状态。'''
+    tuple_config = getattr(ckpt_tuple, "config", {}) or {}
+    tuple_configurable = tuple_config.get("configurable", {}) if isinstance(tuple_config, dict) else {}
+    checkpoint_ns = tuple_configurable.get("checkpoint_ns", "") if isinstance(tuple_configurable, dict) else ""
+    return checkpoint_ns if isinstance(checkpoint_ns, str) else ""
 
 
-def _message_id(obj: Any) -> str | None:
-    '''
-
-    从消息对象或字典中提取非空字符串消息 ID。'''
-    msg_id = getattr(obj, "id", None)
-    if isinstance(msg_id, str) and msg_id:
-        return msg_id
-    if isinstance(obj, dict):
-        raw = obj.get("id")
-        if isinstance(raw, str) and raw:
-            return raw
-    return None
-
-
-def _try_extract_from_message(obj: Any, pre_existing_ids: set[str] | None = None) -> str | None:
-    '''
-
-    检查单条消息是否携带本轮模型错误回退标记。
-
-        跳过标识存在于 ``pre_existing_ids`` 中的消息：它们是同一线程之前运行
-        保存的历史，其回退标记已在该运行完成时处理。
-        若不筛除，LangGraph 通过 ``stream_mode="values"`` 重放完整历史时，
-        过去某次运行的回退标记会让同一线程之后的所有运行都被标为 ``error``。
-    '''
-    if pre_existing_ids:
-        msg_id = _message_id(obj)
-        if msg_id is not None and msg_id in pre_existing_ids:
-            return None
-
-    additional_kwargs = getattr(obj, "additional_kwargs", None)
-    if isinstance(additional_kwargs, dict) and additional_kwargs.get("deerflow_error_fallback"):
-        return _error_fallback_message_from_metadata(additional_kwargs, getattr(obj, "content", None))
-
-    if isinstance(obj, dict):
-        nested_kwargs = obj.get("additional_kwargs")
-        if isinstance(nested_kwargs, dict) and nested_kwargs.get("deerflow_error_fallback"):
-            return _error_fallback_message_from_metadata(nested_kwargs, obj.get("content"))
-    return None
-
-
-def _extract_llm_error_fallback_message(value: Any, pre_existing_ids: set[str] | None = None) -> str | None:
+async def _persist_run_duration(
+    *,
+    checkpointer: Any,
+    thread_id: str,
+    run_id: str,
+    duration_seconds: int,
+) -> None:
     '''
 
-    在 LangGraph 流数据块中查找模型错误回退标记。
-
-        模型调用中间件返回的错误回退消息不一定经过模型结束回调，
-        但会出现在图状态数据块中。
-
-        忽略标识存在于 ``pre_existing_ids`` 中的消息，它们属于同一线程之前运行
-        的历史。LangGraph 在 ``stream_mode="values"`` 数据块中重放完整消息通道，
-        而历史中的错误回退已在所属运行完成时处理。
-    '''
-    # 快速路径：stream_mode="values" 产生的大型状态块在顶层包含 "messages" 列表。
-    # 只扫描该列表，避免递归遍历庞大的状态字典。
-    if isinstance(value, dict):
-        messages = value.get("messages")
-        if isinstance(messages, (list, tuple)):
-            for msg in messages:
-                result = _try_extract_from_message(msg, pre_existing_ids)
-                if result is not None:
-                    return result
-            # 回退标记附加在 messages 通道中的助手消息上，不会出现在 values 状态块的其他位置。
-            return None
-        # 没有顶层 "messages" 时，通常这是以节点名称为键的小型 "updates" 状态块；
-        # 继续执行深度遍历，这类数据的遍历成本较低。
-
-    # 对 updates、messages、tuple 和 list 模式执行深度遍历。这些数据块较小，完整递归的开销可以接受。
-    seen: set[int] = set()
-
-    def walk(obj: Any) -> str | None:
-        '''递归检查消息容器并避开循环引用，寻找本轮错误回退标记。'''
-        oid = id(obj)
-        if oid in seen:
-            return None
-        seen.add(oid)
-
-        result = _try_extract_from_message(obj, pre_existing_ids)
-        if result is not None:
-            return result
-
-        if isinstance(obj, dict):
-            for item in obj.values():
-                result = walk(item)
-                if result is not None:
-                    return result
-            return None
-
-        if isinstance(obj, (list, tuple, set)):
-            for item in obj:
-                result = walk(item)
-                if result is not None:
-                    return result
-        return None
-
-    return walk(value)
+    将单个已完成运行的耗时持久化到线程检查点元数据。'''
+    await persist_run_durations(
+        checkpointer=checkpointer,
+        thread_id=thread_id,
+        durations={run_id: duration_seconds},
+    )
 
 
-def _collect_pre_existing_message_ids(snapshot: dict[str, Any] | None) -> set[str]:
+def valid_duration_entry(run_id: Any, duration_seconds: Any) -> bool:
     '''
 
-    从运行前检查点提取历史消息 ID，供本轮过滤旧错误标记。
-
-        :func:`run_agent` 据此屏蔽历史消息中的过期 ``deerflow_error_fallback``
-        标记，避免误触发当前运行的失败路径。快照缺失或格式错误时返回空集合；
-        本辅助函数采用尽力提取策略，不抛出异常。
-    '''
-    if not isinstance(snapshot, dict):
-        return set()
-    checkpoint = snapshot.get("checkpoint")
-    if not isinstance(checkpoint, dict):
-        return set()
-    channel_values = checkpoint.get("channel_values")
-    if not isinstance(channel_values, dict):
-        return set()
-    messages = channel_values.get("messages")
-    if not isinstance(messages, (list, tuple)):
-        return set()
-    ids: set[str] = set()
-    for msg in messages:
-        msg_id = _message_id(msg)
-        if msg_id is not None:
-            ids.add(msg_id)
-    return ids
+    检查 (run_id, duration_seconds) 是否为格式正确的耗时记录。'''
+    return isinstance(run_id, str) and bool(run_id) and isinstance(duration_seconds, int) and not isinstance(duration_seconds, bool)
 
 
-def _unpack_stream_item(
-    item: Any,
-    lg_modes: list[str],
-    stream_subgraphs: bool,
-) -> tuple[str | None, Any]:
+async def persist_run_durations(
+    *,
+    checkpointer: Any,
+    thread_id: str,
+    durations: dict[str, int],
+) -> bool:
     '''
 
-    将多模式或子图流项目拆成事件模式、命名空间和数据块。
+    将已校验的运行耗时合并进元数据检查点，不重写消息频道。
 
-        无法解析项目时返回 ``(None, None)``。
+        累积耗时后，历史查询的快速路径可从最新检查点读取所有已知轮次。
+        与每次图检查点写入的消息通道数据块相比，每条记录的额外开销
+        （每个 run_id 约 50 字节）很小，因此无需裁剪。
     '''
-    if stream_subgraphs:
-        if isinstance(item, tuple) and len(item) == 3:
-            _ns, mode, chunk = item
-            return str(mode), chunk
-        if isinstance(item, tuple) and len(item) == 2:
-            mode, chunk = item
-            return str(mode), chunk
-        return None, None
+    updates = {run_id: max(0, duration_seconds) for run_id, duration_seconds in durations.items() if valid_duration_entry(run_id, duration_seconds)}
+    if not updates:
+        return False
 
-    if isinstance(item, tuple) and len(item) == 2:
-        mode, chunk = item
-        return str(mode), chunk
+    ckpt_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
+    async with _checkpoint_thread_lock(thread_id):
+        for _attempt in range(3):
+            ckpt_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", ckpt_config)
+            if ckpt_tuple is None:
+                return False
 
-    # 回退处理：取第一个模式产生的单元素输出。
-    return lg_modes[0] if lg_modes else None, item
+            checkpoint = dict(getattr(ckpt_tuple, "checkpoint", {}) or {})
+            metadata = dict(getattr(ckpt_tuple, "metadata", {}) or {})
+            raw_run_durations = metadata.get("run_durations")
+            run_durations = {key: value for key, value in raw_run_durations.items() if valid_duration_entry(key, value)} if isinstance(raw_run_durations, dict) else {}
+            changed_durations = {run_id: duration for run_id, duration in updates.items() if run_durations.get(run_id) != duration}
+            if not changed_durations:
+                return False
+
+            run_durations.update(changed_durations)
+            parent_checkpoint_id = _checkpoint_identity(ckpt_tuple, checkpoint)
+            latest_tuple = await _call_checkpointer_method(checkpointer, "aget_tuple", "get_tuple", ckpt_config)
+            latest_checkpoint = dict(getattr(latest_tuple, "checkpoint", {}) or {}) if latest_tuple is not None else {}
+            if _checkpoint_identity(latest_tuple, latest_checkpoint) != parent_checkpoint_id:
+                continue
+
+            checkpoint.update(_new_checkpoint_marker())
+            metadata["source"] = "update"
+            prev_step = metadata.get("step")
+            metadata["step"] = (prev_step + 1) if isinstance(prev_step, int) else 1
+            metadata["run_durations"] = run_durations
+            metadata["writes"] = {"runtime_run_duration": {"run_ids": sorted(changed_durations)}}
+
+            checkpoint_ns = _checkpoint_namespace(ckpt_tuple)
+            write_config = {
+                "configurable": {
+                    "thread_id": thread_id,
+                    "checkpoint_ns": checkpoint_ns,
+                    "checkpoint_id": parent_checkpoint_id,
+                }
+            }
+            await _call_checkpointer_method(
+                checkpointer,
+                "aput",
+                "put",
+                write_config,
+                checkpoint,
+                metadata,
+                {},
+            )
+            return True
+    return False

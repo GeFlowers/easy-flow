@@ -15,7 +15,6 @@ logger = logging.getLogger(__name__)
 _singleton: LocalSandbox | None = None
 
 _USER_DATA_VIRTUAL_PREFIX = "/mnt/user-data"
-_ACP_WORKSPACE_VIRTUAL_PREFIX = "/mnt/acp-workspace"
 
 DEFAULT_MAX_CACHED_THREAD_SANDBOXES = 256
 
@@ -73,7 +72,6 @@ class LocalSandboxProvider(SandboxProvider):
                 f"{container_path}/public",
                 f"{container_path}/custom",
                 f"{container_path}/legacy",
-                _ACP_WORKSPACE_VIRTUAL_PREFIX,
                 _USER_DATA_VIRTUAL_PREFIX,
             ]
             sandbox_config = config.sandbox
@@ -125,6 +123,42 @@ class LocalSandboxProvider(SandboxProvider):
 
         return mappings
 
+    def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
+        '''获取线程范围内的沙箱标识；没有线程时返回通用单例标识。
+
+        缓存读取和插入受锁保护，相同用户和线程的并发调用始终得到同一实例；创建路径
+        映射涉及文件系统访问时会临时释放锁，并在重新持锁后再次检查缓存。
+        '''
+        global _singleton
+
+        if thread_id is None:
+            with self._lock:
+                if self._generic_sandbox is None:
+                    self._generic_sandbox = LocalSandbox("local", path_mappings=list(self._path_mappings))
+                    _singleton = self._generic_sandbox
+                return self._generic_sandbox.id
+
+        effective_user_id = self._effective_acquire_user_id(user_id)
+        key = self._thread_key(thread_id, effective_user_id)
+
+        with self._lock:
+            cached = self._thread_sandboxes.get(key)
+            if cached is not None:
+                self._thread_sandboxes.move_to_end(key)
+                return cached.id
+
+        new_mappings = list(self._path_mappings) + self._build_thread_path_mappings(thread_id, user_id=effective_user_id)
+
+        with self._lock:
+            cached = self._thread_sandboxes.get(key)
+            if cached is None:
+                cached = LocalSandbox(self._sandbox_id_for_thread(thread_id, effective_user_id), path_mappings=new_mappings)
+                self._thread_sandboxes[key] = cached
+                self._evict_until_within_cap_locked()
+            else:
+                self._thread_sandboxes.move_to_end(key)
+            return cached.id
+
     @staticmethod
     def _effective_acquire_user_id(user_id: str | None) -> str:
         '''返回显式用户标识；未提供时解析当前运行时的有效用户标识。'''
@@ -135,22 +169,6 @@ class LocalSandboxProvider(SandboxProvider):
     @staticmethod
     def _thread_key(thread_id: str, user_id: str) -> tuple[str, str]:
         '''构造用于线程沙箱缓存的用户与线程复合键。'''
-        return (user_id, thread_id)
-
-    @staticmethod
-    def _sandbox_id_for_thread(thread_id: str, user_id: str) -> str:
-        '''构造包含用户和线程范围的本地沙箱标识。'''
-        return f"local:{user_id}:{thread_id}"
-
-    @staticmethod
-    def _key_from_sandbox_id(sandbox_id: str) -> tuple[str, str] | None:
-        '''从本地线程沙箱标识解析用户与线程复合键。'''
-        if not sandbox_id.startswith("local:"):
-            return None
-        value = sandbox_id[len("local:") :]
-        user_id, separator, thread_id = value.partition(":")
-        if not separator or not user_id or not thread_id:
-            return None
         return (user_id, thread_id)
 
     @staticmethod
@@ -186,11 +204,6 @@ class LocalSandboxProvider(SandboxProvider):
             PathMapping(
                 container_path=f"{_USER_DATA_VIRTUAL_PREFIX}/outputs",
                 local_path=str(paths.sandbox_outputs_dir(thread_id, user_id=effective_user_id)),
-                read_only=False,
-            ),
-            PathMapping(
-                container_path=_ACP_WORKSPACE_VIRTUAL_PREFIX,
-                local_path=str(paths.acp_workspace_dir(thread_id, user_id=effective_user_id)),
                 read_only=False,
             ),
         ]
@@ -229,41 +242,10 @@ class LocalSandboxProvider(SandboxProvider):
 
         return mappings
 
-    def acquire(self, thread_id: str | None = None, *, user_id: str | None = None) -> str:
-        '''获取线程范围内的沙箱标识；没有线程时返回通用单例标识。
-
-        缓存读取和插入受锁保护，相同用户和线程的并发调用始终得到同一实例；创建路径
-        映射涉及文件系统访问时会临时释放锁，并在重新持锁后再次检查缓存。
-        '''
-        global _singleton
-
-        if thread_id is None:
-            with self._lock:
-                if self._generic_sandbox is None:
-                    self._generic_sandbox = LocalSandbox("local", path_mappings=list(self._path_mappings))
-                    _singleton = self._generic_sandbox
-                return self._generic_sandbox.id
-
-        effective_user_id = self._effective_acquire_user_id(user_id)
-        key = self._thread_key(thread_id, effective_user_id)
-
-        with self._lock:
-            cached = self._thread_sandboxes.get(key)
-            if cached is not None:
-                self._thread_sandboxes.move_to_end(key)
-                return cached.id
-
-        new_mappings = list(self._path_mappings) + self._build_thread_path_mappings(thread_id, user_id=effective_user_id)
-
-        with self._lock:
-            cached = self._thread_sandboxes.get(key)
-            if cached is None:
-                cached = LocalSandbox(self._sandbox_id_for_thread(thread_id, effective_user_id), path_mappings=new_mappings)
-                self._thread_sandboxes[key] = cached
-                self._evict_until_within_cap_locked()
-            else:
-                self._thread_sandboxes.move_to_end(key)
-            return cached.id
+    @staticmethod
+    def _sandbox_id_for_thread(thread_id: str, user_id: str) -> str:
+        '''构造包含用户和线程范围的本地沙箱标识。'''
+        return f"local:{user_id}:{thread_id}"
 
     def _evict_until_within_cap_locked(self) -> None:
         '''在缓存超过上限时按 LRU 策略淘汰线程沙箱；调用方必须持有锁。'''
@@ -296,6 +278,17 @@ class LocalSandboxProvider(SandboxProvider):
                     self._thread_sandboxes.move_to_end(key)
                 return cached
         return None
+
+    @staticmethod
+    def _key_from_sandbox_id(sandbox_id: str) -> tuple[str, str] | None:
+        '''从本地线程沙箱标识解析用户与线程复合键。'''
+        if not sandbox_id.startswith("local:"):
+            return None
+        value = sandbox_id[len("local:") :]
+        user_id, separator, thread_id = value.partition(":")
+        if not separator or not user_id or not thread_id:
+            return None
+        return (user_id, thread_id)
 
     def release(self, sandbox_id: str) -> None:
         '''保留本地沙箱缓存；其资源由 LRU 淘汰、重置或关闭统一回收。'''

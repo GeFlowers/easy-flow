@@ -1,6 +1,6 @@
 '''
 
-为 LangChain／LangSmith 追踪解析运行名称的辅助函数。'''
+为运行追踪解析名称的辅助函数。'''
 
 from __future__ import annotations
 

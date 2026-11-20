@@ -1,7 +1,6 @@
 import type { AnchorHTMLAttributes } from "react";
 
 import { resolveArtifactURL } from "@/features/artifacts/utils";
-import { cn } from "@/lib/utils";
 
 import { CitationLink } from "../citations/citation-link";
 
@@ -43,10 +42,12 @@ export function createMarkdownLinkComponent(threadId?: string) {
       <a
         {...rest}
         href={href}
-        className={cn(
+        className={[
           "text-primary decoration-primary/30 hover:decoration-primary/60 underline underline-offset-2 transition-colors",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         target={target ?? (external ? "_blank" : undefined)}
         rel={rel ?? (external ? "noopener noreferrer" : undefined)}
       />

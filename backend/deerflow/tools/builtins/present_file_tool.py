@@ -15,21 +15,36 @@ from deerflow.tools.types import Runtime
 OUTPUTS_VIRTUAL_PREFIX = f"{VIRTUAL_PATH_PREFIX}/outputs"
 
 
-def _get_thread_id(runtime: Runtime) -> str | None:
-    '''从运行时状态和配置中解析线程标识。'''
-    thread_id = runtime.context.get("thread_id") if runtime.context else None
-    if thread_id:
-        return thread_id
+@tool("present_files", parse_docstring=True)
+def present_file_tool(
+    runtime: Runtime,
+    filepaths: list[str],
+    tool_call_id: Annotated[str, InjectedToolCallId],
+) -> Command:
+    '''向用户展示一个或多个文件，使其可查看、下载或交互。
 
-    runtime_config = getattr(runtime, "config", None) or {}
-    thread_id = runtime_config.get("configurable", {}).get("thread_id")
-    if thread_id:
-        return thread_id
+    适用于同时展示相关文件，或在创建需要交给用户的文件后调用。
+    仅为内部处理读取内容时无需使用；临时文件或中间文件也不应展示。
 
+    文件创建后应先移至 `/mnt/user-data/outputs`，再调用此工具。
+    本工具可与其他工具并行调用；状态更新由归并器处理，以避免冲突。
+
+    Args:
+        filepaths: 要展示的文件绝对路径列表；**仅限** `/mnt/user-data/outputs` 中的文件。
+    '''
     try:
-        return get_config().get("configurable", {}).get("thread_id")
-    except RuntimeError:
-        return None
+        normalized_paths = [_normalize_presented_filepath(runtime, filepath) for filepath in filepaths]
+    except ValueError as exc:
+        return Command(
+            update={"messages": [ToolMessage(f"Error: {exc}", tool_call_id=tool_call_id)]},
+        )
+
+    return Command(
+        update={
+            "artifacts": normalized_paths,
+            "messages": [ToolMessage("已成功展示文件", tool_call_id=tool_call_id)],
+        },
+    )
 
 
 def _normalize_presented_filepath(
@@ -69,33 +84,18 @@ def _normalize_presented_filepath(
     return f"{OUTPUTS_VIRTUAL_PREFIX}/{relative_path.as_posix()}"
 
 
-@tool("present_files", parse_docstring=True)
-def present_file_tool(
-    runtime: Runtime,
-    filepaths: list[str],
-    tool_call_id: Annotated[str, InjectedToolCallId],
-) -> Command:
-    '''向用户展示一个或多个文件，使其可查看、下载或交互。
+def _get_thread_id(runtime: Runtime) -> str | None:
+    '''从运行时状态和配置中解析线程标识。'''
+    thread_id = runtime.context.get("thread_id") if runtime.context else None
+    if thread_id:
+        return thread_id
 
-    适用于同时展示相关文件，或在创建需要交给用户的文件后调用。
-    仅为内部处理读取内容时无需使用；临时文件或中间文件也不应展示。
+    runtime_config = getattr(runtime, "config", None) or {}
+    thread_id = runtime_config.get("configurable", {}).get("thread_id")
+    if thread_id:
+        return thread_id
 
-    文件创建后应先移至 `/mnt/user-data/outputs`，再调用此工具。
-    本工具可与其他工具并行调用；状态更新由归并器处理，以避免冲突。
-
-    Args:
-        filepaths: 要展示的文件绝对路径列表；**仅限** `/mnt/user-data/outputs` 中的文件。
-    '''
     try:
-        normalized_paths = [_normalize_presented_filepath(runtime, filepath) for filepath in filepaths]
-    except ValueError as exc:
-        return Command(
-            update={"messages": [ToolMessage(f"Error: {exc}", tool_call_id=tool_call_id)]},
-        )
-
-    return Command(
-        update={
-            "artifacts": normalized_paths,
-            "messages": [ToolMessage("已成功展示文件", tool_call_id=tool_call_id)],
-        },
-    )
+        return get_config().get("configurable", {}).get("thread_id")
+    except RuntimeError:
+        return None

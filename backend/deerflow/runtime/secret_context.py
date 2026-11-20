@@ -20,18 +20,18 @@ SECRETS_CONTEXT_KEY = "secrets"
 ACTIVE_SECRETS_CONTEXT_KEY = "__active_skill_secrets"
 
 
-def _string_pairs(raw: Any) -> dict[str, str]:
-    '''筛出键和值均为字符串的密钥映射项，忽略不可信的其他类型。'''
-    if not isinstance(raw, dict):
-        return {}
-    return {key: value for key, value in raw.items() if isinstance(key, str) and isinstance(value, str)}
-
-
 def extract_request_secrets(context: Any) -> dict[str, str]:
     '''从运行上下文读取调用方提供的请求级密钥，并过滤非字符串项。'''
     if not isinstance(context, dict):
         return {}
     return _string_pairs(context.get(SECRETS_CONTEXT_KEY))
+
+
+def _string_pairs(raw: Any) -> dict[str, str]:
+    '''筛出键和值均为字符串的密钥映射项，忽略不可信的其他类型。'''
+    if not isinstance(raw, dict):
+        return {}
+    return {key: value for key, value in raw.items() if isinstance(key, str) and isinstance(value, str)}
 
 
 def read_active_secrets(context: Any) -> dict[str, str]:

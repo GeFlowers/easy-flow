@@ -8,15 +8,6 @@ from deerflow.sandbox.search import GrepMatch
 _ENV_NAME_PATTERN = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*$")
 
 
-def _validate_extra_env(extra_env: dict[str, str] | None) -> None:
-    '''验证额外环境变量名称可安全传递给基于命令解释器的实现。'''
-    if not extra_env:
-        return
-    for key in extra_env:
-        if not isinstance(key, str) or not _ENV_NAME_PATTERN.fullmatch(key):
-            raise ValueError(f"extra_env 键 {key!r} 不是有效的可移植操作系统接口环境变量名（必须匹配 ^[A-Za-z_][A-Za-z0-9_]*$）。此限制用于防止使用命令解释器的沙箱通过键名遭受命令注入。")
-
-
 class Sandbox(ABC):
     '''声明统一的沙箱命令执行和文件访问抽象接口。'''
 
@@ -84,3 +75,12 @@ class Sandbox(ABC):
     def update_file(self, path: str, content: bytes) -> None:
         '''以原始字节内容更新指定文件。'''
         pass
+
+
+def _validate_extra_env(extra_env: dict[str, str] | None) -> None:
+    '''验证额外环境变量名称可安全传递给基于命令解释器的实现。'''
+    if not extra_env:
+        return
+    for key in extra_env:
+        if not isinstance(key, str) or not _ENV_NAME_PATTERN.fullmatch(key):
+            raise ValueError(f"extra_env 键 {key!r} 不是有效的可移植操作系统接口环境变量名（必须匹配 ^[A-Za-z_][A-Za-z0-9_]*$）。此限制用于防止使用命令解释器的沙箱通过键名遭受命令注入。")

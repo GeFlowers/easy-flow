@@ -116,36 +116,12 @@ def _log_recovered_stream_cleanup_result(task: asyncio.Task[None], run_id: str) 
 
 if TYPE_CHECKING:
     from server.gateway.auth.local_provider import LocalAuthProvider
-    from server.gateway.auth.repositories.sql import SQLUserRepository
-    from deerflow.persistence.thread_meta.base import ThreadMetaStore
+    from server.gateway.user_repository import SQLUserRepository
+    from deerflow.persistence.thread_meta import ThreadMetaRepository
     from deerflow.runtime import RunRecord
 
 
 T = TypeVar("T")
-
-
-async def _mark_latest_recovered_threads_error(
-    run_manager: RunManager,
-    thread_store: ThreadMetaStore,
-    recovered_runs: list[RunRecord],
-) -> None:
-    '''仅当线程最新运行被恢复时才将其状态标记为错误。'''
-    recovered_by_thread: dict[str, set[str]] = {}
-    for record in recovered_runs:
-        recovered_by_thread.setdefault(record.thread_id, set()).add(record.run_id)
-
-    for thread_id, recovered_run_ids in recovered_by_thread.items():
-        try:
-            latest_runs = await run_manager.list_by_thread(thread_id, user_id=None, limit=1)
-        except Exception:
-            logger.warning("Failed to find latest run for thread %s during run reconciliation", thread_id, exc_info=True)
-            continue
-        if not latest_runs or latest_runs[0].run_id not in recovered_run_ids:
-            continue
-        try:
-            await thread_store.update_status(thread_id, "error", user_id=None)
-        except Exception:
-            logger.warning("Failed to mark thread %s as error during run reconciliation", thread_id, exc_info=True)
 
 
 def get_config() -> AppConfig:
@@ -222,9 +198,9 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
         app.state.run_store = RunRepository(sf)
         app.state.feedback_repo = FeedbackRepository(sf)
 
-        from deerflow.persistence.thread_meta import make_thread_store
+        from deerflow.persistence.thread_meta import ThreadMetaRepository
 
-        app.state.thread_store = make_thread_store(sf)
+        app.state.thread_store = ThreadMetaRepository(sf)
         from deerflow.persistence.scheduled_task_runs import ScheduledTaskRunRepository
         from deerflow.persistence.scheduled_tasks import ScheduledTaskRepository
 
@@ -269,6 +245,30 @@ async def langgraph_runtime(app: FastAPI, startup_config: AppConfig) -> AsyncGen
             await close_engine()
 
 
+async def _mark_latest_recovered_threads_error(
+    run_manager: RunManager,
+    thread_store: ThreadMetaRepository,
+    recovered_runs: list[RunRecord],
+) -> None:
+    '''仅当线程最新运行被恢复时才将其状态标记为错误。'''
+    recovered_by_thread: dict[str, set[str]] = {}
+    for record in recovered_runs:
+        recovered_by_thread.setdefault(record.thread_id, set()).add(record.run_id)
+
+    for thread_id, recovered_run_ids in recovered_by_thread.items():
+        try:
+            latest_runs = await run_manager.list_by_thread(thread_id, user_id=None, limit=1)
+        except Exception:
+            logger.warning("Failed to find latest run for thread %s during run reconciliation", thread_id, exc_info=True)
+            continue
+        if not latest_runs or latest_runs[0].run_id not in recovered_run_ids:
+            continue
+        try:
+            await thread_store.update_status(thread_id, "error", user_id=None)
+        except Exception:
+            logger.warning("Failed to mark thread %s as error during run reconciliation", thread_id, exc_info=True)
+
+
 # 供路由按请求调用的获取器。
 
 
@@ -299,7 +299,7 @@ def get_store(request: Request):
     return getattr(request.app.state, "store", None)
 
 
-def get_thread_store(request: Request) -> ThreadMetaStore:
+def get_thread_store(request: Request) -> ThreadMetaRepository:
     '''返回线程元数据存储，可由 SQL 或内存后端支撑。'''
     val = getattr(request.app.state, "thread_store", None)
     if val is None:
@@ -364,7 +364,7 @@ def get_local_provider() -> LocalAuthProvider:
     '''
     global _cached_local_provider, _cached_repo
     if _cached_repo is None:
-        from server.gateway.auth.repositories.sql import SQLUserRepository
+        from server.gateway.user_repository import SQLUserRepository
         from deerflow.persistence.engine import get_session_factory
 
         sf = get_session_factory()

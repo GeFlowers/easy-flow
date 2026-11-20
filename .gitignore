@@ -73,7 +73,6 @@ config.yaml.bak
 .worktrees
 
 # 本地追踪文件
-.monocle/
 /Note.docx
 .learning-cleanup.local/
 
@@ -86,7 +85,6 @@ config.yaml.bak
 /backend/**/.coverage.*
 /backend/**/agent_history.gif
 /backend/static/browser_history/*.gif
-/backend/**/.langgraph_api
 # 只忽略旧版后端根目录沙箱，不忽略 deerflow/sandbox 源码。
 /backend/sandbox/
 

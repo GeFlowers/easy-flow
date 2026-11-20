@@ -42,26 +42,6 @@ class WeComChannel(Channel):
         '''声明该渠道支持通过企业微信流式消息逐步发送回复。'''
         return True
 
-    def _clear_ws_context(self, thread_ts: str | None) -> None:
-        '''清除指定消息线程缓存的请求帧和流式消息编号。'''
-        if not thread_ts:
-            return
-        self._ws_frames.pop(thread_ts, None)
-        self._ws_stream_ids.pop(thread_ts, None)
-
-    async def _send_ws_upload_command(self, req_id: str, body: dict[str, Any], cmd: str) -> dict[str, Any]:
-        '''通过 SDK 的 WebSocket 管理器发送媒体分片命令；接口不可用时报告配置错误。'''
-        if not self._ws_client:
-            raise RuntimeError("WeCom WebSocket client is not available")
-
-        ws_manager = getattr(self._ws_client, "_ws_manager", None)
-        send_reply = getattr(ws_manager, "send_reply", None)
-        if not callable(send_reply):
-            raise RuntimeError("Installed wecom-aibot-python-sdk does not expose the WebSocket media upload API expected by DeerFlow. Use wecom-aibot-python-sdk==0.1.6 or update the adapter.")
-
-        send_reply_async = cast(Callable[[str, dict[str, Any], str], Awaitable[dict[str, Any]]], send_reply)
-        return await send_reply_async(req_id, body, cmd)
-
     async def start(self) -> None:
         '''校验机器人凭据，注册各类消息及连接事件回调并启动后台连接任务。'''
         if self._running:
@@ -99,119 +79,6 @@ class WeComChannel(Channel):
             self.bus.subscribe_outbound(self._on_outbound)
         logger.info("WeCom channel started")
 
-    def _on_ws_task_done(self, task: asyncio.Task) -> None:
-        '''检查连接任务的结束状态，并记录未处理的连接异常。'''
-        if task.cancelled():
-            return
-        exc = task.exception()
-        if exc is None:
-            return
-        logger.error(
-            "WeCom WebSocket connection task failed: %s. Check that the network/proxy allows wss://openws.work.weixin.qq.com and that bot_id/bot_secret are valid.",
-            exc,
-        )
-
-    def _on_ws_error(self, error: Any) -> None:
-        '''记录 SDK 上报的 WebSocket 运行错误。'''
-        logger.error("WeCom WebSocket error: %s", error)
-
-    def _on_ws_disconnected(self, *args: Any) -> None:
-        '''记录断连详情；重连工作由企业微信 SDK 负责。'''
-        detail = f" ({args[0]})" if args else ""
-        logger.warning("WeCom WebSocket disconnected%s; SDK will attempt to reconnect", detail)
-
-    async def stop(self) -> None:
-        '''取消机器人连接任务、解除事件订阅并清空连接及消息帧缓存。'''
-        self._running = False
-        self.bus.unsubscribe_outbound(self._on_outbound)
-        if self._ws_task:
-            try:
-                self._ws_task.cancel()
-            except Exception:
-                pass
-            self._ws_task = None
-        if self._ws_client:
-            try:
-                self._ws_client.disconnect()
-            except Exception:
-                pass
-        self._ws_client = None
-        self._ws_frames.clear()
-        self._ws_stream_ids.clear()
-        logger.info("WeCom channel stopped")
-
-    async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
-        '''将回复发往机器人消息流；连接不可用时仅记录警告。'''
-        if self._ws_client:
-            await self._send_ws(msg, _max_retries=_max_retries)
-            return
-        logger.warning("[WeCom] send called but WebSocket client is not available")
-
-    async def _on_outbound(self, msg: OutboundMessage) -> None:
-        '''过滤其他渠道的消息，发送本渠道回复及附件，并在最终回复后释放线程缓存。'''
-        if msg.channel_name != self.name:
-            return
-
-        try:
-            await self.send(msg)
-        except Exception:
-            logger.exception("Failed to send outbound message on channel %s", self.name)
-            if msg.is_final:
-                self._clear_ws_context(msg.thread_ts)
-            return
-
-        for attachment in msg.attachments:
-            try:
-                success = await self.send_file(msg, attachment)
-                if not success:
-                    logger.warning("[%s] file upload skipped for %s", self.name, attachment.filename)
-            except Exception:
-                logger.exception("[%s] failed to upload file %s", self.name, attachment.filename)
-
-        if msg.is_final:
-            self._clear_ws_context(msg.thread_ts)
-
-    async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
-        '''仅在最终回复时上传附件；按类型检查大小并将媒体发送到原消息会话。'''
-        if not msg.is_final:
-            return True
-        if not self._ws_client:
-            return False
-        if not msg.thread_ts:
-            return False
-        frame = self._ws_frames.get(msg.thread_ts)
-        if not frame:
-            return False
-
-        media_type = "image" if attachment.is_image else "file"
-        size_limit = 2 * 1024 * 1024 if attachment.is_image else 20 * 1024 * 1024
-        if attachment.size > size_limit:
-            logger.warning(
-                "[WeCom] %s too large (%d bytes), skipping: %s",
-                media_type,
-                attachment.size,
-                attachment.filename,
-            )
-            return False
-
-        try:
-            media_id = await self._upload_media_ws(
-                media_type=media_type,
-                filename=attachment.filename,
-                path=str(attachment.actual_path),
-                size=attachment.size,
-            )
-            if not media_id:
-                return False
-
-            body = {media_type: {"media_id": media_id}, "msgtype": media_type}
-            await self._ws_client.reply(frame, body)
-            logger.debug("[WeCom] %s sent via ws: %s", media_type, attachment.filename)
-            return True
-        except Exception:
-            logger.exception("[WeCom] failed to upload/send file via ws: %s", attachment.filename)
-            return False
-
     async def _on_ws_text(self, frame: dict[str, Any]) -> None:
         '''提取文本消息及引用内容，忽略空消息后发布到内部消息总线。'''
         body = frame.get("body", {}) or {}
@@ -220,6 +87,112 @@ class WeComChannel(Channel):
         if not text and not quote:
             return
         await self._publish_ws_inbound(frame, text + (f"\nQuote message: {quote}" if quote else ""))
+
+    async def _publish_ws_inbound(
+        self,
+        frame: dict[str, Any],
+        text: str,
+        *,
+        files: list[dict[str, Any]] | None = None,
+    ) -> None:
+        '''处理机器人入站帧、识别绑定码和命令，建立消息流并发布标准化消息。'''
+        if not self._ws_client:
+            return
+        try:
+            from aibot import generate_req_id
+        except Exception:
+            return
+
+        body = frame.get("body", {}) or {}
+        msg_id = body.get("msgid")
+        if not msg_id:
+            return
+
+        user_id = (body.get("from") or {}).get("userid")
+
+        connect_code = self._pending_connect_code(text)
+        if connect_code:
+            handled = await self._bind_connection_from_connect_code(
+                frame=frame,
+                user_id=str(user_id or ""),
+                code=connect_code,
+            )
+            if handled:
+                return
+
+        inbound_type = InboundMessageType.COMMAND if is_known_channel_command(text) else InboundMessageType.CHAT
+        inbound = self._make_inbound(
+            chat_id=user_id,  # 将用户会话保留在内存中
+            user_id=user_id,
+            text=text,
+            msg_type=inbound_type,
+            thread_ts=msg_id,
+            files=files or [],
+            metadata={
+                "aibotid": body.get("aibotid"),
+                "chattype": body.get("chattype"),
+                "message_id": msg_id,
+            },
+        )
+        inbound.topic_id = user_id  # 沿用同一个线程
+
+        stream_id = generate_req_id("stream")
+        self._ws_frames[msg_id] = frame
+        self._ws_stream_ids[msg_id] = stream_id
+
+        try:
+            await self._ws_client.reply_stream(frame, stream_id, self._working_message, False)
+        except Exception:
+            pass
+
+        inbound = await self._attach_connection_identity(inbound)
+        await self.bus.publish_inbound(inbound)
+
+    async def _bind_connection_from_connect_code(self, *, frame: dict[str, Any], user_id: str, code: str) -> bool:
+        '''消费一次性连接码并绑定企业微信账号；无效码或缺少用户身份时向会话反馈。'''
+        if self._connection_repo is None or not code:
+            return False
+
+        state = await self._connection_repo.consume_oauth_state(provider="wecom", state=code)
+        if state is None:
+            await self._send_connection_reply(frame, "WeCom connection code is invalid or expired.")
+            return True
+
+        if not user_id:
+            await self._send_connection_reply(frame, "WeCom connection could not be completed from this message.")
+            return True
+
+        body = frame.get("body", {}) or {}
+        workspace_id = str(body.get("aibotid") or "") or None
+        await self._connection_repo.upsert_connection(
+            owner_user_id=state["owner_user_id"],
+            provider="wecom",
+            external_account_id=user_id,
+            workspace_id=workspace_id,
+            metadata={
+                "aibotid": workspace_id,
+                "chattype": body.get("chattype"),
+            },
+            status="connected",
+        )
+        await self._send_connection_reply(frame, "WeCom connected to DeerFlow.")
+        return True
+
+    async def _send_connection_reply(self, frame: dict[str, Any], text: str) -> None:
+        '''通过机器人当前消息帧向用户发送账号绑定结果文本。'''
+        if not self._ws_client:
+            return
+        await self._ws_client.reply(frame, {"msgtype": "text", "text": {"content": text}})
+
+    async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
+        '''根据工作区和外部用户信息，为入站消息补充已绑定的连接身份。'''
+        return await attach_connection_identity(
+            inbound,
+            repo=self._connection_repo,
+            provider="wecom",
+            workspace_id=str(inbound.metadata.get("aibotid") or "") or None,
+            fallback_without_workspace=True,
+        )
 
     async def _on_ws_mixed(self, frame: dict[str, Any]) -> None:
         '''拆分混合消息中的文本、图片和文件条目，再统一发布为一条入站消息。'''
@@ -293,111 +266,84 @@ class WeComChannel(Channel):
             ],
         )
 
-    async def _publish_ws_inbound(
-        self,
-        frame: dict[str, Any],
-        text: str,
-        *,
-        files: list[dict[str, Any]] | None = None,
-    ) -> None:
-        '''处理机器人入站帧、识别绑定码和命令，建立消息流并发布标准化消息。'''
-        if not self._ws_client:
+    def _on_ws_error(self, error: Any) -> None:
+        '''记录 SDK 上报的 WebSocket 运行错误。'''
+        logger.error("WeCom WebSocket error: %s", error)
+
+    def _on_ws_disconnected(self, *args: Any) -> None:
+        '''记录断连详情；重连工作由企业微信 SDK 负责。'''
+        detail = f" ({args[0]})" if args else ""
+        logger.warning("WeCom WebSocket disconnected%s; SDK will attempt to reconnect", detail)
+
+    def _on_ws_task_done(self, task: asyncio.Task) -> None:
+        '''检查连接任务的结束状态，并记录未处理的连接异常。'''
+        if task.cancelled():
             return
-        try:
-            from aibot import generate_req_id
-        except Exception:
+        exc = task.exception()
+        if exc is None:
             return
-
-        body = frame.get("body", {}) or {}
-        msg_id = body.get("msgid")
-        if not msg_id:
-            return
-
-        user_id = (body.get("from") or {}).get("userid")
-
-        connect_code = self._pending_connect_code(text)
-        if connect_code:
-            handled = await self._bind_connection_from_connect_code(
-                frame=frame,
-                user_id=str(user_id or ""),
-                code=connect_code,
-            )
-            if handled:
-                return
-
-        inbound_type = InboundMessageType.COMMAND if is_known_channel_command(text) else InboundMessageType.CHAT
-        inbound = self._make_inbound(
-            chat_id=user_id,  # 将用户会话保留在内存中
-            user_id=user_id,
-            text=text,
-            msg_type=inbound_type,
-            thread_ts=msg_id,
-            files=files or [],
-            metadata={
-                "aibotid": body.get("aibotid"),
-                "chattype": body.get("chattype"),
-                "message_id": msg_id,
-            },
+        logger.error(
+            "WeCom WebSocket connection task failed: %s. Check that the network/proxy allows wss://openws.work.weixin.qq.com and that bot_id/bot_secret are valid.",
+            exc,
         )
-        inbound.topic_id = user_id  # 沿用同一个线程
 
-        stream_id = generate_req_id("stream")
-        self._ws_frames[msg_id] = frame
-        self._ws_stream_ids[msg_id] = stream_id
+    async def _on_outbound(self, msg: OutboundMessage) -> None:
+        '''过滤其他渠道的消息，发送本渠道回复及附件，并在最终回复后释放线程缓存。'''
+        if msg.channel_name != self.name:
+            return
 
         try:
-            await self._ws_client.reply_stream(frame, stream_id, self._working_message, False)
+            await self.send(msg)
         except Exception:
-            pass
-
-        inbound = await self._attach_connection_identity(inbound)
-        await self.bus.publish_inbound(inbound)
-
-    async def _attach_connection_identity(self, inbound: InboundMessage) -> InboundMessage:
-        '''根据工作区和外部用户信息，为入站消息补充已绑定的连接身份。'''
-        return await attach_connection_identity(
-            inbound,
-            repo=self._connection_repo,
-            provider="wecom",
-            workspace_id=str(inbound.metadata.get("aibotid") or "") or None,
-            fallback_without_workspace=True,
-        )
-
-    async def _bind_connection_from_connect_code(self, *, frame: dict[str, Any], user_id: str, code: str) -> bool:
-        '''消费一次性连接码并绑定企业微信账号；无效码或缺少用户身份时向会话反馈。'''
-        if self._connection_repo is None or not code:
-            return False
-
-        state = await self._connection_repo.consume_oauth_state(provider="wecom", state=code)
-        if state is None:
-            await self._send_connection_reply(frame, "WeCom connection code is invalid or expired.")
-            return True
-
-        if not user_id:
-            await self._send_connection_reply(frame, "WeCom connection could not be completed from this message.")
-            return True
-
-        body = frame.get("body", {}) or {}
-        workspace_id = str(body.get("aibotid") or "") or None
-        await self._connection_repo.upsert_connection(
-            owner_user_id=state["owner_user_id"],
-            provider="wecom",
-            external_account_id=user_id,
-            workspace_id=workspace_id,
-            metadata={
-                "aibotid": workspace_id,
-                "chattype": body.get("chattype"),
-            },
-            status="connected",
-        )
-        await self._send_connection_reply(frame, "WeCom connected to DeerFlow.")
-        return True
-
-    async def _send_connection_reply(self, frame: dict[str, Any], text: str) -> None:
-        '''通过机器人当前消息帧向用户发送账号绑定结果文本。'''
-        if not self._ws_client:
+            logger.exception("Failed to send outbound message on channel %s", self.name)
+            if msg.is_final:
+                self._clear_ws_context(msg.thread_ts)
             return
-        await self._ws_client.reply(frame, {"msgtype": "text", "text": {"content": text}})
+
+        for attachment in msg.attachments:
+            try:
+                success = await self.send_file(msg, attachment)
+                if not success:
+                    logger.warning("[%s] file upload skipped for %s", self.name, attachment.filename)
+            except Exception:
+                logger.exception("[%s] failed to upload file %s", self.name, attachment.filename)
+
+        if msg.is_final:
+            self._clear_ws_context(msg.thread_ts)
+
+    def _clear_ws_context(self, thread_ts: str | None) -> None:
+        '''清除指定消息线程缓存的请求帧和流式消息编号。'''
+        if not thread_ts:
+            return
+        self._ws_frames.pop(thread_ts, None)
+        self._ws_stream_ids.pop(thread_ts, None)
+
+    async def stop(self) -> None:
+        '''取消机器人连接任务、解除事件订阅并清空连接及消息帧缓存。'''
+        self._running = False
+        self.bus.unsubscribe_outbound(self._on_outbound)
+        if self._ws_task:
+            try:
+                self._ws_task.cancel()
+            except Exception:
+                pass
+            self._ws_task = None
+        if self._ws_client:
+            try:
+                self._ws_client.disconnect()
+            except Exception:
+                pass
+        self._ws_client = None
+        self._ws_frames.clear()
+        self._ws_stream_ids.clear()
+        logger.info("WeCom channel stopped")
+
+    async def send(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
+        '''将回复发往机器人消息流；连接不可用时仅记录警告。'''
+        if self._ws_client:
+            await self._send_ws(msg, _max_retries=_max_retries)
+            return
+        logger.warning("[WeCom] send called but WebSocket client is not available")
 
     async def _send_ws(self, msg: OutboundMessage, *, _max_retries: int = 3) -> None:
         '''优先向原消息流发送增量回复；没有可用流时改为发送独立 Markdown 消息。'''
@@ -431,6 +377,47 @@ class WeComChannel(Channel):
             max_retries=_max_retries,
             log_prefix="[WeCom]",
         )
+
+    async def send_file(self, msg: OutboundMessage, attachment: ResolvedAttachment) -> bool:
+        '''仅在最终回复时上传附件；按类型检查大小并将媒体发送到原消息会话。'''
+        if not msg.is_final:
+            return True
+        if not self._ws_client:
+            return False
+        if not msg.thread_ts:
+            return False
+        frame = self._ws_frames.get(msg.thread_ts)
+        if not frame:
+            return False
+
+        media_type = "image" if attachment.is_image else "file"
+        size_limit = 2 * 1024 * 1024 if attachment.is_image else 20 * 1024 * 1024
+        if attachment.size > size_limit:
+            logger.warning(
+                "[WeCom] %s too large (%d bytes), skipping: %s",
+                media_type,
+                attachment.size,
+                attachment.filename,
+            )
+            return False
+
+        try:
+            media_id = await self._upload_media_ws(
+                media_type=media_type,
+                filename=attachment.filename,
+                path=str(attachment.actual_path),
+                size=attachment.size,
+            )
+            if not media_id:
+                return False
+
+            body = {media_type: {"media_id": media_id}, "msgtype": media_type}
+            await self._ws_client.reply(frame, body)
+            logger.debug("[WeCom] %s sent via ws: %s", media_type, attachment.filename)
+            return True
+        except Exception:
+            logger.exception("[WeCom] failed to upload/send file via ws: %s", attachment.filename)
+            return False
 
     async def _upload_media_ws(
         self,
@@ -494,3 +481,16 @@ class WeComChannel(Channel):
             logger.warning("[WeCom] upload finish returned no media_id: %s", finish_ack)
             return None
         return media_id
+
+    async def _send_ws_upload_command(self, req_id: str, body: dict[str, Any], cmd: str) -> dict[str, Any]:
+        '''通过 SDK 的 WebSocket 管理器发送媒体分片命令；接口不可用时报告配置错误。'''
+        if not self._ws_client:
+            raise RuntimeError("WeCom WebSocket client is not available")
+
+        ws_manager = getattr(self._ws_client, "_ws_manager", None)
+        send_reply = getattr(ws_manager, "send_reply", None)
+        if not callable(send_reply):
+            raise RuntimeError("Installed wecom-aibot-python-sdk does not expose the WebSocket media upload API expected by DeerFlow. Use wecom-aibot-python-sdk==0.1.6 or update the adapter.")
+
+        send_reply_async = cast(Callable[[str, dict[str, Any], str], Awaitable[dict[str, Any]]], send_reply)
+        return await send_reply_async(req_id, body, cmd)

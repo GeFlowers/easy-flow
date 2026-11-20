@@ -93,6 +93,14 @@ _BOUNDARY_TOKEN_RE = re.compile(
 )
 
 
+def neutralize_untrusted_tags(text: str) -> str:
+    '''中和不可信文本中的框架标签和输入边界标记，但不添加用户消息专用的包裹标记。'''
+    if not text.strip():
+        return text
+    text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
+    return _neutralize_boundary_tokens(text)
+
+
 def _escape_tag_match(match: re.Match) -> str:
     '''转义被拒绝标签的尖括号，使其作为普通文本显示。'''
     return match.group(0).replace("<", "&lt;").replace(">", "&gt;")
@@ -106,84 +114,30 @@ def _neutralize_boundary_tokens(text: str) -> str:
     )
 
 
-def neutralize_untrusted_tags(text: str) -> str:
-    '''中和不可信文本中的框架标签和输入边界标记，但不添加用户消息专用的包裹标记。'''
-    if not text.strip():
-        return text
-    text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
-    return _neutralize_boundary_tokens(text)
-
-
-def _is_genuine_user_message(message: object) -> bool:
-    '''识别真实用户消息，排除摘要和不含有效人工输入结果的隐藏消息。'''
-    if not isinstance(message, HumanMessage):
-        return False
-    if message.name == _SUMMARY_MESSAGE_NAME:
-        return False
-    if message.additional_kwargs.get("hide_from_ui") and read_human_input_response(message.additional_kwargs) is None:
-        return False
-    return True
-
-
-def _check_user_content(text: str) -> str:
-    '''转义保留标签并包裹用户文本，同时保证重复处理不会嵌套边界标记。'''
-    if not text.strip():
-        return text
-    text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
-    # 只有文本完整包含首尾标记时才视为已处理，单独出现起始标记不算。
-    if text.startswith(_USER_INPUT_BEGIN) and text.endswith(_USER_INPUT_END):
-        # 即使已有外层标记也要处理中间正文，防止用户伪造包裹并插入内部边界。
-        inner = text[len(_USER_INPUT_BEGIN) : -len(_USER_INPUT_END)]
-        neutralized_inner = _neutralize_boundary_tokens(inner)
-        if neutralized_inner == inner:
-            return text
-        return f"{_USER_INPUT_BEGIN}{neutralized_inner}{_USER_INPUT_END}"
-    # 先中和用户自带的标记，防止跳过包裹或提前关闭输入边界。
-    text = _neutralize_boundary_tokens(text)
-    return f"{_USER_INPUT_BEGIN}\n{text}\n{_USER_INPUT_END}"
-
-
 class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
     '''仅在模型请求副本中净化用户输入，不改写持久化的线程消息。'''
 
-    @staticmethod
-    def _extract_text_from_content(content: str | list) -> tuple[str, list | None]:
-        '''从字符串或多模态内容块中提取文本，并返回对应的原文本块引用。'''
-        if isinstance(content, str):
-            return content, None
-        if not isinstance(content, list):
-            return "", None
-        text_parts: list[str] = []
-        text_blocks: list[dict] = []
-        for block in content:
-            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
-                text_parts.append(block["text"])
-                text_blocks.append(block)
-        return "\n".join(text_parts), text_blocks
+    @override
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelCallResult:
+        '''清洗同步模型请求中的用户输入后执行后续处理器。'''
+        return handler(self._try_process(request))
 
-    @staticmethod
-    def _rebuild_content(
-        original_content: list,
-        processed_text: str,
-        text_blocks: list[dict],
-    ) -> list:
-        '''将文本块合并为净化后的单块，同时保留夹在其中的图片等非文本块。'''
-        text_block_ids = {id(b) for b in text_blocks}
-        first = last = None
-        for i, block in enumerate(original_content):
-            if id(block) in text_block_ids:
-                if first is None:
-                    first = i
-                last = i
-        if first is None:
-            return original_content
-        result: list = [*original_content[:first], {"type": "text", "text": processed_text}]
-        # 将首尾文本块之间的图片等非文本块按原顺序放回结果。
-        for i in range(first + 1, last + 1):
-            if id(original_content[i]) not in text_block_ids:
-                result.append(original_content[i])
-        result.extend(original_content[last + 1 :])
-        return result
+    def _try_process(self, request: ModelRequest) -> ModelRequest:
+        '''净化模型请求；图控制异常继续传播，其他内部错误则记录并放行原请求。'''
+        try:
+            return self._process_request(request)
+        except GraphBubbleUp:
+            raise
+        except Exception:
+            logger.warning(
+                "用户输入净化失败，继续使用原请求调用模型",
+                exc_info=True,
+            )
+            return request
 
     def _process_request(self, request: ModelRequest) -> ModelRequest:
         '''复制模型请求并净化最近一条真实用户消息，原状态和消息对象保持不变。'''
@@ -247,27 +201,44 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
             return request.override(messages=messages)
         return request
 
-    def _try_process(self, request: ModelRequest) -> ModelRequest:
-        '''净化模型请求；图控制异常继续传播，其他内部错误则记录并放行原请求。'''
-        try:
-            return self._process_request(request)
-        except GraphBubbleUp:
-            raise
-        except Exception:
-            logger.warning(
-                "用户输入净化失败，继续使用原请求调用模型",
-                exc_info=True,
-            )
-            return request
+    @staticmethod
+    def _extract_text_from_content(content: str | list) -> tuple[str, list | None]:
+        '''从字符串或多模态内容块中提取文本，并返回对应的原文本块引用。'''
+        if isinstance(content, str):
+            return content, None
+        if not isinstance(content, list):
+            return "", None
+        text_parts: list[str] = []
+        text_blocks: list[dict] = []
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text" and isinstance(block.get("text"), str):
+                text_parts.append(block["text"])
+                text_blocks.append(block)
+        return "\n".join(text_parts), text_blocks
 
-    @override
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelCallResult:
-        '''清洗同步模型请求中的用户输入后执行后续处理器。'''
-        return handler(self._try_process(request))
+    @staticmethod
+    def _rebuild_content(
+        original_content: list,
+        processed_text: str,
+        text_blocks: list[dict],
+    ) -> list:
+        '''将文本块合并为净化后的单块，同时保留夹在其中的图片等非文本块。'''
+        text_block_ids = {id(b) for b in text_blocks}
+        first = last = None
+        for i, block in enumerate(original_content):
+            if id(block) in text_block_ids:
+                if first is None:
+                    first = i
+                last = i
+        if first is None:
+            return original_content
+        result: list = [*original_content[:first], {"type": "text", "text": processed_text}]
+        # 将首尾文本块之间的图片等非文本块按原顺序放回结果。
+        for i in range(first + 1, last + 1):
+            if id(original_content[i]) not in text_block_ids:
+                result.append(original_content[i])
+        result.extend(original_content[last + 1 :])
+        return result
 
     @override
     async def awrap_model_call(
@@ -277,3 +248,32 @@ class InputSanitizationMiddleware(AgentMiddleware[AgentState]):
     ) -> ModelCallResult:
         '''清洗异步模型请求中的用户输入后等待后续处理器执行。'''
         return await handler(self._try_process(request))
+
+
+def _is_genuine_user_message(message: object) -> bool:
+    '''识别真实用户消息，排除摘要和不含有效人工输入结果的隐藏消息。'''
+    if not isinstance(message, HumanMessage):
+        return False
+    if message.name == _SUMMARY_MESSAGE_NAME:
+        return False
+    if message.additional_kwargs.get("hide_from_ui") and read_human_input_response(message.additional_kwargs) is None:
+        return False
+    return True
+
+
+def _check_user_content(text: str) -> str:
+    '''转义保留标签并包裹用户文本，同时保证重复处理不会嵌套边界标记。'''
+    if not text.strip():
+        return text
+    text = _BLOCKED_TAG_PATTERN.sub(_escape_tag_match, text)
+    # 只有文本完整包含首尾标记时才视为已处理，单独出现起始标记不算。
+    if text.startswith(_USER_INPUT_BEGIN) and text.endswith(_USER_INPUT_END):
+        # 即使已有外层标记也要处理中间正文，防止用户伪造包裹并插入内部边界。
+        inner = text[len(_USER_INPUT_BEGIN) : -len(_USER_INPUT_END)]
+        neutralized_inner = _neutralize_boundary_tokens(inner)
+        if neutralized_inner == inner:
+            return text
+        return f"{_USER_INPUT_BEGIN}{neutralized_inner}{_USER_INPUT_END}"
+    # 先中和用户自带的标记，防止跳过包裹或提前关闭输入边界。
+    text = _neutralize_boundary_tokens(text)
+    return f"{_USER_INPUT_BEGIN}\n{text}\n{_USER_INPUT_END}"

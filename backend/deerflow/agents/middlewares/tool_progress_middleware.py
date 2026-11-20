@@ -116,67 +116,6 @@ def is_near_duplicate(
     return False
 
 
-def _message_content_str(msg: ToolMessage) -> str:
-    '''仅当工具消息内容为字符串时返回正文，其他内容视为空文本。'''
-    return msg.content if isinstance(msg.content, str) else ""
-
-
-def _parse_tool_meta(meta_dict: object) -> ToolResultMeta | None:
-    '''将原始元数据解析为 ToolResultMeta；结构异常时跳过进度跟踪。'''
-    if not isinstance(meta_dict, dict):
-        return None
-    try:
-        return ToolResultMeta(**meta_dict)
-    except TypeError:
-        logger.warning("Unexpected tool meta schema, skipping progress tracking: %s", meta_dict)
-        return None
-
-
-# 提示和屏蔽原因格式化
-
-
-def _format_hint(meta: ToolResultMeta) -> str:
-    '''根据结果类型和建议动作生成供模型调整策略的提示。'''
-    action_map = {
-        "rewrite_query": "请使用不同的关键词或思路改写搜索查询。",
-        "try_alternative": "请考虑使用不同工具或策略。",
-        "summarize": "请考虑总结当前发现后继续推进。",
-        "stop": "此操作不可恢复，请勿重试。",
-        # 结果虽成功但内容近似重复，仍需建议模型更换检索策略。
-        "continue": "请尝试改写查询或使用不同搜索词。",
-    }
-    base = {
-        "no_results": "[进度提示] 搜索未返回结果。",
-        "not_found": "[进度提示] 多次未找到资源。",
-        "rate_limited": "[进度提示] 工具受到频率限制。",
-        "transient": "[进度提示] 工具反复发生临时故障。",
-        "partial_success": "[进度提示] 工具已多次返回不完整结果。",
-        # 近似重复的成功结果表示工具反复返回相同内容。
-        "success": "[进度提示] 工具正在返回重复结果。",
-    }.get(
-        meta.error_type or meta.status,
-        "[进度提示] 工具未提供新信息。",
-    )
-    suffix = action_map.get(meta.recommended_next_action, "")
-    return f"{base} {suffix}".strip()
-
-
-def _block_reason(meta: ToolResultMeta) -> str:
-    '''把错误类别转换为工具被屏蔽时返回给模型的原因。'''
-    return {
-        "no_results": "多次没有结果，请改写查询或尝试其他工具。",
-        "not_found": "多次未找到目标，请改写查询或尝试其他资源。",
-        "rate_limited": "多次受到频率限制，请总结当前发现后继续。",
-        "transient": "反复发生临时故障，请尝试其他方法。",
-        "auth": "身份验证失败，无法使用此工具。",
-        "config": "工具尚未配置，无法使用。",
-        "internal": "反复发生内部错误，此工具不可用。",
-    }.get(
-        meta.error_type or "",
-        "工具在多次尝试后仍未提供新信息，请总结后继续推进。",
-    )
-
-
 # 中间件实现
 
 
@@ -223,41 +162,31 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
             max_tracked_threads=config.max_tracked_threads,
         )
 
-    # 运行上下文辅助函数
+    # 工具调用钩子
 
-    @staticmethod
-    def _thread_id(runtime: Runtime) -> str:
-        '''读取运行上下文的线程 ID；缺失时归入默认线程。'''
-        tid = runtime.context.get("thread_id") if runtime.context else None
-        return str(tid) if tid else "default"
-
-    @staticmethod
-    def _run_id(runtime: Runtime) -> str:
-        '''读取运行上下文的运行 ID；缺失时归入默认运行。'''
-        rid = runtime.context.get("run_id") if runtime.context else None
-        return str(rid) if rid else "default"
-
-    def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
-        '''组合线程和运行标识，隔离各轮待注入提示。'''
-        return self._thread_id(runtime), self._run_id(runtime)
-
-    # 状态存储（调用方负责持锁）
-
-    def _get_state(self, thread_id: str, tool_name: str) -> ToolPhaseState:
-        '''读取工具状态；首次访问时创建线程记录并按容量淘汰最久未用线程。'''
-        if thread_id not in self._phase_states:
-            self._phase_states[thread_id] = {}
-            while len(self._phase_states) > self._max_tracked_threads:
-                evicted_thread, _ = self._phase_states.popitem(last=False)
-                # 线程状态被淘汰时同步清除其提示队列，避免残留占用。
-                for key in [k for k in self._pending if k[0] == evicted_thread]:
-                    del self._pending[key]
-        self._phase_states.move_to_end(thread_id)
-        return self._phase_states[thread_id].get(tool_name, ToolPhaseState())
-
-    def _set_state(self, thread_id: str, tool_name: str, state: ToolPhaseState) -> None:
-        '''保存指定线程中某个工具的新阶段状态。调用方须持锁。'''
-        self._phase_states[thread_id][tool_name] = state
+    @override
+    def wrap_tool_call(
+        self,
+        request: ToolCallRequest,
+        handler: Callable[[ToolCallRequest], ToolMessage | Command],
+    ) -> ToolMessage | Command:
+        '''同步工具调用前拦截已屏蔽工具，其余调用结果用于更新状态机。'''
+        tool_name = str(request.tool_call.get("name", ""))
+        if not tool_name or tool_name in self._exempt_tools:
+            return handler(request)
+        runtime = getattr(request, "runtime", None)
+        if runtime is None:
+            return handler(request)
+        block_reason = self._get_block_reason(runtime, tool_name)
+        if block_reason:
+            logger.info(
+                "tool_progress: %s/%s call intercepted (blocked): %s",
+                self._thread_id(runtime),
+                tool_name,
+                block_reason,
+            )
+            return self._make_blocked_message(request, tool_name, block_reason)
+        return self._update_state_from_result(handler(request), tool_name, runtime)
 
     def _get_block_reason(self, runtime: Runtime, tool_name: str) -> str | None:
         '''只读检查工具是否已被屏蔽；读取不更新 LRU 顺序。'''
@@ -269,6 +198,14 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
             # 被屏蔽线程的查询不能续期，否则会挤占仍活跃线程的状态容量。
             tool_state = thread_tools.get(tool_name)
             return tool_state.block_reason if tool_state is not None and tool_state.phase == "blocked" else None
+
+    # 运行上下文辅助函数
+
+    @staticmethod
+    def _thread_id(runtime: Runtime) -> str:
+        '''读取运行上下文的线程 ID；缺失时归入默认线程。'''
+        tid = runtime.context.get("thread_id") if runtime.context else None
+        return str(tid) if tid else "default"
 
     def _make_blocked_message(self, request: ToolCallRequest, tool_name: str, block_reason: str) -> ToolMessage:
         '''构造与原工具调用 ID 配对的错误 ToolMessage，并附上可恢复提示元数据。'''
@@ -336,6 +273,20 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
             self._queue_assessment(runtime, hint)
         return result
 
+    # 状态存储（调用方负责持锁）
+
+    def _get_state(self, thread_id: str, tool_name: str) -> ToolPhaseState:
+        '''读取工具状态；首次访问时创建线程记录并按容量淘汰最久未用线程。'''
+        if thread_id not in self._phase_states:
+            self._phase_states[thread_id] = {}
+            while len(self._phase_states) > self._max_tracked_threads:
+                evicted_thread, _ = self._phase_states.popitem(last=False)
+                # 线程状态被淘汰时同步清除其提示队列，避免残留占用。
+                for key in [k for k in self._pending if k[0] == evicted_thread]:
+                    del self._pending[key]
+        self._phase_states.move_to_end(thread_id)
+        return self._phase_states[thread_id].get(tool_name, ToolPhaseState())
+
     # 状态转换逻辑
 
     def _assess_and_transition(
@@ -389,6 +340,10 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
 
         return new_state, hint
 
+    def _set_state(self, thread_id: str, tool_name: str, state: ToolPhaseState) -> None:
+        '''保存指定线程中某个工具的新阶段状态。调用方须持锁。'''
+        self._phase_states[thread_id][tool_name] = state
+
     # 待发送提示队列
 
     def _queue_assessment(self, runtime: Runtime, text: str) -> None:
@@ -403,61 +358,15 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
             if len(queue) < _MAX_PENDING_PER_RUN:
                 queue.append(text)
 
-    def _drain_pending(self, runtime: Runtime) -> list[str]:
-        '''取出并删除当前运行待注入的全部提示。'''
-        key = self._pending_key(runtime)
-        with self._lock:
-            return self._pending.pop(key, [])
+    def _pending_key(self, runtime: Runtime) -> tuple[str, str]:
+        '''组合线程和运行标识，隔离各轮待注入提示。'''
+        return self._thread_id(runtime), self._run_id(runtime)
 
-    def _clear_stale_pending(self, runtime: Runtime) -> None:
-        '''清除同线程其他运行遗留的提示，避免提示跨运行串用。'''
-        thread_id, current_run = self._pending_key(runtime)
-        with self._lock:
-            for key in list(self._pending):
-                if key[0] == thread_id and key[1] != current_run:
-                    del self._pending[key]
-
-    def _reset_run_states(self, runtime: Runtime) -> None:
-        '''新一轮开始时重置该线程工具状态，避免上一轮暂时性故障造成错误屏蔽。'''
-        thread_id = self._thread_id(runtime)
-        with self._lock:
-            thread_tools = self._phase_states.get(thread_id)
-            if thread_tools is None:
-                return
-            for tool_name, tool_state in list(thread_tools.items()):
-                thread_tools[tool_name] = replace(
-                    tool_state,
-                    phase="active",
-                    consecutive_problems=0,
-                    block_reason=None,
-                    recent_word_sets=(),
-                )
-
-    # 工具调用钩子
-
-    @override
-    def wrap_tool_call(
-        self,
-        request: ToolCallRequest,
-        handler: Callable[[ToolCallRequest], ToolMessage | Command],
-    ) -> ToolMessage | Command:
-        '''同步工具调用前拦截已屏蔽工具，其余调用结果用于更新状态机。'''
-        tool_name = str(request.tool_call.get("name", ""))
-        if not tool_name or tool_name in self._exempt_tools:
-            return handler(request)
-        runtime = getattr(request, "runtime", None)
-        if runtime is None:
-            return handler(request)
-        block_reason = self._get_block_reason(runtime, tool_name)
-        if block_reason:
-            logger.info(
-                "tool_progress: %s/%s call intercepted (blocked): %s",
-                self._thread_id(runtime),
-                tool_name,
-                block_reason,
-            )
-            return self._make_blocked_message(request, tool_name, block_reason)
-        return self._update_state_from_result(handler(request), tool_name, runtime)
+    @staticmethod
+    def _run_id(runtime: Runtime) -> str:
+        '''读取运行上下文的运行 ID；缺失时归入默认运行。'''
+        rid = runtime.context.get("run_id") if runtime.context else None
+        return str(rid) if rid else "default"
 
     @override
     async def awrap_tool_call(
@@ -483,6 +392,15 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
             return self._make_blocked_message(request, tool_name, block_reason)
         return self._update_state_from_result(await handler(request), tool_name, runtime)
 
+    @override
+    def wrap_model_call(
+        self,
+        request: ModelRequest,
+        handler: Callable[[ModelRequest], ModelResponse],
+    ) -> ModelCallResult:
+        '''同步模型调用前注入工具进展提示，再调用下游处理器。'''
+        return handler(self._augment_request(request))
+
     # 模型调用钩子：取出提示并在模型读取消息前追加
 
     def _augment_request(self, request: ModelRequest) -> ModelRequest:
@@ -502,14 +420,11 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         ]
         return request.override(messages=new_messages)
 
-    @override
-    def wrap_model_call(
-        self,
-        request: ModelRequest,
-        handler: Callable[[ModelRequest], ModelResponse],
-    ) -> ModelCallResult:
-        '''同步模型调用前注入工具进展提示，再调用下游处理器。'''
-        return handler(self._augment_request(request))
+    def _drain_pending(self, runtime: Runtime) -> list[str]:
+        '''取出并删除当前运行待注入的全部提示。'''
+        key = self._pending_key(runtime)
+        with self._lock:
+            return self._pending.pop(key, [])
 
     @override
     async def awrap_model_call(
@@ -529,9 +444,94 @@ class ToolProgressMiddleware(AgentMiddleware[AgentState]):
         self._reset_run_states(runtime)
         return None
 
+    def _clear_stale_pending(self, runtime: Runtime) -> None:
+        '''清除同线程其他运行遗留的提示，避免提示跨运行串用。'''
+        thread_id, current_run = self._pending_key(runtime)
+        with self._lock:
+            for key in list(self._pending):
+                if key[0] == thread_id and key[1] != current_run:
+                    del self._pending[key]
+
+    def _reset_run_states(self, runtime: Runtime) -> None:
+        '''新一轮开始时重置该线程工具状态，避免上一轮暂时性故障造成错误屏蔽。'''
+        thread_id = self._thread_id(runtime)
+        with self._lock:
+            thread_tools = self._phase_states.get(thread_id)
+            if thread_tools is None:
+                return
+            for tool_name, tool_state in list(thread_tools.items()):
+                thread_tools[tool_name] = replace(
+                    tool_state,
+                    phase="active",
+                    consecutive_problems=0,
+                    block_reason=None,
+                    recent_word_sets=(),
+                )
+
     @override
     async def abefore_agent(self, state: AgentState, runtime: Runtime) -> dict | None:
         '''异步启动钩子执行与同步入口相同的状态清理。'''
         self._clear_stale_pending(runtime)
         self._reset_run_states(runtime)
         return None
+
+
+def _parse_tool_meta(meta_dict: object) -> ToolResultMeta | None:
+    '''将原始元数据解析为 ToolResultMeta；结构异常时跳过进度跟踪。'''
+    if not isinstance(meta_dict, dict):
+        return None
+    try:
+        return ToolResultMeta(**meta_dict)
+    except TypeError:
+        logger.warning("Unexpected tool meta schema, skipping progress tracking: %s", meta_dict)
+        return None
+
+
+def _message_content_str(msg: ToolMessage) -> str:
+    '''仅当工具消息内容为字符串时返回正文，其他内容视为空文本。'''
+    return msg.content if isinstance(msg.content, str) else ""
+
+
+def _block_reason(meta: ToolResultMeta) -> str:
+    '''把错误类别转换为工具被屏蔽时返回给模型的原因。'''
+    return {
+        "no_results": "多次没有结果，请改写查询或尝试其他工具。",
+        "not_found": "多次未找到目标，请改写查询或尝试其他资源。",
+        "rate_limited": "多次受到频率限制，请总结当前发现后继续。",
+        "transient": "反复发生临时故障，请尝试其他方法。",
+        "auth": "身份验证失败，无法使用此工具。",
+        "config": "工具尚未配置，无法使用。",
+        "internal": "反复发生内部错误，此工具不可用。",
+    }.get(
+        meta.error_type or "",
+        "工具在多次尝试后仍未提供新信息，请总结后继续推进。",
+    )
+
+
+# 提示和屏蔽原因格式化
+
+
+def _format_hint(meta: ToolResultMeta) -> str:
+    '''根据结果类型和建议动作生成供模型调整策略的提示。'''
+    action_map = {
+        "rewrite_query": "请使用不同的关键词或思路改写搜索查询。",
+        "try_alternative": "请考虑使用不同工具或策略。",
+        "summarize": "请考虑总结当前发现后继续推进。",
+        "stop": "此操作不可恢复，请勿重试。",
+        # 结果虽成功但内容近似重复，仍需建议模型更换检索策略。
+        "continue": "请尝试改写查询或使用不同搜索词。",
+    }
+    base = {
+        "no_results": "[进度提示] 搜索未返回结果。",
+        "not_found": "[进度提示] 多次未找到资源。",
+        "rate_limited": "[进度提示] 工具受到频率限制。",
+        "transient": "[进度提示] 工具反复发生临时故障。",
+        "partial_success": "[进度提示] 工具已多次返回不完整结果。",
+        # 近似重复的成功结果表示工具反复返回相同内容。
+        "success": "[进度提示] 工具正在返回重复结果。",
+    }.get(
+        meta.error_type or meta.status,
+        "[进度提示] 工具未提供新信息。",
+    )
+    suffix = action_map.get(meta.recommended_next_action, "")
+    return f"{base} {suffix}".strip()

@@ -1,6 +1,5 @@
 "use client";
 
-import { cn } from "@/lib/utils";
 import { motion } from "motion/react";
 import {
   type CSSProperties,
@@ -38,11 +37,13 @@ const ShimmerComponent = ({
   return (
     <MotionComponent
       animate={{ backgroundPosition: "0% center" }}
-      className={cn(
+      className={[
         "relative inline-block bg-[length:250%_100%,auto] bg-clip-text text-transparent",
         "[background-repeat:no-repeat,padding-box] [--bg:linear-gradient(90deg,#0000_calc(50%-var(--spread)),var(--color-background),#0000_calc(50%+var(--spread)))]",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       initial={{ backgroundPosition: "100% center" }}
       style={
         {

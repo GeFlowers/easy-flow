@@ -56,11 +56,6 @@ class JsonMatch(ColumnElement[bool]):
         super().__init__()
 
 
-def _bind(compiler: SQLCompiler, value: object, value_type: TypeEngine[Any], **kw: Any) -> str:
-    '''把筛选值作为有明确 SQL 类型的绑定参数交给驱动。'''
-    return compiler.process(bindparam(None, value, type_=value_type), **kw)
-
-
 def _compile_postgres(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> str:
     '''生成 PostgreSQL JSONB 标量比较，避免跨类型隐式转换造成误匹配。'''
     if not validate_metadata_filter_key(element.key):
@@ -85,6 +80,11 @@ def _compile_postgres(element: JsonMatch, compiler: SQLCompiler, **kw: Any) -> s
 
     parameter = _bind(compiler, value, String(), **kw)
     return f"({value_type} = 'string' AND {extracted_value} = {parameter})"
+
+
+def _bind(compiler: SQLCompiler, value: object, value_type: TypeEngine[Any], **kw: Any) -> str:
+    '''把筛选值作为有明确 SQL 类型的绑定参数交给驱动。'''
+    return compiler.process(bindparam(None, value, type_=value_type), **kw)
 
 
 @compiles(JsonMatch, "postgresql")

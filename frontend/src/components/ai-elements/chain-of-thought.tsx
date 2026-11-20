@@ -7,7 +7,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
-import { cn } from "@/lib/utils";
+
 import {
   BrainIcon,
   ChevronDownIcon,
@@ -72,7 +72,10 @@ export const ChainOfThought = memo(
 
     return (
       <ChainOfThoughtContext.Provider value={chainOfThoughtContext}>
-        <div className={cn("not-prose", className)} {...props}>
+        <div
+          className={["not-prose", className].filter(Boolean).join(" ")}
+          {...props}
+        >
           {children}
         </div>
       </ChainOfThoughtContext.Provider>
@@ -94,10 +97,12 @@ export const ChainOfThoughtHeader = memo(
     return (
       <Collapsible onOpenChange={setIsOpen} open={isOpen}>
         <CollapsibleTrigger
-          className={cn(
+          className={[
             "text-muted-foreground hover:text-foreground flex w-full items-center gap-2 text-sm transition-colors",
             className,
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
           {...props}
         >
           {icon ?? <BrainIcon className="size-4" />}
@@ -105,10 +110,12 @@ export const ChainOfThoughtHeader = memo(
             {children ?? "Chain of Thought"}
           </span>
           <ChevronDownIcon
-            className={cn(
+            className={[
               "size-4 transition-transform",
               isOpen ? "rotate-180" : "rotate-0",
-            )}
+            ]
+              .filter(Boolean)
+              .join(" ")}
           />
         </CollapsibleTrigger>
       </Collapsible>
@@ -142,12 +149,14 @@ export const ChainOfThoughtStep = memo(
 
     return (
       <div
-        className={cn(
+        className={[
           "flex gap-2 text-sm",
           statusStyles[status],
           "fade-in-0 slide-in-from-top-2 animate-in",
           className,
-        )}
+        ]
+          .filter(Boolean)
+          .join(" ")}
         {...props}
       >
         <div className="relative mt-0.5">
@@ -172,10 +181,12 @@ export type ChainOfThoughtSearchResultsProps = ComponentProps<"div">;
 export const ChainOfThoughtSearchResults = memo(
   ({ className, ...props }: ChainOfThoughtSearchResultsProps) => (
     <div
-      className={cn(
+      className={[
         "flex flex-wrap items-center gap-2 overflow-x-hidden",
         className,
-      )}
+      ]
+        .filter(Boolean)
+        .join(" ")}
       {...props}
     />
   ),
@@ -187,7 +198,9 @@ export type ChainOfThoughtSearchResultProps = ComponentProps<typeof Badge>;
 export const ChainOfThoughtSearchResult = memo(
   ({ className, children, ...props }: ChainOfThoughtSearchResultProps) => (
     <Badge
-      className={cn("gap-1 px-2 py-0.5 text-xs font-normal", className)}
+      className={["gap-1 px-2 py-0.5 text-xs font-normal", className]
+        .filter(Boolean)
+        .join(" ")}
       variant="secondary"
       {...props}
     >
@@ -208,11 +221,13 @@ export const ChainOfThoughtContent = memo(
     return (
       <Collapsible open={isOpen}>
         <CollapsibleContent
-          className={cn(
+          className={[
             "mt-2 space-y-3",
             "data-[state=closed]:fade-out-0 data-[state=closed]:slide-out-to-top-2 data-[state=open]:slide-in-from-top-2 text-popover-foreground data-[state=closed]:animate-out data-[state=open]:animate-in outline-none",
             className,
-          )}
+          ]
+            .filter(Boolean)
+            .join(" ")}
           {...props}
         >
           {children}
@@ -229,7 +244,10 @@ export type ChainOfThoughtImageProps = ComponentProps<"div"> & {
 /** 将推理步骤中的图像内容限制在预览框内，并可附加说明文字。 */
 export const ChainOfThoughtImage = memo(
   ({ className, children, caption, ...props }: ChainOfThoughtImageProps) => (
-    <div className={cn("mt-2 space-y-2", className)} {...props}>
+    <div
+      className={["mt-2 space-y-2", className].filter(Boolean).join(" ")}
+      {...props}
+    >
       <div className="bg-muted relative flex max-h-[22rem] items-center justify-center overflow-hidden rounded-lg p-3">
         {children}
       </div>

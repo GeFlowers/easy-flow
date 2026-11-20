@@ -209,6 +209,158 @@ def scan_archive_preflight(archive_path: Path) -> ScanResult:
     return _scan_result(_dedupe(findings), scanner_errors)
 
 
+def _finding(rule_id: str, *, file: str | None, evidence: str | None, line: int | None = None, severity: FindingSeverity | None = None) -> SecurityFinding:
+    '''依据规则定义组装发现记录，并在保存凭据类证据前将其脱敏。'''
+    spec = RULES[rule_id]
+    if evidence is not None and rule_id.startswith("secret-"):
+        evidence = _redact_secret_evidence(evidence)
+    return {
+        "rule_id": rule_id,
+        "severity": severity or spec.severity,
+        "file": file,
+        "line": line,
+        "message": spec.message,
+        "remediation": spec.remediation,
+        "evidence": evidence,
+    }
+
+
+def _redact_secret_evidence(value: str) -> str:
+    # 发现记录会进入 API 和模型上下文，因此不保留令牌的任何片段。
+    '''完全隐藏凭据证据，避免令牌进入 API 响应、日志或模型上下文。'''
+    return "[redacted]"
+
+
+def _scan_result(findings: list[SecurityFinding], scanner_errors: list[str]) -> ScanResult:
+    '''汇总发现与分析错误，并根据是否存在阻断级发现计算 blocked 状态。'''
+    blocked = any(finding["severity"] == _BLOCK_SEVERITY for finding in findings)
+    return {"findings": findings, "blocked": blocked, "scanner_errors": scanner_errors}
+
+
+def _normalize_archive_name(name: str) -> str:
+    '''统一 ZIP 成员分隔符并折叠路径片段，便于后续安全检查。'''
+    return posixpath.normpath(name.replace("\\", "/")).removeprefix("./")
+
+
+def _scan_archive_member_metadata(info: zipfile.ZipInfo, normalized: str) -> list[SecurityFinding]:
+    '''检查 ZIP 成员的绝对路径、目录穿越、符号链接和嵌套技能说明文件。'''
+    findings: list[SecurityFinding] = []
+    if _archive_member_is_absolute(info.filename):
+        findings.append(_finding("package-absolute-path", file=normalized, evidence=info.filename))
+    elif _archive_member_traverses(info.filename):
+        findings.append(_finding("package-path-traversal", file=normalized, evidence=info.filename))
+    if _is_symlink_member(info):
+        findings.append(_finding("package-symlink", file=normalized, evidence=info.filename))
+    parts = PurePosixPath(normalized).parts
+    if parts and parts[-1] == "SKILL.md" and len(parts) > 2 and not is_eval_fixture_skill_md(PurePosixPath(normalized)):
+        findings.append(_finding("package-nested-skill-md", file=normalized, evidence=normalized))
+    return findings
+
+
+def _archive_member_is_absolute(name: str) -> bool:
+    '''同时按 POSIX 和 Windows 路径规则判断压缩包成员是否为绝对路径。'''
+    normalized = name.replace("\\", "/")
+    return normalized.startswith("/") or PurePosixPath(normalized).is_absolute() or PureWindowsPath(name).is_absolute()
+
+
+def _archive_member_traverses(name: str) -> bool:
+    '''判断归一化前的归档成员是否包含父目录片段。'''
+    return ".." in PurePosixPath(name.replace("\\", "/")).parts
+
+
+def _is_symlink_member(info: zipfile.ZipInfo) -> bool:
+    '''从 ZIP 外部属性读取 Unix 文件类型并判断成员是否为符号链接。'''
+    return stat.S_ISLNK(info.external_attr >> 16)
+
+
+def _is_hidden_sensitive_path(rel_path: str) -> bool:
+    '''识别环境变量、凭据及包管理器配置等不应随技能分发的隐藏文件。'''
+    parts = PurePosixPath(rel_path).parts
+    if ".aws" in parts and parts[-1] == "credentials":
+        return True
+    if ".git" in parts and parts[-1] == "config":
+        return True
+    return parts[-1] in _HIDDEN_SENSITIVE_FILES and (parts[-1].startswith(".") or any(token in parts[-1].lower() for token in ("credential", "npmrc", "pypirc", "netrc")))
+
+
+def _is_executable_binary(prefix: bytes) -> bool:
+    '''根据 ELF、PE 和 Mach-O 文件头识别可执行二进制。'''
+    return prefix.startswith(b"\x7fELF") or prefix.startswith(b"MZ") or prefix.startswith((b"\xfe\xed\xfa", b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe"))
+
+
+def _binary_magic_evidence(prefix: bytes) -> str:
+    '''将已识别的可执行文件头转换为便于展示的格式名称。'''
+    if prefix.startswith(b"\x7fELF"):
+        return "ELF"
+    if prefix.startswith(b"MZ"):
+        return "PE"
+    return "Mach-O"
+
+
+def _is_nested_archive_name(rel_path: str) -> bool:
+    '''根据扩展名判断文件是否属于已知压缩包或归档格式。'''
+    lower = rel_path.lower()
+    return any(lower.endswith(suffix) for suffix in _ARCHIVE_SUFFIXES)
+
+
+def _looks_like_archive(file_bytes: bytes) -> bool:
+    '''根据 ZIP、gzip 和 7z 文件头判断内容是否像压缩包。'''
+    return file_bytes.startswith(b"PK\x03\x04") or file_bytes.startswith(b"\x1f\x8b") or file_bytes.startswith(b"7z\xbc\xaf\x27\x1c")
+
+
+def _nested_archive_finding(rel_path: str, prefix: bytes, read_data, scanner_errors: list[str]) -> SecurityFinding:
+    '''报告嵌套压缩包；对 ZIP 额外检查有限成员，发现可执行文件时提升严重级别。'''
+    name = PurePosixPath(rel_path).name
+    if prefix.startswith(b"PK\x03\x04"):
+        try:
+            data = read_data()
+        except Exception as e:
+            scanner_errors.append(f"{rel_path}: 读取嵌套归档以进行检查时失败： {e}")
+        else:
+            if data is not None and _nested_zip_contains_executable(data):
+                return _finding("package-nested-archive", file=rel_path, evidence=f"{name}: 包含可执行二进制成员", severity="CRITICAL")
+    return _finding("package-nested-archive", file=rel_path, evidence=name)
+
+
+def _nested_zip_contains_executable(data: bytes) -> bool:
+    '''只检查 ZIP 前若干个非目录成员的文件头，判断是否含可执行二进制。'''
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as nested:
+            for info in nested.infolist()[:_NESTED_ZIP_PEEK_MEMBER_LIMIT]:
+                if info.is_dir():
+                    continue
+                try:
+                    with nested.open(info) as member:
+                        if _is_executable_binary(member.read(8)):
+                            return True
+                except Exception:
+                    continue
+    except (zipfile.BadZipFile, OSError):
+        return False
+    return False
+
+
+def _read_archive_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes | None:
+    '''读取大小未超限的 ZIP 成员，并将实际读取量限制在单文件上限以内。'''
+    if info.file_size > MAX_FILE_BYTES:
+        return None
+    with zf.open(info) as member:
+        return member.read(MAX_FILE_BYTES + 1)
+
+
+def _dedupe(findings: Iterable[SecurityFinding]) -> list[SecurityFinding]:
+    '''按规则 ID、文件和行号去重，同时保留首次发现的顺序。'''
+    seen: set[tuple[str, str | None, int | None]] = set()
+    deduped: list[SecurityFinding] = []
+    for finding in findings:
+        key = (finding["rule_id"], finding["file"], finding["line"])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(finding)
+    return deduped
+
+
 def scan_skill_dir(skill_dir: Path) -> ScanResult:
     '''遍历技能目录，检查包结构属性并将可解码文本交给对应分析器。'''
     root = Path(skill_dir)
@@ -239,19 +391,9 @@ def scan_skill_dir(skill_dir: Path) -> ScanResult:
     return _scan_result(_dedupe(findings), scanner_errors)
 
 
-def _scan_archive_member_metadata(info: zipfile.ZipInfo, normalized: str) -> list[SecurityFinding]:
-    '''检查 ZIP 成员的绝对路径、目录穿越、符号链接和嵌套技能说明文件。'''
-    findings: list[SecurityFinding] = []
-    if _archive_member_is_absolute(info.filename):
-        findings.append(_finding("package-absolute-path", file=normalized, evidence=info.filename))
-    elif _archive_member_traverses(info.filename):
-        findings.append(_finding("package-path-traversal", file=normalized, evidence=info.filename))
-    if _is_symlink_member(info):
-        findings.append(_finding("package-symlink", file=normalized, evidence=info.filename))
-    parts = PurePosixPath(normalized).parts
-    if parts and parts[-1] == "SKILL.md" and len(parts) > 2 and not is_eval_fixture_skill_md(PurePosixPath(normalized)):
-        findings.append(_finding("package-nested-skill-md", file=normalized, evidence=normalized))
-    return findings
+def _relative_file(path: Path, root: Path) -> str:
+    '''返回相对于技能根目录的 POSIX 风格路径。'''
+    return path.resolve().relative_to(root.resolve()).as_posix()
 
 
 def _scan_file_package_properties(rel_path: str, file_bytes: bytes, file_size: int) -> list[SecurityFinding]:
@@ -271,6 +413,17 @@ def _scan_file_package_properties(rel_path: str, file_bytes: bytes, file_size: i
     if _is_executable_binary(file_bytes[:8]):
         findings.append(_finding("package-executable-binary", file=rel_path, evidence=_binary_magic_evidence(file_bytes[:8])))
     return findings
+
+
+def _decode_text_for_analysis(file_bytes: bytes) -> str | None:
+    # 按内容而非扩展名识别文本，确保无后缀或伪装类型的文本同样会被扫描。
+    '''跳过含 NUL 或无法按 UTF-8 解码的二进制内容，其余返回文本。'''
+    if b"\x00" in file_bytes[:4096]:
+        return None
+    try:
+        return file_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        return None
 
 
 def _scan_text_file(rel_path: str, text: str) -> list[SecurityFinding]:
@@ -315,6 +468,24 @@ def _scan_secrets(rel_path: str, text: str) -> list[SecurityFinding]:
     return findings
 
 
+def _finding_from_match(rule_id: str, rel_path: str, text: str, match: re.Match[str]) -> SecurityFinding:
+    '''将正则匹配转换为带有文件路径和准确行号的扫描发现。'''
+    return _finding(rule_id, file=rel_path, line=_line_number(text, match.start()), evidence=match.group(0))
+
+
+def _line_number(text: str, index: int) -> int:
+    '''将字符串偏移量转换为从 1 开始的行号。'''
+    return text[: max(index, 0)].count("\n") + 1
+
+
+def _looks_like_placeholder(value: str) -> bool:
+    '''判断凭据值是否是示例、占位符或运行时变量引用。'''
+    normalized = value.strip().strip("\"'").lower()
+    if normalized in _PLACEHOLDER_VALUES:
+        return True
+    return normalized.startswith("<") or normalized.startswith("${") or "your" in normalized or "example" in normalized
+
+
 def _scan_declaration(rel_path: str, text: str) -> list[SecurityFinding]:
     '''检查 SKILL.md 是否声明指令覆盖、敏感能力、敏感路径或外部端点。'''
     findings: list[SecurityFinding] = []
@@ -336,6 +507,17 @@ def _scan_declaration(rel_path: str, text: str) -> list[SecurityFinding]:
                 findings.append(_finding_from_match("declaration-external-endpoint", rel_path, text, match))
                 break
     return findings
+
+
+def _http_host(url: str) -> str | None:
+    '''从 HTTP(S) URL 提取主机名，无法解析时返回 ``None``。'''
+    match = re.match(r"https?://\[?([^]/:]+)", url)
+    return match.group(1) if match else None
+
+
+def _is_python_path(rel_path: str, text: str) -> bool:
+    '''依据 .py 后缀或脚本首行的解释器声明判断是否使用 Python 分析器。'''
+    return PurePosixPath(rel_path).suffix.lower() == ".py" or text.startswith("#!") and "python" in text.splitlines()[0].lower()
 
 
 def _scan_python(rel_path: str, text: str) -> list[SecurityFinding]:
@@ -409,246 +591,6 @@ def _scan_python(rel_path: str, text: str) -> list[SecurityFinding]:
     return findings
 
 
-def _scan_shell(rel_path: str, text: str) -> list[SecurityFinding]:
-    '''检查 Shell 脚本中的反向 Shell、敏感信息外传、危险下载和破坏性命令。'''
-    findings: list[SecurityFinding] = []
-    # 明确的反向 Shell 特征会阻断；常见于正常运维脚本的弱特征只提示复核。
-    if match := re.search(r"(/dev/tcp/|nc\s+-e\b)", text):
-        findings.append(_finding_from_match("shell-reverse-shell", rel_path, text, match))
-    if match := re.search(r"(bash\s+-i\b|mkfifo\s+)", text):
-        findings.append(_finding_from_match("shell-reverse-shell-heuristic", rel_path, text, match))
-    if re.search(r"(/etc/shadow|/etc/passwd)", text) and re.search(r"\b(curl|wget|nc|scp)\b", text):
-        findings.append(_finding_for_text("shell-sensitive-exfil", rel_path, text, "/etc"))
-    if match := re.search(r"\b(curl|wget)\b[^\n|;]*\|\s*(?:sh|bash)\b", text):
-        findings.append(_finding_from_match("shell-curl-pipe-shell", rel_path, text, match))
-    if match := re.search(_DESTRUCTIVE_RM_RE + r"|:\(\)\{\s*:\|:&\s*\};:|dd\s+[^#\n]*\bof=/dev/", text):
-        findings.append(_finding_from_match("shell-destructive-command", rel_path, text, match))
-    if match := re.search(r"\b(env|printenv|export\s+-p)\b", text):
-        findings.append(_finding_from_match("shell-env-dump", rel_path, text, match))
-    return findings
-
-
-def _scan_network_and_resource(rel_path: str, text: str) -> list[SecurityFinding]:
-    '''识别云元数据访问、进程递归创建攻击，以及非本地明文网络地址。'''
-    findings: list[SecurityFinding] = []
-    if match := re.search(r"(169\.254\.169\.254|metadata\.google\.internal)", text):
-        findings.append(_finding_from_match("network-cloud-metadata", rel_path, text, match))
-    if match := re.search(r":\(\)\{\s*:\|:&\s*\};:", text):
-        findings.append(_finding_from_match("resource-fork-bomb", rel_path, text, match))
-    for match in _EXTERNAL_HTTP_RE.finditer(text):
-        host = match.group(1)
-        if host in _LOCAL_HTTP_HOSTS or host.startswith("10.") or host.startswith("192.168.") or re.match(r"172\.(1[6-9]|2\d|3[01])\.", host):
-            findings.append(_finding_from_match("network-local-http", rel_path, text, match))
-        else:
-            findings.append(_finding_from_match("network-cleartext-http", rel_path, text, match))
-        break
-    return findings
-
-
-def _finding(rule_id: str, *, file: str | None, evidence: str | None, line: int | None = None, severity: FindingSeverity | None = None) -> SecurityFinding:
-    '''依据规则定义组装发现记录，并在保存凭据类证据前将其脱敏。'''
-    spec = RULES[rule_id]
-    if evidence is not None and rule_id.startswith("secret-"):
-        evidence = _redact_secret_evidence(evidence)
-    return {
-        "rule_id": rule_id,
-        "severity": severity or spec.severity,
-        "file": file,
-        "line": line,
-        "message": spec.message,
-        "remediation": spec.remediation,
-        "evidence": evidence,
-    }
-
-
-def _finding_from_match(rule_id: str, rel_path: str, text: str, match: re.Match[str]) -> SecurityFinding:
-    '''将正则匹配转换为带有文件路径和准确行号的扫描发现。'''
-    return _finding(rule_id, file=rel_path, line=_line_number(text, match.start()), evidence=match.group(0))
-
-
-def _finding_for_text(rule_id: str, rel_path: str, text: str, evidence: str) -> SecurityFinding:
-    '''按证据文本定位行号并创建扫描发现；找不到文本时定位到首行。'''
-    index = text.find(evidence)
-    return _finding(rule_id, file=rel_path, line=_line_number(text, index if index >= 0 else 0), evidence=evidence)
-
-
-def _finding_for_node(rule_id: str, rel_path: str, node: ast.AST | None, evidence: str) -> SecurityFinding:
-    '''用 AST 节点的源码行号创建发现；无节点时使用首行。'''
-    return _finding(rule_id, file=rel_path, line=getattr(node, "lineno", 1), evidence=evidence)
-
-
-def _nested_archive_finding(rel_path: str, prefix: bytes, read_data, scanner_errors: list[str]) -> SecurityFinding:
-    '''报告嵌套压缩包；对 ZIP 额外检查有限成员，发现可执行文件时提升严重级别。'''
-    name = PurePosixPath(rel_path).name
-    if prefix.startswith(b"PK\x03\x04"):
-        try:
-            data = read_data()
-        except Exception as e:
-            scanner_errors.append(f"{rel_path}: 读取嵌套归档以进行检查时失败： {e}")
-        else:
-            if data is not None and _nested_zip_contains_executable(data):
-                return _finding("package-nested-archive", file=rel_path, evidence=f"{name}: 包含可执行二进制成员", severity="CRITICAL")
-    return _finding("package-nested-archive", file=rel_path, evidence=name)
-
-
-def _nested_zip_contains_executable(data: bytes) -> bool:
-    '''只检查 ZIP 前若干个非目录成员的文件头，判断是否含可执行二进制。'''
-    try:
-        with zipfile.ZipFile(io.BytesIO(data)) as nested:
-            for info in nested.infolist()[:_NESTED_ZIP_PEEK_MEMBER_LIMIT]:
-                if info.is_dir():
-                    continue
-                try:
-                    with nested.open(info) as member:
-                        if _is_executable_binary(member.read(8)):
-                            return True
-                except Exception:
-                    continue
-    except (zipfile.BadZipFile, OSError):
-        return False
-    return False
-
-
-def _read_archive_member(zf: zipfile.ZipFile, info: zipfile.ZipInfo) -> bytes | None:
-    '''读取大小未超限的 ZIP 成员，并将实际读取量限制在单文件上限以内。'''
-    if info.file_size > MAX_FILE_BYTES:
-        return None
-    with zf.open(info) as member:
-        return member.read(MAX_FILE_BYTES + 1)
-
-
-def _redact_secret_evidence(value: str) -> str:
-    # 发现记录会进入 API 和模型上下文，因此不保留令牌的任何片段。
-    '''完全隐藏凭据证据，避免令牌进入 API 响应、日志或模型上下文。'''
-    return "[redacted]"
-
-
-def _scan_result(findings: list[SecurityFinding], scanner_errors: list[str]) -> ScanResult:
-    '''汇总发现与分析错误，并根据是否存在阻断级发现计算 blocked 状态。'''
-    blocked = any(finding["severity"] == _BLOCK_SEVERITY for finding in findings)
-    return {"findings": findings, "blocked": blocked, "scanner_errors": scanner_errors}
-
-
-def _dedupe(findings: Iterable[SecurityFinding]) -> list[SecurityFinding]:
-    '''按规则 ID、文件和行号去重，同时保留首次发现的顺序。'''
-    seen: set[tuple[str, str | None, int | None]] = set()
-    deduped: list[SecurityFinding] = []
-    for finding in findings:
-        key = (finding["rule_id"], finding["file"], finding["line"])
-        if key in seen:
-            continue
-        seen.add(key)
-        deduped.append(finding)
-    return deduped
-
-
-def _line_number(text: str, index: int) -> int:
-    '''将字符串偏移量转换为从 1 开始的行号。'''
-    return text[: max(index, 0)].count("\n") + 1
-
-
-def _normalize_archive_name(name: str) -> str:
-    '''统一 ZIP 成员分隔符并折叠路径片段，便于后续安全检查。'''
-    return posixpath.normpath(name.replace("\\", "/")).removeprefix("./")
-
-
-def _archive_member_is_absolute(name: str) -> bool:
-    '''同时按 POSIX 和 Windows 路径规则判断压缩包成员是否为绝对路径。'''
-    normalized = name.replace("\\", "/")
-    return normalized.startswith("/") or PurePosixPath(normalized).is_absolute() or PureWindowsPath(name).is_absolute()
-
-
-def _archive_member_traverses(name: str) -> bool:
-    '''判断归一化前的归档成员是否包含父目录片段。'''
-    return ".." in PurePosixPath(name.replace("\\", "/")).parts
-
-
-def _is_symlink_member(info: zipfile.ZipInfo) -> bool:
-    '''从 ZIP 外部属性读取 Unix 文件类型并判断成员是否为符号链接。'''
-    return stat.S_ISLNK(info.external_attr >> 16)
-
-
-def _relative_file(path: Path, root: Path) -> str:
-    '''返回相对于技能根目录的 POSIX 风格路径。'''
-    return path.resolve().relative_to(root.resolve()).as_posix()
-
-
-def _is_hidden_sensitive_path(rel_path: str) -> bool:
-    '''识别环境变量、凭据及包管理器配置等不应随技能分发的隐藏文件。'''
-    parts = PurePosixPath(rel_path).parts
-    if ".aws" in parts and parts[-1] == "credentials":
-        return True
-    if ".git" in parts and parts[-1] == "config":
-        return True
-    return parts[-1] in _HIDDEN_SENSITIVE_FILES and (parts[-1].startswith(".") or any(token in parts[-1].lower() for token in ("credential", "npmrc", "pypirc", "netrc")))
-
-
-def _is_nested_archive_name(rel_path: str) -> bool:
-    '''根据扩展名判断文件是否属于已知压缩包或归档格式。'''
-    lower = rel_path.lower()
-    return any(lower.endswith(suffix) for suffix in _ARCHIVE_SUFFIXES)
-
-
-def _looks_like_archive(file_bytes: bytes) -> bool:
-    '''根据 ZIP、gzip 和 7z 文件头判断内容是否像压缩包。'''
-    return file_bytes.startswith(b"PK\x03\x04") or file_bytes.startswith(b"\x1f\x8b") or file_bytes.startswith(b"7z\xbc\xaf\x27\x1c")
-
-
-def _is_executable_binary(prefix: bytes) -> bool:
-    '''根据 ELF、PE 和 Mach-O 文件头识别可执行二进制。'''
-    return prefix.startswith(b"\x7fELF") or prefix.startswith(b"MZ") or prefix.startswith((b"\xfe\xed\xfa", b"\xcf\xfa\xed\xfe", b"\xca\xfe\xba\xbe"))
-
-
-def _binary_magic_evidence(prefix: bytes) -> str:
-    '''将已识别的可执行文件头转换为便于展示的格式名称。'''
-    if prefix.startswith(b"\x7fELF"):
-        return "ELF"
-    if prefix.startswith(b"MZ"):
-        return "PE"
-    return "Mach-O"
-
-
-def _decode_text_for_analysis(file_bytes: bytes) -> str | None:
-    # 按内容而非扩展名识别文本，确保无后缀或伪装类型的文本同样会被扫描。
-    '''跳过含 NUL 或无法按 UTF-8 解码的二进制内容，其余返回文本。'''
-    if b"\x00" in file_bytes[:4096]:
-        return None
-    try:
-        return file_bytes.decode("utf-8")
-    except UnicodeDecodeError:
-        return None
-
-
-def _is_python_path(rel_path: str, text: str) -> bool:
-    '''依据 .py 后缀或脚本首行的解释器声明判断是否使用 Python 分析器。'''
-    return PurePosixPath(rel_path).suffix.lower() == ".py" or text.startswith("#!") and "python" in text.splitlines()[0].lower()
-
-
-def _is_shell_path(rel_path: str, text: str) -> bool:
-    '''依据命令脚本后缀或首行的解释器声明判断是否使用命令脚本分析器。'''
-    suffix = PurePosixPath(rel_path).suffix.lower()
-    return suffix in {".sh", ".bash"} or text.startswith("#!") and any(shell in text.splitlines()[0].lower() for shell in ("sh", "bash", "zsh"))
-
-
-def _looks_like_placeholder(value: str) -> bool:
-    '''判断凭据值是否是示例、占位符或运行时变量引用。'''
-    normalized = value.strip().strip("\"'").lower()
-    if normalized in _PLACEHOLDER_VALUES:
-        return True
-    return normalized.startswith("<") or normalized.startswith("${") or "your" in normalized or "example" in normalized
-
-
-def _http_host(url: str) -> str | None:
-    '''从 HTTP(S) URL 提取主机名，无法解析时返回 ``None``。'''
-    match = re.match(r"https?://\[?([^]/:]+)", url)
-    return match.group(1) if match else None
-
-
-def _is_outbound_url(value: str) -> bool:
-    '''判断字符串是否指向非本地 HTTP(S) 地址。'''
-    return bool(value.startswith(("http://", "https://")) and (_http_host(value) or "") not in _LOCAL_HTTP_HOSTS)
-
-
 def _collect_python_aliases(tree: ast.AST) -> dict[str, str]:
     '''收集 AST 中导入名称到完整模块路径的映射，供危险调用识别使用。'''
     aliases: dict[str, str] = {}
@@ -660,6 +602,11 @@ def _collect_python_aliases(tree: ast.AST) -> dict[str, str]:
             for alias in node.names:
                 aliases[alias.asname or alias.name] = f"{node.module}.{alias.name}"
     return aliases
+
+
+def _is_outbound_url(value: str) -> bool:
+    '''判断字符串是否指向非本地 HTTP(S) 地址。'''
+    return bool(value.startswith(("http://", "https://")) and (_http_host(value) or "") not in _LOCAL_HTTP_HOSTS)
 
 
 def _python_name(node: ast.AST, aliases: dict[str, str]) -> str:
@@ -684,9 +631,24 @@ def _compile_mode_is_exec(node: ast.Call) -> bool:
     return any(keyword.arg == "mode" and isinstance(keyword.value, ast.Constant) and keyword.value.value == "exec" for keyword in node.keywords)
 
 
+def _finding_for_node(rule_id: str, rel_path: str, node: ast.AST | None, evidence: str) -> SecurityFinding:
+    '''用 AST 节点的源码行号创建发现；无节点时使用首行。'''
+    return _finding(rule_id, file=rel_path, line=getattr(node, "lineno", 1), evidence=evidence)
+
+
 def _call_has_shell_true(node: ast.Call) -> bool:
     '''检查调用是否显式设置 ``shell=True``。'''
     return any(keyword.arg == "shell" and isinstance(keyword.value, ast.Constant) and keyword.value.value is True for keyword in node.keywords)
+
+
+def _yaml_load_uses_safe_loader(node: ast.Call) -> bool:
+    '''检查 YAML 加载调用是否显式传入 SafeLoader，避免误报安全解析。'''
+    for keyword in node.keywords:
+        if keyword.arg in {"Loader", "loader"}:
+            name = _python_name(keyword.value, {})
+            if "SafeLoader" in name:
+                return True
+    return False
 
 
 def _call_is_network_sink(call_name: str) -> bool:
@@ -716,11 +678,49 @@ def _call_is_network_sink(call_name: str) -> bool:
     }
 
 
-def _yaml_load_uses_safe_loader(node: ast.Call) -> bool:
-    '''检查 YAML 加载调用是否显式传入 SafeLoader，避免误报安全解析。'''
-    for keyword in node.keywords:
-        if keyword.arg in {"Loader", "loader"}:
-            name = _python_name(keyword.value, {})
-            if "SafeLoader" in name:
-                return True
-    return False
+def _is_shell_path(rel_path: str, text: str) -> bool:
+    '''依据命令脚本后缀或首行的解释器声明判断是否使用命令脚本分析器。'''
+    suffix = PurePosixPath(rel_path).suffix.lower()
+    return suffix in {".sh", ".bash"} or text.startswith("#!") and any(shell in text.splitlines()[0].lower() for shell in ("sh", "bash", "zsh"))
+
+
+def _scan_shell(rel_path: str, text: str) -> list[SecurityFinding]:
+    '''检查 Shell 脚本中的反向 Shell、敏感信息外传、危险下载和破坏性命令。'''
+    findings: list[SecurityFinding] = []
+    # 明确的反向 Shell 特征会阻断；常见于正常运维脚本的弱特征只提示复核。
+    if match := re.search(r"(/dev/tcp/|nc\s+-e\b)", text):
+        findings.append(_finding_from_match("shell-reverse-shell", rel_path, text, match))
+    if match := re.search(r"(bash\s+-i\b|mkfifo\s+)", text):
+        findings.append(_finding_from_match("shell-reverse-shell-heuristic", rel_path, text, match))
+    if re.search(r"(/etc/shadow|/etc/passwd)", text) and re.search(r"\b(curl|wget|nc|scp)\b", text):
+        findings.append(_finding_for_text("shell-sensitive-exfil", rel_path, text, "/etc"))
+    if match := re.search(r"\b(curl|wget)\b[^\n|;]*\|\s*(?:sh|bash)\b", text):
+        findings.append(_finding_from_match("shell-curl-pipe-shell", rel_path, text, match))
+    if match := re.search(_DESTRUCTIVE_RM_RE + r"|:\(\)\{\s*:\|:&\s*\};:|dd\s+[^#\n]*\bof=/dev/", text):
+        findings.append(_finding_from_match("shell-destructive-command", rel_path, text, match))
+    if match := re.search(r"\b(env|printenv|export\s+-p)\b", text):
+        findings.append(_finding_from_match("shell-env-dump", rel_path, text, match))
+    return findings
+
+
+def _finding_for_text(rule_id: str, rel_path: str, text: str, evidence: str) -> SecurityFinding:
+    '''按证据文本定位行号并创建扫描发现；找不到文本时定位到首行。'''
+    index = text.find(evidence)
+    return _finding(rule_id, file=rel_path, line=_line_number(text, index if index >= 0 else 0), evidence=evidence)
+
+
+def _scan_network_and_resource(rel_path: str, text: str) -> list[SecurityFinding]:
+    '''识别云元数据访问、进程递归创建攻击，以及非本地明文网络地址。'''
+    findings: list[SecurityFinding] = []
+    if match := re.search(r"(169\.254\.169\.254|metadata\.google\.internal)", text):
+        findings.append(_finding_from_match("network-cloud-metadata", rel_path, text, match))
+    if match := re.search(r":\(\)\{\s*:\|:&\s*\};:", text):
+        findings.append(_finding_from_match("resource-fork-bomb", rel_path, text, match))
+    for match in _EXTERNAL_HTTP_RE.finditer(text):
+        host = match.group(1)
+        if host in _LOCAL_HTTP_HOSTS or host.startswith("10.") or host.startswith("192.168.") or re.match(r"172\.(1[6-9]|2\d|3[01])\.", host):
+            findings.append(_finding_from_match("network-local-http", rel_path, text, match))
+        else:
+            findings.append(_finding_from_match("network-cleartext-http", rel_path, text, match))
+        break
+    return findings
