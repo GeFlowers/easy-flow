@@ -69,7 +69,7 @@ import {
 import { fetch } from "@/features/api/fetcher";
 import { getBackendBaseURL } from "@/features/config";
 import { useI18n } from "@/features/i18n/hooks";
-import { polishInputDraft } from "@/features/input-polish/api";
+import { polishInputDraft } from "@/features/input-polish";
 import { hasOpenHumanInputRequest } from "@/features/messages/human-input";
 import { isHiddenFromUIMessage } from "@/features/messages/utils";
 import { useModels } from "@/features/models/hooks";
@@ -100,7 +100,7 @@ import {
   shouldRestartSpeechRecognition,
   type BrowserSpeechRecognition,
   type SpeechRecognitionErrorKind,
-} from "@/features/voice-input/speech-recognition";
+} from "@/features/speech-recognition";
 
 import {
   ModelSelector,

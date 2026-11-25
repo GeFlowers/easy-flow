@@ -1,8 +1,8 @@
 import type { ToolCall } from "@langchain/core/messages";
 import type { AIMessage } from "@langchain/langgraph-sdk";
 
-import type { Translations } from "../i18n";
-import { hasToolCalls } from "../messages/utils";
+import type { Translations } from "./i18n";
+import { hasToolCalls } from "./messages/utils";
 
 /** 为消息中的最后一次工具调用生成本地化说明。 */
 export function explainLastToolCall(message: AIMessage, t: Translations) {

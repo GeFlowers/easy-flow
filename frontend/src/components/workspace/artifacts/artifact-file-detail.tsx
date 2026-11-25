@@ -39,7 +39,7 @@ import {
 } from "@/features/artifacts/preview";
 import { urlOfArtifact } from "@/features/artifacts/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { extractCitationSources } from "@/features/citations/sources";
+import { extractCitationSources } from "@/features/citation-sources";
 import { writeTextToClipboard } from "@/features/clipboard";
 import { useI18n } from "@/features/i18n/hooks";
 import { findToolCallResult } from "@/features/messages/utils";

@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import {
   formatCitationMarkdownReference,
   type CitationSource,
-} from "@/features/citations/sources";
+} from "@/features/citation-sources";
 import { writeTextToClipboard } from "@/features/clipboard";
 import { useI18n } from "@/features/i18n/hooks";
 

@@ -35,7 +35,7 @@ import {
   resolveArtifactURL,
   resolveMessageImageURL,
 } from "@/features/artifacts/utils";
-import { extractCitationSources } from "@/features/citations/sources";
+import { extractCitationSources } from "@/features/citation-sources";
 import { useI18n } from "@/features/i18n/hooks";
 import {
   extractContentFromMessage,

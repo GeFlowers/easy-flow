@@ -40,7 +40,7 @@ import {
 } from "@/features/messages/human-input";
 import { isHiddenFromUIMessage } from "@/features/messages/utils";
 import { useModels } from "@/features/models/hooks";
-import { useNotification } from "@/features/notification/hooks";
+import { useNotification } from "@/features/notification";
 import { useLocalSettings, useThreadSettings } from "@/features/settings";
 import {
   useBranchThread,

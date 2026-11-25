@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 
-import { useLocalSettings } from "../settings";
+import { useLocalSettings } from "./settings";
 
 /** 浏览器通知创建时可传入的选项。 */
 interface NotificationOptions {

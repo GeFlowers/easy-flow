@@ -30,7 +30,7 @@ import {
   resolveSubtaskModelLabel,
 } from "@/features/tasks/presentation";
 import { stepsForDisplay } from "@/features/tasks/steps";
-import { explainLastToolCall } from "@/features/tools/utils";
+import { explainLastToolCall } from "@/features/tool-utils";
 
 import { CitationLink } from "../citations/citation-link";
 import { FlipDisplay } from "../flip-display";
