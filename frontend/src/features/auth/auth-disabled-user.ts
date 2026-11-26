@@ -1,11 +1,9 @@
 import type { User } from "./types";
 
-/** 仅在非生产环境显式关闭认证时使用的管理员用户。 */
+/** 仅在非生产环境显式关闭认证时使用的用户。 */
 export const AUTH_DISABLED_USER: User = {
   id: "default",
   email: "default@test.local",
-  system_role: "admin",
-  needs_setup: false,
 };
 
 const PRODUCTION_ENV_VALUES = new Set(["prod", "production"]);

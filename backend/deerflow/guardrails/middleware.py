@@ -101,7 +101,6 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
             is_subagent=bool(context.get("is_subagent")),
             timestamp=datetime.now(UTC).isoformat(),
             user_id=context.get("user_id"),
-            user_role=context.get("user_role"),
             run_id=context.get("run_id"),
             tool_call_id=request.tool_call.get("id"),
         )
@@ -129,7 +128,6 @@ class GuardrailMiddleware(AgentMiddleware[AgentState]):
             "agent_id": guardrail_request.agent_id,
             # 内置子智能体通常没有运行日志；自定义运行时仍可提供带子智能体标记的日志。
             "is_subagent": guardrail_request.is_subagent,
-            "user_role": guardrail_request.user_role,
             "allow": decision.allow,
             "policy_id": decision.policy_id,
             "reason_codes": reason_codes,

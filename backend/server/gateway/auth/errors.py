@@ -18,7 +18,6 @@ class AuthErrorCode(StrEnum):
     USER_NOT_FOUND = "user_not_found"
     EMAIL_ALREADY_EXISTS = "email_already_exists"
     NOT_AUTHENTICATED = "not_authenticated"
-    SYSTEM_ALREADY_INITIALIZED = "system_already_initialized"
 
 
 class TokenError(StrEnum):

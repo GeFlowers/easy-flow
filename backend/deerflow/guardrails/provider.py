@@ -17,7 +17,6 @@ class GuardrailRequest:
     is_subagent: bool = False
     timestamp: str = ""
     user_id: str | None = None
-    user_role: str | None = None
     run_id: str | None = None
     tool_call_id: str | None = None
 

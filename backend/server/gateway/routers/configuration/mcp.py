@@ -8,10 +8,9 @@ import re
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, ConfigDict, Field
 
-from server.gateway.deps import require_admin_user
 from deerflow.config.extensions_config import ExtensionsConfig, McpRoutingConfig, McpToolOverride, get_extensions_config, reload_extensions_config
 from deerflow.mcp.cache import reset_mcp_tools_cache
 
@@ -22,7 +21,6 @@ router = APIRouter(prefix="/api", tags=["mcp"])
 # 不再由单线程事件循环隐式保证串行；否则两个并发的 PUT /api/mcp/config 请求可能交错执行并互相覆盖。
 # 跨进程写入仍是另一项既有问题，不由此锁处理。
 _mcp_config_write_lock = asyncio.Lock()
-_ADMIN_REQUIRED_DETAIL = "Admin privileges required to manage MCP configuration."
 
 
 _MCP_STDIO_COMMAND_ALLOWLIST_ENV = "DEER_FLOW_MCP_STDIO_COMMAND_ALLOWLIST"
@@ -77,7 +75,7 @@ class McpConfigResponse(BaseModel):
 
 
 class McpConfigUpdateRequest(BaseModel):
-    '''接收完整 MCP 服务器配置，用于管理员更新配置文件。'''
+    '''接收完整 MCP 服务器配置，用于更新配置文件。'''
 
     mcp_servers: dict[str, McpServerConfigResponse] = Field(
         ...,
@@ -105,7 +103,7 @@ _SENSITIVE_EXTRA_KEY_RE = re.compile(
     summary="Get MCP Configuration",
     description="Retrieve the current Model Context Protocol (MCP) server configurations.",
 )
-async def get_mcp_configuration(request: Request) -> McpConfigResponse:
+async def get_mcp_configuration() -> McpConfigResponse:
     '''读取当前 MCP 服务器及工具配置。
 
         返回：
@@ -126,7 +124,7 @@ async def get_mcp_configuration(request: Request) -> McpConfigResponse:
             }
             ```
     '''
-    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+
 
     config = get_extensions_config()
 
@@ -184,9 +182,8 @@ def _mask_sensitive_extra_value(value: Any) -> Any:
     summary="Reset MCP Tools Cache",
     description=("Reset cached MCP tools and pooled sessions process-wide so tools are reloaded on next use. This affects all threads and users in the current Gateway process."),
 )
-async def reset_mcp_tools_cache_endpoint(request: Request) -> McpCacheResetResponse:
+async def reset_mcp_tools_cache_endpoint() -> McpCacheResetResponse:
     '''清除当前 Gateway 进程的 MCP 工具和会话缓存，使后续调用重新加载配置。'''
-    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     reset_mcp_tools_cache()
     return McpCacheResetResponse(
         success=True,
@@ -200,7 +197,7 @@ async def reset_mcp_tools_cache_endpoint(request: Request) -> McpCacheResetRespo
     summary="Update MCP Configuration",
     description="Update Model Context Protocol (MCP) server configurations and save to file.",
 )
-async def update_mcp_configuration(request: Request, body: McpConfigUpdateRequest) -> McpConfigResponse:
+async def update_mcp_configuration(body: McpConfigUpdateRequest) -> McpConfigResponse:
     '''校验并保存 MCP 配置，随后刷新相关工具配置缓存。
 
         操作流程：
@@ -209,7 +206,7 @@ async def update_mcp_configuration(request: Request, body: McpConfigUpdateReques
         3. 清空工具缓存，以便下次调用时重新初始化。
 
         Args:
-            request：要保存的新 MCP 配置。
+            body：要保存的新 MCP 配置。
 
         Returns:
             更新后的 MCP 配置。
@@ -233,7 +230,6 @@ async def update_mcp_configuration(request: Request, body: McpConfigUpdateReques
             ```
     '''
     try:
-        await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
         _validate_mcp_update_request(body)
 
         # 将 extensions_config.json 的阻塞式读改写操作（解析路径、检查文件、读取原始内容、合并写入、

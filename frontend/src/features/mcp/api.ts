@@ -10,11 +10,7 @@ export class MCPConfigRequestError extends Error {
     super(message);
     this.name = "MCPConfigRequestError";
     this.status = status;
-  }
-  get isAdminRequired(): boolean {
-    return this.status === 403;
-  }
-}
+  }}
 
 /** 从错误响应体读取详情文本；缺失时使用调用方提供的回退信息。 */
 async function readErrorDetail(

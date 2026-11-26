@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/item";
 import { Switch } from "@/components/ui/switch";
 import { useI18n } from "@/features/i18n/hooks";
-import { MCPConfigRequestError } from "@/features/mcp/api";
+
 import { useMCPConfig, useEnableMCPServer } from "@/features/mcp/hooks";
 import type { MCPServerConfig } from "@/features/mcp/types";
 
@@ -19,8 +19,7 @@ import { SettingsSection } from "./settings-section";
 export function ToolSettingsPage() {
   const { t } = useI18n();
   const { config, isLoading, error } = useMCPConfig();
-  const adminRequired =
-    error instanceof MCPConfigRequestError && error.isAdminRequired;
+
   return (
     <SettingsSection
       title={t.settings.tools.title}
@@ -28,10 +27,6 @@ export function ToolSettingsPage() {
     >
       {isLoading ? (
         <div className="text-muted-foreground text-sm">{t.common.loading}</div>
-      ) : adminRequired ? (
-        <div className="text-muted-foreground text-sm">
-          {t.settings.tools.adminRequired}
-        </div>
       ) : error ? (
         <div>Error: {error.message}</div>
       ) : (

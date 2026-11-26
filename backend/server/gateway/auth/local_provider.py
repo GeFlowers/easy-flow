@@ -50,24 +50,14 @@ class LocalAuthProvider(AuthProvider):
         '''按用户 ID 查询用户。'''
         return await self._repo.get_user_by_id(user_id)
 
-    async def create_user(self, email: str, password: str | None = None, system_role: str = "user", needs_setup: bool = False) -> User:
+    async def create_user(self, email: str, password: str | None = None) -> User:
         '''创建本地用户，并在提供密码时先安全地计算密码哈希。'''
         password_hash = await hash_password_async(password) if password else None
         user = User(
             email=email,
             password_hash=password_hash,
-            system_role=system_role,
-            needs_setup=needs_setup,
         )
         return await self._repo.create_user(user)
-
-    async def count_users(self) -> int:
-        '''返回已注册用户总数。'''
-        return await self._repo.count_users()
-
-    async def count_admin_users(self) -> int:
-        '''返回管理员用户数量。'''
-        return await self._repo.count_admin_users()
 
     async def update_user(self, user: User) -> User:
         '''更新已有用户。'''

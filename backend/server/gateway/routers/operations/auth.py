@@ -1,6 +1,5 @@
 '''身份验证端点。'''
 
-import asyncio
 import logging
 import os
 import time
@@ -31,7 +30,6 @@ class LoginResponse(BaseModel):
     '''登录的响应模型 — 令牌仅存在于 HttpOnly cookie 中。'''
 
     expires_in: int  # 有效期（秒）
-    needs_setup: bool = False
 
 
 # 常见弱密码黑名单：取自公开 SecLists 的“10k worst passwords”集合，仅保留小写且长度
@@ -255,7 +253,6 @@ async def login_local(
 
     return LoginResponse(
         expires_in=get_auth_config().token_expiry_days * 24 * 3600,
-        needs_setup=user.needs_setup,
     )
 
 
@@ -290,13 +287,9 @@ def _record_login_success(ip: str) -> None:
 
 @router.post("/register", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
 async def register(request: Request, response: Response, body: RegisterRequest):
-    '''注册新的用户账户（固定授予 `user` 角色）。
-
-    首个管理员须通过 `/initialize` 显式创建；本端点仅创建普通用户，并通过设置会话
-    cookie 自动登录。
-    '''
+    '''注册用户并设置会话 Cookie。'''
     try:
-        user = await get_local_provider().create_user(email=body.email, password=body.password, system_role="user")
+        user = await get_local_provider().create_user(email=body.email, password=body.password)
     except ValueError:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -306,7 +299,7 @@ async def register(request: Request, response: Response, body: RegisterRequest):
     token = create_access_token(str(user.id), token_version=user.token_version)
     _set_session_cookie(response, token, request)
 
-    return UserResponse(id=str(user.id), email=user.email, system_role=user.system_role)
+    return UserResponse(id=str(user.id), email=user.email)
 
 
 @router.post("/logout", response_model=MessageResponse)
@@ -318,10 +311,9 @@ async def logout(request: Request, response: Response):
 
 @router.post("/change-password", response_model=MessageResponse)
 async def change_password(request: Request, response: Response, body: ChangePasswordRequest):
-    '''修改当前已认证用户的密码，并处理首次启动设置。
+    '''修改当前已认证用户的密码。
 
     - 提供 `new_email` 时更新邮箱并校验唯一性；
-    - 当 `user.needs_setup` 为 `True` 且提供 `new_email` 时，清除 `needs_setup`；
     - 始终递增 `token_version`，使旧会话失效；
     - 使用新的 `token_version` 重新签发会话 cookie。
     '''
@@ -358,10 +350,6 @@ async def change_password(request: Request, response: Response, body: ChangePass
     user.password_hash = await hash_password_async(body.new_password)
     user.token_version += 1
 
-    # 首次设置流程完成后清除设置标记。
-    if user.needs_setup and body.new_email is not None:
-        user.needs_setup = False
-
     await provider.update_user(user)
 
     # 使用新的 `token_version` 重新签发 cookie。
@@ -375,120 +363,4 @@ async def change_password(request: Request, response: Response, body: ChangePass
 async def get_me(request: Request):
     '''获取当前经过身份验证的用户信息。'''
     user = await get_current_user_from_request(request)
-    return UserResponse(
-        id=str(user.id),
-        email=user.email,
-        system_role=user.system_role,
-        needs_setup=user.needs_setup,
-    )
-
-
-# 每 IP 缓存：IP → （时间戳，结果字典）。
-# 在 TTL 内直接返回缓存而非 429：管理员是否存在通常不会频繁变化，而 429 会打断多
-# 标签页或服务重启后的集中重连。
-_SETUP_STATUS_CACHE: dict[str, tuple[float, dict]] = {}
-_SETUP_STATUS_CACHE_TTL_SECONDS = 60
-_MAX_TRACKED_SETUP_STATUS_IPS = 10000
-_SETUP_STATUS_INFLIGHT: dict[str, asyncio.Task[dict]] = {}
-_SETUP_STATUS_INFLIGHT_GUARD = asyncio.Lock()
-
-
-@router.get("/setup-status")
-async def setup_status(request: Request):
-    '''检查是否存在管理员账户；不存在时返回 `needs_setup=True`。'''
-    client_ip = _get_client_ip(request)
-    now = time.time()
-
-    # TTL 内返回缓存，避免多标签页重连触发 429。
-    cached = _SETUP_STATUS_CACHE.get(client_ip)
-    if cached is not None:
-        cached_time, cached_result = cached
-        if now - cached_time < _SETUP_STATUS_CACHE_TTL_SECONDS:
-            return cached_result
-
-    async with _SETUP_STATUS_INFLIGHT_GUARD:
-        # 等待进行中的任务保护锁后再次检查缓存。
-        now = time.time()
-        cached = _SETUP_STATUS_CACHE.get(client_ip)
-        if cached is not None:
-            cached_time, cached_result = cached
-            if now - cached_time < _SETUP_STATUS_CACHE_TTL_SECONDS:
-                return cached_result
-
-        task = _SETUP_STATUS_INFLIGHT.get(client_ip)
-        if task is None:
-            # 字典过大时清理过期条目，以限制内存使用。
-            if len(_SETUP_STATUS_CACHE) >= _MAX_TRACKED_SETUP_STATUS_IPS:
-                cutoff = now - _SETUP_STATUS_CACHE_TTL_SECONDS
-                stale = [k for k, (t, _) in _SETUP_STATUS_CACHE.items() if t < cutoff]
-                for k in stale:
-                    del _SETUP_STATUS_CACHE[k]
-                if len(_SETUP_STATUS_CACHE) >= _MAX_TRACKED_SETUP_STATUS_IPS:
-                    by_time = sorted(_SETUP_STATUS_CACHE.items(), key=lambda entry: entry[1][0])
-                    for k, _ in by_time[: len(by_time) // 2]:
-                        del _SETUP_STATUS_CACHE[k]
-
-            async def _compute_setup_status() -> dict:
-                '''查询管理员数量并生成首次设置状态。'''
-                admin_count = await get_local_provider().count_admin_users()
-                return {"needs_setup": admin_count == 0}
-
-            task = asyncio.create_task(_compute_setup_status())
-            _SETUP_STATUS_INFLIGHT[client_ip] = task
-
-    try:
-        result = await task
-    finally:
-        async with _SETUP_STATUS_INFLIGHT_GUARD:
-            if _SETUP_STATUS_INFLIGHT.get(client_ip) is task:
-                del _SETUP_STATUS_INFLIGHT[client_ip]
-
-    # 仅缓存稳定的“已初始化”结果，避免首次设置重定向过期。
-    if result["needs_setup"] is False:
-        _SETUP_STATUS_CACHE[client_ip] = (time.time(), result)
-    else:
-        _SETUP_STATUS_CACHE.pop(client_ip, None)
-    return result
-
-
-class InitializeAdminRequest(BaseModel):
-    '''请求创建首次启动管理员帐户的模型。'''
-
-    email: EmailStr
-    password: str = Field(..., min_length=8)
-
-    _strong_password = field_validator("password")(classmethod(lambda cls, v: _validate_strong_password(v)))
-
-
-@router.post("/initialize", response_model=UserResponse, status_code=status.HTTP_201_CREATED)
-async def initialize_admin(request: Request, response: Response, body: InitializeAdminRequest):
-    '''在系统首次设置期间创建首个管理员账户。
-
-    仅在不存在管理员时可调用；若管理员已存在则返回 409 Conflict。成功后以
-    `needs_setup=False` 创建管理员账户，并设置会话 cookie。
-    '''
-    admin_count = await get_local_provider().count_admin_users()
-    if admin_count > 0:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=AuthErrorResponse(code=AuthErrorCode.SYSTEM_ALREADY_INITIALIZED, message="System already initialized").model_dump(),
-        )
-
-    try:
-        user = await get_local_provider().create_user(email=body.email, password=body.password, system_role="admin", needs_setup=False)
-    except ValueError:
-        admin_count = await get_local_provider().count_admin_users()
-        if admin_count == 0:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=AuthErrorResponse(code=AuthErrorCode.EMAIL_ALREADY_EXISTS, message="Email already registered").model_dump(),
-            )
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail=AuthErrorResponse(code=AuthErrorCode.SYSTEM_ALREADY_INITIALIZED, message="System already initialized").model_dump(),
-        )
-
-    token = create_access_token(str(user.id), token_version=user.token_version)
-    _set_session_cookie(response, token, request)
-
-    return UserResponse(id=str(user.id), email=user.email, system_role=user.system_role)
+    return UserResponse(id=str(user.id), email=user.email)

@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState } from "react";
@@ -9,11 +8,6 @@ import { Button } from "@/components/ui/button";
 import { FlickeringGrid } from "@/components/ui/flickering-grid";
 import { Input } from "@/components/ui/input";
 import { useAuth } from "@/features/auth/AuthProvider";
-import {
-  canCreateRegularAccount,
-  fetchSetupStatus,
-  type SetupStatusResponse,
-} from "@/features/auth/setup";
 import { parseAuthError } from "@/features/auth/types";
 import { useI18n } from "@/features/i18n/hooks";
 
@@ -57,23 +51,12 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isLogin, setIsLogin] = useState(true);
-  const [setupStatus, setSetupStatus] = useState<SetupStatusResponse | null>(
-    null,
-  );
-  const [setupStatusChecked, setSetupStatusChecked] = useState(false);
-
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
   // 先校验回跳地址，再决定登录成功后的落点。
   const nextParam = searchParams.get("next");
   const redirectPath = validateNextParam(nextParam) ?? "/workspace";
-  const regularSignupAllowed = canCreateRegularAccount({
-    checked: setupStatusChecked,
-    status: setupStatus,
-  });
-  const systemNeedsAdminSetup = setupStatus?.needs_setup === true;
-
   // 已登录用户无需重复访问登录页，直接跳转到安全的目标页。
   useEffect(() => {
     if (isAuthenticated) {
@@ -81,45 +64,11 @@ export default function LoginPage() {
     }
   }, [isAuthenticated, redirectPath, router]);
 
-  // 加载系统初始化状态。
-  useEffect(() => {
-    let cancelled = false;
-
-    void fetchSetupStatus()
-      .then((data) => {
-        if (cancelled) return;
-        setSetupStatus(data);
-        if (data.needs_setup) {
-          setIsLogin(true);
-        }
-      })
-      .catch(() => {
-        if (!cancelled) {
-          setSetupStatus(null);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) {
-          setSetupStatusChecked(true);
-        }
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
   /** 提交本地登录或注册，并根据认证结果更新表单状态。 */
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
-    if (!isLogin && !regularSignupAllowed) {
-      setError(t.login.adminSetupRequiredDescription);
-      setLoading(false);
-      return;
-    }
 
     try {
       const endpoint = isLogin
@@ -176,21 +125,6 @@ export default function LoginPage() {
           </p>
         </div>
 
-        {systemNeedsAdminSetup && (
-          <div className="border-l-2 border-blue-500 ps-3 text-sm">
-            <p className="font-medium">{t.login.adminSetupRequiredTitle}</p>
-            <p className="text-muted-foreground mt-1">
-              {t.login.adminSetupRequiredDescription}
-            </p>
-            <Link
-              href="/setup"
-              className="mt-2 inline-block font-medium text-blue-500 hover:underline"
-            >
-              {t.login.createAdminAccount}
-            </Link>
-          </div>
-        )}
-
         <form onSubmit={handleSubmit} className="space-y-2">
           <div className="flex flex-col space-y-1">
             <label htmlFor="email" className="text-sm font-medium">
@@ -231,20 +165,18 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {regularSignupAllowed && (
-          <div className="text-center text-sm">
-            <button
-              type="button"
-              onClick={() => {
-                setIsLogin(!isLogin);
-                setError("");
-              }}
-              className="text-blue-500 hover:underline"
-            >
-              {isLogin ? t.login.noAccountSignUp : t.login.haveAccountSignIn}
-            </button>
-          </div>
-        )}
+        <div className="text-center text-sm">
+          <button
+            type="button"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError("");
+            }}
+            className="text-blue-500 hover:underline"
+          >
+            {isLogin ? t.login.noAccountSignUp : t.login.haveAccountSignIn}
+          </button>
+        </div>
       </div>
     </div>
   );

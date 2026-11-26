@@ -12,10 +12,6 @@ export class SkillRequestError extends Error {
     this.name = "SkillRequestError";
     this.status = status;
   }
-
-  get isAdminRequired(): boolean {
-    return this.status === 403;
-  }
 }
 
 /** 从失败响应中读取技能接口可展示的错误详情。 */
@@ -65,7 +61,7 @@ export interface InstallSkillRequest {
   path: string;
 }
 
-/** 后端返回的技能安装结果；非授权类响应错误会以软失败形式返回。 */
+/** 后端返回的技能安装结果；请求错误会以软失败形式返回。 */
 export interface InstallSkillResponse {
   success: boolean;
   skill_name: string;
@@ -86,11 +82,6 @@ export async function installSkill(
 
   if (!response.ok) {
     const message = await readErrorDetail(response);
-    // 暴露授权失败，让调用方展示仅管理员可用的提示而非通用失败信息。
-    if (response.status === 403) {
-      throw new SkillRequestError(response.status, message);
-    }
-    // 其他响应错误维持既有的软失败约定。
     return {
       success: false,
       skill_name: "",

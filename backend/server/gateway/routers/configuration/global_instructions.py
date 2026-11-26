@@ -4,12 +4,12 @@ import os
 import tempfile
 import threading
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from deerflow.config.agents_config import AGENTS_FILENAME
 from deerflow.config.paths import get_paths
-from server.gateway.deps import require_admin_user
+
 
 router = APIRouter(prefix="/api", tags=["global-instructions"])
 _write_lock = threading.Lock()
@@ -29,14 +29,13 @@ def _read_content() -> str:
 
 
 @router.get("/global-instructions", response_model=InstructionsContent)
-async def get_global_instructions(request: Request) -> InstructionsContent:
-    await require_admin_user(request, detail="Only administrators can manage global instructions.")
+async def get_global_instructions() -> InstructionsContent:
     return InstructionsContent(content=_read_content())
 
 
 @router.put("/global-instructions", response_model=InstructionsContent)
-async def update_global_instructions(request: Request, body: InstructionsUpdate) -> InstructionsContent:
-    await require_admin_user(request, detail="Only administrators can manage global instructions.")
+async def update_global_instructions(body: InstructionsUpdate) -> InstructionsContent:
+
     path = get_paths().base_dir / AGENTS_FILENAME
     with _write_lock:
         if _read_content() != body.original_content:

@@ -6,8 +6,8 @@ import { z } from "zod";
 export const userSchema = z.object({
   id: z.string(),
   email: z.string().email(),
-  system_role: z.enum(["admin", "user"]),
-  needs_setup: z.boolean().optional().default(false),
+
+
 });
 
 /** 前端使用的本地账号数据。 */
@@ -18,8 +18,8 @@ export type User = z.infer<typeof userSchema>;
 /** 服务端认证守卫的全部可判别结果。 */
 export type AuthResult =
   | { tag: "authenticated"; user: User }
-  | { tag: "needs_setup"; user: User }
-  | { tag: "system_setup_required" }
+
+
   | { tag: "unauthenticated" }
   | { tag: "gateway_unavailable" }
   | { tag: "config_error"; message: string };
@@ -43,7 +43,6 @@ const AUTH_ERROR_CODES = [
   "user_not_found",
   "email_already_exists",
   "not_authenticated",
-  "system_already_initialized",
 ] as const;
 
 /** 后端认证接口可能返回的规范错误码。 */

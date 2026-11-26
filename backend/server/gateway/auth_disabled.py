@@ -43,19 +43,18 @@ def warn_if_auth_disabled_enabled() -> None:
         return
 
     logger.warning(
-        "%s=1 is active: authentication is bypassed and anonymous requests run as synthetic admin user %r. Do not enable this in shared or production deployments.",
+        "%s=1 is active: authentication is bypassed and anonymous requests run as synthetic user %r. Do not enable this in shared or production deployments.",
         AUTH_DISABLED_ENV_VAR,
         AUTH_DISABLED_USER_ID,
     )
 
 
 def get_auth_disabled_user():
-    '''返回禁用认证模式使用的合成管理员用户。'''
+    '''返回禁用认证模式使用的合成用户。'''
     return SimpleNamespace(
         id=AUTH_DISABLED_USER_ID,
         email=AUTH_DISABLED_USER_EMAIL,
         password_hash=None,
-        system_role="admin",
-        needs_setup=False,
+
         token_version=0,
     )

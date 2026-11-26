@@ -579,7 +579,6 @@ export const zhCN: Translations = {
       saveError: "无法保存指示",
       conflict: "指示已在其他地方修改，请复制当前编辑内容，再重新加载。",
       reload: "重新加载",
-      adminOnly: "仅管理员可以管理指示。",
     },
     memory: {
       title: "记忆",
@@ -667,14 +666,13 @@ export const zhCN: Translations = {
     tools: {
       title: "工具",
       description: "管理 MCP 工具的配置和启用状态。",
-      adminRequired: "需要管理员权限才能管理 MCP 工具。",
       empty: "暂无 MCP 工具。",
     },
     channels: {
       title: "渠道",
       description: "连接可在浏览器外向 DeerFlow 发送消息的即时通讯账号。",
       disabled:
-        "当前服务器未启用渠道连接。请联系管理员开启 channel_connections。",
+        "当前服务器未启用渠道连接。",
     },
     skills: {
       title: "技能",
@@ -684,8 +682,6 @@ export const zhCN: Translations = {
       emptyDescription:
         "将你的 Agent Skill 文件夹放在 DeerFlow 根目录下的 `/skills/custom` 文件夹中。",
       emptyButton: "创建你的第一个技能",
-      adminRequired: "需要管理员权限才能管理 Agent Skill。",
-      installAdminRequired: "需要管理员权限才能安装 Agent Skill。",
     },
     notification: {
       title: "通知",
@@ -703,7 +699,6 @@ export const zhCN: Translations = {
     account: {
       profileTitle: "个人信息",
       email: "邮箱",
-      role: "角色",
       changePasswordTitle: "修改密码",
       changePasswordDescription: "更新你的账号密码。",
       currentPassword: "当前密码",
@@ -732,10 +727,6 @@ export const zhCN: Translations = {
     pleaseWait: "请稍候...",
     signIn: "登录",
     createAccount: "创建账号",
-    createAdminAccount: "创建管理员账号",
-    adminSetupRequiredTitle: "需要先完成管理员初始化",
-    adminSetupRequiredDescription:
-      "DeerFlow 需要先创建管理员账号，然后才能创建新的普通账号。",
     noAccountSignUp: "还没有账号？立即注册",
     haveAccountSignIn: "已有账号？立即登录",
     networkError: "网络错误，请重试。",

@@ -28,12 +28,17 @@ def _ensure_business_schema(connection) -> None:
     Base.metadata.create_all(connection, checkfirst=True)
     inspector = inspect(connection)
     for table in Base.metadata.sorted_tables:
-        actual = {column['name'] for column in inspector.get_columns(table.name)}
-        missing = set(table.columns.keys()) - actual
+        actual = {column['name']: column for column in inspector.get_columns(table.name)}
+        missing = set(table.columns.keys()) - actual.keys()
         if missing:
             raise RuntimeError(
                 f'数据库表 {table.name} 缺少必要字段 {sorted(missing)}；'
                 '当前不记录结构版本，请先显式升级表结构再启动。'
             )
+        if table.name == 'users':
+            # 旧库保留已有字段值，允许新账号省略已退役的字段。
+            for name in ('system_role', 'needs_setup'):
+                if name in actual and not actual[name]['nullable']:
+                    connection.execute(text(f'ALTER TABLE users ALTER COLUMN {name} DROP NOT NULL'))
         for index in table.indexes:
             index.create(connection, checkfirst=True)

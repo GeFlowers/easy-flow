@@ -504,7 +504,6 @@ export interface Translations {
       saveError: string;
       conflict: string;
       reload: string;
-      adminOnly: string;
     };
     memory: {
       title: string;
@@ -588,7 +587,6 @@ export interface Translations {
     tools: {
       title: string;
       description: string;
-      adminRequired: string;
       empty: string;
     };
     channels: {
@@ -603,8 +601,6 @@ export interface Translations {
       emptyTitle: string;
       emptyDescription: string;
       emptyButton: string;
-      adminRequired: string;
-      installAdminRequired: string;
     };
     notification: {
       title: string;
@@ -620,7 +616,6 @@ export interface Translations {
     account: {
       profileTitle: string;
       email: string;
-      role: string;
       changePasswordTitle: string;
       changePasswordDescription: string;
       currentPassword: string;
@@ -651,9 +646,6 @@ export interface Translations {
     pleaseWait: string;
     signIn: string;
     createAccount: string;
-    createAdminAccount: string;
-    adminSetupRequiredTitle: string;
-    adminSetupRequiredDescription: string;
     noAccountSignUp: string;
     haveAccountSignIn: string;
     networkError: string;

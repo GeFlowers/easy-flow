@@ -21,40 +21,13 @@ export async function getServerSideUser(): Promise<AuthResult> {
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get("access_token");
 
+  if (!sessionCookie) return { tag: "unauthenticated" };
+
   let internalGatewayUrl: string;
   try {
     internalGatewayUrl = getGatewayConfig().internalGatewayUrl;
   } catch (err) {
     return { tag: "config_error", message: String(err) };
-  }
-
-  if (!sessionCookie) {
-    // 没有会话时，检查系统是否尚未完成初始化。
-    const setupController = new AbortController();
-    const setupTimeout = setTimeout(
-      () => setupController.abort(),
-      SSR_AUTH_TIMEOUT_MS,
-    );
-    try {
-      const setupRes = await fetch(
-        `${internalGatewayUrl}/api/v1/auth/setup-status`,
-        {
-          cache: "no-store",
-          signal: setupController.signal,
-        },
-      );
-      clearTimeout(setupTimeout);
-      if (setupRes.ok) {
-        const setupData = (await setupRes.json()) as { needs_setup?: boolean };
-        if (setupData.needs_setup) {
-          return { tag: "system_setup_required" };
-        }
-      }
-    } catch {
-      clearTimeout(setupTimeout);
-      // setup-status 不可达或超时时，继续按未认证状态处理。
-    }
-    return { tag: "unauthenticated" };
   }
 
   const controller = new AbortController();
@@ -73,9 +46,6 @@ export async function getServerSideUser(): Promise<AuthResult> {
       if (!parsed.success) {
         console.error("[SSR auth] Malformed /auth/me response:", parsed.error);
         return { tag: "gateway_unavailable" };
-      }
-      if (parsed.data.needs_setup) {
-        return { tag: "needs_setup", user: parsed.data };
       }
       return { tag: "authenticated", user: parsed.data };
     }

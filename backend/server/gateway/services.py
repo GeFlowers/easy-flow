@@ -22,7 +22,6 @@ from server.gateway.auth_disabled import AUTH_SOURCE_INTERNAL
 from server.gateway.deps import get_checkpointer, get_local_provider, get_run_context, get_run_manager, get_stream_bridge
 from server.gateway.internal_auth import (
     INTERNAL_OWNER_USER_ID_HEADER_NAME,
-    INTERNAL_SYSTEM_ROLE,
     get_internal_user,
     get_trusted_internal_owner_user_id,
 )
@@ -227,8 +226,7 @@ async def resolve_trusted_internal_owner_for_attribution(request: Request, owner
 
     if not owner_user_id:
         return None
-    user = getattr(request.state, "user", None)
-    if getattr(user, "system_role", None) != INTERNAL_SYSTEM_ROLE:
+    if getattr(request.state, "auth_source", None) != AUTH_SOURCE_INTERNAL:
         return None
     try:
         return await get_local_provider().get_user(owner_user_id)
@@ -243,30 +241,27 @@ def inject_authenticated_user_context(
     *,
     internal_owner_user: Any | None = None,
 ) -> None:
-    '''将服务端认证得到的用户及身份属性写入运行时上下文，供后台工具使用。'''
+    '''将服务端认证得到的用户标识写入运行时上下文，供后台工具使用。'''
 
     user = getattr(request.state, "user", None)
     user_id = getattr(user, "id", None)
     if user_id is None:
         return
 
-    if getattr(user, "system_role", None) == INTERNAL_SYSTEM_ROLE:
+    if getattr(request.state, "auth_source", None) == AUTH_SOURCE_INTERNAL:
         runtime_context = config.setdefault("context", {})
         if not isinstance(runtime_context, dict):
             return
         if internal_owner_user is None:
-            runtime_context.pop("user_role", None)
             return
         owner_user_id = getattr(internal_owner_user, "id", None)
         if owner_user_id is not None:
             runtime_context["user_id"] = str(owner_user_id)
-        runtime_context["user_role"] = getattr(internal_owner_user, "system_role", None)
         return
 
     runtime_context = config.setdefault("context", {})
     if isinstance(runtime_context, dict):
         runtime_context["user_id"] = str(user_id)
-        runtime_context["user_role"] = getattr(user, "system_role", None)
 
 
 def resolve_agent_factory(assistant_id: str | None):
@@ -472,7 +467,7 @@ async def start_run(
     user = getattr(request.state, "user", None)
     if user is not None:
         allowed = await run_ctx.thread_store.check_access(thread_id, str(user.id))
-        if not allowed and owner_user_id and getattr(user, "system_role", None) == INTERNAL_SYSTEM_ROLE:
+        if not allowed and owner_user_id:
             # 渠道工作器也可以代表可信请求头中指定的连接所有者执行，例如将默认所有者名下的旧渠道
             # 会话转归其实际所有者。
             allowed = await run_ctx.thread_store.check_access(thread_id, owner_user_id)

@@ -429,25 +429,6 @@ async def get_current_user_from_request(request: Request):
     return user
 
 
-async def require_admin_user(request: Request, *, detail: str) -> None:
-    '''要求已认证调用方为管理员用户。
-
-    通常 ``AuthMiddleware`` 会在请求进入路由前写入 ``request.state.user``。在测试或其他
-    未挂载全局中间件的 ASGI 组合中，此处回退到严格的依赖项进行认证，确保路由仍然安全。
-    ``detail`` 是此路由专用的 403 错误信息。
-
-    将检查集中在此处，后续若调整管理员定义（例如允许内部系统角色、增加审计日志或改为权限
-    检查），只需修改一处，避免逻辑分散在 ``mcp``、``channel_connections`` 和 ``channels``
-    等路由各自维护的副本中。
-    '''
-    user = getattr(request.state, "user", None)
-    if user is None:
-        user = await get_current_user_from_request(request)
-
-    if getattr(user, "system_role", None) != "admin":
-        raise HTTPException(status_code=403, detail=detail)
-
-
 async def get_optional_user_from_request(request: Request):
     '''从请求获取可选的已认证用户。
 

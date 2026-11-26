@@ -7,13 +7,13 @@ import secrets
 from types import SimpleNamespace
 from typing import Any
 
+from server.gateway.auth_disabled import AUTH_SOURCE_INTERNAL
 from deerflow.config.paths import make_safe_user_id
 from deerflow.runtime.user_context import DEFAULT_USER_ID
 
 INTERNAL_AUTH_HEADER_NAME = "X-DeerFlow-Internal-Token"
 INTERNAL_OWNER_USER_ID_HEADER_NAME = "X-DeerFlow-Owner-User-Id"
 INTERNAL_AUTH_ENV_VAR = "DEER_FLOW_INTERNAL_AUTH_TOKEN"
-INTERNAL_SYSTEM_ROLE = "internal"
 
 
 def _load_internal_auth_token() -> str:
@@ -52,7 +52,7 @@ def get_internal_user(owner_user_id: str | None = None):
         effective_id = make_safe_user_id(owner_user_id)
     else:
         effective_id = DEFAULT_USER_ID
-    return SimpleNamespace(id=effective_id, system_role=INTERNAL_SYSTEM_ROLE)
+    return SimpleNamespace(id=effective_id)
 
 
 def get_trusted_internal_owner_user_id(request: Any) -> str | None:
@@ -61,8 +61,7 @@ def get_trusted_internal_owner_user_id(request: Any) -> str | None:
     仅当 ``AuthMiddleware`` 已验证内部令牌并将合成内部用户写入请求状态后，才会
     信任该覆盖值。
     '''
-    user = getattr(getattr(request, "state", None), "user", None)
-    if getattr(user, "system_role", None) != INTERNAL_SYSTEM_ROLE:
+    if getattr(getattr(request, "state", None), "auth_source", None) != AUTH_SOURCE_INTERNAL:
         return None
 
     owner_user_id = request.headers.get(INTERNAL_OWNER_USER_ID_HEADER_NAME)

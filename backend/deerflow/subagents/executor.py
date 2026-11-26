@@ -270,7 +270,6 @@ class SubagentExecutor:
         thread_id: str | None = None,
         trace_id: str | None = None,
         user_id: str | None = None,
-        user_role: str | None = None,
         run_id: str | None = None,
         channel_user_id: str | None = None,
         deerflow_trace_id: str | None = None,
@@ -291,8 +290,6 @@ class SubagentExecutor:
         # 顶层调用未提供追踪标识时生成短 ID，便于日志关联。
         self.trace_id = trace_id or str(uuid.uuid4())[:8]
         self.user_id = user_id
-        # 将父运行的权限身份传给子代理及其工具调用。
-        self.user_role = user_role
         self.run_id = run_id
         # 群聊线程由多人共享；子代理命令必须使用触发本次委派的发送者身份，
         # 不能因线程共享而丢失用户归属。
@@ -438,9 +435,8 @@ class SubagentExecutor:
                 context["thread_id"] = self.thread_id
             if self.app_config is not None:
                 context["app_config"] = self.app_config
-            # 透传父运行的用户和授权身份，让委派工具调用沿用同一权限判定与审计归属。
+            # 透传父运行的用户标识，让委派工具调用沿用同一用户归属。
             context["user_id"] = self.user_id
-            context["user_role"] = self.user_role
             context["run_id"] = self.run_id
             if self.channel_user_id:
                 context["channel_user_id"] = self.channel_user_id

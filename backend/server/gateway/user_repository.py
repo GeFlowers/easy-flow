@@ -11,7 +11,7 @@ from datetime import UTC
 from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import func, select
+from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
@@ -53,9 +53,7 @@ class SQLUserRepository:
             id=str(user.id),
             email=user.email,
             password_hash=user.password_hash,
-            system_role=user.system_role,
             created_at=user.created_at,
-            needs_setup=user.needs_setup,
             token_version=user.token_version,
         )
 
@@ -77,10 +75,8 @@ class SQLUserRepository:
             id=UUID(row.id),
             email=row.email,
             password_hash=row.password_hash,
-            system_role=row.system_role,  # type: ignore[arg-type]
             # 数据库读取时间时会丢失时区；补回协调世界时以便下游可靠比较时间戳。
             created_at=row.created_at if row.created_at.tzinfo else row.created_at.replace(tzinfo=UTC),
-            needs_setup=row.needs_setup,
             token_version=row.token_version,
         )
 
@@ -103,20 +99,6 @@ class SQLUserRepository:
                 raise UserNotFoundError(f"User {user.id} no longer exists")
             row.email = user.email
             row.password_hash = user.password_hash
-            row.system_role = user.system_role
-            row.needs_setup = user.needs_setup
             row.token_version = user.token_version
             await session.commit()
         return user
-
-    async def count_users(self) -> int:
-        '''统计用户表中的全部用户数量。'''
-        stmt = select(func.count()).select_from(UserRow)
-        async with self._sf() as session:
-            return await session.scalar(stmt) or 0
-
-    async def count_admin_users(self) -> int:
-        '''统计角色为管理员的用户数量。'''
-        stmt = select(func.count()).select_from(UserRow).where(UserRow.system_role == "admin")
-        async with self._sf() as session:
-            return await session.scalar(stmt) or 0

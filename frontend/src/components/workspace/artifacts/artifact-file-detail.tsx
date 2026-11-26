@@ -38,12 +38,12 @@ import {
   HTML_PREVIEW_SCROLL_MESSAGE_SOURCE,
 } from "@/features/artifacts/preview";
 import { urlOfArtifact } from "@/features/artifacts/utils";
-import { useAuth } from "@/features/auth/AuthProvider";
+
 import { extractCitationSources } from "@/features/citation-sources";
 import { writeTextToClipboard } from "@/features/clipboard";
 import { useI18n } from "@/features/i18n/hooks";
 import { findToolCallResult } from "@/features/messages/utils";
-import { installSkill, SkillRequestError } from "@/features/skills/api";
+import { installSkill } from "@/features/skills/api";
 import { SafeStreamdown } from "@/features/streamdown/components";
 import {
   canBrowserPreviewFile,
@@ -74,8 +74,7 @@ export function ArtifactFileDetail({
   threadId: string;
 }) {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isAdmin = user?.system_role === "admin";
+
   const { artifacts, setOpen, select } = useArtifacts();
   const { thread } = useThread();
   const isWriteFile = useMemo(() => {
@@ -199,11 +198,7 @@ export function ArtifactFileDetail({
       }
     } catch (error) {
       console.error("Failed to install skill:", error);
-      if (error instanceof SkillRequestError && error.isAdminRequired) {
-        toast.error(t.settings.skills.installAdminRequired);
-      } else {
-        toast.error("Failed to install skill");
-      }
+      toast.error("Failed to install skill");
     } finally {
       setIsInstalling(false);
     }
@@ -258,7 +253,7 @@ export function ArtifactFileDetail({
         </div>
         <div className="flex items-center gap-2">
           <ArtifactActions>
-            {!isWriteFile && filepath.endsWith(".skill") && isAdmin && (
+            {!isWriteFile && filepath.endsWith(".skill") && (
               <Tooltip content={t.toolCalls.skillInstallTooltip}>
                 <ArtifactAction
                   icon={isInstalling ? LoaderIcon : PackageIcon}

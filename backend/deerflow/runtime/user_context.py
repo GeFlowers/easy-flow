@@ -173,7 +173,7 @@ def resolve_user_id(
 
         - :data:`AUTO`（默认）：从上下文读取；没有用户时抛出
           :class:`RuntimeError`，这是请求范围调用的常规路径。
-        - 显式 ``str``：原样使用传入 ID，适合测试和管理员覆盖流程。
+        - 显式 ``str``：原样使用传入 ID，适合测试和显式指定用户的流程。
         - 显式 ``None``：不添加 user_id 过滤，仅供有意绕过隔离的迁移脚本和命令行工具使用。
     '''
     if isinstance(value, _AutoSentinel):

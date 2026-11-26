@@ -28,7 +28,7 @@ export async function startWechatLogin(): Promise<WechatLoginStatus> {
   return response.json() as Promise<WechatLoginStatus>;
 }
 
-/** 查询当前管理员发起的微信扫码进度。 */
+/** 查询当前用户发起的微信扫码进度。 */
 export async function getWechatLogin(
   loginId: string,
 ): Promise<WechatLoginStatus> {

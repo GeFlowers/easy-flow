@@ -127,7 +127,6 @@ async def task_tool(
 
     parent_context = runtime.context if runtime is not None else None
     parent_context = parent_context if isinstance(parent_context, dict) else {}
-    user_role = parent_context.get("user_role")
     run_id = parent_context.get("run_id")
     channel_user_id = parent_context.get("channel_user_id")
     deerflow_trace_id = normalize_trace_id(parent_context.get(DEERFLOW_TRACE_METADATA_KEY)) or normalize_trace_id(metadata.get(DEERFLOW_TRACE_METADATA_KEY)) or get_current_trace_id()
@@ -165,7 +164,6 @@ async def task_tool(
         "thread_id": thread_id,
         "trace_id": trace_id,
         "user_id": user_id,
-        "user_role": user_role,
         "run_id": run_id,
         "channel_user_id": channel_user_id,
         "deerflow_trace_id": deerflow_trace_id,

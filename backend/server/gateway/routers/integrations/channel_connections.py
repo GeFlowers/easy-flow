@@ -16,7 +16,7 @@ from server.channels.runtime_config_store import (
     apply_runtime_connection_config,
     merge_runtime_channel_configs,
 )
-from server.gateway.deps import require_admin_user
+
 from deerflow.config.channel_connections_config import ChannelConnectionsConfig
 from deerflow.persistence.channel_connections import ChannelConnectionRepository
 from deerflow.persistence.engine import get_session_factory
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 _STATE_TTL_SECONDS = 600
 _MAX_PENDING_CONNECT_CODES_PER_PROVIDER = 5
 _MASKED_CREDENTIAL_VALUE = "********"
-_ADMIN_REQUIRED_DETAIL = "Admin privileges required to manage channel runtime credentials."
 
 
 class ChannelCredentialFieldResponse(BaseModel):
@@ -472,8 +471,8 @@ async def disconnect_channel_connection(connection_id: str, request: Request) ->
 
 @router.delete("/{provider}/runtime-config", response_model=ChannelProviderResponse)
 async def disconnect_channel_provider_runtime(provider: str, request: Request) -> ChannelProviderResponse:
-    '''移除管理员配置的渠道运行时凭据与配置。'''
-    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    '''移除已配置的渠道运行时凭据与配置。'''
+
     config = await _get_channel_connections_config(request)
     if not config.enabled:
         raise HTTPException(status_code=400, detail="Channel connections are disabled")
@@ -625,8 +624,8 @@ async def configure_channel_provider_runtime(
     body: ChannelRuntimeConfigRequest,
     request: Request,
 ) -> ChannelProviderResponse:
-    '''由管理员配置指定渠道的运行时凭据并启动渠道。'''
-    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    '''配置指定渠道的运行时凭据并启动渠道。'''
+
     config = await _get_channel_connections_config(request)
     if not config.enabled:
         raise HTTPException(status_code=400, detail="Channel connections are disabled")
@@ -709,8 +708,8 @@ async def _restart_runtime_channel_if_available(provider: str, runtime_config: d
 
 @router.post("/wechat/login", response_model=WechatLoginResponse)
 async def start_wechat_login(request: Request) -> dict[str, Any]:
-    '''由管理员发起个人微信扫码，确认后保存登录凭据并启动微信通道。'''
-    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    '''发起个人微信扫码，确认后保存登录凭据并启动微信通道。'''
+
     config = await _get_channel_connections_config(request)
     if not config.enabled or not config.wechat.enabled:
         raise HTTPException(status_code=400, detail="个人微信通道尚未启用。")
@@ -753,8 +752,7 @@ def _wechat_login_flow(request: Request):
 
 @router.get("/wechat/login/{login_id}", response_model=WechatLoginResponse)
 async def get_wechat_login(login_id: str, request: Request) -> dict[str, Any]:
-    '''仅向发起扫码的管理员返回脱敏后的登录进度。'''
-    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
+    '''仅向发起扫码的用户返回脱敏后的登录进度。'''
     try:
         return await asyncio.to_thread(_wechat_login_flow(request).snapshot, _get_user_id(request), login_id)
     except KeyError:
@@ -764,7 +762,6 @@ async def get_wechat_login(login_id: str, request: Request) -> dict[str, Any]:
 @router.delete("/wechat/login/{login_id}", status_code=204)
 async def cancel_wechat_login(login_id: str, request: Request) -> Response:
     '''关闭网页扫码时取消尚未确认的登录，已连接的微信通道不受影响。'''
-    await require_admin_user(request, detail=_ADMIN_REQUIRED_DETAIL)
     try:
         await _wechat_login_flow(request).cancel(_get_user_id(request), login_id)
     except KeyError:

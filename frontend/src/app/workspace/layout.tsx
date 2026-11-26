@@ -23,10 +23,6 @@ export default async function WorkspaceLayout({
           <WorkspaceContent>{children}</WorkspaceContent>
         </AuthProvider>
       );
-    case "needs_setup":
-      redirect("/setup");
-    case "system_setup_required":
-      redirect("/setup");
     case "unauthenticated":
       redirect("/login");
     case "gateway_unavailable":

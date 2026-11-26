@@ -20,10 +20,6 @@ export default async function AuthLayout({
   switch (result.tag) {
     case "authenticated":
       redirect("/workspace");
-    case "needs_setup":
-      // 初始化管理员时需要保留当前用户信息以完成设置。
-      return <AuthProvider initialUser={result.user}>{children}</AuthProvider>;
-    case "system_setup_required":
     case "unauthenticated":
       return <AuthProvider initialUser={null}>{children}</AuthProvider>;
     case "gateway_unavailable":

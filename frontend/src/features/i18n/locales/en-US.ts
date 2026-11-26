@@ -595,7 +595,6 @@ export const enUS: Translations = {
       saveError: "Could not save global instructions",
       conflict: "The instructions changed elsewhere. Copy your edits before reloading.",
       reload: "Reload",
-      adminOnly: "Only administrators can manage global instructions.",
     },
     memory: {
       title: "Memory",
@@ -686,7 +685,6 @@ export const enUS: Translations = {
     tools: {
       title: "Tools",
       description: "Manage the configuration and enabled status of MCP tools.",
-      adminRequired: "Admin privileges are required to manage MCP tools.",
       empty: "No MCP tools configured.",
     },
     channels: {
@@ -694,7 +692,7 @@ export const enUS: Translations = {
       description:
         "Connect IM accounts that can send messages to DeerFlow from outside the browser.",
       disabled:
-        "Channel connections are not enabled on this server. Ask an administrator to enable channel_connections.",
+        "Channel connections are not enabled on this server.",
     },
     skills: {
       title: "Agent Skills",
@@ -705,9 +703,6 @@ export const enUS: Translations = {
       emptyDescription:
         "Put your agent skill folders under the `/skills/custom` folder under the root folder of DeerFlow.",
       emptyButton: "Create Your First Skill",
-      adminRequired: "Admin privileges are required to manage agent skills.",
-      installAdminRequired:
-        "Admin privileges are required to install agent skills.",
     },
     notification: {
       title: "Notification",
@@ -725,7 +720,6 @@ export const enUS: Translations = {
     account: {
       profileTitle: "Profile",
       email: "Email",
-      role: "Role",
       changePasswordTitle: "Change Password",
       changePasswordDescription: "Update your account password.",
       currentPassword: "Current password",
@@ -754,10 +748,6 @@ export const enUS: Translations = {
     pleaseWait: "Please wait...",
     signIn: "Sign In",
     createAccount: "Create Account",
-    createAdminAccount: "Create admin account",
-    adminSetupRequiredTitle: "Administrator setup is required",
-    adminSetupRequiredDescription:
-      "DeerFlow needs an administrator account before new regular accounts can be created.",
     noAccountSignUp: "Don't have an account? Sign up",
     haveAccountSignIn: "Already have an account? Sign in",
     networkError: "Network error. Please try again.",

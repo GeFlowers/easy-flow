@@ -407,7 +407,7 @@ class SkillActivationMiddleware(AgentMiddleware):
     def _load_skill_registry_by_path(self) -> dict[str, Skill] | None:
         '''每次读取实时技能注册表并按规范化容器路径索引；失败时返回 ``None`` 并拒绝绑定。
 
-        不缓存启用状态，确保管理员禁用技能后下一次模型调用立即撤销其密钥访问。
+        不缓存启用状态，确保技能禁用后下一次模型调用立即撤销其密钥访问。
         '''
         try:
             storage = self._storage()

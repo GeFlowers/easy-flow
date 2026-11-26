@@ -37,7 +37,7 @@ class _LoginSession:
 
 
 class WechatLoginFlow:
-    '''在全局机器人配置范围内串行处理扫码，避免多个管理员互相覆盖登录。'''
+    '''在全局机器人配置范围内串行处理扫码，避免多个用户互相覆盖登录。'''
 
     def __init__(self) -> None:
         '''初始化单个登录会话及保护登录提交与取消操作的异步锁。'''
@@ -45,12 +45,12 @@ class WechatLoginFlow:
         self._lock = asyncio.Lock()
 
     async def start(self, owner: str, save_credentials: Callable[[dict[str, Any]], Awaitable[None]]) -> dict[str, Any]:
-        '''开始或刷新当前管理员的二维码，其他管理员的进行中会话不会被替换。'''
+        '''开始或刷新当前用户的二维码，其他用户的进行中会话不会被替换。'''
         async with self._lock:
             previous = self._session
             if previous and previous.task and not previous.task.done():
                 if previous.owner != owner:
-                    raise PermissionError("另一位管理员正在连接微信，请稍后再试。")
+                    raise PermissionError("另一位用户正在连接微信，请稍后再试。")
                 previous.task.cancel()
                 await asyncio.gather(previous.task, return_exceptions=True)
             channel = WechatChannel(bus=MessageBus(), config={})

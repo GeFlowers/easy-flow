@@ -116,10 +116,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     async with langgraph_runtime(app, startup_config):
         logger.info("LangGraph runtime initialised")
 
-        # 检查管理员引导状态，并在管理员存在后迁移无主线程；必须在 langgraph_runtime
-        # 之后执行，以使线程迁移可使用 app.state.store。
-        await _ensure_admin_user(app)
-
         # 配置了即时通信频道时启动频道服务。
         try:
             from server.channels.service import start_channel_service
@@ -204,104 +200,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
             logger.exception("Failed to flush memory queue on shutdown")
 
     logger.info("Shutting down API Gateway")
-
-
-async def _ensure_admin_user(app: FastAPI) -> None:
-    '''处理首次启动，或在后续启动时迁移无主线程。
-
-    创建管理员后，会将 LangGraph 存储中 ``metadata.user_id`` 未设置的无主线程迁移
-    至该管理员账户。这是“无认证 → 启用认证”的升级路径：此前未启用认证的 DeerFlow
-    用户已有需要分配所有者的 LangGraph 线程数据。
-
-    首次启动（尚无管理员）时不自动创建用户，操作员必须访问 ``/setup`` 创建首个
-    管理员。后续启动（已有管理员）时，才对无 ``user_id`` 的既有 LangGraph 线程元数据
-    执行一次无主线程迁移。
-
-    无需 SQL 持久化迁移：``threads_meta``、``runs``、``run_events`` 与 ``feedback``
-    的四个 ``user_id`` 列随认证模块通过 ``create_all`` 一同创建，因此新建表不会包含
-    所有者为空的行。
-    '''
-    from sqlalchemy import select
-
-    from server.gateway.deps import get_local_provider
-    from deerflow.persistence.engine import get_session_factory
-    from deerflow.persistence.user.model import UserRow
-
-    try:
-        provider = get_local_provider()
-    except RuntimeError:
-        # 某些测试或启动路径可能尚未初始化认证持久化。
-        # 跳过管理员迁移工作，避免网关启动失败。
-        logger.warning("Auth persistence not ready; skipping admin bootstrap check")
-        return
-
-    sf = get_session_factory()
-    if sf is None:
-        return
-
-    admin_count = await provider.count_admin_users()
-
-    if admin_count == 0:
-        logger.info("=" * 60)
-        logger.info("  First boot detected — no admin account exists.")
-        logger.info("  Visit /setup to complete admin account creation.")
-        logger.info("=" * 60)
-        return
-
-    # 管理员已存在，迁移早于认证模块的所有 LangGraph 无主线程元数据。
-    async with sf() as session:
-        stmt = select(UserRow).where(UserRow.system_role == "admin").limit(1)
-        row = (await session.execute(stmt)).scalar_one_or_none()
-
-    if row is None:
-        return  # 上方 admin_count 已大于 0，此情况不应发生，但仍安全退出。
-
-    admin_id = str(row.id)
-
-    # LangGraph 存储的无主线程迁移为非致命操作，覆盖未设 user_id 的既有线程在
-    # “无认证 → 启用认证”升级路径中的归属补全。
-    store = getattr(app.state, "store", None)
-    if store is not None:
-        try:
-            migrated = await _migrate_orphaned_threads(store, admin_id)
-            if migrated:
-                logger.info("Migrated %d orphan LangGraph thread(s) to admin", migrated)
-        except Exception:
-            logger.exception("LangGraph thread migration failed (non-fatal)")
-
-
-async def _migrate_orphaned_threads(store, admin_user_id: str) -> int:
-    '''将未设 ``user_id`` 的 LangGraph 存储线程迁移至指定管理员。
-
-    使用游标分页确保无论无主线程数量多少都能全部迁移，并返回已迁移的行数。
-    '''
-    migrated = 0
-    async for item in _iter_store_items(store, ("threads",)):
-        metadata = item.value.get("metadata", {})
-        if not metadata.get("user_id"):
-            metadata["user_id"] = admin_user_id
-            item.value["metadata"] = metadata
-            await store.aput(("threads",), item.key, item.value)
-            migrated += 1
-    return migrated
-
-
-async def _iter_store_items(store, namespace, *, page_size: int = 500):
-    '''以分页方式异步遍历 LangGraph 存储命名空间。
-
-    使用游标式循环取代旧的固定 ``limit=1000`` 调用，防止无主线程超过一页时静默
-    丢失数据；当页面为空或取得短页（代表最后一页）时结束遍历。
-    '''
-    offset = 0
-    while True:
-        batch = await store.asearch(namespace, limit=page_size, offset=offset)
-        if not batch:
-            return
-        for item in batch:
-            yield item
-        if len(batch) < page_size:
-            return
-        offset += page_size
 
 
 def create_app() -> FastAPI:

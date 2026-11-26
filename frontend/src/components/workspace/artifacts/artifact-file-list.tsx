@@ -11,9 +11,9 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { urlOfArtifact } from "@/features/artifacts/utils";
-import { useAuth } from "@/features/auth/AuthProvider";
+
 import { useI18n } from "@/features/i18n/hooks";
-import { installSkill, SkillRequestError } from "@/features/skills/api";
+import { installSkill } from "@/features/skills/api";
 import {
   getFileExtensionDisplayName,
   getFileIcon,
@@ -33,8 +33,7 @@ export function ArtifactFileList({
   threadId: string;
 }) {
   const { t } = useI18n();
-  const { user } = useAuth();
-  const isAdmin = user?.system_role === "admin";
+
   const { select: selectArtifact, setOpen } = useArtifacts();
   const [installingFile, setInstallingFile] = useState<string | null>(null);
 
@@ -68,11 +67,7 @@ export function ArtifactFileList({
         }
       } catch (error) {
         console.error("Failed to install skill:", error);
-        if (error instanceof SkillRequestError && error.isAdminRequired) {
-          toast.error(t.settings.skills.installAdminRequired);
-        } else {
-          toast.error("Failed to install skill");
-        }
+        toast.error("Failed to install skill");
       } finally {
         setInstallingFile(null);
       }
@@ -103,7 +98,7 @@ export function ArtifactFileList({
               {getFileExtensionDisplayName(file)} file
             </CardDescription>
             <CardAction className="row-span-1 self-center">
-              {file.endsWith(".skill") && isAdmin && (
+              {file.endsWith(".skill") && (
                 <Button
                   variant="ghost"
                   disabled={installingFile === file}

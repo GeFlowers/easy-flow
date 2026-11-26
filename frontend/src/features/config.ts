@@ -1,4 +1,4 @@
-/** 后端请求通过当前站点同源代理发送。 */
+/** 浏览器使用同源路径，由 Nginx 转发后端请求。 */
 export function getBackendBaseURL() {
   return "";
 }

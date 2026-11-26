@@ -6,21 +6,21 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { fetch } from "@/features/api/fetcher";
-import { useAuth } from "@/features/auth/AuthProvider";
+
 import { useI18n } from "@/features/i18n/hooks";
 
 import { SettingsSection } from "./settings-section";
 
 export function InstructionsSettingsPage() {
   const { t } = useI18n();
-  const { user } = useAuth();
+
   const [content, setContent] = useState("");
   const [originalContent, setOriginalContent] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [loadError, setLoadError] = useState(false);
   const [conflict, setConflict] = useState(false);
-  const isAdmin = user?.system_role === "admin";
+
 
   const load = useCallback(async (signal?: AbortSignal) => {
     setLoading(true);
@@ -41,11 +41,10 @@ export function InstructionsSettingsPage() {
   }, []);
 
   useEffect(() => {
-    if (!isAdmin) return;
     const controller = new AbortController();
     void load(controller.signal);
     return () => controller.abort();
-  }, [isAdmin, load]);
+  }, [load]);
 
   async function save() {
     setSaving(true);
@@ -74,11 +73,7 @@ export function InstructionsSettingsPage() {
       title={t.settings.instructions.title}
       description={t.settings.instructions.description}
     >
-      {!isAdmin ? (
-        <p className="text-muted-foreground text-sm">
-          {t.settings.instructions.adminOnly}
-        </p>
-      ) : loading ? (
+      {loading ? (
         <p className="text-muted-foreground text-sm">{t.common.loading}</p>
       ) : loadError ? (
         <div className="space-y-3">

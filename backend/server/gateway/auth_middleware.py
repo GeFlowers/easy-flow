@@ -34,15 +34,13 @@ _PUBLIC_PATH_PREFIXES: tuple[str, ...] = (
     "/api/webhooks/",
 )
 
-# 精确匹配的公开认证路径（登录、注册和状态检查）。
+# 精确匹配的公开认证路径（登录、注册和退出）。
 # 查询当前用户、修改密码等路径不公开。
 _PUBLIC_EXACT_PATHS: frozenset[str] = frozenset(
     {
         "/api/v1/auth/login/local",
         "/api/v1/auth/register",
         "/api/v1/auth/logout",
-        "/api/v1/auth/setup-status",
-        "/api/v1/auth/initialize",
     }
 )
 

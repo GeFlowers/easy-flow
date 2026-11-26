@@ -182,7 +182,7 @@ def require_permission(
             # 对缺失行（未跟踪的旧线程）及所有者为空的行（共享或认证前数据）允许访问，
             # 因而只有已存在且所有者不同的行会触发严格拒绝的 404。
             if owner_check:
-                from server.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME, INTERNAL_SYSTEM_ROLE
+                from server.gateway.internal_auth import get_trusted_internal_owner_user_id
 
                 thread_id = kwargs.get("thread_id")
                 if thread_id is None:
@@ -196,12 +196,12 @@ def require_permission(
                     str(auth.user.id),
                     require_existing=require_existing,
                 )
-                if not allowed and getattr(auth.user, "system_role", None) == INTERNAL_SYSTEM_ROLE:
+                if not allowed:
                     # 可信内部调用方（频道工作进程）也代表头部中携带的连接所有者执行。
                     # 必须以该所有者的范围检查而非绕过检查，泄漏的内部令牌不得授予跨用户
                     # 线程访问。仅在认证状态已验证内部令牌后信任该头部，与基于中间件
                     # 写入用户状态的可信所有者解析规则一致。
-                    header_owner = (request.headers.get(INTERNAL_OWNER_USER_ID_HEADER_NAME) or "").strip()
+                    header_owner = get_trusted_internal_owner_user_id(request)
                     if header_owner:
                         allowed = await thread_store.check_access(
                             thread_id,
