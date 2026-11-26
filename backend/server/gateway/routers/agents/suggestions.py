@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, Field
 
 import deerflow.utils.llm_text as llm_text
-from server.gateway.authz import require_permission
+from server.gateway.authz import require_auth
 from server.gateway.deps import get_config
 from deerflow.config.app_config import AppConfig
 from deerflow.utils.oneshot_llm import run_oneshot_llm
@@ -67,7 +67,7 @@ async def get_suggestions_config(
     summary="Generate Follow-up Questions",
     description="Generate short follow-up questions a user might ask next, based on recent conversation context.",
 )
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def generate_suggestions(
     thread_id: str,
     body: SuggestionsRequest,

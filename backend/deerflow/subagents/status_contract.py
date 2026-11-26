@@ -5,7 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 from collections.abc import Mapping
-from typing import Any, Literal, NotRequired, TypedDict
+from typing import Any, Literal, NotRequired, TypedDict, cast
 
 SUBAGENT_STATUS_KEY = "subagent_status"
 SUBAGENT_STOP_REASON_KEY = "subagent_stop_reason"
@@ -56,13 +56,6 @@ _STOP_REASON_LABELS: dict[SubagentStopReasonValue, str] = {
 #: 只有 completed 状态携带可恢复结果；达到上限但留下部分成果的运行也沿用该状态，
 #: 其他终态只传递错误信息。
 _RESULT_BEARING_STATUSES: frozenset[SubagentStatusValue] = frozenset({"completed"})
-
-#: 将旧检查点中遗留的 max_turns_reached 状态映射到当前停止原因，避免历史任务在委派账本中
-#: 永久停留为进行中；有部分结果时恢复为 completed，否则恢复为 failed。
-_LEGACY_STATUS_NORMALIZATION: dict[str, SubagentStopReasonValue] = {
-    "max_turns_reached": "turn_capped",
-}
-
 
 class StructuredSubagentResult(TypedDict):
     '''限定子代理结果在消息元数据中可传输的状态、摘要、摘要校验和错误字段。'''
@@ -180,20 +173,13 @@ def format_subagent_result_message(
 def read_subagent_result_metadata(
     additional_kwargs: Mapping[str, object] | None,
 ) -> StructuredSubagentResult | None:
-    '''从消息元数据读取并校验结构化结果，同时将旧版状态归一到当前契约。'''
+    '''从消息元数据读取并校验结构化结果。'''
     if not additional_kwargs:
         return None
     raw_status = additional_kwargs.get(SUBAGENT_STATUS_KEY)
-    # 历史检查点仍可能包含已停止生成的旧状态；先归一化再校验，才能让委派账本进入终态。
-    # 旧状态若包含可恢复摘要，则保留为 completed 并附加轮数上限原因，否则归为 failed。
-    legacy_stop_reason = _LEGACY_STATUS_NORMALIZATION.get(raw_status) if isinstance(raw_status, str) else None
-    if legacy_stop_reason is not None:
-        raw_result_brief = additional_kwargs.get(SUBAGENT_RESULT_BRIEF_KEY)
-        status = "completed" if (isinstance(raw_result_brief, str) and raw_result_brief.strip()) else "failed"
-    elif raw_status in SUBAGENT_STATUS_VALUES:
-        status = raw_status
-    else:
+    if not isinstance(raw_status, str) or raw_status not in SUBAGENT_STATUS_VALUES:
         return None
+    status = cast(SubagentStatusValue, raw_status)
     payload: StructuredSubagentResult = {"status": status}
     raw_result = additional_kwargs.get(SUBAGENT_RESULT_BRIEF_KEY)
     raw_hash = additional_kwargs.get(SUBAGENT_RESULT_SHA256_KEY)
@@ -204,10 +190,7 @@ def read_subagent_result_metadata(
             payload["result_sha256"] = raw_hash
     if status != "completed" and isinstance(raw_error, str) and raw_error.strip():
         payload["error"] = _bound_metadata_text(raw_error)
-    # 消息中明确携带的停止原因优先于从旧状态推导出的兼容原因。
     raw_stop_reason = additional_kwargs.get(SUBAGENT_STOP_REASON_KEY)
     if isinstance(raw_stop_reason, str) and raw_stop_reason in SUBAGENT_STOP_REASON_VALUES:
         payload["stop_reason"] = raw_stop_reason
-    elif legacy_stop_reason is not None:
-        payload["stop_reason"] = legacy_stop_reason
     return payload

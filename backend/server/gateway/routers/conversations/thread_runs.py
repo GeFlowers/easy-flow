@@ -13,7 +13,7 @@ from fastapi.responses import Response, StreamingResponse
 from langchain_core.messages import BaseMessage
 from pydantic import BaseModel, Field
 
-from server.gateway.authz import require_permission
+from server.gateway.authz import require_auth
 from server.gateway.deps import get_checkpointer, get_current_user, get_feedback_repo, get_run_event_store, get_run_manager, get_run_store, get_stream_bridge
 from server.gateway.pagination import trim_run_message_page
 from server.gateway.services import sse_consumer, start_run, wait_for_run_completion
@@ -48,7 +48,7 @@ def compute_run_durations(runs) -> dict[str, int]:
 
 
 class RunCreateRequest(BaseModel):
-    '''定义 LangGraph 兼容运行创建请求。'''
+    '''定义创建运行的请求。'''
 
     assistant_id: str | None = Field(default=None, description="Agent / assistant to use")
     input: dict[str, Any] | None = Field(default=None, description="Graph input (e.g. {messages: [...]})")
@@ -95,7 +95,7 @@ class ThreadMessagesPageResponse(BaseModel):
 
 
 class RunResponse(BaseModel):
-    '''表示 LangGraph 兼容运行的状态响应。'''
+    '''表示运行的状态响应。'''
 
     run_id: str
     thread_id: str
@@ -148,7 +148,7 @@ class ThreadTokenUsageResponse(BaseModel):
 
 
 async def _prepare_regenerate_payload(thread_id: str, message_id: str, request: Request) -> RegeneratePrepareResponse:
-    '''构造 LangGraph 兼容重新生成接口所需的输入和检查点载荷。'''
+    '''构造重新生成接口所需的输入和检查点载荷。'''
     checkpointer = get_checkpointer(request)
     latest_config = {"configurable": {"thread_id": thread_id, "checkpoint_ns": ""}}
     try:
@@ -403,7 +403,7 @@ def _message_content(message: Any) -> Any:
 
 
 @router.post("/{thread_id}/runs/regenerate/prepare", response_model=RegeneratePrepareResponse)
-@require_permission("runs", "create", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def prepare_regenerate_run(
     thread_id: str,
     body: RegeneratePrepareRequest,
@@ -438,7 +438,7 @@ def _record_to_response(record: RunRecord) -> RunResponse:
 
 
 @router.post("/{thread_id}/runs", response_model=RunResponse)
-@require_permission("runs", "create", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def create_run(thread_id: str, body: RunCreateRequest, request: Request) -> RunResponse:
     '''启动后台 agent 运行并立即返回运行标识。'''
     record = await start_run(body, thread_id, request)
@@ -446,12 +446,11 @@ async def create_run(thread_id: str, body: RunCreateRequest, request: Request) -
 
 
 @router.post("/{thread_id}/runs/stream")
-@require_permission("runs", "create", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -> StreamingResponse:
     '''启动 agent 运行，并通过 SSE 持续发送运行事件和结束状态。
 
-        响应中的 ``Content-Location`` 标头包含运行资源地址，符合 LangGraph Platform 协议。
-        ``useStream`` React 钩子会据此提取运行元数据。
+        前端的 ``useStream`` 根据 ``Content-Location`` 读取运行资源地址。
     '''
     bridge = get_stream_bridge(request)
     run_mgr = get_run_manager(request)
@@ -464,15 +463,14 @@ async def stream_run(thread_id: str, body: RunCreateRequest, request: Request) -
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",
-            # LangGraph Platform 使用此标头传递运行元数据。软件开发工具包会用贪婪正则表达式从路径中
-            # 提取运行编号，因此路径必须指向标准运行资源，不能带有额外后缀。
+            # 前端从运行资源地址提取运行编号，地址以运行编号结尾。
             "Content-Location": f"/api/threads/{thread_id}/runs/{record.run_id}",
         },
     )
 
 
 @router.post("/{thread_id}/runs/wait", response_model=dict)
-@require_permission("runs", "create", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> dict:
     '''启动运行并等待结束，完成后返回检查点状态或运行错误信息。'''
     bridge = get_stream_bridge(request)
@@ -499,7 +497,7 @@ async def wait_run(thread_id: str, body: RunCreateRequest, request: Request) -> 
 
 
 @router.get("/{thread_id}/runs", response_model=list[RunResponse])
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
     '''按创建时间顺序分页列出线程运行记录。'''
     run_mgr = get_run_manager(request)
@@ -509,7 +507,7 @@ async def list_runs(thread_id: str, request: Request) -> list[RunResponse]:
 
 
 @router.get("/{thread_id}/runs/{run_id}", response_model=RunResponse)
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def get_run(thread_id: str, run_id: str, request: Request) -> RunResponse:
     '''读取指定运行的状态、错误和持久化详情。'''
     run_mgr = get_run_manager(request)
@@ -521,7 +519,7 @@ async def get_run(thread_id: str, run_id: str, request: Request) -> RunResponse:
 
 
 @router.post("/{thread_id}/runs/{run_id}/cancel")
-@require_permission("runs", "cancel", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def cancel_run(
     thread_id: str,
     run_id: str,
@@ -595,7 +593,7 @@ def _cancel_conflict_detail(run_id: str, record: RunRecord) -> str:
 
 
 @router.get("/{thread_id}/runs/{run_id}/join")
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def join_run(thread_id: str, run_id: str, request: Request) -> StreamingResponse:
     '''订阅已有运行的 SSE 事件流，不会创建新的运行。'''
     run_mgr = get_run_manager(request)
@@ -622,7 +620,7 @@ async def join_run(thread_id: str, run_id: str, request: Request) -> StreamingRe
 # 生成 OpenAPI 时重复输出同一个 operationId 并产生警告。
 @router.get("/{thread_id}/runs/{run_id}/stream", response_model=None)
 @router.post("/{thread_id}/runs/{run_id}/stream", response_model=None)
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def stream_existing_run(
     thread_id: str,
     run_id: str,
@@ -674,7 +672,7 @@ async def stream_existing_run(
 
 
 @router.get("/{thread_id}/messages")
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def list_thread_messages(
     thread_id: str,
     request: Request,
@@ -849,7 +847,7 @@ async def _enrich_thread_message_page(
 
 
 @router.get("/{thread_id}/messages/page", response_model=ThreadMessagesPageResponse)
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def list_thread_messages_page(
     thread_id: str,
     request: Request,
@@ -877,7 +875,7 @@ async def list_thread_messages_page(
 
 
 @router.get("/{thread_id}/runs/{run_id}/messages")
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def list_run_messages(
     thread_id: str,
     run_id: str,
@@ -920,7 +918,7 @@ async def list_run_messages(
 
 
 @router.get("/{thread_id}/runs/{run_id}/events")
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def list_run_events(
     thread_id: str,
     run_id: str,
@@ -941,7 +939,7 @@ async def list_run_events(
 
 
 @router.get("/{thread_id}/runs/{run_id}/workspace-changes")
-@require_permission("runs", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def get_run_workspace_changes(
     thread_id: str,
     run_id: str,
@@ -961,7 +959,7 @@ async def get_run_workspace_changes(
 
 
 @router.get("/{thread_id}/token-usage", response_model=ThreadTokenUsageResponse)
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def thread_token_usage(
     thread_id: str,
     request: Request,

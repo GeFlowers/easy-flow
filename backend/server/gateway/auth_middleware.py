@@ -12,16 +12,15 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
+from server.gateway.auth import AUTH_SOURCE_SESSION
 from server.gateway.auth.errors import AuthErrorCode, AuthErrorResponse
-from server.gateway.auth_disabled import (
-    AUTH_SOURCE_AUTH_DISABLED,
+from server.gateway.internal_auth import (
     AUTH_SOURCE_INTERNAL,
-    AUTH_SOURCE_SESSION,
-    get_auth_disabled_user,
-    is_auth_disabled,
+    INTERNAL_AUTH_HEADER_NAME,
+    INTERNAL_OWNER_USER_ID_HEADER_NAME,
+    get_internal_user,
+    is_valid_internal_auth_token,
 )
-from server.gateway.authz import _ALL_PERMISSIONS, AuthContext
-from server.gateway.internal_auth import INTERNAL_AUTH_HEADER_NAME, get_internal_user, is_valid_internal_auth_token
 from deerflow.runtime.user_context import reset_current_user, set_current_user
 
 # 永远不要求认证的路径。
@@ -50,7 +49,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
     对非公开路径先检查 Cookie 是否存在，再严格验证 JWT；成功后写入请求状态和
     用户上下文，使仓储层所有者过滤自动生效。资源级授权仍应使用
-    ``@require_permission(..., owner_check=True)`` 显式检查。
+    ``@require_auth(owner_check=True)`` 显式检查。
     '''
 
     def __init__(self, app: ASGIApp) -> None:
@@ -67,8 +66,6 @@ class AuthMiddleware(BaseHTTPMiddleware):
             # 从可信头部提取频道所有者标识。存在时，合成内部用户携带实际所有者
             # 身份，使有效用户标识及每用户文件路径（自定义技能、记忆、线程数据）
             # 解析为即时通信频道用户而非回退到默认用户。
-            from server.gateway.internal_auth import INTERNAL_OWNER_USER_ID_HEADER_NAME
-
             owner_user_id = request.headers.get(INTERNAL_OWNER_USER_ID_HEADER_NAME)
             if owner_user_id:
                 owner_user_id = owner_user_id.strip()
@@ -90,13 +87,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
             try:
                 user = await get_current_user_from_request(request)
             except HTTPException as exc:
-                if not is_auth_disabled():
-                    return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
-                user = get_auth_disabled_user()
-                auth_source = AUTH_SOURCE_AUTH_DISABLED
-        elif is_auth_disabled():
-            user = get_auth_disabled_user()
-            auth_source = AUTH_SOURCE_AUTH_DISABLED
+                return JSONResponse(status_code=exc.status_code, content={"detail": exc.detail})
         else:
             return JSONResponse(
                 status_code=401,
@@ -108,10 +99,9 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 },
             )
 
-        # 同时写入用户状态和认证状态，使权限检查不会在同一请求中再次执行令牌解码和数据库查询。
+        # 保存已验证的用户与认证来源，供后续归属校验和仓储访问使用。
         request.state.user = user
         request.state.auth_source = auth_source
-        request.state.auth = AuthContext(user=user, permissions=_ALL_PERMISSIONS)
         token = set_current_user(user)
         try:
             return await call_next(request)

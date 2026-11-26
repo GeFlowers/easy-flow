@@ -27,7 +27,6 @@ from server.channels.message_bus import (
     ResolvedAttachment,
 )
 from server.channels.run_policy import CHANNEL_RUN_POLICY, ChannelRunPolicy
-from server.channels.store import ChannelStore
 from server.gateway.csrf_middleware import CSRF_COOKIE_NAME, CSRF_HEADER_NAME, generate_csrf_token
 from server.gateway.internal_auth import create_internal_auth_headers
 from deerflow.config.paths import make_safe_user_id
@@ -481,7 +480,6 @@ class ChannelManager:
     def __init__(
         self,
         bus: MessageBus,
-        store: ChannelStore,
         *,
         max_concurrency: int = 5,
         langgraph_url: str = DEFAULT_LANGGRAPH_URL,
@@ -490,11 +488,9 @@ class ChannelManager:
         default_session: dict[str, Any] | None = None,
         channel_sessions: dict[str, Any] | None = None,
         connection_repo: Any | None = None,
-        require_bound_identity: bool = False,
     ) -> None:
         '''初始化调度依赖、并发边界、身份策略与惰性客户端状态。'''
         self.bus = bus
-        self.store = store
         self._max_concurrency = max_concurrency
         self._langgraph_url = langgraph_url
         self._gateway_url = gateway_url
@@ -502,7 +498,6 @@ class ChannelManager:
         self._default_session = _as_dict(default_session)
         self._channel_sessions = dict(channel_sessions or {})
         self._connection_repo = connection_repo
-        self._require_bound_identity = require_bound_identity
         self._client = None  # langgraph_sdk 异步客户端仅在首次运行时创建。
         self._channel_metadata_synced: set[str] = set()
         # 创建锁按平台会话划分，防止同一会话的并发首条消息各自创建线程。
@@ -615,7 +610,6 @@ class ChannelManager:
 
     async def _handle_message(self, msg: InboundMessage) -> None:
         '''执行身份准入和全局并发控制，再分派命令或普通聊天。'''
-        msg = _apply_effective_owner(msg)
         try:
             # 普通聊天可在占用并发槽前拒绝；管理器命令有独立准入入口，而平台绑定命令
             # 已由适配器提前消费。
@@ -665,16 +659,6 @@ class ChannelManager:
         拒绝对象只携带从服务端连接仓库重新读取的字段，确保回复拒绝消息时不会信任
         入站消息自行声明的连接身份。
         '''
-        if not self._require_bound_identity:
-            return None
-        # GitHub 等 Webhook 通道已在路由层完成 HMAC 验证，且所有权来自 Agent 配置，
-        # 不存在逐发送者的 ``/connect`` 流程，因此可由策略显式跳过此门禁。
-        policy = CHANNEL_RUN_POLICY.get(msg.channel_name)
-        if policy is not None and not policy.requires_bound_identity:
-            return None
-        if _auth_disabled_owner_user_id():
-            return None
-
         has_connection = bool(msg.connection_id)
         has_owner = bool(msg.owner_user_id)
         if not (has_connection and has_owner):
@@ -904,14 +888,10 @@ class ChannelManager:
             self._thread_create_locks.pop(key, None)
 
     async def _lookup_thread_id(self, msg: InboundMessage) -> str | None:
-        '''优先从用户连接仓库查询线程，否则回退到旧版本地映射。'''
-        if msg.connection_id and self._connection_repo is not None:
-            return await self._connection_repo.get_thread_id(
-                msg.connection_id,
-                msg.chat_id,
-                msg.topic_id,
-            )
-        return self.store.get_thread_id(msg.channel_name, msg.chat_id, topic_id=msg.topic_id)
+        '''从已绑定账号的连接仓库查询会话映射。'''
+        if self._connection_repo is None or not msg.connection_id:
+            raise RuntimeError("An authenticated channel connection is required to look up a thread")
+        return await self._connection_repo.get_thread_id(msg.connection_id, msg.chat_id, msg.topic_id)
 
     async def _create_thread(self, client, msg: InboundMessage) -> str:
         '''通过 Gateway 创建线程，并在确认存在后保存平台映射。'''
@@ -963,24 +943,16 @@ class ChannelManager:
         return thread_id
 
     async def _store_thread_id(self, msg: InboundMessage, thread_id: str) -> None:
-        '''按消息身份选择用户连接仓库或旧版本地存储保存线程映射。'''
-        if msg.connection_id and msg.owner_user_id and self._connection_repo is not None:
-            await self._connection_repo.set_thread_id(
-                connection_id=msg.connection_id,
-                owner_user_id=msg.owner_user_id,
-                provider=msg.channel_name,
-                external_conversation_id=msg.chat_id,
-                external_topic_id=msg.topic_id,
-                thread_id=thread_id,
-            )
-            return
-
-        self.store.set_thread_id(
-            msg.channel_name,
-            msg.chat_id,
-            thread_id,
-            topic_id=msg.topic_id,
-            user_id=msg.user_id,
+        '''为已绑定账号保存会话映射。'''
+        if self._connection_repo is None or not msg.connection_id or not msg.owner_user_id:
+            raise RuntimeError("An authenticated channel connection is required to save a thread")
+        await self._connection_repo.set_thread_id(
+            connection_id=msg.connection_id,
+            owner_user_id=msg.owner_user_id,
+            provider=msg.channel_name,
+            external_conversation_id=msg.chat_id,
+            external_topic_id=msg.topic_id,
+            thread_id=thread_id,
         )
 
     async def _update_thread_channel_metadata(self, client, msg: InboundMessage, thread_id: str) -> None:
@@ -1567,29 +1539,6 @@ class ChannelManager:
         logger.info("ChannelManager stopped")
 
 
-def _apply_effective_owner(msg: InboundMessage) -> InboundMessage:
-    '''把服务端解析的有效所有者写回消息，避免后续阶段重复分叉。'''
-    owner_user_id = _effective_owner_user_id(msg)
-    if owner_user_id:
-        msg.owner_user_id = owner_user_id
-    return msg
-
-
-def _effective_owner_user_id(msg: InboundMessage) -> str | None:
-    '''解析当前部署模式下真正用于资源归属的 DeerFlow 用户。'''
-    return _auth_disabled_owner_user_id() or msg.owner_user_id
-
-
-def _auth_disabled_owner_user_id() -> str | None:
-    '''在关闭认证的部署中解析统一的服务端所有者 ID。'''
-    try:
-        from server.gateway.auth_disabled import AUTH_DISABLED_USER_ID, is_auth_disabled
-    except Exception:
-        logger.debug("Unable to inspect auth-disabled mode for channel owner fallback", exc_info=True)
-        return None
-    return AUTH_DISABLED_USER_ID if is_auth_disabled() else None
-
-
 def _unknown_command_reply(command: str | None = None) -> str:
     '''构造包含当前权威命令集合的未知命令提示。'''
     available = " | ".join(sorted(KNOWN_CHANNEL_COMMANDS))
@@ -1635,7 +1584,7 @@ def _channel_storage_user_id(msg: InboundMessage) -> str | None:
     本函数面向进程内文件系统，因此返回已净化 ID；``_owner_headers`` 则故意发送
     原始所有者 ID，让 Gateway 在 HTTP 信任边界内重新解析，两者职责不同。
     '''
-    owner_user_id = _effective_owner_user_id(msg)
+    owner_user_id = msg.owner_user_id
     if owner_user_id:
         return _safe_user_id_for_run(owner_user_id)
     if msg.user_id:
@@ -1656,7 +1605,7 @@ def _safe_user_id_for_run(raw_user_id: str) -> str:
 
 def _owner_headers(msg: InboundMessage) -> dict[str, str] | None:
     '''为绑定用户的内部 Gateway 请求生成所有者认证头。'''
-    owner_user_id = _effective_owner_user_id(msg)
+    owner_user_id = msg.owner_user_id
     if not owner_user_id:
         return None
     return create_internal_auth_headers(owner_user_id=owner_user_id)

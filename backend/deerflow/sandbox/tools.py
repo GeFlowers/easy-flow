@@ -866,9 +866,9 @@ def _extract_skill_name_from_skills_path(path: str) -> str | None:
     if not relative:
         return None
     parts = [part for part in relative.split("/") if part]
-    if len(parts) >= 2 and parts[0] in ("public", "custom", "legacy"):
+    if len(parts) >= 2 and parts[0] in ("public", "custom"):
         return parts[1]
-    if len(parts) == 1 and parts[0] in ("public", "custom", "legacy"):
+    if len(parts) == 1 and parts[0] in ("public", "custom"):
         return None
     if len(parts) >= 1:
         return parts[0]
@@ -878,7 +878,7 @@ def _extract_skill_name_from_skills_path(path: str) -> str | None:
 def _is_disabled_skill_path(path: str, *, user_id: str | None = None) -> bool:
     '''判断路径是否属于已禁用技能。
 
-    公共技能状态来自全局配置；自定义和旧版技能状态来自用户级状态文件。状态无法确定时
+    公共技能状态来自全局配置；自定义技能状态来自用户级状态文件。状态无法确定时
     以拒绝访问处理，避免向调用方暴露已禁用的技能文件。
     '''
     skill_name = _extract_skill_name_from_skills_path(path)
@@ -894,8 +894,6 @@ def _is_disabled_skill_path(path: str, *, user_id: str | None = None) -> bool:
             category = "public"
         elif relative.startswith("custom/"):
             category = "custom"
-        elif relative.startswith("legacy/"):
-            category = "legacy"
         else:
             effective_uid = user_id or get_effective_user_id()
             storage = get_or_new_user_skill_storage(effective_uid)

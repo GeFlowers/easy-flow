@@ -680,7 +680,7 @@ export const zhCN: Translations = {
       createSkill: "新建技能",
       emptyTitle: "还没有技能",
       emptyDescription:
-        "将你的 Agent Skill 文件夹放在 DeerFlow 根目录下的 `/skills/custom` 文件夹中。",
+        "创建技能后，它会出现在你的账号中。",
       emptyButton: "创建你的第一个技能",
     },
     notification: {

@@ -218,15 +218,13 @@ class LocalSkillStorage(SkillStorage):
         return records
 
     def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
-        '''逐类别枚举直属技能目录中的说明文件，不递归扫描子目录。'''
+        '''枚举公共技能目录中的说明文件，不递归扫描子目录。'''
         if not self._host_root.exists():
             return
-        for category in SkillCategory:
-            category_path = self._host_root / category.value
-            if not category_path.exists() or not category_path.is_dir():
-                continue
-            for skill_file in _iter_direct_skill_files(category_path):
-                yield category, category_path, skill_file
+        public_path = self._host_root / SkillCategory.PUBLIC.value
+        if public_path.is_dir():
+            for skill_file in _iter_direct_skill_files(public_path):
+                yield SkillCategory.PUBLIC, public_path, skill_file
 
 
 def _iter_direct_skill_files(category_path: Path) -> Iterable[Path]:

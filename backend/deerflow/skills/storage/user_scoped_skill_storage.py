@@ -1,4 +1,4 @@
-'''为每位用户隔离自定义技能和启用状态，同时以只读方式呈现公共及兼容期旧技能。
+'''为每位用户隔离自定义技能和启用状态，并以只读方式呈现公共技能。
 
 自定义技能放在 ``{base_dir}/users/{user_id}/skills/custom/``，不再写入全局目录。
 公共技能仍从配置的共享技能根目录读取，并保持只读。
@@ -9,14 +9,8 @@
     <user_custom_root>/<name>/SKILL.md             ← 用户独立，可读写
     <user_custom_root>/.history/<name>.jsonl       ← 用户技能修改历史
     <user_skills_root>/_skill_states.json          ← 用户技能启用状态
-    <global_custom_root>/<name>/SKILL.md           ← 兼容旧版技能，只读
-
-用户尚无自定义技能时，旧版全局技能以 ``SkillCategory.LEGACY`` 类别提供，只允许
-读取，不能由用户直接编辑或删除。这保留了迁移兼容性，同时避免用户修改共享内容。
-旧技能通过沙箱中的 ``/mnt/skills/legacy/<name>/`` 路径提供说明和辅助文件。
-
-自定义和旧版技能的开关按技能名保存在各用户的 ``_skill_states.json`` 中，
-公共技能的开关仍由全局 ``extensions_config.json`` 管理，避免同名技能的用户状态互相影响。
+自定义技能的开关按技能名保存在各用户的 ``_skill_states.json`` 中。
+公共技能的开关由全局 ``extensions_config.json`` 管理，避免同名技能的用户状态互相影响。
 '''
 
 from __future__ import annotations
@@ -58,11 +52,10 @@ class UserScopedSkillStorage(LocalSkillStorage):
         paths = get_paths()
         self._user_custom_root: Path = paths.user_custom_skills_dir(self._user_id)
         self._user_skills_root: Path = paths.user_skills_dir(self._user_id)
-        self._global_custom_root: Path = self._host_root / SkillCategory.CUSTOM.value
         self._skill_states_file: Path = self._user_skills_root / "_skill_states.json"
 
     def get_skill_enabled_state(self, skill_name: str) -> bool:
-        '''读取自定义或旧技能的用户级开关；尚无记录时默认启用。'''
+        '''读取自定义技能的用户级开关；尚无记录时默认启用。'''
         states = self._read_skill_states()
         entry = states.get(skill_name)
         if entry is None:
@@ -128,7 +121,7 @@ class UserScopedSkillStorage(LocalSkillStorage):
         # 父类负责通用发现和公共技能状态合并，技能类别来源由迭代器决定。
         skills = super().load_skills(enabled_only=False)
 
-        # 自定义和旧技能同时受全局默认值及用户开关约束，公共技能只遵循全局配置。
+        # 自定义技能同时受全局默认值及用户开关约束，公共技能只遵循全局配置。
         from deerflow.config.extensions_config import get_extensions_config
 
         extensions_config = get_extensions_config()
@@ -145,25 +138,18 @@ class UserScopedSkillStorage(LocalSkillStorage):
         return skills
 
     def public_skill_exists(self, name: str) -> bool:
-        '''检查公共技能或全局旧技能是否存在，以便编辑操作返回正确的只读提示。'''
+        '''检查公共技能是否存在，以便编辑操作返回正确的只读提示。'''
         normalized_name = self.validate_skill_name(name)
-        if (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists():
-            return True
-        if (self._global_custom_root / normalized_name / SKILL_MD_FILE).exists():
-            return True
-        return False
+        return (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists()
 
     def ensure_custom_skill_is_editable(self, name: str) -> None:
-        '''拒绝修改公共或迁移期旧技能，并提示用户创建同名个人技能。'''
+        '''拒绝修改公共技能，并提示用户创建同名个人技能。'''
         if self.custom_skill_exists(name):
             return
         normalized_name = self.validate_skill_name(name)
         is_global_public = (self._host_root / SkillCategory.PUBLIC.value / normalized_name / SKILL_MD_FILE).exists()
-        is_global_custom_fallback = (self._global_custom_root / normalized_name / SKILL_MD_FILE).exists()
         if is_global_public:
             raise ValueError(f"'{name}' 是内置技能。请使用 skill_manage 工具创建个人版本，它将覆盖内置版本。")
-        if is_global_custom_fallback:
-            raise ValueError(f"'{name}' 是旧版共享技能（不可编辑）。若要自定义，请创建同名个人版本，它将覆盖共享版本。")
         raise FileNotFoundError(f"找不到自定义技能 '{name}'。")
 
     async def ainstall_skill_from_archive(self, archive_path: str | Path) -> dict:
@@ -239,22 +225,14 @@ class UserScopedSkillStorage(LocalSkillStorage):
         raise ValueError(f"解析后的技能文件 {resolved_file} 必须位于全局技能根目录（{self._host_root.resolve()}）或用户自定义根目录（{self._user_custom_root.resolve()}）内部。")
 
     def _iter_skill_files(self) -> Iterable[tuple[SkillCategory, Path, Path]]:
-        '''枚举全局公共技能、用户自定义技能及条件成立时的全局旧技能。'''
+        '''枚举全局公共技能、用户自定义技能。'''
         # 公共技能始终来自共享技能根目录。
         public_path = self._host_root / SkillCategory.PUBLIC.value
         if public_path.exists() and public_path.is_dir():
             for skill_file in _iter_direct_skill_files(public_path):
                 yield SkillCategory.PUBLIC, public_path, skill_file
 
-        user_custom_exists = False
         user_custom_path = self._user_custom_root
         if user_custom_path.exists() and user_custom_path.is_dir():
             for skill_file in _iter_direct_skill_files(user_custom_path):
-                user_custom_exists = True
                 yield SkillCategory.CUSTOM, user_custom_path, skill_file
-
-        if not user_custom_exists:
-            global_custom_path = self._global_custom_root
-            if global_custom_path.exists() and global_custom_path.is_dir():
-                for skill_file in _iter_direct_skill_files(global_custom_path):
-                    yield SkillCategory.LEGACY, global_custom_path, skill_file

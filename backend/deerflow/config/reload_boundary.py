@@ -6,8 +6,7 @@ from collections.abc import Iterator
 
 STARTUP_ONLY_PREFIX = "startup-only:"
 STARTUP_ONLY_FIELDS: dict[str, str] = {
-    "database": ("init_engine_from_config() runs once during langgraph_runtime() startup; the SQLAlchemy engine holds the connection pool and is not rebuilt on config.yaml edits."),
-    "checkpointer": ("make_checkpointer() binds the PostgreSQL checkpointer once at startup."),
+    "database": ("The application database engine, PostgreSQL checkpointer, and graph store are initialized once during langgraph_runtime() startup."),
     "run_events": ("make_run_event_store() picks the memory- vs SQL-backed implementation at startup and is frozen onto app.state.run_events_config to stay paired with the underlying event store."),
     "stream_bridge": ("make_stream_bridge() constructs the stream-bridge singleton once during startup."),
     "sandbox": ("get_sandbox_provider() caches the provider singleton (``_default_sandbox_provider``); a different ``sandbox.use`` class path only takes effect on next process start."),

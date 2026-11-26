@@ -34,16 +34,11 @@ def create_empty_memory() -> dict[str, Any]:
 
 
 class MemoryStorage(abc.ABC):
-    '''规定记忆后端必须实现的加载、强制重载和保存操作。'''
+    '''规定记忆后端必须实现的加载和保存操作。'''
 
     @abc.abstractmethod
     def load(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
         '''读取指定用户和代理的记忆文档。'''
-        pass
-
-    @abc.abstractmethod
-    def reload(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '''绕过缓存重新读取指定用户和代理的记忆文档。'''
         pass
 
     @abc.abstractmethod
@@ -106,21 +101,6 @@ class FileMemoryStorage(MemoryStorage):
         except OSError as e:
             logger.warning("Failed to load memory file: %s", e)
             return create_empty_memory()
-
-    def reload(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '''强制从磁盘载入最新文档，并同步刷新对应缓存及其文件修改时间。'''
-        file_path = self._get_memory_file_path(agent_name, user_id=user_id)
-        memory_data = self._load_memory_from_file(agent_name, user_id=user_id)
-        cache_key = self._cache_key(agent_name, user_id=user_id)
-
-        try:
-            mtime = file_path.stat().st_mtime if file_path.exists() else None
-        except OSError:
-            mtime = None
-
-        with self._cache_lock:
-            self._memory_cache[cache_key] = (memory_data, mtime)
-        return memory_data
 
     def save(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> bool:
         '''更新时间戳后先写临时文件再原子替换目标文件；成功后更新缓存。'''

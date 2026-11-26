@@ -231,7 +231,7 @@ class ExtensionsConfig(BaseModel):
         '''按显式技能设置判断可用性；未配置时保留内置类别默认启用。'''
         skill_config = self.skills.get(skill_name)
         if skill_config is None:
-            return skill_category in ("public", "custom", "legacy")
+            return skill_category in ("public", "custom")
         return skill_config.enabled
 
 

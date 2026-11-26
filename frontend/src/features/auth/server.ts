@@ -1,6 +1,5 @@
 import { cookies } from "next/headers";
 
-import { AUTH_DISABLED_USER, isAuthDisabledMode } from "./auth-disabled-user";
 import { getGatewayConfig } from "./gateway-config";
 import { type AuthResult, userSchema } from "./types";
 
@@ -11,13 +10,6 @@ const SSR_AUTH_TIMEOUT_MS = 5_000;
  * 返回带标签的 AuthResult；调用方应使用穷尽式 switch，无需 try/catch。
  */
 export async function getServerSideUser(): Promise<AuthResult> {
-  if (isAuthDisabledMode()) {
-    return {
-      tag: "authenticated",
-      user: AUTH_DISABLED_USER,
-    };
-  }
-
   const cookieStore = await cookies();
   const sessionCookie = cookieStore.get("access_token");
 

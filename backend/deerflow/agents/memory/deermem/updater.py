@@ -303,10 +303,6 @@ class MemoryUpdater:
         '''通过存储层读取当前记忆数据，并复用其缓存策略。'''
         return normalize_memory(self._storage.load(agent_name, user_id=user_id))
 
-    def reload_memory_data(self, agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
-        '''要求存储层绕过缓存重新读取当前记忆数据。'''
-        return normalize_memory(self._storage.reload(agent_name, user_id=user_id))
-
     def import_memory_data(self, memory_data: dict[str, Any], agent_name: str | None = None, *, user_id: str | None = None) -> dict[str, Any]:
         '''保存导入的记忆文档；持久化失败时抛出错误，成功后返回存储中的版本。'''
         if not self._storage.save(normalize_memory(memory_data), agent_name, user_id=user_id):

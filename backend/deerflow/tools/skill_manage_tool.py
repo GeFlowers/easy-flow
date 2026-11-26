@@ -201,7 +201,7 @@ async def _skill_manage_impl(
             return f"已从自定义技能 '{name}' 中移除 '{path}'。"
 
         if await _to_thread(skill_storage.public_skill_exists, name):
-            raise ValueError(f"'{name}' 为只读技能（内置或旧版共享）。如需自定义，请创建同名的个人版本。")
+            raise ValueError(f"'{name}' 为内置只读技能。如需自定义，请创建同名的个人版本。")
         raise ValueError(f"不支持的操作 '{action}'。")
 
 

@@ -20,7 +20,6 @@ class ChannelConnectionsConfig(BaseModel):
     '''汇总通道绑定开关、身份绑定要求和各提供者状态。'''
 
     enabled: bool = False
-    require_bound_identity: bool = True
     wechat: BindingCodeChannelConnectionConfig = Field(default_factory=BindingCodeChannelConnectionConfig)
     wecom: BindingCodeChannelConnectionConfig = Field(default_factory=BindingCodeChannelConnectionConfig)
 

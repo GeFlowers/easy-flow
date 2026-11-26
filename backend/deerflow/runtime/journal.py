@@ -662,7 +662,7 @@ class RunJournal(BaseCallbackHandler):
 
                 Args:
                     tag: 中间件的短标识（如 "title"、"summarize"、
-                         "guardrail"），用于构造 event_type="middleware:{tag}"。
+                         "safety_termination"），用于构造 event_type="middleware:{tag}"。
                     name: 中间件的完整类名。
                     hook: 触发动作的生命周期钩子（如 "after_model"）。
                     action: 执行的具体动作（如 "generate_title"）。

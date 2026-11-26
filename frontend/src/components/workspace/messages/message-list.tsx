@@ -44,7 +44,6 @@ import {
 import {
   extractContentFromMessage,
   extractPresentFilesFromMessage,
-  extractTextFromMessage,
   getAssistantTurnCopyData,
   getAssistantTurnUsageMessages,
   getBranchableAssistantGroupIds,
@@ -931,7 +930,6 @@ export function MessageList({
                   const taskId = message.tool_call_id;
                   if (taskId) {
                     const parsed = parseSubtaskResult(
-                      extractTextFromMessage(message),
                       message.additional_kwargs,
                     );
                     updateSubtask({ id: taskId, ...parsed });

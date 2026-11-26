@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
-from server.gateway.authz import require_permission
+from server.gateway.authz import require_auth
 from server.gateway.deps import (
     get_config,
     get_optional_user_from_request,
@@ -53,7 +53,7 @@ class ScheduledTaskUpdateRequest(BaseModel):
 
 
 @router.get("/scheduled-tasks")
-@require_permission("threads", "read")
+@require_auth()
 async def list_scheduled_tasks(request: Request):
     '''列出当前认证用户拥有的计划任务；匿名请求返回空列表。'''
     repo = get_scheduled_task_repo(request)
@@ -64,7 +64,7 @@ async def list_scheduled_tasks(request: Request):
 
 
 @router.post("/scheduled-tasks")
-@require_permission("threads", "write")
+@require_auth()
 async def create_scheduled_task(request: Request, body: ScheduledTaskCreateRequest):
     '''校验所有权、时区与计划后，为当前用户创建可执行的计划任务。'''
     config = get_config()
@@ -124,7 +124,7 @@ async def create_scheduled_task(request: Request, body: ScheduledTaskCreateReque
 
 
 @router.get("/scheduled-tasks/{task_id}")
-@require_permission("threads", "read")
+@require_auth()
 async def get_scheduled_task(task_id: str, request: Request):
     '''返回当前用户拥有的计划任务，不泄露其他用户的任务是否存在。'''
     repo = get_scheduled_task_repo(request)
@@ -138,7 +138,7 @@ async def get_scheduled_task(task_id: str, request: Request):
 
 
 @router.patch("/scheduled-tasks/{task_id}")
-@require_permission("threads", "write")
+@require_auth()
 async def update_scheduled_task(task_id: str, request: Request, body: ScheduledTaskUpdateRequest):
     '''更新非运行中任务，并在重新排期后重新启用可再次执行的终态任务。'''
     config = get_config()
@@ -226,7 +226,7 @@ def _ensure_task_mutable(task: dict[str, Any]) -> None:
 
 
 @router.post("/scheduled-tasks/{task_id}/pause")
-@require_permission("threads", "write")
+@require_auth()
 async def pause_scheduled_task(task_id: str, request: Request):
     '''暂停当前用户的非运行中计划任务，运行中任务以 409 拒绝抢占式修改。'''
     repo = get_scheduled_task_repo(request)
@@ -244,7 +244,7 @@ async def pause_scheduled_task(task_id: str, request: Request):
 
 
 @router.post("/scheduled-tasks/{task_id}/resume")
-@require_permission("threads", "write")
+@require_auth()
 async def resume_scheduled_task(task_id: str, request: Request):
     '''恢复当前用户的非运行中计划任务，使调度器再次可认领它。'''
     repo = get_scheduled_task_repo(request)
@@ -262,7 +262,7 @@ async def resume_scheduled_task(task_id: str, request: Request):
 
 
 @router.post("/scheduled-tasks/{task_id}/trigger")
-@require_permission("threads", "write")
+@require_auth()
 async def trigger_scheduled_task(task_id: str, request: Request):
     '''手动分派任务，并将调度冲突和分派失败分别转换为 409 与 502。'''
     repo = get_scheduled_task_repo(request)
@@ -282,7 +282,7 @@ async def trigger_scheduled_task(task_id: str, request: Request):
 
 
 @router.delete("/scheduled-tasks/{task_id}")
-@require_permission("threads", "write")
+@require_auth()
 async def delete_scheduled_task(task_id: str, request: Request):
     '''删除当前用户拥有的计划任务；未找到或越权时不暴露任务信息。'''
     repo = get_scheduled_task_repo(request)
@@ -296,7 +296,7 @@ async def delete_scheduled_task(task_id: str, request: Request):
 
 
 @router.get("/scheduled-tasks/{task_id}/runs")
-@require_permission("threads", "read")
+@require_auth()
 async def list_scheduled_task_runs(
     task_id: str,
     request: Request,
@@ -316,7 +316,7 @@ async def list_scheduled_task_runs(
 
 
 @router.get("/threads/{thread_id}/scheduled-tasks")
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def list_thread_scheduled_tasks(thread_id: str, request: Request):
     '''列出当前用户在指定线程上的计划任务，且由线程所有权装饰器先行限制访问。'''
     repo = get_scheduled_task_repo(request)

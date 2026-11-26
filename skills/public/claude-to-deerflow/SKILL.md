@@ -9,12 +9,7 @@ description: "通过网络接口与 DeerFlow 人工智能平台交互。用户�
 
 ## 架构
 
-DeerFlow 在 Nginx 反向代理之后提供两个接口入口：
-
-| 服务 | 直连端口 | 代理入口 | 用途 |
-|----------------|-------------|----------------------------------|----------------------------------|
-| 网关接口 | 8001 | `$DEERFLOW_GATEWAY_URL` | REST（Representational State Transfer，表述性状态转移）端点和嵌入式智能体运行时 |
-| 兼容 LangGraph 的接口 | 8001 | `$DEERFLOW_LANGGRAPH_URL` | 智能体对话、运行和流式传输 |
+DeerFlow 的页面与接口共用一个入口。Nginx 将 `/api/` 请求转发给 8001 端口的后端网关。
 
 ## 环境变量
 
@@ -23,16 +18,12 @@ DeerFlow 在 Nginx 反向代理之后提供两个接口入口：
 | 变量 | 默认值 | 说明 |
 |-------------------------|------------------------------------------|------------------------------------|
 | `DEERFLOW_URL`          | `http://localhost:2026`                  | 统一代理基础地址             |
-| `DEERFLOW_GATEWAY_URL`  | `${DEERFLOW_URL}`                        | 网关基础地址（模型、技能、记忆、上传） |
-| `DEERFLOW_LANGGRAPH_URL`| `${DEERFLOW_URL}/api/langgraph`          | LangGraph 基础地址（对话、运行） |
 
 调用 curl 时，始终按以下方式解析地址：
 
 ```bash
 # 从环境变量解析基础地址（任何接口调用前首先执行）
 DEERFLOW_URL="${DEERFLOW_URL:-http://localhost:2026}"
-DEERFLOW_GATEWAY_URL="${DEERFLOW_GATEWAY_URL:-$DEERFLOW_URL}"
-DEERFLOW_LANGGRAPH_URL="${DEERFLOW_LANGGRAPH_URL:-$DEERFLOW_URL/api/langgraph}"
 ```
 
 ## 可用操作
@@ -42,7 +33,7 @@ DEERFLOW_LANGGRAPH_URL="${DEERFLOW_LANGGRAPH_URL:-$DEERFLOW_URL/api/langgraph}"
 确认 DeerFlow 正在运行：
 
 ```bash
-curl -s "$DEERFLOW_GATEWAY_URL/health"
+curl -s "$DEERFLOW_URL/health"
 ```
 
 ### 2. 发送消息（流式）
@@ -52,7 +43,7 @@ curl -s "$DEERFLOW_GATEWAY_URL/health"
 **第 1 步：创建对话**
 
 ```bash
-curl -s -X POST "$DEERFLOW_LANGGRAPH_URL/threads" \
+curl -s -X POST "$DEERFLOW_URL/api/threads" \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
@@ -62,7 +53,7 @@ curl -s -X POST "$DEERFLOW_LANGGRAPH_URL/threads" \
 **第 2 步：流式运行**
 
 ```bash
-curl -s -N -X POST "$DEERFLOW_LANGGRAPH_URL/threads/<thread_id>/runs/stream" \
+curl -s -N -X POST "$DEERFLOW_URL/api/threads/<thread_id>/runs/stream" \
   -H "Content-Type: application/json" \
   -d '{
     "assistant_id": "lead_agent",
@@ -113,7 +104,7 @@ data: <json_data>
 ### 4. 列出模型
 
 ```bash
-curl -s "$DEERFLOW_GATEWAY_URL/api/models"
+curl -s "$DEERFLOW_URL/api/models"
 ```
 
 返回： `{"models": [{"name": "...", "provider": "...", ...}, ...]}`
@@ -121,7 +112,7 @@ curl -s "$DEERFLOW_GATEWAY_URL/api/models"
 ### 5. 列出技能
 
 ```bash
-curl -s "$DEERFLOW_GATEWAY_URL/api/skills"
+curl -s "$DEERFLOW_URL/api/skills"
 ```
 
 返回： `{"skills": [{"name": "...", "enabled": true, ...}, ...]}`
@@ -129,7 +120,7 @@ curl -s "$DEERFLOW_GATEWAY_URL/api/skills"
 ### 6. 启用／禁用技能
 
 ```bash
-curl -s -X PUT "$DEERFLOW_GATEWAY_URL/api/skills/<skill_name>" \
+curl -s -X PUT "$DEERFLOW_URL/api/skills/<skill_name>" \
   -H "Content-Type: application/json" \
   -d '{"enabled": true}'
 ```
@@ -137,7 +128,7 @@ curl -s -X PUT "$DEERFLOW_GATEWAY_URL/api/skills/<skill_name>" \
 ### 7. 列出智能体
 
 ```bash
-curl -s "$DEERFLOW_GATEWAY_URL/api/agents"
+curl -s "$DEERFLOW_URL/api/agents"
 ```
 
 返回： `{"agents": [{"name": "...", ...}, ...]}`
@@ -145,7 +136,7 @@ curl -s "$DEERFLOW_GATEWAY_URL/api/agents"
 ### 8. 获取记忆
 
 ```bash
-curl -s "$DEERFLOW_GATEWAY_URL/api/memory"
+curl -s "$DEERFLOW_URL/api/memory"
 ```
 
 返回用户上下文、事实以及历史对话摘要。
@@ -153,7 +144,7 @@ curl -s "$DEERFLOW_GATEWAY_URL/api/memory"
 ### 9. 上传文件到对话
 
 ```bash
-curl -s -X POST "$DEERFLOW_GATEWAY_URL/api/threads/<thread_id>/uploads" \
+curl -s -X POST "$DEERFLOW_URL/api/threads/<thread_id>/uploads" \
   -F "files=@/path/to/file.pdf"
 ```
 
@@ -162,19 +153,19 @@ curl -s -X POST "$DEERFLOW_GATEWAY_URL/api/threads/<thread_id>/uploads" \
 ### 10. 列出已上传文件
 
 ```bash
-curl -s "$DEERFLOW_GATEWAY_URL/api/threads/<thread_id>/uploads/list"
+curl -s "$DEERFLOW_URL/api/threads/<thread_id>/uploads/list"
 ```
 
 ### 11. 获取对话历史
 
 ```bash
-curl -s "$DEERFLOW_LANGGRAPH_URL/threads/<thread_id>/history"
+curl -s "$DEERFLOW_URL/api/threads/<thread_id>/history"
 ```
 
 ### 12. 列出对话
 
 ```bash
-curl -s -X POST "$DEERFLOW_LANGGRAPH_URL/threads/search" \
+curl -s -X POST "$DEERFLOW_URL/api/threads/search" \
   -H "Content-Type: application/json" \
   -d '{"limit": 20, "sort_by": "updated_at", "sort_order": "desc"}'
 ```

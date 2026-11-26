@@ -42,7 +42,7 @@ allowed-tools:
 ## 审查流程
 
 1. 确定审查对象。
-   - 优先使用规范的已安装技能引用，例如 `skill://public/data-analysis`、`skill://custom/team-helper` 或 `skill://legacy/old-helper`。
+   - 优先使用规范的已安装技能引用，例如 `skill://public/data-analysis`或 `skill://custom/team-helper`。
    - 用户粘贴单个 `SKILL.md` 时，使用 `target="inline://SKILL.md"`，并通过 `inline_content` 传入内容。
    - 用户要求重点审查时，将 `scope` 设为指定维度；否则使用 `["all"]`。
 

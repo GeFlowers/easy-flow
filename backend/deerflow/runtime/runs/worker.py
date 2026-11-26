@@ -310,7 +310,7 @@ async def run_agent(
             config.setdefault("callbacks", []).append(journal)
 
         # 注入 Langfuse 跟踪属性，使 langchain 回调处理器能把会话编号、用户编号、跟踪名称和标签
-        # 附加到根跟踪。与 ``DeerFlowClient.stream`` 共用此辅助函数，避免两个入口行为不一致；
+        # 附加到根跟踪。
         # 辅助函数使用 setdefault，因此调用方提供的元数据优先。
         inject_langfuse_metadata(
             config,

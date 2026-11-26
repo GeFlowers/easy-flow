@@ -8,7 +8,6 @@ from pathlib import Path
 from deerflow.sandbox.local.local_sandbox import LocalSandbox, PathMapping
 from deerflow.sandbox.sandbox import Sandbox
 from deerflow.sandbox.sandbox_provider import SandboxProvider
-from deerflow.skills.storage import user_should_see_legacy_skills
 
 logger = logging.getLogger(__name__)
 
@@ -71,7 +70,6 @@ class LocalSandboxProvider(SandboxProvider):
             _RESERVED_CONTAINER_PREFIXES = [
                 f"{container_path}/public",
                 f"{container_path}/custom",
-                f"{container_path}/legacy",
                 _USER_DATA_VIRTUAL_PREFIX,
             ]
             sandbox_config = config.sandbox
@@ -223,22 +221,6 @@ class LocalSandboxProvider(SandboxProvider):
             )
         except Exception as exc:
             logger.warning("Could not setup per-thread custom skills mount: %s", exc, exc_info=True)
-
-        try:
-            config = get_app_config()
-            skills_container_path = config.skills.container_path
-            user_custom_path = paths.user_custom_skills_dir(effective_user_id)
-            legacy_skills_path = config.skills.get_skills_path() / "custom"
-            if user_should_see_legacy_skills(effective_user_id, host_path=str(config.skills.get_skills_path())) and legacy_skills_path.exists():
-                mappings.append(
-                    PathMapping(
-                        container_path=f"{skills_container_path}/legacy",
-                        local_path=str(legacy_skills_path),
-                        read_only=True,
-                    )
-                )
-        except Exception as exc:
-            logger.warning("Could not setup per-thread legacy skills mount: %s", exc, exc_info=True)
 
         return mappings
 

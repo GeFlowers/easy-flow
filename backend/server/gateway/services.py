@@ -1,7 +1,6 @@
 '''运行生命周期服务层。
 
-集中处理运行创建、SSE 帧格式化及流桥事件消费；``thread_runs`` 和 ``runs`` 路由模块
-仅作为委托至本模块的轻量 HTTP 处理器。
+集中处理线程运行创建、SSE 帧格式化及流桥事件消费。
 '''
 
 from __future__ import annotations
@@ -18,9 +17,9 @@ from langchain_core.messages import BaseMessage
 from langchain_core.messages.utils import convert_to_messages
 from langgraph.types import Command
 
-from server.gateway.auth_disabled import AUTH_SOURCE_INTERNAL
 from server.gateway.deps import get_checkpointer, get_local_provider, get_run_context, get_run_manager, get_stream_bridge
 from server.gateway.internal_auth import (
+    AUTH_SOURCE_INTERNAL,
     INTERNAL_OWNER_USER_ID_HEADER_NAME,
     get_internal_user,
     get_trusted_internal_owner_user_id,
@@ -153,7 +152,7 @@ async def _terminal_record_stream_missing(bridge: StreamBridge, record: RunRecor
         return False
 
 
-# langgraph 兼容层从 ``body.context`` 转发到运行配置的上下文字段白名单。
+# 从 ``body.context`` 转发到运行配置的上下文字段白名单。
 # LangGraph 0.6 及以上支持 ``config["context"]``，但为兼容旧版
 # ``_get_runtime_config`` 调用方，这些值必须同时写入 ``configurable`` 和 ``context``；
 # LangGraph 1.1.9 及以上不再让 ``ToolRuntime.context`` 供调用方回退读取
@@ -458,10 +457,8 @@ async def start_run(
             )
 
     owner_user_id = get_trusted_internal_owner_user_id(request)
-    # 无状态运行接口把 thread_id 放在请求正文中，因此从路径参数解析所有权的
-    # @require_permission(owner_check=True) 装饰器无法保护这些接口。创建运行前在此校验会话归属，
-    # 防止用户在他人会话上启动运行或读取检查点状态。自动创建的临时会话和所有者为空的共享旧数据
-    # 仍可通过 check_access；只有明确属于其他用户的会话才返回 404，以避免泄露会话是否存在。
+    # 创建运行前校验会话归属。旧数据中所有者为空的会话仍可通过 check_access；
+    # 只有明确属于其他用户的会话才返回 404，以避免泄露会话是否存在。
     # 内部渠道运行使用可信请求头 X-DeerFlow-Owner-User-Id 中的连接所有者身份，因此仍按该用户
     # 检查，而不是绕过归属校验；内部令牌泄露也不能因此获得跨用户会话访问权限。
     user = getattr(request.state, "user", None)
@@ -495,8 +492,7 @@ async def start_run(
         except UnsupportedStrategyError as exc:
             raise HTTPException(status_code=501, detail=str(exc)) from exc
 
-        # 新增或更新会话元数据，使会话能出现在 /threads/search 中，包括从未通过
-        # POST /threads 显式创建的会话（例如无状态运行创建的会话）。
+        # 新增或更新会话元数据，使会话能出现在 /threads/search 中。
         try:
             existing = await run_ctx.thread_store.get(thread_id)
             if existing is None and owner_user_id:
@@ -527,7 +523,7 @@ async def start_run(
         await apply_checkpoint_to_run_config(config, body=body, thread_id=thread_id, request=request)
 
         # 将 DeerFlow 专用上下文覆盖值合并到 ``configurable`` 和 ``context``。
-        # ``context`` 是 langgraph 兼容层的扩展字段，用于传递智能体配置（model_name、
+        # 请求中的 ``context`` 用于传递智能体配置（model_name、
         # thinking_enabled 等）；只转发与智能体相关的键，忽略 thread_id 等未知键。
         merge_run_context_overrides(config, getattr(body, "context", None), internal=is_internal_caller)
         if not is_internal_caller:
@@ -597,7 +593,7 @@ async def launch_scheduled_thread_run(
         metadata=metadata or {},
         config=None,
         # ``user_id`` 与即时通信渠道写入 ``body.context`` 的字段一致，使没有 ContextVar 回退机制的
-        # 运行时上下文调用方（例如按用户区分的 GuardrailMiddleware 提供者）能够读取所有者身份；
+        # 运行时上下文调用方能够读取所有者身份；
         # ``inject_authenticated_user_context`` 会跳过内部用户。
         context=({"non_interactive": True, "user_id": owner_user_id} if owner_user_id else {"non_interactive": True}),
         webhook=None,

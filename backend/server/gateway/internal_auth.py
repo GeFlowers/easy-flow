@@ -7,13 +7,13 @@ import secrets
 from types import SimpleNamespace
 from typing import Any
 
-from server.gateway.auth_disabled import AUTH_SOURCE_INTERNAL
 from deerflow.config.paths import make_safe_user_id
 from deerflow.runtime.user_context import DEFAULT_USER_ID
 
 INTERNAL_AUTH_HEADER_NAME = "X-DeerFlow-Internal-Token"
 INTERNAL_OWNER_USER_ID_HEADER_NAME = "X-DeerFlow-Owner-User-Id"
 INTERNAL_AUTH_ENV_VAR = "DEER_FLOW_INTERNAL_AUTH_TOKEN"
+AUTH_SOURCE_INTERNAL = "internal"
 
 
 def _load_internal_auth_token() -> str:

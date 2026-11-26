@@ -11,7 +11,6 @@ from starlette.responses import JSONResponse
 from starlette.types import ASGIApp
 
 from server.gateway.auth.config import get_auth_config
-from server.gateway.auth_disabled import is_auth_disabled
 
 CSRF_COOKIE_NAME = "csrf_token"
 CSRF_HEADER_NAME = "X-CSRF-Token"
@@ -31,9 +30,6 @@ def generate_csrf_token() -> str:
 def should_check_csrf(request: Request) -> bool:
     '''判断请求是否需要 CSRF 校验，仅校验可能改变服务端持久化状态的方法。'''
     if request.method not in ("POST", "PUT", "DELETE", "PATCH"):
-        return False
-
-    if is_auth_disabled():
         return False
 
     path = request.url.path.rstrip("/")

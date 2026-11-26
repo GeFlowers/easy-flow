@@ -12,9 +12,9 @@ prompt / message_processing）封装在与后端无关的
 相同的增删改查流程继续支撑管理端点。
 
 过滤与检测、``<memory>`` 包装、``enabled`` 门控及事实模型等 DeerMem 专属逻辑
-保留在本后端中，不纳入抽象基类。抽象基类以外的 ``warm`` / ``reload_memory`` /
-``create_fact`` / ``delete_fact`` / ``update_fact`` 方法供 ``hasattr`` 探测能力：
-网关在启动时检查 ``hasattr(manager, "warm")``，网关和客户端通过
+保留在本后端中，不纳入抽象基类。抽象基类以外的 ``warm`` / ``create_fact`` /
+``delete_fact`` / ``update_fact`` 方法供网关探测：
+网关在启动时检查 ``hasattr(manager, "warm")``，并通过
 ``hasattr(manager, "create_fact")`` 检查事实增删改查能力，而不直接导入 DeerMem。
 因此使用其他后端或移除该后端不会使这些模块在导入时失败（参见 MemoryManager 计划第 8 步）。
 '''
@@ -173,15 +173,6 @@ class DeerMem(MemoryManager):
             logger.info("token_counting='char'; tiktoken not used, skipping warm-up")
             return True
         return warm_tiktoken_cache()
-
-    def reload_memory(
-        self,
-        *,
-        user_id: str | None = None,
-        agent_name: str | None = None,
-    ) -> dict[str, Any]:
-        '''丢弃指定用户记忆的内存缓存并从持久化存储重新载入。'''
-        return self._updater.reload_memory_data(agent_name=agent_name, user_id=user_id)
 
     def create_fact(
         self,

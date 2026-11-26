@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 import deerflow.utils.llm_text as llm_text
-from server.gateway.authz import require_permission
+from server.gateway.authz import require_auth
 from server.gateway.deps import get_config
 from deerflow.config.app_config import AppConfig
 from deerflow.utils.oneshot_llm import run_oneshot_llm
@@ -67,7 +67,7 @@ def _clean_rewritten_text(text: str) -> str:
     summary="Polish Composer Input",
     description="Rewrite a draft message before it is sent. This does not create a thread run or persist any message.",
 )
-@require_permission("runs", "create")
+@require_auth()
 async def polish_input(
     body: InputPolishRequest,
     request: Request,

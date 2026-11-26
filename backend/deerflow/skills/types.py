@@ -10,17 +10,14 @@ SKILL_MD_FILE = "SKILL.md"
 
 
 class SkillCategory(StrEnum):
-    '''区分随项目提供、用户自建和迁移遗留的技能来源。
+    '''区分随项目提供与用户自建的技能来源。
 
         - ``PUBLIC``：随平台提供的公共技能，只读。
         - ``CUSTOM``：用户自行创建的技能，允许编辑或删除。
-        - ``LEGACY``：用户隔离之前的共享自定义技能，仅可读取，不可编辑或删除；
-          沙箱通过 ``/mnt/skills/legacy/<name>/`` 路径提供这些技能的文件。
     '''
 
     PUBLIC = "public"
     CUSTOM = "custom"
-    LEGACY = "legacy"
 
 
 @dataclass(frozen=True)

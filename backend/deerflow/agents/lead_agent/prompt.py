@@ -222,8 +222,6 @@ def _skill_mutability_label(category: SkillCategory | str) -> str:
     '''根据技能分类生成其可编辑性的提示标签。'''
     if category == SkillCategory.CUSTOM:
         return "[自定义，可编辑]"
-    if category == SkillCategory.LEGACY:
-        return "[旧版，只读]"
     return "[内置]"
 
 

@@ -1,6 +1,4 @@
-'''提供用户长期记忆的读取、编辑、导入导出和状态查询接口。'''
-
-from typing import Literal
+'''提供用户长期记忆的读取、编辑和导入导出接口。'''
 
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, model_validator
@@ -8,7 +6,6 @@ from pydantic import BaseModel, Field, model_validator
 from server.gateway.internal_auth import get_trusted_internal_owner_user_id
 from deerflow.agents.memory import get_memory_manager
 from deerflow.agents.memory.schema import MEMORY_SCHEMA_VERSION, normalize_memory
-from deerflow.config.memory_config import get_memory_config
 from deerflow.config.paths import make_safe_user_id
 from deerflow.runtime.user_context import get_effective_user_id
 
@@ -67,24 +64,6 @@ class FactPatchRequest(BaseModel):
     confidence: float | None = Field(default=None, ge=0.0, le=1.0, description="Confidence score (0-1)")
 
 
-class MemoryConfigResponse(BaseModel):
-    '''描述记忆功能开关、运行模式和当前后端专属配置。'''
-
-    enabled: bool = Field(..., description="Whether the memory mechanism is enabled (call-site gate).")
-    mode: Literal["middleware", "tool"] = Field(..., description="Memory operation mode: 'middleware' (passive per-turn LLM summarization) or 'tool' (model calls memory tools directly). Mechanism-level, applies to any backend.")
-    injection_enabled: bool = Field(..., description="Whether memory is injected into the system prompt (call-site gate).")
-    shutdown_flush_timeout_seconds: float = Field(..., description="Hard budget (s) to drain pending memory updates on Gateway graceful shutdown; must fit inside the pod's K8s terminationGracePeriodSeconds.")
-    manager_class: str = Field(..., description="Active memory backend selector (backend name or dotted path).")
-    backend_config: dict = Field(..., description="Backend-private config (self-interpreted by the backend).")
-
-
-class MemoryStatusResponse(BaseModel):
-    '''组合记忆配置和当前记忆数据，供状态接口一次性返回。'''
-
-    config: MemoryConfigResponse
-    data: MemoryResponse
-
-
 def _resolve_memory_user_id(request: Request) -> str:
     '''解析当前请求的记忆所有者；可信内部通道请求使用其绑定用户并规范化 ID。'''
     raw_owner = get_trusted_internal_owner_user_id(request)
@@ -103,25 +82,6 @@ def _resolve_memory_user_id(request: Request) -> str:
 async def get_memory(http_request: Request) -> MemoryResponse:
     '''读取当前用户的长期记忆，返回用户画像、历史摘要与独立事实。'''
     memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
-    return MemoryResponse(**memory_data)
-
-
-@router.post(
-    "/memory/reload",
-    response_model=MemoryResponse,
-    response_model_exclude_none=True,
-    summary="Reload Memory Data",
-    description="Reload memory data from the storage file, refreshing the in-memory cache.",
-)
-async def reload_memory(http_request: Request) -> MemoryResponse:
-    '''要求后端刷新持久化记忆；不支持显式重载的后端退回读取当前数据。'''
-    user_id = _resolve_memory_user_id(http_request)
-    manager = get_memory_manager()
-    if hasattr(manager, "reload_memory"):
-        memory_data = manager.reload_memory(user_id=user_id)
-    else:
-        # 不支持重载的后端仍可安全返回当前数据；写操作则必须明确失败，避免掩盖数据未写入。
-        memory_data = manager.get_memory(user_id=user_id)
     return MemoryResponse(**memory_data)
 
 
@@ -266,50 +226,3 @@ async def import_memory(request: MemoryResponse, http_request: Request) -> Memor
         raise HTTPException(status_code=500, detail="Failed to import memory data.") from exc
 
     return MemoryResponse(**memory_data)
-
-
-@router.get(
-    "/memory/config",
-    response_model=MemoryConfigResponse,
-    summary="Get Memory Configuration",
-    description="Retrieve the current memory system configuration.",
-)
-async def get_memory_config_endpoint() -> MemoryConfigResponse:
-    '''读取记忆开关、注入策略及当前后端配置。
-
-    enabled、injection_enabled 和 mode 控制宿主行为；backend_config 保存
-    当前记忆后端自己的存储路径、事实上限和更新间隔等参数。'''
-    config = get_memory_config()
-    return MemoryConfigResponse(
-        enabled=config.enabled,
-        mode=config.mode,
-        injection_enabled=config.injection_enabled,
-        shutdown_flush_timeout_seconds=config.shutdown_flush_timeout_seconds,
-        manager_class=config.manager_class,
-        backend_config=config.backend_config,
-    )
-
-
-@router.get(
-    "/memory/status",
-    response_model=MemoryStatusResponse,
-    response_model_exclude_none=True,
-    summary="Get Memory Status",
-    description="Retrieve both memory configuration and current data in a single request.",
-)
-async def get_memory_status(http_request: Request) -> MemoryStatusResponse:
-    '''汇总记忆系统配置和当前用户已保存的记忆，供设置页展示状态。'''
-    config = get_memory_config()
-    memory_data = get_memory_manager().get_memory(user_id=_resolve_memory_user_id(http_request))
-
-    return MemoryStatusResponse(
-        config=MemoryConfigResponse(
-            enabled=config.enabled,
-            mode=config.mode,
-            injection_enabled=config.injection_enabled,
-            shutdown_flush_timeout_seconds=config.shutdown_flush_timeout_seconds,
-            manager_class=config.manager_class,
-            backend_config=config.backend_config,
-        ),
-        data=MemoryResponse(**memory_data),
-    )

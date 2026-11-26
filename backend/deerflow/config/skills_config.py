@@ -18,7 +18,7 @@ class SkillsConfig(BaseModel):
     )
     path: str | None = Field(
         default=None,
-        description=("Path to skills directory. If not specified, defaults to `skills` under the caller project root, falling back to the legacy repo-root location for monorepo compatibility."),
+        description=("Path to skills directory. If not specified, defaults to `skills` under the caller project root."),
     )
     container_path: str = Field(
         default=DEFAULT_SKILLS_CONTAINER_PATH,
@@ -30,29 +30,14 @@ class SkillsConfig(BaseModel):
     )
 
     def get_skills_path(self) -> Path:
-        '''解析技能目录配置；未设置时优先使用项目默认目录再回退旧布局。'''
+        '''解析技能目录配置；未设置时使用项目默认目录。'''
         if self.path:
             return resolve_path(self.path)
         if env_path := os.getenv("DEER_FLOW_SKILLS_PATH"):
             return resolve_path(env_path)
 
-        project_default = project_root() / "skills"
-        if project_default.is_dir():
-            return project_default
-
-        for candidate in _legacy_skills_candidates():
-            if candidate.is_dir():
-                return candidate
-
-        return project_default
+        return project_root() / "skills"
 
     def get_skill_container_path(self, skill_name: str, category: str = "public") -> str:
         '''返回技能目录在沙箱命名空间中的规范绝对路径。'''
         return f"{self.container_path}/{category}/{skill_name}"
-
-
-def _legacy_skills_candidates() -> tuple[Path, ...]:
-    '''返回仓库旧版布局中可回退读取的技能目录候选项。'''
-    backend_dir = Path(__file__).resolve().parents[2]
-    repo_root = backend_dir.parent
-    return (repo_root / "skills",)

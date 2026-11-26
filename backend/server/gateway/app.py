@@ -8,25 +8,21 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from server.gateway.auth_disabled import warn_if_auth_disabled_enabled
 from server.gateway.auth_middleware import AuthMiddleware
 from server.gateway.config import get_gateway_config
 from server.gateway.csrf_middleware import CSRFMiddleware, get_configured_cors_origins
 from server.gateway.deps import langgraph_runtime
 from server.gateway.routers import (
     artifacts,
-    assistants_compat,
     auth,
     channel_connections,
     channels,
-    console,
     feedback,
     global_instructions,
     input_polish,
     mcp,
     memory,
     models,
-    runs,
     scheduled_tasks,
     skills,
     suggestions,
@@ -71,7 +67,6 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         startup_config = get_app_config()
         configure_logging(startup_config)
         logger.info("Configuration loaded successfully")
-        warn_if_auth_disabled_enabled()
     except Exception as e:
         error_msg = f"Failed to load configuration during gateway startup: {e}"
         logger.exception(error_msg)
@@ -227,7 +222,6 @@ API Gateway for DeerFlow - A LangGraph-based AI agent backend with sandbox execu
 - **Health Monitoring**: System health check endpoints
 
 
-LangGraph-compatible requests are routed through nginx to this gateway.
 This gateway provides runtime endpoints for agent runs plus custom endpoints for models, MCP configuration, skills, and artifacts.
         """,
         version="0.1.0",
@@ -281,12 +275,8 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
                 "description": "Manage IM channel integrations (Feishu, Slack, Telegram)",
             },
             {
-                "name": "assistants-compat",
-                "description": "LangGraph Platform-compatible assistants API (stub)",
-            },
-            {
                 "name": "runs",
-                "description": "LangGraph Platform-compatible runs lifecycle (create, stream, cancel)",
+                "description": "Agent run lifecycle (create, stream, cancel)",
             },
             {
                 "name": "health",
@@ -322,9 +312,6 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     # 装配路由；模型 API 挂载至 /api/models。
     app.include_router(models.router)
 
-    # 控制台 API（跨线程可观测性）挂载至 /api/console。
-    app.include_router(console.router)
-
     # MCP API 挂载至 /api/mcp。
     app.include_router(mcp.router)
 
@@ -359,20 +346,14 @@ This gateway provides runtime endpoints for agent runs plus custom endpoints for
     # 频道 API 挂载至 /api/channels。
     app.include_router(channels.router)
 
-    # 助手兼容 API（LangGraph Platform 存根）。
-    app.include_router(assistants_compat.router)
-
     # 认证 API 挂载至 /api/v1/auth。
     app.include_router(auth.router)
 
     # 反馈 API 挂载至 /api/threads/{thread_id}/runs/{run_id}/feedback。
     app.include_router(feedback.router)
 
-    # 线程运行 API（兼容 LangGraph Platform 的运行生命周期）。
+    # 线程运行 API（启动、流式输出和取消）。
     app.include_router(thread_runs.router)
-
-    # 无状态运行 API（无需预先存在的线程即可流式执行或等待）。
-    app.include_router(runs.router)
 
     @app.get("/health", tags=["health"])
     async def health_check() -> dict[str, str]:

@@ -409,11 +409,9 @@ class InstalledSkillReader(LocalDirectoryReader):
 
 
 def _installed_skill_root(storage: Any, category: str, rel_path: str) -> Path:
-    '''按 public、custom 或 legacy 类别使用存储接口解析已安装技能的磁盘位置。'''
+    '''按 public 或 custom 类别使用存储接口解析已安装技能的磁盘位置。'''
     if category == "custom" and hasattr(storage, "get_user_custom_root"):
         return Path(storage.get_user_custom_root()) / rel_path
-    if category == "legacy":
-        return Path(storage.get_skills_root_path()) / "custom" / rel_path
     return Path(storage.get_skills_root_path()) / category / rel_path
 
 
@@ -423,7 +421,7 @@ def parse_skill_uri(target: str) -> tuple[str, str]:
         raise ValueError("已安装的技能目标必须使用 skill://<category>/<relative-path>")
     raw = target[len("skill://") :]
     category, sep, rel_path = raw.partition("/")
-    if not sep or category not in {"public", "custom", "legacy"}:
-        raise ValueError("技能目标必须包含分类：public、custom 或 legacy")
+    if not sep or category not in {"public", "custom"}:
+        raise ValueError("技能目标必须包含分类：public 或 custom")
     rel_path = normalize_relative_path(rel_path)
     return category, rel_path

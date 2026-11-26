@@ -10,23 +10,19 @@
 #   bash status.sh thread <id>      # 查看会话历史
 # 环境变量：
 #   DEERFLOW_URL           — 统一代理基地址（默认：http://localhost:2026）
-#   DEERFLOW_GATEWAY_URL   — 网关接口基地址（默认：$DEERFLOW_URL）
-#   DEERFLOW_LANGGRAPH_URL — LangGraph 接口基地址（默认：$DEERFLOW_URL/api/langgraph）
 
 set -euo pipefail
 
 DEERFLOW_URL="${DEERFLOW_URL:-http://localhost:2026}"
-GATEWAY_URL="${DEERFLOW_GATEWAY_URL:-$DEERFLOW_URL}"
-LANGGRAPH_URL="${DEERFLOW_LANGGRAPH_URL:-$DEERFLOW_URL/api/langgraph}"
 CMD="${1:-health}"
 ARG="${2:-}"
 
 case "$CMD" in
   health)
-    echo "正在检查 ${GATEWAY_URL} 的 DeerFlow……"
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${GATEWAY_URL}/health" 2>/dev/null || echo "000")
+    echo "正在检查 ${DEERFLOW_URL} 的 DeerFlow……"
+    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${DEERFLOW_URL}/health" 2>/dev/null || echo "000")
     if [ "$HTTP_CODE" = "000" ]; then
-      echo "无法连接：${GATEWAY_URL} 未运行 DeerFlow"
+      echo "无法连接：${DEERFLOW_URL} 未运行 DeerFlow"
       exit 1
     elif [ "$HTTP_CODE" -ge 400 ]; then
       echo "错误：健康检查返回网络状态 ${HTTP_CODE}"
@@ -36,16 +32,16 @@ case "$CMD" in
     fi
     ;;
   models)
-    curl -s "${GATEWAY_URL}/api/models" | python3 -m json.tool
+    curl -s "${DEERFLOW_URL}/api/models" | python3 -m json.tool
     ;;
   skills)
-    curl -s "${GATEWAY_URL}/api/skills" | python3 -m json.tool
+    curl -s "${DEERFLOW_URL}/api/skills" | python3 -m json.tool
     ;;
   agents)
-    curl -s "${GATEWAY_URL}/api/agents" | python3 -m json.tool
+    curl -s "${DEERFLOW_URL}/api/agents" | python3 -m json.tool
     ;;
   threads)
-    curl -s -X POST "${LANGGRAPH_URL}/threads/search" \
+    curl -s -X POST "${DEERFLOW_URL}/api/threads/search" \
       -H "Content-Type: application/json" \
       -d '{"limit": 20, "sort_by": "updated_at", "sort_order": "desc", "select": ["thread_id", "updated_at", "values"]}' \
       | python3 -c "
@@ -62,14 +58,14 @@ for t in threads:
 "
     ;;
   memory)
-    curl -s "${GATEWAY_URL}/api/memory" | python3 -m json.tool
+    curl -s "${DEERFLOW_URL}/api/memory" | python3 -m json.tool
     ;;
   thread)
     if [ -z "$ARG" ]; then
       echo "用法：status.sh thread <thread_id>" >&2
       exit 1
     fi
-    curl -s "${LANGGRAPH_URL}/threads/${ARG}/history" | python3 -c "
+    curl -s "${DEERFLOW_URL}/api/threads/${ARG}/history" | python3 -c "
 import json, sys
 data = json.load(sys.stdin)
 if isinstance(data, list):

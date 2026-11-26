@@ -3,10 +3,11 @@ export function getBackendBaseURL() {
   return "";
 }
 
-/** 解析 LangGraph SDK 的完整基础地址，并处理服务端渲染回退。 */
-export function getLangGraphBaseURL() {
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/api/langgraph`;
-  }
-  return "http://localhost:2026/api/langgraph";
+/** 对话客户端使用站点同源的后端接口基础地址。 */
+export function getAPIBaseURL() {
+  const origin =
+    typeof window === "undefined"
+      ? "http://localhost:2026"
+      : window.location.origin;
+  return `${origin}/api`;
 }

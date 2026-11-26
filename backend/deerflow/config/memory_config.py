@@ -1,37 +1,8 @@
-'''定义长期记忆开关、后端选择及旧配置迁移规则。'''
+'''定义长期记忆开关和后端配置。'''
 
-import logging
 from typing import Any
 
 from pydantic import BaseModel, Field
-
-logger = logging.getLogger(__name__)
-_SHARED_FIELDS = frozenset({"enabled", "injection_enabled", "shutdown_flush_timeout_seconds", "manager_class", "backend_config"})
-_LEGACY_DEERMEM_FIELDS = frozenset(
-    {
-        "storage_path",
-        "storage_class",
-        "debounce_seconds",
-        "max_facts",
-        "fact_confidence_threshold",
-        "max_injection_tokens",
-        "token_counting",
-        "guaranteed_categories",
-        "guaranteed_token_budget",
-        "staleness_review_enabled",
-        "staleness_age_days",
-        "staleness_min_candidates",
-        "staleness_max_removals_per_cycle",
-        "staleness_protected_categories",
-        "staleness_max_lifetime_multiplier",
-        "staleness_max_extension_days",
-        "consolidation_enabled",
-        "consolidation_min_facts",
-        "consolidation_max_groups_per_cycle",
-        "consolidation_max_sources",
-        "model_name",
-    }
-)
 
 
 class MemoryConfig(BaseModel):
@@ -99,50 +70,3 @@ def set_memory_config(config: MemoryConfig) -> None:
     '''替换内存中的记忆配置，供应用配置装载阶段调用。'''
     global _memory_config
     _memory_config = config
-
-
-def load_memory_config_from_dict(config_dict: dict) -> None:
-    '''迁移旧版平铺后端字段，再校验并缓存统一记忆配置。'''
-    global _memory_config
-    config_dict = dict(config_dict or {})
-    backend_config = dict(config_dict.get("backend_config") or {})
-    migrated: list[str] = []
-    for key in list(config_dict.keys()):
-        if key in _SHARED_FIELDS:
-            continue
-        if key in _LEGACY_DEERMEM_FIELDS:
-            value = config_dict.pop(key)
-            if value is None or value == "":
-                continue
-            if key == "model_name":
-                model_cfg = dict(backend_config.get("model") or {})
-                if "model" not in model_cfg:
-                    model_cfg["model"] = value
-                    backend_config["model"] = model_cfg
-                    migrated.append(f"{key} -> backend_config.model.model")
-            elif key == "storage_path" and str(value).endswith(".json"):
-                logger.warning(
-                    "Legacy memory.storage_path=%r looks like a file path; DeerMem now "
-                    "treats storage_path as a root DIRECTORY (per-user memory under "
-                    "{storage_path}/users/{uid}/memory.json). Dropped -- memory now "
-                    "lands under the default root (runtime_home). Set "
-                    "memory.backend_config.storage_path to a directory if you want a "
-                    "custom location.",
-                    value,
-                )
-            elif key not in backend_config:
-                backend_config[key] = value
-                migrated.append(f"{key} -> backend_config.{key}")
-        else:
-            logger.warning(
-                "Unknown memory config key %r at top level (not a shared field %s nor a known legacy DeerMem field); ignored.",
-                key,
-                sorted(_SHARED_FIELDS),
-            )
-    if migrated:
-        logger.warning(
-            "Migrated legacy top-level memory fields into backend_config; move them under memory.backend_config in config.yaml to silence this: %s",
-            ", ".join(migrated),
-        )
-    config_dict["backend_config"] = backend_config
-    _memory_config = MemoryConfig(**config_dict)

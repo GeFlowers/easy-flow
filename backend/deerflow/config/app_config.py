@@ -12,19 +12,17 @@ from dotenv import load_dotenv
 from pydantic import BaseModel, ConfigDict, Field, PrivateAttr, model_validator
 
 from deerflow.config.channel_connections_config import ChannelConnectionsConfig
-from deerflow.config.checkpointer_config import CheckpointerConfig, load_checkpointer_config_from_dict
 from deerflow.config.database_config import DatabaseConfig
 from deerflow.config.extensions_config import ExtensionsConfig
-from deerflow.config.guardrails_config import GuardrailsConfig, load_guardrails_config_from_dict
 from deerflow.config.input_polish_config import InputPolishConfig
 from deerflow.config.loop_detection_config import LoopDetectionConfig
-from deerflow.config.memory_config import MemoryConfig, load_memory_config_from_dict
+from deerflow.config.memory_config import MemoryConfig, set_memory_config
 from deerflow.config.model_config import ModelConfig
 from deerflow.config.read_before_write_config import ReadBeforeWriteConfig
 from deerflow.config.reload_boundary import format_field_description
 from deerflow.config.run_events_config import RunEventsConfig
 from deerflow.config.run_ownership_config import RunOwnershipConfig
-from deerflow.config.runtime_paths import existing_project_file
+from deerflow.config.runtime_paths import project_root
 from deerflow.config.safety_finish_reason_config import SafetyFinishReasonConfig
 from deerflow.config.sandbox_config import SandboxConfig
 from deerflow.config.scheduler_config import SchedulerConfig
@@ -76,9 +74,7 @@ class LoggingConfig(BaseModel):
 def is_trace_correlation_enabled(config: Any) -> bool:
     '''当 *config* 的 ``logging.enhance.enabled`` 已设置时返回 ``True``。
 
-    此函数是请求链路关联开关的唯一事实来源，供 网关 的 ``TraceMiddleware`` 与
-    内嵌 ``DeerFlowClient`` 共用，确保两个入口不会在何时输出
-    ``deerflow_trace_id``（Langfuse 元数据）及何时绑定请求级追踪 ID 上产生偏差。
+    网关的 ``TraceMiddleware`` 使用此开关配置请求链路关联。
     接受任何通过 ``getattr`` 链暴露 ``logging.enhance.enabled`` 的对象
     （如 ``AppConfig``、``SimpleNamespace`` 测试夹具等）；缺失的中间属性会静默
     降级为 ``False``。
@@ -152,7 +148,6 @@ class AppConfig(BaseModel):
     summarization: SummarizationConfig = Field(default_factory=SummarizationConfig, description="Conversation summarization configuration")
     memory: MemoryConfig = Field(default_factory=MemoryConfig, description="Memory subsystem configuration")
     subagents: SubagentsAppConfig = Field(default_factory=SubagentsAppConfig, description="Subagent runtime configuration")
-    guardrails: GuardrailsConfig = Field(default_factory=GuardrailsConfig, description="Guardrail middleware configuration")
     input_polish: InputPolishConfig = Field(default_factory=InputPolishConfig, description="Pre-send input polishing configuration.")
     suggestions: SuggestionsConfig = Field(default_factory=SuggestionsConfig, description="Follow-up suggestions configuration.")
     circuit_breaker: CircuitBreakerConfig = Field(default_factory=CircuitBreakerConfig, description="LLM circuit breaker configuration")
@@ -172,7 +167,7 @@ class AppConfig(BaseModel):
         default_factory=DatabaseConfig,
         description=format_field_description(
             "database",
-            field_doc="PostgreSQL database backend for run/feedback metadata.",
+            field_doc="PostgreSQL database backend for checkpoints, graph storage, and application data.",
         ),
     )
     run_events: RunEventsConfig = Field(
@@ -187,13 +182,6 @@ class AppConfig(BaseModel):
         description=format_field_description(
             "scheduler",
             field_doc="Scheduled task runtime configuration (background poller for one-time and cron agent runs).",
-        ),
-    )
-    checkpointer: CheckpointerConfig | None = Field(
-        default=None,
-        description=format_field_description(
-            "checkpointer",
-            field_doc="LangGraph state-persistence checkpointer configuration.",
         ),
     )
     stream_bridge: StreamBridgeConfig | None = Field(
@@ -244,28 +232,22 @@ class AppConfig(BaseModel):
         优先级：
         1. 若提供 ``config_path`` 参数，则使用它。
         2. 若设置 ``DEER_FLOW_CONFIG_PATH`` 环境变量，则使用它。
-        3. 否则搜索调用方项目根目录。
-        4. 最后为兼容单体仓库而搜索旧版 backend/仓库根目录默认位置。
+        3. 否则使用项目根目录下的 ``config/config.yaml``。
         '''
         if config_path:
             path = Path(config_path)
             if not Path.exists(path):
                 raise FileNotFoundError(f"Config file specified by param `config_path` not found at {path}")
             return path
-        elif os.getenv("DEER_FLOW_CONFIG_PATH"):
-            path = Path(os.getenv("DEER_FLOW_CONFIG_PATH"))
+        if env_config_path := os.getenv("DEER_FLOW_CONFIG_PATH"):
+            path = Path(env_config_path)
             if not Path.exists(path):
                 raise FileNotFoundError(f"Config file specified by environment variable `DEER_FLOW_CONFIG_PATH` not found at {path}")
             return path
-        else:
-            project_config = existing_project_file(("config.yaml",))
-            if project_config is not None:
-                return project_config
-
-            for path in _legacy_config_candidates():
-                if path.exists():
-                    return path
-            raise FileNotFoundError("`config.yaml` file not found in the project root or legacy backend/repository root locations")
+        path = project_root() / "config" / "config.yaml"
+        if not path.is_file():
+            raise FileNotFoundError(f"Config file not found at {path}")
+        return path
 
     @classmethod
     def from_file(cls, config_path: str | None = None) -> Self:
@@ -317,25 +299,12 @@ class AppConfig(BaseModel):
     @classmethod
     def _apply_singleton_configs(cls, config: Self) -> None:
         '''将应用配置同步到运行时单例配置。'''
-        from deerflow.config.checkpointer_config import get_checkpointer_config
-
-        previous_checkpointer_config = get_checkpointer_config()
-
         load_title_config_from_dict(config.title.model_dump())
         load_summarization_config_from_dict(config.summarization.model_dump())
-        load_memory_config_from_dict(config.memory.model_dump())
+        set_memory_config(config.memory.model_copy(deep=True))
         load_subagents_config_from_dict(config.subagents.model_dump())
         load_tool_search_config_from_dict(config.tool_search.model_dump())
-        load_guardrails_config_from_dict(config.guardrails.model_dump())
-        load_checkpointer_config_from_dict(config.checkpointer.model_dump() if config.checkpointer is not None else None)
         load_stream_bridge_config_from_dict(config.stream_bridge.model_dump() if config.stream_bridge is not None else None)
-
-        if previous_checkpointer_config != config.checkpointer:
-            from deerflow.runtime.checkpointer import reset_checkpointer
-            from deerflow.runtime.store import reset_store
-
-            reset_checkpointer()
-            reset_store()
 
     @classmethod
     def resolve_env_variables(cls, config: Any) -> Any:
@@ -418,13 +387,6 @@ class AppConfig(BaseModel):
             找到时返回工具组配置，否则返回 None。
         '''
         return self._tool_groups_by_name.get(name)
-
-
-def _legacy_config_candidates() -> tuple[Path, ...]:
-    '''返回为兼容单体仓库而保留的源码树 config.yaml 位置。'''
-    backend_dir = Path(__file__).resolve().parents[2]
-    repo_root = backend_dir.parent
-    return (repo_root / "config" / "config.yaml", backend_dir / "config.yaml", repo_root / "config.yaml")
 
 
 _app_config: AppConfig | None = None

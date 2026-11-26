@@ -7,30 +7,26 @@
 #   DEERFLOW_URL=http://host:2026 bash chat.sh "你好"   # 指定服务地址
 # 环境变量：
 #   DEERFLOW_URL          — 统一代理基地址（默认：http://localhost:2026）
-#   DEERFLOW_GATEWAY_URL  — 网关接口基地址（默认：$DEERFLOW_URL）
-#   DEERFLOW_LANGGRAPH_URL — LangGraph 接口基地址（默认：$DEERFLOW_URL/api/langgraph）
 # 模式：flash、standard、pro（默认）、ultra
 
 set -euo pipefail
 
 DEERFLOW_URL="${DEERFLOW_URL:-http://localhost:2026}"
-GATEWAY_URL="${DEERFLOW_GATEWAY_URL:-$DEERFLOW_URL}"
-LANGGRAPH_URL="${DEERFLOW_LANGGRAPH_URL:-$DEERFLOW_URL/api/langgraph}"
 MESSAGE="${1:?用法：chat.sh <message> [thread_id] [mode]}"
 THREAD_ID="${2:-}"
 MODE="${3:-pro}"
 
 # --- 健康检查：请求前快速失败，避免创建无效会话 ---
-HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${GATEWAY_URL}/health" 2>/dev/null || echo "000")
+HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "${DEERFLOW_URL}/health" 2>/dev/null || echo "000")
 if [ "$HTTP_CODE" = "000" ] || [ "$HTTP_CODE" -ge 400 ]; then
-  echo "错误：无法连接 ${GATEWAY_URL} 的 DeerFlow（网络状态 ${HTTP_CODE}）" >&2
+  echo "错误：无法连接 ${DEERFLOW_URL} 的 DeerFlow（网络状态 ${HTTP_CODE}）" >&2
   echo "请确认 DeerFlow 已运行。启动命令：cd <deerflow-dir> && bash scripts/start.sh" >&2
   exit 1
 fi
 
 # --- 创建或复用 thread ---
 if [ -z "$THREAD_ID" ]; then
-  THREAD_RESP=$(curl -s -X POST "${LANGGRAPH_URL}/threads" \
+  THREAD_RESP=$(curl -s -X POST "${DEERFLOW_URL}/api/threads" \
     -H "Content-Type: application/json" \
     -d '{}')
   THREAD_ID=$(echo "$THREAD_RESP" | python3 -c "import sys,json; print(json.load(sys.stdin)['thread_id'])" 2>/dev/null)
@@ -91,12 +87,12 @@ ENDJSON
 TMPFILE=$(mktemp)
 trap "rm -f '$TMPFILE'" EXIT
 
-curl -s -N -X POST "${LANGGRAPH_URL}/threads/${THREAD_ID}/runs/stream" \
+curl -s -N -X POST "${DEERFLOW_URL}/api/threads/${THREAD_ID}/runs/stream" \
   -H "Content-Type: application/json" \
   -d "$BODY" > "$TMPFILE"
 
 # 解析 SSE 输出：提取最后一个 "event: values" 数据块并取得最终智能体消息。
-python3 - "$TMPFILE" "$GATEWAY_URL" "$THREAD_ID" << 'PYEOF'
+python3 - "$TMPFILE" "$DEERFLOW_URL" "$THREAD_ID" << 'PYEOF'
 import json
 import sys
 

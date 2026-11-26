@@ -301,8 +301,6 @@ def _provider_response(
     connection: dict[str, Any] | None = None,
 ) -> ChannelProviderResponse:
     '''构建面向当前用户的渠道提供商状态响应。'''
-    from server.gateway.auth_disabled import is_auth_disabled
-
     status, unavailable_reason = _provider_status(config, channels_config, provider)
     if unavailable_reason is not None:
         # 运行时提供商不可用时，不得将过期的 `connected` 记录仍报告为已连接；其余
@@ -313,10 +311,6 @@ def _provider_response(
             connection_status = "not_connected"
     elif connection:
         connection_status = connection["status"]
-    elif is_auth_disabled() and status["configured"] and unavailable_reason is None:
-        # 认证禁用的本地模式会将所有渠道消息路由至默认用户，因此已配置且运行中的
-        # 渠道无需用户级绑定。
-        connection_status = "connected"
     else:
         connection_status = "not_connected"
     credential_values = _credential_values(provider, channels_config)
@@ -367,7 +361,7 @@ def _provider_unavailable_reason(
 def _provider_config(config: ChannelConnectionsConfig, provider: str):
     '''返回已知提供商的连接配置，不接受任意配置属性。'''
     # 仅解析已知提供商。任意 `getattr` 会让请求提供的名称命中其他配置属性（如
-    # `enabled` / `require_bound_identity` 布尔值），绕过 404 并返回非提供商对象；
+    # `enabled` 布尔值），绕过 404 并返回非提供商对象；
     # 调用方随后按提供商配置解引用时会触发 `AttributeError`，最终变为 HTTP 500。
     if provider not in _PROVIDER_META:
         raise HTTPException(status_code=404, detail="Unknown channel provider")

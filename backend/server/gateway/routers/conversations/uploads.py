@@ -10,7 +10,7 @@ from typing import BinaryIO
 from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from pydantic import BaseModel, Field
 
-from server.gateway.authz import require_permission
+from server.gateway.authz import require_auth
 from server.gateway.deps import get_config
 from deerflow.config.app_config import AppConfig
 from deerflow.config.paths import get_paths
@@ -98,18 +98,16 @@ class UploadLimits(BaseModel):
 def _get_upload_limits(app_config: AppConfig) -> UploadLimits:
     '''从应用配置汇总每请求文件数、单文件和总大小限制。'''
     return UploadLimits(
-        max_files=_get_upload_limit(app_config, "max_files", DEFAULT_MAX_FILES, legacy_key="max_file_count"),
-        max_file_size=_get_upload_limit(app_config, "max_file_size", DEFAULT_MAX_FILE_SIZE, legacy_key="max_single_file_size"),
+        max_files=_get_upload_limit(app_config, "max_files", DEFAULT_MAX_FILES),
+        max_file_size=_get_upload_limit(app_config, "max_file_size", DEFAULT_MAX_FILE_SIZE),
         max_total_size=_get_upload_limit(app_config, "max_total_size", DEFAULT_MAX_TOTAL_SIZE),
     )
 
 
-def _get_upload_limit(app_config: AppConfig, key: str, default: int, *, legacy_key: str | None = None) -> int:
-    '''读取单项上传限制，并兼容旧配置键及无效值回退。'''
+def _get_upload_limit(app_config: AppConfig, key: str, default: int) -> int:
+    '''读取单项上传限制，无效值回退到默认值。'''
     try:
         value = _get_uploads_config_value(app_config, key, None)
-        if value is None and legacy_key is not None:
-            value = _get_uploads_config_value(app_config, legacy_key, None)
         if value is None:
             value = default
         limit = int(value)
@@ -245,7 +243,7 @@ def _sync_upload_to_sandbox(sandbox, file_path: os.PathLike[str] | str, virtual_
 
 
 @router.post("", response_model=UploadResponse)
-@require_permission("threads", "write", owner_check=True, require_existing=False)
+@require_auth(owner_check=True, require_existing=False)
 async def upload_files(
     thread_id: str,
     request: Request,
@@ -369,7 +367,7 @@ async def upload_files(
 
 
 @router.get("/limits", response_model=UploadLimits)
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def get_upload_limits(
     thread_id: str,
     request: Request,
@@ -392,7 +390,7 @@ def _list_uploaded_files_for_thread(thread_id: str, user_id: str) -> dict:
 
 
 @router.get("/list", response_model=UploadListResponse)
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def list_uploaded_files(thread_id: str, request: Request) -> UploadListResponse:
     '''列出当前线程上传目录中可见的文件及其元数据。'''
     try:
@@ -404,7 +402,7 @@ async def list_uploaded_files(thread_id: str, request: Request) -> UploadListRes
 
 
 @router.delete("/{filename}")
-@require_permission("threads", "delete", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def delete_uploaded_file(thread_id: str, filename: str, request: Request) -> dict:
     '''删除当前线程上传目录中的指定文件。'''
     try:

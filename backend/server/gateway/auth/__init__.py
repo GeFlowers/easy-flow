@@ -12,7 +12,10 @@ from server.gateway.auth.password import hash_password, verify_password
 from server.gateway.auth.providers import AuthProvider
 from server.gateway.user_repository import SQLUserRepository, UserNotFoundError
 
+AUTH_SOURCE_SESSION = "session"
+
 __all__ = [
+    "AUTH_SOURCE_SESSION",
     # 配置
     "AuthConfig",
     "get_auth_config",

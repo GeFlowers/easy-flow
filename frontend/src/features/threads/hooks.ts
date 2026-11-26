@@ -70,12 +70,6 @@ type SendMessageOptions = {
   onSent?: () => void;
 };
 
-type ThreadDeleteClient = {
-  threads: {
-    delete: (threadId: string) => Promise<unknown>;
-    search: (query: Record<string, unknown>) => Promise<AgentThread[]>;
-  };
-};
 
 type ThreadSidecarSearchClient = {
   threads: {
@@ -2079,8 +2073,8 @@ export function useRunDetail(threadId: string, runId: string) {
   });
 }
 
-/** 删除浏览器中与线程关联的本地数据。 */
-async function deleteLocalThreadData(threadId: string) {
+/** 请求网关删除会话及其持久化数据。 */
+async function deleteThread(threadId: string) {
   const response = await fetch(
     `${getBackendBaseURL()}/api/threads/${encodeURIComponent(threadId)}`,
     {
@@ -2088,25 +2082,12 @@ async function deleteLocalThreadData(threadId: string) {
     },
   );
 
-  // 404 表示线程已不存在，正是期望的最终状态。先前的 `apiClient.threads.delete`
-  // 调用命中同一网关处理器（nginx 将 /api/langgraph/threads/* 重写为
-  // /api/threads/*）并删除 thread_meta 行，因此第二次删除会被所有权守卫拒绝为
-  // 404。将其视为成功，以保持删除操作幂等。
-  if (!response.ok && response.status !== 404) {
+  if (!response.ok) {
     const error = await response
       .json()
       .catch(() => ({ detail: "Failed to delete local thread data." }));
-    throw new Error(error.detail ?? "Failed to delete local thread data.");
+    throw new Error(error.detail ?? "Failed to delete thread.");
   }
-}
-
-/** 在远端与本地删除单个线程。 */
-async function deleteThreadEverywhere(
-  apiClient: ThreadDeleteClient,
-  threadId: string,
-) {
-  await apiClient.threads.delete(threadId);
-  await deleteLocalThreadData(threadId);
 }
 
 /** 查找指定父线程关联的所有侧栏线程标识。 */
@@ -2151,7 +2132,7 @@ export async function findSidecarThreadIdsForParent(
 
 /** 删除父线程关联的侧栏线程。 */
 async function deleteSidecarThreadsForParent(
-  apiClient: ThreadDeleteClient,
+  apiClient: ThreadSidecarSearchClient,
   parentThreadId: string,
 ) {
   let sidecarThreadIds: string[];
@@ -2169,9 +2150,7 @@ async function deleteSidecarThreadsForParent(
   }
 
   const results = await Promise.allSettled(
-    sidecarThreadIds.map((threadId) =>
-      deleteThreadEverywhere(apiClient, threadId),
-    ),
+    sidecarThreadIds.map(deleteThread),
   );
 
   const failedDeletions = results
@@ -2199,7 +2178,7 @@ async function deleteSidecarThreadsForParent(
 /** 创建删除线程及其侧栏子线程的变更操作。 */
 export function useDeleteThread() {
   const queryClient = useQueryClient();
-  const apiClient = getAPIClient() as ThreadDeleteClient;
+  const apiClient = getAPIClient() as ThreadSidecarSearchClient;
   return useMutation({
     mutationFn: async ({
       threadId,
@@ -2212,9 +2191,8 @@ export function useDeleteThread() {
         apiClient,
         threadId,
       );
-      await apiClient.threads.delete(threadId);
+      await deleteThread(threadId);
       onRemoteDeleted?.();
-      await deleteLocalThreadData(threadId);
       return deletedSidecarThreadIds;
     },
     /** 删除成功后从普通列表和分页缓存移除主线程及其侧边线程。 */

@@ -9,14 +9,13 @@ from collections.abc import AsyncIterator
 from langgraph.store.base import BaseStore
 
 from deerflow.config.app_config import AppConfig, get_app_config
-from deerflow.runtime.store.provider import (
-    POSTGRES_CONN_REQUIRED,
-    POSTGRES_STORE_INSTALL,
-    _resolve_store_config,
-)
+from deerflow.persistence.langgraph_schema import ensure_langgraph_schema_async
 
 logger = logging.getLogger(__name__)
 
+POSTGRES_STORE_INSTALL = (
+    "langgraph-checkpoint-postgres is required for the PostgreSQL store. Install the package extra with: pip install 'deer-flow[postgres]' (or use: uv sync --all-packages --extra postgres when developing locally)"
+)
 
 
 @contextlib.asynccontextmanager
@@ -25,29 +24,16 @@ async def make_store(app_config: AppConfig | None = None) -> AsyncIterator[BaseS
     if app_config is None:
         app_config = get_app_config()
 
-    config = _resolve_store_config(app_config)
-    async with _async_store(config) as store:
+    connection_string = app_config.database.postgres_url
+    if not connection_string:
+        raise ValueError("database.postgres_url is required for the postgres backend")
+
+    try:
+        from langgraph.store.postgres.aio import AsyncPostgresStore
+    except ImportError as exc:
+        raise ImportError(POSTGRES_STORE_INSTALL) from exc
+
+    async with AsyncPostgresStore.from_conn_string(connection_string) as store:
+        await ensure_langgraph_schema_async(connection_string, 'store')
+        logger.info("Store: using AsyncPostgresStore")
         yield store
-
-
-@contextlib.asynccontextmanager
-async def _async_store(config) -> AsyncIterator[BaseStore]:
-    '''创建并初始化异步 PostgreSQL 存储器，离开上下文时关闭连接。'''
-    if config.type == "postgres":
-        try:
-            from langgraph.store.postgres.aio import AsyncPostgresStore  # type: ignore[import]
-        except ImportError as exc:
-            raise ImportError(POSTGRES_STORE_INSTALL) from exc
-
-        if not config.connection_string:
-            raise ValueError(POSTGRES_CONN_REQUIRED)
-
-        async with AsyncPostgresStore.from_conn_string(config.connection_string) as store:
-            from deerflow.persistence.langgraph_schema import ensure_langgraph_schema_async
-
-            await ensure_langgraph_schema_async(config.connection_string, 'store')
-            logger.info("Store: using AsyncPostgresStore")
-            yield store
-        return
-
-    raise ValueError(f"Unknown store backend type: {config.type!r}")

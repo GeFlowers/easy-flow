@@ -38,7 +38,7 @@ class SkillResponse(BaseModel):
     name: str = Field(..., description="Name of the skill")
     description: str = Field(..., description="Description of what the skill does")
     license: str | None = Field(None, description="License information")
-    category: SkillCategory = Field(..., description="Category of the skill (public, custom, or legacy)")
+    category: SkillCategory = Field(..., description="Category of the skill (public or custom)")
     enabled: bool = Field(default=True, description="Whether this skill is enabled")
     editable: bool = Field(default=False, description="Whether this skill can be edited/deleted (true only for custom)")
 
@@ -167,7 +167,7 @@ async def install_skill(body: SkillInstallRequest, config: AppConfig = Depends(g
 
 @router.get("/skills/custom", response_model=SkillsListResponse, summary="List Custom Skills")
 async def list_custom_skills(config: AppConfig = Depends(get_config)) -> SkillsListResponse:
-    '''仅列出当前用户可编辑的自定义技能；只读旧版共享技能由完整技能列表接口提供。'''
+    '''列出当前用户可编辑的自定义技能。'''
     try:
         skills = [skill for skill in _get_user_skill_storage(config).load_skills(enabled_only=False) if skill.category == SkillCategory.CUSTOM]
         return SkillsListResponse(skills=[_skill_to_response(skill) for skill in skills])
@@ -404,7 +404,7 @@ async def update_skill(skill_name: str, body: SkillUpdateRequest, config: AppCon
         if skill is None:
             raise HTTPException(status_code=404, detail=f"Skill '{skill_name}' not found")
 
-        # PUBLIC 技能写入全局 extensions_config.json（共享状态）；CUSTOM / LEGACY 技能写入用户各自的
+        # PUBLIC 技能写入全局 extensions_config.json（共享状态）；CUSTOM 技能写入用户各自的
         # _skill_states.json（隔离状态），因此不同用户可独立切换同名自定义技能。
         if skill.category == SkillCategory.PUBLIC:
             config_path = ExtensionsConfig.resolve_write_path()
@@ -423,7 +423,7 @@ async def update_skill(skill_name: str, body: SkillUpdateRequest, config: AppCon
             logger.info(f"Skills configuration updated and saved to: {config_path}")
             reload_extensions_config()
         else:
-            # CUSTOM / LEGACY：写入当前用户的技能状态。
+            # CUSTOM：写入当前用户的技能状态。
             from deerflow.skills.storage.user_scoped_skill_storage import UserScopedSkillStorage
 
             if isinstance(storage, UserScopedSkillStorage):
@@ -442,7 +442,7 @@ async def update_skill(skill_name: str, body: SkillUpdateRequest, config: AppCon
                 reload_extensions_config()
 
         # PUBLIC 技能状态保存在全局 extensions_config.json，会影响所有用户，因此必须清除所有用户的
-        # 提示缓存。CUSTOM / LEGACY 状态按用户保存，只需清除当前用户的缓存。
+        # 提示缓存。CUSTOM 状态按用户保存，只需清除当前用户的缓存。
         if skill.category == SkillCategory.PUBLIC:
             # clear_skills_system_prompt_cache 是同步函数，因此在线程池中执行以避免阻塞事件循环。
             # 其内部锁开销很小；采用异步包装也能保持测试替身接口一致（测试会替换异步版本）。

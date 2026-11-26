@@ -2,7 +2,7 @@
 
 import { Client as LangGraphClient } from "@langchain/langgraph-sdk/client";
 
-import { getLangGraphBaseURL } from "../config";
+import { getAPIBaseURL } from "../config";
 
 import { isStateChangingMethod, readCsrfCookie } from "./fetcher";
 import { sanitizeRunStreamOptions } from "./stream-mode";
@@ -12,8 +12,7 @@ import { sanitizeRunStreamOptions } from "./stream-mode";
  * Cookie 生成 ``X-CSRF-Token`` 请求头。
  *
  * 每次请求读取 Cookie（而非在构造 SDK 时写入 ``defaultHeaders``）可透明处理
- * 登录、登出及修改密码导致的 Cookie 轮换。``/api/langgraph/*`` SDK 路径和
- * ``fetcher.ts:fetchWithAuth`` 中的直连 REST 端点共用
+ * 登录、登出及修改密码导致的 Cookie 轮换。对话客户端和普通接口请求共用
  * :func:`readCsrfCookie` 与 :const:`STATE_CHANGING_METHODS`，从而保持该约定同步。
  */
 function injectCsrfHeader(_url: URL, init: RequestInit): RequestInit {
@@ -148,12 +147,10 @@ export function clearReconnectRun(
   }
 }
 
-/** 创建兼容 Gateway、CSRF 保护、终态重连和流模式约束的 LangGraph 客户端。 */
-function createCompatibleClient(): LangGraphClient {
-  const apiUrl = getLangGraphBaseURL();
-  console.log(`Creating API client with base URL: ${apiUrl}`);
+/** 创建带请求保护、终态重连和流模式约束的对话客户端。 */
+function createAPIClient(): LangGraphClient {
   const client = new LangGraphClient({
-    apiUrl,
+    apiUrl: getAPIBaseURL(),
     onRequest: injectCsrfHeader,
   });
 
@@ -210,8 +207,8 @@ function createCompatibleClient(): LangGraphClient {
 }
 
 let client: LangGraphClient | undefined;
-/** 获取并缓存兼容 Gateway 的 LangGraph 客户端。 */
+/** 获取并缓存当前站点的对话客户端。 */
 export function getAPIClient(): LangGraphClient {
-  client ??= createCompatibleClient();
+  client ??= createAPIClient();
   return client;
 }

@@ -14,7 +14,7 @@ from langgraph.checkpoint.base import empty_checkpoint, uuid6
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy.exc import IntegrityError
 
-from server.gateway.authz import require_permission
+from server.gateway.authz import require_auth
 from server.gateway.deps import get_checkpointer, get_run_manager
 from server.gateway.internal_auth import get_trusted_internal_owner_user_id
 from deerflow.config.paths import Paths, get_paths
@@ -240,7 +240,7 @@ def _delete_thread_data(thread_id: str, paths: Paths | None = None, *, user_id: 
 
 
 @router.delete("/{thread_id}", response_model=ThreadDeleteResponse)
-@require_permission("threads", "delete", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def delete_thread_data(thread_id: str, request: Request) -> ThreadDeleteResponse:
     '''删除指定线程保存在本地文件系统中的用户数据。
 
@@ -517,7 +517,7 @@ def _ignore_branch_user_data(directory: str, names: list[str]) -> set[str]:
 
 
 @router.post("/{thread_id}/branches", response_model=ThreadBranchResponse)
-@require_permission("threads", "write", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def branch_thread(thread_id: str, body: ThreadBranchRequest, request: Request) -> ThreadBranchResponse:
     '''从已完成的助手轮次创建新线程，并仅在目标为最新轮次时复制当前工作区。'''
     from server.gateway.deps import get_thread_store
@@ -636,7 +636,7 @@ async def search_threads(body: ThreadSearchRequest, request: Request) -> list[Th
 
 
 @router.patch("/{thread_id}", response_model=ThreadResponse)
-@require_permission("threads", "write", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def patch_thread(thread_id: str, body: ThreadPatchRequest, request: Request) -> ThreadResponse:
     '''将请求元数据合并到线程记录，并返回更新后的线程响应。'''
     from server.gateway.deps import get_thread_store
@@ -684,7 +684,7 @@ def _derive_thread_status(checkpoint_tuple) -> str:
 
 
 @router.get("/{thread_id}", response_model=ThreadResponse)
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
     '''读取线程元数据及当前用户可见的状态信息。
 
@@ -738,7 +738,7 @@ async def get_thread(thread_id: str, request: Request) -> ThreadResponse:
 
 
 @router.get("/{thread_id}/goal", response_model=ThreadGoalResponse)
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def get_thread_goal(thread_id: str, request: Request) -> ThreadGoalResponse:
     '''返回线程当前活动目标；尚未设置时返回空值。'''
     checkpointer = get_checkpointer(request)
@@ -781,7 +781,7 @@ async def _ensure_thread_for_goal(thread_id: str, request: Request) -> None:
 
 
 @router.put("/{thread_id}/goal", response_model=ThreadGoalResponse)
-@require_permission("threads", "write", owner_check=True)
+@require_auth(owner_check=True)
 async def set_thread_goal(thread_id: str, body: ThreadGoalRequest, request: Request) -> ThreadGoalResponse:
     '''创建或替换线程活动目标；若线程尚无检查点则在写入前补建。'''
     checkpointer = get_checkpointer(request)
@@ -799,7 +799,7 @@ async def set_thread_goal(thread_id: str, body: ThreadGoalRequest, request: Requ
 
 
 @router.delete("/{thread_id}/goal", response_model=ThreadGoalResponse)
-@require_permission("threads", "write", owner_check=True)
+@require_auth(owner_check=True)
 async def clear_thread_goal(thread_id: str, request: Request) -> ThreadGoalResponse:
     '''清除线程活动目标；线程或检查点不存在时仍返回空目标。'''
     checkpointer = get_checkpointer(request)
@@ -829,7 +829,7 @@ def _thread_compact_response(result: ThreadCompactionResult) -> ThreadCompactRes
 
 
 @router.post("/{thread_id}/compact", response_model=ThreadCompactResponse)
-@require_permission("threads", "write", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def compact_thread(thread_id: str, body: ThreadCompactRequest, request: Request) -> ThreadCompactResponse:
     '''在没有进行中运行时压缩线程上下文，并保留近期可见消息。'''
     run_manager = get_run_manager(request)
@@ -861,7 +861,7 @@ async def compact_thread(thread_id: str, body: ThreadCompactRequest, request: Re
 
 
 @router.get("/{thread_id}/state", response_model=ThreadStateResponse)
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def get_thread_state(thread_id: str, request: Request) -> ThreadStateResponse:
     '''读取线程最新的 LangGraph 状态快照。
 
@@ -912,7 +912,7 @@ async def get_thread_state(thread_id: str, request: Request) -> ThreadStateRespo
 
 
 @router.post("/{thread_id}/state", response_model=ThreadStateResponse)
-@require_permission("threads", "write", owner_check=True, require_existing=True)
+@require_auth(owner_check=True, require_existing=True)
 async def update_thread_state(thread_id: str, body: ThreadStateUpdateRequest, request: Request) -> ThreadStateResponse:
     '''把指定字段合并到最新检查点，并同步更新线程标题索引。'''
     from server.gateway.deps import get_thread_store
@@ -1025,7 +1025,7 @@ def _ai_message_lacks_duration(message: dict[str, Any]) -> bool:
 
 
 @router.post("/{thread_id}/history", response_model=list[HistoryEntry])
-@require_permission("threads", "read", owner_check=True)
+@require_auth(owner_check=True)
 async def get_thread_history(
     thread_id: str,
     body: ThreadHistoryRequest,

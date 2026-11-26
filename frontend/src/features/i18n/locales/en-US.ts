@@ -701,7 +701,7 @@ export const enUS: Translations = {
       createSkill: "Create skill",
       emptyTitle: "No agent skill yet",
       emptyDescription:
-        "Put your agent skill folders under the `/skills/custom` folder under the root folder of DeerFlow.",
+        "Create a skill to add it to your account.",
       emptyButton: "Create Your First Skill",
     },
     notification: {

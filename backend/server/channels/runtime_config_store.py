@@ -17,7 +17,7 @@ RUNTIME_CHANNEL_DISABLED_FLAG = "_runtime_disabled"
 class ChannelRuntimeConfigStore:
     '''以本地 JSON 文件保存界面录入的通道凭据与启停状态。
 
-    该存储刻意保持与 ``ChannelStore`` 相同的轻量方案，使本地或私有部署无需公开
+    该存储采用本地文件，使本地或私有部署无需公开
     回调地址，也无需直接编辑 ``config.yaml``，即可跨进程重启保留通道配置。
     '''
 
